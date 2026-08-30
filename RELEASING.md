@@ -10,6 +10,18 @@ hand, or manual and ordered so the irreversible steps come last.
 
 ## Before you tag
 
+Run this first. It is the mechanical half of everything below, and it takes a
+second:
+
+```
+python tools/release/check.py --version X.Y.Z
+```
+
+It reports and changes nothing. Every row in it exists because that thing was
+wrong once and nothing noticed. What it cannot check it prints at the end
+under "Still yours", so a step that needs judgement is visible rather than
+implied.
+
 ### 1. Version locations
 
 `pt.version()` is a published fact and these must agree:
@@ -51,13 +63,25 @@ the time you see the failure the wheels are already on PyPI, which is the one
 step that cannot be undone. Write the section before you tag, not after.
 
 Write prose, with no em dashes or en dashes anywhere;
-`tests/test_brand_commitments.py` enforces that on `CHANGELOG.md`.
+`tests/test_brand_commitments.py` enforces that on `CHANGELOG.md`, and
+`tools/prose/prose.py` checks the rest of the house style.
 
-**Lead the section, then mark where the lead ends.** The whole section is what
-`release.yml` publishes as the GitHub release note and what the release-notes
-page renders, and this project writes changelog sections as essays: 0.3.0 ran
-to 2,370 words across eight subsections, which is the right permanent record
-and an unreadable release page.
+**250 words above the marker.** That is the budget, and
+`tests/test_prose.py` fails over it. Everything above
+`<!-- release-note-ends -->` is what `release.yml` publishes as the GitHub
+release note and what the release-notes page renders; everything below it is
+kept and not published.
+
+The budget exists because this project used to write changelog sections as
+essays and they grew: 0.3.0 ran to 375 words, 0.6.0 reached 1,257 against a
+median of 139 across the twelve sections before it. A reader on a release
+page wants what changed, what breaks, what to pin and what got worse. 250 is
+not tight: 0.4.0 (233) and 0.2.0 (240) both moved the default preset and
+explained themselves inside it.
+
+The budget binds the newest section only. The ones below it were published
+under their tags, and rewriting a release note afterwards edits a record
+somebody may have read.
 
 ```markdown
 ## X.Y.Z
@@ -77,10 +101,20 @@ publishes whole, as every version before 0.3.0 does.
 ### 3. Full suite including the slow half and Rust
 
 ```
+maturin develop --release          # FIRST, and not optional either
 python -m pytest tests/ -q
 TRADEFLOOR_SLOW_TESTS=1 python -m pytest tests/test_examples.py -q
 cd rust && cargo test --offline
 ```
+
+**Rebuild before you read any of it.** The suite compares a source tree
+against a compiled extension, so a tree that has moved past its build reports
+drift everywhere and none of it is real. On 2026-08-30 an extension exposing
+101 settable parameters against a tree carrying 106 produced thirteen
+failures across `test_atlas` and the survey files, all of them phantom, and
+the first reading of them was that another branch had broken `main`.
+`tools/release/check.py` reports the mismatch as its first row for the same
+reason.
 
 The third line is not optional and was learned the hard way at 0.2.0. The
 Python suite does not run the crate's own unit tests, so `cargo test` sat
@@ -200,7 +234,11 @@ branch:
 
 **5.1 Re-vendor what the site checks itself against**, from this tag:
 `pyproject.toml`, `rust/src/params.rs`, `python/tradefloor/_core.pyi`,
-`measurements/`, `rust/goldens/*.json`, `examples/data/`. That repo's README
+`measurements/`, `rust/goldens/*.json`, `examples/data/`,
+`python/tradefloor/presets/*.json` and `tools/prose/prose.py`. The last two
+are new: the preset records carry the measured panel the site publishes, and
+`prose.py` is canonical here now rather than in the docs repo, so both trees
+are checked by one copy of the rules. That repo's README
 lists each one and why it is there. The site builds its parameter and API
 reference out of these, so a stale copy is a page that describes the previous
 release.
@@ -242,15 +280,69 @@ next build writes. A tree still dirty on the third run is a bug, not churn.
 
 ### 5b. If this release moves the default preset
 
-Almost every measured figure the site publishes was measured under one preset,
-and almost none of them say which. When the default moved from `pt-v12` to
-`pt-v14`, nothing re-measured: six pages went on quoting pt-v12 numbers until
-2026-08-29, reporting a pooled capture of +0.783 where the shipped default
-gives +0.878, and a sign test of 9-3 where it is 11-1. Two pages also printed
-a `separation()` shape the function has never returned.
+The rarest release and the one that touches most. Everything below moved at
+0.6.0, and the ones marked NEW were found by breaking rather than by being on
+a list.
 
-So when `model_preset()` changes, re-measure the published grid and sweep the
-docs repo for what it replaces:
+**What a default move changes, in order:**
+
+**1. The certified envelope.** `envelope.PRESET`, `CERTIFIED` and
+`MEASURED_504` describe the shipped default by the module's own contract, and
+`tests/test_envelope.py` asserts `model_preset()["name"] == envelope.PRESET`.
+Measure the new preset beside the outgoing one in a single paired run, so the
+comparison is not two runs on two days.
+
+**2. The preset record**, generated rather than typed:
+
+```
+python tools/presets/record.py --panel <the preset_panel artefact>
+python tools/presets/record.py --panel <the same artefact> --check
+```
+
+One JSON per preset under `python/tradefloor/presets/`, shipped in the wheel,
+read by `tradefloor.preset_record` and by the site.
+`tests/test_preset_records.py` binds the record for `envelope.PRESET` to
+`CERTIFIED` and `MEASURED_504`, so the panel and the preset it describes
+cannot disagree. That binding is what 0.6.0 lacked: the panel was re-typed by
+hand and `DECAY_252` beside it was not, and nothing failed.
+
+**3. The determinism baseline.** Every seeded trajectory changes, so
+`KAT_VERSION` bumps and `tests/known_answer.json` is regenerated. Produce the
+new digest on two architectures before committing it; the baseline note
+records that it was, and at 0.6.0 a Windows build and a Graviton box agreed
+before the five-target gate ever ran.
+
+**4. Test expectations pinned to the old default.** NEW, and the largest
+unplanned piece of 0.6.0, where six broke in three shapes:
+
+- a dial that was inert becomes live, so its perturbation entry flips
+- a scenario stops reaching a threshold because the new preset runs calmer,
+  which a non-vacuity guard reports as "this proves nothing"
+- a documented invariant stops holding
+
+Re-measure each expectation. Do not relax one. Keep the replaced value in the
+comment beside it: those comments are how the fifth momentum and
+mean-reversion swap was recognised as the fifth.
+
+**5. Anything recorded and keyed to the market.** NEW. A replay fixture keyed
+to the exact text an agent was sent dies when the market moves.
+`tests/fixtures/finrobot/rate-shock.json` had to be re-recorded live against
+the model at 0.6.0. Grep `tests/fixtures/` for anything a market change
+invalidates before assuming the suite covers it.
+
+**6. Prose that names the preset.** NEW. `README.md` states the default twice
+and neither line is a version location, so nothing in step 1 catches them.
+`tools/release/check.py` now does. Also sweep `python/` for prose figures:
+`scenario.py` and `interventions.py` both described a boundary that a preset
+had moved.
+
+**7. The published grid, and the site.** Almost every figure the site
+publishes was measured under one preset and almost none say which. When the
+default moved from `pt-v12` to `pt-v14`, nothing re-measured: six pages went
+on quoting pt-v12 numbers until 2026-08-29, reporting a pooled capture of
++0.783 where the shipped default gives +0.878, and a sign test of 9-3 where
+it is 11-1. Two pages also printed a `separation()` shape the function has
+never returned.
 
 ```python
 u = tf.Universe.random(30, seed=11)
@@ -268,25 +360,11 @@ write the preset beside it.
 `tools/remeasure/inventory.json`, which lives in this repository and was never
 vendored, so the prose-figure check does not run there at all.
 
-### 5b-ii. Write the preset record
-
-```
-python tools/presets/record.py --panel <the preset_panel artefact>
-python tools/presets/record.py --panel <the same artefact> --check
-```
-
-The panel from the step above is a scratch file; the record is the committed
-form of it. One JSON per preset under `python/tradefloor/presets/`, shipped in
-the wheel, read by `tradefloor.preset_record` and by the documentation site.
-
-`tests/test_preset_records.py` binds the record for `envelope.PRESET` to
-`CERTIFIED` and `MEASURED_504`, so the panel and the preset it describes can
-no longer disagree. That binding is what 0.6.0 lacked: the panel was re-typed
-by hand and `DECAY_252` beside it was not, and nothing failed.
-
-Records exist for the presets the project publishes figures about rather than
-for all of them, because each one costs a measurement.
-`tradefloor.preset_records()` is the honest list of which.
+**What a default move does NOT change.** A figure measured under a preset
+that is still selectable stays true; it just stops describing the default. Say
+which preset it describes rather than deleting it. Where a constant could not
+be re-measured in time, mark it in place: `DECAY_252` and `DECAY_SLOPE` carry
+that mark today.
 
 ### 5c. Document the API this release makes public
 
@@ -492,13 +570,21 @@ one still 404s after ten minutes, the build failed and the crate page says why.
   ```
   The second is the path that was broken in 0.1.0 and nobody noticed until
   the release had gone out.
-- **There is no Pages deploy workflow.** `.github/workflows/` holds exactly
-  two files, `determinism.yml` and `release.yml`. The site is the committed
-  `docs/` tree (56 tracked files, including `.nojekyll`), so it is only as
-  current as the last hand-run of `build_site.py` in step 5, and it changes
-  only when that rebuild is committed and pushed. Nothing fails if you skip
-  it; the site just goes on describing the previous release. Check it serves:
-  `curl -sI https://tradefloor.dev/`.
+- **Verify what was published, not that publishing happened.** Install the
+  wheel from PyPI and ask it what it is:
+  ```
+  python -c "import tradefloor as tf; print(tf.version(), tf.model_preset()['name'])"
+  ```
+  Then reproduce the determinism digest inside it against
+  `tests/known_answer.json` from the tag. That pair is what catches a tag cut
+  from the wrong commit, which no amount of local green will show you. At
+  0.6.0 both agreed, which is how the published envelope was known to
+  describe the preset the wheel actually runs.
+- **The site deploys from its own repository.** `docs/`, `tools/docs/` and
+  `build_site.py` left this repository at 0.5.0. There is no Pages workflow
+  here and no committed `docs/` tree; `.github/workflows/` holds
+  `determinism.yml`, `release.yml` and `suite.yml`. Step 5 is the whole of
+  what the site needs. Check it serves: `curl -sI https://tradefloor.dev/`.
 - Submit the sitemap in Search Console if the page set changed. Google
   removed the ping endpoint in 2024, so it is a manual step.
 
