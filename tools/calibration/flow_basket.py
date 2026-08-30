@@ -11,7 +11,21 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import os
 CELLS = {"v16": {}}
-if os.environ.get("FLOW_GRID", "one") == "three":
+if os.environ.get("FLOW_GRID", "one") == "four":
+    # Screen four (round 141): threshold 50 -- ABOVE the held-45
+    # instrument entirely (lever/co clean by construction), hotter gain
+    # to compensate for fewer active days in the crash window.
+    def c(g, th, k):
+        o = {"forced_flow_gain": g, "forced_flow_threshold": th}
+        if k: o["forced_flow_beta_exponent"] = k
+        return o
+    CELLS.update({
+        "g200t50k2": c(0.002, 50.0, 2.0),
+        "g300t50k2": c(0.003, 50.0, 2.0),
+        "g400t50k2": c(0.004, 50.0, 2.0),
+        "g300t55k2": c(0.003, 55.0, 2.0),
+    })
+elif os.environ.get("FLOW_GRID", "one") == "three":
     # Screen three (round 140): the frontier corners — hot dose x strong
     # concentration.
     def c(g, th, k):
