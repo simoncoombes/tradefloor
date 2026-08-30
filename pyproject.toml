@@ -9,7 +9,7 @@ description = "A reproducible evaluation environment for financial AI agents."
 readme = "README.md"
 requires-python = ">=3.11"
 # Dual-licensed, the Rust-ecosystem norm. See LICENSE-APACHE and LICENSE-MIT
-# at the repository root, and DECISIONS.md in pretium-design for the
+# at the repository root, and DECISIONS.md in tradefloor-design for the
 # reasoning that superseded an earlier Apache-2.0-only decision.
 license = "MIT OR Apache-2.0"
 # Declared explicitly, and it has to be. Left to itself maturin finds the
@@ -113,7 +113,7 @@ finrobot = [
 # `python -m tradefloor ...` is the same command tree without the script.
 tradefloor = "tradefloor.__main__:main"
 # Speaks MCP over stdio. Point an MCP client at `tradefloor-mcp` with no
-# arguments; see docs/mcp.md for a client configuration block.
+# arguments; see tradefloor-docs: docs/mcp.md for a client configuration block.
 tradefloor-mcp = "tradefloor.mcp:main"
 
 [tool.maturin]
