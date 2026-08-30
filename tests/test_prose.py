@@ -51,7 +51,7 @@ def test_the_house_style_holds_across_the_published_prose():
     out = subprocess.run([sys.executable, str(CHECKER)], cwd=ROOT,
                          capture_output=True, text=True, encoding="utf-8")
     assert out.returncode == 0, out.stderr
-    assert out.stdout.strip().endswith("0 findings across 5 files"), (
+    assert out.stdout.strip().endswith("0 findings across 6 files"), (
         "the house style is broken somewhere in this repository's prose:\n"
         + out.stdout
     )
@@ -90,8 +90,8 @@ def test_every_section_that_carries_the_marker_carries_it_once():
 
 
 @pytest.mark.parametrize("name", ["README.md", "CHANGELOG.md",
-                                  "CONTRIBUTING.md", "PRODUCT.md",
-                                  "RELEASING.md"])
+                                  "CONTRIBUTING.md", "CONTENT.md",
+                                  "PRODUCT.md", "RELEASING.md"])
 def test_the_prose_files_the_checker_defaults_to_all_exist(name):
     """A checker that silently skips a missing file reports green.
 

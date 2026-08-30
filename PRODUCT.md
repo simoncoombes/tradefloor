@@ -145,9 +145,15 @@ Rules, set by the plan owner:
 
 When a sentence could open a blog post, rewrite it.
 
-`tools/docs/learn/prose.py` in `tradefloor-docs` checks the mechanical rules
-and reports file, line and text. It cannot see register, so a clean run is not
-a passing grade.
+`tools/prose/prose.py` checks the mechanical rules and reports file, line and
+text. It is canonical in this repository and `tradefloor-docs` vendors it, so
+one copy of the rules checks both trees. It cannot see register, so a clean
+run is not a passing grade.
+
+This section is the register: what the writing sounds like. `CONTENT.md` is
+the other half, and holds the budgets and the per-surface rules, including
+how long a release note may run and which surfaces name the default preset in
+prose.
 <!-- prose: on -->
 
 Dual-licensed MIT OR Apache-2.0, at the user's option, which is the
