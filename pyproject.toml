@@ -90,8 +90,8 @@ mcp = ["mcp>=2.0"]
 # needs >=3.11.
 finrobot = [
   "finrobot>=0.1.5",
-  "pyautogen[retrievechat]>=0.2.19,<0.3",
-  "anthropic>=0.30,<1.0",
+  "pyautogen[retrievechat]>=0.2.19,<0.11",
+  "anthropic>=0.30,<2.0",
   "finnhub-python",
   "yfinance",
   "sec-api",

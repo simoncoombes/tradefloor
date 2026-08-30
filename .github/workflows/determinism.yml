@@ -132,9 +132,9 @@ jobs:
         include: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           # The abi3 floor. One wheel per platform covers this and every
           # later CPython, so the matrix does not multiply by Python version.
@@ -239,7 +239,7 @@ jobs:
             tests/test_mcp_integration.py \
             tests/test_gym.py
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: digest-${{ matrix.target }}
           path: ${{ runner.temp }}/digest-${{ matrix.target }}.txt
@@ -249,7 +249,7 @@ jobs:
     needs: [setup, digest]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: digest-*
           merge-multiple: true
