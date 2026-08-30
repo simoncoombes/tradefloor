@@ -15,13 +15,13 @@ pt-v16 is the first preset to hold the complete card at the deepest standard
 this programme runs, over twenty-six seed blocks at one hundred seeds each,
 thirteen of the blocks never touched by any search:
 
-| | `pt-v16` | the pre-trim candidate |
+| | `pt-v16` as shipped | the pre-trim candidate |
 |---|---|---|
-| 504-day full house | **26 of 26** | 24 of 26 |
-| crisis co-movement in range | 26 of 26, spread 0.0406 | 26 of 26 |
-| crisis lever in tolerance | 26 of 26, median 6.241 | 26 of 26 |
-| driven noise ratio | **1.1246** | 1.2995 |
-| out-of-band rows anywhere | **none** | `corr_asymmetry` twice |
+| union full house, both panels | **25 of 26** | 24 of 26 |
+| crisis co-movement in range | 26 of 26 | 26 of 26 |
+| crisis lever in tolerance | 26 of 26 | 26 of 26 |
+| driven noise ratio | **1.12** | 1.30 |
+| out-of-band rows anywhere | one, stated below | `corr_asymmetry` twice |
 
 Three ideas compose it. `qe_pe_gain` 0.0 silences a channel whose driven input
 is a proxy anticorrelated with measured Fed purchases at -0.485.
@@ -32,8 +32,24 @@ dispersion and seasoned by pulling the business-cycle share of the VIX in. The
 six noise sources then scale together by 0.86, a trim that has to be joint,
 since any single source alone re-balances the market and idiosyncratic split
 and collapses correlations instead of re-levelling. `volume_move_response`
-rises from 0.6 to 1.0, and `vix_decay_ratio`, `vix_jump_intensity` and
-`vix_jump_scale` join the settable set.
+rises from 0.6 to 1.0.
+
+**And the VIX learns fear.** Left as it was, the engine's VIX tracked its
+own market's realized volatility at 0.16 correlation against a real 0.87
+and decayed as fast as it rose. pt-v16 closes the loop: a third of the VIX
+target is the variance process's own inverse (`vix_realised_vol_weight`
+0.3), fear decays at six tenths of the rate it arrives (`vix_decay_ratio`
+0.6, a new dial, bit-inert at 1.0), and the reversion slows to match
+(`vix_mean_reversion` 0.06). Measured on ^VIX and ^GSPC over 2004-2025:
+realized-vol tracking 0.16 to 0.57, spike asymmetry 0.95 to 1.28 against a
+real 1.20, day persistence 0.90 to 0.985. The fold's price is the one
+out-of-band row in the table: a `corr_asymmetry` median at one block,
+0.0025 past a floor whose own derivation noise is 0.038. Crisis frequency
+stays below real -- every mechanism that raised P(VIX>30) broke certified
+statistics, three families measured to their deaths in the design record,
+and a market afraid of itself at the right frequency belongs to a later
+era's recalibration. The fear-event dials (`vix_jump_intensity`,
+`vix_jump_scale`) ship inert, taking no draws at zero.
 
 **A policy rate now reaches equities before the first meeting.** Equities
 discount off the corporate bond yield, which the central bank recomputes from
@@ -91,6 +107,24 @@ serialisation, `RunManifest.of(..., derived_from=checkpoint)` records it, and
 `verify_lineage(checkpoint)` checks the claim on identity before history.
 `state_snapshot` gains the day's endogenous news, the universe's remembered
 stress and the per-name volume states.
+
+**Flow composition: crashes get their sellers.** The engine gains a
+stress-activated forced-flow segment -- a common sell lean in the price
+path above a fear threshold, weighted by beta (leveraged names get sold
+hardest) and drawing down a finite, checkpointed budget, because
+deleveraging completes and stops (an instrument that held VIX 65 for sixty
+days caught the infinite-sellers version grinding prices into their
+clamps). Five dials, all shipped at zero and bit-inert there:
+`forced_flow_gain`, `forced_flow_threshold`, `forced_flow_beta_exponent`,
+`forced_flow_reservoir`, `forced_flow_replenish`. At the measured
+configuration (gain 0.003, threshold 50, beta exponent 2, reservoir 400,
+replenish 0.05) the replayed 2020 crash coheres at 0.78 against a real
+0.78 where the preset alone reads 0.52 on a good seed and 0.22 on a bad
+one, and crash dispersion improves -- at the price of a crash about eight
+percent hotter than the real one. Funding that price inside the certified
+preset was measured and failed, so the presets do not carry it: the
+segment is for embedders who want a market that crashes like a market,
+switched on with five documented numbers.
 
 **Smaller fixes.** `truth(day=N)` and `bars(day=N)` select a day, having
 previously discarded the argument. A failed `reproduce()` separates the three

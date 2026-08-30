@@ -310,6 +310,9 @@ pub struct TickInputs<'a> {
     /// (`market_beta_down_asym_lag`); false everywhere that dial is 0.0,
     /// including every recorded reference stream.
     pub prev_day_down: bool,
+    /// Fraction of the forced-flow segment's budget remaining, 1.0 when
+    /// the reservoir dial is off. See `ModelParams::forced_flow_reservoir`.
+    pub forced_flow_eff: f64,
     /// Today's market-factor sigma at DAILY scale — the conditional level
     /// of the factor's variance process ([`super::factor_vol`]), fixed for
     /// the whole session at the previous close's update.
@@ -664,6 +667,26 @@ pub fn simulate_market_tick(
         let momentum = companies[idx].stock.mispricing_momentum.unwrap_or(0.0);
         fundamentals[i] = fv;
 
+        // Forced flow: the stress-activated COMMON lean (params docstring).
+        // Computed once, applied AND recorded in the crowd's slot -- the
+        // attribution contract is "recorded as applied". A branch, not
+        // arithmetic, so 0.0 is bit-identical.
+        let forced = if p.forced_flow_gain != 0.0 {
+            let common = -p.forced_flow_gain
+                * mathx::max(0.0, economy.vix - p.forced_flow_threshold)
+                * inputs.forced_flow_eff;
+            // beta^0 through a branch, so screen one's uniform lean and
+            // every recorded run reproduce bit for bit.
+            if p.forced_flow_beta_exponent != 0.0 {
+                let beta = companies[idx].stock.beta.unwrap_or(1.0);
+                common * mathx::pow(mathx::max(beta, 0.1), p.forced_flow_beta_exponent)
+            } else {
+                common
+            }
+        } else {
+            0.0
+        };
+
         // Each contribution recorded as it is applied, in the same spelling
         // the update uses. Reported, never fed back: the update below is
         // written exactly as the source writes it, because `s*phi` and
@@ -676,7 +699,11 @@ pub fn simulate_market_tick(
             [
                 s_val * (p.s_phi_tick - 1.0),
                 (p.momentum_theta * momentum) / 390.0,
-                crowd_lean_with(p, s_val, momentum) / 390.0,
+                (if p.forced_flow_gain != 0.0 {
+                    crowd_lean_with(p, s_val, momentum) + forced
+                } else {
+                    crowd_lean_with(p, s_val, momentum)
+                }) / 390.0,
                 raw.company_news * scale,
                 raw.order_flow_impact * scale,
                 raw.short_squeeze_effect * scale,
@@ -710,7 +737,7 @@ pub fn simulate_market_tick(
             // were produced by this spelling.
             s_val = s_val * p.s_phi_tick
                 + (p.momentum_theta * momentum) / 390.0
-                + lean / 390.0
+                + (if p.forced_flow_gain != 0.0 { lean + forced } else { lean }) / 390.0
                 + all_drifts[i]
                 + all_noises[i] * intraday_vol_mult;
         } else {

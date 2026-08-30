@@ -1961,6 +1961,10 @@ impl PyEngine {
                  market_slow_variance, market_prev_day_factor,
                  market_smoothed_vix],
         )?;
+        // The forced-flow segment's spent budget (round 143). Its own key:
+        // a snapshot without it restores to 0.0, which is bit-exact for
+        // every run recorded while the reservoir dial shipped 0.0.
+        out.set_item("forced_flow_spent", self.inner.forced_flow_spent())?;
         // The common log-volume state. Same reason as the variance above, and
         // the same failure: omitted, a fork re-opens at volume 1.0 mid-regime
         // and diverges through the book (§74).
@@ -2251,6 +2255,11 @@ impl PyEngine {
                 });
             }
             self.inner.set_session_news(events);
+        }
+        // Restore the forced-flow budget; absent means a pre-reservoir
+        // snapshot, whose runs all carried 0.0.
+        if let Some(raw) = snapshot.get_item("forced_flow_spent")? {
+            self.inner.set_forced_flow_spent(raw.extract()?);
         }
         if let Some(raw) = snapshot.get_item("market_variance")? {
             let vals: Vec<f64> = raw.extract()?;
