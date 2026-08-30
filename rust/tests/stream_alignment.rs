@@ -121,6 +121,9 @@ fn run_world(policy: SettleDrawPolicy, trader_flow: f64) -> (Vec<f64>, usize) {
         simulate_market_tick(
             &mut companies,
             &TickInputs {
+                // The lagged asymmetry branches on this flag and its gain
+                // defaults to 0.0, so false is bit-identical here.
+                prev_day_down: false,
                 // The mechanism ships inert; 0.0 is the value that
                 // preserves the behaviour these tests pin.
                 universe_stress: 0.0,

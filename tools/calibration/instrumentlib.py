@@ -167,6 +167,12 @@ PARAM_SPECS: dict[str, dict] = {
     # penalty on it would be about the regulariser rather than the model.
     "usd_crisis_vix_threshold": {"kind": "log"},
     "vix_mean_reversion": {"kind": "abs", "step_unit": 0.02},
+    # Fear-gap era: decay-side multiplier on the VIX mean reversion.
+    # 1.0 ships (symmetric); real spike asymmetry says the decay side
+    # runs slower, so the box reaches down to a fifth of the rate.
+    "vix_decay_ratio": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.2, 1.5)},
+    "vix_jump_intensity": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 24.0)},
+    "vix_jump_scale": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 30.0)},
     # The volatility feedback (§68). Real markets move the VIX 165 points
     # per unit return on a heavy down day against the shipped 25, so the
     # box reaches well past the shipped value rather than around it.

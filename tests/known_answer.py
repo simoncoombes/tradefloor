@@ -142,7 +142,17 @@ import tradefloor
 # any block measured. Two new dials ship inert with it
 # (`crisis_blend_variance_damp`, `qe_pe_gain`) and do not move the
 # trajectory at their defaults.
-KAT_VERSION = 12
+#
+# 2026-08-30: the pt-v14 to pt-v16 era boundary, at 0.6.0. Every seeded run
+# changes, so the digest must. pt-v16 silences the QE valuation channel
+# (`qe_pe_gain` 0.0), composes correlation asymmetry from
+# `vix_cycle_amplitude` 0.85, `sector_loading_beta_slope` 0.7 and
+# `market_beta_down_asym` 0.025, and trims the six noise sources jointly by
+# 0.86. It is the first preset to hold the 504-day full house on all
+# twenty-six measured blocks with no out-of-band row anywhere. Windows
+# x86_64 and Linux aarch64 produced this digest independently before it was
+# committed, which is the cross-platform half of the claim.
+KAT_VERSION = 13
 
 SEED = 20260820
 DAYS = 250

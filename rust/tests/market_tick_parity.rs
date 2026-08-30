@@ -268,7 +268,10 @@ fn check_scenario(file: &str) {
             &mut companies,
             &TickInputs {
                 // The mechanism ships inert; 0.0 is the value that
-                // preserves the behaviour these tests pin.
+                // preserves the behaviour these tests pin. The lagged
+                // asymmetry branches on this flag and its gain defaults
+                // to 0.0, so false is bit-identical here.
+                prev_day_down: false,
                 universe_stress: 0.0,
                 volume_state: 0.0,
                 volume_idio: &[],

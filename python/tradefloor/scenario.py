@@ -59,10 +59,16 @@ so a scenario can hold VIX calm for sixty days and then spike it.
 
 ## The trap this exists to close
 
-Pinning `federal_funds_rate` on its own does **nothing inside the first
-central-bank meeting window**. Measured on this build, on
-``Universe.random(20, seed=4)`` at sim seed 5: a 250bp policy-only ramp over
-thirty days moved twenty instruments by exactly 0.00% at 40 days.
+How far a `federal_funds_rate` pin reaches inside the first central-bank
+meeting window **depends on the preset**. Measured on this build, on
+``Universe.random(20, seed=4)`` at sim seed 5, with a 250bp policy-only ramp
+over thirty days read at 40 days: pt-v12 and pt-v14 move twenty instruments
+by exactly 0.00%, and the shipped default moves the median one down 3.34%.
+
+`daily_credit_floor_gain` is the difference. It re-asserts both credit floors
+on every daily step rather than at meeting cadence, so from pt-v15 onward the
+spread is touched daily and a policy ramp reaches equities without waiting for
+a meeting.
 
 That is the valuation model doing its job. Equities are discounted off
 the **corporate bond yield**, and the policy rate is only a fallback used when

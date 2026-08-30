@@ -419,19 +419,19 @@ impl Engine {
     /// default written as a bare `PT_V1` at two call sites, where moving an
     /// era means finding both.
     ///
-    /// Since the 2026-08-28 era boundary this is [`PT_V14`], the first
-    /// preset to improve the realism panel while regressing nothing against
-    /// the preset it replaced: over thirteen seed blocks it holds all
-    /// fourteen statistics at 504 days on 11 blocks against pt-v12's 3, is
-    /// outside the crisis co-movement range on 2 against 4, and halves the
-    /// crisis lever error. It is never worse on any block measured.
+    /// Since 0.6.0 this is [`PT_V16`], the first preset to hold the complete
+    /// card at the deepest standard this programme runs: over twenty-six
+    /// seed blocks at one hundred seeds each, thirteen of them never touched
+    /// by any search, it holds the 504-day full house on 26, keeps crisis
+    /// co-movement and the crisis lever in range on 26 each, and leaves no
+    /// out-of-band row anywhere.
     ///
     /// Every earlier preset stays selectable and bit-reproducing, so
     /// anything recorded under one replays exactly by naming it.
     ///
-    /// [`PT_V14`]: crate::params::PT_V14
+    /// [`PT_V16`]: crate::params::PT_V16
     pub const fn default_model() -> crate::params::ModelParams {
-        crate::params::PT_V14
+        crate::params::PT_V16
     }
 
     /// [`Engine::new`] under an explicit model preset (the runtime seam,
@@ -1195,6 +1195,9 @@ impl Engine {
             &self.economy,
             &DailyInputs {
                 vix_mean_reversion: self.params.vix_mean_reversion,
+                vix_decay_ratio: self.params.vix_decay_ratio,
+                vix_jump_intensity: self.params.vix_jump_intensity,
+                vix_jump_scale: self.params.vix_jump_scale,
                 vix_return_gain: self.params.vix_return_gain,
                 vix_realised_vol_weight: self.params.vix_realised_vol_weight,
                 vix_return_source: self.params.vix_return_source,

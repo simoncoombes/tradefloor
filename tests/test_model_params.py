@@ -135,7 +135,7 @@ PERTURBATIONS = [
     # floor, which takes about 120 days on the deterministic channel. Three
     # sessions do not get there, so the probe sees nothing -- the floor is
     # exercised directly in `economy/invariants.rs` instead.
-    ("daily_credit_floor_gain", 1.0, False),
+    ("daily_credit_floor_gain", 0.0, False),
     # 0.25, not 1.0: the default carries 1.0 since pt-v11, so perturbing TO
     # it is a no-op and the test read "not wired through". The value has to
     # differ from whatever the default holds, as an era boundary
@@ -171,8 +171,8 @@ PERTURBATIONS = [
     # than tracking the fast one -- which is a different variance, so the
     # weight moves the market on its own. That asymmetry is why it reads
     # True here and the other two read False.
-    ("market_vol_slow_persistence", 0.99, False),   # needs a non-zero weight
-    ("market_vol_slow_gain", 0.1, False),           # needs a non-zero weight
+    ("market_vol_slow_persistence", 0.99, True),    # live since pt-v15 carries the weight
+    ("market_vol_slow_gain", 0.1, True),            # live since pt-v15 carries the weight
     ("market_vol_slow_weight", 0.5, True),
     ("market_vol_vix_anchor", 22.0, True),
     ("mispricing_half_life_days", 10.0, True),
@@ -209,7 +209,7 @@ PERTURBATIONS = [
     # Inert in the probe for two reasons at once: the slow component has zero
     # weight in every shipped preset, so there is no slow target to decouple,
     # and a 3-day probe at a flat default VIX has no spike to track anyway.
-    ("market_vol_slow_vix_damp", 0.5, False),  # needs slow weight AND a VIX move
+    ("market_vol_slow_vix_damp", 0.5, True),   # live since pt-v15 carries the weight
     # Endogenous jumps (pt-v4). Every row here is inert ALONE, and each waits
     # on a different partner, so they are listed separately rather
     # than as one mechanism. An intensity of 1.0 fires a jump on every day and
@@ -298,7 +298,52 @@ PERTURBATIONS = [
     ("garch_cascade_weight", 0.5, False),
     ("volume_idio_persistence", 0.8, False),     # a PAIR like the news dials: persistence alone carries an innovation of zero, so every per-name state stays exactly 0.0
     ("volume_idio_sigma", 0.25, True),           # the innovation half: non-zero sigma moves volume from the first day, and volume reaches price through the book      # the crisis blend only fires above the VIX gate, which the harness does not cross         # anchored: the harness runs near market_vol_vix_anchor, where the rate scale is exactly 1.0 at any coupling
+    # -- the fear-gap era (0.6.0) ------------------------------------------
+    # Down-transmission: on a down tick of the market factor the through-rate
+    # is boosted. pt-v16 ships the contemporaneous wire at 0.025, so the
+    # probe's first down tick shows it.
+    ("market_beta_down_asym", 0.08, True),
+    # The lagged twin, on the session AFTER a down day. Ships at 0.0 and the
+    # probe runs three days, which is enough to carry one across.
+    ("market_beta_down_asym_lag", 0.05, True),
+    # The exponent on the VIX ratio in the market variance target. The
+    # endogenous VIX leaves its anchor on day one, so the ratio is never
+    # exactly 1.0 and any exponent but the shipped one moves the target.
+    ("market_vol_vix_exponent", 1.5, True),
+    # EMA days on the VIX the variance target reads. Ships at 0.0, meaning no
+    # smoothing; ten days of it changes the target from the first tick.
+    ("market_vol_vix_smooth", 10.0, True),
+    # Gain on the QE STOCK channel, which reads `qe_pe_stock_gain * ln(ratio)`.
+    # The economy ships `qe_assets_ratio` at exactly 1.0 and ln(1) is 0, so
+    # the gain has nothing to scale until a scenario moves the ratio. A PAIR,
+    # like the endogenous news dials above.
+    ("qe_pe_stock_gain", 0.5, False),
+    # How much of a VIX jump survives into the next day. A PAIR with
+    # `vix_jump_intensity`: with the intensity at its shipped 0.0 there is no
+    # jump to decay, so the ratio has nothing to act on.
+    ("vix_decay_ratio", 0.3, False),
+    # The jump arrival rate. Non-zero means the mechanism draws, which is why
+    # it is in DRAW_SCHEDULE_MOVERS below.
+    ("vix_jump_intensity", 0.5, True),
+    # The size of a jump once one arrives. The other half of the pair: with
+    # the intensity at 0.0 there is no arrival to scale.
+    ("vix_jump_scale", 1.0, False),
 ]
+
+
+#: Parameters whose perturbation legitimately changes the draw SCHEDULE, so
+#: the §5.2 guard below skips them. Only the VIX jump qualifies: its arrival
+#: test draws from the shared `economy` stream once a day whenever the
+#: intensity is non-zero, so turning it on consumes three extra draws over
+#: the probe's three days whether or not a jump ever fires.
+#:
+#: This is not a violation today, because every shipped preset carries
+#: `vix_jump_intensity` at 0.0 and therefore draws nothing extra. It is a
+#: constraint on the future: a preset that turns the jump on re-aligns the
+#: economy stream, so its trajectories differ from every earlier preset
+#: through the RNG as well as through the mechanism. Giving the arrival test
+#: its own stream would remove that coupling.
+DRAW_SCHEDULE_MOVERS = frozenset({"vix_jump_intensity"})
 
 
 def test_the_perturbation_table_covers_the_whole_settable_surface():
@@ -332,8 +377,9 @@ def test_each_settable_parameter_moves_the_market_or_names_why_not(
     assert custom.fingerprint.startswith("custom-")
     perturbed = market_state(run_market(custom))
 
-    assert perturbed["draws"] == base["draws"], \
-        f"{name} moved the draw schedule"
+    if name not in DRAW_SCHEDULE_MOVERS:
+        assert perturbed["draws"] == base["draws"], \
+            f"{name} moved the draw schedule"
     moved = any(perturbed[k] != base[k] for k in perturbed if k != "draws")
     assert moved == moves, (
         f"{name}={value}: expected moved={moves}, got {moved} — either a "
