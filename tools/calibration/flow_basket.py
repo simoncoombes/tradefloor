@@ -11,7 +11,58 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import os
 CELLS = {"v16": {}}
-if os.environ.get("FLOW_GRID", "one") == "res":
+if os.environ.get("FLOW_GRID", "one") == "trim":
+    # Round 145: fund the flow's covid-path variance with the round-111
+    # six-sigma joint trim (preserves correlations and ratios).
+    CELLS.update({
+        "r400p5": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "forced_flow_reservoir": 400.0,
+                "forced_flow_replenish": 0.05
+        },
+        "rt90": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "forced_flow_reservoir": 400.0,
+                "forced_flow_replenish": 0.05,
+                "market_factor_sigma": 0.006833722432130459,
+                "idio_sigma_scale": 0.46133837333999994,
+                "jump_sigma_idio": 0.06768720557999999,
+                "jump_sigma_market": 0.0022137810588347354,
+                "endogenous_news_sigma": 0.015759039384,
+                "sector_factor_sigma": 0.007724748252600001
+        },
+        "rt92": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "forced_flow_reservoir": 400.0,
+                "forced_flow_replenish": 0.05,
+                "market_factor_sigma": 0.006985582930622247,
+                "idio_sigma_scale": 0.471590337192,
+                "jump_sigma_idio": 0.069191365704,
+                "jump_sigma_market": 0.002262976193475507,
+                "endogenous_news_sigma": 0.016109240259200002,
+                "sector_factor_sigma": 0.007896409324880001
+        },
+        "rt94": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "forced_flow_reservoir": 400.0,
+                "forced_flow_replenish": 0.05,
+                "market_factor_sigma": 0.0071374434291140345,
+                "idio_sigma_scale": 0.48184230104399994,
+                "jump_sigma_idio": 0.070695525828,
+                "jump_sigma_market": 0.002312171328116279,
+                "endogenous_news_sigma": 0.0164594411344,
+                "sector_factor_sigma": 0.00806807039716
+        }
+})
+elif os.environ.get("FLOW_GRID", "one") == "res":
     # Round 144: the reservoir ladder on the hot dose.
     CELLS.update({
         "g300inf": {
