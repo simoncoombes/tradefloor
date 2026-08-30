@@ -11,7 +11,55 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import os
 CELLS = {"v16": {}}
-if os.environ.get("FLOW_GRID", "one") == "fund":
+if os.environ.get("FLOW_GRID", "one") == "res":
+    # Round 144: the reservoir ladder on the hot dose.
+    CELLS.update({
+        "g300inf": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0
+        },
+        "r200p0": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "forced_flow_reservoir": 200.0
+        },
+        "r200p5": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "forced_flow_reservoir": 200.0,
+                "forced_flow_replenish": 0.05
+        },
+        "r400p0": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "forced_flow_reservoir": 400.0
+        },
+        "r400p5": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "forced_flow_reservoir": 400.0,
+                "forced_flow_replenish": 0.05
+        },
+        "r800p0": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "forced_flow_reservoir": 800.0
+        },
+        "r800p5": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "forced_flow_reservoir": 800.0,
+                "forced_flow_replenish": 0.05
+        }
+})
+elif os.environ.get("FLOW_GRID", "one") == "fund":
     # Round 142: funded composites -- forced flow paid for by an
     # endpoint-pinned exponent DROP (T5/T45 fixed, T65 lowered), so
     # crisis variance is recomposed from factor noise into forced flow.
