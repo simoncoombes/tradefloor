@@ -152,6 +152,7 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
             // asymmetry branches on this flag and its gain defaults
             // to 0.0, so false is bit-identical here.
             prev_day_down: false,
+            forced_flow_eff: 1.0,
             universe_stress: 0.0,
             volume_state: 0.0,
             volume_idio: &[],
