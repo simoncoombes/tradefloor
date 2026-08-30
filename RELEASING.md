@@ -19,7 +19,12 @@ hand, or manual and ordered so the irreversible steps come last.
 | `pyproject.toml` | the wheel, the sdist, PyPI |
 | `rust/Cargo.toml` | the crate, crates.io |
 | `CITATION.cff` | anyone citing a result |
-| `docs/reproducing-a-run.md` | the worked example that prints it |
+| `tradefloor-docs: docs/reproducing-a-run.md` | the worked example that prints it |
+
+The fourth location moved with the docs at 0.5.0: it lives in the
+PRIVATE `simoncoombes/tradefloor-docs` repo now, along with every
+rendered page that prints the version. Bump it there, rebuild, and
+push that repo as part of the same release pass.
 
 `CITATION.cff` carries two fields, not one: `version:` and `date-released:`,
 the day the version was tagged. A version without the date it shipped is half
