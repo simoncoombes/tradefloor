@@ -1,6 +1,6 @@
-"""Enforce the commitments in `PRODUCT.md` that a grep can enforce.
+"""Enforce the commitments in `CONTENT.md` that a grep can enforce.
 
-Why this file exists. `PRODUCT.md` has said since the project began that "the
+Why this file exists. `CONTENT.md` has said since the project began that "the
 repository must not reference the commercial product the engine was ported
 from". Nothing checked it. On 2026-08-24 a brief for that product's own
 website was committed to `tools/docs/`, naming the product ten times,
@@ -74,7 +74,7 @@ WASM_CONSUMER_ALLOWANCE = (
     "Nothing in the shipped tooling is",
 )
 
-#: `PRODUCT.md`: "ASCII punctuation only (no em dashes, en dashes, typographic
+#: `CONTENT.md`: "ASCII punctuation only (no em dashes, en dashes, typographic
 #: minus signs or arrows)", set as the project voice and "established and
 #: approved across the README".
 #:
@@ -87,8 +87,9 @@ ASCII_PROSE = (
     "README.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
-    "PRODUCT.md",
+    "CONTENT.md",
     "RELEASING.md",
+    "SECURITY.md",
     "rust/README.md",
     "rust/goldens/README.md",
     # `docs/` is not on this list because there is no `docs/` here any more:
@@ -143,7 +144,7 @@ def _is_wasm_consumer_line(line: str) -> bool:
 
 @pytest.mark.parametrize("label,pattern", list(ORIGIN_PATTERNS.items()))
 def test_the_repository_does_not_disclose_the_engine_s_origin(label, pattern):
-    """`PRODUCT.md`: the repository must not reference the commercial product.
+    """`CONTENT.md`: the repository must not reference the commercial product.
 
     Reported per pattern rather than as one pass/fail, so a failure names
     which disclosure it found instead of making the reader grep for it.
@@ -162,7 +163,7 @@ def test_the_repository_does_not_disclose_the_engine_s_origin(label, pattern):
 
     assert not offenders, (
         f"{len(offenders)} tracked line(s) disclose {label}.\n"
-        "PRODUCT.md commits this repository not to reference the commercial\n"
+        "CONTENT.md commits this repository not to reference the commercial\n"
         "product the engine was ported from. Say 'the reference\n"
         "implementation' instead; keep symbol names, drop paths, line\n"
         "numbers, languages and build commands.\n  "
@@ -210,7 +211,7 @@ def test_the_wasm_consumer_allowance_is_narrow():
 
 @pytest.mark.parametrize("path", ASCII_PROSE)
 def test_the_prose_surfaces_use_ascii_punctuation(path):
-    """`PRODUCT.md`: ASCII punctuation only, the voice approved on the README.
+    """`CONTENT.md`: ASCII punctuation only, the voice approved on the README.
 
     Scoped to the files that hold to it today. Widening this list is the way
     to widen the commitment; the alternative, a repo-wide assertion that fails
@@ -229,7 +230,7 @@ def test_the_prose_surfaces_use_ascii_punctuation(path):
     )
 
 
-#: `PRODUCT.md`: 'no "X is not the Y, it is the Z" constructions'. Banned in
+#: `CONTENT.md`: 'no "X is not the Y, it is the Z" constructions'. Banned in
 #: the same sentence as the ASCII rule above, by the same owner, and unchecked
 #: until now -- so it drifted, into 312 sentences across 116 files, while the
 #: rule it was written beside held.
@@ -268,7 +269,7 @@ BANNED_CONSTRUCTIONS = {
 
 @pytest.mark.parametrize("path", ASCII_PROSE)
 def test_the_prose_surfaces_avoid_the_banned_constructions(path):
-    """`PRODUCT.md` bans them; nothing checked, so they came back.
+    """`CONTENT.md` bans them; nothing checked, so they came back.
 
     Scoped to the same list the ASCII rule uses, for the same stated reason:
     a repo-wide assertion that failed on arrival would be skipped instead of
@@ -276,12 +277,12 @@ def test_the_prose_surfaces_avoid_the_banned_constructions(path):
     same time as this landed and are clean today; widening this tuple is how
     the commitment widens to them.
 
-    `PRODUCT.md` itself is exempt below, because the sentence that carries the
+    `CONTENT.md` itself is exempt below, because the sentence that carries the
     ban has to quote the construction in order to name it -- the same
     exemption this file already takes for the origin patterns.
     """
-    if path == "PRODUCT.md":
-        pytest.skip("PRODUCT.md quotes the construction in order to ban it")
+    if path == "CONTENT.md":
+        pytest.skip("CONTENT.md quotes the construction in order to ban it")
     text = read(path)
     assert text is not None, f"{path} is missing"
 
@@ -291,7 +292,7 @@ def test_the_prose_surfaces_avoid_the_banned_constructions(path):
             if re.search(pattern, line, re.IGNORECASE):
                 found.append(f"{path}:{i}: {description}\n      {line.strip()}")
     assert not found, (
-        "PRODUCT.md bans these constructions. State the positive and stop; a "
+        "CONTENT.md bans these constructions. State the positive and stop; a "
         "clause explaining that the previous clause mattered can go.\n  "
         + "\n  ".join(found[:12])
     )
@@ -331,7 +332,7 @@ def test_the_construction_guard_would_actually_catch_one():
 
 
 def test_both_manifests_declare_the_dual_licence():
-    """`PRODUCT.md`: dual-licensed MIT OR Apache-2.0, at the user's option.
+    """`CONTENT.md`: dual-licensed MIT OR Apache-2.0, at the user's option.
 
     Two manifests declare it and they are edited independently, so this is
     the kind of pair that drifts silently. crates.io and PyPI each render
@@ -343,6 +344,6 @@ def test_both_manifests_declare_the_dual_licence():
         text = read(manifest)
         assert text is not None, f"{manifest} is missing"
         assert re.search(rf"^license\s*=\s*{re.escape(expected)}", text, re.M), (
-            f"{manifest} does not declare license = {expected}. PRODUCT.md "
+            f"{manifest} does not declare license = {expected}. CONTENT.md "
             "commits the project to MIT OR Apache-2.0 in both manifests."
         )
