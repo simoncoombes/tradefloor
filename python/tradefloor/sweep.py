@@ -1,7 +1,7 @@
 """Columnar results for many seeds, without holding them all.
 
 `run_many` returns prices or summaries, small things, one per seed. This
-returns TABLES, which are not small, and the whole point is that you never
+returns TABLES, which are not small. Everything here is arranged so you never
 hold more than a few at once.
 
 The arithmetic that motivates it. One recorded engine keeps fourteen f64
@@ -28,14 +28,15 @@ and drops the engine before starting the next, so peak memory is one engine
 regardless of how many seeds you ask for.
 
 Which means **consuming it out of order, or keeping the tables, brings the
-memory back**. `list(sweep(...))` is exactly the thing this exists to avoid,
-and it is worth saying because it looks like an obvious convenience.
+memory back**. `list(sweep(...))` is the thing this exists to avoid, and it
+is worth saying because it looks like an obvious convenience.
 
 ## Workers trade memory back for speed, explicitly
 
 `workers=n` keeps `n` engines alive at once, so peak memory is `n` times one
-engine. That is a real trade rather than a free speedup, and it is why the
-default is one. Ordering is preserved regardless: results come back in seed
+engine. That is a real trade rather than a free speedup, and the default is
+one for that reason. Ordering is preserved regardless: results come back in
+seed
 order even when they finish out of order, because a sweep whose row order
 depended on scheduling would be non-deterministic in exactly the way this
 library exists to avoid.

@@ -253,7 +253,7 @@ def test_a_fingerprint_distinguishes_universes_that_tickers_cannot():
 
     Tickers are generated positionally, so two universes from different seeds
     share every name. Anything that asks "same universe?" by comparing tickers
-    is checking almost nothing -- which is exactly the hole found in
+    is checking almost nothing -- which is the hole found in
     `restore_state`, where a substituted roster was accepted.
     """
     a = tradefloor.Universe.random(40, seed=1)
@@ -407,7 +407,7 @@ def test_a_mid_day_checkpoint_is_exact_because_it_replays():
     forget: every input is re-applied and the accumulators rebuild themselves.
 
     That is the reason the serialisable form is the log rather than the
-    snapshot, and it is asserted here rather than argued.
+    snapshot, asserted here rather than argued.
     """
     universe = tradefloor.Universe.random(6, seed=5)
     count = len(universe)

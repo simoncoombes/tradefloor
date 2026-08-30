@@ -30,7 +30,7 @@ def run(scenario, **kwargs):
 def test_the_policy_rate_alone_moves_nothing_before_the_first_meeting():
     """The measurement that justifies the whole rate_shock constructor.
 
-    Not a defect: equities discount off the corporate bond yield, and the
+    No defect: equities discount off the corporate bond yield, and the
     policy rate is only the fallback when no yield is present. Inside the
     engine the economy always carries one, so the policy rate never reaches
     fair value DIRECTLY.
@@ -66,7 +66,7 @@ def test_the_policy_rate_reaches_the_curve_at_the_first_meeting():
 
 
 def test_rate_shock_moves_the_whole_curve_and_prices_fall():
-    # Both legs, which is what a rate shock is. Measured: -4.74% median on a
+    # Both legs, the shape a rate shock takes. Measured: -4.74% median on a
     # 250bp hike over thirty days.
     result = run(Scenario.rate_shock(start=0.025, end=0.05, over=30))
     assert result["median_pct"] < -3.0
@@ -293,7 +293,7 @@ def test_two_pins_on_one_field_layer_as_consecutive_segments():
     scenario = (Scenario()
                 .step("vix", before=15.0, after=48.0, at=60)
                 .ramp("vix", start=48.0, end=22.0, over=45, begin=75))
-    assert scenario.at(0)["vix"] == 15.0        # the whole point: NOT 48
+    assert scenario.at(0)["vix"] == 15.0        # the assertion: NOT 48
     assert scenario.at(59)["vix"] == 15.0
     assert scenario.at(60)["vix"] == 48.0       # the step lands
     assert scenario.at(74)["vix"] == 48.0       # and holds until the decay
@@ -305,7 +305,7 @@ def test_two_pins_on_one_field_layer_as_consecutive_segments():
 def test_hold_then_ramp_is_the_idiom_for_a_level_and_then_an_episode():
     """A ramp starts AT its start value, so this is a jump and then a decay.
 
-    Written with one pin per phase, which is what the same-day refusal points
+    Written with one pin per phase, the one the same-day refusal points
     callers at.
     """
     scenario = (Scenario().hold(vix=15.0)
@@ -452,7 +452,7 @@ def test_the_realised_path_serialises_for_citation():
 
 
 def test_a_scenario_reaches_the_evaluation_harness():
-    """Agents can be scored under a shock, which is the point of all this.
+    """Agents can be scored under a shock. All this exists for that.
 
     Measured on seed 7 over twenty days, a 250bp hike over fifteen: buy and
     hold gives up 4.37 percentage points, momentum GAINS 1.73 because it can
@@ -695,7 +695,7 @@ def test_a_misspelt_cycle_phase_is_refused_where_it_is_written():
 
     That is late. A scenario is built in one place and run in another -- a
     manifest, a sweep worker, a doc example -- so the traceback arrived at
-    the run rather than at the typo, and a phase name is exactly the kind of
+    the run rather than at the typo, and a phase name is the kind of
     string nobody re-reads.
     """
     with pytest.raises(tradefloor.ValidationError) as excinfo:

@@ -73,8 +73,8 @@ def detrend(a: np.ndarray, window: int) -> np.ndarray:
 
     Centred, so the filter introduces no phase shift and cannot manufacture
     or destroy autocorrelation by shifting the series against itself. The
-    edges are handled by reflecting the series, which is what `np.pad` in
-    'reflect' mode does: truncating instead would drop the first and last
+    edges are handled by reflecting the series, as `np.pad` in 'reflect'
+    mode does: truncating instead would drop the first and last
     half-windows, and those are exactly the years a drift makes most extreme.
     """
     pad = window // 2

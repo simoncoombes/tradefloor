@@ -2,7 +2,7 @@
 
 A column cannot carry `None`, so every optional field needs a spelling for
 "not set yet". This library uses NaN for that everywhere — and did not, in one
-place, which is what these tests exist to hold.
+place, the one these tests exist to hold.
 """
 
 import math

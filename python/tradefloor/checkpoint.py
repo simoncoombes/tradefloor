@@ -11,8 +11,8 @@ calm, hiked = mark.branch(2)
 run_scenario(shock, engine=hiked, ...)
 ```
 
-That is a counterfactual real markets cannot offer, and it is a different one
-from the two already here. `tca.analyse` asks what your trading cost against a
+That is a counterfactual real markets cannot offer, and a different one from
+the two already here. `tca.analyse` asks what your trading cost against a
 world where you did not trade; `scenario.compare` asks what a macro path did.
 This asks what happens NEXT, from a state you have already reached and want to
 keep.
@@ -318,7 +318,7 @@ class Checkpoint:
         if not isinstance(payload, dict):
             raise ValidationError(
                 "this is not a checkpoint: a checkpoint is a JSON object with "
-                f"a seed, a universe and a log, and this is a "
+                f"a seed, a universe and a log. This is a "
                 f"{type(payload).__name__}."
             )
         for field in ("seed", "universe", "log"):
@@ -406,7 +406,7 @@ def branch(
     beginning at day zero, silently.
 
     ``universe``, ``seed`` and ``macro`` are accepted for compatibility and are
-    no longer needed. A copy cannot land on the wrong roster, which is what
+    no longer needed. A copy cannot land on the wrong roster, the hazard
     ``universe`` and ``seed`` were there to prevent; a ``universe`` that IS
     passed is checked against the engine's own tickers, so a caller who
     believes they are forking a different market is told rather than humoured.
@@ -416,7 +416,7 @@ def branch(
     by the snapshot's own economy. A fork inherits its parent's macro state,
     which is the only reading that makes it a fork. To give a branch a
     different economy, drive it with a :class:`tradefloor.Scenario` after
-    forking, which is what the intervention half of an experiment is.
+    forking. That is the intervention half of an experiment.
 
     For a fork that must survive the process, use :class:`Checkpoint`.
     """

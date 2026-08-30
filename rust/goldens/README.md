@@ -39,7 +39,7 @@ If the Rust disagrees with a vector, exactly two responses are legitimate:
    absorbed. See `CONTRIBUTING.md`, "The one rule everything else follows".
 
 Regenerating the vector is not on the list. The only reason to re-run the
-generator is that the **reference implementation itself** changed, and that is
+generator is that the **reference implementation itself** changed, which is
 a formula-era change whether or not anyone intended it to be.
 
 Every file records the SHA-256 of both source files it was generated from, so a
@@ -62,7 +62,7 @@ generator, so what runs here is `python rust/sync-goldens.py --verify`, which
 re-hashes every committed vector against the SHA-256 recorded in `index.json`
 and prints `46/46 golden files verified against index.json.` That catches a
 missing, corrupted or edited vector; it cannot catch a vector that was
-generated wrongly, which is what `--check` above is for.
+generated wrongly. `--check` above is for that.
 
 `--check` re-reads every file from disk, decodes the recorded **inputs** from
 their IEEE-754 bit patterns, re-runs the reference implementation, and compares
@@ -125,8 +125,8 @@ counts and byte sizes.
 Every NaN is recorded as `7FF8000000000000`, which is the bit pattern of Rust's
 `f64::NAN`.
 
-This is a deliberate normalisation, and it is there because the first run of the
-verifier caught V8 emitting *both* `7FF8000000000000` and `FFF8000000000000` for
+This is a deliberate normalisation. The first run of the verifier caught V8
+emitting *both* `7FF8000000000000` and `FFF8000000000000` for
 the same expression depending on whether the result had passed through the heap.
 **The sign and payload of a NaN are not part of the parity contract; NaN-ness
 is.** Compare NaN results with `is_nan()`, not with bits.

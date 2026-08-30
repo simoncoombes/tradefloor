@@ -39,8 +39,8 @@ not have to take on trust.
 
 ## Fork on a day boundary, always
 
-:class:`World` runs whole days and forks between them, and that is not a
-convenience. `checkpoint.py` records a defect where a snapshot taken BETWEEN
+:class:`World` runs whole days and forks between them, and does so for a
+reason. `checkpoint.py` records a defect where a snapshot taken BETWEEN
 two sessions of the same day lost the day's accumulators, re-opened the day on
 its next session, and priced differently from the parent it was a copy of.
 Every test forked on a day boundary, so nothing caught it. This module cannot
@@ -71,7 +71,7 @@ Two optional hooks, neither required:
 
 It does not score. :class:`~tradefloor.Scorecard` and :func:`tradefloor.rank`
 already answer "which agent is better", across many seeds and with a paired
-test, and that is a different question from "what did this one change do".
+test, and that asks something different from "what did this one change do".
 A counterfactual is one seed by construction -- that is the point of it -- so
 a single arm's return here is a measurement of this market as much as of the
 agent, and :class:`Comparison` reports behaviour before it reports P&L for
@@ -229,8 +229,8 @@ class World:
         grid has already rounded. Two worlds with equal digests are on the
         same market to the bit.
 
-        Comparable between worlds at the same fork depth -- which is what an
-        experiment compares -- and NOT between a fork and its parent. The
+        Comparable between worlds at the same fork depth, the pairing an
+        experiment puts side by side, and NOT between a fork and its parent. The
         digest folds in ``draws_consumed``, and a branched engine's counter
         restarts at zero while every column is carried, so a fork and its
         parent report different digests for the same market.
@@ -266,8 +266,8 @@ class World:
             day = self._day
             # Pinned before the market opens, so day zero already runs under
             # the path rather than under whatever the engine was built with.
-            # `pin_macro` is recorded in the order log, which is what puts
-            # the intervention inside the checkpoint and the manifest rather
+            # `pin_macro` is recorded in the order log, which puts the
+            # intervention inside the checkpoint and the manifest rather
             # than only in this object's memory.
             scenario.apply(self.engine, day)
             macro = _macro(self.engine)
@@ -330,13 +330,13 @@ class World:
                  tickers: Sequence[str]) -> tuple[list[dict], list[str]]:
         """Send the agent's orders, recording each fill against its arrival mid.
 
-        The mid is read BEFORE the sweep, which is what makes the recorded
+        The mid is read BEFORE the sweep, which makes the recorded
         slippage a cost rather than a tautology: after the sweep the book has
         already moved to where the trade left it.
 
         Refused trades are recorded and counted, not raised. Being unable to
-        size a position is information about the agent, and it is information
-        the comparison wants -- an arm that hit its leverage cap and an arm
+        size a position is information about the agent, and information the
+        comparison wants -- an arm that hit its leverage cap and an arm
         that did not are behaving differently.
         """
         fills: list[dict] = []
@@ -458,7 +458,7 @@ class World:
     def intervene(self, **fields: Any) -> "World":
         """Change one or more macro fields, from this world's next day on.
 
-        The whole point of the module, and deliberately narrow: it writes
+        What the module exists for, and deliberately narrow: it writes
         macro fields and nothing else. An intervention that could also reach
         into the portfolio, the book or the agent would not be a controlled
         variable, it would be a second experiment.
@@ -466,8 +466,8 @@ class World:
         Recorded three times over, because a counterfactual whose intervention
         is not written down is an anecdote: here on the world, in the
         :meth:`scenario` it derives, and -- once the next day opens and
-        ``pin_macro`` runs -- in the engine's own order log, which is what
-        travels inside a :class:`~tradefloor.Checkpoint` and a
+        ``pin_macro`` runs -- in the engine's own order log, which travels
+        inside a :class:`~tradefloor.Checkpoint` and a
         :class:`~tradefloor.RunManifest`.
         """
         if not fields:

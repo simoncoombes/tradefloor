@@ -138,7 +138,7 @@ def test_a_resumed_checkpoint_continues_identically():
     """Restoring is not enough; the continuation has to match too.
 
     A state that restores correctly and then prices the next day differently
-    is the exact defect `checkpoint.py` documents, and it is invisible at the
+    is the exact defect `checkpoint.py` documents, invisible at the
     moment of the restore.
     """
     world = build()

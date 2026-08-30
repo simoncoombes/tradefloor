@@ -48,7 +48,7 @@ def main() -> dict:
 
     # 3. Rank agents on one market. Same seed for every agent, so the
     #    comparison is between strategies rather than between markets, so order
-    #    flow consumes no RNG draws, which is what makes that exact.
+    #    flow consumes no RNG draws, which keeps that exact.
     mark = time.time()
     scores = tf.evaluate(reference_agents(seed=3), seed=7, universe=universe,
                          days=10)
@@ -99,8 +99,8 @@ def main() -> dict:
           f"{'' if verdict['decisive'] else '  (not separated)'}")
 
     # The spread of the leader across single seeds is wider than its whole
-    # margin over the runner-up. That is the finding, and it is asserted so
-    # that a change which quietly narrows the spread has to explain itself.
+    # margin over the runner-up. That is the finding, asserted so that a
+    # change which quietly narrows the spread has to explain itself.
     span = first.capture_range[1] - first.capture_range[0]
     margin = first.pooled_capture - second.pooled_capture
     report["span_exceeds_margin"] = span > margin
@@ -199,8 +199,8 @@ def main() -> dict:
     )
 
     # Past the displayed depth the average price STOPS moving, and reading that
-    # as "size is free above here" is the trap. The order is not cheap, it is
-    # unfilled: every request beyond the book returns the same fill, capped at
+    # as "size is free above here" is the trap. The order is unfilled rather
+    # than cheap: every request beyond the book returns the same fill, capped at
     # what was actually offered. A cost per share is meaningless without the
     # quantity beside it.
     beyond = book.sweep_cost("buy", 5e7)

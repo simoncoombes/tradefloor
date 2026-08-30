@@ -63,7 +63,7 @@ def test_the_earlier_presets_are_untouched() -> None:
 def test_it_is_no_longer_the_default() -> None:
     """It was the default from 2026-08-26 until pt-v12 replaced it the same
     day (§114). Still selectable and still bit-reproducing: anything recorded
-    under pt-v10 replays exactly by naming it, which is the whole point of
+    under pt-v10 replays exactly by naming it, and naming it is what
     the preset table."""
     from tradefloor import envelope
     assert envelope.PRESET != "pt-v10"

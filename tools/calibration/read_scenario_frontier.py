@@ -67,8 +67,8 @@ def attempt(label: str, fn, chars: int) -> None:
     `tradefloor.atlas` refuses a rank correlation over too few usable rows, which
     is correct: five points describe the sample rather than the model. But
     `atlas_survey.py collect` builds a readable survey from whatever is on
-    disk, ON PURPOSE, so that a run can be read mid-flight, and that is exactly
-    when rows are scarce. Dying in a traceback there turns a partial answer
+    disk, ON PURPOSE, so that a run can be read mid-flight, which is when
+    rows are scarcest. Dying in a traceback there turns a partial answer
     into no answer.
     """
     try:

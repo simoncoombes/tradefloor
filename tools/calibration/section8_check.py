@@ -71,7 +71,7 @@ AXES = {
     "holdout_universe": (HOLD_SEEDS, 60, 909, 252),
     # CONFIRM, not TRAIN. calibrate.py's own help records that this axis
     # used to default to the training seeds, which held out the horizon and
-    # not the paths. I reproduced that defect on the first pass.
+    # and not the paths. I reproduced that defect on the first pass.
     "train_horizon":    (TRAIN,      40, 111, 504),
     "holdout_horizon":  (CONFIRM,    40, 111, 504),
 }

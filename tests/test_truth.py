@@ -3,7 +3,7 @@
 The claim these tests exist to defend is not "the simulator reports reasons" —
 anything can report a reason. It is that the reported reasons **reconstruct the
 outcome**, so a consumer can check the label rather than trust it. That is what
-separates ground truth from commentary, and it is checkable, so it is checked.
+separates ground truth from commentary, and being checkable, it is checked.
 """
 
 import math
@@ -289,7 +289,7 @@ def test_attribution_covers_the_whole_day_not_the_last_step():
 
     For the reference, which runs one session per day, opening inside the
     session and opening the day are the same act. They stop being the same
-    when a day is made of several sessions -- which is exactly what agent
+    when a day is made of several sessions, as agent
     stepping does. `open_market` resets the attribution accumulator, so
     attribution documented itself as per-DAY and was per-session.
 

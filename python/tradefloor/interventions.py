@@ -5,8 +5,8 @@ no `elect_president()`, no `recession=True`. A scenario is a **named,
 inspectable collection of explicit interventions**, and the narrative that
 motivated it is a description, not a mechanism.
 
-The distinction is the whole point. `OilCrisis` hides its assumptions inside a
-class name; a scenario that says
+Everything here turns on that distinction. `OilCrisis` hides its assumptions
+inside a class name; a scenario that says
 
     shocks:       commodity.oil  x1.40  at 50
     transmission: macro.inflation +1.5pp at 55
@@ -43,8 +43,8 @@ part of an experiment is never the arithmetic.
 
 `at` counts days from the moment the run loop starts applying the scenario.
 For a fresh run that is simulation day zero. For a fork it is the day of the
-fork, which is what makes the same YAML mean the same experiment on both
-sides of a checkpoint. See :meth:`tradefloor.Scenario.apply`.
+fork, so the same YAML means the same experiment on both sides of a
+checkpoint. See :meth:`tradefloor.Scenario.apply`.
 
 ## Relative operations read the live market
 
@@ -158,8 +158,8 @@ class Target:
         self.name = name
         self.units = units
         self.note = note
-        # False for a target whose value is a NAME. There is one, and it is
-        # what makes this flag worth carrying: a `ramp` interpolates between
+        # False for a target whose value is a NAME. There is one, and it
+        # earns this flag: a `ramp` interpolates between
         # two values, and interpolating between two cycle phases raised a
         # bare TypeError from inside the run rather than being refused where
         # it was written.
@@ -533,7 +533,7 @@ _register(Target(
     "market.liquidity",
     units="shares (avg_volume)",
     note=(
-        "The `avg_volume` column, which is what the market maker quotes "
+        "The `avg_volume` column, the one the market maker quotes "
         "off: every ladder level is a fraction of a base size derived from "
         "it, and a tick's printed volume is bounded by avg_volume/390. "
         "Immediate, and the only target here that touches execution rather "
@@ -632,9 +632,9 @@ _register(_make_macro_target(
         "window closes, because nothing else would."
     ),
     check=_rate_check(), format=_pp, domain=_domain_rate,
-    # The one macro field nothing in the engine moves, which is what
-    # makes an impulse on it permanent -- and what means a HOLD on it
-    # has to put the old rate back when its window ends.
+    # The one macro field nothing in the engine moves. That makes an
+    # impulse on it permanent, and means a HOLD on it has to put the old
+    # rate back when its window ends.
     restores=False,
 ))
 
@@ -763,8 +763,7 @@ class Intervention:
     """One explicit change to one target at one time.
 
     Immutable, validated at construction, and the same object whether it came
-    from YAML or from Python -- which is what makes a fingerprint comparable
-    across the two.
+    from YAML or from Python, so a fingerprint compares across the two.
 
     ``at`` counts days from the start of the run the scenario is applied to.
     See :meth:`tradefloor.Scenario.apply` for what that means after a fork.
@@ -791,7 +790,7 @@ class Intervention:
             raise ScenarioValidationError(
                 f"unknown role {role!r}. An intervention is either a "
                 f"{ROLES[0]!r} -- what the scenario asserts happened -- or a "
-                f"{ROLES[1]!r}, which is what the author ASSUMES it did next."
+                f"{ROLES[1]!r}, what the author ASSUMES it did next."
             )
         if value is None:
             raise ScenarioValidationError(

@@ -27,7 +27,7 @@ def test_known_answer_digest_matches_the_committed_baseline():
 
     Every wheel target runs this and must produce the same digest. A mismatch
     without a katVersion bump means one platform's build disagrees with the
-    others -- which is exactly the failure the libm-only design exists to
+    others -- which is the failure the libm-only design exists to
     prevent, and which nothing else in the suite would notice, since every
     other test compares this build against itself or against a reference the
     release machine may not have.
@@ -88,7 +88,7 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
 
     Everything above imports the module and calls into it. That left the
     ``__main__`` path -- the only path the determinism gate ever takes --
-    completely uncovered, and it was broken: it called ``tradefloor.version()``,
+    completely uncovered, and broken: it called ``tradefloor.version()``,
     which the package had never re-exported. Every test passed and the gate
     failed on all five platforms at once.
 

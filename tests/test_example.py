@@ -1,6 +1,6 @@
 """Run the shipped example the way a user runs it.
 
-Not a duplicate of the unit tests. Running the library end to end, in the shape
+This duplicates no unit test. Running the library end to end, in the shape
 a researcher would actually use, is what caught the two worst defects this
 project has had:
 
@@ -12,7 +12,7 @@ project has had:
     worked, so nothing functional failed.
 
 Both were invisible to unit tests by construction. This exists so the whole
-path stays exercised, and it is why the example asserts rather than only
+path stays exercised, and why the example asserts rather than only
 printing.
 """
 

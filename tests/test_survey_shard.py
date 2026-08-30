@@ -1,6 +1,6 @@
 """`--shard I/N` must partition a plan, or refuse.
 
-The failure that matters is not a wrong answer, it is a silent one: a
+The failure that matters is a silent one rather than a wrong answer: a
 malformed shard spec that falls back to running everything would have every
 box in a fleet measure the whole plan, cost N times the money, and produce a
 tasks.jsonl that looks complete. So the spec is validated up front and the

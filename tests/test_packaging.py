@@ -8,7 +8,7 @@ in it:
   `python/tradefloor/`, so `maturin develop` began writing an unignored 1.1 MB
   extension and a 1.0 MB debug database into the source tree. Both were
   committed. The committed extension then SHADOWED the real one for anyone
-  importing from `python/`, and it was stale enough to raise `ImportError:
+  importing from `python/`, stale enough to raise `ImportError:
   cannot import name 'ModelParams'` on a tree that built and tested fine.
 - Because maturin packages everything under `python-source`, the stray
   `pretium.pdb` was copied into every wheel built from such a tree. tradefloor

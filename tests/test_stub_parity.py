@@ -26,7 +26,7 @@ import tradefloor._core as core
 
 STUB = Path(__file__).resolve().parent.parent / "python" / "tradefloor" / "_core.pyi"
 
-# NOT a skipif. The path said "pretium" for a week after the package became
+# No skipif here. The path said "pretium" for a week after the package became
 # `tradefloor`, so `STUB.exists()` was False, and all ninety-nine tests in
 # this file skipped and reported green while the stub they exist to check
 # went unread. A guard that disables itself when its subject moves is worse

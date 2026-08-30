@@ -66,7 +66,7 @@ and an unreadable release page.
 
 Everything above `<!-- release-note-ends -->` becomes the release note, and
 the page folds the rest behind a disclosure. A section without the marker
-publishes whole, which is what every version before 0.3.0 does.
+publishes whole, as every version before 0.3.0 does.
 
 ### 3. Run the suite, including the slow half AND the Rust one
 
@@ -140,8 +140,8 @@ claims that stopped being true and are worse than a moved number.
 
 The last stored run is the record of what was current at that release. The
 0.2.0 run (`tools/remeasure/out-0.2.0/REPORT.md`, commit `e3396b9`) reported
-106 reproduced against 165 MOVED and 5 `structural_fail`, which is what a
-release looks like when the preset moved and the prose did not follow yet.
+106 reproduced against 165 MOVED and 5 `structural_fail`: the shape of a
+release where the preset moved and the prose did not follow yet.
 
 ### 4b. Re-point the inventory before believing a MOVED row
 
@@ -295,7 +295,7 @@ python -m pytest tests/test_readme_links.py -q
 `readme = "README.md"` means this file becomes the PyPI project page, which
 lives at pypi.org, so a relative link like `examples/01-first-simulation.ipynb`
 resolves to `pypi.org/project/tradefloor/examples/...` and 404s. It renders
-correctly on GitHub, which is why it survived two releases. The test fails on
+correctly on GitHub, so it survived two releases. The test fails on
 any relative link and on any absolute link naming a file that is not there.
 
 ### 7. Run the determinism gate on the branch
@@ -317,9 +317,9 @@ default because nothing else in the project touches them: `macos-arm64` is
 the machine the work is done on, and every AWS calibration run builds the
 crate and executes `tests/known_answer.py` before its own work, which has
 covered `linux-aarch64` repeatedly and `linux-x86_64` once, on 2026-08-24.
-So the default is the narrow path to the gap, not the cheap one. Money is
-not the reason for it: the repository is public, so standard runners are
-free, and the workflow's own note records the five-target run of 2026-08-27
+So the default is the narrow path to the gap rather than the cheap one.
+Money has nothing to do with it: the repository is public, so standard runners
+are free, and the workflow's own note records the five-target run of 2026-08-27
 (run 33028345268) at 3m35s of wall clock and about ten minutes of runner
 time across all seven jobs. Ask for `all` here anyway, because the point of
 a release gate is that the whole artifact set was checked in one place,
@@ -363,7 +363,7 @@ gate has to be green BEFORE the merge, because it is what admits the merge.
 6. **Check the tag target is the merged commit.** `git rev-parse origin/main`
    against the merge commit, compared rather than assumed. A squash merge
    makes a NEW commit, so the SHA that passed the gate is not the SHA you are
-   about to tag; the gate ran on the same tree, which is what matters, but
+   about to tag. The gate ran on the same tree, which covers the code, but
    the tag must point at what is on `main`.
 7. **Tag `origin/main` and push the tag.** That is the irreversible step: a
    PyPI version number cannot be reused.

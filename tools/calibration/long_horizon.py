@@ -16,7 +16,7 @@ That is enough to answer the question the gap actually raises, which is
 whether the model is stable over a five-year run or quietly degenerates.
 A statistic that walks monotonically away from its 504-day value is a
 process with a trend in it; one that flattens has simply been measured at a
-longer window. Naming which is which is the point.
+longer window. This names which is which.
 
     python tools/calibration/long_horizon.py --seeds 30 --workers 94 \
         --out long-horizon.json

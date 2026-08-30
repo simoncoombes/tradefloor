@@ -1,7 +1,7 @@
 """A reader for the boring part of YAML, and nothing else.
 
-The library depends on nothing, and that is a promise rather than an
-accident: `pip install tradefloor` pulls one wheel, and a research
+The library depends on nothing. That is a promise rather than an accident:
+`pip install tradefloor` pulls one wheel, and a research
 environment does not acquire a transitive tree because somebody wanted a
 config file. Scenario documents are configuration, so they had to be readable
 without a dependency.
@@ -77,8 +77,8 @@ regression corpus from it.
 
 It is not a YAML implementation. A document this reader accepts is read the
 way a compliant parser would read it, or it raises; a document it refuses may
-still be valid YAML. That asymmetry is the safe direction, and it is what
-`tests/test_yaml_subset.py` pins: where pyyaml happens to be installed, the
+still be valid YAML. That asymmetry runs in the safe direction, and
+`tests/test_yaml_subset.py` pins it: where pyyaml happens to be installed, the
 suite compares this reader against `yaml.safe_load` on every shipped scenario
 and on a corpus of accepted fragments.
 """
@@ -126,8 +126,8 @@ class _Line:
 class _Doc:
     """The significant lines, plus the raw ones a block scalar has to re-read.
 
-    Blank lines and comments are dropped before parsing, which is what makes
-    the indent logic short. A block scalar cannot use the dropped version --
+    Blank lines and comments are dropped before parsing, which keeps the
+    indent logic short. A block scalar cannot use the dropped version --
     a blank line inside `>` is a paragraph break and a `#` inside `|` is
     text -- so it reads the raw lines back by number instead.
 

@@ -18,8 +18,8 @@ Trading moves the price twice over, through mechanisms worth keeping apart:
 **The book channel.** An order matches against resting liquidity with
 price-time priority. A large order walks up the levels and pays worse prices
 as it goes. This is emergent, since nothing multiplies size by a coefficient
-and the order simply consumes what is there, and it is where a big trade's cost
-actually comes from.
+and the order simply consumes what is there. A big trade's cost actually
+comes from there.
 
 **The information channel.** Order imbalance feeds the factor model as a
 signal, moving the mispricing itself. This one PERSISTS: the book recovers as
@@ -72,7 +72,7 @@ Nothing is wrong where the round trip comes back negative. The entry pushed
 the price up, part of that impact persisted, and the exit sold into it. On
 that leg the agent really did transact at prices better than the untraded
 world offered. How much impact survives three steps is the market's call,
-which is why this is quoted as a range.
+so this is quoted as a range.
 
 What it means is that shortfall answers "what did each execution cost against a
 market where I never traded", which is the execution desk's question. It does
@@ -261,7 +261,7 @@ class Execution:
         near, and the +/-0.03% clamp that once made the channel
         intermittent was a pt-v1..pt-v8 value. A one-day analysis stays
         structurally immune, its final prices predating the first repriced
-        variance target, which is why ``test_tca.py`` can still assert
+        variance target, so ``test_tca.py`` can still assert
         emptiness there. When the untouched names must be byte-exact, pin
         VIX in both worlds, via ``scenario=Scenario().hold(vix=15.0)``,
         verified empty on the ten-day run above. Anything here that was not

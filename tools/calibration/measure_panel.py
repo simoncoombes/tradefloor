@@ -2,8 +2,8 @@
 
 This is the measurement half of the `MARKET_FACTOR_SIGMA` calibration. It
 runs in a fresh interpreter against whatever `pretium` wheel is installed,
-which is the point: the sweep driver rebuilds and reinstalls the wheel
-between calls, and a fresh process cannot be holding a stale module.
+deliberately: the sweep driver rebuilds and reinstalls the wheel between
+calls, and a fresh process cannot be holding a stale module.
 
 The panel is `tradefloor.facts.measure` — the library's own instrument, not a
 reimplementation — at the published method: `Universe.random(40, seed=111)`,
@@ -16,7 +16,7 @@ reimplementation — at the published method: `Universe.random(40, seed=111)`,
     both.
   - cross-sectional correlation under pinned VIX (15 / 45 / 65 by default),
     because the crisis-correlation blend in `tick.rs` acts above VIX 40 and
-    whether it does anything observable is exactly what a market-factor
+    whether it does anything observable is what a market-factor
     recalibration should change. Same method as finding 7 in the design
     findings, via `pin_macro` re-applied before each open.
 
