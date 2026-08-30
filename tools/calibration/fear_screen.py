@@ -39,8 +39,22 @@ def _grid(name):
         # keep the fear gates and stay in band?
         combos = [(w, dr, 0.06) for w in (0.3, 0.35, 0.4)
                   for dr in (0.6, 0.7)]
+    elif name == "wire":
+        # Round 132: P(VIX>30) regressed under the feedback (calm implied
+        # pulls the median down). The one mechanism left: the same-day
+        # fear wire at the MEASURED real slopes (-1.55 down / -1.10 up,
+        # clamp 3) on top of the card-clean dose.
+        base = {"vix_realised_vol_weight": 0.3, "vix_decay_ratio": 0.6,
+                "vix_mean_reversion": 0.06}
+        def wired(gd, gu):
+            return {**base, "vix_return_source": 1.0, "vix_return_gain": gd,
+                    "vix_return_gain_up": gu, "vix_return_clamp": 3.0}
+        return {"w30d6": dict(base), "w30wireH": wired(0.8, 0.55),
+                "w30wire1": wired(1.55, 1.10), "w30wire2": wired(2.0, 1.4)}
     else:
         raise SystemExit(f"unknown grid {name}")
+    if isinstance(combos, dict):
+        return combos
     cells = {}
     for w, dr, mr in combos:
         label = f"w{int(w*10)}d{int(dr*10)}m{int(mr*100)}"
