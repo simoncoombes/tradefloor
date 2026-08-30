@@ -82,8 +82,8 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.setup.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - uses: dtolnay/rust-toolchain@stable
@@ -129,12 +129,12 @@ jobs:
           print("smoke OK:", pt.version())
           PY
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheel-${{ matrix.target }}
           path: dist/*.whl
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: digest-${{ matrix.target }}
           path: ${{ runner.temp }}/digest-${{ matrix.target }}.txt
@@ -145,14 +145,14 @@ jobs:
     if: needs.setup.outputs.publish == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: { python-version: "3.11" }
       - uses: dtolnay/rust-toolchain@stable
       - run: |
           python -m pip install --upgrade pip maturin
           maturin sdist --out dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -162,8 +162,8 @@ jobs:
     needs: [setup, wheels]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with: { pattern: digest-*, merge-multiple: true, path: digests }
 
       - name: Compare against each other and against the committed baseline
@@ -215,9 +215,9 @@ jobs:
     permissions:
       id-token: write        # Trusted Publishing; no API token exists
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { pattern: wheel-*, merge-multiple: true, path: dist }
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: sdist, path: dist }
       - run: ls -la dist
       - uses: pypa/gh-action-pypi-publish@release/v1
@@ -239,7 +239,7 @@ jobs:
     permissions:
       id-token: write        # Trusted Publishing, as for PyPI; no token stored
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       # The same gate the Python side gets. Sixteen of nineteen integration
       # tests read the 140 MB goldens corpus that `exclude` keeps out of the
@@ -284,10 +284,10 @@ jobs:
     permissions:
       contents: write        # to create the release and attach artefacts
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with: { pattern: wheel-*, merge-multiple: true, path: dist }
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: sdist, path: dist }
 
       - name: Assemble the release notes
@@ -371,8 +371,8 @@ jobs:
     permissions:
       id-token: write        # the pretium project's Trusted Publisher, repointed here
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: { python-version: "3.11" }
       - name: Build the shim
         run: |
