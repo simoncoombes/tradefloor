@@ -85,8 +85,7 @@ reference implementation. They are the evidence for the port being
 bit-identical, so if you change anything in `rust/src/market/` or
 `rust/src/economy/`, run them.
 
-## Branches, and how work reaches `main`
-
+## Branches and merges
 `main` is what ships. It is protected: nothing lands on it except through a
 pull request that has passed the determinism gate on all five targets and the
 documentation build, and only the owner merges. `dev` carries the same
@@ -121,8 +120,7 @@ release rebuilds it, and failing that check mid-experiment teaches nothing.
 to be a normal way to tidy up; it is now blocked, because a calibration run
 that cloned it cannot be reproduced afterwards if its commits are gone.
 
-## Where code goes
-
+## Code layout
 **If it decides something about the market, it belongs in `rust/src/`, not
 in a binding.**
 
@@ -135,8 +133,7 @@ should not have to happen twice.
 
 Bindings own conversion, error translation and bookkeeping. Nothing else.
 
-## Where examples, integrations and fixtures go
-
+## Examples and fixtures
 `examples/` used to mean one thing: a numbered series read in order. It now
 means two, and keeping both flat has already cost something. The example test
 globbed `0*`, so the first unnumbered example added to `examples/` was

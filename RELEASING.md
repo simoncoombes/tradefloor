@@ -10,8 +10,7 @@ hand, or manual and ordered so the irreversible steps come last.
 
 ## Before you tag
 
-### 1. Move the version in four places
-
+### 1. Version locations
 `pt.version()` is a published fact and these must agree:
 
 | file | what reads it |
@@ -39,8 +38,7 @@ Then `cargo update -p tradefloor` so `Cargo.lock` follows, and rebuild
 (`maturin develop --release`) so the installed package reports the new
 number rather than the old one.
 
-### 2. Write the changelog section
-
+### 2. Changelog section
 `CHANGELOG.md`, newest first, heading `## X.Y.Z`. The release workflow cuts
 the GitHub release notes from this section, matching `## X.Y.Z` or
 `## [X.Y.Z]`. If it finds nothing it does not ship empty notes: the script
@@ -73,8 +71,7 @@ Everything above `<!-- release-note-ends -->` becomes the release note, and
 the page folds the rest behind a disclosure. A section without the marker
 publishes whole, as every version before 0.3.0 does.
 
-### 3. Run the suite, including the slow half AND the Rust one
-
+### 3. Full suite
 ```
 python -m pytest tests/ -q
 TRADEFLOOR_SLOW_TESTS=1 python -m pytest tests/test_examples.py -q
@@ -104,8 +101,7 @@ for the next slowest. That figure is machine-bound: the same file under load
 has measured more than twice that, so read it as an order of magnitude
 rather than a budget. Time it on a quiet machine or not at all.
 
-### 4. Re-measure the published figures
-
+### 4. Published figures
 ```
 python tools/remeasure/remeasure.py
 ```
@@ -183,8 +179,7 @@ either.
 The gate is worth reading only once it comes back clean. 0.3.0 finished at 285
 figures, 199 reproduced, zero MOVED.
 
-### 5. Update the documentation site
-
+### 5. Documentation site
 **The site is not in this repository.** It is `simoncoombes/tradefloor-docs`,
 private, and Vercel serves its `docs/` directory verbatim from `main` with no
 build step, so a push there is a deploy that is live in about a minute.
@@ -211,7 +206,7 @@ python tools/docs/learn/params.py --python /tmp/rel/bin/python
 python tools/docs/learn/api.py
 ```
 
-`--python` is not a courtesy. A local development build reports the same
+`--python` is required. A local development build reports the same
 version string as the release and can expose parameters the release does not:
 on 2026-08-29 this machine's system interpreter carried a build calling itself
 0.5.0 with 98 settable parameters against the published wheel's 93,
@@ -279,7 +274,7 @@ wrong, and the pages carry no version of their own to warn them.
 
 Two things to check while doing it, because both have been wrong before:
 
-- **An argument that changed meaning is not a new feature.** Say so
+- **An argument that changed meaning needs its own note.** Say so
   plainly. Code that already passes it is now doing something different,
   and its author will not think to re-read a page about a call they
   already use.
@@ -291,8 +286,7 @@ If a release ships nothing public, say so in the docs PR rather than
 skipping the step, so the next person can tell the difference between
 "nothing to do" and "not done".
 
-### 6. Check the README survives PyPI
-
+### 6. README on PyPI
 ```
 python -m pytest tests/test_readme_links.py -q
 ```
@@ -303,8 +297,7 @@ resolves to `pypi.org/project/tradefloor/examples/...` and 404s. It renders
 correctly on GitHub, so it survived two releases. The test fails on
 any relative link and on any absolute link naming a file that is not there.
 
-### 7. Run the determinism gate on the branch
-
+### 7. Determinism gate
 ```
 gh workflow run determinism.yml --ref <branch> -f targets=all
 ```
@@ -341,8 +334,7 @@ be green before the merge, not against `main` afterwards. The two-target push
 gate does not satisfy it: the required context is the job named `all targets
 agree`, and a run started with the default `unverified` never produces it.
 
-## Shipping it, in order
-
+## Shipping order
 The seven steps above run on a release branch off `main`, not on `main` and
 not on `dev`. `main` is protected: a pull request is the only way in, it must
 pass the determinism gate on all five targets and the documentation build,
@@ -479,8 +471,7 @@ one still 404s after ten minutes, the build failed and the crate page says why.
 - Submit the sitemap in Search Console if the page set changed. Google
   removed the ping endpoint in 2024, so it is a manual step.
 
-## What has gone wrong before, and what now catches it
-
+## Past failures and their checks
 | failure | what caught it | what stops it now |
 |---|---|---|
 | sdist rejected, licence files declared at the root and packaged under `rust/` | PyPI, at upload | `license-files` declared explicitly; the sdist is verified before tagging |
@@ -497,7 +488,7 @@ one still 404s after ten minutes, the build failed and the crate page says why.
 | a push reported `Everything up-to-date` while the fix sat on another branch | comparing SHAs rather than reading the push output | the branch check in the shipping list |
 
 The pattern in all five: **correct everywhere the author looks, wrong only in
-the destination.** That is why the checks above run against the artifact
+the destination.** The checks above therefore run against the artifact
 rather than the source, and why the last step is installing from PyPI rather
 than trusting the tree it was built from.
 
@@ -509,7 +500,7 @@ every published result that cited it. Coefficient changes therefore arrive as
 a **new model preset**, never as an edit to an existing one, and old presets
 keep running exactly as they did.
 
-That is why `pt-v1` through `pt-v12` all still exist and reproduce, and why a
+This is why `pt-v1` through `pt-v12` all still exist and reproduce, and why a
 patch release can carry a new preset without being a breaking change. Check
 the range rather than trusting this sentence: the shipped list is what
 `pt.ModelParams.from_preset("pt-v99")` names in its error, and the default is

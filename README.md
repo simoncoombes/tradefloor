@@ -70,8 +70,7 @@ scores["mine"].strategy_fingerprint  # sha256, cite this
 That is one market draw. It tells you as much about the seed as about the
 strategy. `tf.rank` runs many seeds and compares them with a paired sign test.
 
-## What you get
-
+## Contents
 | | |
 |---|---|
 | `engine.truth()` | why each price moved: nine factors that sum to the move, to 1e-16 |
@@ -133,8 +132,7 @@ Six scenarios ship inside the package, so `Scenario.load` works on a plain
 `tradefloor scenario list` names them, and `tradefloor scenario targets`
 lists every target and what it actually reaches.
 
-## How real it is
-
+## Realism
 `tf.facts.measure()` scores fourteen statistics against real-market bands. The
 default preset, `pt-v14`, holds all fourteen at one year and at two years. It
 holds all fourteen on a roster it never saw, and thirteen on new seeds.
@@ -162,8 +160,7 @@ model, so a strategy shaped like that model looks excellent and teaches you
 nothing. A strategy that fails here tells you more. There is one venue, no
 latency, and no counterparty that adapts to you.
 
-## Same seed, same market
-
+## Seed determinism
 Each release builds five targets, runs one fixed simulation in each, and
 compares digests. A disagreement stops the release. The crate ships its own
 `exp`, `log`, `sin` and `cos`, so the platform libm cannot change a result.

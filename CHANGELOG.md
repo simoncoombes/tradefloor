@@ -251,7 +251,7 @@ The ignore rules name the directory that exists, the artefacts are untracked,
 **`tests/test_stub_parity.py` runs again.** Its `STUB` path still pointed at
 `python/pretium/_core.pyi`, so its `skipif` skipped all ninety-nine of its
 tests and reported green while the type stub went unread. A missing stub is
-now an error rather than a skip.
+now an error.
 
 **New:** `tests/test_forking.py` (38 invariant tests over the whole
 run/checkpoint/fork/intervene/compare chain, including a cross-process
@@ -278,7 +278,7 @@ days of shared history, a checkpoint, a fork, +200bps in one branch, and
 twenty more days in each. Runs in about two seconds with no keys, no
 network and no data files, writes a checkpoint, a `RunManifest` per arm, a
 comparison and a chart, and is covered by `tests/test_rate_shock_demo.py`.
-The tutorial is `examples/rate-shock/README.md`.
+The tutorial for it is `examples/rate-shock/README.md`.
 
 **Evaluate a real FinRobot agent: `tradefloor.integrations.finrobot`.** The
 canonical rate-shock experiment, with the agent swapped and nothing else
@@ -315,7 +315,7 @@ artifacts, so they sit beside the run that wrote them. Recorded inputs a study
 replays are committed once under `tests/fixtures/`, because two copies of a
 recording can drift apart. `tests/test_examples.py` now walks `examples/`
 instead of globbing `0*`, after the first unnumbered example arrived
-with nothing checking it at all. `CONTRIBUTING.md` has the rule.
+with nothing checking it at all. The rule is recorded in `CONTRIBUTING.md`.
 
 **Fixed: a forked world's log held the shared history twice.** `World`
 carried its parent's order log across a fork because a branched engine's began
@@ -399,8 +399,7 @@ since the site was rebuilt.
 
 <!-- release-note-ends -->
 
-### the detail, and why nothing caught it
-
+### Detail
 The dollar index is not an output-only series. `economy/daily.rs` reads it for
 the inflation effect and for the dollar effect, so a change to the safe-haven
 drift propagates through inflation into the whole macro chain and out into
@@ -451,8 +450,7 @@ nothing changes until a preset sets it.
 
 <!-- release-note-ends -->
 
-### the detail, and why the third one ships switched off
-
+### Detail
 `update_economy_daily` is preset-independent, so flooring the spread
 unconditionally would move the economy trajectory of every preset, `pt-v1`
 included. The version policy in `RELEASING.md` is explicit that a change to
@@ -488,8 +486,7 @@ Both presets now report 60, the rate they run. If you pinned either one in
 
 <!-- release-note-ends -->
 
-### the detail, and how it happened
-
+### Detail
 The presets are built by `const fn`. The half-life is an INPUT: assigning it
 has to recompute `mispricing_phi` and `s_phi_tick` through `ln` and `exp`,
 which const evaluation cannot do. The runtime path does this correctly, and
@@ -559,12 +556,11 @@ that replaced them, and four pages were retired.
 
 <!-- release-note-ends -->
 
-### the detail, and how it was measured
-
+### Detail
 **A band was too narrow and is now correct.** `abs_return_acf5` ran 0.02 to
 0.09. Real markets leave that band on five of eight non-crisis reference
 windows, which means it was rejecting reality. Re-derived from eight windows
-instead of three, it is 0.01 to 0.12. No preset's score changes.
+instead of three, it is 0.01 to 0.12. No preset's score changes as a result.
 
 **The leverage effect sits nearer its edge.** Its median moves from -0.0377
 to -0.0222 in a band that runs -0.16 to 0.0, and the count of seeds landing
@@ -613,13 +609,13 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v10")
 
 **The fix was one number.** Volume stopped responding to a move at 4 percent,
 so a stock down 12 traded like a stock down 4. That cap had been in the engine
-since the first version and nobody chose it. It is now 12 percent.
+since the first version and nobody chose it. The figure is now 12 percent.
 
 **One thing got worse.** Under a real macro path, daily swings run 1.57x as
 wide as the real stock they are compared against, against 1.555x before. It is
 the `scenario-magnitude` gap.
 
-**`pt-v11` also ships, and is not the default.** It is the base `pt-v12` is
+**`pt-v11` also ships and is not selected by default.** It is the base `pt-v12` is
 built on, and the first preset whose crises behave like real ones.
 
 | in a crisis | `pt-v10` | `pt-v11` | real |
@@ -636,7 +632,7 @@ Before this, one company's earnings surprise reached nobody.
 
 **Seventeen new settings**, each at the value the engine already used, so no
 preset from `pt-v1` to `pt-v10` moves. `ModelParams` goes from 70 coefficients
-to 87. `pt.ModelParams.settable()` lists them.
+to 87. `tf.ModelParams.settable()` lists them.
 
 **The envelope covers more than it did.** Six gaps become five. `pt-v12` holds
 volume change in band at both horizons, so that gap is gone. Two-year and
@@ -648,7 +644,7 @@ S&P-like, technology-heavy and defensive rosters all hold 14 of 14 at one year.
 
 **A bug fixed on the way.** Driven a minute at a time, the model's own company
 news never reached you. A batched tick loop also rolled that news every minute.
-Both paths now print the same prices. This only affected `pt-v11`.
+Both paths now print the same prices. The defect affected `pt-v11` alone.
 
 **Documentation.** Every published figure was re-measured against the engine.
 Three new pages: a glossary, the two loops, and the principles. References to
@@ -707,7 +703,7 @@ none. Both hold 13 of 14 in band at 504 days.
 
 Four statistics join the panel: `corr_asymmetry`, `corr_asymmetry_lagged`,
 `sector_excess_corr` and `corr_persistence_acf1`. `pt-v3` now reads 12 of 14 at
-252 days and 7 of 14 at 504. The engine did not move. The misses were always
+252 days and 7 of 14 at 504. The engine itself is unchanged. The misses were always
 there.
 
 Five settings that were literals: `crisis_blend_source`, `sector_vix_coupling`,
@@ -780,7 +776,7 @@ hold outside the notebook: only `qe_pe_boost` moves a valuation, and
 
 ## 0.1.2
 
-Fixes the PyPI project page. The engine did not move.
+Fixes the PyPI project page. The engine itself is unchanged.
 
 The README linked to examples and licences by relative path. That works on
 GitHub and 404s on PyPI, which renders the same file. Eleven links were dead. It
@@ -838,7 +834,7 @@ on purpose: an optimiser pointed at a target it cannot reach distorts everything
 else. Six further gaps say what each one stops you concluding, and
 `envelope.check()` refuses a question that falls outside them.
 
-`pt-v4` also ships and is not the default. It is the first preset to bring
+`pt-v4` also ships and is not selected by default. It is the first preset to bring
 504-day kurtosis inside its band, and it pays at one year, holding eight of ten.
 
 **Versioning.** Anything that changes the simulated trajectory is a breaking
