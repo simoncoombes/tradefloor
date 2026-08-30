@@ -5,11 +5,28 @@
 **pt-v16 registered.** pt-v15 with the QE valuation channel silenced,
 correlation asymmetry recomposed from sector-loading dispersion and a quieter
 VIX cycle, a 0.86x joint trim of every noise source, and
-`volume_move_response` raised from 0.6 to 1.0. Over twenty-six seed blocks at
-one hundred seeds each, thirteen never touched by any search: both panels in
-band on every statistic on all twenty-six, crisis co-movement and lever 26/26,
-and the driven noise ratio 1.13 against pt-v15's 1.46. Selectable by name,
-with `pt-v14` still the default.
+`volume_move_response` raised from 0.6 to 1.0. Selectable by name, with
+`pt-v14` still the default.
+
+**And its VIX learns fear.** Left alone, the engine's VIX tracked its own
+market's realized volatility at 0.16 correlation against a real 0.87 and
+decayed as fast as it rose. pt-v16 closes the loop: a third of the VIX target
+is the variance process's own inverse (`vix_realised_vol_weight` 0.3), fear
+decays at six tenths of the rate it arrives (`vix_decay_ratio` 0.6, a new
+dial, bit-inert at 1.0), and the reversion slows to match
+(`vix_mean_reversion` 0.06). Measured on ^VIX and ^GSPC over 2004-2025:
+realized-vol tracking 0.16 to 0.57, spike asymmetry 0.95 to 1.28 against a
+real 1.20, day persistence 0.90 to 0.985. The card over twenty-six seed
+blocks at one hundred seeds, thirteen never touched by any search: crisis
+co-movement and lever 26/26, the driven noise ratio 1.13 against pt-v15's
+1.46, both panels in band on twenty-five of twenty-six blocks -- one
+correlation-asymmetry row sits 0.0025 past a floor whose derivation noise is
+0.038, the fear process's measured price. Crisis frequency stays below real:
+every mechanism that raised P(VIX>30) broke certified statistics (three
+families measured to their deaths in the design record), so a market afraid
+of itself at the right frequency belongs to a later era's recalibration, not
+a dial this one could turn. The fear-event dials (`vix_jump_intensity`,
+`vix_jump_scale`) ship inert, taking no random draws at zero.
 
 **Scenarios: a named collection of interventions, in YAML or Python.**
 `tf.Scenario` names targets from a registry of twelve fields the engine reads,

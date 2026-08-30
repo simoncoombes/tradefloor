@@ -1022,6 +1022,26 @@ pub struct ModelParams {
     /// variance process was measured to cost long-horizon realism, a longer
     /// SPIKE touches variance persistence not at all.
     pub vix_mean_reversion: f64,
+    /// Fear decays slower than it arrives. Multiplies the mean reversion
+    /// on days the target sits BELOW the current VIX (fear decaying);
+    /// rising days keep the full rate. 1.0 -- every preset before the
+    /// fear-gap era -- is the symmetric shipped arithmetic, bit for bit.
+    /// Real markets: up-moves average 1.20x the size of down-moves
+    /// (fear-gap-targets.json, 2004-2025).
+    pub vix_decay_ratio: f64,
+    /// Exogenous fear events, per YEAR. Real VIX spikes often arrive from
+    /// news rather than accumulated market moves, and the target's small
+    /// Gaussian noise cannot make that tail: P(VIX>30) reads ~0.007
+    /// endogenous against a real 0.082 (round 133). At intensity != 0 a
+    /// rare jump lands directly on the VIX LEVEL (a target jump would be
+    /// eaten by the mean reversion, which is the measured death of the
+    /// return wire) and decays through the slow side of
+    /// [`ModelParams::vix_decay_ratio`] -- up fast, down slow, like fear.
+    /// 0.0 -- every preset before the fear era -- takes NO random draws,
+    /// so the schedule and every recorded run reproduce bit for bit.
+    pub vix_jump_intensity: f64,
+    /// Mean size of a fear event, in VIX points (exponential draw).
+    pub vix_jump_scale: f64,
     /// VIX points added to its target per unit of a DOWN day's index
     /// return, before the clamp and cap below.
     ///
@@ -1376,6 +1396,9 @@ impl ModelParams {
             spread_size_smoothness: 0.0,
             spread_size_exponent: crate::microstructure::SPREAD_SIZE_EXPONENT,
             vix_mean_reversion: crate::economy::VIX_MEAN_REVERSION,
+            vix_decay_ratio: 1.0,
+            vix_jump_intensity: 0.0,
+            vix_jump_scale: 0.0,
             vix_realised_vol_weight: 0.0,
             vix_cycle_amplitude: 1.0,
             vix_return_source: 0.0,
@@ -2268,6 +2291,21 @@ impl ModelParams {
         // qualification blocks clear the floor and the union card is
         // clean on both panels (volqual, 100 seeds).
         p.volume_move_response = 1.0;
+        // The VIX learns fear (the fear-gap campaign, rounds 124-135).
+        // The realized-vol feedback closes the loop the code left open
+        // since the implied read was built: a third of the VIX target is
+        // the variance process's own inverse. Fear decays at six tenths
+        // of the rate it arrives, and the reversion slows to match.
+        // Measured against ^VIX/^GSPC 2004-2025: realized-vol tracking
+        // 0.16 -> 0.57, spike asymmetry 0.95 -> 1.28 (real 1.20), day
+        // persistence 0.90 -> 0.985. Two numbers are stated rather than
+        // hidden: crisis frequency P(VIX>30) stays below real (every
+        // mechanism that raised it broke the certified statistics --
+        // three families measured dead), and one corr_asymmetry row on
+        // one of twenty-six blocks sits 0.0025 past its floor.
+        p.vix_realised_vol_weight = 0.3;
+        p.vix_decay_ratio = 0.6;
+        p.vix_mean_reversion = 0.06;
         p
     }
 
@@ -2398,6 +2436,9 @@ impl ModelParams {
             "spread_size_smoothness" => self.spread_size_smoothness,
             "spread_size_exponent" => self.spread_size_exponent,
             "vix_mean_reversion" => self.vix_mean_reversion,
+            "vix_decay_ratio" => self.vix_decay_ratio,
+            "vix_jump_intensity" => self.vix_jump_intensity,
+            "vix_jump_scale" => self.vix_jump_scale,
             "vix_cycle_amplitude" => self.vix_cycle_amplitude,
             "vix_realised_vol_weight" => self.vix_realised_vol_weight,
             "vix_return_clamp" => self.vix_return_clamp,
@@ -2533,6 +2574,9 @@ impl ModelParams {
             "spread_size_exponent" => out.spread_size_exponent = value,
             "spread_size_smoothness" => out.spread_size_smoothness = value,
             "vix_mean_reversion" => out.vix_mean_reversion = value,
+            "vix_decay_ratio" => out.vix_decay_ratio = value,
+            "vix_jump_intensity" => out.vix_jump_intensity = value,
+            "vix_jump_scale" => out.vix_jump_scale = value,
             "vix_cycle_amplitude" => out.vix_cycle_amplitude = value,
             "vix_realised_vol_weight" => out.vix_realised_vol_weight = value,
             "vix_return_clamp" => out.vix_return_clamp = value,
@@ -2732,6 +2776,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "usd_crisis_vix_threshold",
         "vix_cycle_amplitude",
         "vix_mean_reversion",
+        "vix_decay_ratio",
+        "vix_jump_intensity",
+        "vix_jump_scale",
         "vix_realised_vol_weight",
         "vix_return_clamp",
         "vix_return_gain",
@@ -3030,6 +3077,9 @@ mod tests {
             .and_then(|m| m.with_override("endogenous_news_sigma", 0.01751004376))
             .and_then(|m| m.with_override("sector_factor_sigma", 0.008583053614))
             .and_then(|m| m.with_override("volume_move_response", 1.0))
+            .and_then(|m| m.with_override("vix_realised_vol_weight", 0.3))
+            .and_then(|m| m.with_override("vix_decay_ratio", 0.6))
+            .and_then(|m| m.with_override("vix_mean_reversion", 0.06))
             .expect("every folded dial is settable");
         assert_eq!(crate::params::PT_V16.digest(), measured.digest());
         assert_eq!(crate::params::PT_V16.fingerprint(), "pt-v16");
