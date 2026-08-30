@@ -11,7 +11,50 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import os
 CELLS = {"v16": {}}
-if os.environ.get("FLOW_GRID", "one") == "four":
+if os.environ.get("FLOW_GRID", "one") == "fund":
+    # Round 142: funded composites -- forced flow paid for by an
+    # endpoint-pinned exponent DROP (T5/T45 fixed, T65 lowered), so
+    # crisis variance is recomposed from factor noise into forced flow.
+    CELLS.update({
+        "g300t50k2": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0
+        },
+        "f300p17": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "market_vol_vix_exponent": 1.7,
+                "market_vol_vix_coupling": 1.0432946095791136,
+                "market_vol_vix_anchor": 13.938395948914303
+        },
+        "f300p18": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "market_vol_vix_exponent": 1.8,
+                "market_vol_vix_coupling": 1.0065722134144428,
+                "market_vol_vix_anchor": 14.621968758459962
+        },
+        "f200p18": {
+                "forced_flow_gain": 0.002,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "market_vol_vix_exponent": 1.8,
+                "market_vol_vix_coupling": 1.0065722134144428,
+                "market_vol_vix_anchor": 14.621968758459962
+        },
+        "f300p19": {
+                "forced_flow_gain": 0.003,
+                "forced_flow_threshold": 50.0,
+                "forced_flow_beta_exponent": 2.0,
+                "market_vol_vix_exponent": 1.9,
+                "market_vol_vix_coupling": 0.9773477138978486,
+                "market_vol_vix_anchor": 15.30542178476031
+        }
+})
+elif os.environ.get("FLOW_GRID", "one") == "four":
     # Screen four (round 141): threshold 50 -- ABOVE the held-45
     # instrument entirely (lever/co clean by construction), hotter gain
     # to compensate for fewer active days in the crash window.
