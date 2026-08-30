@@ -35,6 +35,19 @@ and collapses correlations instead of re-levelling. `volume_move_response`
 rises from 0.6 to 1.0, and `vix_decay_ratio`, `vix_jump_intensity` and
 `vix_jump_scale` join the settable set.
 
+**A policy rate now reaches equities before the first meeting.** Equities
+discount off the corporate bond yield, which the central bank recomputes from
+the 10Y at meetings, the first of them 45 days out. A policy-only ramp
+therefore moved nothing inside that window, and both the scenario
+documentation and `tests/test_scenario.py` stated it as a fact: 0.00% at 40
+days. `daily_credit_floor_gain` re-asserts both credit floors on every daily
+step, so from pt-v15 onward the spread is touched daily and the ramp
+transmits inside the window. Measured on `Universe.random(20, seed=4)` at sim
+seed 5, read at 40 days: pt-v12 and pt-v14 give 0.00% and the shipped default
+gives -3.34% on the median instrument. The 0.4.2 entry named this consequence
+in advance and placed it at a preset boundary, which is where it arrived. Pin
+`pt-v14` to keep the sharp boundary.
+
 **What is still short, stated.** The `corr_asymmetry` median of -0.022 is
 band-complete and sits below every real reference window, and the driven
 window at 1.12 is the closest this model has come to the real 1.00 without

@@ -180,6 +180,13 @@ MEASURED_504: dict[str, float] = {
 #: |return| autocorrelation at the certified horizon, against real markets.
 #: The model crosses below real around lag 8 and goes NEGATIVE by lag 30,
 #: where real markets stay weakly positive out to lag 60.
+#:
+#: MEASURED UNDER pt-v14, and not yet re-measured for pt-v16. Every other
+#: constant in this module moved to the new default at 0.6.0; this curve, the
+#: slope below and the `decay-shape` gap that quotes them did not, because
+#: re-deriving them is a multi-lag measurement rather than a panel read. A
+#: single seed at lag twenty reads +0.0221 under pt-v16 against -0.0071 under
+#: pt-v14, so the shape has narrowed and the numbers here understate it.
 DECAY_252: dict[int, float] = {
     1: 0.1413, 2: 0.1063, 3: 0.0897, 5: 0.0496, 8: 0.0371,
     12: 0.0173, 20: 0.0082, 30: -0.0052, 45: -0.0120, 60: -0.0142,

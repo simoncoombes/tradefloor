@@ -170,11 +170,17 @@ def test_the_circuit_breaker_component_fires_when_the_breaker_binds():
     """
     pa = pytest.importorskip("pyarrow")
 
+    # The numbers here are the violence needed, not a preference. The ramp
+    # started at 65 with a -0.30 QE step until 0.6.0, when pt-v16's joint
+    # 0.86x noise trim left that scenario short of the band on every seed and
+    # this guard reported "never bound". Measured at the values below the
+    # breaker binds on 33 to 729 rows across seeds 2024, 7, 101 and 555, so
+    # the margin survives the next preset that runs calmer still.
     universe = tradefloor.Universe.random(20, seed=5)
     scenario = (tradefloor.Scenario()
                 .hold(vix=15.0, corporate_bond_yield=0.055)
-                .ramp("vix", start=65.0, end=15.0, over=20, begin=5)
-                .step("qe_pe_boost", before=0.0, after=-0.30, at=5))
+                .ramp("vix", start=200.0, end=15.0, over=20, begin=5)
+                .step("qe_pe_boost", before=0.0, after=-0.90, at=5))
     engine = tradefloor.Engine(seed=2024, universe=universe)
     for day in range(25):
         scenario.apply(engine, day)

@@ -180,13 +180,14 @@ class Macro:
     corporate_bond_yield: float | None
     inflation_rate: float
     qe_pe_boost: float
+    qe_assets_ratio: float
     fear_greed_index: float
     cycle: str
     def __init__(
         self, *, vix: float = ..., federal_funds_rate: float = ...,
         corporate_bond_yield: float | None = ..., inflation_rate: float = ...,
-        qe_pe_boost: float = ..., fear_greed_index: float = ...,
-        cycle: CycleName = ...,
+        qe_pe_boost: float = ..., qe_assets_ratio: float = ...,
+        fear_greed_index: float = ..., cycle: CycleName = ...,
     ) -> None: ...
 
 class News:
@@ -322,7 +323,8 @@ class Engine:
     def pin_macro(
         self, *, vix: float | None = ..., federal_funds_rate: float | None = ...,
         corporate_bond_yield: float | None = ..., inflation_rate: float | None = ...,
-        qe_pe_boost: float | None = ..., fear_greed_index: float | None = ...,
+        qe_pe_boost: float | None = ..., qe_assets_ratio: float | None = ...,
+        fear_greed_index: float | None = ...,
         gdp_growth: float | None = ..., unemployment_rate: float | None = ...,
         tariff_rate: float | None = ..., oil_price: float | None = ...,
         cycle: CycleName | None = ...,

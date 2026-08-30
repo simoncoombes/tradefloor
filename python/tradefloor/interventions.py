@@ -33,7 +33,9 @@ depth through the book. Everything else in the economy reaches the market
 through the macro chain: a monthly inflation update, then the central bank's
 next MEETING, then the curve. The first meeting is scheduled 45 days out. A
 sixty-day study of an oil shock will see very little, and it will not warn
-you. `note` on each target says so before you run it.
+you. `note` on each target says so before you run it. The policy rate is the
+exception from pt-v15 onward, where the daily credit floor touches the spread
+every day and a rate pin reaches equities inside the window.
 
 ## Three operations and one clock
 

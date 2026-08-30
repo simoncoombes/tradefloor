@@ -27,7 +27,7 @@ def run(scenario, **kwargs):
 # --------------------------------------------------------------------------
 
 
-def test_the_policy_rate_alone_moves_nothing_before_the_first_meeting():
+def test_when_the_policy_rate_reaches_equities_depends_on_the_preset():
     """The measurement that justifies the whole rate_shock constructor.
 
     No defect: equities discount off the corporate bond yield, and the
@@ -35,22 +35,36 @@ def test_the_policy_rate_alone_moves_nothing_before_the_first_meeting():
     engine the economy always carries one, so the policy rate never reaches
     fair value DIRECTLY.
 
-    Since the macro chain began running endogenously (2026-08), the trap is
-    horizon-dependent rather than absolute: the corporate yield is recomputed
-    from the 10Y at central-bank MEETINGS, and the first meeting is scheduled
-    45 days out. Inside that window a policy-only ramp still moves exactly
-    nothing -- measured 0.00% at 40 days -- which is this test. Past it, the
-    chain transmits: see the companion test below.
+    Which leaves the question of WHEN the yield moves, and the answer changed
+    at pt-v15. The corporate yield is recomputed from the 10Y at central-bank
+    MEETINGS, the first of which is 45 days out, so on a preset that only
+    recomputes there a policy-only ramp moves exactly nothing inside the
+    window: pt-v12 and pt-v14 both measure 0.00% at 40 days.
 
-    It is pinned as a test because it is SILENT. A user ramps the rate over a
-    month, sees nothing move, and concludes the model does not care about
-    rates. It cares -- at meeting cadence, through the curve.
+    `daily_credit_floor_gain` re-asserts both credit floors on every daily
+    step. pt-v15 turned it on and pt-v16 inherits it, so the spread is now
+    touched daily and the ramp reaches equities without waiting for a
+    meeting: -3.34% at 40 days on the shipped default. The 0.4.2 changelog
+    named this consequence in advance and placed it at a preset boundary,
+    which is where it arrived.
+
+    Both halves are pinned because the old one is SILENT. A user on a pinned
+    pt-v14 ramps the rate over a month, sees nothing move, and concludes the
+    model does not care about rates. It cares, at meeting cadence, through
+    the curve.
     """
     policy_only = Scenario().ramp("federal_funds_rate",
                                   start=0.025, end=0.05, over=30)
-    result = run(policy_only)
-    assert result["median_pct"] == pytest.approx(0.0, abs=1e-9)
-    assert result["worst_pct"] == pytest.approx(0.0, abs=1e-9)
+
+    # Meeting cadence only: the boundary is sharp where the daily floor is off.
+    pinned = run(policy_only, model="pt-v14")
+    assert pinned["median_pct"] == pytest.approx(0.0, abs=1e-9)
+    assert pinned["worst_pct"] == pytest.approx(0.0, abs=1e-9)
+
+    # The shipped default, where the daily floor carries it inside the window.
+    shipped = run(policy_only)
+    assert shipped["median_pct"] < -1.0
+    assert shipped["worst_pct"] < shipped["median_pct"]
 
 
 def test_the_policy_rate_reaches_the_curve_at_the_first_meeting():
