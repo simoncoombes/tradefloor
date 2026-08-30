@@ -260,6 +260,9 @@ pub struct Engine {
     /// event's effect on the cross-section OUTLIVES the day it happened.
     /// Zero, and inert, under every preset before pt-v4.
     universe_stress: f64,
+    /// Forced-flow budget spent, in VIX-point-days. 0.0 while the
+    /// reservoir dial ships 0.0; see `ModelParams::forced_flow_reservoir`.
+    forced_flow_spent: f64,
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
     volume_state: f64,
@@ -468,6 +471,7 @@ impl Engine {
             market_vol: MarketVarianceState::new_with(&params),
             universe_stress: 0.0,
             volume_state: 0.0,
+            forced_flow_spent: 0.0,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             sector_keys,
@@ -670,6 +674,14 @@ impl Engine {
             &TickInputs {
                 economy: &self.economy,
                 prev_day_down: self.market_vol.prev_day_down(),
+                forced_flow_eff: if self.params.forced_flow_reservoir > 0.0 {
+                    crate::mathx::max(
+                        0.0,
+                        1.0 - self.forced_flow_spent / self.params.forced_flow_reservoir,
+                    )
+                } else {
+                    1.0
+                },
                 universe_stress: self.universe_stress,
                 volume_state: self.volume_state,
                 volume_idio: &self.volume_idio,
@@ -966,6 +978,20 @@ impl Engine {
         // is the day's TRADING value — the macro chain has not advanced
         // yet, exactly as the per-name updates see the day they closed.
         self.market_vol.close_day_with(&self.params, self.economy.vix);
+        // The forced-flow reservoir drains on stress days and rebuilds in
+        // calm. Updated only while the mechanism is live: at gain 0 or
+        // reservoir 0 the state stays exactly 0.0 and nothing changes.
+        if self.params.forced_flow_gain != 0.0 && self.params.forced_flow_reservoir > 0.0 {
+            let excess = crate::mathx::max(
+                0.0,
+                self.economy.vix - self.params.forced_flow_threshold,
+            );
+            if excess > 0.0 {
+                self.forced_flow_spent += excess;
+            } else if self.params.forced_flow_replenish != 0.0 {
+                self.forced_flow_spent *= 1.0 - self.params.forced_flow_replenish;
+            }
+        }
         self.update_universe_stress();
         self.apply_jumps();
         self.update_volume_state();
@@ -1406,6 +1432,15 @@ impl Engine {
     /// embedder's side is a divergence waiting for the first day the two
     /// disagree, and the caller cannot supply it correctly in any case --
     /// the value being asked for is the noise the session just accumulated.
+    /// Read/write the forced-flow segment's spent budget, for checkpoints.
+    pub fn forced_flow_spent(&self) -> f64 {
+        self.forced_flow_spent
+    }
+
+    pub fn set_forced_flow_spent(&mut self, spent: f64) {
+        self.forced_flow_spent = spent;
+    }
+
     pub fn close_day(&mut self, game_day: i64) {
         let noise = self.attribution_column(random_noise_index());
         let innovations: Vec<Option<f64>> = noise.into_iter().map(Some).collect();

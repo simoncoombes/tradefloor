@@ -1067,6 +1067,17 @@ pub struct ModelParams {
     /// uniform screen-one behaviour bit for bit (beta^0 multiplies by
     /// 1.0 through a branch, not a pow call).
     pub forced_flow_beta_exponent: f64,
+    /// Forced sellers are FINITE (round 143: sixty held days of constant
+    /// sell drift ground prices into their clamps and the crisis lever
+    /// broke DOWNWARD -- only a sustained-stress instrument could catch
+    /// infinite sellers). The reservoir is the segment's total budget in
+    /// VIX-point-days: each day above the threshold spends its excess,
+    /// and the effective lean scales by the fraction remaining. 0.0 is
+    /// the infinite-sellers screen behaviour bit for bit.
+    pub forced_flow_reservoir: f64,
+    /// Fraction of spent budget recovered per below-threshold day
+    /// (deleveraging capacity rebuilds in calm). 0.0: never.
+    pub forced_flow_replenish: f64,
     /// VIX points added to its target per unit of a DOWN day's index
     /// return, before the clamp and cap below.
     ///
@@ -1427,6 +1438,8 @@ impl ModelParams {
             forced_flow_gain: 0.0,
             forced_flow_threshold: 40.0,
             forced_flow_beta_exponent: 0.0,
+            forced_flow_reservoir: 0.0,
+            forced_flow_replenish: 0.0,
             vix_realised_vol_weight: 0.0,
             vix_cycle_amplitude: 1.0,
             vix_return_source: 0.0,
@@ -2470,6 +2483,8 @@ impl ModelParams {
             "forced_flow_gain" => self.forced_flow_gain,
             "forced_flow_threshold" => self.forced_flow_threshold,
             "forced_flow_beta_exponent" => self.forced_flow_beta_exponent,
+            "forced_flow_reservoir" => self.forced_flow_reservoir,
+            "forced_flow_replenish" => self.forced_flow_replenish,
             "vix_cycle_amplitude" => self.vix_cycle_amplitude,
             "vix_realised_vol_weight" => self.vix_realised_vol_weight,
             "vix_return_clamp" => self.vix_return_clamp,
@@ -2611,6 +2626,8 @@ impl ModelParams {
             "forced_flow_gain" => out.forced_flow_gain = value,
             "forced_flow_threshold" => out.forced_flow_threshold = value,
             "forced_flow_beta_exponent" => out.forced_flow_beta_exponent = value,
+            "forced_flow_reservoir" => out.forced_flow_reservoir = value,
+            "forced_flow_replenish" => out.forced_flow_replenish = value,
             "vix_cycle_amplitude" => out.vix_cycle_amplitude = value,
             "vix_realised_vol_weight" => out.vix_realised_vol_weight = value,
             "vix_return_clamp" => out.vix_return_clamp = value,
@@ -2816,6 +2833,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "forced_flow_gain",
         "forced_flow_threshold",
         "forced_flow_beta_exponent",
+        "forced_flow_reservoir",
+        "forced_flow_replenish",
         "vix_realised_vol_weight",
         "vix_return_clamp",
         "vix_return_gain",

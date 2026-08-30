@@ -310,6 +310,9 @@ pub struct TickInputs<'a> {
     /// (`market_beta_down_asym_lag`); false everywhere that dial is 0.0,
     /// including every recorded reference stream.
     pub prev_day_down: bool,
+    /// Fraction of the forced-flow segment's budget remaining, 1.0 when
+    /// the reservoir dial is off. See `ModelParams::forced_flow_reservoir`.
+    pub forced_flow_eff: f64,
     /// Today's market-factor sigma at DAILY scale — the conditional level
     /// of the factor's variance process ([`super::factor_vol`]), fixed for
     /// the whole session at the previous close's update.
@@ -670,7 +673,8 @@ pub fn simulate_market_tick(
         // arithmetic, so 0.0 is bit-identical.
         let forced = if p.forced_flow_gain != 0.0 {
             let common = -p.forced_flow_gain
-                * mathx::max(0.0, economy.vix - p.forced_flow_threshold);
+                * mathx::max(0.0, economy.vix - p.forced_flow_threshold)
+                * inputs.forced_flow_eff;
             // beta^0 through a branch, so screen one's uniform lean and
             // every recorded run reproduce bit for bit.
             if p.forced_flow_beta_exponent != 0.0 {
