@@ -2291,6 +2291,21 @@ impl ModelParams {
         // qualification blocks clear the floor and the union card is
         // clean on both panels (volqual, 100 seeds).
         p.volume_move_response = 1.0;
+        // The VIX learns fear (the fear-gap campaign, rounds 124-135).
+        // The realized-vol feedback closes the loop the code left open
+        // since the implied read was built: a third of the VIX target is
+        // the variance process's own inverse. Fear decays at six tenths
+        // of the rate it arrives, and the reversion slows to match.
+        // Measured against ^VIX/^GSPC 2004-2025: realized-vol tracking
+        // 0.16 -> 0.57, spike asymmetry 0.95 -> 1.28 (real 1.20), day
+        // persistence 0.90 -> 0.985. Two numbers are stated rather than
+        // hidden: crisis frequency P(VIX>30) stays below real (every
+        // mechanism that raised it broke the certified statistics --
+        // three families measured dead), and one corr_asymmetry row on
+        // one of twenty-six blocks sits 0.0025 past its floor.
+        p.vix_realised_vol_weight = 0.3;
+        p.vix_decay_ratio = 0.6;
+        p.vix_mean_reversion = 0.06;
         p
     }
 
@@ -3062,6 +3077,9 @@ mod tests {
             .and_then(|m| m.with_override("endogenous_news_sigma", 0.01751004376))
             .and_then(|m| m.with_override("sector_factor_sigma", 0.008583053614))
             .and_then(|m| m.with_override("volume_move_response", 1.0))
+            .and_then(|m| m.with_override("vix_realised_vol_weight", 0.3))
+            .and_then(|m| m.with_override("vix_decay_ratio", 0.6))
+            .and_then(|m| m.with_override("vix_mean_reversion", 0.06))
             .expect("every folded dial is settable");
         assert_eq!(crate::params::PT_V16.digest(), measured.digest());
         assert_eq!(crate::params::PT_V16.fingerprint(), "pt-v16");

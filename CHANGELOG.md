@@ -2,21 +2,45 @@
 
 ## Unreleased
 
-**pt-v16 registered: the complete card.** pt-v15 re-levelled and
-re-coupled: the QE valuation channel silenced (its driven input was a
-proxy anticorrelated with measured Fed purchases), the
-correlation-asymmetry composition (down ticks transmit harder, funded
-by sector-loading dispersion and a quieter VIX cycle), a 0.86x joint
-trim of every noise source (preserves correlations and ratios while
-bringing the volatility level to real scale), and the same-day volume
-coupling raised (volume_move_response 0.6 to 1.0) -- at the shipped
-value the 252-day volume-|return| correlation sat below the weakest
-real reference window on every block measured. Judged on twenty-six
-blocks -- thirteen of them never touched by any search -- at one
-hundred seeds per block: BOTH panels in band on every statistic on
-all twenty-six blocks, no out-of-band row anywhere, crisis
-co-movement and lever 26/26 each, and the driven noise ratio at 1.13
-against pt-v15's ~1.46. Selectable by name; not the default, which remains
+**pt-v16 registered: the card, and a VIX that learns fear.** pt-v15
+re-levelled and re-coupled: the QE valuation channel silenced (its
+driven input was a proxy anticorrelated with measured Fed purchases),
+the correlation-asymmetry composition (down ticks transmit harder,
+funded by sector-loading dispersion and a quieter VIX cycle), a 0.86x
+joint trim of every noise source (preserves correlations and ratios
+while bringing the volatility level to real scale), and the same-day
+volume coupling raised (volume_move_response 0.6 to 1.0) -- at the
+shipped value the 252-day volume-|return| correlation sat below the
+weakest real reference window on every block measured.
+
+And the engine's VIX stops being a function of the business cycle
+alone. Left as it was, it tracked its own market's realized
+volatility at 0.16 correlation against a real 0.87 and decayed as
+fast as it rose, where real fear rises faster than it fades. pt-v16
+closes the loop the code left open since the implied read was built:
+a third of the VIX target is now the variance process's own inverse
+(vix_realised_vol_weight 0.3), fear decays at six tenths of the rate
+it arrives (vix_decay_ratio 0.6, a new dial, bit-inert at 1.0), and
+the reversion slows to match (vix_mean_reversion 0.06). Measured
+against ^VIX and ^GSPC over 2004-2025: realized-vol tracking 0.16 to
+0.57, spike asymmetry 0.95 to 1.28 against a real 1.20, day
+persistence 0.90 to 0.985.
+
+Judged on twenty-six blocks -- thirteen never touched by any search
+-- at one hundred seeds per block: crisis co-movement and lever
+26/26 each, the driven noise ratio at 1.13 against pt-v15's ~1.46,
+both panels in band on every statistic on twenty-five of twenty-six
+blocks. Two numbers are stated rather than hidden. One
+correlation-asymmetry row on one block sits 0.0025 past a floor
+whose own derivation noise is 0.038 -- the price of the fear
+process, measured and named. And crisis frequency stays below real:
+P(VIX>30) reads about 0.007 against a real 0.082, because every
+mechanism that raised it -- slower decay, return-driven spikes,
+exogenous jump events -- broke certified statistics when it did
+(three families measured to their deaths in the design record). A
+market that is afraid of itself at the right frequency needs the
+full recalibration a later era will be, not a dial this one could
+turn. Selectable by name; not the default, which remains
 pt-v14.
 
 **Scenarios are now a file you can hand to somebody else.** `tf.Scenario`
