@@ -38,8 +38,8 @@ jobs:
     name: build the wheel
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - uses: dtolnay/rust-toolchain@stable
@@ -51,7 +51,7 @@ jobs:
           # test four different ones.
           python -m pip install --upgrade pip maturin
           maturin build --release --out dist
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         with:
           name: suite-wheel
           path: dist/*.whl
@@ -60,7 +60,7 @@ jobs:
     name: cargo test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -90,11 +90,11 @@ jobs:
       matrix:
         batch: [a-e, f-p, q-z, facts]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v4
         with:
           name: suite-wheel
           path: dist
@@ -135,11 +135,11 @@ jobs:
         # find out that it does.
         python: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v4
         with:
           name: suite-wheel
           path: dist
