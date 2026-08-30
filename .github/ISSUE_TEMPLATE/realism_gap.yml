@@ -1,0 +1,48 @@
+name: Realism gap
+description: The simulated market differs from a real one in a way the envelope does not name
+labels: ["realism"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        `tradefloor.envelope` publishes what this model is known to get wrong,
+        and `envelope.check()` refuses a question that falls outside it. A gap
+        already named there is documented rather than defective, so please
+        check it first. A gap it does not name is worth reporting.
+
+  - type: textarea
+    id: statistic
+    attributes:
+      label: What the model does, and what real markets do
+      description: >-
+        The measurement, with the real reference beside it. A number without a
+        reference window is hard to act on.
+    validations:
+      required: true
+
+  - type: textarea
+    id: method
+    attributes:
+      label: How you measured it
+      description: >-
+        Seeds, horizon, roster and preset. Clustering and correlation are
+        strongly horizon-dependent, so a 180-day reading scored against a
+        252-day band is measuring with the wrong ruler.
+      render: python
+    validations:
+      required: true
+
+  - type: input
+    id: envelope
+    attributes:
+      label: Which envelope gap is closest
+      description: "`[g.id for g in tradefloor.envelope.GAPS]`, or none"
+      placeholder: "decay-shape, or none"
+
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: Before opening
+      options:
+        - label: I named a preset rather than taking the default
+        - label: I checked `envelope.GAPS` for this one already

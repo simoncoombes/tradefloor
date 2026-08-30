@@ -30,7 +30,8 @@ ROOT = HERE.parent.parent
 #: below were written for prose a reader meets, not for a comment beside
 #: the line it explains.
 DEFAULT_TARGETS = ("README.md", "CHANGELOG.md", "CONTRIBUTING.md",
-                   "CONTENT.md", "PRODUCT.md", "RELEASING.md")
+                   "CONTENT.md", "PRODUCT.md", "RELEASING.md",
+                   "SECURITY.md")
 
 #: Phrases that tell the reader something is significant.
 SIGNIFICANCE = [

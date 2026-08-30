@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://tradefloor.dev
+    about: Install, core concepts, the realism envelope, presets and the API.
+  - name: Security report
+    url: https://github.com/simoncoombes/tradefloor/security/advisories/new
+    about: Report a vulnerability privately rather than as an issue.

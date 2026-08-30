@@ -188,12 +188,29 @@ def rule(text: str) -> None:
 
 
 def have_live_key() -> bool:
-    """Whether a live run is possible, without ending the process if not.
+    """Whether a key is present, without ending the process if not.
 
     `llm_config` exits, which is right for the script and wrong inside a
     notebook cell, where it stops the kernel rather than the cell.
     """
     return bool(os.environ.get(LIVE_KEY_VAR))
+
+
+def can_run_live() -> bool:
+    """A key AND a FinRobot to spend it through.
+
+    The key alone is not enough and assuming it was made the notebook fail on
+    any machine that had one without the extra installed, which includes CI.
+    The replay path exists for exactly that machine, so the test is both
+    halves or neither.
+    """
+    if not have_live_key():
+        return False
+    try:
+        import finrobot.agents.workflow  # noqa: F401, PLC0415
+    except ImportError:
+        return False
+    return True
 
 
 def llm_config() -> dict:

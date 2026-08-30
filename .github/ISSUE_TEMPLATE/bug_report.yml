@@ -1,0 +1,59 @@
+name: Bug report
+description: Something behaves differently from what is documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A market that runs differently from the same seed is the most serious
+        defect this project has, so the fields below ask for what a
+        reproduction needs. If you have a `RunManifest`, attaching it answers
+        most of them at once.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+      description: The observed behaviour against the documented one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: A run that shows it
+      description: >-
+        The smallest script that reproduces it. Please name the preset: a run
+        that took the default replays only against the release it was run on.
+      render: python
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version and preset
+      description: "`tradefloor.version()` and `tradefloor.model_preset()['name']`"
+      placeholder: "0.6.0, pt-v16"
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: >-
+        OS and architecture. Determinism is checked across five targets, so a
+        result that differs between two of them is worth saying plainly.
+      placeholder: "windows-x86_64, Python 3.11"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: reproducible
+    attributes:
+      label: Does it reproduce
+      options:
+        - label: The same seed gives the same wrong answer every time
+        - label: It varies between runs on one machine
+        - label: It varies between platforms
