@@ -4,12 +4,18 @@
 # five wheel targets, and a stream of single-dependency pull requests against
 # a determinism gate that runs five builds is a lot of compute for very little
 # signal. One pull request per ecosystem per week is reviewable.
+#
+# Every block below targets `dev`. Dependabot opens against the DEFAULT branch
+# unless told otherwise, so without this a dependency bump arrives on `main`,
+# which this project keeps clear between releases. One did, on 2026-08-30,
+# before this line existed.
 version: 2
 updates:
   - package-ecosystem: cargo
     directory: /rust
     schedule:
       interval: weekly
+    target-branch: dev
     groups:
       rust:
         patterns: ["*"]
@@ -18,6 +24,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    target-branch: dev
     groups:
       python:
         patterns: ["*"]
@@ -26,6 +33,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    target-branch: dev
     groups:
       actions:
         patterns: ["*"]
