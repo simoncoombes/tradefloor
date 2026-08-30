@@ -18,16 +18,35 @@ FEAR_SEEDS = list(range(1, 9))
 FEAR_DAYS = 1260
 PANEL_SEEDS = list(range(1, 5))
 
+def _grid(name):
+    combos = []
+    if name == "base":
+        combos = [(w, dr, mr) for w in (0.0, 0.2, 0.4, 0.6)
+                  for dr in (1.0, 0.6, 0.4) for mr in (0.12, 0.06)]
+    elif name == "ext":
+        # The bracket-completion grid, launched in parallel with base
+        # (Simon: max out AWS): stronger feedback, slower decay, and the
+        # mr axis widened both ways.
+        combos = ([(w, dr, mr) for w in (0.8, 1.0)
+                   for dr in (1.0, 0.6, 0.4) for mr in (0.12, 0.06)]
+                  + [(w, dr, mr) for w in (0.2, 0.4, 0.6)
+                     for dr in (0.3, 0.2) for mr in (0.12, 0.06)]
+                  + [(w, dr, mr) for w in (0.4, 0.6)
+                     for dr in (0.6, 0.4) for mr in (0.18, 0.09)])
+    else:
+        raise SystemExit(f"unknown grid {name}")
+    cells = {}
+    for w, dr, mr in combos:
+        label = f"w{int(w*10)}d{int(dr*10)}m{int(mr*100)}"
+        over = {}
+        if w: over["vix_realised_vol_weight"] = w
+        if dr != 1.0: over["vix_decay_ratio"] = dr
+        if mr != 0.12: over["vix_mean_reversion"] = mr
+        cells[label] = over
+    return cells
+
+
 CELLS = {}
-for w in (0.0, 0.2, 0.4, 0.6):
-    for dr in (1.0, 0.6, 0.4):
-        for mr in (0.12, 0.06):
-            label = f"w{int(w*10)}d{int(dr*10)}m{int(mr*100)}"
-            over = {}
-            if w: over["vix_realised_vol_weight"] = w
-            if dr != 1.0: over["vix_decay_ratio"] = dr
-            if mr != 0.12: over["vix_mean_reversion"] = mr
-            CELLS[label] = over
 
 
 def corr(x, y):
@@ -91,7 +110,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--grid", default="base")
     a = ap.parse_args()
+    CELLS.update(_grid(a.grid))
     jobs = ([("fear", l, s) for l in CELLS for s in FEAR_SEEDS]
             + [("panel", l, s) for l in CELLS for s in PANEL_SEEDS])
     rows = []
