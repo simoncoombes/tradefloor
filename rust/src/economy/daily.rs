@@ -76,6 +76,10 @@ pub struct DailyInputs<'a> {
     /// See [`crate::params::ModelParams::vix_decay_ratio`]. 1.0 is the
     /// shipped symmetric reversion exactly.
     pub vix_decay_ratio: f64,
+    /// See [`crate::params::ModelParams::vix_jump_intensity`]. 0.0 takes
+    /// no draws and reproduces the shipped schedule exactly.
+    pub vix_jump_intensity: f64,
+    pub vix_jump_scale: f64,
     /// VIX points per unit of a down day's index return (shipped 25.0), of
     /// an up day's (10.0), the clamp on that return (0.03) and the ceiling
     /// on the whole target excursion (12.0). Threaded for the reason
@@ -141,6 +145,8 @@ impl<'a> Default for DailyInputs<'a> {
             game_day: 0,
             vix_mean_reversion: VIX_MEAN_REVERSION,
             vix_decay_ratio: 1.0,
+            vix_jump_intensity: 0.0,
+            vix_jump_scale: 0.0,
             vix_return_gain: VIX_RETURN_GAIN,
             vix_realised_vol_weight: 0.0,
             vix_return_source: 0.0,
@@ -757,10 +763,25 @@ pub fn update_economy_daily(
     } else {
         inputs.vix_mean_reversion
     };
+    // Exogenous fear events (round 134). STRICTLY no draws at zero: any
+    // draw here would shift every later draw in the economy schedule and
+    // break bit-reproduction of recorded runs.
+    let fear_jump = if inputs.vix_jump_intensity != 0.0 {
+        let p_daily = inputs.vix_jump_intensity / 252.0;
+        if rng.next_f64() < p_daily {
+            // Exponential magnitude: mean `vix_jump_scale` points.
+            inputs.vix_jump_scale * -(rng.next_f64().max(1e-12)).ln()
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    };
     new_state.vix = clamp(
         economy.vix
             + (target_vix - economy.vix) * vix_mr
-            + random_normal(rng, 0.0, 0.15 * volatility),
+            + random_normal(rng, 0.0, 0.15 * volatility)
+            + fear_jump,
         10.0,
         80.0,
     );

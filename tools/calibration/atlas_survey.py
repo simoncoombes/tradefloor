@@ -177,6 +177,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the era's P/E premium peaked at ~1.29x fair, so gain ~7 reproduces
     # the whole premium through this channel alone; 10 bounds the box.
     "qe_pe_stock_gain": (0.0, 10.0),
+    # Fear events (round 134): a few per year at ~10 points reproduces the
+    # real P(VIX>30) tail; 12/yr at 30 points is far past plausible.
+    "vix_jump_intensity": (0.0, 12.0),
+    "vix_jump_scale": (0.0, 30.0),
     # The VIX's feedback weight (§68): a share, so its box is the unit
     # interval. At 1.0 the loop gain is exactly one by construction, since
     # the implied VIX is the forward coupling's own inverse, so the top of

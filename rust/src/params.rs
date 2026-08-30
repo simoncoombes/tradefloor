@@ -1029,6 +1029,19 @@ pub struct ModelParams {
     /// Real markets: up-moves average 1.20x the size of down-moves
     /// (fear-gap-targets.json, 2004-2025).
     pub vix_decay_ratio: f64,
+    /// Exogenous fear events, per YEAR. Real VIX spikes often arrive from
+    /// news rather than accumulated market moves, and the target's small
+    /// Gaussian noise cannot make that tail: P(VIX>30) reads ~0.007
+    /// endogenous against a real 0.082 (round 133). At intensity != 0 a
+    /// rare jump lands directly on the VIX LEVEL (a target jump would be
+    /// eaten by the mean reversion, which is the measured death of the
+    /// return wire) and decays through the slow side of
+    /// [`ModelParams::vix_decay_ratio`] -- up fast, down slow, like fear.
+    /// 0.0 -- every preset before the fear era -- takes NO random draws,
+    /// so the schedule and every recorded run reproduce bit for bit.
+    pub vix_jump_intensity: f64,
+    /// Mean size of a fear event, in VIX points (exponential draw).
+    pub vix_jump_scale: f64,
     /// VIX points added to its target per unit of a DOWN day's index
     /// return, before the clamp and cap below.
     ///
@@ -1384,6 +1397,8 @@ impl ModelParams {
             spread_size_exponent: crate::microstructure::SPREAD_SIZE_EXPONENT,
             vix_mean_reversion: crate::economy::VIX_MEAN_REVERSION,
             vix_decay_ratio: 1.0,
+            vix_jump_intensity: 0.0,
+            vix_jump_scale: 0.0,
             vix_realised_vol_weight: 0.0,
             vix_cycle_amplitude: 1.0,
             vix_return_source: 0.0,
@@ -2407,6 +2422,8 @@ impl ModelParams {
             "spread_size_exponent" => self.spread_size_exponent,
             "vix_mean_reversion" => self.vix_mean_reversion,
             "vix_decay_ratio" => self.vix_decay_ratio,
+            "vix_jump_intensity" => self.vix_jump_intensity,
+            "vix_jump_scale" => self.vix_jump_scale,
             "vix_cycle_amplitude" => self.vix_cycle_amplitude,
             "vix_realised_vol_weight" => self.vix_realised_vol_weight,
             "vix_return_clamp" => self.vix_return_clamp,
@@ -2543,6 +2560,8 @@ impl ModelParams {
             "spread_size_smoothness" => out.spread_size_smoothness = value,
             "vix_mean_reversion" => out.vix_mean_reversion = value,
             "vix_decay_ratio" => out.vix_decay_ratio = value,
+            "vix_jump_intensity" => out.vix_jump_intensity = value,
+            "vix_jump_scale" => out.vix_jump_scale = value,
             "vix_cycle_amplitude" => out.vix_cycle_amplitude = value,
             "vix_realised_vol_weight" => out.vix_realised_vol_weight = value,
             "vix_return_clamp" => out.vix_return_clamp = value,
@@ -2743,6 +2762,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_cycle_amplitude",
         "vix_mean_reversion",
         "vix_decay_ratio",
+        "vix_jump_intensity",
+        "vix_jump_scale",
         "vix_realised_vol_weight",
         "vix_return_clamp",
         "vix_return_gain",
