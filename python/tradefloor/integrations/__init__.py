@@ -11,6 +11,15 @@ A framework never touches engine state. It receives an
 :class:`~tradefloor.harness.Observation`, rendered into whatever it reads, and
 returns a decision that this package validates before anything is executed.
 
+``common.py`` is the shared half of every adapter -- the observation
+allowlist, the decision model and its two-stage validation, transcripts and
+replay, adapter metadata, and the :class:`~.common.FrameworkAdapter` base --
+derived from the FinRobot integration, which came first and settled those
+questions. ``callable.py`` is the reference adapter over a plain Python
+function, and the template a new framework adapter starts from. ``common``
+depends on nothing outside the library, so importing it never needs any
+framework installed.
+
 ## Why these are not in the top-level namespace
 
 Every other module under ``tradefloor/`` is first-party engine surface, and

@@ -11,7 +11,8 @@
     "provider": "anthropic",
     "model": "claude-sonnet-4-5-20250929",
     "temperature": 0.0,
-    "recorded": true
+    "recorded": true,
+    "instructions_digest": "affa3e771bfe8a9d"
   },
   "entries": [
     {

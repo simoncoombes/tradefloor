@@ -221,6 +221,15 @@ jobs:
         # for as long as the rename had existed: ninety-two tests, silent,
         # because `mcp` is installed nowhere. The gym file is the same shape
         # waiting to happen.
+        #
+        # The agent-framework adapters have the same skip shape and are NOT
+        # here: `suite.yml` gates a pull request too as of 0.6.x, and its
+        # batch job installs openai-agents, pydantic-ai-slim and langgraph
+        # and runs those files. Adding three more dependency trees to this
+        # gate would double a three-minute job for a second copy of an
+        # answer, and nothing an adapter does can move a trajectory -- it
+        # produces share deltas for the same `Portfolio.execute` every agent
+        # uses.
         if: matrix.target == 'linux-x86_64'
         shell: bash
         run: |

@@ -108,8 +108,28 @@ jobs:
           # By name, so the extras' own dependencies can resolve. Every one of
           # these gates an `importorskip`, and a lane that skips is a lane
           # that reports green by not running.
-          python -m pip install pyarrow numpy gymnasium mcp anthropic pydantic
-          python -c "import pyarrow, numpy, gymnasium, mcp; print('optional surfaces present')"
+          #
+          # The three agent frameworks are that same rule applied to the
+          # adapters under `python/tradefloor/integrations/`. Two of them are
+          # imported under a different name than they are installed under:
+          # `openai-agents` imports as `agents`, `pydantic-ai-slim` as
+          # `pydantic_ai`. Slim rather than the umbrella `pydantic-ai`,
+          # because slim is what the extra in pyproject.toml installs and a
+          # lane that tests a different distribution from the one a user gets
+          # is testing the wrong package.
+          #
+          # `finrobot` is deliberately not here. Its tree is an order of
+          # magnitude heavier than the rest of this line put together
+          # (`pyautogen[retrievechat]` pulls a whole RAG stack), it needs
+          # `anthropic<1.0` and would drag this job's `anthropic` back with
+          # it, and the FinRobot tests are written to pass WITHOUT it: they
+          # replay a recorded run, and
+          # `test_live_mode_without_finrobot_names_the_extra` can only run
+          # when the package is absent. Installing it here would cost minutes
+          # and turn a test off.
+          python -m pip install pyarrow numpy gymnasium mcp anthropic pydantic \
+                                openai-agents pydantic-ai-slim langgraph
+          python -c "import pyarrow, numpy, gymnasium, mcp, agents, pydantic_ai, langgraph; print('optional surfaces present')"
       - name: Run
         shell: bash
         run: |

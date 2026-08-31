@@ -100,6 +100,16 @@ changes, the key goes missing, and the replay RAISES naming the step. Keyed
 by (arm, step) it would answer the new question with a response given to the
 old one.
 
+What a key over the input cannot see is a change to something that never
+enters it. The mandate reaches FinRobot as the agent profile, not as part of
+the prompt, so editing it leaves every recorded key intact -- the run
+completes, all sixty digests match, and the decisions replayed were taken
+under instructions nobody is running any more. That is a property of any
+adapter whose instructions travel separately from the keyed input, not a
+FinRobot quirk, and the other integrations in this package share it. Replay
+therefore compares the mandate's own digest against the one the transcript
+recorded, and refuses on a mismatch. See ``_refuse_a_changed_mandate``.
+
 Replay needs no FinRobot, no API key and no network. The shipped example and
 notebook default to it, and CI runs them.
 """
@@ -115,6 +125,14 @@ from typing import Any, Sequence
 
 from .._core import ValidationError
 from ..counterfactual import MACRO_FIELDS
+from .common import (AdapterInfo, FrameworkError, IntegrationError,
+                     MissingDependencyError)
+from .common import DecisionError as _CommonDecisionError
+#: The shared digest, which hashes a mapping as canonical JSON. This module's
+#: own :func:`digest` takes the rendered prompt and is the replay key; it is
+#: deliberately str-only and does not change. This one is for hashing a
+#: config, which is a dict.
+from .common import digest as _digest_any
 
 #: The macro fields FinRobot is shown. Bound to ``counterfactual.MACRO_FIELDS``
 #: itself, so the two cannot drift apart over what a macro experiment covers.
@@ -123,6 +141,20 @@ OBSERVABLE_MACRO = MACRO_FIELDS
 #: The sides a decision may name. HOLD carries no quantity and produces no
 #: order, so the agent can decline a decision period.
 SIDES = ("BUY", "SELL", "HOLD")
+
+#: The only keys a decision object may carry, and the only keys an action may
+#: carry. Anything else is refused rather than dropped.
+#:
+#: Silently ignoring an unknown field executes an instruction the agent did
+#: not give. A model that writes ``stop_loss`` believes it has protection and
+#: sizes accordingly; dropping the field buys at market with none, and the
+#: trace records a decision the agent never made. The two fields a model
+#: reaches for most -- ``order_type`` and ``limit_price`` -- get refusals
+#: naming the missing capability, because Tradefloor executes market sweeps
+#: only: ``Portfolio.execute`` takes a signed share count and sweeps the live
+#: book, and there is no resting order at the agent boundary.
+DECISION_FIELDS = ("actions", "rationale")
+ACTION_FIELDS = ("symbol", "side", "quantity")
 
 #: Price rows kept for the recent-return and volatility lines. Five days at
 #: the library's six steps a day: long enough for a realised-volatility number
@@ -141,6 +173,17 @@ MAX_PARTICIPATION = 0.02
 #: different mandate produces a different experiment; this is how a reader
 #: notices.
 MANDATE_VERSION = "1"
+
+#: The FinRobot abstraction this integration drives, recorded in the adapter
+#: metadata. Named here rather than only in the example, because a reader of a
+#: transcript has to be able to tell a SingleAssistant run from a group chat:
+#: they are different experiments and the responses do not mean the same
+#: thing. See the module docstring for why this one.
+ENTRY_POINT = "finrobot.agents.workflow.SingleAssistant"
+
+#: The upstream project. Recorded so a citation of a run can name what it ran
+#: against; this repository neither owns FinRobot nor is affiliated with it.
+FRAMEWORK_URL = "https://github.com/AI4Finance-Foundation/FinRobot"
 
 #: The mandate, identical in both arms of the experiment. It says what the
 #: agent is for, what it may do, and the shape of the answer. It says nothing
@@ -199,7 +242,7 @@ AGENT_CONFIG = {"name": "Portfolio_Manager", "profile": MANDATE,
                 "toolkits": []}
 
 
-class DecisionError(ValidationError):
+class DecisionError(_CommonDecisionError):
     """FinRobot returned something that is not an executable decision.
 
     A subclass of :class:`~tradefloor.ValidationError`, so a caller already
@@ -207,6 +250,14 @@ class DecisionError(ValidationError):
     that cannot be parsed, and for one that parses into an action the market
     cannot accept: an unknown symbol, an unsupported side, a negative or
     non-finite quantity, a symbol named twice.
+
+    It derives from the shared
+    :class:`~tradefloor.integrations.common.DecisionError` rather than from
+    ``ValidationError`` directly, which reaches ``ValidationError`` by the
+    same path and adds one thing: code written against the shared adapter
+    layer catches FinRobot's refusals without naming FinRobot. Nothing that
+    already caught this stops catching it -- that is the only reason the base
+    moved.
 
     It raises instead of repairing. A guess at what the model meant would be a
     second, unrecorded agent between FinRobot and the market, and every
@@ -310,6 +361,18 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
         })
 
     portfolio = obs.portfolio
+    # The funding limit, and what is left under it. Without these the payload
+    # states a participation cap worth several times equity and never states
+    # the constraint that actually refuses the trade -- an agent that sizes to
+    # what it was told then scores zero fills and reads as a bad agent when it
+    # was misled. Measured on the native OpenAI path: twelve rejections, no
+    # trades. `None` where no limit is configured, never a made-up number,
+    # because a fabricated ceiling is the same defect pointing the other way.
+    equity = portfolio.net_worth(obs.engine)
+    limit = portfolio.max_leverage
+    exposure = portfolio.gross_exposure(obs.engine)
+    headroom = (None if limit is None
+                else max(0.0, limit * equity - exposure))
     return {
         "step": obs.step,
         "day": obs.day,
@@ -318,8 +381,10 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
         "assets": assets,
         "portfolio": {
             "cash": portfolio.cash,
-            "net_worth": portfolio.net_worth(obs.engine),
+            "net_worth": equity,
             "gross_exposure": portfolio.leverage(obs.engine),
+            "max_leverage": limit,
+            "buying_power": headroom,
         },
     }
 
@@ -476,7 +541,42 @@ def parse(text: str) -> Decision:
             "expected a JSON object with an 'actions' key, got a "
             f"{type(raw).__name__}")
 
-    actions_raw = raw.get("actions", [])
+    # An ABSENT 'actions' key is refused; an EMPTY list is accepted. The
+    # distinction is load-bearing, and defaulting the absent key to [] was a
+    # defect in released code rather than a lenience.
+    #
+    # A model that half-follows the mandate writes what it would say to a
+    # person -- `{"recommendation": "trim NOVA", "confidence": 0.8}` -- and
+    # the brace search above finds it. Read as a hold, that run completes
+    # with trades=0 and an empty errors list, which is EXACTLY the shape of
+    # an agent that considered the market and declined. Measured against the
+    # shared adapter layer on one market, one seed and that same response:
+    # this adapter scored trades=0 with no errors while the shared validator
+    # reported three refusals. Two adapters disagreeing about whether a
+    # decision happened makes a cross-adapter comparison uncontrolled, and
+    # nothing in either scorecard says so.
+    #
+    # `{"actions": null}` stays a no-op: the key is present, so whoever
+    # wrote it addressed the question and declined.
+    if "actions" not in raw:
+        keys = ", ".join(sorted(str(k) for k in raw)) or "none"
+        raise DecisionError(
+            f"no 'actions' key in the FinRobot response (keys present: "
+            f"{keys}). A decision that declines to trade says so with an "
+            "EMPTY 'actions' list, which the mandate asks for by name; a "
+            "JSON object without the key is a model answering a different "
+            "question, and treating it as HOLD would score a failed "
+            "instruction as a considered choice.")
+    stray = sorted(set(raw) - set(DECISION_FIELDS))
+    if stray:
+        raise DecisionError(
+            f"the FinRobot response carries {', '.join(stray)}, and a "
+            f"decision is {', '.join(DECISION_FIELDS)} and nothing else. A "
+            "key this adapter does not read is either a model answering a "
+            "different question or an instruction the market cannot follow, "
+            "and dropping it silently would execute a decision the agent did "
+            "not make.")
+    actions_raw = raw["actions"]
     if actions_raw is None:
         actions_raw = []
     if not isinstance(actions_raw, list):
@@ -499,6 +599,34 @@ def parse(text: str) -> Decision:
                 f"action {i} names side {side!r}, which is not one of "
                 f"{', '.join(SIDES)}")
         side = side.upper()
+
+        # Named refusals for the two a model reaches for most, so the message
+        # says what the market cannot do rather than that a key was unexpected.
+        order_type = item.get("order_type")
+        if order_type is not None and not (isinstance(order_type, str)
+                                           and order_type.lower() == "market"):
+            raise DecisionError(
+                f"action {i} asks for order_type {order_type!r}. Tradefloor "
+                "executes market sweeps only -- Portfolio.execute takes a "
+                "signed share count and sweeps the live book, and there is no "
+                "resting order at the agent boundary -- so only 'market' is "
+                "accepted.")
+        if item.get("limit_price") is not None:
+            raise DecisionError(
+                f"action {i} carries a limit_price, and this market has no "
+                "limit orders at the agent boundary: Portfolio.execute sweeps "
+                "the live book at whatever price it gives. Dropping the field "
+                "silently would execute at market a trade the agent priced as "
+                "protected, so it is refused instead.")
+        unknown = sorted(set(item) - set(ACTION_FIELDS)
+                         - {"order_type", "limit_price"})
+        if unknown:
+            raise DecisionError(
+                f"action {i} carries {', '.join(unknown)}, which this market "
+                "has no execution path for. An action is "
+                f"{', '.join(ACTION_FIELDS)} and nothing else. Ignoring the "
+                "field would execute a trade the agent conditioned on "
+                "something it never got.")
 
         quantity = item.get("quantity", 0)
         if quantity is None:
@@ -652,6 +780,56 @@ class Transcript:
         target.write_text(self.to_json(), encoding="utf-8")
 
 
+def _refuse_a_changed_mandate(transcript: "Transcript | None",
+                              mandate: str) -> None:
+    """Refuse a replay whose instructions are not the recorded ones.
+
+    The replay key is the digest of the rendered prompt, and the mandate does
+    NOT travel in that prompt -- it reaches FinRobot as the agent profile, a
+    separate constructor argument. So editing the mandate leaves every
+    recorded key intact: the run completes, all sixty digests match, and the
+    decisions replayed were taken under instructions nobody is running any
+    more. Nothing in the output says the question changed.
+
+    This is not a FinRobot quirk. It is a property of any adapter whose
+    instructions travel separately from the input the key is computed over,
+    and the other integrations in this package have the same shape.
+
+    Keyed on the digest rather than on ``mandate_version`` because a version
+    is a thing somebody has to remember to bump, and the dangerous edit is
+    the one made without remembering. The version is still checked, as the
+    fallback for a recording made before the digest was stamped: an older
+    transcript carries the version and not the hash, and a deliberate version
+    bump is at least caught. A transcript carrying neither cannot be checked
+    and is allowed through -- refusing those would break every recording made
+    before this existed, and they are no worse off than they were.
+    """
+    if transcript is None:
+        return
+    meta = transcript.meta or {}
+    recorded = meta.get("instructions_digest")
+    if recorded:
+        current = digest(mandate)
+        if recorded != current:
+            raise DecisionError(
+                f"this transcript was recorded under a different mandate "
+                f"(recorded {recorded}, current {current}). The mandate does "
+                "not travel in the prompt the replay is keyed on, so every "
+                "recorded key still matches and the run would complete -- "
+                "answering the instructions you have now with decisions taken "
+                "under the ones you had then. Restore the mandate, or "
+                "re-record with --live --record.")
+        return
+    version = meta.get("mandate_version")
+    if version is not None and str(version) != MANDATE_VERSION:
+        raise DecisionError(
+            f"this transcript was recorded under mandate version {version!r} "
+            f"and the current mandate is version {MANDATE_VERSION!r}. The "
+            "recording predates the instructions digest, so the version is "
+            "all there is to compare -- and it says the instructions changed. "
+            "Re-record with --live --record.")
+
+
 # -- the adapter ------------------------------------------------------------
 
 
@@ -692,7 +870,7 @@ class FinRobotAdapter:
                  agent_config: dict[str, Any] | None = None,
                  every: int = 6,
                  max_participation: float = MAX_PARTICIPATION,
-                 arm: str = "") -> None:
+                 arm: str = "", info: AdapterInfo | None = None) -> None:
         if mode not in ("replay", "live"):
             raise ValidationError(
                 f"mode must be 'replay' or 'live', got {mode!r}")
@@ -704,9 +882,11 @@ class FinRobotAdapter:
             raise ValidationError(
                 "live mode needs an llm_config -- the autogen config that "
                 "says which provider and model FinRobot talks to. See "
-                "examples/finrobot/rate_shock.py for one.")
+                "examples/integrations/finrobot/rate_shock.py for one.")
         if every < 1:
             raise ValidationError(f"every must be >= 1 step, got {every}")
+        if mode == "replay":
+            _refuse_a_changed_mandate(transcript, mandate)
 
         self.mode = mode
         self.transcript = transcript
@@ -729,6 +909,65 @@ class FinRobotAdapter:
         self.record: list[dict[str, Any]] = []
         self._decision: dict[str, Any] | None = None
         self._assistant: Any = None
+        #: What ran, for ``Transcript.meta`` and for a manifest citation.
+        #: Built here rather than at module scope because ``mode`` and
+        #: whether a recorder is attached are per-instance, and a fork
+        #: rebuilds it from the arguments it was handed.
+        self.info = info or self._describe()
+
+    def _describe(self) -> AdapterInfo:
+        """The adapter's own identity, with nothing secret in it.
+
+        Provider, model and the generation parameters are lifted OUT of
+        ``llm_config`` by name. The config object itself never reaches this
+        record and never should: it carries the API key, and this dictionary
+        is written into a committed fixture. ``config_digest`` is the
+        one-way record of it, which is enough to prove two arms ran the same
+        configuration without storing what it was.
+        """
+        config = self.llm_config or {}
+        entries = config.get("config_list") or []
+        first = entries[0] if entries and isinstance(entries[0], dict) else {}
+        generation = {field: config[field]
+                      for field in ("temperature", "top_p", "max_tokens",
+                                    "seed")
+                      if config.get(field) is not None}
+        version = "not installed"
+        try:                                    # pragma: no cover - optional
+            from importlib.metadata import version as _version
+            version = _version("finrobot")
+        except Exception:                       # pragma: no cover - optional
+            pass
+        return AdapterInfo(
+            framework="FinRobot", framework_version=version,
+            provider=str(first.get("api_type") or ""),
+            model=str(first.get("model") or ""),
+            agent_name=str(self.agent_config.get("name") or ""),
+            entry_point=ENTRY_POINT, mode=self.mode,
+            framework_url=FRAMEWORK_URL,
+            instructions_version=MANDATE_VERSION,
+            instructions_digest=digest(self.mandate),
+            config_digest=_digest_any(config) if config else "",
+            generation=generation,
+            # `mandate_version` is kept under its own name as well as in
+            # `instructions_version`. The shipped fixture's meta already
+            # spells it this way and the suite asserts it by that name, so
+            # dropping the spelling would either break that test or quietly
+            # change what an existing recording claims about itself.
+            extra={"recorded": self.recorder is not None,
+                   "mandate_version": MANDATE_VERSION})
+
+    def provenance(self) -> dict[str, Any]:
+        """What ``Transcript.meta`` should carry, as the shared layer shapes
+        it: the framework's identity plus the two Tradefloor-side settings a
+        recording cannot reconstruct without them -- the decision cadence,
+        without which an agent asked once a day and one asked every step read
+        as the same agent, and the participation cap, which decides what
+        "clipped" means in the record."""
+        out = self.info.as_dict()
+        out["decision_every_steps"] = self.every
+        out["max_participation"] = self.max_participation
+        return out
 
     # -- the agent protocol ----------------------------------------------
 
@@ -752,7 +991,25 @@ class FinRobotAdapter:
                           max_participation=self.max_participation)
         prompt = render(payload, objective=self.objective)
         key = digest(prompt)
-        response = self._ask(prompt, key, obs)
+        try:
+            response = self._ask(prompt, key, obs)
+        except IntegrationError:
+            # Already one of the adapter family's own -- a DecisionError from
+            # a replay miss, a MissingDependencyError naming the extra --
+            # and already actionable. Wrapping one again would bury the pip
+            # command or the missing digest a level down.
+            raise
+        except Exception as exc:
+            # Everything else is FinRobot's own failure, and it is a
+            # different thing from a bad decision: the agent never answered.
+            # An experiment scoring "the agent decided badly" must not count
+            # "the call did not complete" in the same column, which is why
+            # this is a FrameworkError and not a DecisionError. The original
+            # exception rides on __cause__, so the traceback a user debugs
+            # still reaches the provider's own error.
+            raise FrameworkError(
+                f"FinRobot raised {type(exc).__name__} instead of returning "
+                f"a decision: {exc}") from exc
 
         decision = parse(response)
         orders, notes = orders_from(
@@ -821,7 +1078,11 @@ class FinRobotAdapter:
             fundamentals=self.fundamentals, objective=self.objective,
             mandate=self.mandate, agent_config=self.agent_config,
             every=self.every, max_participation=self.max_participation,
-            arm=self.arm)
+            arm=self.arm,
+            # Passed rather than left to rebuild. It rebuilds identically
+            # from the arguments above, but a caller who supplied their own
+            # `info` would silently lose it in both arms.
+            info=self.info)
         twin.history = [list(row) for row in self.history]
         twin.record = copy.deepcopy(self.record)
         twin._decision = copy.deepcopy(self._decision)
@@ -890,7 +1151,20 @@ class FinRobotAdapter:
         try:
             from finrobot.agents.workflow import SingleAssistant
         except ImportError as exc:
-            raise ImportError(
+            # MissingDependencyError rather than a plain ImportError, and it
+            # loses nothing: it IS an ImportError, so every caller written
+            # against the old behaviour still catches it. What it adds is
+            # membership of the adapter error family, which is what lets
+            # `act` tell a missing install apart from a framework that failed
+            # and pass this through with its own message instead of wrapping
+            # it in a FrameworkError.
+            #
+            # Raised by hand rather than through `common.require`, because
+            # `require` has no way to carry the sentence after the pip
+            # command, and on this integration that sentence is the
+            # diagnosis: somebody on 3.12 who runs the command gets a
+            # resolver failure they cannot read.
+            raise MissingDependencyError(
                 "live mode needs FinRobot, which is an optional extra:\n"
                 '    pip install "tradefloor[finrobot]"\n'
                 "FinRobot supports Python 3.10 and 3.11 only, and Tradefloor "

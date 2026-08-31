@@ -45,24 +45,34 @@ question, because history ran once.
 ## Running it
 
 ```bash
-python examples/finrobot/rate_shock.py
+python examples/integrations/finrobot/rate_shock.py
 ```
 
 That replays a genuine recorded FinRobot run. It needs no API key, no network
 and no FinRobot install. The market is deterministic, so re-executing it
-against the recorded agent responses reproduces the experiment exactly. About
-fifteen seconds.
+against the recorded agent responses reproduces the experiment exactly. A
+couple of seconds.
 
 ```bash
 pip install "tradefloor[finrobot]"
 export ANTHROPIC_API_KEY=...
-python examples/finrobot/rate_shock.py --live
+python examples/integrations/finrobot/rate_shock.py --live
 ```
 
 That calls the real thing. Sixty decisions -- twenty days of shared history
 plus twenty in each arm, one decision a day -- so it costs sixty API calls and
 takes a few minutes. Add `--record` to overwrite the replay fixture with the
 run you just did.
+
+## The replay key
+
+The recording is keyed by the exact text the agent was sent, not by the step
+number. Change the roster, the seed, the cadence, the mandate or anything else
+the observation is built from, and the key goes missing: the run stops and
+names the step it stopped at. That refusal is the design. Keyed by step, a
+replay would answer the new question with the answer given to the old one and
+nothing in the output would say so, so an edited experiment has to be
+re-recorded with `--live --record` before it replays again.
 
 `tradefloor[finrobot]` is a large extra and needs **Python 3.11 exactly**:
 FinRobot declares `>=3.10, <3.12` and Tradefloor needs `>=3.11`. See the

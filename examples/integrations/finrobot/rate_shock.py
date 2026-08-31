@@ -2,8 +2,8 @@
 
 Run it:
 
-    python examples/finrobot/rate_shock.py             # replays a real run
-    python examples/finrobot/rate_shock.py --live      # calls FinRobot
+    python examples/integrations/finrobot/rate_shock.py             # replays a real run
+    python examples/integrations/finrobot/rate_shock.py --live      # calls FinRobot
 
 The canonical rate-shock counterfactual from
 `examples/rate-shock/counterfactual.py`, with one thing changed: the agent is
@@ -143,7 +143,24 @@ OBJECTIVE = ("Manage the portfolio for attractive risk-adjusted returns "
 #: The recorded run. In `tests/` rather than beside this file because the
 #: automated tests replay the same interactions, and two copies of a recording
 #: are two recordings that can drift apart.
-FIXTURE = (Path(__file__).resolve().parents[2]
+def _repo_root() -> Path:
+    """The repository root, found by marker rather than by counting parents.
+
+    A fixed `parents[N]` climb is a bet on this file's depth, and the bet was
+    lost once already: moving this study one level down, from
+    `examples/finrobot/` to `examples/integrations/finrobot/`, left
+    `parents[2]` pointing at `examples/` and the fixture path resolving to
+    nothing. It failed silently, because the end-to-end test passes its OWN
+    fixture path and so never exercised the default -- CI stayed green while
+    the command README tells a reader to run was broken for everyone.
+    """
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "pyproject.toml").is_file():
+            return parent
+    raise RuntimeError("no pyproject.toml above this file; where is the root?")
+
+
+FIXTURE = (_repo_root()
            / "tests" / "fixtures" / "finrobot" / "rate-shock.json")
 
 #: Where a run writes its artifacts. Beside the run that wrote them, and
