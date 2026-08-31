@@ -52,8 +52,42 @@ future edit reaching for one fails on the access.
 Company fundamentals -- sector, EPS, book value, revenue growth, beta -- do
 not come off the engine either. The caller supplies them as ``fundamentals``.
 An analyst reads all five off a filing, and keeping them out of the adapter
-leaves one less line to audit. The inputs to a valuation are public. The
-valuation is the answer key.
+leaves one less line to audit.
+
+What that does NOT do is withhold the valuation, and an earlier version of
+this docstring claimed it did. :func:`tradefloor.fair_value` is public, and
+its arguments are ``sector``, ``eps``, ``book_value_per_share`` and
+``revenue_growth`` -- the four fields the caller is invited to supply --
+plus ``federal_funds_rate`` and ``corporate_bond_yield``, both in
+``OBSERVABLE_MACRO``. So a caller who supplies full fundamentals has supplied
+the means to reconstruct the model's own anchor, and no engine attribute is
+read to do it -- the ``Sealed`` proxy in ``tests/test_finrobot.py`` cannot
+see it happen, and neither can any allowlist of engine reads.
+
+Two different claims sit here and they are worth separating, because three
+people measured this and produced three numbers by conflating them.
+
+``fair_value`` reconstructs EXACTLY. It is a pure function of six inputs,
+four supplied and two observable, so there is nothing approximate about it.
+
+``mispricing_s`` is closely APPROXIMABLE and not recoverable. The engine
+applies it as ``fair_value * exp(s)``, so the inversion is
+``log(price / fair_value)`` and not ``price / fair_value - 1``; the ratio
+form is simply the wrong arithmetic and every figure derived from it was an
+artefact. Even the right inversion lands near rather than on, because a
+traded price carries microstructure on top of the anchor. How near depends
+on the roster and the moment, which is why no distance is quoted here. The
+tolerance lives in
+``test_the_valuation_is_reconstructible_from_what_the_caller_supplies``,
+where it can be re-derived, rather than in prose where it would rot.
+
+The boundary is unchanged by this: a native agent reads ``mispricing_s``
+straight off the engine without reconstructing anything, and the allowlist
+still stops that. What is true is narrower and worth stating plainly.
+Supplying fundamentals is the caller's decision about their own experiment,
+this adapter only declines to make it for them, and the shipped example --
+which does supply all five -- is trading that ground-truth distance for a
+roster an analyst could reason about.
 
 ## Which FinRobot abstraction
 
@@ -271,9 +305,28 @@ class Action:
     __slots__ = ("symbol", "side", "quantity")
 
     def __init__(self, symbol: str, side: str, quantity: float = 0.0) -> None:
+        # Validated rather than trusted. `Action("A", "SHORT", -5)` used to
+        # construct: `signed()` returns 0.0 for an unrecognised side, so an
+        # unknown side became a silent hold, and a negative SELL became a
+        # sign-flipped BUY. Both are the kind of quiet wrongness `parse`
+        # exists to refuse, one layer below where it refuses it.
+        #
+        # Case is normalised in `parse`, not here, because leniency belongs
+        # at the boundary where model output arrives and this constructor is
+        # reached with values already checked.
+        if side not in SIDES:
+            raise DecisionError(
+                f"side must be one of {', '.join(SIDES)}, got {side!r}. "
+                "Action is built from validated input; parse normalises "
+                "case and refuses the rest.")
+        quantity = float(quantity)
+        if not quantity >= 0 or quantity == float("inf"):
+            raise DecisionError(
+                f"quantity must be a finite, non-negative share count, got "
+                f"{quantity}. The side carries the direction.")
         self.symbol = symbol
         self.side = side
-        self.quantity = float(quantity)
+        self.quantity = quantity
 
     def as_dict(self) -> dict[str, Any]:
         return {"symbol": self.symbol, "side": self.side,
@@ -504,6 +557,28 @@ def _qty(value: Any) -> str:
 _OBJECT = re.compile(r"\{.*\}", re.DOTALL)
 
 
+def _no_duplicate_keys(pairs: list) -> dict[str, Any]:
+    """``json.loads`` hook that refuses an object naming a key twice.
+
+    Standard JSON parsing keeps the LAST occurrence, so a response carrying
+    ``"actions": [], "actions": [...]`` resolved to whichever the model
+    emitted second, silently, and nothing recorded that a first statement
+    existed. :func:`parse` refuses duplicate SYMBOLS one layer up for exactly
+    this reason -- two instructions with no defined order -- and the JSON
+    layer owed the same principle to duplicate keys.
+    """
+    keys = [key for key, _ in pairs]
+    duplicated = sorted({key for key in keys if keys.count(key) > 1})
+    if duplicated:
+        raise DecisionError(
+            f"the FinRobot response names keys more than once: "
+            f"{', '.join(duplicated)}. json parsing keeps the last "
+            "occurrence, so which of the model's statements reached the "
+            "market would depend on emission order, and nothing would "
+            "record that another existed.")
+    return dict(pairs)
+
+
 def parse(text: str) -> Decision:
     """Turn a FinRobot response into a validated :class:`Decision`.
 
@@ -521,7 +596,8 @@ def parse(text: str) -> Decision:
     # and never through the brace search, which cannot tell a top-level list
     # from an object and would report the wrong thing about it.
     try:
-        raw = json.loads(text.strip())
+        raw = json.loads(text.strip(),
+                         object_pairs_hook=_no_duplicate_keys)
     except json.JSONDecodeError:
         match = _OBJECT.search(text)
         if match is None:
@@ -530,7 +606,8 @@ def parse(text: str) -> Decision:
                 f"for one object and nothing else; got {text.strip()[:200]!r}"
             ) from None
         try:
-            raw = json.loads(match.group(0))
+            raw = json.loads(match.group(0),
+                             object_pairs_hook=_no_duplicate_keys)
         except json.JSONDecodeError as exc:
             raise DecisionError(
                 "the JSON object in the FinRobot response does not parse: "
@@ -695,8 +772,15 @@ def orders_from(decision: Decision, obs: Any, *,
         delta = action.signed()
         if not delta:
             continue
-        cap = max_participation * obs.avg_volume(action.symbol)
-        if cap > 0 and abs(delta) > cap:
+        # A cap of zero IS a cap. `if cap > 0` once read "no volume to
+        # participate in" as "no cap at all": with avg_volume or
+        # max_participation at zero, a 1e12-share order passed through whole
+        # with no note, while the payload showed the agent max_order_shares
+        # of exactly 0.0 -- the observation and the enforcement stating
+        # opposite things. Clipped to zero, the order falls out as dust
+        # below and the note says what happened.
+        cap = max(0.0, max_participation * obs.avg_volume(action.symbol))
+        if abs(delta) > cap:
             notes.append(
                 f"{action.symbol}: asked for {abs(delta):,.0f} shares, "
                 f"clipped to {cap:,.0f} ({max_participation:.1%} of average "
@@ -754,6 +838,16 @@ class Transcript:
         entry = self._by_digest.get(key)
         return None if entry is None else entry["response"]
 
+    def entry_for(self, key: str) -> dict[str, Any] | None:
+        """The whole recorded entry, or None only when none exists.
+
+        Distinct from :meth:`response_for`, which returns None BOTH for a
+        missing entry and for an entry whose recorded response is null --
+        two situations with opposite remedies, which :meth:`_ask` has to
+        tell apart.
+        """
+        return self._by_digest.get(key)
+
     def __len__(self) -> int:
         return len(self.entries)
 
@@ -778,6 +872,33 @@ class Transcript:
         target = pathlib.Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(self.to_json(), encoding="utf-8")
+
+
+def _as_jsonable(value: Any) -> Any:
+    """A JSON-able rendering of ``value``, for digesting.
+
+    An ``llm_config`` is somebody else's object graph. AutoGen's own
+    documented members include ``http_client`` and a ``filter_dict``
+    callable, and neither is JSON -- so digesting the config directly raised
+    ``TypeError`` out of ``json.dumps`` on a configuration the released
+    adapter accepted, and ``TypeError`` is not a
+    :class:`~tradefloor.ValidationError`, so a caller catching the library's
+    refusals did not catch it either. Constructing an adapter must not fail
+    on a config that worked before.
+
+    Unrepresentable parts become their type name. A digest has to be stable
+    and one-way; it does not have to round-trip, and two configs differing
+    only in which client object they hold are the same configuration for the
+    purpose this records. Same shape as ``langgraph._as_jsonable``; if a
+    third adapter needs it, it belongs in ``common``.
+    """
+    if isinstance(value, dict):
+        return {str(k): _as_jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_as_jsonable(v) for v in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return f"<{type(value).__name__}>"
 
 
 def _refuse_a_changed_mandate(transcript: "Transcript | None",
@@ -809,7 +930,7 @@ def _refuse_a_changed_mandate(transcript: "Transcript | None",
     meta = transcript.meta or {}
     recorded = meta.get("instructions_digest")
     if recorded:
-        current = digest(mandate)
+        current = digest(str(mandate))
         if recorded != current:
             raise DecisionError(
                 f"this transcript was recorded under a different mandate "
@@ -928,7 +1049,11 @@ class FinRobotAdapter:
         config = self.llm_config or {}
         entries = config.get("config_list") or []
         first = entries[0] if entries and isinstance(entries[0], dict) else {}
-        generation = {field: config[field]
+        # Rendered rather than passed through, for the same reason the digest
+        # is: a caller may hold anything under these names, and `AdapterInfo`
+        # refuses what it cannot serialise. Constructing an adapter must not
+        # fail on a config the released version accepted.
+        generation = {field: _as_jsonable(config[field])
                       for field in ("temperature", "top_p", "max_tokens",
                                     "seed")
                       if config.get(field) is not None}
@@ -946,8 +1071,13 @@ class FinRobotAdapter:
             entry_point=ENTRY_POINT, mode=self.mode,
             framework_url=FRAMEWORK_URL,
             instructions_version=MANDATE_VERSION,
-            instructions_digest=digest(self.mandate),
-            config_digest=_digest_any(config) if config else "",
+            # `str()` because the mandate is a caller-supplied argument and
+            # `digest` is str-only; a non-string one used to reach FinRobot
+            # and fail there, not fail construction here. For a string
+            # mandate -- every real one -- this is the identical digest, so
+            # the recorded fixture keeps matching.
+            instructions_digest=digest(str(self.mandate)),
+            config_digest=_digest_any(_as_jsonable(config)) if config else "",
             generation=generation,
             # `mandate_version` is kept under its own name as well as in
             # `instructions_version`. The shipped fixture's meta already
@@ -1092,8 +1222,16 @@ class FinRobotAdapter:
 
     def _ask(self, prompt: str, key: str, obs: Any) -> str:
         if self.mode == "replay":
-            response = self.transcript.response_for(key)
-            if response is None:
+            # `entry_for`, not `response_for`. The latter returns None both
+            # for a missing entry and for an entry whose recorded response is
+            # null, and the two have opposite remedies: one means the inputs
+            # moved and the recording no longer covers them, the other means
+            # the recording covers this exact input and captured no answer.
+            # Sending the second case the first case's message tells a reader
+            # to spend sixty live calls re-recording something already
+            # recorded.
+            entry = self.transcript.entry_for(key)
+            if entry is None:
                 raise DecisionError(
                     f"no recorded FinRobot response for step {obs.step} "
                     f"(day {obs.day}, digest {key}). The transcript holds "
@@ -1104,6 +1242,17 @@ class FinRobotAdapter:
                     "recording -- replaying anyway would answer this question "
                     "with a response given to a different one. Re-record with "
                     "--live --record.")
+            response = entry.get("response")
+            if response is None:
+                raise DecisionError(
+                    f"the recorded interaction for step {obs.step} (day "
+                    f"{obs.day}, digest {key}) has no response. The recording "
+                    "covers this exact input -- nothing has drifted -- so the "
+                    "live call that produced it returned nothing and that is "
+                    "what was written down. An empty answer is not a HOLD, so "
+                    "it cannot be replayed as one. Re-record this run, or "
+                    "drop the entry if the failed call is what you meant to "
+                    "keep.")
             return response
 
         response = self._live(prompt)

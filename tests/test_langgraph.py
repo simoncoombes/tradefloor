@@ -466,6 +466,67 @@ def test_a_non_mapping_result_is_refused():
         default_output_parser(42)
 
 
+@pytest.mark.parametrize("state,expected,why", [
+    ({"actions": None, "observation": {}}, "refuse",
+     "an unwritten channel is not a decision"),
+    ({"actions": []}, "empty",
+     "an EMPTY list is how a decision declines, and must still work"),
+    ({"actions": None, "decision": DECISION}, "decision",
+     "a real decision beside an unwritten actions channel must survive"),
+    ({"actions": DECISION["actions"]}, "decision", "the ordinary case"),
+], ids=["null-actions", "empty-actions", "null-actions-real-decision",
+        "normal"])
+def test_an_unwritten_actions_channel_is_not_a_considered_decline(
+        state, expected, why):
+    """The silent hold this parser exists to prevent, in its subtlest form.
+
+    `parse_decision` maps `{"actions": None}` to an empty decision, on the
+    stated grounds that a present-but-null key means its author addressed
+    the question and declined. Sound for a model's JSON, where something
+    wrote `null` on purpose. FALSE for a graph state channel, where None is
+    the UNWRITTEN DEFAULT: a node that failed, never ran, or swallowed an
+    exception leaves exactly that.
+
+    Selecting the branch on key presence therefore scored a broken graph at
+    trades=0 with an empty error list -- indistinguishable from an agent
+    that looked and declined. The third case is the worst: `actions` is
+    examined before `decision`, so a graph that wrote a real decision into
+    `decision` while leaving `actions` at its default had that decision
+    silently discarded.
+    """
+    if expected == "refuse":
+        with pytest.raises(ci.DecisionError):
+            ci.parse_decision(default_output_parser(state))
+        return
+    decision = ci.parse_decision(default_output_parser(state))
+    if expected == "empty":
+        assert decision.actions == [], why
+    else:
+        assert len(decision.actions) == 1, why
+        assert decision.actions[0].symbol == "TECH_A", why
+
+
+def test_a_graph_leaving_actions_unwritten_is_scored_as_an_error_not_a_hold():
+    """The same defect measured where it actually hurt: through a real
+    market. trades=0 beside an empty errors list is what a considered
+    decline looks like, and a graph whose decision node never wrote must
+    not wear that shape."""
+    broken = LangGraphAdapter(DuckGraph(
+        lambda payload: {"actions": None, "observation": payload}))
+    declining = make_agent(lambda payload: {"actions": []})
+
+    scores = tf.evaluate({"broken": broken, "declining": declining},
+                         seed=7, universe=contract.universe(), days=1)
+
+    assert scores["broken"].errors, (
+        "a graph that never wrote its decision scored silently")
+    assert scores["broken"].trades == 0
+    # The control: a genuine decline is still a clean no-op, so the test
+    # above is detecting the defect and not merely detecting zero trades.
+    assert not scores["declining"].errors
+    assert scores["declining"].trades == 0
+
+
 def test_a_custom_output_parser_replaces_the_default():
     """A graph returning ticker-to-shares is a shape the shared contract
     does not define, and this is how a user gets it accepted without the
@@ -892,6 +953,64 @@ def test_the_provenance_carries_the_cadence_and_the_cap():
     assert meta["decision_every_steps"] == 3
     assert meta["max_participation"] == ci.MAX_PARTICIPATION
     json.dumps(meta)
+
+
+def test_changed_instructions_cannot_be_replayed_against_an_old_recording():
+    """The mandate-drift guard, and it is the replay KEY rather than a check
+    beside it.
+
+    `digest(prompt)` is taken over text that BEGINS with the instructions,
+    so editing them moves every digest and the first lookup misses. That is
+    the strongest place to put this: it cannot be forgotten, disabled, or
+    left unarmed, because it is the lookup itself. A recording made under
+    one mandate can never answer a question asked under another.
+    """
+    recorder = ci.Transcript()
+    live = LangGraphAdapter(DuckGraph(lambda payload: DECISION),
+                            recorder=recorder)
+    contract.make_world(live).run(days=2)
+
+    same = LangGraphAdapter(mode="replay", transcript=recorder)
+    contract.make_world(same).run(days=2)
+    assert len(same.record) == 2, "the unchanged mandate must still replay"
+
+    drifted = LangGraphAdapter(
+        mode="replay", transcript=recorder,
+        instructions=INSTRUCTIONS + "\n\nAlso: never trade on Fridays.")
+    with pytest.raises(ci.DecisionError, match="step 0"):
+        contract.make_world(drifted).run(days=1)
+
+
+def test_the_recorder_stamps_its_own_provenance_on_the_first_write():
+    """Self-arming, because a guard that works only when somebody remembered
+    to set `meta` is off in exactly the runs nobody was careful about. This
+    is provenance rather than the drift guard -- the digest above is what
+    stops a stale replay -- but a transcript should describe itself whoever
+    built the recorder."""
+    recorder = ci.Transcript()
+    assert recorder.meta == {}
+
+    agent = LangGraphAdapter(DuckGraph(lambda payload: DECISION),
+                             recorder=recorder)
+    contract.make_world(agent).run(days=1)
+
+    assert recorder.meta["framework"] == "langgraph"
+    assert recorder.meta["instructions_digest"] == ci.digest(INSTRUCTIONS)
+    assert recorder.meta["decision_every_steps"] == agent.every
+    json.dumps(recorder.meta)
+
+
+def test_stamping_never_overwrites_a_caller_supplied_meta():
+    """The shipped example sets richer meta before the run -- provider,
+    model, the experiment's own constants. Stamping must not clobber it."""
+    recorder = ci.Transcript(meta={"framework": "langgraph",
+                                   "model": "claude-opus-5",
+                                   "shock_bps": 200})
+    agent = LangGraphAdapter(DuckGraph(lambda payload: DECISION),
+                             recorder=recorder)
+    contract.make_world(agent).run(days=1)
+    assert recorder.meta["model"] == "claude-opus-5"
+    assert recorder.meta["shock_bps"] == 200
 
 
 def test_a_replay_miss_names_the_step():

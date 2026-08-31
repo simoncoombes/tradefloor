@@ -389,7 +389,24 @@ def default_output_parser(result: Any) -> Any:
         # step with the last step's decision would be worse than refusing.
         if result.get(INTERRUPT_KEY):
             raise GraphInterruptedError(_interrupt_message(result))
-        if "actions" in result:
+        # `is not None`, NOT `"actions" in result`, and the difference is a
+        # silent hold. `parse_decision` maps `{"actions": None}` to an empty
+        # decision, on the stated grounds that a present-but-null key means
+        # its author addressed the question and declined. That reasoning is
+        # sound for a model's JSON output, where something wrote `null` on
+        # purpose. It is FALSE for a graph state channel, where `None` is
+        # the unwritten default: a node that failed, never ran, or swallowed
+        # an exception leaves exactly that, and reading it as a considered
+        # decline scores the failure at trades=0 with an empty error list --
+        # indistinguishable from an agent that looked and declined.
+        #
+        # It is the same argument this module's docstring makes about
+        # UNDECLARED keys, which I failed to extend to declared-but-unwritten
+        # ones. The worst case is the third: with a presence check, a graph
+        # that wrote a real decision into `decision` while leaving `actions`
+        # at its default had that decision silently discarded, because
+        # `actions` is examined first.
+        if result.get("actions") is not None:
             # The decision FIELDS, extracted -- not the whole state. A graph
             # returns everything its schema declares, so a state carrying
             # `actions` almost always carries `observation`, `notes` and the
@@ -573,6 +590,19 @@ class LangGraphAdapter(FrameworkAdapter):
         parsed = self.output_parser(result)
 
         if self.recorder is not None:
+            # Stamp provenance on the FIRST write, so a transcript describes
+            # itself whoever built the recorder. Self-arming on purpose: a
+            # guard that only works when somebody remembered to set `meta`
+            # is off in exactly the runs nobody was careful about.
+            #
+            # This is provenance, NOT the drift guard. What actually stops a
+            # recording being replayed under changed instructions is the key
+            # itself: `digest(prompt)` over text that BEGINS with the
+            # instructions, so editing them moves every digest and every
+            # lookup misses at step 0. That cannot be forgotten, because it
+            # is the lookup rather than a check beside it.
+            if not self.recorder.meta.get("framework"):
+                self.recorder.meta.update(self.provenance())
             # Recorded as text, because a replay feeds the recorded response
             # straight back to parse_decision and a string is the one shape
             # that survives a JSON round trip unchanged.

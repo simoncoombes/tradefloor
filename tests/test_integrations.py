@@ -91,12 +91,21 @@ def buy(payload):
 # -- the ground-truth boundary ----------------------------------------------
 
 #: Everything on the engine that a trader in this market could not know.
-#: The same list `tests/test_finrobot.py` seals: `column` is on it because
-#: its fields include `mispricing_s` and `garch_variance`; `truth` and
-#: `attribution` are the answer key outright.
-SEALED = ("fair_value", "attribution", "truth", "session_mispricing_s",
+#: `column` is on it because its fields include `mispricing_s` and
+#: `garch_variance`; `truth` and `attribution` are the answer key outright;
+#: the draw counters, the book snapshots and the session tapes are the
+#: simulator's own bookkeeping. Every name here MUST be a real engine
+#: attribute -- a test below asserts it -- because `fair_value` sat in this
+#: list for a while and could never fire: it is a public module FUNCTION,
+#: not an engine attribute, so an engine proxy structurally cannot seal it
+#: (a caller who supplies full fundamentals supplies the means to
+#: reconstruct it; see serialize_observation's docstring). A sealed name
+#: that does not exist seals nothing, and the list rots silently.
+SEALED = ("attribution", "truth", "session_mispricing_s",
           "column", "state_snapshot", "macro_table", "bars", "order_log",
-          "model_params", "model")
+          "model_params", "model", "draws_consumed", "draws_by_stream",
+          "model_fingerprint", "book_table", "snapshot_book",
+          "session_prices", "session_volumes")
 
 
 class Sealed:
@@ -217,8 +226,16 @@ def check_a_framework_exception_is_surfaced_with_its_chain(make_agent):
 
 
 def check_the_observation_is_not_mutated(make_agent):
-    """`act` reads the Observation and touches nothing: the same object is
-    what the harness executes against after `act` returns."""
+    """`act` reads the Observation and touches NOTHING -- including the
+    live engine the Observation carries. The package validates decisions;
+    it does not sandbox this seam, so an adapter holds the same engine any
+    agent holds and not touching it is an obligation this check enforces,
+    not a property the harness provides. A subclass calling
+    `obs.engine.pin_macro(...)` inside ask() once ran to completion with
+    zero errors and moved the market, because the first version of this
+    check snapshotted only the Observation's own fields."""
+    from tradefloor.manifest import market_digest
+
     world = make_world(make_agent(hold))
     world.run(days=1)
     obs = _observation(world)
@@ -226,6 +243,16 @@ def check_the_observation_is_not_mutated(make_agent):
     before_cash = obs.portfolio.cash
     before_positions = {t: p.quantity
                         for t, p in obs.portfolio.positions.items()}
+    # The engine's own state, three ways, because no single view covers it:
+    # the market digest (prices and the continuous internals), the order
+    # log length (every COMMAND the engine accepts is logged, macro pins
+    # included, so this catches a mutation of state the digest does not
+    # fold in), and the observable macro fields (the demonstrated attack,
+    # asserted directly so a failure names the field).
+    before_digest = market_digest(world.engine)
+    before_log = len(world.engine.order_log)
+    before_macro = {field: getattr(world.engine.macro_state, field)
+                    for field in ci.OBSERVABLE_MACRO}
 
     agent = make_agent(buy)
     orders = agent.act(obs)
@@ -234,6 +261,13 @@ def check_the_observation_is_not_mutated(make_agent):
     assert obs.portfolio.cash == before_cash
     assert {t: p.quantity for t, p in obs.portfolio.positions.items()} \
         == before_positions, "act() traded; execution belongs to the harness"
+    assert market_digest(world.engine) == before_digest, (
+        "act() changed the market's state")
+    assert len(world.engine.order_log) == before_log, (
+        "act() sent the engine a command; only the harness may")
+    assert {field: getattr(world.engine.macro_state, field)
+            for field in ci.OBSERVABLE_MACRO} == before_macro, (
+        "act() moved the macro state the experiment is about")
 
 
 def check_fork_preserves_type_and_copies_state(make_agent):
@@ -567,6 +601,20 @@ def test_the_macro_allowlist_is_the_librarys_own():
     assert "qe_pe_boost" not in ci.OBSERVABLE_MACRO
 
 
+def test_the_sealed_list_names_real_engine_attributes():
+    """A sealed name that does not exist on the engine seals nothing.
+    `fair_value` sat in this list and could never fire -- it is a module
+    function, not an engine attribute -- which is the tell that the list
+    was written from intent rather than from the engine's surface. This
+    pins every entry to the surface, so the list cannot rot silently
+    again."""
+    world = make_world(callable_agent(hold))
+    missing = [name for name in SEALED if not hasattr(world.engine, name)]
+    assert not missing, (
+        f"SEALED names attributes the engine does not have: {missing}. "
+        "They seal nothing; fix the name or remove it.")
+
+
 def test_the_serializer_never_touches_ground_truth():
     agent = callable_agent(hold)
     world = make_world(agent)
@@ -596,6 +644,23 @@ def test_fundamentals_are_supplied_not_discovered():
 
 
 # -- the decision model ------------------------------------------------------
+
+
+def test_action_is_a_validating_constructor():
+    """signed() returns 0.0 for a side it does not recognise, so a
+    hand-built Action("A", "SHORT", 5) handed to the public orders_from
+    silently became a hold, and a negative quantity flipped the trade's
+    sign through the same arithmetic. Every documented path revalidates
+    through parse_decision; the constructor now refuses what only a
+    hand-builder could reach."""
+    with pytest.raises(ci.DecisionError, match="side"):
+        ci.Action("A", "SHORT", 5)
+    with pytest.raises(ci.DecisionError, match="non-negative"):
+        ci.Action("A", "SELL", -5)
+    with pytest.raises(ci.DecisionError, match="finite"):
+        ci.Action("A", "BUY", float("inf"))
+    assert ci.Action("A", "HOLD").signed() == 0.0
+    assert ci.Action("A", "SELL", 5).signed() == -5.0
 
 
 def test_a_decision_parses_from_all_three_shapes():
@@ -764,6 +829,13 @@ DECISION_CORPUS = [
      False),
     ("limit-price", {"actions": [dict(_ACT, limit_price=99.0)]}, False),
     ("unknown-top-level-key", {"actions": [], "confidence": 0.9}, False),
+    # Pydantic's allow_inf_nan default admitted an INFINITE quantity
+    # through a field whose schema said minimum 0; parse_decision refused
+    # it all along. Both non-finite spellings are pinned on both paths.
+    ("infinite-quantity",
+     {"actions": [dict(_ACT, quantity=float("inf"))]}, False),
+    ("nan-quantity",
+     {"actions": [dict(_ACT, quantity=float("nan"))]}, False),
 ]
 
 
@@ -951,6 +1023,41 @@ def test_sub_share_dust_produces_no_order():
     assert orders == {}
 
 
+def test_a_zero_cap_means_no_order_not_no_cap():
+    """`if cap > 0` once read a zero cap as NO cap: with avg_volume or
+    max_participation at zero, a 1e12-share order passed through whole
+    with no clip note, while serialize_observation showed the agent
+    max_order_shares of exactly 0.0 -- the observation and the enforcement
+    stating opposite things, and the function accepting the exact order it
+    exists to refuse. A zero cap now clips to zero, the order falls out as
+    dust, and the note says so."""
+    world = make_world(callable_agent(hold))
+    world.run(days=1)
+    obs = _observation(world)
+    decision = ci.parse_decision(
+        {"actions": [{"symbol": "TECH_A", "side": "BUY",
+                      "quantity": 1e12}]})
+    orders, notes = ci.orders_from(decision, obs, max_participation=0.0)
+    assert orders == {}
+    assert len(notes) == 1 and "clipped to 0" in notes[0], notes
+
+
+@pytest.mark.parametrize("text", [
+    '{"actions": [], '
+    '"actions": [{"symbol": "A", "side": "BUY", "quantity": 9999}]}',
+    '{"actions": [{"symbol": "A", "side": "BUY", "quantity": 9999}], '
+    '"actions": []}',
+], ids=["hold-then-buy", "buy-then-hold"])
+def test_duplicate_json_keys_are_refused_not_resolved_by_order(text):
+    """json.loads keeps the LAST occurrence, so which of the model's two
+    statements reached the market depended on emission order, and nothing
+    recorded that another existed. The mapping layer refuses duplicate
+    SYMBOLS for exactly this reason; the JSON layer now applies the same
+    principle to keys, in both orderings."""
+    with pytest.raises(ci.DecisionError, match="more than once"):
+        ci.parse_decision(text)
+
+
 # -- recording and replay ----------------------------------------------------
 
 
@@ -987,6 +1094,25 @@ def test_a_missing_recording_raises_and_says_which_step():
     assert "Re-record" in message, (
         "the message has to say how to fix it, because the usual cause is "
         "an intentional change to the observation mapping")
+
+
+def test_a_recorded_null_response_is_not_diagnosed_as_missing():
+    """response_for returns None both for 'no entry' and 'entry recorded
+    with a null response' -- two situations with OPPOSITE remedies. The
+    missing-key message told the user their inputs had changed and to
+    re-record the run, about an entry sitting right there; that spends
+    money rediscovering a file they already have."""
+    transcript = ci.Transcript()
+    transcript.record({"digest": "k", "response": None, "step": 3})
+    with pytest.raises(ci.DecisionError) as excinfo:
+        ci.replay_response(transcript, "k", step=3, day=0)
+    message = str(excinfo.value)
+    assert "null response" in message
+    assert "this interaction" in message, (
+        "the remedy is re-recording ONE interaction, and the message must "
+        "say so")
+    assert "none for this input" not in message, (
+        "the missing-key diagnosis is the wrong one here")
 
 
 # -- adapter metadata --------------------------------------------------------
@@ -1121,6 +1247,26 @@ def test_adapter_info_refuses_unserialisable_metadata():
 def test_adapter_info_stamps_the_schema_version_itself():
     info = ci.AdapterInfo(framework="example")
     assert info.decision_schema_version == ci.DECISION_SCHEMA_VERSION
+
+
+def test_the_credential_scan_cannot_be_bypassed_after_construction():
+    """The scan once ran on a SHALLOW copy, so nested structures stayed
+    shared with the caller's object: build a config, hand it over, keep
+    using it -- the completely normal shape -- and anything added
+    afterwards was unscanned and reached provenance(), which is what gets
+    written into committed transcript meta. The stored form is now a deep
+    copy taken before validation, and the published form is a deep copy of
+    the stored one, so neither direction hands out a handle."""
+    cfg = {"client": {"note": "clean"}}
+    info = ci.AdapterInfo(framework="x", extra=cfg)
+
+    cfg["client"]["note"] = "sk-proj-INSERTED-AFTER-THE-SCAN"
+    assert info.extra["client"]["note"] == "clean"
+    assert "INSERTED" not in json.dumps(info.as_dict())
+
+    published = info.as_dict()
+    published["extra"]["client"]["note"] = "sk-proj-VIA-AS-DICT"
+    assert info.extra["client"]["note"] == "clean"
 
 
 def test_the_reference_string_cites_the_run():

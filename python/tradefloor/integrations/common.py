@@ -22,9 +22,16 @@ re-litigating them.
 The framework owns interpretation, the portfolio decision and a short
 rationale. Tradefloor owns the market, the macro path, execution, the order
 book, fills, accounting, checkpoints, forks, interventions and the
-comparison. A framework never mutates engine state: it returns a decision,
-and every path from a framework response to the engine runs through
-:func:`parse_decision` and :func:`orders_from`.
+comparison. A framework MUST NOT mutate engine state, and every path from a
+framework RESPONSE to the engine runs through :func:`parse_decision` and
+:func:`orders_from` -- but that is validation, not confinement. ``act`` and
+``ask`` hold the Observation, the Observation carries the live engine, and
+the seam is not sandboxed: the adapter boundary is exactly an ordinary
+agent's, no tighter. The serializer's allowlist and the contract checks
+catch the accident of a cooperating author reading or writing what they
+should not; nothing in this package restrains an adapter that reaches for
+``obs.engine`` deliberately, and claiming otherwise would leave an author
+believing in a property nobody enforces.
 
 ## The observation allowlist
 
@@ -290,11 +297,30 @@ def run_sync(awaitable: Any) -> Any:
 
 
 class Action:
-    """One validated instruction: a symbol, a side, and a share count."""
+    """One validated instruction: a symbol, a side, and a share count.
+
+    The constructor validates the two fields that carry direction, because
+    :meth:`signed` returns 0.0 for any side it does not recognise -- so a
+    hand-built ``Action("A", "SHORT", 5)`` handed straight to
+    :func:`orders_from` would silently become a hold, and a negative
+    quantity would flip the trade's sign. Refused here instead; case is
+    normalised by :func:`parse_decision`, which is where lenient input
+    belongs.
+    """
 
     __slots__ = ("symbol", "side", "quantity")
 
     def __init__(self, symbol: str, side: str, quantity: float = 0.0) -> None:
+        if side not in SIDES:
+            raise DecisionError(
+                f"side must be one of {', '.join(SIDES)}, got {side!r}. "
+                "Action is built from validated input; parse_decision "
+                "normalises case and refuses the rest.")
+        quantity = float(quantity)
+        if not quantity >= 0 or quantity == float("inf"):
+            raise DecisionError(
+                f"quantity must be a finite, non-negative share count, got "
+                f"{quantity}. The side carries the direction.")
         self.symbol = symbol
         self.side = side
         self.quantity = float(quantity)
@@ -457,8 +483,12 @@ def decision_model() -> Any:
         symbol: str = pydantic.Field(
             min_length=props["symbol"]["minLength"])
         side: Side
+        # allow_inf_nan=False, explicitly: pydantic's default admits an
+        # INFINITE quantity through a field whose schema says minimum 0,
+        # and the model whose entire job is making an invalid decision
+        # hard to generate was accepting one parse_decision refuses.
         quantity: float = pydantic.Field(
-            0.0, ge=props["quantity"]["minimum"],
+            0.0, ge=props["quantity"]["minimum"], allow_inf_nan=False,
             description=props["quantity"]["description"])
 
         @pydantic.field_validator("side", mode="before")
@@ -544,6 +574,28 @@ def parse_decision(raw: Any) -> Decision:
         "returns a Decision, a dict with an 'actions' list, or a JSON string.")
 
 
+def _no_duplicate_keys(pairs: list) -> dict[str, Any]:
+    """`json.loads` hook that refuses an object naming a key twice.
+
+    Standard JSON parsing keeps the LAST occurrence, so a response carrying
+    '"actions": [], "actions": [...]' resolved to whichever the model
+    emitted second, silently, and nothing recorded that a first statement
+    existed. `_decision_from_mapping` refuses duplicate SYMBOLS one layer
+    up for exactly this reason -- two instructions with no defined order --
+    and the JSON layer owed the same principle to duplicate keys.
+    """
+    keys = [key for key, _ in pairs]
+    duplicated = sorted({key for key in keys if keys.count(key) > 1})
+    if duplicated:
+        raise DecisionError(
+            f"the JSON response names keys more than once: "
+            f"{', '.join(duplicated)}. json parsing keeps the last "
+            "occurrence, so which of the model's statements reached the "
+            "market would depend on emission order, and nothing would "
+            "record that another existed.")
+    return dict(pairs)
+
+
 def _decision_from_text(text: str) -> Decision:
     if not text.strip():
         raise DecisionError(
@@ -556,7 +608,7 @@ def _decision_from_text(text: str) -> Decision:
     # and never through the brace search, which cannot tell a top-level list
     # from an object and would report the wrong thing about it.
     try:
-        raw = json.loads(text.strip())
+        raw = json.loads(text.strip(), object_pairs_hook=_no_duplicate_keys)
     except json.JSONDecodeError:
         match = _OBJECT.search(text)
         if match is None:
@@ -565,7 +617,8 @@ def _decision_from_text(text: str) -> Decision:
                 "contract is one object and nothing else; got "
                 f"{text.strip()[:200]!r}") from None
         try:
-            raw = json.loads(match.group(0))
+            raw = json.loads(match.group(0),
+                             object_pairs_hook=_no_duplicate_keys)
         except json.JSONDecodeError as exc:
             raise DecisionError(
                 "the JSON object in the framework response does not parse: "
@@ -745,8 +798,15 @@ def orders_from(decision: Decision, obs: Any, *,
         delta = action.signed()
         if not delta:
             continue
-        cap = max_participation * obs.avg_volume(action.symbol)
-        if cap > 0 and abs(delta) > cap:
+        # A cap of zero IS a cap. `if cap > 0` once read "no volume to
+        # participate in" as "no cap at all": with avg_volume or
+        # max_participation at zero, a 1e12-share order passed through
+        # whole with no note, while the serialized observation showed the
+        # agent max_order_shares of exactly 0.0 -- the observation and the
+        # enforcement stating opposite things. Clipped to zero, the order
+        # falls out as dust below and the note says what happened.
+        cap = max(0.0, max_participation * obs.avg_volume(action.symbol))
+        if abs(delta) > cap:
             notes.append(
                 f"{action.symbol}: asked for {abs(delta):,.0f} shares, "
                 f"clipped to {cap:,.0f} ({max_participation:.1%} of average "
@@ -781,10 +841,14 @@ def serialize_observation(obs: Any, *,
 
     Company fundamentals -- sector, EPS, book value, revenue growth, beta --
     do not come off the engine either. The caller supplies them as
-    ``fundamentals``, keyed by ticker. An analyst reads all five off a
+    ``fundamentals``, keyed by ticker; an analyst reads all five off a
     filing, and keeping them out of the adapter leaves one less line to
-    audit: the inputs to a valuation are public, the valuation is the answer
-    key.
+    audit. Worth stating plainly rather than implying otherwise:
+    :func:`tradefloor.fair_value` is a public function, so a caller who
+    supplies the full set of valuation inputs has also supplied the means
+    to reconstruct the model's anchor. Whether to hand an agent that much
+    is the caller's decision about their own experiment; what this function
+    guarantees is only that it never makes the decision for them.
 
     How the payload is RENDERED is the adapter's decision -- a chat framework
     wants prose, a graph framework wants the dict itself -- but what it may
@@ -862,6 +926,19 @@ def _window_return(rows: Sequence[Sequence[float]], i: int,
     None, for a window the agent has not lived through yet. Zero would claim
     the price did not move, and on day one that describes the record and not
     the market. From the number alone the agent cannot tell the two apart.
+
+    The longest window is one step short of its label, KNOWINGLY. A
+    five-day return needs ``steps + 1`` rows -- 31 at six steps a day --
+    and ``HISTORY_STEPS`` keeps 30, so once the buffer is full "return_5d"
+    spans 29 intervals: 4.83 days, permanently, labelled five. The honest
+    fix is ``HISTORY_STEPS = steps_per_day * 5 + 1``, and it is
+    deliberately not made: this value is rendered into every adapter's
+    recorded input, so correcting the arithmetic moves every committed
+    replay digest across all five fixture sets, replacing recorded
+    evidence to relabel a diagnostic. The number is the same for every
+    agent and both arms of any comparison; only its name overstates it by
+    a sixth of a day. Fix the arithmetic in the pass that next re-records
+    the fixtures for cause, and not before.
 
     The window is load-bearing beyond this file. The value it produces is
     rendered into FinRobot's prompt, and FinRobot's recorded replay keys
@@ -962,6 +1039,16 @@ class Transcript:
         entry = self._by_digest.get(key)
         return None if entry is None else entry["response"]
 
+    def entry_for(self, key: str) -> dict[str, Any] | None:
+        """The whole recorded entry, or None only when none exists.
+
+        Distinct from :meth:`response_for`, which returns None BOTH for a
+        missing entry and for an entry whose recorded response is null --
+        two situations with opposite remedies, which
+        :func:`replay_response` has to tell apart.
+        """
+        return self._by_digest.get(key)
+
     def __len__(self) -> int:
         return len(self.entries)
 
@@ -997,9 +1084,17 @@ def replay_response(transcript: Transcript, key: str, *, step: int,
     says the same thing everywhere: which step missed, why a miss means the
     inputs changed, and that replaying anyway would answer this question
     with a response given to a different one.
+
+    A missing ENTRY and a recorded NULL are told apart, because their
+    remedies are opposite: a missing key means the inputs changed and the
+    run needs re-recording; a null response means the recording is right
+    there and holds no answer -- the live call likely failed mid-run and
+    the failure was written down -- and sending the user off to re-record
+    the whole run would spend money to rediscover a file they already
+    have.
     """
-    response = transcript.response_for(key)
-    if response is None:
+    entry = transcript.entry_for(key)
+    if entry is None:
         raise DecisionError(
             f"no recorded response for step {step} (day {day}, digest "
             f"{key}). The transcript holds {len(transcript)} interactions, "
@@ -1008,6 +1103,15 @@ def replay_response(transcript: Transcript, key: str, *, step: int,
             "instructions or the market configuration has changed since the "
             "recording -- replaying anyway would answer this question with a "
             "response given to a different one. Re-record the run live.")
+    response = entry.get("response")
+    if response is None:
+        raise DecisionError(
+            f"the recorded entry for step {step} (day {day}, digest {key}) "
+            "holds a null response. The recording exists -- the inputs have "
+            "not changed -- but this interaction captured no answer, which "
+            "usually means the live call failed mid-run and the failure was "
+            "recorded. Re-record this interaction; the rest of the "
+            "transcript is fine.")
     return response
 
 
@@ -1057,23 +1161,33 @@ _SECRET_VALUE = re.compile(r"\bsk-[A-Za-z0-9_-]{4,}|Bearer\s+[A-Za-z0-9]")
 
 
 def _credential_free(mapping: dict[str, Any], where: str) -> dict[str, Any]:
-    """A copy of ``mapping``, refused if anything in it smells like a secret.
+    """A DEEP copy of ``mapping``, refused if anything in it smells like a
+    secret.
 
     The open mappings on :class:`AdapterInfo` moved the no-credentials
     boundary from shape to validation, so the validation has to be real:
-    key names are checked recursively against ``_SECRET_FRAGMENTS``, string
-    values against known secret prefixes, and the whole thing must be
-    JSON-serialisable, because it is written into transcripts and printed
-    by the fork agreement.
+    key names are checked recursively, string values against anchored
+    secret shapes, and the whole thing must be JSON-serialisable, because
+    it is written into transcripts and printed by the fork agreement.
+
+    Deep, not shallow, and that is the boundary itself: the first version
+    took ``dict(mapping)``, which shares every NESTED structure with the
+    caller's object -- so building a config, handing it over and mutating
+    it afterwards (the completely normal shape) put unscanned values into
+    what :meth:`FrameworkAdapter.provenance` writes into committed
+    transcript meta. A scan-once-share-forever guard is a guard against
+    the past only. The copy is a JSON round-trip rather than
+    ``copy.deepcopy``, so what is stored is byte-for-byte the form a
+    transcript will hold.
     """
-    out = dict(mapping)
     try:
-        json.dumps(out)
+        blob = json.dumps(dict(mapping))
     except (TypeError, ValueError) as exc:
         raise ValidationError(
             f"AdapterInfo {where} must be JSON-serialisable -- it is "
             f"written into transcripts and manifests -- and is not: "
             f"{exc}") from exc
+    out = json.loads(blob)
 
     def walk(node: Any) -> None:
         if isinstance(node, dict):
@@ -1166,10 +1280,15 @@ class AdapterInfo:
         self.decision_schema_version = DECISION_SCHEMA_VERSION
 
     def as_dict(self) -> dict[str, Any]:
+        # Deep copies of the mappings, for the same reason the validator
+        # deep-copies on the way in: a shallow copy hands the caller a
+        # handle on the STORED nested structures, and a mutation through it
+        # would bypass the credential scan that ran at construction.
         out = {}
         for slot in self.__slots__:
             value = getattr(self, slot)
-            out[slot] = dict(value) if isinstance(value, dict) else value
+            out[slot] = copy.deepcopy(value) if isinstance(value, dict) \
+                else value
         return out
 
     def reference(self) -> str:

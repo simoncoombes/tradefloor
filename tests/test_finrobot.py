@@ -697,9 +697,20 @@ def test_the_participation_cap_the_agent_is_shown_is_the_one_it_is_held_to():
 #: Everything on the engine that a trader in this market could not know.
 #: `column` is on the list because its fields include `mispricing_s` and
 #: `garch_variance`; `truth` and `attribution` are the answer key outright.
-SEALED = ("fair_value", "attribution", "truth", "session_mispricing_s",
+#: `fair_value` was on this list and could never fire: it is a module-level
+#: function, not an engine attribute, so `hasattr(engine, "fair_value")` is
+#: False and the proxy below would never have been asked for it. One entry of
+#: the guard was decorative for as long as the guard existed. Every name here
+#: is now pinned by `test_every_sealed_name_is_a_real_engine_attribute`, so a
+#: rename upstream disarms the entry loudly instead of silently.
+SEALED = ("attribution", "truth", "session_mispricing_s",
           "column", "state_snapshot", "macro_table", "bars", "order_log",
-          "model_params", "model")
+          "model_params", "model",
+          # Added after an adversarial review of the shared layer found them
+          # reachable and unsealed. Each verified present on a live engine
+          # before being listed, which is what the phantom above did not get.
+          "draws_consumed", "draws_by_stream", "model_fingerprint",
+          "book_table", "snapshot_book", "session_prices", "session_volumes")
 
 
 class Sealed:
@@ -737,6 +748,137 @@ def _observation(world: World, engine=None):
                        world.steps_per_day)
 
 
+def test_every_sealed_name_is_a_real_engine_attribute():
+    """The guard that guards the guard.
+
+    A name in `SEALED` that the engine does not have is a clause the proxy
+    can never reach: `__getattr__` only fires for an attribute somebody asks
+    for, and nobody asks for one that does not exist. `fair_value` sat here
+    for exactly that reason -- it is a module-level function -- so one
+    eleventh of this defence was decorative and every run reported it green.
+
+    That is the same shape as a skipped test reporting success, and the fix
+    is the same: check the subject still exists rather than trusting the
+    list's intent.
+    """
+    world, _ = one_observation(days=1)
+    missing = [name for name in SEALED if not hasattr(world.engine, name)]
+    assert not missing, (
+        f"{missing} are listed as sealed but are not engine attributes, so "
+        "the proxy can never be asked for them and those entries guard "
+        "nothing. Either the engine renamed them -- in which case find the "
+        "new name -- or they never belonged here.")
+    assert len(set(SEALED)) == len(SEALED), "a name is listed twice"
+
+
+def test_the_valuation_is_reconstructible_from_what_the_caller_supplies():
+    """The limit of the ground-truth boundary, written down.
+
+    `tradefloor.fair_value` is public, and every argument it needs is either
+    a fundamental the caller is invited to supply or a macro field in
+    `OBSERVABLE_MACRO`. So supplying full fundamentals hands the agent the
+    means to reconstruct the model's own anchor, without reading one engine
+    attribute -- which is why neither `Sealed` nor any allowlist of engine
+    reads can see it happen.
+
+    This asserts the claim the module docstring makes, in both directions. If
+    `fair_value` ever gains a required argument that is neither supplied nor
+    observable, the reconstruction stops being possible and the docstring
+    starts over-warning; this fails and says so.
+    """
+    import inspect
+
+    required = {name for name, p in
+                inspect.signature(tf.fair_value).parameters.items()
+                if p.default is inspect.Parameter.empty}
+    supplied = {"sector", "eps", "book_value_per_share", "revenue_growth",
+                "beta"}
+    observable = set(fr.OBSERVABLE_MACRO)
+    assert required <= supplied | observable, (
+        f"fair_value now requires {sorted(required - supplied - observable)}, "
+        "which the caller cannot supply and the agent cannot observe. The "
+        "module docstring's warning about reconstruction is now too strong.")
+
+    # The anchor reconstructs EXACTLY. It is a pure function of six inputs,
+    # so there is nothing approximate about this half.
+    world, agent = one_observation(days=2)
+    facts = {"TECH_A": {"sector": "technology", "eps": 3.0,
+                        "book_value_per_share": 15.0, "revenue_growth": 0.30}}
+    payload = fr.observe(_observation(world), history=agent.history,
+                         fundamentals=facts)
+    asset = payload["assets"][0]
+    f, macro = asset["fundamentals"], payload["macro"]
+    reconstructed = tf.fair_value(
+        eps=f["eps"], sector=f["sector"], revenue_growth=f["revenue_growth"],
+        book_value_per_share=f["book_value_per_share"],
+        federal_funds_rate=macro["federal_funds_rate"],
+        corporate_bond_yield=macro["corporate_bond_yield"]).fair_value
+    direct = tf.fair_value(
+        eps=3.0, sector="technology", revenue_growth=0.30,
+        book_value_per_share=15.0, federal_funds_rate=0.04,
+        corporate_bond_yield=0.055).fair_value
+    assert reconstructed == direct, (
+        "fair_value is a pure function of six inputs and the payload carries "
+        "all six, so this is an equality and not an approximation")
+
+
+#: How close `log(price / fair_value)` lands to the engine's `mispricing_s`.
+#: Measured, not chosen: the error is roster- and moment-dependent, so this
+#: is a ceiling generous enough not to be flaky and tight enough to fail if
+#: the relationship stops holding at all.
+#:
+#: It lives here rather than in a docstring for a reason. Three people
+#: measured this claim and produced three numbers -- "exact", "a tenth of a
+#: percentage point", "8.5 percentage points" -- because two of the three
+#: inverted it as `price / fair_value - 1`. The engine applies the
+#: mispricing as `fair_value * exp(s)`, so the ratio form is the wrong
+#: arithmetic and both derived figures were artefacts. A number in prose
+#: cannot be re-derived by the next reader; this one can.
+MISPRICING_TOLERANCE = 0.05
+
+
+def test_the_state_variable_is_approximable_but_not_recoverable():
+    """The other half, and the half that is NOT exact.
+
+    `mispricing_s` is a state variable, not a ratio that can be read off a
+    price. The traded price carries microstructure on top of the anchor, so
+    even the correct inversion lands near rather than on it.
+    """
+    import math
+    import struct
+
+    world, _agent = one_observation(days=4)
+    engine = world.engine
+    n = len(engine.tickers)
+    prices = list(struct.unpack("<%dd" % n, engine.prices()))
+    truth = list(struct.unpack("<%dd" % n, engine.column("mispricing_s")))
+
+    facts = {"TECH_A": {"sector": "technology", "eps": 3.0,
+                        "book_value_per_share": 15.0, "revenue_growth": 0.30}}
+    payload = fr.observe(_observation(world), history=[], fundamentals=facts)
+    macro = payload["macro"]
+    f = facts["TECH_A"]
+    value = tf.fair_value(
+        eps=f["eps"], sector=f["sector"], revenue_growth=f["revenue_growth"],
+        book_value_per_share=f["book_value_per_share"],
+        federal_funds_rate=macro["federal_funds_rate"],
+        corporate_bond_yield=macro["corporate_bond_yield"]).fair_value
+
+    approximation = math.log(prices[0] / value)
+    error = abs(approximation - truth[0])
+    assert error < MISPRICING_TOLERANCE, (
+        f"log(price/fair_value) is {error:.6f} from mispricing_s, past the "
+        "measured tolerance. Either the engine changed how it applies the "
+        "mispricing, or the approximation no longer holds at all.")
+    # And it is genuinely an approximation, not a hidden equality. If this
+    # ever fails, the state variable became recoverable and the module
+    # docstring's careful distinction has collapsed.
+    assert error > 0.0, (
+        "log(price/fair_value) now equals mispricing_s exactly, which the "
+        "docstring says it does not. Re-read that paragraph before relaxing "
+        "this.")
+
+
 def test_the_mapping_never_touches_simulator_ground_truth():
     world, agent = one_observation(days=3)
     obs = _observation(world, engine=Sealed(world.engine))
@@ -771,6 +913,92 @@ def test_no_hidden_value_appears_in_the_text_finrobot_receives():
     assert not leaked, (
         f"values only the simulator knows appear in the FinRobot input: "
         f"{leaked}")
+
+
+class _NotJsonable:
+    """Stands in for the objects a real `llm_config` holds.
+
+    AutoGen documents `http_client` and a `filter_dict` callable as members,
+    so a config carrying something `json` cannot serialise is ordinary rather
+    than exotic.
+    """
+
+    def __repr__(self):
+        return "<a client object>"
+
+
+@pytest.mark.parametrize("config", [
+    # nested inside config_list, which is where a client usually sits
+    {"config_list": [{"model": "gpt-4o", "api_key": "k",
+                      "http_client": _NotJsonable()}]},
+    # and at the top level, which AutoGen also allows
+    {"config_list": [{"model": "gpt-4o"}], "http_client": _NotJsonable()},
+    # a callable, which is what filter_dict is
+    {"config_list": [{"model": "gpt-4o"}], "filter_dict": lambda d: True},
+    # and under a generation key, which is lifted by name
+    {"config_list": [{"model": "m"}], "temperature": _NotJsonable()},
+])
+def test_a_config_that_is_not_json_still_builds_an_adapter(config):
+    """The regression this test exists for.
+
+    Recording `config_digest` meant digesting the caller's `llm_config`, and
+    the shared digest falls back to `json.dumps` for anything that is not a
+    string. A config holding a client object then raised `TypeError` out of
+    the constructor -- on input the released adapter accepted, and as an
+    exception `except ValidationError` does not catch, which is what every
+    docstring here tells a caller to write.
+
+    A digest has to be stable and one-way. It does not have to round-trip,
+    so the unserialisable parts become their type name and construction
+    proceeds.
+    """
+    agent = fr.FinRobotAdapter(mode="live", llm_config=config)
+    assert agent.info.config_digest, "the config left no trace"
+    assert len(agent.info.config_digest) == 16
+    # And the record still serialises, which is what a fixture needs.
+    assert json.dumps(agent.provenance())
+
+
+def test_the_config_digest_still_tells_two_configs_apart():
+    """Rendering the unserialisable parts must not collapse them together.
+
+    A digest that returned the same value for every config would satisfy the
+    test above and record nothing, which is the failure mode of a fix that
+    only stops an exception.
+    """
+    def built(config):
+        return fr.FinRobotAdapter(mode="live",
+                                  llm_config=config).info.config_digest
+
+    a = built({"config_list": [{"model": "gpt-4o"}], "temperature": 0.0})
+    b = built({"config_list": [{"model": "gpt-4o"}], "temperature": 1.0})
+    c = built({"config_list": [{"model": "other"}], "temperature": 0.0})
+    d = built({"config_list": [{"model": "gpt-4o"}], "temperature": 0.0,
+               "http_client": _NotJsonable()})
+    assert len({a, b, c, d}) == 4, "the digest stopped discriminating"
+
+
+def test_a_non_string_mandate_does_not_break_construction():
+    """`digest` is str-only, and the mandate is a caller-supplied argument.
+
+    Before the metadata was recorded, a non-string mandate reached FinRobot
+    and failed there, in live mode. Digesting it at construction turned that
+    into an `AttributeError` from `__init__`, which is both earlier and
+    uncatchable as a `ValidationError`.
+    """
+    agent = fr.FinRobotAdapter(
+        mode="live", llm_config={"config_list": [{"model": "m"}]},
+        mandate=_NotJsonable())
+    assert agent.info.instructions_digest
+
+
+def test_the_mandate_digest_is_unchanged_for_a_real_mandate():
+    """The `str()` above must not move the shipped fixture's key.
+
+    `str()` on a string is that string, so the stamped digest still matches.
+    If this ever fails, every recorded transcript stops replaying.
+    """
+    assert fr.digest(str(fr.MANDATE)) == fr.digest(fr.MANDATE)
 
 
 def test_the_adapter_metadata_carries_no_credential():
@@ -1133,6 +1361,118 @@ def test_an_oversized_order_is_clipped_and_the_clip_is_recorded():
     orders, notes = fr.orders_from(decision, obs)
     assert orders["TECH_A"] == pytest.approx(cap)
     assert len(notes) == 1 and "clipped" in notes[0]
+
+
+def test_a_zero_cap_is_a_cap_and_not_an_absence_of_one():
+    """`if cap > 0` read "no volume to participate in" as "no cap at all".
+
+    With `avg_volume` or `max_participation` at zero, an arbitrarily large
+    order passed through whole and unnoted, while the payload showed the
+    agent `max_order_shares: 0.0` -- the observation and the enforcement
+    stating opposite things about the same limit.
+    """
+    world, _ = one_observation(days=1)
+    obs = _observation(world)
+    decision = fr.parse(answer(act("TECH_A", "BUY", 1e12)))
+
+    orders, notes = fr.orders_from(decision, obs, max_participation=0.0)
+    assert orders == {}, "a zero cap let a trillion shares through"
+    assert len(notes) == 1 and "clipped to 0" in notes[0], (
+        "being clipped to nothing is something the agent did, so the trace "
+        f"has to carry it; got {notes}")
+
+    # And the payload agrees with the enforcement, which is the actual claim.
+    payload = fr.observe(obs, history=[], max_participation=0.0)
+    assert payload["assets"][0]["max_order_shares"] == 0.0
+
+
+def test_a_json_object_naming_a_key_twice_is_refused():
+    """`json.loads` keeps the LAST occurrence, silently.
+
+    `parse` already refuses a SYMBOL named twice, because two instructions
+    with no defined order cannot both reach the market. The JSON layer owed
+    the same principle to duplicate keys, and did not enforce it: which of
+    the model's two statements counted depended on emission order and
+    nothing recorded that another existed.
+    """
+    with pytest.raises(fr.DecisionError, match="more than once"):
+        fr.parse('{"actions": [], "actions": '
+                 '[{"symbol": "TECH_A", "side": "BUY", "quantity": 500}]}')
+    # Inside an action object too, not only at the top level.
+    with pytest.raises(fr.DecisionError, match="more than once"):
+        fr.parse('{"actions": [{"symbol": "A", "symbol": "B", '
+                 '"side": "BUY", "quantity": 5}]}')
+    # And through the brace-search path, which is a second call site.
+    with pytest.raises(fr.DecisionError, match="more than once"):
+        fr.parse('Here you go:\n```json\n{"rationale": "a", '
+                 '"rationale": "b", "actions": []}\n```')
+
+
+@pytest.mark.parametrize("symbol,side,quantity,match", [
+    ("A", "SHORT", 5, "side must be one of"),
+    ("A", "buy", 5, "side must be one of"),      # case belongs to parse
+    ("A", "SELL", -5, "non-negative"),
+    ("A", "BUY", float("inf"), "finite"),
+    ("A", "BUY", float("nan"), "non-negative"),
+])
+def test_an_action_refuses_what_it_cannot_mean(symbol, side, quantity, match):
+    """`Action` validated nothing, one layer below where `parse` refuses.
+
+    `Action("A", "SHORT", -5)` constructed, and `signed()` returns 0.0 for an
+    unrecognised side -- so an unknown side became a silent HOLD and a
+    negative SELL became a sign-flipped BUY. Anybody building an Action
+    directly, which the class being public invites, got a decision the
+    market executed differently from how it read.
+    """
+    with pytest.raises(fr.DecisionError, match=match):
+        fr.Action(symbol, side, quantity)
+
+
+def test_a_valid_action_still_constructs_every_way_it_used_to():
+    """The compatibility half. Validation must refuse only the unmeanable."""
+    assert fr.Action("A", "BUY", 5).signed() == 5.0
+    assert fr.Action("A", "SELL", 5).signed() == -5.0
+    assert fr.Action("A", "HOLD").signed() == 0.0        # default quantity
+    assert fr.Action("A", "BUY", 0).quantity == 0.0
+    assert fr.Action("A", "BUY", "5").quantity == 5.0    # coerced, as before
+
+
+def test_a_recorded_null_response_gets_its_own_diagnosis():
+    """Two failures, opposite remedies, one message between them.
+
+    `response_for` returns None both for a missing entry and for an entry
+    whose response is null. Telling the second "the inputs changed, re-record
+    with --live --record" sends a reader to spend sixty live calls
+    re-recording an interaction that is sitting right there.
+    """
+    world, _ = one_observation(days=2)
+    obs = _observation(world)
+    prompt = fr.render(fr.observe(obs, history=[list(obs.prices)]))
+
+    transcript = fr.Transcript()
+    transcript.record({"digest": fr.digest(prompt), "step": obs.step,
+                       "response": None})
+    agent = fr.FinRobotAdapter(mode="replay", transcript=transcript, every=1)
+    with pytest.raises(fr.DecisionError) as excinfo:
+        agent.act(obs)
+    message = str(excinfo.value)
+    assert "has no response" in message
+    assert "nothing has drifted" in message, (
+        "the reader has to be told the recording is fine, or they will "
+        "re-record it")
+    assert "--live --record" not in message, (
+        "that is the OTHER failure's remedy and sends sixty live calls at "
+        "an interaction that is already recorded")
+
+
+def test_entry_for_and_response_for_answer_different_questions():
+    transcript = fr.Transcript()
+    transcript.record({"digest": "abc", "response": None, "step": 0})
+    assert transcript.response_for("abc") is None
+    assert transcript.response_for("missing") is None
+    assert transcript.entry_for("abc") is not None, (
+        "the entry exists; only its response is null")
+    assert transcript.entry_for("missing") is None
 
 
 def test_sub_share_dust_produces_no_order():
