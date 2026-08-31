@@ -238,7 +238,13 @@ page no root holds. Judged by resync's own standard of a unique distinctive
 match, five of those re-point automatically, ten are pages still printing a
 pt-v12 number, and fifty-four state neither value anywhere. Re-pointing the
 inventory at the new page set is therefore a piece of work with judgement in
-it and not a `--apply` away. The 0.6.1 run is stored under
+it and not a `--apply` away. The register itself now follows the pages it
+describes: `remeasure.py` and `resync.py` resolve it from `--inventory`,
+then `TRADEFLOOR_DOCS/tools/remeasure/inventory.json`, then the copy still
+committed here, and each prints which of the three it read. A
+`TRADEFLOOR_DOCS` holding no register stops the run and says so, since a
+quiet fall back to the copy here would report the old register's figures
+under the new one's name, which is the failure this section describes. The 0.6.1 run is stored under
 `tools/remeasure/out-0.6.1/` as the record of where this stands.
 
 ### 5. Documentation site

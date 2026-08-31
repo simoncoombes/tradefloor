@@ -33,10 +33,14 @@ import argparse
 import json
 import os
 import pathlib
+import sys
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-INVENTORY = ROOT / "tools" / "remeasure" / "inventory.json"
+# Resolved per run, not fixed here: the register describes the pages,
+# and the pages live in another repository since 0.5.0. See register.py.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import register as _register
 
 
 def renderings(v: float) -> list[str]:
@@ -231,6 +235,8 @@ def main() -> None:
     # resolve them against, every page in the inventory is unreadable.
     ap.add_argument("--docs-root", default=os.environ.get("TRADEFLOOR_DOCS"),
                     help="checkout of the docs repository the inventory cites")
+    ap.add_argument("--inventory", default=None,
+                    help="the claim register; overrides TRADEFLOOR_DOCS")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--report", action="store_true")
     args = ap.parse_args()
@@ -239,14 +245,14 @@ def main() -> None:
     measured_by_id = {r["id"]: r.get("measured") for r in figures["figures"]}
     moved = {r["id"] for r in figures["figures"] if r["status"] == "MOVED"}
 
-    inv = json.loads(INVENTORY.read_text(encoding="utf-8"))
+    inventory_path, how = _register.resolve(args.inventory)
+    print(f"register: {inventory_path}  (via {how})")
+    inv = json.loads(inventory_path.read_text(encoding="utf-8"))
     rows = inv["figures"]
 
     cache: dict[str, str] = {}
 
-    bases = [ROOT]
-    if args.docs_root:
-        bases.append(pathlib.Path(args.docs_root).expanduser().resolve())
+    bases = _register.page_roots(args.docs_root)
 
     def text_of(path: str):
         """The page's text, or None when no root holds it.
@@ -329,8 +335,8 @@ def main() -> None:
                 row["published"] = float(rendered.replace(",", ""))
         keep.append(row)
     inv["figures"] = keep
-    INVENTORY.write_text(json.dumps(inv, indent=1) + "\n", encoding="utf-8")
-    print(f"\nwrote {INVENTORY.relative_to(ROOT)}: "
+    inventory_path.write_text(json.dumps(inv, indent=1) + "\n", encoding="utf-8")
+    print(f"\nwrote {inventory_path}: "
           f"{len(keep)} figures ({len(retired)} retired, {len(fixes)} re-pointed)")
 
 
