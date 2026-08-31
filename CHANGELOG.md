@@ -1,14 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.6.1
 
 **Four agent frameworks reach the same market.** `tradefloor.integrations`
 gains adapters for the OpenAI Agents SDK, PydanticAI and LangGraph, alongside
 a generic adapter over any plain Python function. Each hands its framework an
-allowlisted observation and validates the decision that comes back before the
-market executes it, so two frameworks can be compared on one seed through one
-harness. FinRobot, which came first, keeps its own integration and its own
-extra.
+allowlisted observation and validates the decision that comes back, so two
+frameworks can be compared on one seed through one harness. FinRobot, which
+came first, keeps its own integration and extra.
 
 ```
 pip install "tradefloor[openai-agents]"   # or [pydantic-ai], or [langgraph]
@@ -20,13 +19,20 @@ replays for free, with the framework uninstalled and no network reached. The
 key comes from the input, so an edited experiment stops instead of answering
 the new question with the answer given to the old one.
 
-**The examples run offline.** `examples/integrations/` carries one per
-framework, each driving the real framework with a deterministic function
-standing where a model would sit. No API key, no provider account, a few
-seconds each.
+**The examples run offline.** `examples/integrations/` carries a folder per
+framework, each holding a script and a notebook that drive the real framework,
+with a deterministic function where a model would sit. No API key, no provider
+account, a few seconds each.
 
-Below the marker: the shared layer, what a decision may contain, the version
-floors on the three new extras, and the CI lanes that install them.
+**Two fixes.** FinRobot's rendered observation named the participation cap and
+not the funding cap, so an agent sizing to the only limit it saw could be
+refused by one it never saw. It now states both. The Claude example printed a
+scorecard for a run where every decision failed.
+
+The market is unchanged: same digest, same preset.
+
+Below the marker: the shared layer, the decision contract, version floors
+and CI lanes.
 
 <!-- release-note-ends -->
 
