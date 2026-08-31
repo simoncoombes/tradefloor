@@ -51,6 +51,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 
 sys.path.insert(0, str(HERE))
+import register  # noqa: E402
 from measures import GROUPS, TIMED_GROUPS, Ctx  # noqa: E402
 
 
@@ -237,10 +238,15 @@ def main() -> int:
     ap.add_argument("--only", help="comma-separated group names")
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--out", default=str(HERE / "out"))
+    ap.add_argument("--inventory", default=None,
+                    help="the claim register; overrides TRADEFLOOR_DOCS")
     ap.add_argument("--list", action="store_true")
     args = ap.parse_args()
 
-    inventory = json.loads((HERE / "inventory.json").read_text())["figures"]
+    inventory_path, how = register.resolve(args.inventory)
+    print(f"register: {inventory_path}  (via {how})")
+    inventory = json.loads(
+        inventory_path.read_text(encoding="utf-8"))["figures"]
     if args.list:
         for fig in inventory:
             print(f"{fig['id']:34s} {fig['file']}:{fig['line']:<4} "
