@@ -15,6 +15,12 @@ BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/remeasure-0.4.0
 # remeasure.py learned to label a --only run as PARTIAL. Verified with
 # `git show origin/dev:...` before launch, which is runbook trap 16.
 BRANCH=dev
+# The repository and the package were both renamed from `pretium` at
+# 0.5.x. GitHub redirects the old clone URL, so this script kept
+# cloning successfully and failed two lines later at `pip install
+# pretium` -- which is why the rename survived here unnoticed until
+# the 0.6.1 pass. The bucket path keeps its `pretium-calib` prefix
+# deliberately: that is a real S3 location with existing history.
 # 64, not 96. remeasure uses a THREAD pool, not processes, so the ceiling is
 # how much of the engine runs with the GIL released rather than the core
 # count. 64 is eight times the laptop's 8 with headroom left for the serial
@@ -63,18 +69,18 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 
 git clone --depth 1 --branch BRANCH_PLACEHOLDER \
-    https://github.com/simoncoombes/pretium.git src
+    https://github.com/simoncoombes/tradefloor.git src
 cd src
 
 uv venv --python 3.11 .venv
 export VIRTUAL_ENV=$PWD/.venv
 export PATH="$VIRTUAL_ENV/bin:$PATH"
-# measures.py imports pyarrow directly and pretium.baselines needs numpy.
+# measures.py imports pyarrow directly and tradefloor.baselines needs numpy.
 uv pip install numpy pyarrow maturin pytest
 maturin build --release --out dist --features python
-uv pip install --no-index --find-links dist --force-reinstall pretium
+uv pip install --no-index --find-links dist --force-reinstall tradefloor
 
-python -c "import numpy, pyarrow, pretium; print('PREFLIGHT OK', pretium.version())"
+python -c "import numpy, pyarrow, tradefloor; print('PREFLIGHT OK', tradefloor.version())"
 
 # The gate must be able to fail. Four earlier runs in this project's history
 # carried a probe calling a function that does not exist, behind a `|| true`
