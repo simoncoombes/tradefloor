@@ -42,7 +42,7 @@ A model handed `{"return_pct": 88.7}` will report that a strategy made
 88.7%. So every tool here returns a `caveats` list beside its numbers, and
 the caveats are **computed from the envelope and the measured facts at call
 time** -- never retyped prose. That rule has already earned itself: while
-this module was being written, `PRODUCT.md` and `README.md` were both found
+this module was being written, the product brief and `README.md` were both found
 still asserting a return autocorrelation of +0.219 and +0.249 from an
 earlier preset, where the shipped `pt-v3` measures 0.0485 across the
 README's own published method. Hardcoding a caveat is how a caveat becomes

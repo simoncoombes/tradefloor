@@ -19,7 +19,7 @@ because history ran once.
 `main` below is the experiment and nothing else; every `_show` is narration,
 and deleting all of them would leave the design intact and readable. The agent
 is in `agent.py`, and is a parameter -- replace that import and no other
-line here changes. `examples/finrobot/` is that swap, made: the same
+line here changes. `examples/integrations/finrobot/` is that swap, made: the same
 experiment with a real FinRobot agent in place of this one.
 
 Everything reported is ground truth about THIS market. It is a controlled

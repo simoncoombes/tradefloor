@@ -127,7 +127,7 @@ def test_the_protocol_layer_returns_structured_content():
 def test_no_measured_number_is_hardcoded_in_the_module():
     """The drift guard, and the reason this server computes its caveats.
 
-    `PRODUCT.md` and `README.md` both still assert a return autocorrelation
+    The product brief and `README.md` both still asserted a return autocorrelation
     of +0.219 and +0.249 from a superseded preset, where the shipped one
     measures well under half that and is IN band. Those are prose. A caveat
     that hardcoded the same figure would be a lie told by the software, to

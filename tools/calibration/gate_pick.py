@@ -35,7 +35,21 @@ import tradefloor as pt  # noqa: E402
 from tradefloor import Scenario, envelope, facts  # noqa: E402
 
 TRAIN = tuple(range(101, 131))
-HELDOUT = (1, 2, 3, 4, 5, 6)
+
+#: Thirty, matching TRAIN, since round 122. It was six, and six was too few
+#: for the statistic that reads worst here. `corr_persistence_acf1` has a
+#: per-seed sd of 0.274, so a six-seed median carries about 0.11 of noise
+#: against a band 0.73 wide. Seeds 1-6 happen to hold a -0.50 and two -0.25s:
+#: the ho row read -0.2226 and called the statistic OUT, while the same build
+#: at 100 seeds reads +0.1527 and the held-out 909 universe +0.1409, both
+#: comfortably in. The pt-v14-out, pt-v15-in, pt-v16-out history an audit
+#: found in this row was noise walking across a band edge rather than the
+#: model moving.
+#:
+#: Thirty carries about 0.06, which is 8 percent of that band. It costs
+#: nothing net: the rows no longer recompute per block, see `--ho-cache` in
+#: gate_batch, so a campaign runs them once rather than twenty-six times.
+HELDOUT = tuple(range(1, 31))
 
 # The measurement universe. 111/40 is the search universe every recorded
 # figure used; PT_UNIVERSE_SEED/PT_UNIVERSE_N override it for held-out

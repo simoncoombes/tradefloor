@@ -54,8 +54,36 @@ claude = ["anthropic>=0.40", "pydantic>=2"]
 # Optional for the same reason as the rest: nothing in the library imports it,
 # and a user who only wants the simulator should not install a server stack.
 mcp = ["mcp>=2.0"]
+# One extra per framework adapter under python/tradefloor/integrations/,
+# named after the framework, as that subpackage's rules require. Floors only,
+# no ceilings: every adapter imports its framework lazily and validates
+# everything it returns, so an upstream release that moves the API fails
+# loudly inside the adapter with the framework named, rather than silently in
+# a resolver fight with somebody's other pins. There is deliberately no
+# aggregate "agents" extra: the frameworks are alternatives, not a set, and an
+# extra that installs three dependency trees to use one would mostly install
+# conflict surface.
+#
+# The floor is the version the adapter was WRITTEN AND TESTED AGAINST, not the
+# major it belongs to. A floor at the major admits releases the adapter has
+# never met, and for two of these that is not theoretical: the OpenAI adapter
+# is tested through `agents.testing.ScriptedModel`, which 0.2 does not carry,
+# and the PydanticAI adapter is written against a 2.36 surface on which
+# `usage` is a property and `Agent.__init__` takes no `instrument`. A user who
+# resolved to the major would install an extra that cannot run the code it
+# exists for, and would read the failure as the adapter's fault.
+#
+# `pydantic-ai-slim` and not `pydantic-ai`: slim is what provides the
+# `pydantic_ai` module, and the umbrella adds openai, anthropic, google-genai,
+# groq, mistral, cohere and boto3 that no adapter imports. Whoever hands us a
+# PydanticAI agent already installed the provider they built it against.
+# `TestModel` and `FunctionModel` are both in slim, so the test suite needs
+# nothing further.
+openai-agents = ["openai-agents>=0.22"]
+pydantic-ai = ["pydantic-ai-slim>=2.36"]
+langgraph = ["langgraph>=1.2"]
 # Runs a real FinRobot agent inside a market, for
-# examples/finrobot/rate_shock.py. Optional, and it has to be: this is the
+# examples/integrations/finrobot/rate_shock.py. Optional, and it has to be: this is the
 # largest extra by an order of magnitude, and only the LIVE half of the
 # integration needs it. Replaying the recorded run -- which is what the
 # example and the notebook do by default -- imports none of it.
@@ -90,8 +118,8 @@ mcp = ["mcp>=2.0"]
 # needs >=3.11.
 finrobot = [
   "finrobot>=0.1.5",
-  "pyautogen[retrievechat]>=0.2.19,<0.3",
-  "anthropic>=0.30,<1.0",
+  "pyautogen[retrievechat]>=0.2.19,<0.11",
+  "anthropic>=0.30,<2.0",
   "finnhub-python",
   "yfinance",
   "sec-api",
