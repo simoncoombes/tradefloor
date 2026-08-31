@@ -167,6 +167,7 @@ from .common import DecisionError as _CommonDecisionError
 #: deliberately str-only and does not change. This one is for hashing a
 #: config, which is a dict.
 from .common import digest as _digest_any
+from .common import jsonable as _as_jsonable
 
 #: The macro fields FinRobot is shown. Bound to ``counterfactual.MACRO_FIELDS``
 #: itself, so the two cannot drift apart over what a macro experiment covers.
@@ -874,33 +875,6 @@ class Transcript:
         target.write_text(self.to_json(), encoding="utf-8")
 
 
-def _as_jsonable(value: Any) -> Any:
-    """A JSON-able rendering of ``value``, for digesting.
-
-    An ``llm_config`` is somebody else's object graph. AutoGen's own
-    documented members include ``http_client`` and a ``filter_dict``
-    callable, and neither is JSON -- so digesting the config directly raised
-    ``TypeError`` out of ``json.dumps`` on a configuration the released
-    adapter accepted, and ``TypeError`` is not a
-    :class:`~tradefloor.ValidationError`, so a caller catching the library's
-    refusals did not catch it either. Constructing an adapter must not fail
-    on a config that worked before.
-
-    Unrepresentable parts become their type name. A digest has to be stable
-    and one-way; it does not have to round-trip, and two configs differing
-    only in which client object they hold are the same configuration for the
-    purpose this records. Same shape as ``langgraph._as_jsonable``; if a
-    third adapter needs it, it belongs in ``common``.
-    """
-    if isinstance(value, dict):
-        return {str(k): _as_jsonable(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_as_jsonable(v) for v in value]
-    if isinstance(value, (str, int, float, bool)) or value is None:
-        return value
-    return f"<{type(value).__name__}>"
-
-
 def _refuse_a_changed_mandate(transcript: "Transcript | None",
                               mandate: str) -> None:
     """Refuse a replay whose instructions are not the recorded ones.
@@ -1257,6 +1231,20 @@ class FinRobotAdapter:
 
         response = self._live(prompt)
         if self.recorder is not None:
+            # Stamp the provenance on first write rather than leaving it to
+            # the caller. `_refuse_a_changed_mandate` can only refuse a
+            # mismatched replay if the recording says what it ran under, and
+            # a fresh `Transcript()` has empty `meta` -- so before this, the
+            # only transcript in the world that armed the guard was the
+            # committed fixture, because it was stamped by hand. Every
+            # recording a user made landed in the permissive branch, forever.
+            #
+            # `setdefault`, so an explicit `meta` wins key by key: the
+            # shipped example sets a richer one, and a stamp that clobbered
+            # it would trade a working guard for a lost record.
+            if "instructions_digest" not in self.recorder.meta:
+                for field, value in self.provenance().items():
+                    self.recorder.meta.setdefault(field, value)
             self.recorder.record({
                 "arm": self.arm, "step": obs.step, "day": obs.day,
                 "digest": key, "prompt": prompt, "response": response,

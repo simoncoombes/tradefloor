@@ -159,6 +159,27 @@ metadata.
 
 ## Replay
 
+## What the replay key cannot see
+
+The key is a digest of the input, so changing the brief or the observation
+mapping makes every lookup miss and the replay refuses, naming the step.
+What a key over the input cannot see is a change to something that never
+enters it. The user's agent carries its OWN instructions, and those reach
+the model as ``system_instructions`` rather than as part of the input --
+so replacing the agent entirely leaves every recorded key intact. Measured
+before this was guarded: an agent instructed "BUY EVERYTHING" and one
+instructed "SELL EVERYTHING" produced byte-identical replay keys, and the
+recording replayed under either as though nothing had changed.
+
+That is a property of any adapter whose **instructions travel separately
+from the keyed input**, not an Agents SDK quirk, and the other integrations
+in this package share it.
+:meth:`OpenAIAgentsAdapter._check_instructions` closes it by comparing the
+recorded ``instructions_digest`` against the configured one, at
+construction rather than at the first decision. The recorder stamps that
+digest on its first write, so a recording arms the guard without anybody
+remembering to set ``Transcript.meta``.
+
 Live decisions cost money and a model answers differently every time.
 ``mode="replay"`` reads recorded responses keyed by
 :func:`~tradefloor.integrations.common.digest` of the exact input, and never
@@ -331,15 +352,30 @@ def _instructions_digest(instructions: Any) -> str:
 def _model_name(model: Any) -> str:
     """The model, as a name that can be written into a transcript.
 
-    A string is the model name and is recorded. Anything else is a
+    A string is the model name and is recorded as given. Anything else is a
     :class:`agents.models.interface.Model` instance, which may hold a
-    configured HTTP client and therefore an API key, so only its class name
-    is taken. There is nowhere in :class:`AdapterInfo` to put a credential
-    and this is one of the reasons.
+    configured HTTP client and therefore an API key, so nothing is read off
+    it wholesale. There is nowhere in :class:`AdapterInfo` to put a
+    credential and this is one of the reasons.
+
+    The class name alone was not enough. Two ``LitellmModel`` instances
+    pointed at different providers rendered identically, so a field whose
+    job is saying what produced a recording said the same thing about two
+    different models -- the same defect the reviewer found in the shared
+    ``jsonable`` helper, in this module's own spelling of it. A ``.model``
+    attribute holding a STRING is the SDK's own convention for the model
+    name and is safe to name: it is a model identifier, not a secret, and
+    ``AdapterInfo``'s recursive validator refuses anything key-shaped that
+    somehow arrives here anyway.
     """
     if isinstance(model, str):
         return model
-    return "" if model is None else type(model).__name__
+    if model is None:
+        return ""
+    named = getattr(model, "model", None)
+    if isinstance(named, str) and named:
+        return f"{type(model).__name__}:{named}"
+    return type(model).__name__
 
 
 class OpenAIAgentsAdapter(FrameworkAdapter):
@@ -481,6 +517,66 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         #: copied by a fork, and it is not in `fork_kwargs`.
         self._bound: Any = None
 
+        self._check_instructions()
+
+    def _check_instructions(self) -> None:
+        """Refuse a replay whose recording ran under other instructions.
+
+        Called from the constructor rather than from :meth:`act`: everything
+        this needs is known before the market opens, and a replay that
+        refuses twenty simulated days in has already spent the reader's
+        time on a fault that was knowable at the start.
+
+        What a key over the input cannot see is a change to something that
+        never enters it. The replay key is a digest of the brief and the
+        observation, and the user's agent carries its OWN instructions,
+        which reach the model as ``system_instructions`` and never appear
+        in the keyed input. So swapping the agent entirely leaves every
+        recorded key intact: every lookup hits, the run completes, and the
+        decisions replayed were taken by an agent nobody is running any
+        more. Measured before this guard existed -- an agent instructed
+        "BUY EVERYTHING" and one instructed "SELL EVERYTHING" produced
+        byte-identical replay keys. That is a property of any adapter whose
+        **instructions travel separately from the keyed input**, not an
+        Agents SDK quirk, and the other integrations in this package share
+        it.
+
+        The brief is the other half and needs no guard here: it IS in the
+        keyed input, so editing it makes every key miss and the replay
+        refuses on its own. It is folded into ``instructions_digest``
+        anyway, which only makes this check fire earlier and more
+        specifically than the missing-key one would.
+
+        Only a MISMATCH is refused, and only when an agent was actually
+        configured. A transcript that records no digest never claimed
+        anything, so it is not known to be wrong, and refusing it would
+        break hand-written fixtures for no safety gain. Replay WITHOUT an
+        agent is the ordinary path -- it needs no SDK and no key -- and it
+        asserts nothing about whose instructions produced the recording, so
+        there is nothing to contradict.
+        """
+        if self.transcript is None or self.agent is None:
+            return
+        recorded = (self.transcript.meta or {}).get("instructions_digest")
+        if not recorded or recorded == self.info.instructions_digest:
+            return
+        was = (self.transcript.meta or {}).get("instructions_version")
+        raise DecisionError(
+            "this transcript was recorded under different instructions: it "
+            f"carries instructions_digest {recorded} and this adapter is "
+            f"configured with {self.info.instructions_digest} (recorded "
+            f"under brief version {was or 'custom'}, configured with "
+            f"{self.info.instructions_version or 'custom'}).\n"
+            "The digest covers the agent's own instructions AND the standing "
+            "brief. The agent's instructions never enter the replay key -- "
+            "they reach the model as system_instructions -- so every lookup "
+            "would still hit and the run would complete, answering for this "
+            "agent with decisions another one made.\n"
+            "Either pass the agent the recording was made with, or drop the "
+            "agent argument to replay it as a recording rather than as this "
+            "agent's run: OpenAIAgentsAdapter(mode='replay', "
+            "transcript=...).")
+
     # -- the one framework-specific method --------------------------------
 
     def ask(self, obs: Any, payload: dict[str, Any]) -> Any:
@@ -517,6 +613,18 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
 
         response = self._run(items, obs)
         if self.recorder is not None:
+            # Stamp the provenance on the first write rather than leaving it
+            # to the caller. `_check_instructions` can only refuse a
+            # mismatched replay if the recording says what it ran under, and
+            # a guard that arms itself only when somebody remembers to set
+            # `meta` is off in exactly the runs nobody was careful about.
+            # Every recording this adapter makes now carries the digest to
+            # compare against tomorrow. An explicit `meta` is respected:
+            # keys already there win, so a caller who set their own
+            # provenance keeps it.
+            if "instructions_digest" not in self.recorder.meta:
+                for field, value in self.provenance().items():
+                    self.recorder.meta.setdefault(field, value)
             self.recorder.record({
                 "arm": self.arm, "step": obs.step, "day": obs.day,
                 "digest": key, "prompt": items, "response": response,

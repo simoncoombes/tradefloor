@@ -361,7 +361,13 @@ def main(*, live: bool = False, record: bool = False,
 
     written = _save(out, world, mark, control, shock, report, provenance)
     if recorder is not None:
-        recorder.meta = provenance
+        # Merged, not assigned. The adapter stamps its own provenance on the
+        # recorder's first write, and that stamp is what arms the replay's
+        # mandate check -- `instructions_digest` is in it and this block's
+        # `provenance` dict is not. Replacing `meta` wholesale, which this
+        # line used to do, threw the digest away and left every recording
+        # made by this example protected only by `mandate_version`.
+        recorder.meta.update(provenance)
         recorder.save(fixture)
         written.append(fixture)
 

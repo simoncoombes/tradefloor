@@ -46,10 +46,30 @@ network. The three framework examples drive the real framework, with a
 deterministic function standing where a model would sit, so what runs offline
 is the adapter and the framework and not a mock of either.
 
-All four run the same five-day mean-reversion rule over the same market at
-the same seed, so all four print the same scorecard: 3 trades, +0.51%,
-+3.96 bps of impact. That agreement is the check. A difference between two of
-those numbers would be the harness leaking into the comparison.
+All four have the same shape with one part swapped: build a market, ask the
+agent once a simulated day for five days, print the scorecard and the
+decision record. The rule is the same five-day mean-reversion rule in every
+one, so the part that changes is who reads the payload and answers.
+
+The market is where they diverge, deliberately. Each example sizes its own
+book to show something its own section explains, and the LangGraph one runs
+a duration-laddered roster it shares with the FinRobot study instead of the
+roster the other three use. The scorecards differ accordingly, and a
+difference between two rows here is a fact about two markets and not about
+two adapters:
+
+| example | trades | return | impact |
+|---|---|---|---|
+| [`callable_agent.py`](callable_agent.py) | 3 | +0.51% | +3.96 bps |
+| [`openai_agents_agent.py`](openai_agents_agent.py) | 3 | +0.51% | +3.96 bps |
+| [`pydantic_ai_agent.py`](pydantic_ai_agent.py) | 3 | +2.32% | +11.70 bps |
+| [`langgraph_agent.py`](langgraph_agent.py) | 2 | +0.73% | -5.67 bps |
+
+Comparing two frameworks means holding the market fixed, which is what the
+shared contract checks in `tests/test_integrations.py` do.
+`tests/test_integration_examples.py` runs all four examples and asserts the
+table above against what they print, since a table nothing executes is a
+table that goes stale.
 
 ## Plain Python
 

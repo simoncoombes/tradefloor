@@ -1128,6 +1128,144 @@ def test_the_recorded_response_round_trips_one_level_deep(tmp_path):
 
 
 @needs_sdk
+def test_swapping_the_agent_cannot_replay_silently():
+    """The hole this guard closes, measured before it existed.
+
+    The replay key is a digest of the brief and the observation. The user's
+    agent carries its OWN instructions, which reach the model as
+    `system_instructions` and never enter the keyed input -- so two agents
+    with opposite instructions produce byte-identical keys, every lookup
+    hits, the run completes, and the decisions replayed were taken by an
+    agent nobody is running any more.
+    """
+    recorder = ci.Transcript()
+    live = make_agent(lambda p: answer(),
+                      agent=user_agent(instructions="BUY EVERYTHING"),
+                      recorder=recorder)
+    contract.make_world(live).run(days=1)
+
+    # The keys really are identical -- that is why the digest comparison is
+    # needed rather than being redundant with the missing-key refusal.
+    other = make_agent(lambda p: answer(),
+                       agent=user_agent(instructions="SELL EVERYTHING"))
+    payload = payload_of(recorder.entries[0]["prompt"])
+    assert ci.digest(other.input_items(payload)) == \
+        recorder.entries[0]["digest"], (
+        "the inputs differ, so this test is no longer exercising the hole")
+
+    with pytest.raises(ci.DecisionError, match="different instructions") as e:
+        OpenAIAgentsAdapter(user_agent(instructions="SELL EVERYTHING"),
+                            mode="replay", transcript=recorder)
+    message = str(e.value)
+    assert recorder.meta["instructions_digest"] in message
+    assert "system_instructions" in message, (
+        "the message must say WHY the key did not catch it")
+
+
+@needs_sdk
+def test_the_guard_refuses_at_construction_not_twenty_days_in():
+    """Everything it needs is known before the market opens, and a replay
+    that fails deep into a run has already spent the reader's time."""
+    recorder = ci.Transcript()
+    live = make_agent(lambda p: answer(), agent=user_agent(),
+                      recorder=recorder)
+    contract.make_world(live).run(days=1)
+
+    with pytest.raises(ci.DecisionError):
+        OpenAIAgentsAdapter(user_agent(instructions="something else"),
+                            mode="replay", transcript=recorder)
+
+
+@needs_sdk
+def test_the_matching_agent_and_the_no_agent_replay_are_both_allowed():
+    """Only a mismatch is refused. Replay WITHOUT an agent is the ordinary
+    path -- it needs no SDK and no key -- and it asserts nothing about whose
+    instructions produced the recording, so there is nothing to contradict."""
+    recorder = ci.Transcript()
+    live = make_agent(lambda p: answer(), agent=user_agent(),
+                      recorder=recorder)
+    world = contract.make_world(live)
+    world.run(days=1)
+
+    same = OpenAIAgentsAdapter(user_agent(), mode="replay",
+                               transcript=recorder)
+    assert same.mode == "replay"
+    none = OpenAIAgentsAdapter(mode="replay", transcript=recorder)
+    contract.make_world(none).run(days=1)
+    assert [e["decision"] for e in none.record] == \
+        [e["decision"] for e in live.record]
+
+
+@needs_sdk
+def test_a_transcript_claiming_nothing_is_not_refused():
+    """It never claimed a set of instructions, so it is not known to be
+    wrong, and refusing it would break hand-written fixtures for no gain."""
+    recorder = ci.Transcript()
+    live = make_agent(lambda p: answer(), agent=user_agent(),
+                      recorder=recorder)
+    contract.make_world(live).run(days=1)
+
+    bare = ci.Transcript(entries=recorder.entries)      # no meta at all
+    assert not bare.meta
+    replay = OpenAIAgentsAdapter(user_agent(instructions="anything at all"),
+                                 mode="replay", transcript=bare)
+    contract.make_world(replay).run(days=1)
+    assert len(replay.record) == 1
+
+
+@needs_sdk
+def test_the_recorder_arms_the_guard_by_itself():
+    """A guard that arms only when somebody remembers to set `meta` is off
+    in exactly the runs nobody was careful about. Nothing in this test calls
+    `provenance()` or touches `meta`."""
+    recorder = ci.Transcript()
+    live = make_agent(lambda p: answer(), agent=user_agent(),
+                      recorder=recorder)
+    contract.make_world(live).run(days=1)
+
+    assert (recorder.meta["instructions_digest"]
+            == live.info.instructions_digest)
+    assert recorder.meta["framework"] == "openai-agents"
+    assert recorder.meta["model"] == live.info.model
+
+
+@needs_sdk
+def test_an_explicit_meta_wins_over_the_self_stamp():
+    """A caller who set their own provenance keeps it; the stamp fills gaps
+    rather than overwriting a deliberate record."""
+    recorder = ci.Transcript(meta={"instructions_digest": "handwritten",
+                                   "framework": "mine"})
+    live = make_agent(lambda p: answer(),
+                      agent=user_agent(), recorder=recorder)
+    contract.make_world(live).run(days=1)
+    assert recorder.meta["instructions_digest"] == "handwritten"
+    assert recorder.meta["framework"] == "mine"
+
+
+@needs_sdk
+def test_two_model_instances_at_different_providers_are_distinguishable():
+    """`config_digest` and `model` exist to prove two arms ran the same
+    setup. Rendering a Model instance as its bare class name made two
+    LitellmModels pointed at different providers identical -- the same
+    defect the reviewer found in the shared `jsonable` helper, in this
+    module's own spelling of it."""
+    def routed(target):
+        # A real Model -- the SDK type-checks `Agent.model` -- carrying the
+        # `.model` attribute LitellmModel uses to name its target.
+        instance = scripted(lambda p: answer(), turns=1)
+        instance.model = target
+        return instance
+
+    one = make_agent(lambda p: answer(),
+                     agent=user_agent(model=routed("anthropic/opus")))
+    two = make_agent(lambda p: answer(),
+                     agent=user_agent(model=routed("openai/gpt")))
+    assert one.info.model != two.info.model, (one.info.model, two.info.model)
+    assert "anthropic/opus" in one.info.model
+    assert one.info.config_digest != two.info.config_digest
+
+
+@needs_sdk
 def test_a_missing_recording_raises_and_says_which_step():
     """A replay is keyed by the exact input. A changed brief means the key
     goes missing, and answering anyway would answer this question with a

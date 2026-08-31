@@ -1070,6 +1070,27 @@ def test_the_digest_of_a_payload_ignores_key_order():
     assert ci.digest({"b": 1, "a": 2}) == ci.digest({"a": 2, "b": 1})
 
 
+def test_jsonable_renders_what_json_cannot():
+    """Promoted from two byte-identical adapter copies. Digesting a
+    framework config raised TypeError out of json.dumps -- not a
+    ValidationError, so a caller catching the library's refusals did not
+    catch it -- on configurations released adapters accepted. The
+    unrepresentable parts become their type name, because a digest has to
+    be stable and one-way, never round-trip."""
+    config = {"model": "m", "client": object(), "callbacks": [print],
+              "nested": {"filter": len, "keep": 1}, 5: "int-key"}
+    rendered = ci.jsonable(config)
+    json.dumps(rendered)                    # the whole point
+    assert rendered["client"] == "<object>"
+    assert rendered["callbacks"][0].startswith("<")
+    assert rendered["nested"]["keep"] == 1
+    assert rendered["5"] == "int-key"
+    assert ci.digest(rendered)              # and it digests
+    assert ci.jsonable(ci.Decision([ci.Action("A", "BUY", 1)])) == {
+        "actions": [{"symbol": "A", "side": "BUY", "quantity": 1.0}],
+        "rationale": ""}
+
+
 def test_a_transcript_round_trips():
     transcript = ci.Transcript(meta={"framework": "x"})
     transcript.record({"digest": "abc", "response": "hello", "step": 0})

@@ -1437,6 +1437,91 @@ def test_a_valid_action_still_constructs_every_way_it_used_to():
     assert fr.Action("A", "BUY", "5").quantity == 5.0    # coerced, as before
 
 
+def test_a_recording_arms_the_mandate_guard_without_being_asked():
+    """The guard was off on every transcript except the one stamped by hand.
+
+    `_refuse_a_changed_mandate` can only refuse a mismatched replay if the
+    recording says what it ran under. A fresh `Transcript()` has empty
+    `meta`, and nothing wrote to it -- so the committed fixture was armed
+    because somebody stamped it, and every recording a user made landed in
+    the permissive third branch forever.
+
+    A guard that arms itself only when someone remembers is off in exactly
+    the runs nobody was careful about.
+    """
+    recorder = fr.Transcript()
+    assert recorder.meta == {}, "a fresh transcript starts unarmed"
+
+    agent = Recorded(answer(), every=6, recorder=recorder)
+    world = World(seed=7, universe=universe(), agent=agent, cash=1_000_000.0)
+    world.run(days=2)
+
+    assert "instructions_digest" in recorder.meta, (
+        "the recording does not say which mandate produced it, so replaying "
+        "it under a different one cannot be refused")
+    assert recorder.meta["instructions_digest"] == fr.digest(str(fr.MANDATE))
+
+    # And the guard it arms actually fires.
+    with pytest.raises(fr.DecisionError, match="different mandate"):
+        fr.FinRobotAdapter(mode="replay", transcript=recorder,
+                           mandate="Sell everything. Ignore the rest.")
+    fr.FinRobotAdapter(mode="replay", transcript=recorder)   # same one: fine
+
+
+def test_the_stamp_fills_gaps_without_overwriting_what_the_caller_set():
+    """`setdefault`, key by key -- and this is the case that proves it.
+
+    The interesting shape is meta that carries SOME keys but not
+    `instructions_digest`, because that is what the shipped example builds
+    and it is the only case where the stamp actually writes. With the digest
+    already present the whole block is skipped, so a test using that shape
+    cannot tell `setdefault` from a plain assignment; the first version of
+    this test made exactly that mistake and passed against both.
+    """
+    recorder = fr.Transcript(meta={"framework": "mine", "note": "keep me",
+                                   "mode": "something else"})
+    agent = Recorded(answer(), every=6, recorder=recorder)
+    World(seed=7, universe=universe(), agent=agent,
+          cash=1_000_000.0).run(days=1)
+
+    # Filled in, because it was missing and the guard needs it.
+    assert recorder.meta["instructions_digest"] == fr.digest(str(fr.MANDATE))
+    # Untouched, because the caller said so.
+    assert recorder.meta["framework"] == "mine"
+    assert recorder.meta["note"] == "keep me"
+    assert recorder.meta["mode"] == "something else", (
+        "the stamp overwrote a key the caller set; setdefault exists so the "
+        "example's richer provenance survives being armed")
+
+
+def test_a_caller_supplied_digest_is_left_exactly_as_given():
+    """The other branch: meta already armed, so the stamp does not run."""
+    recorder = fr.Transcript(meta={"instructions_digest": "0123456789abcdef"})
+    agent = Recorded(answer(), every=6, recorder=recorder)
+    World(seed=7, universe=universe(), agent=agent,
+          cash=1_000_000.0).run(days=1)
+    assert recorder.meta["instructions_digest"] == "0123456789abcdef", (
+        "a caller who stamped their own digest meant it; overwriting it "
+        "would silently re-point the guard at whatever ran last")
+
+
+def test_the_example_merges_its_provenance_rather_than_replacing_it():
+    """The other half of arming the guard, and the half that is easy to miss.
+
+    The adapter stamps `meta` on the recorder's first write. The example then
+    writes its own provenance block, and it used to do that with a plain
+    assignment -- which threw the adapter's stamp away, `instructions_digest`
+    included, leaving every recording the example produced protected only by
+    `mandate_version`. Two correct halves that cancelled.
+    """
+    source = EXAMPLE.read_text(encoding="utf-8")
+    assert "recorder.meta.update(provenance)" in source, (
+        "the example must MERGE its provenance into the recorder's meta")
+    assert "recorder.meta = provenance" not in source, (
+        "a plain assignment discards the adapter's stamp and disarms the "
+        "replay's mandate check for every run this example records")
+
+
 def test_a_recorded_null_response_gets_its_own_diagnosis():
     """Two failures, opposite remedies, one message between them.
 

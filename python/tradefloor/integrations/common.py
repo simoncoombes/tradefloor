@@ -846,9 +846,16 @@ def serialize_observation(obs: Any, *,
     audit. Worth stating plainly rather than implying otherwise:
     :func:`tradefloor.fair_value` is a public function, so a caller who
     supplies the full set of valuation inputs has also supplied the means
-    to reconstruct the model's anchor. Whether to hand an agent that much
-    is the caller's decision about their own experiment; what this function
-    guarantees is only that it never makes the decision for them.
+    to reconstruct the model's anchor EXACTLY -- and, through
+    ``log(price / fair_value)``, to land near the mispricing on top of it.
+    Near, never on: a traded price carries microstructure the anchor does
+    not, and the ratio form of that inversion is the wrong arithmetic
+    outright (the engine applies ``fair_value * exp(s)``). How near depends
+    on the roster and the moment, which is why no distance is quoted here;
+    the measured ceiling lives in a test constant where it can be
+    re-derived. Whether to hand an agent that much is the caller's decision
+    about their own experiment; what this function guarantees is only that
+    it never makes the decision for them.
 
     How the payload is RENDERED is the adapter's decision -- a chat framework
     wants prose, a graph framework wants the dict itself -- but what it may
@@ -979,6 +986,35 @@ def _volatility(rows: Sequence[Sequence[float]], i: int) -> float | None:
 
 
 # -- recording and replay -----------------------------------------------------
+
+
+def jsonable(value: Any) -> Any:
+    """A JSON-able rendering of ``value``, for digesting and recording.
+
+    A framework config is somebody else's object graph -- HTTP clients,
+    callbacks, filter callables -- and digesting one directly raised
+    ``TypeError`` out of ``json.dumps`` on configurations released adapters
+    accepted; ``TypeError`` is not a :class:`~tradefloor.ValidationError`,
+    so a caller catching the library's refusals did not catch it either.
+    The unrepresentable parts become their type name: a digest has to be
+    stable and one-way, never round-trip, and two configs differing only in
+    which client object they hold are the same configuration for what a
+    digest records.
+
+    Promoted from two byte-identical private copies in the LangGraph and
+    FinRobot adapters, by the argument that produced :class:`ReplayMixin`:
+    a helper that exists twice is two chances to drift, and this one feeds
+    ``config_digest``, which the fork agreement compares.
+    """
+    if isinstance(value, Decision):
+        return value.as_dict()
+    if isinstance(value, dict):
+        return {str(k): jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [jsonable(v) for v in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return f"<{type(value).__name__}>"
 
 
 def digest(data: Any) -> str:
