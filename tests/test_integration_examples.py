@@ -40,16 +40,21 @@ README = EXAMPLES / "README.md"
 #: package. Named rather than inferred, so an example added without a thought
 #: about its dependency fails the coverage test below.
 NEEDS: dict[str, str | None] = {
-    "callable_agent.py": None,
-    "openai_agents_agent.py": "agents",
-    "pydantic_ai_agent.py": "pydantic_ai",
-    "langgraph_agent.py": "langgraph",
+    "callable/five_days.py": None,
+    "openai_agents/five_days.py": "agents",
+    "pydantic_ai/rate_shock.py": "pydantic_ai",
+    "langgraph/rate_shock.py": "langgraph",
 }
+
+#: FinRobot is documented by its own page and its own rate-shock study
+#: rather than by the scorecard table, so it is not a row here. Named
+#: rather than inferred, so a sixth integration cannot slip in unseen.
+NOT_IN_THE_TABLE = {"finrobot"}
 
 #: A row of the scorecard table: the linked file name, then trades, return
 #: and impact exactly as the examples print them.
 ROW = re.compile(
-    r"^\|\s*\[`(?P<file>[a-z_]+\.py)`\]\([^)]*\)\s*\|"
+    r"^\|\s*\[`(?P<file>[a-z_]+/[a-z_]+\.py)`\]\([^)]*\)\s*\|"
     r"\s*(?P<trades>\d+)\s*\|"
     r"\s*(?P<ret>[-+][0-9.]+)%\s*\|"
     r"\s*(?P<impact>[-+][0-9.]+) bps\s*\|\s*$",
@@ -78,7 +83,9 @@ def test_the_table_covers_every_example():
     example that no longer exists would be checked against nothing. Both are
     the shape where a guard keeps reporting green over a smaller subject.
     """
-    on_disk = {p.name for p in EXAMPLES.glob("*_agent.py")}
+    on_disk = {f"{p.parent.name}/{p.name}"
+               for p in EXAMPLES.glob("*/*.py")
+               if p.parent.name not in NOT_IN_THE_TABLE}
     assert on_disk == set(NEEDS), (
         f"examples/integrations holds {sorted(on_disk)}, this file expects "
         f"{sorted(NEEDS)}. Add the new example to NEEDS and to the scorecard "

@@ -31,7 +31,7 @@ extra, and by then the failure is a collection error across ~2,200 tests.
 
 from __future__ import annotations
 
-import importlib
+import importlib.util
 import pathlib
 import sys
 
@@ -45,7 +45,7 @@ from tradefloor.integrations.pydantic_ai import (MANDATE, MANDATE_VERSION,
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 FIXTURE = REPO / "tests" / "fixtures" / "pydantic_ai" / "rate-shock.json"
-EXAMPLE = REPO / "examples" / "integrations" / "pydantic_ai_agent.py"
+EXAMPLE = REPO / "examples" / "integrations" / "pydantic_ai" / "rate_shock.py"
 
 needs_fixture = pytest.mark.skipif(
     not FIXTURE.exists(),
@@ -60,11 +60,18 @@ def _load_example():
     one's name. The example's own framework imports are guarded, so this
     works with the extra absent -- which is the whole point of this file.
     """
-    sys.path.insert(0, str(EXAMPLE.parent))
-    try:
-        return importlib.import_module("pydantic_ai_agent")
-    finally:
-        sys.path.remove(str(EXAMPLE.parent))
+    # By location under a unique name: three integrations name their study
+    # `rate_shock.py`, and `sys.modules` caches by name, so the bare name
+    # would return whichever integration was imported first.
+    spec = importlib.util.spec_from_file_location(
+        "example_pydantic_ai_replay", EXAMPLE)
+    module = importlib.util.module_from_spec(spec)
+    # Registered before execution: dataclasses resolve their own types
+    # through sys.modules[cls.__module__], and a module absent from it
+    # raises inside dataclasses rather than anywhere near this line.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 @needs_fixture

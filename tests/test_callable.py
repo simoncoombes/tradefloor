@@ -32,7 +32,7 @@ from tradefloor.integrations.callable import CallableAgentAdapter, callable_agen
 import test_integrations as contract
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-EXAMPLE = REPO / "examples" / "integrations" / "callable_agent.py"
+EXAMPLE = REPO / "examples" / "integrations" / "callable" / "five_days.py"
 
 
 def _load_example():

@@ -3,10 +3,10 @@
 Two things live here, and they share one definition of the market so they
 cannot drift into describing different experiments:
 
-1. **A runnable example.** ``python examples/integrations/langgraph_agent.py``
+1. **A runnable example.** ``python examples/integrations/langgraph/rate_shock.py``
    runs a real compiled two-node graph against a five-day market. No
    network, no API key, seconds. The decision node is a plain Python rule.
-2. **The rate-shock experiment** that ``langgraph_agent.ipynb`` narrates,
+2. **The rate-shock experiment** that ``langgraph/rate_shock.ipynb`` narrates,
    where the decision node is a language model and the run is forked at a
    checkpoint to ask what the same agent does when one number changes. The
    notebook replays a recorded run by default; ``--record`` is what
@@ -63,8 +63,8 @@ sits on ``sys.path[0]``.
 
 Run it:
 
-    python examples/integrations/langgraph_agent.py
-    TRADEFLOOR_LIVE_EXAMPLES=1 python examples/integrations/langgraph_agent.py --record
+    python examples/integrations/langgraph/rate_shock.py
+    TRADEFLOOR_LIVE_EXAMPLES=1 python examples/integrations/langgraph/rate_shock.py --record
 
 The second one CALLS A MODEL AND SPENDS MONEY, sixty times. It needs the
 opt-in above as well as ``ANTHROPIC_API_KEY``, because a credential sitting
@@ -394,7 +394,7 @@ def build_graph(decide=decide_by_rule):
     produces the runnable ``CompiledStateGraph`` the adapter takes. Passing
     the builder is the easy mistake, and the adapter refuses it by name.
     """
-    # This import is why the file is called `langgraph_agent.py` and not
+    # This import is why the file is called `langgraph/rate_shock.py` and not
     # `langgraph.py`: a script's directory is `sys.path[0]`, so a sibling of
     # that name would shadow the installed package and this line would
     # import the example itself. See the module docstring before renaming.

@@ -56,7 +56,7 @@ from tradefloor.integrations.langgraph import (INSTRUCTIONS, INTERRUPT_KEY,
 import test_integrations as contract
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-EXAMPLE = REPO / "examples" / "integrations" / "langgraph_agent.py"
+EXAMPLE = REPO / "examples" / "integrations" / "langgraph" / "rate_shock.py"
 
 
 # -- nothing phones home -----------------------------------------------------
@@ -228,8 +228,9 @@ def test_the_example_is_not_named_after_the_package():
     part of a package, never as `sys.path[0]`."""
     assert not (EXAMPLE.parent / "langgraph.py").exists(), (
         "an example named langgraph.py shadows the langgraph package for "
-        "its own process; name it langgraph_agent.py")
-    assert EXAMPLE.name == "langgraph_agent.py"
+        "its own process; keep the study name on the file")
+    assert EXAMPLE.name == "rate_shock.py"
+    assert EXAMPLE.parent.name == "langgraph"
 
 
 # -- constructor refusals ----------------------------------------------------
@@ -1295,7 +1296,7 @@ def test_a_duck_object_is_not_a_runnable_and_is_accepted_anyway():
 
 
 FIXTURE = REPO / "tests" / "fixtures" / "langgraph" / "rate-shock.json"
-NOTEBOOK = REPO / "examples" / "integrations" / "langgraph_agent.ipynb"
+NOTEBOOK = REPO / "examples" / "integrations" / "langgraph" / "rate_shock.ipynb"
 
 #: Every credential prefix that could plausibly reach a recording: Anthropic,
 #: OpenAI, LangSmith personal, and LangSmith service. `AdapterInfo` has
@@ -1306,11 +1307,26 @@ SECRET_PREFIXES = ("sk-ant-", "sk-proj-", "sk-", "lsv2_pt_", "lsv2_sk_",
 
 
 def experiment_module():
-    """The shipped example, imported as the notebook imports it."""
-    sys.path.insert(0, str(REPO / "examples" / "integrations"))
-    import langgraph_agent
+    """The shipped example.
 
-    return langgraph_agent
+    Loaded by location under a unique name, not by bare module name.
+    Three integrations name their study `rate_shock.py`, and `sys.modules`
+    caches by name -- so importing the bare name would hand whichever
+    integration ran first to whoever asked second, silently, with every
+    attribute answered by the wrong experiment. Demonstrated: importing
+    langgraph's and then pydantic_ai's returns the same object.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "example_langgraph_rate_shock", EXAMPLE)
+    module = importlib.util.module_from_spec(spec)
+    # Registered before execution: dataclasses resolve their own types
+    # through sys.modules[cls.__module__], and a module absent from it
+    # raises inside dataclasses rather than anywhere near this line.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_live_mode_requires_an_explicit_opt_in(monkeypatch):
@@ -1388,7 +1404,7 @@ def test_the_fixture_carries_no_credential():
     """A recording is committed once and read forever. `Transcript` excludes
     credentials by construction, and this checks the artefact anyway."""
     if not FIXTURE.exists():
-        pytest.fail(f"{FIXTURE} is missing; run langgraph_agent.py --record")
+        pytest.fail(f"{FIXTURE} is missing; run langgraph/rate_shock.py --record")
     text = FIXTURE.read_text(encoding="utf-8")
     for prefix in SECRET_PREFIXES:
         assert prefix not in text, f"the fixture contains {prefix!r}"
@@ -1476,9 +1492,9 @@ class Blocked:
 
 
 sys.meta_path.insert(0, Blocked())
-sys.path.insert(0, r"{REPO / 'examples' / 'integrations'}")
+sys.path.insert(0, r"{REPO / 'examples' / 'integrations' / 'langgraph'}")
 
-import langgraph_agent as experiment
+import rate_shock as experiment
 from tradefloor.integrations import common as ci
 
 agent = experiment.replay_agent(ci.Transcript.load(experiment.FIXTURE))
@@ -1510,7 +1526,7 @@ def test_the_notebook_replays_the_committed_fixture():
     assert "experiment.FIXTURE" in source, (
         "the notebook should load the fixture the experiment module names, "
         "not a path of its own")
-    assert "langgraph_agent" in source
+    assert "import rate_shock as experiment" in source
 
     experiment = experiment_module()
     assert experiment.FIXTURE == FIXTURE

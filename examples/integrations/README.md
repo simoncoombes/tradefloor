@@ -25,20 +25,20 @@ differ by the agent and not by the harness.
 
 | | |
 |---|---|
-| [`callable_agent.py`](callable_agent.py) | A plain Python function |
-| [`openai_agents_agent.py`](openai_agents_agent.py) | The OpenAI Agents SDK |
-| [`pydantic_ai_agent.py`](pydantic_ai_agent.py) | A PydanticAI agent |
-| [`langgraph_agent.py`](langgraph_agent.py) | A compiled LangGraph graph |
-| [`../finrobot/`](finrobot/) | FinRobot, in the rate-shock study |
+| [`callable/five_days.py`](callable/five_days.py) | A plain Python function |
+| [`openai_agents/five_days.py`](openai_agents/five_days.py) | The OpenAI Agents SDK |
+| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | A PydanticAI agent |
+| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | A compiled LangGraph graph |
+| [`finrobot/`](finrobot/) | FinRobot, in the rate-shock study |
 | [`../../python/tradefloor/integrations/`](../../python/tradefloor/integrations/) | The adapters themselves, and the shared layer they sit on |
 
 ## Running them
 
 ```bash
-python examples/integrations/callable_agent.py
-python examples/integrations/openai_agents_agent.py
-python examples/integrations/pydantic_ai_agent.py
-python examples/integrations/langgraph_agent.py
+python examples/integrations/callable/five_days.py
+python examples/integrations/openai_agents/five_days.py
+python examples/integrations/pydantic_ai/rate_shock.py
+python examples/integrations/langgraph/rate_shock.py
 ```
 
 Each finishes in a few seconds with no API key, no provider account and no
@@ -60,10 +60,10 @@ two adapters:
 
 | example | trades | return | impact |
 |---|---|---|---|
-| [`callable_agent.py`](callable_agent.py) | 3 | +0.51% | +3.96 bps |
-| [`openai_agents_agent.py`](openai_agents_agent.py) | 3 | +0.51% | +3.96 bps |
-| [`pydantic_ai_agent.py`](pydantic_ai_agent.py) | 3 | +2.32% | +11.70 bps |
-| [`langgraph_agent.py`](langgraph_agent.py) | 2 | +0.73% | -5.67 bps |
+| [`callable/five_days.py`](callable/five_days.py) | 3 | +0.51% | +3.96 bps |
+| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 3 | +0.51% | +3.96 bps |
+| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 3 | +2.32% | +11.70 bps |
+| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 2 | +0.73% | -5.67 bps |
 
 Comparing two frameworks means holding the market fixed, which is what the
 shared contract checks in `tests/test_integrations.py` do.
@@ -87,7 +87,7 @@ agent = callable_agent(rule)
 scores = tf.evaluate({"mine": agent}, seed=4242, universe=roster, days=5)
 ```
 
-Fuller example: [`callable_agent.py`](callable_agent.py).
+Fuller example: [`callable/five_days.py`](callable/five_days.py).
 
 `rule` is handed the serialized payload and never the `Observation`. The
 Observation carries `.engine`, which holds the answer key: fair value, the
@@ -118,7 +118,7 @@ agent = OpenAIAgentsAdapter(pm, mode="live", recorder=Transcript())
 scores = tf.evaluate({"pm": agent}, seed=4242, universe=roster, days=5)
 ```
 
-Fuller example: [`openai_agents_agent.py`](openai_agents_agent.py), which
+Fuller example: [`openai_agents/five_days.py`](openai_agents/five_days.py), which
 runs against `agents.testing.ScriptedModel` and then replays itself from the
 transcript it just recorded.
 
@@ -153,7 +153,7 @@ agent = PydanticAIAdapter(my_agent, deps=my_deps)
 scores = tf.evaluate({"pm": agent}, seed=4242, universe=roster, days=5)
 ```
 
-Fuller example: [`pydantic_ai_agent.py`](pydantic_ai_agent.py), driven by a
+Fuller example: [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py), driven by a
 `FunctionModel`.
 
 Your agent arrives already built and leaves unmodified. Its `deps_type`, its
@@ -190,7 +190,7 @@ agent = LangGraphAdapter(graph)
 scores = tf.evaluate({"graph": agent}, seed=4242, universe=roster, days=5)
 ```
 
-Fuller example: [`langgraph_agent.py`](langgraph_agent.py), a two-node
+Fuller example: [`langgraph/rate_shock.py`](langgraph/rate_shock.py), a two-node
 `StateGraph` with its own state schema and a reducer.
 
 A graph returns its whole state, so unwrapping it is the adapter's job. The

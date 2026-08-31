@@ -57,7 +57,7 @@ from tradefloor.integrations.openai_agents import (BRIEF, BRIEF_VERSION,
 import test_integrations as contract
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-EXAMPLE = REPO / "examples" / "integrations" / "openai_agents_agent.py"
+EXAMPLE = REPO / "examples" / "integrations" / "openai_agents" / "five_days.py"
 
 # Off before anything imports the SDK: `TraceProvider` reads the env var once,
 # on first use, and caches it.

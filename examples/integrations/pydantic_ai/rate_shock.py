@@ -1,6 +1,6 @@
 """A PydanticAI agent trading a Tradefloor market, through the adapter.
 
-The same job as `callable_agent.py`, done by a real `pydantic_ai.Agent`
+The same job as `../callable/five_days.py`, done by a real `pydantic_ai.Agent`
 instead of a plain function, so the two can be read line for line:
 
     1. build a small market
@@ -21,7 +21,7 @@ rule and show it responding to prices.
 
 ## This file is also the notebook's source of constants
 
-`pydantic_ai_agent.ipynb` runs the same market with a real model behind it,
+`pydantic_ai/rate_shock.ipynb` runs the same market with a real model behind it,
 and imports `SEED`, `ROSTER`, `universe()` and the fork settings from here
 rather than restating them. Two copies of a roster are two rosters that will
 eventually disagree, and the notebook and the script would then describe two
@@ -46,7 +46,7 @@ on `sys.path[0]`.
 
 Run it:
 
-    python examples/integrations/pydantic_ai_agent.py
+    python examples/integrations/pydantic_ai/rate_shock.py
 """
 
 from __future__ import annotations
@@ -127,7 +127,23 @@ ROSTER = [
 #: The recorded run the notebook replays. Committed, because it is INPUT --
 #: the thing that makes the notebook reproducible without a key -- and not
 #: output, which is what `artifacts/` is for.
-FIXTURE = (Path(__file__).resolve().parents[2]
+def _repo_root() -> Path:
+    """The repository root, found by marker rather than by counting parents.
+
+    This file kept a fixed ``parents[2]`` climb after its three siblings had
+    already been converted, so it was the one example still betting on its
+    own depth -- and the bet lost the moment each integration gained a
+    folder. A marker survives any future rearrangement or fails loudly, and
+    those are the only two acceptable outcomes.
+    """
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    raise RuntimeError("no pyproject.toml above this file; is the "
+                       "repository layout intact?")
+
+
+FIXTURE = (_repo_root()
            / "tests" / "fixtures" / "pydantic_ai" / "rate-shock.json")
 
 #: The model a live run calls, in PydanticAI's `provider:name` spelling.
@@ -186,7 +202,7 @@ def universe() -> list:
 def mean_reversion(payload: dict) -> dict:
     """Buy what fell, trim what ran. The whole strategy is this function.
 
-    Identical to the rule in `callable_agent.py`, deliberately: the examples
+    Identical to the rule in `callable/five_days.py`, deliberately: the examples
     differ in who runs the rule, not in what the rule is.
 
     ``payload`` is the serialized observation: the allowlisted view of the

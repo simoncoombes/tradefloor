@@ -65,7 +65,7 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel  # noqa: E402
 from pydantic_ai.models.test import TestModel  # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-EXAMPLE = REPO / "examples" / "integrations" / "pydantic_ai_agent.py"
+EXAMPLE = REPO / "examples" / "integrations" / "pydantic_ai" / "rate_shock.py"
 
 
 @pytest.fixture(autouse=True)
@@ -1082,14 +1082,26 @@ def test_the_metadata_names_the_framework_and_the_version():
 
 
 def _load_example():
-    """The shipped example, imported as the notebook imports it."""
-    import importlib
+    """The shipped example.
 
-    sys.path.insert(0, str(EXAMPLE.parent))
-    try:
-        return importlib.import_module("pydantic_ai_agent")
-    finally:
-        sys.path.remove(str(EXAMPLE.parent))
+    Loaded by location under a unique name, not by bare module name.
+    Three integrations name their study `rate_shock.py`, and `sys.modules`
+    caches by name -- so importing the bare name would hand whichever
+    integration ran first to whoever asked second, silently, with every
+    attribute answered by the wrong experiment. Demonstrated: importing
+    langgraph's and then pydantic_ai's returns the same object.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "example_pydantic_ai_rate_shock", EXAMPLE)
+    module = importlib.util.module_from_spec(spec)
+    # Registered before execution: dataclasses resolve their own types
+    # through sys.modules[cls.__module__], and a module absent from it
+    # raises inside dataclasses rather than anywhere near this line.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_live_mode_requires_an_explicit_opt_in(monkeypatch):
