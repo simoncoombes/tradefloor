@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import re
 
@@ -221,7 +222,15 @@ def classify(row: dict, measured, text: str) -> tuple[str, dict]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--figures", default="tools/remeasure/out-0.3.0/figures.json")
+    # The CURRENT run, not a pinned old one. This defaulted to
+    # out-0.3.0/figures.json, whose gate had zero MOVED rows, so
+    # `resync.py --report` walked no rows, opened no pages and printed
+    # "0 / 0 / 0" however stale the inventory had become.
+    ap.add_argument("--figures", default="tools/remeasure/out/figures.json")
+    # The documentation left this repository at 0.5.0. Without a root to
+    # resolve them against, every page in the inventory is unreadable.
+    ap.add_argument("--docs-root", default=os.environ.get("TRADEFLOOR_DOCS"),
+                    help="checkout of the docs repository the inventory cites")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--report", action="store_true")
     args = ap.parse_args()
@@ -235,20 +244,42 @@ def main() -> None:
 
     cache: dict[str, str] = {}
 
-    def text_of(path: str) -> str:
+    bases = [ROOT]
+    if args.docs_root:
+        bases.append(pathlib.Path(args.docs_root).expanduser().resolve())
+
+    def text_of(path: str):
+        """The page's text, or None when no root holds it.
+
+        Returning None rather than raising: a page this tool cannot open is
+        a fact about the inventory that belongs in the report. Raising made
+        the first missing page end the run, and the previous behaviour of
+        never looking at all made it report clean.
+        """
         if path not in cache:
-            cache[path] = (ROOT / path).read_text(encoding="utf-8")
+            cache[path] = None
+            for base in bases:
+                candidate = base / path
+                if candidate.is_file():
+                    cache[path] = candidate.read_text(encoding="utf-8")
+                    break
         return cache[path]
 
-    buckets: dict[str, list] = {"repoint": [], "retire": [], "review": []}
+    buckets: dict[str, list] = {"repoint": [], "retire": [], "review": [],
+                                "unreadable": []}
     for row in rows:
         if row["id"] not in moved:
             continue
-        verdict, info = classify(row, measured_by_id.get(row["id"]),
-                                 text_of(row["file"]))
+        text = text_of(row["file"])
+        if text is None:
+            buckets["unreadable"].append(
+                (row, {"why": "no root holds this page; pass --docs-root, or "
+                              "the inventory still cites a page that moved"}))
+            continue
+        verdict, info = classify(row, measured_by_id.get(row["id"]), text)
         buckets[verdict].append((row, info))
 
-    for name in ("repoint", "retire", "review"):
+    for name in ("repoint", "retire", "review", "unreadable"):
         print(f"\n=== {name.upper()}  ({len(buckets[name])}) ===")
         for row, info in buckets[name]:
             print(f"  {row['id']:<34} {row['file']}")
@@ -261,8 +292,21 @@ def main() -> None:
                 if info.get("line"):
                     print(f"      L{info['at']}: {str(info['line'])[:96]}")
 
+    considered = sum(len(v) for v in buckets.values())
+    blind = len(buckets["unreadable"])
+    print(f"\n{considered} MOVED rows considered, {blind} on pages "
+          f"no root holds.")
+    if blind:
+        print("A row whose page cannot be read is not a row that "
+              "reproduced. Re-point the inventory, or pass --docs-root, "
+              "before reading this gate as clean.")
+
     if not args.apply:
         print("\n(report only; pass --apply to write inventory.json)")
+        if considered and blind == considered:
+            # Every row blind: the tool saw nothing at all. Returning 0
+            # here is exactly how a gate becomes decoration.
+            raise SystemExit(2)
         return
 
     keep, retired = [], {r["id"] for r, _ in buckets["retire"]}

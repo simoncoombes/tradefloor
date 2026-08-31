@@ -219,6 +219,28 @@ either.
 The gate is worth reading only once it comes back clean. 0.3.0 finished at 285
 figures, 199 reproduced, zero MOVED.
 
+**Since 0.5.0 this step could not do its job, and said so in neither
+direction.** The documentation left this repository for `tradefloor-docs` at
+0.5.0 and was rebuilt from Markdown into `.dc.html` under new page names.
+`inventory.json` still cites `docs/*.md`, so 257 of its 260 rows name a file
+nothing holds. `resync.py` defaulted to `--figures out-0.3.0/figures.json`, a
+run with zero MOVED rows, so it walked nothing, opened nothing and printed
+`0 / 0 / 0`; pointed at a real run it raised on the first missing page
+instead. Both are fixed: the default is the current run, `--docs-root` (or
+`TRADEFLOOR_DOCS`) resolves pages outside this repository, an unreadable page
+is reported rather than raised, and a report in which every row was
+unreadable exits non-zero, which are the three behaviours
+`tests/test_resync.py` now holds against a regression.
+
+The data is still stale. At 0.6.1 the gate ran clean mechanically, 260
+figures, zero `structural_fail`, and reported 83 MOVED of which all 83 name a
+page no root holds. Judged by resync's own standard of a unique distinctive
+match, five of those re-point automatically, ten are pages still printing a
+pt-v12 number, and fifty-four state neither value anywhere. Re-pointing the
+inventory at the new page set is therefore a piece of work with judgement in
+it and not a `--apply` away. The 0.6.1 run is stored under
+`tools/remeasure/out-0.6.1/` as the record of where this stands.
+
 ### 5. Documentation site
 
 **The site is not in this repository.** It is `simoncoombes/tradefloor-docs`,
