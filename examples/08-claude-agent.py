@@ -246,6 +246,21 @@ def main() -> None:
         agents, seed=2026, universe=universe, days=20, max_leverage=2.0,
     )
 
+    # A run where every decision failed is not a result. Without this the
+    # table below reports claude at zero pnl and no explanation accuracy,
+    # which reads as a weak agent -- when in fact it was never asked. The
+    # commonest cause is no resolvable credential, which surfaces at request
+    # time rather than at construction, so it cannot be caught up front.
+    failures = scores["claude"].errors
+    if failures and not claude._log:
+        sys.exit(
+            "Claude was never reached -- all %d decisions failed.\n"
+            "First error: %s\n\n"
+            "If that is a credentials problem, set ANTHROPIC_API_KEY or run\n"
+            '`ant auth login`. The extra is: pip install "tradefloor[claude]"'
+            % (len(failures), failures[0])
+        )
+
     print("%-16s %12s %9s %12s" % ("agent", "pnl", "impact", "why-right"))
     print("-" * 54)
     for s in tf.leaderboard(scores):
