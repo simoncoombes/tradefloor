@@ -514,6 +514,15 @@ def render(payload: dict[str, Any], *, objective: str = "") -> str:
         f"cash                   {_money(book['cash'])}",
         f"net worth              {_money(book['net_worth'])}",
         f"gross exposure         {_num(book['gross_exposure'])}x",
+        # The funding cap, and what is left under it. `max_order_shares`
+        # above says what the MARKET absorbs per order; these say what this
+        # BOOK can hold before the leverage limit refuses the trade, and it
+        # is usually the smaller of the two. Stating one without the other
+        # is what produced twelve rejections and no trades on the native
+        # OpenAI path: the agent sized to the limit it was shown.
+        f"max leverage           {_num(book['max_leverage'])}"
+        + ("" if book["max_leverage"] is None else "x"),
+        f"buying power           {_money(book['buying_power'])}",
         "",
         "Positions:",
     ]
