@@ -19,7 +19,7 @@ a comparison between two adapters would measure the harness.
 
 Run it:
 
-    python examples/integrations/callable_agent.py
+    python examples/integrations/callable/five_days.py
 
 The notebook beside this file runs the same market twice -- once with the
 rule below, once with a function that calls a language model -- through the

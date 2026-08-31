@@ -1,6 +1,6 @@
 """An OpenAI Agents SDK agent trading a Tradefloor market, offline.
 
-The same job as ``callable_agent.py`` beside it, so the two can be read line
+The same job as ``../callable/five_days.py``, so the two can be read line
 for line. Only step 2 changes -- who turns the observation into a decision:
 
     1. build a small market
@@ -29,7 +29,7 @@ adapter and give the agent one:
     agent = OpenAIAgentsAdapter(pm, mode="live", recorder=Transcript())
 
 with ``OPENAI_API_KEY`` set and ``pip install "tradefloor[openai-agents]"``.
-``openai_agents_agent.ipynb`` beside this file does exactly that, and ships
+``openai_agents/five_days.ipynb`` beside this file does exactly that, and ships
 the recording it made.
 
 ## The second half: replay
@@ -42,11 +42,11 @@ replay that quietly diverged would be worse than no replay at all.
 
 ## The filename
 
-``openai_agents_agent.py``, not ``openai_agents.py``. The doubled word reads
+``openai_agents/five_days.py``, not ``openai_agents.py``. The doubled word reads
 oddly enough to invite tidying, so the two reasons not to, in order.
 
-Every example here is ``<framework>_agent.py`` -- ``callable_agent.py``,
-``pydantic_ai_agent.py``, ``langgraph_agent.py`` -- and renaming this one
+Every example here is ``<framework>_agent.py`` -- ``callable/five_days.py``,
+``pydantic_ai/rate_shock.py``, ``langgraph/rate_shock.py`` -- and renaming this one
 alone would break the pattern a reader uses to find the others.
 
 And the ``_agent`` suffix is what keeps an example from SHADOWING the package
@@ -59,7 +59,7 @@ because a convention with one exception is a convention nobody trusts.
 
 Run it:
 
-    python examples/integrations/openai_agents_agent.py
+    python examples/integrations/openai_agents/five_days.py
 """
 
 from __future__ import annotations
@@ -205,7 +205,7 @@ def universe() -> list:
 def mean_reversion(payload: dict) -> dict:
     """Buy what fell, trim what ran. The whole strategy is this function.
 
-    Identical to the rule in ``callable_agent.py``, deliberately: the point
+    Identical to the rule in ``callable/five_days.py``, deliberately: the point
     of the four integration examples is that the harness, the observation and
     the decision are the same, and only the thing making the decision
     changes.

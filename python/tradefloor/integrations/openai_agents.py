@@ -185,7 +185,7 @@ Live decisions cost money and a model answers differently every time.
 :func:`~tradefloor.integrations.common.digest` of the exact input, and never
 reaches :meth:`OpenAIAgentsAdapter._run`, which is where the SDK is
 imported -- so a replay needs no API key, no network and no
-``openai-agents`` install. ``examples/integrations/openai_agents_agent.py``
+``openai-agents`` install. ``examples/integrations/openai_agents/five_days.py``
 records a run and replays it in the same script.
 """
 

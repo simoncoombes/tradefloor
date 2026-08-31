@@ -216,10 +216,10 @@ frameworks can be measured on one market through one harness.
 
 | Framework | Tradefloor support |
 |---|---|
-| [Plain Python](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/callable_agent.py) | Generic callable |
-| [OpenAI Agents SDK](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/openai_agents_agent.py) | Adapter |
-| [PydanticAI](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/pydantic_ai_agent.py) | Adapter |
-| [LangGraph](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/langgraph_agent.py) | Adapter |
+| [Plain Python](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/callable/five_days.py) | Generic callable |
+| [OpenAI Agents SDK](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/openai_agents/five_days.py) | Adapter |
+| [PydanticAI](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/pydantic_ai/rate_shock.py) | Adapter |
+| [LangGraph](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/langgraph/rate_shock.py) | Adapter |
 | [FinRobot](https://github.com/simoncoombes/tradefloor/tree/main/examples/integrations/finrobot) | Existing integration |
 
 ```
