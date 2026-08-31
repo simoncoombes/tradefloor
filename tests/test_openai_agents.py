@@ -1306,6 +1306,76 @@ def test_the_replay_key_is_the_input_the_model_was_sent():
     assert entry["prompt"][0]["content"] == BRIEF
 
 
+# -- the committed fixture ---------------------------------------------------
+
+FIXTURE = REPO / "tests" / "fixtures" / "openai_agents" / "five-days.json"
+
+needs_fixture = pytest.mark.skipif(
+    not FIXTURE.exists(), reason="no recorded run committed")
+
+
+@needs_fixture
+def test_the_committed_recording_replays_end_to_end():
+    """The shipped fixture, replayed through `evaluate` with a model that
+    EXPLODES if called: no network, no key, no SDK needed for the decisions.
+
+    This test exists because the fixture had none. An audit hook over the
+    seven adapter and contract files showed `callable`, `finrobot`,
+    `langgraph` and `pydantic_ai` fixtures all being opened and this one
+    never -- the example records a fresh in-memory transcript rather than
+    loading the committed artefact, so 20 KB of evidence shipped unread.
+
+    The exact values are pinned rather than bounded, and that is the point.
+    Corrupting one recorded digest does not raise: the replay refuses that
+    step, `evaluate` absorbs the refusal into `card.errors`, and the run
+    completes with three of the five decisions silently gone -- 5 decisions
+    to 2, 3 trades to 1, the P&L moved and still plausible. Only asserting
+    the numbers catches that.
+    """
+    example = _load_example()
+
+    def exploding(*args, **kwargs):
+        raise AssertionError("replay reached the model")
+
+    transcript = ci.Transcript.load(FIXTURE)
+    assert len(transcript) == example.DAYS, "the fixture lost interactions"
+
+    agent = OpenAIAgentsAdapter(mode="replay", transcript=transcript,
+                                model=exploding)
+    card = tf.evaluate({"pm": agent}, seed=example.SEED,
+                       universe=example.universe(),
+                       days=example.DAYS)["pm"]
+
+    assert len(agent.record) == example.DAYS, (
+        f"{example.DAYS - len(agent.record)} recorded decisions did not "
+        "replay; a missing key is absorbed by evaluate() rather than raised")
+    assert card.trades == 3, card.trades
+    assert card.pnl == pytest.approx(20370.0), card.pnl
+    assert card.turnover == pytest.approx(1676790.0), card.turnover
+
+    # The recording carries one genuine market refusal -- the day-1 leverage
+    # overshoot the notebook is built around. Pinned so that a replay
+    # failure, which lands in the same list, cannot hide inside it.
+    assert card.rejected == 1, card.errors
+    assert card.errors == [
+        "step 6: trade would take leverage to 2.19x, above the 2.00x limit"
+    ], card.errors
+
+
+@needs_fixture
+def test_the_committed_recording_is_what_this_module_would_send_today():
+    """A fixture recorded under a different brief would replay only by luck.
+    The digest guard catches a changed brief through the key, and this
+    catches it directly -- byte-for-byte, so the artefact cannot silently
+    belong to a previous revision of this module."""
+    transcript = ci.Transcript.load(FIXTURE)
+    assert transcript.entries[0]["prompt"][0]["content"] == BRIEF
+    assert transcript.meta["instructions_version"] == BRIEF_VERSION
+    assert transcript.meta["framework"] == "openai-agents"
+    assert transcript.meta["model"], "the recording does not name its model"
+    assert not CREDENTIAL.search(transcript.to_json())
+
+
 # -- the live gate -----------------------------------------------------------
 
 

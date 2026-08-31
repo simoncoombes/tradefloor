@@ -1027,6 +1027,12 @@ def digest(data: Any) -> str:
 
     Sixteen hex characters: ample for the few dozen decision points of one
     experiment, and short enough to compare by eye in an error message.
+
+    A rule for every caller, learned three separate times in one review: if
+    you compute a fingerprint, something must FAIL when it differs, and a
+    test must prove that something fails. A digest that is recorded and
+    never compared is provenance theatre -- it decorates the artifact
+    while two different setups replay as one.
     """
     if isinstance(data, bytes):
         blob = data

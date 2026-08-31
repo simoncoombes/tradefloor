@@ -1071,6 +1071,119 @@ def test_the_metadata_names_the_framework_and_the_version():
 # -- the shipped example -----------------------------------------------------
 
 
+# -- the committed recording -------------------------------------------------
+
+#: The recorded live run the notebook replays. These tests exist because
+#: nothing else in the default suite opens it: the shipped example's `main()`
+#: uses an offline `FunctionModel`, and the notebook that does read the
+#: fixture only executes under `TRADEFLOOR_SLOW_TESTS`, which no workflow in
+#: `.github/workflows/` sets. So a corrupted or stale 44 KB artefact would
+#: ship invisibly. An audit hook over the adapter suites found the file was
+#: never opened at all.
+FIXTURE = REPO / "tests" / "fixtures" / "pydantic_ai" / "rate-shock.json"
+
+needs_fixture = pytest.mark.skipif(
+    not FIXTURE.exists(),
+    reason="no recorded model run at tests/fixtures/pydantic_ai/")
+
+
+@needs_fixture
+def test_the_recorded_run_replays_end_to_end():
+    """The whole recorded experiment, replayed: shared history, fork, one
+    intervention, both arms.
+
+    The full fork and not just the shared days, because the recording holds
+    all three phases -- five shared decisions and five per arm -- and a test
+    that ran only the first third would leave two thirds of the artefact
+    unread while reporting it covered.
+
+    No agent, no key, no network: `mode="replay"` is constructed without one,
+    so a call reaching the framework would fail on `self.agent` being None
+    rather than quietly succeeding.
+    """
+    from tradefloor.counterfactual import World, agree
+
+    example = _load_example()
+    transcript = ci.Transcript.load(FIXTURE)
+
+    agent = PydanticAIAdapter(mode="replay", transcript=transcript,
+                              every=example.DECISION_EVERY, arm="shared")
+    assert agent.agent is None, (
+        "a replay must need no framework object at all")
+
+    world = World(seed=example.SEED, universe=example.universe(),
+                  agent=agent, cash=example.CASH, pins=example.PINS)
+    world.run(days=example.SHARED_DAYS)
+    assert len(agent.record) == example.SHARED_DAYS
+
+    control, shock = world.fork("control", "+200bps")
+    control.agent.arm, shock.agent.arm = "control", "+200bps"
+    assert bool(agree(control, shock)), "the arms diverged before the shock"
+
+    shock.intervene(federal_funds_rate=example.SHOCKED_POLICY_RATE,
+                    corporate_bond_yield=example.SHOCKED_DISCOUNT_RATE)
+    control.run(days=example.BRANCH_DAYS)
+    shock.run(days=example.BRANCH_DAYS)
+
+    # Every recorded interaction was consumed: five shared, five per arm.
+    expected = example.SHARED_DAYS + 2 * example.BRANCH_DAYS
+    assert len(transcript) == expected, len(transcript)
+    for arm in (control, shock):
+        assert len(arm.agent.record) == example.SHARED_DAYS + example.BRANCH_DAYS
+        assert not arm.rejected, arm.rejected
+
+    # The intervention reached one arm and the decisions actually differ,
+    # or the recording describes an experiment with nothing in it.
+    assert control.agent.record[-1]["decision"] \
+        != shock.agent.record[-1]["decision"]
+
+
+@needs_fixture
+def test_the_committed_fixture_still_matches_the_shipped_mandate():
+    """The last mile of the replay guard, asserted against the real artefact.
+
+    The guard refuses a replay whose recording ran under other instructions.
+    This asserts the committed fixture is not that case: the mandate on disk
+    today is the one that produced the recording. It catches a mandate edit
+    that silently invalidated the fixture, which no amount of checking the
+    observation keys would notice -- the instructions travel separately from
+    the keyed input.
+
+    Each extraction is asserted non-empty BEFORE anything is compared. The
+    obvious way to write this compares two `.get()` results and passes
+    vacuously when both are None, which is how the equivalent check on
+    another adapter reported "unchanged: True" out of three failed lookups.
+    """
+    meta = ci.Transcript.load(FIXTURE).meta
+    recorded = meta.get("instructions_digest")
+    version = meta.get("instructions_version")
+    assert recorded, f"the fixture records no instructions_digest: {sorted(meta)}"
+    assert version, f"the fixture records no instructions_version: {sorted(meta)}"
+
+    assert recorded == ci.digest(MANDATE), (
+        f"the committed recording ran under instructions_digest {recorded}, "
+        f"and MANDATE on disk digests to {ci.digest(MANDATE)}. The mandate "
+        "was edited without re-recording, so every replay of this fixture "
+        "answers the current instructions with decisions taken under the "
+        "old ones. Re-record, or restore the mandate.")
+    assert version == MANDATE_VERSION, (
+        f"fixture records mandate version {version}, module says "
+        f"{MANDATE_VERSION}")
+
+    # The comparison must be able to fail, or its passing means nothing.
+    assert ci.digest(MANDATE + " altered") != recorded
+
+
+@needs_fixture
+def test_the_committed_fixture_carries_no_credential():
+    """The artefact is committed, so what is in it matters more than what
+    `state()` publishes."""
+    text = FIXTURE.read_text(encoding="utf-8")
+    for secret in ("sk-ant-", "sk-proj-", "lsv2_pt_", "pylf_v1_",
+                   "api_key", "Bearer ", "Authorization"):
+        assert secret not in text, f"the fixture carries {secret!r}"
+
+
 def _load_example():
     """The shipped example, imported as the notebook imports it."""
     import importlib

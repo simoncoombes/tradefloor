@@ -25,11 +25,19 @@ unmodified, because a double that reimplemented the validation would be
 testing itself.
 
 Nothing here needs a network, an API key, or any framework installed.
+
+One harness property every adapter test must respect: ``tf.evaluate``
+absorbs a DecisionError into ``card.errors`` and COMPLETES, so a test that
+drives an adapter through it and asserts only on the scorecard passes over
+a raising adapter. Assert ``not card.errors`` too -- that line is the one
+doing the work, and its absence let a corrupted recording lose three of
+five decisions while a notebook's narrative still read as intact.
 """
 
 from __future__ import annotations
 
 import json
+import pathlib
 import struct
 import subprocess
 import sys
@@ -441,6 +449,65 @@ def assert_adapter_contract(make_agent) -> None:
 @pytest.mark.parametrize("check", CONTRACT_CHECKS, ids=lambda f: f.__name__)
 def test_the_callable_adapter_meets_the_shared_contract(check):
     check(lambda respond: callable_agent(respond))
+
+
+# -- the committed recordings ------------------------------------------------
+
+#: Every committed recording, discovered rather than listed, so a sixth
+#: fixture arrives covered and a renamed one cannot quietly leave.
+_FIXTURES = sorted(
+    pathlib.Path(__file__).resolve().parent.joinpath("fixtures")
+    .glob("*/*.json"))
+
+
+def test_there_are_committed_recordings_to_check():
+    """Guards the guard: a glob matching nothing would make the test below
+    pass by vacuum, and the suite would report the recordings healthy
+    while reading none of them -- which is exactly the state an audit
+    found two of five fixtures in."""
+    assert len(_FIXTURES) >= 5, [p.as_posix() for p in _FIXTURES]
+
+
+@pytest.mark.parametrize("path", _FIXTURES, ids=lambda p: p.parent.name)
+def test_a_committed_recording_is_valid_without_its_framework(path):
+    """Replay is the one path this package guarantees works with no
+    framework installed, and it was the path with the least coverage in
+    exactly that configuration: two of the five committed fixtures were
+    read by no test at all, a corrupted response in either left the
+    default suite green, and the per-adapter fixture tests that closed it
+    sit behind importorskip on the framework -- a gate stricter than the
+    code, since replay imports nothing. So the shared layer proves what it
+    claims, here, on a bare install: every fixture loads as a Transcript,
+    its meta carries what a replay cannot reconstruct, every entry has
+    exactly the allowed keys and a unique digest, every recorded response
+    still parses through the shared validator, and no credential shape
+    appears anywhere.
+
+    What this deliberately does NOT do is re-run each adapter's world.
+    The seeds and rosters belong to the examples, and a sixth place that
+    knows five worlds is a sixth place to keep in sync -- the digest-keyed
+    end-to-end replay stays with each adapter's own tests, which need no
+    framework either and should not hide behind one."""
+    text = path.read_text(encoding="utf-8")
+    transcript = ci.Transcript.from_json(text)
+    assert len(transcript) > 0, "an empty recording records nothing"
+    for field in ("framework", "decision_every_steps", "max_participation"):
+        assert transcript.meta.get(field) not in (None, ""), (
+            f"{path.parent.name} meta is missing {field}")
+
+    allowed = {"arm", "step", "day", "digest", "prompt", "response"}
+    digests = []
+    for entry in transcript.entries:
+        assert set(entry) <= allowed, set(entry) - allowed
+        assert entry.get("digest"), (
+            "an entry without a key can never be replayed")
+        digests.append(entry["digest"])
+        ci.parse_decision(entry["response"])    # raises if the response rotted
+    assert len(digests) == len(set(digests)), "duplicate replay keys"
+
+    for secret in ("sk-ant-", "sk-proj-", "lsv2_pt-", "pylf_v1_", "api_key",
+                   "Bearer ", "Authorization"):
+        assert secret not in text, f"{path.parent.name} contains {secret!r}"
 
 
 # -- import hygiene ----------------------------------------------------------
