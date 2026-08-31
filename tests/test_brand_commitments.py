@@ -103,7 +103,7 @@ ASCII_PROSE = (
     # And the two study READMEs, written after the commitment. Widening
     # this list is how it widens, so a study that holds to it joins.
     "examples/rate-shock/README.md",
-    "examples/finrobot/README.md",
+    "examples/integrations/finrobot/README.md",
 )
 
 NON_ASCII_PUNCTUATION = {

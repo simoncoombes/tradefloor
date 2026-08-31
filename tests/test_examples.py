@@ -180,21 +180,36 @@ def test_the_forking_demo_runs_end_to_end():
     assert "FAIL" not in done.stdout
 
 
-@SLOW
-def test_the_claude_example_refuses_without_its_extra():
-    """It cannot be run here -- it needs an API key and spends money per
-    decision -- so what is checked is that it fails the way a reader should
-    experience it: a sentence naming the extra, not a traceback."""
+def test_the_claude_example_refuses_when_every_decision_fails():
+    """A run that never happened must not be presented as a result.
+
+    When no model is reachable every decision fails, and the leaderboard
+    would report claude at zero pnl and no explanation accuracy -- which a
+    reader cannot tell apart from a genuinely flat agent. What is checked is
+    that the example says so instead, in a sentence naming the fix rather
+    than a traceback, and that it prints no table at all.
+
+    The child environment is pinned so this can never reach a provider:
+    both credential variables are removed AND the base URL points at a
+    closed local port. Removing the variables alone is not enough -- the
+    SDK also resolves a stored `ant auth login` profile, which on a
+    developer machine would turn this test into twenty billed calls.
+    """
     import os
     import subprocess
     script = EXAMPLES / "08-claude-agent.py"
     if not script.exists():
         pytest.skip(f"{script.name} not present")
-    env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+    env["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:1"
     done = subprocess.run([sys.executable, str(script)],
-                          capture_output=True, text=True, timeout=120, env=env)
+                          capture_output=True, text=True, timeout=300, env=env)
     combined = done.stdout + done.stderr
+    tail = combined[-1500:]
+    assert done.returncode != 0, f"expected a non-zero exit, got 0. Output: {tail}"
     assert "tradefloor[claude]" in combined or "ANTHROPIC_API_KEY" in combined, (
-        f"expected a readable refusal, got:\n{combined[-1500:]}"
-    )
-    assert "Traceback" not in done.stdout
+        f"expected a refusal naming the extra or the variable. Output: {tail}")
+    assert "Traceback" not in combined, f"refused with a traceback. Output: {tail}"
+    assert "why-right" not in combined, (
+        f"printed the leaderboard for a run Claude was never reached in. Output: {tail}")

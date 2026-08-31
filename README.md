@@ -205,7 +205,39 @@ and they come in no particular order.
 | | |
 |---|---|
 | [`rate-shock/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/rate-shock) | The canonical demo: checkpoint, fork, +200bps in one branch, compare |
-| [`finrobot/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/finrobot) | The same experiment with a real FinRobot agent |
+| [`finrobot/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/integrations/finrobot) | The same experiment with a real FinRobot agent |
+
+## Agent frameworks
+
+The framework decides; Tradefloor runs the market it decides in. Each adapter
+under `tradefloor.integrations` carries one framework's output through the
+same loop of observation, decision, execution and evaluation, so two
+frameworks can be measured on one market through one harness.
+
+| Framework | Tradefloor support |
+|---|---|
+| [Plain Python](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/callable_agent.py) | Generic callable |
+| [OpenAI Agents SDK](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/openai_agents_agent.py) | Adapter |
+| [PydanticAI](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/pydantic_ai_agent.py) | Adapter |
+| [LangGraph](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/langgraph_agent.py) | Adapter |
+| [FinRobot](https://github.com/simoncoombes/tradefloor/tree/main/examples/integrations/finrobot) | Existing integration |
+
+```
+pip install "tradefloor[openai-agents]"   # or [pydantic-ai], or [langgraph]
+```
+
+A plain Python function needs no extra. FinRobot keeps the `finrobot` extra
+it has always had, and its section below covers the rate-shock experiment
+that integration was built for.
+
+Each example runs offline in seconds, with a deterministic function standing
+where a model would sit, so reading one costs no API key and no provider
+account. The market replays from a seed; a live model call does not, so an
+adapter records each exchange keyed by a digest of the exact input it sent
+and replays that recording later with the framework uninstalled. The four
+sit together in
+[`examples/integrations/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/integrations),
+which sets out what each framework contributes and what Tradefloor keeps.
 
 ## FinRobot integration
 
@@ -217,15 +249,15 @@ agent swapped and nothing else moved.
 
 ```bash
 pip install "tradefloor[finrobot]"
-python examples/finrobot/rate_shock.py            # replays a real recorded run
-python examples/finrobot/rate_shock.py --live     # calls FinRobot
+python examples/integrations/finrobot/rate_shock.py            # replays a real recorded run
+python examples/integrations/finrobot/rate_shock.py --live     # calls FinRobot
 ```
 
 The default run replays a genuine recorded FinRobot run and needs no API key,
 no network and no FinRobot install.
 
-- [`examples/finrobot/rate_shock.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/finrobot/rate_shock.py)
-- [`examples/finrobot/rate_shock.ipynb`](https://github.com/simoncoombes/tradefloor/blob/main/examples/finrobot/rate_shock.ipynb)
+- [`examples/integrations/finrobot/rate_shock.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/finrobot/rate_shock.py)
+- [`examples/integrations/finrobot/rate_shock.ipynb`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/finrobot/rate_shock.ipynb)
 
 FinRobot is a project of the AI4Finance Foundation, licensed Apache-2.0. The
 notebooks above are a Tradefloor integration for FinRobot, maintained in this

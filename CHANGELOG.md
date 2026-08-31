@@ -1,5 +1,78 @@
 # Changelog
 
+## Unreleased
+
+**Four agent frameworks reach the same market.** `tradefloor.integrations`
+gains adapters for the OpenAI Agents SDK, PydanticAI and LangGraph, alongside
+a generic adapter over any plain Python function. Each hands its framework an
+allowlisted observation and validates the decision that comes back before the
+market executes it, so two frameworks can be compared on one seed through one
+harness. FinRobot, which came first, keeps its own integration and its own
+extra.
+
+```
+pip install "tradefloor[openai-agents]"   # or [pydantic-ai], or [langgraph]
+```
+
+**Recorded decisions replay exactly.** A `Transcript` keys each exchange by a
+digest of the exact input the framework was sent, so a run that cost money
+replays for free, with the framework uninstalled and no network reached. The
+key comes from the input, so an edited experiment stops instead of answering
+the new question with the answer given to the old one.
+
+**The examples run offline.** `examples/integrations/` carries one per
+framework, each driving the real framework with a deterministic function
+standing where a model would sit. No API key, no provider account, a few
+seconds each.
+
+Below the marker: the shared layer, what a decision may contain, the version
+floors on the three new extras, and the CI lanes that install them.
+
+<!-- release-note-ends -->
+
+### Detail
+
+**The shared layer.** `tradefloor.integrations.common` holds what every
+adapter needs and no framework owns: the observation allowlist, the decision
+schema and the Pydantic model derived from it, two-stage validation,
+transcripts and replay, credential-screened adapter metadata, and the
+`FrameworkAdapter` base an adapter completes by implementing one method.
+`ReplayMixin` supplies the record-and-replay branch, so a new adapter states
+`prepare()` and `call()` and gets the rest. The layer derives from the
+FinRobot integration, which came first and settled those questions; the only
+change to FinRobot itself is that its `DecisionError` now descends from the
+shared one, so a caller can catch either.
+
+**What a decision may contain.** The engine takes signed share quantities
+through `Portfolio.execute`, so a decision names a symbol, a side and a
+quantity. `parse_decision` refuses an unknown key at the top level or on an
+action, naming it, because a silently dropped `stop_loss` would leave an
+agent believing it has protection this market cannot give. An envelope
+carrying no `actions` key is refused on the same reasoning, since unwrapped
+framework state would otherwise score as a considered hold.
+
+**The extras.** `openai-agents>=0.22`, `pydantic-ai-slim>=2.36` and
+`langgraph>=1.2`. Each floor is the version its adapter was written and
+tested against, since a floor at the major admits releases the adapter has
+never met. `pydantic-ai-slim` supplies the `pydantic_ai` module without the
+six provider SDKs the umbrella package adds. There is no aggregate extra: the
+frameworks are alternatives, and installing three dependency trees to use one
+would mostly install conflict surface.
+
+**Reproducibility.** Tradefloor reproduces a run from its configuration and
+the sequence of agent actions. A live model call sits outside that guarantee,
+which is the gap the transcript closes: a recorded exchange replays exactly,
+and `adapter.provenance()` records the framework, its version, the provider,
+the model, the generation parameters and the decision cadence that a market
+replay cannot reconstruct.
+
+**The CI lanes.** The batch job in `suite.yml` installs the three frameworks
+by name and asserts each one imports before pytest starts, on the reasoning
+that file already carries for MCP and Gymnasium: a lane that skips is a lane
+that reports green by not running. `finrobot` stays out of that install,
+since its tests replay a recorded run and one of them can only execute while
+the package is absent.
+
 ## 0.6.0
 
 **`pt-v16` is the default.** The market itself is different, so a run that
