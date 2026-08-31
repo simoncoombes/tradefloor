@@ -241,12 +241,25 @@ def main() -> None:
     ap.add_argument("--report", action="store_true")
     args = ap.parse_args()
 
-    figures = json.loads((ROOT / args.figures).read_text(encoding="utf-8"))
+    # Named before anything is loaded, so a run that cannot start still says
+    # which register it was going to read.
+    inventory_path, how = _register.resolve(args.inventory)
+    print(f"register: {inventory_path}  (via {how})")
+
+    figures_path = ROOT / args.figures
+    if not figures_path.is_file():
+        # `out/` is not committed, so this is what a fresh clone hits. A bare
+        # FileNotFoundError names a path and not the thing to do about it.
+        raise SystemExit(
+            f"no measurement run at {figures_path}. Run "
+            "`python tools/remeasure/remeasure.py` first, or pass --figures "
+            "pointing at a stored run such as tools/remeasure/out-0.6.1/"
+            "figures.json."
+        )
+    figures = json.loads(figures_path.read_text(encoding="utf-8"))
     measured_by_id = {r["id"]: r.get("measured") for r in figures["figures"]}
     moved = {r["id"] for r in figures["figures"] if r["status"] == "MOVED"}
 
-    inventory_path, how = _register.resolve(args.inventory)
-    print(f"register: {inventory_path}  (via {how})")
     inv = json.loads(inventory_path.read_text(encoding="utf-8"))
     rows = inv["figures"]
 

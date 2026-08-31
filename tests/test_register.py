@@ -92,8 +92,13 @@ def test_the_local_copy_answers_when_nothing_is_set(monkeypatch):
 def test_each_tool_says_which_register_it_read(tool):
     """Naming it is the difference between a gate and a rumour."""
     done = subprocess.run(
-        [sys.executable, str(REPO / "tools" / "remeasure" / tool),
-         "--list" if tool == "remeasure.py" else "--report"],
+        [sys.executable, str(REPO / "tools" / "remeasure" / tool)]
+        + (["--list"] if tool == "remeasure.py" else
+           # A stored run, not `out/`, which is not committed: on a fresh
+           # clone the default figures file does not exist, and a test that
+           # depends on one being there passes only on a machine that has
+           # already run the gate.
+           ["--report", "--figures", "tools/remeasure/out-0.6.1/figures.json"]),
         capture_output=True, text=True, cwd=REPO, timeout=300,
     )
     assert "register:" in done.stdout, (
@@ -138,3 +143,24 @@ def test_the_documentation_root_is_searched_at_all(tmp_path, monkeypatch):
     found = [r / "docs" / "scenarios.html" for r in register.page_roots()
              if (r / "docs" / "scenarios.html").is_file()]
     assert found == [page], f"documentation page did not resolve: {found}"
+
+
+def test_a_missing_measurement_run_is_explained(tmp_path):
+    """`out/` is not committed, so this is what a fresh clone hits.
+
+    A bare FileNotFoundError names a path and not the thing to do about it,
+    and it arrived before the register line, so the run said nothing at all
+    about what it had been asked to read.
+    """
+    done = subprocess.run(
+        [sys.executable, str(REPO / "tools" / "remeasure" / "resync.py"),
+         "--report", "--figures", "tools/remeasure/out/definitely-absent.json"],
+        capture_output=True, text=True, cwd=REPO, timeout=300,
+    )
+    combined = done.stdout + done.stderr
+    assert "Traceback" not in combined, combined[-800:]
+    assert "no measurement run at" in combined, combined[-800:]
+    assert "remeasure.py" in combined, combined[-800:]
+    assert "register:" in done.stdout, (
+        "the run did not say which register it was going to read before "
+        f"stopping. stdout: {done.stdout[-800:]}")
