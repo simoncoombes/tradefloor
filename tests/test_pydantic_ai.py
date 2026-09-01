@@ -1041,8 +1041,9 @@ def test_a_replayed_run_records_the_same_chain_a_live_one_does():
     contract.make_world(replayed).run(days=1)
 
     entry = replayed.record[0]
-    assert set(entry) == {"arm", "step", "day", "digest", "prompt",
-                          "response", "decision", "orders", "clipped"}
+    assert set(entry) == {"arm", "step", "day", "payload", "digest",
+                          "prompt", "response", "decision", "orders",
+                          "clipped"}
     assert entry["digest"] == recorder.entries[0]["digest"], (
         "a replayed record must join to the recording it replayed")
 

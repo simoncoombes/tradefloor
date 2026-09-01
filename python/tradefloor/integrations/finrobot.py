@@ -167,6 +167,7 @@ from .common import DecisionError as _CommonDecisionError
 #: deliberately str-only and does not change. This one is for hashing a
 #: config, which is a dict.
 from .common import check_prior as _check_prior  # noqa: F401 -- parity
+from .common import moment_of, refuse_replay_reask  # noqa: F401
 from .common import digest as _digest_any
 from .common import stamp_resume_counts
 from .common import jsonable as _as_jsonable
@@ -1151,6 +1152,10 @@ class FinRobotAdapter:
             "arm": self.arm,
             "step": obs.step,
             "day": obs.day,
+            # The observation end of the chain. It was missing here too:
+            # the entry began at the rendered prompt, so nothing joined a
+            # decision back to what the agent was shown.
+            "payload": payload,
             "digest": key,
             "prompt": prompt,
             "response": response,
@@ -1305,6 +1310,11 @@ class FinRobotAdapter:
             if entry is not None:
                 return entry.get("response")
         return live()
+
+    def reask(self, entry: Any) -> Any:
+        """One more answer to a recorded input, changing nothing."""
+        refuse_replay_reask(self.mode, type(self).__name__)
+        return self._live(entry.get("prompt"))
 
     def _live(self, prompt: str) -> str:
         """One real FinRobot decision.

@@ -33,8 +33,8 @@ from . import facts
 from . import loss
 from .checkpoint import Checkpoint, branch
 from . import counterfactual
-from .counterfactual import (Agreement, Comparison, Divergence, World,
-                             agree, compare)
+from .counterfactual import (Agreement, Comparison, Divergence, Resample,
+                             World, agree, compare, resample)
 from .sweep import sweep
 from . import manifest
 from .manifest import RunManifest
@@ -101,7 +101,8 @@ __all__ = [
     "rank", "Ranking", "AgentRecord",
     "spec", "StrategySpec", "SPEC_VERSION",
     "Scenario", "run_scenario", "facts", "loss", "Checkpoint", "branch", "sweep",
-    "counterfactual", "World", "agree", "compare", "Agreement", "Comparison",
+    "counterfactual", "World", "agree", "compare", "resample",
+    "Agreement", "Comparison", "Resample",
     "Divergence",
     "Intervention", "Firing", "ScenarioValidationError", "interventions",
     "TARGETS", "UNSUPPORTED_TARGETS", "yaml_subset",

@@ -196,8 +196,8 @@ from typing import Any
 from .._core import ValidationError
 from .common import (MAX_PARTICIPATION, AdapterInfo, DecisionError,
                      FrameworkAdapter, check_prior, decision_model, digest,
-                     replay_response, require, run_sync,
-                     stamp_resume_counts)
+                     moment_of, refuse_replay_reask, replay_response,
+                     require, run_sync, stamp_resume_counts)
 
 #: The PyPI distribution that installs the framework, and the Tradefloor
 #: extra that pulls it in: ``pip install "tradefloor[openai-agents]"``.
@@ -715,6 +715,11 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
                 "decision_schema_version":
                     self.info.decision_schema_version,
             })
+
+    def reask(self, entry: Any) -> Any:
+        """One more answer to a recorded input, changing nothing."""
+        refuse_replay_reask(self.mode, type(self).__name__)
+        return self._run(entry.get("prompt"), moment_of(entry))
 
     def _run(self, items: list[dict[str, str]], obs: Any) -> str:
         """One real SDK run, returned as the decision in JSON.

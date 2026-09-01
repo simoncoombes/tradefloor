@@ -234,8 +234,9 @@ def test_the_record_carries_every_decision_point_and_its_exchange():
     world, agent = run_world(buy, days=2)
     assert [e["step"] for e in agent.record] == [0, 6]
     entry = agent.record[0]
-    assert set(entry) == {"arm", "step", "day", "digest", "prompt",
-                         "response", "decision", "orders", "clipped"}
+    assert set(entry) == {"arm", "step", "day", "payload", "digest",
+                         "prompt", "response", "decision", "orders",
+                         "clipped"}
     assert entry["decision"]["rationale"] == "test"
     # The exchange half: the exact input is the payload itself, keyed by
     # its canonical-JSON digest, and the response is what fn returned.

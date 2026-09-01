@@ -212,8 +212,9 @@ from .._core import ValidationError
 from .common import (DECISION_SCHEMA_VERSION, MAX_PARTICIPATION, AdapterInfo,
                      DecisionError, FrameworkAdapter, FrameworkError,
                      IntegrationError, Transcript, check_prior,
-                     decision_model, digest, replay_response, require,
-                     run_sync, stamp_resume_counts)
+                     decision_model, digest, moment_of, refuse_replay_reask,
+                     replay_response, require, run_sync,
+                     stamp_resume_counts)
 
 #: The rules of this market, appended to whatever the agent was already
 #: instructed. It says what the agent is for and what the market can execute.
@@ -518,6 +519,12 @@ class PydanticAIAdapter(FrameworkAdapter):
                 "or re-record the run live against the mandate you want.")
 
     # -- PydanticAI ---------------------------------------------------------
+
+    def reask(self, entry: Any) -> Any:
+        """One more answer to a recorded input, changing nothing."""
+        refuse_replay_reask(self.mode, type(self).__name__)
+        return self._run(entry.get("prompt"), entry.get("payload") or {},
+                         moment_of(entry))
 
     def _run(self, prompt: str, payload: dict[str, Any], obs: Any) -> Any:
         """One real PydanticAI run. The only method that reaches the
