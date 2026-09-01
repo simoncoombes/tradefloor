@@ -102,6 +102,22 @@ computing the hidden values and scanning the text FinRobot receives for them.
 
 The agent is never told which arm it is in.
 
+## Larger rosters
+
+Four names render nine lines each and read well. Four hundred render 3,600
+lines, and the market data crowds out the question. `observe` takes an
+optional `detail=` argument for that case: the symbols named in it keep the
+full block, every other symbol arrives as one compact row carrying price,
+five-day return, position and order cap, and a sector summary sits above the
+table. Every symbol stays a legal action, and the allowlist gains no field.
+`FinRobotAdapter` takes `panel=`, which turns the rendering on and travels
+through `state()` and `fork()`, so a fork agreement covers which names each
+arm sees.
+
+This study leaves both at their defaults and renders every asset in full.
+A published experiment using them over 421 companies lives at
+https://github.com/simoncoombes/tradefloor-experiments.
+
 ## What comes out
 
 Artifacts land in `artifacts/`, git-ignored because they are output:

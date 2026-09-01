@@ -94,7 +94,8 @@ class CallableAgentAdapter(ReplayMixin, FrameworkAdapter):
                  max_participation: float = MAX_PARTICIPATION,
                  arm: str = "", mode: str = "live",
                  transcript: Transcript | None = None,
-                 recorder: Transcript | None = None) -> None:
+                 recorder: Transcript | None = None,
+                 prior: Transcript | None = None) -> None:
         # `fn` defaults to None rather than being required, so the refusal
         # below owns the message; a bare TypeError from the signature would
         # not say what a valid `fn` looks like. It stays required in replay
@@ -111,6 +112,7 @@ class CallableAgentAdapter(ReplayMixin, FrameworkAdapter):
         # the default just runs the function.
         super().__init__(
             mode=mode, transcript=transcript, recorder=recorder,
+            prior=prior,
             info=info or AdapterInfo(
                 framework="callable",
                 agent_name=name or getattr(fn, "__name__", "")),

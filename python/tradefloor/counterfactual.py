@@ -81,7 +81,12 @@ exactly that reason.
 from __future__ import annotations
 
 import copy
+import difflib
+import json
+import re
+import statistics
 import struct
+from collections import Counter
 from typing import Any, Sequence
 
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
@@ -110,6 +115,27 @@ def _macro(engine: Engine) -> dict[str, Any]:
     return {field: getattr(state, field) for field in MACRO_FIELDS}
 
 
+_REFUSAL_TYPES: tuple[type[BaseException], type[BaseException]] | None = None
+
+
+def _refusal_types() -> tuple[type[BaseException], type[BaseException]]:
+    """`(DecisionError, ReplayMiss)`, resolved late.
+
+    `integrations.common` imports this module for `MACRO_FIELDS`, so the
+    import cannot sit at the top of the file. It is resolved once, when a
+    world is built with `on_refusal="skip"`, rather than on every step.
+
+    Two types because the skip policy applies to one and not the other.
+    See :meth:`World._ask`.
+    """
+    global _REFUSAL_TYPES
+    if _REFUSAL_TYPES is None:
+        from .integrations.common import DecisionError, ReplayMiss
+
+        _REFUSAL_TYPES = (DecisionError, ReplayMiss)
+    return _REFUSAL_TYPES
+
+
 class World:
     """A market, an agent trading it, and the macro path they run under.
 
@@ -129,13 +155,20 @@ class World:
     agent with no funding limit is not being tested against the market: large
     trades cost more through the book, but arbitrarily large is always
     available and "trade everything" wins.
+
+    ``on_refusal`` decides what an agent that cannot produce a decision
+    costs. ``"raise"`` is the default and ends the run, which is what this
+    class has always done. ``"skip"`` records the refusal, trades nothing
+    that step, and carries on; see :meth:`_ask`. Either way the count is in
+    the trace and in :meth:`summary` under ``unusable_responses``, kept
+    apart from the market-side ``refused`` so a comparison cannot add them.
     """
 
     __slots__ = ("label", "seed", "universe", "macro", "model", "cash",
                  "max_leverage", "steps_per_day", "ticks_per_step", "start",
                  "engine", "portfolio", "agent", "trace", "pins",
                  "interventions", "applied", "rejected", "fork_step",
-                 "_day", "_step", "_adv", "_ran")
+                 "on_refusal", "_day", "_step", "_adv", "_ran")
 
     def __init__(
         self,
@@ -152,10 +185,14 @@ class World:
         start: tuple[int, int, int] = (9, 30, 3),
         model: str | ModelParams | None = None,
         label: str = "",
+        on_refusal: str = "raise",
     ) -> None:
         if steps_per_day < 1 or ticks_per_step < 1:
             raise ValidationError(
                 "steps_per_day and ticks_per_step must be >= 1")
+        if on_refusal not in ("raise", "skip"):
+            raise ValidationError(
+                f"on_refusal must be 'raise' or 'skip', got {on_refusal!r}")
         self.label = label
         self.seed = int(seed)
         self.universe = list(universe)
@@ -166,6 +203,12 @@ class World:
         self.steps_per_day = int(steps_per_day)
         self.ticks_per_step = int(ticks_per_step)
         self.start = start
+        self.on_refusal = on_refusal
+        if on_refusal == "skip":
+            # Resolved here rather than on the step it first matters, so a
+            # missing integrations layer is a construction error and not a
+            # surprise forty paid calls into a live run.
+            _refusal_types()
         self.pins = dict(pins or {})
         self.interventions: list[dict[str, Any]] = []
         # Interventions from a scenario handed to `apply`, already rebased
@@ -187,6 +230,15 @@ class World:
         self.fork_step: int | None = None
         self._day = 0
         self._step = 0
+        #: The depth the agent is shown and the participation cap is sized
+        #: against. Seeded from the universe and RE-READ from the engine at
+        #: the top of every day, because a scenario can move it and this
+        #: used to be read once and never again. What that cost:
+        #: `liquidity_crisis` takes quoted depth to 40%, and the agent went
+        #: on seeing the pre-crisis figure and went on being allowed the
+        #: pre-crisis order size -- in a book with 40% of the ladder. The
+        #: clip that exists to keep an order realistic was sized against a
+        #: market that no longer existed.
         self._adv = [instrument.avg_volume for instrument in self.universe]
 
     # -- identity ---------------------------------------------------------
@@ -270,6 +322,12 @@ class World:
             # intervention inside the checkpoint and the manifest rather
             # than only in this object's memory.
             scenario.apply(self.engine, day)
+            # Re-read the depth AFTER the scenario has fired. `avg_volume`
+            # is the column the market maker quotes off, `market.liquidity`
+            # scales it, and nothing else in the engine writes it -- so
+            # once a day, here, is both sufficient and the earliest point
+            # at which today's value is known.
+            self._adv = _f64(self.engine.column("avg_volume"))
             macro = _macro(self.engine)
             self.engine.open_market()
 
@@ -282,8 +340,14 @@ class World:
                     day, self._step,
                     (self._step % self.steps_per_day) * self.ticks_per_step)
 
-                orders = self.agent.act(obs) or {}
-                decision = self._decision()
+                orders, unusable = self._ask(obs)
+                # No decision on a refused step. The adapter's last
+                # decision is still the one BEFORE this step, and reading
+                # it here would put a decision the agent did not take into
+                # the row that records it not taking one -- and `compare`
+                # finds the divergence step by comparing exactly this
+                # field.
+                decision = None if unusable else self._decision()
                 fills, refused = self._execute(orders, tickers)
 
                 self.engine.run_session(
@@ -303,6 +367,12 @@ class World:
                     "orders": {t: q for t, q in orders.items() if q},
                     "fills": fills,
                     "refused": refused,
+                    # Market-side above, agent-side here, and they are two
+                    # different failures: `refused` is an order this market
+                    # would not take, `unusable` is output that was never an
+                    # order. One column covering both would read an agent
+                    # that cannot format an answer as an illiquid market.
+                    "unusable": unusable,
                     # End of step: what this step's session produced. The
                     # orders above are what opened it. Both in one row, so a
                     # divergence can be attributed to a decision or to the
@@ -320,6 +390,51 @@ class World:
             self.engine.close_market()
             self._day += 1
         return self
+
+    def _ask(self, obs: "Observation") -> tuple[dict[str, float], str | None]:
+        """The agent's orders for this step, and its refusal if it gave one.
+
+        Under ``on_refusal="raise"`` -- the default, and what this module
+        has always done -- an agent that cannot produce a decision ends the
+        run. Under ``"skip"`` the step trades nothing, the refusal is
+        recorded, and the run continues.
+
+        The case for ``"skip"``: an agent that returns unusable output is
+        an agent behaving badly, and behaving badly is a measurement. A
+        malformed response measured at 1 in 35 on a live 60-decision run
+        ended it on call 36 and took 35 recorded interactions, 20 days of
+        shared history and both arms of a fork with it. A run long enough
+        to be interesting is a run long enough to hit that.
+
+        The case for ``"raise"`` staying the default: a run that quietly
+        skipped every decision would report a flat agent rather than a
+        broken one, and nobody asked for it.
+
+        :class:`~tradefloor.integrations.common.DecisionError` only, which
+        covers both stages a decision can fail at -- output that does not
+        parse, and a well-formed order in a symbol this market does not
+        list. A :class:`FrameworkError` is not caught: the call never
+        completed, the agent produced nothing to judge, and charging it a
+        step would score a dropped connection as bad behaviour.
+
+        :class:`~tradefloor.integrations.common.ReplayMiss` is not caught
+        either, and it is the exception that matters most. A recording with
+        no answer for this input is a broken EXPERIMENT, not a badly
+        behaved agent: skipping it turns a transcript that covers nothing
+        into an agent that refused everything, and the run then completes
+        and publishes that. Measured, before this exemption: two arms
+        replayed against a transcript covering neither, reported twenty
+        refusals each, and produced an empty series.
+        """
+        if self.on_refusal == "raise":
+            return self.agent.act(obs) or {}, None
+        refusal, miss = _refusal_types()
+        try:
+            return self.agent.act(obs) or {}, None
+        except miss:
+            raise
+        except refusal as exc:
+            return {}, f"{type(exc).__name__}: {exc}"
 
     def _decision(self) -> Any:
         """Whatever the agent chose to publish about its last decision."""
@@ -534,7 +649,13 @@ class World:
                           max_leverage=self.max_leverage,
                           steps_per_day=self.steps_per_day,
                           ticks_per_step=self.ticks_per_step,
-                          start=self.start, model=self.model, label=label)
+                          start=self.start, model=self.model, label=label,
+                          # Carried, like every other setting a fork must
+                          # not silently change: an arm that reverted to
+                          # "raise" would die on output its sibling counted
+                          # and continued past, and the surviving arm's
+                          # column would be the only one anybody read.
+                          on_refusal=self.on_refusal)
             child.engine = engine
             child.portfolio = copy.deepcopy(self.portfolio)
             child.trace = copy.deepcopy(self.trace)
@@ -661,6 +782,8 @@ class World:
             "orders": sum(len(row["orders"]) for row in window),
             "trades": len(fills),
             "refused": sum(len(row["refused"]) for row in window),
+            "unusable_responses": sum(1 for row in window
+                                      if row.get("unusable")),
             "partial_fills": sum(1 for f in fills if f["partial"]),
             "turnover": turnover,
             "execution_cost": cost,
@@ -937,6 +1060,7 @@ class Comparison:
         ("final gross exposure", "exposure", "{:.2f}x"),
         ("steps it traded on", "rebalances", "{:,.0f}"),
         ("orders sent", "orders", "{:,.0f}"),
+        ("unusable responses", "unusable_responses", "{:,.0f}"),
         ("turnover", "turnover", "${:,.0f}"),
         ("--- execution ---", None, None),
         ("trades filled", "trades", "{:,.0f}"),
@@ -1026,3 +1150,381 @@ def compare(control: World, treatment: World,
             steps_per_day=control.steps_per_day,
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# The agent's own noise floor
+# ---------------------------------------------------------------------------
+
+def _shape(decision: Any) -> tuple:
+    """One answer's orders, canonical and hashable.
+
+    Sorted, so two answers naming the same trades in a different order are
+    the same answer. The quantity is in, because "buy 2,000" and "buy 200"
+    are different decisions and collapsing them would understate the
+    spread this function exists to measure.
+    """
+    return tuple(sorted((action.symbol, action.side, float(action.quantity))
+                        for action in decision.actions))
+
+
+def _net(decision: Any) -> float:
+    """Buys minus sells, counted in ACTIONS rather than shares.
+
+    The direction of the answer, at the granularity the agent chose it: an
+    agent that turned one buy into one sell moved by 2 whether the position
+    was a hundred shares or a million. `_gross` carries the size.
+    """
+    sides = [action.side.upper() for action in decision.actions]
+    return float(sides.count("BUY") - sides.count("SELL"))
+
+
+def _gross(decision: Any) -> float:
+    """Shares moved, both directions."""
+    return float(sum(abs(action.quantity) for action in decision.actions
+                     if action.side.upper() in ("BUY", "SELL")))
+
+
+def _lines(prompt: Any) -> list[str]:
+    """A prompt as comparable lines, whatever shape the adapter sent.
+
+    Text is already lines. Anything else -- a message list, a payload
+    mapping -- is rendered as sorted, indented JSON, which puts one field
+    per line so a diff names fields rather than offsets.
+    """
+    if isinstance(prompt, str):
+        return prompt.splitlines()
+    return json.dumps(_jsonable_prompt(prompt), indent=2,
+                      sort_keys=True, default=str).splitlines()
+
+
+def _jsonable_prompt(prompt: Any) -> Any:
+    from .integrations.common import jsonable
+
+    return jsonable(prompt)
+
+
+def _field_of(line: str) -> str:
+    """The field a diff line is about, for an error a reader can act on."""
+    match = re.match(r'\s*"?([A-Za-z_][\w.\-]*)"?\s*[:=]', line)
+    return match.group(1) if match else line.strip()[:60]
+
+
+class Resample:
+    """One decision point, asked N times per arm.
+
+    `compare` reports one trajectory each, which is the whole answer for a
+    deterministic policy and half of it for a language model: the agent is
+    the one stochastic component left in an otherwise bit-identical
+    experiment, and a single pair of trajectories cannot separate "the
+    agent responded to the intervention" from "the agent answered the same
+    question two ways".
+
+    Everything else has already been eliminated by construction, which is
+    what makes a small N enough here. :func:`agree` verifies the whole
+    engine state at the fork, and the two arms' inputs at the first
+    post-fork decision differ only in the intervened fields -- checked, not
+    assumed, by :attr:`identical_inputs`. So this measures exactly one
+    thing.
+
+    Read :attr:`separation` against :attr:`noise`: a between-arm gap
+    smaller than an arm's own within-arm spread is not a finding. Read
+    ``distinct`` and ``modal_share`` as well, because two arms can differ
+    in decision STABILITY at the same mean -- one distinct answer in eight
+    calls against four is a real difference that a mean hides.
+    """
+
+    __slots__ = ("at", "n", "control", "treatment", "noise", "separation",
+                 "identical_inputs", "differing_lines", "intervened_fields")
+
+    def __init__(self, *, at: int, n: int, control: str, treatment: str,
+                 noise: dict, separation: dict, identical_inputs: bool,
+                 differing_lines: list, intervened_fields: list) -> None:
+        self.at = at
+        self.n = n
+        self.control = control
+        self.treatment = treatment
+        #: Per arm: sample count, refusals, distinct answers, modal share,
+        #: and the mean and population stdev of `net` and `gross`.
+        self.noise = noise
+        #: The between-arm gap in units of the larger within-arm stdev.
+        #: `None` where neither arm varied: a ratio over zero is not a
+        #: large number, it is an undefined one, and `inf` in a published
+        #: table reads as a result.
+        self.separation = separation
+        #: True when the two inputs are BYTE-IDENTICAL, which means the
+        #: intervention had not reached the agent by this step. Worth
+        #: knowing before reading a gap: with identical inputs the two
+        #: arms answered the same question, so the whole gap is agent
+        #: noise and there is no intervention effect in it to find. False
+        #: is the ordinary case, and the differences are in
+        #: :attr:`differing_lines`; anything they cannot account for was
+        #: already refused.
+        self.identical_inputs = identical_inputs
+        #: The lines the two inputs differ on, for the write-up. Every one
+        #: of them is attributable to an intervened field, because a
+        #: difference that was not would have raised.
+        self.differing_lines = differing_lines
+        self.intervened_fields = intervened_fields
+
+    def as_dict(self) -> dict[str, Any]:
+        """Artifact-shaped, like :meth:`Comparison.as_dict`.
+
+        JSON-serialisable and credential-free: counts, symbol names, and
+        the differing prompt lines, which come from the allowlisted
+        observation and carry nothing the agent was not shown.
+        """
+        return {
+            "at": self.at,
+            "n": self.n,
+            "arms": {"control": self.control, "treatment": self.treatment},
+            "identical_inputs": self.identical_inputs,
+            "intervened_fields": list(self.intervened_fields),
+            "differing_lines": [dict(row) for row in self.differing_lines],
+            "noise": copy.deepcopy(self.noise),
+            "separation": dict(self.separation),
+        }
+
+    ROWS = (
+        ("calls made", "samples", "{:,.0f}"),
+        ("unusable answers", "refusals", "{:,.0f}"),
+        ("distinct answers", "distinct", "{:,.0f}"),
+        ("modal share", "modal_share", "{:.0%}"),
+        ("net (buys - sells)", "mean_net", "{:+.2f}"),
+        ("its own stdev", "stdev_net", "{:.2f}"),
+        ("gross shares", "mean_gross", "{:,.0f}"),
+        ("its own stdev", "stdev_gross", "{:,.0f}"),
+    )
+
+    def render(self, width: int = 24) -> str:
+        left, right = self.control, self.treatment
+        out = [f"  resampled step {self.at}, {self.n} calls per arm",
+               f"  {'':<{width}} {left:>16} {right:>16}",
+               "  " + "-" * (width + 34)]
+        for label, key, fmt in self.ROWS:
+            a = self.noise[self.control][key]
+            b = self.noise[self.treatment][key]
+            out.append(f"  {label:<{width}} {fmt.format(a):>16} "
+                       f"{fmt.format(b):>16}")
+        out.append("  " + "-" * (width + 34))
+        for measure in ("net", "gross"):
+            gap = self.separation[f"gap_{measure}"]
+            floor = self.separation[f"floor_{measure}"]
+            ratio = self.separation[measure]
+            said = ("undefined: neither arm varied" if ratio is None
+                    else f"{ratio:.2f} within-arm stdevs")
+            out.append(f"  {measure + ' gap':<{width}} "
+                       f"{gap:+.2f} against a noise floor of {floor:.2f} "
+                       f"-- {said}")
+        if self.identical_inputs:
+            out.append("  the two inputs are identical: the intervention "
+                       "had not reached the agent by this step, so the "
+                       "gap above is agent noise and nothing else")
+        else:
+            fields = ", ".join(self.intervened_fields) or "nothing"
+            out.append(f"  inputs differ in {fields} and nowhere else")
+        return "\n".join(out)
+
+    def __repr__(self) -> str:
+        return (f"Resample(at={self.at}, n={self.n}, "
+                f"{self.control!r} vs {self.treatment!r})")
+
+
+def _intervened_fields(*worlds: World) -> list[str]:
+    touched: set[str] = set()
+    for world in worlds:
+        for entry in world.interventions:
+            touched.update(entry["fields"])
+        for applied in world.applied:
+            target = getattr(applied, "target", None)
+            if target:
+                touched.add(str(target))
+    return sorted(touched)
+
+
+def _entry_at(world: World, at: int) -> dict[str, Any]:
+    record = getattr(world.agent, "record", None)
+    if not record:
+        raise ValidationError(
+            f"arm {world.label!r} has no decision record. resample replays "
+            "the input an adapter recorded; a plain policy has none, and a "
+            "world that has not run has nothing to resample.")
+    for entry in record:
+        if entry.get("step") == at:
+            return entry
+    steps = [entry.get("step") for entry in record]
+    raise ValidationError(
+        f"arm {world.label!r} took no decision at step {at}. It decided at "
+        f"{steps}. The agent is asked every {getattr(world.agent, 'every', 1)} "
+        "steps, so pass one of those; the first post-fork decision is the "
+        "step a reader is about to draw a conclusion from.")
+
+
+def _diff(control_entry: dict, treatment_entry: dict,
+          touched: Sequence[str]) -> list[dict[str, str]]:
+    """The differing prompt lines, refusing any the intervention cannot own.
+
+    Two arms whose inputs differ for a second reason are not a controlled
+    resample. This is the check that makes the measurement one, and today
+    that difference is silent.
+    """
+    left = _lines(control_entry.get("prompt"))
+    right = _lines(treatment_entry.get("prompt"))
+    rows: list[dict[str, str]] = []
+    stray: list[str] = []
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(
+            None, left, right).get_opcodes():
+        if tag == "equal":
+            continue
+        rows.append({"control": "\n".join(left[i1:i2]),
+                     "treatment": "\n".join(right[j1:j2])})
+        # Line by line rather than block by block. One replace opcode
+        # can span a changed rate AND a changed price, and asking
+        # whether the BLOCK mentions an intervened field lets the price
+        # ride in on the rate's ticket -- which is the single thing this
+        # check exists to catch.
+        for line in left[i1:i2] + right[j1:j2]:
+            if not any(field in line for field in touched):
+                stray.append(_field_of(line))
+    if stray:
+        named = ", ".join(sorted(set(stray))[:8])
+        raise ValidationError(
+            f"the two arms' inputs differ in {named}, which no intervention "
+            f"touched (the interventions moved {list(touched) or 'nothing'}). "
+            "Two arms answering different questions are not a controlled "
+            "resample, and the difference is invisible in the result. This "
+            "is for the FIRST post-fork decision, where the arms have the "
+            "same prices, the same positions and the same history; by the "
+            "second the market has already answered the intervention and "
+            "every line differs.")
+    return rows
+
+
+def _statistics(decisions: Sequence[Any], refusals: int,
+                n: int) -> dict[str, Any]:
+    shapes = [_shape(decision) for decision in decisions]
+    nets = [_net(decision) for decision in decisions]
+    grosses = [_gross(decision) for decision in decisions]
+    modal = Counter(shapes).most_common(1)
+    bought, sold = set(), set()
+    for decision in decisions:
+        for action in decision.actions:
+            if action.side.upper() == "BUY":
+                bought.add(action.symbol)
+            elif action.side.upper() == "SELL":
+                sold.add(action.symbol)
+    return {
+        "samples": n,
+        "parsed": len(decisions),
+        "refusals": refusals,
+        "distinct": len(set(shapes)),
+        "modal_share": (modal[0][1] / len(shapes)) if shapes else 0.0,
+        "mean_net": statistics.fmean(nets) if nets else 0.0,
+        "stdev_net": statistics.pstdev(nets) if nets else 0.0,
+        "mean_gross": statistics.fmean(grosses) if grosses else 0.0,
+        "stdev_gross": statistics.pstdev(grosses) if grosses else 0.0,
+        "bought": sorted(bought),
+        "sold": sorted(sold),
+    }
+
+
+def _ask_again(world: World, entry: dict, n: int) -> tuple[list, int]:
+    """``n`` fresh answers to one recorded input. No market is advanced.
+
+    A call that fails to parse is counted as a refusal and never retried.
+    An agent that returns unusable output on three of twenty calls is a
+    finding, and sampling until twenty parse would hide it.
+    """
+    from .integrations.common import DecisionError, parse_decision
+
+    reask = getattr(world.agent, "reask", None)
+    if not callable(reask):
+        raise ValidationError(
+            f"arm {world.label!r} runs an agent with no reask(). resample "
+            "asks one recorded input again; a FrameworkAdapter implements "
+            "it, and a plain policy has no framework to ask.")
+    decisions, refusals = [], 0
+    for _ in range(n):
+        try:
+            decisions.append(parse_decision(reask(entry)))
+        except DecisionError:
+            refusals += 1
+    return decisions, refusals
+
+
+def resample(control: World, treatment: World, *, at: int | None = None,
+             n: int = 8) -> Resample:
+    """Ask one decision point ``n`` times per arm, and report the spread.
+
+    The measurement that keeps a false finding out of a paper. Worked
+    example, live, both arms at temperature 0: at the first post-fork
+    decision the prompts differed in 2 lines of 376, and the recorded
+    trajectories then diverged readably -- control bought the dip, the
+    shock arm cut exposure "to manage downside risk". Resampling those two
+    exact prompts eight times each: control gave 4 distinct answers with a
+    net of 0.62 +/- 0.99, the shock arm gave 1 answer in 8 calls with a net
+    of 0.00 +/- 0.00. The between-arm gap of 0.62 sits inside control's own
+    spread. The recorded split was one of control's four available answers,
+    and nothing in this library would have said so.
+
+    The same numbers carry a second reading worth keeping: four distinct
+    answers against one is a difference in decision STABILITY rather than
+    in direction, it is invisible to :func:`compare`, and it is only
+    observable because the input was byte-identical eight times.
+
+    ``at`` defaults to the treatment arm's fork step, the first decision
+    the intervention could have reached. No market is advanced: this
+    replays two frozen inputs, so N paired samples cost N calls rather than
+    N re-simulations.
+
+    No p-value. The gap is reported in units of the noise floor and the
+    reader judges; a significance test would imply an inference model
+    nobody here has argued for.
+    """
+    if n < 2:
+        raise ValidationError(
+            f"resample needs at least 2 calls per arm to have a spread to "
+            f"report, got n={n}.")
+    if at is None:
+        at = treatment.fork_step
+    if at is None:
+        raise ValidationError(
+            "resample needs a step. Neither arm was forked, so there is no "
+            "fork_step to default to; pass at=<decision step>.")
+    at = int(at)
+
+    left = control.label or "control"
+    right = treatment.label or "treatment"
+    if left == right:
+        raise ValidationError(
+            f"both arms are labelled {left!r}, so one arm's numbers would "
+            "land on top of the other's and the result would describe one "
+            "arm twice. Label them apart; `fork` refuses duplicate labels "
+            "for the same reason.")
+
+    touched = _intervened_fields(control, treatment)
+    control_entry = _entry_at(control, at)
+    treatment_entry = _entry_at(treatment, at)
+    differing = _diff(control_entry, treatment_entry, touched)
+
+    noise: dict[str, Any] = {}
+    for world, entry, label in ((control, control_entry, left),
+                                (treatment, treatment_entry, right)):
+        decisions, refusals = _ask_again(world, entry, n)
+        noise[label] = _statistics(decisions, refusals, n)
+
+    separation: dict[str, Any] = {}
+    for measure in ("net", "gross"):
+        gap = (noise[right][f"mean_{measure}"]
+               - noise[left][f"mean_{measure}"])
+        floor = max(noise[left][f"stdev_{measure}"],
+                    noise[right][f"stdev_{measure}"])
+        separation[f"gap_{measure}"] = gap
+        separation[f"floor_{measure}"] = floor
+        # None rather than inf. A ratio over zero is undefined, not large,
+        # and `inf` printed in a table reads as an overwhelming result.
+        separation[measure] = abs(gap) / floor if floor > 0 else None
+
+    return Resample(at=at, n=n, control=left, treatment=right, noise=noise,
+                    separation=separation, identical_inputs=not differing,
+                    differing_lines=differing, intervened_fields=touched)

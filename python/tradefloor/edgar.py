@@ -136,8 +136,20 @@ class Snapshot:
         return hashlib.sha256(self.to_json().encode("utf-8")).hexdigest()
 
     def save(self, path: str) -> str:
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(json.dumps(self.to_dict(), sort_keys=True, indent=2))
+        """Write the snapshot and return its content hash.
+
+        The bytes on disk are the same bytes on every platform, so a
+        digest over the file identifies the snapshot rather than the
+        machine that saved it.
+        """
+        # write_bytes, not text mode: the caller is told to hash this
+        # file and cite the digest, and Python's text mode would make
+        # that digest a property of the machine that wrote it. An
+        # explicit `newline=""` fixes it too, until an edit forgets
+        # the argument; bytes cannot be forgotten.
+        text = json.dumps(self.to_dict(), sort_keys=True, indent=2)
+        with open(path, "wb") as fh:
+            fh.write(text.encode("utf-8"))
         return self.hash
 
     @classmethod
@@ -469,14 +481,39 @@ def fetch(
     *,
     as_of: str,
     user_agent: str,
-    limit: int = 100,
+    limit: int | None = None,
     fiscal_year: int | None = None,
     transport=None,
     progress=None,
     exclude_negative_equity: bool = True,
-    rank_by: str = "equity",
+    rank_by: str | None = None,
+    ciks: Sequence[int | str] | None = None,
 ) -> Snapshot:
     """Build a :class:`Snapshot` from SEC filings.
+
+    # Two ways to choose the roster
+
+    ``limit`` with ``rank_by`` takes the largest filers under one ranking.
+    ``ciks`` takes an exact list of filers and nothing else. The two are
+    alternatives and passing both raises, because a ranking cannot reorder a
+    roster somebody wrote down.
+
+    ``ciks`` is for an experiment whose universe is decided outside EDGAR: an
+    index roster, a screen run elsewhere, the holdings of a fund. EDGAR
+    publishes no index membership, so neither ranking approximates one.
+    ``rank_by="public_float"`` ranks by reported public float and returns a
+    roster whose sector composition resembles an index, which is a weaker
+    claim than membership and the only one it supports.
+
+    Under ``ciks`` every requested filer reaches one of two places. It is a
+    row in :attr:`Snapshot.rows`, or it is an entry in
+    :attr:`Snapshot.excluded` carrying its CIK and a ``reason`` string. No
+    filer outside the request can enter either, and none is dropped in
+    silence: ``test_edgar.py`` pins the partition against the request.
+
+    Rows come back in the order requested. That is the caller's order and not
+    a ranking, so a roster file with a stable order produces a stable
+    snapshot and the same file produces the same hash.
 
     # Which companies you get, and why it matters
 
@@ -547,6 +584,28 @@ def fetch(
             'requests without one. tradefloor will not send a fabricated '
             'User-Agent on your behalf.'
         )
+    roster = None if ciks is None else _requested_ciks(ciks)
+    if roster is not None:
+        # Refused rather than ignored. A caller who passes both has two
+        # different rosters in mind, and picking one silently would hand
+        # back a universe nobody asked for under a note saying it was
+        # ranked. `limit` and `rank_by` default to None for exactly this:
+        # with a value of their own they could not be told apart from a
+        # caller who accepted the old defaults.
+        conflict = [name for name, value in (("limit", limit),
+                                             ("rank_by", rank_by))
+                    if value is not None]
+        if conflict:
+            raise ValidationError(
+                f"ciks= names an exact roster and {' and '.join(conflict)} "
+                "asks for a ranked one. Pass one or the other: a ranking "
+                "cannot reorder a roster that was written down, and taking "
+                "the first `limit` of it would drop members without saying "
+                "which.")
+    if limit is None:
+        limit = 100
+    if rank_by is None:
+        rank_by = "equity"
     if limit < 1:
         raise ValidationError(f"limit must be >= 1, got {limit}")
 
@@ -596,9 +655,33 @@ def fetch(
             f'rank_by must be "equity" or "public_float", got {rank_by!r}'
         )
 
-    usable = [cik for cik in eps if cik in shares and shares[cik] > 0]
+    rows: list[dict] = []
+    excluded: list[dict] = []
+    seen: set[str] = set()
 
-    if rank_by == "public_float":
+    if roster is not None:
+        # The requested order, kept. Filers the frames cannot describe drop
+        # out here with a reason each, rather than vanishing into a `usable`
+        # comprehension: under a ranking a filer with no EPS is one of five
+        # thousand the ranking passed over, and under an exact roster it is
+        # a member of the roster that did not arrive.
+        candidates = []
+        for cik in roster:
+            if cik not in eps:
+                excluded.append({"cik": cik,
+                                 "reason": f"no diluted EPS in {duration}"})
+            elif cik not in shares:
+                excluded.append({"cik": cik,
+                                 "reason": f"no share count in {instant}"})
+            elif shares[cik] <= 0:
+                excluded.append({"cik": cik,
+                                 "reason": "share count is zero or negative"})
+            else:
+                candidates.append(cik)
+        say(f"{len(candidates)} of {len(roster)} requested filers have EPS "
+            "and a share count")
+    elif rank_by == "public_float":
+        usable = [cik for cik in eps if cik in shares and shares[cik] > 0]
         # Filed as-of the fiscal SECOND quarter, not the fourth: the cover
         # page reports it at the last business day of the most recently
         # completed Q2. Asking for the Q4 instant returns almost nothing,
@@ -629,19 +712,17 @@ def fetch(
             usable, key=lambda cik: (-ranked.get(cik, 0.0), cik)
         )
     else:
+        usable = [cik for cik in eps if cik in shares and shares[cik] > 0]
         # Equity descending, CIK ascending. The tie-break is not decoration:
         # without it, two filers with identical equity would order by whichever
         # the response happened to list first, and the universe would depend on a
         # detail of the JSON rather than on the data.
         candidates = sorted(usable, key=lambda cik: (-equity.get(cik, 0.0), cik))
-    say(f"{len(candidates)} filers have EPS and a share count")
-
-    rows: list[dict] = []
-    excluded: list[dict] = []
-    seen: set[str] = set()
+    if roster is None:
+        say(f"{len(candidates)} filers have EPS and a share count")
 
     for cik in candidates:
-        if len(rows) >= limit:
+        if roster is None and len(rows) >= limit:
             break
         try:
             meta = _get_json(get, _SUBMISSIONS.format(cik=cik))
@@ -686,34 +767,96 @@ def fetch(
             row["revenue_growth"] = current / prior - 1.0
         seen.add(ticker)
         rows.append(row)
-        say(f"{len(rows)}/{limit} {ticker}")
+        say(f"{len(rows)}/{len(candidates) if roster is not None else limit} "
+            f"{ticker}")
 
     keep, dropped = filter_rows(
         rows, exclude_negative_equity=exclude_negative_equity)
+    notes = {
+        "fiscal_year": fy,
+        "duration_frame": duration,
+        "instant_frame": instant,
+        # Reports what the ranking ACTUALLY was. This read
+        # "stockholders_equity" unconditionally when `rank_by` landed,
+        # so a float-ranked snapshot carried a note saying it was
+        # equity-ranked -- the identical bug class as `model_preset()`'s
+        # hardcoded "pt-v1" default, fixed hours earlier in this same
+        # session, reintroduced by the person who fixed it. A provenance
+        # field that does not follow the thing it describes is worse than
+        # no field: it is a confident wrong answer.
+        "ranked_by": (
+            "public_float" if rank_by == "public_float"
+            else "stockholders_equity"
+        ),
+        "candidates": len(candidates),
+        "requested": limit,
+    }
+    if roster is not None:
+        # `ranked_by` goes, because nothing was ranked and a snapshot saying
+        # it was equity-ranked would be the confident wrong answer the
+        # comment above is about. The request itself is carried in full: a
+        # reader holding the file can then check exact membership against
+        # what was asked for, without the roster file the caller read.
+        notes.pop("ranked_by")
+        notes["selection"] = "exact_ciks"
+        notes["requested"] = len(roster)
+        notes["requested_ciks"] = list(roster)
+        notes["requested_ciks_digest"] = hashlib.sha256(
+            json.dumps(sorted(roster), separators=(",", ":"))
+            .encode("utf-8")).hexdigest()
     return Snapshot(
         as_of=as_of,
         rows=keep,
         excluded=excluded + dropped,
-        notes={
-            "fiscal_year": fy,
-            "duration_frame": duration,
-            "instant_frame": instant,
-            # Reports what the ranking ACTUALLY was. This read
-            # "stockholders_equity" unconditionally when `rank_by` landed,
-            # so a float-ranked snapshot carried a note saying it was
-            # equity-ranked -- the identical bug class as `model_preset()`'s
-            # hardcoded "pt-v1" default, fixed hours earlier in this same
-            # session, reintroduced by the person who fixed it. A provenance
-            # field that does not follow the thing it describes is worse than
-            # no field: it is a confident wrong answer.
-            "ranked_by": (
-                "public_float" if rank_by == "public_float"
-                else "stockholders_equity"
-            ),
-            "candidates": len(candidates),
-            "requested": limit,
-        },
+        notes=notes,
     )
+
+
+def _requested_ciks(ciks: Sequence[int | str]) -> list[int]:
+    """The requested roster as CIK integers, order preserved.
+
+    Accepts the zero-padded ten-character form EDGAR prints and the bare
+    integer its frames return, because a roster file copied off a filing
+    carries the first and this module works in the second.
+
+    A CIK named twice raises. Deduplicating it silently would make the
+    included and excluded counts add up to fewer filers than were asked for,
+    with nothing saying which request the extra one was. A caller whose
+    roster holds two share classes of one company -- three of the S&P 500's
+    503 lines do -- resolves that in the roster, where the second line can be
+    recorded as the share class it is.
+    """
+    out: list[int] = []
+    seen: dict[int, int] = {}
+    for i, raw in enumerate(ciks):
+        text = str(raw).strip()
+        if text[:3].upper() == "CIK":
+            text = text[3:]
+        try:
+            value = int(text)
+        except ValueError:
+            raise ValidationError(
+                f"ciks[{i}] is {raw!r}, which is not a CIK. A CIK is an "
+                'integer, written bare (320193), zero-padded to ten '
+                'characters ("0000320193"), or with the "CIK" prefix EDGAR '
+                'puts on a submissions filename.') from None
+        if value <= 0:
+            raise ValidationError(
+                f"ciks[{i}] is {raw!r}, and a CIK is a positive integer.")
+        if value in seen:
+            raise ValidationError(
+                f"ciks[{i}] repeats CIK {value}, already requested at "
+                f"index {seen[value]}. One filer files once, so a second "
+                "request for it can only end as one row or as an exclusion "
+                "with no reason to give. Resolve the duplicate in the "
+                "roster: two share classes of one company are one filer.")
+        seen[value] = i
+        out.append(value)
+    if not out:
+        raise ValidationError(
+            "ciks= is empty. Pass the roster, or leave it out and take a "
+            "ranked universe with limit= and rank_by=.")
+    return out
 
 
 # ---------------------------------------------------------------------------

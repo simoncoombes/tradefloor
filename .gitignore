@@ -8,6 +8,10 @@ build/
 *.egg-info/
 __pycache__/
 .venv/
+# The finrobot extra downgrades numpy, protobuf and the opentelemetry
+# stack, which breaks pydantic-ai and logfire in the main environment.
+# It gets an environment of its own.
+.venv-finrobot/
 
 # Internal design material lives in the private tradefloor-design repo,
 # never in this one. The public documentation lives in the private

@@ -211,8 +211,10 @@ from typing import Any
 from .._core import ValidationError
 from .common import (DECISION_SCHEMA_VERSION, MAX_PARTICIPATION, AdapterInfo,
                      DecisionError, FrameworkAdapter, FrameworkError,
-                     IntegrationError, Transcript, decision_model, digest,
-                     replay_response, require, run_sync)
+                     IntegrationError, Transcript, check_prior,
+                     decision_model, digest, moment_of, refuse_replay_reask,
+                     replay_response, require, run_sync,
+                     stamp_resume_counts)
 
 #: The rules of this market, appended to whatever the agent was already
 #: instructed. It says what the agent is for and what the market can execute.
@@ -322,6 +324,7 @@ class PydanticAIAdapter(FrameworkAdapter):
                  mode: str = "live", model: Any = None,
                  transcript: Transcript | None = None,
                  recorder: Transcript | None = None,
+                 prior: Transcript | None = None,
                  instructions: str = MANDATE,
                  bind_output_type: bool = True,
                  request_limit: int | None = REQUEST_LIMIT,
@@ -386,6 +389,9 @@ class PydanticAIAdapter(FrameworkAdapter):
         self.model = model
         self.transcript = transcript
         self.recorder = recorder
+        self.prior = check_prior(
+            prior, mode=mode, recorder=recorder,
+            instructions_digest=self.info.instructions_digest)
         self.instructions = instructions
         self.bind_output_type = bind_output_type
         self.request_limit = request_limit
@@ -436,7 +442,8 @@ class PydanticAIAdapter(FrameworkAdapter):
                                    step=obs.step, day=obs.day)
 
         try:
-            output = self._run(prompt, payload, obs)
+            output = self.call_or_resume(
+                key, lambda: self._run(prompt, payload, obs))
         except IntegrationError:
             # Already one of ours -- MissingDependencyError from `require`,
             # or a refusal a subclass raised deliberately.
@@ -462,6 +469,7 @@ class PydanticAIAdapter(FrameworkAdapter):
                 "digest": key, "prompt": prompt,
                 "response": _recordable(output),
             })
+            stamp_resume_counts(self.recorder, self.prior)
         return output
 
     def _check_instructions(self) -> None:
@@ -511,6 +519,12 @@ class PydanticAIAdapter(FrameworkAdapter):
                 "or re-record the run live against the mandate you want.")
 
     # -- PydanticAI ---------------------------------------------------------
+
+    def reask(self, entry: Any) -> Any:
+        """One more answer to a recorded input, changing nothing."""
+        refuse_replay_reask(self.mode, type(self).__name__)
+        return self._run(entry.get("prompt"), entry.get("payload") or {},
+                         moment_of(entry))
 
     def _run(self, prompt: str, payload: dict[str, Any], obs: Any) -> Any:
         """One real PydanticAI run. The only method that reaches the
@@ -585,7 +599,8 @@ class PydanticAIAdapter(FrameworkAdapter):
         kwargs = super().fork_kwargs()
         kwargs.update(agent=self.agent, deps=self.deps, mode=self.mode,
                       model=self.model, transcript=self.transcript,
-                      recorder=self.recorder, instructions=self.instructions,
+                      recorder=self.recorder, prior=self.prior,
+                      instructions=self.instructions,
                       bind_output_type=self.bind_output_type,
                       request_limit=self.request_limit)
         return kwargs

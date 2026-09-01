@@ -997,10 +997,15 @@ class Survey:
         translation; `allow_nan=False` enforces the promise rather than
         trusting it.
         """
-        with open(path, "w", encoding="utf-8") as handle:
-            json.dump(_jsonsafe(self.to_dict()), handle, indent=1,
-                      allow_nan=False)
-            handle.write("\n")
+        # write_bytes, not text mode: the caller is told to hash this
+        # file and cite the digest, and Python's text mode would make
+        # that digest a property of the machine that wrote it. An
+        # explicit `newline=""` fixes it too, until an edit forgets
+        # the argument; bytes cannot be forgotten.
+        text = json.dumps(_jsonsafe(self.to_dict()), indent=1,
+                          allow_nan=False) + "\n"
+        with open(path, "wb") as handle:
+            handle.write(text.encode("utf-8"))
         return path
 
     @classmethod

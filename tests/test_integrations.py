@@ -348,9 +348,17 @@ def check_the_record_joins_the_decision_to_the_exchange(make_agent):
     world.run(days=1)
     assert world.agent.record, "no decision point was recorded"
     entry = world.agent.record[0]
-    assert set(entry) == {"arm", "step", "day", "digest", "prompt",
-                          "response", "decision", "orders", "clipped"}, (
+    assert set(entry) == {"arm", "step", "day", "payload", "digest",
+                          "prompt", "response", "decision", "orders",
+                          "clipped"}, (
         f"record entry carries {sorted(entry)}")
+    # `payload` is the OBSERVATION end of the chain this docstring names,
+    # and it was the one link missing: the entry began at the rendered
+    # input, so nothing joined a decision back to what the agent was
+    # shown. `resample` needs it -- an adapter that builds its framework
+    # input from the payload rather than from text has nothing to re-ask
+    # without it.
+    assert entry["payload"]["step"] == entry["step"]
     assert entry["digest"], "the record must carry the replay key"
     assert entry["response"], "the record must carry the raw response"
     json.dumps(entry)   # the record feeds artifacts; it must serialise
@@ -410,6 +418,37 @@ def check_the_adapter_never_reaches_ground_truth(make_agent):
     assert orders, "the sealed decision produced nothing to check"
 
 
+def check_a_recorded_decision_can_be_asked_again(make_agent):
+    """`resample` asks one recorded input again, and the noise floor it
+    reports is only meaningful if the re-ask changes nothing. An adapter
+    that appended to the price history here would move the market memory
+    the rest of the run was taken under, and the samples after the first
+    would be answers to a different question."""
+    world = make_world(make_agent(buy))
+    world.run(days=1)
+    agent = world.agent
+    entry = agent.record[0]
+
+    if getattr(agent, "mode", "live") == "replay":
+        # A recording holds one answer per input, so re-asking it would
+        # report a within-arm spread of zero -- the most convincing result
+        # a resample can produce, and an artifact of the file.
+        with pytest.raises(tf.ValidationError, match="noise floor of zero"):
+            agent.reask(entry)
+        return
+
+    before = (len(agent.history), len(agent.record),
+              json.dumps(agent.state(), default=str))
+    again = agent.reask(entry)
+    assert (len(agent.history), len(agent.record),
+            json.dumps(agent.state(), default=str)) == before, (
+        "reask must not touch adapter state; a resample happens after the "
+        "run and the state belongs to the run")
+
+    # Same shape as ask() returns, so parse_decision reads both.
+    assert ci.parse_decision(again).actions
+
+
 #: Every check above, in one list, so an adapter's test file can parametrize
 #: over it and a failure names the clause that broke.
 CONTRACT_CHECKS = [
@@ -427,6 +466,7 @@ CONTRACT_CHECKS = [
     check_the_decision_hook_publishes_actions_and_rationale,
     check_metadata_is_captured_and_credential_free,
     check_the_record_joins_the_decision_to_the_exchange,
+    check_a_recorded_decision_can_be_asked_again,
     check_the_replay_key_derives_from_the_input,
     check_the_state_carries_an_instructions_identity,
     check_the_adapter_never_reaches_ground_truth,
@@ -502,7 +542,37 @@ def test_a_committed_recording_is_valid_without_its_framework(path):
         assert entry.get("digest"), (
             "an entry without a key can never be replayed")
         digests.append(entry["digest"])
-        ci.parse_decision(entry["response"])    # raises if the response rotted
+        assert isinstance(entry.get("response"), str), (
+            "a recorded response has to be text; a null one cannot be "
+            "replayed and is not the same thing as a refusal")
+
+    # How many recorded responses the shared validator refuses, checked
+    # against what the recording says it should be.
+    #
+    # This was a bare `parse_decision` on every entry, which reads a
+    # corrupted file and a model that answered badly as the same failure.
+    # They are not: `parse` is strict on purpose, so a long enough real
+    # recording contains output it refuses, and forbidding that forbids
+    # committing an honest recording. One measured case, in a recording of
+    # 80 decisions: a per-action `rationale` field, which the study around
+    # it counted as a refusal and a lost step.
+    #
+    # A recording that declares nothing must still parse cleanly, so the
+    # five fixtures committed before this are unchanged by it, and a
+    # corrupted response in any of them still fails here.
+    refused = 0
+    for entry in transcript.entries:
+        try:
+            ci.parse_decision(entry["response"])
+        except ci.DecisionError:
+            refused += 1
+    declared = transcript.meta.get("unparseable_responses", 0)
+    assert refused == declared, (
+        f"{path.parent.name} has {refused} responses the validator "
+        f"refuses and declares {declared}. A recording may hold output a "
+        "real model produced, and it has to say how much: a change in "
+        "this count is either a corrupted file or a different run."
+    )
     assert len(digests) == len(set(digests)), "duplicate replay keys"
 
     for secret in ("sk-ant-", "sk-proj-", "lsv2_pt-", "pylf_v1_", "api_key",
