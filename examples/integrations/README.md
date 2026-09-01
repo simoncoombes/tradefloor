@@ -298,6 +298,46 @@ the run stops and names the step it stopped at. Keyed by position, a replay
 would answer the new question with the answer given to the old one, and
 nothing in the output would say so.
 
+## When a live run goes wrong
+
+Two things end a long live run, and they end it differently.
+
+An agent can return output that is not an executable decision. `parse` is
+strict on purpose -- dropping an unknown field executes a trade the agent
+conditioned on something it never got -- so it raises `DecisionError`, and
+by default that ends the run. Measured on a 60-decision pilot, one response
+in 35 was malformed, and the one that arrived on call 36 took 35 recorded
+interactions and 20 days of shared history with it.
+
+```python
+world = World(seed=42, universe=roster, agent=agent, on_refusal="skip")
+```
+
+Under `"skip"` that step trades nothing, the refusal is recorded, and the
+run continues. The count is in the trace, in `World.summary()` and in a
+`Comparison` row, as `unusable_responses`. It is kept apart from `refused`,
+which counts orders the MARKET rejected: those are different failures with
+different remedies, and one column covering both would make an unusable
+agent read as an illiquid market. `"raise"` remains the default.
+
+The other way a run dies is outside the agent: a rate limit, a dropped
+connection, an interrupt. Hand the next attempt what the last one paid for.
+
+```python
+agent = OpenAIAgentsAdapter(pm, mode="live", recorder=Transcript(),
+                            prior=Transcript.load("journal.json"))
+```
+
+`prior` is consulted before the provider, on the same key the replay path
+uses. The market is deterministic, so the resumed run reaches the same
+prompts and computes the same digests; a hit replays, a miss calls out. The
+new recording carries `replayed_from_prior` and `called_live` in its meta,
+so a file stitched from two sessions cannot read as one live run. A `prior`
+recorded under different instructions is refused before the run starts, for
+the reason the replay guard exists: instructions do not travel in the input
+the key is computed over, so every key would still match and nothing in the
+output would say the question had changed.
+
 ## The decision boundary
 
 A framework returns a decision and never touches engine state.

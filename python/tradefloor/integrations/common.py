@@ -1187,6 +1187,100 @@ _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 _SEGMENTS = re.compile(r"[^A-Za-z0-9]+")
 
 
+def check_prior(prior: "Transcript | None", *, mode: str,
+                recorder: "Transcript | None",
+                instructions_digest: str) -> "Transcript | None":
+    """Validate a ``prior`` recording and hand it back, or refuse it.
+
+    Every adapter that records calls this from its constructor, so a bad
+    resume is a construction error rather than something discovered forty
+    paid calls into a run.
+
+    ``prior`` is a recording an earlier live run produced. Any live run can
+    die -- a rate limit, a dropped connection, a keyboard interrupt -- and
+    without a resume the second attempt re-asks every question it already
+    holds an answer to. On a digest hit the recorded answer is reused; on a
+    miss the provider is called. Same keying as the replay path, different
+    source.
+
+    Three ways it is refused: outside live mode, where no provider is
+    called and the argument means nothing; with no recorder, where the
+    resumed run keeps nothing; and under changed instructions, which
+    :func:`refuse_changed_instructions` explains.
+    """
+    if prior is None:
+        return None
+    if mode != "live":
+        raise ValidationError(
+            "prior is for resuming a live run: it is consulted before the "
+            "provider is called, and replay mode calls no provider. To "
+            "replay a recording, pass it as transcript=.")
+    if recorder is None:
+        raise ValidationError(
+            "prior needs a recorder to resume into. Without one the resumed "
+            "run keeps nothing, which is the loss prior exists to stop.")
+    refuse_changed_instructions(prior, instructions_digest)
+    return prior
+
+
+def stamp_resume_counts(recorder: "Transcript | None",
+                        prior: "Transcript | None") -> None:
+    """Record how much of ``recorder`` was resumed rather than called.
+
+    A recording stitched from two sessions has to say so on its face.
+    Without this it claims to be one live run, and a reader counting
+    entries cannot tell how many of them were paid for today.
+
+    DERIVED from the two transcripts rather than counted as it goes. A fork
+    shares one recorder between arms and gives each arm its own adapter, so
+    a counter living on an adapter would split across the arms and each
+    half would understate the file it describes.
+    """
+    if recorder is None or prior is None:
+        return
+    resumed = sum(1 for entry in recorder.entries
+                  if prior.entry_for(entry.get("digest", "")))
+    recorder.meta["replayed_from_prior"] = resumed
+    recorder.meta["called_live"] = len(recorder.entries) - resumed
+
+
+def refuse_changed_instructions(prior: "Transcript | None",
+                                current: str) -> None:
+    """Refuse a resume whose instructions are not the recorded ones.
+
+    The transcript key is a digest of the INPUT, and an adapter's
+    instructions do not travel in that input -- they reach the framework as
+    a system prompt, an agent profile or a constructor argument. So editing
+    them leaves every recorded key intact: the resume completes, every
+    digest matches, and the answers it reuses were given under instructions
+    nobody is running any more. Nothing in the output says the question
+    changed.
+
+    ``current`` is :attr:`AdapterInfo.instructions_digest`, which is
+    already a digest and therefore cannot carry a credential.
+
+    A prior carrying no ``instructions_digest`` in its meta is allowed
+    through. It cannot be checked, and refusing it would break every
+    recording made before this existed for no gain -- those runs are no
+    worse off than they were. An adapter that leaves
+    ``instructions_digest`` empty is in the same position, and the fix
+    there is to stamp one.
+    """
+    if prior is None:
+        return
+    recorded = (prior.meta or {}).get("instructions_digest")
+    if not recorded or not current or recorded == current:
+        return
+    raise ValidationError(
+        f"this prior transcript was recorded under different instructions "
+        f"(recorded {recorded}, current {current}). The instructions do not "
+        "travel in the input the resume is keyed on, so every recorded key "
+        "would still match and the run would complete -- answering the "
+        "instructions you have now with decisions taken under the ones you "
+        "had then. Restore the instructions, or start a fresh recording "
+        "without prior=.")
+
+
 def _head_of(key: Any) -> str:
     """The final segment of a key name, lowercased. Empty if there is none."""
     spaced = _CAMEL_BOUNDARY.sub("_", str(key))
@@ -1397,6 +1491,10 @@ class FrameworkAdapter:
         self.fundamentals = dict(fundamentals or {})
         self.max_participation = float(max_participation)
         self.arm = arm
+        #: A recording an earlier live run produced, consulted before the
+        #: provider. Set by an adapter that records; see :func:`check_prior`
+        #: and :meth:`call_or_resume`. None on an adapter with no live path.
+        self.prior: "Transcript | None" = None
 
         #: Prices this adapter has been shown, oldest first. The agent's own
         #: memory, and the only reason it can quote a return or a volatility
@@ -1445,6 +1543,26 @@ class FrameworkAdapter:
             f"{type(self).__name__} does not implement ask(). An adapter "
             "subclasses FrameworkAdapter and implements ask(obs, payload), "
             "the one method that reaches its framework.")
+
+    def call_or_resume(self, key: str, live: Any) -> Any:
+        """The answer recorded for ``key`` in :attr:`prior`, or ``live()``.
+
+        Wrap the live call in every adapter's ``ask``. A resumed answer
+        costs nothing and raises nothing, so an adapter that catches
+        framework exceptions around the live call keeps catching exactly
+        what it did.
+
+        The market is deterministic, so a resumed run reaches the same
+        prompts and computes the same digests, and a recorded answer is
+        still an answer to the question being asked. That is the same
+        property the replay path rests on; this changes which source is
+        consulted first, and a miss falls through to the provider.
+        """
+        if self.prior is not None:
+            entry = self.prior.entry_for(key)
+            if entry is not None:
+                return entry.get("response")
+        return live()
 
     def record_exchange(self, prompt: Any, *, key: str | None = None) -> None:
         """Declare the exact framework input behind the decision under way.
@@ -1663,7 +1781,8 @@ class ReplayMixin:
 
     def __init__(self, *, mode: str = "replay",
                  transcript: Transcript | None = None,
-                 recorder: Transcript | None = None, **kwargs: Any) -> None:
+                 recorder: Transcript | None = None,
+                 prior: Transcript | None = None, **kwargs: Any) -> None:
         if mode not in ("replay", "live"):
             raise ValidationError(
                 f"mode must be 'replay' or 'live', got {mode!r}")
@@ -1676,6 +1795,9 @@ class ReplayMixin:
         self.mode = mode
         self.transcript = transcript
         self.recorder = recorder
+        self.prior = check_prior(
+            prior, mode=mode, recorder=recorder,
+            instructions_digest=self.info.instructions_digest)
 
     # -- the two framework-specific hooks ---------------------------------
 
@@ -1721,7 +1843,14 @@ class ReplayMixin:
         if self.mode == "replay":
             return replay_response(self.transcript, key,
                                    step=obs.step, day=obs.day)
-        response = self.call(obs, prompt)
+        # A `prior` recording is consulted first. The market is
+        # deterministic, so a resumed run reaches the same prompts and the
+        # same digests, and a recorded answer is still an answer to the
+        # question being asked. Same keying as the replay path; different
+        # source, and a miss falls through to the provider.
+        resumed = None if self.prior is None else self.prior.entry_for(key)
+        response = (self.call(obs, prompt) if resumed is None
+                    else resumed.get("response"))
         if self.recorder is not None:
             # The response is recorded AS RETURNED, never re-serialised.
             # Replay hands back exactly what was recorded, so live and
@@ -1732,13 +1861,16 @@ class ReplayMixin:
                 "arm": self.arm, "step": obs.step, "day": obs.day,
                 "digest": key, "prompt": prompt, "response": response,
             })
+            stamp_resume_counts(self.recorder, self.prior)
         return response
 
     def fork_kwargs(self) -> dict[str, Any]:
         kwargs = super().fork_kwargs()
         # SHARED, not copied, in both directions on purpose: a replay of
         # one arm must read the same recorded run as its sibling, and a
-        # live recording of both arms belongs in one file.
+        # live recording of both arms belongs in one file. `prior` shares
+        # for the same reason -- a resume that only one arm consulted
+        # would pay for one arm and not the other.
         kwargs.update(mode=self.mode, transcript=self.transcript,
-                      recorder=self.recorder)
+                      recorder=self.recorder, prior=self.prior)
         return kwargs
