@@ -94,6 +94,7 @@ pub struct DailyInputs<'a> {
     pub vix_selfex_phase: f64,
     pub vix_selfex_size_coupling: f64,
     pub vix_selfex_relax_slope: f64,
+    pub vix_selfex_vol_jump: f64,
     /// The HAR realized-vol anchor (params `vix_har_*`). At weight 0.0
     /// the branch is skipped and the anchor's EMAs stay frozen.
     pub vix_har_weight: f64,
@@ -178,6 +179,7 @@ impl<'a> Default for DailyInputs<'a> {
             vix_selfex_phase: 0.0,
             vix_selfex_size_coupling: 0.0,
             vix_selfex_relax_slope: 0.0,
+            vix_selfex_vol_jump: 0.0,
             vix_har_weight: 0.0,
             vix_har_mid: 0.4,
             vix_har_slow: 0.25,
@@ -887,6 +889,20 @@ pub fn update_economy_daily(
             )
         };
         fear_next = retain * fear_prev + if fired { magnitude } else { 0.0 };
+        // The variance co-jump: the event lands in the MARKET, not only
+        // on the ticker. The engine hands it to the factor's GARCH state
+        // after this update. Written every active day so nothing stale
+        // survives; the formula is annualized-%^2 to daily variance.
+        if inputs.vix_selfex_vol_jump != 0.0 {
+            new_state.vix_selfex_vol_kick = if fired {
+                inputs.vix_selfex_vol_jump
+                    * (2.0 * economy.vix * magnitude + magnitude * magnitude)
+                    / 252.0
+                    / 1e4
+            } else {
+                0.0
+            };
+        }
         new_state.vix_selfex_fear = fear_next;
         new_state.vix_selfex_excitation = inputs.vix_selfex_excite_decay
             * economy.vix_selfex_excitation

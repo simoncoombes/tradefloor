@@ -1239,6 +1239,7 @@ impl Engine {
                 vix_selfex_phase: self.params.vix_selfex_phase,
                 vix_selfex_size_coupling: self.params.vix_selfex_size_coupling,
                 vix_selfex_relax_slope: self.params.vix_selfex_relax_slope,
+                vix_selfex_vol_jump: self.params.vix_selfex_vol_jump,
                 vix_har_weight: self.params.vix_har_weight,
                 vix_har_mid: self.params.vix_har_mid,
                 vix_har_slow: self.params.vix_har_slow,
@@ -1274,6 +1275,19 @@ impl Engine {
             },
             rng,
         );
+        // The variance co-jump lands NOW, before the next session prices
+        // anything: a fired fear event hands the market factor's GARCH
+        // state its share of the day's implied-variance move, so the
+        // episode is a property of the market rather than an overlay on
+        // it. Written fresh every active day by the economy update, so a
+        // restored snapshot cannot re-apply a stale kick; at dial 0 the
+        // field is never written and this branch is never taken.
+        if self.params.vix_selfex_vol_jump != 0.0 {
+            let kick = self.economy.vix_selfex_vol_kick;
+            if kick != 0.0 {
+                self.market_vol.inject_variance(kick);
+            }
+        }
         self.economy = check_cycle_transition(&self.economy, rng);
 
         let meeting =

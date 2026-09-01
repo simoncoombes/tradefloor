@@ -444,6 +444,18 @@ impl MarketVarianceState {
         mathx::sqrt(self.variance)
     }
 
+    /// The variance co-jump (params `vix_selfex_vol_jump`): a fired fear
+    /// event lands in the market's own variance, so the following
+    /// sessions genuinely move harder and realized volatility carries
+    /// the episode. Both the mixture and the fast component take the
+    /// kick — the next close re-mixes and re-targets through the normal
+    /// update, whose ceiling then applies. Called by the engine with a
+    /// non-zero kick only; no state here changes otherwise.
+    pub fn inject_variance(&mut self, kick: f64) {
+        self.fast_variance += kick;
+        self.variance += kick;
+    }
+
     /// Accumulate one tick's market factor into the day's innovation.
     pub fn accumulate(&mut self, market_factor: f64) {
         self.day_factor += market_factor;

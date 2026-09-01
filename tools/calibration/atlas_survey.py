@@ -203,6 +203,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_selfex_size_coupling": (0.0, 2.0),
     # Retention slides ~slope per sigma; 0.94 base and |z|~3 says 0.15 spans it.
     "vix_selfex_relax_slope": (0.0, 0.2),
+    # Variance co-jump share; 1.0 passes the whole implied-var event through.
+    "vix_selfex_vol_jump": (0.0, 2.0),
     # The HAR anchor's weight (mechanisms-literature M3): a share of the
     # target, unit interval minus headroom for the cycle base to matter.
     "vix_har_weight": (0.0, 0.85),

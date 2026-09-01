@@ -280,6 +280,12 @@ pub struct EconomyState {
     pub vix_har_rv_week: f64,
     /// The HAR anchor's monthly EMA. Same discipline.
     pub vix_har_rv_month: f64,
+    /// TRANSIENT: the variance co-jump the day's fired event hands the
+    /// market factor (params `vix_selfex_vol_jump`), consumed by the
+    /// engine in the same advance. Rewritten every active day, fired or
+    /// not, so a stale kick can never be re-applied; 0.0 forever while
+    /// the dial is off.
+    pub vix_selfex_vol_kick: f64,
 
     // Trade
     pub tariff_rate: f64,
@@ -427,6 +433,7 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         vix_selfex_excitation: 0.0,
         vix_har_rv_week: 0.0,
         vix_har_rv_month: 0.0,
+        vix_selfex_vol_kick: 0.0,
 
         tariff_rate: 5.0,
         trade_balance: -50.0,

@@ -157,6 +157,30 @@ def _grid(name):
                 "j15h03d85": pair(0.15, 0.3, d=0.85),
                 "j15h03d85m03": pair(0.15, 0.3, mid=0.3, d=0.85),
                 "j25h03d85m03": pair(0.25, 0.3, mid=0.3, d=0.85)}
+    elif name == "selfex5":
+        # Round 157: fear through the market's own variance. Two screens
+        # measured that the fear component's decay tail dilutes whatever
+        # same-day correlation the anchor supplies; the variance co-jump
+        # routes the episode through the market itself (real moves, real
+        # realized vol, the anchor reads it, the VIX follows honestly).
+        # Cells isolate the route (noh), minimize the ticker pop (f0),
+        # and dose c_h across its range on the har-jump base.
+        def sx(**kw):
+            return kw
+        har = dict(vix_har_weight=0.3, vix_har_mid=0.3, vix_har_vrp=1.0)
+        jump = dict(vix_selfex_gain=0.25, vix_selfex_size_coupling=0.5,
+                    vix_decay_ratio=0.85, vix_selfex_relax_slope=0.03)
+        def cell(ch, **kw):
+            return sx(**har, **jump, vix_selfex_vol_jump=ch, **kw)
+        return {"v16": {},
+                "h03d85": sx(**har, vix_decay_ratio=0.85),
+                "ch03": cell(0.3),
+                "ch06": cell(0.6),
+                "ch10": cell(1.0),
+                "ch06j15": cell(0.6, vix_selfex_gain=0.15),
+                "ch06f0": cell(0.6, vix_selfex_min=1.0, vix_selfex_scale=2.0),
+                "ch06noh": sx(**jump, vix_selfex_vol_jump=0.6),
+                "ch06v11": cell(0.6, vix_har_weight=0.35, vix_har_vrp=1.1)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):

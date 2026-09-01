@@ -1146,6 +1146,18 @@ pub struct ModelParams {
     /// bit for bit; the binary relax branch above it is then inert by
     /// the clamp order.
     pub vix_selfex_relax_slope: f64,
+    /// Routes a fired event into the MARKET'S OWN VARIANCE: the market
+    /// factor's GARCH state takes (this x (2 x VIX x magnitude +
+    /// magnitude^2) / 252 / 1e4) of daily variance at the close, so the
+    /// following sessions genuinely move harder, realized vol rises, the
+    /// HAR anchor reads it, and the VIX follows a real episode instead
+    /// of riding above an unchanged market — round 135's panel diagnosis
+    /// fixed at its root, and the SVCJ variance co-jump the round-151
+    /// design deferred. Two screens then measured why it cannot stay
+    /// deferred: the fear component's own decay tail dilutes the
+    /// same-day correlation that the anchor supplies (rounds 155-156).
+    /// 0.0 writes nothing and touches no state.
+    pub vix_selfex_vol_jump: f64,
     /// Couples an event's SIZE to the down-move that fired it: the
     /// magnitude is scaled by (1 + this x the gate excess). Round 153
     /// measured the missing piece exactly — the gate protects the
@@ -1559,6 +1571,7 @@ impl ModelParams {
             vix_selfex_phase: 0.0,
             vix_selfex_size_coupling: 0.0,
             vix_selfex_relax_slope: 0.0,
+            vix_selfex_vol_jump: 0.0,
             vix_har_weight: 0.0,
             vix_har_mid: 0.4,
             vix_har_slow: 0.25,
@@ -2622,6 +2635,7 @@ impl ModelParams {
             "vix_selfex_phase" => self.vix_selfex_phase,
             "vix_selfex_size_coupling" => self.vix_selfex_size_coupling,
             "vix_selfex_relax_slope" => self.vix_selfex_relax_slope,
+            "vix_selfex_vol_jump" => self.vix_selfex_vol_jump,
             "vix_har_weight" => self.vix_har_weight,
             "vix_har_mid" => self.vix_har_mid,
             "vix_har_slow" => self.vix_har_slow,
@@ -2781,6 +2795,7 @@ impl ModelParams {
             "vix_selfex_phase" => out.vix_selfex_phase = value,
             "vix_selfex_size_coupling" => out.vix_selfex_size_coupling = value,
             "vix_selfex_relax_slope" => out.vix_selfex_relax_slope = value,
+            "vix_selfex_vol_jump" => out.vix_selfex_vol_jump = value,
             "vix_har_weight" => out.vix_har_weight = value,
             "vix_har_mid" => out.vix_har_mid = value,
             "vix_har_slow" => out.vix_har_slow = value,
@@ -3004,6 +3019,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_selfex_phase",
         "vix_selfex_size_coupling",
         "vix_selfex_relax_slope",
+        "vix_selfex_vol_jump",
         "vix_har_weight",
         "vix_har_mid",
         "vix_har_slow",
