@@ -26,8 +26,17 @@ def prices_and_draws(engine):
 
 
 def continue_days(engine, days):
+    """Prices after `days` more, plus the draws CONSUMED BY those days.
+
+    The delta, not the counter: `draws_consumed` counts from an engine's
+    construction, so a parent that ran fifteen days before the snapshot
+    carries them on its counter and a freshly-restored engine does not.
+    The snapshot contract is about the future — same continuation, same
+    consumption — which the delta states and the counter does not."""
+    before = engine.draws_consumed
     engine.run_days(days, record=False)
-    return prices_and_draws(engine)
+    prices, after = prices_and_draws(engine)
+    return prices, after - before
 
 
 def test_the_co_jump_state_survives_a_snapshot_mid_episode():
