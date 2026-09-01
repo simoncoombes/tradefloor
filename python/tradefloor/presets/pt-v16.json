@@ -2,7 +2,7 @@
  "schema": 1,
  "preset": "pt-v16",
  "fingerprint": "pt-v16",
- "coefficient_digest": "bd3147f01a2b3e4ae85d26fa5cd66c018cf91d46550e20ba023a58455a350c3e",
+ "coefficient_digest": "36b65df47e22804b3293e686a048772f6661ec1f2d2db55b10c7e8406564c036",
  "coefficients": {
   "book_levels": 10.0,
   "crash_amplifier_slope": 0.2,
@@ -154,7 +154,8 @@
   "vix_har_weight": 0.0,
   "vix_har_mid": 0.4,
   "vix_har_slow": 0.25,
-  "vix_har_vrp": 1.25
+  "vix_har_vrp": 1.25,
+  "vix_selfex_size_coupling": 0.0
  },
  "default_since": "0.6.0",
  "measured": {
