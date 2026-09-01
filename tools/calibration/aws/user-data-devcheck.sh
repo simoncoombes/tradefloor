@@ -76,6 +76,9 @@ echo "cargo-test exit ${PIPESTATUS[0]}" | tee -a /home/ec2-user/out/cargo-test.l
 maturin build --release --out dist --features python
 uv pip install --no-index --find-links dist --force-reinstall tradefloor
 python -c "import numpy, pyarrow, tradefloor; print('PREFLIGHT OK', tradefloor.version())"
+# The wheel is the run's build artefact: gate boxes install THIS file from
+# S3 instead of spending twelve minutes rebuilding it per box per wave.
+cp dist/*.whl /home/ec2-user/out/
 
 # Stage 2: the known answer, printed for the console watcher and kept as an
 # artefact. A digest that moved when no engine change was intended is the

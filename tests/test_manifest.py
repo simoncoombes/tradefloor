@@ -399,12 +399,22 @@ def test_a_divergence_on_one_platform_does_not_blame_the_platform():
 
 def test_a_divergence_across_platforms_still_names_the_pair():
     """The case the old message was written for, kept: same operations, same
-    draw counts, different machines. That IS the leading suspect there."""
+    draw counts, different machines. That IS the leading suspect there.
+
+    The foreign platform is derived, not hardcoded: a literal Linux-aarch64
+    stopped being foreign the day the suite ran on a Graviton spot box, and
+    this test failed there while meaning to test the opposite case.
+    """
+    import platform as _p
+
+    other_os = "Darwin" if _p.system() == "Linux" else "Linux"
+    other_machine = ("x86_64" if _p.machine().lower() in ("aarch64", "arm64")
+                     else "aarch64")
     with pytest.raises(tradefloor.ValidationError) as raised:
-        _diverging_manifest(os="Linux", machine="aarch64").reproduce()
+        _diverging_manifest(os=other_os, machine=other_machine).reproduce()
     message = str(raised.value)
     assert "different platforms" in message
-    assert "Linux-aarch64 wrote it" in message
+    assert f"{other_os}-{other_machine} wrote it" in message
 
 
 def test_a_short_history_is_named_as_an_input_difference():
