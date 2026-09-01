@@ -64,6 +64,23 @@ def _grid(name):
                 "w30j158": j(b6, 1.5, 8.0), "w30j310": j(b6, 3.0, 10.0),
                 "w30j312": j(b6, 3.0, 12.0), "w30j610": j(b6, 6.0, 10.0),
                 "w30d7j310": j(b7, 3.0, 10.0), "w30d7j312": j(b7, 3.0, 12.0)}
+    elif name == "selfex":
+        # Round 151: the crash-gated co-jump family's first screen
+        # (PT-V17-MECHANISMS.md B1; predictions pre-registered there).
+        # pt-v16 base, so the gate rides the shipped fear process. The
+        # Poisson family died here at every dose (round 135); the claim
+        # under test is that conditioning the arrival on the day's own
+        # down-move inverts that death mode.
+        def sx(**kw):
+            return kw
+        return {"v16": {},
+                "g03": sx(vix_selfex_gain=0.3),
+                "g05": sx(vix_selfex_gain=0.5),
+                "g05s8": sx(vix_selfex_gain=0.5, vix_selfex_scale=8.0),
+                "g05s8p1": sx(vix_selfex_gain=0.5, vix_selfex_scale=8.0,
+                              vix_selfex_phase=1.0),
+                "g03e55": sx(vix_selfex_gain=0.3, vix_selfex_excite=0.55),
+                "g05r80": sx(vix_selfex_gain=0.5, vix_selfex_relax=0.80)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):
