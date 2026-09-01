@@ -1,13 +1,36 @@
 # Changelog
 
-## Unreleased
+## 0.6.2
 
-**Saved files are the same bytes on every platform.** `Snapshot.save`,
-`Transcript.save` and `Survey.save` write bytes rather than going through
-Python's text mode, which emitted CRLF on Windows. A digest over one of
-these files identifies the file itself, and a fixture recorded on Windows
-matches the one a Linux CI regenerates.
-Reading is untouched, so every file already on disk still loads.
+**A scenario reaches the agent.** `market.liquidity` is the one scenario
+lever that touches execution, and the figure an agent read was built once
+and never re-read. A depth shock thinned the book while the volume the
+agent saw, and the order cap it was clipped against, stayed at their
+pre-crisis values. `World.run` and `evaluate` now re-read the column each
+day a scenario fires.
+
+**A bad answer no longer ends a run.** `World(on_refusal="skip")` records
+an unusable agent response, trades nothing that step, and carries on,
+counting it apart from the market-side `refused`. A recording that cannot
+answer raises `ReplayMiss` and still stops the run.
+
+**A dead live run keeps what it paid for.** Every adapter takes `prior=`, a
+recording consulted before the provider, with a mandate guard and a
+replayed-versus-called count.
+
+**The agent's own noise floor is measurable.** `resample()` asks one
+recorded decision N times per arm and reports the within-arm spread beside
+the between-arm gap, refusing when the two arms' inputs differ beyond the
+intervention.
+
+**An exact roster reaches EDGAR, and a large universe reaches an agent.**
+`fetch(ciks=)` returns those filers and no others, accounting for every
+request. `observe(detail=)` renders a chosen few in full and the rest as
+compact rows.
+
+**Saved files are the same bytes everywhere.** `Snapshot.save`,
+`Transcript.save` and `Survey.save` write bytes rather than text mode,
+which emitted CRLF on Windows.
 
 <!-- release-note-ends -->
 
@@ -48,27 +71,6 @@ package source for a text-mode write anywhere, because four savers checked
 one at a time leaves the fifth unguarded, and the fifth is where this came
 from. On Linux every one of them passes trivially, which is how the
 existing suite stayed green through the bug.
-**An exact roster reaches EDGAR.** `tradefloor.edgar.fetch` takes `ciks=`, a
-list of SEC Central Index Keys, and returns those filers and no others. Every
-requested CIK comes back as a row or as an exclusion carrying a machine
-readable reason, rows keep the requested order, and the snapshot notes record
-the request and its digest. `limit` and `rank_by` behave as they always have,
-and passing either beside `ciks=` raises.
-
-**A large universe reaches an agent.**
-`tradefloor.integrations.finrobot.observe` takes `detail=`, the symbols to
-render in full. Every other symbol arrives as a compact row carrying price,
-five-day return, position and order cap, and stays a legal action.
-`FinRobotAdapter` takes `panel=`, which switches that rendering on and
-travels through `state()` and `fork()`, so the fork agreement covers which
-names each arm sees. Both default to the output 0.6.1 released, byte for
-byte.
-
-**A pin that installed a FinRobot unable to import itself.** The `finrobot`
-extra admitted `pyautogen` 0.10 and `anthropic` 1.x, and both ceilings now
-exclude the versions the adapter cannot drive.
-
-<!-- release-note-ends -->
 
 ### The exact roster
 
@@ -132,16 +134,6 @@ refuses, and the check forbade committing an honest one. It now compares the
 number of refused responses against a count the recording declares in its
 meta. An absent count means zero, so every fixture committed before this is
 unchanged.
-**A depth shock reaches the agent.** `market.liquidity` is the one scenario
-lever that touches execution, and the figure an agent reads was built once
-from the universe and never read again. So `liquidity_crisis` thinned the
-book, and both the depth the agent was shown and the participation cap its
-orders were clipped against stayed at their pre-crisis values. `World.run`
-and `evaluate` now re-read the column each day a scenario fires. A run with
-no scenario is unchanged, so every existing recording, digest and fixture
-stands.
-
-<!-- release-note-ends -->
 
 ### The cost
 
@@ -187,29 +179,6 @@ without the fix.
 
 Both `World.run` and `harness.evaluate`, three lines apart in different
 files. `_run_untraded` builds no Observation and needed nothing.
-**One malformed answer no longer ends a run.** `World` takes
-`on_refusal="skip"`, which records an unusable agent response, trades
-nothing that step, and carries on. The count reaches the trace,
-`World.summary()` and a `Comparison` row, under `unusable_responses` and
-apart from the market-side `refused`. `"raise"` stays the default and
-behaves as it always has. A recording that cannot answer raises
-`ReplayMiss` and stops the run under either policy.
-
-**A dead live run keeps what it paid for.** Every adapter takes `prior=`, a
-recording an earlier run produced. On a digest hit the recorded answer is
-reused; on a miss the provider is called. The resulting file records how
-many of its entries were resumed and how many were called, and a `prior`
-recorded under different instructions is refused before the run starts.
-
-**The agent's own noise floor, measurable.**
-`tradefloor.counterfactual.resample` asks one recorded decision point N
-times per arm and reports the within-arm spread beside the between-arm gap.
-It replays two frozen inputs, so N paired samples cost N calls rather than N
-re-simulations, and it refuses when the two arms' inputs differ in anything
-the intervention did not touch. `Resample.as_dict` and `.render` match what
-`Comparison` already offers, and every adapter gains a `reask` hook.
-
-<!-- release-note-ends -->
 
 ### The case for the library
 
