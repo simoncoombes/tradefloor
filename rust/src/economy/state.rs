@@ -280,6 +280,14 @@ pub struct EconomyState {
     pub vix_har_rv_week: f64,
     /// The HAR anchor's monthly EMA. Same discipline.
     pub vix_har_rv_month: f64,
+    /// The co-jump gate's slow scale ruler: a long EMA (half-life near
+    /// a quarter) of the market factor's daily sigma, in percent. Three
+    /// measured ruler failures specified it (round 162): the gate
+    /// normalizes by THIS (damping on the episode timescale; a pinned
+    /// window adapts within a quarter) and the event energy is sized to
+    /// THIS (proportional at every level). 0.0 means unseeded; the
+    /// first active day seeds it with the day's own sigma.
+    pub vix_selfex_ruler: f64,
     /// TRANSIENT: the variance co-jump the day's fired event hands the
     /// market factor (params `vix_selfex_vol_jump`), consumed by the
     /// engine in the same advance. Rewritten every active day, fired or
@@ -433,6 +441,7 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         vix_selfex_excitation: 0.0,
         vix_har_rv_week: 0.0,
         vix_har_rv_month: 0.0,
+        vix_selfex_ruler: 0.0,
         vix_selfex_vol_kick: 0.0,
 
         tariff_rate: 5.0,

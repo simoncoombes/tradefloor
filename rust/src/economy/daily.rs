@@ -845,13 +845,22 @@ pub fn update_economy_daily(
     let core_prev = economy.vix - fear_prev;
     let mut fear_next = fear_prev;
     if selfex_on {
-        // The market's own post-close daily sigma as the ruler: the gate
-        // is self-normalized, so it fires at its design rate whatever the
-        // level around it — endogenous, pinned high, or pinned low. The
-        // day's own move is inside the ruler (post-close), which rescales
-        // z by a near-uniform factor the threshold dial absorbs.
-        let z = if inputs.market_sigma_daily_pct > 0.0 {
-            inputs.market_day_return_pct / inputs.market_sigma_daily_pct
+        // The SLOW ruler (round 162, the law three failures specified):
+        // a quarter-half-life EMA of the market's daily sigma. Instant
+        // self-normalization removed the damping and ran away; a pinned
+        // VIX misread both pins; the slow scale damps on the episode
+        // timescale, adapts to a pinned regime within a quarter, and
+        // sizes the event energy proportionally at every level. Seeded
+        // with the first active day's sigma; retained ~0.989/day.
+        let ruler_prev = if economy.vix_selfex_ruler > 0.0 {
+            economy.vix_selfex_ruler
+        } else {
+            inputs.market_sigma_daily_pct
+        };
+        let ruler = 0.989 * ruler_prev + 0.011 * inputs.market_sigma_daily_pct;
+        new_state.vix_selfex_ruler = ruler;
+        let z = if ruler > 0.0 {
+            inputs.market_day_return_pct / ruler
         } else {
             0.0
         };
@@ -918,9 +927,15 @@ pub fn update_economy_daily(
             // event, same energy, whatever the level around it — which
             // is bit-near-identical on endogenous paths (median VIX
             // ~18-19) and stops the pinned windows amplifying it.
+            // Energy PROPORTIONAL to the slow scale: the ruler's own
+            // vix-point equivalent replaces the phase-mean constant, so
+            // an m-point event carries the variance m points represent
+            // at the PREVAILING regime — small in a calm window, large
+            // in a stressed one, identical arithmetic at the phase mean.
+            let ruler_vix_pts = ruler * 15.874507866387544;
             new_state.vix_selfex_vol_kick = if fired {
                 inputs.vix_selfex_vol_jump
-                    * (2.0 * VIX_PHASE_MEAN * magnitude + magnitude * magnitude)
+                    * (2.0 * ruler_vix_pts * magnitude + magnitude * magnitude)
                     / 252.0
                     / 1e4
             } else {
