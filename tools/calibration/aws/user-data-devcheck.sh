@@ -85,8 +85,11 @@ cp dist/*.whl /home/ec2-user/out/
 # whole conversation.
 python tests/known_answer.py 2>&1 | tee /home/ec2-user/out/kat.txt
 
-# Stage 3: the Python suite.
-python -m pytest tests/ -q 2>&1 | tee /home/ec2-user/out/pytest.log
+# Stage 3: the Python suite. The faulthandler timeout names a hung
+# test in the log (devcheck8 hung silently at 84% until the dead-man
+# fired); it dumps every thread's stack and lets the run continue, so
+# a slow test is named rather than killed.
+python -m pytest tests/ -q -o faulthandler_timeout=600 2>&1 | tee /home/ec2-user/out/pytest.log
 
 WORK
 
