@@ -186,6 +186,22 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # twice the crowd cap; 0.005 is far past plausible and bounds the box.
     "forced_flow_gain": (0.0, 0.005),
     "forced_flow_beta_exponent": (0.0, 3.0),
+    # The recomposition era (pt-v17). The up-tick compensation is the same
+    # per-tick transmission multiplier class as the down wire above, so it
+    # takes the same strong-to-implausible bound.
+    "market_beta_up_comp": (0.0, 0.1),
+    # The co-jump master (mechanisms-literature M1): per-unit-of-gate
+    # intensity. At 0.8 a neutral-phase -3-sigma day fires with p ~ 0.63;
+    # 1.5 is far past the literature's ~two-events-a-year physical-measure
+    # anchor and bounds the box.
+    "vix_selfex_gain": (0.0, 1.5),
+    # Extra intensity in Contraction/Trough. The real sub-period spread of
+    # P(VIX>30) is 0.004-0.263, a factor near sixty; a 3x phase kick on
+    # top of the cycle's own gate is the strong end.
+    "vix_selfex_phase": (0.0, 3.0),
+    # The HAR anchor's weight (mechanisms-literature M3): a share of the
+    # target, unit interval minus headroom for the cycle base to matter.
+    "vix_har_weight": (0.0, 0.85),
     # The reservoir (round 143): covid's above-50 excess integrates to
     # ~400 VIX-point-days, so the box spans drains-mid-crash to
     # never-drains.

@@ -1198,11 +1198,15 @@ impl Engine {
         let phase_before = self.economy.cycle_phase;
 
         // The DAY's cap-weighted return, in the same percent units as
-        // `market_return_pct`. Read only when `vix_return_source` is
-        // non-zero, so the shipped path is untouched. `previous_close` is
-        // set at the OPEN (market/daily.rs), so this is open to close, and
+        // `market_return_pct`. Read only when a consumer is live -- the
+        // return-source wire, the co-jump gate or the HAR anchor -- so
+        // the shipped path is untouched. `previous_close` is set at the
+        // OPEN (market/daily.rs), so this is open to close, and
         // `apply_jumps` has already run, so the jumps are in `price`.
-        let market_day_return_pct = if self.params.vix_return_source == 0.0 {
+        let market_day_return_pct = if self.params.vix_return_source == 0.0
+            && self.params.vix_selfex_gain == 0.0
+            && self.params.vix_har_weight == 0.0
+        {
             0.0
         } else {
             let (mut acc, mut mcap) = (0.0, 0.0);
@@ -1224,6 +1228,19 @@ impl Engine {
                 vix_decay_ratio: self.params.vix_decay_ratio,
                 vix_jump_intensity: self.params.vix_jump_intensity,
                 vix_jump_scale: self.params.vix_jump_scale,
+                vix_selfex_gain: self.params.vix_selfex_gain,
+                vix_selfex_threshold: self.params.vix_selfex_threshold,
+                vix_selfex_min: self.params.vix_selfex_min,
+                vix_selfex_scale: self.params.vix_selfex_scale,
+                vix_selfex_decay: self.params.vix_selfex_decay,
+                vix_selfex_relax: self.params.vix_selfex_relax,
+                vix_selfex_excite: self.params.vix_selfex_excite,
+                vix_selfex_excite_decay: self.params.vix_selfex_excite_decay,
+                vix_selfex_phase: self.params.vix_selfex_phase,
+                vix_har_weight: self.params.vix_har_weight,
+                vix_har_mid: self.params.vix_har_mid,
+                vix_har_slow: self.params.vix_har_slow,
+                vix_har_vrp: self.params.vix_har_vrp,
                 vix_return_gain: self.params.vix_return_gain,
                 vix_realised_vol_weight: self.params.vix_realised_vol_weight,
                 vix_return_source: self.params.vix_return_source,

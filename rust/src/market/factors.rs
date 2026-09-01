@@ -365,6 +365,19 @@ pub fn calculate_live_factors(
     } else {
         beta * shared.market_factor * (1.0 + params.market_beta_down_asym)
     };
+    // The compensation side of the wire (pt-v17): up ticks transmit at
+    // (1 - market_beta_up_comp). The bare down-asym raises MEAN
+    // transmission with its dose, which is its measured co-movement tax
+    // (round 102); paired, the two shift correlation from unconditional
+    // to down-day-conditional -- the shape of the 2026-09 re-derived
+    // rulers. A branch, not arithmetic: 0.0 is bit-identical.
+    let factor_through = if params.market_beta_up_comp == 0.0
+        || shared.market_factor <= 0.0
+    {
+        factor_through
+    } else {
+        factor_through * (1.0 - params.market_beta_up_comp)
+    };
     // The LAGGED wire (block 1201's signature, round 110's interim): on the
     // session AFTER a down day, transmission is boosted regardless of the
     // tick's own sign -- down moves continue into the next day. A branch,

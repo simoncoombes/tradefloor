@@ -80,6 +80,24 @@ pub struct DailyInputs<'a> {
     /// no draws and reproduces the shipped schedule exactly.
     pub vix_jump_intensity: f64,
     pub vix_jump_scale: f64,
+    /// The crash-gated co-jump family (params `vix_selfex_*`). At gain
+    /// 0.0 the whole block takes no draws, updates no state, and the
+    /// level arithmetic below is the shipped expression bit for bit.
+    pub vix_selfex_gain: f64,
+    pub vix_selfex_threshold: f64,
+    pub vix_selfex_min: f64,
+    pub vix_selfex_scale: f64,
+    pub vix_selfex_decay: f64,
+    pub vix_selfex_relax: f64,
+    pub vix_selfex_excite: f64,
+    pub vix_selfex_excite_decay: f64,
+    pub vix_selfex_phase: f64,
+    /// The HAR realized-vol anchor (params `vix_har_*`). At weight 0.0
+    /// the branch is skipped and the anchor's EMAs stay frozen.
+    pub vix_har_weight: f64,
+    pub vix_har_mid: f64,
+    pub vix_har_slow: f64,
+    pub vix_har_vrp: f64,
     /// VIX points per unit of a down day's index return (shipped 25.0), of
     /// an up day's (10.0), the clamp on that return (0.03) and the ceiling
     /// on the whole target excursion (12.0). Threaded for the reason
@@ -147,6 +165,19 @@ impl<'a> Default for DailyInputs<'a> {
             vix_decay_ratio: 1.0,
             vix_jump_intensity: 0.0,
             vix_jump_scale: 0.0,
+            vix_selfex_gain: 0.0,
+            vix_selfex_threshold: 1.75,
+            vix_selfex_min: 3.0,
+            vix_selfex_scale: 6.0,
+            vix_selfex_decay: 0.94,
+            vix_selfex_relax: 0.85,
+            vix_selfex_excite: 0.35,
+            vix_selfex_excite_decay: 0.87,
+            vix_selfex_phase: 0.0,
+            vix_har_weight: 0.0,
+            vix_har_mid: 0.4,
+            vix_har_slow: 0.25,
+            vix_har_vrp: 1.25,
             vix_return_gain: VIX_RETURN_GAIN,
             vix_realised_vol_weight: 0.0,
             vix_return_source: 0.0,
@@ -755,10 +786,94 @@ pub fn update_economy_daily(
         target_vix = (1.0 - w) * target_vix + w * inputs.vix_implied_from_market;
     }
 
+    // THE PERSISTENT-TARGET CHANNEL (pt-v17, the HAR anchor). The return
+    // wire died because a one-day target spike transmits ~6% at reversion
+    // 0.06 (round 133); a target move that PERSISTS transmits 74% over a
+    // month, and HAR components are persistent by construction. The anchor
+    // is expected realized vol times a variance premium -- the
+    // Bekaert-Hoerova decomposition of what the VIX is. Stacked after the
+    // realised branch so the two feedbacks split the target between them.
+    // At weight 0.0 the branch is skipped and the EMAs stay frozen:
+    // nothing dormant moves, and every shipped preset reproduces.
+    if inputs.vix_har_weight != 0.0 {
+        let day_frac = inputs.market_day_return_pct / 100.0;
+        let rv_d = day_frac * day_frac;
+        // Fixed EMA clocks: half-lives near five and twenty-two trading
+        // days. The WEIGHTS are the dials; the clocks are the definition.
+        new_state.vix_har_rv_week = 0.87 * economy.vix_har_rv_week + 0.13 * rv_d;
+        new_state.vix_har_rv_month = 0.969 * economy.vix_har_rv_month + 0.031 * rv_d;
+        let b_w = inputs.vix_har_mid;
+        let b_m = inputs.vix_har_slow;
+        let b_d = 1.0 - b_w - b_m;
+        let harvar =
+            b_d * rv_d + b_w * new_state.vix_har_rv_week + b_m * new_state.vix_har_rv_month;
+        let harvol = mathx::sqrt(252.0 * harvar) * 100.0 * inputs.vix_har_vrp;
+        let w = inputs.vix_har_weight;
+        target_vix = (1.0 - w) * target_vix + w * harvol;
+    }
+
+    // CRASH-GATED FEAR EVENTS (pt-v17, the co-jump family). The Poisson
+    // jump below was measured dead at every dose (round 135): a jump day
+    // with no return behind it. Here an event can fire ONLY because the
+    // market fell -- the day's index return standardized by the PRIOR
+    // VIX's own implied daily sigma gates the intensity, so every event
+    // day is a crash day and the same-day coupling survives by
+    // construction. The fear rides as its own additive component with its
+    // own decay clock, so the mean reversion cannot eat it (the return
+    // wire's measured death: the level takes ~6% of a one-day target
+    // move at reversion 0.06). At gain 0.0: NO draws, no state updates,
+    // and the level arithmetic below is the shipped expression bit for
+    // bit. When on: exactly two uniforms per day, fire or not.
+    let selfex_on = inputs.vix_selfex_gain != 0.0;
+    let fear_prev = economy.vix_selfex_fear;
+    let core_prev = economy.vix - fear_prev;
+    let mut fear_next = fear_prev;
+    if selfex_on {
+        // Yesterday's VIX as the day's vol ruler: VIX 16 is about 1% a
+        // day (sqrt of 252). Causal -- the day's own move never scales
+        // itself -- and self-damping: at VIX 60 a -3% day is ordinary,
+        // which hands clustering to the excitation state rather than to
+        // re-triggering.
+        let sigma_daily_pts = economy.vix / 15.874507866387544;
+        let z = inputs.market_day_return_pct / sigma_daily_pts;
+        let g = mathx::max(0.0, -z - inputs.vix_selfex_threshold);
+        let in_stress = matches!(
+            economy.cycle_phase,
+            CyclePhase::Contraction | CyclePhase::Trough
+        );
+        let phase_mult = if in_stress {
+            1.0 + inputs.vix_selfex_phase
+        } else {
+            1.0
+        };
+        let lambda = (inputs.vix_selfex_gain + economy.vix_selfex_excitation) * phase_mult;
+        let p_fire = 1.0 - mathx::exp(-lambda * g);
+        let u1 = rng.next_f64();
+        // The magnitude draw is consumed on non-fire days too, so the
+        // schedule is two per day whatever happens.
+        let u2 = rng.next_f64();
+        let fired = u1 < p_fire;
+        let magnitude =
+            inputs.vix_selfex_min + inputs.vix_selfex_scale * -mathx::log(mathx::max(u2, 1e-12));
+        // Fear resolves faster when the market answers with a rally.
+        let retain = if z > 1.0 {
+            inputs.vix_selfex_relax
+        } else {
+            inputs.vix_selfex_decay
+        };
+        fear_next = retain * fear_prev + if fired { magnitude } else { 0.0 };
+        new_state.vix_selfex_fear = fear_next;
+        new_state.vix_selfex_excitation = inputs.vix_selfex_excite_decay
+            * economy.vix_selfex_excitation
+            + if fired { inputs.vix_selfex_excite } else { 0.0 };
+    }
     // Asymmetric reversion: fear arrives at the full rate and decays at
     // `vix_decay_ratio` of it. At 1.0 the branch collapses to the shipped
-    // arithmetic exactly (same multiply, same operand order).
-    let vix_mr = if target_vix < economy.vix {
+    // arithmetic exactly (same multiply, same operand order). The
+    // comparison is against the CORE (the level net of the ridden fear
+    // component), which is the level itself whenever the co-jump family
+    // is off.
+    let vix_mr = if target_vix < core_prev {
         inputs.vix_mean_reversion * inputs.vix_decay_ratio
     } else {
         inputs.vix_mean_reversion
@@ -777,14 +892,22 @@ pub fn update_economy_daily(
     } else {
         0.0
     };
-    new_state.vix = clamp(
-        economy.vix
-            + (target_vix - economy.vix) * vix_mr
-            + random_normal(rng, 0.0, 0.15 * volatility)
-            + fear_jump,
-        10.0,
-        80.0,
-    );
+    let vix_noise = random_normal(rng, 0.0, 0.15 * volatility);
+    new_state.vix = if selfex_on {
+        // The base process advances on the core; the fear component rides
+        // on top with its own clock.
+        clamp(
+            core_prev + (target_vix - core_prev) * vix_mr + vix_noise + fear_jump + fear_next,
+            10.0,
+            80.0,
+        )
+    } else {
+        clamp(
+            economy.vix + (target_vix - economy.vix) * vix_mr + vix_noise + fear_jump,
+            10.0,
+            80.0,
+        )
+    };
 
     // ── Treasury yields ───────────────────────────────────────────────────
     let debt_premium = mathx::max(0.0, (economy.government_debt_to_gdp - 100.0) * 0.002);

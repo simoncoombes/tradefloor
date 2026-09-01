@@ -268,6 +268,18 @@ pub struct EconomyState {
     pub business_confidence: f64,
     pub fear_greed_index: f64,
     pub vix: f64,
+    /// The co-jump family's fear component, VIX points riding ON the
+    /// base process with their own decay clock (params `vix_selfex_*`).
+    /// 0.0 forever while the family's master dial is 0.0.
+    pub vix_selfex_fear: f64,
+    /// The co-jump family's Hawkes excitation memory. Same discipline.
+    pub vix_selfex_excitation: f64,
+    /// The HAR anchor's weekly EMA of squared daily index returns
+    /// (params `vix_har_*`). Frozen at 0.0 while the anchor is off:
+    /// nothing dormant moves.
+    pub vix_har_rv_week: f64,
+    /// The HAR anchor's monthly EMA. Same discipline.
+    pub vix_har_rv_month: f64,
 
     // Trade
     pub tariff_rate: f64,
@@ -411,6 +423,10 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         business_confidence: confidence,
         fear_greed_index: fear_greed_base,
         vix,
+        vix_selfex_fear: 0.0,
+        vix_selfex_excitation: 0.0,
+        vix_har_rv_week: 0.0,
+        vix_har_rv_month: 0.0,
 
         tariff_rate: 5.0,
         trade_balance: -50.0,

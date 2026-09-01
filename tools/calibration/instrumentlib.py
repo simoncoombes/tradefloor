@@ -178,6 +178,27 @@ PARAM_SPECS: dict[str, dict] = {
     "forced_flow_beta_exponent": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 3.0)},
     "forced_flow_reservoir": {"kind": "abs", "step_unit": 50.0, "hard_range": (0.0, 5000.0)},
     "forced_flow_replenish": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 0.5)},
+    # The compensation side of the down-transmission wire (pt-v17): an
+    # up-tick damp searched in hundredths, paired with market_beta_down_asym.
+    "market_beta_up_comp": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.10)},
+    # The crash-gated co-jump family (pt-v17). The gain is the master:
+    # zero is inert by construction. Shape dials carry neutral anchors and
+    # literature-sized boxes (mechanisms-literature.md M1).
+    "vix_selfex_gain": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.5)},
+    "vix_selfex_threshold": {"kind": "abs", "step_unit": 0.25, "hard_range": (1.0, 3.0)},
+    "vix_selfex_min": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 8.0)},
+    "vix_selfex_scale": {"kind": "abs", "step_unit": 1.0, "hard_range": (2.0, 14.0)},
+    "vix_selfex_decay": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.90, 0.98)},
+    "vix_selfex_relax": {"kind": "abs", "step_unit": 0.02, "hard_range": (0.75, 0.95)},
+    "vix_selfex_excite": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.9)},
+    "vix_selfex_excite_decay": {"kind": "abs", "step_unit": 0.02, "hard_range": (0.80, 0.96)},
+    "vix_selfex_phase": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 3.0)},
+    # The HAR anchor for the VIX target (pt-v17): persistent-target
+    # channel, weights per Corsi-family index estimates (M3).
+    "vix_har_weight": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.85)},
+    "vix_har_mid": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.15, 0.55)},
+    "vix_har_slow": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.05, 0.45)},
+    "vix_har_vrp": {"kind": "abs", "step_unit": 0.05, "hard_range": (1.0, 1.6)},
     # The volatility feedback (§68). Real markets move the VIX 165 points
     # per unit return on a heavy down day against the shipped 25, so the
     # box reaches well past the shipped value rather than around it.

@@ -550,6 +550,18 @@ pub struct ModelParams {
     /// its structure) is the measured motivation: real down-moves
     /// continue, and the contemporaneous wire alone cannot express that.
     pub market_beta_down_asym_lag: f64,
+    /// The compensation side of the downside wire: on UP ticks of the
+    /// market factor, transmission is scaled by (1 - this). The bare
+    /// [`ModelParams::market_beta_down_asym`] raises MEAN transmission
+    /// with its dose, which is measured as its co-movement tax (round
+    /// 102: "per unit of 1201 gain the dial pays roughly its own weight
+    /// in 401 co-movement"). Paired, the two move correlation from
+    /// unconditional to down-day-conditional -- which is the shape the
+    /// 2026-09 re-derived rulers say real markets have (fresh
+    /// cross-sectional ceilings BELOW the model, fresh corr_asymmetry
+    /// floors ABOVE it). 0.0 -- every shipped preset -- takes the
+    /// untouched branch, bit for bit.
+    pub market_beta_up_comp: f64,
     /// Persistence of the SLOW variance component (Engle-Lee style). The
     /// market factor's variance carries two timescales from the pt-v4 era:
     /// the fast one above tracks the VIX-scaled target, this one carries
@@ -1078,6 +1090,74 @@ pub struct ModelParams {
     /// Fraction of spent budget recovered per below-threshold day
     /// (deleveraging capacity rebuilds in calm). 0.0: never.
     pub forced_flow_replenish: f64,
+    /// Crash-gated fear events (the pt-v17 era's co-jump family). The
+    /// Poisson fear jump above was measured dead at every dose (round
+    /// 135): a jump day with no return behind it dilutes the same-day
+    /// coupling and decouples the VIX from realized vol. This family
+    /// inverts that by construction -- a fear event can fire ONLY
+    /// because the market fell. The day's index return, standardized by
+    /// the prior VIX's own implied daily sigma, gates the intensity:
+    /// nothing fires on mild or up days; the SVCJ shared-arrival
+    /// structure (Duffie-Pan-Singleton 2000) at daily resolution.
+    /// This is the master dial (per-unit-of-gate intensity). At 0.0 the
+    /// branch takes NO draws and every recorded run reproduces bit for
+    /// bit; when on, exactly two uniforms per day, fire or not.
+    pub vix_selfex_gain: f64,
+    /// The gate's threshold, in sigmas of down-move (the day's index
+    /// return over the prior VIX's implied daily sigma). Below it the
+    /// fire probability is exactly zero.
+    pub vix_selfex_threshold: f64,
+    /// Minimum size of a fear event, VIX points. Small pops belong to
+    /// the diffusive channel; events start here.
+    pub vix_selfex_min: f64,
+    /// Mean event size above the minimum, VIX points (exponential).
+    pub vix_selfex_scale: f64,
+    /// Per-day retention of the fear component -- fear rides on the VIX
+    /// as its own additive state with its own clock, so the mean
+    /// reversion cannot eat it (the measured death of the return wire:
+    /// at reversion 0.06 the level takes 6% of a one-day target move).
+    /// 0.94 is a half-life near eleven trading days.
+    pub vix_selfex_decay: f64,
+    /// Retention on strong rally days (day return above +1 sigma):
+    /// fear resolves faster when the market answers. The counterweight
+    /// that keeps spike asymmetry near the real 1.20 rather than above
+    /// it (Amengual-Xiu: implied vol also jumps DOWN, on resolution).
+    pub vix_selfex_relax: f64,
+    /// Hawkes self-excitation: each fired event kicks the intensity by
+    /// this much, so aftershocks cluster (Ait-Sahalia et al 2015;
+    /// Fulop-Li-Yu 2015 find exactly this clustering since 1987).
+    pub vix_selfex_excite: f64,
+    /// Per-day retention of the excitation memory. The branching ratio
+    /// excite/(1-this) stays below one: clustering, not criticality.
+    pub vix_selfex_excite_decay: f64,
+    /// Extra intensity in Contraction and Trough phases, as a fraction
+    /// (0.0: no phase gating). Real crisis frequency is phase-skewed:
+    /// the sub-period spread of P(VIX>30) runs 0.004 to 0.263.
+    pub vix_selfex_phase: f64,
+    /// The HAR realized-vol anchor for the VIX target (the pt-v17
+    /// era's persistent-target channel). A one-day target spike
+    /// transmits ~6% at reversion 0.06 -- the measured death of the
+    /// return wire -- but a target move that PERSISTS transmits 74%
+    /// over a month. HAR components (Corsi 2009) are persistent by
+    /// construction, and VIX = expected realized vol + premium is the
+    /// Bekaert-Hoerova decomposition. Weight of the anchor in the
+    /// target after the realised-vol branch; 0.0 -- every shipped
+    /// preset -- skips the branch AND freezes the anchor's state, so
+    /// nothing dormant moves.
+    pub vix_har_weight: f64,
+    /// The HAR anchor's weekly-component weight (weight on the 5-day
+    /// EMA of squared daily index returns). The daily component gets
+    /// one minus this minus the monthly weight.
+    pub vix_har_mid: f64,
+    /// The HAR anchor's monthly-component weight (22-day EMA). The
+    /// persistence carrier -- and therefore the AR(1) risk, watched
+    /// against the real 0.976 ceiling.
+    pub vix_har_slow: f64,
+    /// Variance risk premium multiplier on the HAR anchor: the VIX
+    /// trades above expected realized vol (Bollerslev-Tauchen-Zhou:
+    /// ~4-6 points on average, countercyclical). 1.25 is the neutral
+    /// anchor of the searched range.
+    pub vix_har_vrp: f64,
     /// VIX points added to its target per unit of a DOWN day's index
     /// return, before the clamp and cap below.
     ///
@@ -1397,6 +1477,7 @@ impl ModelParams {
             market_vol_vix_exponent: 2.0,
             market_beta_down_asym: 0.0,
             market_beta_down_asym_lag: 0.0,
+            market_beta_up_comp: 0.0,
             // Legacy values: the slow component is OFF, and the update
             // reduces to the single-component form bit for bit.
             market_vol_slow_persistence: 0.0,
@@ -1441,6 +1522,24 @@ impl ModelParams {
             forced_flow_beta_exponent: 0.0,
             forced_flow_reservoir: 0.0,
             forced_flow_replenish: 0.0,
+            // The co-jump family ships OFF with its shape dials at the
+            // neutral anchors of their searched ranges, the
+            // forced_flow_threshold convention: the master at zero is
+            // what inertness means; the shapes carry sensible values so
+            // turning one dial on means something.
+            vix_selfex_gain: 0.0,
+            vix_selfex_threshold: 1.75,
+            vix_selfex_min: 3.0,
+            vix_selfex_scale: 6.0,
+            vix_selfex_decay: 0.94,
+            vix_selfex_relax: 0.85,
+            vix_selfex_excite: 0.35,
+            vix_selfex_excite_decay: 0.87,
+            vix_selfex_phase: 0.0,
+            vix_har_weight: 0.0,
+            vix_har_mid: 0.4,
+            vix_har_slow: 0.25,
+            vix_har_vrp: 1.25,
             vix_realised_vol_weight: 0.0,
             vix_cycle_amplitude: 1.0,
             vix_return_source: 0.0,
@@ -2446,6 +2545,7 @@ impl ModelParams {
             "market_vol_vix_exponent" => self.market_vol_vix_exponent,
             "market_beta_down_asym" => self.market_beta_down_asym,
             "market_beta_down_asym_lag" => self.market_beta_down_asym_lag,
+            "market_beta_up_comp" => self.market_beta_up_comp,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
@@ -2488,6 +2588,19 @@ impl ModelParams {
             "forced_flow_beta_exponent" => self.forced_flow_beta_exponent,
             "forced_flow_reservoir" => self.forced_flow_reservoir,
             "forced_flow_replenish" => self.forced_flow_replenish,
+            "vix_selfex_gain" => self.vix_selfex_gain,
+            "vix_selfex_threshold" => self.vix_selfex_threshold,
+            "vix_selfex_min" => self.vix_selfex_min,
+            "vix_selfex_scale" => self.vix_selfex_scale,
+            "vix_selfex_decay" => self.vix_selfex_decay,
+            "vix_selfex_relax" => self.vix_selfex_relax,
+            "vix_selfex_excite" => self.vix_selfex_excite,
+            "vix_selfex_excite_decay" => self.vix_selfex_excite_decay,
+            "vix_selfex_phase" => self.vix_selfex_phase,
+            "vix_har_weight" => self.vix_har_weight,
+            "vix_har_mid" => self.vix_har_mid,
+            "vix_har_slow" => self.vix_har_slow,
+            "vix_har_vrp" => self.vix_har_vrp,
             "vix_cycle_amplitude" => self.vix_cycle_amplitude,
             "vix_realised_vol_weight" => self.vix_realised_vol_weight,
             "vix_return_clamp" => self.vix_return_clamp,
@@ -2589,6 +2702,7 @@ impl ModelParams {
             "market_vol_vix_exponent" => out.market_vol_vix_exponent = value,
             "market_beta_down_asym" => out.market_beta_down_asym = value,
             "market_beta_down_asym_lag" => out.market_beta_down_asym_lag = value,
+            "market_beta_up_comp" => out.market_beta_up_comp = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
@@ -2631,6 +2745,19 @@ impl ModelParams {
             "forced_flow_beta_exponent" => out.forced_flow_beta_exponent = value,
             "forced_flow_reservoir" => out.forced_flow_reservoir = value,
             "forced_flow_replenish" => out.forced_flow_replenish = value,
+            "vix_selfex_gain" => out.vix_selfex_gain = value,
+            "vix_selfex_threshold" => out.vix_selfex_threshold = value,
+            "vix_selfex_min" => out.vix_selfex_min = value,
+            "vix_selfex_scale" => out.vix_selfex_scale = value,
+            "vix_selfex_decay" => out.vix_selfex_decay = value,
+            "vix_selfex_relax" => out.vix_selfex_relax = value,
+            "vix_selfex_excite" => out.vix_selfex_excite = value,
+            "vix_selfex_excite_decay" => out.vix_selfex_excite_decay = value,
+            "vix_selfex_phase" => out.vix_selfex_phase = value,
+            "vix_har_weight" => out.vix_har_weight = value,
+            "vix_har_mid" => out.vix_har_mid = value,
+            "vix_har_slow" => out.vix_har_slow = value,
+            "vix_har_vrp" => out.vix_har_vrp = value,
             "vix_cycle_amplitude" => out.vix_cycle_amplitude = value,
             "vix_realised_vol_weight" => out.vix_realised_vol_weight = value,
             "vix_return_clamp" => out.vix_return_clamp = value,
@@ -2838,6 +2965,20 @@ pub fn settable_names() -> Vec<&'static str> {
         "forced_flow_beta_exponent",
         "forced_flow_reservoir",
         "forced_flow_replenish",
+        "market_beta_up_comp",
+        "vix_selfex_gain",
+        "vix_selfex_threshold",
+        "vix_selfex_min",
+        "vix_selfex_scale",
+        "vix_selfex_decay",
+        "vix_selfex_relax",
+        "vix_selfex_excite",
+        "vix_selfex_excite_decay",
+        "vix_selfex_phase",
+        "vix_har_weight",
+        "vix_har_mid",
+        "vix_har_slow",
+        "vix_har_vrp",
         "vix_realised_vol_weight",
         "vix_return_clamp",
         "vix_return_gain",

@@ -341,6 +341,35 @@ PERTURBATIONS = [
     ("forced_flow_reservoir", 0.3, False),
     ("forced_flow_replenish", 0.2, False),
     ("forced_flow_beta_exponent", 1.5, False),
+    # -- the recomposition era (pt-v17) -------------------------------------
+    # The compensation side of the down-transmission wire: up ticks of the
+    # market factor transmit at (1 - this), so the probe's first up tick
+    # shows it.
+    ("market_beta_up_comp", 0.05, True),
+    # The co-jump master. Non-zero means two uniforms a day from the shared
+    # economy stream whether or not an event ever fires, which is why it is
+    # in DRAW_SCHEDULE_MOVERS below -- the same contract as the Poisson
+    # intensity above.
+    ("vix_selfex_gain", 0.5, True),
+    # The co-jump family's shape dials. All gated behind the master gain,
+    # which ships at 0.0: with it off none of these is ever read.
+    ("vix_selfex_threshold", 1.0, False),
+    ("vix_selfex_min", 5.0, False),
+    ("vix_selfex_scale", 10.0, False),
+    ("vix_selfex_decay", 0.90, False),
+    ("vix_selfex_relax", 0.80, False),
+    ("vix_selfex_excite", 0.6, False),
+    ("vix_selfex_excite_decay", 0.90, False),
+    ("vix_selfex_phase", 1.0, False),
+    # The HAR anchor's weight. Non-zero re-mixes the VIX target from the
+    # first close (the anchor starts cold at zero realized variance, which
+    # IS a target move), and the VIX reaches the market through the
+    # variance coupling on the next session. No draws are consumed.
+    ("vix_har_weight", 0.5, True),
+    # The anchor's shape dials, gated behind the weight, which ships 0.0.
+    ("vix_har_mid", 0.3, False),
+    ("vix_har_slow", 0.15, False),
+    ("vix_har_vrp", 1.4, False),
 ]
 
 
@@ -356,7 +385,7 @@ PERTURBATIONS = [
 #: economy stream, so its trajectories differ from every earlier preset
 #: through the RNG as well as through the mechanism. Giving the arrival test
 #: its own stream would remove that coupling.
-DRAW_SCHEDULE_MOVERS = frozenset({"vix_jump_intensity"})
+DRAW_SCHEDULE_MOVERS = frozenset({"vix_jump_intensity", "vix_selfex_gain"})
 
 
 def test_the_perturbation_table_covers_the_whole_settable_surface():
