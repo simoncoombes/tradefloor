@@ -34,313 +34,97 @@ which emitted CRLF on Windows.
 
 <!-- release-note-ends -->
 
-### The file digest and the content digest
+### The file digest (#127)
 
 `Snapshot.hash` is computed over canonical JSON and was always portable.
-That is the right definition and it does not change here. It is also not
-the thing a reader reaches for when checking that two people hold the same
-file: that is `sha256` over the bytes, and the library was making it a
-property of the operating system.
-
-The failure it caused, in full. An experiment saved a snapshot, recorded
-`sha256` of the file in its published results, and shipped a validator that
-compared the two. Everything passed. A clone of the same commit into a
-clean directory produced a different digest:
-
-```
-edgar-2026-08-31.json   0b9f6bf946d8663d...   Windows working tree
-                        959783efb512c335...   fresh clone, same commit
-```
-
-`.gitattributes` sets `* text=auto eol=lf`, so git normalised the 5,450
-CRLF pairs on the way in and never put them back. The working tree and
-every clone of it held different bytes, the published digest described the
-working tree, and the validator compared the file against itself.
-
-### Reading
-
-A recording costs API calls to make, and every recording a Windows user
-already holds carries CRLF. `Snapshot.load`, `Transcript.load` and
-`Survey.load` are unchanged and still read them, so this fixes a
-portability bug without creating a data-loss one.
-
-### The guard
-
+`sha256` over the saved file was a property of the operating system: a
+snapshot saved on Windows and a fresh clone of the same commit carried
+different digests, because `.gitattributes` sets `* text=auto eol=lf` and
+git normalised 5,450 CRLF pairs on the way in. The three loaders are
+unchanged, so every recording on disk still reads.
 `tests/test_portable_writes.py` exercises each writer and then scans the
-package source for a text-mode write anywhere, because four savers checked
-one at a time leaves the fifth unguarded, and the fifth is where this came
-from. On Linux every one of them passes trivially, which is how the
-existing suite stayed green through the bug.
+package for a text-mode write anywhere.
 
-### The exact roster
+### The exact roster (#128)
 
-`limit` with `rank_by` answers "the largest N filers", and an experiment
-whose universe was decided elsewhere asks a different question. The two have
-different failure modes: a ranked fetch returning 98 of 100 is still a ranked
-universe, and an exact fetch returning 498 of 500 has lost two members, which
-is the finding. So `ciks=` accounts for every request. A filer with no
-diluted EPS, no share count, no submissions record, no listed ticker or no
-sector mapping lands in `Snapshot.excluded` under its own reason, and
-`notes["requested_ciks"]` carries the request so membership is checkable from
-the file alone.
+An exact fetch returning 498 of 500 has lost two members, so `ciks=`
+accounts for every request: each CIK comes back as a row or as an entry in
+`Snapshot.excluded` with its own reason, and `notes["requested_ciks"]`
+carries the request. `limit` and `rank_by` default to `None` so that
+either beside a roster is refused, with the same resolution as before.
 
-`limit` and `rank_by` grew a `None` default so that passing one beside a
-roster could be refused. Resolving to the same 100 and `"equity"` as before,
-so every released call returns the snapshot it returned.
+`observe(detail=)` adds no field to the allowlist, and the sealed-engine
+proxy and hidden-value scan in `tests/test_finrobot.py` cover the compact
+rendering too. The panel travels in `state()` and the fork agreement reads
+it.
 
-### The large universe
+`pyautogen<0.3` and `anthropic<1.0` are the ceilings: the AutoGen 0.3
+rewrite provides no `autogen` module, and the 1.0 SDK removed
+`anthropic.types.Completion`. `pyautogen` 0.2.35 sends `temperature` on
+every request and Claude Opus 5 and Sonnet 5 reject any explicit value, so
+recorded runs use `claude-sonnet-4-5-20250929`. `tests/test_integrations.py`
+compares refused responses in a committed recording against a count the
+recording declares.
 
-Nine lines an asset reads well for four names and buries the question at four
-hundred. The split is a rendering decision and not a narrowing: the allowlist
-gains no field, the sector summary is arithmetic over the asset rows, and the
-sealed-engine proxy and the hidden-value scan in `tests/test_finrobot.py` now
-run over the large rendering as well as the small one.
-
-The panel belongs to the experiment, so it travels in `state()` and the fork
-agreement reads it. Two arms shown different names would be answering
-different questions, and the price history, the last decision and the cadence
-would all match while that went unrecorded.
-
-### The dependency ceilings
-
-`pyautogen<0.11` resolves to the AutoGen 0.4 rewrite, which installs
-`autogen-agentchat` and `autogen-core` and provides no `autogen` module, so
-`finrobot.functional.rag` fails on `No module named 'autogen'` before
-`SingleAssistant` is reached. The rewrite starts at 0.3, so that is the
-ceiling. `anthropic<2.0` admitted the 1.0 SDK, which removed
-`anthropic.types.Completion` that autogen 0.2.35's client imports.
-
-One consequence worth stating, because it decides which model a study
-can use. `pyautogen` 0.2.35 sends `temperature` on every request: unlike
-`top_k`, `top_p` and `stop_sequences`, which it drops when unset, the
-parameter is non-nullable and defaults to 1.0. Claude Opus 5 and Sonnet 5
-have deprecated it, and answer
-
-```
-400 invalid_request_error: `temperature` is deprecated for this model.
-```
-
-to any explicit value. They run through FinRobot at the default of 1.0.
-A reproducible study wants temperature 0, and temperature 0 is the one
-setting those models refuse, so every recorded run in this repository uses
-`claude-sonnet-4-5-20250929`. Measured 2026-09-01 against the live API.
-
-### The recording check
-
-`tests/test_integrations.py` parsed every response in every committed
-recording and read a failure as a corrupted file. `parse` is strict on
-purpose, so a long enough recording of a real model contains output it
-refuses, and the check forbade committing an honest one. It now compares the
-number of refused responses against a count the recording declares in its
-meta. An absent count means zero, so every fixture committed before this is
-unchanged.
-
-### The cost
+### The observed depth (#131)
 
 `liquidity_crisis` takes quoted depth to 40%. Measured on
-`Universe.random(6, seed=11)`, forked, with the scenario on one arm:
-
-```
-engine avg_volume column   543,983  ->  217,593     exactly x0.40
-what the agent was shown   543,983  ->  543,983     unchanged
-participation cap           27,199  ->   27,199     unchanged
-order actually permitted    27,199  ->   27,199     unchanged
-```
-
-The agent asked for 60,000 shares in both arms and was allowed the same
-27,199 in a book holding 40% of the ladder. The clip exists to stop an order
-the market cannot absorb. It was sized against a market that no longer
-existed. The agent never learned the order was unrealistic, because the only
-signal was a worse fill.
-
-`Observation.book()` on the same object DID show the thinned ladder, so the
-observation disagreed with itself: one accessor in the crisis, one in the
-market before it.
-
-`liquidity_crisis.yml` says an evaluation reading only the price series will
-score an agent as though it traded for free. The harness was doing a version
-of that.
-
-### The re-read
-
-`World.run` re-reads `avg_volume` at the top of each day, straight after
-`Scenario.apply`. That is the earliest point at which the day's value is
-known, and once a day is sufficient because nothing in the engine writes the
-column. `evaluate` does the same, guarded on a scenario being present: with
-none there is nothing to move it, and a daily column copy through every
-ordinary run would be work nobody asked for.
-
-The engine's column starts equal to the instrument list, so with no scenario
-in play the re-read returns exactly the value the old code held.
-`tests/test_observed_depth.py` pins that, alongside the four cases that fail
+`Universe.random(6, seed=11)`, forked, with the scenario on one arm, the
+engine's `avg_volume` column moved from 543,983 to 217,593 while the volume
+the agent was shown and the 27,199-share participation cap both stayed at
+their pre-crisis values, so the agent was allowed the same order in a book
+holding 40% of the ladder. `World.run` and `harness.evaluate` now re-read
+the column at the top of each day, after `Scenario.apply`. Nothing in the
+engine writes the column, so once a day is sufficient, and with no scenario
+the re-read returns the value the old code held.
+`tests/test_observed_depth.py` pins that case beside the four that fail
 without the fix.
 
-### The two sites
+### The noise floor (#130)
 
-Both `World.run` and `harness.evaluate`, three lines apart in different
-files. `_run_untraded` builds no Observation and needed nothing.
+A single pair of trajectories cannot separate a response to the
+intervention from an agent answering the same question two ways.
+`resample()` replays the two frozen inputs at one decision point N times
+per arm and reports the within-arm spread beside the between-arm gap. Live
+at temperature 0, the two prompts differed in 2 lines of 376; eight samples
+per arm gave the control arm 4 distinct answers and a net of 0.62 +/- 0.99
+against 1 distinct answer for the +200bps arm, so the recorded gap sat
+inside the control arm's own standard deviation. Inputs that differ beyond
+the intervention are refused with the moved fields named, refusals are
+counted, a zero-variance arm reports a separation of `None`, and no p-value
+is reported. `FrameworkAdapter.reask(entry)` performs one live interaction
+from a record entry without touching adapter state, and `agent.record`
+entries gain `payload`.
 
-### The case for the library
+### The refusal policy (#129)
 
-`compare` reports one trajectory per arm, which is the whole answer for a
-deterministic policy and half of one for a language model. The agent is the
-only stochastic component left in an otherwise bit-identical experiment, and
-a single pair of trajectories cannot separate "the agent responded to the
-intervention" from "the agent answered the same question two ways". Every
-study running an LLM agent has to hand-roll the same paired resampling, and
-none of them did.
+`World.run` called the agent with no guard, so a `DecisionError` from `act`
+ended the run past the trace, the checkpoint and every artifact. On a live
+pilot of 24 names and 60 planned decisions, call 36 carried a per-action
+`rationale` field, `parse` refused it, and 35 recorded interactions went
+with it. Under `on_refusal="skip"` the response is counted under
+`unusable_responses`, a column kept apart from the market-side `refused`
+and never summed with it, and `Comparison.ROWS` carries both. There is no
+retry, because a second attempt is a second agent, and `parse` stays
+strict.
 
-A small N suffices here only because of the determinism, so the library
-that provides the determinism should provide the measurement that cashes it
-in.
-Everything except the agent has already been eliminated by construction:
-`agree()` verifies the whole engine state at the fork, and the two arms'
-inputs at the first post-fork decision differ only in the intervened fields.
-Outside this environment the same question would need to separate agent
-variance from market noise, path dependence and different starting states,
-with no counterfactual available at all.
+`replay_response` raises when a recording has no answer, and a blanket skip
+turned a transcript covering nothing into an agent that refused everything:
+two arms replayed against one reported twenty refusals each and an empty
+series. A missing entry and a recorded null now raise `ReplayMiss`, which
+`World._ask` re-raises under either policy. It subclasses `DecisionError`,
+so callers that catch one keep catching it. `World.fork` carries
+`on_refusal` to both arms.
 
-### The measurement it exists to prevent
+### The resumed recording (#129)
 
-Live, both arms at temperature 0. At the first post-fork decision the two
-prompts differed in 2 lines of 376, `federal_funds_rate` and
-`corporate_bond_yield`, with every price, position and return byte-identical.
-The recorded trajectories then diverged, readably:
-
-- control: "Deploying excess cash into quality positions: buying IBM's dip"
-- +200bps: "Reducing exposure to IBM after its sharp 4.2% single-day
-  decline ... to manage downside risk"
-
-Resampling those two exact prompts eight times each:
-
-| arm | distinct answers in 8 | modal share | net (buys - sells) |
-|---|---:|---:|---:|
-| control | 4 | 62% | 0.62 +/- 0.99 |
-| +200bps | 1 | 100% | 0.00 +/- 0.00 |
-
-The between-arm gap of 0.62 sits inside control's own within-arm standard
-deviation of 0.99. The recorded split was one of control's four available
-answers. The study around it passed 71 publication checks.
-
-The same numbers carry a second reading the feature reports on purpose. One
-distinct answer in eight calls against four is a difference in decision
-STABILITY rather than in direction. `compare` cannot see it. It is
-observable at all only because the input was byte-identical eight times.
-
-### The refusals
-
-Inputs that differ beyond the intervention. A controlled resample needs
-two arms answering one question, so a difference the intervention cannot
-account for is refused and the error names the fields that moved. This is for the FIRST post-fork decision; by the second
-the market has already answered the intervention and every line differs.
-
-A zero-variance arm reports a standard deviation of 0 and a separation of
-`None`. A ratio over zero is undefined rather than large, and `inf` printed
-in a published table reads as an overwhelming result.
-
-Refusals are counted, never dropped. An agent that returns unusable output
-on three of twenty calls is a finding, and sampling until twenty parse would
-hide it. Exactly N calls are made per arm.
-
-No p-value. The gap is reported in units of the noise floor and the reader
-judges; a significance test would imply an inference model nobody has
-argued for here.
-
-### The re-ask hook and the record
-
-`FrameworkAdapter.reask(entry)` performs one live interaction from a record
-entry and changes no adapter state: no price appended to the history, no row
-added to the record, no write to the recorder. A resample happens after the
-run, and the adapter's state belongs to the run, so all five adapters
-implement it under a contract check that asserts the state is untouched.
-
-`agent.record` entries gain `payload`. The record's own docstring says it
-carries the whole chain, "observation to input to response to validated
-action to order", and it began at the rendered input -- so nothing joined a
-decision back to what the agent was shown, and an adapter that builds its
-framework input from the payload rather than from text had nothing to
-re-ask.
-
-
-
-### The refusal policy
-
-`World.run` called the agent with no guard, so a `DecisionError` from
-`act` went out past the trace, past the checkpoint and past every artifact
-the caller was about to write. The adapter layer documented the opposite:
-"the caller decides whether that ends the run or costs the agent a step".
-The caller is `World.run`, and the choice did not exist.
-
-Measured on a live pilot: 24 names, 60 planned decisions, and on call 36 a
-per-action `rationale` field. `parse` is right to refuse it -- dropping an
-unknown field executes a trade the agent conditioned on something it never
-got -- and 35 recorded interactions, 20 simulated days of shared history
-and both arms of a fork went with it, at a malformed rate of 1 in 35. A run
-long enough to be interesting is a run long enough to hit that.
-
-An agent that returns unusable output is an agent behaving badly, and
-behaving badly is a measurement. It belongs beside `refused` in the trace
-rather than in a traceback.
-
-`refused` and `unusable_responses` are two columns and are never summed. A
-market that rejected an order and an agent that could not format an answer
-are different failures with different remedies, and one column covering
-both would make an unusable agent read as an illiquid market.
-`Comparison.ROWS` carries both, because two arms with different refusal
-counts are not comparable on turnover without the reader being told.
-
-What this does not do: retry. A second attempt at the same question is a
-second agent, and the experiment would then be measuring the retry policy.
-`parse` is unchanged and stays strict.
-
-### The exempt refusal
-
-`replay_response` raises `DecisionError` when a recording has no answer for
-an input, so a blanket skip turns a transcript covering nothing into an
-agent that refused everything -- and the run then completes, writes its
-artifacts and publishes that. Measured while building a study against this:
-two arms replayed against a transcript covering neither, reported twenty
-refusals each, and produced an empty series two hundred lines later.
-
-So a missing entry and a recorded null both raise `ReplayMiss`, and
-`World._ask` re-raises it while skipping everything else. A model that
-answered badly is a fact about the agent; a recording that does not cover
-the question is a fact about the experiment, and the two have opposite
-remedies.
-
-`ReplayMiss` subclasses `DecisionError`, so every caller written to catch
-one and charge the agent a step keeps catching it. Only the skip policy
-treats it differently.
-
-### Resuming a recording
-
-A refusal policy does not survive a rate limit, a dropped connection or a
-keyboard interrupt. The recorder is written by the caller at the end, so a
-run that died had paid for N calls and kept none of them in a form the next
-run could use, and the second attempt re-asked every question it already
-had an answer to.
-
-`prior=` is consulted before the provider, on the same key the replay path
-uses. The market is deterministic, so a resumed run reaches the same
-prompts and computes the same digests, and every recorded answer is still
-an answer to the question being asked.
-
-Two guards. A `prior` whose `instructions_digest` differs from the current
-one is refused at construction: instructions do not travel in the input the
-key is computed over, so every recorded key would still match and the run
-would complete, answering the instructions you have now with decisions
-taken under the ones you had then. And the resulting recording carries
-`replayed_from_prior` and `called_live`, so a file stitched from two
-sessions cannot claim to be one.
-
-Both counts are derived from the two transcripts rather than accumulated as
-the run goes. A fork shares one recorder and gives each arm its own
-adapter, so a counter living on an adapter would split across the arms and
-each half would understate the file it describes.
-
-`World.fork` now carries `on_refusal` to both arms, for the same reason it
-carries every other setting: an arm that reverted to the default would die
-on output its sibling counted and continued past.
+`prior=` is consulted before the provider, on the key the replay path uses,
+so a run that died after N paid calls resumes with them. A `prior` whose
+`instructions_digest` differs from the current one is refused at
+construction, since instructions do not travel in the keyed input. The
+recording carries `replayed_from_prior` and `called_live`, derived from the
+two transcripts because a fork gives each arm its own adapter over one
+shared recorder.
 
 ## 0.6.1
 
