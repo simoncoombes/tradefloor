@@ -171,7 +171,9 @@ def _grid(name):
         jump = dict(vix_selfex_gain=0.25, vix_selfex_size_coupling=0.5,
                     vix_decay_ratio=0.85, vix_selfex_relax_slope=0.03)
         def cell(ch, **kw):
-            return sx(**har, **jump, vix_selfex_vol_jump=ch, **kw)
+            # Dict merge, not double-splat: kw OVERRIDES the base (the
+            # first launch died on a duplicate keyword).
+            return {**har, **jump, "vix_selfex_vol_jump": ch, **kw}
         return {"v16": {},
                 "h03d85": sx(**har, vix_decay_ratio=0.85),
                 "ch03": cell(0.3),
