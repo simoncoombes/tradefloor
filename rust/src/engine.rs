@@ -1240,6 +1240,7 @@ impl Engine {
                 vix_selfex_size_coupling: self.params.vix_selfex_size_coupling,
                 vix_selfex_relax_slope: self.params.vix_selfex_relax_slope,
                 vix_selfex_vol_jump: self.params.vix_selfex_vol_jump,
+                market_sigma_daily_pct: self.market_vol.sigma_daily() * 100.0,
                 vix_har_weight: self.params.vix_har_weight,
                 vix_har_mid: self.params.vix_har_mid,
                 vix_har_slow: self.params.vix_har_slow,

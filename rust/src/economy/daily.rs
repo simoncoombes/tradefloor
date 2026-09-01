@@ -95,6 +95,15 @@ pub struct DailyInputs<'a> {
     pub vix_selfex_size_coupling: f64,
     pub vix_selfex_relax_slope: f64,
     pub vix_selfex_vol_jump: f64,
+    /// The market factor's post-close daily sigma, in the same percent
+    /// units as `market_day_return_pct`. The co-jump gate standardizes
+    /// the day's return by THIS — the market's own scale — so the gate
+    /// fires at its design rate in every window, pinned or not. (The
+    /// first standardizer was the prior VIX, and a pinned LOW VIX made
+    /// every ordinary day read as a multi-sigma crash: at a held 5 the
+    /// lever collapsed downward across the whole leaders card. The
+    /// post-close bias is a near-uniform rescale the threshold absorbs.)
+    pub market_sigma_daily_pct: f64,
     /// The HAR realized-vol anchor (params `vix_har_*`). At weight 0.0
     /// the branch is skipped and the anchor's EMAs stay frozen.
     pub vix_har_weight: f64,
@@ -180,6 +189,7 @@ impl<'a> Default for DailyInputs<'a> {
             vix_selfex_size_coupling: 0.0,
             vix_selfex_relax_slope: 0.0,
             vix_selfex_vol_jump: 0.0,
+            market_sigma_daily_pct: 1.0,
             vix_har_weight: 0.0,
             vix_har_mid: 0.4,
             vix_har_slow: 0.25,
@@ -835,13 +845,16 @@ pub fn update_economy_daily(
     let core_prev = economy.vix - fear_prev;
     let mut fear_next = fear_prev;
     if selfex_on {
-        // Yesterday's VIX as the day's vol ruler: VIX 16 is about 1% a
-        // day (sqrt of 252). Causal -- the day's own move never scales
-        // itself -- and self-damping: at VIX 60 a -3% day is ordinary,
-        // which hands clustering to the excitation state rather than to
-        // re-triggering.
-        let sigma_daily_pts = economy.vix / 15.874507866387544;
-        let z = inputs.market_day_return_pct / sigma_daily_pts;
+        // The market's own post-close daily sigma as the ruler: the gate
+        // is self-normalized, so it fires at its design rate whatever the
+        // level around it — endogenous, pinned high, or pinned low. The
+        // day's own move is inside the ruler (post-close), which rescales
+        // z by a near-uniform factor the threshold dial absorbs.
+        let z = if inputs.market_sigma_daily_pct > 0.0 {
+            inputs.market_day_return_pct / inputs.market_sigma_daily_pct
+        } else {
+            0.0
+        };
         let g = mathx::max(0.0, -z - inputs.vix_selfex_threshold);
         let in_stress = matches!(
             economy.cycle_phase,
