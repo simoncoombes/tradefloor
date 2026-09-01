@@ -131,6 +131,32 @@ def _grid(name):
                 "h035v11": sx(vix_har_weight=0.35, vix_har_vrp=1.1),
                 "d75rs06h025": sx(**d75, vix_selfex_relax_slope=0.06,
                                   vix_har_weight=0.25, vix_har_vrp=1.0)}
+    elif name == "selfex4":
+        # Round 156: the har-jump balance. Screen 3 found the re-dosed
+        # anchor carries same-day AND rv-tracking (the return wire done
+        # right: the day's return reaches the target through a component
+        # with persistence behind it), the jumps carry P30 and fix the
+        # anchor's AR1, and the open fight is the jump tails re-diluting
+        # the anchor's same-day plus spike asym under the anchor. Smaller
+        # jump doses, a bigger daily HAR share (lower mid => higher b_d),
+        # and the d85 asym killer.
+        def sx(**kw):
+            return kw
+        def pair(gain, har, mid=0.4, vrp=1.0, d=0.75, rs=0.03):
+            return sx(vix_selfex_gain=gain, vix_selfex_size_coupling=0.5,
+                      vix_decay_ratio=d, vix_selfex_relax_slope=rs,
+                      vix_har_weight=har, vix_har_mid=mid, vix_har_vrp=vrp)
+        return {"v16": {},
+                "h03m03": sx(vix_har_weight=0.3, vix_har_mid=0.3,
+                             vix_har_vrp=1.0),
+                "j15h03": pair(0.15, 0.3),
+                "j15h03m03": pair(0.15, 0.3, mid=0.3),
+                "j25h03m03": pair(0.25, 0.3, mid=0.3),
+                "j15h035v11m03": pair(0.15, 0.35, mid=0.3, vrp=1.1),
+                "j25h025m03": pair(0.25, 0.25, mid=0.3),
+                "j15h03d85": pair(0.15, 0.3, d=0.85),
+                "j15h03d85m03": pair(0.15, 0.3, mid=0.3, d=0.85),
+                "j25h03d85m03": pair(0.25, 0.3, mid=0.3, d=0.85)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):
