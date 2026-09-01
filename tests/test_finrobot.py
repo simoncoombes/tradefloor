@@ -259,7 +259,7 @@ def test_the_adapters_constructor_keywords_are_the_ones_callers_wrote():
     assert set(parameters) == {
         "mode", "transcript", "recorder", "llm_config", "fundamentals",
         "objective", "mandate", "agent_config", "every", "max_participation",
-        "arm", "info"}
+        "panel", "arm", "info"}
     assert all(p.kind is inspect.Parameter.KEYWORD_ONLY
                for p in parameters.values()), (
         "a positional argument here breaks FinRobotAdapter.fork, which "
@@ -2289,3 +2289,405 @@ def _load_example():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+# -- the large universe -----------------------------------------------------
+#
+# A four-name roster renders nine lines a name and reads well. Five hundred
+# names render 4,500 lines, and the market data crowds out the question. The
+# `detail` argument splits the observation into a compact row per symbol and
+# a full block for the symbols that earn one. What it must not do is narrow
+# what the agent is allowed to know or allowed to trade, and the checks below
+# are about that boundary rather than about the layout.
+
+
+#: The keys the payload grows in its large-universe form, and nothing else.
+#: `detail` is which symbols get a full block; `sectors` is a projection of
+#: `assets`. Neither adds a field the allowlist did not already carry.
+LARGE_PAYLOAD_KEYS = PAYLOAD_KEYS | {"detail", "sectors"}
+SECTOR_KEYS = {"sector", "names", "held", "exposure", "return_5d"}
+
+
+def big_universe(n: int = 12) -> list:
+    return list(tf.Universe.random(n, seed=7))
+
+
+def big_world(agent, *, days: int = 3, n: int = 12) -> World:
+    world = World(seed=4242, universe=big_universe(n), agent=agent,
+                  pins={"federal_funds_rate": 0.04,
+                        "corporate_bond_yield": 0.055},
+                  cash=5_000_000.0, label="big")
+    if days:
+        world.run(days=days)
+    return world
+
+
+def detailed_symbols(prompt: str, tickers) -> set[str]:
+    """The symbols carrying a full block in a large-universe prompt.
+
+    Read off the rendered text rather than off the payload, because what the
+    experiment claims is about what FinRobot RECEIVED.
+    """
+    parts = prompt.split("\nDetail\n------\n", 1)
+    if len(parts) == 1:
+        return set()
+    lines = {line.strip() for line in parts[1].splitlines()
+             if line and not line.startswith(" ")}
+    return {t for t in tickers if t in lines}
+
+
+def test_the_default_rendering_is_byte_identical():
+    """The switch is `detail`, and only `detail`.
+
+    Every existing caller passes nothing and must get the text it has always
+    got, because the replay key is the SHA-256 of this string and a changed
+    byte invalidates every recorded run in the repository.
+    """
+    world, agent = one_observation(days=3)
+    facts = {"TECH_A": {"sector": "technology", "eps": 3.0}}
+    payload = fr.observe(_observation(world), history=agent.history,
+                         fundamentals=facts)
+    assert set(payload) == PAYLOAD_KEYS
+    assert "detail" not in payload and "sectors" not in payload
+
+    text = fr.render(payload, objective="Do the thing.")
+    assert "Assets" in text and "Universe" not in text
+    assert "Sectors" not in text and "Detail" not in text
+
+
+def test_the_shipped_fixture_still_hashes_to_the_keys_it_is_filed_under():
+    """The strongest form of the check above.
+
+    The committed recording is keyed by the digest of the exact text the
+    canonical study sent. A default rendering that moved by one character
+    would leave every key unreachable, and the study would stop replaying.
+    """
+    transcript = fr.Transcript.load(FIXTURE)
+    assert transcript.entries, "the fixture recorded nothing"
+    for entry in transcript.entries:
+        assert fr.digest(entry["prompt"]) == entry["digest"], (
+            "a recorded prompt no longer hashes to the key it was filed "
+            "under, so the digest function or the rendering moved")
+
+
+def test_the_large_form_adds_two_keys_and_removes_none():
+    agent = Scripted(answer())
+    world = big_world(agent)
+    facts = {t: {"sector": "technology"} for t in world.engine.tickers}
+    payload = fr.observe(_observation(world), history=agent.history,
+                         fundamentals=facts, detail=[world.engine.tickers[0]])
+    assert set(payload) == LARGE_PAYLOAD_KEYS
+    assert set(payload["assets"][0]) == ASSET_KEYS
+    assert all(set(row) == SECTOR_KEYS for row in payload["sectors"])
+
+
+def test_every_universe_symbol_is_still_visible_and_still_tradable():
+    """The compact table is a rendering, and it is not a shortlist.
+
+    An agent shown forty names out of five hundred would be trading a
+    universe somebody narrowed for it, and the comparison would measure the
+    narrowing. Two halves: every symbol appears in the text, and every
+    symbol is still accepted by the validator that decides what reaches the
+    market.
+    """
+    agent = Scripted(answer())
+    world = big_world(agent)
+    obs = _observation(world)
+    facts = {t: {"sector": "technology"} for t in obs.tickers}
+    payload = fr.observe(obs, history=agent.history, fundamentals=facts,
+                         detail=[obs.tickers[0]])
+    text = fr.render(payload)
+
+    for ticker in obs.tickers:
+        assert ticker in text, f"{ticker} is not in the observation at all"
+
+    undetailed = [t for t in obs.tickers if t != obs.tickers[0]]
+    decision = fr.parse(answer(*[act(t, "BUY", 10) for t in undetailed]))
+    orders, _notes = fr.orders_from(decision, obs)
+    assert set(orders) == set(undetailed), (
+        "a symbol with no detail block was refused, so the compact table is "
+        "a shortlist and the agent's action space was narrowed by a "
+        "rendering decision")
+
+
+def test_the_table_states_the_order_cap_it_is_held_to():
+    """The lesson the detail block already carries, kept in the table.
+
+    An agent sized against a limit it was not shown has its refused orders
+    read as decisions it made. That was measured once on the native OpenAI
+    path, twelve rejections and no trades, so the compact row carries the
+    cap rather than leaving it to a detail block a name may not have.
+    """
+    agent = Scripted(answer())
+    world = big_world(agent)
+    obs = _observation(world)
+    payload = fr.observe(obs, history=agent.history, fundamentals={},
+                         detail=[], max_participation=0.01)
+    text = fr.render(payload)
+    assert "max order" in text
+    for asset in payload["assets"]:
+        assert asset["max_order_shares"] == 0.01 * obs.avg_volume(
+            asset["symbol"])
+        assert f"{asset['max_order_shares']:,.0f}" in text
+
+
+def test_a_detail_symbol_this_market_does_not_list_is_dropped():
+    """A panel outliving a roster edit is a stale configuration.
+
+    Naming an unlisted symbol in the observation would describe an
+    instrument the agent cannot trade, and `orders_from` would refuse the
+    order the observation invited.
+    """
+    agent = Scripted(answer())
+    world = big_world(agent)
+    payload = fr.observe(_observation(world), history=agent.history,
+                         fundamentals={},
+                         detail=[world.engine.tickers[0], "NOT_LISTED"])
+    assert payload["detail"] == [world.engine.tickers[0]]
+    assert "NOT_LISTED" not in fr.render(payload)
+
+
+def test_the_detail_set_is_sorted_and_deduplicated():
+    """The rendering has to be stable, because the digest is over the text."""
+    agent = Scripted(answer())
+    world = big_world(agent)
+    tickers = list(world.engine.tickers[:3])
+    obs = _observation(world)
+    a = fr.render(fr.observe(obs, history=agent.history, fundamentals={},
+                             detail=tickers))
+    b = fr.render(fr.observe(obs, history=agent.history, fundamentals={},
+                             detail=list(reversed(tickers)) + tickers))
+    assert a == b
+
+
+def test_the_same_observation_renders_the_same_text_twice():
+    agent = Scripted(answer())
+    world = big_world(agent)
+    obs = _observation(world)
+    facts = {t: {"sector": "technology"} for t in obs.tickers}
+    args = dict(history=agent.history, fundamentals=facts,
+                detail=[obs.tickers[0]])
+    first = fr.render(fr.observe(obs, **args), objective="Manage the book.")
+    second = fr.render(fr.observe(obs, **args), objective="Manage the book.")
+    assert first == second
+    assert fr.digest(first) == fr.digest(second)
+
+
+def test_the_sector_summary_is_computed_from_the_rows_above_it():
+    """Nothing in it is read off the engine. It is arithmetic on `assets`."""
+    agent = Scripted(answer())
+    world = big_world(agent)
+    obs = _observation(world)
+    facts = {t: {"sector": "tech" if i % 2 else "energy"}
+             for i, t in enumerate(obs.tickers)}
+    payload = fr.observe(obs, history=agent.history, fundamentals=facts,
+                         detail=[])
+    rows = {row["sector"]: row for row in payload["sectors"]}
+    assert set(rows) == {"tech", "energy"}
+    assert sum(row["names"] for row in rows.values()) == len(obs.tickers)
+    for sector, row in rows.items():
+        members = [a for a in payload["assets"]
+                   if a["fundamentals"]["sector"] == sector]
+        assert row["names"] == len(members)
+        assert row["held"] == sum(1 for m in members if m["position"])
+        assert row["exposure"] == pytest.approx(
+            sum(m["position"] * m["price"] for m in members))
+
+
+def test_a_name_with_no_supplied_sector_is_unclassified_rather_than_guessed():
+    agent = Scripted(answer())
+    world = big_world(agent)
+    payload = fr.observe(_observation(world), history=agent.history,
+                         fundamentals={}, detail=[])
+    assert [row["sector"] for row in payload["sectors"]] == ["unclassified"]
+
+
+def test_the_large_rendering_reaches_no_simulator_ground_truth():
+    """`Sealed` again, over the path the large universe takes.
+
+    The default path is covered above. This one renders a different set of
+    lines from the same payload, and a future edit that reached for
+    `engine.column` to fill a sector summary would fail on the access.
+    """
+    agent = Scripted(answer())
+    world = big_world(agent)
+    obs = _observation(world, engine=Sealed(world.engine))
+    facts = {t: {"sector": "technology"} for t in world.engine.tickers}
+    payload = fr.observe(obs, history=agent.history, fundamentals=facts,
+                         detail=list(world.engine.tickers[:2]))
+    fr.render(payload)
+    assert payload["assets"], "the sealed run produced nothing to check"
+
+
+def test_no_hidden_value_appears_in_the_large_rendering():
+    """The complementary scan, over the text the large universe produces."""
+    import struct
+
+    agent = Scripted(answer())
+    world = big_world(agent, days=4)
+    facts = {i.ticker: {"sector": i.sector, "eps": i.eps,
+                        "book_value_per_share": i.book_value_per_share,
+                        "revenue_growth": i.revenue_growth}
+             for i in world.universe}
+    payload = fr.observe(_observation(world), history=agent.history,
+                         fundamentals=facts,
+                         detail=list(world.engine.tickers[:3]))
+    text = fr.render(payload)
+
+    hidden = []
+    for instrument in world.universe:
+        for policy, discount in ((0.04, 0.055), (0.06, 0.075)):
+            hidden.append(tf.fair_value(
+                eps=instrument.eps, sector=instrument.sector,
+                revenue_growth=instrument.revenue_growth,
+                book_value_per_share=instrument.book_value_per_share,
+                federal_funds_rate=policy,
+                corporate_bond_yield=discount).fair_value)
+    for factor in ("momentum", "reversion", "company_news"):
+        blob = world.engine.attribution(factor)
+        hidden += list(struct.unpack("<%dd" % (len(blob) // 8), blob))
+
+    # A value that rounds to zero at four places renders as "0.0000", which
+    # is also what an unmoved price and an empty position render as. Its
+    # appearance in the text is arithmetic rather than evidence, and on a
+    # twelve-name roster the attribution columns carry several: matching on
+    # them would fail this test on a market with no leak in it. The larger
+    # values are the ones a leak would show up in, and they are still
+    # matched.
+    leaked = [v for v in hidden
+              if v and abs(v) > 1e-9 and f"{v:.4f}" not in ("0.0000",
+                                                            "-0.0000")
+              and f"{v:.4f}" in text]
+    assert not leaked, (
+        f"values only the simulator knows appear in the FinRobot input: "
+        f"{leaked}")
+
+
+# -- the standing panel -----------------------------------------------------
+
+
+def test_an_empty_panel_keeps_the_original_observation():
+    """The default, and what every released caller gets."""
+    agent = Scripted(answer())
+    assert agent.panel == ()
+    world = big_world(agent, days=1)
+    assert "Universe" not in agent.record[0]["prompt"]
+    assert "Assets" in agent.record[0]["prompt"]
+
+
+def test_a_panel_switches_the_rendering_and_survives_a_fork():
+    panel = tuple(sorted(i.ticker for i in big_universe()[:3]))
+    agent = Scripted(answer(), panel=panel)
+    world = big_world(agent, days=1)
+    assert "Universe" in agent.record[0]["prompt"]
+
+    control, shock = world.fork("control", "shock")
+    assert control.agent.panel == panel == shock.agent.panel
+    assert agree(control, shock).identical
+
+
+def test_the_fork_agreement_covers_the_panel():
+    """Two arms shown different names are answering different questions.
+
+    Nothing else in `state()` would say so: the price history, the last
+    decision and the cadence would all match while one arm read a detail
+    block the other got a table row for.
+    """
+    tickers = [i.ticker for i in big_universe()]
+    a = Scripted(answer(), panel=tickers[:3])
+    b = Scripted(answer(), panel=tickers[3:6])
+    assert "panel" in a.state()
+    assert a.state()["panel"] != b.state()["panel"]
+    assert a.state()["panel"] == sorted(tickers[:3])
+
+
+def test_held_names_are_always_detailed():
+    """A position the agent cannot see the book for is a different question.
+
+    Which names are held diverges after the fork, so this is the one part of
+    the detail set that is allowed to differ between the arms, and it has to
+    follow the book rather than the panel.
+    """
+    tickers = [i.ticker for i in big_universe()]
+    panel = tuple(tickers[:2])
+    held = tickers[9]
+    agent = Scripted(answer(act(held, "BUY", 500)), panel=panel)
+    world = big_world(agent, days=2)
+
+    first, last = agent.record[0], agent.record[-1]
+    assert held not in detailed_symbols(first["prompt"], tickers)
+    assert held in detailed_symbols(last["prompt"], tickers), (
+        "a name the book now holds got no detail block")
+    for symbol in panel:
+        assert symbol in detailed_symbols(last["prompt"], tickers)
+    assert world.portfolio.positions[held].quantity > 0
+
+
+def test_both_arms_see_the_same_panel_after_the_fork():
+    """The selection MECHANISM is identical; the held half is allowed to
+    differ, because that is the experiment's outcome rather than its
+    configuration."""
+    panel = tuple(sorted(i.ticker for i in big_universe()[:3]))
+    agent = Scripted(answer(), panel=panel)
+    world = big_world(agent, days=1)
+    control, shock = world.fork("control", "+200bps")
+    shock.intervene(federal_funds_rate=0.06, corporate_bond_yield=0.075)
+    control.run(days=1)
+    shock.run(days=1)
+
+    tickers = [i.ticker for i in world.universe]
+    left = detailed_symbols(control.agent.record[-1]["prompt"], tickers)
+    right = detailed_symbols(shock.agent.record[-1]["prompt"], tickers)
+    assert set(panel) <= left and set(panel) <= right
+
+
+def test_the_prompt_size_is_measurable_from_the_record():
+    """The study reports its context size from `len(prompt)`.
+
+    A second field for it would be a key one adapter carries and three do
+    not, and `test_integrations.py` pins that dictionary across all four.
+    """
+    panel = tuple(sorted(i.ticker for i in big_universe()[:3]))
+    agent = Scripted(answer(), panel=panel)
+    big_world(agent, days=1)
+    sizes = [len(entry["prompt"]) for entry in agent.record]
+    assert sizes and all(size > 0 for size in sizes)
+
+
+def test_the_panel_is_recorded_in_the_provenance_only_when_there_is_one():
+    """An older recording must keep the meta it has always had."""
+    plain = fr.FinRobotAdapter(
+        mode="live", llm_config={"config_list": [{"model": "m"}]})
+    assert "detail_panel" not in plain.provenance()
+    with_panel = fr.FinRobotAdapter(
+        mode="live", llm_config={"config_list": [{"model": "m"}]},
+        panel=["B", "A"])
+    assert with_panel.provenance()["detail_panel"] == ["A", "B"]
+
+
+def test_a_long_symbol_is_not_truncated_to_its_column():
+    """A clipped symbol would name an instrument this market does not list.
+
+    `orders_from` would then refuse the order the observation invited, and
+    the agent would be scored on a rendering decision. A row that runs wide
+    is the cheaper defect, so the column is a minimum width.
+    """
+    universe = [tf.Instrument("VERYLONGTICKER", "technology",
+                              initial_price=10.0, shares_outstanding=1e8,
+                              eps=1.0, book_value_per_share=5.0,
+                              revenue_growth=0.1, avg_volume=1e6, beta=1.0,
+                              short_interest=1e5)]
+    agent = Scripted(answer())
+    world = World(seed=1, universe=universe, agent=agent,
+                  pins={"federal_funds_rate": 0.04,
+                        "corporate_bond_yield": 0.055})
+    world.run(days=1)
+    obs = _observation(world)
+    payload = fr.observe(obs, history=agent.history, fundamentals={},
+                         detail=[])
+    text = fr.render(payload)
+    assert "VERYLONGTICKER" in text
+
+    decision = fr.parse(answer(act("VERYLONGTICKER", "BUY", 10)))
+    orders, _ = fr.orders_from(decision, obs)
+    assert set(orders) == {"VERYLONGTICKER"}

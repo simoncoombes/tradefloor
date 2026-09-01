@@ -118,7 +118,14 @@ langgraph = ["langgraph>=1.2"]
 # needs >=3.11.
 finrobot = [
   "finrobot>=0.1.5",
-  "pyautogen[retrievechat]>=0.2.19,<0.11",
+  # `<0.3` and not `<0.11`, which is what this said and what the comment
+  # above already argued against. 0.10.0 is inside `<0.11`, so a fresh
+  # install of this extra resolved to the AutoGen 0.4+ rewrite, installed
+  # `autogen-agentchat` and `autogen-core` instead of `autogen`, and left
+  # FinRobot unable to import itself: `finrobot.functional.rag` fails on
+  # `No module named 'autogen'` before `SingleAssistant` is reached. The
+  # ceiling has to exclude the rewrite, and the rewrite starts at 0.3.
+  "pyautogen[retrievechat]>=0.2.19,<0.3",
   "anthropic>=0.30,<2.0",
   "finnhub-python",
   "yfinance",

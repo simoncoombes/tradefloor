@@ -800,3 +800,224 @@ def test_a_real_fetch_builds_a_universe_that_drives_an_engine():
                                   corporate_bond_yield=0.055))
     engine.run_days(3)
     assert all(p > 0 for p in arr(engine.prices()))
+
+
+# --------------------------------------------------------------------------
+# An exact roster
+# --------------------------------------------------------------------------
+#
+# `limit` with `rank_by` answers "the largest N filers". An experiment whose
+# universe was decided outside EDGAR asks a different question, and the two
+# have different failure modes. A ranked fetch that returns 98 of 100 is
+# still a ranked universe; an exact fetch that returns 498 of 500 has lost
+# two members, and which two is the finding.
+
+
+def test_an_exact_roster_returns_exactly_its_members():
+    """Nothing outside the request, and the requested order kept.
+
+    Roster order decides the RNG draw order in `to_instruments`, so a fetch
+    that reordered would build a different market from the same roster file.
+    """
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+                 ciks=[1045810, 320193])
+    assert [r["ticker"] for r in snap.rows] == ["NVDA", "AAPL"]
+    assert [r["cik"] for r in snap.rows] == [1045810, 320193]
+
+
+def test_no_filer_outside_the_roster_can_enter_the_snapshot():
+    """The frames carry the whole market. Only the request may pass."""
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+                 ciks=[320193])
+    assert len(snap.rows) == 1
+    assert {r["cik"] for r in snap.rows} == {320193}
+    assert not snap.excluded
+
+
+def test_every_requested_filer_is_included_or_excluded_with_a_reason():
+    """The partition, asserted as a partition.
+
+    A silent omission is the defect this guards: a roster member that is
+    neither a row nor an exclusion has left the experiment with nothing
+    recording that it did.
+    """
+    requested = [320193, 789019, 99999999]
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+                 ciks=requested)
+    accounted = ({r["cik"] for r in snap.rows}
+                 | {e["cik"] for e in snap.excluded})
+    assert accounted == set(requested)
+    assert len(snap.rows) + len(snap.excluded) == len(requested)
+    assert all(e.get("reason") for e in snap.excluded)
+
+
+def test_a_requested_cik_the_frames_do_not_carry_is_excluded_by_name():
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+                 ciks=[320193, 99999999])
+    excluded = {e["cik"]: e["reason"] for e in snap.excluded}
+    assert excluded == {99999999: "no diluted EPS in CY2023"}
+
+
+def test_a_requested_filer_with_no_share_count_is_excluded_by_name():
+    fake = FakeEdgar(
+        eps={320193: 6.13, 111: 1.0},
+        equity={320193: 62e9},
+        shares={320193: 15.5e9},
+        submissions={320193: submission("Apple Inc.", "AAPL", "3571")},
+    )
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=fake,
+                 ciks=[320193, 111])
+    excluded = {e["cik"]: e["reason"] for e in snap.excluded}
+    assert excluded == {111: "no share count in CY2023Q4I"}
+
+
+def test_a_requested_filer_with_a_zero_share_count_is_excluded_by_name():
+    fake = FakeEdgar(
+        eps={320193: 6.13, 111: 1.0},
+        equity={320193: 62e9},
+        shares={320193: 15.5e9, 111: 0.0},
+        submissions={320193: submission("Apple Inc.", "AAPL", "3571")},
+    )
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=fake,
+                 ciks=[320193, 111])
+    excluded = {e["cik"]: e["reason"] for e in snap.excluded}
+    assert excluded == {111: "share count is zero or negative"}
+
+
+def test_a_requested_filer_that_maps_to_no_sector_is_excluded_by_name():
+    """The exclusion reasons the ranked path already had, still reached."""
+    fake = FakeEdgar(
+        eps={320193: 6.13, 111: 1.0},
+        equity={320193: 62e9, 111: 1e9},
+        shares={320193: 15.5e9, 111: 1e8},
+        submissions={320193: submission("Apple Inc.", "AAPL", "3571"),
+                     111: submission("Blank Check Co", "SPAC", "6770")},
+    )
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=fake,
+                 ciks=[320193, 111])
+    excluded = {e["cik"]: e["reason"] for e in snap.excluded}
+    assert excluded == {111: "SIC maps to no sector"}
+
+
+def test_an_excluded_loss_maker_still_carries_its_cik():
+    """`filter_rows` exclusions land in the same partition as the rest.
+
+    They arrive by a different route, after the row is built rather than
+    before, so the CIK has to survive that route for the partition check
+    above to hold on a real roster, where loss-makers are most of the
+    exclusions.
+    """
+    fake = FakeEdgar(
+        eps={320193: 6.13, 111: -4.0},
+        equity={320193: 62e9, 111: -9e8},
+        shares={320193: 15.5e9, 111: 1e8},
+        submissions={320193: submission("Apple Inc.", "AAPL", "3571"),
+                     111: submission("Zombie Inc", "ZMB", "3841")},
+    )
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=fake,
+                 ciks=[320193, 111])
+    assert [e["cik"] for e in snap.excluded] == [111]
+    assert "negative" in snap.excluded[0]["reason"]
+
+
+def test_the_notes_record_that_an_exact_roster_was_requested():
+    """A reader holding only the file can check membership against the ask.
+
+    Without the request in the notes, exact membership is checkable only
+    against the roster file the caller happened to read, which is not
+    carried anywhere in the snapshot.
+    """
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+                 ciks=[1045810, 320193])
+    assert snap.notes["selection"] == "exact_ciks"
+    assert snap.notes["requested"] == 2
+    assert snap.notes["requested_ciks"] == [1045810, 320193]
+    assert len(snap.notes["requested_ciks_digest"]) == 64
+    # Nothing was ranked, so a `ranked_by` note would be a confident wrong
+    # answer about how the roster was chosen.
+    assert "ranked_by" not in snap.notes
+
+
+def test_the_request_digest_is_order_independent():
+    """Two orderings of one roster are the same request and different data.
+
+    The digest identifies the SET asked for, which is what a membership
+    check compares. The snapshot hash still moves, because roster order
+    decides the market.
+    """
+    a = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+              ciks=[1045810, 320193])
+    b = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+              ciks=[320193, 1045810])
+    assert (a.notes["requested_ciks_digest"]
+            == b.notes["requested_ciks_digest"])
+    assert a.hash != b.hash
+
+
+def test_an_exact_roster_takes_the_padded_form_edgar_prints():
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+                 ciks=["0000320193", "CIK0001045810"])
+    assert [r["ticker"] for r in snap.rows] == ["AAPL", "NVDA"]
+    assert snap.notes["requested_ciks"] == [320193, 1045810]
+
+
+def test_a_roster_and_a_ranking_together_are_refused():
+    """Two rosters in one call, and no way to say which the caller meant."""
+    with pytest.raises(ValidationError, match="exact roster"):
+        fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+              ciks=[320193], limit=10)
+    with pytest.raises(ValidationError, match="exact roster"):
+        fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+              ciks=[320193], rank_by="public_float")
+
+
+def test_a_repeated_cik_is_refused_rather_than_deduplicated():
+    """Deduplicating would make the counts stop adding up.
+
+    Three of the S&P 500's 503 lines are a second share class of a company
+    already listed, so this is the shape a real roster arrives in. It is
+    resolved in the roster, where the second line can be recorded as the
+    share class it is.
+    """
+    with pytest.raises(ValidationError, match="repeats CIK"):
+        fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+              ciks=[320193, 320193])
+
+
+def test_an_empty_roster_is_refused():
+    with pytest.raises(ValidationError, match="empty"):
+        fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+              ciks=[])
+
+
+@pytest.mark.parametrize("bad", ["", "AAPL", "12.5", None])
+def test_a_value_that_is_not_a_cik_is_refused(bad):
+    with pytest.raises(ValidationError, match="not a CIK"):
+        fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+              ciks=[bad])
+
+
+def test_a_non_positive_cik_is_refused():
+    with pytest.raises(ValidationError, match="positive integer"):
+        fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+              ciks=[0])
+
+
+def test_the_ranked_path_is_untouched_by_the_roster_argument():
+    """Every documented ranked call still returns what it returned.
+
+    `limit` and `rank_by` grew a None default so that passing them beside a
+    roster could be refused. A default that changed behaviour rather than
+    only its spelling would break every caller of the released signature.
+    """
+    default = fetch(as_of="2024-06-30", user_agent=UA,
+                    transport=small_market())
+    explicit = fetch(as_of="2024-06-30", user_agent=UA, limit=100,
+                     rank_by="equity", transport=small_market())
+    assert default.hash == explicit.hash
+    assert default.notes["ranked_by"] == "stockholders_equity"
+    assert default.notes["requested"] == 100
+
+    capped = fetch(as_of="2024-06-30", user_agent=UA, limit=2,
+                   transport=small_market())
+    assert [r["ticker"] for r in capped.rows] == ["MSFT", "AAPL"]
