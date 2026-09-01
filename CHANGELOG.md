@@ -201,7 +201,98 @@ reused; on a miss the provider is called. The resulting file records how
 many of its entries were resumed and how many were called, and a `prior`
 recorded under different instructions is refused before the run starts.
 
+**The agent's own noise floor, measurable.**
+`tradefloor.counterfactual.resample` asks one recorded decision point N
+times per arm and reports the within-arm spread beside the between-arm gap.
+It replays two frozen inputs, so N paired samples cost N calls rather than N
+re-simulations, and it refuses when the two arms' inputs differ in anything
+the intervention did not touch. `Resample.as_dict` and `.render` match what
+`Comparison` already offers, and every adapter gains a `reask` hook.
+
 <!-- release-note-ends -->
+
+### The case for the library
+
+`compare` reports one trajectory per arm, which is the whole answer for a
+deterministic policy and half of one for a language model. The agent is the
+only stochastic component left in an otherwise bit-identical experiment, and
+a single pair of trajectories cannot separate "the agent responded to the
+intervention" from "the agent answered the same question two ways". Every
+study running an LLM agent has to hand-roll the same paired resampling, and
+none of them did.
+
+A small N suffices here only because of the determinism, so the library
+that provides the determinism should provide the measurement that cashes it
+in.
+Everything except the agent has already been eliminated by construction:
+`agree()` verifies the whole engine state at the fork, and the two arms'
+inputs at the first post-fork decision differ only in the intervened fields.
+Outside this environment the same question would need to separate agent
+variance from market noise, path dependence and different starting states,
+with no counterfactual available at all.
+
+### The measurement it exists to prevent
+
+Live, both arms at temperature 0. At the first post-fork decision the two
+prompts differed in 2 lines of 376, `federal_funds_rate` and
+`corporate_bond_yield`, with every price, position and return byte-identical.
+The recorded trajectories then diverged, readably:
+
+- control: "Deploying excess cash into quality positions: buying IBM's dip"
+- +200bps: "Reducing exposure to IBM after its sharp 4.2% single-day
+  decline ... to manage downside risk"
+
+Resampling those two exact prompts eight times each:
+
+| arm | distinct answers in 8 | modal share | net (buys - sells) |
+|---|---:|---:|---:|
+| control | 4 | 62% | 0.62 +/- 0.99 |
+| +200bps | 1 | 100% | 0.00 +/- 0.00 |
+
+The between-arm gap of 0.62 sits inside control's own within-arm standard
+deviation of 0.99. The recorded split was one of control's four available
+answers. The study around it passed 71 publication checks.
+
+The same numbers carry a second reading the feature reports on purpose. One
+distinct answer in eight calls against four is a difference in decision
+STABILITY rather than in direction. `compare` cannot see it. It is
+observable at all only because the input was byte-identical eight times.
+
+### The refusals
+
+Inputs that differ beyond the intervention. A controlled resample needs
+two arms answering one question, so a difference the intervention cannot
+account for is refused and the error names the fields that moved. This is for the FIRST post-fork decision; by the second
+the market has already answered the intervention and every line differs.
+
+A zero-variance arm reports a standard deviation of 0 and a separation of
+`None`. A ratio over zero is undefined rather than large, and `inf` printed
+in a published table reads as an overwhelming result.
+
+Refusals are counted, never dropped. An agent that returns unusable output
+on three of twenty calls is a finding, and sampling until twenty parse would
+hide it. Exactly N calls are made per arm.
+
+No p-value. The gap is reported in units of the noise floor and the reader
+judges; a significance test would imply an inference model nobody has
+argued for here.
+
+### The re-ask hook and the record
+
+`FrameworkAdapter.reask(entry)` performs one live interaction from a record
+entry and changes no adapter state: no price appended to the history, no row
+added to the record, no write to the recorder. A resample happens after the
+run, and the adapter's state belongs to the run, so all five adapters
+implement it under a contract check that asserts the state is untouched.
+
+`agent.record` entries gain `payload`. The record's own docstring says it
+carries the whole chain, "observation to input to response to validated
+action to order", and it began at the rendered input -- so nothing joined a
+decision back to what the agent was shown, and an adapter that builds its
+framework input from the payload rather than from text had nothing to
+re-ask.
+
+
 
 ### The refusal policy
 

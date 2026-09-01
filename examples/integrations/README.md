@@ -298,6 +298,36 @@ the run stops and names the step it stopped at. Keyed by position, a replay
 would answer the new question with the answer given to the old one, and
 nothing in the output would say so.
 
+## The agent's own noise floor
+
+A model is the one thing in a Tradefloor experiment that answers the same
+question two ways. Before reading a difference between two arms, measure the
+spread inside one.
+
+```python
+from tradefloor import resample
+
+probe = resample(control, shock, at=control.fork_step, n=8)
+print(probe.render())
+print(probe.separation["net"])      # the gap, in within-arm stdevs
+```
+
+It replays the two recorded inputs rather than re-running the market, so N
+paired samples cost N calls. It refuses when the arms' inputs differ in
+anything the intervention did not touch, which is what makes it a controlled
+measurement and is silent today; that makes it a tool for the first
+post-fork decision, where the arms still share prices, positions and
+history.
+
+Read `distinct` and `modal_share` beside the means. Two arms can differ in
+how STABLE their answers are at the same average, and that difference is
+invisible to `compare`.
+
+Measured on a real study: a between-arm gap of 0.62 against a within-arm
+standard deviation of 0.99, from a pair of trajectories that read like a
+clean response to the intervention. The recorded split was one of four
+answers the control arm gave to the same prompt.
+
 ## When a live run goes wrong
 
 Two things end a long live run, and they end it differently.

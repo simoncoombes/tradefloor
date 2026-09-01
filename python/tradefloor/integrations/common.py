@@ -1221,6 +1221,51 @@ _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 _SEGMENTS = re.compile(r"[^A-Za-z0-9]+")
 
 
+class Moment:
+    """The step and day a re-ask belongs to.
+
+    A resample happens after the run, so the Observation those decisions
+    were taken against is gone. Every adapter that reads the observation
+    inside its live call reads exactly two fields off it -- ``step`` and
+    ``day``, for a trace tag or an error message -- and both are on the
+    record entry the input came from. This carries those two and nothing
+    else, so an adapter reaching for market state here fails loudly rather
+    than resampling against a stale price.
+    """
+
+    __slots__ = ("step", "day")
+
+    def __init__(self, step: int, day: int) -> None:
+        self.step = int(step)
+        self.day = int(day)
+
+    def __repr__(self) -> str:
+        return f"Moment(step={self.step}, day={self.day})"
+
+
+def refuse_replay_reask(mode: str, name: str) -> None:
+    """Refuse a re-ask on a replaying adapter.
+
+    A recording holds ONE answer per input. Re-asking it N times returns
+    that answer N times and reports a within-arm spread of zero, which is
+    the most confident-looking result a resample can produce and is an
+    artifact of the recording rather than a property of the agent. The
+    noise floor has to be measured live, or it has not been measured.
+    """
+    if mode == "replay":
+        raise ValidationError(
+            f"{name} is replaying, and a recording holds one answer per "
+            "input. Asking it again would hand back the same answer every "
+            "time and report a noise floor of zero -- the most convincing "
+            "result available, and an artifact of the file. Resample a "
+            "live run, or record more than one answer per input.")
+
+
+def moment_of(entry: Any) -> Moment:
+    """The :class:`Moment` a record entry happened at."""
+    return Moment(entry.get("step", -1), entry.get("day", -1))
+
+
 def check_prior(prior: "Transcript | None", *, mode: str,
                 recorder: "Transcript | None",
                 instructions_digest: str) -> "Transcript | None":
@@ -1578,6 +1623,27 @@ class FrameworkAdapter:
             "subclasses FrameworkAdapter and implements ask(obs, payload), "
             "the one method that reaches its framework.")
 
+    def reask(self, entry: Any) -> Any:
+        """One more live answer to a decision this adapter already took.
+
+        ``entry`` is a row of :attr:`record`, carrying ``payload``,
+        ``prompt``, ``step`` and ``day``. Return the raw response, in the
+        same shape :meth:`ask` returns.
+
+        It MUST change nothing. No price appended to :attr:`history`, no
+        row added to :attr:`record`, no write to the recorder: a resample
+        happens after the run, and the adapter's state belongs to the run.
+
+        :func:`~tradefloor.counterfactual.resample` is the caller. The
+        determinism everywhere else is what makes a small sample enough
+        there, so the one stochastic component has to be askable twice.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement reask(entry). It "
+            "should perform ONE live interaction from a recorded record "
+            "entry, changing no adapter state, and return the raw "
+            "response.")
+
     def call_or_resume(self, key: str, live: Any) -> Any:
         """The answer recorded for ``key`` in :attr:`prior`, or ``live()``.
 
@@ -1660,6 +1726,13 @@ class FrameworkAdapter:
         self._decision = {"step": obs.step, **decision.as_dict()}
         entry: dict[str, Any] = {"arm": self.arm, "step": obs.step,
                                  "day": obs.day}
+        # The observation end of the chain this record is documented to
+        # carry. It was missing: the entry began at the rendered input, so
+        # nothing joined a decision back to what the agent was shown, and
+        # `resample` -- which asks one recorded input again -- had nothing
+        # to re-ask an adapter that renders from the payload rather than
+        # from text.
+        entry["payload"] = payload
         # The exchange, when ask() declared one, in the same keys the
         # FinRobot record and the Transcript use, so the three join without
         # translation. The response is always in hand -- it is what ask()
@@ -1897,6 +1970,17 @@ class ReplayMixin:
             })
             stamp_resume_counts(self.recorder, self.prior)
         return response
+
+    def reask(self, entry: Any) -> Any:
+        """One more answer, straight through :meth:`call`.
+
+        The recording is deliberately not consulted: :attr:`prior` answers
+        a question that has no answer yet, and a resample is asking one
+        that does, N more times. Reading the recording here would hand back
+        the same answer N times and report a noise floor of zero.
+        """
+        refuse_replay_reask(self.mode, type(self).__name__)
+        return self.call(moment_of(entry), entry.get("prompt"))
 
     def fork_kwargs(self) -> dict[str, Any]:
         kwargs = super().fork_kwargs()

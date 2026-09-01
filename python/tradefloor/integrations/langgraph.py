@@ -152,9 +152,9 @@ from .._core import ValidationError
 from .common import (DECISION_SCHEMA_VERSION, MAX_PARTICIPATION, AdapterInfo,
                      Decision, DecisionError, FrameworkAdapter,
                      FrameworkError, MissingDependencyError, Transcript,
-                     check_prior, digest, parse_decision,
-                     replay_response, require, run_sync,
-                     stamp_resume_counts)
+                     check_prior, digest, moment_of, parse_decision,
+                     refuse_replay_reask, replay_response, require,
+                     run_sync, stamp_resume_counts)
 
 #: What the graph is told to produce, when the default input builder renders
 #: the prompt text. Short on purpose: the decision contract is stated once,
@@ -620,6 +620,20 @@ class LangGraphAdapter(FrameworkAdapter):
             })
             stamp_resume_counts(self.recorder, self.prior)
         return parsed
+
+    def reask(self, entry: Any) -> Any:
+        """One more answer to a recorded input, changing nothing.
+
+        Built from the recorded ``payload`` rather than the recorded
+        prompt: this adapter sends the graph whatever ``input_builder``
+        makes, and the prompt is the rendered text the replay key is
+        computed over. Re-asking the text would ask a graph with a custom
+        builder a question it never saw.
+        """
+        refuse_replay_reask(self.mode, type(self).__name__)
+        return self.output_parser(self._invoke(
+            self.input_builder(entry.get("payload") or {}),
+            self.build_config(moment_of(entry))))
 
     def _invoke(self, graph_input: Any, config: dict[str, Any]) -> Any:
         """Call the runnable, preferring the synchronous entry point.

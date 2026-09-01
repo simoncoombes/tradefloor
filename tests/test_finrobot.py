@@ -293,11 +293,25 @@ def _contract_agent(respond):
             kwargs.setdefault("llm_config",
                               {"config_list": [{"model": "none"}]})
             super().__init__(**kwargs)
+            self._last_payload = None
 
         def _ask(self, prompt, key, obs):
             payload = fr.observe(obs, history=self.history,
                                  fundamentals=self.fundamentals,
                                  max_participation=self.max_participation)
+            self._last_payload = payload
+            return self._answer(payload)
+
+        def _live(self, prompt):
+            # `reask` reaches the framework call directly, BELOW `_ask`,
+            # which is the whole point of it: a re-ask must not run the
+            # record-and-replay skeleton. So the double has to cover this
+            # seam too, or the contract check for it would only ever
+            # exercise a real FinRobot install.
+            return self._answer(self._last_payload)
+
+        @staticmethod
+        def _answer(payload):
             out = respond(payload)
             return out if isinstance(out, str) else json.dumps(out)
 
