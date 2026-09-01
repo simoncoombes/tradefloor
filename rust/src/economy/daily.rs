@@ -857,8 +857,17 @@ pub fn update_economy_daily(
         } else {
             inputs.market_sigma_daily_pct
         };
-        let ruler = 0.989 * ruler_prev + 0.011 * inputs.market_sigma_daily_pct;
-        new_state.vix_selfex_ruler = ruler;
+        let ruler_ema = 0.989 * ruler_prev + 0.011 * inputs.market_sigma_daily_pct;
+        new_state.vix_selfex_ruler = ruler_ema;
+        // THE UNIFIED RULER (round 163): the max of the VIX-implied sigma
+        // and the slow EMA. Every measured failure named one half: the
+        // VIX side is the damping that kept the endogenous system stable
+        // in every VIX-ruler screen (fear up -> z down -> fires stop),
+        // and the EMA side floors the ruler wherever a pin understates
+        // the market (a held 5 stops reading ordinary days as crashes).
+        // Each covers exactly the other's measured hole.
+        let vix_sigma_pts = economy.vix / 15.874507866387544;
+        let ruler = mathx::max(vix_sigma_pts, ruler_ema);
         let z = if ruler > 0.0 {
             inputs.market_day_return_pct / ruler
         } else {
