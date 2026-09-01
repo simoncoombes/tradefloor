@@ -7,7 +7,8 @@
 nothing that step, and carries on. The count reaches the trace,
 `World.summary()` and a `Comparison` row, under `unusable_responses` and
 apart from the market-side `refused`. `"raise"` stays the default and
-behaves as it always has.
+behaves as it always has. A recording that cannot answer raises
+`ReplayMiss` and stops the run under either policy.
 
 **A dead live run keeps what it paid for.** Every adapter takes `prior=`, a
 recording an earlier run produced. On a digest hit the recorded answer is
@@ -46,6 +47,25 @@ counts are not comparable on turnover without the reader being told.
 What this does not do: retry. A second attempt at the same question is a
 second agent, and the experiment would then be measuring the retry policy.
 `parse` is unchanged and stays strict.
+
+### The exempt refusal
+
+`replay_response` raises `DecisionError` when a recording has no answer for
+an input, so a blanket skip turns a transcript covering nothing into an
+agent that refused everything -- and the run then completes, writes its
+artifacts and publishes that. Measured while building a study against this:
+two arms replayed against a transcript covering neither, reported twenty
+refusals each, and produced an empty series two hundred lines later.
+
+So a missing entry and a recorded null both raise `ReplayMiss`, and
+`World._ask` re-raises it while skipping everything else. A model that
+answered badly is a fact about the agent; a recording that does not cover
+the question is a fact about the experiment, and the two have opposite
+remedies.
+
+`ReplayMiss` subclasses `DecisionError`, so every caller written to catch
+one and charge the agent a step keeps catching it. Only the skip policy
+treats it differently.
 
 ### Resuming a recording
 

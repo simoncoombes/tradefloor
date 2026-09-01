@@ -110,22 +110,25 @@ def _macro(engine: Engine) -> dict[str, Any]:
     return {field: getattr(state, field) for field in MACRO_FIELDS}
 
 
-_REFUSAL_TYPE: type[BaseException] | None = None
+_REFUSAL_TYPES: tuple[type[BaseException], type[BaseException]] | None = None
 
 
-def _refusal_type() -> type[BaseException]:
-    """`DecisionError`, resolved late.
+def _refusal_types() -> tuple[type[BaseException], type[BaseException]]:
+    """`(DecisionError, ReplayMiss)`, resolved late.
 
     `integrations.common` imports this module for `MACRO_FIELDS`, so the
     import cannot sit at the top of the file. It is resolved once, when a
     world is built with `on_refusal="skip"`, rather than on every step.
-    """
-    global _REFUSAL_TYPE
-    if _REFUSAL_TYPE is None:
-        from .integrations.common import DecisionError
 
-        _REFUSAL_TYPE = DecisionError
-    return _REFUSAL_TYPE
+    Two types because the skip policy applies to one and not the other.
+    See :meth:`World._ask`.
+    """
+    global _REFUSAL_TYPES
+    if _REFUSAL_TYPES is None:
+        from .integrations.common import DecisionError, ReplayMiss
+
+        _REFUSAL_TYPES = (DecisionError, ReplayMiss)
+    return _REFUSAL_TYPES
 
 
 class World:
@@ -200,7 +203,7 @@ class World:
             # Resolved here rather than on the step it first matters, so a
             # missing integrations layer is a construction error and not a
             # surprise forty paid calls into a live run.
-            _refusal_type()
+            _refusal_types()
         self.pins = dict(pins or {})
         self.interventions: list[dict[str, Any]] = []
         # Interventions from a scenario handed to `apply`, already rebased
@@ -393,12 +396,24 @@ class World:
         list. A :class:`FrameworkError` is not caught: the call never
         completed, the agent produced nothing to judge, and charging it a
         step would score a dropped connection as bad behaviour.
+
+        :class:`~tradefloor.integrations.common.ReplayMiss` is not caught
+        either, and it is the exception that matters most. A recording with
+        no answer for this input is a broken EXPERIMENT, not a badly
+        behaved agent: skipping it turns a transcript that covers nothing
+        into an agent that refused everything, and the run then completes
+        and publishes that. Measured, before this exemption: two arms
+        replayed against a transcript covering neither, reported twenty
+        refusals each, and produced an empty series.
         """
         if self.on_refusal == "raise":
             return self.agent.act(obs) or {}, None
+        refusal, miss = _refusal_types()
         try:
             return self.agent.act(obs) or {}, None
-        except _refusal_type() as exc:
+        except miss:
+            raise
+        except refusal as exc:
             return {}, f"{type(exc).__name__}: {exc}"
 
     def _decision(self) -> Any:

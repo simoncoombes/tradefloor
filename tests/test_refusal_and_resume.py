@@ -27,7 +27,8 @@ from tradefloor.counterfactual import Comparison, World, agree, compare
 from tradefloor.integrations import common as ci
 from tradefloor.integrations.callable import CallableAgentAdapter
 from tradefloor.integrations.common import (DecisionError, FrameworkError,
-                                            MarketRefusalError, Transcript)
+                                            MarketRefusalError, ReplayMiss,
+                                            Transcript)
 
 SEED = 909
 
@@ -225,6 +226,56 @@ def test_the_count_is_windowed_to_the_fork_like_every_other_count():
     assert world.summary()["unusable_responses"] == 1
     assert control.summary()["unusable_responses"] == 0
     assert control.summary(since=0)["unusable_responses"] == 1
+
+
+def test_a_broken_replay_is_not_an_agent_behaving_badly():
+    """The exemption that decides whether `skip` is safe to turn on.
+
+    `replay_response` raises `DecisionError` when the recording has no
+    answer, so a blanket skip turns a transcript that covers nothing into
+    an agent that refused everything -- and the run completes, writes its
+    artifacts and publishes that. Measured before the exemption existed:
+    two arms replayed against a transcript covering neither, reported
+    twenty refusals each, and produced an empty series two hundred lines
+    later.
+    """
+    empty = Transcript(meta={"framework": "test"})
+    world = make_world(CallableAgentAdapter(Counting(), mode="replay",
+                                            transcript=empty),
+                       on_refusal="skip")
+    with pytest.raises(ReplayMiss, match="no recorded response"):
+        world.run(days=1)
+
+
+def test_a_recorded_null_answer_is_a_broken_replay_too():
+    """The recording exists and holds no answer. Same remedy: re-record,
+    not charge the agent a step."""
+    holed = Transcript(meta={"framework": "test"})
+    world = make_world(CallableAgentAdapter(Counting(), mode="live",
+                                            recorder=holed))
+    world.run(days=1)
+    for entry in holed.entries:
+        entry["response"] = None
+
+    replayed = make_world(CallableAgentAdapter(Counting(), mode="replay",
+                                               transcript=holed),
+                          on_refusal="skip")
+    with pytest.raises(ReplayMiss, match="null response"):
+        replayed.run(days=1)
+
+
+def test_a_replay_miss_is_still_a_decision_error():
+    """Subclassed on purpose: every caller written to catch a
+    `DecisionError` and charge the agent a step keeps catching it. Only
+    `World`'s skip policy treats it differently."""
+    assert issubclass(ReplayMiss, DecisionError)
+
+
+def test_a_real_refusal_is_still_skipped_beside_it():
+    """The exemption must not have turned the feature off."""
+    world = make_world(Scripted(bad={4}), on_refusal="skip")
+    world.run(days=2)
+    assert world.summary()["unusable_responses"] == 1
 
 
 # --------------------------------------------------------------------------

@@ -181,6 +181,28 @@ class DecisionError(IntegrationError):
     """
 
 
+class ReplayMiss(DecisionError):
+    """The recording holds no answer for this input.
+
+    A subclass of :class:`DecisionError`, so every caller written to catch
+    one and charge the agent a step keeps catching it. Its own class
+    because that charge is wrong here, and wrong in a way that publishes.
+
+    A model that answered badly is a fact about the AGENT. A recording that
+    does not cover the question is a fact about the EXPERIMENT: the
+    observation mapping, the instructions or the market moved since the
+    recording was made. Counting the second as a refusal turns a
+    misconfigured replay into an agent that refused every decision, and the
+    run then completes, writes its artifacts and publishes that. Measured,
+    before this class existed: two arms ran with a transcript that covered
+    neither, reported twenty refusals each, and produced an empty series
+    two hundred lines later.
+
+    So :class:`~tradefloor.counterfactual.World` re-raises this under
+    ``on_refusal="skip"`` while skipping everything else.
+    """
+
+
 class MarketRefusalError(DecisionError):
     """The decision was well-formed, and this market cannot take it.
 
@@ -1127,6 +1149,11 @@ def replay_response(transcript: Transcript, key: str, *, step: int,
     inputs changed, and that replaying anyway would answer this question
     with a response given to a different one.
 
+    Both failures raise :class:`ReplayMiss`, which is a
+    :class:`DecisionError` a skipping caller must NOT skip: a recording
+    that cannot answer is a broken experiment rather than a badly behaved
+    agent.
+
     A missing ENTRY and a recorded NULL are told apart, because their
     remedies are opposite: a missing key means the inputs changed and the
     run needs re-recording; a null response means the recording is right
@@ -1137,7 +1164,7 @@ def replay_response(transcript: Transcript, key: str, *, step: int,
     """
     entry = transcript.entry_for(key)
     if entry is None:
-        raise DecisionError(
+        raise ReplayMiss(
             f"no recorded response for step {step} (day {day}, digest "
             f"{key}). The transcript holds {len(transcript)} interactions, "
             "none for this input. A replay is keyed by the exact input the "
@@ -1147,7 +1174,7 @@ def replay_response(transcript: Transcript, key: str, *, step: int,
             "response given to a different one. Re-record the run live.")
     response = entry.get("response")
     if response is None:
-        raise DecisionError(
+        raise ReplayMiss(
             f"the recorded entry for step {step} (day {day}, digest {key}) "
             "holds a null response. The recording exists -- the inputs have "
             "not changed -- but this interaction captured no answer, which "
