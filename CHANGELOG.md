@@ -132,6 +132,61 @@ refuses, and the check forbade committing an honest one. It now compares the
 number of refused responses against a count the recording declares in its
 meta. An absent count means zero, so every fixture committed before this is
 unchanged.
+**A depth shock reaches the agent.** `market.liquidity` is the one scenario
+lever that touches execution, and the figure an agent reads was built once
+from the universe and never read again. So `liquidity_crisis` thinned the
+book, and both the depth the agent was shown and the participation cap its
+orders were clipped against stayed at their pre-crisis values. `World.run`
+and `evaluate` now re-read the column each day a scenario fires. A run with
+no scenario is unchanged, so every existing recording, digest and fixture
+stands.
+
+<!-- release-note-ends -->
+
+### The cost
+
+`liquidity_crisis` takes quoted depth to 40%. Measured on
+`Universe.random(6, seed=11)`, forked, with the scenario on one arm:
+
+```
+engine avg_volume column   543,983  ->  217,593     exactly x0.40
+what the agent was shown   543,983  ->  543,983     unchanged
+participation cap           27,199  ->   27,199     unchanged
+order actually permitted    27,199  ->   27,199     unchanged
+```
+
+The agent asked for 60,000 shares in both arms and was allowed the same
+27,199 in a book holding 40% of the ladder. The clip exists to stop an order
+the market cannot absorb. It was sized against a market that no longer
+existed. The agent never learned the order was unrealistic, because the only
+signal was a worse fill.
+
+`Observation.book()` on the same object DID show the thinned ladder, so the
+observation disagreed with itself: one accessor in the crisis, one in the
+market before it.
+
+`liquidity_crisis.yml` says an evaluation reading only the price series will
+score an agent as though it traded for free. The harness was doing a version
+of that.
+
+### The re-read
+
+`World.run` re-reads `avg_volume` at the top of each day, straight after
+`Scenario.apply`. That is the earliest point at which the day's value is
+known, and once a day is sufficient because nothing in the engine writes the
+column. `evaluate` does the same, guarded on a scenario being present: with
+none there is nothing to move it, and a daily column copy through every
+ordinary run would be work nobody asked for.
+
+The engine's column starts equal to the instrument list, so with no scenario
+in play the re-read returns exactly the value the old code held.
+`tests/test_observed_depth.py` pins that, alongside the four cases that fail
+without the fix.
+
+### The two sites
+
+Both `World.run` and `harness.evaluate`, three lines apart in different
+files. `_run_untraded` builds no Observation and needed nothing.
 
 ## 0.6.1
 

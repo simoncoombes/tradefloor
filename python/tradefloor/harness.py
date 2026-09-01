@@ -460,6 +460,13 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         # path rather than under whatever the engine was constructed with.
         if scenario is not None:
             scenario.apply(engine, day)
+            # Re-read the depth the agent is shown and the participation
+            # cap is sized against, because a scenario can move it and
+            # this was read once, before the loop. Only under a scenario:
+            # with none, nothing in the engine writes this column, and a
+            # daily re-read of every ordinary run would be a column copy
+            # nobody asked for.
+            adv = _f64(engine.column("avg_volume"))
         engine.open_market()
         for _ in range(steps_per_day):
             obs = Observation(step, day, tickers, _f64(engine.prices()),

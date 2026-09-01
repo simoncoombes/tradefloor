@@ -187,6 +187,15 @@ class World:
         self.fork_step: int | None = None
         self._day = 0
         self._step = 0
+        #: The depth the agent is shown and the participation cap is sized
+        #: against. Seeded from the universe and RE-READ from the engine at
+        #: the top of every day, because a scenario can move it and this
+        #: used to be read once and never again. What that cost:
+        #: `liquidity_crisis` takes quoted depth to 40%, and the agent went
+        #: on seeing the pre-crisis figure and went on being allowed the
+        #: pre-crisis order size -- in a book with 40% of the ladder. The
+        #: clip that exists to keep an order realistic was sized against a
+        #: market that no longer existed.
         self._adv = [instrument.avg_volume for instrument in self.universe]
 
     # -- identity ---------------------------------------------------------
@@ -270,6 +279,12 @@ class World:
             # intervention inside the checkpoint and the manifest rather
             # than only in this object's memory.
             scenario.apply(self.engine, day)
+            # Re-read the depth AFTER the scenario has fired. `avg_volume`
+            # is the column the market maker quotes off, `market.liquidity`
+            # scales it, and nothing else in the engine writes it -- so
+            # once a day, here, is both sufficient and the earliest point
+            # at which today's value is known.
+            self._adv = _f64(self.engine.column("avg_volume"))
             macro = _macro(self.engine)
             self.engine.open_market()
 
