@@ -278,6 +278,28 @@ def _grid(name):
                 "g25t175ch06": cell(0.25, 1.75, ch=0.6),
                 "g25t175lag": cell(0.25, 1.75, market_beta_up_comp=0.02,
                                    market_beta_down_asym_lag=0.02)}
+    elif name == "selfex10":
+        # Round 164: the unified max-ruler at the selfex5-proven doses —
+        # the neighbourhood where the VIX-side damping is measured to
+        # hold, now with the EMA floor covering the pins.
+        def cell(ch, har=0.18, **kw):
+            base = {"vix_selfex_gain": 0.25, "vix_selfex_threshold": 1.75,
+                    "vix_selfex_size_coupling": 0.5,
+                    "vix_decay_ratio": 0.85, "vix_selfex_relax_slope": 0.03,
+                    "vix_selfex_min": 2.0, "vix_selfex_scale": 4.0,
+                    "vix_selfex_vol_jump": ch}
+            if har:
+                base.update(vix_har_weight=har, vix_har_mid=0.3,
+                            vix_har_vrp=1.0)
+            return {**base, **kw}
+        return {"v16": {},
+                "u06": cell(0.6),
+                "u08": cell(0.8),
+                "u10": cell(1.0),
+                "u08h01": cell(0.8, har=0.1),
+                "u08noh": cell(0.8, har=0.0),
+                "u10lag": cell(1.0, market_beta_up_comp=0.02,
+                               market_beta_down_asym_lag=0.02)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):
