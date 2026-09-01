@@ -1158,6 +1158,32 @@ pub struct ModelParams {
     /// same-day correlation that the anchor supplies (rounds 155-156).
     /// 0.0 writes nothing and touches no state.
     pub vix_selfex_vol_jump: f64,
+    /// The market_factor_sigma the fear side was calibrated at, so the
+    /// co-jump scales with the LEVEL. Its trigger and its variance kick
+    /// are sized through the identity 1 VIX point = 1/sqrt(252) % daily
+    /// sigma, and the HAR anchor maps realized variance back to VIX
+    /// points through the same identity; all three are properties of the
+    /// level they were tuned at. Round 170 measured what a 0.78x market
+    /// sigma does to them: the kicks stop shrinking with the market they
+    /// land in, take over the calm held-VIX window (cs@5 0.32 -> 0.60,
+    /// vol@5 21 -> 32) and the crisis lever collapses 6.27 -> 3.31. With
+    /// this set, scale = market_factor_sigma / level_ref multiplies the
+    /// ruler's VIX side, scale^2 multiplies the kick's energy and the HAR
+    /// anchor's VIX target is divided by it — the fear process is then
+    /// invariant to a sigma trim in its own units. 0.0 = off, bit for bit;
+    /// set equal to the running market_factor_sigma it is also bit for
+    /// bit (every scale is exactly 1.0).
+    pub vix_selfex_level_ref: f64,
+    /// SVCJ state dependence of the co-jump's intensity (Bates 2000; Pan
+    /// 2002; Eraker-Johannes-Polson 2003 have it affine in variance):
+    /// lambda is multiplied by (vix / market_vol_vix_anchor)^power. The
+    /// shipped form fires at its design rate at any VIX because the
+    /// unified ruler standardizes the trigger; round 170 measured the
+    /// price at a held VIX of 5 (cs 0.195 -> 0.322, vol 18.8 -> 21.1 under
+    /// the era overlay). At 1.0: 0.31x the fires at a held 5, 1.1x at 18,
+    /// 1.9x at 30. Zero draws change (both uniforms are always drawn when
+    /// the gain is on). 0.0 = off, bit for bit.
+    pub vix_selfex_vix_power: f64,
     /// Couples an event's SIZE to the down-move that fired it: the
     /// magnitude is scaled by (1 + this x the gate excess). Round 153
     /// measured the missing piece exactly — the gate protects the
@@ -1572,6 +1598,8 @@ impl ModelParams {
             vix_selfex_size_coupling: 0.0,
             vix_selfex_relax_slope: 0.0,
             vix_selfex_vol_jump: 0.0,
+            vix_selfex_level_ref: 0.0,
+            vix_selfex_vix_power: 0.0,
             vix_har_weight: 0.0,
             vix_har_mid: 0.4,
             vix_har_slow: 0.25,
@@ -2636,6 +2664,8 @@ impl ModelParams {
             "vix_selfex_size_coupling" => self.vix_selfex_size_coupling,
             "vix_selfex_relax_slope" => self.vix_selfex_relax_slope,
             "vix_selfex_vol_jump" => self.vix_selfex_vol_jump,
+            "vix_selfex_level_ref" => self.vix_selfex_level_ref,
+            "vix_selfex_vix_power" => self.vix_selfex_vix_power,
             "vix_har_weight" => self.vix_har_weight,
             "vix_har_mid" => self.vix_har_mid,
             "vix_har_slow" => self.vix_har_slow,
@@ -2796,6 +2826,8 @@ impl ModelParams {
             "vix_selfex_size_coupling" => out.vix_selfex_size_coupling = value,
             "vix_selfex_relax_slope" => out.vix_selfex_relax_slope = value,
             "vix_selfex_vol_jump" => out.vix_selfex_vol_jump = value,
+            "vix_selfex_level_ref" => out.vix_selfex_level_ref = value,
+            "vix_selfex_vix_power" => out.vix_selfex_vix_power = value,
             "vix_har_weight" => out.vix_har_weight = value,
             "vix_har_mid" => out.vix_har_mid = value,
             "vix_har_slow" => out.vix_har_slow = value,
@@ -3020,6 +3052,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_selfex_size_coupling",
         "vix_selfex_relax_slope",
         "vix_selfex_vol_jump",
+        "vix_selfex_level_ref",
+        "vix_selfex_vix_power",
         "vix_har_weight",
         "vix_har_mid",
         "vix_har_slow",

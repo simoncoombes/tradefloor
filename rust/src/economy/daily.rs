@@ -95,6 +95,12 @@ pub struct DailyInputs<'a> {
     pub vix_selfex_size_coupling: f64,
     pub vix_selfex_relax_slope: f64,
     pub vix_selfex_vol_jump: f64,
+    /// Round 170: the level reference and the two model constants it
+    /// needs. At level_ref 0.0 nothing below reads market_factor_sigma.
+    pub vix_selfex_level_ref: f64,
+    pub vix_selfex_vix_power: f64,
+    pub market_factor_sigma: f64,
+    pub market_vol_vix_anchor: f64,
     /// The market factor's post-close daily sigma, in the same percent
     /// units as `market_day_return_pct`. The co-jump gate standardizes
     /// the day's return by THIS — the market's own scale — so the gate
@@ -189,6 +195,10 @@ impl<'a> Default for DailyInputs<'a> {
             vix_selfex_size_coupling: 0.0,
             vix_selfex_relax_slope: 0.0,
             vix_selfex_vol_jump: 0.0,
+            vix_selfex_level_ref: 0.0,
+            vix_selfex_vix_power: 0.0,
+            market_factor_sigma: 0.0,
+            market_vol_vix_anchor: 1.0,
             market_sigma_daily_pct: 1.0,
             vix_har_weight: 0.0,
             vix_har_mid: 0.4,
@@ -811,6 +821,16 @@ pub fn update_economy_daily(
     // realised branch so the two feedbacks split the target between them.
     // At weight 0.0 the branch is skipped and the EMAs stay frozen:
     // nothing dormant moves, and every shipped preset reproduces.
+    // The level-fair scale (round 170): how far the running market sigma
+    // sits from the level the fear side was calibrated at. Exactly 1.0
+    // when the two agree, and the branches below are not taken at all
+    // when the reference is unset, so every shipped trajectory holds.
+    let level_on = inputs.vix_selfex_level_ref != 0.0 && inputs.market_factor_sigma > 0.0;
+    let level_scale = if level_on {
+        inputs.market_factor_sigma / inputs.vix_selfex_level_ref
+    } else {
+        1.0
+    };
     if inputs.vix_har_weight != 0.0 {
         let day_frac = inputs.market_day_return_pct / 100.0;
         let rv_d = day_frac * day_frac;
@@ -823,7 +843,13 @@ pub fn update_economy_daily(
         let b_d = 1.0 - b_w - b_m;
         let harvar =
             b_d * rv_d + b_w * new_state.vix_har_rv_week + b_m * new_state.vix_har_rv_month;
-        let harvol = mathx::sqrt(252.0 * harvar) * 100.0 * inputs.vix_har_vrp;
+        let harvol = if level_on {
+            // A trimmed market realizes less variance for the same fear;
+            // the anchor's VIX target stays in the calibrated identity.
+            mathx::sqrt(252.0 * harvar) * 100.0 * inputs.vix_har_vrp / level_scale
+        } else {
+            mathx::sqrt(252.0 * harvar) * 100.0 * inputs.vix_har_vrp
+        };
         let w = inputs.vix_har_weight;
         target_vix = (1.0 - w) * target_vix + w * harvol;
     }
@@ -866,7 +892,13 @@ pub fn update_economy_daily(
         // and the EMA side floors the ruler wherever a pin understates
         // the market (a held 5 stops reading ordinary days as crashes).
         // Each covers exactly the other's measured hole.
-        let vix_sigma_pts = economy.vix / 15.874507866387544;
+        let vix_sigma_pts = if level_on {
+            // The VIX-implied sigma in the running market's own units, so a
+            // trimmed market's two-sigma day still reads as two sigma.
+            economy.vix / 15.874507866387544 * level_scale
+        } else {
+            economy.vix / 15.874507866387544
+        };
         let ruler = mathx::max(vix_sigma_pts, ruler_ema);
         let z = if ruler > 0.0 {
             inputs.market_day_return_pct / ruler
@@ -883,7 +915,19 @@ pub fn update_economy_daily(
         } else {
             1.0
         };
-        let lambda = (inputs.vix_selfex_gain + economy.vix_selfex_excitation) * phase_mult;
+        // SVCJ state dependence (round 170): the arrival rate rises with
+        // the VIX level, so a calm world fires seldom and a stressed one
+        // often. A branch, so 0.0 keeps the constant-rate form bit for bit.
+        let state_mult = if inputs.vix_selfex_vix_power != 0.0 && inputs.market_vol_vix_anchor > 0.0 {
+            mathx::pow(economy.vix / inputs.market_vol_vix_anchor, inputs.vix_selfex_vix_power)
+        } else {
+            1.0
+        };
+        let lambda = if inputs.vix_selfex_vix_power != 0.0 {
+            (inputs.vix_selfex_gain + economy.vix_selfex_excitation) * phase_mult * state_mult
+        } else {
+            (inputs.vix_selfex_gain + economy.vix_selfex_excitation) * phase_mult
+        };
         let p_fire = 1.0 - mathx::exp(-lambda * g);
         let u1 = rng.next_f64();
         // The magnitude draw is consumed on non-fire days too, so the
@@ -942,13 +986,27 @@ pub fn update_economy_daily(
             // at the PREVAILING regime — small in a calm window, large
             // in a stressed one, identical arithmetic at the phase mean.
             let ruler_vix_pts = ruler * 15.874507866387544;
-            new_state.vix_selfex_vol_kick = if fired {
+            new_state.vix_selfex_vol_kick = if !fired {
+                0.0
+            } else if level_on {
+                // Level-fair (round 170): the ruler back in reference VIX
+                // points, and the variance m points represent scaled by
+                // the square of the level — an m-point event in a 0.78x
+                // market carries 0.61x the variance it carried at the
+                // calibrated level, so the kicks shrink with the market
+                // they land in instead of taking it over.
+                let ruler_ref_pts = ruler_vix_pts / level_scale;
+                inputs.vix_selfex_vol_jump
+                    * level_scale
+                    * level_scale
+                    * (2.0 * ruler_ref_pts * magnitude + magnitude * magnitude)
+                    / 252.0
+                    / 1e4
+            } else {
                 inputs.vix_selfex_vol_jump
                     * (2.0 * ruler_vix_pts * magnitude + magnitude * magnitude)
                     / 252.0
                     / 1e4
-            } else {
-                0.0
             };
         }
         new_state.vix_selfex_fear = fear_next;

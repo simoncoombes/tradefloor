@@ -364,6 +364,11 @@ PERTURBATIONS = [
     ("vix_selfex_size_coupling", 0.5, False),
     ("vix_selfex_relax_slope", 0.05, False),
     ("vix_selfex_vol_jump", 0.5, False),
+    # Round 170: the level reference and the state power, both gated
+    # behind the gain like the rest of the family. Proven live under the
+    # gain in test_the_fear_scale_dials_act_when_the_co_jump_is_on.
+    ("vix_selfex_level_ref", 0.005, False),
+    ("vix_selfex_vix_power", 1.0, False),
     # The HAR anchor's weight. Non-zero re-mixes the VIX target from the
     # first close (the anchor starts cold at zero realized variance, which
     # IS a target move), and the VIX reaches the market through the
@@ -775,6 +780,29 @@ def test_the_conditionally_inert_parameters_act_under_their_conditions():
         moved = run_with_inputs(custom)
         assert moved["draws"] == base["draws"], name
         assert moved != base, f"{name} did not act even under its inputs"
+
+
+def test_the_fear_scale_dials_act_when_the_co_jump_is_on():
+    """Round 170's two dials are inert behind the gain (the table above)
+    and must ACT once the co-jump runs: the level reference re-sizes the
+    trigger, the kick and the HAR anchor; the state power re-weights the
+    arrival rate. Neither may touch the draw schedule. And the level
+    reference set to the running market sigma is bit-identical to off,
+    because every scale it applies is then exactly 1.0 — the identity that
+    lets a search carry the dial at the incumbent's value at no cost."""
+    fear = dict(vix_selfex_gain=0.5, vix_selfex_vol_jump=0.5, vix_har_weight=0.5)
+    base = market_state(run_market(tradefloor.ModelParams.from_preset(**fear)))
+    for name, value in [("vix_selfex_level_ref", 0.005),
+                        ("vix_selfex_vix_power", 1.0)]:
+        custom = tradefloor.ModelParams.from_preset(**fear, **{name: value})
+        moved = market_state(run_market(custom))
+        assert moved["draws"] == base["draws"], f"{name} moved the draw schedule"
+        assert any(moved[k] != base[k] for k in moved if k != "draws"), \
+            f"{name} did not act even with the co-jump on"
+    running = tradefloor.ModelParams.from_preset(**fear).to_dict()["market_factor_sigma"]
+    same = tradefloor.ModelParams.from_preset(**fear, vix_selfex_level_ref=running)
+    assert market_state(run_market(same)) == base, \
+        "a level reference equal to the running sigma must be bit-identical to off"
 
 
 def test_a_recomputed_half_life_still_halves_in_its_stated_days():
