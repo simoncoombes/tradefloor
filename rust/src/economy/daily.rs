@@ -894,9 +894,20 @@ pub fn update_economy_daily(
         // after this update. Written every active day so nothing stale
         // survives; the formula is annualized-%^2 to daily variance.
         if inputs.vix_selfex_vol_jump != 0.0 {
+            // LEVEL-INDEPENDENT event energy (round 160). The first form
+            // used the live VIX in the cross-term, and the held-VIX
+            // instruments priced it immediately: at a pinned 65 every
+            // event carried 3.4x its endogenous energy, the gate fired on
+            // every big day of a window whose days are all big, and the
+            // crisis lever exploded (error 0.0183 -> 0.859 across the
+            // whole leaders card). An event of m points now injects the
+            // variance m points represent at the PHASE-MEAN VIX — same
+            // event, same energy, whatever the level around it — which
+            // is bit-near-identical on endogenous paths (median VIX
+            // ~18-19) and stops the pinned windows amplifying it.
             new_state.vix_selfex_vol_kick = if fired {
                 inputs.vix_selfex_vol_jump
-                    * (2.0 * economy.vix * magnitude + magnitude * magnitude)
+                    * (2.0 * VIX_PHASE_MEAN * magnitude + magnitude * magnitude)
                     / 252.0
                     / 1e4
             } else {
