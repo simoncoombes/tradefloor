@@ -209,6 +209,29 @@ def _grid(name):
                 "n08h015": cell(0.8, har=0.15),
                 "n08h01lag": cell(0.8, har=0.1, market_beta_up_comp=0.02,
                                   market_beta_down_asym_lag=0.02)}
+    elif name == "selfex7":
+        # Round 159: the apex micro-screen. Screen 6 put five gates in
+        # everywhere and left same-day 0.005 outside the window at
+        # n08g02/n08h015 — while the real SUB-PERIOD minimum (-0.7769)
+        # sits at n08h015's own reading. The har 0.16-0.22 window is the
+        # untested crossing where same-day and asym trade.
+        def cell(har, vrp=1.0, ch=0.8, **kw):
+            base = {"vix_selfex_gain": 0.25, "vix_selfex_size_coupling": 0.5,
+                    "vix_decay_ratio": 0.85, "vix_selfex_relax_slope": 0.03,
+                    "vix_selfex_min": 2.0, "vix_selfex_scale": 4.0,
+                    "vix_selfex_vol_jump": ch,
+                    "vix_har_weight": har, "vix_har_mid": 0.3,
+                    "vix_har_vrp": vrp}
+            return {**base, **kw}
+        return {"v16": {},
+                "h016": cell(0.16),
+                "h018": cell(0.18),
+                "h020": cell(0.20),
+                "h018v105": cell(0.18, vrp=1.05),
+                "h018ch10": cell(0.18, ch=1.0),
+                "h020d90": cell(0.20, vix_decay_ratio=0.9),
+                "h018lag": cell(0.18, market_beta_up_comp=0.02,
+                                market_beta_down_asym_lag=0.02)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):
