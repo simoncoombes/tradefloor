@@ -187,6 +187,100 @@ without the fix.
 
 Both `World.run` and `harness.evaluate`, three lines apart in different
 files. `_run_untraded` builds no Observation and needed nothing.
+**One malformed answer no longer ends a run.** `World` takes
+`on_refusal="skip"`, which records an unusable agent response, trades
+nothing that step, and carries on. The count reaches the trace,
+`World.summary()` and a `Comparison` row, under `unusable_responses` and
+apart from the market-side `refused`. `"raise"` stays the default and
+behaves as it always has. A recording that cannot answer raises
+`ReplayMiss` and stops the run under either policy.
+
+**A dead live run keeps what it paid for.** Every adapter takes `prior=`, a
+recording an earlier run produced. On a digest hit the recorded answer is
+reused; on a miss the provider is called. The resulting file records how
+many of its entries were resumed and how many were called, and a `prior`
+recorded under different instructions is refused before the run starts.
+
+<!-- release-note-ends -->
+
+### The refusal policy
+
+`World.run` called the agent with no guard, so a `DecisionError` from
+`act` went out past the trace, past the checkpoint and past every artifact
+the caller was about to write. The adapter layer documented the opposite:
+"the caller decides whether that ends the run or costs the agent a step".
+The caller is `World.run`, and the choice did not exist.
+
+Measured on a live pilot: 24 names, 60 planned decisions, and on call 36 a
+per-action `rationale` field. `parse` is right to refuse it -- dropping an
+unknown field executes a trade the agent conditioned on something it never
+got -- and 35 recorded interactions, 20 simulated days of shared history
+and both arms of a fork went with it, at a malformed rate of 1 in 35. A run
+long enough to be interesting is a run long enough to hit that.
+
+An agent that returns unusable output is an agent behaving badly, and
+behaving badly is a measurement. It belongs beside `refused` in the trace
+rather than in a traceback.
+
+`refused` and `unusable_responses` are two columns and are never summed. A
+market that rejected an order and an agent that could not format an answer
+are different failures with different remedies, and one column covering
+both would make an unusable agent read as an illiquid market.
+`Comparison.ROWS` carries both, because two arms with different refusal
+counts are not comparable on turnover without the reader being told.
+
+What this does not do: retry. A second attempt at the same question is a
+second agent, and the experiment would then be measuring the retry policy.
+`parse` is unchanged and stays strict.
+
+### The exempt refusal
+
+`replay_response` raises `DecisionError` when a recording has no answer for
+an input, so a blanket skip turns a transcript covering nothing into an
+agent that refused everything -- and the run then completes, writes its
+artifacts and publishes that. Measured while building a study against this:
+two arms replayed against a transcript covering neither, reported twenty
+refusals each, and produced an empty series two hundred lines later.
+
+So a missing entry and a recorded null both raise `ReplayMiss`, and
+`World._ask` re-raises it while skipping everything else. A model that
+answered badly is a fact about the agent; a recording that does not cover
+the question is a fact about the experiment, and the two have opposite
+remedies.
+
+`ReplayMiss` subclasses `DecisionError`, so every caller written to catch
+one and charge the agent a step keeps catching it. Only the skip policy
+treats it differently.
+
+### Resuming a recording
+
+A refusal policy does not survive a rate limit, a dropped connection or a
+keyboard interrupt. The recorder is written by the caller at the end, so a
+run that died had paid for N calls and kept none of them in a form the next
+run could use, and the second attempt re-asked every question it already
+had an answer to.
+
+`prior=` is consulted before the provider, on the same key the replay path
+uses. The market is deterministic, so a resumed run reaches the same
+prompts and computes the same digests, and every recorded answer is still
+an answer to the question being asked.
+
+Two guards. A `prior` whose `instructions_digest` differs from the current
+one is refused at construction: instructions do not travel in the input the
+key is computed over, so every recorded key would still match and the run
+would complete, answering the instructions you have now with decisions
+taken under the ones you had then. And the resulting recording carries
+`replayed_from_prior` and `called_live`, so a file stitched from two
+sessions cannot claim to be one.
+
+Both counts are derived from the two transcripts rather than accumulated as
+the run goes. A fork shares one recorder and gives each arm its own
+adapter, so a counter living on an adapter would split across the arms and
+each half would understate the file it describes.
+
+`World.fork` now carries `on_refusal` to both arms, for the same reason it
+carries every other setting: an arm that reverted to the default would die
+on output its sibling counted and continued past.
 
 ## 0.6.1
 

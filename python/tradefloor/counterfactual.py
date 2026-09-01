@@ -110,6 +110,27 @@ def _macro(engine: Engine) -> dict[str, Any]:
     return {field: getattr(state, field) for field in MACRO_FIELDS}
 
 
+_REFUSAL_TYPES: tuple[type[BaseException], type[BaseException]] | None = None
+
+
+def _refusal_types() -> tuple[type[BaseException], type[BaseException]]:
+    """`(DecisionError, ReplayMiss)`, resolved late.
+
+    `integrations.common` imports this module for `MACRO_FIELDS`, so the
+    import cannot sit at the top of the file. It is resolved once, when a
+    world is built with `on_refusal="skip"`, rather than on every step.
+
+    Two types because the skip policy applies to one and not the other.
+    See :meth:`World._ask`.
+    """
+    global _REFUSAL_TYPES
+    if _REFUSAL_TYPES is None:
+        from .integrations.common import DecisionError, ReplayMiss
+
+        _REFUSAL_TYPES = (DecisionError, ReplayMiss)
+    return _REFUSAL_TYPES
+
+
 class World:
     """A market, an agent trading it, and the macro path they run under.
 
@@ -129,13 +150,20 @@ class World:
     agent with no funding limit is not being tested against the market: large
     trades cost more through the book, but arbitrarily large is always
     available and "trade everything" wins.
+
+    ``on_refusal`` decides what an agent that cannot produce a decision
+    costs. ``"raise"`` is the default and ends the run, which is what this
+    class has always done. ``"skip"`` records the refusal, trades nothing
+    that step, and carries on; see :meth:`_ask`. Either way the count is in
+    the trace and in :meth:`summary` under ``unusable_responses``, kept
+    apart from the market-side ``refused`` so a comparison cannot add them.
     """
 
     __slots__ = ("label", "seed", "universe", "macro", "model", "cash",
                  "max_leverage", "steps_per_day", "ticks_per_step", "start",
                  "engine", "portfolio", "agent", "trace", "pins",
                  "interventions", "applied", "rejected", "fork_step",
-                 "_day", "_step", "_adv", "_ran")
+                 "on_refusal", "_day", "_step", "_adv", "_ran")
 
     def __init__(
         self,
@@ -152,10 +180,14 @@ class World:
         start: tuple[int, int, int] = (9, 30, 3),
         model: str | ModelParams | None = None,
         label: str = "",
+        on_refusal: str = "raise",
     ) -> None:
         if steps_per_day < 1 or ticks_per_step < 1:
             raise ValidationError(
                 "steps_per_day and ticks_per_step must be >= 1")
+        if on_refusal not in ("raise", "skip"):
+            raise ValidationError(
+                f"on_refusal must be 'raise' or 'skip', got {on_refusal!r}")
         self.label = label
         self.seed = int(seed)
         self.universe = list(universe)
@@ -166,6 +198,12 @@ class World:
         self.steps_per_day = int(steps_per_day)
         self.ticks_per_step = int(ticks_per_step)
         self.start = start
+        self.on_refusal = on_refusal
+        if on_refusal == "skip":
+            # Resolved here rather than on the step it first matters, so a
+            # missing integrations layer is a construction error and not a
+            # surprise forty paid calls into a live run.
+            _refusal_types()
         self.pins = dict(pins or {})
         self.interventions: list[dict[str, Any]] = []
         # Interventions from a scenario handed to `apply`, already rebased
@@ -297,8 +335,14 @@ class World:
                     day, self._step,
                     (self._step % self.steps_per_day) * self.ticks_per_step)
 
-                orders = self.agent.act(obs) or {}
-                decision = self._decision()
+                orders, unusable = self._ask(obs)
+                # No decision on a refused step. The adapter's last
+                # decision is still the one BEFORE this step, and reading
+                # it here would put a decision the agent did not take into
+                # the row that records it not taking one -- and `compare`
+                # finds the divergence step by comparing exactly this
+                # field.
+                decision = None if unusable else self._decision()
                 fills, refused = self._execute(orders, tickers)
 
                 self.engine.run_session(
@@ -318,6 +362,12 @@ class World:
                     "orders": {t: q for t, q in orders.items() if q},
                     "fills": fills,
                     "refused": refused,
+                    # Market-side above, agent-side here, and they are two
+                    # different failures: `refused` is an order this market
+                    # would not take, `unusable` is output that was never an
+                    # order. One column covering both would read an agent
+                    # that cannot format an answer as an illiquid market.
+                    "unusable": unusable,
                     # End of step: what this step's session produced. The
                     # orders above are what opened it. Both in one row, so a
                     # divergence can be attributed to a decision or to the
@@ -335,6 +385,51 @@ class World:
             self.engine.close_market()
             self._day += 1
         return self
+
+    def _ask(self, obs: "Observation") -> tuple[dict[str, float], str | None]:
+        """The agent's orders for this step, and its refusal if it gave one.
+
+        Under ``on_refusal="raise"`` -- the default, and what this module
+        has always done -- an agent that cannot produce a decision ends the
+        run. Under ``"skip"`` the step trades nothing, the refusal is
+        recorded, and the run continues.
+
+        The case for ``"skip"``: an agent that returns unusable output is
+        an agent behaving badly, and behaving badly is a measurement. A
+        malformed response measured at 1 in 35 on a live 60-decision run
+        ended it on call 36 and took 35 recorded interactions, 20 days of
+        shared history and both arms of a fork with it. A run long enough
+        to be interesting is a run long enough to hit that.
+
+        The case for ``"raise"`` staying the default: a run that quietly
+        skipped every decision would report a flat agent rather than a
+        broken one, and nobody asked for it.
+
+        :class:`~tradefloor.integrations.common.DecisionError` only, which
+        covers both stages a decision can fail at -- output that does not
+        parse, and a well-formed order in a symbol this market does not
+        list. A :class:`FrameworkError` is not caught: the call never
+        completed, the agent produced nothing to judge, and charging it a
+        step would score a dropped connection as bad behaviour.
+
+        :class:`~tradefloor.integrations.common.ReplayMiss` is not caught
+        either, and it is the exception that matters most. A recording with
+        no answer for this input is a broken EXPERIMENT, not a badly
+        behaved agent: skipping it turns a transcript that covers nothing
+        into an agent that refused everything, and the run then completes
+        and publishes that. Measured, before this exemption: two arms
+        replayed against a transcript covering neither, reported twenty
+        refusals each, and produced an empty series.
+        """
+        if self.on_refusal == "raise":
+            return self.agent.act(obs) or {}, None
+        refusal, miss = _refusal_types()
+        try:
+            return self.agent.act(obs) or {}, None
+        except miss:
+            raise
+        except refusal as exc:
+            return {}, f"{type(exc).__name__}: {exc}"
 
     def _decision(self) -> Any:
         """Whatever the agent chose to publish about its last decision."""
@@ -549,7 +644,13 @@ class World:
                           max_leverage=self.max_leverage,
                           steps_per_day=self.steps_per_day,
                           ticks_per_step=self.ticks_per_step,
-                          start=self.start, model=self.model, label=label)
+                          start=self.start, model=self.model, label=label,
+                          # Carried, like every other setting a fork must
+                          # not silently change: an arm that reverted to
+                          # "raise" would die on output its sibling counted
+                          # and continued past, and the surviving arm's
+                          # column would be the only one anybody read.
+                          on_refusal=self.on_refusal)
             child.engine = engine
             child.portfolio = copy.deepcopy(self.portfolio)
             child.trace = copy.deepcopy(self.trace)
@@ -676,6 +777,8 @@ class World:
             "orders": sum(len(row["orders"]) for row in window),
             "trades": len(fills),
             "refused": sum(len(row["refused"]) for row in window),
+            "unusable_responses": sum(1 for row in window
+                                      if row.get("unusable")),
             "partial_fills": sum(1 for f in fills if f["partial"]),
             "turnover": turnover,
             "execution_cost": cost,
@@ -952,6 +1055,7 @@ class Comparison:
         ("final gross exposure", "exposure", "{:.2f}x"),
         ("steps it traded on", "rebalances", "{:,.0f}"),
         ("orders sent", "orders", "{:,.0f}"),
+        ("unusable responses", "unusable_responses", "{:,.0f}"),
         ("turnover", "turnover", "${:,.0f}"),
         ("--- execution ---", None, None),
         ("trades filled", "trades", "{:,.0f}"),

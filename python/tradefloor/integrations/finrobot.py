@@ -175,7 +175,9 @@ from .common import DecisionError as _CommonDecisionError
 #: own :func:`digest` takes the rendered prompt and is the replay key; it is
 #: deliberately str-only and does not change. This one is for hashing a
 #: config, which is a dict.
+from .common import check_prior as _check_prior  # noqa: F401 -- parity
 from .common import digest as _digest_any
+from .common import stamp_resume_counts
 from .common import jsonable as _as_jsonable
 
 #: The macro fields FinRobot is shown. Bound to ``counterfactual.MACRO_FIELDS``
@@ -1158,6 +1160,7 @@ class FinRobotAdapter:
     def __init__(self, *, mode: str = "replay",
                  transcript: Transcript | None = None,
                  recorder: Transcript | None = None,
+                 prior: Transcript | None = None,
                  llm_config: dict[str, Any] | None = None,
                  fundamentals: dict[str, dict[str, Any]] | None = None,
                  objective: str = "",
@@ -1183,10 +1186,25 @@ class FinRobotAdapter:
             raise ValidationError(f"every must be >= 1 step, got {every}")
         if mode == "replay":
             _refuse_a_changed_mandate(transcript, mandate)
+        if prior is not None:
+            if mode != "live":
+                raise ValidationError(
+                    "prior is for resuming a live run: it is consulted "
+                    "before FinRobot is called, and replay mode calls "
+                    "nothing. To replay a recording, pass it as transcript=.")
+            if recorder is None:
+                raise ValidationError(
+                    "prior needs a recorder to resume into. Without one the "
+                    "resumed run keeps nothing, which is the loss prior "
+                    "exists to stop.")
+            _refuse_a_changed_mandate(prior, mandate)
 
         self.mode = mode
         self.transcript = transcript
         self.recorder = recorder
+        #: A recording an earlier live run produced, consulted before
+        #: FinRobot. See :meth:`call_or_resume`.
+        self.prior = prior
         self.llm_config = llm_config
         self.fundamentals = dict(fundamentals or {})
         self.objective = objective
@@ -1422,7 +1440,8 @@ class FinRobotAdapter:
         """
         twin = type(self)(
             mode=self.mode, transcript=self.transcript,
-            recorder=self.recorder, llm_config=self.llm_config,
+            recorder=self.recorder, prior=self.prior,
+            llm_config=self.llm_config,
             fundamentals=self.fundamentals, objective=self.objective,
             mandate=self.mandate, agent_config=self.agent_config,
             every=self.every, max_participation=self.max_participation,
@@ -1473,7 +1492,7 @@ class FinRobotAdapter:
                     "keep.")
             return response
 
-        response = self._live(prompt)
+        response = self.call_or_resume(key, lambda: self._live(prompt))
         if self.recorder is not None:
             # Stamp the provenance on first write rather than leaving it to
             # the caller. `_refuse_a_changed_mandate` can only refuse a
@@ -1493,7 +1512,34 @@ class FinRobotAdapter:
                 "arm": self.arm, "step": obs.step, "day": obs.day,
                 "digest": key, "prompt": prompt, "response": response,
             })
+            stamp_resume_counts(self.recorder, self.prior)
         return response
+
+    def call_or_resume(self, key: str, live: Any) -> Any:
+        """The answer recorded for ``key`` in :attr:`prior`, or ``live()``.
+
+        Any live run can die -- a rate limit, a dropped connection, a
+        keyboard interrupt -- and without this the second attempt re-asks
+        every question it already holds an answer to. Measured: a 60-call
+        pilot died on call 36 and the 35 answers it had paid for were
+        unreachable to the next attempt.
+
+        The market is deterministic, so a resumed run reaches the same
+        prompts and computes the same digests, and a recorded answer is
+        still an answer to the question being asked. That is the property
+        the replay path already rests on; this changes which source is
+        consulted first, and a miss falls through to FinRobot.
+
+        The same method as
+        :meth:`~tradefloor.integrations.common.FrameworkAdapter.call_or_resume`,
+        written out here for the reason everything else in this file is:
+        the adapter predates the shared base and does not take it.
+        """
+        if self.prior is not None:
+            entry = self.prior.entry_for(key)
+            if entry is not None:
+                return entry.get("response")
+        return live()
 
     def _live(self, prompt: str) -> str:
         """One real FinRobot decision.

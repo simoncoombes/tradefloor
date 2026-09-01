@@ -257,9 +257,9 @@ def test_the_adapters_constructor_keywords_are_the_ones_callers_wrote():
     import inspect
     parameters = inspect.signature(fr.FinRobotAdapter).parameters
     assert set(parameters) == {
-        "mode", "transcript", "recorder", "llm_config", "fundamentals",
-        "objective", "mandate", "agent_config", "every", "max_participation",
-        "panel", "arm", "info"}
+        "mode", "transcript", "recorder", "prior", "llm_config",
+        "fundamentals", "objective", "mandate", "agent_config", "every",
+        "max_participation", "panel", "arm", "info"}
     assert all(p.kind is inspect.Parameter.KEYWORD_ONLY
                for p in parameters.values()), (
         "a positional argument here breaks FinRobotAdapter.fork, which "

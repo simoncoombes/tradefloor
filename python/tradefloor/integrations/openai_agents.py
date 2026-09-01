@@ -195,8 +195,9 @@ from typing import Any
 
 from .._core import ValidationError
 from .common import (MAX_PARTICIPATION, AdapterInfo, DecisionError,
-                     FrameworkAdapter, decision_model, digest,
-                     replay_response, require, run_sync)
+                     FrameworkAdapter, check_prior, decision_model, digest,
+                     replay_response, require, run_sync,
+                     stamp_resume_counts)
 
 #: The PyPI distribution that installs the framework, and the Tradefloor
 #: extra that pulls it in: ``pip install "tradefloor[openai-agents]"``.
@@ -426,7 +427,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
     # `type(self)(**fork_kwargs())`, can pass it by keyword.
     def __init__(self, agent: Any = None, *, mode: str = "replay",
                  transcript: Any = None, recorder: Any = None,
-                 model: Any = None, brief: str = BRIEF, max_turns: int = 6,
+                 prior: Any = None, model: Any = None, brief: str = BRIEF, max_turns: int = 6,
                  tracing: bool = False, run_id: str = "",
                  info: AdapterInfo | None = None, every: int = 6,
                  fundamentals: dict[str, dict[str, Any]] | None = None,
@@ -507,6 +508,9 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         self.mode = mode
         self.transcript = transcript
         self.recorder = recorder
+        self.prior = check_prior(
+            prior, mode=mode, recorder=recorder,
+            instructions_digest=self.info.instructions_digest)
         self.model = model
         self.brief = brief
         self.max_turns = int(max_turns)
@@ -611,7 +615,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
             return replay_response(self.transcript, key, step=obs.step,
                                    day=obs.day)
 
-        response = self._run(items, obs)
+        response = self.call_or_resume(key, lambda: self._run(items, obs))
         if self.recorder is not None:
             # Stamp the provenance on the first write rather than leaving it
             # to the caller. `_check_instructions` can only refuse a
@@ -629,6 +633,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
                 "arm": self.arm, "step": obs.step, "day": obs.day,
                 "digest": key, "prompt": items, "response": response,
             })
+            stamp_resume_counts(self.recorder, self.prior)
         return response
 
     # -- observation -> the SDK -------------------------------------------
@@ -820,6 +825,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         kwargs.update({
             "agent": self.agent, "mode": self.mode,
             "transcript": self.transcript, "recorder": self.recorder,
+            "prior": self.prior,
             "model": self.model, "brief": self.brief,
             "max_turns": self.max_turns, "tracing": self.tracing,
             "run_id": self.run_id,

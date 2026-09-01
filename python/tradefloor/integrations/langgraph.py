@@ -152,8 +152,9 @@ from .._core import ValidationError
 from .common import (DECISION_SCHEMA_VERSION, MAX_PARTICIPATION, AdapterInfo,
                      Decision, DecisionError, FrameworkAdapter,
                      FrameworkError, MissingDependencyError, Transcript,
-                     digest, parse_decision, replay_response, require,
-                     run_sync)
+                     check_prior, digest, parse_decision,
+                     replay_response, require, run_sync,
+                     stamp_resume_counts)
 
 #: What the graph is told to produce, when the default input builder renders
 #: the prompt text. Short on purpose: the decision contract is stated once,
@@ -521,6 +522,7 @@ class LangGraphAdapter(FrameworkAdapter):
     def __init__(self, runnable: Any = None, *, mode: str = "live",
                  transcript: Transcript | None = None,
                  recorder: Transcript | None = None,
+                 prior: Transcript | None = None,
                  input_builder: Callable[[dict[str, Any]], Any] | None = None,
                  output_parser: Callable[[Any], Any] | None = None,
                  instructions: str = INSTRUCTIONS,
@@ -548,6 +550,9 @@ class LangGraphAdapter(FrameworkAdapter):
         self.mode = mode
         self.transcript = transcript
         self.recorder = recorder
+        self.prior = check_prior(
+            prior, mode=mode, recorder=recorder,
+            instructions_digest=self.info.instructions_digest)
         self.input_builder = input_builder or default_input_builder
         self.output_parser = output_parser or default_output_parser
         self.instructions = instructions
@@ -583,7 +588,8 @@ class LangGraphAdapter(FrameworkAdapter):
         graph_input = self.input_builder(payload)
         config = self.build_config(obs)
         try:
-            result = self._invoke(graph_input, config)
+            result = self.call_or_resume(
+                key, lambda: self._invoke(graph_input, config))
         except Exception as exc:                          # noqa: BLE001
             _reraise_known(exc)
             raise
@@ -612,6 +618,7 @@ class LangGraphAdapter(FrameworkAdapter):
                 "response": parsed if isinstance(parsed, str)
                 else json.dumps(_as_jsonable(parsed)),
             })
+            stamp_resume_counts(self.recorder, self.prior)
         return parsed
 
     def _invoke(self, graph_input: Any, config: dict[str, Any]) -> Any:
@@ -705,6 +712,7 @@ class LangGraphAdapter(FrameworkAdapter):
             "mode": self.mode,
             "transcript": self.transcript,
             "recorder": self.recorder,
+            "prior": self.prior,
             "input_builder": self.input_builder,
             "output_parser": self.output_parser,
             "instructions": self.instructions,
