@@ -183,6 +183,32 @@ def _grid(name):
                 "ch06f0": cell(0.6, vix_selfex_min=1.0, vix_selfex_scale=2.0),
                 "ch06noh": sx(**jump, vix_selfex_vol_jump=0.6),
                 "ch06v11": cell(0.6, vix_har_weight=0.35, vix_har_vrp=1.1)}
+    elif name == "selfex6":
+        # Round 158: the noh-neighbourhood refinement. Screen 5 measured
+        # the frontier's shape — asym clean wants the anchor small or
+        # absent (noh 1.206 vs anchor cells 1.37+), same-day wants either
+        # the anchor's daily component or HEAVY variance routing (ch10
+        # -0.755 with no anchor at all), and P30 overshoots with both.
+        # The interpolation: heavy route, tiny anchor, small fear pops.
+        def cell(ch, har=0.0, gain=0.25, **kw):
+            base = {"vix_selfex_gain": gain, "vix_selfex_size_coupling": 0.5,
+                    "vix_decay_ratio": 0.85, "vix_selfex_relax_slope": 0.03,
+                    "vix_selfex_min": 2.0, "vix_selfex_scale": 4.0,
+                    "vix_selfex_vol_jump": ch}
+            if har:
+                base.update(vix_har_weight=har, vix_har_mid=0.3,
+                            vix_har_vrp=1.0)
+            return {**base, **kw}
+        return {"v16": {},
+                "n06": cell(0.6),
+                "n08": cell(0.8),
+                "n10": cell(1.0),
+                "n08g02": cell(0.8, gain=0.2),
+                "n06h01": cell(0.6, har=0.1),
+                "n08h01": cell(0.8, har=0.1),
+                "n08h015": cell(0.8, har=0.15),
+                "n08h01lag": cell(0.8, har=0.1, market_beta_up_comp=0.02,
+                                  market_beta_down_asym_lag=0.02)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):
