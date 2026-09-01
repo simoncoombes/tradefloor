@@ -300,6 +300,41 @@ def _grid(name):
                 "u08noh": cell(0.8, har=0.0),
                 "u10lag": cell(1.0, market_beta_up_comp=0.02,
                                market_beta_down_asym_lag=0.02)}
+    elif name == "level1":
+        # Round 171: the fear side under a market-sigma trim, with and
+        # without the level reference (round 170's diagnosis: the co-jump's
+        # trigger, kick and anchor are sized through a VIX-to-sigma
+        # identity fixed at pt-v16's level, so a trimmed market's kicks
+        # take over the calm window), and the SVCJ state power on the
+        # arrival rate. The overlay is the era's frozen fear cell (ch 0.75).
+        REF = 0.007593024924589399          # pt-v16 market_factor_sigma
+        ovl = {"vix_selfex_gain": 0.25, "vix_selfex_threshold": 1.75,
+               "vix_selfex_size_coupling": 0.5, "vix_decay_ratio": 0.85,
+               "vix_selfex_relax_slope": 0.03, "vix_selfex_min": 2.0,
+               "vix_selfex_scale": 4.0, "vix_selfex_vol_jump": 0.75,
+               "vix_har_weight": 0.18, "vix_har_mid": 0.3, "vix_har_vrp": 1.0}
+        def cell(r=1.0, ref=True, k=0.0, gain=None):
+            c = dict(ovl)
+            if r != 1.0:
+                c["market_factor_sigma"] = float(f"{REF * r:.8g}")
+            if ref:
+                c["vix_selfex_level_ref"] = REF
+            if k:
+                c["vix_selfex_vix_power"] = k
+            if gain is not None:
+                c["vix_selfex_gain"] = gain
+            return c
+        return {"v16": {},
+                "ovl": cell(ref=False),
+                "ovlref": cell(),                   # bit-identical to ovl: the pin
+                "r85": cell(0.85),
+                "r78": cell(0.78),
+                "r78noref": cell(0.78, ref=False),  # the artefact, on record
+                "k05": cell(k=0.5),
+                "k10": cell(k=1.0),
+                "k15": cell(k=1.5),
+                "k10g20": cell(k=1.0, gain=0.20),
+                "r78k10": cell(0.78, k=1.0)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):
