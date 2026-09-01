@@ -81,6 +81,30 @@ def _grid(name):
                               vix_selfex_phase=1.0),
                 "g03e55": sx(vix_selfex_gain=0.3, vix_selfex_excite=0.55),
                 "g05r80": sx(vix_selfex_gain=0.5, vix_selfex_relax=0.80)}
+    elif name == "selfex2":
+        # Round 154: the composite the first two screens dictated (round
+        # 153). Size-coupled magnitudes repair the same-day regression;
+        # decay_ratio hands the asymmetry budget to the jumps; the comp
+        # and lag wires ride where the card screens priced them; the HAR
+        # anchor takes its first cells.
+        def sx(**kw):
+            return kw
+        base35 = dict(vix_selfex_gain=0.3, vix_selfex_size_coupling=0.5)
+        base55 = dict(vix_selfex_gain=0.5, vix_selfex_size_coupling=0.5)
+        return {"v16": {},
+                "g03sc05": dict(base35),
+                "g03sc10": sx(vix_selfex_gain=0.3, vix_selfex_size_coupling=1.0),
+                "g05sc05": dict(base55),
+                "g05sc10": sx(vix_selfex_gain=0.5, vix_selfex_size_coupling=1.0),
+                "g03sc05d75": sx(**base35, vix_decay_ratio=0.75),
+                "g05sc05d80": sx(**base55, vix_decay_ratio=0.8),
+                "g03sc05d75c02": sx(**base35, vix_decay_ratio=0.75,
+                                    market_beta_up_comp=0.02),
+                "g03sc05d75c02lag": sx(**base35, vix_decay_ratio=0.75,
+                                       market_beta_up_comp=0.02,
+                                       market_beta_down_asym_lag=0.02),
+                "h05": sx(vix_har_weight=0.5),
+                "g03sc05h05": sx(**base35, vix_har_weight=0.5)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):

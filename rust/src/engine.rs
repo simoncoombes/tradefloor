@@ -1237,6 +1237,7 @@ impl Engine {
                 vix_selfex_excite: self.params.vix_selfex_excite,
                 vix_selfex_excite_decay: self.params.vix_selfex_excite_decay,
                 vix_selfex_phase: self.params.vix_selfex_phase,
+                vix_selfex_size_coupling: self.params.vix_selfex_size_coupling,
                 vix_har_weight: self.params.vix_har_weight,
                 vix_har_mid: self.params.vix_har_mid,
                 vix_har_slow: self.params.vix_har_slow,

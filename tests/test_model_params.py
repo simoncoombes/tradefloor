@@ -361,6 +361,7 @@ PERTURBATIONS = [
     ("vix_selfex_excite", 0.6, False),
     ("vix_selfex_excite_decay", 0.90, False),
     ("vix_selfex_phase", 1.0, False),
+    ("vix_selfex_size_coupling", 0.5, False),
     # The HAR anchor's weight. Non-zero re-mixes the VIX target from the
     # first close (the anchor starts cold at zero realized variance, which
     # IS a target move), and the VIX reaches the market through the

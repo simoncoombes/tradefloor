@@ -92,6 +92,7 @@ pub struct DailyInputs<'a> {
     pub vix_selfex_excite: f64,
     pub vix_selfex_excite_decay: f64,
     pub vix_selfex_phase: f64,
+    pub vix_selfex_size_coupling: f64,
     /// The HAR realized-vol anchor (params `vix_har_*`). At weight 0.0
     /// the branch is skipped and the anchor's EMAs stay frozen.
     pub vix_har_weight: f64,
@@ -174,6 +175,7 @@ impl<'a> Default for DailyInputs<'a> {
             vix_selfex_excite: 0.35,
             vix_selfex_excite_decay: 0.87,
             vix_selfex_phase: 0.0,
+            vix_selfex_size_coupling: 0.0,
             vix_har_weight: 0.0,
             vix_har_mid: 0.4,
             vix_har_slow: 0.25,
@@ -855,6 +857,14 @@ pub fn update_economy_daily(
         let fired = u1 < p_fire;
         let magnitude =
             inputs.vix_selfex_min + inputs.vix_selfex_scale * -mathx::log(mathx::max(u2, 1e-12));
+        // The SVCJ size wire (round 153): bigger down-moves take bigger
+        // events, so the dVIX-on-return regression keeps its slope. A
+        // branch, so 0.0 reproduces the first ladder bit for bit.
+        let magnitude = if inputs.vix_selfex_size_coupling == 0.0 {
+            magnitude
+        } else {
+            magnitude * (1.0 + inputs.vix_selfex_size_coupling * g)
+        };
         // Fear resolves faster when the market answers with a rally.
         let retain = if z > 1.0 {
             inputs.vix_selfex_relax

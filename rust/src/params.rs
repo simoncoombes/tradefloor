@@ -1134,6 +1134,15 @@ pub struct ModelParams {
     /// (0.0: no phase gating). Real crisis frequency is phase-skewed:
     /// the sub-period spread of P(VIX>30) runs 0.004 to 0.263.
     pub vix_selfex_phase: f64,
+    /// Couples an event's SIZE to the down-move that fired it: the
+    /// magnitude is scaled by (1 + this x the gate excess). Round 153
+    /// measured the missing piece exactly — the gate protects the
+    /// TIMING (jump days are crash days) but an independent magnitude
+    /// still thins the dVIX-on-return regression (same-day corr -0.86
+    /// -> -0.64..-0.71 across the first ladder). Real co-jump sizes
+    /// are strongly anti-correlated (Todorov-Tauchen 2011: SPX -6%,
+    /// VIX +16). 0.0 multiplies by exactly one, bit for bit.
+    pub vix_selfex_size_coupling: f64,
     /// The HAR realized-vol anchor for the VIX target (the pt-v17
     /// era's persistent-target channel). A one-day target spike
     /// transmits ~6% at reversion 0.06 -- the measured death of the
@@ -1536,6 +1545,7 @@ impl ModelParams {
             vix_selfex_excite: 0.35,
             vix_selfex_excite_decay: 0.87,
             vix_selfex_phase: 0.0,
+            vix_selfex_size_coupling: 0.0,
             vix_har_weight: 0.0,
             vix_har_mid: 0.4,
             vix_har_slow: 0.25,
@@ -2597,6 +2607,7 @@ impl ModelParams {
             "vix_selfex_excite" => self.vix_selfex_excite,
             "vix_selfex_excite_decay" => self.vix_selfex_excite_decay,
             "vix_selfex_phase" => self.vix_selfex_phase,
+            "vix_selfex_size_coupling" => self.vix_selfex_size_coupling,
             "vix_har_weight" => self.vix_har_weight,
             "vix_har_mid" => self.vix_har_mid,
             "vix_har_slow" => self.vix_har_slow,
@@ -2754,6 +2765,7 @@ impl ModelParams {
             "vix_selfex_excite" => out.vix_selfex_excite = value,
             "vix_selfex_excite_decay" => out.vix_selfex_excite_decay = value,
             "vix_selfex_phase" => out.vix_selfex_phase = value,
+            "vix_selfex_size_coupling" => out.vix_selfex_size_coupling = value,
             "vix_har_weight" => out.vix_har_weight = value,
             "vix_har_mid" => out.vix_har_mid = value,
             "vix_har_slow" => out.vix_har_slow = value,
@@ -2975,6 +2987,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_selfex_excite",
         "vix_selfex_excite_decay",
         "vix_selfex_phase",
+        "vix_selfex_size_coupling",
         "vix_har_weight",
         "vix_har_mid",
         "vix_har_slow",

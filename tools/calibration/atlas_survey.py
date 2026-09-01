@@ -199,6 +199,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # P(VIX>30) is 0.004-0.263, a factor near sixty; a 3x phase kick on
     # top of the cycle's own gate is the strong end.
     "vix_selfex_phase": (0.0, 3.0),
+    # Size wire: at coupling 1 a -3.75-sigma day doubles the event; 2 bounds.
+    "vix_selfex_size_coupling": (0.0, 2.0),
     # The HAR anchor's weight (mechanisms-literature M3): a share of the
     # target, unit interval minus headroom for the cycle base to matter.
     "vix_har_weight": (0.0, 0.85),
