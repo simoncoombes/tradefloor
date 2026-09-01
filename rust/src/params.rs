@@ -1134,6 +1134,18 @@ pub struct ModelParams {
     /// (0.0: no phase gating). Real crisis frequency is phase-skewed:
     /// the sub-period spread of P(VIX>30) runs 0.004 to 0.263.
     pub vix_selfex_phase: f64,
+    /// Couples the fear component's DECAY to the day's return — vol
+    /// crush on rallies, persistence under continued stress. Round 154's
+    /// screen falsified the size wire as the same-day repair and named
+    /// the true dilution: the decay tail, a stream of large negative
+    /// dVIX days uncorrelated with their own returns. With this slope
+    /// the effective retention is (decay - slope x z), clamped, so an
+    /// up day decays fear harder (negative dVIX WITH a positive return)
+    /// and a down day holds it — both sides feed the real -0.81
+    /// same-day correlation. 0.0 reproduces the fixed-decay arithmetic
+    /// bit for bit; the binary relax branch above it is then inert by
+    /// the clamp order.
+    pub vix_selfex_relax_slope: f64,
     /// Couples an event's SIZE to the down-move that fired it: the
     /// magnitude is scaled by (1 + this x the gate excess). Round 153
     /// measured the missing piece exactly — the gate protects the
@@ -1546,6 +1558,7 @@ impl ModelParams {
             vix_selfex_excite_decay: 0.87,
             vix_selfex_phase: 0.0,
             vix_selfex_size_coupling: 0.0,
+            vix_selfex_relax_slope: 0.0,
             vix_har_weight: 0.0,
             vix_har_mid: 0.4,
             vix_har_slow: 0.25,
@@ -2608,6 +2621,7 @@ impl ModelParams {
             "vix_selfex_excite_decay" => self.vix_selfex_excite_decay,
             "vix_selfex_phase" => self.vix_selfex_phase,
             "vix_selfex_size_coupling" => self.vix_selfex_size_coupling,
+            "vix_selfex_relax_slope" => self.vix_selfex_relax_slope,
             "vix_har_weight" => self.vix_har_weight,
             "vix_har_mid" => self.vix_har_mid,
             "vix_har_slow" => self.vix_har_slow,
@@ -2766,6 +2780,7 @@ impl ModelParams {
             "vix_selfex_excite_decay" => out.vix_selfex_excite_decay = value,
             "vix_selfex_phase" => out.vix_selfex_phase = value,
             "vix_selfex_size_coupling" => out.vix_selfex_size_coupling = value,
+            "vix_selfex_relax_slope" => out.vix_selfex_relax_slope = value,
             "vix_har_weight" => out.vix_har_weight = value,
             "vix_har_mid" => out.vix_har_mid = value,
             "vix_har_slow" => out.vix_har_slow = value,
@@ -2988,6 +3003,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_selfex_excite_decay",
         "vix_selfex_phase",
         "vix_selfex_size_coupling",
+        "vix_selfex_relax_slope",
         "vix_har_weight",
         "vix_har_mid",
         "vix_har_slow",

@@ -194,6 +194,7 @@ PARAM_SPECS: dict[str, dict] = {
     "vix_selfex_excite_decay": {"kind": "abs", "step_unit": 0.02, "hard_range": (0.80, 0.96)},
     "vix_selfex_phase": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 3.0)},
     "vix_selfex_size_coupling": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 2.0)},
+    "vix_selfex_relax_slope": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 0.2)},
     # The HAR anchor for the VIX target (pt-v17): persistent-target
     # channel, weights per Corsi-family index estimates (M3).
     "vix_har_weight": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.85)},

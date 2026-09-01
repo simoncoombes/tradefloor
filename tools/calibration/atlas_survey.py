@@ -201,6 +201,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_selfex_phase": (0.0, 3.0),
     # Size wire: at coupling 1 a -3.75-sigma day doubles the event; 2 bounds.
     "vix_selfex_size_coupling": (0.0, 2.0),
+    # Retention slides ~slope per sigma; 0.94 base and |z|~3 says 0.15 spans it.
+    "vix_selfex_relax_slope": (0.0, 0.2),
     # The HAR anchor's weight (mechanisms-literature M3): a share of the
     # target, unit interval minus headroom for the cycle base to matter.
     "vix_har_weight": (0.0, 0.85),

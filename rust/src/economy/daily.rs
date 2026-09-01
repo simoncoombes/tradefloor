@@ -93,6 +93,7 @@ pub struct DailyInputs<'a> {
     pub vix_selfex_excite_decay: f64,
     pub vix_selfex_phase: f64,
     pub vix_selfex_size_coupling: f64,
+    pub vix_selfex_relax_slope: f64,
     /// The HAR realized-vol anchor (params `vix_har_*`). At weight 0.0
     /// the branch is skipped and the anchor's EMAs stay frozen.
     pub vix_har_weight: f64,
@@ -176,6 +177,7 @@ impl<'a> Default for DailyInputs<'a> {
             vix_selfex_excite_decay: 0.87,
             vix_selfex_phase: 0.0,
             vix_selfex_size_coupling: 0.0,
+            vix_selfex_relax_slope: 0.0,
             vix_har_weight: 0.0,
             vix_har_mid: 0.4,
             vix_har_slow: 0.25,
@@ -870,6 +872,19 @@ pub fn update_economy_daily(
             inputs.vix_selfex_relax
         } else {
             inputs.vix_selfex_decay
+        };
+        // The continuous form (round 155): retention slides with the
+        // day's return — vol crush on rallies, persistence under
+        // continued stress — so the decay tail itself carries the
+        // same-day correlation instead of diluting it. A branch: 0.0
+        // keeps the binary form above bit for bit.
+        let retain = if inputs.vix_selfex_relax_slope == 0.0 {
+            retain
+        } else {
+            mathx::min(
+                0.995,
+                mathx::max(0.5, inputs.vix_selfex_decay - inputs.vix_selfex_relax_slope * z),
+            )
         };
         fear_next = retain * fear_prev + if fired { magnitude } else { 0.0 };
         new_state.vix_selfex_fear = fear_next;
