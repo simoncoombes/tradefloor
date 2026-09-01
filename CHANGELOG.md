@@ -48,6 +48,90 @@ package source for a text-mode write anywhere, because four savers checked
 one at a time leaves the fifth unguarded, and the fifth is where this came
 from. On Linux every one of them passes trivially, which is how the
 existing suite stayed green through the bug.
+**An exact roster reaches EDGAR.** `tradefloor.edgar.fetch` takes `ciks=`, a
+list of SEC Central Index Keys, and returns those filers and no others. Every
+requested CIK comes back as a row or as an exclusion carrying a machine
+readable reason, rows keep the requested order, and the snapshot notes record
+the request and its digest. `limit` and `rank_by` behave as they always have,
+and passing either beside `ciks=` raises.
+
+**A large universe reaches an agent.**
+`tradefloor.integrations.finrobot.observe` takes `detail=`, the symbols to
+render in full. Every other symbol arrives as a compact row carrying price,
+five-day return, position and order cap, and stays a legal action.
+`FinRobotAdapter` takes `panel=`, which switches that rendering on and
+travels through `state()` and `fork()`, so the fork agreement covers which
+names each arm sees. Both default to the output 0.6.1 released, byte for
+byte.
+
+**A pin that installed a FinRobot unable to import itself.** The `finrobot`
+extra admitted `pyautogen` 0.10 and `anthropic` 1.x, and both ceilings now
+exclude the versions the adapter cannot drive.
+
+<!-- release-note-ends -->
+
+### The exact roster
+
+`limit` with `rank_by` answers "the largest N filers", and an experiment
+whose universe was decided elsewhere asks a different question. The two have
+different failure modes: a ranked fetch returning 98 of 100 is still a ranked
+universe, and an exact fetch returning 498 of 500 has lost two members, which
+is the finding. So `ciks=` accounts for every request. A filer with no
+diluted EPS, no share count, no submissions record, no listed ticker or no
+sector mapping lands in `Snapshot.excluded` under its own reason, and
+`notes["requested_ciks"]` carries the request so membership is checkable from
+the file alone.
+
+`limit` and `rank_by` grew a `None` default so that passing one beside a
+roster could be refused. Resolving to the same 100 and `"equity"` as before,
+so every released call returns the snapshot it returned.
+
+### The large universe
+
+Nine lines an asset reads well for four names and buries the question at four
+hundred. The split is a rendering decision and not a narrowing: the allowlist
+gains no field, the sector summary is arithmetic over the asset rows, and the
+sealed-engine proxy and the hidden-value scan in `tests/test_finrobot.py` now
+run over the large rendering as well as the small one.
+
+The panel belongs to the experiment, so it travels in `state()` and the fork
+agreement reads it. Two arms shown different names would be answering
+different questions, and the price history, the last decision and the cadence
+would all match while that went unrecorded.
+
+### The dependency ceilings
+
+`pyautogen<0.11` resolves to the AutoGen 0.4 rewrite, which installs
+`autogen-agentchat` and `autogen-core` and provides no `autogen` module, so
+`finrobot.functional.rag` fails on `No module named 'autogen'` before
+`SingleAssistant` is reached. The rewrite starts at 0.3, so that is the
+ceiling. `anthropic<2.0` admitted the 1.0 SDK, which removed
+`anthropic.types.Completion` that autogen 0.2.35's client imports.
+
+One consequence worth stating, because it decides which model a study
+can use. `pyautogen` 0.2.35 sends `temperature` on every request: unlike
+`top_k`, `top_p` and `stop_sequences`, which it drops when unset, the
+parameter is non-nullable and defaults to 1.0. Claude Opus 5 and Sonnet 5
+have deprecated it, and answer
+
+```
+400 invalid_request_error: `temperature` is deprecated for this model.
+```
+
+to any explicit value. They run through FinRobot at the default of 1.0.
+A reproducible study wants temperature 0, and temperature 0 is the one
+setting those models refuse, so every recorded run in this repository uses
+`claude-sonnet-4-5-20250929`. Measured 2026-09-01 against the live API.
+
+### The recording check
+
+`tests/test_integrations.py` parsed every response in every committed
+recording and read a failure as a corrupted file. `parse` is strict on
+purpose, so a long enough recording of a real model contains output it
+refuses, and the check forbade committing an honest one. It now compares the
+number of refused responses against a count the recording declares in its
+meta. An absent count means zero, so every fixture committed before this is
+unchanged.
 
 ## 0.6.1
 

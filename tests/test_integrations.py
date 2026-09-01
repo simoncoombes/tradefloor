@@ -502,7 +502,37 @@ def test_a_committed_recording_is_valid_without_its_framework(path):
         assert entry.get("digest"), (
             "an entry without a key can never be replayed")
         digests.append(entry["digest"])
-        ci.parse_decision(entry["response"])    # raises if the response rotted
+        assert isinstance(entry.get("response"), str), (
+            "a recorded response has to be text; a null one cannot be "
+            "replayed and is not the same thing as a refusal")
+
+    # How many recorded responses the shared validator refuses, checked
+    # against what the recording says it should be.
+    #
+    # This was a bare `parse_decision` on every entry, which reads a
+    # corrupted file and a model that answered badly as the same failure.
+    # They are not: `parse` is strict on purpose, so a long enough real
+    # recording contains output it refuses, and forbidding that forbids
+    # committing an honest recording. One measured case, in a recording of
+    # 80 decisions: a per-action `rationale` field, which the study around
+    # it counted as a refusal and a lost step.
+    #
+    # A recording that declares nothing must still parse cleanly, so the
+    # five fixtures committed before this are unchanged by it, and a
+    # corrupted response in any of them still fails here.
+    refused = 0
+    for entry in transcript.entries:
+        try:
+            ci.parse_decision(entry["response"])
+        except ci.DecisionError:
+            refused += 1
+    declared = transcript.meta.get("unparseable_responses", 0)
+    assert refused == declared, (
+        f"{path.parent.name} has {refused} responses the validator "
+        f"refuses and declares {declared}. A recording may hold output a "
+        "real model produced, and it has to say how much: a change in "
+        "this count is either a corrupted file or a different run."
+    )
     assert len(digests) == len(set(digests)), "duplicate replay keys"
 
     for secret in ("sk-ant-", "sk-proj-", "lsv2_pt-", "pylf_v1_", "api_key",
