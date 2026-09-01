@@ -105,6 +105,32 @@ def _grid(name):
                                        market_beta_down_asym_lag=0.02),
                 "h05": sx(vix_har_weight=0.5),
                 "g03sc05h05": sx(**base35, vix_har_weight=0.5)}
+    elif name == "selfex3":
+        # Round 155: the return-coupled decay ladder on the d75 base
+        # (the composite's best fear shape), after round 154 falsified
+        # the size wire as the same-day repair and named the decay tail.
+        # Plus the HAR anchor re-dosed below its measured runaway
+        # (w 0.5 x vrp 1.25 spiralled; the loop-gain arithmetic says
+        # dose, not defect).
+        def sx(**kw):
+            return kw
+        d75 = dict(vix_selfex_gain=0.3, vix_selfex_size_coupling=0.5,
+                   vix_decay_ratio=0.75)
+        return {"v16": {},
+                "d75rs03": sx(**d75, vix_selfex_relax_slope=0.03),
+                "d75rs06": sx(**d75, vix_selfex_relax_slope=0.06),
+                "d75rs10": sx(**d75, vix_selfex_relax_slope=0.10),
+                "d80g05rs06": sx(vix_selfex_gain=0.5,
+                                 vix_selfex_size_coupling=0.5,
+                                 vix_decay_ratio=0.8,
+                                 vix_selfex_relax_slope=0.06),
+                "d75rs06c02lag": sx(**d75, vix_selfex_relax_slope=0.06,
+                                    market_beta_up_comp=0.02,
+                                    market_beta_down_asym_lag=0.02),
+                "h025v10": sx(vix_har_weight=0.25, vix_har_vrp=1.0),
+                "h035v11": sx(vix_har_weight=0.35, vix_har_vrp=1.1),
+                "d75rs06h025": sx(**d75, vix_selfex_relax_slope=0.06,
+                                  vix_har_weight=0.25, vix_har_vrp=1.0)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):
