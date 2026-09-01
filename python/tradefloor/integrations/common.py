@@ -1111,10 +1111,17 @@ class Transcript:
         return cls.from_json(pathlib.Path(path).read_text(encoding="utf-8"))
 
     def save(self, path: Any) -> None:
+        """Write the recording. The bytes do not depend on the platform.
+
+        `write_bytes` rather than `write_text`, so a recording made on
+        Windows and one made on Linux from the same transcript are the
+        same file. Recordings get committed, diffed and hashed, and text
+        mode would answer all three differently per machine.
+        """
         import pathlib
         target = pathlib.Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(self.to_json(), encoding="utf-8")
+        target.write_bytes(self.to_json().encode("utf-8"))
 
 
 def replay_response(transcript: Transcript, key: str, *, step: int,

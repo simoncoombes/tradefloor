@@ -1,5 +1,54 @@
 # Changelog
 
+## Unreleased
+
+**Saved files are the same bytes on every platform.** `Snapshot.save`,
+`Transcript.save` and `Survey.save` write bytes rather than going through
+Python's text mode, which emitted CRLF on Windows. A digest over one of
+these files identifies the file itself, and a fixture recorded on Windows
+matches the one a Linux CI regenerates.
+Reading is untouched, so every file already on disk still loads.
+
+<!-- release-note-ends -->
+
+### The file digest and the content digest
+
+`Snapshot.hash` is computed over canonical JSON and was always portable.
+That is the right definition and it does not change here. It is also not
+the thing a reader reaches for when checking that two people hold the same
+file: that is `sha256` over the bytes, and the library was making it a
+property of the operating system.
+
+The failure it caused, in full. An experiment saved a snapshot, recorded
+`sha256` of the file in its published results, and shipped a validator that
+compared the two. Everything passed. A clone of the same commit into a
+clean directory produced a different digest:
+
+```
+edgar-2026-08-31.json   0b9f6bf946d8663d...   Windows working tree
+                        959783efb512c335...   fresh clone, same commit
+```
+
+`.gitattributes` sets `* text=auto eol=lf`, so git normalised the 5,450
+CRLF pairs on the way in and never put them back. The working tree and
+every clone of it held different bytes, the published digest described the
+working tree, and the validator compared the file against itself.
+
+### Reading
+
+A recording costs API calls to make, and every recording a Windows user
+already holds carries CRLF. `Snapshot.load`, `Transcript.load` and
+`Survey.load` are unchanged and still read them, so this fixes a
+portability bug without creating a data-loss one.
+
+### The guard
+
+`tests/test_portable_writes.py` exercises each writer and then scans the
+package source for a text-mode write anywhere, because four savers checked
+one at a time leaves the fifth unguarded, and the fifth is where this came
+from. On Linux every one of them passes trivially, which is how the
+existing suite stayed green through the bug.
+
 ## 0.6.1
 
 **Four agent frameworks reach the same market.** `tradefloor.integrations`

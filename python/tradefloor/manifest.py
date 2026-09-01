@@ -6,7 +6,7 @@ by hand. This module is that page as a single artifact:
 
 ```python
 manifest = tf.RunManifest.of(engine, seed=42, universe=u, macro=m)
-open("run.json", "w").write(manifest.to_json())
+open("run.json", "wb").write(manifest.to_json().encode("utf-8"))
 
 # ...anywhere else, with nothing but the package and the file...
 same = tf.RunManifest.from_json(open("run.json").read()).reproduce()

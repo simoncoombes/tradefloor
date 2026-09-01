@@ -136,8 +136,20 @@ class Snapshot:
         return hashlib.sha256(self.to_json().encode("utf-8")).hexdigest()
 
     def save(self, path: str) -> str:
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(json.dumps(self.to_dict(), sort_keys=True, indent=2))
+        """Write the snapshot and return its content hash.
+
+        The bytes on disk are the same bytes on every platform, so a
+        digest over the file identifies the snapshot rather than the
+        machine that saved it.
+        """
+        # write_bytes, not text mode: the caller is told to hash this
+        # file and cite the digest, and Python's text mode would make
+        # that digest a property of the machine that wrote it. An
+        # explicit `newline=""` fixes it too, until an edit forgets
+        # the argument; bytes cannot be forgotten.
+        text = json.dumps(self.to_dict(), sort_keys=True, indent=2)
+        with open(path, "wb") as fh:
+            fh.write(text.encode("utf-8"))
         return self.hash
 
     @classmethod
