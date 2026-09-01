@@ -232,6 +232,30 @@ def _grid(name):
                 "h020d90": cell(0.20, vix_decay_ratio=0.9),
                 "h018lag": cell(0.18, market_beta_up_comp=0.02,
                                 market_beta_down_asym_lag=0.02)}
+    elif name == "selfex8":
+        # Round 161: re-dose under the self-normalized gate. The market's
+        # own sigma as ruler rescales z by roughly the post-close update's
+        # factor, so fire rates drop and gain/threshold re-dose together.
+        # The shape holds from selfex7 (small pops, d85, rs03, level-fair
+        # route, tiny anchor).
+        def cell(gain, thr, har=0.18, ch=1.0, **kw):
+            base = {"vix_selfex_gain": gain, "vix_selfex_threshold": thr,
+                    "vix_selfex_size_coupling": 0.5,
+                    "vix_decay_ratio": 0.85, "vix_selfex_relax_slope": 0.03,
+                    "vix_selfex_min": 2.0, "vix_selfex_scale": 4.0,
+                    "vix_selfex_vol_jump": ch,
+                    "vix_har_weight": har, "vix_har_mid": 0.3,
+                    "vix_har_vrp": 1.0}
+            return {**base, **kw}
+        return {"v16": {},
+                "g35t10": cell(0.35, 1.0),
+                "g35t12": cell(0.35, 1.2),
+                "g50t12": cell(0.50, 1.2),
+                "g50t14": cell(0.50, 1.4),
+                "g35t12h01": cell(0.35, 1.2, har=0.1),
+                "g35t12ch06": cell(0.35, 1.2, ch=0.6),
+                "g50t12lag": cell(0.50, 1.2, market_beta_up_comp=0.02,
+                                  market_beta_down_asym_lag=0.02)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):
