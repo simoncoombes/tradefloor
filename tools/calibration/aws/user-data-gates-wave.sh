@@ -1,7 +1,8 @@
 #!/bin/bash
 # The parameterised gates box (pt-v17 era): one template, launched by
-# fleet.py with __VARS__ substituted, replacing the per-run hand-cloned
-# scripts. One box measures one seed BLOCK for one candidate file.
+# fleet.py with its placeholder tokens substituted, replacing the
+# per-run hand-cloned scripts. One box measures one seed BLOCK for one
+# candidate file.
 #
 # __WHEEL__ is either "pypi:<spec>" (install from PyPI -- valid while the
 # branch's engine is bit-identical to the published wheel) or "s3:<key>"
@@ -77,8 +78,12 @@ uv pip install numpy pyarrow pytest
 WHEEL="WHEEL_PLACEHOLDER"
 case "$WHEEL" in
   s3:*)
-    aws s3 cp "s3://dia-test-101631415962-us-east-2-an/pretium-calib/${WHEEL#s3:}" /home/ec2-user/wheel.whl
-    uv pip install /home/ec2-user/wheel.whl
+    # Keep the wheel's own filename: uv refuses a wheel whose name has
+    # no version, and `cp` to wheel.whl renamed it into exactly that.
+    WHEEL_KEY="${WHEEL#s3:}"
+    WHEEL_FILE="/home/ec2-user/$(basename "$WHEEL_KEY")"
+    aws s3 cp "s3://dia-test-101631415962-us-east-2-an/pretium-calib/${WHEEL_KEY}" "$WHEEL_FILE"
+    uv pip install "$WHEEL_FILE"
     ;;
   pypi:*)
     uv pip install "${WHEEL#pypi:}"
