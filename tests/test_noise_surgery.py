@@ -213,7 +213,8 @@ def test_point_replaces_one_future_draw_and_refuses_a_drawn_one():
         "kind": "point", "day": 1, "step": STEPS, "stream": "jumps",
         "address": ("jumps", "uniform", ahead), "value": 0.25}]
     w.trace_draws("jumps", 1, 1).run(1)
-    hit = [e for e in w.draws("jumps", 1, 1) if e.address.index == ahead]
+    hit = [e for e in w.draws("jumps", 1, 1)
+           if e.address == noise.DrawAddress("jumps", "uniform", ahead)]
     assert [(e.value, e.site) for e in hit] == [(0.25, "jump_market_u")]
 
 

@@ -133,7 +133,8 @@ def draw_log(engine: Engine, stream: str, from_day: int,
     """The draws ``stream`` delivered on days ``from_day..to_day``.
 
     Logging is opt-in: ``engine.trace_draws(stream, from_day, to_day)``
-    must have been called before those days ran, or the log is empty.
+    must have been called before those days ran, or the log is empty. A
+    second call widens the range and keeps what was recorded.
     ``run_day_with`` traces the day it runs. The value logged is the one
     the consumer received, so a patched draw shows its patched value.
     """

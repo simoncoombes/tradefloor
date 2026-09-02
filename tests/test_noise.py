@@ -257,3 +257,13 @@ def test_addresses_and_kinds_are_checked():
     engine = fresh()
     with pytest.raises(ValueError):
         noise.market_day_layout(engine, 5)
+
+
+def test_a_second_trace_widens_the_range_and_keeps_the_records():
+    engine = fresh()
+    engine.trace_draws("jumps", 0, 0)
+    run(engine, 1)
+    engine.trace_draws("jumps", 2, 2)
+    run(engine, 2, first=1)
+    days = sorted({e.day for e in noise.draw_log(engine, "jumps", 0, 2)})
+    assert days == [0, 1, 2]

@@ -608,8 +608,22 @@ impl GameRng {
     }
 
     /// Record every draw taken on days in `[from_day, to_day]`.
+    /// Log the draws taken on days `from_day..=to_day`.
+    ///
+    /// A second call widens the range to cover both and keeps what was
+    /// recorded, so a caller tracing a window on top of an earlier trace
+    /// loses nothing; the log is one range, so the days between two
+    /// disjoint requests are logged too.
     pub fn enable_log(&mut self, from_day: i64, to_day: i64) {
-        self.log = Some(Box::new(DrawLog { from_day, to_day, records: Vec::new() }));
+        match self.log.as_deref_mut() {
+            Some(log) => {
+                log.from_day = log.from_day.min(from_day);
+                log.to_day = log.to_day.max(to_day);
+            }
+            None => {
+                self.log = Some(Box::new(DrawLog { from_day, to_day, records: Vec::new() }));
+            }
+        }
     }
 
     pub fn log(&self) -> Option<&DrawLog> {
