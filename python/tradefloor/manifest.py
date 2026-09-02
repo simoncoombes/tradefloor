@@ -674,7 +674,7 @@ class DayLedger:
     engine.run_days(60, ledger=ledger)
     manifest = tf.RunManifest.of(engine, seed=42, universe=roster,
                                  ledger=ledger)
-    open("ledger.json", "w").write(ledger.to_json())
+    open("ledger.json", "wb").write(ledger.to_json().encode("utf-8"))
     ```
 
     ## What the snapshots buy
