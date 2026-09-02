@@ -2022,7 +2022,15 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
     The unit is day-runs and engine ticks, and it is exact in those units.
     Wall time tracks it, and the ratio is the part worth quoting: seconds on
     one machine say as much about what else was running as about this
-    function.
+    function. On ``Universe.random(40, seed=7)``, seed 42, twenty days at
+    390 ticks, at ``c40fd39``, with the three modes interleaved in one
+    process and medians of seven, verifying every day costs 1.10 times what
+    running those days live costs and ``reproduce()`` over the same log
+    costs 1.01 times it. Two runs of that protocol on this machine an hour
+    apart differed by a factor of two in seconds a day and by 0.03 in the
+    first ratio, which is why the ratio is the number written down. An
+    independent measurement on a second checkout of this branch gave 0.95
+    for it, so read the figure as parity rather than to two decimals.
 
     ## What it cannot say
 
