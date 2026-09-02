@@ -152,7 +152,11 @@ OUTCOMES = ("decided", "unusable", "unreachable")
 #: are different numbers whenever the agent is not deterministic:
 #: ``net_gap`` is between the two RECORDED decisions the bracket closed
 #: on, ``floor_gap`` between the two arms' RESAMPLED mean answers, and
-#: ``separation`` is ``floor_gap`` over ``floor``.
+#: ``separation`` is ``floor_gap`` over ``floor``. Those three are null
+#: on every row whose floor was not measured, the ``floor unmeasurable``
+#: rows included: a resample that ran and was gated is carried in full
+#: on :attr:`Search.floor` and in :meth:`BoundaryMap.as_dict`, and stays
+#: out of the columns a reader sorts on.
 COLUMNS = (
     "scenario", "target", "operation", "day", "step", "status",
     "low", "high", "seen_low", "seen_high",
@@ -616,7 +620,14 @@ class Search:
 
     @property
     def floor_net(self) -> float | None:
-        if self.floor is None:
+        """The larger within-arm stdev, for a floor that was measured.
+
+        None where no floor was measured, including a resample that ran
+        and was gated for an arm with fewer than two parsed answers: its
+        numbers are still in :attr:`floor`, and they describe the answers
+        that parsed rather than the agent's spread.
+        """
+        if self.floor is None or self.status == "floor unmeasurable":
             return None
         return self.floor["separation"]["floor_net"]
 
@@ -1054,9 +1065,12 @@ def search(world: World, target: str, *, at: int | None = None,
         result.caveats += _context_caveats(base, day, result.step)
         return result
 
+    # The resample is carried whatever the gate says, so a reader can see
+    # what came back. The three scalars a table sorts on are set only
+    # once the gate has passed: a gap read off an arm that parsed nothing
+    # is one arm's answer minus the absence of one, and a published
+    # column cannot carry the qualifier the caveat does.
     result.floor = measured.as_dict()
-    result.floor_gap = measured.separation["gap_net"]
-    result.separation = measured.separation["net"]
     unmeasured = _unmeasured(measured)
     if unmeasured is not None:
         result.status = "floor unmeasurable"
@@ -1066,6 +1080,8 @@ def search(world: World, target: str, *, at: int | None = None,
         ] + _refusal_caveat(measured) + caveats
         result.caveats += _context_caveats(base, day, result.step)
         return result
+    result.floor_gap = measured.separation["gap_net"]
+    result.separation = measured.separation["net"]
 
     caveats = _floor_caveats(measured, floor is not None) + caveats
     if not _clears(measured):

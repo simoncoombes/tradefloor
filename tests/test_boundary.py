@@ -285,7 +285,16 @@ def test_an_arm_whose_re_asks_all_refuse_has_no_floor():
     assert found.floor["noise"][high]["parsed"] == 0
     assert found.floor["noise"][high]["refusals"] == FLOOR_CALLS
     assert found.floor["separation"]["net"] is None
-    assert found.floor_gap != 0.0, "the number that used to pass as a gap"
+    # The number that used to pass as a gap stays in the carried resample
+    # and reaches no column: one arm's answer minus the absence of one.
+    assert found.floor["separation"]["gap_net"] == -1.0
+    assert found.floor_gap is None and found.separation is None
+    assert found.floor_net is None
+    row = found.row()
+    assert row["status"] == "floor unmeasurable"
+    assert (row["floor"], row["floor_gap"], row["separation"]) == (
+        None, None, None)
+    assert found.as_dict()["floor"]["separation"]["gap_net"] == -1.0
     assert f"arm {high!r} returned 0 executable decision(s)" in \
         found.caveats[0]
     assert f"in {FLOOR_CALLS} calls ({FLOOR_CALLS} refused)" in \
@@ -299,7 +308,8 @@ def test_two_arms_that_refuse_everything_are_not_inside_a_floor():
                      every=STEPS_PER_DAY)
     found = rate_search(build(agent=agent), steps=2)
     assert found.status == "floor unmeasurable"
-    assert found.floor_gap == 0.0
+    assert found.floor["separation"]["gap_net"] == 0.0
+    assert found.floor_gap is None and found.floor_net is None
     assert not any("inside the agent's own spread" in c
                for c in found.caveats)
     assert "returned 0 executable decision(s)" in found.caveats[0]
