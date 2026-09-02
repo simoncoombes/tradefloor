@@ -1,18 +1,21 @@
 """The renderer, and the invariance experiment built on it.
 
-`docs/design/P6-observation-invariance.md` (`feat/programme-design`) sets
-the question: how much of what an agent decides is the market, and how
-much is how the market was described to it. `tradefloor.render` is the
-seam -- one allowlisted payload, rendered four ways -- and
-`tradefloor.counterfactual.invariance` is the experiment built on it.
+The P6 observation-invariance design note (the programme design
+repository, outside this checkout) sets the question: how much of what
+an agent decides is the market, and how much is how the market was
+described to it. `tradefloor.render` is the seam -- one allowlisted
+payload, rendered four ways -- and `tradefloor.counterfactual.invariance`
+is the experiment built on it.
 
 Three things this file has to prove, because nothing else checks them:
 
 - `TextRenderer()`, the all-default construction, reproduces
-  `integrations.finrobot.render` character for character. Not close --
-  identical, because the shipped FinRobot fixtures and the published
-  study at `examples/integrations/finrobot/README.md` are keyed on the
-  digest of this exact text.
+  `integrations.finrobot.render` character for character. `render` is now
+  a thin wrapper over it, so this is a delegation check rather than a
+  cross-implementation one, and it stays here because it is what actually
+  proves the shipped FinRobot fixtures and the published study at
+  `examples/integrations/finrobot/README.md` -- both keyed on the digest
+  of this exact text -- keep replaying.
 - `JSONRenderer()` reproduces what LangGraph, PydanticAI and OpenAI
   Agents already send: `payload`, `json.dumps`-ed with sorted keys. Their
   own shipped fixtures are keyed on it the same way.

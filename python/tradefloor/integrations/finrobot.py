@@ -550,190 +550,30 @@ def _volatility(rows: Sequence[Sequence[float]], i: int) -> float | None:
 def render(payload: dict[str, Any], *, objective: str = "") -> str:
     """The payload as the text FinRobot receives.
 
-    Text and not raw JSON: the assistant is a chat agent and reads prose
-    better than a nested object, and a rendered block is what somebody
-    auditing the recorded transcript has to read. Generated from ``payload``
-    alone, so nothing outside the allowlist can appear here by accident.
+    A thin wrapper over :class:`tradefloor.render.TextRenderer`. This
+    function and :class:`~tradefloor.render.TextRenderer` were briefly two
+    implementations of the same text -- this one written first, the other
+    added generalised over ``units``, ``order`` and ``language`` for the
+    P6 observation-invariance experiment -- and ``tests/test_render.py``
+    proved them character for character equal before this wrapper existed.
+    Keeping both would have meant one drifting from the other the first
+    time either changed, silently, with nothing to say so; this is the
+    fix. ``objective``, when given, is appended as its own section here
+    rather than inside the renderer, the same choice
+    :meth:`FinRobotAdapter.act` makes for its own default renderer -- a
+    renderer renders the payload, and a mandate is the caller's.
 
     A payload carrying ``detail`` renders in the large-universe form: a
     sector summary, one compact row per symbol, and a full block for the
-    symbols named. Every other payload renders exactly as it always has,
-    which ``test_finrobot.py`` pins byte for byte.
+    union of the named symbols and whichever the payload's own
+    ``position`` fields say are held. Every other payload renders exactly
+    as it always has, which ``test_finrobot.py``'s fixture-replay tests
+    pin byte for byte.
     """
-    macro = payload["macro"]
-    out = [
-        "SIMULATED MARKET",
-        "",
-        f"Day {payload['day']}, decision step {payload['step']}.",
-        "",
-        "Macro",
-        "-----",
-    ]
-    for field in OBSERVABLE_MACRO:
-        out.append(f"{field:<22} {_num(macro.get(field))}")
-
-    detail = payload.get("detail")
-    if detail is None:
-        out += ["", "Assets", "------"]
-        for asset in payload["assets"]:
-            out.append("")
-            out += _asset_block(asset)
-    else:
-        out += _universe_block(payload, set(detail))
-
-    book = payload["portfolio"]
-    out += [
-        "",
-        "Portfolio",
-        "---------",
-        f"cash                   {_money(book['cash'])}",
-        f"net worth              {_money(book['net_worth'])}",
-        f"gross exposure         {_num(book['gross_exposure'])}x",
-        # The funding cap, and what is left under it. `max_order_shares`
-        # above says what the MARKET absorbs per order; these say what this
-        # BOOK can hold before the leverage limit refuses the trade, and it
-        # is usually the smaller of the two. Stating one without the other
-        # is what produced twelve rejections and no trades on the native
-        # OpenAI path: the agent sized to the limit it was shown.
-        f"max leverage           {_num(book['max_leverage'])}"
-        + ("" if book["max_leverage"] is None else "x"),
-        f"buying power           {_money(book['buying_power'])}",
-        "",
-        "Positions:",
-    ]
-    held = [a for a in payload["assets"] if a["position"]]
-    if not held:
-        out.append("  none")
-    for asset in held:
-        out.append(f"  {asset['symbol']:<8} {_qty(asset['position'])} shares"
-                   f"  ({_money(asset['position'] * asset['price'])})")
-
+    body = TextRenderer(detail=payload.get("detail")).render(payload)
     if objective:
-        out += ["", "Objective", "---------", objective]
-    return "\n".join(out)
-
-
-def _asset_block(asset: dict[str, Any]) -> list[str]:
-    """One asset in full. The nine lines a detailed name has always got."""
-    out = [
-        asset["symbol"],
-        f"  price                {_money(asset['price'])}",
-        f"  return, 1 day        {_pct(asset['return_1d'])}",
-        f"  return, 5 days       {_pct(asset['return_5d'])}",
-        f"  step volatility      {_pct(asset['volatility'])}",
-        f"  bid / ask            {_money(asset['best_bid'])}"
-        f" / {_money(asset['best_ask'])}",
-        f"  avg daily volume     {_qty(asset['avg_daily_volume'])}",
-        f"  your position        {_qty(asset['position'])} shares",
-        f"  max order this step  {_qty(asset['max_order_shares'])} shares",
-    ]
-    for key, value in sorted(asset["fundamentals"].items()):
-        out.append(f"  {key:<20} {_num(value)}")
-    return out
-
-
-#: Column widths for the compact universe table. Fixed rather than measured
-#: off the data, so the rendering of one market does not shift when another
-#: market has a longer ticker, and two runs of one experiment produce the
-#: same text.
-_ROW = "{symbol:<8} {sector:<24}{price:>13}{ret:>10}{position:>16}{cap:>16}"
-
-
-def _universe_block(payload: dict[str, Any],
-                    detail: set[str]) -> list[str]:
-    """The large-universe rendering: sectors, every symbol, some in full.
-
-    Three sections in the order an analyst reads them. The sector summary
-    says where the market moved. The universe table lists every tradable
-    symbol with the four numbers a decision to look closer is made on, and
-    the order cap it would be held to. The detail section then carries the
-    full block for the held names and the standing panel.
-
-    Every symbol in the table is a legal action whether or not it has a
-    detail block, which the table says in a sentence, because an agent that
-    read the detail section as the tradable set would be trading a universe
-    nobody restricted it to.
-    """
-    out = ["", "Sectors", "-------",
-           f"{'sector':<24}{'names':>7}{'held':>7}{'exposure':>18}"
-           f"{'5d':>10}"]
-    for row in payload.get("sectors", ()):
-        out.append(f"{row['sector']:<24}{row['names']:>7,}{row['held']:>7,}"
-                   f"{_money(row['exposure']):>18}"
-                   f"{_short_pct(row['return_5d']):>10}")
-
-    out += [
-        "",
-        "Universe",
-        "--------",
-        f"All {len(payload['assets'])} symbols below are tradable. A dash "
-        "means the figure is not available yet.",
-        "Full detail for your holdings and for a standing panel follows the "
-        "table.",
-        "",
-        _ROW.format(symbol="symbol", sector="sector", price="price",
-                    ret="5d", position="position", cap="max order"),
-    ]
-    for asset in payload["assets"]:
-        # Neither field is truncated to its column. A clipped symbol would
-        # name an instrument this market does not list, so `orders_from`
-        # would refuse the order the observation invited, and the agent
-        # would be scored on a rendering decision. A row that runs wide is
-        # the cheaper defect.
-        out.append(_ROW.format(
-            symbol=asset["symbol"],
-            sector=str(asset["fundamentals"].get("sector")
-                       or "unclassified"),
-            price=_short_money(asset["price"]),
-            ret=_short_pct(asset["return_5d"]),
-            position=_short_qty(asset["position"]),
-            cap=_short_qty(asset["max_order_shares"]),
-        ))
-
-    shown = [a for a in payload["assets"] if a["symbol"] in detail]
-    out += ["", "Detail", "------",
-            f"{len(shown)} of {len(payload['assets'])} symbols, being every "
-            "name you hold plus a standing panel."]
-    for asset in shown:
-        out.append("")
-        out += _asset_block(asset)
-    return out
-
-
-def _num(value: Any) -> str:
-    if value is None:
-        return "not available"
-    if isinstance(value, float):
-        return f"{value:.4f}"
-    return str(value)
-
-
-def _money(value: Any) -> str:
-    return "not available" if value is None else f"{value:,.2f}"
-
-
-def _pct(value: Any) -> str:
-    return "not available" if value is None else f"{value * 100:+.2f}%"
-
-
-def _qty(value: Any) -> str:
-    return "not available" if value is None else f"{value:,.0f}"
-
-
-#: The compact table's own formatters. A missing value renders as one
-#: character rather than as "not available", which is thirteen and would
-#: push every column out of line on the row that had one. The table says
-#: what the dash means in the sentence above it.
-def _short_money(value: Any) -> str:
-    return "-" if value is None else f"{value:,.2f}"
-
-
-def _short_pct(value: Any) -> str:
-    return "-" if value is None else f"{value * 100:+.2f}%"
-
-
-def _short_qty(value: Any) -> str:
-    return "-" if value is None else f"{value:,.0f}"
+        return f"{body}\n\nObjective\n---------\n{objective}"
+    return body
 
 
 # -- FinRobot -> Tradefloor -------------------------------------------------
