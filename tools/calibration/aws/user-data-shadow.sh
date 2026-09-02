@@ -37,7 +37,7 @@ while true; do
   date -u +"%Y-%m-%dT%H:%M:%SZ" > /tmp/stream-alive
   aws s3 cp /tmp/stream-alive "$BUCKET/STREAM-ALIVE" 2>&1 || echo "STREAM UPLOAD FAILED"
   aws s3 cp /var/log/pretium-run.log "$BUCKET/run.log" || true
-  aws s3 sync /home/ec2-user/out "$BUCKET/partial/" --exclude "*.whl" --quiet || true
+  aws s3 cp /home/ec2-user/out "$BUCKET/partial/" --recursive --exclude "*.whl" --quiet || true
   sleep 45
 done
 STREAM
