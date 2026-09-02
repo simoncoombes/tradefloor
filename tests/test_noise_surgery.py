@@ -45,7 +45,7 @@ def logs(w, streams, first, last):
 def trace_all(*worlds, first, last):
     for w in worlds:
         for s in noise.STREAMS:
-            w.trace(s, first, last)
+            w.trace_draws(s, first, last)
 
 
 # -- unfire ------------------------------------------------------------------
@@ -195,7 +195,7 @@ def test_a_transplant_needs_a_traced_source():
 def test_a_transplant_refuses_a_roster_of_another_size():
     small = World(seed=SEED, universe=tf.Universe.random(4, seed=1),
                   agent=Buyer(), steps_per_day=STEPS, ticks_per_step=TICKS)
-    small.trace("jumps", 0, 0).run(1)
+    small.trace_draws("jumps", 0, 0).run(1)
     target = world()
     with pytest.raises(tf.ValidationError, match="instruments"):
         target.transplant(small, "jumps", 0)
@@ -212,7 +212,7 @@ def test_point_replaces_one_future_draw_and_refuses_a_drawn_one():
     assert w.surgeries == [{
         "kind": "point", "day": 1, "step": STEPS, "stream": "jumps",
         "address": ("jumps", "uniform", ahead), "value": 0.25}]
-    w.trace("jumps", 1, 1).run(1)
+    w.trace_draws("jumps", 1, 1).run(1)
     hit = [e for e in w.draws("jumps", 1, 1) if e.address.index == ahead]
     assert [(e.value, e.site) for e in hit] == [(0.25, "jump_market_u")]
 

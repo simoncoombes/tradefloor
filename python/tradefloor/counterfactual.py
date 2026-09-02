@@ -736,14 +736,15 @@ class World:
 
     # -- draw surgery -----------------------------------------------------
 
-    def trace(self, stream: str, from_day: int, to_day: int) -> "World":
+    def trace_draws(self, stream: str, from_day: int, to_day: int) -> "World":
         """Record what ``stream`` delivers on days ``from_day..to_day``.
 
         Opt-in, because the market stream takes several hundred draws per
         tick at a hundred names and a log of a whole run is the size of the
         tape. Read it back with :meth:`draws`. A transplant reads the
         SOURCE world's log, so a source is traced before it runs the days
-        to be copied.
+        to be copied. Named as the engine method it wraps; ``trace`` is the
+        world's step record.
         """
         self.engine.trace_draws(stream, int(from_day), int(to_day))
         return self
@@ -890,7 +891,7 @@ class World:
         Address for address: what ``source`` received at each address the
         stream took on those days, this world receives at the same
         address. The source must have been traced on those days before it
-        ran them (:meth:`trace`); an untraced source has no record to copy
+        ran them (:meth:`trace_draws`); an untraced source has no record to copy
         and the call says so rather than running it again.
 
         The addresses are the source's. On a world with the same roster
@@ -916,7 +917,7 @@ class World:
             raise ValidationError(
                 f"{source.label or 'the source'} has no draw log for "
                 f"{stream} on days {first}..{last}. Trace the source before "
-                f"it runs those days: source.trace({stream!r}, {first}, "
+                f"it runs those days: source.trace_draws({stream!r}, {first}, "
                 f"{last}).")
         patches = [_noise.Patch(e.address, e.value) for e in logged]
         for item in patches:
