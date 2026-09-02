@@ -387,13 +387,35 @@ impl Engine {
     }
 
     /// Put the per-name volume states back. See [`Engine::volume_idio`].
+    ///
+    /// # A width mismatch is refused rather than resized
+    ///
+    /// A snapshot written before issue #148 was fixed on 2026-09-02 holds
+    /// this array at the width the engine was CONSTRUCTED with, because
+    /// `add_company` and `remove_company` left it alone. Any such snapshot
+    /// from a run that listed or delisted an instrument therefore carries a
+    /// width its own roster disagrees with, and it fails here.
+    ///
+    /// Resizing it silently would be worse than the failure. The array is
+    /// positional against the roster, so a pad or a truncation attaches each
+    /// state to whichever company now sits at that index, and the restored
+    /// market continues plausibly under states belonging to other names.
+    /// The caller is told which two numbers disagree and where the mismatch
+    /// came from.
     pub fn set_volume_idio(&mut self, values: &[f64]) -> Result<(), String> {
         if values.len() != self.volume_idio.len() {
             return Err(format!(
-                "expected {} per-name volume states for {} companies, got {}",
+                "this snapshot carries {} per-name volume states and the \
+                 roster holds {} companies. A snapshot written before issue \
+                 #148 was fixed records the array at the width the engine \
+                 was constructed with, so a run that listed or delisted an \
+                 instrument saved a width its own roster disagrees with. \
+                 The states are positional against the roster, so this \
+                 restore is refused rather than padded or truncated. \
+                 Reproduce the run from its seed and its order log to get a \
+                 snapshot at the roster's width.",
+                values.len(),
                 self.volume_idio.len(),
-                self.companies.len(),
-                values.len()
             ));
         }
         self.volume_idio.copy_from_slice(values);
@@ -1152,6 +1174,18 @@ impl Engine {
     /// the schedule stops being comparable across presets. At zero sigma
     /// every state stays exactly 0.0, so the multiplier stays exactly 1.0
     /// and the tick's volume arithmetic is untouched.
+    ///
+    /// # The count is the roster's width
+    ///
+    /// The loop walks `volume_idio`, which [`Engine::add_company`] and
+    /// [`Engine::remove_company`] hold at the roster's width. So a run that
+    /// lists or delists draws from this stream at the NEW width from that
+    /// mutation onward, and its position on any later day differs from the
+    /// position the same run reached before issue #148 was fixed on
+    /// 2026-09-02, when the two mutations left the array at its
+    /// construction width. Every other stream is untouched by the
+    /// difference, and every shipped preset holds both coefficients at 0.0,
+    /// so no shipped price path moves.
     fn update_volume_idio(&mut self) {
         let p = &self.params;
         let (rho, sigma) = (p.volume_idio_persistence, p.volume_idio_sigma);
@@ -1590,12 +1624,29 @@ impl Engine {
     /// inserting into the middle would renumber every company after it and
     /// change which draws they receive. An embedder that needs a particular
     /// ordering must establish it before the first tick.
+    ///
+    /// # The five per-slot arrays it carries
+    ///
+    /// `attribution`, `tick_components`, `tick_fundamental`, `tick_anchor`
+    /// and `volume_idio` are all positional against `companies`, so each one
+    /// gains a slot here. The new company's `volume_idio` slot is 0.0, which
+    /// is what `Engine::with_params` gives every company at construction: a
+    /// listing starts with no idiosyncratic volume state.
+    ///
+    /// `volume_idio` was left out until 2026-09-02 (issue #148), and the
+    /// consequence reached two things. `update_volume_idio` draws once per
+    /// SLOT, so the draw count per day was the array's stale width rather
+    /// than the roster's; from this mutation onward it is the roster's
+    /// width. And the tick reads each company's state at its own index, so
+    /// under a preset with a non-zero `volume_idio_sigma` every company past
+    /// the new one read a state that was not its own.
     pub fn add_company(&mut self, company: TickCompany) -> usize {
         self.companies.push(company);
         self.attribution.push([0.0; 9]);
         self.tick_components.push([0.0; 8]);
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);
+        self.volume_idio.push(0.0);
         self.companies.len() - 1
     }
 
@@ -1609,6 +1660,15 @@ impl Engine {
     /// Returns `None` for an out-of-range index rather than panicking — a
     /// removal racing a bankruptcy is an embedder bug worth reporting, not a
     /// reason to abort the module and take the session with it.
+    ///
+    /// # The five per-slot arrays it carries
+    ///
+    /// The same five [`Engine::add_company`] appends to, each losing the slot
+    /// at `index` so the tail shifts down with the roster it is positional
+    /// against. `volume_idio` was left out until 2026-09-02 (issue #148),
+    /// which left the survivors reading their old neighbours' states and
+    /// held the per-day draw count at the pre-removal width; from this
+    /// mutation onward the count is the roster's width.
     pub fn remove_company(&mut self, index: usize) -> Option<TickCompany> {
         if index >= self.companies.len() {
             return None;
@@ -1624,6 +1684,9 @@ impl Engine {
         }
         if index < self.attribution.len() {
             self.attribution.remove(index);
+        }
+        if index < self.volume_idio.len() {
+            self.volume_idio.remove(index);
         }
         Some(self.companies.remove(index))
     }

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+**A run can commit to the state it held at the end of every day**, and a
+sampled check verifies k days for the cost of k days.
+
+**The per-name volume states follow the roster**, which moves the
+volume-idio generator position of any run that lists or delists and breaks
+old checkpoints of such runs.
+
+<!-- release-note-ends -->
+
+### The day ledger
+
 **A run can commit to the state it held at the end of every day.** A
 `DayLedger` takes a canonical hash of the engine's state at every close,
 and a `RunManifest` written with one carries the Merkle root over those
@@ -14,9 +25,6 @@ and `tradefloor.manifest.state_hash` computes the same digest in Python
 from `state_snapshot()`. Nothing about a trajectory moves: the manifest
 field is additive under the schema it already had, and `reproduce()`
 behaves the same with the field and without it.
-
-<!-- release-note-ends -->
-
 ### The measured cost
 
 On `Universe.random(8, seed=99)`, seed 42, twelve days at 30 ticks a day,
@@ -62,6 +70,80 @@ chain, the generators and the draw count are identical across them, which
 is why nothing saw the flag until a leaf covered it. The flag is left
 where it is: clearing it would change the trajectory of a run that calls
 `run_session` twice without opening a market between them.
+
+### The per-name volume states
+
+**The per-name volume states follow the roster.** `volume_idio` holds one
+state per company and is positional against the roster, alongside the four
+per-slot arrays `add_company` and `remove_company` already carried. It was
+in neither, so its width stayed at whatever the engine was constructed
+with. A listing left the new company without a slot of its own, a delisting
+left every survivor reading its old neighbour's state, and the per-day draw
+count from the volume-idio stream followed the stale width.
+
+This reaches the volume-idio generator position, and the state snapshot, of
+any run that lists or delists an instrument. Such a run draws once per
+company per day from the mutation onward, so its position on every later
+day differs from the position the same run reached in 0.6.2, and its
+snapshot records the array at the roster's width.
+
+The change reaches nothing else. All sixteen shipped presets hold
+`volume_idio_sigma` and `volume_idio_persistence` at 0.0, so every state
+stays exactly 0.0 and no shipped price path moves. The known-answer digest
+holds at KAT 13. A run with a fixed roster agrees with 0.6.2 on its prices,
+its snapshot and all seven generator positions.
+
+**A checkpoint of a roster-changing run saved before this will not
+restore.** It carries the array at the construction width, which its own
+roster disagrees with. `restore_state` refuses it, and the error names both
+widths and issue #148. Reproduce such a run from its seed and its order log
+to get a snapshot at the roster's width.
+### The measured comparison
+
+Two builds ran the same three runs on `Universe.random(8, seed=99)` at seed
+42 under pt-v16, one at `f47c149` and one with the fix. The fixed-roster
+run of three days held every field: its price digest, its whole state
+snapshot, its draw count and all seven generator positions.
+
+The roster-changing run listed one instrument after day one and delisted
+index 0 after day two. Its price digest held at
+`7bd337ec5e38dbb86853da8cbfeaaa934cc2028e7747b4a4538c44169fd55825` and its
+draw count held at 73,739. Four fields moved: the volume-idio generator
+position, the snapshot digest that carries it, the array width after the
+listing, which went from 8 to 9, and the survivors' states after the
+delisting under a model with `volume_idio_sigma` at 0.4.
+
+That last arm is one no shipped preset reaches. At sigma 0.0 every slot
+holds exactly 0.0, so a survivor reading its neighbour's slot reads the
+same number and the defect has no visible consequence. The test that states
+the claim builds its own `ModelParams` in the test, so this work adds no
+preset and no dial.
+
+### The draw schedule
+
+`update_volume_idio` draws once per slot at every close, before the check
+that skips the write at zero coefficients. The count is therefore the
+array's width, which from this release is the roster's width. A run that
+never mutates its roster takes the count it always took, because the
+constructor already sized the array to the roster.
+
+The volume-idio stream is derived from the root seed alone, so its position
+after a run is a function of the seed and the draw count. The tests rest on
+that. Eight names for three days, twelve for two and twenty-four for one
+all reach one position, and the roster-changing run reaches the position of
+a twenty-five-name run of a single day. The pre-fix count appears in the
+tests as a fixed-roster run of the construction width, so no digest is
+copied into an assertion.
+
+### The stale checkpoints
+
+`set_volume_idio` refused a width its roster disagreed with before this
+change, and that refusal is kept. A pad or a truncation would attach each
+state to whichever company now sits at that index, and the restored market
+would continue plausibly under states belonging to other names. The error
+now names the width the snapshot carries, the width the roster holds and
+issue #148, so a reader meets the explanation where the failure happens.
+
 
 ## 0.6.2
 
