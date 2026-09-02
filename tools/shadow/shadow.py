@@ -761,6 +761,14 @@ def build_provenance(engine, preset=None) -> dict:
     # "preset None (fingerprint pt-v16)". A shipped preset's fingerprint is
     # its name, which is what the engine resolved to.
     return {"tradefloor": tf.version(), "commit": commit,
+            # Which Jacobian the sensitivity column came from. A run solved
+            # before the fresh finite difference landed carries the
+            # optimiser's own, which is Broyden-updated between refreshes
+            # and drifted by a factor of nine on one day in four. A saved
+            # run has no way to say so unless the run said it, so it does,
+            # and a re-render of an older one reports the absence.
+            "sensitivity": "fresh finite difference at the accepted "
+                           "solution",
             "preset": preset or engine.model_fingerprint,
             "model_fingerprint": engine.model_fingerprint,
             "order_flow": "zero; no agent trades in a shadow run",
@@ -1000,7 +1008,17 @@ def render(run: dict) -> str:
     if len(sens):
         real_sd = np.array([run["real_idio_sd"][t] for t in run["tickers"]])
         med = np.median(sens, axis=0)
+        source = run["provenance"].get("sensitivity")
         lines += ["", "## Close sensitivity to one unit of innovation", "",
+                  ("Measured as a " + source + "."
+                   if source else
+                   "Taken from the optimiser's own Jacobian, which is "
+                   "updated by secant between refreshes: this run was "
+                   "solved before the column was measured fresh at the "
+                   "accepted solution, and on one day in four the two "
+                   "differed by a factor of nine. Read this section and "
+                   "the binding clamp column below as the optimiser's "
+                   "estimate rather than as a measurement."), "",
                   "The Jacobian's column for each name's day innovation, in log "
                   "return per unit z (median over the days), beside the name's "
                   "real daily idiosyncratic sd over the year. A ratio well "
@@ -1036,6 +1054,9 @@ def render(run: dict) -> str:
               f"- data: {run['provenance']['source']}; fetched "
               f"{sorted(set(run['provenance']['fetched'].values()))}",
               f"- url template: {run['provenance']['url_template']}",
+              "- the fetched panel is not committed, and is reproduced from "
+              "that template on those dates; a cloud run archives it beside "
+              "this report as shadow-data.tgz",
               f"- tradefloor {run['provenance']['tradefloor']}, commit "
               f"{run['provenance']['commit']}",
               "", "## The implied innovations", "",
@@ -1178,8 +1199,27 @@ def main(argv=None) -> int:
                    help="a shadow-partial.json from an earlier run of the "
                         "same year, preset and seed; continues after its "
                         "checkpoint day")
+    p.add_argument("--render", default=None,
+                   help="a shadow.json or shadow-partial.json from an "
+                        "earlier run; re-renders its report on this code "
+                        "and solves nothing")
     p.add_argument("--out", required=True)
     args = p.parse_args(argv)
+    if args.render:
+        # A box uploads the JSON beside the report, so a report can be
+        # regenerated on fixed code without a new solve. Everything the
+        # report says is a function of the saved per-day solutions, which
+        # is what makes this possible and what a change to `render` has to
+        # keep true.
+        with open(args.render, encoding="utf-8") as f:
+            saved = json.load(f)
+        os.makedirs(args.out, exist_ok=True)
+        text = render(saved)
+        name = "shadow-partial.md" if saved.get("partial") else "shadow.md"
+        with open(os.path.join(args.out, name), "w", encoding="utf-8") as f:
+            f.write(text)
+        sys.stdout.write(text)
+        return 0
     if not args.lab and args.year is None:
         p.error("--year is required unless --lab is given")
     os.makedirs(args.out, exist_ok=True)

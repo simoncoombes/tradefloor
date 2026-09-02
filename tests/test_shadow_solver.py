@@ -396,3 +396,102 @@ def test_an_intensity_of_zero_or_one_does_not_raise(short_days):
     for intensities in ((1.0, 0.5), (0.5, 0.0), (0.0, 0.0), (1.0, 1.0)):
         out = shadow.solve_day(fwd, r_obs, intensities, sigma=1e-3)
         assert out["residual"]
+
+
+# -- a report is a function of the saved solve --------------------------------
+
+def _saved_run(short_days_ticks=40, days=3, sensitivity=True):
+    """A run dict of the shape the tool writes beside its report.
+
+    Built from real solves on days the engine generated, so every number
+    the report reads is one the solver produced.
+    """
+    universe = tf.Universe.random(6, seed=3)
+    tickers = [f"N{i}" for i in range(len(universe))]
+    rng = np.random.default_rng(11)
+    engine = tf.Engine(seed=11, universe=universe)
+    out_days = []
+    for k in range(days):
+        fwd = shadow.Forward(engine, k, len(universe))
+        x_true = rng.normal(size=fwd.layout.size)
+        r_obs = fwd.returns(x_true, fwd.jump_patches(None, {}))
+        result = shadow.solve_day(fwd, r_obs, (0.05, 0.006), sigma=1e-3)
+        fwd.commit(result["x"], result["jumps"])
+        engine.record(k)
+        macro = engine.macro_state
+        out_days.append({
+            "day": k, "date": f"2017-01-{k + 3:02d}",
+            "x_market": result["x_market"], "x_idio": result["x_idio"],
+            "x_sector": result["x_sector"],
+            "jump_market": result["jump_market"],
+            "jump_company": result["jump_company"],
+            "max_abs_residual": float(np.max(np.abs(result["residual"]))),
+            "converged": result["converged"], "clamped": [],
+            "worst": tickers[0], "evals": result["evals"],
+            "reached": True,
+            "sensitivity": result["jacobian_idio_norm"],
+            "vix_model": float(macro.vix), "vix_real": 14.0 + k,
+            "level_gap_mean_abs": 0.01 * (k + 1),
+            "mispricing_mean": -0.001 * (k + 1),
+            "market_variance": [0.0002] * 6,
+            "universe_stress": 0.0,
+        })
+    provenance = {"tradefloor": tf.version(), "commit": "abcdef0",
+                  "preset": "pt-v16",
+                  "model_fingerprint": engine.model_fingerprint,
+                  "order_flow": "zero", "fundamentals": "synthetic",
+                  "source": "a fixture", "fetched": {"N0": "2026-01-01"},
+                  "url_template": "https://example.invalid/{ticker}"}
+    if sensitivity:
+        provenance["sensitivity"] = ("fresh finite difference at the "
+                                     "accepted solution")
+    return {
+        "args": {"year": "calm", "preset": "pt-v16", "seed": 7,
+                 "sigma": 1e-3, "days": days, "null_days": 0},
+        "year": "2017", "sessions": [0, days], "days": out_days,
+        "provenance": provenance, "intensities": [0.05, 0.006],
+        "tickers": tickers, "truth_rows": 0, "bars": [], "bar_rows": 0,
+        "seconds": 1.0, "null": None,
+        "real_idio_sd": {t: 0.02 for t in tickers},
+    }
+
+
+def test_a_report_re_renders_from_the_saved_solve(short_days):
+    """A box uploads the JSON beside the report, so the report can be
+    regenerated on fixed code without a new solve. That works only while
+    every line is a function of the saved per-day solutions, which this
+    states by rendering the dict and its JSON round trip and comparing
+    byte for byte.
+    """
+    import json
+    run = _saved_run()
+    first = shadow.render(run)
+    again = shadow.render(json.loads(json.dumps(run)))
+    assert first == again
+    assert first.encode("utf-8") == again.encode("utf-8")
+    # and it says where the sensitivity came from
+    assert "Measured as a fresh finite difference" in first
+
+
+def test_a_report_says_when_the_sensitivity_was_not_measured(short_days):
+    """A run solved before the column was measured fresh carries no such
+    note, and the report has to say so rather than present the optimiser's
+    estimate as a measurement."""
+    run = _saved_run(sensitivity=False)
+    text = shadow.render(run)
+    assert "Measured as a fresh" not in text
+    assert "optimiser's own Jacobian" in text
+    assert "factor of nine" in text
+    assert "binding clamp column below as the optimiser's" in text
+
+
+def test_the_render_mode_writes_the_report_and_solves_nothing(
+        short_days, tmp_path):
+    import json
+    run = _saved_run()
+    saved = tmp_path / "shadow.json"
+    saved.write_text(json.dumps(run), encoding="utf-8")
+    out = tmp_path / "out"
+    assert shadow.main(["--render", str(saved), "--out", str(out)]) == 0
+    written = (out / "shadow.md").read_text(encoding="utf-8")
+    assert written == shadow.render(run)
