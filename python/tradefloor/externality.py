@@ -21,8 +21,12 @@ print(result.render())
 ``matrix[a][b]`` is what b's P&L since the fork changes by when a stops
 trading. ``diagonal[a]`` is what a's own execution cost against the market
 it would have traded into had it not been there, which is implementation
-shortfall against the world-without-a, and on a one-agent cohort it is
-:func:`tradefloor.tca.analyse` exactly.
+shortfall against the world-without-a. On a one-agent cohort forked at day
+zero it equals :func:`tradefloor.tca.analyse` to the bit, because the
+world-without-a is then the nobody-trades world and the two measurements
+cover the same steps. On a cohort that has already run they measure
+different windows: this leaves out the fills before the fork, which both
+arms share, and ``analyse`` has no shared history to leave out.
 
 ## Why the arms are exact rather than estimated
 
@@ -38,17 +42,23 @@ shared history is the same object in all of them.
 ## What one number in the matrix holds
 
 An effect on b is b's P&L change. It arrives as prices, and two things
-reach b through prices: the liquidity a consumed and the impact a left, and
-b's own reaction to the market a made. Both are in the number and this
-cannot split them. Splitting them needs a third arm in which b sees a's
-prices and answers as though it did not, and there is no such arm.
+reach b through prices: the impact a's flow left on the market, and b's own
+reaction to the market a made. Both are in the number and this cannot split
+them. Splitting them needs a third arm in which b sees a's prices and
+answers as though it did not, and there is no such arm.
+
+The channel is impact rather than liquidity. Agents in a cohort take no
+levels from each other, because :meth:`Portfolio.execute` reads the ladder
+and removes nothing, so a's whole effect on b travels through the merged
+``order_flow`` of a session and the prices it produced. `counterfactual.py`
+carries the measurement.
 
 Removal is inaction from the fork day on. The removed agent keeps the
-positions it held at the fork and they go on being marked to the arm's
-market, so its net worth still moves in a world it no longer trades. A
-world where the agent had never existed would differ from day zero and
-there would be no fork to measure from. :meth:`Externality.caveats` names
-that choice on every result, computed from the arms rather than typed here.
+positions it held at the fork, and a frozen holding sends no flow, so it
+moves no price in the arm and enters no number here. A world where the
+agent had never existed would differ from day zero and there would be no
+fork to measure from. :meth:`Externality.caveats` names that choice on
+every result, computed from the arms rather than typed here.
 """
 
 from __future__ import annotations
@@ -123,15 +133,20 @@ class Externality:
         does carry worth reading. The rule and its reasoning are
         `python/tradefloor/mcp.py`'s.
         """
+        held = (f" At this fork {_names(self.held_at_fork)} held a "
+                f"position, so those arms are markets in which an agent "
+                f"stopped trading with a position on." if self.held_at_fork
+                else "")
         out = [
-            "An effect is a P&L change and nothing finer. What reached "
-            "the affected agent through the book and what reached it "
-            "through its own reaction to the prices the book left are "
-            "both in the number, because both arrive as prices.",
+            "An effect is a P&L change and nothing finer. The impact the "
+            "removed agent's flow left on prices and the affected agent's "
+            "own reaction to those prices are both in the number, because "
+            "both arrive as prices.",
             f"Removal is inaction from day {self.fork_day} on. The removed "
             f"agent sends no order and is asked nothing; it keeps the "
-            f"positions it held at the fork and they go on being marked to "
-            f"the arm's own market.",
+            f"positions it held at the fork, and a frozen holding sends no "
+            f"flow, so it moves no price in the arm and enters no number "
+            f"here.{held}",
         ]
         if not self.agreement.identical:
             out.append(
@@ -142,26 +157,21 @@ class Externality:
         if idle:
             out.append(
                 f"{len(idle)} of {len(self.labels)} agents filled no trade "
-                f"over the {self.days} measured days ({', '.join(idle)}). "
-                f"Removing an agent that sent no order changes nothing, so "
-                f"each of those rows is zero; each of those columns still "
-                f"moves, because the prices its holdings mark against "
-                f"moved.")
-        if self.held_at_fork:
-            out.append(
-                f"{len(self.held_at_fork)} agents held a position at the "
-                f"fork ({', '.join(self.held_at_fork)}). A frozen position "
-                f"is still marked, so part of a diagonal agent's own P&L in "
-                f"its arm is the market moving under holdings it can no "
-                f"longer trade out of.")
+                f"over the {self.days} measured {_days(self.days)} "
+                f"({', '.join(idle)}). An agent that filled no trade sent "
+                f"the market nothing, since a refused order reaches neither "
+                f"the book nor the session, so each of those rows is zero; "
+                f"each of those columns still moves, because the prices its "
+                f"holdings mark against moved.")
         flat = sum(1 for a in self.labels for b in self.labels
                    if a != b and self.matrix[a][b] == 0.0)
         pairs = len(self.labels) * (len(self.labels) - 1)
         if pairs and flat == pairs:
             out.append(
-                f"Every off-diagonal entry is zero. Over these {self.days} "
-                f"days on this roster the cohort is separable: each agent's "
-                f"P&L is what it would have been alone.")
+                f"Every off-diagonal entry is zero. Over "
+                f"{self.days} {_days(self.days)} on this roster the cohort "
+                f"is separable: each agent's P&L is what it would have "
+                f"been alone.")
         if self.days == 1:
             out.append(
                 "The window is one day. An effect that needs one session to "
@@ -223,8 +233,8 @@ class Externality:
         width = max(width, longest + 9)
         cell = max(14, longest + 3)
         out = [
-            f"  externalities over {self.days} days from day "
-            f"{self.fork_day}, {len(self.labels)} agents",
+            f"  externalities over {self.days} {_days(self.days)} from "
+            f"day {self.fork_day}, {len(self.labels)} agents",
             "",
             "  P&L since the fork, whole cohort present",
         ]
@@ -264,6 +274,18 @@ class Externality:
     def __repr__(self) -> str:
         return (f"Externality({', '.join(self.labels)}, days={self.days}, "
                 f"identical={self.agreement.identical})")
+
+
+def _days(count: int) -> str:
+    """"day" or "days", so a rendered line does not read "1 days"."""
+    return "day" if count == 1 else "days"
+
+
+def _names(labels: "tuple[str, ...]") -> str:
+    """Labels as an English list, so a caveat reads as a sentence."""
+    if len(labels) == 1:
+        return labels[0]
+    return ", ".join(labels[:-1]) + " and " + labels[-1]
 
 
 def externalities(world: World, days: int = 1) -> Externality:

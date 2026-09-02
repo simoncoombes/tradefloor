@@ -199,6 +199,58 @@ def test_the_cohort_flow_reaches_the_market_as_one_merged_order_flow():
     assert solo(Buyer(0, at=0, shares=10_000.0)) != solo(Idle())
 
 
+def test_agents_do_not_take_each_others_liquidity_within_a_step():
+    """`Portfolio.execute` reads the ladder and removes nothing.
+
+    So label order decides which agent is asked first, which flow is summed
+    first and whose rejection is written first, and no price. Two agents
+    buying one name on one step meet the same levels and pay the same
+    average, and the market is the same market whichever label sorts first.
+
+    Without this the module could claim, as it did, that a later agent pays
+    the levels an earlier one took. The behaviour was always right and the
+    sentence was wrong, which is the failure a test states rather than a
+    paragraph.
+    """
+    cash = 50_000_000.0
+    both = cohort(cash=cash,
+                  agents={"alpha": Buyer(0, at=0, shares=10_000.0),
+                          "beta": Buyer(0, at=0, shares=10_000.0)})
+    both.run(days=1)
+    alpha = both.portfolios["alpha"].fills[0]
+    beta = both.portfolios["beta"].fills[0]
+    assert alpha["price"] == beta["price"]
+    assert alpha["worst_price"] == beta["worst_price"]
+
+    # And the ladder both of them swept is the ladder neither of them moved.
+    fresh = tf.Engine(seed=SEED, universe=roster())
+    fresh.open_market()
+    ticker = fresh.tickers[0]
+    before = _levels(fresh, ticker)
+    tf.Portfolio(cash=cash).execute(fresh, ticker, 10_000.0)
+    assert _levels(fresh, ticker) == before
+
+    # Sorting order decides no price and no market.
+    first = cohort(cash=cash,
+                   agents={"aa": Buyer(0, at=0, shares=3_000.0),
+                           "zz": Buyer(0, at=0, shares=9_000.0)})
+    second = cohort(cash=cash,
+                    agents={"aa": Buyer(0, at=0, shares=9_000.0),
+                            "zz": Buyer(0, at=0, shares=3_000.0)})
+    first.run(days=1)
+    second.run(days=1)
+    assert first.digest() == second.digest()
+    assert (first.portfolios["aa"].fills[0]["price"]
+            == second.portfolios["zz"].fills[0]["price"])
+
+
+def _levels(engine, ticker, depth: int = 3):
+    book = engine.book(ticker)
+    return [(level.price, level.quantity)
+            for side in ("buy", "sell")
+            for level in book.price_levels(side, depth)]
+
+
 def test_agents_are_asked_before_any_of_them_executes():
     """Simultaneous within a step: they see each other's impact and never
     each other's orders."""
@@ -428,6 +480,65 @@ def test_the_diagonal_is_the_tca_shortfall_on_a_one_agent_cohort():
     assert result.diagonal["alpha"] == reference.shortfall()
     assert result.diagonal_bps["alpha"] == reference.shortfall_bps()
     assert result.matrix["alpha"]["alpha"] == reference.shortfall()
+
+
+class Roundtrip:
+    """Buys before the fork, buys again after it, then sells."""
+
+    def act(self, obs) -> dict[str, float]:
+        ticker = obs.tickers[0]
+        if obs.step in (2, 7):
+            return {ticker: 900.0}
+        if obs.step == 13:
+            return {ticker: -900.0}
+        return {}
+
+
+def test_the_diagonal_leaves_out_the_fills_the_arms_share():
+    """A fork that lands mid-run has fills on both sides of it.
+
+    Those before it happened in a history both arms share, so their cost is
+    the shared history's rather than an externality, and pricing them
+    against a baseline path that starts at the fork is arithmetic on two
+    unrelated steps. `tca.Execution._reference` guards only the upper end of
+    the path, so a pre-fork fill carries a negative index, reads a real
+    price off the end of the list and returns a wrong number in silence.
+
+    The expected value here is built from the arm's own price path rather
+    than from `externalities`, so the test can fail honestly.
+    """
+    world = World(seed=SEED, universe=roster(), agents={"alpha": Roundtrip()})
+    world.run(days=1)
+    fork = world.step
+    assert [f["step"] for f in world.portfolios["alpha"].fills] == [2], (
+        "the fixture leaves no fill before the fork, so the filter this "
+        "test is about would be a no-op")
+
+    result = externalities(world, days=3)
+
+    (full,) = world.fork("full")
+    arm = world.without("alpha")
+    full.run(days=3)
+    arm.run(days=3)
+    baseline = [_prices(world.engine)] + [list(row["prices"])
+                                          for row in arm.trace[fork:]]
+    tickers = full.engine.tickers
+    expected = sum(
+        fill["quantity"] * (fill["price"]
+                            - baseline[fill["step"] - fork][
+                                tickers.index(fill["ticker"])])
+        for fill in full.portfolios["alpha"].fills if fill["step"] >= fork)
+
+    assert result.diagonal["alpha"] == expected
+    # And the number a missing filter would produce is a different number,
+    # so the assertion above is not passing on an equality that holds either
+    # way.
+    wrong = sum(
+        fill["quantity"] * (fill["price"]
+                            - baseline[fill["step"] - fork][
+                                tickers.index(fill["ticker"])])
+        for fill in full.portfolios["alpha"].fills)
+    assert wrong != expected
 
 
 def test_two_agents_that_never_trade_give_a_zero_matrix():

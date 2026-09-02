@@ -73,16 +73,36 @@ A world takes ``agents={"a": agent_a, "b": agent_b}`` in place of ``agent=``,
 and then holds one :class:`~tradefloor.Portfolio` per label against one
 engine, which `portfolio.py` was written to allow. Within a step every agent
 sees the same prices and the same book, each over its own portfolio; they are
-asked in label order, they execute in label order against the shared book, so
-a later agent's fills are priced into liquidity an earlier one has already
-consumed; every portfolio's pending flow is merged per ticker and reaches the
+asked in label order, they execute in label order against the shared book,
+and every portfolio's pending flow is merged per ticker and reaches the
 market as the one ``order_flow`` argument of the one session. Agents see each
 other's impact and never each other's orders, and :meth:`Scenario.apply` runs
 once a day for the whole cohort.
 
-Label order is sorted order, so the same labels give the same market whatever
-order the mapping was built in. A dict literal's own order would make the
-market a property of how the caller typed it.
+## Agents do not take each other's liquidity within a step
+
+:meth:`Portfolio.execute` prices a fill through ``book.sweep_cost``, which
+walks the levels to compute an average and removes nothing from the book. So
+two agents buying the same name on the same step meet the same ladder and
+fill at the same price, and the ladder after both of them is the ladder
+before either. Measured on ``Universe.random(8, seed=99)`` at seed 42, two
+agents each buying 10,000 shares of the first name at step 0: both fill at
+83.961190 against a first level of 9,762 shares that neither of them moved.
+``test_externality.py`` pins it.
+
+The cohort's whole footprint reaches the market once, as the merged
+``order_flow`` of that step's session, so an agent meets another's trading
+from the next step on and never inside the step it happened. Order priority
+within a step is a queue this engine does not run, and a cohort does not
+introduce one.
+
+Label order therefore decides three things and no price: the order agents are
+asked, the order their flows are summed into the merged mapping, and the
+order :attr:`World.rejected` is written. It is sorted order, so the same
+labels give the same market whatever order the mapping was built in. A dict
+literal's own order would make the market a property of how the caller typed
+it, and with three or more agents on one ticker the summation order is a
+float-associativity question rather than a cosmetic one.
 
 The single-agent form is a one-element cohort under its old names.
 :attr:`World.agent` and :attr:`World.portfolio` read that one element and
@@ -526,8 +546,11 @@ class World:
 
                 asked = {label: self._ask_agent(label, obs)
                          for label, obs in observed.items()}
-                # Execution in label order, against the one book, so a later
-                # agent pays the levels an earlier one has already taken.
+                # Execution in label order, against the one book. The order
+                # fixes which agent's rejection is written first and nothing
+                # about price: `sweep_cost` reads the ladder and removes
+                # nothing, so both agents meet the same levels and fill at
+                # the same price. See the module docstring.
                 done = {label: self._execute(asked[label][0], tickers, label)
                         for label in self._agents}
 
@@ -1238,7 +1261,9 @@ def agree(a: World, b: World) -> Agreement:
     not come back identical the experiment has no control, and every number
     downstream of it is describing two different markets.
 
-    Nine checks, every one read back off the two objects. The engine state
+    Nine checks between two single-agent worlds, and seven plus two per
+    label between two cohorts, every one of them read back off the two
+    objects. The engine state
     snapshot subsumes several of the others on its own -- it carries every
     column, the generator position, the per-day accumulators, the macro chain
     and the central bank -- but they are listed beside it rather than folded
