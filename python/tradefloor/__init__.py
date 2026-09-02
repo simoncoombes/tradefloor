@@ -35,6 +35,8 @@ from .checkpoint import Checkpoint, branch
 from . import counterfactual
 from .counterfactual import (Agreement, Comparison, Divergence, Resample,
                              World, agree, compare, resample)
+from . import externality
+from .externality import Externality, externalities
 from .sweep import sweep
 from . import boundary
 from .boundary import BoundaryMap, Flip, flip, map_boundaries
@@ -104,6 +106,7 @@ __all__ = [
     "spec", "StrategySpec", "SPEC_VERSION",
     "Scenario", "run_scenario", "facts", "loss", "Checkpoint", "branch", "sweep",
     "counterfactual", "World", "agree", "compare", "resample",
+    "externality", "Externality", "externalities",
     "Agreement", "Comparison", "Resample",
     "Divergence",
     "boundary", "flip", "map_boundaries", "Flip", "BoundaryMap",
