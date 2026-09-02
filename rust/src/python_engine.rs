@@ -725,6 +725,48 @@ impl DayBuffer {
 /// `Clone` is what [`PyEngine::fork`] is made of, and it is derived rather
 /// than written so that a field added here is carried into a fork without
 /// anyone remembering to carry it. See the note on [`Engine`].
+fn stream_name(id: u32) -> &'static str {
+    match id {
+        crate::rng::stream::MARKET => "market",
+        crate::rng::stream::ECONOMY => "economy",
+        crate::rng::stream::EXTERNAL => "external",
+        crate::rng::stream::JUMPS => "jumps",
+        crate::rng::stream::VOLUME => "volume",
+        crate::rng::stream::NEWS => "news",
+        crate::rng::stream::VOLUME_IDIO => "volume_idio",
+        _ => "unknown",
+    }
+}
+
+fn stream_id(name: &str) -> PyResult<u32> {
+    Ok(match name {
+        "market" => crate::rng::stream::MARKET,
+        "economy" => crate::rng::stream::ECONOMY,
+        "external" => crate::rng::stream::EXTERNAL,
+        "jumps" => crate::rng::stream::JUMPS,
+        "volume" => crate::rng::stream::VOLUME,
+        "news" => crate::rng::stream::NEWS,
+        "volume_idio" => crate::rng::stream::VOLUME_IDIO,
+        other => {
+            return Err(ValidationError::new_err(format!(
+                "unknown stream {other:?}; one of market, economy, external, jumps, volume, news, volume_idio"
+            )))
+        }
+    })
+}
+
+fn draw_kind(name: &str) -> PyResult<crate::rng::DrawKind> {
+    Ok(match name {
+        "uniform" => crate::rng::DrawKind::Uniform,
+        "normal" => crate::rng::DrawKind::Normal,
+        other => {
+            return Err(ValidationError::new_err(format!(
+                "unknown draw kind {other:?}; uniform or normal"
+            )))
+        }
+    })
+}
+
 #[pyclass(name = "Engine", module = "tradefloor._core")]
 #[derive(Clone)]
 pub struct PyEngine {
@@ -1105,6 +1147,7 @@ impl PyEngine {
             return Err(ValidationError::new_err("ticks_per_day must be greater than zero"));
         }
         for offset in 0..days {
+            self.inner.set_current_day((first_day + offset as u32) as i64);
             self.open_market();
             self.run_session(py, hour, minute, day_of_week, ticks_per_day, volatility,
                              false, None, None, None)?;
@@ -1442,6 +1485,100 @@ impl PyEngine {
         out.set_item("economy", draws.economy)?;
         out.set_item("external", draws.external)?;
         Ok(out)
+    }
+
+    // ── Draw addressing (phase 1) ─────────────────────────────────────────
+
+    /// The day the next `open_market` opens, for the draw log and the day
+    /// marks. `run_days` sets it from `first_day`; a caller driving
+    /// `open_market` and `run_session` by hand sets it here.
+    fn set_day(&mut self, day: i64) {
+        self.inner.set_current_day(day);
+    }
+
+    /// `(uniforms, normals)` taken so far on each stream, keyed by stream
+    /// name: the address the next draw of each kind would take.
+    fn stream_positions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let out = PyDict::new_bound(py);
+        for (id, (u, n)) in self.inner.stream_positions().iter().enumerate() {
+            out.set_item(stream_name(id as u32), (*u, *n))?;
+        }
+        Ok(out)
+    }
+
+    /// Install substitutions: `(stream, kind, index, value)` tuples, the
+    /// stream and kind by name. The generators still advance at every
+    /// address; only the value the consumer receives changes.
+    fn patch_draws(&mut self, patches: Vec<(String, String, u64, f64)>) -> PyResult<()> {
+        for (stream, kind, index, value) in patches {
+            let id = stream_id(&stream)?;
+            let kind = draw_kind(&kind)?;
+            self.inner.patch_draw(id, kind, index, value);
+        }
+        Ok(())
+    }
+
+    /// The installed overlay, as `(stream, kind, index, value)` tuples.
+    fn draw_patches(&self) -> Vec<(String, String, u64, f64)> {
+        let mut out = Vec::new();
+        for id in 0..7u32 {
+            if let Some(o) = self.inner.draw_overlay(id) {
+                for ((kind, index), value) in &o.table {
+                    out.push((stream_name(id).to_string(), kind.name().to_string(), *index, *value));
+                }
+            }
+        }
+        out
+    }
+
+    /// Record every draw `stream` takes on days `from_day..=to_day`.
+    fn trace_draws(&mut self, stream: String, from_day: i64, to_day: i64) -> PyResult<()> {
+        self.inner.enable_draw_log(stream_id(&stream)?, from_day, to_day);
+        Ok(())
+    }
+
+    /// The recorded draws of `stream` on days `from_day..=to_day`, as
+    /// `((stream, kind, index), value, day, site, tag)` tuples in the order
+    /// they were taken.
+    fn draw_log(&self, stream: String, from_day: i64, to_day: i64)
+        -> PyResult<Vec<((String, String, u64), f64, i64, String, u32)>> {
+        let id = stream_id(&stream)?;
+        Ok(self
+            .inner
+            .draw_log(id)
+            .iter()
+            .filter(|r| from_day <= r.day && r.day <= to_day)
+            .map(|r| ((stream.clone(), r.kind.name().to_string(), r.index), r.value, r.day, r.site.name().to_string(), r.tag))
+            .collect())
+    }
+
+    /// One dict per opened day: `day`, `positions` (stream name to
+    /// `(uniforms, normals)` at the open), `active`, `sectors`, `ticks`.
+    fn day_marks<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        let mut out = Vec::new();
+        for m in self.inner.day_marks() {
+            let d = PyDict::new_bound(py);
+            d.set_item("day", m.day)?;
+            let pos = PyDict::new_bound(py);
+            for (id, (u, n)) in m.positions.iter().enumerate() {
+                pos.set_item(stream_name(id as u32), (*u, *n))?;
+            }
+            d.set_item("positions", pos)?;
+            d.set_item("active", m.active.clone())?;
+            d.set_item("sectors", m.sectors)?;
+            d.set_item("ticks", m.ticks)?;
+            out.push(d);
+        }
+        Ok(out)
+    }
+
+    /// Where each active company's market-stream normals sit on `day`:
+    /// `(company, first, stride, ticks)`, the normal at tick `t` being
+    /// `first + t * stride`. `None` if the day was never opened.
+    fn market_day_layout(&self, day: i64) -> Option<Vec<(u32, u64, u64, u32)>> {
+        self.inner
+            .market_day_layout(day)
+            .map(|v| v.iter().map(|l| (l.company, l.first, l.stride, l.ticks)).collect())
     }
 
     #[getter]
@@ -1918,6 +2055,24 @@ impl PyEngine {
             rng_out.push(s.spare.unwrap_or(f64::NAN));
         }
         out.set_item("rng", rng_out)?;
+        // Draw addressing (phase 1): the counts that give every draw its
+        // address, and the overlay, both additive. A snapshot from before
+        // this key restores with counts of zero and no overlay.
+        let positions = self.inner.stream_positions();
+        let counts: Vec<f64> = positions
+            .iter()
+            .flat_map(|(u, n)| [*u as f64, *n as f64])
+            .collect();
+        out.set_item("draw_counts", counts)?;
+        let mut overlay: Vec<(u32, u8, u64, f64)> = Vec::new();
+        for id in 0..7u32 {
+            if let Some(o) = self.inner.draw_overlay(id) {
+                for ((kind, index), value) in &o.table {
+                    overlay.push((id, *kind as u8, *index, *value));
+                }
+            }
+        }
+        out.set_item("draw_overlay", overlay)?;
         out.set_item("tickers", self.inner.ids().to_vec())?;
         // The model the frozen market was priced under. `restore_state`
         // refuses a mismatch: a snapshot restored onto an engine running
@@ -2144,6 +2299,16 @@ impl PyEngine {
                 rng.len()
             )));
         }
+        let counts: Vec<f64> = match snapshot.get_item("draw_counts")? {
+            Some(v) => v.extract()?,
+            None => vec![0.0; 14],
+        };
+        if counts.len() != 14 {
+            return Err(ValidationError::new_err(format!(
+                "draw_counts must be 14 numbers, two per stream, got {}",
+                counts.len()
+            )));
+        }
         let stream = |at: usize| crate::rng::RngState {
             state: rng[at].to_bits(),
             increment: rng[at + 1].to_bits(),
@@ -2152,6 +2317,8 @@ impl PyEngine {
             } else {
                 Some(rng[at + 2])
             },
+            uniforms: counts[(at / 3) * 2] as u64,
+            normals: counts[(at / 3) * 2 + 1] as u64,
         };
         // A nine-number snapshot predates the jump stream. Its jump position
         // is whatever this engine derived from its seed, and keeping that is
@@ -2177,6 +2344,24 @@ impl PyEngine {
             news,
             volume_idio,
         });
+        if let Some(raw) = snapshot.get_item("draw_overlay")? {
+            let entries: Vec<(u32, u8, u64, f64)> = raw.extract()?;
+            for id in 0..7u32 {
+                self.inner.set_draw_overlay(id, None);
+            }
+            for (id, kind, index, value) in entries {
+                let kind = match kind {
+                    0 => crate::rng::DrawKind::Uniform,
+                    1 => crate::rng::DrawKind::Normal,
+                    other => {
+                        return Err(ValidationError::new_err(format!(
+                            "draw_overlay kind must be 0 (uniform) or 1 (normal), got {other}"
+                        )))
+                    }
+                };
+                self.inner.patch_draw(id, kind, index, value);
+            }
+        }
 
         // The per-day accumulators. Absent from a snapshot written before
         // these were carried, so they are optional and default to "a day that
