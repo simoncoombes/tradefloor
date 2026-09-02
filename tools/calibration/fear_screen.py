@@ -437,6 +437,32 @@ def _grid(name):
                 "d94k10c20Cr": cell(0.94, 1.0, 2.0, vix_selfex_kick_clawback=1.0, vix_selfex_kick_confirm=1.0, crisis_blend_ramp=15.0),
                 "d94k10c20r": cell(0.94, 1.0, 2.0, crisis_blend_ramp=15.0),
                 "ovlr": cell(0.94, 0.0, 0.0, crisis_blend_ramp=15.0)}
+    elif name == "combo3":
+        # Round 171.25: the ramp's dose on the fear side of the claw-back
+        # cell (ramp 15 cost same-day and asym; the step at 31 was feeding
+        # them), and the confirm scale.
+        REF = 0.007593024924589399
+        base = {"vix_selfex_gain": 0.25, "vix_selfex_threshold": 1.75,
+                "vix_selfex_size_coupling": 0.5, "vix_decay_ratio": 0.85,
+                "vix_selfex_relax_slope": 0.03, "vix_selfex_min": 2.0,
+                "vix_selfex_scale": 4.0, "vix_selfex_vol_jump": 0.75,
+                "vix_har_weight": 0.18, "vix_har_mid": 0.3, "vix_har_vrp": 1.0,
+                "vix_selfex_level_ref": REF, "vix_selfex_vix_power": 1.0,
+                "vix_selfex_vix_cap": 2.0, "vix_selfex_kick_clawback": 1.0,
+                "vix_selfex_kick_confirm": 1.0}
+        def cell(**extra):
+            return {**base, **extra}
+        return {"v16": {},
+                "C": cell(),
+                "Cr3": cell(crisis_blend_ramp=3.0),
+                "Cr5": cell(crisis_blend_ramp=5.0),
+                "Cr8": cell(crisis_blend_ramp=8.0),
+                "Cr10": cell(crisis_blend_ramp=10.0),
+                "Cc05": cell(vix_selfex_kick_confirm=0.5),
+                "Cc3": cell(vix_selfex_kick_confirm=3.0),
+                "Ck15c20": cell(vix_selfex_vix_power=1.5),
+                "Cg20": cell(vix_selfex_gain=0.20),
+                "Cch06": cell(vix_selfex_vol_jump=0.6)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):
