@@ -2,7 +2,7 @@
  "schema": 1,
  "preset": "pt-v14",
  "fingerprint": "pt-v14",
- "coefficient_digest": "e7666edc1c2c34b6bbfbe999a3096b86da634558603f2c34528d1e00a52e2b32",
+ "coefficient_digest": "43a51057c23eb4fdba6cb7af2c9f5c544fb07e90c3d82cc5ca38b1556b9d6191",
  "coefficients": {
   "book_levels": 10.0,
   "crash_amplifier_slope": 0.2,
@@ -159,7 +159,8 @@
   "vix_selfex_relax_slope": 0.0,
   "vix_selfex_vol_jump": 0.0,
   "vix_selfex_level_ref": 0.0,
-  "vix_selfex_vix_power": 0.0
+  "vix_selfex_vix_power": 0.0,
+  "vix_selfex_vix_cap": 0.0
  },
  "default_since": "0.4.0",
  "measured": {

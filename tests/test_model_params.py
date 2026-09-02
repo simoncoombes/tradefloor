@@ -369,6 +369,7 @@ PERTURBATIONS = [
     # gain in test_the_fear_scale_dials_act_when_the_co_jump_is_on.
     ("vix_selfex_level_ref", 0.005, False),
     ("vix_selfex_vix_power", 1.0, False),
+    ("vix_selfex_vix_cap", 1.5, False),
     # The HAR anchor's weight. Non-zero re-mixes the VIX target from the
     # first close (the anchor starts cold at zero realized variance, which
     # IS a target move), and the VIX reaches the market through the
@@ -807,6 +808,13 @@ def test_the_fear_scale_dials_act_when_the_co_jump_is_on():
         assert moved["draws"] == base["draws"], f"{name} moved the draw schedule"
         assert any(moved[k] != base[k] for k in moved if k != "draws"), \
             f"{name} did not act even with the co-jump on"
+    powered = tradefloor.ModelParams.from_preset(**fear, vix_selfex_vix_power=8.0)
+    capped = tradefloor.ModelParams.from_preset(**fear, vix_selfex_vix_power=8.0,
+                                                vix_selfex_vix_cap=1.0)
+    p_state, c_state = market_state(run_market(powered)), market_state(run_market(capped))
+    assert c_state["draws"] == p_state["draws"], "the cap moved the draw schedule"
+    assert any(c_state[k] != p_state[k] for k in c_state if k != "draws"), \
+        "a cap of 1.0 under a power of 8 did not act"
     running = tradefloor.ModelParams.from_preset(**fear).to_dict()["market_factor_sigma"]
     same = tradefloor.ModelParams.from_preset(**fear, vix_selfex_level_ref=running)
     assert market_state(run_market(same)) == base, \

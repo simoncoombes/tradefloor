@@ -99,6 +99,7 @@ pub struct DailyInputs<'a> {
     /// needs. At level_ref 0.0 nothing below reads market_factor_sigma.
     pub vix_selfex_level_ref: f64,
     pub vix_selfex_vix_power: f64,
+    pub vix_selfex_vix_cap: f64,
     pub market_factor_sigma: f64,
     pub market_vol_vix_anchor: f64,
     /// The market factor's post-close daily sigma, in the same percent
@@ -197,6 +198,7 @@ impl<'a> Default for DailyInputs<'a> {
             vix_selfex_vol_jump: 0.0,
             vix_selfex_level_ref: 0.0,
             vix_selfex_vix_power: 0.0,
+            vix_selfex_vix_cap: 0.0,
             market_factor_sigma: 0.0,
             market_vol_vix_anchor: 1.0,
             market_sigma_daily_pct: 1.0,
@@ -918,7 +920,14 @@ pub fn update_economy_daily(
         // the VIX level, so a calm world fires seldom and a stressed one
         // often. A branch, so 0.0 keeps the constant-rate form bit for bit.
         let state_mult = if inputs.vix_selfex_vix_power != 0.0 && inputs.market_vol_vix_anchor > 0.0 {
-            mathx::pow(economy.vix / inputs.market_vol_vix_anchor, inputs.vix_selfex_vix_power)
+            let raw = mathx::pow(economy.vix / inputs.market_vol_vix_anchor, inputs.vix_selfex_vix_power);
+            // The cap (round 171.9): 1.0 keeps only the damping below the
+            // anchor. A branch, so 0.0 is the uncapped form bit for bit.
+            if inputs.vix_selfex_vix_cap != 0.0 {
+                mathx::min(raw, inputs.vix_selfex_vix_cap)
+            } else {
+                raw
+            }
         } else {
             1.0
         };

@@ -313,8 +313,9 @@ def _grid(name):
                "vix_selfex_relax_slope": 0.03, "vix_selfex_min": 2.0,
                "vix_selfex_scale": 4.0, "vix_selfex_vol_jump": 0.75,
                "vix_har_weight": 0.18, "vix_har_mid": 0.3, "vix_har_vrp": 1.0}
-        def cell(r=1.0, ref=True, k=0.0, gain=None):
+        def cell(r=1.0, ref=True, k=0.0, gain=None, **extra):
             c = dict(ovl)
+            c.update(extra)
             if r != 1.0:
                 c["market_factor_sigma"] = float(f"{REF * r:.8g}")
             if ref:
@@ -334,7 +335,13 @@ def _grid(name):
                 "k10": cell(k=1.0),
                 "k15": cell(k=1.5),
                 "k10g20": cell(k=1.0, gain=0.20),
-                "r78k10": cell(0.78, k=1.0)}
+                "r78k10": cell(0.78, k=1.0),
+                # round 171.9: the cap — damping-only (1.0) and the middle
+                "k10c10": cell(k=1.0, vix_selfex_vix_cap=1.0),
+                "k10c15": cell(k=1.0, vix_selfex_vix_cap=1.5),
+                "k10c20": cell(k=1.0, vix_selfex_vix_cap=2.0),
+                "k15c15": cell(k=1.5, vix_selfex_vix_cap=1.5),
+                "r78k10c15": cell(0.78, k=1.0, vix_selfex_vix_cap=1.5)}
     elif name == "persist1":
         # Round 171 queue item 1: the persistence trade. The overlay's
         # p504 abs_return_acf5 (0.124 vs a 0.08 ceiling) is the fear

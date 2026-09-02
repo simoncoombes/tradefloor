@@ -1187,6 +1187,15 @@ pub struct ModelParams {
     /// 1.9x at 30. Zero draws change (both uniforms are always drawn when
     /// the gain is on). 0.0 = off, bit for bit.
     pub vix_selfex_vix_power: f64,
+    /// Ceiling on the state power's multiplier (round 171.9). level1 and
+    /// mshare2 measured the power's two faces at once: at 1.0 the
+    /// overlay passes every fear gate (the calm window fires 0.3x, the
+    /// stressed one 2-3x) and the held-45/65 windows fire so much more
+    /// that co-movement reads 0.827 and the lever 7.6. A cap of 1.0 keeps
+    /// only the damping below the anchor — the calm-window gain at zero
+    /// crisis-window price by construction; 1.5-2.0 is the middle. 0.0 =
+    /// no cap, bit for bit.
+    pub vix_selfex_vix_cap: f64,
     /// Couples an event's SIZE to the down-move that fired it: the
     /// magnitude is scaled by (1 + this x the gate excess). Round 153
     /// measured the missing piece exactly — the gate protects the
@@ -1603,6 +1612,7 @@ impl ModelParams {
             vix_selfex_vol_jump: 0.0,
             vix_selfex_level_ref: 0.0,
             vix_selfex_vix_power: 0.0,
+            vix_selfex_vix_cap: 0.0,
             vix_har_weight: 0.0,
             vix_har_mid: 0.4,
             vix_har_slow: 0.25,
@@ -2669,6 +2679,7 @@ impl ModelParams {
             "vix_selfex_vol_jump" => self.vix_selfex_vol_jump,
             "vix_selfex_level_ref" => self.vix_selfex_level_ref,
             "vix_selfex_vix_power" => self.vix_selfex_vix_power,
+            "vix_selfex_vix_cap" => self.vix_selfex_vix_cap,
             "vix_har_weight" => self.vix_har_weight,
             "vix_har_mid" => self.vix_har_mid,
             "vix_har_slow" => self.vix_har_slow,
@@ -2831,6 +2842,7 @@ impl ModelParams {
             "vix_selfex_vol_jump" => out.vix_selfex_vol_jump = value,
             "vix_selfex_level_ref" => out.vix_selfex_level_ref = value,
             "vix_selfex_vix_power" => out.vix_selfex_vix_power = value,
+            "vix_selfex_vix_cap" => out.vix_selfex_vix_cap = value,
             "vix_har_weight" => out.vix_har_weight = value,
             "vix_har_mid" => out.vix_har_mid = value,
             "vix_har_slow" => out.vix_har_slow = value,
@@ -3057,6 +3069,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_selfex_vol_jump",
         "vix_selfex_level_ref",
         "vix_selfex_vix_power",
+        "vix_selfex_vix_cap",
         "vix_har_weight",
         "vix_har_mid",
         "vix_har_slow",

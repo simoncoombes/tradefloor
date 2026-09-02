@@ -1242,6 +1242,7 @@ impl Engine {
                 vix_selfex_vol_jump: self.params.vix_selfex_vol_jump,
                 vix_selfex_level_ref: self.params.vix_selfex_level_ref,
                 vix_selfex_vix_power: self.params.vix_selfex_vix_power,
+                vix_selfex_vix_cap: self.params.vix_selfex_vix_cap,
                 market_factor_sigma: self.params.market_factor_sigma,
                 market_vol_vix_anchor: self.params.market_vol_vix_anchor,
                 market_sigma_daily_pct: self.market_vol.sigma_daily() * 100.0,
