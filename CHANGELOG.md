@@ -149,11 +149,14 @@ would continue plausibly under states belonging to other names. The error
 now names the width the snapshot carries, the width the roster holds and
 issue #148, so a reader meets the explanation where the failure happens.
 
-The refusal is the last write `restore_state` attempts, and every write
-before it stands. An engine that has caught this error holds the snapshot's
-price columns, generator positions, day accumulators, market-open flag,
-common volume state and remembered stress, and keeps only its own per-name
-volume array. Drop that engine rather than running it on.
+The refusal is the last write `restore_state` runs, and several more are
+attempted after it and never reached, so the split follows position rather
+than field. An engine that has caught this error holds the snapshot's price
+columns, generator positions, day accumulators, market-open flag, common
+volume state and remembered stress, and keeps its own per-name volume array,
+session news, forced-flow counter, market-variance state, macro economy and
+day counter. It holds one run's market beside another run's macro state, so
+drop it rather than running it on.
 
 ## 0.6.2
 

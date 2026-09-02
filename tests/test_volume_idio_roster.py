@@ -223,25 +223,33 @@ def test_a_snapshot_at_a_stale_width_is_refused():
 
 
 def test_a_refused_restore_leaves_the_engine_partly_written():
-    """The guard is the LAST step of `restore_state`, so it is not atomic.
+    """The guard is the last write of `restore_state` that RUNS.
 
-    By the time the width is checked, every price column, the generator
-    positions, the day accumulators, the market-open flag, the common volume
-    state and the remembered stress have all been written from the snapshot.
-    Only the per-name volume array keeps its own values, because the write
-    that would have replaced it is the one that refused.
+    Several more writes are attempted after it and never reached, because
+    the error propagates out of the guard, so the split is by POSITION in
+    `restore_state` rather than by field.
 
-    An engine that caught this error holds another run's market and its own
-    per-name volume states. Asserted rather than described, because the
-    changelog and `set_volume_idio` both tell a reader to stop using it, and
-    a reader deserves to know what they are holding.
+    Taken from the snapshot, because they are written before the guard:
+    every price column, the generator positions, the day accumulators, the
+    market-open flag, the common volume state and the remembered stress.
+
+    Left holding the engine's own values, because they are written after it:
+    the per-name volume array, the day's session news, the forced-flow
+    counter, the market-variance state, the macro economy and the day
+    counter.
+
+    An engine that caught this error therefore holds one run's market beside
+    another run's macro state. Asserted rather than described, because the
+    changelog and `set_volume_idio` both tell a reader to drop it, and a
+    reader deserves to know what they are holding.
     """
     donor = engine(8)
     donor.run_days(1)
     donor.list_instrument(IPO)
-    donor.run_days(2)
+    donor.run_days(5)
     stale = donor.state_snapshot()
     donor_rng = stream_state(donor.state_snapshot(), "market")
+    donor_days = donor.state_snapshot()["day_count"]
     stale["volume_idio"] = stale["volume_idio"][: 8 * 8]
 
     target = engine(8)
@@ -249,17 +257,24 @@ def test_a_refused_restore_leaves_the_engine_partly_written():
     target.run_days(1)
     own_prices = target.prices()
     own_states = states(target)
+    own_days = target.state_snapshot()["day_count"]
+    assert own_days != donor_days, "the two engines must differ on this"
 
     with pytest.raises(tf.ValidationError):
         target.restore_state(stale)
 
+    # Written before the guard.
     assert target.prices() == donor.prices(), \
         "the price columns were written before the refusal"
     assert target.prices() != own_prices
     assert stream_state(target.state_snapshot(), "market") == donor_rng, \
         "the generator positions were written before the refusal"
+
+    # Written after the guard, so not written at all.
     assert states(target) == own_states, \
-        "the per-name volume array is the one write that did not happen"
+        "the per-name volume array is the write that refused"
+    assert target.state_snapshot()["day_count"] == own_days, \
+        "the day counter is written after the guard, so it stays"
     assert widths(target) == (9, 9)
 
 

@@ -405,14 +405,24 @@ impl Engine {
     ///
     /// # The writes that already stand when this refuses
     ///
-    /// In `PyEngine::restore_state` this is the LAST write, so by the time
-    /// it refuses, the price columns, the generator positions, the day
-    /// accumulators, the market-open flag, the common volume state and the
-    /// remembered stress have all been taken from the snapshot. Only this
-    /// array keeps the engine's own values. An engine that has caught this
-    /// error therefore holds another run's market beside its own per-name
-    /// volume states, and it should be dropped rather than run on.
-    /// `tests/test_volume_idio_roster.py` asserts that state field by field.
+    /// In `PyEngine::restore_state` this is the last write that RUNS, and
+    /// several more are attempted after it and never reached, because the
+    /// error propagates out of here. So the split is by position rather
+    /// than by field.
+    ///
+    /// Written from the snapshot before this point: the price columns, the
+    /// generator positions, the day accumulators, the market-open flag, the
+    /// common volume state and the remembered stress.
+    ///
+    /// Left holding the engine's own values, this array among them: the
+    /// day's session news, the forced-flow counter, the market-variance
+    /// state, the macro economy and the day counter. Nothing
+    /// `restore_state` writes after this point is written at all.
+    ///
+    /// An engine that has caught this error therefore holds one run's
+    /// market beside another run's macro state, and it should be dropped
+    /// rather than run on. `tests/test_volume_idio_roster.py` asserts both
+    /// halves of that split field by field.
     pub fn set_volume_idio(&mut self, values: &[f64]) -> Result<(), String> {
         if values.len() != self.volume_idio.len() {
             return Err(format!(
