@@ -1196,6 +1196,19 @@ pub struct ModelParams {
     /// crisis-window price by construction; 1.5-2.0 is the middle. 0.0 =
     /// no cap, bit for bit.
     pub vix_selfex_vix_cap: f64,
+    /// The variance co-jump FOLLOWS the VIX (round 171.14). Off, a fired
+    /// event hands the market its variance at the close whether or not
+    /// the VIX goes on to move — and in a held-VIX window it never does,
+    /// so the market receives variance for a move that never happened:
+    /// the double count behind co-movement 0.766 against a 0.727 ceiling
+    /// and a held-45 vol of 94% against 77% without the co-jump. At 1.0
+    /// the kick is staged at the close and lands at the NEXT close scaled
+    /// by clamp((the VIX the next session opened at - the VIX the fire's
+    /// session opened at) / the event's size, 0, 1): endogenously the VIX
+    /// carries the fear and the ratio is near one (the kick lands a day
+    /// late); pinned, the ratio is zero and nothing lands. Between 0 and
+    /// 1 blends the two forms. 0.0 = the immediate form, bit for bit.
+    pub vix_selfex_kick_follow: f64,
     /// Couples an event's SIZE to the down-move that fired it: the
     /// magnitude is scaled by (1 + this x the gate excess). Round 153
     /// measured the missing piece exactly — the gate protects the
@@ -1613,6 +1626,7 @@ impl ModelParams {
             vix_selfex_level_ref: 0.0,
             vix_selfex_vix_power: 0.0,
             vix_selfex_vix_cap: 0.0,
+            vix_selfex_kick_follow: 0.0,
             vix_har_weight: 0.0,
             vix_har_mid: 0.4,
             vix_har_slow: 0.25,
@@ -2680,6 +2694,7 @@ impl ModelParams {
             "vix_selfex_level_ref" => self.vix_selfex_level_ref,
             "vix_selfex_vix_power" => self.vix_selfex_vix_power,
             "vix_selfex_vix_cap" => self.vix_selfex_vix_cap,
+            "vix_selfex_kick_follow" => self.vix_selfex_kick_follow,
             "vix_har_weight" => self.vix_har_weight,
             "vix_har_mid" => self.vix_har_mid,
             "vix_har_slow" => self.vix_har_slow,
@@ -2843,6 +2858,7 @@ impl ModelParams {
             "vix_selfex_level_ref" => out.vix_selfex_level_ref = value,
             "vix_selfex_vix_power" => out.vix_selfex_vix_power = value,
             "vix_selfex_vix_cap" => out.vix_selfex_vix_cap = value,
+            "vix_selfex_kick_follow" => out.vix_selfex_kick_follow = value,
             "vix_har_weight" => out.vix_har_weight = value,
             "vix_har_mid" => out.vix_har_mid = value,
             "vix_har_slow" => out.vix_har_slow = value,
@@ -3070,6 +3086,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_selfex_level_ref",
         "vix_selfex_vix_power",
         "vix_selfex_vix_cap",
+        "vix_selfex_kick_follow",
         "vix_har_weight",
         "vix_har_mid",
         "vix_har_slow",

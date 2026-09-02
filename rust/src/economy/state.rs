@@ -294,6 +294,16 @@ pub struct EconomyState {
     /// not, so a stale kick can never be re-applied; 0.0 forever while
     /// the dial is off.
     pub vix_selfex_vol_kick: f64,
+    /// The staged kick under `vix_selfex_kick_follow` (round 171.14): the
+    /// variance a fired event would hand the market, waiting for the VIX
+    /// to confirm the move at the next close. 0.0 while the dial is off.
+    pub vix_selfex_kick_pending: f64,
+    /// The staged event's size in VIX points, the denominator of the
+    /// confirmation ratio. 0.0 while the dial is off.
+    pub vix_selfex_kick_points: f64,
+    /// The VIX the fire's session opened at, the base of the confirmation
+    /// ratio. 0.0 while the dial is off.
+    pub vix_selfex_kick_vix_ref: f64,
 
     // Trade
     pub tariff_rate: f64,
@@ -443,6 +453,9 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         vix_har_rv_month: 0.0,
         vix_selfex_ruler: 0.0,
         vix_selfex_vol_kick: 0.0,
+        vix_selfex_kick_pending: 0.0,
+        vix_selfex_kick_points: 0.0,
+        vix_selfex_kick_vix_ref: 0.0,
 
         tariff_rate: 5.0,
         trade_balance: -50.0,

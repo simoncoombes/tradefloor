@@ -423,7 +423,13 @@ def _grid(name):
                 "d91k10c25": cell(0.91, 1.0, 2.5),
                 "d94k10c25": cell(0.94, 1.0, 2.5),
                 "d94k07c20": cell(0.94, 0.7, 2.0),
-                "d88k10c20": cell(0.88, 1.0, 2.0)}      # combo1's, the other control
+                "d88k10c20": cell(0.88, 1.0, 2.0),      # combo1's, the other control
+                # round 171.14: the kick follows the VIX
+                "ovlF": cell(0.94, 0.0, 0.0, vix_selfex_kick_follow=1.0),
+                "d94k10c20F": cell(0.94, 1.0, 2.0, vix_selfex_kick_follow=1.0),
+                "d94k10F": cell(0.94, 1.0, 0.0, vix_selfex_kick_follow=1.0),
+                "d91k10c20F": cell(0.91, 1.0, 2.0, vix_selfex_kick_follow=1.0),
+                "ovlF05": cell(0.94, 0.0, 0.0, vix_selfex_kick_follow=0.5)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):

@@ -1221,6 +1221,10 @@ impl Engine {
             if mcap > 0.0 { acc / mcap } else { 0.0 }
         };
 
+        // The VIX this session opened at — after any scenario pin — is the
+        // base of the follow ratio (round 171.14); captured before the
+        // daily step moves it.
+        let vix_at_open = self.economy.vix;
         self.economy = update_economy_daily(
             &self.economy,
             &DailyInputs {
@@ -1243,6 +1247,7 @@ impl Engine {
                 vix_selfex_level_ref: self.params.vix_selfex_level_ref,
                 vix_selfex_vix_power: self.params.vix_selfex_vix_power,
                 vix_selfex_vix_cap: self.params.vix_selfex_vix_cap,
+                vix_selfex_kick_follow: self.params.vix_selfex_kick_follow,
                 market_factor_sigma: self.params.market_factor_sigma,
                 market_vol_vix_anchor: self.params.market_vol_vix_anchor,
                 market_sigma_daily_pct: self.market_vol.sigma_daily() * 100.0,
@@ -1290,7 +1295,31 @@ impl Engine {
         // field is never written and this branch is never taken.
         if self.params.vix_selfex_vol_jump != 0.0 {
             let kick = self.economy.vix_selfex_vol_kick;
-            if kick != 0.0 {
+            let follow = self.params.vix_selfex_kick_follow;
+            if follow != 0.0 {
+                // Follow the VIX (round 171.14). Settle the kick staged at
+                // the previous close against the move the market actually
+                // saw between the two opens; then stage this close's kick.
+                // The immediate share (1 - follow) lands as before.
+                let pending = self.economy.vix_selfex_kick_pending;
+                if pending != 0.0 {
+                    let points = self.economy.vix_selfex_kick_points;
+                    let moved = vix_at_open - self.economy.vix_selfex_kick_vix_ref;
+                    let ratio = if points > 0.0 {
+                        (moved / points).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    if ratio > 0.0 {
+                        self.market_vol.inject_variance(pending * ratio);
+                    }
+                }
+                if kick != 0.0 && follow < 1.0 {
+                    self.market_vol.inject_variance(kick * (1.0 - follow));
+                }
+                self.economy.vix_selfex_kick_pending = kick * follow;
+                self.economy.vix_selfex_kick_vix_ref = vix_at_open;
+            } else if kick != 0.0 {
                 self.market_vol.inject_variance(kick);
             }
         }

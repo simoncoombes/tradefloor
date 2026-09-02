@@ -100,6 +100,7 @@ pub struct DailyInputs<'a> {
     pub vix_selfex_level_ref: f64,
     pub vix_selfex_vix_power: f64,
     pub vix_selfex_vix_cap: f64,
+    pub vix_selfex_kick_follow: f64,
     pub market_factor_sigma: f64,
     pub market_vol_vix_anchor: f64,
     /// The market factor's post-close daily sigma, in the same percent
@@ -199,6 +200,7 @@ impl<'a> Default for DailyInputs<'a> {
             vix_selfex_level_ref: 0.0,
             vix_selfex_vix_power: 0.0,
             vix_selfex_vix_cap: 0.0,
+            vix_selfex_kick_follow: 0.0,
             market_factor_sigma: 0.0,
             market_vol_vix_anchor: 1.0,
             market_sigma_daily_pct: 1.0,
@@ -1016,6 +1018,12 @@ pub fn update_economy_daily(
                     / 252.0
                     / 1e4
             };
+        }
+        // The event's size, for the follow ratio (round 171.14). Written
+        // only when the follow dial is on, so the checkpoint of every
+        // earlier run keeps its bytes.
+        if inputs.vix_selfex_kick_follow != 0.0 {
+            new_state.vix_selfex_kick_points = if fired { magnitude } else { 0.0 };
         }
         new_state.vix_selfex_fear = fear_next;
         new_state.vix_selfex_excitation = inputs.vix_selfex_excite_decay
