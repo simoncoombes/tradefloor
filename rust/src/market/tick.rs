@@ -38,7 +38,9 @@
 use crate::economy::EconomyState;
 use crate::fair_value::{compute_fair_value_with, CompanyValuationInputs, EconomyValuationInputs};
 use crate::mathx;
-use crate::microstructure::{settle_price_through_book, CompanyMicrostructure, SettleOptions};
+use crate::microstructure::{
+    decompose, settle_price_through_book, CompanyMicrostructure, SettleOptions,
+};
 use crate::mispricing::crowd_lean_with;
 use crate::params::ModelParams;
 use crate::rng::Rng;
@@ -337,6 +339,16 @@ pub struct TickInputs<'a> {
     /// See [`SettleDrawPolicy`]. `FourAlways` unless replaying a recorded
     /// reference stream.
     pub settle_draws: SettleDrawPolicy,
+    /// Settle each open tick a second time against unbounded depth, and
+    /// report what the difference was.
+    ///
+    /// Off by default and inert to the market: the second settlement runs on
+    /// its own book, its result reaches no company field, and it takes no
+    /// draw. It is served the four uniforms the real settlement was served,
+    /// rewound, so it requires [`SettleDrawPolicy::FourAlways`] and is
+    /// skipped under `FourOrZero`, where the settlement draws from the
+    /// caller's recorded source and there is no buffer to rewind.
+    pub settle_depth_counterfactual: bool,
     /// The model coefficients (the runtime seam, CALIBRATION.md §5). The
     /// engine passes its own; a caller building `TickInputs` directly
     /// passes [`crate::params::PT_V1`] for the shipped model, which is
@@ -379,6 +391,40 @@ pub struct TickOutcome {
     /// carry and cannot be recovered afterwards.
     pub factors: Vec<LiveFactors>,
     pub shared_factors: SharedFactors,
+    /// The shock that arrived, per active company, in log units.
+    ///
+    /// `log(fair_value / the last print)`: the distance the price model put
+    /// between the tape and this tick's anchor, before the book covered any
+    /// of it. Phase 4 reports it whether or not the market is open, because
+    /// a closed tick still moves fair value and prints the model price.
+    pub shock: Vec<f64>,
+    /// The depth that absorbed it, per active company, in log units.
+    ///
+    /// `log(the print / fair_value)`, against the print the tape carries --
+    /// so it includes the second circuit breaker, which lands between the
+    /// book's last trade and what is published. `shock + absorbed` is the
+    /// print's log move away from the last print.
+    pub absorbed: Vec<f64>,
+    /// What the same tick would have printed against unbounded depth, per
+    /// active company.
+    ///
+    /// Empty unless [`TickInputs::settle_depth_counterfactual`] was set and
+    /// the schedule was [`SettleDrawPolicy::FourAlways`]. Same draws, same
+    /// book state, same breaker; the only difference is how many resting
+    /// levels a slice could walk.
+    pub unbounded_print: Vec<f64>,
+    /// Liquidity's share of the print's move, per active company.
+    ///
+    /// `log(print / unbounded_print) / log(print / the last print)`: the
+    /// fraction of the move that the depth bound put there rather than the
+    /// shock. Zero when the two prints coincide, which covers every tick
+    /// that did not settle, and NaN when the print did not move and the
+    /// deeper book would have moved it. Empty alongside `unbounded_print`.
+    ///
+    /// A ratio of two log distances rather than a share of one quantity, so
+    /// it is not bounded by one: the shock and the book can pull opposite
+    /// ways and leave a small move with a large ratio.
+    pub liquidity_share: Vec<f64>,
 }
 
 /// Run one simulated market minute.
@@ -449,6 +495,10 @@ pub fn simulate_market_tick(
                 crisis_spike: 0.0,
                 prev_day_down: false,
             },
+            shock: Vec::new(),
+            absorbed: Vec::new(),
+            unbounded_print: Vec::new(),
+            liquidity_share: Vec::new(),
         };
     }
 
@@ -846,10 +896,45 @@ pub fn simulate_market_tick(
     }
 
     // ── Phase 4: settlement ───────────────────────────────────────────────
+    //
+    // The decomposition columns are filled here rather than derived
+    // afterwards, because `shock` is measured against the LAST print and a
+    // consumer reading a finished table has already lost it at the first tick
+    // of a day.
+    let mut shock_col = vec![0.0; active_count];
+    let mut absorbed_col = vec![0.0; active_count];
+    // The counterfactual arm needs the buffered uniforms, which exist only on
+    // the engine's own generated schedule. Under `FourOrZero` the settlement
+    // draws lazily from the caller's recorded stream and a second settlement
+    // would take draws off it, so the arm does not run and its columns stay
+    // empty rather than being filled with the real print twice.
+    let depth_arm = inputs.settle_depth_counterfactual
+        && inputs.settle_draws == SettleDrawPolicy::FourAlways;
+    let mut unbounded_col = if depth_arm { vec![0.0; active_count] } else { Vec::new() };
+    let mut share_col = if depth_arm { vec![0.0; active_count] } else { Vec::new() };
+
     for i in 0..active_count {
         let idx = active_indices[i];
         let fair_value = new_prices[i];
         let volume = volumes[i].floor();
+        // The tape's last print, read before this tick overwrites it at the
+        // foot of the loop. `micro` below is built from the same field.
+        let last_print = companies[idx].stock.price;
+        // The breaker's band for this company, hoisted so the counterfactual
+        // print is clamped by the same bounds as the real one. Comparing a
+        // clamped print against an unclamped one would book the breaker to
+        // liquidity.
+        let print_max = previous_closes[i] * p.breaker_up;
+        let print_min = mathx::max(previous_closes[i] * p.breaker_down, 0.01);
+        let breaker = |price: f64| {
+            if price > print_max || price < print_min {
+                mathx::max(print_min, mathx::min(print_max, price))
+            } else {
+                price
+            }
+        };
+        // NaN until the arm runs, and never read unless it does.
+        let mut unbounded_price = f64::NAN;
 
         let mut new_price = fair_value;
         if open {
@@ -878,6 +963,9 @@ pub fn simulate_market_tick(
                 vix: economy.vix,
                 difficulty: None,
                 flow_lean: Some(crowd_leans[i]),
+                // The shipped bound. `settle_price_through_book` returns it
+                // untouched at 1.0, so this line moves no trajectory.
+                depth_multiplier: 1.0,
             };
             let settled = match predrawn.as_mut() {
                 Some(buffer) => {
@@ -887,13 +975,41 @@ pub fn simulate_market_tick(
             };
             new_price = settled.price;
 
+            // The depth counterfactual: this tick again, from the same state,
+            // against every level the maker quotes.
+            //
+            // It runs HERE, between the settlement and the maker-inventory
+            // carry below, for two reasons. The book it quotes against is
+            // built from `micro`, which was taken before the settlement, so
+            // the arm sees the state the real settlement saw rather than the
+            // state it left. And it takes NO draw: the buffer is rewound and
+            // serves the same four uniforms a second time, which is why the
+            // stream position after this block is what it was without it.
+            if depth_arm {
+                if let Some(buffer) = predrawn.as_mut() {
+                    buffer.rewind();
+                    let deep = settle_price_through_book(
+                        &micro,
+                        fair_value,
+                        volume,
+                        &SettleOptions {
+                            depth_multiplier: f64::INFINITY,
+                            ..options
+                        },
+                        buffer,
+                    );
+                    // The maker inventory this returns is DISCARDED, along
+                    // with everything else about it except the price. An arm
+                    // that fed its fills back would be a second market, and
+                    // the next tick would no longer be the one that actually
+                    // ran.
+                    unbounded_price = breaker(deep.price);
+                }
+            }
+
             // Breaker #2 — the PRINT. See the module header for why this one
             // is the load-bearing clamp.
-            let print_max = previous_closes[i] * p.breaker_up;
-            let print_min = mathx::max(previous_closes[i] * p.breaker_down, 0.01);
-            if new_price > print_max || new_price < print_min {
-                new_price = mathx::max(print_min, mathx::min(print_max, new_price));
-            }
+            new_price = breaker(new_price);
 
             // Carry maker inventory forward. This is what makes impact
             // PERSIST: a large buy leaves the maker short, so it keeps quoting
@@ -904,6 +1020,39 @@ pub fn simulate_market_tick(
                         + settled.maker_inventory_delta,
                 );
             }
+        }
+
+        // The decomposition, against the print the tape carries. `absorbed`
+        // therefore holds the breaker as well as the book, which is the
+        // honest reading of "what stood between the model price and the
+        // print" -- on a halted name the breaker IS what absorbed the shock.
+        let (shock, absorbed) = decompose(last_print, fair_value, new_price);
+        shock_col[i] = shock;
+        absorbed_col[i] = absorbed;
+        if depth_arm {
+            // A tick that never settled leaves the arm unrun, and the honest
+            // reading of that is that unbounded depth would have printed the
+            // same price. `mathx::log` of a ratio of one is zero, so the
+            // share below is zero without a special case.
+            let unbounded = if unbounded_price.is_nan() { new_price } else { unbounded_price };
+            unbounded_col[i] = unbounded;
+            let moved = mathx::log(new_price / last_print);
+            share_col[i] = if unbounded == new_price {
+                // The two prints coincide, so liquidity's share is zero
+                // whatever the move was -- including a move of zero, where
+                // the ratio below would be 0/0.
+                0.0
+            } else if moved == 0.0 {
+                // The print did not move and the deeper book would have
+                // moved it. There is no move to apportion, so the share is
+                // undefined and says so. Dividing anyway gives an infinity
+                // that survives into every mean taken over the column;
+                // measured at 7 rows in 14,040 on a three-day run of twelve
+                // names, so it is rare and it is real.
+                f64::NAN
+            } else {
+                mathx::log(new_price / unbounded) / moved
+            };
         }
 
         let stock = &mut companies[idx].stock;
@@ -923,6 +1072,10 @@ pub fn simulate_market_tick(
         volumes,
         factors: all_factors,
         shared_factors: shared,
+        shock: shock_col,
+        absorbed: absorbed_col,
+        unbounded_print: unbounded_col,
+        liquidity_share: share_col,
     }
 }
 
@@ -950,6 +1103,17 @@ struct PredrawnUniforms {
 impl PredrawnUniforms {
     fn new(draws: [f64; 4]) -> Self {
         Self { draws, at: 0 }
+    }
+
+    /// Serve the same four uniforms again, from the start.
+    ///
+    /// This is what makes the depth counterfactual free: the second
+    /// settlement is fed the numbers the first one was fed, so the shared
+    /// stream is not touched and the tick's draw count is what it was. The
+    /// buffer is per-company and per-tick, so a rewind cannot reach any
+    /// settlement but the one it belongs to.
+    fn rewind(&mut self) {
+        self.at = 0;
     }
 }
 

@@ -249,6 +249,25 @@ pub struct Engine {
     tick_components: Vec<[f64; 8]>,
     tick_fundamental: Vec<f64>,
     tick_anchor: Vec<f64>,
+    /// This tick's print decomposition, per company slot: the shock that
+    /// arrived and the depth that absorbed it, in log units.
+    ///
+    /// `anchor` above is the price the model wanted and the print is what the
+    /// book settled, so the gap between them was already computable. These
+    /// two put the LAST print on the same footing, which is what a consumer
+    /// reading a finished table cannot recover: the first tick of a day has
+    /// no previous row to difference against.
+    tick_shock: Vec<f64>,
+    tick_absorbed: Vec<f64>,
+    /// The depth counterfactual, per company slot. Empty unless
+    /// [`Engine::set_settle_depth_counterfactual`] turned it on, which is
+    /// how the reporting surface knows whether it has an arm to report.
+    tick_unbounded_print: Vec<f64>,
+    tick_liquidity_share: Vec<f64>,
+    /// Whether every open tick settles a second time against unbounded
+    /// depth. Off by default, and inert to the market either way: see
+    /// [`crate::market::TickInputs::settle_depth_counterfactual`].
+    settle_depth_counterfactual: bool,
     /// The market factor's conditional-variance state
     /// (`market::factor_vol`). Advanced at every close from the day's
     /// accumulated factor — zero draws — and read by every generated tick
@@ -505,6 +524,15 @@ impl Engine {
             // rather than as "not yet computed".
             tick_fundamental: vec![f64::NAN; companies_len],
             tick_anchor: vec![f64::NAN; companies_len],
+            // Zero, not NaN: a company that has not ticked has not moved, and
+            // a move of zero is the true reading rather than a missing one.
+            tick_shock: vec![0.0; companies_len],
+            tick_absorbed: vec![0.0; companies_len],
+            // Empty until the counterfactual is switched on, so emptiness is
+            // the one signal that says whether an arm ran.
+            tick_unbounded_print: Vec::new(),
+            tick_liquidity_share: Vec::new(),
+            settle_depth_counterfactual: false,
             market_vol: MarketVarianceState::new_with(&params),
             universe_stress: 0.0,
             volume_state: 0.0,
@@ -731,6 +759,7 @@ impl Engine {
                 sector_keys: &self.sector_keys,
                 market_sigma_daily,
                 settle_draws,
+                settle_depth_counterfactual: self.settle_depth_counterfactual,
                 params: &self.params,
             },
             rng,
@@ -763,6 +792,30 @@ impl Engine {
         for slot in self.tick_components.iter_mut() {
             *slot = [0.0; 8];
         }
+        // The print decomposition is zeroed on the same argument and for the
+        // same reason: a company that did not tick moved by nothing, so its
+        // shock and the depth that absorbed it are both zero. Carrying the
+        // previous tick's pair forward would report the same move twice.
+        for slot in self.tick_shock.iter_mut() {
+            *slot = 0.0;
+        }
+        for slot in self.tick_absorbed.iter_mut() {
+            *slot = 0.0;
+        }
+        // The counterfactual columns are prices, so their zero is the price
+        // the company is carrying: unbounded depth does not move a name that
+        // did not settle. Written before the copy below so an inactive slot
+        // is right, and an active one is overwritten.
+        for (slot, value) in self.tick_unbounded_print.iter_mut().enumerate() {
+            *value = self
+                .companies
+                .get(slot)
+                .map(|c| c.stock.price)
+                .unwrap_or(f64::NAN);
+        }
+        for slot in self.tick_liquidity_share.iter_mut() {
+            *slot = 0.0;
+        }
         for (n, slot) in outcome.active_indices.iter().enumerate() {
             if let (Some(acc), Some(computed)) = (
                 self.attribution.get_mut(*slot),
@@ -789,6 +842,26 @@ impl Engine {
             }
             if let Some(v) = outcome.fair_values.get(n) {
                 if let Some(slot_v) = self.tick_anchor.get_mut(*slot) {
+                    *slot_v = *v;
+                }
+            }
+            if let Some(v) = outcome.shock.get(n) {
+                if let Some(slot_v) = self.tick_shock.get_mut(*slot) {
+                    *slot_v = *v;
+                }
+            }
+            if let Some(v) = outcome.absorbed.get(n) {
+                if let Some(slot_v) = self.tick_absorbed.get_mut(*slot) {
+                    *slot_v = *v;
+                }
+            }
+            if let Some(v) = outcome.unbounded_print.get(n) {
+                if let Some(slot_v) = self.tick_unbounded_print.get_mut(*slot) {
+                    *slot_v = *v;
+                }
+            }
+            if let Some(v) = outcome.liquidity_share.get(n) {
+                if let Some(slot_v) = self.tick_liquidity_share.get_mut(*slot) {
                     *slot_v = *v;
                 }
             }
@@ -845,6 +918,61 @@ impl Engine {
     /// The book anchor each company was last given: `fundamental * exp(s)`.
     pub fn tick_anchor(&self) -> &[f64] {
         &self.tick_anchor
+    }
+
+    /// This tick's shock per company slot: `log(anchor / the last print)`.
+    ///
+    /// Zero for a company that did not tick.
+    pub fn tick_shock(&self) -> &[f64] {
+        &self.tick_shock
+    }
+
+    /// This tick's absorption per company slot: `log(the print / anchor)`.
+    ///
+    /// Measured against the printed tape, so a halted name books the
+    /// breaker's clamp here. Zero for a company that did not tick.
+    pub fn tick_absorbed(&self) -> &[f64] {
+        &self.tick_absorbed
+    }
+
+    /// What each company would have printed this tick against unbounded
+    /// depth. Empty while the counterfactual is off.
+    pub fn tick_unbounded_print(&self) -> &[f64] {
+        &self.tick_unbounded_print
+    }
+
+    /// Liquidity's share of each company's move this tick. Empty while the
+    /// counterfactual is off.
+    pub fn tick_liquidity_share(&self) -> &[f64] {
+        &self.tick_liquidity_share
+    }
+
+    /// Settle every open tick a second time against unbounded depth.
+    ///
+    /// Off by default. Switching it on adds a second settlement per active
+    /// company per open tick, served the same four uniforms, on its own book,
+    /// with its result reaching no company field. The market is the same
+    /// market either way and the digest is the same digest; what changes is
+    /// that [`Engine::tick_unbounded_print`] and
+    /// [`Engine::tick_liquidity_share`] have something in them.
+    ///
+    /// The cost is roughly one settlement per active company per open tick,
+    /// which is the largest single item in a tick, so this is a measurement
+    /// setting rather than something to leave on.
+    pub fn set_settle_depth_counterfactual(&mut self, on: bool) {
+        self.settle_depth_counterfactual = on;
+        let n = self.companies.len();
+        self.tick_unbounded_print.clear();
+        self.tick_liquidity_share.clear();
+        if on {
+            self.tick_unbounded_print.resize(n, f64::NAN);
+            self.tick_liquidity_share.resize(n, 0.0);
+        }
+    }
+
+    /// Whether the depth counterfactual is running.
+    pub fn settle_depth_counterfactual(&self) -> bool {
+        self.settle_depth_counterfactual
     }
 
     /// Restore the per-day accumulators that a column snapshot does not hold.
@@ -943,6 +1071,20 @@ impl Engine {
         self.tick_fundamental.resize(self.companies.len(), f64::NAN);
         self.tick_anchor.clear();
         self.tick_anchor.resize(self.companies.len(), f64::NAN);
+        self.tick_shock.clear();
+        self.tick_shock.resize(self.companies.len(), 0.0);
+        self.tick_absorbed.clear();
+        self.tick_absorbed.resize(self.companies.len(), 0.0);
+        // Resized only while the arm is on, so a roster that changed between
+        // days does not leave a short column behind -- and emptiness keeps
+        // meaning "no arm ran" rather than "no companies".
+        self.tick_unbounded_print.clear();
+        self.tick_liquidity_share.clear();
+        if self.settle_depth_counterfactual {
+            self.tick_unbounded_print
+                .resize(self.companies.len(), f64::NAN);
+            self.tick_liquidity_share.resize(self.companies.len(), 0.0);
+        }
         // The factor-variance day accumulator is per-day state like the
         // attribution above: an abandoned day must not leak its partial
         // innovation into the next close's update.
@@ -1354,6 +1496,7 @@ impl Engine {
         buffer: &mut SessionBuffer,
     ) -> SessionOutcome {
         buffer.resize(request.ticks, self.companies.len());
+        buffer.resize_counterfactual(self.settle_depth_counterfactual);
 
         if request.reopen {
             self.open_market();
@@ -1388,9 +1531,15 @@ impl Engine {
             buffer.write_tick(
                 t,
                 &self.companies,
-                &self.tick_components,
-                &self.tick_fundamental,
-                &self.tick_anchor,
+                &TickTruth {
+                    components: &self.tick_components,
+                    fundamental: &self.tick_fundamental,
+                    anchor: &self.tick_anchor,
+                    shock: &self.tick_shock,
+                    absorbed: &self.tick_absorbed,
+                    unbounded_print: &self.tick_unbounded_print,
+                    liquidity_share: &self.tick_liquidity_share,
+                },
             );
 
             if let Some(stop) = &request.stop {
@@ -2505,6 +2654,31 @@ pub struct SessionBuffer {
     /// `[f64; 7]`, because each becomes an Arrow column and a column wants a
     /// contiguous run of its own values.
     pub components: [Vec<f64>; 8],
+    /// The print decomposition, each `ticks * companies`: the shock that
+    /// arrived and the depth that absorbed it, in log units.
+    pub shock: Vec<f64>,
+    pub absorbed: Vec<f64>,
+    /// The depth counterfactual, each `ticks * companies` when it ran and
+    /// EMPTY when it did not. Emptiness is the signal, which is why these
+    /// two are not resized alongside the columns above.
+    pub unbounded_print: Vec<f64>,
+    pub liquidity_share: Vec<f64>,
+}
+
+/// One tick's ground truth, as the engine holds it, handed to
+/// [`SessionBuffer::write_tick`].
+///
+/// A struct rather than nine positional slices. The call site passes nine
+/// same-typed buffers and a transposition there would compile, run, and
+/// mislabel every row of every column it touched.
+pub struct TickTruth<'a> {
+    pub components: &'a [[f64; 8]],
+    pub fundamental: &'a [f64],
+    pub anchor: &'a [f64],
+    pub shock: &'a [f64],
+    pub absorbed: &'a [f64],
+    pub unbounded_print: &'a [f64],
+    pub liquidity_share: &'a [f64],
 }
 
 impl SessionBuffer {
@@ -2520,6 +2694,8 @@ impl SessionBuffer {
             self.mispricing_s.resize(needed, 0.0);
             self.fundamental.resize(needed, f64::NAN);
             self.anchor.resize(needed, f64::NAN);
+            self.shock.resize(needed, 0.0);
+            self.absorbed.resize(needed, 0.0);
             for column in self.components.iter_mut() {
                 column.resize(needed, 0.0);
             }
@@ -2528,14 +2704,25 @@ impl SessionBuffer {
         self.ticks_written = ticks;
     }
 
-    fn write_tick(
-        &mut self,
-        tick: usize,
-        companies: &[TickCompany],
-        components: &[[f64; 8]],
-        fundamental: &[f64],
-        anchor: &[f64],
-    ) {
+    /// Size the counterfactual columns for a session that is about to run
+    /// with the arm on, or empty them for one that is not.
+    ///
+    /// Separate from [`SessionBuffer::resize`] because these two columns are
+    /// the only ones whose PRESENCE carries information. Resizing them
+    /// unconditionally would leave a run with the arm off holding a full
+    /// column of zeros, which reads as "liquidity moved nothing" rather than
+    /// as "nobody asked".
+    fn resize_counterfactual(&mut self, on: bool) {
+        let needed = if on { self.prices.len() } else { 0 };
+        if self.unbounded_print.len() != needed {
+            self.unbounded_print.clear();
+            self.liquidity_share.clear();
+            self.unbounded_print.resize(needed, f64::NAN);
+            self.liquidity_share.resize(needed, 0.0);
+        }
+    }
+
+    fn write_tick(&mut self, tick: usize, companies: &[TickCompany], truth: &TickTruth<'_>) {
         let base = tick * self.companies;
         for (i, c) in companies.iter().enumerate() {
             self.prices[base + i] = c.stock.price;
@@ -2543,9 +2730,23 @@ impl SessionBuffer {
             // NaN for a company that has never ticked — a column cannot carry
             // `None`, and zero would be a real mispricing.
             self.mispricing_s[base + i] = c.stock.mispricing_s.unwrap_or(f64::NAN);
-            self.fundamental[base + i] = fundamental.get(i).copied().unwrap_or(f64::NAN);
-            self.anchor[base + i] = anchor.get(i).copied().unwrap_or(f64::NAN);
-            let row = components.get(i).copied().unwrap_or([0.0; 8]);
+            self.fundamental[base + i] = truth.fundamental.get(i).copied().unwrap_or(f64::NAN);
+            self.anchor[base + i] = truth.anchor.get(i).copied().unwrap_or(f64::NAN);
+            self.shock[base + i] = truth.shock.get(i).copied().unwrap_or(0.0);
+            self.absorbed[base + i] = truth.absorbed.get(i).copied().unwrap_or(0.0);
+            // Guarded on the buffer rather than on the source: a session that
+            // sized these columns and then met an engine with the arm off
+            // would otherwise write NaN into a column it had promised.
+            if !self.unbounded_print.is_empty() {
+                self.unbounded_print[base + i] = truth
+                    .unbounded_print
+                    .get(i)
+                    .copied()
+                    .unwrap_or(c.stock.price);
+                self.liquidity_share[base + i] =
+                    truth.liquidity_share.get(i).copied().unwrap_or(0.0);
+            }
+            let row = truth.components.get(i).copied().unwrap_or([0.0; 8]);
             for (k, column) in self.components.iter_mut().enumerate() {
                 column[base + i] = row[k];
             }
@@ -2981,6 +3182,102 @@ mod tests {
             sector_base_variances: variances,
             stop: None,
         }
+    }
+
+    // ── The depth counterfactual ──────────────────────────────────────────
+
+    /// The arm is inert to the market. Same seed, same session, one engine
+    /// with the second settlement and one without, and every price agrees to
+    /// the bit along with the draw count.
+    ///
+    /// This is the claim the known-answer digest checks at the package level;
+    /// asserting it here as well means a build that broke it says so in
+    /// seconds rather than at the end of a wheel build.
+    #[test]
+    fn the_depth_counterfactual_leaves_the_market_and_the_draws_alone() {
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let run = |on: bool| {
+            let mut e = engine(4242);
+            e.set_settle_depth_counterfactual(on);
+            let mut buf = SessionBuffer::new();
+            for _ in 0..3 {
+                e.run_session(&session(60, &innovations, &variances), &mut buf);
+            }
+            (e.draws_by_stream(), buf.prices.clone(), buf.shock.clone())
+        };
+        let (draws_off, prices_off, shock_off) = run(false);
+        let (draws_on, prices_on, shock_on) = run(true);
+        assert_eq!(draws_off, draws_on, "the arm must take no draw");
+        for (i, (a, b)) in prices_off.iter().zip(prices_on.iter()).enumerate() {
+            assert_eq!(a.to_bits(), b.to_bits(), "price {i} moved");
+        }
+        for (i, (a, b)) in shock_off.iter().zip(shock_on.iter()).enumerate() {
+            assert_eq!(a.to_bits(), b.to_bits(), "shock {i} moved");
+        }
+    }
+
+    /// The columns arrive only when they are asked for, and they are the
+    /// length of the table when they do.
+    #[test]
+    fn the_counterfactual_columns_are_present_only_when_the_arm_runs() {
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+
+        let mut off = engine(7);
+        let mut buf_off = SessionBuffer::new();
+        off.run_session(&session(60, &innovations, &variances), &mut buf_off);
+        assert!(buf_off.unbounded_print.is_empty());
+        assert!(buf_off.liquidity_share.is_empty());
+        assert_eq!(buf_off.shock.len(), buf_off.prices.len());
+
+        let mut on = engine(7);
+        on.set_settle_depth_counterfactual(true);
+        let mut buf_on = SessionBuffer::new();
+        on.run_session(&session(60, &innovations, &variances), &mut buf_on);
+        assert_eq!(buf_on.unbounded_print.len(), buf_on.prices.len());
+        assert_eq!(buf_on.liquidity_share.len(), buf_on.prices.len());
+    }
+
+    /// Every print splits into a shock and an absorption that add back up to
+    /// the move, and liquidity's share is finite on every row.
+    #[test]
+    fn every_print_decomposes_into_its_shock_and_its_absorption() {
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let mut e = engine(1234);
+        e.set_settle_depth_counterfactual(true);
+        let mut buf = SessionBuffer::new();
+        e.run_session(&session(60, &innovations, &variances), &mut buf);
+
+        let n = buf.companies;
+        let mut checked = 0usize;
+        // From tick one, so every row has a previous print on the same tape.
+        for t in 1..buf.ticks_written {
+            for i in 0..n {
+                let row = t * n + i;
+                let previous = buf.prices[(t - 1) * n + i];
+                let moved = crate::mathx::log(buf.prices[row] / previous);
+                let split = buf.shock[row] + buf.absorbed[row];
+                assert!(
+                    (split - moved).abs() < 1e-12,
+                    "row {row}: shock + absorbed is {split}, the move is {moved}"
+                );
+                // Never an infinity. A share is NaN only where there was no
+                // move to apportion, which is a statement about the row
+                // rather than an escaped division.
+                let share = buf.liquidity_share[row];
+                assert!(!share.is_infinite(), "row {row}: liquidity share is {share}");
+                if share.is_nan() {
+                    assert_eq!(
+                        buf.prices[row], previous,
+                        "row {row}: a NaN share needs a print that did not move"
+                    );
+                }
+                checked += 1;
+            }
+        }
+        assert!(checked > 0, "the session wrote no rows to check");
     }
 
     #[test]

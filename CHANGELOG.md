@@ -9,6 +9,10 @@ sampled check verifies k days for the cost of k days.
 generator of any run that lists or delists, breaking such runs' old
 checkpoints and letting the day ledger check them.
 
+**Every print decomposes into the shock that arrived, the depth that
+absorbed it and the breaker's share, with a counterfactual against
+unbounded depth on request.**
+
 <!-- release-note-ends -->
 
 ### The day ledger
@@ -25,6 +29,22 @@ and `tradefloor.manifest.state_hash` computes the same digest in Python
 from `state_snapshot()`. Nothing about a trajectory moves: the manifest
 field is additive under the schema it already had, and `reproduce()`
 behaves the same with the field and without it.
+
+### The prints table
+
+**Every print says what it was made of.** `Engine.prints()` is a table
+beside `bars` and `truth`, one row per instrument per tick: the print, the
+model price behind it, and the two log distances between them. `shock` is
+the distance from the last print to the model price, `absorbed` is the
+distance from there to the tape, and the two sum to the print's own move.
+
+**A depth counterfactual measures liquidity's share.**
+`Engine.settle_depth_counterfactual(True)` settles every open tick a second
+time against every resting level, under the same four uniforms and from the
+same book state, and adds `unbounded_print` and `liquidity_share` to that
+table. It takes no draw and its fills reach no company field, so the market
+and the known-answer digest are the same with it on. It roughly quadruples
+what a settlement costs, so it stays off until a caller asks for it.
 
 ### The measured cost
 
@@ -166,6 +186,60 @@ keeps the engine's own, because the error propagates out of the guard and
 the later writes are attempted and never reached. An engine that has caught
 this error holds one run's market beside another run's macro state, so drop
 it rather than running it on.
+
+### The depth bound
+
+`settle_price_through_book` quotes only the levels a tick's flow can reach:
+`min(BOOK_LEVELS, max(2, ceil(tick_volume / level_size) + 1))`, computed
+before any draw. Quoting all ten was measured at roughly four times the
+settlement cost for depth ordinary flow never touches. `SettleOptions`
+gains `depth_multiplier`, read at that one site and nowhere else. The four
+settlement uniforms, `fair_value` and `buy_fraction` are all decided
+without it, so the same tick settled twice at two multipliers is a
+controlled comparison rather than two markets.
+
+At the shipped `1.0` the bound is returned untouched rather than multiplied
+by one, so the change is a no-op a reader can check by looking. The
+counterfactual runs at `f64::INFINITY`, which lifts the bound to every
+level the maker quotes.
+
+The second settlement runs inside the tick, on its own book, between the
+real settlement and the maker-inventory carry, so it sees the state the
+real one saw. It is served the four uniforms the real settlement was
+served, rewound, so the stream position and `draws_by_stream` hold at the
+values they had. It is skipped on the recorded-stream replay path, where
+settlement draws from the caller's source and there is no buffer to rewind.
+
+### The absorption column and the share
+
+`absorbed` is measured against the printed tape, so it holds the second
+circuit breaker as well as the book. On a halted name the breaker is what
+absorbed the shock, and booking it to the book would be the more flattering
+of two wrong answers.
+
+`liquidity_share` is `log(print / unbounded_print)` over the print's own log
+move. It is one log distance over another, so it runs past one where
+the shock and the book pull opposite ways and leave a small move. It is exactly zero
+where the two prints coincide, which covers every tick that did not settle,
+and NaN where the print did not move and the deeper book would have moved
+it. Dividing anyway would put an infinity in the column, and one infinity
+turns every mean taken over it into an infinity too; the case was measured
+at 7 rows in 14,040 on three days of twelve names.
+
+The counterfactual prints one tick from the real state. It cannot say what
+a deeper book would have done to the next tick, because the maker inventory
+it would have left is discarded and the tick after this one is the one that
+actually ran.
+
+### The reading in the liquidity-crisis example
+
+`examples/experiments/liquidity-crisis` runs both arms with the
+counterfactual on and reports what the book paid for. `market.liquidity` at
+40% is a claim about depth, and the column reads it back off the tape: on
+the last day of the post-fork window the depth bound moved 0.76% of control
+prints and 2.04% of crisis prints, with a mean absorption of 23.3 and 34.7
+basis points. The arms are the same arms, and their exposure numbers are
+unchanged.
 
 ## 0.6.2
 

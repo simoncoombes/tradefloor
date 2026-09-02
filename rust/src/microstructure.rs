@@ -40,6 +40,22 @@
 //! leaves drawn values unused rather than draws untaken. This function's
 //! own contract is unchanged either way.
 //!
+//! # The depth bound, and the counterfactual it allows
+//!
+//! `settle_price_through_book` quotes only the levels this tick's flow can
+//! reach: `levels_needed = min(BOOK_LEVELS, max(2, ceil(tick_volume /
+//! level_size) + 1))`, computed before any draw.
+//! [`SettleOptions::depth_multiplier`] is read at that one site and at no
+//! other. The four settlement uniforms, `fair_value` and `buy_fraction` are
+//! all decided without it, so the SAME tick settled twice at two multipliers
+//! is a controlled comparison rather than two markets: only which resting
+//! levels a slice can walk differs.
+//!
+//! The shipped multiplier is `1.0` and the shipped bound is returned
+//! untouched at that value ([`scaled_depth`]). `f64::INFINITY` lifts the
+//! bound to [`BOOK_LEVELS`], which is the unbounded-depth arm the engine's
+//! depth counterfactual runs.
+//!
 //! # Faithfulness notes
 //!
 //! - **`||` is not `??`.** `baseQuoteSize` falls through a chain of `||`, so
@@ -365,6 +381,39 @@ pub struct SettlementResult {
     /// Change in maker inventory from this tick's fills. Returned rather than
     /// applied, so this stays a pure function of its inputs and the generator.
     pub maker_inventory_delta: f64,
+    /// The shock that arrived, in log units: `log(fair_value / last_price)`.
+    ///
+    /// The distance the price model asked the book to cover this tick, before
+    /// the book covered any of it. See [`decompose`].
+    pub shock: f64,
+    /// The depth that absorbed it, in log units: `log(price / fair_value)`.
+    ///
+    /// Negative of the part of the shock the book did NOT print. `shock +
+    /// absorbed` is the print's own log move away from the last print. See
+    /// [`decompose`].
+    pub absorbed: f64,
+}
+
+/// Split a print's log move into the shock that arrived and the depth that
+/// absorbed it.
+///
+/// `shock` is `log(model_price / last_price)`: the distance the price model
+/// put between the last print and this tick's anchor. `absorbed` is
+/// `log(print / model_price)`: what the book did with that distance. They
+/// sum to `log(print / last_price)`, to within the rounding of two logs
+/// against one.
+///
+/// One definition, called twice. [`settle_price_through_book`] reports the
+/// settlement's own view, where the print is the last trade the book made;
+/// the engine reports the same pair against the printed tape, where the
+/// print has also been through the circuit breaker. A second spelling of
+/// this arithmetic beside the second call site is how the two would drift
+/// apart while both looking right.
+pub fn decompose(last_price: f64, model_price: f64, print: f64) -> (f64, f64) {
+    (
+        mathx::log(model_price / last_price),
+        mathx::log(print / model_price),
+    )
 }
 
 /// Options for [`settle_price_through_book`].
@@ -381,6 +430,21 @@ pub struct SettleOptions {
     /// same spread the caller asked for rather than a defaulted one.
     pub spread_size_smoothness: f64,
     pub spread_size_exponent: f64,
+    /// How far to widen the depth bound this settlement quotes against.
+    ///
+    /// Read at exactly one site, where `levels_needed` is computed, and
+    /// nowhere else: no draw, no factor, no `fair_value` and no
+    /// `buy_fraction` reads it. Widening the bound changes which resting
+    /// levels a slice can walk and nothing else, which is what makes a
+    /// settlement at a different multiplier a counterfactual under the SAME
+    /// draws rather than a different market.
+    ///
+    /// `1.0` is what ships, and at `1.0` the bound is returned untouched
+    /// rather than multiplied, so no trajectory can move. `f64::INFINITY`
+    /// lifts it to every level the maker quotes ([`BOOK_LEVELS`]), which is
+    /// the unbounded-depth arm. Values between the two are arithmetic that
+    /// works and nothing measures.
+    pub depth_multiplier: f64,
 }
 
 impl Default for SettleOptions {
@@ -391,7 +455,25 @@ impl Default for SettleOptions {
             flow_lean: None,
             spread_size_smoothness: 0.0,
             spread_size_exponent: SPREAD_SIZE_EXPONENT,
+            depth_multiplier: 1.0,
         }
+    }
+}
+
+/// Apply [`SettleOptions::depth_multiplier`] to the depth a tick's flow
+/// reaches.
+///
+/// The shipped multiplier returns `reach` itself rather than `reach * 1.0`.
+/// Multiplying by one is exact for every finite and infinite f64, so the two
+/// spellings agree on every value a market produces -- and the identity of
+/// the bits is the contract here, not an argument about IEEE 754. The branch
+/// is what makes "the counterfactual cannot move a trajectory" something a
+/// reader can check by looking rather than by running the digest.
+fn scaled_depth(reach: f64, multiplier: f64) -> f64 {
+    if multiplier == 1.0 {
+        reach
+    } else {
+        reach * multiplier
     }
 }
 
@@ -437,16 +519,28 @@ pub fn settle_price_through_book(
 ) -> SettlementResult {
     let last_price = company.price;
 
-    let no_trade = SettlementResult {
-        price: fair_value,
-        traded_volume: 0.0,
-        traded: false,
-        maker_inventory_delta: 0.0,
+    // Nothing traded, so the print IS the model price and the book absorbed
+    // exactly none of the shock. `decompose` gives `absorbed` of zero here
+    // for free, because `log(fair_value / fair_value)` is zero.
+    //
+    // A closure rather than a value: it costs two logarithms, and building it
+    // eagerly would spend them on every settlement that goes on to trade and
+    // never looks at it. Called at each of the three returns below.
+    let no_trade = || {
+        let (shock, absorbed) = decompose(last_price, fair_value, fair_value);
+        SettlementResult {
+            price: fair_value,
+            traded_volume: 0.0,
+            traded: false,
+            maker_inventory_delta: 0.0,
+            shock,
+            absorbed,
+        }
     };
 
     // Guard 1 — before any draw.
     if !(fair_value > 0.0) || !(last_price > 0.0) || !(tick_volume > 0.0) {
-        return no_trade;
+        return no_trade();
     }
 
     // Build only the depth this tick's flow can actually reach. A tick prints
@@ -460,7 +554,10 @@ pub fn settle_price_through_book(
     // Any integer cast turns that NaN into one quoted level and four draws.
     let levels_needed = mathx::min(
         BOOK_LEVELS,
-        mathx::max(2.0, (tick_volume / level_size).ceil() + 1.0),
+        scaled_depth(
+            mathx::max(2.0, (tick_volume / level_size).ceil() + 1.0),
+            options.depth_multiplier,
+        ),
     );
     let mut book = build_live_book(
         company,
@@ -479,7 +576,7 @@ pub fn settle_price_through_book(
 
     // Guard 2 — still before any draw.
     if book.asks.is_empty() || book.bids.is_empty() {
-        return no_trade;
+        return no_trade();
     }
 
     // Lean the flow toward whichever side closes the gap to fair value, plus
@@ -523,13 +620,18 @@ pub fn settle_price_through_book(
 
     // Guard 3 — the only one AFTER the draws, so it still costs four.
     match book.last_price {
-        Some(price) if traded != 0.0 => SettlementResult {
-            price,
-            traded_volume: traded,
-            traded: true,
-            maker_inventory_delta,
-        },
-        _ => no_trade,
+        Some(price) if traded != 0.0 => {
+            let (shock, absorbed) = decompose(last_price, fair_value, price);
+            SettlementResult {
+                price,
+                traded_volume: traded,
+                traded: true,
+                maker_inventory_delta,
+                shock,
+                absorbed,
+            }
+        }
+        _ => no_trade(),
     }
 }
 
@@ -777,6 +879,221 @@ mod tests {
         let before = rng.clone();
         settle_price_through_book(&c, 100.0, 100_000.0, &SettleOptions::default(), &mut rng);
         assert_eq!(draws_consumed(&before, &rng), 4);
+    }
+
+    // ── The depth bound, and the counterfactual ───────────────────────────
+
+    /// Four fixed uniforms, so a settlement's flow direction is decided by
+    /// the test rather than by a search for a convenient seed.
+    struct Fixed([f64; 4], usize);
+
+    impl Rng for Fixed {
+        fn next_f64(&mut self) -> f64 {
+            let v = self.0[self.1];
+            self.1 += 1;
+            v
+        }
+        fn next_normal(&mut self) -> f64 {
+            unreachable!("settlement draws uniforms only")
+        }
+    }
+
+    /// The shipped multiplier is the shipped market. This is the whole
+    /// argument that the option cannot move a trajectory, and it is asserted
+    /// on the BITS rather than on a comparison that a NaN would pass.
+    #[test]
+    fn the_shipped_depth_multiplier_settles_exactly_as_before() {
+        for volume in [0.0, 1.0, 10_000.0, 100_000.0, f64::NAN] {
+            let mut a = GameRng::from_seed(11);
+            let mut b = GameRng::from_seed(11);
+            let default = settle_price_through_book(
+                &company(),
+                100.0,
+                volume,
+                &SettleOptions::default(),
+                &mut a,
+            );
+            let explicit = settle_price_through_book(
+                &company(),
+                100.0,
+                volume,
+                &SettleOptions {
+                    depth_multiplier: 1.0,
+                    ..SettleOptions::default()
+                },
+                &mut b,
+            );
+            assert_eq!(
+                default.price.to_bits(),
+                explicit.price.to_bits(),
+                "volume {volume}: the shipped multiplier must be a no-op"
+            );
+            assert_eq!(a, b, "volume {volume}: and must take the same draws");
+        }
+    }
+
+    /// The counterfactual costs the same four uniforms the real settlement
+    /// costs, which is what lets the engine serve it from a rewound buffer.
+    #[test]
+    fn unbounded_depth_consumes_exactly_four_draws() {
+        let mut rng = GameRng::from_seed(42);
+        let before = rng.clone();
+        let out = settle_price_through_book(
+            &company(),
+            100.0,
+            10_000.0,
+            &SettleOptions {
+                depth_multiplier: f64::INFINITY,
+                ..SettleOptions::default()
+            },
+            &mut rng,
+        );
+        assert!(out.traded);
+        assert_eq!(draws_consumed(&before, &rng), 4);
+    }
+
+    /// Every guard that costs zero draws costs zero at unbounded depth too.
+    ///
+    /// The guards are the reason the two arms can share a buffer: if a
+    /// multiplier could change which one fired, the second settlement would
+    /// sometimes need draws the first one never took.
+    #[test]
+    fn unbounded_depth_takes_the_same_early_returns() {
+        let cases: Vec<(&str, CompanyMicrostructure, f64, f64)> = vec![
+            ("fair value zero", company(), 0.0, 10_000.0),
+            ("fair value NaN", company(), f64::NAN, 10_000.0),
+            ("tick volume zero", company(), 100.0, 0.0),
+            ("tick volume NaN", company(), 100.0, f64::NAN),
+            (
+                "last price zero",
+                CompanyMicrostructure {
+                    price: 0.0,
+                    ..company()
+                },
+                100.0,
+                10_000.0,
+            ),
+        ];
+        for (note, c, fair_value, tick_volume) in cases {
+            let mut rng = GameRng::from_seed(42);
+            let before = rng.clone();
+            let out = settle_price_through_book(
+                &c,
+                fair_value,
+                tick_volume,
+                &SettleOptions {
+                    depth_multiplier: f64::INFINITY,
+                    ..SettleOptions::default()
+                },
+                &mut rng,
+            );
+            assert!(!out.traded, "{note}: should not trade");
+            assert_eq!(draws_consumed(&before, &rng), 0, "{note}: should not draw");
+        }
+    }
+
+    /// A tick whose flow already reaches every level settles identically at
+    /// unbounded depth, so liquidity's share of that print is zero.
+    ///
+    /// `company()` quotes 10,000 a level, so 100,000 of flow puts
+    /// `levels_needed` at its `BOOK_LEVELS` ceiling before the multiplier is
+    /// consulted. The two arms are then the same call.
+    #[test]
+    fn a_book_already_at_full_depth_prints_the_same_unbounded() {
+        let deep = settle_price_through_book(
+            &company(),
+            101.0,
+            100_000.0,
+            &SettleOptions::default(),
+            &mut Fixed([0.1, 0.2, 0.3, 0.4], 0),
+        );
+        let unbounded = settle_price_through_book(
+            &company(),
+            101.0,
+            100_000.0,
+            &SettleOptions {
+                depth_multiplier: f64::INFINITY,
+                ..SettleOptions::default()
+            },
+            &mut Fixed([0.1, 0.2, 0.3, 0.4], 0),
+        );
+        assert_eq!(deep, unbounded);
+    }
+
+    /// Flow that exhausts the bounded book fills more of itself against
+    /// unbounded depth, and prints nearer fair value for doing so.
+    ///
+    /// Four uniforms below the buy fraction send every slice to the ask side,
+    /// so the test does not depend on a draw happening to lean one way.
+    #[test]
+    fn one_sided_flow_walks_further_when_the_bound_is_lifted() {
+        // 30,000 against a 10,000 level puts the bound at four levels, which
+        // quote 2.92 levels of size a side against four slices of 7,500.
+        let bounded = settle_price_through_book(
+            &company(),
+            101.0,
+            30_000.0,
+            &SettleOptions::default(),
+            &mut Fixed([0.1, 0.1, 0.1, 0.1], 0),
+        );
+        let unbounded = settle_price_through_book(
+            &company(),
+            101.0,
+            30_000.0,
+            &SettleOptions {
+                depth_multiplier: f64::INFINITY,
+                ..SettleOptions::default()
+            },
+            &mut Fixed([0.1, 0.1, 0.1, 0.1], 0),
+        );
+        assert!(
+            unbounded.traded_volume > bounded.traded_volume,
+            "unbounded depth must fill more of the same flow: {} against {}",
+            unbounded.traded_volume,
+            bounded.traded_volume
+        );
+        assert!(
+            unbounded.price > bounded.price,
+            "and the extra fills print higher: {} against {}",
+            unbounded.price,
+            bounded.price
+        );
+    }
+
+    /// The two halves of a print add up to the print's own move.
+    #[test]
+    fn the_shock_and_the_absorption_sum_to_the_print_move() {
+        let out = settle_price_through_book(
+            &company(),
+            101.0,
+            30_000.0,
+            &SettleOptions::default(),
+            &mut Fixed([0.1, 0.6, 0.1, 0.6], 0),
+        );
+        assert!(out.traded);
+        let moved = mathx::log(out.price / company().price);
+        assert!(
+            (out.shock + out.absorbed - moved).abs() < 1e-12,
+            "shock {} + absorbed {} should be the move {moved}",
+            out.shock,
+            out.absorbed
+        );
+    }
+
+    /// Nothing traded means the book absorbed nothing, and the print IS the
+    /// model price.
+    #[test]
+    fn a_tick_that_does_not_settle_absorbs_exactly_zero() {
+        let out = settle_price_through_book(
+            &company(),
+            101.0,
+            0.0,
+            &SettleOptions::default(),
+            &mut GameRng::from_seed(3),
+        );
+        assert!(!out.traded);
+        assert_eq!(out.absorbed, 0.0);
+        assert_eq!(out.shock, mathx::log(101.0 / company().price));
     }
 
     #[test]

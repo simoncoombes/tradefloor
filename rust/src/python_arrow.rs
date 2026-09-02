@@ -212,6 +212,149 @@ pub fn truth_batch(
     RecordBatch::try_new(truth_schema(), columns).map_err(|e| e.to_string())
 }
 
+/// `prints`: how each print was arrived at.
+///
+/// One row per instrument per tick, joining to `bars` and `truth` on
+/// `(day, tick, instrument_id)`. `truth` says what moved fair value;
+/// this says what happened between fair value and the tape.
+///
+/// **The decomposition.** `shock` is `log(model_price / the last print)`:
+/// the distance the price model put between the tape and this tick's anchor.
+/// `absorbed` is `log(print / model_price)`: what stood in the way. They sum
+/// to the print's own log move, so a consumer can difference `print` across
+/// ticks and check the split rather than trust it.
+///
+/// `absorbed` carries the circuit breaker as well as the book, because the
+/// breaker lands between the book's last trade and what is published. On a
+/// halted name the breaker is what absorbed the shock, and booking it to the
+/// book would be the more flattering of two wrong answers.
+///
+/// **The counterfactual.** `unbounded_print` is what the same tick printed
+/// when it was settled a second time against every resting level, under the
+/// same four uniforms and from the same book state. `liquidity_share` is
+/// `log(print / unbounded_print) / log(print / the last print)`: the fraction
+/// of the move the depth bound put there. Both columns are absent unless
+/// `Engine.settle_depth_counterfactual(True)` was set before the run, and the
+/// schema metadata says which case a reader is holding.
+///
+/// `liquidity_share` is a ratio of two log distances rather than a part of
+/// one quantity, so it is not bounded by one. It is exactly zero where the
+/// two prints coincide, which is most rows, and NaN on the rows where the
+/// print did not move and the deeper book would have moved it. Filter the
+/// NaN before taking a mean.
+///
+/// # What it cannot say
+///
+/// The counterfactual prints one tick from the real state. It does not say
+/// what a deeper book would have done to the NEXT tick, because the maker
+/// inventory it would have left is discarded and the tick after this one is
+/// the one that actually ran. A study wanting the compounded answer runs two
+/// markets, not one market and an arm.
+pub fn prints_schema(counterfactual: bool) -> SchemaRef {
+    let mut fields = vec![
+        Field::new("day", DataType::UInt32, false),
+        Field::new("tick", DataType::UInt32, false),
+        Field::new("instrument_id", DataType::UInt32, false),
+        Field::new("print", DataType::Float64, false),
+        Field::new("model_price", DataType::Float64, false),
+        Field::new("shock", DataType::Float64, false),
+        Field::new("absorbed", DataType::Float64, false),
+    ];
+    if counterfactual {
+        fields.push(Field::new("unbounded_print", DataType::Float64, false));
+        fields.push(Field::new("liquidity_share", DataType::Float64, false));
+    }
+    // Computed from the columns that are actually here, so the metadata
+    // cannot describe a table this is not. A retyped sentence per branch is
+    // how a caveat becomes false.
+    let present: Vec<&str> = fields.iter().map(|f| f.name().as_str()).collect();
+    let caveat = if counterfactual {
+        "unbounded_print is the same tick settled against every resting \
+         level, under the same draws and from the same book state. It is \
+         one tick from the real state and says nothing about the next one. \
+         liquidity_share is a ratio of log distances, so it is not bounded \
+         by one, and it is NaN where the print did not move."
+    } else {
+        "The depth counterfactual did not run, so unbounded_print and \
+         liquidity_share are absent. Set Engine.settle_depth_counterfactual \
+         (True) before the run to get them."
+    };
+    let metadata = std::collections::HashMap::from([
+        (
+            "depth_counterfactual".to_string(),
+            if counterfactual { "on" } else { "off" }.to_string(),
+        ),
+        ("columns".to_string(), present.join(",")),
+        ("caveat".to_string(), caveat.to_string()),
+    ]);
+    Arc::new(Schema::new_with_metadata(fields, metadata))
+}
+
+/// Build the `prints` batch from a session's buffers.
+///
+/// The counterfactual columns are included when both are the length of the
+/// table, which is exactly when the arm ran for this day. A short column is
+/// an error rather than a pad: padding one would put a real value on the
+/// wrong row for the rest of the day.
+#[allow(clippy::too_many_arguments)]
+pub fn prints_batch(
+    day: u32,
+    ticks: usize,
+    instruments: usize,
+    prints: &[f64],
+    model_price: &[f64],
+    shock: &[f64],
+    absorbed: &[f64],
+    unbounded_print: &[f64],
+    liquidity_share: &[f64],
+) -> Result<RecordBatch, String> {
+    let rows = ticks * instruments;
+    for (name, len) in [
+        ("print", prints.len()),
+        ("model_price", model_price.len()),
+        ("shock", shock.len()),
+        ("absorbed", absorbed.len()),
+    ] {
+        if len < rows {
+            return Err(format!(
+                "{name} buffer shorter than {ticks} ticks x {instruments} instruments"
+            ));
+        }
+    }
+    let counterfactual = !unbounded_print.is_empty() || !liquidity_share.is_empty();
+    if counterfactual && (unbounded_print.len() < rows || liquidity_share.len() < rows) {
+        return Err(format!(
+            "counterfactual buffer shorter than {ticks} ticks x {instruments} instruments"
+        ));
+    }
+
+    let mut day_col = Vec::with_capacity(rows);
+    let mut tick_col = Vec::with_capacity(rows);
+    let mut id_col = Vec::with_capacity(rows);
+    for t in 0..ticks {
+        for i in 0..instruments {
+            day_col.push(day);
+            tick_col.push(t as u32);
+            id_col.push(i as u32);
+        }
+    }
+
+    let mut columns: Vec<ArrayRef> = vec![
+        Arc::new(UInt32Array::from(day_col)),
+        Arc::new(UInt32Array::from(tick_col)),
+        Arc::new(UInt32Array::from(id_col)),
+        Arc::new(Float64Array::from(prints[..rows].to_vec())),
+        Arc::new(Float64Array::from(model_price[..rows].to_vec())),
+        Arc::new(Float64Array::from(shock[..rows].to_vec())),
+        Arc::new(Float64Array::from(absorbed[..rows].to_vec())),
+    ];
+    if counterfactual {
+        columns.push(Arc::new(Float64Array::from(unbounded_print[..rows].to_vec())));
+        columns.push(Arc::new(Float64Array::from(liquidity_share[..rows].to_vec())));
+    }
+    RecordBatch::try_new(prints_schema(counterfactual), columns).map_err(|e| e.to_string())
+}
+
 /// A reader over a fixed set of batches.
 ///
 /// Deliberately a READER rather than a single batch, even when there is only
@@ -483,6 +626,15 @@ pub struct RecordedDay {
     pub fundamental: Vec<f64>,
     pub anchor: Vec<f64>,
     pub components: [Vec<f64>; 9],
+    /// The print decomposition. See [`prints_schema`].
+    pub shock: Vec<f64>,
+    pub absorbed: Vec<f64>,
+    /// The depth counterfactual, EMPTY on a day that ran without it. A day
+    /// carries its own answer because the arm can be switched between days,
+    /// and a table that reported one day's setting for all of them would be
+    /// wrong for the rest.
+    pub unbounded_print: Vec<f64>,
+    pub liquidity_share: Vec<f64>,
 }
 
 /// `bars` at a coarser grain: real OHLCV.
