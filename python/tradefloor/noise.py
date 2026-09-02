@@ -502,7 +502,7 @@ def attribute(world: Any, window: Any, target: Any,
 
     control, = world.fork("control")
     for s in traced:
-        control.trace(s, first, last)
+        control.trace_draws(s, first, last)
     control.run(days, record=record)
     base = _evaluate(target, control)
 
