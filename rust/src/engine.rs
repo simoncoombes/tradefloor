@@ -2301,6 +2301,38 @@ impl Engine {
 
         hash_u32(&mut buf, day_count);
 
+        // The draw-addressing layer's two snapshot fields. The counts are
+        // the seven streams' uniform and normal positions, flattened the
+        // way the snapshot flattens them; the overlay is the table of
+        // substitutions installed on them, walked stream by stream in the
+        // same order.
+        //
+        // Both are hashed because both decide what the engine does next. Two
+        // engines alike in every column but differing by one patched draw
+        // take different days from here, and a leaf that skipped the table
+        // would commit to a state that does not describe them. The hash
+        // refuses a snapshot carrying a field it does not know for exactly
+        // this reason, and these two arrived after it was written.
+        for (uniforms, normals) in self.stream_positions() {
+            hash_f64(&mut buf, uniforms as f64);
+            hash_f64(&mut buf, normals as f64);
+        }
+        let mut overlay: Vec<(u32, u8, u64, f64)> = Vec::new();
+        for id in 0..7u32 {
+            if let Some(table) = self.draw_overlay(id) {
+                for ((kind, index), value) in &table.table {
+                    overlay.push((id, *kind as u8, *index, *value));
+                }
+            }
+        }
+        hash_u32(&mut buf, overlay.len() as u32);
+        for (stream, kind, index, value) in overlay {
+            hash_u32(&mut buf, stream);
+            hash_u32(&mut buf, u32::from(kind));
+            hash_u64(&mut buf, index);
+            hash_f64(&mut buf, value);
+        }
+
         let mut hasher = Sha256::new();
         hasher.update(&buf);
         let out = hasher.finalize();
