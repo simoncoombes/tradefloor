@@ -977,9 +977,12 @@ impl Engine {
     ///
     /// It adds a second settlement per active company per open tick, and
     /// that settlement quotes every level rather than the two ordinary flow
-    /// reaches. Measured at 2.4x the wall time of the whole tick loop: 0.225
-    /// against 0.539 seconds, best of three, 24 names over three days of 390
-    /// ticks at seed 42 on pt-v16. It stays off until a caller asks for it.
+    /// reaches. A run takes three to four times as long with it on, best of
+    /// seven over 24 names and three days of 390 ticks at seed 42 on pt-v16.
+    /// The ratio and not just the times move with load on a shared machine,
+    /// because the arm-off run is the smaller number, so it is given as a
+    /// range rather than to two decimals. It stays off until a caller asks
+    /// for it.
     pub fn set_settle_depth_counterfactual(&mut self, on: bool) {
         self.settle_depth_counterfactual = on;
         let n = self.companies.len();

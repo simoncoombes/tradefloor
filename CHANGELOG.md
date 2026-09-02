@@ -43,9 +43,8 @@ distance from there to the tape, and the two sum to the print's own move.
 time against every resting level, under the same four uniforms and from the
 same book state, and adds `unbounded_print` and `liquidity_share` to that
 table. It takes no draw and its fills reach no company field, so the market
-and the known-answer digest are the same with it on. It costs 2.4 times
-the wall time of a run, measured over 24 names and three days, so it stays
-off until a caller asks for it.
+and the known-answer digest are the same with it on. A run takes three to
+four times as long with it on, so it stays off until a caller asks for it.
 
 ### The measured cost
 
