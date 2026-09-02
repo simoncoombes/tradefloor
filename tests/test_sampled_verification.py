@@ -1164,3 +1164,48 @@ def test_a_world_ledgers_every_day_it_runs():
                                  ledger=ledger)
     report = mf.verify(manifest, ledger, 6, seed=1)
     assert report.ok, report.describe()
+
+
+def test_the_hash_reads_every_field_of_an_overlay_entry():
+    """The overlay's content, not only its presence.
+
+    A hash that counted the substitutions and ignored their stream, kind,
+    index and value passed everything: two engines whose overlays differ
+    only in value, only in address or only in stream came back with the
+    same leaf, and the Rust side and the twin silently disagreed on any
+    engine carrying one. Dropping every entry from the Rust hash while
+    keeping the length prefix left the suite green, which is what this
+    fixes.
+    """
+    from tradefloor import noise
+
+    def with_overlay(*patches):
+        engine = tf.Engine(seed=SEED, universe=UNIVERSE)
+        engine.run_days(1, record=False, ticks_per_day=TICKS)
+        if patches:
+            noise.patch_draws(engine, [
+                noise.Patch(noise.DrawAddress(s, k, i), v)
+                for s, k, i, v in patches])
+        return engine
+
+    plain = with_overlay()
+    one = with_overlay(("jumps", "uniform", 0, 0.5))
+    other_value = with_overlay(("jumps", "uniform", 0, 0.25))
+    other_index = with_overlay(("jumps", "uniform", 1, 0.5))
+    other_stream = with_overlay(("news", "uniform", 0, 0.5))
+
+    # every field of the entry reaches the leaf
+    assert plain.state_hash() != one.state_hash()
+    assert one.state_hash() != other_value.state_hash()
+    assert one.state_hash() != other_index.state_hash()
+    assert one.state_hash() != other_stream.state_hash()
+
+    # and the two implementations agree on an engine that carries one,
+    # which is the case the agreement test never reached
+    for engine in (plain, one, other_value, other_index, other_stream):
+        snapshot = engine.state_snapshot()
+        assert engine.state_hash() == state_hash(snapshot)
+    assert one.state_snapshot()["draw_overlay"] == [(3, 0, 0, 0.5)]
+
+    # the prices are untouched, so this is the overlay and nothing else
+    assert list(one.prices()) == list(plain.prices())
