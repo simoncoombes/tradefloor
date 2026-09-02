@@ -57,8 +57,8 @@ the marginal at one seed is the response of one noise path to the group's
 dials. The JSON carries every per-seed share, and the report prints their
 median, their spread and the count of seeds whose share carries the
 headline's sign. A headline share whose sign a minority of seeds carries is
-a statement about the panel the envelope would print rather than about the
-mechanism.
+a statement about the panel the envelope would print; the per-seed column
+is the statement about the mechanism.
 
 The report separates each share into a main effect, the group's marginal
 against the base alone, and an interaction, the rest of the share. A group
@@ -279,6 +279,11 @@ def verify_declaration(groups: dict[str, dict[str, float]], base: str,
     owner: dict[str, str] = {}
     problems: list[str] = []
     for name, dials in groups.items():
+        if not name or "+" in name or name == "base":
+            problems.append(
+                f"{name!r}: a group name is non-empty, carries no '+', and "
+                "is never 'base', since the JSON and the report label the "
+                "empty subset 'base' and join members with '+'")
         if not isinstance(dials, dict):
             problems.append(f"{name}: a group is a dict of dial overrides")
             continue
@@ -479,6 +484,9 @@ def evaluate(base: str, groups: dict[str, dict[str, float]],
     the plan is written to `out/meta.json`, so a run that dies resumes
     from its rows. A directory holding another plan's rows is refused.
     """
+    if len(set(seeds)) != len(seeds):
+        raise ValueError(f"seeds repeat: {list(seeds)}; a repeated seed "
+                         "would weight one path twice in every median")
     verify_declaration(groups, base, target)
     lattice = subsets(groups)
     vectors: dict[str, dict[str, float]] = {}
@@ -772,10 +780,31 @@ def ruler(days: int) -> tuple[str, dict[str, tuple[float, float]]]:
     return "facts.REAL_MARKETS", dict(facts.REAL_MARKETS)
 
 
+def certified_column(days: int, stats: list[str]) -> dict:
+    """The envelope's own value of each statistic, at the matching horizon.
+
+    `envelope.CERTIFIED` at 252 days; `envelope.MEASURED_504` at 504,
+    which is measured on the same preset and roster and is the column a
+    504-day run should sit beside.
+    """
+    from tradefloor import envelope
+
+    if days == 2 * envelope.CERTIFIED_HORIZON_DAYS:
+        source, table = "envelope.MEASURED_504", envelope.MEASURED_504
+        horizon = days
+    else:
+        source, table = "envelope.CERTIFIED", envelope.CERTIFIED
+        horizon = envelope.CERTIFIED_HORIZON_DAYS
+    return {"preset": envelope.PRESET, "source": source,
+            "horizon_days": horizon,
+            "values": {key: table[key] for key in stats}}
+
+
 def caveats(*, seeds: list[int], days: int, universe: tuple[int, int],
             unmeasured: list[str], crn: dict, ruler_name: str,
             values: dict[frozenset[str], dict[str, float]],
-            names: list[str], inert: list[str] = ()) -> list[str]:
+            names: list[str], inert: tuple[str, ...] | list[str] = ()
+            ) -> list[str]:
     """The caveats this run earns, computed from the run.
 
     Each fires on a property of the request or the result, in the way the
@@ -791,12 +820,13 @@ def caveats(*, seeds: list[int], days: int, universe: tuple[int, int],
             "envelope states its panel on; the per-seed spread column is "
             "the evidence for each share, and the medians are medians of "
             f"{len(seeds)}")
-    if days != envelope.CERTIFIED_HORIZON_DAYS:
+    column = certified_column(days, [])
+    if days != column["horizon_days"]:
         out.append(
             f"{days} days against the certified horizon of "
             f"{envelope.CERTIFIED_HORIZON_DAYS}; band verdicts use "
-            f"{ruler_name}, and the certified column was measured at "
-            f"{envelope.CERTIFIED_HORIZON_DAYS} days")
+            f"{ruler_name}, and the {column['source']} column was "
+            f"measured at {column['horizon_days']} days")
     if tuple(universe) != (ROSTER_N, ROSTER_SEED):
         out.append(
             f"roster Universe.random({universe[0]}, seed={universe[1]}) "
@@ -832,17 +862,23 @@ def caveats(*, seeds: list[int], days: int, universe: tuple[int, int],
             "inert at this roster and horizon, with a share of 0.0 to the "
             "bit on every statistic and seed: " + ", ".join(inert)
             + "; the dials changed no panel, so the mechanism never fired "
-            "here rather than fired and measured small")
+            "at this roster and horizon")
     return out
 
 
 def summarise(rows_by_subset: dict[frozenset[str], list[dict]],
               groups: dict[str, dict[str, float]], *, base: str,
               target: str | None, seeds: list[int], days: int,
-              universe: tuple[int, int], crn: dict) -> dict:
-    """Everything the report prints and the JSON carries."""
+              universe: tuple[int, int], crn: dict | None = None) -> dict:
+    """Everything the report prints and the JSON carries.
+
+    `crn` is the guard's result; without one the guard runs here, so no
+    path to a share skips it.
+    """
     from tradefloor import envelope
 
+    if crn is None:
+        crn = guard(distinct_rows(rows_by_subset))
     names = list(groups)
     measured, unmeasured = measured_statistics(rows_by_subset)
     medians = median_values(rows_by_subset, measured)
@@ -896,10 +932,7 @@ def summarise(rows_by_subset: dict[frozenset[str], list[dict]],
                    for key in measured},
         "ruler": ruler_name,
         "bands": {key: list(bands[key]) for key in measured},
-        "certified": {"preset": envelope.PRESET,
-                      "horizon_days": envelope.CERTIFIED_HORIZON_DAYS,
-                      "values": {key: envelope.CERTIFIED[key]
-                                 for key in measured}},
+        "certified": certified_column(days, measured),
         "band_moves": band_moves(medians, names, bands),
         "crn": crn,
         "caveats": caveats(seeds=seeds, days=days, universe=universe,
@@ -923,12 +956,15 @@ def report(summary: dict, *, provenance: dict | None = None,
     seeds = summary["seeds"]
     roster = summary["roster"]
     count = len(summary["subsets"])
+    contiguous = list(seeds) == list(range(seeds[0], seeds[-1] + 1))
+    seed_text = (f"{seeds[0]}-{seeds[-1]}" if contiguous
+                 else ",".join(str(seed) for seed in seeds))
     lines = [
         f"mechanism Shapley: {summary['base']} to "
         f"{summary['target'] or 'the union of all groups'}, "
         f"{len(names)} groups, {count} subsets",
         f"roster Universe.random({roster['n']}, seed={roster['seed']}), "
-        f"seeds {seeds[0]}-{seeds[-1]} ({len(seeds)}), {summary['days']} "
+        f"seeds {seed_text} ({len(seeds)}), {summary['days']} "
         f"days, {count * len(seeds)} panels"
         + (f", {wall_seconds:.0f}s wall" if wall_seconds else ""),
     ]
@@ -946,9 +982,9 @@ def report(summary: dict, *, provenance: dict | None = None,
         f"{len(branched)} of {len(seeds)} seed(s)")
     certified = summary["certified"]
     lines.append(
-        f"ruler {summary['ruler']}; certified column: envelope.CERTIFIED "
-        f"for {certified['preset']} at {certified['horizon_days']} days, "
-        f"{ENVELOPE_SEEDS} seeds")
+        f"ruler {summary['ruler']}; certified column: "
+        f"{certified['source']} for {certified['preset']} at "
+        f"{certified['horizon_days']} days, {ENVELOPE_SEEDS} seeds")
     if summary["caveats"]:
         lines.append("")
         lines.append("caveats:")

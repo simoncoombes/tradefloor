@@ -119,6 +119,21 @@ def test_every_subset_saw_the_same_market_draws(toy):
     assert set(crn["market"]) == set(TOY_SEEDS)
 
 
+def test_a_summary_built_without_the_guard_runs_it(toy):
+    """No path to a share skips the guard."""
+    rows, crn, _ = toy
+    summary = shapley.summarise(rows, TOY_GROUPS, base="pt-v14", target=None,
+                                seeds=TOY_SEEDS, days=TOY_DAYS,
+                                universe=TOY_UNIVERSE)
+    assert summary["crn"]["market"] == crn["market"]
+
+
+def test_repeated_seeds_are_refused_before_any_panel():
+    with pytest.raises(ValueError, match="seeds repeat"):
+        shapley.evaluate("pt-v14", TOY_GROUPS, [1, 1], TOY_DAYS,
+                         TOY_UNIVERSE, workers=1, progress=lambda *_: None)
+
+
 def _row(overrides: dict, seed: int, market: int, economy: int) -> dict:
     return {
         "base": "pt-v14", "fingerprint": "custom-toy", "overrides": overrides,
@@ -178,6 +193,8 @@ def test_the_declaration_holds_to_the_preset_table():
      "declared in both a and b"),
     ({"a": {"no_such_dial": 1.0}}, "not a settable"),
     ({"a": {"qe_pe_gain": "off"}}, "not a number"),
+    ({"base": {"qe_pe_gain": 0.0}}, "never 'base'"),
+    ({"a+b": {"qe_pe_gain": 0.0}}, "carries no"),
 ])
 def test_a_wrong_declaration_is_refused(groups, complaint):
     with pytest.raises(ValueError, match=complaint):
