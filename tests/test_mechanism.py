@@ -20,8 +20,8 @@ sys.path.insert(0, os.path.join(ROOT, "tools", "mechanism", "mechanisms"))
 import check as checker  # noqa: E402
 import emit  # noqa: E402
 from spec import (Add, Bin, Call, Const, Dial, DialSpec, Draw, Extern,  # noqa: E402
-                  ForCompanies, If, IfSome, Let, Mechanism, Neg, Set, State,
-                  StateSpec, Var, When, bits)
+                  ExternSpec, ForCompanies, If, IfSome, Let, Mechanism, Neg,
+                  Set, State, StateSpec, Var, When, bits)
 from jumps import JUMPS  # noqa: E402
 from vix_jump import VIX_JUMP_AS_WRITTEN  # noqa: E402
 
@@ -479,3 +479,106 @@ def test_the_spec_digest_covers_a_declared_field_doc_string():
     b = toy((Set("x", State("x")),),
             state=(dataclasses.replace(plain[0], doc="another"),))
     assert a.digest() == b.digest()
+
+
+# -- the declared doses are the build's ---------------------------------------
+
+def test_every_declared_default_is_the_builds():
+    """The inertness proof runs at the declared defaults, so they have to
+    be the values a build has. One of the eight was 20.0 against the
+    build's 15.0, and nothing could see it: the record test compares the
+    declared default against itself on both sides.
+    """
+    import tradefloor as tf
+    build = tf.ModelParams.from_preset("pt-v1").to_dict()
+    for dial in JUMPS.dials:
+        assert dial.name in build, dial.name
+        assert dial.default == build[dial.name], dial.name
+    # and the proof the emitter gates on is taken at that vector
+    assert checker.prove_inert(JUMPS, build).inert
+
+
+# -- hoisting reaches every body it says it reaches ---------------------------
+
+def test_hoisting_descends_into_a_when_body():
+    """Named in `hoist`'s own docstring. The Let is lifted above the
+    statement, so the draw is taken whether or not the branch is."""
+    body = (When(Bin("<", State("x"), Const(1.0)),
+                 (Let("z", Draw("normal", "External", 0)),
+                  Add("x", Var("z")))),)
+    hoisted = checker.hoist(body)
+    assert len(hoisted) == 2
+    assert isinstance(hoisted[0], Let) and isinstance(hoisted[0].expr, Draw)
+    assert isinstance(hoisted[1], When)
+    # the draw is replaced where it stood, so the inner Let survives and
+    # binds the hoisted name instead of taking a draw of its own
+    assert hoisted[1].body == (Let("z", Var("hoisted_normal_1")),
+                               Add("x", Var("z")))
+    assert checker.check(toy(hoisted))["effect"] == checker.Effect(normals=1)
+
+
+def test_hoisting_descends_into_an_ifsome_body():
+    """Also named in the docstring. Whether the field is present is state,
+    so the draw has to come out."""
+    body = (IfSome("x", "held", (Let("z", Draw("normal", "External", 0)),
+                                 Add("x", Var("z")))),)
+    hoisted = checker.hoist(body)
+    assert len(hoisted) == 2
+    assert isinstance(hoisted[0], Let) and isinstance(hoisted[0].expr, Draw)
+    assert hoisted[1].body == (Let("z", Var("hoisted_normal_1")),
+                               Add("x", Var("z")))
+    assert checker.check(toy(hoisted))["effect"] == checker.Effect(normals=1)
+
+
+def test_hoisting_keeps_a_draw_inside_a_forcompanies():
+    """The one case where lifting the Let out of the loop would be wrong.
+
+    A draw inside `ForCompanies` is one draw PER COMPANY, so its Let stays
+    in the loop body and the effect stays per company. Lifted above the
+    loop it would become one draw for the whole day, which is the shape
+    every draw in the shipped mechanism has.
+    """
+    body = (ForCompanies("i", (
+        Set("x", If(Bin("<", Dial("gain"), Const(0.5)),
+                    Draw("normal", "External", "i"), Const(0.0))),)),)
+    hoisted = checker.hoist(body)
+    assert len(hoisted) == 1
+    loop = hoisted[0]
+    assert isinstance(loop, ForCompanies)
+    # the Let is INSIDE the loop, before the statement it feeds
+    assert isinstance(loop.body[0], Let)
+    assert isinstance(loop.body[0].expr, Draw)
+    assert isinstance(loop.body[1], Set)
+    found = checker.check(toy(hoisted))
+    assert found["effect"] == checker.Effect(normals_per_company=1)
+
+
+def test_hoisting_descends_into_extern_arguments():
+    body = (Set("x", If(Bin("<", Dial("gain"), Const(0.5)),
+                        Extern("clamp_s", (Draw("normal", "External", 0),)),
+                        Const(0.0))),)
+    mech = Mechanism(name="toy", stream="jumps",
+                     dials=(DialSpec("gain", 0.0),),
+                     state=(StateSpec("x", scope="engine", rust="self.x"),),
+                     externs=(ExternSpec("clamp_s", "clamp_s({0})"),),
+                     body=body, target={"params": "p", "rng": "self.rng"})
+    hoisted = checker.hoist(body)
+    assert isinstance(hoisted[0], Let) and isinstance(hoisted[0].expr, Draw)
+    call = hoisted[1].expr.then
+    assert isinstance(call, Extern)
+    assert call.args == (Var("hoisted_normal_1"),)
+    rewritten = dataclasses.replace(mech, body=hoisted)
+    assert checker.check(rewritten)["effect"] == checker.Effect(normals=1)
+
+
+# -- the IfSome path is declared too ------------------------------------------
+
+def test_an_ifsome_on_an_undeclared_path_is_a_spec_error():
+    """The binding is exercised by the resolution test; the rejection was
+    not. An IfSome names a state field like any other read."""
+    body = (IfSome("nowhere", "held", (Set("x", Var("held")),)),)
+    with pytest.raises(checker.SpecError, match="state 'nowhere'"):
+        checker.check(toy(body))
+    # the declared spelling resolves
+    assert checker.check(toy((IfSome("x", "held",
+                                     (Set("x", Var("held")),)),)))

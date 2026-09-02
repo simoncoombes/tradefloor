@@ -51,8 +51,16 @@ JUMPS = Mechanism(
                  "standard deviation of the company jump"),
         DialSpec("jump_vix_coupling", 0.0,
                  "how much the arrival rate follows the VIX"),
-        DialSpec("market_vol_vix_anchor", 20.0,
-                 "the VIX at which the rate scale is one; read, not owned"),
+        DialSpec("market_vol_vix_anchor", 15.0,
+                 "the VIX at which the rate scale is one; read, not owned. "
+                 "This is factor_vol::MARKET_VOL_VIX_ANCHOR, which "
+                 "params.rs sets every preset from, and it is declared here "
+                 "because prove_inert runs at these defaults: declared at "
+                 "20.0 the proof was taken at a dose vector no build has. "
+                 "It was harmless, because the ratio it feeds is discarded "
+                 "while jump_vix_coupling is zero, and "
+                 "test_every_declared_default_is_the_builds pins the whole "
+                 "vector so the next one is not."),
         DialSpec("jump_momentum_share", 1.0,
                  "the share of a jump herding is allowed to see"),
     ),
