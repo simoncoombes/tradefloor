@@ -496,9 +496,9 @@ def attribute(world: Any, window: Any, target: Any,
             "stream. Event level covers " + ", ".join(EVENT_STREAMS)
             + "; day aggregate covers the market stream.")
     days = horizon - world.day + 1
+    # A statistic reads the daily bars, so the arms record; whether the run
+    # is long enough for it is facts' to say, on the real bars.
     record = target.kind == "statistic"
-    if record and horizon - world.day + 1 + len(world.trace) // max(1, world.steps_per_day) < 31:
-        pass  # the length check is facts' to make, below, on the real bars
 
     control, = world.fork("control")
     for s in traced:
