@@ -674,9 +674,9 @@ def attribute(world: Any, window: Any, target: Any,
     if target.kind == "pnl" or getattr(world.agent, "act", None) is not None:
         if not hasattr(world.agent, "state"):
             caveats.append(
-                "the agent runs in every arm and publishes no state() hook; "
-                "an agent whose decisions are not a function of what it "
-                "sees puts its own noise into every effect.")
+                "the agent runs in every arm and publishes no state() "
+                "hook; an agent that samples its decisions puts its own "
+                "noise into every effect.")
     if shard is not None:
         caveats.append(f"shard {shard[0]} of {shard[1]}: every "
                        f"{shard[1]}-th row from the {shard[0]}-th.")
@@ -772,8 +772,8 @@ def row_caveats(rows: Sequence[dict], *, target: Any, last: int,
     elif matched:
         out.append(
             f"all {len(rows)} arms matched the control's draw positions on "
-            "all seven streams, so every effect is the draw's and not a "
-            "reshuffle of them.")
+            "all seven streams, so every effect is what that one draw did "
+            "to the target.")
     fired = sum(1 for r in rows if r["perturbation"] == "fire")
     if fired:
         # Which row is the control's own state is readable only where
@@ -821,9 +821,9 @@ def row_caveats(rows: Sequence[dict], *, target: Any, last: int,
             why = (f"the horizon is day {horizon} and the window ends on "
                    f"day {last}, so the last day's events are never seen")
         else:
-            why = ("the horizon reaches past the window, so this is the "
-                   "draws saying nothing rather than the measurement "
-                   "stopping short")
+            why = ("the horizon reaches past the window, so the "
+                   "measurement had room and the draws moved the target "
+                   "by zero")
         out.append(f"every {s} row measured exactly zero: {why}.")
     return out
 
