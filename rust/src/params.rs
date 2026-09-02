@@ -1209,6 +1209,24 @@ pub struct ModelParams {
     /// late); pinned, the ratio is zero and nothing lands. Between 0 and
     /// 1 blends the two forms. 0.0 = the immediate form, bit for bit.
     pub vix_selfex_kick_follow: f64,
+    /// The claw-back form of the VIX-confirmed kick (round 171.21). The
+    /// follow form (above) under-fed episodes: inside one the VIX's
+    /// realized move is the event's size less the old fear's decay, so
+    /// the ratio shrank the kicks exactly where the loop needed them,
+    /// and it landed them a day late. Here the kick lands immediately as
+    /// shipped, and at the next close the UNCONFIRMED share — (1 - ratio)
+    /// x kick x the market's persistence x this — is withdrawn from the
+    /// variance state, floored at half the current variance. Endogenously
+    /// the VIX confirms nearly every fire and nothing is withdrawn;
+    /// pinned, the whole kick leaves a day later and a held window
+    /// carries a one-day blip instead of a persistent injection. 0.0 =
+    /// off, bit for bit.
+    pub vix_selfex_kick_clawback: f64,
+    /// The confirmation scale in VIX points (round 171.21). 0.0: the
+    /// ratio is move / event size. Positive: ratio = clamp(move / this,
+    /// 0, 1), so a fire the VIX visibly confirms by this many points
+    /// lands in full whatever the event's size.
+    pub vix_selfex_kick_confirm: f64,
     /// Couples an event's SIZE to the down-move that fired it: the
     /// magnitude is scaled by (1 + this x the gate excess). Round 153
     /// measured the missing piece exactly — the gate protects the
@@ -1627,6 +1645,8 @@ impl ModelParams {
             vix_selfex_vix_power: 0.0,
             vix_selfex_vix_cap: 0.0,
             vix_selfex_kick_follow: 0.0,
+            vix_selfex_kick_clawback: 0.0,
+            vix_selfex_kick_confirm: 0.0,
             vix_har_weight: 0.0,
             vix_har_mid: 0.4,
             vix_har_slow: 0.25,
@@ -2695,6 +2715,8 @@ impl ModelParams {
             "vix_selfex_vix_power" => self.vix_selfex_vix_power,
             "vix_selfex_vix_cap" => self.vix_selfex_vix_cap,
             "vix_selfex_kick_follow" => self.vix_selfex_kick_follow,
+            "vix_selfex_kick_clawback" => self.vix_selfex_kick_clawback,
+            "vix_selfex_kick_confirm" => self.vix_selfex_kick_confirm,
             "vix_har_weight" => self.vix_har_weight,
             "vix_har_mid" => self.vix_har_mid,
             "vix_har_slow" => self.vix_har_slow,
@@ -2859,6 +2881,8 @@ impl ModelParams {
             "vix_selfex_vix_power" => out.vix_selfex_vix_power = value,
             "vix_selfex_vix_cap" => out.vix_selfex_vix_cap = value,
             "vix_selfex_kick_follow" => out.vix_selfex_kick_follow = value,
+            "vix_selfex_kick_clawback" => out.vix_selfex_kick_clawback = value,
+            "vix_selfex_kick_confirm" => out.vix_selfex_kick_confirm = value,
             "vix_har_weight" => out.vix_har_weight = value,
             "vix_har_mid" => out.vix_har_mid = value,
             "vix_har_slow" => out.vix_har_slow = value,
@@ -3087,6 +3111,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_selfex_vix_power",
         "vix_selfex_vix_cap",
         "vix_selfex_kick_follow",
+        "vix_selfex_kick_clawback",
+        "vix_selfex_kick_confirm",
         "vix_har_weight",
         "vix_har_mid",
         "vix_har_slow",

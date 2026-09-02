@@ -209,6 +209,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_selfex_vix_power": (0.0, 2.0),
     "vix_selfex_vix_cap": (0.0, 4.0),
     "vix_selfex_kick_follow": (0.0, 1.0),
+    "vix_selfex_kick_clawback": (0.0, 1.0),
+    "vix_selfex_kick_confirm": (0.0, 5.0),
     # The HAR anchor's weight (mechanisms-literature M3): a share of the
     # target, unit interval minus headroom for the cycle base to matter.
     "vix_har_weight": (0.0, 0.85),

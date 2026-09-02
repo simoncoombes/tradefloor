@@ -1248,6 +1248,7 @@ impl Engine {
                 vix_selfex_vix_power: self.params.vix_selfex_vix_power,
                 vix_selfex_vix_cap: self.params.vix_selfex_vix_cap,
                 vix_selfex_kick_follow: self.params.vix_selfex_kick_follow,
+                vix_selfex_kick_clawback: self.params.vix_selfex_kick_clawback,
                 market_factor_sigma: self.params.market_factor_sigma,
                 market_vol_vix_anchor: self.params.market_vol_vix_anchor,
                 market_sigma_daily_pct: self.market_vol.sigma_daily() * 100.0,
@@ -1296,7 +1297,32 @@ impl Engine {
         if self.params.vix_selfex_vol_jump != 0.0 {
             let kick = self.economy.vix_selfex_vol_kick;
             let follow = self.params.vix_selfex_kick_follow;
-            if follow != 0.0 {
+            let clawback = self.params.vix_selfex_kick_clawback;
+            if clawback != 0.0 {
+                // The claw-back (round 171.21): land now, withdraw at the
+                // next close whatever the VIX did not confirm.
+                let pending = self.economy.vix_selfex_kick_pending;
+                if pending != 0.0 {
+                    let points = self.economy.vix_selfex_kick_points;
+                    let moved = vix_at_open - self.economy.vix_selfex_kick_vix_ref;
+                    let scale = if self.params.vix_selfex_kick_confirm > 0.0 {
+                        self.params.vix_selfex_kick_confirm
+                    } else {
+                        points
+                    };
+                    let ratio = if scale > 0.0 { (moved / scale).clamp(0.0, 1.0) } else { 0.0 };
+                    let unconfirmed = pending * (1.0 - ratio) * clawback
+                        * (self.params.market_vol_alpha + self.params.market_vol_beta);
+                    if unconfirmed > 0.0 {
+                        self.market_vol.withdraw_variance(unconfirmed);
+                    }
+                }
+                if kick != 0.0 {
+                    self.market_vol.inject_variance(kick);
+                }
+                self.economy.vix_selfex_kick_pending = kick;
+                self.economy.vix_selfex_kick_vix_ref = vix_at_open;
+            } else if follow != 0.0 {
                 // Follow the VIX (round 171.14). Settle the kick staged at
                 // the previous close against the move the market actually
                 // saw between the two opens; then stage this close's kick.

@@ -429,7 +429,14 @@ def _grid(name):
                 "d94k10c20F": cell(0.94, 1.0, 2.0, vix_selfex_kick_follow=1.0),
                 "d94k10F": cell(0.94, 1.0, 0.0, vix_selfex_kick_follow=1.0),
                 "d91k10c20F": cell(0.91, 1.0, 2.0, vix_selfex_kick_follow=1.0),
-                "ovlF05": cell(0.94, 0.0, 0.0, vix_selfex_kick_follow=0.5)}
+                "ovlF05": cell(0.94, 0.0, 0.0, vix_selfex_kick_follow=0.5),
+                # round 171.21: the claw-back form, with ramp 15 (171.21)
+                "ovlC": cell(0.94, 0.0, 0.0, vix_selfex_kick_clawback=1.0, vix_selfex_kick_confirm=1.0),
+                "d94k10c20C": cell(0.94, 1.0, 2.0, vix_selfex_kick_clawback=1.0, vix_selfex_kick_confirm=1.0),
+                "d94k10c20C2": cell(0.94, 1.0, 2.0, vix_selfex_kick_clawback=1.0, vix_selfex_kick_confirm=2.0),
+                "d94k10c20Cr": cell(0.94, 1.0, 2.0, vix_selfex_kick_clawback=1.0, vix_selfex_kick_confirm=1.0, crisis_blend_ramp=15.0),
+                "d94k10c20r": cell(0.94, 1.0, 2.0, crisis_blend_ramp=15.0),
+                "ovlr": cell(0.94, 0.0, 0.0, crisis_blend_ramp=15.0)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):

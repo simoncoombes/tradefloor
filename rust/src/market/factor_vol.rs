@@ -456,6 +456,16 @@ impl MarketVarianceState {
         self.variance += kick;
     }
 
+    /// Withdraw variance a kick injected that the VIX did not confirm
+    /// (round 171.21, the claw-back). Floored at half of each component,
+    /// so a withdrawal can never take the process below a live level.
+    pub fn withdraw_variance(&mut self, amount: f64) {
+        let take = amount.min(0.5 * self.variance).max(0.0);
+        let take_fast = amount.min(0.5 * self.fast_variance).max(0.0);
+        self.fast_variance -= take_fast;
+        self.variance -= take;
+    }
+
     /// Accumulate one tick's market factor into the day's innovation.
     pub fn accumulate(&mut self, market_factor: f64) {
         self.day_factor += market_factor;
