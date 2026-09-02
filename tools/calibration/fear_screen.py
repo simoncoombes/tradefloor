@@ -335,6 +335,24 @@ def _grid(name):
                 "k15": cell(k=1.5),
                 "k10g20": cell(k=1.0, gain=0.20),
                 "r78k10": cell(0.78, k=1.0)}
+    elif name == "persist1":
+        # Round 171 queue item 1: the persistence trade. The overlay's
+        # p504 abs_return_acf5 (0.124 vs a 0.08 ceiling) is the fear
+        # episode's variance outliving the episode; shorten the fear and
+        # excitation half-lives and read P30 against acf5.
+        ovl = {"vix_selfex_gain": 0.25, "vix_selfex_threshold": 1.75,
+               "vix_selfex_size_coupling": 0.5, "vix_decay_ratio": 0.85,
+               "vix_selfex_relax_slope": 0.03, "vix_selfex_min": 2.0,
+               "vix_selfex_scale": 4.0, "vix_selfex_vol_jump": 0.75,
+               "vix_har_weight": 0.18, "vix_har_mid": 0.3, "vix_har_vrp": 1.0}
+        cells = {"v16": {}, "ovl": dict(ovl)}
+        for dcy in (0.94, 0.91, 0.88):
+            for ed in (0.87, 0.80):
+                if dcy == 0.94 and ed == 0.87:
+                    continue
+                cells[f"d{int(dcy * 100)}e{int(ed * 100)}"] = {
+                    **ovl, "vix_selfex_decay": dcy, "vix_selfex_excite_decay": ed}
+        return cells
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):

@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import statistics as st
 import sys
@@ -82,8 +83,15 @@ CRISIS_LEVER_REAL = 6.16
 #: that nothing compares against is a defect waiting for a preset.
 CRISIS_LEVER_TOLERANCE = 0.05
 
-KINDS = ("p252", "p504", "vix5", "vix45", "vix65", "driven",
-         "ho_seeds", "ho_universe")
+#: The held-VIX levels a gate run measures. The three the lever and the
+#: crisis card need are the default; round 171 lets a launch add levels
+#: (GATE_HELD_VIX=5,25,35,45,65) so the model's correlation-state curve
+#: can be read at the real curve's resolution. vix45 must be present:
+#: crisis co-movement is scored from it.
+HELD_VIX = tuple(f"vix{int(float(x))}" for x in
+                 os.environ.get("GATE_HELD_VIX", "5,45,65").split(","))
+assert "vix45" in HELD_VIX and "vix5" in HELD_VIX and "vix65" in HELD_VIX
+KINDS = ("p252", "p504") + HELD_VIX + ("driven", "ho_seeds", "ho_universe")
 
 
 #: The two axes that do not vary with the block seed, and therefore do not
@@ -153,7 +161,7 @@ def verdict(rows_by_kind: dict[str, list]) -> dict:
         if kind == "driven":
             out["driven"] = med
             continue
-        if kind in ("vix5", "vix45", "vix65"):
+        if kind in HELD_VIX:
             out[kind] = {k: med[k] for k in (
                 "sector_excess_corr", "cross_sectional_corr",
                 "excess_kurtosis", "annualised_vol_pct")}
@@ -219,9 +227,8 @@ def main() -> int:
               flush=True)
         jobs += [(label, base, ov, "p252", s) for s in train]
         jobs += [(label, base, ov, "p504", s) for s in train]
-        jobs += [(label, base, ov, "vix5", s) for s in train]
-        jobs += [(label, base, ov, "vix45", s) for s in train]
-        jobs += [(label, base, ov, "vix65", s) for s in train]
+        for held in HELD_VIX:
+            jobs += [(label, base, ov, held, s) for s in train]
         # Six seeds, not thirty: the driven window is one FIXED macro path,
         # so seeds vary only the noise around it, and each run is 505
         # sessions over forty names. Six is enough to median a ratio.

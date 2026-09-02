@@ -396,12 +396,14 @@ def one(job):
         f = facts.measure(seed=seed, universe=_universe(), days=252, model=m)
     elif kind == "p504":
         f = facts.measure(seed=seed, universe=_universe(), days=504, model=m)
-    elif kind in ("vix5", "vix45", "vix65"):
+    elif kind.startswith("vix") and kind[3:].isdigit():
         # The two ENDS as well as the middle: the crisis volatility lever is
         # vol(VIX 65) / vol(VIX 5), the headline number for any
         # crisis preset. A gate that reported only the middle sent every
         # candidate to a separate laptop run to find its lever (§93).
-        held = {"vix5": 5.0, "vix45": 45.0, "vix65": 65.0}[kind]
+        # Round 171: any level — vix25/vix35 give the model's correlation-
+        # state curve at the resolution of the real one (corpus/corrstate6).
+        held = float(kind[3:])
         f = facts.measure(seed=seed, universe=_universe(), days=252,
                           model=m, scenario=Scenario().hold(vix=held))
     elif kind == "driven":
@@ -422,7 +424,7 @@ def summarise(kind: str, rows: list[dict]) -> str:
                 f"{med['ret_sd']:.4f} vs real AAPL {med['real_ret_sd']:.4f} "
                 f"= {med['noise_ratio']:.2f}x; VIX gain {med['vix_beta']:.5f} "
                 f"vs real {med['real_vix_beta']:.5f}")
-    if kind in ("vix5", "vix65"):
+    if kind.startswith("vix") and kind != "vix45":
         return (f"  held VIX {kind[3:]:<3s} ({len(rows)} seeds): vol "
                 f"{med['annualised_vol_pct']:.1f} xs {med['cross_sectional_corr']:.3f}")
     if kind == "vix45":
