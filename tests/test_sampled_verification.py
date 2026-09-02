@@ -9,6 +9,7 @@ behaves the same with the ledger block and without it.
 """
 
 import json
+import re
 import struct
 
 import pytest
@@ -89,26 +90,49 @@ def test_the_two_hashes_agree_on_a_day_that_carries_news():
     )
 
 
-def _moved(value):
-    """The same value, changed, whatever kind of value it is.
+def _nudge(value):
+    """The same float, changed, by flipping the low bit of its pattern.
 
-    A NaN is replaced rather than added to: `nan + 1` is `nan`, so a
-    perturbation written the obvious way would leave `tick_fundamental`
-    untouched before the first tick and the walk below would pass without
-    testing anything.
+    Adding one is the obvious perturbation and it is a no-op on much of what
+    a snapshot carries. Four of the twenty-one generator words reinterpret to
+    doubles at or above 2 ** 53, where `value + 1.0 == value`, so a walk built
+    on addition would report four covered fields as uncovered.
+
+    A NaN is replaced rather than flipped, because flipping one gives another
+    NaN and every NaN writes the same canonical pattern wherever `_f64` is
+    the encoder. `tick_fundamental` is NaN until the first tick.
     """
+    if value != value:
+        return 1.0
+    bits = struct.unpack("<Q", struct.pack("<d", value))[0] ^ 1
+    return struct.unpack("<d", struct.pack("<Q", bits))[0]
+
+
+def _slot(buffer, index):
+    """The same transport buffer with one f64 slot changed."""
+    at = index * 8
+    head = struct.unpack("<d", buffer[at:at + 8])[0]
+    return buffer[:at] + struct.pack("<d", _nudge(head)) + buffer[at + 8:]
+
+
+def _moved(value):
+    """The same value, changed, whatever kind of value it is."""
     if isinstance(value, bool):
         return not value
     if isinstance(value, bytes):
-        head = struct.unpack("<d", value[:8])[0]
-        head = 1.0 if head != head else head + 1.0
-        return struct.pack("<d", head) + value[8:]
+        return _slot(value, 0)
     if isinstance(value, str):
         return value + "x"
     if isinstance(value, float):
-        return 1.0 if value != value else value + 1.0
+        return _nudge(value)
     if isinstance(value, int):
         return value + 1
+    if isinstance(value, dict):
+        # One endogenous news event. Flipping the optional ticker exercises
+        # the presence byte as well as the string behind it.
+        out = dict(value)
+        out["ticker"] = None if out["ticker"] is not None else "ZZZ"
+        return out
     if isinstance(value, list):
         if not value:
             return [{"ticker": "ZZZ", "sector": "technology",
@@ -117,6 +141,52 @@ def _moved(value):
     if value is None:
         return 1.0
     raise AssertionError(f"no perturbation for {type(value).__name__}")
+
+
+def _differs(left, right):
+    """Whether two snapshot values differ, NaN and None included.
+
+    `NaN != NaN`, so a plain comparison reports a difference where there is
+    none. The generator array is the case that matters, since it carries u64
+    bit patterns as floats and several of them reinterpret to NaN.
+    """
+    if left is None or right is None:
+        return left is not right
+    if isinstance(left, float) and isinstance(right, float):
+        return struct.pack("<d", left) != struct.pack("<d", right)
+    if isinstance(left, list) and isinstance(right, list):
+        return (len(left) != len(right)
+                or any(_differs(a, b) for a, b in zip(left, right)))
+    if isinstance(left, dict) and isinstance(right, dict):
+        return (set(left) != set(right)
+                or any(_differs(left[k], right[k]) for k in left))
+    return left != right
+
+
+def _mutations(label, value):
+    """Every one-field change worth making to one snapshot value.
+
+    A list is walked element by element. Walking only the first left twenty
+    of the twenty-one generator words, five of the six variance slots, three
+    of the four GDP-trend points and every news event after the first
+    untested, which is most of what a written list of fields can lose.
+
+    A transport buffer is walked at its first and last slot rather than
+    throughout. It is decoded in one `struct.unpack` against a length the
+    hash computes from the roster, so a read that stopped short raises rather
+    than hashing less, and two slots are the cheap second opinion.
+    """
+    if isinstance(value, bytes):
+        yield f"{label}[0]", _slot(value, 0)
+        last = len(value) // 8 - 1
+        if last > 0:
+            yield f"{label}[{last}]", _slot(value, last)
+    elif isinstance(value, list) and value:
+        for i, element in enumerate(value):
+            yield (f"{label}[{i}]",
+                   value[:i] + [_moved(element)] + value[i + 1:])
+    else:
+        yield label, _moved(value)
 
 
 def _walk(snapshot):
@@ -129,14 +199,16 @@ def _walk(snapshot):
     for key, value in snapshot.items():
         if isinstance(value, dict):
             for inner, inner_value in value.items():
-                mutated = dict(snapshot)
-                mutated[key] = dict(value)
-                mutated[key][inner] = _moved(inner_value)
-                yield f"{key}.{inner}", mutated
+                for label, moved in _mutations(f"{key}.{inner}", inner_value):
+                    mutated = dict(snapshot)
+                    mutated[key] = dict(value)
+                    mutated[key][inner] = moved
+                    yield label, mutated
         else:
-            mutated = dict(snapshot)
-            mutated[key] = _moved(value)
-            yield key, mutated
+            for label, moved in _mutations(key, value):
+                mutated = dict(snapshot)
+                mutated[key] = moved
+                yield label, mutated
 
 
 def test_the_hash_moves_when_any_snapshot_field_moves():
@@ -149,10 +221,10 @@ def test_the_hash_moves_when_any_snapshot_field_moves():
     ledger committing to a state it does not describe, with every day still
     verifying.
 
-    Asserted field by field rather than by comparing two whole snapshots: a
-    single mutation somewhere in eighty-three fields is what a tampered
-    archive looks like, and a test that only moved everything at once would
-    pass while most of them were uncovered.
+    Asserted one field at a time rather than by comparing two whole
+    snapshots. A single change is what a tampered archive looks like, and a
+    walk that moved everything at once would pass while most of the fields
+    it names were uncovered.
     """
     engine = tf.Engine(seed=SEED, universe=UNIVERSE)
     engine.run_days(2, record=False, ticks_per_day=TICKS)
@@ -162,19 +234,55 @@ def test_the_hash_moves_when_any_snapshot_field_moves():
     base = state_hash(snapshot)
 
     fields = list(_walk(snapshot))
-    expected = (len(mf._SNAPSHOT_KEYS) - 3 + len(mf._STATE_HASH_COLUMNS)
-                + len(mf._ECONOMY_KEYS) + len(mf._CENTRAL_BANK_FIELDS))
-    assert len(fields) == expected, (
-        f"the walk covers {len(fields)} fields and the hash declares "
-        f"{expected}. A field was added to the snapshot; place it in the "
-        "hash rather than leaving it out of every leaf."
-    )
+    labels = [label for label, _ in fields]
+    named = {label.split("[")[0] for label in labels}
+    assert {name.split(".")[0] for name in named} == set(mf._SNAPSHOT_KEYS)
+    assert {name.split(".", 1)[1] for name in named
+            if name.startswith("columns.")} == set(mf._STATE_HASH_COLUMNS)
+    assert {name.split(".", 1)[1] for name in named
+            if name.startswith("economy.")} == set(mf._ECONOMY_KEYS)
+    assert {name.split(".", 1)[1] for name in named
+            if name.startswith("central_bank.")} == set(
+                mf._CENTRAL_BANK_FIELDS)
+
+    # The lists, element by element, which is the half a walk loses first.
+    def slots(prefix):
+        return sum(1 for label in labels if label.startswith(prefix))
+
+    assert slots("rng[") == 21
+    assert slots("market_variance[") == 6
+    assert slots("economy.gdp_trend[") == 4
+    assert slots("tickers[") == len(UNIVERSE)
+    assert slots("columns.price[") == 2
 
     unmoved = [label for label, mutated in fields
                if state_hash(mutated) == base]
     assert unmoved == [], (
         f"changing {unmoved} left the leaf unchanged, so the hash does not "
         "cover them. A ledger would commit to a state it does not describe."
+    )
+
+
+def test_every_mutation_the_walk_makes_is_a_real_change():
+    """Guards the guard, and it needs guarding.
+
+    A walk proves nothing unless each of its mutations changes the value it
+    touches. Adding one to a float is the perturbation that looks right and
+    is a no-op on four of the generator words, and a walk built that way
+    would report those four as uncovered while the hash covered them.
+    """
+    engine = tf.Engine(seed=SEED, universe=UNIVERSE)
+    engine.run_days(1, record=False, ticks_per_day=TICKS)
+    snapshot = engine.state_snapshot()
+
+    inert = []
+    for label, mutated in _walk(snapshot):
+        key = label.split("[")[0].split(".")[0]
+        if not _differs(mutated[key], snapshot[key]):
+            inert.append(label)
+    assert inert == [], (
+        f"the walk left {inert} unchanged, so those fields are named by the "
+        "guard above and not tested by it"
     )
 
 
@@ -397,7 +505,7 @@ def test_the_caveats_name_the_sample_and_are_computed():
     _, ledger, manifest = run()
     report = mf.verify(manifest, ledger, 4, seed=7)
     joined = " ".join(report.caveats)
-    assert "4 of 12 days" in joined
+    assert "4 of the 12 days" in joined
     assert f"{report.day_runs} day-runs" in joined
     assert "the recorded tape" in joined
 
@@ -405,6 +513,104 @@ def test_the_caveats_name_the_sample_and_are_computed():
     assert any("rests on no sampling" in caveat for caveat in whole.caveats)
     assert not any("rests on no sampling" in caveat
                    for caveat in report.caveats)
+
+
+def test_the_caveat_says_when_a_day_came_from_construction():
+    """Day 0 has no predecessor, and the caveat has to know it.
+
+    The cost caveat is computed from the sample rather than from whether the
+    ledger carries states at all. Written the other way it said "each sampled
+    day was replayed from its committed predecessor" for a verification of
+    day 0 alone, in which none was.
+    """
+    _, ledger, manifest = run()
+
+    alone = mf.verify(manifest, ledger, 1, seed=12)
+    assert alone.days == (0,) and alone.restored == 0
+    joined = " ".join(alone.caveats)
+    assert "Day 0 has no committed predecessor" in joined
+    assert "committed predecessor. The sample cost" not in joined
+
+    mixed = mf.verify(manifest, ledger, 4, seed=4)
+    assert 0 in mixed.days and mixed.restored == 3
+    joined = " ".join(mixed.caveats)
+    assert "Day 0 has no committed predecessor" in joined
+    assert "The other 3 days started from a committed predecessor" in joined
+
+    without = mf.verify(manifest, ledger, 4, seed=7)
+    assert 0 not in without.days and without.restored == 4
+    assert any("Each sampled day was replayed from its committed predecessor"
+               in caveat for caveat in without.caveats)
+
+
+def test_a_caveat_never_puts_a_number_in_front_of_the_wrong_plural():
+    """These strings are read by a person, so "1 days" is a defect.
+
+    Every count in a caveat goes through `_count`, which is the only reason
+    the singular case reads. Checked at k of 1 because that is where every
+    number in the sentence lands on one.
+    """
+    _, ledger, manifest = run()
+    joined = " ".join(mf.verify(manifest, ledger, 1, seed=12).caveats)
+    for wrong in ("1 days", "1 day-runs", "1 engine ticks"):
+        # Word-bounded: a bare substring test reads "11 days" as "1 days"
+        # and fails on a sentence that is correct.
+        assert not re.search(rf"{wrong}", joined), joined
+    assert "1 day-run" in joined
+
+    plural = " ".join(mf.verify(manifest, ledger, 4, seed=7).caveats)
+    assert "4 day-runs" in plural
+
+
+def test_an_empty_ledger_has_no_root_and_no_proof():
+    """A ledger that crossed no close boundary commits to nothing.
+
+    Refused by name at both entry points. A root over zero leaves would
+    otherwise come out of `_merkle_levels` as an index error, which tells a
+    reader that a list was empty and nothing about what they are holding.
+    """
+    empty = tf.DayLedger()
+    assert empty.count == 0 and len(empty) == 0
+    with pytest.raises(tf.ValidationError, match="holds no days"):
+        empty.root()
+    with pytest.raises(tf.ValidationError, match="outside this ledger"):
+        empty.proof(0)
+    assert "empty" in repr(empty)
+
+
+def test_a_leaf_that_is_not_a_hash_is_refused_on_load():
+    """Every malformed ledger is refused by name, this one included.
+
+    A four-character leaf still hashes into the tree and produces a root, so
+    a ledger holding one verifies against itself and commits to nothing. A
+    non-hex leaf reaches `bytes.fromhex` and raises a bare `ValueError` out
+    of a public reader, which is the one exception shape this module does not
+    otherwise produce.
+    """
+    _, ledger, _ = run(days=5)
+    for bad in ("not-hex", "abababab", "A" * 64, 123, ledger.leaves[0][:63]):
+        payload = json.loads(ledger.to_json(with_snapshots=False))
+        payload["leaves"][2] = bad
+        with pytest.raises(tf.ValidationError, match="leaf 2 of this ledger"):
+            tf.DayLedger.from_json(json.dumps(payload))
+
+    reloaded = tf.DayLedger.from_json(ledger.to_json(with_snapshots=False))
+    assert reloaded.leaves == ledger.leaves
+
+
+def test_a_recorded_run_verifies():
+    """`record=True` is the `run_days` default, so it is the common path.
+
+    The recorded tape is not in a snapshot, so a restored engine starts the
+    day with an empty one and fills it from the day's own sessions. Asserted
+    rather than assumed, because a leaf that depended on the tape would fail
+    here and nowhere else in this file.
+    """
+    engine, ledger, manifest = run(record=True)
+    assert engine.recorded_days == DAYS
+    report = mf.verify(manifest, ledger, DAYS, seed=5)
+    assert report.ok, report.describe()
+    assert report.day_runs == DAYS
 
 
 # --------------------------------------------------------------------------
@@ -517,8 +723,8 @@ def test_reproduce_is_unchanged_with_the_ledger_block_and_without_it():
 
     left = json.loads(with_ledger.to_json())
     right = json.loads(without.to_json())
-    assert set(left) - set(right) == {"days"}
-    del left["days"]
+    assert set(left) - set(right) == {"day_ledger"}
+    del left["day_ledger"]
     assert left == right
     assert left["schema"] == right["schema"] == mf.MANIFEST_SCHEMA
 
@@ -537,8 +743,8 @@ def test_an_edited_ledger_block_is_refused_on_load():
     """The block is presence-checked on the way in, as each part is."""
     _, _, manifest = run()
     payload = json.loads(manifest.to_json())
-    del payload["days"]["count"]
-    with pytest.raises(tf.ValidationError, match="day ledger block"):
+    del payload["day_ledger"]["count"]
+    with pytest.raises(tf.ValidationError, match="day_ledger block"):
         tf.RunManifest.from_json(json.dumps(payload))
 
 
@@ -636,7 +842,7 @@ def test_a_session_closed_day_ledgers_like_an_explicit_close():
 
 
 def test_a_run_that_lists_and_delists_still_verifies():
-    """A roster that changes mid-run reaches the shape its snapshot was taken at.
+    """A roster that changes mid-run reaches its snapshot's shape.
 
     `restore_state` refuses a snapshot whose tickers are not the engine's,
     because the columns are positional. A verifier that built a fresh engine
@@ -692,7 +898,8 @@ def test_a_world_ledgers_every_day_it_runs():
     assert ledger.leaves[-1] == world.engine.state_hash()
 
     log = world.engine.order_log
-    assert log[0]["op"] == "pin_macro" and log[1]["op"] == "open_market", (
+    assert [entry["op"] for entry in log[:2]] == ["pin_macro",
+                                                  "open_market"], (
         "the world writes its macro path before the open, which is the case "
         "the day segment has to cover"
     )

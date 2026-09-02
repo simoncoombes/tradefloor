@@ -1903,6 +1903,15 @@ impl PyEngine {
     /// order log, the recorded tape and the pending daily jump are outside
     /// it, exactly as they are outside the snapshot.
     ///
+    /// One difference is worth knowing before two runs are compared.
+    /// `run_session` with `close_at_end` leaves this binding's session flag
+    /// set where `close_market` clears it, so the two spellings of one close
+    /// hash apart on a market that is otherwise identical to the bit. The
+    /// flag is state rather than bookkeeping: it decides whether the next
+    /// session re-opens the day and re-anchors `previous_close`. A recorded
+    /// run still verifies against itself either way, because a replay runs
+    /// the spelling its own log holds.
+    ///
     /// `tradefloor.manifest.state_hash(engine.state_snapshot())` computes
     /// the same digest in Python, and a test holds the two equal.
     fn state_hash(&self) -> String {

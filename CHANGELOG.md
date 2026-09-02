@@ -23,8 +23,9 @@ On `Universe.random(8, seed=99)`, seed 42, twelve days at 30 ticks a day,
 verifying k days runs k days of ticks and no more, for k of 1, 3 and 12.
 The whole run is 360 ticks, so a four-day verification is a third of what
 replaying it costs. A ledger written without the states reaches day d by
-running to it, so three sampled days cost 31 day-runs, and `Verification`
-reports which of the two was paid along with the days it drew.
+running to it, so a sample costs the sum of d plus one over the days it
+drew, which the verify seed decides. `Verification` reports the days, the
+day-runs and which of the two costs was paid.
 
 ### The ledger size
 

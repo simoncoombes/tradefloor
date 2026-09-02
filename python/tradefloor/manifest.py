@@ -371,6 +371,15 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     the same, which is the property that lets a replayed day be checked
     against a recorded one.
 
+    One difference is worth knowing before two runs are compared.
+    ``run_session(close_at_end=True)`` leaves the binding's session flag set
+    where ``close_market()`` clears it, so the two spellings of one close
+    hash apart on a market that is otherwise identical to the bit. The flag
+    is state rather than bookkeeping: it decides whether the next session
+    re-opens the day and re-anchors ``previous_close``. A recorded run still
+    verifies against itself either way, because a replay runs the spelling
+    its own log holds.
+
     ## The encoding
 
     Every float is eight bytes big-endian with one canonical NaN pattern, the
@@ -621,6 +630,23 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
                    "tick_anchor", "volume_idio")
 
 
+#: The characters a leaf may be built from. A state hash is lowercase hex,
+#: which is what `hashlib.hexdigest` produces and what `bytes.fromhex` will
+#: take without complaint on either case.
+_HEX = frozenset("0123456789abcdef")
+
+
+def _is_leaf(value: Any) -> bool:
+    """Whether this is a state hash rather than something that resembles one.
+
+    64 lowercase hex characters. Anything shorter still enters the tree and
+    produces a root, so a ledger holding one would verify against itself and
+    commit to nothing.
+    """
+    return (isinstance(value, str) and len(value) == 64
+            and _HEX.issuperset(value))
+
+
 def _merkle_levels(leaves: Sequence[str]) -> list[list[bytes]]:
     """Every level of the tree, leaves first, root last.
 
@@ -805,7 +831,8 @@ class DayLedger:
         Refuses a hash version this build does not compute, by name: a leaf
         from another version of the state hash is a different measurement,
         and checking a day against one would report a tampered day that is
-        not.
+        not. Refuses a leaf that is not 64 lowercase hex characters, by
+        position, for the reason :func:`_is_leaf` gives.
         """
         try:
             payload = json.loads(text)
@@ -832,9 +859,19 @@ class DayLedger:
                 f"computes {STATE_HASH_VERSION!r}. The two are different "
                 "measurements, so every day would report as tampered."
             )
+        leaves = list(payload["leaves"])
+        for position, leaf in enumerate(leaves):
+            if not _is_leaf(leaf):
+                raise ValidationError(
+                    f"leaf {position} of this ledger is {leaf!r}, which is "
+                    "not a state hash: a leaf is 64 lowercase hex "
+                    "characters. A shorter one still hashes into the tree "
+                    "and produces a root, so the file is refused here rather "
+                    "than checked against."
+                )
         raw = payload.get("snapshots")
         ledger = cls(snapshots=raw is not None)
-        ledger.leaves = [str(leaf) for leaf in payload["leaves"]]
+        ledger.leaves = leaves
         if raw is not None:
             if len(raw) != len(ledger.leaves):
                 raise ValidationError(
@@ -1066,7 +1103,7 @@ class RunManifest:
                     "leaf is taken at a close boundary and this run crossed "
                     "none."
                 )
-            doc["days"] = {
+            doc["day_ledger"] = {
                 "root": ledger.root(),
                 "count": ledger.count,
                 "hash": STATE_HASH_VERSION,
@@ -1230,18 +1267,19 @@ class RunManifest:
                 "individually: the seed was edited in transit."
             )
 
-        days = payload.get("days")
-        if days is not None:
+        block = payload.get("day_ledger")
+        if block is not None:
             # Shape only. An unknown hash version is left for `verify` to
             # refuse by name, because a manifest whose leaves this build
             # cannot recompute still reproduces: the ledger is additive and
             # `reproduce()` never reads it.
-            if not isinstance(days, dict) or set(days) != {"root", "count",
-                                                           "hash"}:
+            if not isinstance(block, dict) or set(block) != {"root", "count",
+                                                             "hash"}:
                 raise ValidationError(
-                    "this manifest's day ledger block is not the three fields "
-                    "it should carry (root, count, hash). It was edited in "
-                    "transit, or written by something that is not tradefloor."
+                    "this manifest's day_ledger block is not the three "
+                    "fields it should carry (root, count, hash). It was "
+                    "edited in transit, or written by something that is not "
+                    "tradefloor."
                 )
 
         return cls(payload)
@@ -1541,16 +1579,17 @@ class RunManifest:
     def day_ledger(self) -> dict[str, Any] | None:
         """The run's per-day commitment, or ``None`` when it has none.
 
-        ``{"root": <Merkle root>, "count": <days>, "hash": "state/1"}``, read
-        from the document's ``days`` key. Named apart from
+        ``{"root": <Merkle root>, "count": <days>, "hash": "state/1"}``,
+        under the document's ``day_ledger`` key. Named apart from
         ``result["days"]``, which is the number of days the run traded: one
-        is a count and the other is a commitment, and a reader should not
-        have to work out which ``days`` they are holding.
+        is a count and the other is a commitment, and a document that
+        answered to ``days`` twice at two levels would make a reader work
+        out which one they had opened.
 
         :func:`verify` pairs this with a :class:`DayLedger` and recomputes a
         sample of the days it commits to.
         """
-        recorded = self._doc.get("days")
+        recorded = self._doc.get("day_ledger")
         return dict(recorded) if recorded else None
 
     @property
@@ -1784,6 +1823,16 @@ def _sample_days(count: int, k: int, seed: int) -> list[int]:
     return sorted(pool[:k])
 
 
+def _count(n: int, noun: str) -> str:
+    """``1 day``, ``3 days``. A caveat is read by a person.
+
+    Written out because these strings are UI copy under `CONTENT.md`, and
+    "1 days cost 1 day-runs" is the shape a caveat takes when a number is
+    interpolated in front of a hardcoded plural.
+    """
+    return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
+
+
 class Verification:
     """What a sampled verification measured, and over what.
 
@@ -1794,11 +1843,11 @@ class Verification:
     the failure to end the program.
     """
 
-    __slots__ = ("days", "k", "count", "ticks", "day_runs", "failures",
-                 "from_snapshots", "root", "_wrote", "_here")
+    __slots__ = ("days", "k", "count", "ticks", "day_runs", "restored",
+                 "failures", "from_snapshots", "root", "_wrote", "_here")
 
     def __init__(self, *, days: Sequence[int], count: int, ticks: int,
-                 day_runs: int, failures: Sequence[str],
+                 day_runs: int, restored: int, failures: Sequence[str],
                  from_snapshots: bool, root: str,
                  wrote: str, here: str) -> None:
         self.days = tuple(days)
@@ -1806,6 +1855,10 @@ class Verification:
         self.count = int(count)
         self.ticks = int(ticks)
         self.day_runs = int(day_runs)
+        #: Sampled days that started from a committed predecessor. Day 0 has
+        #: none and replays from construction, so a sample that drew it is
+        #: short of k here even on a ledger that carries every state.
+        self.restored = int(restored)
         self.failures = tuple(failures)
         self.from_snapshots = bool(from_snapshots)
         self.root = root
@@ -1825,30 +1878,41 @@ class Verification:
         span the hash covers. A caveat typed into this docstring would go on
         being printed after the thing it describes had changed.
         """
-        out = [
-            f"This verification recomputed {self.k} of {self.count} days on "
-            f"this build. The other {self.count - self.k} days are covered "
-            "by their leaf's membership in the root, which records what was "
-            "committed at each position."
-        ]
         if self.k == self.count:
+            out = [
+                "This verification recomputed every one of the "
+                f"{_count(self.count, 'day')} in the ledger on this build, "
+                "so the result rests on no sampling."
+            ]
+        else:
+            out = [
+                f"This verification recomputed {self.k} of the "
+                f"{_count(self.count, 'day')} in the ledger on this build. "
+                f"The root covers the other "
+                f"{_count(self.count - self.k, 'day')}, recording the leaf "
+                "committed at each position."
+            ]
+        cost = (f"The sample cost {_count(self.day_runs, 'day-run')} and "
+                f"{_count(self.ticks, 'engine tick')}.")
+        if not self.from_snapshots:
             out.append(
-                "Every day in the ledger was recomputed, so the result rests "
-                "on no sampling."
+                "This ledger carries no snapshots, so each sampled day was "
+                f"replayed from day 0. {cost} A ledger written with "
+                "snapshots costs one day-run per sampled day."
             )
-        if self.from_snapshots:
+        elif self.restored == self.k:
+            out.append("Each sampled day was replayed from its committed "
+                       f"predecessor. {cost}")
+        elif self.restored == 0:
             out.append(
-                f"Each sampled day was replayed from its committed "
-                f"predecessor, so {self.k} days cost {self.day_runs} "
-                f"day-runs and {self.ticks} engine ticks."
+                "Day 0 has no committed predecessor, so the sample was "
+                f"replayed from construction. {cost}"
             )
         else:
             out.append(
-                f"This ledger carries no snapshots, so each sampled day was "
-                f"replayed from day 0. The {self.k} days cost "
-                f"{self.day_runs} day-runs and {self.ticks} engine ticks; a "
-                f"ledger written with snapshots costs one day-run per "
-                f"sampled day."
+                "Day 0 has no committed predecessor and was replayed from "
+                f"construction. The other {_count(self.restored, 'day')} "
+                f"started from a committed predecessor. {cost}"
             )
         out.append(
             "The leaf hashes engine state. The order log, the recorded tape "
@@ -1889,7 +1953,9 @@ class Verification:
             f"sampled verification {verdict}: {self.k} of {self.count} days, "
             f"root {self.root[:12]}...",
             f"  days: {', '.join(str(d) for d in self.days)}",
-            f"  cost: {self.day_runs} day-runs, {self.ticks} engine ticks",
+            f"  cost: {_count(self.day_runs, 'day-run')}, "
+            f"{_count(self.ticks, 'engine tick')}, "
+            f"{self.restored} restored from a predecessor",
         ]
         for failure in self.failures:
             lines.append(f"  FAILED {failure}")
@@ -1930,6 +1996,14 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
     length of the run. A ledger without snapshots reaches day d - 1 by
     running to it, so day d costs d + 1 days, and
     :attr:`Verification.day_runs` reports which of the two was paid.
+    :attr:`Verification.restored` counts the sampled days that started from a
+    committed predecessor, which is every one of them except day 0.
+
+    The unit is day-runs and engine ticks, and it is exact in those units.
+    A replayed day carries an overhead a live one does not, since it goes
+    through the Python operation table and, for a day after the first, a
+    state restore. ``reproduce()`` carries the same overhead over the same
+    log.
 
     ## What it cannot say
 
@@ -1945,7 +2019,7 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
     """
     manifest._check_era()
 
-    recorded = manifest._doc.get("days")
+    recorded = manifest._doc.get("day_ledger")
     if recorded is None:
         raise ValidationError(
             "this manifest carries no day ledger, so there is nothing to "
@@ -1995,6 +2069,7 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
     model = manifest._model_for_replay()
     ticks = 0
     day_runs = 0
+    restored = 0
 
     for day in chosen:
         engine = Engine(seed=manifest.seed, universe=universe,
@@ -2014,6 +2089,7 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
                 apply_log(engine, shape)
             engine.restore_state(ledger.snapshots[day - 1])
             day_runs += 1
+            restored += 1
         else:
             start, end = 0, spans[day][1]
             day_runs += day + 1
@@ -2042,7 +2118,8 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
     wrote = manifest.written_by.get("platform") or {}
     return Verification(
         days=chosen, count=ledger.count, ticks=ticks, day_runs=day_runs,
-        failures=failures, from_snapshots=ledger.snapshots is not None,
+        restored=restored, failures=failures,
+        from_snapshots=ledger.snapshots is not None,
         root=root,
         wrote=f"{wrote.get('os')}-{wrote.get('machine')}",
         here=f"{_platform.system()}-{_platform.machine()}",
