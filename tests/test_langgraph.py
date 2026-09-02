@@ -843,7 +843,11 @@ def test_a_fork_shares_the_graph_and_keeps_the_hooks():
     assert type(twin) is LangGraphAdapter
     assert twin.runnable is graph
     assert twin.output_parser is parse
-    assert twin.input_builder is agent.input_builder
+    # Not `twin.input_builder is agent.input_builder`: the default builder
+    # is bound to `self.renderer`, so each arm gets its OWN bound method --
+    # what actually has to match is the renderer it is bound to, which is
+    # `self.renderer` for both, since fork_kwargs() carries it through.
+    assert twin.renderer is agent.renderer
     assert twin.thread_id == "pinned"
     assert twin.config == {"tags": ["mine"]}
     assert twin.arm == "control"

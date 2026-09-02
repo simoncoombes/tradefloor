@@ -148,6 +148,7 @@ from .harness import Observation, session_clock
 from .manifest import RunManifest, market_digest
 from .portfolio import Portfolio
 from .interventions import Intervention
+from .render import Renderer
 from .scenario import Scenario
 from .universe_util import fingerprint_of
 
@@ -1954,3 +1955,265 @@ def resample(control: World, treatment: World, *, at: int | None = None,
     return Resample(at=at, n=n, control=left, treatment=right, noise=noise,
                     separation=separation, identical_inputs=not differing,
                     differing_lines=differing, intervened_fields=touched)
+
+
+# ---------------------------------------------------------------------------
+# Observation invariance: the same world, shown differently
+# ---------------------------------------------------------------------------
+
+
+class Invariance:
+    """How much a decision changed because the market changed, against how
+    much it changed because the market was described differently.
+
+    :func:`invariance` forks one world once per renderer, runs each fork
+    the same number of days under the same agent, and reports two things
+    side by side: :attr:`presentation`, the first step at which any two
+    renderers' arms came apart, and :attr:`floor`, the same agent's own
+    noise on one renderer's identical, repeated input. A presentation
+    effect smaller than the floor is not a finding; it is the agent
+    answering the same question twice, the way :func:`resample` already
+    reads a between-arm gap against a within-arm one.
+
+    It cannot say a difference is a defect. An agent may read basis points
+    more reliably than dollars, or a compact table better than nine lines a
+    name. :attr:`presentation` says where two renderings first diverged and
+    what diverged -- the decision, the orders, the resulting prices, the
+    portfolio -- not which renderer was right.
+    """
+
+    __slots__ = ("renderers", "days", "decisions", "presentation", "floor")
+
+    def __init__(self, *, renderers: Sequence[str], days: int,
+                decisions: dict[str, list], presentation: list[Comparison],
+                floor: "Resample | None") -> None:
+        #: The renderer keys :func:`invariance` was called with, in the
+        #: order given. `presentation`'s pairs and `decisions`' keys both
+        #: name renderers from this list.
+        self.renderers = list(renderers)
+        self.days = days
+        #: Per renderer key, the decision published at every post-fork
+        #: step (`None` on a step the agent was not asked). The shared
+        #: pre-fork history is left out: every arm ran it identically by
+        #: construction, so it says nothing about presentation.
+        self.decisions = decisions
+        #: One :class:`Comparison` per pair of renderers, control and
+        #: treatment ordered as they appear in :attr:`renderers`. Its
+        #: :attr:`~Comparison.divergence` is a :class:`Divergence` whose
+        #: `intervention_step` and `intervention_day` are always `None`
+        #: here -- nothing was intervened on, only shown differently --
+        #: and whose `decision`, `orders`, `prices` and `portfolio` are
+        #: the steps this experiment is about.
+        self.presentation = list(presentation)
+        #: :func:`resample` between two forks of the SAME renderer
+        #: (`renderers[0]`), or `None` when `invariance` was called with
+        #: `floor=False`. Its `identical_inputs` is always True: nothing
+        #: was intervened on here either, and the whole point is a
+        #: between-arm gap measured on one unchanging question.
+        self.floor = floor
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "renderers": list(self.renderers),
+            "days": self.days,
+            "decisions": copy.deepcopy(self.decisions),
+            "presentation": [c.as_dict() for c in self.presentation],
+            "floor": None if self.floor is None else self.floor.as_dict(),
+        }
+
+    def table(self) -> Any:
+        """One row per pair of renderers, where their arms first came
+        apart, as a :class:`pyarrow.Table`.
+
+        Columns: `renderer_a`, `renderer_b`, `fork_agreed` (whether
+        :func:`agree` found the two arms identical at the fork, before
+        either renderer had rendered a step), and the first post-fork step
+        at which `decision`, `orders`, `prices` and `portfolio` diverged,
+        `None` where they never did over :attr:`days` days.
+
+        Lazily imports `pyarrow`, a TEST and TOOLING dependency the library
+        itself does not carry; see `tests/test_arrow.py`.
+        """
+        try:
+            import pyarrow as pa
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError(
+                "Invariance.table() needs pyarrow. Install it with: "
+                "pip install pyarrow"
+            ) from exc
+
+        rows = []
+        for comparison in self.presentation:
+            d = comparison.divergence
+            rows.append({
+                "renderer_a": comparison.control.get("label", ""),
+                "renderer_b": comparison.treatment.get("label", ""),
+                "fork_agreed": (None if comparison.agreement is None
+                               else comparison.agreement.identical),
+                "decision_diverges_at": d.decision,
+                "orders_diverge_at": d.orders,
+                "prices_diverge_at": d.prices,
+                "portfolio_diverges_at": d.portfolio,
+            })
+        if not rows:
+            # Unreachable through `invariance()`, which refuses fewer than
+            # two renderers and so always produces at least one pair; only
+            # a caller constructing `Invariance` by hand with an empty
+            # `presentation` can reach this. `pa.table([])` cannot infer a
+            # schema from nothing, so the columns are named explicitly
+            # rather than left for the caller to discover by failing.
+            schema = pa.schema([
+                ("renderer_a", pa.string()), ("renderer_b", pa.string()),
+                ("fork_agreed", pa.bool_()),
+                ("decision_diverges_at", pa.int64()),
+                ("orders_diverge_at", pa.int64()),
+                ("prices_diverge_at", pa.int64()),
+                ("portfolio_diverges_at", pa.int64()),
+            ])
+            return pa.table(
+                {name: [] for name in schema.names}, schema=schema)
+        return pa.Table.from_pylist(rows)
+
+    def render(self) -> str:
+        out = [f"  invariance over {self.days} days, "
+              f"{len(self.renderers)} renderers: "
+              + ", ".join(self.renderers)]
+        out.append("")
+        for comparison in self.presentation:
+            left = comparison.control.get("label", "control")
+            right = comparison.treatment.get("label", "treatment")
+            d = comparison.divergence
+            agreed = ("agreed at the fork" if (comparison.agreement is None
+                      or comparison.agreement.identical)
+                      else "DID NOT AGREE at the fork")
+            out.append(f"  {left} vs {right}, {agreed}")
+            out.append(d.render())
+            out.append("")
+        if self.floor is not None:
+            out.append("  the agent's own noise floor, on "
+                       f"{self.renderers[0]!r} asked twice more:")
+            out.append(self.floor.render())
+        return "\n".join(out)
+
+    def __repr__(self) -> str:
+        return (f"Invariance({len(self.renderers)} renderers, "
+                f"{len(self.presentation)} pairs, "
+                f"floor={'measured' if self.floor is not None else None})")
+
+
+def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
+               floor: bool = True) -> Invariance:
+    """Fork `world` once per renderer, run each `days` days, and report how
+    much the agent's decisions moved.
+
+    ```python
+    from tradefloor.render import TextRenderer, JSONRenderer
+
+    report = invariance(
+        world, [TextRenderer(units="usd"), TextRenderer(units="bps"),
+               JSONRenderer()],
+        days=10)
+    print(report.render())
+    ```
+
+    Each renderer gets its own fork of `world`, taken in one call to
+    :meth:`World.fork` so every arm shares identical pre-fork state, and
+    its own copy of `world.agent` with `renderer` replaced -- everything
+    else about the agent (its framework, its instructions, its cadence)
+    stays what `world` was already running. `world.agent` must carry a
+    `renderer` attribute, which every adapter under
+    `tradefloor.integrations` does; a plain policy with no rendering step
+    has nothing for this function to vary.
+
+    `floor`, true by default, forks one more arm under `renderers[0]` --
+    the first renderer, taken as the reference -- and calls
+    :func:`resample` between it and the `renderers[0]` arm above, asking
+    the agent's own first post-fork decision again several times. Both
+    arms saw identical input, so the resulting gap is the agent's own
+    noise and nothing else, which is what :attr:`Invariance.floor`
+    measures a presentation effect against. Set it false to skip the extra
+    fork and the extra calls.
+
+    Raises :class:`~tradefloor._core.ValidationError` on fewer than two
+    renderers, on two renderers sharing a :meth:`~.Renderer.key`, or on an
+    agent with no `renderer` attribute, all at the call, before anything
+    runs.
+    """
+    if len(renderers) < 2:
+        raise ValidationError(
+            f"invariance needs at least 2 renderers to compare, got "
+            f"{len(renderers)}. One renderer has nothing to be invariant "
+            "against.")
+    if not hasattr(world.agent, "renderer"):
+        raise ValidationError(
+            f"{type(world.agent).__name__} has no `renderer` attribute, so "
+            "there is nothing for invariance() to vary between forks. "
+            "FinRobotAdapter, LangGraphAdapter, PydanticAIAdapter and "
+            "OpenAIAgentsAdapter all carry one; a hand-written policy or "
+            "CallableAgentAdapter renders nothing and is not a subject for "
+            "this experiment.")
+
+    keys = [r.key() for r in renderers]
+    if len(set(keys)) != len(keys):
+        raise ValidationError(
+            f"renderers must have distinct keys, got {keys}. invariance "
+            "reports one column per renderer, and two sharing a key would "
+            "be reported, and forked, as one.")
+
+    labels = list(keys)
+    if floor:
+        floor_label = f"{keys[0]} (floor)"
+        while floor_label in labels:
+            floor_label += " (floor)"
+        labels = labels + [floor_label]
+
+    forks = world.fork(*labels)
+    for fork_world, renderer in zip(forks, renderers):
+        fork_world.agent.renderer = renderer
+    if floor:
+        forks[-1].agent.renderer = renderers[0]
+
+    renderer_forks = forks[:len(keys)]
+    # Every pairwise agreement, taken HERE -- right after the fork and the
+    # renderer swap, before any arm has run a step. `agree()` is only proof
+    # of an identical start if nothing has happened yet; called after
+    # `run()` it would report the divergence this function exists to
+    # measure as a failed fork, which is a different and wrong story.
+    agreements = {}
+    for i in range(len(renderer_forks)):
+        for j in range(i + 1, len(renderer_forks)):
+            agreements[(i, j)] = agree(renderer_forks[i], renderer_forks[j])
+    floor_agreement = (agree(forks[0], forks[-1]) if floor else None)
+
+    for fork_world in forks:
+        fork_world.run(days=days)
+
+    decisions = {
+        key: [row["decision"]
+             for row in fork_world.trace[fork_world.fork_step:]]
+        for key, fork_world in zip(keys, renderer_forks)
+    }
+
+    presentation = []
+    for i in range(len(renderer_forks)):
+        for j in range(i + 1, len(renderer_forks)):
+            a, b = renderer_forks[i], renderer_forks[j]
+            presentation.append(compare(a, b, agreement=agreements[(i, j)]))
+
+    # `Resample` carries no `agreement` slot of its own -- `resample()`
+    # takes two already-forked worlds and has never needed one, because it
+    # is normally called on arms whose fork already had a `Comparison` to
+    # attach to. Here the check is worth making anyway, since a floor
+    # resting on a fork that was not actually identical would understate
+    # itself, but the finding belongs in the error a caller would see, not
+    # in a field bolted onto a type this package does not own.
+    if floor and not floor_agreement.identical:
+        raise ValidationError(
+            f"the two forks built for the noise floor disagree at the "
+            f"fork: {floor_agreement.differences}. This should not happen "
+            "-- World.fork() is meant to guarantee an identical start -- "
+            "and a floor measured past it would not be pure agent noise.")
+    floor_result = (resample(forks[0], forks[-1]) if floor else None)
+
+    return Invariance(renderers=keys, days=days, decisions=decisions,
+                      presentation=presentation, floor=floor_result)

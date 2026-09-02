@@ -168,6 +168,7 @@ from typing import Any, Sequence
 
 from .._core import ValidationError
 from ..counterfactual import MACRO_FIELDS
+from ..render import Renderer, TextRenderer
 from .common import (AdapterInfo, FrameworkError, IntegrationError,
                      MissingDependencyError)
 from .common import DecisionError as _CommonDecisionError
@@ -1156,6 +1157,20 @@ class FinRobotAdapter:
     EXPERIMENT and must be chosen before the run: :meth:`state` publishes it
     so :func:`tradefloor.agree` checks both arms carry the same one, and
     :meth:`fork` copies it.
+
+    ``renderer`` is what turns the observation into the text FinRobot reads,
+    in place of the ``detail=`` argument :func:`observe` and :func:`render`
+    took directly until this argument existed. Left at ``None``, it defaults
+    to ``TextRenderer(detail=panel or None)`` -- a renderer that reproduces
+    this adapter's own historical text character for character, which is
+    what lets the shipped fixtures keep replaying. Pass a
+    :class:`~tradefloor.render.Renderer` of your own -- another
+    :class:`~tradefloor.render.TextRenderer` with different ``units``,
+    ``order`` or ``language``, or a :class:`~tradefloor.render.JSONRenderer`
+    -- to change what FinRobot is shown without changing ``panel`` or any
+    other argument here. :meth:`fork` copies whichever renderer this
+    instance holds, and :meth:`state` publishes its :meth:`~.Renderer.key`
+    so two arms built by hand cannot silently disagree about it.
     """
 
     def __init__(self, *, mode: str = "replay",
@@ -1170,6 +1185,7 @@ class FinRobotAdapter:
                  every: int = 6,
                  max_participation: float = MAX_PARTICIPATION,
                  panel: Sequence[str] = (),
+                 renderer: Renderer | None = None,
                  arm: str = "", info: AdapterInfo | None = None) -> None:
         if mode not in ("replay", "live"):
             raise ValidationError(
@@ -1220,6 +1236,13 @@ class FinRobotAdapter:
         #: holds. Sorted and frozen on construction so a caller cannot
         #: change one arm's panel after the fork.
         self.panel: tuple[str, ...] = tuple(sorted({str(s) for s in panel}))
+        #: What turns the observation into text. Built from ``panel`` when
+        #: nobody passed one, so the default reproduces this adapter's own
+        #: history -- see the class docstring -- and stays a real object on
+        #: every path, including the default one, because :meth:`provenance`
+        #: and :meth:`state` both publish its :meth:`~.Renderer.key`.
+        self.renderer: Renderer = (renderer if renderer is not None
+                                   else TextRenderer(detail=panel or None))
         self.arm = arm
 
         #: Prices this adapter has been shown, oldest first. The agent's own
@@ -1304,6 +1327,11 @@ class FinRobotAdapter:
             # every shipped fixture starts claiming a field it never
             # carried.
             out["detail_panel"] = list(self.panel)
+        # Always, unlike `detail_panel`: every recording this adapter has
+        # ever made was rendered by SOME configuration, the pre-`renderer`
+        # ones included, and `TextRenderer(detail=panel or None)` names that
+        # configuration exactly. See `render.Renderer.key`.
+        out["renderer"] = self.renderer.key()
         return out
 
     # -- the agent protocol ----------------------------------------------
@@ -1325,9 +1353,16 @@ class FinRobotAdapter:
 
         payload = observe(obs, history=self.history,
                           fundamentals=self.fundamentals,
-                          max_participation=self.max_participation,
-                          detail=self._detail(obs))
-        prompt = render(payload, objective=self.objective)
+                          max_participation=self.max_participation)
+        # `self.renderer` decides which symbols get a full block: its
+        # `detail` was the standing panel at construction, and it unions
+        # that with whatever `payload["assets"][i]["position"]` says is
+        # held right now -- see `TextRenderer`. `observe` above builds the
+        # same allowlisted payload for every renderer; nothing about
+        # rendering choices reaches it.
+        body = self.renderer.render(payload)
+        prompt = (f"{body}\n\nObjective\n---------\n{self.objective}"
+                 if self.objective else body)
         key = digest(prompt)
         try:
             response = self._ask(prompt, key, obs)
@@ -1377,24 +1412,6 @@ class FinRobotAdapter:
         })
         return orders
 
-    def _detail(self, obs: Any) -> list[str] | None:
-        """Which symbols get a full block this step, or None for all of them.
-
-        Every name the book holds, plus the standing panel. Held names are
-        in it unconditionally: an agent asked to manage a position it cannot
-        see the bid, the volatility or the order cap for is being asked a
-        different question from the one the other arm gets, and which names
-        are held diverges after the fork.
-
-        The panel does not. It is fixed before the run and identical in both
-        arms, which :meth:`state` publishes so :func:`tradefloor.agree`
-        checks it at the fork.
-        """
-        if not self.panel:
-            return None
-        held = [t for t in obs.tickers if obs.position(t)]
-        return sorted(set(self.panel).union(held))
-
     def decision(self) -> dict[str, Any] | None:
         """The last validated decision, as ``World`` records it every step.
 
@@ -1423,6 +1440,14 @@ class FinRobotAdapter:
             # Two arms running different panels would be answering different
             # questions, and nothing else in this dictionary would say so.
             "panel": list(self.panel),
+            # The renderer's identity, not the panel's, is what actually
+            # decided the text -- two arms could carry the same panel and
+            # different `units` or `order` and answer different questions
+            # with `panel` alone reporting them identical. Named `renderer`
+            # rather than `renderer_key`: the credential scan every adapter's
+            # published state runs through treats a trailing `key` as one,
+            # correctly, for the fields that usually end that way.
+            "renderer": self.renderer.key(),
             "mandate_version": MANDATE_VERSION,
         }
 
@@ -1450,7 +1475,7 @@ class FinRobotAdapter:
             fundamentals=self.fundamentals, objective=self.objective,
             mandate=self.mandate, agent_config=self.agent_config,
             every=self.every, max_participation=self.max_participation,
-            panel=self.panel, arm=self.arm,
+            panel=self.panel, renderer=self.renderer, arm=self.arm,
             # Passed rather than left to rebuild. It rebuilds identically
             # from the arguments above, but a caller who supplied their own
             # `info` would silently lose it in both arms.

@@ -149,6 +149,7 @@ import json
 from typing import Any, Callable
 
 from .._core import ValidationError
+from ..render import JSONRenderer, Renderer
 from .common import (DECISION_SCHEMA_VERSION, MAX_PARTICIPATION, AdapterInfo,
                      Decision, DecisionError, FrameworkAdapter,
                      FrameworkError, MissingDependencyError, Transcript,
@@ -526,6 +527,7 @@ class LangGraphAdapter(FrameworkAdapter):
                  input_builder: Callable[[dict[str, Any]], Any] | None = None,
                  output_parser: Callable[[Any], Any] | None = None,
                  instructions: str = INSTRUCTIONS,
+                 renderer: Renderer | None = None,
                  config: dict[str, Any] | None = None,
                  thread_id: str | Callable[[Any], str] | None = None,
                  info: AdapterInfo | None = None, every: int = 6,
@@ -553,11 +555,35 @@ class LangGraphAdapter(FrameworkAdapter):
         self.prior = check_prior(
             prior, mode=mode, recorder=recorder,
             instructions_digest=self.info.instructions_digest)
-        self.input_builder = input_builder or default_input_builder
+        #: The caller's own builder, or `None`. Kept apart from
+        #: `input_builder` below so :meth:`fork_kwargs` can tell "nobody
+        #: passed one" from "the default was resolved and stored" -- the
+        #: default is now bound to `self.renderer`, and passing the BOUND
+        #: method through a fork would leave the twin calling the parent's
+        #: renderer forever, which is the one thing a fork must not do.
+        self._custom_input_builder = input_builder
+        self.input_builder = input_builder or self._default_input_builder
         self.output_parser = output_parser or default_output_parser
         self.instructions = instructions
+        #: What turns the payload into the text half of the graph input and
+        #: of the record. Defaults to :class:`~tradefloor.render.JSONRenderer`,
+        #: which reproduces this adapter's own historical body -- sorted,
+        #: indented JSON -- character for character; see :meth:`_render_prompt`.
+        self.renderer: Renderer = renderer if renderer is not None else JSONRenderer()
         self.config = dict(config) if config else None
         self.thread_id = thread_id
+
+    def provenance(self) -> dict[str, Any]:
+        """The base's provenance, plus which renderer produced the text.
+
+        Every other field the base already carries -- the framework, the
+        cadence, the participation cap -- describes what ran; this is the
+        one that says how the market was shown, and it is what
+        :func:`~tradefloor.render.Renderer.key` names.
+        """
+        out = super().provenance()
+        out["renderer"] = self.renderer.key()
+        return out
 
     # -- the one framework-specific method --------------------------------
 
@@ -577,7 +603,7 @@ class LangGraphAdapter(FrameworkAdapter):
         assembled and correctly misses when the market or the mandate
         moved.
         """
-        prompt = render(payload, instructions=self.instructions)
+        prompt = self._render_prompt(payload)
         key = digest(prompt)
         self.record_exchange(prompt, key=key)
 
@@ -620,6 +646,37 @@ class LangGraphAdapter(FrameworkAdapter):
             })
             stamp_resume_counts(self.recorder, self.prior)
         return parsed
+
+    def _render_prompt(self, payload: dict[str, Any]) -> str:
+        """`self.renderer`'s text, with `self.instructions` in front.
+
+        The one place `self.renderer` and `self.instructions` are joined,
+        called from :meth:`ask` for the record and the replay key and from
+        :meth:`_default_input_builder` for the live graph input, so the two
+        cannot drift apart: a custom renderer changes what both see, not
+        only what a transcript remembers. Byte-identical to the module-level
+        :func:`render` on this adapter's default construction -- `renderer`
+        left at :class:`~tradefloor.render.JSONRenderer` and `instructions`
+        left at `INSTRUCTIONS` -- which is what keeps a shipped fixture
+        replaying.
+        """
+        body = self.renderer.render(payload)
+        return (f"{self.instructions}\n\nOBSERVATION\n{body}"
+               if self.instructions else body)
+
+    def _default_input_builder(self, payload: dict[str, Any],
+                               ) -> dict[str, Any]:
+        """What `self.input_builder` resolves to when nobody passed one.
+
+        Both shapes :func:`default_input_builder` sends, built from
+        :meth:`_render_prompt` rather than from the module-level
+        :func:`render`, so a custom `renderer` reaches the graph this
+        adapter actually calls and not only the transcript it writes. The
+        module-level :func:`default_input_builder` stays exactly what it
+        was, for a caller who reaches for it directly.
+        """
+        return {"observation": payload,
+               "messages": [_user_message(self._render_prompt(payload))]}
 
     def reask(self, entry: Any) -> Any:
         """One more answer to a recorded input, changing nothing.
@@ -727,9 +784,18 @@ class LangGraphAdapter(FrameworkAdapter):
             "transcript": self.transcript,
             "recorder": self.recorder,
             "prior": self.prior,
-            "input_builder": self.input_builder,
+            # The caller's own builder, never the resolved default: the
+            # default is bound to THIS instance's `renderer`, and passing
+            # the bound method through would leave the twin rendering
+            # through its parent forever. `None` here resolves to the
+            # twin's own `_default_input_builder` in its constructor,
+            # which is what lets it pick up a `renderer` this fork call
+            # (or an `invariance` experiment afterwards) sets on the twin
+            # rather than on `self`.
+            "input_builder": self._custom_input_builder,
             "output_parser": self.output_parser,
             "instructions": self.instructions,
+            "renderer": self.renderer,
             "config": self.config,
             "thread_id": self.thread_id,
         })

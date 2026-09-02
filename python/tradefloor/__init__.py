@@ -33,10 +33,13 @@ from . import facts
 from . import loss
 from .checkpoint import Checkpoint, branch
 from . import counterfactual
-from .counterfactual import (Agreement, Comparison, Divergence, Resample,
-                             World, agree, compare, resample)
+from .counterfactual import (Agreement, Comparison, Divergence, Invariance,
+                             Resample, World, agree, compare, invariance,
+                             resample)
 from . import externality
 from .externality import Externality, externalities
+from . import render
+from .render import JSONRenderer, Renderer, TextRenderer
 from .sweep import sweep
 from . import boundary
 from .boundary import BoundaryMap, Flip, flip, map_boundaries
@@ -110,6 +113,8 @@ __all__ = [
     "Agreement", "Comparison", "Resample",
     "Divergence",
     "boundary", "flip", "map_boundaries", "Flip", "BoundaryMap",
+    "invariance", "Invariance", "render", "Renderer", "TextRenderer",
+    "JSONRenderer",
     "Intervention", "Firing", "ScenarioValidationError", "interventions",
     "TARGETS", "UNSUPPORTED_TARGETS", "yaml_subset",
     "manifest", "RunManifest", "DayLedger", "Verification",
