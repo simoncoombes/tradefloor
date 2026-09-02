@@ -582,3 +582,39 @@ def test_an_ifsome_on_an_undeclared_path_is_a_spec_error():
     # the declared spelling resolves
     assert checker.check(toy((IfSome("x", "held",
                                      (Set("x", Var("held")),)),)))
+
+
+# -- the threshold has one definition -----------------------------------------
+
+def test_the_intensity_accessor_is_generated_from_the_specification():
+    """The threshold a caller reads and the one the mechanism compares its
+    uniform against are one expression, emitted once.
+
+    Written by hand in Rust beside the generated body it was a second copy
+    of an expression this language owns, and a copy is what the language
+    exists to remove. The emitter renders the pure bindings up to the one
+    named and returns it.
+    """
+    have = emit.committed(JUMPS, "jumps.intensity_market")
+    assert have is not None
+    assert have == emit.accessor_body(JUMPS, "intensity_market")
+    assert "let ratio = self.economy.vix / p.market_vol_vix_anchor;" in have
+    assert "let rate_scale = if p.jump_vix_coupling == 0.0" in have
+    assert "let intensity_market = if p.jump_vix_coupling == 0.0" in have
+    # it reads state and dials and takes no draw
+    assert "next_f64" not in have and "next_normal" not in have
+    assert ".site(" not in have
+    # and --check covers it as it covers the body
+    assert emit.main(["--check"]) == 0
+
+
+def test_an_accessor_of_a_binding_below_a_draw_is_refused():
+    """A binding under a draw is not a function of the state, so it cannot
+    be a function of it."""
+    with pytest.raises(emit.EmitError, match="function of the state"):
+        emit.accessor_body(JUMPS, "market")
+
+
+def test_both_generated_regions_are_listed():
+    names = [name for name, _ in emit.regions(JUMPS)]
+    assert names == ["jumps", "jumps.intensity_market"]

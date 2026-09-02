@@ -131,5 +131,10 @@ JUMPS = Mechanism(
         )),
     ),
     target={"file": "rust/src/engine.rs", "function": "apply_jumps",
-            "rng": "self.jump_rng", "params": "p"},
+            "rng": "self.jump_rng", "params": "p",
+            # The market intensity is read outside the mechanism too, by a
+            # caller asking whether a jump can fire. Generated from this
+            # specification rather than restated in Rust beside it, so the
+            # threshold has one definition and one place to change.
+            "accessors": ("intensity_market",)},
 )
