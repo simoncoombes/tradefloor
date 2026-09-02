@@ -617,8 +617,14 @@ impl GameRng {
     pub fn enable_log(&mut self, from_day: i64, to_day: i64) {
         match self.log.as_deref_mut() {
             Some(log) => {
-                log.from_day = log.from_day.min(from_day);
-                log.to_day = log.to_day.max(to_day);
+                // Spelled as comparisons: the parity scan keeps `.min`/`.max`
+                // inside mathx even on integers, and a day is an integer.
+                if from_day < log.from_day {
+                    log.from_day = from_day;
+                }
+                if to_day > log.to_day {
+                    log.to_day = to_day;
+                }
             }
             None => {
                 self.log = Some(Box::new(DrawLog { from_day, to_day, records: Vec::new() }));
