@@ -486,7 +486,8 @@ def curve_window(m, seed: int) -> dict:
 
 
 def summarise(kind: str, rows: list[dict]) -> str:
-    med = {k: st.median([r[k] for r in rows if r.get(k) is not None]) for k in rows[0]}
+    med = {k: (st.median(v) if v else None) for k in rows[0]
+           for v in ([r[k] for r in rows if r.get(k) is not None],)}
     if kind == "curve":
         parts = []
         for lo, hi in CURVE_BUCKETS:

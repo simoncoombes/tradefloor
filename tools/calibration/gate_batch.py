@@ -158,8 +158,8 @@ def verdict(rows_by_kind: dict[str, list]) -> dict:
         rows = rows_by_kind.get(kind)
         if not rows:
             continue
-        med = {k: st.median([r[k] for r in rows if r.get(k) is not None])
-               for k in rows[0]}
+        med = {k: (st.median(v) if v else None) for k in rows[0]
+               for v in ([r[k] for r in rows if r.get(k) is not None],)}
         if kind == "driven":
             out["driven"] = med
             continue
