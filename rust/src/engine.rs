@@ -643,6 +643,32 @@ impl Engine {
     /// the macro chain consults it, so moving it cannot move a trajectory.
     /// `open_market` is the only caller that must run before a draw is taken,
     /// because the day mark and the day's news draws are taken there.
+    /// The market jump's effective daily intensity, here and now.
+    ///
+    /// The threshold `apply_jumps` compares its market uniform against,
+    /// at this engine's dials and its current VIX. A caller that wants to
+    /// know whether a jump can fire asks for this rather than restating
+    /// the scaling: a Python copy of it had already diverged on a zero
+    /// anchor, where the copy returned the base intensity and this
+    /// divides by zero, and CONTRIBUTING keeps a modelling decision in
+    /// one place for exactly that reason.
+    ///
+    /// Takes no draw and changes nothing.
+    ///
+    /// It has to agree with `apply_jumps`, and
+    /// `test_the_intensity_is_the_threshold_the_jump_fires_on` holds the
+    /// two together by behaviour: a market uniform patched just under it
+    /// fires and one just over it does not.
+    pub fn market_jump_intensity(&self) -> f64 {
+        let p = &self.params;
+        if p.jump_vix_coupling == 0.0 {
+            return p.jump_intensity_market;
+        }
+        let ratio = self.economy.vix / p.market_vol_vix_anchor;
+        let c = p.jump_vix_coupling;
+        p.jump_intensity_market * (1.0 - c + c * ratio * ratio)
+    }
+
     pub fn set_current_day(&mut self, day: i64) {
         self.current_day = day;
         for id in 0..7 {
