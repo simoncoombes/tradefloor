@@ -241,10 +241,54 @@ class Forward:
         self.evals += 1
         return np.log(prices(fork) / self.base)
 
-    def commit(self, x: np.ndarray, jumps: list) -> None:
-        """Install the day's draws on the engine and walk it to the close."""
-        self._drive(self.engine, jumps + self.layout.patches(x))
+    def commit(self, x: np.ndarray, jumps: list) -> dict:
+        """Install the day's draws on the engine and walk it to the close.
+
+        The jump patches go in before the previous close and the day's
+        market patches after it, with the overlay emptied in between at
+        the closed boundary: a snapshot with no overlay is restored onto
+        the engine, which is the one place a restore is safe (the market
+        is closed and the day's accumulators are settled). Without this
+        the overlay kept every day's hundred thousand patches since the
+        start and every draw paid a lookup over all of them; the run
+        slowed from fifty to a hundred and ten seconds a day over a year.
+
+        Returns the checkpoint: the stripped snapshot at the boundary and
+        the day's market patches, from which ``resume`` rebuilds this
+        exact state on another engine.
+        """
+        if jumps:
+            noise.patch_draws(self.engine, jumps)
+        if self.day > 0:
+            self.engine.close_market()
+        snapshot = self.engine.state_snapshot()
+        snapshot["draw_overlay"] = []
+        self.engine.restore_state(snapshot)
+        market = self.layout.patches(x)
+        noise.patch_draws(self.engine, market)
+        self.engine.open_market()
+        self.engine.run_session(*CLOCK, TICKS)
         self.engine.record(self.day)
+        return {"day": self.day, "snapshot": snapshot,
+                "patches": [(p.address.stream, p.address.kind,
+                             p.address.index, p.value) for p in market]}
+
+
+def resume(engine, checkpoint: dict) -> None:
+    """Rebuild the state ``commit`` left from its checkpoint.
+
+    The snapshot is the closed boundary before the checkpoint day with
+    an empty overlay; the patches are that day's market patches. Restore,
+    patch, open, run, record: the engine is then where the run was after
+    that day's commit, bit for bit, and the next day solves from it.
+    """
+    engine.restore_state(checkpoint["snapshot"])
+    noise.patch_draws(engine, [
+        noise.Patch(noise.DrawAddress(s, k, i), v)
+        for s, k, i, v in checkpoint["patches"]])
+    engine.open_market()
+    engine.run_session(*CLOCK, TICKS)
+    engine.record(checkpoint["day"])
 
 
 # -- the solver ----------------------------------------------------------
@@ -452,11 +496,28 @@ def shadow(args) -> dict:
                      for k in range(first - 1, last)])
     days = []
     started = time.time()
+    start_k = 0
+    checkpoint = None
+    if args.resume:
+        with open(args.resume, encoding="utf-8") as f:
+            saved = json.load(f)
+        if saved["year"] != year or saved["args"]["preset"] != args.preset \
+                or saved["args"]["seed"] != args.seed:
+            raise SystemExit("the checkpoint is from another year, preset "
+                             "or seed; a resume continues one run")
+        days = saved["days"]
+        checkpoint = saved["checkpoint"]
+        resume(engine, checkpoint)
+        start_k = checkpoint["day"] + 1
+        print(f"  resumed after day {checkpoint['day']} "
+              f"({len(days)} days carried)", flush=True)
     for k, session in enumerate(range(first, last)):
+        if k < start_k:
+            continue
         r_obs = np.log(real[k + 1] / real[k])
         fwd = Forward(engine, k, n)
         result = solve_day(fwd, r_obs, intensities, sigma=args.sigma)
-        fwd.commit(result["x"], result["jumps"])
+        checkpoint = fwd.commit(result["x"], result["jumps"])
         model = prices(engine)
         snap = engine.state_snapshot()
         residual = np.array(result["residual"])
@@ -493,6 +554,7 @@ def shadow(args) -> dict:
             # or a spot reclaim ends still leaves what it solved.
             partial = {"args": vars(args), "year": year, "partial": True,
                        "sessions": [first, session + 1], "days": days,
+                       "checkpoint": checkpoint,
                        "intensities": intensities, "tickers": tickers,
                        "betas": betas, "truth_rows": 0, "truth": [],
                        "provenance": dict(d["provenance"], **build_provenance(engine)),
@@ -773,6 +835,10 @@ def main(argv=None) -> int:
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--sigma", type=float, default=1e-3)
     p.add_argument("--days", type=int, default=0, help="limit, for a smoke run")
+    p.add_argument("--resume", default=None,
+                   help="a shadow-partial.json from an earlier run of the "
+                        "same year, preset and seed; continues after its "
+                        "checkpoint day")
     p.add_argument("--out", required=True)
     args = p.parse_args(argv)
     os.makedirs(args.out, exist_ok=True)

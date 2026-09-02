@@ -101,3 +101,51 @@ def test_year_slicing_and_the_idiosyncratic_sd():
     sd = shadow.real_idio_sd(data, betas, 1, n)
     assert set(sd) == set(realdata.TICKERS)
     assert all(0.015 < v < 0.025 for v in sd.values())
+
+
+def test_commit_with_a_clean_overlay_matches_a_straight_run(short_days):
+    """The overlay is emptied at each closed boundary and refilled with the
+    day's patches; the closes are the same as with every day's patches
+    kept, and the overlay stays one day deep."""
+    universe = tf.Universe.random(6, seed=3)
+    xs = [np.random.default_rng(10 + k).normal(size=1 + 8 + 6) for k in range(3)]
+
+    def drive(engine, keep):
+        prices = []
+        for k in range(3):
+            fwd = shadow.Forward(engine, k, 6)
+            x = xs[k][:fwd.layout.size]
+            if keep:
+                fwd._drive(engine, fwd.jump_patches(None, {}) + fwd.layout.patches(x))
+                engine.record(k)
+            else:
+                fwd.commit(x, fwd.jump_patches(None, {}))
+            prices.append(shadow.prices(engine).copy())
+        return prices
+
+    kept = drive(tf.Engine(seed=11, universe=universe), keep=True)
+    clean_engine = tf.Engine(seed=11, universe=universe)
+    clean = drive(clean_engine, keep=False)
+    for a, b in zip(kept, clean):
+        assert np.array_equal(a, b)
+    one_day = 40 * (1 + 8 + 6)
+    assert len(clean_engine.draw_patches()) <= one_day + 2 * (6 + 1)
+
+
+def test_a_resumed_engine_continues_bit_for_bit(short_days):
+    universe = tf.Universe.random(6, seed=3)
+    engine = tf.Engine(seed=11, universe=universe)
+    checkpoint = None
+    for k in range(3):
+        fwd = shadow.Forward(engine, k, 6)
+        x = np.random.default_rng(20 + k).normal(size=fwd.layout.size)
+        checkpoint = fwd.commit(x, fwd.jump_patches(None, {}))
+    other = tf.Engine(seed=11, universe=universe)
+    shadow.resume(other, checkpoint)
+    assert np.array_equal(shadow.prices(other), shadow.prices(engine))
+    assert other.stream_positions() == engine.stream_positions()
+    for e in (engine, other):
+        fwd = shadow.Forward(e, 3, 6)
+        x = np.random.default_rng(23).normal(size=fwd.layout.size)
+        fwd.commit(x, fwd.jump_patches(None, {}))
+    assert np.array_equal(shadow.prices(other), shadow.prices(engine))
