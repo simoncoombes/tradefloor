@@ -149,14 +149,12 @@ would continue plausibly under states belonging to other names. The error
 now names the width the snapshot carries, the width the roster holds and
 issue #148, so a reader meets the explanation where the failure happens.
 
-The refusal is the last write `restore_state` runs, and several more are
-attempted after it and never reached, so the split follows position rather
-than field. An engine that has caught this error holds the snapshot's price
-columns, generator positions, day accumulators, market-open flag, common
-volume state and remembered stress, and keeps its own per-name volume array
-along with everything `restore_state` writes after that point, which is the
-whole of its macro state. It holds one run's market beside another run's
-macro state, so drop it rather than running it on.
+That guard is the boundary of the restore. Everything `restore_state`
+writes before it takes the snapshot's value, and everything it writes after
+keeps the engine's own, because the error propagates out of the guard and
+the later writes are attempted and never reached. An engine that has caught
+this error holds one run's market beside another run's macro state, so drop
+it rather than running it on.
 
 ## 0.6.2
 

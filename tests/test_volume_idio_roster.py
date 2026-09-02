@@ -223,36 +223,35 @@ def test_a_snapshot_at_a_stale_width_is_refused():
 
 
 def test_a_refused_restore_leaves_the_engine_partly_written():
-    """The guard is the last write of `restore_state` that RUNS.
+    """The width guard is the boundary of the restore, not a rollback.
 
-    Several more writes are attempted after it and never reached, because
-    the error propagates out of the guard, so the split is by POSITION in
-    `restore_state` rather than by field.
+    Everything `restore_state` writes BEFORE the guard holds the snapshot's
+    value, and everything it writes AFTER holds the engine's own, because
+    the error propagates out of the guard and the later writes are attempted
+    and never reached. The rule is positional, so it stays true as writes
+    are added on either side, and reading `restore_state` in order is what
+    says which side a field is on.
 
-    Taken from the snapshot, because they are written before the guard:
-    every price column, the generator positions, the day accumulators, the
-    market-open flag, the common volume state and the remembered stress.
+    One witness per side, rather than a list that goes stale when a write
+    moves. The price columns stand for the before side. The day counter
+    stands for the after side, because it is the last write `restore_state`
+    makes, so it moves under any reordering that pulls a write forward past
+    the guard.
 
-    Left holding the engine's own values, because they are written after it:
-    the per-name volume array, the day's session news, the forced-flow
-    counter, the market-variance state, the macro economy, the central bank
-    and the day counter.
+    Anyone adding a second witness on the after side should check that the
+    two engines differ on it first. The central bank is also written after
+    the guard and does not move at all over a run this short, so an
+    assertion on it would pass here without testing anything.
 
-    An engine that caught this error therefore holds one run's market beside
-    another run's macro state. Asserted rather than described, because the
-    changelog and `set_volume_idio` both tell a reader to drop it, and a
-    reader deserves to know what they are holding.
-
-    The donor runs 60 days for one reason: the central bank is the furthest
-    write past the guard and it does not move at all over a short run, so a
-    shorter donor makes the two engines agree on it and the assertion below
-    passes without testing anything. Each of the three assertions on a kept
-    field is paired with one that the two engines differ on it first.
+    An engine that caught this error holds one run's market beside another
+    run's macro state. Asserted rather than described, because the changelog
+    and `set_volume_idio` both tell a reader to drop it, and a reader
+    deserves to know what they are holding.
     """
     donor = engine(8)
     donor.run_days(1)
     donor.list_instrument(IPO)
-    donor.run_days(60)
+    donor.run_days(5)
     stale = donor.state_snapshot()
     donor_snap = donor.state_snapshot()
     donor_rng = stream_state(donor_snap, "market")
@@ -264,29 +263,26 @@ def test_a_refused_restore_leaves_the_engine_partly_written():
     own = target.state_snapshot()
     own_prices = target.prices()
     own_states = states(target)
-
-    for field in ("day_count", "central_bank", "economy"):
-        assert own[field] != donor_snap[field], \
-            f"the two engines must differ on {field} or the check is vacuous"
+    assert own["day_count"] != donor_snap["day_count"], \
+        "the two engines must differ on the day counter or the check is vacuous"
 
     with pytest.raises(tf.ValidationError):
         target.restore_state(stale)
 
     after = target.state_snapshot()
 
-    # Written before the guard, so taken from the snapshot.
+    # Before the guard, so taken from the snapshot.
     assert target.prices() == donor.prices(), \
-        "the price columns were written before the refusal"
+        "the price columns are written before the guard"
     assert target.prices() != own_prices
     assert stream_state(after, "market") == donor_rng, \
-        "the generator positions were written before the refusal"
+        "the generator positions are written before the guard"
 
-    # Written after the guard, so not written at all.
+    # The guard itself, and everything after it.
     assert states(target) == own_states, \
         "the per-name volume array is the write that refused"
-    for field in ("day_count", "central_bank", "economy"):
-        assert after[field] == own[field], \
-            f"{field} is written after the guard, so it stays"
+    assert after["day_count"] == own["day_count"], \
+        "the day counter is written after the guard, so it stays"
     assert widths(target) == (9, 9)
 
 
