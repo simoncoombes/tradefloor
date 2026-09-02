@@ -489,6 +489,21 @@ def shadow(args) -> dict:
                   f"{result['evals']} vix {days[-1]['vix_model']:.1f}/"
                   f"{days[-1]['vix_real']:.1f} {time.time() - started:.0f}s",
                   flush=True)
+            # A partial record every ten days, so a run a dead-man timer
+            # or a spot reclaim ends still leaves what it solved.
+            partial = {"args": vars(args), "year": year, "partial": True,
+                       "sessions": [first, session + 1], "days": days,
+                       "intensities": intensities, "tickers": tickers,
+                       "betas": betas, "truth_rows": 0, "truth": [],
+                       "provenance": dict(d["provenance"], **build_provenance(engine)),
+                       "real_idio_sd": real_idio_sd(d, betas, first, last),
+                       "seconds": time.time() - started}
+            with open(os.path.join(args.out, "shadow-partial.json"), "w",
+                      encoding="utf-8") as f:
+                json.dump(partial, f)
+            with open(os.path.join(args.out, "shadow-partial.md"), "w",
+                      encoding="utf-8") as f:
+                f.write(render(partial))
     truth = []
     try:
         import pyarrow as pa
@@ -592,8 +607,9 @@ def render(run: dict) -> str:
     vm = np.array([d["vix_model"] for d in days])
     vr = np.array([d["vix_real"] for d in days])
     gap = vm - vr
-    lines = [f"# Shadow run: {run['year']} ({run['args']['year']})", "",
-             "## Where the solve fails", ""]
+    lines = [f"# Shadow run: {run['year']} ({run['args']['year']})"
+             + (" PARTIAL, the run was still going" if run.get("partial") else ""),
+             "", "## Where the solve fails", ""]
     if not failed:
         lines.append(f"Every one of the {N} days reached its observed closes "
                      f"within five sigma ({5 * run['args']['sigma']:.0e} in "
