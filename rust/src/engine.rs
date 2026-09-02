@@ -1621,7 +1621,6 @@ impl Engine {
     }
 
     pub fn close_day(&mut self, game_day: i64) {
-        self.set_current_day(game_day);
         let noise = self.attribution_column(random_noise_index());
         let innovations: Vec<Option<f64>> = noise.into_iter().map(Some).collect();
         let variances = self.sector_base_variances();

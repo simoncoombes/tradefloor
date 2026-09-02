@@ -892,6 +892,12 @@ impl PyEngine {
         // would grow one unbounded "day".
         self.day_buffer.clear();
         self.market_open = true;
+        // The day a draw carries in the draw log is the day whose open it
+        // follows, so the jumps, volume and macro draws taken at a close
+        // belong to the day they close rather than to the one after.
+        // Stamped from the counter here, so `open_market()` and
+        // `run_days()` number a day the same way.
+        self.inner.set_current_day(i64::from(self.day_count));
         self.inner.open_market();
     }
 
@@ -1147,8 +1153,10 @@ impl PyEngine {
             return Err(ValidationError::new_err("ticks_per_day must be greater than zero"));
         }
         for offset in 0..days {
-            self.inner.set_current_day((first_day + offset as u32) as i64);
             self.open_market();
+            // `first_day` is the day number the record and the truth table
+            // carry, so the draw log carries it too.
+            self.inner.set_current_day((first_day + offset as u32) as i64);
             self.run_session(py, hour, minute, day_of_week, ticks_per_day, volatility,
                              false, None, None, None)?;
             // Record BEFORE the close: the close advances the macro chain
