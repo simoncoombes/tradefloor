@@ -1868,10 +1868,13 @@ class Verification:
     """
 
     __slots__ = ("days", "k", "count", "ticks", "day_runs", "restored",
-                 "failures", "from_snapshots", "root", "_wrote", "_here")
+                 "root_ok", "root_note", "replay_failures", "proof_failures",
+                 "from_snapshots", "root", "_wrote", "_here")
 
     def __init__(self, *, days: Sequence[int], count: int, ticks: int,
-                 day_runs: int, restored: int, failures: Sequence[str],
+                 day_runs: int, restored: int, root_ok: bool,
+                 root_note: str, replay_failures: Sequence[str],
+                 proof_failures: Sequence[str],
                  from_snapshots: bool, root: str,
                  wrote: str, here: str) -> None:
         self.days = tuple(days)
@@ -1883,16 +1886,48 @@ class Verification:
         #: none and replays from construction, so a sample that drew it is
         #: short of k here even on a ledger that carries every state.
         self.restored = int(restored)
-        self.failures = tuple(failures)
+        #: Whether the ledger's own root is the one the manifest commits to.
+        #: Kept apart from the per-day results, because it is one fact about
+        #: the whole ledger rather than a verdict on any day: reported as a
+        #: day it made a sample of nine read as ten failed days.
+        self.root_ok = bool(root_ok)
+        self.root_note = root_note
+        #: Sampled days that did not replay to the state committed for them.
+        #: This is the per-day evidence, and the only thing counted over k.
+        self.replay_failures = tuple(replay_failures)
+        #: Leaves that failed their Merkle proof under a root the ledger
+        #: reproduces. Empty in every case the tree handles correctly; see
+        #: :func:`verify` for why one here means the tree disagrees with
+        #: itself rather than that a day was edited.
+        self.proof_failures = tuple(proof_failures)
         self.from_snapshots = bool(from_snapshots)
         self.root = root
         self._wrote = wrote
         self._here = here
 
     @property
+    def failures(self) -> tuple[str, ...]:
+        """Everything wrong with this verification, in one list.
+
+        The root first, then the days that did not replay, then any proof
+        that failed under a matching root. Reading the length of this as a
+        count of failed days is what produced "10 of 9 sampled days did not
+        verify" on a nine-day ledger with one edited leaf, so the count in
+        :meth:`check` runs over :attr:`replay_failures` alone.
+        """
+        root = () if self.root_ok else (self.root_note,)
+        return root + self.replay_failures + self.proof_failures
+
+    @property
+    def replayed(self) -> int:
+        """Sampled days that reproduced the state committed for them."""
+        return self.k - len(self.replay_failures)
+
+    @property
     def ok(self) -> bool:
-        """True when every sampled day recomputed to its committed leaf."""
-        return not self.failures
+        """True when the root matches and every sampled day recomputed."""
+        return (self.root_ok and not self.replay_failures
+                and not self.proof_failures)
 
     @property
     def caveats(self) -> list[str]:
@@ -1958,17 +1993,37 @@ class Verification:
         return out
 
     def check(self) -> "Verification":
-        """Raise when a sampled day did not recompute. Returns self otherwise.
+        """Raise when anything did not verify. Returns self otherwise.
 
         For a caller that wants the failure to end the program, in the shape
-        :meth:`RunManifest.verify_lineage` uses.
+        :meth:`RunManifest.verify_lineage` uses. The message separates the
+        one fact about the whole ledger from the verdict on each sampled day,
+        because running them together counted a root mismatch as a tenth
+        failed day on a sample of nine and read eight days that replayed
+        perfectly as failures.
         """
-        if self.failures:
-            raise ValidationError(
-                f"{len(self.failures)} of {self.k} sampled days did not "
-                "verify:\n  " + "\n  ".join(self.failures)
-            )
-        return self
+        if self.ok:
+            return self
+        lines: list[str] = []
+        if not self.root_ok:
+            lines.append(self.root_note)
+        if self.replay_failures:
+            lines.append(
+                f"{len(self.replay_failures)} of "
+                f"{_count(self.k, 'sampled day')} did not replay to the "
+                "state the ledger commits:")
+            lines.extend("  " + entry for entry in self.replay_failures)
+            if self.replayed:
+                lines.append(
+                    f"The remaining {self.replayed} replayed to the state "
+                    "the ledger commits.")
+        else:
+            lines.append(
+                f"Every one of the {_count(self.k, 'sampled day')} replayed "
+                "to the state the ledger commits, so no day this sample drew "
+                "was edited.")
+        lines.extend(self.proof_failures)
+        raise ValidationError("\n".join(lines))
 
     def describe(self) -> str:
         """A reader's summary: sample, cost, verdict and caveats."""
@@ -1980,8 +2035,15 @@ class Verification:
             f"  cost: {_count(self.day_runs, 'day-run')}, "
             f"{_count(self.ticks, 'engine tick')}, "
             f"{self.restored} restored from a predecessor",
+            f"  root: {'matches the manifest' if self.root_ok else 'MOVED'}",
+            f"  replay: {self.replayed} of {self.k} sampled days reproduced "
+            f"the committed state",
         ]
-        for failure in self.failures:
+        if not self.root_ok:
+            lines.append(f"  FAILED {self.root_note}")
+        for failure in self.replay_failures:
+            lines.append(f"  FAILED {failure}")
+        for failure in self.proof_failures:
             lines.append(f"  FAILED {failure}")
         for caveat in self.caveats:
             lines.append(f"  caveat: {caveat}")
@@ -1989,7 +2051,9 @@ class Verification:
 
     def __repr__(self) -> str:
         return (f"Verification({'ok' if self.ok else 'FAILED'}, "
-                f"{self.k}/{self.count} days, {self.day_runs} day-runs)")
+                f"{self.replayed}/{self.k} days replayed, "
+                f"root {'ok' if self.root_ok else 'MOVED'}, "
+                f"{self.day_runs} day-runs)")
 
 
 def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
@@ -2086,13 +2150,22 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
         )
 
     root = str(recorded["root"])
-    failures: list[str] = []
-    if ledger.root() != root:
-        failures.append(
-            f"the ledger's root is {ledger.root()[:12]}... and the manifest "
-            f"commits to {root[:12]}.... A leaf was edited after the "
-            "manifest was written, and the sampled days below say which."
-        )
+    # One fact about the whole ledger, kept out of the per-day list. Inside
+    # this function it is also the membership answer for every day: a proof
+    # is built from the leaves that produce the ledger's own root, so it
+    # recomputes to that root and reaches the manifest's exactly when the two
+    # agree. Appending a per-day proof failure beside it therefore added k
+    # entries that repeated this one, and the count over them read a
+    # nine-day sample as ten failed days.
+    root_ok = ledger.root() == root
+    root_note = "" if root_ok else (
+        f"the ledger's root is {ledger.root()[:12]}... and the manifest "
+        f"commits to {root[:12]}.... A leaf was edited after the manifest "
+        "was written, so no sampled day's leaf proves against the "
+        "manifest's root. The replay verdicts below say which day moved."
+    )
+    replay_failures: list[str] = []
+    proof_failures: list[str] = []
 
     chosen = _sample_days(ledger.count, k, seed)
     universe = manifest.universe
@@ -2131,25 +2204,30 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
         rebuilt = engine.state_hash()
         leaf = ledger.leaves[day]
         if rebuilt != leaf:
-            failures.append(
+            replay_failures.append(
                 f"day {day}: replaying it produced state "
                 f"{rebuilt[:12]}... and the ledger commits to "
                 f"{leaf[:12]}.... Either this day's inputs changed, or the "
                 f"state it started from did."
             )
             continue
-        if not _proof_holds(leaf, day, ledger.proof(day), root):
-            failures.append(
-                f"day {day}: the day recomputes to its leaf and the leaf's "
-                f"proof does not reach the manifest's root {root[:12]}.... "
-                "The leaf belongs to a different ledger, or another day's "
-                "leaf was edited."
+        # Still checked, and reported only when it says something the root
+        # comparison did not. A proof that fails under a root the ledger
+        # reproduces means the tree disagrees with itself, which is a defect
+        # in this module rather than evidence about the run.
+        if root_ok and not _proof_holds(leaf, day, ledger.proof(day), root):
+            proof_failures.append(
+                f"day {day}: the leaf recomputes and its proof does not "
+                f"reach the root {root[:12]}... that the ledger itself "
+                "produces. The tree implementation disagrees with itself; "
+                "this is a defect in tradefloor, not an edited run."
             )
 
     wrote = manifest.written_by.get("platform") or {}
     return Verification(
         days=chosen, count=ledger.count, ticks=ticks, day_runs=day_runs,
-        restored=restored, failures=failures,
+        restored=restored, root_ok=root_ok, root_note=root_note,
+        replay_failures=replay_failures, proof_failures=proof_failures,
         from_snapshots=ledger.snapshots is not None,
         root=root,
         wrote=f"{wrote.get('os')}-{wrote.get('machine')}",

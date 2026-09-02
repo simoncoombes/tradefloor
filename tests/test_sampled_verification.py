@@ -665,7 +665,9 @@ def test_a_tampered_leaf_fails():
 
     The root no longer matches the manifest's, which is the cheap check, and
     the day the leaf belongs to does not recompute to it, which is the one
-    that says which day moved.
+    that says which day moved. The two are reported apart:
+    `test_a_root_mismatch_is_not_counted_as_a_failed_day` says what happened
+    when they were not.
     """
     _, ledger, manifest = run()
     tampered = tf.DayLedger.from_json(ledger.to_json())
@@ -673,10 +675,11 @@ def test_a_tampered_leaf_fails():
 
     report = mf.verify(manifest, tampered, DAYS, seed=5)
     assert not report.ok
-    assert any("the ledger's root is" in failure
-               for failure in report.failures)
-    assert any(failure.startswith("day 5:") for failure in report.failures)
-    with pytest.raises(tf.ValidationError, match="did not verify"):
+    assert not report.root_ok
+    assert "the ledger's root is" in report.root_note
+    assert [f.split(":")[0] for f in report.replay_failures] == ["day 5"]
+    assert report.replayed == DAYS - 1
+    with pytest.raises(tf.ValidationError, match="did not replay"):
         report.check()
 
 
@@ -703,6 +706,57 @@ def test_a_tampered_snapshot_fails_on_the_day_that_follows_it():
         "an edited state must fail on the day replayed from it, and on that "
         "day alone"
     )
+
+
+def test_a_root_mismatch_is_not_counted_as_a_failed_day():
+    """One edited leaf is one edited day, however many proofs it breaks.
+
+    A tampered leaf moves the ledger's root, and inside `verify` a proof is
+    built from the leaves that produce that root, so it recomputes to the
+    ledger's own root and reaches the manifest's exactly when the two agree.
+    Every sampled day's proof therefore fails together, saying nothing the
+    root comparison had not already said.
+
+    Reported into one list beside the per-day results, those entries joined
+    the single real finding and the count over the list read a nine-day
+    sample as ten failed days, while eight days that replayed perfectly were
+    listed as failures. The roster, seed and tamper below are the ones the
+    defect was found on.
+    """
+    roster = list(tf.Universe.random(11, seed=222))
+    engine = tf.Engine(seed=8675309, universe=roster)
+    ledger = tf.DayLedger()
+    engine.run_days(9, record=False, ticks_per_day=TICKS, ledger=ledger)
+    manifest = tf.RunManifest.of(engine, seed=8675309, universe=roster,
+                                 ledger=ledger)
+
+    tampered = tf.DayLedger.from_json(ledger.to_json())
+    leaf = tampered.leaves[4]
+    tampered.leaves[4] = ("1" if leaf[0] == "0" else "0") + leaf[1:]
+
+    report = mf.verify(manifest, tampered, 9, seed=1)
+    assert not report.ok
+    assert not report.root_ok
+    assert report.replayed == 8
+    assert [f.split(":")[0] for f in report.replay_failures] == ["day 4"]
+    assert report.proof_failures == (), (
+        "a proof failing under a root the ledger reproduces would be a "
+        "defect in the tree, and the root here has moved"
+    )
+
+    with pytest.raises(tf.ValidationError) as raised:
+        report.check()
+    message = str(raised.value)
+    assert "1 of 9 sampled days did not replay" in message
+    assert "The remaining 8 replayed" in message
+    assert "10 of 9" not in message
+    assert message.count("day 4:") == 1
+    for day in (0, 1, 2, 3, 5, 6, 7, 8):
+        assert f"day {day}:" not in message, message
+
+    rendered = report.describe()
+    assert "root: MOVED" in rendered
+    assert "replay: 8 of 9 sampled days reproduced" in rendered
 
 
 def test_a_ledger_from_another_run_is_refused_rather_than_reported():
