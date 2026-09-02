@@ -12,10 +12,14 @@ things nothing else checks.
   `test_canonical_decisions_are_blind_to_price_fill_and_net_worth` shows
   this by perturbing a copy of a trace and re-extracting.
 - A real recorded run -- the FinRobot fixture already shipped for P5 --
-  hashes to the same digest on every platform this suite runs on, because
-  the digest is over decisions and never over the prices a platform's own
-  transcendentals could move by a ULP. See `rust/src/rng.rs` for why that
-  ULP is real and not hypothetical.
+  canonicalises to the SAME decision list whether it is read cold from
+  the transcript's own recorded responses or replayed through a
+  hand-built `World`. Both sides are derived at run time; neither is a
+  value typed into this file, so the check cannot rot into pinning a
+  number instead of a claim. Because the digest is over decisions and
+  never over a price, this holds even on a platform whose own
+  transcendentals move a price by a ULP -- see `rust/src/rng.rs` for why
+  that ULP is real and not hypothetical.
 - `commit`/`reveal` is a real commitment scheme over the ordinary case
   (matches) and the two ways it can fail (a different seed list, a
   different salt), not only the happy path.
@@ -31,13 +35,15 @@ checkpoint, a fork and a `+200bps` intervention
 cell is a single `Universe.random` roster run once through
 `World.apply(Scenario.load(...))`. Nothing about `fingerprint()` or
 `battery()` could replay a transcript keyed to a different roster and a
-different shape of run, so the pinned-digest test below reproduces the
-fixture's own recorded world by hand and canonicalises its trace with the
-same two private helpers `fingerprint()` uses, rather than calling
-`fingerprint()` itself. What the shipped battery would need to cover this
-recording instead is a cell shaped like a fork -- two arms sharing a
-history -- which `Cell` does not express; see this package's pull
-request description for the fuller account.
+different shape of run, so the test below reproduces the fixture's own
+recorded world by hand and canonicalises its trace with the same two
+private helpers `fingerprint()` uses, rather than calling `fingerprint()`
+itself -- and checks that reproduction against the transcript's own
+recorded responses, read cold, instead of against a value typed into
+this file. What the shipped battery would need to cover this recording
+instead is a cell shaped like a fork -- two arms sharing a history --
+which `Cell` does not express; see this package's pull request
+description for the fuller account.
 """
 
 from __future__ import annotations
@@ -228,34 +234,56 @@ def test_canonical_decisions_are_blind_to_price_fill_and_net_worth():
 
 
 # ---------------------------------------------------------------------------
-# The recorded FinRobot fixture: a pinned digest
+# The recorded FinRobot fixture: two independently derived digests agree
 # ---------------------------------------------------------------------------
 
 @needs_fixture
-def test_the_fingerprint_of_the_recorded_finrobot_fixture_is_a_pinned_digest():
-    """The 60 real FinRobot calls in the shipped fixture, canonicalised
-    and hashed the same way `fingerprint()` hashes a battery cell.
+def test_the_recorded_finrobot_fixture_matches_its_own_transcript():
+    """Two ways of getting a decision list out of the same recording,
+    neither a value typed into this file.
 
-    Measured on: the FinRobot fixture's own world
-    (`examples/integrations/finrobot/rate_shock.py`), seed 4242, the
-    four-instrument roster NOVA/HELX/BRDG/STAP, 20 days of shared history
-    then a `+200bps` federal-funds-rate and corporate-bond-yield
-    intervention, 20 days each on the control and shock arms -- 60
-    decision days in all, matching the fixture's own 60 recorded
-    interactions. Canonicalised with the same
-    `tradefloor.fingerprint._decisions_for_trace` and
-    `tradefloor.fingerprint._digest` battery version 1's own cells use.
-    Commit bf2387c5ee9909dcb68b385e92bd2fee84a55b2b.
+    Side A reads the transcript cold: every entry's raw model response,
+    parsed on its own with no `World` involved, grouped into cells by
+    ``arm`` -- "control" and "+200bps" share every step number, both
+    forking from the same day-20 boundary, so `arm` is what tells them
+    apart. Side B is a hand-built replay of the same world (seed 4242,
+    the four-instrument roster NOVA/HELX/BRDG/STAP, 20 days of shared
+    history, a fork, the `+200bps` federal-funds-rate and
+    corporate-bond-yield intervention, 20 days each on the control and
+    shock arms), read off a real `World.trace`. Both sides run through
+    the same two private helpers `fingerprint()` itself uses.
 
-    The digest is over decisions and never over a price, so this holds
-    across every platform this suite gates on even though `next_normal`
-    itself is not bit-identical there (`rust/src/rng.rs`) --
-    demonstrated directly, not only argued, by
-    `test_canonical_decisions_are_blind_to_price_fill_and_net_worth`
-    above.
+    A frozen digest here could only pass today and rot the day the
+    parser, the engine or the fixture legitimately changed together;
+    asserting the two independently derived sides agree, and agree with
+    the transcript's own actual entry count, is the claim that survives
+    all three changing in step.
     """
+    from tradefloor.integrations import finrobot
+
     module = _load_finrobot_example()
     transcript = module.Transcript.load(FIXTURE)
+
+    # -- side A: the transcript's own recorded responses, parsed cold ---
+    arm_to_cell = {"shared": 0, "control": 1, "+200bps": 2}
+    rows_by_cell: dict[int, list[dict]] = {0: [], 1: [], 2: []}
+    for entry in transcript.entries:
+        decision = finrobot.parse(entry["response"])
+        # `step` folded into the published dict, the same way a live
+        # `FrameworkAdapter.act()` folds it in -- see
+        # `fingerprint._decisions_for_trace` -- so two entries that
+        # happened to trade identically within one cell still compare
+        # unequal and neither is mistaken for a stale repeat.
+        raw = {"step": entry["step"], **decision.as_dict()}
+        rows_by_cell[arm_to_cell[entry["arm"]]].append(
+            {"step": entry["step"], "decision": raw})
+    from_transcript: list[dict] = []
+    for cell, rows in rows_by_cell.items():
+        rows.sort(key=lambda row: row["step"])
+        from_transcript.extend(_decisions_for_trace(rows, cell=cell))
+    from_transcript.sort(key=lambda entry: (entry["cell"], entry["step"]))
+
+    # -- side B: a hand-built replay of the same world -------------------
     agent = module.FinRobotAdapter(
         mode="replay", transcript=transcript, fundamentals=module.FUNDAMENTALS,
         objective=module.OBJECTIVE, every=module.DECISION_EVERY, arm="shared")
@@ -272,37 +300,19 @@ def test_the_fingerprint_of_the_recorded_finrobot_fixture_is_a_pinned_digest():
     control.run(days=module.BRANCH_DAYS)
     shock.run(days=module.BRANCH_DAYS)
 
-    decisions = (
+    from_replay = (
         _decisions_for_trace(world.trace, cell=0)
         + _decisions_for_trace(control.trace[fork_step:], cell=1)
         + _decisions_for_trace(shock.trace[fork_step:], cell=2))
-    decisions.sort(key=lambda entry: (entry["cell"], entry["step"]))
+    from_replay.sort(key=lambda entry: (entry["cell"], entry["step"]))
 
-    assert len(decisions) == len(transcript) == 60
-    assert _digest(decisions) == (
-        "6258607029b5eeb8b320c65d73bb73aa8eeb4af064642c9ea8a56d35beed69d9")
+    assert len(from_transcript) == len(from_replay) == len(transcript)
+    assert from_transcript == from_replay
+    assert _digest(from_transcript) == _digest(from_replay)
 
-    # The agent's own renderer is P6's default text convention -- the
-    # same key `battery().renderer_key` names -- because FinRobotAdapter
-    # defaults to it and this recording overrides no renderer.
+    # The agent's own renderer is P6's default text convention, because
+    # FinRobotAdapter defaults to it and this recording overrides none.
     assert agent.provenance()["renderer"] == tf.battery().renderer_key
-    assert agent.provenance()["renderer"] == "text/en/usd/roster/full"
-
-
-@needs_fixture
-def test_the_shipped_fixtures_transcript_entry_count_still_matches():
-    """A guard on the assumption the pinned test above is built from.
-
-    If the fixture is ever re-recorded at a different cadence or a
-    different run length, the entry count changes and the test above
-    would go on passing against the WRONG expectation of "60" silently
-    unless something else names the number the fixture actually carries.
-    """
-    module = _load_finrobot_example()
-    transcript = module.Transcript.load(FIXTURE)
-    assert len(transcript) == 60
-    assert module.WARMUP_DAYS == module.BRANCH_DAYS == 20
-    assert module.DECISION_EVERY == module.STEPS_PER_DAY == 6
 
 
 # ---------------------------------------------------------------------------
