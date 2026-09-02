@@ -82,6 +82,10 @@ done
 if [ "__AMP__" = "1" ]; then
   python tools/calibration/amplification.py --out /home/ec2-user/out/amplification       __AMP_ARGS__ 2>&1 | tee /home/ec2-user/out/amplification.log
 fi
+# The fetched panel, archived beside the reports. It is git-ignored
+# because vendor data is not committed, and it goes to the bucket so a
+# reader of a report can reproduce its numbers without re-fetching. The
+# bucket is the run's own private prefix; nothing here makes it public.
 tar -czf /home/ec2-user/out/shadow-data.tgz -C tools/shadow data
 
 WORK
