@@ -714,9 +714,12 @@ class DayLedger:
 
     The size is what decides between them, and it is why the states sit
     here rather than inside the manifest. On ``Universe.random(40,
-    seed=7)``, seed 42, 252 days, at ``b5031cd``: the ledger writes 4.88 MB
-    with the states and 16.9 kB without them, beside a 61.8 kB manifest. A
-    manifest is meant to be read, so it carries the root alone.
+    seed=7)``, seed 42, 252 days at 30 ticks a day with ``record=False``,
+    at ``fd7b6dc``: the ledger writes 4,880,447 bytes with the states and
+    16,924 without them, beside a 61,781-byte manifest. The run shape
+    belongs in that sentence, because ``record=True`` takes the manifest to
+    68,223 bytes and leaves the ledger where it is. A manifest is meant to
+    be read, so it carries the root alone.
 
     ## The leaf is taken after the close
 

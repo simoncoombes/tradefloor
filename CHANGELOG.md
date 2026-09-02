@@ -30,9 +30,9 @@ day-runs and which of the two costs was paid.
 ### The ledger size
 
 The states sit in the ledger, beside the manifest rather than inside it.
-On `Universe.random(40, seed=7)`, seed 42, 252 days, the ledger writes
-4.88 MB with the states and 16.9 kB without them, next to a 61.8 kB
-manifest. A manifest is meant to be read, so it carries the root, the
+On `Universe.random(40, seed=7)`, seed 42, 252 days at 30
+ticks a day with `record=False`, the ledger writes 4.88 MB with the states
+and 16.9 kB without them, next to a 61.8 kB manifest. A manifest is meant to be read, so it carries the root, the
 count and the hash version.
 
 ### The session flag at a close
