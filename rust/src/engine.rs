@@ -416,8 +416,10 @@ impl Engine {
     ///
     /// Left holding the engine's own values, this array among them: the
     /// day's session news, the forced-flow counter, the market-variance
-    /// state, the macro economy and the day counter. Nothing
-    /// `restore_state` writes after this point is written at all.
+    /// state, the macro economy, the central bank and the day counter.
+    /// Nothing `restore_state` writes after this point is written at all,
+    /// which is the half of this to trust if the list ever falls behind
+    /// the code.
     ///
     /// An engine that has caught this error therefore holds one run's
     /// market beside another run's macro state, and it should be dropped

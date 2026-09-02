@@ -235,46 +235,58 @@ def test_a_refused_restore_leaves_the_engine_partly_written():
 
     Left holding the engine's own values, because they are written after it:
     the per-name volume array, the day's session news, the forced-flow
-    counter, the market-variance state, the macro economy and the day
-    counter.
+    counter, the market-variance state, the macro economy, the central bank
+    and the day counter.
 
     An engine that caught this error therefore holds one run's market beside
     another run's macro state. Asserted rather than described, because the
     changelog and `set_volume_idio` both tell a reader to drop it, and a
     reader deserves to know what they are holding.
+
+    The donor runs 60 days for one reason: the central bank is the furthest
+    write past the guard and it does not move at all over a short run, so a
+    shorter donor makes the two engines agree on it and the assertion below
+    passes without testing anything. Each of the three assertions on a kept
+    field is paired with one that the two engines differ on it first.
     """
     donor = engine(8)
     donor.run_days(1)
     donor.list_instrument(IPO)
-    donor.run_days(5)
+    donor.run_days(60)
     stale = donor.state_snapshot()
-    donor_rng = stream_state(donor.state_snapshot(), "market")
-    donor_days = donor.state_snapshot()["day_count"]
+    donor_snap = donor.state_snapshot()
+    donor_rng = stream_state(donor_snap, "market")
     stale["volume_idio"] = stale["volume_idio"][: 8 * 8]
 
     target = engine(8)
     target.list_instrument(IPO)
     target.run_days(1)
+    own = target.state_snapshot()
     own_prices = target.prices()
     own_states = states(target)
-    own_days = target.state_snapshot()["day_count"]
-    assert own_days != donor_days, "the two engines must differ on this"
+
+    for field in ("day_count", "central_bank", "economy"):
+        assert own[field] != donor_snap[field], \
+            f"the two engines must differ on {field} or the check is vacuous"
 
     with pytest.raises(tf.ValidationError):
         target.restore_state(stale)
 
-    # Written before the guard.
+    after = target.state_snapshot()
+
+    # Written before the guard, so taken from the snapshot.
     assert target.prices() == donor.prices(), \
         "the price columns were written before the refusal"
     assert target.prices() != own_prices
-    assert stream_state(target.state_snapshot(), "market") == donor_rng, \
+    assert stream_state(after, "market") == donor_rng, \
         "the generator positions were written before the refusal"
 
     # Written after the guard, so not written at all.
     assert states(target) == own_states, \
         "the per-name volume array is the write that refused"
-    assert target.state_snapshot()["day_count"] == own_days, \
-        "the day counter is written after the guard, so it stays"
+    for field in ("day_count", "central_bank", "economy"):
+        assert after[field] == own[field], \
+            f"{field} is written after the guard, so it stays"
     assert widths(target) == (9, 9)
 
 

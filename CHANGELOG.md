@@ -153,10 +153,10 @@ The refusal is the last write `restore_state` runs, and several more are
 attempted after it and never reached, so the split follows position rather
 than field. An engine that has caught this error holds the snapshot's price
 columns, generator positions, day accumulators, market-open flag, common
-volume state and remembered stress, and keeps its own per-name volume array,
-session news, forced-flow counter, market-variance state, macro economy and
-day counter. It holds one run's market beside another run's macro state, so
-drop it rather than running it on.
+volume state and remembered stress, and keeps its own per-name volume array
+along with everything `restore_state` writes after that point, which is the
+whole of its macro state. It holds one run's market beside another run's
+macro state, so drop it rather than running it on.
 
 ## 0.6.2
 
