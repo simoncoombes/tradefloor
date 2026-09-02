@@ -234,9 +234,17 @@ def test_a_refused_restore_leaves_the_engine_partly_written():
 
     One witness per side, rather than a list that goes stale when a write
     moves. The price columns stand for the before side. The day counter
-    stands for the after side, because it is the last write `restore_state`
-    makes, so it moves under any reordering that pulls a write forward past
-    the guard.
+    stands for the after side, because it is the write furthest from the
+    guard that reliably differs between two short runs, so its assertion is
+    live on a donor of a few days.
+
+    What that witness pins is its OWN position. The assertion fails when the
+    day counter itself crosses the guard, which was measured by moving that
+    restore to just above the guard and rebuilding. It does not fail when
+    some other write crosses, which was measured too: moving the economy
+    restore above the guard leaves this test green. Being the last write
+    makes the day counter the weakest sentinel for the guard's position
+    rather than the strongest, since every other write sits between the two.
 
     Anyone adding a second witness on the after side should check that the
     two engines differ on it first. The central bank is also written after
