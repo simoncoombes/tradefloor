@@ -414,6 +414,49 @@ def test_the_jump_contribution_is_the_one_the_tape_books_to_the_day():
 # --------------------------------------------------------------------------
 
 
+def test_a_preset_that_draws_no_news_says_which_stream_was_silent():
+    """The case the two silence caveats exist for.
+
+    ``pt-v1`` carries no endogenous news, and the engine skips the news
+    draws entirely at zero intensity, so that stream takes nothing at
+    all. The news contribution then names a draw site with no address
+    behind it, and both caveats have to say so rather than the tree
+    presenting a leafless mechanism as one that read nothing.
+    """
+    roster = tf.Universe.random(ROSTER_SIZE, seed=ROSTER_SEED)
+    e = tf.Engine(seed=ENGINE_SEED, universe=roster, model="pt-v1")
+    e.keep_explanations(1, 1)
+    e.run_days(3, record=True)
+    result = e.explain(e.tickers[0], 1)
+    assert sorted(result._traced) == ["jumps", "market"]
+    sites = {node.name for _, node, _ in result._walk
+             if node.kind == "draw"}
+    assert "news_u" not in sites and "news_z" not in sites
+    blind = next(c for c in result.caveats if "no leaf here" in c)
+    assert "1 contribution" in blind and "company_news" in blind
+    silent = next(c for c in result.caveats if "took no logged draw" in c)
+    assert "1 stream" in silent and "(news)" in silent
+    assert result.check() == []
+
+
+def test_the_first_day_has_no_jump_leaf_and_the_caveat_names_it():
+    # The jump a day carries was drawn at the close before it, and day
+    # zero has no close before it, so the jump node is leafless there.
+    e = engine(keep=(0, 1))
+    result = e.explain(e.tickers[0], 0)
+    jump = next(child for child in result.root.children
+                if child.name == "jump")
+    assert not [node for node in jump.children[0].children
+                if node.kind == "draw"]
+    blind = next(c for c in result.caveats if "no leaf here" in c)
+    assert "1 contribution" in blind and "jump" in blind
+    later = e.explain(e.tickers[0], 1)
+    assert [node.name for node in later.root.children[8].children[0].children
+            if node.kind == "draw"] == [
+        "jump_market_u", "jump_market_z", "jump_company_u",
+        "jump_company_z"]
+
+
 def test_without_the_previous_day_the_valuation_and_the_book_are_one():
     e = engine(record=False)
     result = e.explain(e.tickers[0], 1)

@@ -673,8 +673,9 @@ class Explanation:
                 "state and the dials under them.")
         if blind:
             out.append(
-                ", ".join(blind) + " draw and have no leaf here, because "
-                "the log holds no draw of theirs for this day.")
+                _count(len(blind), "contribution") + " names a draw site "
+                f"the log holds no draw of for this day "
+                f"({', '.join(blind)}), so it has no leaf here.")
         off = [stream for stream in _STREAMS
                if stream not in self._traced]
         if off:
