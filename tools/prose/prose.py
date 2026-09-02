@@ -12,6 +12,11 @@ have to be re-read for verbs and commas.
 
 Every rule reports the file, the line and the text, so a failure is
 actionable rather than a score.
+
+One rule here is not about style. `control_bytes` reads the raw file and
+reports any byte below 0x20 outside tab, newline and carriage return. Such
+a byte is invisible in an editor, in a diff and in a review, and it passes
+every check that asks whether a file is ASCII, because 0x08 is below 128.
 """
 
 from __future__ import annotations
@@ -41,6 +46,14 @@ SIGNIFICANCE = [
     r"\bis what makes\b", r"\bis the reason\b", r"\bthat is why\b",
     r"\bworth (?:saying|noting|knowing)\b",
 ]
+
+#: Bytes below 0x20 that a text file may hold: tab, newline, carriage
+#: return. Everything else in that range is invisible in an editor, in a
+#: diff and in a review, and every check asking whether a file is ASCII
+#: passes it, because 0x08 is below 128. Two literal backspaces inside a
+#: regex in a test made that assertion match nothing while the suite
+#: reported green, which is what this rule exists to catch.
+ALLOWED_CONTROL = frozenset({0x09, 0x0A, 0x0D})
 
 #: Definition by negation.
 NEGATION = [
@@ -150,8 +163,40 @@ def excerpt(text: str, at: int, span: int = 34) -> str:
     return text[max(0, at - 8):at + span].strip()
 
 
+def control_bytes(label: str, text: str) -> list[str]:
+    """Control bytes, read over the RAW file rather than its parsed blocks.
+
+    Every other rule here reads paragraphs, so none of them sees a heading,
+    a fenced code block, or a line the markdown parser dropped. A control
+    byte hides in exactly those places, so this reads the file as it was
+    written and reports the line and the column.
+
+    The reported excerpt goes through `repr`, so the byte appears as `\\x08`
+    rather than being written to a terminal that would act on it.
+
+    The rule covers 0x00 to 0x1F. 0x7F is equally invisible and is outside
+    it, so a DEL byte passes this check today.
+    """
+    out: list[str] = []
+    line, col = 1, 1
+    for i, ch in enumerate(text):
+        code = ord(ch)
+        if code < 0x20 and code not in ALLOWED_CONTROL:
+            out.append(f"{label}:{line}: control byte 0x{code:02X} at column "
+                       f"{col}: {text[max(0, i - 8):i + 9]!r}")
+        if ch == "\n":
+            line, col = line + 1, 1
+        else:
+            col += 1
+    return out
+
+
 def from_markdown(path: pathlib.Path) -> list[str]:
-    lines = path.read_text(encoding="utf-8").split("\n")
+    text = path.read_text(encoding="utf-8")
+    # Before the parse, because the parse drops fences and headings and a
+    # control byte in either of those is still a control byte.
+    control = control_bytes(path.name, text)
+    lines = text.split("\n")
     blocks, headings, buf, start, fence = [], [], [], 1, False
     off = False
     for n, raw in enumerate(lines, 1):
@@ -183,18 +228,21 @@ def from_markdown(path: pathlib.Path) -> list[str]:
             buf = []
     if buf:
         blocks.append((start, " ".join(buf)))
-    return check_text(path.name, blocks, headings)
+    return control + check_text(path.name, blocks, headings)
 
 
 def from_page(path: pathlib.Path) -> list[str]:
     """The rendered page: its headings and its paragraphs."""
-    src = path.read_text(encoding="utf-8").split("<template")[0]
+    text = path.read_text(encoding="utf-8")
+    # As in `from_markdown`: the raw file, before the markup is stripped.
+    control = control_bytes(path.name, text)
+    src = text.split("<template")[0]
     src = re.sub(r"<(script|style|pre|code)[^>]*>.*?</\1>", " ", src, flags=re.S)
     headings = [(0, html.unescape(re.sub(r"<[^>]+>", "", m.group(1))))
                 for m in re.finditer(r"<h[1-3][^>]*>(.*?)</h[1-3]>", src, re.S)]
     blocks = [(0, html.unescape(re.sub(r"<[^>]+>", " ", m.group(1))))
               for m in re.finditer(r"<p[^>]*>(.*?)</p>", src, re.S)]
-    return check_text(path.name, blocks, headings)
+    return control + check_text(path.name, blocks, headings)
 
 
 def main() -> None:
