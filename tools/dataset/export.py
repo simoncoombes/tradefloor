@@ -617,11 +617,20 @@ def card(written: Sequence[Written]) -> str:
     out.append("## Columns")
     out.append("")
     recorded_columns = first.card.get("columns") or {}
+    # Whether prints.arrow is skipped here is decided by THIS flag alone --
+    # the same one the Files table and the "is absent" paragraph above read
+    # -- rather than by whether `recorded_columns["prints"]` happens to be
+    # `None`. The two used to be two independent signals that `export`'s own
+    # code kept in sync but nothing enforced, so a `Written` assembled by
+    # hand with the presence flag off and a stale `columns["prints"]` left
+    # over rendered a full prints.arrow column table directly under a
+    # paragraph saying the file does not exist.
+    prints_present = bool((first.card.get("prints") or {}).get("present"))
     for table_name in ("bars", "truth", "prints", "macro", "labels"):
+        if table_name == "prints" and not prints_present:
+            continue  # reported as absent above; no schema to list
         columns = recorded_columns.get(table_name)
         if columns is None:
-            if table_name == "prints":
-                continue  # reported as absent above; no schema to list
             # A `Written` built without a "columns" entry (`export` always
             # records one; a hand-built `Written` in a test may not) falls
             # back to the units table's own keys, in the order declared.

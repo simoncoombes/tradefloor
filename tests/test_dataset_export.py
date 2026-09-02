@@ -394,12 +394,23 @@ def test_card_names_prints_absent_when_the_engine_lacks_it(toy_written):
     without = copy.deepcopy(toy_written.card)
     without["prints"] = info
     without["rows"] = {**without["rows"], "prints": None}
+    # `columns["prints"]` is left as `toy_written` recorded it (a real
+    # column list) deliberately, rather than also nulled here: the point
+    # of this test is that "prints.arrow is absent" is decided from
+    # `card["prints"]["present"]` alone, so a stale, non-null
+    # `columns["prints"]` left over on a hand-assembled `Written` must not
+    # produce a "### prints.arrow" section under the paragraph that says
+    # the file does not exist. Nulling it too would let this test pass
+    # whichever field `card()` actually reads.
     stand_in = export.Written(seed=toy_written.seed, files=dict(
         (k, v) for k, v in toy_written.files.items() if k != "prints"
     ), card=without)
     text = export.card([stand_in])
     assert "absent" in text
     assert info["reason"] in text
+    assert "### prints.arrow" not in text, (
+        "a prints.arrow column table rendered directly under a paragraph "
+        "saying the file is absent")
 
 
 def test_card_refuses_an_empty_batch():
