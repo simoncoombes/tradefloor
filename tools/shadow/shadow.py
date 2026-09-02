@@ -80,6 +80,10 @@ def build_universe(d: dict, first: int) -> list:
     donors: dict[str, list] = {}
     for inst in tf.Universe.random(40, seed=111):
         donors.setdefault(inst.sector, []).append(inst)
+    if first < 253:
+        raise SystemExit(f"only {first} sessions precede the year; the beta "
+                         "estimate needs 252 and the window in data.YEARS "
+                         "is meant to provide them")
     idx = np.array(d["index"][first - 253:first], dtype=float)
     idx_r = np.diff(np.log(idx))
     out = []

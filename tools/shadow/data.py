@@ -51,10 +51,11 @@ ENGINE_SECTOR = {
     "indus": "industrials",
 }
 INDEX, VIX = "^GSPC", "^VIX"
-#: The two years the brief names: one calm, one crisis. Each window carries
-#: the prior year as well, for the beta estimate and the starting price.
-YEARS = {"calm": ("2016-01-01", "2018-01-01"),
-         "crisis": ("2019-01-01", "2021-01-01")}
+#: The two years the brief names: one calm, one crisis. Each window starts
+#: fifteen months earlier, so the beta estimate has 252 prior sessions and
+#: the starting price is the close before the first session.
+YEARS = {"calm": ("2015-10-01", "2018-01-01"),
+         "crisis": ("2018-10-01", "2021-01-01")}
 
 
 def epoch(day: str) -> int:
