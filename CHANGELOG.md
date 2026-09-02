@@ -1,5 +1,130 @@
 # Changelog
 
+## Unreleased
+
+**A run can commit to the state it held at the end of every day.** A
+`DayLedger` takes a canonical hash of the engine's state at every close,
+and a `RunManifest` written with one carries the Merkle root over those
+hashes. `tradefloor.manifest.verify` recomputes k random days from their
+committed predecessors and checks each leaf against the root, so checking
+k days costs k days of simulation whatever the length of the run.
+`Engine.state_hash` covers every field a state snapshot carries, including
+the macro chain and the generator positions the market digest leaves out,
+and `tradefloor.manifest.state_hash` computes the same digest in Python
+from `state_snapshot()`. Nothing about a trajectory moves: the manifest
+field is additive under the schema it already had, and `reproduce()`
+behaves the same with the field and without it.
+
+**Every draw the engine takes has an address**, and a table of
+substitutions can replace one at it; a second `run_days` call numbers its
+days from the engine's own counter rather than from zero.
+
+**A surgery replaces one draw**, re-randomises a stream over a window or
+transplants another world's draws, and the record says what it installed
+and whether it could bite.
+
+<!-- release-note-ends -->
+
+### Draw surgery in a world
+
+Four surgeries sit on a world beside its interventions. `point` replaces
+one draw, `unfire` stops a day's market jump, `window` re-randomises one
+stream over a range of days under a generator derived from the seed, the
+stream and a surgery seed, and `transplant` copies another world's draws
+of one stream address for address. Each is checked after its day runs:
+the draw log must show the patched address drawn on that day, at the site
+it was aimed at, with the value that was installed, and a schedule that
+moved in between raises rather than reporting a surgery that landed
+somewhere else. A delisting moves the schedule as a listing does, because
+the jumps stream takes one uniform per active company.
+
+`unfire` says what it did. `Engine.market_jump_intensity` reports the
+threshold `apply_jumps` compares its market uniform against, so the
+record carries whether the jump could fire and whether the surgery could
+stop it. At an intensity of zero the jump cannot fire and the surgery is
+a no-op; above one the value the surgery installs is itself under the
+threshold, so the jump fires in both arms and the record says the surgery
+could not stop it.
+
+### The draw log's range
+
+A second trace widens the log's range in both directions and keeps what
+was already recorded, so a caller tracing a window on top of an earlier
+trace loses nothing.
+
+### Draw addressing and the patching layer
+
+A draw's address is its stream, whether it was a uniform or a normal, and
+how many draws of that kind the stream had taken. An overlay substitutes
+a value at an address without skipping the generator step, so every
+address after it keeps its value and the draw counts are identical with
+and without one. A log records what each stream delivered, with the day
+and the call site, and `Engine.market_day_layout` maps a day and a company
+to the market normals it drew.
+
+The day a draw carries is stamped at the open it belongs to. Opening a day
+pushes its mark and takes its endogenous news draws, so a day stamped
+after the open left one run carrying two numbers: a three-day run numbered
+from 100 logged five streams on 100, 101 and 102 and the news stream and
+the marks on 0, 1 and 2, and the layout of day 100 resolved to nothing.
+
+`run_days` numbers from the engine's own day counter unless told
+otherwise, so a second call continues the first instead of repeating its
+numbers. A caller that wants the old behaviour passes `first_day=0`. This
+moves the day column of a recorded second run, from 0 and 1 to 2 and 3.
+
+A restore drops the day marks, which described the run it replaced. The
+log costs 32 bytes a record, pinned beside the type: at 60 names and 390
+ticks the market stream takes 145,470 draws a day, 4.7 MB a day and 1.17
+GB over a year, and its time cost did not resolve above the noise of a
+shared machine.
+
+### The measured cost
+
+On `Universe.random(8, seed=99)`, seed 42, twelve days at 30 ticks a day,
+verifying k days runs k days of ticks and no more, for k of 1, 3 and 12.
+The whole run is 360 ticks, so a four-day verification is a third of what
+replaying it costs. A ledger written without the states reaches day d by
+running to it, so a sample costs the sum of d plus one over the days it
+drew, which the verify seed decides. `Verification` reports the days, the
+day-runs and which of the two costs was paid.
+
+### The ledger size
+
+The states sit in the ledger, beside the manifest rather than inside it.
+On `Universe.random(40, seed=7)`, seed 42, 252 days at 30 ticks a day with
+`record=False`, the ledger writes 4.88 MB with the states and 16.9 kB
+without them, next to a 61.8 kB manifest. A manifest is meant to be read,
+so it carries the root, the count and the hash version.
+
+### The per-name volume array and a changed roster
+
+`tradefloor.manifest.state_hash` hashes each per-slot array at the width
+the snapshot carries and refuses a snapshot whose arrays disagree with the
+roster. Before tradefloor issue #148, `volume_idio` is sized at
+construction and is the one per-slot array `add_company` and
+`remove_company` do not resize, so a snapshot taken after a listing or a
+delisting is refused and a run whose roster changed cannot be checked by
+the Python side. `Engine.state_hash` in Rust hashes the same array at the
+same width, so such a run's leaf is self-consistent and `verify` passes
+over it.
+
+No price depends on the width. Every shipped preset holds
+`volume_idio_sigma` and `volume_idio_persistence` at 0.0, so every value
+in the array is exactly 0.0. Issue #148 is where the resize is being made,
+and the test here reads the widths off the snapshot rather than pinning
+them, so it states the same relationship before and after that lands.
+
+### The session flag at a close
+
+`run_session(close_at_end=True)` leaves the binding's session flag set
+where `close_market()` clears it, so the two spellings of one close
+produce different leaves for the same market. The columns, the macro
+chain, the generators and the draw count are identical across them, which
+is why nothing saw the flag until a leaf covered it. The flag is left
+where it is: clearing it would change the trajectory of a run that calls
+`run_session` twice without opening a market between them.
+
 ## 0.6.2
 
 **A scenario reaches the agent.** `market.liquidity` is the one scenario

@@ -1156,10 +1156,17 @@ impl PyEngine {
     /// over `run_session` loses well under one per cent. Use this because it
     /// reads better and records for you, not because a loop would be slow.
     ///
+    /// `ledger` is an optional `tradefloor.DayLedger`, which is handed the
+    /// state hash after every close and, when it keeps them, the state
+    /// itself. It is a callback rather than a return value because a run of
+    /// 252 days holds 252 leaves and the caller usually wants them beside a
+    /// `RunManifest` rather than in a list this method built.
+    ///
     /// Returns the number of days run.
     #[pyo3(signature = (
         days, *, hour = 9, minute = 30, day_of_week = 3,
-        ticks_per_day = 390, volatility = 1.0, record = true, first_day = None
+        ticks_per_day = 390, volatility = 1.0, record = true,
+        first_day = None, ledger = None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn run_days(
@@ -1173,6 +1180,7 @@ impl PyEngine {
         volatility: f64,
         record: bool,
         first_day: Option<u32>,
+        ledger: Option<Py<PyAny>>,
     ) -> PyResult<usize> {
         if days == 0 {
             return Err(ValidationError::new_err("days must be greater than zero"));
@@ -1189,6 +1197,13 @@ impl PyEngine {
         // what makes the second call continue the first. A caller that
         // wants to restart the numbering passes `first_day=0`.
         let first_day = first_day.unwrap_or(self.day_count);
+        // Asked once rather than per day: whether the ledger wants the
+        // predecessor states decides how much a later verification costs, and
+        // it cannot change halfway through a run.
+        let keeps_snapshots: bool = match &ledger {
+            Some(l) => l.bind(py).getattr("keeps_snapshots")?.extract()?,
+            None => false,
+        };
         for offset in 0..days {
             // `first_day` is the day number the record and the truth table
             // carry, so the day mark, the news draws and every stream's log
@@ -1204,6 +1219,18 @@ impl PyEngine {
                 self.record(first_day + offset as u32)?;
             }
             self.close_market();
+            // The leaf is taken AFTER the close, so a run that never called
+            // `record` still ledgers, and the state a leaf commits to is the
+            // one the next day starts from.
+            if let Some(l) = &ledger {
+                let leaf = self.state_hash();
+                let snapshot = if keeps_snapshots {
+                    Some(self.state_snapshot(py)?)
+                } else {
+                    None
+                };
+                l.bind(py).call_method1("_close", (leaf, snapshot))?;
+            }
         }
         Ok(days)
     }
@@ -2090,6 +2117,56 @@ impl PyEngine {
             )));
         }
         Ok((0..count).map(|_| self.clone()).collect())
+    }
+
+    /// This market's state as one 64-character hex digest: the ledger leaf.
+    ///
+    /// Covers every field [`PyEngine::state_snapshot`] carries, in one fixed
+    /// order, on the canonical-f64 rule `manifest._f64` and
+    /// `tests/known_answer.py` share. `crate::engine::Engine::state_hash`
+    /// documents the encoding and why the generator states are hashed as
+    /// `u64` bit patterns rather than as floats.
+    ///
+    /// Two engines whose hashes agree hold the same market state to the bit,
+    /// including the macro chain and the generator positions that
+    /// `market_digest` leaves out. Two engines that reached that state by
+    /// different routes hash the same: this is a hash of state, and the
+    /// order log, the recorded tape and the pending daily jump are outside
+    /// it, exactly as they are outside the snapshot.
+    ///
+    /// One difference is worth knowing before two runs are compared.
+    /// `run_session` with `close_at_end` leaves this binding's session flag
+    /// set where `close_market` clears it, so the two spellings of one close
+    /// hash apart on a market that is otherwise identical to the bit. The
+    /// flag is state rather than bookkeeping: it decides whether the next
+    /// session re-opens the day and re-anchors `previous_close`. A recorded
+    /// run still verifies against itself either way, because a replay runs
+    /// the spelling its own log holds.
+    ///
+    /// Each per-slot array is hashed at the width the engine holds for it.
+    /// That is the invariant, whatever the roster does.
+    ///
+    /// Before tradefloor issue #148 one array makes that width differ from
+    /// the roster's. `volume_idio` is sized at construction and is the one
+    /// per-slot array `add_company` and `remove_company` do not resize, so
+    /// after a listing or a delisting this walks it at the constructor's
+    /// width. The leaf stays self-consistent and such a run still verifies,
+    /// because the recording and the replay read the same array, and no
+    /// price depends on the width: every shipped preset holds
+    /// `volume_idio_sigma` and `volume_idio_persistence` at 0.0, so every
+    /// value is exactly 0.0. The Python twin refuses such a snapshot rather
+    /// than hashing a width it cannot check. #148 is where the resize is
+    /// being made, and this second paragraph goes when it lands.
+    ///
+    /// `tradefloor.manifest.state_hash(engine.state_snapshot())` computes
+    /// the same digest in Python, and a test holds the two equal.
+    fn state_hash(&self) -> String {
+        let bytes = self.inner.state_hash(self.day_count, self.market_open);
+        let mut hex = String::with_capacity(64);
+        for byte in bytes {
+            hex.push_str(&format!("{byte:02x}"));
+        }
+        hex
     }
 
     /// Every column plus the generator position, as one dict.

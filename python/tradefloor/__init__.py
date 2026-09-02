@@ -36,9 +36,13 @@ from . import counterfactual
 from . import noise
 from .counterfactual import (Agreement, Comparison, Divergence, Resample,
                              World, agree, compare, resample)
+from . import externality
+from .externality import Externality, externalities
 from .sweep import sweep
+from . import boundary
+from .boundary import BoundaryMap, Flip, flip, map_boundaries
 from . import manifest
-from .manifest import RunManifest
+from .manifest import DayLedger, RunManifest, Verification
 from . import spec
 from .spec import SPEC_VERSION, StrategySpec
 from .scenario import Scenario, run_scenario
@@ -104,11 +108,13 @@ __all__ = [
     "Scenario", "run_scenario", "facts", "loss", "Checkpoint", "branch", "sweep",
     "counterfactual", "World", "agree", "compare", "resample",
     "noise",
+    "externality", "Externality", "externalities",
     "Agreement", "Comparison", "Resample",
     "Divergence",
+    "boundary", "flip", "map_boundaries", "Flip", "BoundaryMap",
     "Intervention", "Firing", "ScenarioValidationError", "interventions",
     "TARGETS", "UNSUPPORTED_TARGETS", "yaml_subset",
-    "manifest", "RunManifest",
+    "manifest", "RunManifest", "DayLedger", "Verification",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
     "market_status", "model_preset", "run_many", "sector_daily_sigma", "sectors",
