@@ -253,7 +253,12 @@ class Forward:
 #: number of accepted steps between fresh Jacobians (Broyden in between),
 #: the iterations per round and the rounds a solve may restart when the
 #: closes are not reached. ``lab()`` measures alternatives on synthetic days.
-SOLVER = {"step": 0.5, "refresh": 3, "max_iter": 12, "restarts": 2}
+#: Measured by the lab (run shadowlab1, 2026-09-02, four synthetic days each
+#: on six and forty names, sigma 1e-3): step 0.25 with Broyden updates only
+#: reached 0 of 4 forty-name days (median residual 1.7e-2); step 0.5 or 1.0
+#: with a fresh Jacobian every three steps reached 4 of 4 at the grid floor
+#: (median 1.8e-3 and 2.1e-3, max 2.7e-3 and 2.2e-3, 502 and 399 evaluations).
+SOLVER = {"step": 1.0, "refresh": 3, "max_iter": 12, "restarts": 2}
 
 
 def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
