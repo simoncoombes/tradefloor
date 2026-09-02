@@ -7,6 +7,7 @@ schedule, and the year slicing and the idiosyncratic sd read the data
 shape the tool feeds them.
 """
 
+import json
 import math
 import os
 import sys
@@ -445,6 +446,7 @@ def _saved_run(short_days_ticks=40, days=3, sensitivity=True):
     if sensitivity:
         provenance["sensitivity"] = ("fresh finite difference at the "
                                      "accepted solution")
+        provenance["solver"] = shadow.SOLVER_VERSION
     return {
         # The shape `shadow()` writes, tuples included: a fixture that
         # carries a list where the tool carries a tuple makes the JSON
@@ -690,3 +692,60 @@ def test_the_generated_report_meets_the_house_style(short_days, tmp_path):
         capture_output=True, text=True)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "0 findings" in proc.stdout, proc.stdout
+
+
+def test_a_recompute_reproduces_a_fixed_solvers_columns(synthetic_year,
+                                                        tmp_path):
+    """The columns a render recomputes are the ones the fixed solver
+    produces.
+
+    A run solved before the sensitivity was measured fresh carries the
+    optimiser's carried Jacobian in its sensitivity and binding-clamp
+    columns, and a render that only relabelled them would leave a wrong
+    number in a published table. Recomputed from the saved per-day
+    solutions, they come back equal to what a run solved by the fixed
+    solver reports, day for day.
+    """
+    run = shadow.shadow(_args(tmp_path / "a"))
+    assert run["provenance"]["solver"] == shadow.SOLVER_VERSION
+
+    # the same run as an older box would have written it: no solver
+    # version, and the two columns whatever they happened to be
+    old = json.loads(json.dumps(run))
+    old["provenance"].pop("solver")
+    for day in old["days"]:
+        day["sensitivity"] = [0.0] * len(day["sensitivity"])
+        day["clamped"] = ["WRONG"]
+
+    back = shadow.recompute_sensitivity(old, shadow.realdata.load("calm"))
+    assert len(back["days"]) == len(run["days"])
+    for fresh, solved in zip(back["days"], run["days"]):
+        assert fresh["sensitivity"] == solved["sensitivity"], fresh["day"]
+        assert fresh["clamped"] == solved["clamped"], fresh["day"]
+    assert "recomputed at render time" in back["provenance"]["sensitivity"]
+    assert back["provenance"]["clamp_threshold"] == shadow.CLAMP_BELOW
+    assert "recomputed at render time" in shadow.render(back)
+    assert f"{shadow.CLAMP_BELOW:.0e}" in shadow.render(back)
+
+
+def test_a_render_leaves_a_fixed_solvers_run_alone(synthetic_year, tmp_path):
+    """A run that already measured its columns fresh is rendered as it is,
+    and `--no-recompute` says so for one that did not."""
+    run = shadow.shadow(_args(tmp_path / "a"))
+    saved = tmp_path / "shadow.json"
+    saved.write_text(json.dumps(run), encoding="utf-8")
+    out = tmp_path / "out"
+    assert shadow.main(["--render", str(saved), "--out", str(out)]) == 0
+    assert ((out / "shadow.md").read_text(encoding="utf-8")
+            == shadow.render(run))
+
+    old = json.loads(json.dumps(run))
+    old["provenance"].pop("solver")
+    older = tmp_path / "old.json"
+    older.write_text(json.dumps(old), encoding="utf-8")
+    out2 = tmp_path / "out2"
+    assert shadow.main(["--render", str(older), "--no-recompute",
+                        "--out", str(out2)]) == 0
+    text = (out2 / "shadow.md").read_text(encoding="utf-8")
+    assert "optimiser's own Jacobian" in text
+    assert "recomputed at render time" not in text
