@@ -72,7 +72,7 @@ would have done to the tick after.
 
 Measured on day 39, the last day of the post-fork window, over 390 ticks
 and the twenty-four names drawn from `data/edgar-2026-08-31.json`. Seed
-4242, universe seed 4242, preset `pt-v16`, at commit `ae8d3d6`. The
+4242, universe seed 4242, preset `pt-v16`, at commit `f4ae3b7`. The
 notebook prints this table from `ex.depth_readings(worlds)`.
 
 ## Reading it
