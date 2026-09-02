@@ -337,7 +337,7 @@ class World:
         ``record`` also records each day on the engine before its close,
         the way :func:`tradefloor.facts.measure` does, so ``engine.bars``
         and ``engine.truth`` carry the run and
-        :func:`tradefloor.facts.statistics` can read it. Off by default:
+        :func:`tradefloor.facts.panel_statistics` can read it. Off by default:
         a record is an entry in the order log, and a world that recorded
         would checkpoint and replay differently from one that did not.
         Nothing about the market moves either way.

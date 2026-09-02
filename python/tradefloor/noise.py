@@ -286,7 +286,7 @@ class Target(NamedTuple):
 
 
 def statistic(name: str) -> Target:
-    """A panel statistic from :func:`tradefloor.facts.statistics`, by key.
+    """A panel statistic from :func:`tradefloor.facts.panel_statistics`, by key.
 
     The arms record every day they run and the statistic is read off the
     daily bars at the horizon, so the run must be long enough for it:
@@ -626,7 +626,7 @@ def _evaluate(target: Target, arm: Any) -> float:
                 f"{target.ticker!r} is not in this world's roster")
     if target.kind == "statistic":
         from . import facts
-        stats = facts.statistics(arm.engine.bars(grain="day"), arm.universe)
+        stats = facts.panel_statistics(arm.engine.bars(grain="day"), arm.universe)
         if target.name not in stats:
             raise ValidationError(
                 f"{target.name!r} is not a panel statistic; one of "

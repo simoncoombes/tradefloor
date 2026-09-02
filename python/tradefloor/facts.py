@@ -1164,12 +1164,12 @@ def measure(
         "model_fingerprint": engine.model_fingerprint,
         "days": days,
     }
-    facts.update(statistics(engine.bars(grain="day"), universe,
-                            min_observations=min_observations))
+    facts.update(panel_statistics(engine.bars(grain="day"), universe,
+                                  min_observations=min_observations))
     return facts
 
 
-def statistics(
+def panel_statistics(
     table: Any,
     universe: Sequence[Instrument],
     *,
@@ -1191,7 +1191,7 @@ def statistics(
         import pyarrow as pa
     except ImportError as exc:  # pragma: no cover
         raise ImportError(
-            "tradefloor.facts.statistics reads the daily bars table and needs "
+            "tradefloor.facts.panel_statistics reads the daily bars table and needs "
             "pyarrow. Install it with: pip install tradefloor[arrow]"
         ) from exc
 

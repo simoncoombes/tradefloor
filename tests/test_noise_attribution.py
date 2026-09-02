@@ -125,8 +125,8 @@ def test_a_statistic_target_reads_facts_off_the_recorded_arms():
     assert len(attribution.rows) == 1
     control, = root.fork("control")
     control.run(32, record=True)
-    stats = facts.statistics(control.engine.bars(grain="day"),
-                             control.universe)
+    stats = facts.panel_statistics(control.engine.bars(grain="day"),
+                                   control.universe)
     assert attribution.control == stats["annualised_vol_pct"]
     assert math.isfinite(attribution.rows[0]["effect"])
     with pytest.raises(tf.ValidationError, match="not a panel statistic"):
@@ -134,7 +134,7 @@ def test_a_statistic_target_reads_facts_off_the_recorded_arms():
                         streams=["volume"], horizon=32)
 
 
-def test_facts_statistics_is_what_measure_reports():
+def test_facts_panel_statistics_is_what_measure_reports():
     universe = tf.Universe.random(4, seed=7)
     measured = facts.measure(seed=3, universe=universe, days=40)
     engine = tf.Engine(seed=3, universe=universe)
@@ -143,7 +143,7 @@ def test_facts_statistics_is_what_measure_reports():
         engine.run_session(9, 30, 3, 390)
         engine.record(day)
         engine.close_market()
-    stats = facts.statistics(engine.bars(grain="day"), universe)
+    stats = facts.panel_statistics(engine.bars(grain="day"), universe)
     assert set(stats) <= set(measured)
     assert all(measured[k] == v for k, v in stats.items())
     assert set(measured) - set(stats) == {
