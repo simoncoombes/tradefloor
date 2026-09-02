@@ -802,14 +802,38 @@ class World:
 
         # The address
 
-        The jumps stream takes ``1 + companies`` uniforms per day, the
-        market's first, in every state of the market, since a delisted
-        company still draws. So the market uniform of ``day`` sits at the
-        stream's current uniform position plus that many per day until
-        then. The arithmetic is checked after ``day`` runs: the draw log
-        must show the patched address at the market jump site on that
-        day, and a run that moved the schedule in between (a listing)
-        raises rather than reporting a surgery that landed on a company.
+        The jumps stream takes one uniform for the market and one per
+        ACTIVE company each day, the market's first, so the market uniform
+        of ``day`` sits at the stream's current uniform position plus that
+        many per day until then. The count moves with the active set, and
+        both directions were measured: a ten-name roster took 11 uniforms
+        and 11 normals on a day, and 10 of each on the day after
+        ``delist(0)``. A listing moves it the same way.
+
+        So the arithmetic assumes the active set does not change between
+        the surgery and the day, and the check after ``day`` runs is what
+        holds that assumption to account: the draw log must show the
+        patched address at the market jump site on that day, with the value
+        that was installed, and a schedule that moved raises rather than
+        reporting a surgery that landed on a company.
+
+        # Whether the jump would have fired
+
+        The record carries ``intensity``, the market jump intensity read
+        from the model at the moment of the call, and ``fires``. An
+        intensity of zero makes ``u < intensity`` false for every ``u`` in
+        ``[0, 1)``, so the jump cannot fire and ``fires`` is ``False``: the
+        surgery is a no-op and the record says so, rather than leaving an
+        unfired arm that is identical to its control and silent about why.
+        An intensity of one or more fires on every day, so ``fires`` is
+        ``True``. Between the two the draw decides it, ``fires`` is
+        ``None``, and the control arm is what shows it.
+
+        ``intensity`` is read when ``unfire`` is called. Where the VIX
+        coupling is on it moves with the VIX, so for a day that has not run
+        it is the intensity of today rather than of ``day``, and only the
+        zero case is exact for both, since a zero intensity stays zero
+        whatever the VIX does.
         """
         self._refuse_open_market("unfire")
         day = int(day)
@@ -823,11 +847,41 @@ class World:
                            [_noise.Patch(address, _noise.NO_FIRE)])
         self.engine.trace_draws("jumps", day, day)
         self._expect(day, address, _noise.NO_FIRE, "jump_market_u")
+        intensity = self._market_jump_intensity()
+        fires: bool | None
+        if intensity <= 0.0:
+            fires = False
+        elif intensity >= 1.0:
+            fires = True
+        else:
+            fires = None
         self.surgeries.append({
             "kind": "unfire", "day": day, "step": day * self.steps_per_day,
             "stream": "jumps", "address": tuple(address),
-            "value": _noise.NO_FIRE})
+            "value": _noise.NO_FIRE,
+            "intensity": intensity, "fires": fires})
         return self
+
+    def _market_jump_intensity(self) -> float:
+        """The market jump intensity this engine is running, right now.
+
+        The mechanism reads ``jump_intensity_market`` and, where
+        ``jump_vix_coupling`` is not zero, scales it by
+        ``(1 - coupling) + coupling * ratio * ratio`` for
+        ``ratio = vix / market_vol_vix_anchor``. Read from the model and
+        the macro state rather than assumed, so a preset that moves either
+        dial moves this with it.
+        """
+        model = dict(self.engine.model_params)
+        base = float(model.get("jump_intensity_market", 0.0))
+        coupling = float(model.get("jump_vix_coupling", 0.0))
+        if coupling == 0.0:
+            return base
+        anchor = float(model.get("market_vol_vix_anchor", 0.0))
+        if anchor == 0.0:
+            return base
+        ratio = float(self.engine.macro_state.vix) / anchor
+        return base * ((1.0 - coupling) + coupling * ratio * ratio)
 
     def window(self, stream: str, days: Any, surgery_seed: int) -> "World":
         """Re-randomise ``stream`` over ``days`` under a surgery generator.

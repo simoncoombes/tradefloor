@@ -70,7 +70,10 @@ def test_unfiring_a_jump_moves_nothing_before_its_day():
     assert [e.value for e in market] == [noise.NO_FIRE]
     assert unfired.surgeries == [{
         "kind": "unfire", "day": 4, "step": 4 * STEPS, "stream": "jumps",
-        "address": market[0].address, "value": noise.NO_FIRE}]
+        "address": tuple(market[0].address), "value": noise.NO_FIRE,
+        # the record says whether the jump it defeats could have fired;
+        # this preset fires on every day, so it could
+        "intensity": 1.0, "fires": True}]
 
     report = compare(control, unfired, agreement=agreement)
     assert report.divergence.intervention_day == 4
@@ -250,3 +253,115 @@ def test_a_fork_carries_the_surgery_and_agree_reports_it_as_engine_state():
     child.run(2)
     b.run(2)
     assert child.trace == b.trace
+
+
+# -- the check after the day -------------------------------------------------
+
+QUIET = tf.ModelParams.from_preset("pt-v16", jump_intensity_market=0.0,
+                                   jump_vix_coupling=0.0)
+
+
+def test_the_check_after_the_day_names_the_site_it_landed_on():
+    """A schedule that moved puts the aimed address on another site.
+
+    The jumps stream takes one uniform for the market and one per active
+    company, so a delisting between the surgery and its day shortens every
+    later day and slides the address onto a company's draw. Without this
+    branch the surgery reports success while patching a company's jump.
+    """
+    w = world(JUMPY).run(1)
+    w.unfire(2)
+    w.engine.delist(0)
+    with pytest.raises(tf.ValidationError) as caught:
+        w.run(2)
+    message = str(caught.value)
+    assert "landed on jump_company_u" in message
+    assert "rather than jump_market_u" in message
+    assert "company 0" in message
+
+
+def test_the_check_after_the_day_names_the_value_it_delivered():
+    """A second patch at the same address wins, and the check says so.
+
+    The address is drawn on the day it was aimed at, at the site it was
+    aimed at, and still delivers a value the surgery did not install.
+    Without this branch that overlay passes as the installed one.
+    """
+    w = world(JUMPY).run(1)
+    w.unfire(2)
+    w.engine.patch_draws([(*w.surgeries[0]["address"], 0.5)])
+    with pytest.raises(tf.ValidationError) as caught:
+        w.run(2)
+    message = str(caught.value)
+    assert "delivered 0.5 rather than 1.0" in message
+    assert "the overlay in place is not the one installed" in message
+
+
+# -- a surgery that cannot do anything ---------------------------------------
+
+def test_unfire_records_that_a_zero_intensity_jump_cannot_fire():
+    """An unfired arm identical to its control used to say nothing about
+    why. At an intensity of zero the jump cannot fire, so the record says
+    the surgery is a no-op rather than leaving the reader to guess."""
+    base = world(QUIET).run(3)
+    control, shock = base.fork("control", "unfired")
+    shock.unfire(3)
+    record = shock.surgeries[0]
+    assert record["intensity"] == 0.0
+    assert record["fires"] is False
+    control.run(2)
+    shock.run(2)
+    # and the arms agree, which is what the record predicted
+    assert compare(control, shock).divergence.prices is None
+
+
+def test_unfire_records_that_a_certain_jump_fires():
+    """The other outcome. An intensity of one fires on every day, because
+    every uniform the stream can draw is below it."""
+    base = world(JUMPY).run(3)
+    control, shock = base.fork("control", "unfired")
+    shock.unfire(3)
+    record = shock.surgeries[0]
+    assert record["intensity"] == 1.0
+    assert record["fires"] is True
+    control.run(2)
+    shock.run(2)
+    assert compare(control, shock).divergence.prices is not None
+
+
+def test_the_intensity_is_read_from_the_model_and_the_vix():
+    """Read, not assumed: the coupled form scales the base intensity by
+    the VIX ratio, so a preset that moves either dial moves this."""
+    w = world().run(1)
+    model = dict(w.engine.model_params)
+    base = model["jump_intensity_market"]
+    coupling = model["jump_vix_coupling"]
+    anchor = model["market_vol_vix_anchor"]
+    ratio = w.engine.macro_state.vix / anchor
+    want = base * ((1.0 - coupling) + coupling * ratio * ratio)
+    assert w._market_jump_intensity() == want
+    assert 0.0 < want < 1.0
+    w.unfire(1)
+    assert w.surgeries[0]["fires"] is None
+
+
+# -- the day a surgery may name ----------------------------------------------
+
+def test_a_surgery_refuses_a_day_that_has_run():
+    """A draw already taken cannot be replaced, so a window starts today
+    or later."""
+    w = world().run(3)
+    with pytest.raises(tf.ValidationError) as caught:
+        w.window("jumps", 1, surgery_seed=1)
+    assert "day 1 has run" in str(caught.value)
+    assert "this world is on day 3" in str(caught.value)
+    # today is allowed
+    assert w.window("jumps", 3, surgery_seed=1) is w
+
+
+def test_a_day_pair_that_runs_backwards_is_refused():
+    w = world().run(3)
+    with pytest.raises(tf.ValidationError) as caught:
+        w.window("jumps", (4, 2), surgery_seed=1)
+    assert "days runs backwards: (4, 2)" in str(caught.value)
+    assert w.window("jumps", (4, 5), surgery_seed=1) is w
