@@ -843,13 +843,12 @@ pub fn update_economy_daily(
         let b_d = 1.0 - b_w - b_m;
         let harvar =
             b_d * rv_d + b_w * new_state.vix_har_rv_week + b_m * new_state.vix_har_rv_month;
-        let harvol = if level_on {
-            // A trimmed market realizes less variance for the same fear;
-            // the anchor's VIX target stays in the calibrated identity.
-            mathx::sqrt(252.0 * harvar) * 100.0 * inputs.vix_har_vrp / level_scale
-        } else {
-            mathx::sqrt(252.0 * harvar) * 100.0 * inputs.vix_har_vrp
-        };
+        // NOT level-scaled (round 171.8): the anchor's realized variance is
+        // the index's, which a market-sigma trim shrinks by less than the
+        // sigma, so dividing by the scale over-corrected — P30 doubled and
+        // the spike asymmetry drifted at r 0.78. The anchor tracks whatever
+        // vol the market realizes; the VIX premium is vix_har_vrp's job.
+        let harvol = mathx::sqrt(252.0 * harvar) * 100.0 * inputs.vix_har_vrp;
         let w = inputs.vix_har_weight;
         target_vix = (1.0 - w) * target_vix + w * harvol;
     }

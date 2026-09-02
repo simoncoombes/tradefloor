@@ -1168,9 +1168,12 @@ pub struct ModelParams {
     /// land in, take over the calm held-VIX window (cs@5 0.32 -> 0.60,
     /// vol@5 21 -> 32) and the crisis lever collapses 6.27 -> 3.31. With
     /// this set, scale = market_factor_sigma / level_ref multiplies the
-    /// ruler's VIX side, scale^2 multiplies the kick's energy and the HAR
-    /// anchor's VIX target is divided by it — the fear process is then
-    /// invariant to a sigma trim in its own units. 0.0 = off, bit for bit;
+    /// ruler's VIX side and scale^2 multiplies the kick's energy — the
+    /// co-jump is then invariant to a sigma trim in its own units. The
+    /// HAR anchor is deliberately NOT scaled (round 171.8): its realized
+    /// variance is the index's, which the trim shrinks by less than the
+    /// sigma, and the first form over-corrected the VIX level; the anchor
+    /// tracks realized vol and vix_har_vrp carries the premium. 0.0 = off, bit for bit;
     /// set equal to the running market_factor_sigma it is also bit for
     /// bit (every scale is exactly 1.0).
     pub vix_selfex_level_ref: f64,
