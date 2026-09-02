@@ -886,7 +886,27 @@ impl PyEngine {
     }
 
     /// Roll the day's opening marks. Call once before the session's ticks.
+    ///
+    /// Numbers the day from the engine's own counter. `run_days` numbers it
+    /// from `first_day` instead, through [`Self::open_market_on`].
     fn open_market(&mut self) {
+        self.open_market_on(i64::from(self.day_count));
+    }
+
+    /// Roll the day's opening marks, numbering the day `day`.
+    ///
+    /// The day is stamped BEFORE `inner.open_market()`, and the order is the
+    /// whole of it. That call pushes the day mark and takes the day's
+    /// endogenous news draws, so both carry whatever number was stamped when
+    /// it ran. `run_days` used to open first and re-stamp afterwards, which
+    /// left one run carrying two numbers: `run_days(3, first_day=100)` logged
+    /// the market, economy, jumps, volume and per-name volume streams on days
+    /// 100, 101 and 102, the news stream on 0, 1 and 2, and `day_marks()` on
+    /// 0, 1 and 2, so `market_day_layout(100)` found nothing while
+    /// `market_day_layout(0)` returned a mark for a day the log called 100.
+    /// Two `run_days(2)` calls in a row reached the same split without any
+    /// `first_day` at all.
+    fn open_market_on(&mut self, day: i64) {
         self.log.push(crate::python_log::LogEntry::OpenMarket);
         // A new day's tape starts here. Without this, a run that never closed
         // would grow one unbounded "day".
@@ -895,9 +915,7 @@ impl PyEngine {
         // The day a draw carries in the draw log is the day whose open it
         // follows, so the jumps, volume and macro draws taken at a close
         // belong to the day they close rather than to the one after.
-        // Stamped from the counter here, so `open_market()` and
-        // `run_days()` number a day the same way.
-        self.inner.set_current_day(i64::from(self.day_count));
+        self.inner.set_current_day(day);
         self.inner.open_market();
     }
 
@@ -1153,10 +1171,11 @@ impl PyEngine {
             return Err(ValidationError::new_err("ticks_per_day must be greater than zero"));
         }
         for offset in 0..days {
-            self.open_market();
             // `first_day` is the day number the record and the truth table
-            // carry, so the draw log carries it too.
-            self.inner.set_current_day((first_day + offset as u32) as i64);
+            // carry, so the day mark, the news draws and every stream's log
+            // carry it too. Passed INTO the open rather than stamped after
+            // it, for the reason `open_market_on` gives.
+            self.open_market_on((first_day + offset as u32) as i64);
             self.run_session(py, hour, minute, day_of_week, ticks_per_day, volatility,
                              false, None, None, None)?;
             // Record BEFORE the close: the close advances the macro chain
@@ -1529,10 +1548,14 @@ impl PyEngine {
 
     /// The day the draws taken from now on carry in the draw log and the
     /// day marks. `open_market` stamps the engine's own day counter and
-    /// `run_days` stamps `first_day` after each open, so this is for a
-    /// caller that drives the core between an open and a close and wants
-    /// the draws numbered its own way, or an embedder taking draws through
-    /// `draw_uniform` on a closed market.
+    /// `run_days` stamps `first_day`, each at the open it labels, so this is
+    /// for a caller that drives the core between an open and a close and
+    /// wants the draws numbered its own way, or an embedder taking draws
+    /// through `draw_uniform` on a closed market.
+    ///
+    /// Stamped between an open and the close that follows it, this moves the
+    /// number the rest of that day's draws carry and leaves the day mark on
+    /// the number the open stamped.
     fn set_day(&mut self, day: i64) {
         self.inner.set_current_day(day);
     }
@@ -2604,6 +2627,11 @@ impl PyEngine {
                     })?;
             }
         }
+        // The marks name the days THIS engine opened, and a restore replaces
+        // the run. Kept across one, they named days the restored engine had
+        // not run: two days, then a three-day snapshot, then two more
+        // reported marks for 0, 1, 3 and 4.
+        self.inner.clear_day_marks();
         if let Some(v) = snapshot.get_item("day_count")? {
             self.day_count = v.extract()?;
         }
