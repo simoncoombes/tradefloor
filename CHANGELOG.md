@@ -15,9 +15,8 @@ from `state_snapshot()`. Nothing about a trajectory moves: the manifest
 field is additive under the schema it already had, and `reproduce()`
 behaves the same with the field and without it.
 
-**Every draw the engine takes has an address**, and a table of
-substitutions can replace one at it; a second `run_days` call numbers its
-days from the engine's own counter rather than from zero.
+**Every draw has an address**, a table of substitutions can replace one,
+and a second `run_days` call numbers days from the engine's own counter.
 
 <!-- release-note-ends -->
 
