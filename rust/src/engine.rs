@@ -637,7 +637,12 @@ impl Engine {
 
     /// The day the next `open_market` opens. The engine cannot know it on
     /// its own: `run_session` and `tick` take no day, and only the caller
-    /// that numbers its days does. `close_day` sets it too.
+    /// that numbers its days does.
+    ///
+    /// A label, not state the market reads: nothing in the tick, the close or
+    /// the macro chain consults it, so moving it cannot move a trajectory.
+    /// `open_market` is the only caller that must run before a draw is taken,
+    /// because the day mark and the day's news draws are taken there.
     pub fn set_current_day(&mut self, day: i64) {
         self.current_day = day;
         for id in 0..7 {
@@ -685,6 +690,21 @@ impl Engine {
 
     pub fn day_marks(&self) -> &[DayMark] {
         &self.day_marks
+    }
+
+    /// Drop every day mark.
+    ///
+    /// The marks describe the days THIS engine opened, so a restore has to
+    /// drop them: restoring a snapshot replaces the run, and marks kept
+    /// across it named days the restored engine never ran. An engine that
+    /// ran two days, restored a three-day snapshot and ran two more reported
+    /// marks for days 0, 1, 3 and 4. `market_day_layout` reads the newest
+    /// match and so resolved correctly throughout, which is why this was
+    /// invisible. The marks are per-run diagnostic state and a snapshot does
+    /// not carry them, so a restored engine starts with none and gains one
+    /// per day it opens itself.
+    pub fn clear_day_marks(&mut self) {
+        self.day_marks.clear();
     }
 
     /// Where each active company's market-stream normals sit on `day`,
