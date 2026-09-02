@@ -499,6 +499,18 @@ def fd_jacobian(forward: Forward, r_obs: np.ndarray, x: np.ndarray,
     return J
 
 
+#: The solver's version, recorded in every run. Version 1 is the first
+#: that measures each day's sensitivity by a fresh finite difference at
+#: the accepted solution; a saved run carrying no version predates it and
+#: its sensitivity and binding-clamp columns are the optimiser's carried
+#: Jacobian, which drifted by a factor of nine on one day of four.
+SOLVER_VERSION = 1
+
+
+#: The column norm below which a name is called a binding clamp.
+CLAMP_BELOW = 1e-3
+
+
 #: The prior weight of an outcome a probability of zero forbids.
 #: ``-log(0)`` is infinite, and an intensity of exactly zero or one is a
 #: value the surface accepts: at ``jump_intensity_market = 1.0`` the term
@@ -675,7 +687,7 @@ def shadow(args) -> dict:
         reached = bool(np.abs(residual).max() < 5 * args.sigma)
         clamped = [tickers[i] for i in range(n)
                    if abs(residual[i]) > 5 * args.sigma
-                   and result["jacobian_idio_norm"][i] < 1e-3]
+                   and result["jacobian_idio_norm"][i] < CLAMP_BELOW]
         days.append({
             "day": k, "date": d["dates"][session],
             "x_market": result["x_market"], "x_sector": result["x_sector"],
@@ -772,6 +784,73 @@ def shadow(args) -> dict:
             "real_idio_sd": real_idio_sd(d, betas, first, last)}
 
 
+def recompute_sensitivity(run: dict, d: dict) -> dict:
+    """A saved run with its sensitivity and clamp columns measured fresh.
+
+    A run solved before :data:`SOLVER_VERSION` 1 carries the optimiser's
+    own Jacobian in both columns, and that Jacobian is Broyden-updated
+    between refreshes: on one day of four a name's column read 0.00196
+    against 0.01820 measured fresh at the same point. The report
+    publishes the median of one column and reads the other for a binding
+    clamp, so relabelling them leaves a wrong number in a published
+    table.
+
+    Neither saved file carries a per-day checkpoint, so the day states
+    cannot be jumped to. This walks the year instead, committing each
+    saved day's own solution, which costs one session a day rather than
+    the several hundred evaluations a solve costs, and takes a fresh
+    Jacobian at each day before committing it. Measured on the certified
+    forty-name roster at 390 ticks: 0.35 s to rebuild a day's forward
+    map, 8.83 s for its 54-evaluation Jacobian, so about 9.2 s a day and
+    38 minutes over a 251-day year.
+
+    Returns a new run dict; the argument is left alone.
+    """
+    universe, betas = build_universe(d, run["sessions"][0])
+    engine = tf.Engine(seed=run["args"]["seed"], universe=universe,
+                       model=run["args"].get("preset"))
+    first, last = run["sessions"]
+    n = len(universe)
+    real = np.array([np.array([d["closes"][t][k] for t in realdata.TICKERS])
+                     for k in range(first - 1, last)])
+    days = []
+    for k, day in enumerate(run["days"]):
+        r_obs = np.log(real[k + 1] / real[k])
+        fwd = Forward(engine, k, n)
+        S = len(fwd.layout.sectors)
+        x = np.array([day["x_market"]] + list(day["x_sector"])
+                     + list(day["x_idio"]))
+        # The saved day names its fired companies by ticker, which is
+        # what a reader of the record wants; the forward map wants the
+        # roster index.
+        index = {t: i for i, t in enumerate(realdata.TICKERS)}
+        jumps = fwd.jump_patches(
+            day["jump_market"],
+            {index[t]: float(v)
+             for t, v in (day["jump_company"] or {}).items()})
+        fresh = fd_jacobian(fwd, r_obs, x, jumps, 0)
+        norms = np.linalg.norm(fresh[:, 1 + S:1 + S + n], axis=0)
+        # A binding clamp is both halves of what the solve tested: a
+        # residual the day never closed, and a column too small to close
+        # it. The residual is measured here at the saved solution rather
+        # than read, because the record keeps only its largest element.
+        residual = fwd.returns(x, jumps) - r_obs
+        sigma = float(run["args"]["sigma"])
+        clamped = [realdata.TICKERS[i] for i in range(n)
+                   if abs(residual[i]) > 5 * sigma
+                   and norms[i] < CLAMP_BELOW]
+        days.append(dict(day, sensitivity=norms.tolist(), clamped=clamped))
+        fwd.commit(x, jumps)
+    out = dict(run, days=days)
+    out["provenance"] = dict(run["provenance"],
+                             sensitivity="fresh finite difference at the "
+                                         "accepted solution, recomputed at "
+                                         "render time",
+                             solver=SOLVER_VERSION,
+                             clamp_threshold=CLAMP_BELOW)
+    return out
+
+
 def build_provenance(engine, preset=None) -> dict:
     try:
         commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
@@ -792,6 +871,11 @@ def build_provenance(engine, preset=None) -> dict:
             # and a re-render of an older one reports the absence.
             "sensitivity": "fresh finite difference at the accepted "
                            "solution",
+            # The solver that produced this run. A saved run without it
+            # was solved before the sensitivity was measured fresh, and a
+            # render recomputes its two Jacobian columns rather than
+            # reprinting them.
+            "solver": SOLVER_VERSION,
             "preset": preset or engine.model_fingerprint,
             "model_fingerprint": engine.model_fingerprint,
             "order_flow": "zero; no agent trades in a shadow run",
@@ -1057,9 +1141,16 @@ def render(run: dict) -> str:
     if len(sens):
         real_sd = np.array([run["real_idio_sd"][t] for t in run["tickers"]])
         med = np.median(sens, axis=0)
-        source = run["provenance"].get("sensitivity")
+        # The solver version decides which column this is: a run without
+        # one predates the fresh finite difference, whatever else its
+        # provenance says.
+        source = (run["provenance"].get("sensitivity")
+                  if run["provenance"].get("solver") else None)
+        threshold = run["provenance"].get("clamp_threshold", CLAMP_BELOW)
         lines += ["", "## Close sensitivity to one unit of innovation", "",
-                  ("Measured as a " + source + "."
+                  ("Measured as a " + source
+                   + f". A name is called a binding clamp below "
+                     f"{threshold:.0e}."
                    if source else
                    "Taken from the optimiser's own Jacobian, which is "
                    "updated by secant between refreshes: this run was "
@@ -1259,6 +1350,11 @@ def main(argv=None) -> int:
                    help="a shadow.json or shadow-partial.json from an "
                         "earlier run; re-renders its report on this code "
                         "and solves nothing")
+    p.add_argument("--no-recompute", action="store_true",
+                   help="render a run solved before the sensitivity was "
+                        "measured fresh without recomputing its two "
+                        "Jacobian columns; they are then the optimiser's "
+                        "estimate and the report says so")
     p.add_argument("--out", required=True)
     args = p.parse_args(argv)
     if args.render:
@@ -1270,6 +1366,21 @@ def main(argv=None) -> int:
         with open(args.render, encoding="utf-8") as f:
             saved = json.load(f)
         os.makedirs(args.out, exist_ok=True)
+        # A run with no solver version predates the fresh finite
+        # difference, so its sensitivity and binding-clamp columns are the
+        # optimiser's carried Jacobian. Relabelling them leaves a wrong
+        # number in a published table, so they are recomputed from the
+        # saved per-day solutions unless the caller says otherwise. The
+        # panel the run used has to be readable, which is what the archive
+        # beside it is for.
+        if not saved["provenance"].get("solver") and not args.no_recompute:
+            print("  recomputing the sensitivity and the clamp from "
+                  f"{len(saved['days'])} saved days", flush=True)
+            started = time.time()
+            saved = recompute_sensitivity(
+                saved, realdata.load(saved["args"]["year"]))
+            print(f"  recomputed in {time.time() - started:.0f} s",
+                  flush=True)
         text = render(saved)
         name = "shadow-partial.md" if saved.get("partial") else "shadow.md"
         with open(os.path.join(args.out, name), "w", encoding="utf-8") as f:
