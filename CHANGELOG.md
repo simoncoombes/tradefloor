@@ -28,7 +28,7 @@ and the rows carry the residual by which they miss the joint effect.
 the draws that reproduce its observed closes.
 
 **A mechanism is a specification the engine's Rust is generated from**,
-checked for its draw effect and proven inert at its shipped doses.
+checked for its draw effect and proven inert at its default doses.
 
 <!-- release-note-ends -->
 
