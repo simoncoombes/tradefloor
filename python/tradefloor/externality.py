@@ -53,11 +53,19 @@ reacts to that same day, VIX sets the shared factor's variance target, and
 the nudge reaches every name's volatility two closes later.
 :meth:`tradefloor.Execution.moved` documents and measures this channel, and
 says plainly that it is not a rounding error. It reaches b through names a
-never touched, so ``matrix[a][b]`` is non-zero for two agents whose traded
-sets are disjoint, and it grows with the horizon because the reaction has
-to cross two closes. :meth:`Externality.caveats` names those entries when
-a result carries them, and hands over the control `tca.py` gives, which is
-to pin the gauge in both worlds.
+never touched, so ``matrix[a][b]`` is non-zero even when nothing a traded
+is anything b traded or held, and it grows with the horizon because the
+reaction has to cross two closes. :meth:`Externality.caveats` names those
+entries when a result carries them, and hands over the control `tca.py`
+gives, which is to pin the gauge in both worlds.
+
+The comparison is ``traded`` against ``exposure`` and not ``traded``
+against ``traded``. A removed agent reaches the market through the names
+it FILLED, and the agent it reaches is reached through every name it is
+EXPOSED to, which is what it filled plus what it already held at the fork.
+An agent holding a name it did not trade in the window has an empty traded
+set, so comparing traded against traded calls it disjoint from everyone
+and blames the gauge for a direct effect.
 
 And b's own reaction to the market a made, which is in the number too.
 Separating that one needs a third arm in which b sees a's prices and
@@ -102,16 +110,16 @@ class Externality:
     """
 
     __slots__ = ("labels", "matrix", "diagonal", "diagonal_bps", "cohort_pnl",
-                 "trades", "traded", "agreement", "days", "fork_day",
-                 "fork_step", "held_at_fork")
+                 "trades", "traded", "exposure", "agreement", "days",
+                 "fork_day", "fork_step", "held_at_fork")
 
     #: The columns :meth:`table` produces, in order. One row per ordered
     #: pair of labels, so an N-agent cohort is N squared rows.
     COLUMNS = ("removed", "affected", "kind", "value")
 
     def __init__(self, *, labels, matrix, diagonal, diagonal_bps, cohort_pnl,
-                 trades, traded, agreement, days, fork_day, fork_step,
-                 held_at_fork) -> None:
+                 trades, traded, exposure, agreement, days, fork_day,
+                 fork_step, held_at_fork) -> None:
         self.labels = tuple(labels)
         self.matrix = matrix
         self.diagonal = diagonal
@@ -125,6 +133,13 @@ class Externality:
         #: Two agents with disjoint sets still reach each other, through
         #: the fear gauge, and :meth:`caveats` reads this to say so.
         self.traded = traded
+        #: The names each agent's P&L over the window can move with: what
+        #: it filled, plus what it held at the fork. A removed agent
+        #: reaches another through the names it FILLED, and the other is
+        #: reached through the names it is EXPOSED to, so the two sets are
+        #: not the same and :meth:`caveats` compares the right one to the
+        #: right one.
+        self.exposure = exposure
         self.agreement = agreement
         self.days = days
         self.fork_day = fork_day
@@ -175,11 +190,14 @@ class Externality:
                 "in " + ", ".join(self.agreement.differences) + ".")
         crossed = [f"{a} on {b}" for a in self.labels for b in self.labels
                    if a != b and self.matrix[a][b] != 0.0
-                   and not (set(self.traded[a]) & set(self.traded[b]))]
+                   and not (set(self.traded[a]) & set(self.exposure[b]))]
         if crossed:
             out.append(
-                f"{len(crossed)} entries move an agent that shares no "
-                f"traded name with the one removed ({', '.join(crossed)}). "
+                f"{len(crossed)} "
+                f"{_plural(len(crossed), 'entry', 'entries')} "
+                f"{_plural(len(crossed), 'moves', 'move')} an agent that "
+                f"holds and trades no name the removed agent traded "
+                f"({', '.join(crossed)}). "
                 f"Order flow reaches names its sender never touched: the "
                 f"fear gauge reacts same-day to the cap-weighted market "
                 f"return, VIX sets the shared factor's variance target, and "
@@ -256,6 +274,8 @@ class Externality:
             "cohort_pnl": dict(self.cohort_pnl),
             "trades": dict(self.trades),
             "traded": {b: list(names) for b, names in self.traded.items()},
+            "exposure": {b: list(names)
+                         for b, names in self.exposure.items()},
             "matrix": {a: dict(row) for a, row in self.matrix.items()},
             "diagonal": dict(self.diagonal),
             "diagonal_bps": dict(self.diagonal_bps),
@@ -312,9 +332,14 @@ class Externality:
                 f"identical={self.agreement.identical})")
 
 
+def _plural(count: int, singular: str, plural: str) -> str:
+    """The word that agrees with a count, so no line reads "1 entries"."""
+    return singular if count == 1 else plural
+
+
 def _days(count: int) -> str:
     """"day" or "days", so a rendered line does not read "1 days"."""
-    return "day" if count == 1 else "days"
+    return _plural(count, "day", "days")
 
 
 def _names(labels: "tuple[str, ...]") -> str:
@@ -363,10 +388,14 @@ def externalities(world: World, days: int = 1) -> Externality:
     # can, and `_path` needs it to line a fill up with the step it happened
     # on.
     at_fork = _f64(world.engine.prices())
-    held = tuple(label for label in labels
-                 if any(position.quantity
-                        for position in world.portfolios[label].positions
-                        .values()))
+    # The names each agent already holds when the fork is taken. A holding
+    # is exposure without a fill, so it belongs in the exposure set below
+    # even though the agent sends no flow for it.
+    held_names = {label: frozenset(
+        ticker for ticker, position
+        in world.portfolios[label].positions.items() if position.quantity)
+        for label in labels}
+    held = tuple(label for label in labels if held_names[label])
 
     (full,) = world.fork("full")
     arms = {label: world.without(label) for label in labels}
@@ -390,6 +419,11 @@ def externalities(world: World, days: int = 1) -> Externality:
                                for fill in full.portfolios[b].fills
                                if fill["step"] >= fork_step}))
               for b in labels}
+    # What each agent's P&L over the window can move with: the names it
+    # filled, plus the names it already held at the fork. A position moves
+    # only by filling, so those two sets are the whole of its exposure.
+    exposure = {b: tuple(sorted(set(traded[b]) | held_names[b]))
+                for b in labels}
 
     matrix: dict[str, dict[str, float]] = {}
     diagonal: dict[str, float] = {}
@@ -407,6 +441,7 @@ def externalities(world: World, days: int = 1) -> Externality:
     return Externality(labels=labels, matrix=matrix, diagonal=diagonal,
                        diagonal_bps=diagonal_bps, cohort_pnl=cohort_pnl,
                        trades=trades, traded=traded,
+                       exposure=exposure,
                        agreement=agreement, days=days,
                        fork_day=fork_day, fork_step=fork_step,
                        held_at_fork=held)

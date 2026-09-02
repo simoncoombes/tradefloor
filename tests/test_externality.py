@@ -648,7 +648,7 @@ def test_two_agents_on_disjoint_names_still_move_each_other():
         "direct channel and not the one it is about")
     assert result.matrix["low"]["high"] != 0.0
     assert result.matrix["high"]["low"] != 0.0
-    assert any("shares no traded name" in line for line in result.caveats())
+    assert any("holds and trades no name" in line for line in result.caveats())
 
 
 def test_a_pinned_fear_gauge_removes_the_whole_cross_effect():
@@ -662,8 +662,64 @@ def test_a_pinned_fear_gauge_removes_the_whole_cross_effect():
     result = _disjoint(pins={"vix": 15.0})
     assert result.matrix["low"]["high"] == 0.0
     assert result.matrix["high"]["low"] == 0.0
-    assert not any("shares no traded name" in line
+    assert not any("holds and trades no name" in line
                    for line in result.caveats())
+
+
+class BuyFirstOnce:
+    """Buys the first name once, at a chosen step, and never again."""
+
+    def __init__(self, at: int, shares: float = 5_000.0) -> None:
+        self.at, self.shares = at, shares
+
+    def act(self, obs) -> dict[str, float]:
+        return {obs.tickers[0]: self.shares} if obs.step == self.at else {}
+
+
+def test_the_cross_name_caveat_reads_exposure_and_not_fills():
+    """A holding is exposure without a fill, so it belongs in the set.
+
+    An agent that bought a name before the fork and left it alone has an
+    empty traded set over the window, which is trivially disjoint from
+    everyone. Comparing traded against traded would call its entry a
+    fear-gauge effect when the removed agent moved the very name it holds,
+    and the control the caveat hands over disproves that: pinning the
+    gauge leaves the entry larger rather than zero.
+
+    Measured on this build, on `Universe.random(20, seed=11)` at seed 42
+    with 20,000,000 of cash, one agent buying 5,000 shares of the first
+    name at step 0 and the other buying the same name at step 7, forked at
+    step 6 and run two days: the entry is -650.00 free and -1,700.00 under
+    a pinned gauge.
+    """
+    universe = list(tf.Universe.random(20, seed=11))
+
+    def build(pins=None):
+        world = World(seed=SEED, universe=universe, cash=20_000_000.0,
+                      pins=pins, agents={"holder": BuyFirstOnce(at=0),
+                                         "mover": BuyFirstOnce(at=7)})
+        world.run(days=1)
+        return world
+
+    world = build()
+    result = externalities(world, days=2)
+    ticker = world.engine.tickers[0]
+
+    assert result.traded["holder"] == (), "the holder traded in the window"
+    assert ticker in result.exposure["holder"], (
+        "the holder is not exposed to the name it holds")
+    assert ticker in result.traded["mover"]
+    assert result.matrix["mover"]["holder"] != 0.0
+
+    assert not any("holds and trades no name" in line
+                   for line in result.caveats()), (
+        "the caveat blamed the fear gauge for an effect through a name the "
+        "two agents share")
+
+    # The control the caveat hands over is what settles it. A reader who
+    # followed it on a misfiring entry would get a larger number, not zero.
+    pinned = externalities(build(pins={"vix": 15.0}), days=2)
+    assert pinned.matrix["mover"]["holder"] != 0.0
 
 
 def test_one_day_leaks_nothing_across_disjoint_names():
