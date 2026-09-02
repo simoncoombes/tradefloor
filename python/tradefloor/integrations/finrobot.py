@@ -168,7 +168,7 @@ from typing import Any, Sequence
 
 from .._core import ValidationError
 from ..counterfactual import MACRO_FIELDS
-from ..render import Renderer, TextRenderer, check_renderer
+from ..render import Renderer, TextRenderer, _sector_rows, check_renderer
 from .common import (AdapterInfo, FrameworkError, IntegrationError,
                      MissingDependencyError)
 from .common import DecisionError as _CommonDecisionError
@@ -488,39 +488,6 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
     return payload
 
 
-def _sector_rows(assets: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-    """A per-sector summary, computed from the asset rows above and nothing
-    else.
-
-    The sector comes from the fundamentals the CALLER supplied, on the same
-    terms as every other company fact: an analyst reads it off a filing, and
-    the adapter does not go looking for it on the engine. A name with no
-    sector supplied lands in ``unclassified`` rather than in a guess.
-
-    The five-day return is the mean across the sector's names, equally
-    weighted, over the names that have one. Equal weighting because the
-    alternative weights by position, and a sector the book is flat in would
-    then report no return at all.
-    """
-    buckets: dict[str, list[dict[str, Any]]] = {}
-    for asset in assets:
-        sector = asset["fundamentals"].get("sector") or "unclassified"
-        buckets.setdefault(str(sector), []).append(asset)
-    rows = []
-    for sector in sorted(buckets):
-        members = buckets[sector]
-        returns = [m["return_5d"] for m in members
-                   if m["return_5d"] is not None]
-        rows.append({
-            "sector": sector,
-            "names": len(members),
-            "held": sum(1 for m in members if m["position"]),
-            "exposure": sum(m["position"] * m["price"] for m in members),
-            "return_5d": (sum(returns) / len(returns)) if returns else None,
-        })
-    return rows
-
-
 def _window_return(rows: Sequence[Sequence[float]], i: int,
                    steps: int) -> float | None:
     """Return over the last ``steps`` observations, or None if unseen.
@@ -564,11 +531,19 @@ def render(payload: dict[str, Any], *, objective: str = "") -> str:
     renderer renders the payload, and a mandate is the caller's.
 
     A payload carrying ``detail`` renders in the large-universe form: a
-    sector summary, one compact row per symbol, and a full block for the
-    union of the named symbols and whichever the payload's own
-    ``position`` fields say are held. Every other payload renders exactly
-    as it always has, which ``test_finrobot.py``'s fixture-replay tests
-    pin byte for byte.
+    sector summary, one compact row per symbol, and a full block for
+    EXACTLY the symbols ``payload["detail"]`` names -- no union with
+    whatever is held, because this function calls
+    :class:`~tradefloor.render.TextRenderer` at its default
+    ``union_held=False``, which is what makes it byte-identical to what
+    a direct caller of :func:`observe` and this function has always
+    published. The union that includes a held name whether or not it is
+    in the panel is :class:`FinRobotAdapter`'s OWN setting
+    (``union_held=True``, on its default renderer only); see
+    :class:`~tradefloor.render.TextRenderer` for why the two callers
+    read ``detail`` differently. Every other payload renders exactly as
+    it always has, which ``test_finrobot.py``'s fixture-replay tests pin
+    byte for byte.
     """
     body = TextRenderer(detail=payload.get("detail")).render(payload)
     if objective:

@@ -1985,12 +1985,13 @@ class Invariance:
     """
 
     __slots__ = ("renderers", "days", "decisions", "presentation", "floor",
-                "unrecorded")
+                "unrecorded", "stopped_early")
 
     def __init__(self, *, renderers: Sequence[str], days: int,
                 decisions: dict[str, list], presentation: list[Comparison],
                 floor: "Resample | None",
-                unrecorded: Sequence[str] = ()) -> None:
+                unrecorded: Sequence[str] = (),
+                stopped_early: dict[str, int] | None = None) -> None:
         #: The renderer keys :func:`invariance` was called with, in the
         #: order given. `presentation`'s pairs and `decisions`' keys both
         #: name renderers from this list, minus whichever are in
@@ -2005,7 +2006,9 @@ class Invariance:
         #: again); `None` marks only a REFUSED step. The shared pre-fork
         #: history is left out: every arm ran it identically by
         #: construction, so it says nothing about presentation. A
-        #: renderer in :attr:`unrecorded` has no entry here.
+        #: renderer in :attr:`unrecorded` has no entry here; a renderer
+        #: in :attr:`stopped_early` has a TRUNCATED one, covering only
+        #: the days it actually completed.
         self.decisions = decisions
         #: One :class:`Comparison` per pair of MEASURED renderers (both
         #: outside :attr:`unrecorded`), control and treatment ordered as
@@ -2033,10 +2036,24 @@ class Invariance:
         #: FinRobot, which carries no `ReplayMiss` of its own and raises
         #: the same class for a genuine replay miss and for a malformed
         #: recorded response -- and that renderer is reported here rather
-        #: than taking the whole call down. Typically every renderer but
-        #: the one the recording was made under. Empty against a live
-        #: agent, which answers any renderer's text.
+        #: than taking the whole call down. ONLY a renderer that completed
+        #: ZERO post-fork days lands here; one that got partway is in
+        #: :attr:`stopped_early` instead, with what it DID measure kept
+        #: rather than thrown away. Typically every renderer but the one
+        #: the recording was made under. Empty against a live agent,
+        #: which answers any renderer's text.
         self.unrecorded = list(unrecorded)
+        #: Renderer keys that completed at least one post-fork day but
+        #: not all `days` of them, mapped to the STEP whose decision
+        #: never arrived. Most often this means `days` asked for more
+        #: than a replayed transcript covers for that renderer -- the
+        #: renderer that matches the recording typically gets this far
+        #: rather than landing in :attr:`unrecorded`, which is why the
+        #: two are kept apart: an arm that genuinely ran most of the
+        #: experiment is a different thing from one that never started,
+        #: and :attr:`decisions` keeps what a stopped-early arm measured
+        #: rather than discarding it.
+        self.stopped_early = dict(stopped_early or {})
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -2046,6 +2063,7 @@ class Invariance:
             "presentation": [c.as_dict() for c in self.presentation],
             "floor": None if self.floor is None else self.floor.as_dict(),
             "unrecorded": list(self.unrecorded),
+            "stopped_early": dict(self.stopped_early),
         }
 
     def agreement_rate(self) -> dict[str, float]:
@@ -2083,13 +2101,26 @@ class Invariance:
         return {k: (sum(v) / len(v) if v else 0.0) for k, v in totals.items()}
 
     def most_agreed(self) -> str | None:
-        """The renderer key with the highest :meth:`agreement_rate`, or
-        `None` when fewer than two renderers were measured. A tie goes to
-        whichever renderer appears first in :attr:`renderers`."""
+        """The renderer key with the STRICTLY highest :meth:`agreement_rate`,
+        or `None` when fewer than two renderers were measured, or when two
+        or more renderers tie for the highest rate.
+
+        A tie is not a finding, and reporting one of the tied renderers as
+        the winner -- which a naive `max` would, by whichever happened to
+        come first in :attr:`renderers` -- would print a result this
+        function has no basis for: this package's whole premise is that it
+        cannot say which renderer is right, and a "winner" drawn from list
+        order is exactly the claim it must not make. Two renderers that
+        fully agree with each other tie at `1.0` and this returns `None`
+        for them, correctly -- there is nothing to prefer between two
+        renderings the agent read identically.
+        """
         rates = self.agreement_rate()
         if len(rates) < 2:
             return None
-        return max(rates, key=lambda k: (rates[k], -self.renderers.index(k)))
+        best = max(rates.values())
+        winners = [key for key, rate in rates.items() if rate == best]
+        return winners[0] if len(winners) == 1 else None
 
     def table(self) -> Any:
         """One row per pair of renderers, where their arms first came
@@ -2151,6 +2182,11 @@ class Invariance:
         if self.unrecorded:
             out.append(f"  unrecorded (no reply for this text in the "
                        f"transcript): {', '.join(self.unrecorded)}")
+        if self.stopped_early:
+            stopped = ", ".join(f"{key!r} at step {step}" for key, step
+                                in self.stopped_early.items())
+            out.append(f"  stopped early (ran out of recorded days, "
+                       f"decisions kept up to the stop): {stopped}")
         out.append("")
         for comparison in self.presentation:
             left = comparison.control.get("label", "control")
@@ -2179,6 +2215,7 @@ class Invariance:
         return (f"Invariance({len(self.renderers)} renderers, "
                 f"{len(self.presentation)} pairs, "
                 f"unrecorded={len(self.unrecorded)}, "
+                f"stopped_early={len(self.stopped_early)}, "
                 f"floor={'measured' if self.floor is not None else None})")
 
 
@@ -2338,28 +2375,52 @@ def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
     if floor:
         forks[-1].agent.renderer = renderers[0]
 
-    def _run(fork_world: "World") -> bool:
-        try:
-            fork_world.run(days=days)
-            return True
-        except DecisionError:
-            return False
+    def _run(fork_world: "World") -> int:
+        """Days of `fork_world` actually completed before a
+        `DecisionError`, if any.
 
-    ran = [_run(fork_world) for fork_world in renderer_forks]
-    unrecorded = [key for key, ok in zip(keys, ran) if not ok]
+        A day at a time -- proven equal to one `fork_world.run(days=days)`
+        call for a fork that never fails, see `tests/test_render.py`'s
+        day-by-day equivalence check -- rather than the whole span in one
+        call, so a failure partway through leaves the days that DID
+        succeed in the trace instead of discarding them. `days` more than
+        a transcript covers used to report the reference renderer itself
+        as unrecorded, having genuinely replayed most of the run; now it
+        reports exactly how far it got.
+        """
+        completed = 0
+        for _ in range(days):
+            try:
+                fork_world.run(days=1)
+            except DecisionError:
+                return completed
+            completed += 1
+        return completed
+
+    completed = [_run(fork_world) for fork_world in renderer_forks]
+    unrecorded = [key for key, n in zip(keys, completed) if n == 0]
+    # A step, not a day: `fork_world.step` is exactly the step whose
+    # decision never arrived, because `World.run` raises before
+    # advancing `_step` past the step that failed.
+    stopped_early = {
+        key: fork_world.step
+        for key, fork_world, n in zip(keys, renderer_forks, completed)
+        if 0 < n < days
+    }
 
     decisions = {
         key: [row["decision"]
              for row in fork_world.trace[fork_world.fork_step:]]
-        for key, fork_world, ok in zip(keys, renderer_forks, ran) if ok
+        for key, fork_world, n in zip(keys, renderer_forks, completed)
+        if n > 0
     }
 
     presentation = []
     for i in range(len(renderer_forks)):
-        if not ran[i]:
+        if completed[i] == 0:
             continue
         for j in range(i + 1, len(renderer_forks)):
-            if not ran[j]:
+            if completed[j] == 0:
                 continue
             a, b = renderer_forks[i], renderer_forks[j]
             presentation.append(compare(a, b, agreement=agreements[(i, j)]))
@@ -2368,14 +2429,17 @@ def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
     if floor:
         # Attempted unconditionally: the floor's own fork is an
         # independent replay of `renderers[0]`'s text, and while it is
-        # deterministic to reach the same outcome as `ran[0]` -- same
-        # seed, same renderer, same market -- checking it rather than
-        # inferring it from `ran[0]` costs one more replay attempt and
-        # nothing else.
-        floor_ok = _run(forks[-1])
-        if ran[0] and floor_ok:
+        # deterministic to reach the same outcome as `completed[0]` --
+        # same seed, same renderer, same market -- checking it rather
+        # than inferring it costs one more replay attempt and nothing
+        # else. `resample` only needs the FIRST post-fork decision, so
+        # one completed day is enough on both sides even if either later
+        # stops early.
+        floor_completed = _run(forks[-1])
+        if completed[0] > 0 and floor_completed > 0:
             floor_result = resample(forks[0], forks[-1])
 
     return Invariance(renderers=keys, days=days, decisions=decisions,
                       presentation=presentation, floor=floor_result,
+                      stopped_early=stopped_early,
                       unrecorded=unrecorded)

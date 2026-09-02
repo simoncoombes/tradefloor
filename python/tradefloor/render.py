@@ -297,11 +297,16 @@ def _short_bps(value: Any) -> str:
 def _sector_rows(assets: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     """A per-sector summary, computed from `assets` and nothing else.
 
-    Byte-for-byte the arithmetic in `integrations.finrobot._sector_rows`:
-    a name with no supplied sector lands in `"unclassified"`, and the
-    five-day return is the equally weighted mean over the members that
-    have one. Order-independent -- callers may hand this an already
-    reordered asset list -- because it buckets and sums.
+    The one implementation: `integrations.finrobot.observe` imports this
+    directly to build `payload["sectors"]`, rather than keeping its own
+    copy of the same arithmetic -- two copies of a bucket-and-sum this
+    small still cost nothing to keep in sync until the day they are not,
+    which is the whole argument against a second implementation of
+    anything this module renders. A name with no supplied sector lands
+    in `"unclassified"`, and the five-day return is the equally weighted
+    mean over the members that have one. Order-independent -- callers
+    may hand this an already reordered asset list -- because it buckets
+    and sums.
     """
     buckets: dict[str, list[dict[str, Any]]] = {}
     for asset in assets:

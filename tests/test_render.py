@@ -36,7 +36,7 @@ import sys
 import pytest
 
 import tradefloor as tf
-from tradefloor.counterfactual import World, agree, invariance
+from tradefloor.counterfactual import Invariance, World, agree, invariance
 from tradefloor.integrations import common as ci
 from tradefloor.integrations import finrobot as fr
 from tradefloor.integrations.langgraph import LangGraphAdapter
@@ -742,6 +742,9 @@ def test_invariance_reports_a_non_matching_renderer_as_unrecorded():
                         days=example.BRANCH_DAYS, floor=False)
 
     assert report.unrecorded == [other.key()]
+    assert report.stopped_early == {}, (
+        "the matching renderer ran exactly the days asked for; it did "
+        "not stop early")
     assert matching.key() in report.decisions
     assert other.key() not in report.decisions
     assert report.presentation == [], (
@@ -761,6 +764,59 @@ def test_invariance_reports_a_non_matching_renderer_as_unrecorded():
         "hold in between")
     # The report says so in text, not only in the field.
     assert other.key() in report.render()
+
+
+def test_invariance_asked_for_more_days_than_the_fixture_covers_stops_early():
+    """Round 2, finding 1: asking for `days` more than the transcript
+    covers used to catch the exception at the WHOLE `run()` call, so the
+    renderer the recording was made under -- which replayed every day it
+    could -- was reported exactly the same as one that never matched at
+    all: `unrecorded`, with the days it genuinely measured discarded.
+    `invariance()` now runs day by day and keeps what succeeded; a
+    renderer that ran out partway is in `stopped_early`, not
+    `unrecorded`, and its partial `decisions` are kept."""
+    example = _load("test_render_finrobot_stopped_early",
+                    REPO / "examples" / "integrations" / "finrobot"
+                    / "rate_shock.py")
+    fixture_path = REPO / "tests" / "fixtures" / "finrobot" / "rate-shock.json"
+    if not fixture_path.exists():
+        pytest.skip("no committed FinRobot fixture")
+    transcript = fr.Transcript.load(fixture_path)
+
+    agent = fr.FinRobotAdapter(mode="replay", transcript=transcript,
+                               fundamentals=example.FUNDAMENTALS,
+                               objective=example.OBJECTIVE,
+                               every=example.DECISION_EVERY, arm="shared")
+    world = World(seed=example.SEED, universe=example.universe(),
+                 agent=agent, pins=example.BASE_PINS, cash=example.CASH,
+                 steps_per_day=example.STEPS_PER_DAY,
+                 ticks_per_step=example.TICKS_PER_STEP)
+    world.run(days=example.WARMUP_DAYS)
+
+    matching = TextRenderer()
+    other = TextRenderer(units="bps")
+    asked = example.BRANCH_DAYS + 5  # more than the fixture covers
+    report = invariance(world, [matching, other], days=asked, floor=False)
+
+    assert report.unrecorded == [other.key()], (
+        "the non-matching renderer still never got a first reply")
+    assert matching.key() not in report.unrecorded, (
+        "the reference renderer replayed most of the run and must not "
+        "be reported the same as one that never matched at all")
+    assert set(report.stopped_early) == {matching.key()}
+    stopped_step = report.stopped_early[matching.key()]
+    assert stopped_step == \
+        world.step + example.BRANCH_DAYS * example.STEPS_PER_DAY
+
+    # Its measurement up to the stop is kept, not thrown away.
+    assert matching.key() in report.decisions
+    decisions = report.decisions[matching.key()]
+    assert len(decisions) == example.BRANCH_DAYS * example.STEPS_PER_DAY
+    assert all(d is not None for d in decisions)
+
+    text = report.render()
+    assert "stopped early" in text and matching.key() in text
+    assert "unrecorded" in text and other.key() in text
 
 
 # ---------------------------------------------------------------------------
@@ -928,3 +984,58 @@ def test_invariance_render_produces_readable_text():
     assert "text/en/usd/roster/full" in text
     assert "text/en/bps/roster/full" in text
     assert "noise floor" in text
+
+
+# ---------------------------------------------------------------------------
+# Invariance.most_agreed(): no winner drawn from list order on a tie
+# ---------------------------------------------------------------------------
+
+
+def _bare_invariance(decisions: dict[str, list]) -> Invariance:
+    """An `Invariance` built by hand, for `agreement_rate`/`most_agreed`
+    alone -- no fork, no run, just the decisions dict those two methods
+    read."""
+    return Invariance(renderers=list(decisions), days=1,
+                      decisions=decisions, presentation=[], floor=None)
+
+
+def test_most_agreed_is_none_when_two_renderers_fully_agree():
+    """Round 2, finding 3: two renderers whose decisions match at every
+    step tie at a 1.0 agreement rate, and `most_agreed()` must not report
+    one of them as the winner -- there is nothing to prefer between two
+    renderings the agent read identically."""
+    decisions = {"a": [{"actions": []}, {"actions": []}],
+                "b": [{"actions": []}, {"actions": []}]}
+    report = _bare_invariance(decisions)
+    assert report.agreement_rate() == {"a": 1.0, "b": 1.0}
+    assert report.most_agreed() is None
+    assert "agreed with" not in report.render()
+
+
+def test_most_agreed_is_none_on_a_three_way_tie():
+    decisions = {"a": [{"actions": []}], "b": [{"actions": []}],
+                "c": [{"actions": [{"symbol": "X"}]}]}
+    report = _bare_invariance(decisions)
+    # a and b agree with each other and with nothing else; c agrees with
+    # neither. Every pairwise rate a renderer participates in is either
+    # 1.0 (a-b) or 0.0 (a-c, b-c), so a and b each average to 0.5 and tie.
+    rates = report.agreement_rate()
+    assert rates["a"] == rates["b"] == 0.5
+    assert report.most_agreed() is None
+
+
+def test_most_agreed_names_a_strict_winner():
+    decisions = {"a": [{"actions": []}, {"actions": []}, {"actions": []}],
+                "b": [{"actions": []}, {"actions": []},
+                     {"actions": [{"symbol": "X"}]}],
+                "c": [{"actions": [{"symbol": "X"}]},
+                     {"actions": [{"symbol": "X"}]},
+                     {"actions": [{"symbol": "X"}]}]}
+    report = _bare_invariance(decisions)
+    # a matches b at 2 of 3 steps and c at 0 of 3: rate 1/3.
+    # b matches a at 2 of 3 and c at 1 of 3: rate 1/2.
+    # c matches a at 0 of 3 and b at 1 of 3: rate 1/6.
+    rates = report.agreement_rate()
+    assert rates["b"] > rates["a"] > rates["c"]
+    assert report.most_agreed() == "b"
+    assert "agreed with 'b' most often" in report.render()
