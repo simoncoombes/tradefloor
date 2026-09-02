@@ -237,14 +237,21 @@ class Forward:
 
 def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
           extra: int = 0, *, sigma: float, step: float = 0.25,
-          max_iter: int = 8, tol: float = 1e-4) -> dict:
+          max_iter: int = 8, tol: float = 1e-4, J0: np.ndarray | None = None,
+          restarts: int = 1) -> dict:
     """Levenberg-Marquardt for the MAP day aggregates.
 
     Minimises ``|r(x) - r_obs|^2 / (2 sigma^2) + |x|^2 / 2``. ``extra``
     trailing entries of ``x`` are jump normals: they enter the forward map
     through ``jumps`` (a function of ``x[-extra:]``) and carry the same
-    prior. Returns the solution, the residual, the Jacobian and whether
-    the residual tolerance was met.
+    prior. ``J0`` is a Jacobian from an earlier solve whose leading columns
+    are reused; only the columns it lacks are taken by finite difference,
+    which is what keeps a jump candidate at a handful of evaluations
+    rather than a whole Jacobian. When the closes are not reached at
+    convergence the Jacobian is retaken at the solution and the search
+    continues, up to ``restarts`` times, so a Broyden drift is not
+    mistaken for a clamp. Returns the solution, the residual, the
+    Jacobian and whether the optimiser converged.
     """
     m = len(x0)
 
@@ -256,15 +263,33 @@ def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
 
     x = x0.copy()
     r = resid(x)
-    J = np.zeros((len(r), m))
-    for k in range(m):
-        xk = x.copy()
-        xk[k] += step
-        J[:, k] = (resid(xk) - r) / step
+
+    def jacobian(x, r, keep=None):
+        J = np.zeros((len(r), m))
+        start = 0
+        if keep is not None and keep.shape[0] == len(r) and keep.shape[1] <= m:
+            J[:, :keep.shape[1]] = keep
+            start = keep.shape[1]
+        for k in range(start, m):
+            xk = x.copy()
+            xk[k] += step
+            J[:, k] = (resid(xk) - r) / step
+        return J
+
+    J = jacobian(x, r, J0)
     lam = 1e-3
     cost = (r @ r) / (2 * sigma ** 2) + (x @ x) / 2
     converged = False
-    for _ in range(max_iter):
+    rounds = 0
+    for _ in range(max_iter * (1 + restarts)):
+        if converged:
+            if np.max(np.abs(r)) < 5 * sigma or rounds >= restarts:
+                break
+            # not reached: a fresh Jacobian at the solution, then on
+            rounds += 1
+            J = jacobian(x, r)
+            lam = 1e-3
+            converged = False
         A = J.T @ J / sigma ** 2 + np.eye(m)
         g = J.T @ r / sigma ** 2 + x
         accepted = False
@@ -288,9 +313,6 @@ def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
             lam *= 10
         if not accepted:
             converged = True
-            break
-        if converged:
-            break
     return {"x": x, "residual": r, "jacobian": J, "cost": float(cost),
             "converged": bool(converged)}
 
@@ -319,7 +341,8 @@ def solve_day(forward: Forward, r_obs: np.ndarray, intensities: tuple,
         def jumps_m(tail):
             return forward.jump_patches(float(tail[0]), fired)
         trial = solve(forward, r_obs, jumps_m, np.append(best["x"][:m0], 0.0),
-                      extra=1, sigma=sigma)
+                      extra=1, sigma=sigma, J0=base["jacobian"][:, :m0],
+                      restarts=0)
         cost = trial["cost"] - math.log(p_market) - forward.n * math.log(1 - p_idio)
         if cost < best_cost:
             best, best_cost, fired_market = trial, cost, float(trial["x"][-1])
@@ -341,7 +364,8 @@ def solve_day(forward: Forward, r_obs: np.ndarray, intensities: tuple,
             x0 = np.concatenate([best["x"][:m0],
                                  [fired_market] if fired_market is not None else [],
                                  [0.0]])
-            trial = solve(forward, r_obs, jumps_i, x0, extra=extra, sigma=sigma)
+            trial = solve(forward, r_obs, jumps_i, x0, extra=extra, sigma=sigma,
+                          J0=best["jacobian"][:, :len(x0) - 1], restarts=0)
             n_fired = len(tried)
             cost = (trial["cost"]
                     - (math.log(p_market) if fired_market is not None else math.log(1 - p_market))

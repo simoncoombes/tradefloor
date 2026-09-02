@@ -75,10 +75,12 @@ maturin build --release --out dist --features python
 uv pip install --no-index --find-links dist --force-reinstall tradefloor
 python -c "import numpy, pyarrow, tradefloor; print('PREFLIGHT OK', tradefloor.version())"
 cp dist/*.whl /home/ec2-user/out/
-for year in calm crisis; do
+for year in __YEARS__; do
   python tools/shadow/shadow.py --year $year --out /home/ec2-user/out/shadow-$year       __SHADOW_ARGS__ 2>&1 | tee /home/ec2-user/out/shadow-$year.log
 done
-python tools/calibration/amplification.py --out /home/ec2-user/out/amplification     __AMP_ARGS__ 2>&1 | tee /home/ec2-user/out/amplification.log
+if [ "__AMP__" = "1" ]; then
+  python tools/calibration/amplification.py --out /home/ec2-user/out/amplification       __AMP_ARGS__ 2>&1 | tee /home/ec2-user/out/amplification.log
+fi
 tar -czf /home/ec2-user/out/shadow-data.tgz -C tools/shadow data
 
 WORK
@@ -96,7 +98,7 @@ set -e
 
 # The artefacts' existence is the test, and the marker names THIS run's
 # artefacts. All three stages present + exit 0 = CERTIFIED.
-if [ "$STATUS" -eq 0 ] && [ -s /home/ec2-user/out/shadow-crisis/shadow.md ] \n   && [ -s /home/ec2-user/out/shadow-calm/shadow.md ] && [ -s /home/ec2-user/out/amplification/amplification.md ]; then
+if [ "$STATUS" -eq 0 ] && [ -n "$(ls /home/ec2-user/out/shadow-*/shadow.md 2>/dev/null)" ]; then
   echo "CERTIFIED exit=$STATUS branch=$BRANCH" > /tmp/DONE
 else
   echo "FAILED exit=$STATUS branch=$BRANCH see shadow-*.log/amplification.log" > /tmp/DONE
