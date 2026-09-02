@@ -267,3 +267,92 @@ def test_a_second_trace_widens_the_range_and_keeps_the_records():
     run(engine, 2, first=1)
     days = sorted({e.day for e in noise.draw_log(engine, "jumps", 0, 2)})
     assert days == [0, 1, 2]
+
+
+# -- the day a draw carries --------------------------------------------------
+
+def test_every_stream_and_the_marks_carry_the_day_run_days_was_given():
+    """`run_days(first_day=K)` numbers one day one way.
+
+    The open pushes the day mark and takes the day's endogenous news draws,
+    so a day stamped after the open left the mark and the news on the
+    engine's own counter while every other stream carried K. A run of three
+    days from 100 logged news on 0, 1 and 2 and everything else on 100, 101
+    and 102, and `market_day_layout(100)` found nothing.
+    """
+    engine = fresh()
+    for stream in noise.STREAMS:
+        engine.trace_draws(stream, -1000, 1000)
+    engine.run_days(3, hour=9, minute=30, day_of_week=3, ticks_per_day=TICKS,
+                    volatility=1.0, record=True, first_day=100)
+    for stream in noise.STREAMS:
+        log = engine.draw_log(stream, -1000, 1000)
+        if stream == "external":
+            assert log == []
+            continue
+        assert sorted({e[2] for e in log}) == [100, 101, 102], stream
+    assert [m["day"] for m in engine.day_marks()] == [100, 101, 102]
+    for day in (100, 101, 102):
+        assert engine.market_day_layout(day) is not None
+    assert engine.market_day_layout(0) is None
+    # the range filter names the days the run used
+    assert engine.draw_log("news", 100, 102) == \
+        engine.draw_log("news", -1000, 1000)
+
+
+def test_two_runs_in_a_row_leave_every_stream_on_the_same_days():
+    """Reachable without `first_day`: the counter advanced across the two
+    calls while `first_day` restarted, so the news stream numbered four days
+    and the rest numbered two, twice."""
+    engine = fresh()
+    for stream in noise.STREAMS:
+        engine.trace_draws(stream, -1000, 1000)
+    for _ in range(2):
+        engine.run_days(2, hour=9, minute=30, day_of_week=3,
+                        ticks_per_day=TICKS, volatility=1.0, record=True)
+    seen = {}
+    for stream in noise.STREAMS:
+        log = engine.draw_log(stream, -1000, 1000)
+        if stream == "external":
+            continue
+        seen[stream] = sorted({e[2] for e in log})
+    assert set(map(tuple, seen.values())) == {(0, 1)}, seen
+    # the marks agree with the streams: two days numbered 0 and two
+    # numbered 1, because both calls were given the same first_day
+    assert [m["day"] for m in engine.day_marks()] == [0, 1, 0, 1]
+
+
+def test_a_restore_drops_the_marks_of_the_run_it_replaced():
+    """The marks name the days THIS engine opened. Kept across a restore
+    they named days the restored engine never ran: two days, then a
+    three-day snapshot, then two more reported 0, 1, 3 and 4."""
+    source = fresh()
+    source.run_days(3, hour=9, minute=30, day_of_week=3, ticks_per_day=TICKS,
+                    volatility=1.0, record=False, first_day=0)
+    snapshot = source.state_snapshot()
+    other = fresh()
+    other.run_days(2, hour=9, minute=30, day_of_week=3, ticks_per_day=TICKS,
+                   volatility=1.0, record=False, first_day=0)
+    assert [m["day"] for m in other.day_marks()] == [0, 1]
+    other.restore_state(snapshot)
+    assert other.day_marks() == []
+    other.run_days(2, hour=9, minute=30, day_of_week=3, ticks_per_day=TICKS,
+                   volatility=1.0, record=False, first_day=3)
+    assert [m["day"] for m in other.day_marks()] == [3, 4]
+    assert other.market_day_layout(0) is None
+
+
+def test_the_market_log_length_is_the_schedule():
+    """The log's memory is quoted per day in `rng.rs`, and the draw count it
+    rests on is a schedule quantity rather than a benchmark."""
+    engine = fresh()
+    engine.trace_draws("market", -1000, 1000)
+    engine.run_days(1, hour=9, minute=30, day_of_week=3, ticks_per_day=TICKS,
+                    volatility=1.0, record=False, first_day=0)
+    mark = engine.day_marks()[0]
+    names = len(mark["active"])
+    sectors = mark["sectors"]
+    # per tick: one market factor normal, one normal per sector, one normal
+    # and one uniform per name, and settlement's four uniforms per name
+    per_tick = 1 + sectors + names + names + 4 * names
+    assert len(engine.draw_log("market", -1000, 1000)) == TICKS * per_tick
