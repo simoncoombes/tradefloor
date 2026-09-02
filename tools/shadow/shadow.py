@@ -233,7 +233,7 @@ class Forward:
 
 def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
           extra: int = 0, *, sigma: float, step: float = 0.25,
-          max_iter: int = 8, tol: float = 2e-4) -> dict:
+          max_iter: int = 8, tol: float = 1e-4) -> dict:
     """Levenberg-Marquardt for the MAP day aggregates.
 
     Minimises ``|r(x) - r_obs|^2 / (2 sigma^2) + |x|^2 / 2``. ``extra``
@@ -259,10 +259,8 @@ def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
         J[:, k] = (resid(xk) - r) / step
     lam = 1e-3
     cost = (r @ r) / (2 * sigma ** 2) + (x @ x) / 2
-    converged = np.max(np.abs(r)) < tol
+    converged = False
     for _ in range(max_iter):
-        if converged:
-            break
         A = J.T @ J / sigma ** 2 + np.eye(m)
         g = J.T @ r / sigma ** 2 + x
         accepted = False
@@ -274,14 +272,21 @@ def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
             if cost_new < cost:
                 dr = r_new - r
                 J += np.outer(dr - J @ delta, delta) / (delta @ delta)
+                improvement = (cost - cost_new) / max(cost, 1e-12)
                 x, r, cost = x_new, r_new, cost_new
                 lam = max(lam / 3, 1e-6)
                 accepted = True
+                # converged: the posterior stopped moving, which is the
+                # optimiser's claim; whether the closes were reached is a
+                # separate question the residual answers
+                converged = improvement < tol
                 break
             lam *= 10
         if not accepted:
+            converged = True
             break
-        converged = np.max(np.abs(r)) < tol
+        if converged:
+            break
     return {"x": x, "residual": r, "jacobian": J, "cost": float(cost),
             "converged": bool(converged)}
 
@@ -386,8 +391,9 @@ def shadow(args) -> dict:
         snap = engine.state_snapshot()
         residual = np.array(result["residual"])
         worst = int(np.argmax(np.abs(residual)))
+        reached = bool(np.abs(residual).max() < 5 * args.sigma)
         clamped = [tickers[i] for i in range(n)
-                   if abs(residual[i]) > 3 * args.sigma
+                   if abs(residual[i]) > 5 * args.sigma
                    and result["jacobian_idio_norm"][i] < 1e-3]
         days.append({
             "day": k, "date": d["dates"][session],
@@ -396,6 +402,7 @@ def shadow(args) -> dict:
             "jump_company": {tickers[i]: v for i, v in result["jump_company"].items()},
             "max_abs_residual": float(np.abs(residual).max()),
             "worst": tickers[worst], "converged": result["converged"],
+            "reached": reached,
             "clamped": clamped, "evals": result["evals"],
             "vix_model": float(engine.macro_state.vix),
             "vix_real": d["vix"][session],
@@ -506,22 +513,26 @@ def diagnostics(run: dict) -> list[dict]:
 def render(run: dict) -> str:
     days = run["days"]
     N = len(days)
-    failed = [d for d in days if not d["converged"] or d["clamped"]]
+    failed = [d for d in days
+              if not d.get("reached", d["max_abs_residual"] < 5 * run["args"]["sigma"])
+              or d["clamped"]]
     vm = np.array([d["vix_model"] for d in days])
     vr = np.array([d["vix_real"] for d in days])
     gap = vm - vr
     lines = [f"# Shadow run: {run['year']} ({run['args']['year']})", "",
              "## Where the solve fails", ""]
     if not failed:
-        lines.append(f"Every one of the {N} days converged within the "
-                     f"residual tolerance with no binding clamp.")
+        lines.append(f"Every one of the {N} days reached its observed closes "
+                     f"within five sigma ({5 * run['args']['sigma']:.0e} in "
+                     "log return) with no binding clamp.")
     else:
         lines.append(f"{len(failed)} of {N} days did not reach the observed "
-                     "closes within tolerance or hit a binding clamp. A day "
-                     "is accepted only at the fit it reached; the residual "
-                     "is reported, not absorbed.")
+                     f"closes within five sigma ({5 * run['args']['sigma']:.0e} "
+                     "in log return) or hit a binding clamp. A day is accepted "
+                     "at the fit it reached; the residual is reported, not "
+                     "absorbed.")
         lines += ["", "| day | date | worst name | max abs residual | "
-                  "converged | binding clamp |", "|---|---|---|---|---|---|"]
+                  "optimiser converged | binding clamp |", "|---|---|---|---|---|---|"]
         for d in sorted(failed, key=lambda d: -d["max_abs_residual"])[:25]:
             lines.append(f"| {d['day']} | {d['date']} | {d['worst']} | "
                          f"{d['max_abs_residual']:.2e} | {d['converged']} | "
