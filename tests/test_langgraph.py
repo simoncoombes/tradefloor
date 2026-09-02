@@ -832,20 +832,48 @@ def test_an_unknown_exception_is_left_for_the_base_to_wrap():
 def test_a_fork_shares_the_graph_and_keeps_the_hooks():
     """The graph is shared, not copied: it may hold a checkpointer and an
     HTTP client. The hooks are the policy, and two arms disagreeing about
-    how the observation is presented would not be a comparison."""
+    how the observation is presented would not be a comparison.
+
+    A caller's own `input_builder` is one of those hooks and is checked
+    by identity, same as `output_parser`: `fork_kwargs` carries the
+    caller's function through unchanged. The DEFAULT builder is not
+    checked by identity -- it is bound to `self.renderer`, so each arm
+    gets its own bound method -- and `renderer` identity is the
+    corresponding check for that case; see
+    `test_a_forks_default_input_builder_is_bound_to_its_own_renderer`.
+    """
     def parse(result):
         return result
 
+    def build(payload):
+        return {"observation": payload}
+
     graph = DuckGraph(contract.buy)
-    agent = LangGraphAdapter(graph, output_parser=parse, thread_id="pinned",
+    agent = LangGraphAdapter(graph, output_parser=parse,
+                             input_builder=build, thread_id="pinned",
                              config={"tags": ["mine"]}, arm="control")
     twin = agent.fork()
     assert type(twin) is LangGraphAdapter
     assert twin.runnable is graph
     assert twin.output_parser is parse
-    assert twin.input_builder is agent.input_builder
+    assert twin.input_builder is build
+    assert agent.input_builder is build
     assert twin.thread_id == "pinned"
     assert twin.config == {"tags": ["mine"]}
+
+
+def test_a_forks_default_input_builder_is_bound_to_its_own_renderer():
+    """The default `input_builder` cannot be checked by identity across a
+    fork -- it is a bound method, and each arm gets its own, bound to
+    its own instance. What has to match, and does, is which `renderer`
+    it is bound to: `fork_kwargs()` carries `self.renderer` through, so
+    both arms render through the SAME renderer object until one is
+    deliberately swapped, which is what `invariance()` does."""
+    graph = DuckGraph(contract.buy)
+    agent = LangGraphAdapter(graph, arm="control")
+    twin = agent.fork()
+    assert twin.input_builder is not agent.input_builder
+    assert twin.renderer is agent.renderer
     assert twin.arm == "control"
 
 
