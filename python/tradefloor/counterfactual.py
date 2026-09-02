@@ -292,7 +292,7 @@ class World:
 
     # -- running ----------------------------------------------------------
 
-    def run(self, days: int = 1) -> "World":
+    def run(self, days: int = 1, *, ledger: Any = None) -> "World":
         """Advance ``days`` whole days, agent trading, and record every step.
 
         Whole days only. A world stopped mid-day could not be forked safely,
@@ -304,6 +304,12 @@ class World:
         same feedback of the agent's own flow into the next session. A
         counterfactual run that stepped the market differently from the
         library's own evaluation would be measuring a second engine.
+
+        ``ledger`` is an optional :class:`tradefloor.DayLedger`, handed the
+        state hash after every close. It is an argument here rather than a
+        field on the world, because :meth:`fork` produces two worlds and one
+        ledger shared between them would interleave the arms into a single
+        list of leaves that describes neither.
         """
         if days < 0:
             raise ValidationError(f"days cannot be negative, got {days}")
@@ -388,6 +394,8 @@ class World:
                 self._step += 1
 
             self.engine.close_market()
+            if ledger is not None:
+                ledger.close(self.engine)
             self._day += 1
         return self
 

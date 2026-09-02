@@ -72,6 +72,21 @@ values give a mismatch a specific name when the model itself moved, and the
 embedded values are what will let a future custom preset travel without a
 format change, but none of them is trusted as the era. The probe is.
 
+## Sampled verification, for a run too long to replay
+
+`reproduce()` replays the whole run, so a 252-day manifest costs 252 days to
+check. A reader who wants evidence for a fraction of that cost has
+:class:`DayLedger`: the run takes a canonical hash of the engine's state at
+every close, the manifest carries the Merkle root over those leaves, and
+:func:`verify` recomputes k random days from their committed predecessors.
+Checking k days costs k days of simulation, whatever the length of the run.
+
+The two checks measure different things and both are here. The market digest
+says the whole run rebuilds to the same market on this build. A sampled
+verification says k named days recompute to the states committed for them,
+and :attr:`Verification.caveats` names those days and states what the days
+outside the sample rest on.
+
 ## What a successful reproduction proves about platforms
 
 Cross-OS bit-identity is measured by commit. The five-target release gate
@@ -94,6 +109,7 @@ with both platforms named.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import platform as _platform
@@ -114,7 +130,7 @@ from ._core import (
     step_mispricing_daily,
     version,
 )
-from .replay import replay
+from .replay import apply_log, replay
 from .scenario import Scenario
 from .spec import StrategySpec
 
@@ -136,6 +152,77 @@ DIGEST_COLUMNS = (
     "price", "previous_close", "open", "high", "low",
     "volume", "market_cap", "mispricing_s", "garch_variance",
 )
+
+#: Version of the per-day state hash a :class:`DayLedger` writes, recorded in
+#: a manifest's ``days`` block. Bumped only when the HASH ITSELF changes,
+#: since its leaves are then a new series and comparing across versions is
+#: refused rather than reported as a tampered day it is not. Same discipline
+#: as :data:`ERA_PROBE`.
+STATE_HASH_VERSION = "state/1"
+
+#: The eighteen engine columns, in the order `Engine::state_hash` walks them,
+#: which is `python_engine::COLUMN_FIELDS` order. Declared here rather than
+#: read off the snapshot, so a column added to the engine and not placed here
+#: fails :func:`state_hash` by name instead of dropping out of every leaf.
+_STATE_HASH_COLUMNS = (
+    "price", "previous_close", "previous_tick_price", "open", "high", "low",
+    "volume", "avg_volume", "market_cap", "mispricing_s",
+    "mispricing_s_prev_close", "mispricing_momentum", "last_daily_return",
+    "maker_inventory", "garch_variance", "beta", "short_interest",
+    "float_shares",
+)
+
+#: The economy's scalar fields, in the order `state_snapshot` declares them.
+#: Two of them are not f64: ``oil_last_opec_day`` is an integer day and
+#: ``market_pe`` is optional, so each is hashed with its own encoding.
+_ECONOMY_FIELDS = (
+    "federal_funds_rate", "prime_rate", "corporate_bond_yield",
+    "treasury_yield_10y", "treasury_yield_2y", "mortgage_rate_30y",
+    "cpi", "inflation_rate", "core_inflation",
+    "gdp_growth", "gdp",
+    "unemployment_rate", "jobs_created", "labor_force_participation",
+    "usd_index", "oil_price", "gold_price", "copper_price",
+    "housing_index", "home_starts_monthly", "housing_transaction_volume",
+    "long_term_unemployment_rate", "structural_unemployment",
+    "consumer_confidence", "business_confidence", "fear_greed_index", "vix",
+    "tariff_rate", "trade_balance",
+    "oil_inventory_level", "oil_last_opec_day",
+    "wage_growth",
+    "previous_day_market_return", "rolling_market_return_30d",
+    "market_pe", "qe_pe_boost",
+    "fiscal_stimulus", "government_debt_to_gdp",
+    "months_in_current_phase", "recession_probability",
+)
+
+#: Every key the economy sub-dict carries: the scalars above, the four-point
+#: GDP trend and the cycle phase.
+_ECONOMY_KEYS = _ECONOMY_FIELDS + ("gdp_trend", "cycle_phase")
+
+#: The central bank's fields, in `state_snapshot` order.
+_CENTRAL_BANK_FIELDS = (
+    "last_meeting_date", "next_meeting_date", "target_inflation",
+    "target_unemployment", "qe_active", "qe_monthly_purchases",
+    "hawkish_dovish_score", "forward_guidance",
+)
+
+#: Every key `Engine.state_snapshot` carries. :func:`state_hash` checks a
+#: snapshot against this before hashing, so a field added to the engine
+#: raises here rather than being left silently out of every leaf a ledger
+#: holds -- the failure `state_snapshot` itself has had six times.
+_SNAPSHOT_KEYS = (
+    "columns", "rng", "tickers", "model_fingerprint",
+    "attribution", "tick_components", "tick_fundamental", "tick_anchor",
+    "market_open", "market_variance", "forced_flow_spent", "volume_state",
+    "universe_stress", "volume_idio", "session_news", "economy",
+    "central_bank", "day_count",
+)
+
+#: The generator sequence :func:`verify` draws its sample of days from.
+#: The library's own PCG32 rather than `random`, because a verification is
+#: reproducible only if the days it sampled are: the same seed must name the
+#: same days on every platform and every Python version, and the standard
+#: library promises that of neither.
+_VERIFY_STREAM = 909
 
 _MACRO_FIELDS = ("vix", "federal_funds_rate", "corporate_bond_yield",
                  "inflation_rate", "qe_pe_boost", "fear_greed_index", "cycle")
@@ -181,6 +268,245 @@ def market_digest(engine: Engine) -> str:
             _f64(buf, value)
     _f64(buf, float(engine.draws_consumed))
     return hashlib.sha256(bytes(buf)).hexdigest()
+
+
+def _bits(buf: bytearray, value: float) -> None:
+    """One f64 as its raw bit pattern, big-endian, NaN payload included.
+
+    For a value that is a bit pattern wearing a float, which is how a
+    generator state crosses into Python: a PCG32 state is a u64 and a u64
+    does not survive a Python float. Roughly one u64 in a thousand reads as a
+    NaN, so putting one of these through :func:`_f64` would map distinct
+    generator positions onto one digest.
+    """
+    buf.extend(struct.pack(">d", value))
+
+
+def _u32(buf: bytearray, value: int) -> None:
+    buf.extend(struct.pack(">I", int(value)))
+
+
+def _i64(buf: bytearray, value: int) -> None:
+    buf.extend(struct.pack(">q", int(value)))
+
+
+def _flag(buf: bytearray, value: bool) -> None:
+    buf.append(1 if value else 0)
+
+
+def _text(buf: bytearray, value: str) -> None:
+    """A string, length-prefixed, so two adjacent strings cannot be re-split.
+
+    Without the prefix "AB" then "C" and "A" then "BC" write the same bytes,
+    and a roster renamed across that boundary would hash unchanged.
+    """
+    encoded = str(value).encode("utf-8")
+    _u32(buf, len(encoded))
+    buf.extend(encoded)
+
+
+def _maybe_f64(buf: bytearray, value: float | None) -> None:
+    if value is None:
+        _flag(buf, False)
+    else:
+        _flag(buf, True)
+        _f64(buf, value)
+
+
+def _maybe_text(buf: bytearray, value: str | None) -> None:
+    if value is None:
+        _flag(buf, False)
+    else:
+        _flag(buf, True)
+        _text(buf, value)
+
+
+def _column(buffer: bytes, count: int, name: str) -> tuple[float, ...]:
+    """Decode one of a snapshot's transport buffers.
+
+    The buffers cross the boundary as LITTLE-endian bytes, which is the
+    machine's layout and not the digest's. Hashing them as they arrive would
+    write a digest that agrees with itself on one endianness and with nothing
+    else, so every value is decoded here and re-encoded big-endian by
+    :func:`_f64`.
+    """
+    if len(buffer) != count * 8:
+        raise ValidationError(
+            f"snapshot column {name!r} carries {len(buffer)} bytes and this "
+            f"roster needs {count * 8}. The snapshot was written for a "
+            "different roster, or truncated in transit."
+        )
+    return struct.unpack("<%dd" % count, buffer)
+
+
+def state_hash(snapshot: dict[str, Any]) -> str:
+    """sha256 over an engine's state: the per-day ledger leaf, in Python.
+
+    The twin of ``Engine.state_hash``, computed from
+    ``Engine.state_snapshot()`` rather than from the engine, and a test holds
+    the two equal. It exists so a reader can check a ledger's leaves against
+    an archived snapshot with the package alone, and so the encoding has a
+    second implementation that a divergence between the two would expose.
+
+    ## What it covers
+
+    Every field the snapshot carries, in one fixed order: the eighteen
+    columns instrument by instrument, the seven generator states, the roster
+    and the model fingerprint, the day accumulators and the market-open flag,
+    the market factor's variance, the volume states, the universe stress, the
+    forced-flow budget, the day's endogenous news, the economy in declared
+    order, the central bank and the day counter.
+
+    ``market_digest`` covers nine columns and the draw count, which is what a
+    published result is checked against. This covers the macro chain and the
+    generator positions on top, because a ledger commits to the state the
+    NEXT day starts from, and two runs can print the same prices today while
+    holding different state for tomorrow.
+
+    ## What it cannot say
+
+    It is a hash of state, so history is outside it: the order log, the
+    recorded tape and the pending daily jump are not in a snapshot and are
+    not in this. Two engines that reached one state by different routes hash
+    the same, which is the property that lets a replayed day be checked
+    against a recorded one.
+
+    ## The encoding
+
+    Every float is eight bytes big-endian with one canonical NaN pattern, the
+    rule :func:`_f64` and ``tests/known_answer.py`` share. The generator
+    states are raw bit patterns instead; :func:`_bits` says why. Strings are
+    length-prefixed, a bool is one byte, and an optional value is a presence
+    byte followed by the value when it is there.
+
+    A snapshot carrying a key this function does not know, or missing one it
+    does, is refused by name. The alternative is a leaf that silently stops
+    covering a field the engine grew, which is the failure
+    ``state_snapshot`` has had six times.
+    """
+    if not isinstance(snapshot, dict):
+        raise ValidationError(
+            "state_hash takes the dict Engine.state_snapshot() returns, not a "
+            f"{type(snapshot).__name__}."
+        )
+    carried = set(snapshot)
+    expected = set(_SNAPSHOT_KEYS)
+    if carried != expected:
+        missing = sorted(expected - carried)
+        extra = sorted(carried - expected)
+        raise ValidationError(
+            "this snapshot does not match the fields the state hash covers: "
+            f"missing {missing}, unexpected {extra}. A leaf that skipped a "
+            "field the engine carries would commit to a state it does not "
+            "describe, so the hash refuses rather than hashing what it "
+            "recognises."
+        )
+
+    tickers = list(snapshot["tickers"])
+    n = len(tickers)
+    buf = bytearray()
+
+    columns = snapshot["columns"]
+    if set(columns) != set(_STATE_HASH_COLUMNS):
+        raise ValidationError(
+            "this snapshot's columns are not the eighteen the state hash "
+            "covers: missing "
+            f"{sorted(set(_STATE_HASH_COLUMNS) - set(columns))}, unexpected "
+            f"{sorted(set(columns) - set(_STATE_HASH_COLUMNS))}."
+        )
+    decoded = [_column(columns[name], n, name) for name in _STATE_HASH_COLUMNS]
+    for i in range(n):
+        for column in decoded:
+            _f64(buf, column[i])
+
+    rng = list(snapshot["rng"])
+    if len(rng) != 21:
+        raise ValidationError(
+            f"this snapshot carries {len(rng)} generator numbers and the "
+            "state hash covers 21: seven streams of state, increment and "
+            "Box-Muller spare. A snapshot from an earlier stream layout "
+            "froze a market this hash cannot describe."
+        )
+    for value in rng:
+        _bits(buf, value)
+
+    _u32(buf, n)
+    for ticker in tickers:
+        _text(buf, ticker)
+    _text(buf, snapshot["model_fingerprint"])
+
+    for name, width in (("attribution", 9), ("tick_components", 8),
+                        ("tick_fundamental", 1), ("tick_anchor", 1)):
+        for value in _column(snapshot[name], n * width, name):
+            _f64(buf, value)
+    _flag(buf, bool(snapshot["market_open"]))
+
+    variance = list(snapshot["market_variance"])
+    if len(variance) != 6:
+        raise ValidationError(
+            f"market_variance carries {len(variance)} numbers and the state "
+            "hash covers six."
+        )
+    for value in variance:
+        _f64(buf, value)
+    _f64(buf, snapshot["volume_state"])
+    for value in _column(snapshot["volume_idio"], n, "volume_idio"):
+        _f64(buf, value)
+    _f64(buf, snapshot["universe_stress"])
+    _f64(buf, snapshot["forced_flow_spent"])
+
+    news = list(snapshot["session_news"])
+    _u32(buf, len(news))
+    for event in news:
+        _maybe_text(buf, event["ticker"])
+        _maybe_text(buf, event["sector"])
+        _maybe_f64(buf, event["price_impact"])
+
+    economy = snapshot["economy"]
+    if set(economy) != set(_ECONOMY_KEYS):
+        raise ValidationError(
+            "this snapshot's economy is not the one the state hash covers: "
+            f"missing {sorted(set(_ECONOMY_KEYS) - set(economy))}, unexpected "
+            f"{sorted(set(economy) - set(_ECONOMY_KEYS))}."
+        )
+    for name in _ECONOMY_FIELDS:
+        value = economy[name]
+        if name == "oil_last_opec_day":
+            _i64(buf, value)
+        elif name == "market_pe":
+            _maybe_f64(buf, value)
+        else:
+            _f64(buf, value)
+    trend = list(economy["gdp_trend"])
+    if len(trend) != 4:
+        raise ValidationError(
+            f"gdp_trend carries {len(trend)} points and the state hash "
+            "covers four."
+        )
+    for value in trend:
+        _f64(buf, value)
+    _text(buf, economy["cycle_phase"])
+
+    bank = snapshot["central_bank"]
+    if set(bank) != set(_CENTRAL_BANK_FIELDS):
+        raise ValidationError(
+            "this snapshot's central bank is not the one the state hash "
+            "covers: missing "
+            f"{sorted(set(_CENTRAL_BANK_FIELDS) - set(bank))}, unexpected "
+            f"{sorted(set(bank) - set(_CENTRAL_BANK_FIELDS))}."
+        )
+    _i64(buf, bank["last_meeting_date"])
+    _i64(buf, bank["next_meeting_date"])
+    _f64(buf, bank["target_inflation"])
+    _f64(buf, bank["target_unemployment"])
+    _flag(buf, bool(bank["qe_active"]))
+    _f64(buf, bank["qe_monthly_purchases"])
+    _f64(buf, bank["hawkish_dovish_score"])
+    _text(buf, bank["forward_guidance"])
+
+    _u32(buf, snapshot["day_count"])
+    return hashlib.sha256(bytes(buf)).hexdigest()
+
 
 
 def era_fingerprint() -> str:
@@ -283,6 +609,271 @@ def era_fingerprint() -> str:
     return hashlib.sha256(bytes(buf)).hexdigest()
 
 
+
+#: Schema of the JSON a :class:`DayLedger` writes.
+LEDGER_SCHEMA = 1
+
+#: Snapshot keys whose value is a buffer of little-endian f64s. They travel
+#: base64-encoded, because the exact bits have to survive: a NaN in
+#: ``tick_fundamental`` or in the ``rng`` array is a value, and JSON's own
+#: float syntax would round-trip it as some other NaN.
+_LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
+                   "tick_anchor", "volume_idio")
+
+
+def _merkle_levels(leaves: Sequence[str]) -> list[list[bytes]]:
+    """Every level of the tree, leaves first, root last.
+
+    Binary, with duplicate-last padding: an odd level pairs its final node
+    with itself. The alternative, promoting a lone node to the next level,
+    makes two different leaf counts produce one root, so a ledger could be
+    truncated and still verify.
+    """
+    level = [bytes.fromhex(leaf) for leaf in leaves]
+    levels = [level]
+    while len(level) > 1:
+        if len(level) % 2:
+            level = level + [level[-1]]
+        level = [hashlib.sha256(level[i] + level[i + 1]).digest()
+                 for i in range(0, len(level), 2)]
+        levels.append(level)
+    return levels
+
+
+def _proof_holds(leaf: str, day: int, proof: Sequence[str], root: str) -> bool:
+    """Recompute the root from one leaf and its siblings.
+
+    The direction at each level comes from the index rather than from the
+    proof, so a proof is a list of hashes and cannot claim a position its
+    day does not have.
+    """
+    try:
+        node = bytes.fromhex(leaf)
+        siblings = [bytes.fromhex(s) for s in proof]
+    except ValueError:
+        return False
+    index = day
+    for sibling in siblings:
+        pair = (node + sibling) if index % 2 == 0 else (sibling + node)
+        node = hashlib.sha256(pair).digest()
+        index //= 2
+    return node.hex() == root
+
+
+class DayLedger:
+    """The per-day state hashes of one run, and the tree over them.
+
+    A leaf is ``Engine.state_hash()`` taken after a day's close, and the root
+    of the binary tree over the leaves is what a :class:`RunManifest` carries.
+    The manifest stays a document a person can read: a year of snapshots at
+    forty names is several megabytes, so the states live here, beside the
+    manifest rather than inside it.
+
+    ```python
+    ledger = tf.DayLedger()
+    engine.run_days(60, ledger=ledger)
+    manifest = tf.RunManifest.of(engine, seed=42, universe=roster,
+                                 ledger=ledger)
+    open("ledger.json", "w").write(ledger.to_json())
+    ```
+
+    ## What the snapshots buy
+
+    With them, checking day d costs one day of simulation: the verifier
+    restores day d - 1 and replays day d. Without them it costs d days,
+    because the only way to reach day d - 1 is to run to it, and
+    :class:`Verification` says which of the two it paid. ``snapshots=False``
+    is for a ledger that has to stay small and whose days will be checked
+    rarely.
+
+    ## The leaf is taken after the close
+
+    Not after ``record``, so a run that never recorded a tape still ledgers,
+    and the state a leaf commits to is the one the next day starts from.
+    That is what makes day d checkable from day d - 1.
+    """
+
+    __slots__ = ("leaves", "snapshots")
+
+    def __init__(self, *, snapshots: bool = True) -> None:
+        self.leaves: list[str] = []
+        self.snapshots: list[dict[str, Any]] | None = [] if snapshots else None
+
+    # -- writing -----------------------------------------------------------
+
+    @property
+    def keeps_snapshots(self) -> bool:
+        """Whether this ledger stores the state behind each leaf.
+
+        Read by ``Engine.run_days`` before its day loop, so the Rust side
+        knows whether to build a snapshot it would otherwise discard.
+        """
+        return self.snapshots is not None
+
+    @property
+    def count(self) -> int:
+        return len(self.leaves)
+
+    def close(self, engine: Engine) -> None:
+        """Take this engine's leaf. Called at every close boundary."""
+        self._close(engine.state_hash(),
+                    engine.state_snapshot() if self.keeps_snapshots else None)
+
+    def _close(self, leaf: str, snapshot: dict[str, Any] | None) -> None:
+        """The protocol ``Engine.run_days`` calls from its Rust day loop.
+
+        Two arguments rather than the engine, because the day loop holds a
+        `&mut PyEngine` and no Python handle to hand back.
+        """
+        if self.snapshots is not None and snapshot is None:
+            raise ValidationError(
+                "this ledger keeps snapshots and was handed a leaf without "
+                "one. A ledger half of whose days carry state would cost one "
+                "day to check for some days and the whole run for others, "
+                "with nothing recording which."
+            )
+        self.leaves.append(str(leaf))
+        if self.snapshots is not None:
+            self.snapshots.append(snapshot)
+
+    # -- the tree ----------------------------------------------------------
+
+    def root(self) -> str:
+        """The Merkle root over every leaf, as hex."""
+        if not self.leaves:
+            raise ValidationError(
+                "this ledger holds no days, so it has no root. A ledger is "
+                "filled at each close boundary; this run crossed none, or "
+                "the ledger was not passed to the loop that ran it."
+            )
+        return _merkle_levels(self.leaves)[-1][0].hex()
+
+    def proof(self, day: int) -> list[str]:
+        """The sibling hashes that carry day ``day`` up to the root.
+
+        Checked with the root and the leaf, this says the leaf was committed
+        at that position. It says nothing about the day recomputing to it,
+        which is what :func:`verify` measures.
+        """
+        if not 0 <= day < len(self.leaves):
+            raise ValidationError(
+                f"day {day} is outside this ledger, which holds "
+                f"{len(self.leaves)} days numbered 0 to "
+                f"{len(self.leaves) - 1}."
+            )
+        out: list[str] = []
+        index = day
+        for level in _merkle_levels(self.leaves)[:-1]:
+            padded = level + [level[-1]] if len(level) % 2 else level
+            out.append(padded[index ^ 1].hex())
+            index //= 2
+        return out
+
+    # -- serialisation -----------------------------------------------------
+
+    def to_json(self, *, with_snapshots: bool = True) -> str:
+        """The ledger as JSON: the file that travels beside a manifest.
+
+        ``with_snapshots=False`` writes the leaves alone, which is the small
+        artifact. A ledger that never held snapshots writes none either way,
+        and :func:`verify` reports the cost that follows from what it finds.
+
+        The f64 buffers travel base64-encoded rather than as JSON numbers,
+        because ``tick_fundamental`` and the generator array carry NaN as a
+        VALUE and JSON's float syntax cannot round-trip one.
+        """
+        payload: dict[str, Any] = {
+            "schema": LEDGER_SCHEMA,
+            "hash": STATE_HASH_VERSION,
+            "leaves": list(self.leaves),
+        }
+        if with_snapshots and self.snapshots is not None:
+            payload["snapshots"] = [_snapshot_to_json(s)
+                                    for s in self.snapshots]
+        return _canonical(payload)
+
+    @classmethod
+    def from_json(cls, text: str) -> "DayLedger":
+        """Load a ledger written by :meth:`to_json`.
+
+        Refuses a hash version this build does not compute, by name: a leaf
+        from another version of the state hash is a different measurement,
+        and checking a day against one would report a tampered day that is
+        not.
+        """
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValidationError(
+                f"this is not JSON, so it is not a day ledger: {exc}"
+            ) from exc
+        if not isinstance(payload, dict) or "leaves" not in payload:
+            raise ValidationError(
+                "this is not a day ledger: a ledger is a JSON object with a "
+                "list of leaves and a hash version."
+            )
+        schema = payload.get("schema", 0)
+        if schema > LEDGER_SCHEMA:
+            raise ValidationError(
+                f"ledger schema {schema} is newer than this version "
+                "understands. Upgrade tradefloor rather than reading it "
+                "partially."
+            )
+        version = payload.get("hash")
+        if version != STATE_HASH_VERSION:
+            raise ValidationError(
+                f"this ledger's leaves are {version!r} hashes and this build "
+                f"computes {STATE_HASH_VERSION!r}. The two are different "
+                "measurements, so every day would report as tampered."
+            )
+        raw = payload.get("snapshots")
+        ledger = cls(snapshots=raw is not None)
+        ledger.leaves = [str(leaf) for leaf in payload["leaves"]]
+        if raw is not None:
+            if len(raw) != len(ledger.leaves):
+                raise ValidationError(
+                    f"this ledger holds {len(ledger.leaves)} leaves and "
+                    f"{len(raw)} snapshots. One of the two was truncated, and "
+                    "a snapshot read against the wrong day would report a "
+                    "tampered run."
+                )
+            ledger.snapshots = [_snapshot_from_json(s) for s in raw]
+        return ledger
+
+    def __len__(self) -> int:
+        return len(self.leaves)
+
+    def __repr__(self) -> str:
+        held = "with snapshots" if self.keeps_snapshots else "leaves only"
+        root = self.root()[:12] + "..." if self.leaves else "empty"
+        return f"DayLedger({len(self.leaves)} days, {held}, root {root})"
+
+
+def _snapshot_to_json(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """One state snapshot in a form JSON can carry losslessly."""
+    out = dict(snapshot)
+    out["columns"] = {name: base64.b64encode(buf).decode("ascii")
+                      for name, buf in snapshot["columns"].items()}
+    for name in _LEDGER_BUFFERS:
+        out[name] = base64.b64encode(snapshot[name]).decode("ascii")
+    values = list(snapshot["rng"])
+    out["rng"] = base64.b64encode(
+        struct.pack("<%dd" % len(values), *values)).decode("ascii")
+    return out
+
+
+def _snapshot_from_json(payload: dict[str, Any]) -> dict[str, Any]:
+    """The inverse of :func:`_snapshot_to_json`, ready for a restore."""
+    out = dict(payload)
+    out["columns"] = {name: base64.b64decode(text)
+                      for name, text in payload["columns"].items()}
+    for name in _LEDGER_BUFFERS:
+        out[name] = base64.b64decode(payload[name])
+    raw = base64.b64decode(payload["rng"])
+    out["rng"] = list(struct.unpack("<%dd" % (len(raw) // 8), raw))
+    return out
+
+
 class RunManifest:
     """A finished run as one shareable, self-verifying document.
 
@@ -305,7 +896,8 @@ class RunManifest:
            scenario: Scenario | None = None,
            strategy: StrategySpec | str | None = None,
            universe_source: Any = None, label: str = "",
-           derived_from: Any = None) -> "RunManifest":
+           derived_from: Any = None,
+           ledger: "DayLedger | None" = None) -> "RunManifest":
         """Capture a finished run.
 
         ``universe`` and ``seed`` are passed rather than read off the engine
@@ -335,6 +927,13 @@ class RunManifest:
         holding both manifests can recover the structure by comparing them.
         A reader holding one cannot, and nothing says a run is a branch of
         anything. This is that sentence, written down.
+
+        ``ledger`` is the :class:`DayLedger` the run filled, and it adds one
+        ``days`` block holding the Merkle root over the per-day state hashes,
+        the day count and the hash version. The manifest carries the root
+        alone; the leaves and the states stay in the ledger, because a year
+        of snapshots at forty names is several megabytes and a manifest is
+        meant to be read. :func:`verify` is what the block is for.
         """
         from . import Universe
 
@@ -441,6 +1040,31 @@ class RunManifest:
                 "draws_consumed": engine.draws_consumed,
             },
         }
+        if ledger is not None:
+            # A ledger and a log that disagree about how many days the run
+            # crossed describe two different runs, and pairing them would
+            # check day d of one against day d of the other. Counted from the
+            # log rather than from `result["days"]`, which counts opens: a run
+            # that opened a day and stopped inside it has no leaf for it.
+            boundaries = sum(1 for entry in log if _is_close(entry))
+            if ledger.count != boundaries:
+                raise ValidationError(
+                    f"this ledger holds {ledger.count} days and the run's log "
+                    f"crosses {boundaries} day boundaries. The ledger was "
+                    "filled by a different run, or it was not passed to the "
+                    "loop that ran this one."
+                )
+            if ledger.count == 0:
+                raise ValidationError(
+                    "this ledger holds no days, so it commits to nothing. A "
+                    "leaf is taken at a close boundary and this run crossed "
+                    "none."
+                )
+            doc["days"] = {
+                "root": ledger.root(),
+                "count": ledger.count,
+                "hash": STATE_HASH_VERSION,
+            }
         if derived_from is not None:
             # Identity before history. The log is a sequence of INPUTS, so two
             # runs that opened and ran the same sessions carry the same log
@@ -599,6 +1223,20 @@ class RunManifest:
                 "were written with, and every carried component checks out "
                 "individually: the seed was edited in transit."
             )
+
+        days = payload.get("days")
+        if days is not None:
+            # Shape only. An unknown hash version is left for `verify` to
+            # refuse by name, because a manifest whose leaves this build
+            # cannot recompute still reproduces: the ledger is additive and
+            # `reproduce()` never reads it.
+            if not isinstance(days, dict) or set(days) != {"root", "count",
+                                                           "hash"}:
+                raise ValidationError(
+                    "this manifest's day ledger block is not the three fields "
+                    "it should carry (root, count, hash). It was edited in "
+                    "transit, or written by something that is not tradefloor."
+                )
 
         return cls(payload)
 
@@ -894,6 +1532,22 @@ class RunManifest:
             )
 
     @property
+    def day_ledger(self) -> dict[str, Any] | None:
+        """The run's per-day commitment, or ``None`` when it has none.
+
+        ``{"root": <Merkle root>, "count": <days>, "hash": "state/1"}``, read
+        from the document's ``days`` key. Named apart from
+        ``result["days"]``, which is the number of days the run traded: one
+        is a count and the other is a commitment, and a reader should not
+        have to work out which ``days`` they are holding.
+
+        :func:`verify` pairs this with a :class:`DayLedger` and recomputes a
+        sample of the days it commits to.
+        """
+        recorded = self._doc.get("days")
+        return dict(recorded) if recorded else None
+
+    @property
     def universe(self):
         """The embedded roster, as a :class:`tradefloor.Universe`."""
         from . import Universe
@@ -1052,3 +1706,338 @@ class RunManifest:
         return (f"RunManifest({label}seed={self.seed}, "
                 f"{len(self._doc['universe']['instruments'])} instruments, "
                 f"{self._doc['result']['days']} days, {state})")
+
+# -- sampled verification ---------------------------------------------------
+
+
+def _is_close(entry: dict[str, Any]) -> bool:
+    """Whether this entry is a day boundary.
+
+    Two spellings of one close, which the engine keeps equivalent:
+    ``close_market`` on its own, and ``run_session`` with ``close_at_end``.
+    A verifier that knew only the first would read a session-closed run as
+    one long day.
+    """
+    op = entry.get("op")
+    return op == "close_market" or (op == "run_session"
+                                    and bool(entry.get("close_at_end")))
+
+
+def _day_spans(log: Sequence[dict[str, Any]]) -> list[tuple[int, int]]:
+    """Half-open index ranges, one per closed day.
+
+    A day runs from the entry after the previous close through its own
+    close. That is wider than the open-to-close window, deliberately: a
+    scenario writes ``pin_macro`` BEFORE the market opens and a listing can
+    land there too, so a segment that started at ``open_market`` would replay
+    the day under yesterday's macro path and diverge for a reason that has
+    nothing to do with tampering.
+
+    Entries after the last close belong to no day. A run stopped mid-day has
+    no leaf for it, because a leaf is taken at a close.
+    """
+    spans: list[tuple[int, int]] = []
+    start = 0
+    for i, entry in enumerate(log):
+        if _is_close(entry):
+            spans.append((start, i + 1))
+            start = i + 1
+    return spans
+
+
+def _tick_count(entries: Sequence[dict[str, Any]]) -> int:
+    """Engine ticks in a segment of log entries.
+
+    The unit the cost claim is made in: a session carries its tick count and
+    a ``tick`` entry is one. Draw counts would say the same thing less
+    directly, since a closed market draws nothing.
+    """
+    total = 0
+    for entry in entries:
+        op = entry.get("op")
+        if op == "tick":
+            total += 1
+        elif op == "run_session":
+            total += int(entry.get("ticks", 0))
+    return total
+
+
+def _sample_days(count: int, k: int, seed: int) -> list[int]:
+    """``k`` distinct days from ``range(count)``, reproducibly.
+
+    A partial Fisher-Yates shuffle over the library's own PCG32. The standard
+    library's generator would do the arithmetic, and its ``sample`` is not a
+    published sequence: a verification whose sampled days moved between
+    Python versions could not be repeated by the reader it was reported to.
+    """
+    rng = GameRng(int(seed) & 0xFFFFFFFF, _VERIFY_STREAM)
+    pool = list(range(count))
+    for i in range(k):
+        j = i + int(rng.next_int(0, count - 1 - i))
+        pool[i], pool[j] = pool[j], pool[i]
+    return sorted(pool[:k])
+
+
+class Verification:
+    """What a sampled verification measured, and over what.
+
+    Returned by :func:`verify`. It reports rather than raising because k and
+    the days drawn are part of the answer on a pass: "this run verifies" is a
+    different claim from "these four of sixty days recompute on this build",
+    and only the second is true. :meth:`check` raises for a caller that wants
+    the failure to end the program.
+    """
+
+    __slots__ = ("days", "k", "count", "ticks", "day_runs", "failures",
+                 "from_snapshots", "root", "_wrote", "_here")
+
+    def __init__(self, *, days: Sequence[int], count: int, ticks: int,
+                 day_runs: int, failures: Sequence[str],
+                 from_snapshots: bool, root: str,
+                 wrote: str, here: str) -> None:
+        self.days = tuple(days)
+        self.k = len(self.days)
+        self.count = int(count)
+        self.ticks = int(ticks)
+        self.day_runs = int(day_runs)
+        self.failures = tuple(failures)
+        self.from_snapshots = bool(from_snapshots)
+        self.root = root
+        self._wrote = wrote
+        self._here = here
+
+    @property
+    def ok(self) -> bool:
+        """True when every sampled day recomputed to its committed leaf."""
+        return not self.failures
+
+    @property
+    def caveats(self) -> list[str]:
+        """What this particular verification does and does not establish.
+
+        Computed from the call: the sample, the cost, the platforms and the
+        span the hash covers. A caveat typed into this docstring would go on
+        being printed after the thing it describes had changed.
+        """
+        out = [
+            f"This verification recomputed {self.k} of {self.count} days on "
+            f"this build. The other {self.count - self.k} days are covered "
+            "by their leaf's membership in the root, which records what was "
+            "committed at each position."
+        ]
+        if self.k == self.count:
+            out.append(
+                "Every day in the ledger was recomputed, so the result rests "
+                "on no sampling."
+            )
+        if self.from_snapshots:
+            out.append(
+                f"Each sampled day was replayed from its committed "
+                f"predecessor, so {self.k} days cost {self.day_runs} "
+                f"day-runs and {self.ticks} engine ticks."
+            )
+        else:
+            out.append(
+                f"This ledger carries no snapshots, so each sampled day was "
+                f"replayed from day 0. The {self.k} days cost "
+                f"{self.day_runs} day-runs and {self.ticks} engine ticks; a "
+                f"ledger written with snapshots costs one day-run per "
+                f"sampled day."
+            )
+        out.append(
+            "The leaf hashes engine state. The order log, the recorded tape "
+            "and the pending daily jump sit outside it, so a day that "
+            "reached the same state by another route verifies."
+        )
+        if self._wrote == self._here:
+            out.append(
+                f"The manifest was written on {self._wrote} and checked on "
+                f"{self._here}, so this measures the build rather than a "
+                "platform pair."
+            )
+        else:
+            out.append(
+                f"The manifest was written on {self._wrote} and checked on "
+                f"{self._here}. Each day that recomputed here is a "
+                "cross-platform measurement for that day, made by the reader."
+            )
+        return out
+
+    def check(self) -> "Verification":
+        """Raise when a sampled day did not recompute. Returns self otherwise.
+
+        For a caller that wants the failure to end the program, in the shape
+        :meth:`RunManifest.verify_lineage` uses.
+        """
+        if self.failures:
+            raise ValidationError(
+                f"{len(self.failures)} of {self.k} sampled days did not "
+                "verify:\n  " + "\n  ".join(self.failures)
+            )
+        return self
+
+    def describe(self) -> str:
+        """A reader's summary: sample, cost, verdict and caveats."""
+        verdict = "PASSED" if self.ok else "FAILED"
+        lines = [
+            f"sampled verification {verdict}: {self.k} of {self.count} days, "
+            f"root {self.root[:12]}...",
+            f"  days: {', '.join(str(d) for d in self.days)}",
+            f"  cost: {self.day_runs} day-runs, {self.ticks} engine ticks",
+        ]
+        for failure in self.failures:
+            lines.append(f"  FAILED {failure}")
+        for caveat in self.caveats:
+            lines.append(f"  caveat: {caveat}")
+        return "\n".join(lines)
+
+    def __repr__(self) -> str:
+        return (f"Verification({'ok' if self.ok else 'FAILED'}, "
+                f"{self.k}/{self.count} days, {self.day_runs} day-runs)")
+
+
+def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
+           seed: int) -> Verification:
+    """Recompute ``k`` random days of a recorded run and check them.
+
+    ```python
+    report = tf.manifest.verify(manifest, ledger, 4, seed=7)
+    print(report.describe())
+    ```
+
+    ## What it measures
+
+    For each sampled day d it restores the ledger's snapshot for day d - 1
+    onto a fresh engine, replays day d's log entries, hashes the result and
+    compares it with the ledger's leaf for day d. It then checks that leaf
+    against the root the manifest carries, by its Merkle proof. Day 0
+    replays from construction, which is its own predecessor.
+
+    So a pass says two things about each sampled day: this build recomputes
+    it to the same state, and that state was committed at that position when
+    the manifest was written. A tampered day fails on its own leaf; a
+    tampered predecessor state fails on the day that follows it.
+
+    ## The cost
+
+    With snapshots, checking k days costs k days of simulation, whatever the
+    length of the run. A ledger without snapshots reaches day d - 1 by
+    running to it, so day d costs d + 1 days, and
+    :attr:`Verification.day_runs` reports which of the two was paid.
+
+    ## What it cannot say
+
+    Nothing about the days outside the sample beyond their membership in the
+    root, and :attr:`Verification.caveats` says so with k and the day list
+    filled in. ``reproduce()`` remains the whole-run check: it replays every
+    day and compares the market digest at the end.
+
+    ``seed`` chooses the sample and is required rather than defaulted, for
+    the reason ``GameRng`` requires a sequence: a verification is repeatable
+    only if the reader can name the days it drew, and a hidden default makes
+    "four random days" a claim nobody can check.
+    """
+    manifest._check_era()
+
+    recorded = manifest._doc.get("days")
+    if recorded is None:
+        raise ValidationError(
+            "this manifest carries no day ledger, so there is nothing to "
+            "verify against. Pass a DayLedger to RunManifest.of when the run "
+            "is captured; reproduce() is the check for a manifest without "
+            "one."
+        )
+    if recorded.get("hash") != STATE_HASH_VERSION:
+        raise ValidationError(
+            f"this manifest's leaves are {recorded.get('hash')!r} hashes and "
+            f"this build computes {STATE_HASH_VERSION!r}. The two are "
+            "different measurements, so every day would report as tampered."
+        )
+    if ledger.count != int(recorded["count"]):
+        raise ValidationError(
+            f"this manifest commits to {recorded['count']} days and the "
+            f"ledger holds {ledger.count}. The two describe different runs, "
+            "or one of them was truncated."
+        )
+
+    log = manifest.order_log
+    spans = _day_spans(log)
+    if len(spans) != ledger.count:
+        raise ValidationError(
+            f"this manifest's order log crosses {len(spans)} day boundaries "
+            f"and the ledger holds {ledger.count} days. The log is not the "
+            "one the ledger was written from."
+        )
+    if not 1 <= k <= ledger.count:
+        raise ValidationError(
+            f"k must be between 1 and the {ledger.count} days this ledger "
+            f"holds, got {k}."
+        )
+
+    root = str(recorded["root"])
+    failures: list[str] = []
+    if ledger.root() != root:
+        failures.append(
+            f"the ledger's root is {ledger.root()[:12]}... and the manifest "
+            f"commits to {root[:12]}.... A leaf was edited after the "
+            "manifest was written, and the sampled days below say which."
+        )
+
+    chosen = _sample_days(ledger.count, k, seed)
+    universe = manifest.universe
+    macro = manifest.macro
+    model = manifest._model_for_replay()
+    ticks = 0
+    day_runs = 0
+
+    for day in chosen:
+        engine = Engine(seed=manifest.seed, universe=universe,
+                        macro_state=macro, model=model)
+        if ledger.snapshots is not None and day > 0:
+            start, end = spans[day]
+            # The roster first, and only the roster. `restore_state` refuses a
+            # snapshot whose tickers are not the engine's, because the columns
+            # are positional -- so a run that listed or delisted a name before
+            # this day has to reach the shape the snapshot was taken at. These
+            # entries carry the fundamentals a column cannot (sector, earnings,
+            # book value), and they take draws, which the restore below
+            # overwrites along with the rest of the state.
+            shape = [entry for entry in log[:start]
+                     if entry.get("op") in ("list_instrument", "delist")]
+            if shape:
+                apply_log(engine, shape)
+            engine.restore_state(ledger.snapshots[day - 1])
+            day_runs += 1
+        else:
+            start, end = 0, spans[day][1]
+            day_runs += day + 1
+        segment = log[start:end]
+        ticks += _tick_count(segment)
+        apply_log(engine, segment)
+
+        rebuilt = engine.state_hash()
+        leaf = ledger.leaves[day]
+        if rebuilt != leaf:
+            failures.append(
+                f"day {day}: replaying it produced state "
+                f"{rebuilt[:12]}... and the ledger commits to "
+                f"{leaf[:12]}.... Either this day's inputs changed, or the "
+                f"state it started from did."
+            )
+            continue
+        if not _proof_holds(leaf, day, ledger.proof(day), root):
+            failures.append(
+                f"day {day}: the day recomputes to its leaf and the leaf's "
+                f"proof does not reach the manifest's root {root[:12]}.... "
+                "The leaf belongs to a different ledger, or another day's "
+                "leaf was edited."
+            )
+
+    wrote = manifest.written_by.get("platform") or {}
+    return Verification(
+        days=chosen, count=ledger.count, ticks=ticks, day_runs=day_runs,
+        failures=failures, from_snapshots=ledger.snapshots is not None,
+        root=root,
+        wrote=f"{wrote.get('os')}-{wrote.get('machine')}",
+        here=f"{_platform.system()}-{_platform.machine()}",
+    )

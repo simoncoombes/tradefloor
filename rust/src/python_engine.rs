@@ -1080,10 +1080,17 @@ impl PyEngine {
     /// over `run_session` loses well under one per cent. Use this because it
     /// reads better and records for you, not because a loop would be slow.
     ///
+    /// `ledger` is an optional `tradefloor.DayLedger`, which is handed the
+    /// state hash after every close and, when it keeps them, the state
+    /// itself. It is a callback rather than a return value because a run of
+    /// 252 days holds 252 leaves and the caller usually wants them beside a
+    /// `RunManifest` rather than in a list this method built.
+    ///
     /// Returns the number of days run.
     #[pyo3(signature = (
         days, *, hour = 9, minute = 30, day_of_week = 3,
-        ticks_per_day = 390, volatility = 1.0, record = true, first_day = 0
+        ticks_per_day = 390, volatility = 1.0, record = true, first_day = 0,
+        ledger = None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn run_days(
@@ -1097,6 +1104,7 @@ impl PyEngine {
         volatility: f64,
         record: bool,
         first_day: u32,
+        ledger: Option<Py<PyAny>>,
     ) -> PyResult<usize> {
         if days == 0 {
             return Err(ValidationError::new_err("days must be greater than zero"));
@@ -1104,6 +1112,13 @@ impl PyEngine {
         if ticks_per_day == 0 {
             return Err(ValidationError::new_err("ticks_per_day must be greater than zero"));
         }
+        // Asked once rather than per day: whether the ledger wants the
+        // predecessor states decides how much a later verification costs, and
+        // it cannot change halfway through a run.
+        let keeps_snapshots: bool = match &ledger {
+            Some(l) => l.bind(py).getattr("keeps_snapshots")?.extract()?,
+            None => false,
+        };
         for offset in 0..days {
             self.open_market();
             self.run_session(py, hour, minute, day_of_week, ticks_per_day, volatility,
@@ -1115,6 +1130,18 @@ impl PyEngine {
                 self.record(first_day + offset as u32)?;
             }
             self.close_market();
+            // The leaf is taken AFTER the close, so a run that never called
+            // `record` still ledgers, and the state a leaf commits to is the
+            // one the next day starts from.
+            if let Some(l) = &ledger {
+                let leaf = self.state_hash();
+                let snapshot = if keeps_snapshots {
+                    Some(self.state_snapshot(py)?)
+                } else {
+                    None
+                };
+                l.bind(py).call_method1("_close", (leaf, snapshot))?;
+            }
         }
         Ok(days)
     }
@@ -1859,6 +1886,32 @@ impl PyEngine {
             )));
         }
         Ok((0..count).map(|_| self.clone()).collect())
+    }
+
+    /// This market's state as one 64-character hex digest: the ledger leaf.
+    ///
+    /// Covers every field [`PyEngine::state_snapshot`] carries, in one fixed
+    /// order, on the canonical-f64 rule `manifest._f64` and
+    /// `tests/known_answer.py` share. `crate::engine::Engine::state_hash`
+    /// documents the encoding and why the generator states are hashed as
+    /// `u64` bit patterns rather than as floats.
+    ///
+    /// Two engines whose hashes agree hold the same market state to the bit,
+    /// including the macro chain and the generator positions that
+    /// `market_digest` leaves out. Two engines that reached that state by
+    /// different routes hash the same: this is a hash of state, and the
+    /// order log, the recorded tape and the pending daily jump are outside
+    /// it, exactly as they are outside the snapshot.
+    ///
+    /// `tradefloor.manifest.state_hash(engine.state_snapshot())` computes
+    /// the same digest in Python, and a test holds the two equal.
+    fn state_hash(&self) -> String {
+        let bytes = self.inner.state_hash(self.day_count, self.market_open);
+        let mut hex = String::with_capacity(64);
+        for byte in bytes {
+            hex.push_str(&format!("{byte:02x}"));
+        }
+        hex
     }
 
     /// Every column plus the generator position, as one dict.
