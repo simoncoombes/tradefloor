@@ -194,6 +194,7 @@ from __future__ import annotations
 from typing import Any
 
 from .._core import ValidationError
+from ..render import JSONRenderer, Renderer, check_renderer
 from .common import (MAX_PARTICIPATION, AdapterInfo, DecisionError,
                      FrameworkAdapter, check_prior, decision_model, digest,
                      moment_of, refuse_replay_reask, replay_response,
@@ -429,6 +430,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
                  transcript: Any = None, recorder: Any = None,
                  prior: Any = None, model: Any = None, brief: str = BRIEF, max_turns: int = 6,
                  tracing: bool = False, run_id: str = "",
+                 renderer: Renderer | None = None,
                  info: AdapterInfo | None = None, every: int = 6,
                  fundamentals: dict[str, dict[str, Any]] | None = None,
                  max_participation: float = MAX_PARTICIPATION,
@@ -516,6 +518,15 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         self.max_turns = int(max_turns)
         self.tracing = bool(tracing)
         self.run_id = run_id
+        #: What turns the payload into the JSON half of :meth:`input_items`.
+        #: The brief stays a separate first message either way -- structured
+        #: output means this adapter never concatenates instructions onto
+        #: rendered text the way FinRobot and LangGraph do. Defaults to
+        #: :class:`~tradefloor.render.JSONRenderer`, which reproduces this
+        #: adapter's own historical second message character for character.
+        if renderer is not None:
+            check_renderer(renderer, where="renderer")
+        self.renderer: Renderer = renderer if renderer is not None else JSONRenderer()
         #: The cloned agent carrying the bound output type, built on the
         #: first live call and reused. Derived, so it is rebuilt rather than
         #: copied by a fork, and it is not in `fork_kwargs`.
@@ -639,25 +650,25 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
     # -- observation -> the SDK -------------------------------------------
 
     def input_items(self, payload: dict[str, Any]) -> list[dict[str, str]]:
-        """The run input: the brief, then the payload as JSON.
+        """The run input: the brief, then `self.renderer`'s text.
 
-        Two messages rather than one concatenated string, and the payload
-        message is JSON and nothing else. That keeps the observation exactly
-        recoverable -- :func:`payload_of` reads it straight back, so a
-        scripted model decides from the same dict a real one is shown --
-        and it keeps the brief separable from the data for anyone reading a
-        transcript.
-
-        Sorted keys, so the digest that keys a replay depends on the
-        observation and not on the order a dict happened to be built in.
+        Two messages rather than one concatenated string, so the brief stays
+        separable from the observation for anyone reading a transcript. The
+        brief is never handed to the renderer: structured output is what
+        this adapter keeps of its own, and `self.renderer` only ever
+        decides how the SECOND message reads. On the default renderer,
+        :class:`~tradefloor.render.JSONRenderer`, the second message is the
+        payload as sorted, indented JSON -- character for character what
+        this method always sent -- which is what keeps it exactly
+        recoverable by :func:`payload_of`, so a scripted model decides from
+        the same dict a real one is shown. A renderer whose text is not
+        JSON (:class:`~tradefloor.render.TextRenderer`, say) is valid here
+        and changes what the agent reads; :func:`payload_of` then has
+        nothing to parse back out of the second message, and says so.
         """
-        import json
-
         return [
             {"role": "user", "content": self.brief},
-            {"role": "user",
-             "content": json.dumps(payload, sort_keys=True, indent=2,
-                                   default=float)},
+            {"role": "user", "content": self.renderer.render(payload)},
         ]
 
     # -- the SDK -----------------------------------------------------------
@@ -833,9 +844,16 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
             "prior": self.prior,
             "model": self.model, "brief": self.brief,
             "max_turns": self.max_turns, "tracing": self.tracing,
-            "run_id": self.run_id,
+            "run_id": self.run_id, "renderer": self.renderer,
         })
         return kwargs
+
+    def provenance(self) -> dict[str, Any]:
+        """The base's provenance, plus which renderer produced the second
+        message."""
+        out = super().provenance()
+        out["renderer"] = self.renderer.key()
+        return out
 
     def state(self) -> dict[str, Any]:
         """What a fork has to agree on, plus what this adapter adds to it.
