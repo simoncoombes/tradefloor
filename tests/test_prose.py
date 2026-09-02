@@ -292,6 +292,22 @@ def test_printable_ascii_and_ordinary_text_report_nothing():
     assert not control_bytes("f.md", "Ordinary prose, with punctuation.")
 
 
+def test_nothing_above_the_printable_range_is_reported():
+    """The upper bound, so this rule and the non-ASCII one stay apart.
+
+    `NON_ASCII_PUNCTUATION` in `tests/test_brand_commitments.py` owns
+    everything above 127, and this rule owns two ranges below it. A rule
+    that fired above the tilde would report an em dash twice and would flag
+    every accented letter in the tree, so the two ranges it does cover are
+    pinned from both sides.
+    """
+    from prose import control_bytes  # noqa: PLC0415
+
+    for code in range(0x80, 0x100):
+        assert not control_bytes("f.md", f"text {chr(code)} more text"), \
+            f"0x{code:02X} is reported and belongs to the non-ASCII rule"
+
+
 def test_the_published_prose_carries_no_control_byte():
     """The rule over the files the checker walks by default.
 
