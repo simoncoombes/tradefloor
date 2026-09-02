@@ -85,9 +85,12 @@ once a day for the whole cohort.
 walks the levels to compute an average and removes nothing from the book. So
 two agents buying the same name on the same step meet the same ladder and
 fill at the same price, and the ladder after both of them is the ladder
-before either. Measured on ``Universe.random(8, seed=99)`` at seed 42, two
-agents each buying 10,000 shares of the first name at step 0: both fill at
-83.961190 against a first level of 9,762 shares that neither of them moved.
+before either. Measured on this build, on ``Universe.random(8, seed=99)``
+at seed 42, two agents each buying 10,000 shares of the first name at step
+0: both fill at 83.96118999999999 against a first ask level of 9,762 shares
+at 83.96 that neither of them moved, and the sweep walks past that level to
+a worst price of 84.01, so the equality is a claim about a ladder that did
+not move rather than two fills at the top of the book.
 ``test_externality.py`` pins it.
 
 The cohort's whole footprint reaches the market once, as the merged
