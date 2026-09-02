@@ -109,10 +109,13 @@ def test_commit_with_a_clean_overlay_matches_a_straight_run(short_days):
     kept, and the overlay stays one day deep."""
     universe = tf.Universe.random(6, seed=3)
 
+    sizes = []
+
     def drive(engine, keep):
         prices = []
         for k in range(3):
             fwd = shadow.Forward(engine, k, 6)
+            sizes.append(fwd.layout.size)
             # the same vector on both engines: the layout size is the
             # roster's, and the generator is seeded by the day
             x = np.random.default_rng(10 + k).normal(size=fwd.layout.size)
@@ -129,7 +132,9 @@ def test_commit_with_a_clean_overlay_matches_a_straight_run(short_days):
     clean = drive(clean_engine, keep=False)
     for a, b in zip(kept, clean):
         assert np.array_equal(a, b)
-    one_day = 40 * (1 + 8 + 6)
+    # one day of market patches (every sector's normal is drawn each tick,
+    # whatever the roster spans) plus the jump pair per name and market
+    one_day = 40 * sizes[-1]
     assert len(clean_engine.draw_patches()) <= one_day + 2 * (6 + 1)
 
 
