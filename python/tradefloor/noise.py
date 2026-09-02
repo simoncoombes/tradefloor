@@ -601,10 +601,19 @@ def attribute(world: Any, window: Any, target: Any,
         plan = plan[i::n]
 
     rows: list[dict] = []
+    # Common random numbers is the whole claim, so it is measured rather
+    # than assumed: every arm's stream positions are compared against the
+    # control's, on all seven streams. The economy chain is the one that
+    # can break it, because its draw count depends on its own state.
+    control_positions = control.engine.stream_positions()
+    moved: list[str] = []
     for head, patches in plan:
         arm, = world.fork("arm")
         patch_draws(arm.engine, patches)
         value = _run_arm(target, arm, horizon, record)
+        if arm.engine.stream_positions() != control_positions:
+            moved.append(f"{head['stream']} {head['kind']} {head['index']} "
+                         f"({head['perturbation']})")
         rows.append(dict(head, control=base, treatment=value,
                          effect=value - base))
 
@@ -662,6 +671,26 @@ def attribute(world: Any, window: Any, target: Any,
     if shard is not None:
         caveats.append(f"shard {shard[0]} of {shard[1]}: every "
                        f"{shard[1]}-th row from the {shard[0]}-th.")
+    if "economy" in event_streams:
+        caveats.append(
+            "a window on the economy chain is aimed by the control's "
+            "schedule, and the chain's draw count depends on its own "
+            "state, so a perturbation that moves the chain moves the "
+            "addresses after it and the rows below it are aimed at draws "
+            "the arm did not take. Every arm's stream positions were "
+            "compared against the control's, and the next caveat names "
+            "any that moved.")
+    if moved:
+        caveats.append(
+            f"{len(moved)} of {len(plan)} arms consumed a different number "
+            "of draws from the control, so their rows are not a common "
+            "random numbers comparison: " + ", ".join(moved[:5])
+            + ("" if len(moved) <= 5 else ", and more."))
+    else:
+        caveats.append(
+            f"all {len(plan)} arms matched the control's draw positions on "
+            "all seven streams, so every effect is the draw's rather than "
+            "a reshuffle.")
     dropped = [s for s in wanted if s not in traced]
     if dropped:
         caveats.append(

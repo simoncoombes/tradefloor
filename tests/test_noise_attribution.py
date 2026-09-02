@@ -356,3 +356,38 @@ def test_row_caveats_restate_the_counts_over_merged_rows():
     fired = sum(1 for r in whole.rows if r["perturbation"] == "fire")
     assert fired > 1
     assert any(c.startswith(f"{fired} event uniforms") for c in restated)
+
+
+# -- the arms are checked, not assumed ----------------------------------------
+
+def test_an_economy_attribution_carries_its_caveats():
+    """The one limitation the documentation names for this stream lived in
+    the docstring and nowhere else: an economy call shipped an empty
+    caveat list. The hazard is stated and the arms are measured against
+    it."""
+    root = world()
+    attribution = noise.attribute(root, (1, 2), noise.column("price", 3),
+                                  "event", streams=["economy"], horizon=3)
+    assert attribution.rows
+    assert attribution.caveats
+    named = [c for c in attribution.caveats if "economy chain" in c]
+    assert len(named) == 1
+    assert "draw count depends on its own state" in named[0]
+    # and the measurement the caveat promises
+    measured = [c for c in attribution.caveats
+                if "draw positions on all seven streams" in c]
+    assert len(measured) == 1
+    assert f"all {len(attribution.rows)} arms" in measured[0]
+
+
+def test_the_arms_are_compared_on_all_seven_streams():
+    """`draws_by_stream` reports three streams and cannot see four of the
+    five attributed at event level, so the comparison is on the positions."""
+    root = world()
+    attribution = noise.attribute(root, (1, 1), noise.column("price", 2),
+                                  "event", streams=["jumps", "news"])
+    control, = root.fork("control")
+    control.run(2)
+    assert set(control.engine.stream_positions()) == set(noise.STREAMS)
+    matched = [c for c in attribution.caveats if "matched the control" in c]
+    assert len(matched) == 1
