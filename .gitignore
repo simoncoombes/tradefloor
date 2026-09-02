@@ -70,6 +70,7 @@ Thumbs.db
 # the repository. The recorded inputs a study REPLAYS are a different thing
 # and are committed, under tests/fixtures/. See CONTRIBUTING.md.
 examples/**/artifacts/
+tools/boundary/artifacts/
 
 # real bars fetched by tools/shadow; vendor data is never committed
 tools/shadow/data/

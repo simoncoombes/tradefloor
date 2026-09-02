@@ -2120,6 +2120,194 @@ impl Engine {
             company.stock.market_cap = price * company.stock.shares_outstanding;
         }
     }
+
+    /// This engine's state as one 32-byte digest: the per-day ledger leaf.
+    ///
+    /// # What it measures
+    ///
+    /// sha256 over every field `state_snapshot` carries, in one fixed order,
+    /// with one encoding per type. Two engines whose hashes agree hold the
+    /// same market state to the bit: the same columns, the same generator
+    /// positions, the same day accumulators, the same macro chain and the
+    /// same central bank. `market_digest` covers nine columns and the draw
+    /// count; this covers the macro chain and the generators as well, which
+    /// is what a day-by-day ledger needs, because two runs can agree on
+    /// today's prices and hold different state for tomorrow's.
+    ///
+    /// # What it cannot say
+    ///
+    /// It is a hash of STATE, so it says nothing about history: the order
+    /// log, the recorded tape and the pending daily jump are outside it,
+    /// exactly as they are outside `state_snapshot`. Two engines that reached
+    /// the same state by different routes hash the same, which is what makes
+    /// a replayed day checkable against a recorded one at all.
+    ///
+    /// # Why the two arguments
+    ///
+    /// The snapshot carries `market_open` and `day_count` and this struct
+    /// holds neither: the session flag and the day counter live in the
+    /// binding, which passes the day into `close_day`. The caller supplies
+    /// them so the digest covers the whole snapshot, rather than this method
+    /// hashing a subset of it and calling that the state.
+    ///
+    /// # The encoding
+    ///
+    /// Every float is eight bytes big-endian with `0x7ff8000000000000` for
+    /// any NaN, the rule `manifest._f64` and `tests/known_answer.py` share,
+    /// so neither a decimal formatter nor a platform's NaN payload can reach
+    /// the digest.
+    ///
+    /// The generator states are the one exception and it is load-bearing. A
+    /// PCG32 state is a `u64`, and the snapshot carries it as an `f64` bit
+    /// pattern because a `u64` does not survive a Python float. About one
+    /// `u64` in a thousand reads as a NaN, so canonicalising those would map
+    /// distinct generator positions onto one digest and a tampered position
+    /// would verify. They are hashed as raw big-endian `u64` bit patterns.
+    ///
+    /// A string is length-prefixed, `u32` big-endian then UTF-8, so "AB"
+    /// followed by "C" cannot hash as "A" followed by "BC". A bool is one
+    /// byte. An `Option` is a presence byte and then the value when present.
+    pub fn state_hash(&self, day_count: u32, market_open: bool) -> [u8; 32] {
+        use sha2::{Digest, Sha256};
+
+        let n = self.companies.len();
+        let mut buf: Vec<u8> = Vec::new();
+
+        // The eighteen columns, instrument by instrument. Read once each
+        // rather than per instrument, because `column` builds a Vec.
+        let columns: Vec<Vec<f64>> = STATE_HASH_COLUMNS
+            .iter()
+            .map(|field| self.column(*field))
+            .collect();
+        for i in 0..n {
+            for column in &columns {
+                hash_f64(&mut buf, column[i]);
+            }
+        }
+
+        // The seven generator states, in the order the snapshot's flat `rng`
+        // array carries them. Raw bit patterns, per the encoding note above.
+        let rng = self.rng_state();
+        for state in [
+            rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
+            rng.news, rng.volume_idio,
+        ] {
+            hash_u64(&mut buf, state.state);
+            hash_u64(&mut buf, state.increment);
+            hash_bits(&mut buf, state.spare.unwrap_or(f64::NAN));
+        }
+
+        // The roster and the model, which the snapshot carries as its two
+        // identity guards. Hashed because a leaf that ignored them would let
+        // a day taken on another roster, or under another preset, verify as
+        // this one: `restore_state` refuses both, and a ledger written
+        // outside it would not.
+        hash_u32(&mut buf, n as u32);
+        for id in self.ids() {
+            hash_str(&mut buf, &id);
+        }
+        hash_str(&mut buf, &self.params.fingerprint());
+
+        // The day accumulators, in snapshot order.
+        for row in &self.attribution {
+            for value in row {
+                hash_f64(&mut buf, *value);
+            }
+        }
+        for row in &self.tick_components {
+            for value in row {
+                hash_f64(&mut buf, *value);
+            }
+        }
+        for value in &self.tick_fundamental {
+            hash_f64(&mut buf, *value);
+        }
+        for value in &self.tick_anchor {
+            hash_f64(&mut buf, *value);
+        }
+        hash_bool(&mut buf, market_open);
+
+        // The engine-level dials.
+        let (variance, day_factor, fast_variance, slow_variance,
+             prev_day_factor, smoothed_vix) = self.market_variance_state();
+        for value in [variance, day_factor, fast_variance, slow_variance,
+                      prev_day_factor, smoothed_vix] {
+            hash_f64(&mut buf, value);
+        }
+        hash_f64(&mut buf, self.volume_state);
+        for value in &self.volume_idio {
+            hash_f64(&mut buf, *value);
+        }
+        hash_f64(&mut buf, self.universe_stress);
+        hash_f64(&mut buf, self.forced_flow_spent);
+
+        // The day's endogenous news. Generated at `open_market` and cleared
+        // at the next one, so a close-boundary leaf carries the day's events
+        // rather than an empty list.
+        hash_u32(&mut buf, self.session_news.len() as u32);
+        for event in &self.session_news {
+            hash_opt_str(&mut buf, event.company_id.as_deref());
+            hash_opt_str(&mut buf, event.sector.as_deref());
+            hash_opt_f64(&mut buf, event.price_impact);
+        }
+
+        // The economy, in the order `state_snapshot` declares its fields.
+        // `qe_assets_ratio` is absent from both, which is a gap in the
+        // snapshot rather than a decision taken here.
+        let e = &self.economy;
+        for value in [
+            e.federal_funds_rate, e.prime_rate, e.corporate_bond_yield,
+            e.treasury_yield_10y, e.treasury_yield_2y, e.mortgage_rate_30y,
+            e.cpi, e.inflation_rate, e.core_inflation,
+            e.gdp_growth, e.gdp,
+            e.unemployment_rate, e.jobs_created, e.labor_force_participation,
+            e.usd_index, e.oil_price, e.gold_price, e.copper_price,
+            e.housing_index, e.home_starts_monthly,
+            e.housing_transaction_volume,
+            e.long_term_unemployment_rate, e.structural_unemployment,
+            e.consumer_confidence, e.business_confidence, e.fear_greed_index,
+            e.vix,
+            e.tariff_rate, e.trade_balance,
+            e.oil_inventory_level,
+        ] {
+            hash_f64(&mut buf, value);
+        }
+        hash_i64(&mut buf, e.oil_last_opec_day);
+        for value in [e.wage_growth, e.previous_day_market_return,
+                      e.rolling_market_return_30d] {
+            hash_f64(&mut buf, value);
+        }
+        hash_opt_f64(&mut buf, e.market_pe);
+        for value in [e.qe_pe_boost, e.fiscal_stimulus,
+                      e.government_debt_to_gdp, e.months_in_current_phase,
+                      e.recession_probability] {
+            hash_f64(&mut buf, value);
+        }
+        for value in e.gdp_trend {
+            hash_f64(&mut buf, value);
+        }
+        hash_str(&mut buf, e.cycle_phase.as_str());
+
+        // The central bank.
+        let bank = &self.central_bank;
+        hash_i64(&mut buf, bank.last_meeting_date);
+        hash_i64(&mut buf, bank.next_meeting_date);
+        hash_f64(&mut buf, bank.target_inflation);
+        hash_f64(&mut buf, bank.target_unemployment);
+        hash_bool(&mut buf, bank.qe_active);
+        hash_f64(&mut buf, bank.qe_monthly_purchases);
+        hash_f64(&mut buf, bank.hawkish_dovish_score);
+        hash_str(&mut buf, bank.forward_guidance.as_str());
+
+        hash_u32(&mut buf, day_count);
+
+        let mut hasher = Sha256::new();
+        hasher.update(&buf);
+        let out = hasher.finalize();
+        let mut digest = [0u8; 32];
+        digest.copy_from_slice(&out);
+        digest
+    }
 }
 
 /// Fields exposed columnar-wise across the FFI boundary.
@@ -2159,6 +2347,124 @@ pub enum PriceField {
     Beta,
     ShortInterest,
     FloatShares,
+}
+
+/// The columns [`Engine::state_hash`] walks, in the order
+/// `python_engine::COLUMN_FIELDS` declares them, so the Rust digest and the
+/// Python twin that reads a snapshot see one order.
+pub const STATE_HASH_COLUMNS: [PriceField; 18] = [
+    PriceField::Price,
+    PriceField::PreviousClose,
+    PriceField::PreviousTickPrice,
+    PriceField::Open,
+    PriceField::High,
+    PriceField::Low,
+    PriceField::Volume,
+    PriceField::AvgVolume,
+    PriceField::MarketCap,
+    PriceField::MispricingS,
+    PriceField::MispricingSPrevClose,
+    PriceField::MispricingMomentum,
+    PriceField::LastDailyReturn,
+    PriceField::MakerInventory,
+    PriceField::GarchVariance,
+    PriceField::Beta,
+    PriceField::ShortInterest,
+    PriceField::FloatShares,
+];
+
+/// Where a column sits in [`Engine::state_hash`].
+///
+/// Exhaustive on `PriceField`, the same discipline `set_column` uses: a
+/// nineteenth column fails to compile here until someone decides where it
+/// goes, rather than being dropped from every leaf a ledger holds. The test
+/// below walks [`STATE_HASH_COLUMNS`] and holds the two in agreement.
+pub fn state_hash_position(field: PriceField) -> usize {
+    match field {
+        PriceField::Price => 0,
+        PriceField::PreviousClose => 1,
+        PriceField::PreviousTickPrice => 2,
+        PriceField::Open => 3,
+        PriceField::High => 4,
+        PriceField::Low => 5,
+        PriceField::Volume => 6,
+        PriceField::AvgVolume => 7,
+        PriceField::MarketCap => 8,
+        PriceField::MispricingS => 9,
+        PriceField::MispricingSPrevClose => 10,
+        PriceField::MispricingMomentum => 11,
+        PriceField::LastDailyReturn => 12,
+        PriceField::MakerInventory => 13,
+        PriceField::GarchVariance => 14,
+        PriceField::Beta => 15,
+        PriceField::ShortInterest => 16,
+        PriceField::FloatShares => 17,
+    }
+}
+
+/// The one NaN pattern any digest in this crate writes. IEEE-754 leaves the
+/// sign and payload of a NaN to the platform, so hashing the bits as they
+/// arrive would make a digest depend on the machine rather than the model.
+const CANONICAL_NAN: [u8; 8] = [0x7f, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+
+/// One f64 in canonical digest form: big-endian, one NaN pattern.
+fn hash_f64(buf: &mut Vec<u8>, value: f64) {
+    if value.is_nan() {
+        buf.extend_from_slice(&CANONICAL_NAN);
+    } else {
+        buf.extend_from_slice(&value.to_be_bytes());
+    }
+}
+
+/// One f64 as its raw bit pattern, NaN included.
+///
+/// For a value that is a bit pattern wearing a float, which is how a
+/// generator state crosses into Python. Canonicalising one of those would
+/// collapse distinct states onto one digest.
+fn hash_bits(buf: &mut Vec<u8>, value: f64) {
+    buf.extend_from_slice(&value.to_bits().to_be_bytes());
+}
+
+fn hash_u64(buf: &mut Vec<u8>, value: u64) {
+    buf.extend_from_slice(&value.to_be_bytes());
+}
+
+fn hash_i64(buf: &mut Vec<u8>, value: i64) {
+    buf.extend_from_slice(&value.to_be_bytes());
+}
+
+fn hash_u32(buf: &mut Vec<u8>, value: u32) {
+    buf.extend_from_slice(&value.to_be_bytes());
+}
+
+fn hash_bool(buf: &mut Vec<u8>, value: bool) {
+    buf.push(u8::from(value));
+}
+
+/// A string, length-prefixed so two adjacent strings cannot be re-split.
+fn hash_str(buf: &mut Vec<u8>, value: &str) {
+    hash_u32(buf, value.len() as u32);
+    buf.extend_from_slice(value.as_bytes());
+}
+
+fn hash_opt_f64(buf: &mut Vec<u8>, value: Option<f64>) {
+    match value {
+        Some(v) => {
+            hash_bool(buf, true);
+            hash_f64(buf, v);
+        }
+        None => hash_bool(buf, false),
+    }
+}
+
+fn hash_opt_str(buf: &mut Vec<u8>, value: Option<&str>) {
+    match value {
+        Some(v) => {
+            hash_bool(buf, true);
+            hash_str(buf, v);
+        }
+        None => hash_bool(buf, false),
+    }
 }
 
 /// Index of `random_noise` among the components, found rather than written.
@@ -3120,6 +3426,129 @@ mod tests {
         }
         assert!(held > 0, "no meeting in 400 days, so the test proved nothing");
         assert!(quiet > 0, "every day was a meeting, so the None case is untested");
+    }
+
+    // ----------------------------------------------------------------------
+    // The per-day state hash (P9)
+    // ----------------------------------------------------------------------
+
+    #[test]
+    fn the_hash_column_order_and_the_position_table_agree() {
+        // Two declarations of one order. `state_hash_position` is exhaustive
+        // on `PriceField`, so a nineteenth column fails to compile there; this
+        // is what stops the two drifting apart once it does.
+        for (i, field) in STATE_HASH_COLUMNS.iter().enumerate() {
+            assert_eq!(
+                state_hash_position(*field),
+                i,
+                "{field:?} sits at {i} in STATE_HASH_COLUMNS"
+            );
+        }
+        let mut seen: Vec<usize> = STATE_HASH_COLUMNS
+            .iter()
+            .map(|f| state_hash_position(*f))
+            .collect();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(seen.len(), 18, "every column has its own position");
+    }
+
+    #[test]
+    fn a_clone_hashes_the_same_and_a_tick_moves_the_hash() {
+        let mut e = engine(77);
+        e.open_market();
+        for m in 0..30 {
+            e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+        }
+        let copy = e.clone();
+        assert_eq!(
+            e.state_hash(3, true),
+            copy.state_hash(3, true),
+            "a clone is the same state, so it is the same leaf"
+        );
+
+        let before = e.state_hash(3, true);
+        e.tick(&request(10, 5));
+        assert_ne!(
+            before,
+            e.state_hash(3, true),
+            "a tick moved prices and the generator, so the leaf must move"
+        );
+    }
+
+    #[test]
+    fn the_two_binding_owned_fields_reach_the_hash() {
+        // `day_count` and `market_open` are in the snapshot and not on this
+        // struct, so they arrive as arguments. A hash that ignored them would
+        // let a leaf taken before a close pass for one taken after it.
+        let e = engine(9);
+        assert_ne!(e.state_hash(3, false), e.state_hash(4, false));
+        assert_ne!(e.state_hash(3, false), e.state_hash(3, true));
+    }
+
+    #[test]
+    fn two_generator_states_a_float_digest_would_collapse_hash_apart() {
+        // The reason the generator states are hashed as `u64` bit patterns
+        // rather than through the canonical-NaN float rule. Both states below
+        // read as NaN when interpreted as an f64, so a float digest would
+        // write the same eight bytes for two different generator positions
+        // and a tampered position would verify.
+        let left_bits = 0x7ff8_0000_0000_0001u64;
+        let right_bits = 0x7ff8_0000_0000_0002u64;
+        assert!(f64::from_bits(left_bits).is_nan());
+        assert!(f64::from_bits(right_bits).is_nan());
+
+        let mut a = engine(5);
+        let mut b = engine(5);
+        let mut sa = a.rng_state();
+        sa.market.state = left_bits;
+        a.set_rng_state(sa);
+        let mut sb = b.rng_state();
+        sb.market.state = right_bits;
+        b.set_rng_state(sb);
+
+        assert_ne!(
+            a.state_hash(0, false),
+            b.state_hash(0, false),
+            "the two generator positions must hash apart"
+        );
+    }
+
+    #[test]
+    fn the_hash_follows_the_macro_chain_and_the_central_bank() {
+        // `market_digest` covers nine columns and the draw count, so a macro
+        // difference alone leaves it unmoved. This leaf has to see it: the
+        // whole reason a ledger hashes state rather than prices.
+        let mut e = engine(11);
+        let before = e.state_hash(0, false);
+        e.economy_mut().vix = e.economy().vix + 1.0;
+        assert_ne!(before, e.state_hash(0, false), "the VIX moved");
+
+        let mut f = engine(11);
+        let before = f.state_hash(0, false);
+        f.central_bank_mut().hawkish_dovish_score += 0.5;
+        assert_ne!(before, f.state_hash(0, false), "the bank's score moved");
+    }
+
+    #[test]
+    fn the_hash_separates_two_days_of_one_run() {
+        // What a ledger needs: consecutive leaves of one run are distinct, so
+        // a day swapped for its neighbour fails on its own leaf.
+        let mut e = engine(31);
+        let mut leaves = Vec::new();
+        for day in 1..=4i64 {
+            e.open_market();
+            for m in 0..40 {
+                e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+            }
+            e.close_day(day);
+            leaves.push(e.state_hash(day as u32, false));
+        }
+        for i in 0..leaves.len() {
+            for j in (i + 1)..leaves.len() {
+                assert_ne!(leaves[i], leaves[j], "days {i} and {j} share a leaf");
+            }
+        }
     }
 }
 
