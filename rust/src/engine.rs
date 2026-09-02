@@ -635,14 +635,6 @@ impl Engine {
         }
     }
 
-    /// The day the next `open_market` opens. The engine cannot know it on
-    /// its own: `run_session` and `tick` take no day, and only the caller
-    /// that numbers its days does.
-    ///
-    /// A label, not state the market reads: nothing in the tick, the close or
-    /// the macro chain consults it, so moving it cannot move a trajectory.
-    /// `open_market` is the only caller that must run before a draw is taken,
-    /// because the day mark and the day's news draws are taken there.
     /// The market jump's effective daily intensity, here and now.
     ///
     /// The threshold `apply_jumps` compares its market uniform against,
@@ -669,6 +661,14 @@ impl Engine {
         p.jump_intensity_market * (1.0 - c + c * ratio * ratio)
     }
 
+    /// The day the next `open_market` opens. The engine cannot know it on
+    /// its own: `run_session` and `tick` take no day, and only the caller
+    /// that numbers its days does.
+    ///
+    /// A label, not state the market reads: nothing in the tick, the close or
+    /// the macro chain consults it, so moving it cannot move a trajectory.
+    /// `open_market` is the only caller that must run before a draw is taken,
+    /// because the day mark and the day's news draws are taken there.
     pub fn set_current_day(&mut self, day: i64) {
         self.current_day = day;
         for id in 0..7 {
