@@ -57,6 +57,11 @@ from . import yaml_subset
 from .tca import Execution
 from .baselines import capture_ratio, reference_agents
 from .ranking import AgentRecord, Ranking, rank
+from . import fingerprint
+from .fingerprint import (
+    BATTERY_VERSION, Battery, Cell, Fingerprint, FingerprintComparison,
+    battery, commit, reveal, sealed_battery,
+)
 from ._core import (  # noqa: F401
     ArrowStream,
     Engine,
@@ -118,6 +123,8 @@ __all__ = [
     "Intervention", "Firing", "ScenarioValidationError", "interventions",
     "TARGETS", "UNSUPPORTED_TARGETS", "yaml_subset",
     "manifest", "RunManifest", "DayLedger", "Verification",
+    "fingerprint", "BATTERY_VERSION", "Battery", "Cell", "Fingerprint",
+    "FingerprintComparison", "battery", "commit", "reveal", "sealed_battery",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
     "market_status", "model_preset", "run_many", "sector_daily_sigma", "sectors",
