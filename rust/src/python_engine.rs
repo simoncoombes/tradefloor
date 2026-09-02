@@ -1565,6 +1565,17 @@ impl PyEngine {
 
     // ── Draw addressing (phase 1) ─────────────────────────────────────────
 
+    /// The market jump's effective daily intensity at this engine's dials
+    /// and its current VIX: the threshold `apply_jumps` compares its
+    /// market uniform against. Takes no draw and changes nothing.
+    ///
+    /// A surgery that stops the jump installs 1.0, so it can only stop one
+    /// where this is at most 1.0; above that every uniform the stream can
+    /// draw is already under the threshold.
+    fn market_jump_intensity(&self) -> f64 {
+        self.inner.market_jump_intensity()
+    }
+
     /// The day the draws taken from now on carry in the draw log and the
     /// day marks. `open_market` stamps the engine's own day counter and
     /// `run_days` stamps `first_day`, each at the open it labels, so this is
