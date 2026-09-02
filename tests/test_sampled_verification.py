@@ -841,6 +841,96 @@ def test_a_session_closed_day_ledgers_like_an_explicit_close():
     )
 
 
+#: The per-slot arrays a snapshot carries, and the number of f64 slots each
+#: holds per instrument. `volume_idio` is deliberately absent: it is the one
+#: the engine does not resize, which is what the test below pins.
+_PER_SLOT = {"attribution": 9, "tick_components": 8, "tick_fundamental": 1,
+             "tick_anchor": 1}
+
+
+def _slots(buffer, per_instrument):
+    return len(buffer) // 8 // per_instrument
+
+
+@pytest.mark.parametrize("change", ["list", "delist"])
+def test_the_per_name_volume_array_does_not_follow_the_roster(change):
+    """A gap in the engine, pinned here so it cannot go quiet.
+
+    `volume_idio` is sized once at construction and is the one per-slot array
+    `add_company` and `remove_company` do not maintain. Every other per-slot
+    array follows the roster. Nothing has read the array per slot until this
+    package hashed it, which is why the gap surfaced here.
+
+    Two consequences, and both are narrower than they look. The Python twin
+    refuses any snapshot taken after a listing or a delisting, so the
+    reader-side check cannot serve a run whose roster changed. The Rust leaf
+    walks the array at the constructor's width, so such a run's leaf covers a
+    stale count of values. No price moves either way: every shipped preset
+    holds `volume_idio_sigma` and `volume_idio_persistence` at 0.0, so every
+    value in the array is exactly 0.0 and a shift is a shift between equal
+    values.
+
+    The fix belongs in the engine and moves a trajectory, because
+    `update_volume_idio` draws once per slot before its zero check, so
+    resizing the array changes that stream's draw count and every leaf of a
+    roster-changing run with it. This package cannot take that, so it states
+    it instead.
+
+    Written to FAIL the day `add_company` and `remove_company` carry the
+    array. That is the prompt to delete this test, lift the paragraph from
+    both `state_hash` docstrings, and check whether any recorded ledger was
+    written under the old widths.
+    """
+    built = len(UNIVERSE)
+    engine = tf.Engine(seed=SEED, universe=UNIVERSE)
+    engine.open_market()
+    engine.run_session(9, 30, 3, TICKS)
+    engine.close_market()
+    assert _slots(engine.state_snapshot()["volume_idio"], 1) == built
+    assert state_hash(engine.state_snapshot()) == engine.state_hash()
+
+    if change == "list":
+        engine.list_instrument(tf.Instrument(
+            "NEWCO", "technology", initial_price=40.0,
+            shares_outstanding=1e8, eps=2.0, book_value_per_share=10.0,
+            revenue_growth=0.05, avg_volume=5e5, beta=1.1))
+    else:
+        engine.delist(0)
+
+    snapshot = engine.state_snapshot()
+    roster = len(snapshot["tickers"])
+    assert roster == (built + 1 if change == "list" else built - 1)
+
+    for name, per_instrument in _PER_SLOT.items():
+        assert _slots(snapshot[name], per_instrument) == roster, (
+            f"{name} no longer follows the roster, so the array below is not "
+            "the only one out of step"
+        )
+    for name in snapshot["columns"]:
+        assert _slots(snapshot["columns"][name], 1) == roster
+
+    assert _slots(snapshot["volume_idio"], 1) == built, (
+        "volume_idio now follows the roster. The engine gap this test pins "
+        "is fixed: delete the test and the paragraph in both state_hash "
+        "docstrings, and check any ledger recorded under the old widths."
+    )
+
+    # The reader-side hole. The twin refuses rather than hashing a width it
+    # cannot check against the roster, which is what made the gap visible.
+    with pytest.raises(tf.ValidationError, match="volume_idio"):
+        state_hash(snapshot)
+
+    # The Rust leaf still computes, over the constructor's width.
+    assert len(engine.state_hash()) == 64
+
+    # Why no price moves: the array is all zeros on every shipped preset.
+    values = set(struct.unpack("<%dd" % built, snapshot["volume_idio"]))
+    assert values == {0.0}
+    model = dict(engine.model_params)
+    assert model["volume_idio_sigma"] == 0.0
+    assert model["volume_idio_persistence"] == 0.0
+
+
 def test_a_run_that_lists_and_delists_still_verifies():
     """A roster that changes mid-run reaches its snapshot's shape.
 
@@ -851,6 +941,13 @@ def test_a_run_that_lists_and_delists_still_verifies():
     than the listing that moved it. The listing and delisting entries are
     replayed first, which costs no ticks and carries the fundamentals no
     column holds.
+
+    This checks the Rust leaf and nothing else, which is the whole of what
+    `verify` computes. It cannot also check the Python twin: the twin refuses
+    every snapshot taken after a roster change, for the reason
+    `test_the_per_name_volume_array_does_not_follow_the_roster` above pins.
+    So a roster-changing run is covered here on one side only, and the day
+    that gap closes this test should grow the second side.
     """
     engine = tf.Engine(seed=SEED, universe=UNIVERSE)
     ledger = tf.DayLedger()

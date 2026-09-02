@@ -380,6 +380,22 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     verifies against itself either way, because a replay runs the spelling
     its own log holds.
 
+    On this build it refuses a snapshot from a run whose roster changed, and
+    that is the reader-side half of this package going missing rather than a
+    cosmetic limit. ``volume_idio``, the per-name volume state, is sized at
+    construction and is the one per-slot array ``add_company`` and
+    ``remove_company`` do not maintain, so after a listing or a delisting its
+    width disagrees with the roster and the length check refuses.
+    ``Engine.state_hash`` in Rust hashes that array at the width the engine
+    was built with, so a roster-changing run's leaf covers a stale count of
+    values. Such a run still verifies, because the recording and the replay
+    read the same array, and no price depends on the width: every shipped
+    preset holds ``volume_idio_sigma`` and ``volume_idio_persistence`` at
+    0.0, so every value in the array is exactly 0.0. The fix belongs in the
+    engine and moves a trajectory, since ``update_volume_idio`` draws once
+    per slot before its zero check and resizing the array would change that
+    stream's draw count.
+
     ## The encoding
 
     Every float is eight bytes big-endian with one canonical NaN pattern, the

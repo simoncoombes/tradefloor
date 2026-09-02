@@ -1912,6 +1912,19 @@ impl PyEngine {
     /// run still verifies against itself either way, because a replay runs
     /// the spelling its own log holds.
     ///
+    /// A run whose roster changed is hashed at a stale width. `volume_idio`
+    /// is sized at construction and is the one per-slot array `add_company`
+    /// and `remove_company` do not maintain, so after a listing or a
+    /// delisting this walks it at the width the engine was built with rather
+    /// than at the current roster width. The leaf stays stable and such a run
+    /// still verifies, because the recording and the replay read the same
+    /// array, and no price depends on the width: every shipped preset holds
+    /// `volume_idio_sigma` and `volume_idio_persistence` at 0.0, so every
+    /// value is exactly 0.0. The Python twin refuses such a snapshot outright
+    /// rather than hashing a width it cannot check. Resizing the array is the
+    /// fix and it moves a trajectory, since `update_volume_idio` draws once
+    /// per slot before its zero check.
+    ///
     /// `tradefloor.manifest.state_hash(engine.state_snapshot())` computes
     /// the same digest in Python, and a test holds the two equal.
     fn state_hash(&self) -> String {
