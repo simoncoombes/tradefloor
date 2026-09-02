@@ -279,7 +279,7 @@ class Engine:
     def run_days(
         self, days: int, *, hour: int = ..., minute: int = ...,
         day_of_week: int = ..., ticks_per_day: int = ..., volatility: float = ...,
-        record: bool = ..., first_day: int = ...,
+        record: bool = ..., first_day: int | None = ...,
     ) -> int: ...
     def run_until(
         self, *, ticker: str, above: float | None = ..., below: float | None = ...,

@@ -829,6 +829,42 @@ pub struct PyEngine {
     log: Vec<crate::python_log::LogEntry>,
 }
 
+/// The day stamp, kept off the Python surface.
+///
+/// `open_market_on` is how `open_market` and `run_days` agree on the day
+/// a mark and the day's news draws carry, and it is not something a caller
+/// reaches for: a caller that wants its own numbering has `set_day`. Held
+/// in a plain `impl` rather than `#[pymethods]` for that reason, since
+/// every method of a `#[pymethods]` block becomes a binding and every
+/// binding has to be declared in the stub.
+impl PyEngine {
+    /// Roll the day's opening marks, numbering the day `day`.
+    ///
+    /// The day is stamped BEFORE `inner.open_market()`, and the order is the
+    /// whole of it. That call pushes the day mark and takes the day's
+    /// endogenous news draws, so both carry whatever number was stamped when
+    /// it ran. `run_days` used to open first and re-stamp afterwards, which
+    /// left one run carrying two numbers: `run_days(3, first_day=100)` logged
+    /// the market, economy, jumps, volume and per-name volume streams on days
+    /// 100, 101 and 102, the news stream on 0, 1 and 2, and `day_marks()` on
+    /// 0, 1 and 2, so `market_day_layout(100)` found nothing while
+    /// `market_day_layout(0)` returned a mark for a day the log called 100.
+    /// Two `run_days(2)` calls in a row reached the same split without any
+    /// `first_day` at all.
+    fn open_market_on(&mut self, day: i64) {
+        self.log.push(crate::python_log::LogEntry::OpenMarket);
+        // A new day's tape starts here. Without this, a run that never closed
+        // would grow one unbounded "day".
+        self.day_buffer.clear();
+        self.market_open = true;
+        // The day a draw carries in the draw log is the day whose open it
+        // follows, so the jumps, volume and macro draws taken at a close
+        // belong to the day they close rather than to the one after.
+        self.inner.set_current_day(day);
+        self.inner.open_market();
+    }
+}
+
 #[pymethods]
 impl PyEngine {
     /// Build an engine over a universe.
@@ -891,32 +927,6 @@ impl PyEngine {
     /// from `first_day` instead, through [`Self::open_market_on`].
     fn open_market(&mut self) {
         self.open_market_on(i64::from(self.day_count));
-    }
-
-    /// Roll the day's opening marks, numbering the day `day`.
-    ///
-    /// The day is stamped BEFORE `inner.open_market()`, and the order is the
-    /// whole of it. That call pushes the day mark and takes the day's
-    /// endogenous news draws, so both carry whatever number was stamped when
-    /// it ran. `run_days` used to open first and re-stamp afterwards, which
-    /// left one run carrying two numbers: `run_days(3, first_day=100)` logged
-    /// the market, economy, jumps, volume and per-name volume streams on days
-    /// 100, 101 and 102, the news stream on 0, 1 and 2, and `day_marks()` on
-    /// 0, 1 and 2, so `market_day_layout(100)` found nothing while
-    /// `market_day_layout(0)` returned a mark for a day the log called 100.
-    /// Two `run_days(2)` calls in a row reached the same split without any
-    /// `first_day` at all.
-    fn open_market_on(&mut self, day: i64) {
-        self.log.push(crate::python_log::LogEntry::OpenMarket);
-        // A new day's tape starts here. Without this, a run that never closed
-        // would grow one unbounded "day".
-        self.day_buffer.clear();
-        self.market_open = true;
-        // The day a draw carries in the draw log is the day whose open it
-        // follows, so the jumps, volume and macro draws taken at a close
-        // belong to the day they close rather than to the one after.
-        self.inner.set_current_day(day);
-        self.inner.open_market();
     }
 
     /// Advance one game-minute.
@@ -1149,7 +1159,7 @@ impl PyEngine {
     /// Returns the number of days run.
     #[pyo3(signature = (
         days, *, hour = 9, minute = 30, day_of_week = 3,
-        ticks_per_day = 390, volatility = 1.0, record = true, first_day = 0
+        ticks_per_day = 390, volatility = 1.0, record = true, first_day = None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn run_days(
@@ -1162,7 +1172,7 @@ impl PyEngine {
         ticks_per_day: usize,
         volatility: f64,
         record: bool,
-        first_day: u32,
+        first_day: Option<u32>,
     ) -> PyResult<usize> {
         if days == 0 {
             return Err(ValidationError::new_err("days must be greater than zero"));
@@ -1170,6 +1180,15 @@ impl PyEngine {
         if ticks_per_day == 0 {
             return Err(ValidationError::new_err("ticks_per_day must be greater than zero"));
         }
+        // Defaults to the engine's own counter, not to zero. Numbering from
+        // zero on every call gave a second run the day numbers of the first:
+        // two `run_days(2)` calls on one engine put four simulated days on
+        // two numbers, so `draw_log("jumps", 0, 0)` returned two days of
+        // draws and `day_marks()` read 0, 1, 0, 1. The counter is what the
+        // record and the day marks already advanced on, so following it is
+        // what makes the second call continue the first. A caller that
+        // wants to restart the numbering passes `first_day=0`.
+        let first_day = first_day.unwrap_or(self.day_count);
         for offset in 0..days {
             // `first_day` is the day number the record and the truth table
             // carry, so the day mark, the news draws and every stream's log

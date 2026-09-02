@@ -290,10 +290,16 @@ def test_every_stream_and_the_marks_carry_the_day_run_days_was_given():
         engine.draw_log("news", -1000, 1000)
 
 
-def test_two_runs_in_a_row_leave_every_stream_on_the_same_days():
+def test_two_runs_in_a_row_number_four_distinct_days():
     """Reachable without `first_day`: the counter advanced across the two
-    calls while `first_day` restarted, so the news stream numbered four days
-    and the rest numbered two, twice."""
+    calls while `first_day` restarted from zero, so the news stream numbered
+    four days and the rest numbered two, twice, and one day number named two
+    simulated days.
+
+    `first_day` now defaults to the engine's own counter, which is what the
+    record and the marks already advanced on, so a second call continues the
+    first.
+    """
     engine = fresh()
     for stream in noise.STREAMS:
         engine.trace_draws(stream, -1000, 1000)
@@ -306,9 +312,22 @@ def test_two_runs_in_a_row_leave_every_stream_on_the_same_days():
         if stream == "external":
             continue
         seen[stream] = sorted({e[2] for e in log})
-    assert set(map(tuple, seen.values())) == {(0, 1)}, seen
-    # the marks agree with the streams: two days numbered 0 and two
-    # numbered 1, because both calls were given the same first_day
+    assert set(map(tuple, seen.values())) == {(0, 1, 2, 3)}, seen
+    assert [m["day"] for m in engine.day_marks()] == [0, 1, 2, 3]
+    # one day number names one simulated day: the jumps stream takes
+    # 1 + companies uniforms and the same normals, once
+    n = len(engine.tickers)
+    assert len(engine.draw_log("jumps", 0, 0)) == 2 * (1 + n)
+
+
+def test_first_day_zero_still_restarts_the_numbering():
+    """The caller keeps the old behaviour by asking for it."""
+    engine = fresh()
+    engine.trace_draws("jumps", -1000, 1000)
+    for _ in range(2):
+        engine.run_days(2, hour=9, minute=30, day_of_week=3,
+                        ticks_per_day=TICKS, volatility=1.0, record=True,
+                        first_day=0)
     assert [m["day"] for m in engine.day_marks()] == [0, 1, 0, 1]
 
 
