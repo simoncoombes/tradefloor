@@ -202,19 +202,28 @@ def verdict(ratio, corr, rows=None, nonzero=None) -> str:
         return "no effect under A"
     if nonzero is not None and nonzero < 3:
         return f"too few contributing rows ({nonzero})"
+    # The gain is named first and always. The correlation test used to
+    # short-circuit ahead of it, so a threefold gain at a correlation just
+    # under the cut-off was published as "different mechanism" and the
+    # gain itself was never printed.
+    if ratio > AMPLIFIED_ABOVE:
+        gain = "amplified"
+    elif ratio < DAMPED_BELOW:
+        gain = "damped"
+    else:
+        gain = "same gain"
+    # No mechanism claim without a correlation to make it on. A site with
+    # two rows or fewer has none, and "same gain" used to be asserted
+    # there as though it did.
     if corr is None:
-        return "correlation undefined"
+        return f"{gain}, no correlation"
     if rows:
         se = 1.0 / math.sqrt(rows)
         if abs(corr) < 2 * se:
-            return f"correlation within 2 se ({2 * se:.2f})"
+            return f"{gain}, correlation within 2 se ({2 * se:.2f})"
     if corr < CORRELATION_FLOOR:
-        return "different mechanism"
-    if ratio > AMPLIFIED_ABOVE:
-        return "amplified"
-    if ratio < DAMPED_BELOW:
-        return "damped"
-    return "same gain"
+        return f"{gain}, different mechanism"
+    return gain
 
 
 def who(row: dict) -> str:
@@ -263,15 +272,19 @@ def render(a: dict, b: dict, diff: dict, args: argparse.Namespace,
              "address. A ratio away from one with a high correlation is the "
              "same mechanism at another gain; a low correlation is a "
              "different mechanism reading the draw.", "",
-             f"The verdict reads a correlation below {CORRELATION_FLOOR} as "
-             f"a different mechanism, a ratio above {AMPLIFIED_ABOVE} as "
-             f"amplified and one below {DAMPED_BELOW} as damped. Those "
-             "three numbers are conventions chosen for this report and no "
-             "measurement set them. The standard error column is 1 over "
-             "the square root of the row count, and a correlation inside "
-             "two of them cannot support a verdict, so none is given. The "
-             "nonzero columns are how many rows contribute anything under "
-             "each preset, which is what the correlation is actually "
+             f"The verdict names the gain first: a ratio above "
+             f"{AMPLIFIED_ABOVE} is amplified, one below {DAMPED_BELOW} is "
+             f"damped, and between them the gain is the same. It then adds "
+             f"a mechanism reading where the correlation supports one: "
+             f"below {CORRELATION_FLOOR} the two presets are reading the "
+             "draw differently. Those three numbers are conventions chosen "
+             "for this report and no measurement set them. The standard "
+             "error column is 1 over the square root of the row count, and "
+             "a correlation inside two of them supports no mechanism "
+             "reading, nor does a site with too few rows to have a "
+             "correlation at all; the gain is still named in both cases. "
+             "The nonzero columns are how many rows contribute anything "
+             "under each preset, which is what the correlation is actually "
              "taken over.", "",
              "| stream | site | perturbation | rows | nonzero A | nonzero B "
              "| sum abs A | sum abs B | B/A | corr | se | verdict |",
