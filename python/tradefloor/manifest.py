@@ -686,6 +686,12 @@ class DayLedger:
     is for a ledger that has to stay small and whose days will be checked
     rarely.
 
+    The size is what decides between them, and it is why the states sit
+    here rather than inside the manifest. On ``Universe.random(40,
+    seed=7)``, seed 42, 252 days, at ``b5031cd``: the ledger writes 4.88 MB
+    with the states and 16.9 kB without them, beside a 61.8 kB manifest. A
+    manifest is meant to be read, so it carries the root alone.
+
     ## The leaf is taken after the close
 
     Not after ``record``, so a run that never recorded a tape still ledgers,
