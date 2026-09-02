@@ -18,6 +18,7 @@ import json
 import math
 import re
 import struct
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -735,6 +736,51 @@ def test_no_measured_number_is_hardcoded_in_the_module():
              and isinstance(node.value, str)
              and re.search(r"\d+\.\d", node.value)]
     assert not typed, typed
+
+
+def resolves(sha: str) -> bool:
+    """Whether ``sha`` names a commit this checkout can reach.
+
+    A checkout at depth one holds one commit, which is what CI does, so a
+    citation that is a real ancestor does not resolve until the clone is
+    deepened. Deepened here rather than skipped, because a provenance
+    guard that stands down on the machine that runs it every day is a
+    guard that never runs.
+    """
+    def cat() -> bool:
+        return subprocess.run(["git", "cat-file", "-e", sha + "^{commit}"],
+                              cwd=ROOT, capture_output=True).returncode == 0
+
+    if cat():
+        return True
+    shallow = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"], cwd=ROOT,
+        capture_output=True, text=True).stdout.strip()
+    if shallow != "true":
+        return False
+    subprocess.run(["git", "fetch", "--quiet", "--unshallow"], cwd=ROOT,
+                   capture_output=True)
+    return cat()
+
+
+def test_every_commit_this_module_cites_is_reachable():
+    """A measured number names the commit it was measured on, and a
+    rebase makes that name point at nothing.
+
+    The module's cost table cites a commit. This branch is rebased before
+    it merges, so the citation has to be re-pointed at a commit that
+    survived, and a citation nobody checks survives as a plausible hex
+    string. Read from the repository rather than from a list here.
+    """
+    source = (ROOT / "python" / "tradefloor" / "explain.py").read_text(
+        encoding="utf-8")
+    cited = set(re.findall(r"\bat ([0-9a-f]{7,40})\b", source))
+    assert cited, "the cost table cites no commit, so nothing is provenanced"
+    dead = [sha for sha in sorted(cited) if not resolves(sha)]
+    assert not dead, (
+        f"{', '.join(dead)} name no commit this checkout can reach. A "
+        "rebase moved them, and a measurement has to name a commit that "
+        "survived it.")
 
 
 def test_a_caveat_names_the_mechanisms_with_no_draw_of_their_own():

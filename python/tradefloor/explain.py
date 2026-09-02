@@ -54,6 +54,31 @@ formula: a replay is the engine running the same day from the same state
 under the same draws, which is what ``CONTRIBUTING.md`` requires of
 anything that decides a price.
 
+## What a call costs
+
+The tree reads the day's draw log, and the market stream's log is the
+size of the tape: 673 draws a tick at a hundred names. On
+``Universe.random(n, seed=111)`` at engine seed 42, three days,
+``pt-v16``, at 8273f24, one ``explain`` call and one ``check`` on it
+cost:
+
+===== ========== ========= =========
+names  explain     check      peak
+===== ========== ========= =========
+   12     1.03 s    0.29 s    38.7 MB
+   40     2.30 s    0.96 s    94.3 MB
+  100     5.57 s    2.27 s   224.0 MB
+===== ========== ========= =========
+
+The addressed draws under one name are 2,736 at every roster size, so
+what grows is the log the call reads rather than the tree it builds. A
+filtered read on the extension side would remove it, and this build does
+not have one.
+
+Keeping a window costs a run some time and some memory of its own: at a
+hundred names over twenty days, 3.13 seconds against 2.43 seconds
+without one, on the same roster and seed.
+
 ## The jump slot's day
 
 ``Engine::apply_jumps`` runs at a close and moves ``mispricing_s`` after
