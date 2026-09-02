@@ -249,10 +249,18 @@ class Forward:
 
 # -- the solver ----------------------------------------------------------
 
+#: Solver settings, one place: the finite-difference step in z units, the
+#: number of accepted steps between fresh Jacobians (Broyden in between),
+#: the iterations per round and the rounds a solve may restart when the
+#: closes are not reached. ``lab()`` measures alternatives on synthetic days.
+SOLVER = {"step": 0.5, "refresh": 3, "max_iter": 12, "restarts": 2}
+
+
 def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
-          extra: int = 0, *, sigma: float, step: float = 0.25,
-          max_iter: int = 8, tol: float = 1e-4, J0: np.ndarray | None = None,
-          restarts: int = 1) -> dict:
+          extra: int = 0, *, sigma: float, step: float | None = None,
+          max_iter: int | None = None, tol: float = 1e-4,
+          J0: np.ndarray | None = None, restarts: int | None = None,
+          refresh: int | None = None) -> dict:
     """Levenberg-Marquardt for the MAP day aggregates.
 
     Minimises ``|r(x) - r_obs|^2 / (2 sigma^2) + |x|^2 / 2``. ``extra``
@@ -268,6 +276,10 @@ def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
     Jacobian and whether the optimiser converged.
     """
     m = len(x0)
+    step = SOLVER["step"] if step is None else step
+    max_iter = SOLVER["max_iter"] if max_iter is None else max_iter
+    restarts = SOLVER["restarts"] if restarts is None else restarts
+    refresh = SOLVER["refresh"] if refresh is None else refresh
 
     def jump_list(x):
         return jumps(x[m - extra:]) if callable(jumps) else jumps
@@ -295,6 +307,7 @@ def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
     cost = (r @ r) / (2 * sigma ** 2) + (x @ x) / 2
     converged = False
     rounds = 0
+    since_fresh = 0
     for _ in range(max_iter * (1 + restarts)):
         if converged:
             if np.max(np.abs(r)) < 5 * sigma or rounds >= restarts:
@@ -302,6 +315,7 @@ def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
             # not reached: a fresh Jacobian at the solution, then on
             rounds += 1
             J = jacobian(x, r)
+            since_fresh = 0
             lam = 1e-3
             converged = False
         A = J.T @ J / sigma ** 2 + np.eye(m)
@@ -314,9 +328,17 @@ def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
             cost_new = (r_new @ r_new) / (2 * sigma ** 2) + (x_new @ x_new) / 2
             if cost_new < cost:
                 dr = r_new - r
-                J += np.outer(dr - J @ delta, delta) / (delta @ delta)
                 improvement = (cost - cost_new) / max(cost, 1e-12)
                 x, r, cost = x_new, r_new, cost_new
+                since_fresh += 1
+                if refresh and since_fresh >= refresh:
+                    # the map is piecewise flat at the cent grid, and a
+                    # secant update over a flat step corrupts the column;
+                    # a fresh difference every few steps keeps it honest
+                    J = jacobian(x, r)
+                    since_fresh = 0
+                else:
+                    J += np.outer(dr - J @ delta, delta) / (delta @ delta)
                 lam = max(lam / 3, 1e-6)
                 accepted = True
                 # converged: a near Gauss-Newton step (small damping) moved
@@ -657,9 +679,75 @@ def render(run: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def lab(args) -> str:
+    """Solver settings against days whose draws are known.
+
+    Two rosters (six names, and the certified forty), several synthetic
+    days each: a random aggregate vector makes the closes, and each
+    setting solves for them from zero. What is reported is the max
+    absolute residual and the evaluations, per setting, so the defaults
+    in ``SOLVER`` are a measured choice rather than a guess. The residual
+    floor is the cent grid: a close on a fifty-dollar name moves in steps
+    of two basis points, and no setting reaches below that.
+    """
+    rows = []
+    settings = [
+        {"step": 0.25, "refresh": 0, "max_iter": 8, "restarts": 1},
+        {"step": 0.25, "refresh": 3, "max_iter": 12, "restarts": 2},
+        {"step": 0.5, "refresh": 3, "max_iter": 12, "restarts": 2},
+        {"step": 1.0, "refresh": 3, "max_iter": 12, "restarts": 2},
+        {"step": 0.5, "refresh": 1, "max_iter": 12, "restarts": 2},
+        {"step": 0.5, "refresh": 3, "max_iter": 20, "restarts": 3},
+    ]
+    global TICKS
+    for names, seed, ticks in ((6, 3, 40), (40, 111, 390)):
+        TICKS = ticks
+        universe = tf.Universe.random(names, seed=seed)
+        for day_seed in range(args.days or 4):
+            engine = tf.Engine(seed=11 + day_seed, universe=universe)
+            fwd = Forward(engine, 0, names)
+            rng = np.random.default_rng(100 + day_seed)
+            x_true = rng.normal(size=fwd.layout.size)
+            r_obs = fwd.returns(x_true, [])
+            floor = float(np.max(0.01 / prices(engine)))
+            for s in settings:
+                fwd.evals = 0
+                out = solve(fwd, r_obs, [], np.zeros(fwd.layout.size),
+                            sigma=args.sigma, **s)
+                rows.append({"names": names, "day": day_seed, **s,
+                             "residual": float(np.max(np.abs(out["residual"]))),
+                             "floor": floor, "evals": fwd.evals,
+                             "converged": out["converged"],
+                             "reached": bool(np.max(np.abs(out["residual"])) < 5 * args.sigma)})
+            print(f"  lab {names} names day {day_seed} done", flush=True)
+    lines = ["# Solver lab", "",
+             "| names | step | refresh | iters | restarts | days reached | "
+             "median residual | max residual | grid floor | mean evals |",
+             "|---|---|---|---|---|---|---|---|---|---|"]
+    for names in (6, 40):
+        for s in settings:
+            part = [r for r in rows if r["names"] == names
+                    and all(r[k] == v for k, v in s.items())]
+            if not part:
+                continue
+            res = np.array([r["residual"] for r in part])
+            lines.append(f"| {names} | {s['step']} | {s['refresh']} | "
+                         f"{s['max_iter']} | {s['restarts']} | "
+                         f"{sum(r['reached'] for r in part)}/{len(part)} | "
+                         f"{np.median(res):.2e} | {res.max():.2e} | "
+                         f"{np.mean([r['floor'] for r in part]):.1e} | "
+                         f"{np.mean([r['evals'] for r in part]):.0f} |")
+    text = "\n".join(lines) + "\n"
+    with open(os.path.join(args.out, "lab.json"), "w", encoding="utf-8") as f:
+        json.dump(rows, f, indent=1)
+    return text
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--year", choices=list(realdata.YEARS), required=True)
+    p.add_argument("--lab", action="store_true",
+                   help="run the solver lab on synthetic days instead of the year")
     p.add_argument("--preset", default=None)
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--sigma", type=float, default=1e-3)
@@ -667,6 +755,12 @@ def main(argv=None) -> int:
     p.add_argument("--out", required=True)
     args = p.parse_args(argv)
     os.makedirs(args.out, exist_ok=True)
+    if args.lab:
+        text = lab(args)
+        with open(os.path.join(args.out, "shadow.md"), "w", encoding="utf-8") as f:
+            f.write(text)
+        sys.stdout.write(text)
+        return 0
     run = shadow(args)
     with open(os.path.join(args.out, "shadow.json"), "w", encoding="utf-8") as f:
         json.dump(run, f)
