@@ -369,12 +369,25 @@ thinned and the agent went on seeing -- and being allowed -- the pre-crisis
 size. In a market with 40% of the depth.
 """)
 
+M("""
+Both arms also run with the depth counterfactual on. It settles every open
+tick a second time against every resting level, under the same four
+uniforms and from the same book state, and writes what that would have
+printed into a column beside the real print. It takes no draw and its
+fills reach nothing, so the market is the market either way; the arms
+below are the same arms, and their exposure numbers are the same numbers.
+""")
+
 C("""
 for label, treatment in ex.ARMS.items():
     print(f"{label:>9}  {ex.treat(worlds[label], treatment)}")
 
 for arm in worlds.values():
+    arm.engine.settle_depth_counterfactual(True)
     arm.run(days=ex.BRANCH_DAYS)
+    # The engine holds one day's tape at a time, so this keeps the last
+    # one for the depth reading further down.
+    arm.engine.record(arm.day - 1)
 print(f"\\nboth arms ran {ex.BRANCH_DAYS} days")
 """)
 
@@ -486,6 +499,77 @@ print(f"days where it fails: {order['failures'] or 'none'}")
 print(f"settled from day {order['settled_from_day']} onward")
 print()
 print(order["note"])
+""")
+
+M("""
+### What the market did, print by print
+
+The exposure numbers above are the agent's side of the crisis. This is the
+market's side, on the same ticks.
+
+Every print decomposes into two log distances. `shock` is the distance from
+the last print to the price the model wanted; `absorbed` is the distance
+from there to what actually printed, and they sum to the print's own move.
+`absorbed` is the book, plus the circuit breaker where it fired.
+
+Then the counterfactual. The same tick is settled a second time against
+every resting level, under the same four uniforms and from the same book
+state, so the two prints differ only where the flow reached the end of the
+quoted depth. `liquidity_share` is `log(print / unbounded_print)` over the
+print's own move.
+
+That share is normally NEGATIVE, and the sign is the finding rather than a
+convention. The depth bound truncates a walk: an order that exhausts a
+shallow book stops there, while against every resting level it keeps
+filling and prints further from where it started. So the real print sits
+between the last print and the unbounded print. Read it through the
+identity the column satisfies, that the unbounded book's move is
+`1 - share` times the printed move, so a share of -1 means the deeper book
+would have moved the price twice as far.
+
+`market.liquidity` at 40% is a claim about depth, and this is the column
+that reads it back off the tape rather than off the scenario file.
+""")
+
+C("""
+depth = ex.depth_readings(worlds)
+
+print(f"{'arm':<10}{'prints':>9}{'depth reached':>15}{'of prints':>11}"
+      f"{'median share':>14}{'negative':>10}{'mean |absorbed|':>17}")
+for name in names:
+    row = depth[name]
+    print(f"{name:<10}{row['rows']:>9,}{row['moved']:>15,}"
+          f"{row['moved_fraction']:>10.2%}"
+          f"{row['median_share']:>14.3f}"
+          f"{row['shares_negative']:>10,}"
+          f"{row['mean_abs_absorbed_bps']:>14.1f} bps")
+
+print()
+print(f"day {depth[names[0]]['day']}, the last of the post-fork window, "
+      f"{depth[names[0]]['instruments']} names over 390 ticks")
+print("median share is signed; mean |absorbed| is a distance, because the "
+      "signed mean cancels across up and down ticks")
+""")
+
+M("""
+Flow reaches the end of the quoted depth on a small minority of prints in
+both arms, which is what the book is built for: it quotes the depth this
+tick's flow can reach, and ordinary flow does not leave the top level or
+two.
+
+The crisis changes the FREQUENCY and not the size. Flow runs out of book
+2.7 times as often in the crisis arm, and the median share is the same in
+both, so each event is the same shape and there are more of them. The mean
+distance from the model price to the print rises with the count.
+
+A share of -1.0 says the deeper book would have moved the price twice as
+far as it actually moved, since the unbounded move is `1 - share` times the
+printed one. Nothing bounds the ratio by one.
+
+One day of one recorded run, and one tick at a time. The counterfactual
+prints from the real state and stops there: the inventory a deeper book
+would have left is discarded, so this says nothing about what the next tick
+would have done.
 """)
 
 M("""
