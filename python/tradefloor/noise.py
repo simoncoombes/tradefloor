@@ -44,8 +44,9 @@ description of it.
 """
 from __future__ import annotations
 
+import math
 import struct
-from typing import Any, NamedTuple, Sequence
+from typing import Any, Callable, NamedTuple, Sequence
 
 from ._core import Engine
 
@@ -247,6 +248,400 @@ def surgery_patches(seed: int, stream: str, surgery_seed: int,
     return [Patch(a, v) for a, v in zip(checked, values)]
 
 
+# -- attribution --------------------------------------------------------------
+
+#: The sites whose uniforms decide an event. A small change to one of these
+#: either does nothing or flips the event, so they are forced to each end of
+#: the unit interval rather than perturbed: 0.0 fires, 1.0 does not.
+EVENT_SITES = frozenset({"jump_market_u", "jump_company_u", "news_u"})
+#: The streams attributed at event level: one row per logged draw.
+EVENT_STREAMS = ("jumps", "economy", "news", "volume", "volume_idio")
+#: The market stream's sites that are aggregated by day.
+DAY_SITES = {"factor_idio_z": "company", "market_factor_z": "market",
+             "sector_z": "sector"}
+
+
+class Target(NamedTuple):
+    """What an attribution measures, per arm.
+
+    Build one with :func:`statistic`, :func:`pnl` or :func:`column`, or pass
+    a callable ``f(world) -> float`` to :func:`attribute` and it is wrapped.
+    """
+
+    kind: str
+    name: str | None = None
+    day: int | None = None
+    ticker: str | None = None
+    fn: Any = None
+
+    def label(self) -> str:
+        if self.kind == "statistic":
+            return str(self.name)
+        if self.kind == "pnl":
+            return "pnl_since_fork"
+        if self.kind == "column":
+            who = self.ticker or "roster mean"
+            return f"{self.name}[{who}] at day {self.day}"
+        return getattr(self.fn, "__name__", "callable")
+
+
+def statistic(name: str) -> Target:
+    """A panel statistic from :func:`tradefloor.facts.statistics`, by key.
+
+    The arms record every day they run and the statistic is read off the
+    daily bars at the horizon, so the run must be long enough for it:
+    ``facts`` needs ``min_observations`` daily returns per name (thirty by
+    default), which is thirty-one recorded days.
+    """
+    return Target("statistic", name=name)
+
+
+def pnl() -> Target:
+    """The agent's P&L since the fork, ``World.summary()["pnl_since"]``."""
+    return Target("pnl")
+
+
+def column(name: str, day: int, ticker: str | None = None) -> Target:
+    """An engine column at the close of ``day``: one name's value, or the
+    mean across the roster when ``ticker`` is ``None``. The arms run to
+    ``day`` even when the window ends earlier."""
+    return Target("column", name=name, day=int(day), ticker=ticker)
+
+
+class Attribution:
+    """The effect of each draw, or each day of a name's draws, on a target.
+
+    ``rows`` is one dict per perturbation: the address (or the first
+    address of a day aggregate and how many it covers), the day, the site
+    and its tag, the ticker where the site names one, the granularity, the
+    perturbation and its size, the target under the control and under the
+    perturbation, and the effect as their difference. ``control`` is the
+    target's value on the untouched arm and ``caveats`` what this call
+    could not do, computed from what it was asked.
+
+    :meth:`table` is the same rows as an Arrow table, on the results
+    surface the rest of the library uses. Rows are also plain data, so a
+    caller without pyarrow still has the answer.
+    """
+
+    def __init__(self, *, target: Target, window: tuple[int, int],
+                 horizon: int, control: float, rows: list[dict],
+                 caveats: list[str], delta: float) -> None:
+        self.target = target
+        self.window = window
+        self.horizon = horizon
+        self.control = control
+        self.rows = rows
+        self.caveats = caveats
+        self.delta = delta
+
+    #: The columns of :meth:`table`, in order, with their Arrow types.
+    COLUMNS = (("stream", "string"), ("kind", "string"), ("index", "int64"),
+               ("count", "int64"), ("day", "int64"), ("site", "string"),
+               ("tag", "int64"), ("ticker", "string"),
+               ("granularity", "string"), ("perturbation", "string"),
+               ("delta", "float64"), ("control", "float64"),
+               ("treatment", "float64"), ("effect", "float64"))
+
+    def table(self) -> Any:
+        """The rows as a ``pyarrow.Table``."""
+        try:
+            import pyarrow as pa
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError(
+                "Attribution.table builds an Arrow table and needs pyarrow. "
+                "Install it with: pip install tradefloor[arrow]; the rows "
+                "are on .rows without it.") from exc
+        schema = pa.schema([(name, getattr(pa, kind)())
+                            for name, kind in self.COLUMNS])
+        columns = {name: [row.get(name) for row in self.rows]
+                   for name, _ in self.COLUMNS}
+        return pa.table(columns, schema=schema)
+
+    def ranked(self) -> list[dict]:
+        """Rows by absolute effect, largest first."""
+        return sorted(self.rows, key=lambda r: -abs(r["effect"]))
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"target": self.target.label(), "window": list(self.window),
+                "horizon": self.horizon, "control": self.control,
+                "delta": self.delta, "rows": self.rows,
+                "caveats": list(self.caveats)}
+
+    def render(self, top: int = 20) -> str:
+        lines = [f"  target {self.target.label()}: control {self.control:.6g}",
+                 f"  window days {self.window[0]}..{self.window[1]}, run to "
+                 f"day {self.horizon}, {len(self.rows)} rows",
+                 f"  {'stream':<12}{'site':<18}{'day':>5}{'tag':>5}"
+                 f"{'perturbation':>16}{'effect':>14}"]
+        for row in self.ranked()[:top]:
+            lines.append(f"  {row['stream']:<12}{row['site']:<18}"
+                         f"{row['day']:>5}{row['tag']:>5}"
+                         f"{row['perturbation']:>16}{row['effect']:>14.6g}")
+        for caveat in self.caveats:
+            lines.append(f"  caveat: {caveat}")
+        return "\n".join(lines)
+
+    def __repr__(self) -> str:
+        return (f"Attribution({self.target.label()!r}, "
+                f"window={self.window}, {len(self.rows)} rows)")
+
+
+def attribute(world: Any, window: Any, target: Any,
+              granularity: str = "both", *, streams: Sequence[str] | None = None,
+              delta: float = 1.0, horizon: int | None = None,
+              shard: tuple[int, int] | None = None) -> Attribution:
+    """Finite differences of ``target`` in each draw, under common random
+    numbers, over the days in ``window``.
+
+    # What it measures
+
+    A control arm is forked from ``world`` and run to the horizon with the
+    chosen streams traced over the window; the target is read off it. Then
+    one arm per perturbation is forked from the same state, one patch set
+    is installed, the arm runs the same days with the same agent, and the
+    target is read again. The effect is the difference. Every arm shares
+    every other draw with the control, so the difference is the draw's and
+    not a reshuffle: ``draws_by_stream`` is identical across arms.
+
+    Two perturbations, by what a draw is:
+
+    - A normal moves by ``delta`` in z units, at the value the control
+      received. One row.
+    - A uniform at an event site (:data:`EVENT_SITES`) is forced to each
+      end of the unit interval: 0.0 fires the event and 1.0 does not. Two
+      rows, ``fire`` and ``unfire``. One of them is the control's own
+      state and has an effect of exactly zero, which says which state the
+      control was in. A small change to an event uniform either does
+      nothing or flips the event, so a finite difference in it is not a
+      derivative and is not taken.
+
+    # Granularity
+
+    ``"event"`` attributes the jumps, economy, news and volume streams one
+    logged draw at a time. ``"day"`` attributes the market stream by day
+    aggregate: all of one name's factor normals on one day move together
+    by ``delta / sqrt(ticks)``, and so do the day's market factor normals
+    and each sector's. ``"both"`` does both. ``streams`` narrows either.
+
+    The day aggregate is the identified quantity. One name's daily return
+    is a sum over its tick normals, so a common shift of ``delta /
+    sqrt(T)`` across ``T`` ticks moves the day by ``delta`` in the units
+    of one tick's noise; the effect of one tick normal on its own is not
+    identified from a daily target, and a row for it would be a number
+    without a meaning. The market stream's other draws (the stash and
+    settlement uniforms) drive microstructure and are not attributed;
+    the caveats say so whenever the market stream is in the call.
+
+    # What it cannot do
+
+    The agent runs in every arm. An agent whose decisions are a function
+    of what it sees gives the same answer in the same state; one that is
+    not (a model sampled at temperature) puts its own noise into every
+    effect, and nothing here separates the two. An effect measured across
+    a circuit breaker or a book clamp is the clamped effect. A window on
+    the economy chain is aimed by the control's schedule and the chain's
+    draw count depends on its state, so a perturbation that moves the
+    chain moves later addresses too; the row still reports what the arm
+    did.
+
+    ``horizon`` is the last day the arms run, inclusive, defaulting to the
+    window's last day, or the target's day for a column. ``shard=(i, n)``
+    keeps every n-th row from the i-th, for a caller spreading the arms
+    over processes; each shard computes its own control.
+
+    Cost: one run of the arms' days per row. A day of the market stream
+    at forty names is forty-one company and market rows plus one per
+    sector; a day of the jumps stream at forty names is forty-one
+    uniforms, at two rows each, plus forty-one normals.
+    """
+    from .counterfactual import World, _days
+    from ._core import ValidationError
+
+    if not isinstance(world, World):
+        raise ValidationError(
+            f"attribute takes a World, got {type(world).__name__}")
+    first, last = _days(window)
+    if first < world.day:
+        raise ValidationError(
+            f"day {first} has run; this world is on day {world.day}. A "
+            "draw already taken cannot be perturbed.")
+    if granularity not in ("event", "day", "both"):
+        raise ValidationError(
+            f"granularity is 'event', 'day' or 'both', got {granularity!r}")
+    if callable(target) and not isinstance(target, Target):
+        target = Target("callable", fn=target)
+    if not isinstance(target, Target):
+        raise ValidationError(
+            "target is noise.statistic(name), noise.pnl(), noise.column(...) "
+            f"or a callable of the world, got {target!r}")
+    if target.kind == "column":
+        horizon = max(int(target.day), last if horizon is None else int(horizon))
+    horizon = last if horizon is None else int(horizon)
+    if horizon < last:
+        raise ValidationError(
+            f"the horizon (day {horizon}) is before the window's last day "
+            f"({last}); the arms must run through the window.")
+    wanted = list(STREAMS if streams is None else streams)
+    for s in wanted:
+        DrawAddress(s, "uniform", 0).check()
+    event_streams = [s for s in wanted if s in EVENT_STREAMS
+                     and granularity in ("event", "both")]
+    day_streams = [s for s in wanted if s == "market"
+                   and granularity in ("day", "both")]
+    traced = event_streams + day_streams
+    if not traced:
+        raise ValidationError(
+            f"nothing to attribute: {granularity!r} over {wanted} names no "
+            "stream. Event level covers " + ", ".join(EVENT_STREAMS)
+            + "; day aggregate covers the market stream.")
+    days = horizon - world.day + 1
+    record = target.kind == "statistic"
+    if record and horizon - world.day + 1 + len(world.trace) // max(1, world.steps_per_day) < 31:
+        pass  # the length check is facts' to make, below, on the real bars
+
+    control, = world.fork("control")
+    for s in traced:
+        control.trace(s, first, last)
+    control.run(days, record=record)
+    base = _evaluate(target, control)
+
+    plan: list[tuple[dict, list[Patch]]] = []
+    for s in event_streams:
+        for entry in control.draws(s, first, last):
+            head = {"stream": s, "kind": entry.address.kind,
+                    "index": entry.address.index, "count": 1,
+                    "day": entry.day, "site": entry.site, "tag": entry.tag,
+                    "ticker": _ticker(world, entry.site, entry.tag),
+                    "granularity": "event"}
+            if entry.address.kind == "normal":
+                plan.append((dict(head, perturbation="z+delta", delta=delta),
+                             [Patch(entry.address, entry.value + delta)]))
+            elif entry.site in EVENT_SITES:
+                plan.append((dict(head, perturbation="fire", delta=0.0),
+                             [Patch(entry.address, 0.0)]))
+                plan.append((dict(head, perturbation="unfire", delta=1.0),
+                             [Patch(entry.address, NO_FIRE)]))
+            else:
+                plan.append((dict(head, perturbation="u=0", delta=0.0),
+                             [Patch(entry.address, 0.0)]))
+                plan.append((dict(head, perturbation="u=1", delta=1.0),
+                             [Patch(entry.address, NO_FIRE)]))
+    for s in day_streams:
+        groups: dict[tuple, list] = {}
+        for entry in control.draws(s, first, last):
+            role = DAY_SITES.get(entry.site)
+            if role is None:
+                continue
+            key = (entry.day, entry.site, entry.tag if role != "market" else 0)
+            groups.setdefault(key, []).append(entry)
+        for (day, site, tag), entries in sorted(groups.items()):
+            ticks = len(entries)
+            step = delta / math.sqrt(ticks)
+            head = {"stream": s, "kind": "normal",
+                    "index": entries[0].address.index, "count": ticks,
+                    "day": day, "site": site, "tag": tag,
+                    "ticker": _ticker(world, site, tag),
+                    "granularity": "day", "perturbation": "z+delta/sqrt(T)",
+                    "delta": step}
+            plan.append((head, [Patch(e.address, e.value + step)
+                                for e in entries]))
+    if shard is not None:
+        i, n = int(shard[0]), int(shard[1])
+        if n < 1 or not 0 <= i < n:
+            raise ValidationError(f"shard is (i, n) with 0 <= i < n, got {shard!r}")
+        plan = plan[i::n]
+
+    rows: list[dict] = []
+    for head, patches in plan:
+        arm, = world.fork("arm")
+        patch_draws(arm.engine, patches)
+        arm.run(days, record=record)
+        value = _evaluate(target, arm)
+        rows.append(dict(head, control=base, treatment=value,
+                         effect=value - base))
+
+    caveats: list[str] = []
+    if day_streams:
+        caveats.append(
+            "market stream rows are day aggregates: one name's factor "
+            "normals on one day moved together by delta/sqrt(T). The day "
+            "is the identified quantity; one tick normal is not.")
+        caveats.append(
+            "the market stream's stash and settlement uniforms drive "
+            "microstructure and were not perturbed.")
+    fired = sum(1 for r in rows if r["perturbation"] == "fire")
+    if fired:
+        caveats.append(
+            f"{fired} event uniforms were forced to each end of the unit "
+            "interval (fire, unfire) rather than perturbed; the row with "
+            "zero effect is the control's own state.")
+    odd = sum(1 for r in rows if r["perturbation"] in ("u=0", "u=1"))
+    if odd:
+        caveats.append(
+            f"{odd} uniforms outside the event sites were forced to 0 and "
+            "to 1; which end is which event is their consumer's to say.")
+    if horizon > last:
+        caveats.append(
+            f"the arms ran to day {horizon}, past the window's last day "
+            f"{last}; each effect includes everything downstream of the "
+            "draw through the horizon.")
+    if target.kind == "pnl" or getattr(world.agent, "act", None) is not None:
+        if not hasattr(world.agent, "state"):
+            caveats.append(
+                "the agent runs in every arm and publishes no state() hook; "
+                "an agent whose decisions are not a function of what it "
+                "sees puts its own noise into every effect.")
+    if shard is not None:
+        caveats.append(f"shard {shard[0]} of {shard[1]}: every "
+                       f"{shard[1]}-th row from the {shard[0]}-th.")
+    return Attribution(target=target, window=(first, last), horizon=horizon,
+                       control=base, rows=rows, caveats=caveats, delta=delta)
+
+
+def _ticker(world: Any, site: str, tag: int) -> str | None:
+    if site in ("factor_idio_z", "stash_u", "settle_u", "jump_company_u",
+                "jump_company_z", "volume_idio_z", "news_u", "news_z"):
+        tickers = world.engine.tickers
+        return tickers[tag] if 0 <= tag < len(tickers) else None
+    return None
+
+
+def _evaluate(target: Target, arm: Any) -> float:
+    from ._core import ValidationError
+
+    if target.kind == "pnl":
+        return float(arm.summary()["pnl_since"])
+    if target.kind == "callable":
+        return float(target.fn(arm))
+    if target.kind == "column":
+        values = struct.unpack(f"<{len(arm.engine.tickers)}d",
+                               arm.engine.column(target.name))
+        if target.ticker is None:
+            return float(sum(values) / len(values))
+        try:
+            return float(values[arm.engine.tickers.index(target.ticker)])
+        except ValueError:
+            raise ValidationError(
+                f"{target.ticker!r} is not in this world's roster")
+    if target.kind == "statistic":
+        from . import facts
+        stats = facts.statistics(arm.engine.bars(grain="day"), arm.universe)
+        if target.name not in stats:
+            raise ValidationError(
+                f"{target.name!r} is not a panel statistic; one of "
+                + ", ".join(sorted(stats)))
+        value = stats[target.name]
+        if value is None:
+            raise ValidationError(
+                f"{target.name} could not be measured on this run; facts "
+                "returns None where a statistic has no observations")
+        return float(value)
+    raise ValidationError(f"unknown target kind {target.kind!r}")
+
+
 __all__ = ["DrawAddress", "Patch", "LoggedDraw", "DayResult", "SITES",
-           "STREAMS", "KINDS", "NO_FIRE", "patch_draws", "draw_log",
-           "run_day_with", "market_day_layout", "surgery_patches"]
+           "STREAMS", "KINDS", "NO_FIRE", "EVENT_SITES", "EVENT_STREAMS",
+           "Target", "Attribution", "patch_draws", "draw_log",
+           "run_day_with", "market_day_layout", "surgery_patches",
+           "attribute", "statistic", "pnl", "column"]

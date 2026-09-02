@@ -1151,12 +1151,47 @@ def measure(
         engine.record(day)
         engine.close_market()
 
-    table = engine.bars(grain="day")
+    facts: dict[str, Any] = {
+        "seed": seed,
+        # Which market these statistics describe. A realism claim without it
+        # is unfalsifiable: "kurtosis is +4.8" is only checkable against the
+        # roster it was measured on, and tickers do not identify a roster.
+        "universe_fingerprint": fingerprint_of(universe),
+        # And which MODEL produced them. The panel is the calibration
+        # search's objective, so a panel row that does not name its
+        # coefficient set carries the ambiguity the fingerprint exists to
+        # remove.
+        "model_fingerprint": engine.model_fingerprint,
+        "days": days,
+    }
+    facts.update(statistics(engine.bars(grain="day"), universe,
+                            min_observations=min_observations))
+    return facts
+
+
+def statistics(
+    table: Any,
+    universe: Sequence[Instrument],
+    *,
+    min_observations: int = 30,
+) -> dict[str, Any]:
+    """The panel statistics of a recorded run, from its daily bars.
+
+    What :func:`measure` reports after it has run the market, as a
+    function of the bars table alone, so a run recorded elsewhere (a
+    :class:`~tradefloor.counterfactual.World` under a draw surgery, say)
+    gets the same numbers from the same code. ``table`` is
+    ``Engine.bars(grain="day")`` or anything ``pyarrow.table`` reads.
+
+    The identity fields (seed, fingerprints, days) are ``measure``'s to
+    add: this function does not know what produced the table, and says
+    nothing it cannot read off it.
+    """
     try:
         import pyarrow as pa
     except ImportError as exc:  # pragma: no cover
         raise ImportError(
-            "tradefloor.facts.measure reads the daily bars table and needs "
+            "tradefloor.facts.statistics reads the daily bars table and needs "
             "pyarrow. Install it with: pip install tradefloor[arrow]"
         ) from exc
 
@@ -1191,17 +1226,6 @@ def measure(
     standard = [(x - mean) / sd for x in pooled] if sd else [0.0] * len(pooled)
 
     facts: dict[str, Any] = {
-        "seed": seed,
-        # Which market these statistics describe. A realism claim without it
-        # is unfalsifiable: "kurtosis is +4.8" is only checkable against the
-        # roster it was measured on, and tickers do not identify a roster.
-        "universe_fingerprint": fingerprint_of(universe),
-        # And which MODEL produced them. The panel is the calibration
-        # search's objective, so a panel row that does not name its
-        # coefficient set carries the ambiguity the fingerprint exists to
-        # remove.
-        "model_fingerprint": engine.model_fingerprint,
-        "days": days,
         "instruments": count,
         "observations": len(pooled),
         "annualised_vol_pct": sd * math.sqrt(252) * 100.0,
