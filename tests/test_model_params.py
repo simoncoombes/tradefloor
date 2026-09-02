@@ -801,8 +801,7 @@ def test_the_fear_scale_dials_act_when_the_co_jump_is_on():
     fear = dict(vix_selfex_gain=0.01, vix_selfex_vol_jump=0.5, vix_har_weight=0.5,
                 vix_selfex_threshold=-3.0, market_vol_vix_anchor=8.0)
     base = market_state(run_market(tradefloor.ModelParams.from_preset(**fear)))
-    for name, value in [("vix_selfex_level_ref", 0.005),
-                        ("vix_selfex_vix_power", 8.0)]:
+    for name, value in [("vix_selfex_vix_power", 8.0)]:
         custom = tradefloor.ModelParams.from_preset(**fear, **{name: value})
         moved = market_state(run_market(custom))
         assert moved["draws"] == base["draws"], f"{name} moved the draw schedule"
@@ -815,6 +814,13 @@ def test_the_fear_scale_dials_act_when_the_co_jump_is_on():
     assert c_state["draws"] == p_state["draws"], "the cap moved the draw schedule"
     assert any(c_state[k] != p_state[k] for k in c_state if k != "draws"), \
         "a cap of 1.0 under a power of 8 did not act"
+    # The level reference acts through the trigger and the kick ONLY (the
+    # anchor term was removed, round 171.8), so it needs fires to show: it
+    # is probed on top of the powered form, where every session fires.
+    scaled = market_state(run_market(tradefloor.ModelParams.from_preset(
+        **fear, vix_selfex_vix_power=8.0, vix_selfex_level_ref=0.005)))
+    assert scaled["draws"] == p_state["draws"], "vix_selfex_level_ref moved the draw schedule"
+    assert any(scaled[k] != p_state[k] for k in scaled if k != "draws"),         "vix_selfex_level_ref did not act even with the co-jump firing"
     running = tradefloor.ModelParams.from_preset(**fear).to_dict()["market_factor_sigma"]
     same = tradefloor.ModelParams.from_preset(**fear, vix_selfex_level_ref=running)
     assert market_state(run_market(same)) == base, \
