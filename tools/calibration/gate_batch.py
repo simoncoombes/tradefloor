@@ -91,7 +91,9 @@ CRISIS_LEVER_TOLERANCE = 0.05
 HELD_VIX = tuple(f"vix{int(float(x))}" for x in
                  os.environ.get("GATE_HELD_VIX", "5,45,65").split(","))
 assert "vix45" in HELD_VIX and "vix5" in HELD_VIX and "vix65" in HELD_VIX
-KINDS = ("p252", "p504") + HELD_VIX + ("driven", "ho_seeds", "ho_universe")
+#: The model-side pooled curve (round 171.19), on request: GATE_CURVE=1.
+CURVE = os.environ.get("GATE_CURVE", "0") not in ("", "0")
+KINDS = ("p252", "p504") + HELD_VIX + ("driven",) + (("curve",) if CURVE else ()) + ("ho_seeds", "ho_universe")
 
 
 #: The two axes that do not vary with the block seed, and therefore do not
@@ -160,6 +162,23 @@ def verdict(rows_by_kind: dict[str, list]) -> dict:
                for k in rows[0]}
         if kind == "driven":
             out["driven"] = med
+            continue
+        if kind == "curve":
+            # Day-weighted pooling across seeds, the real instrument's way.
+            curve = {}
+            for lo, hi in gate_pick.CURVE_BUCKETS:
+                key = f"{lo}-{hi}"
+                cs = [(r[f"{key}:corr"], r[f"{key}:vol"], r[f"{key}:n"]) for r in rows
+                      if r.get(f"{key}:corr") is not None]
+                n_all = sum(r[f"{key}:n"] for r in rows)
+                if cs:
+                    w = sum(n for _, _, n in cs)
+                    curve[key] = {"corr": sum(c * n for c, _, n in cs) / w,
+                                  "vol": sum(v * n for _, v, n in cs) / w,
+                                  "days": n_all}
+                else:
+                    curve[key] = {"corr": None, "vol": None, "days": n_all}
+            out["curve"] = curve
             continue
         if kind in HELD_VIX:
             out[kind] = {k: med[k] for k in (
@@ -233,6 +252,8 @@ def main() -> int:
         # so seeds vary only the noise around it, and each run is 505
         # sessions over forty names. Six is enough to median a ratio.
         jobs += [(label, base, ov, "driven", s) for s in train[:6]]
+        if CURVE:
+            jobs += [(label, base, ov, "curve", s) for s in train]
         # The held-out rows vary with the model and not with the block, so
         # a campaign that runs twenty-six blocks measures them twenty-six
         # times and gets the same answer. With a cache the first block pays

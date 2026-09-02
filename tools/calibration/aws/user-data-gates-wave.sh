@@ -23,6 +23,7 @@ BLOCK=__BLOCK__
 SEEDS=__SEEDS__
 WORKERS=__WORKERS__
 export GATE_HELD_VIX=__HELD_VIX__
+export GATE_CURVE=__CURVE__
 WHEEL="__WHEEL__"
 CANDS_KEY=__CANDS_KEY__
 
@@ -107,6 +108,7 @@ python -m pytest tests/test_known_answer.py -q
 
 mkdir -p /home/ec2-user/out
 export GATE_HELD_VIX=HELD_PLACEHOLDER
+export GATE_CURVE=CURVE_PLACEHOLDER
 python tools/calibration/gate_batch.py \
   --candidates /home/ec2-user/candidates.json \
   --seeds SEEDS_PLACEHOLDER --seed-start BLOCK_PLACEHOLDER \
@@ -120,6 +122,7 @@ sed -i "s|SEEDS_PLACEHOLDER|${SEEDS}|" /home/ec2-user/run.sh
 sed -i "s|BLOCK_PLACEHOLDER|${BLOCK}|g" /home/ec2-user/run.sh
 sed -i "s|WORKERS_PLACEHOLDER|${WORKERS}|" /home/ec2-user/run.sh
 sed -i "s|HELD_PLACEHOLDER|${GATE_HELD_VIX}|" /home/ec2-user/run.sh
+sed -i "s|CURVE_PLACEHOLDER|${GATE_CURVE}|" /home/ec2-user/run.sh
 chown ec2-user:ec2-user /home/ec2-user/run.sh
 chmod +x /home/ec2-user/run.sh
 mkdir -p /home/ec2-user/out

@@ -408,6 +408,8 @@ def one(job):
                           model=m, scenario=Scenario().hold(vix=held))
     elif kind == "driven":
         return kind, driven_window(m, seed)
+    elif kind == "curve":
+        return kind, curve_window(m, seed)
     elif kind == "ho_seeds":
         f = facts.measure(seed=seed, universe=_universe(), days=252, model=m)
     elif kind == "ho_universe":
@@ -417,8 +419,84 @@ def one(job):
     return kind, {k: f.get(k) for k in list(facts.REAL_MARKETS)}
 
 
+#: The real ruler's buckets (real_corr_state.py), by the VIX the session
+#: opened under.
+CURVE_BUCKETS = ((0, 12), (12, 16), (16, 20), (20, 25), (25, 30), (30, 40), (40, 50), (50, 99))
+CURVE_DAYS = 504
+
+
+def curve_window(m, seed: int) -> dict:
+    """The model's correlation-state curve, measured exactly as the real
+    one (round 171.19, PT-V17-THEORY §6.2): 504 endogenous sessions, each
+    session's forty log returns bucketed by the VIX it opened under, mean
+    pairwise correlation and pooled annualised vol per bucket. The held
+    windows are steady states; this is the transient mixture real data
+    are, so the two curves compare like with like."""
+    import math
+    import statistics as st
+    import pyarrow as pa
+    import pyarrow.compute as pc
+    u = _universe()
+    e = pt.Engine(seed=seed, universe=u, model=m)
+    opened = []
+    for d in range(CURVE_DAYS):
+        mf = e.macro_fields
+        if callable(mf):
+            mf = mf()
+        opened.append(mf["vix"] if isinstance(mf, dict) else mf.vix)
+        e.run_days(1, first_day=d)
+    b = pa.table(e.bars(grain="day"))
+    n = len(u)
+    rets = []
+    for iid in range(n):
+        close = pc.filter(b, pc.equal(b["instrument_id"], iid))["close"].to_pylist()
+        rets.append([math.log(close[i] / close[i - 1]) for i in range(1, len(close))
+                     if close[i] > 0 and close[i - 1] > 0])
+    days = min(len(r) for r in rets)
+    rets = [r[:days] for r in rets]
+    levels = opened[1:days + 1]
+    out = {"days": days}
+    for lo, hi in CURVE_BUCKETS:
+        ks = [k for k, v in enumerate(levels) if lo <= v < hi]
+        key = f"{lo}-{hi}"
+        out[f"{key}:n"] = len(ks)
+        if len(ks) < 5:
+            out[f"{key}:corr"] = None
+            out[f"{key}:vol"] = None
+            continue
+        sub = [[r[k] for k in ks] for r in rets]
+        centred, norms = [], []
+        for r in sub:
+            mu = st.fmean(r)
+            c = [x - mu for x in r]
+            centred.append(c)
+            norms.append(math.sqrt(sum(x * x for x in c)))
+        rhos = []
+        for i in range(n):
+            if norms[i] == 0.0:
+                continue
+            for j in range(i + 1, n):
+                if norms[j] == 0.0:
+                    continue
+                rhos.append(sum(a * b_ for a, b_ in zip(centred[i], centred[j])) / (norms[i] * norms[j]))
+        pooled = [x for r in sub for x in r]
+        out[f"{key}:corr"] = st.fmean(rhos) if rhos else None
+        out[f"{key}:vol"] = st.pstdev(pooled) * math.sqrt(252) * 100.0
+    return out
+
+
 def summarise(kind: str, rows: list[dict]) -> str:
     med = {k: st.median([r[k] for r in rows if r.get(k) is not None]) for k in rows[0]}
+    if kind == "curve":
+        parts = []
+        for lo, hi in CURVE_BUCKETS:
+            key = f"{lo}-{hi}"
+            ns = [r[f"{key}:n"] for r in rows]
+            cs = [(r[f"{key}:corr"], r[f"{key}:n"]) for r in rows if r.get(f"{key}:corr") is not None]
+            if cs:
+                c = sum(a * w for a, w in cs) / sum(w for _, w in cs)
+                parts.append(f"{key}: {c:.3f} (n={sum(ns)})")
+        return f"  curve ({len(rows)} seeds, by opening VIX): " + ", ".join(parts)
     if kind == "driven":
         return (f"  driven 2020-21 ({len(rows)} seeds): return sd "
                 f"{med['ret_sd']:.4f} vs real AAPL {med['real_ret_sd']:.4f} "
