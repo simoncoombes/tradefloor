@@ -1495,6 +1495,36 @@ impl PyEngine {
         Ok(out)
     }
 
+    // ── Draw surgery (phase 2) ────────────────────────────────────────────
+
+    /// The draws a surgery generator delivers, in the order of `kinds`.
+    ///
+    /// A fresh generator per the surgery derivation contract in `rng.rs`
+    /// (`GameRng::surgery`), read once. `kinds` is "uniform" or "normal"
+    /// per draw, in the order of the addresses the caller is about to
+    /// replace, and the result is the value for each. Nothing on any
+    /// engine is read or moved; the root seed is an argument because the
+    /// derivation is a function of it, the stream and the surgery seed,
+    /// and of nothing else.
+    #[staticmethod]
+    fn surgery_draws(
+        seed: u32,
+        stream: &str,
+        surgery_seed: u32,
+        kinds: Vec<String>,
+    ) -> PyResult<Vec<f64>> {
+        let id = stream_id(stream)?;
+        let mut rng = crate::rng::GameRng::surgery(seed, id, surgery_seed);
+        let mut out = Vec::with_capacity(kinds.len());
+        for kind in &kinds {
+            out.push(match draw_kind(kind)? {
+                crate::rng::DrawKind::Uniform => rng.next_f64(),
+                crate::rng::DrawKind::Normal => rng.next_normal(),
+            });
+        }
+        Ok(out)
+    }
+
     // ── Draw addressing (phase 1) ─────────────────────────────────────────
 
     /// The day the draws taken from now on carry in the draw log and the

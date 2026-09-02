@@ -211,6 +211,41 @@ def market_day_layout(engine: Engine, day: int) -> dict[int, tuple[int, int, int
             for company, first, stride, ticks in layout}
 
 
+#: The uniform that keeps a jump from firing. ``Engine::apply_jumps``
+#: fires the market jump when its uniform is below the day's intensity,
+#: and a uniform lies in ``[0, 1)``, so ``1.0`` is never below an
+#: intensity of at most one. ``World.unfire`` documents the comparison.
+NO_FIRE = 1.0
+
+
+def surgery_patches(seed: int, stream: str, surgery_seed: int,
+                    addresses: Sequence[DrawAddress]) -> list[Patch]:
+    """Patches that re-randomise ``addresses`` of ``stream``.
+
+    One value per address, in order, from a generator derived from the
+    root ``seed``, the stream and ``surgery_seed`` per the surgery
+    derivation contract in ``rust/src/rng.rs`` (``GameRng::surgery``):
+    the stream's own mix, mixed again with the surgery seed and a tag,
+    on a sequence no stream uses. Uniforms and normals are drawn from it
+    in the order the addresses ask, so the same addresses under the same
+    seeds give the same patches, and a different order gives different
+    ones.
+
+    The addresses are the caller's to know. ``World.window`` finds them
+    by running the days once in a fork with the stream traced; this
+    function only turns them into values.
+    """
+    checked = [DrawAddress(*a).check() for a in addresses]
+    for a in checked:
+        if a.stream != stream:
+            raise ValueError(
+                f"a surgery of {stream} cannot patch {a.stream}; one "
+                f"stream per surgery, so the record says what moved")
+    values = Engine.surgery_draws(int(seed), stream, int(surgery_seed),
+                                  [a.kind for a in checked])
+    return [Patch(a, v) for a, v in zip(checked, values)]
+
+
 __all__ = ["DrawAddress", "Patch", "LoggedDraw", "DayResult", "SITES",
-           "STREAMS", "KINDS", "patch_draws", "draw_log", "run_day_with",
-           "market_day_layout"]
+           "STREAMS", "KINDS", "NO_FIRE", "patch_draws", "draw_log",
+           "run_day_with", "market_day_layout", "surgery_patches"]

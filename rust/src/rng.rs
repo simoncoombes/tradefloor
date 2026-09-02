@@ -367,6 +367,15 @@ pub mod stream {
     /// Derived streams live at `256 + id`. See the module docs for why the
     /// offset exists.
     pub const STREAM_SEQUENCE_BASE: u32 = 256;
+    /// The sequence base for surgery generators (`GameRng::surgery`):
+    /// clear of the stream sequences at `256 + k` and of every raw
+    /// sequence in historical use, so a re-randomised window traverses
+    /// an orbit no stream does.
+    pub const SURGERY_SEQUENCE_BASE: u32 = 512;
+    /// The tag mixed into a surgery input, ASCII "SURG", so the input
+    /// of a surgery of stream `k` under surgery seed `g` is never the
+    /// input of a stream.
+    pub const SURGERY_TAG: u32 = 0x5355_5247;
 }
 
 /// The SplitMix64 output finalizer. Integer-only, exact on every platform.
@@ -653,6 +662,50 @@ impl GameRng {
         Self::new(
             (mixed >> 32) as u32,
             stream::STREAM_SEQUENCE_BASE + stream_id,
+        )
+    }
+
+    /// A surgery generator: the source of a re-randomised window of one
+    /// stream, per the surgery derivation contract.
+    ///
+    /// # The surgery derivation contract
+    ///
+    /// A contract in the sense of the stream derivation in [`stream`]: a
+    /// formula a reader reproduces, pinned by a golden test, and an era
+    /// boundary if it changes. For a root seed `s`, a stream id `k` and a
+    /// surgery seed `g` (all `u32`):
+    ///
+    /// ```text
+    /// inner    = splitmix64_mix((s as u64) << 32 | k as u64)        // the stream's own mix
+    /// mixed    = splitmix64_mix(inner ^ ((g as u64) << 32 | SURGERY_TAG as u64))
+    /// seed_g   = (mixed >> 32) as u32                               // top 32 bits
+    /// seq_g    = SURGERY_SEQUENCE_BASE + k                          // = 512 + k
+    /// surgery  = GameRng::new(seed_g, seq_g)
+    /// ```
+    ///
+    /// `splitmix64_mix` is the finalizer the stream contract names, and
+    /// `SURGERY_TAG` is `0x5355_5247`. The same two properties carry the
+    /// independence argument. Structurally, `512 + k` is no stream's
+    /// sequence, so a surgery generator traverses an orbit no stream
+    /// does and a re-randomised window can never be a shifted copy of
+    /// the stream it replaces or of any other. By mixing, the second
+    /// finalizer over the stream's own mix and the surgery seed gives
+    /// each `(s, k, g)` an unrelated starting state, so two surgeries of
+    /// one stream, or one surgery seed over two streams, share nothing
+    /// but the formula.
+    ///
+    /// What the generator delivers is the caller's schedule: it draws
+    /// uniforms and normals from it in the order of the addresses it
+    /// replaces. `Engine.surgery_draws` on the Python side is that
+    /// caller, and `World.window` is what asks.
+    pub fn surgery(root_seed: u32, stream_id: u32, surgery_seed: u32) -> Self {
+        let inner = splitmix64_mix(((root_seed as u64) << 32) | stream_id as u64);
+        let mixed = splitmix64_mix(
+            inner ^ (((surgery_seed as u64) << 32) | stream::SURGERY_TAG as u64),
+        );
+        Self::new(
+            (mixed >> 32) as u32,
+            stream::SURGERY_SEQUENCE_BASE + stream_id,
         )
     }
 
@@ -974,6 +1027,46 @@ mod substream_tests {
                 );
             }
         }
+    }
+
+    /// The surgery derivation, pinned to hand-computed values of the
+    /// documented formula for the reason the stream derivation is: a
+    /// silent re-derivation would move every recorded window.
+    #[test]
+    fn surgery_derivation_is_the_documented_formula() {
+        // splitmix64_mix(splitmix64_mix(s << 32 | k) ^ (g << 32 | 0x53555247)),
+        // top 32 bits, computed independently.
+        for (root, id, surgery, seed) in [
+            (42_u32, stream::JUMPS, 7_u32, 0x493A_2503_u32),
+            (42, stream::MARKET, 1, 0xF382_1A83),
+            (7, stream::VOLUME_IDIO, 0, 0x3D21_372F),
+        ] {
+            let mut derived = GameRng::surgery(root, id, surgery);
+            let mut expected = GameRng::new(seed, stream::SURGERY_SEQUENCE_BASE + id);
+            for _ in 0..64 {
+                assert_eq!(
+                    derived.next_f64().to_bits(),
+                    expected.next_f64().to_bits(),
+                    "surgery ({root}, {id}, {surgery}) does not match the documented derivation"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_surgery_differs_from_its_stream_and_from_other_surgeries() {
+        let mut own = GameRng::substream(42, stream::JUMPS);
+        let mut a = GameRng::surgery(42, stream::JUMPS, 7);
+        assert!((0..64).any(|_| own.next_f64() != a.next_f64()));
+        let mut a = GameRng::surgery(42, stream::JUMPS, 7);
+        let mut b = GameRng::surgery(42, stream::JUMPS, 8);
+        assert!((0..64).any(|_| a.next_f64() != b.next_f64()));
+        let mut a = GameRng::surgery(42, stream::JUMPS, 7);
+        let mut c = GameRng::surgery(42, stream::MARKET, 7);
+        assert!((0..64).any(|_| a.next_f64() != c.next_f64()));
+        let mut a = GameRng::surgery(42, stream::JUMPS, 7);
+        let mut d = GameRng::surgery(43, stream::JUMPS, 7);
+        assert!((0..64).any(|_| a.next_f64() != d.next_f64()));
     }
 
     #[test]
