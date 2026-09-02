@@ -370,7 +370,12 @@ class Attribution:
                ("tag", "int64"), ("ticker", "string"),
                ("granularity", "string"), ("perturbation", "string"),
                ("delta", "float64"), ("control", "float64"),
-               ("treatment", "float64"), ("effect", "float64"))
+               ("treatment", "float64"), ("effect", "float64"),
+               # The comparison each row carries: whether the arm took the
+               # control's draws, and how many it took. A column a row
+               # holds should reach the table, and these two are what make
+               # the common-random-numbers caveat checkable.
+               ("draws", "int64"), ("positions_match", "bool_"))
 
     def table(self) -> Any:
         """The rows as a ``pyarrow.Table``."""
