@@ -635,7 +635,6 @@ impl GameRng {
         self.overlay = overlay.filter(|o| !o.table.is_empty()).map(Box::new);
     }
 
-    /// Record every draw taken on days in `[from_day, to_day]`.
     /// Log the draws taken on days `from_day..=to_day`.
     ///
     /// A second call widens the range to cover both and keeps what was
