@@ -336,7 +336,12 @@ class Attribution:
                  horizon: int, control: float, rows: list[dict],
                  caveats: list[str], delta: float, joint: float = 0.0,
                  interaction: float = 0.0, joint_rows: int = 0,
-                 plan_caveats: list[str] | None = None) -> None:
+                 plan_caveats: list[str] | None = None,
+                 control_draws: int = 0) -> None:
+        #: Every draw the control took, over the seven streams. Each row
+        #: carries the same number for its arm, so ``positions_match`` is
+        #: checkable rather than asserted.
+        self.control_draws = control_draws
         #: The caveats whose text counts rows, so a caller that shards the
         #: plan can drop them and restate them over the merged rows.
         #: :func:`row_caveats` rebuilds all but the interaction line, which
@@ -461,7 +466,8 @@ def attribute(world: Any, window: Any, target: Any,
     the quantity it states is per day, and ``delta * sqrt(count)`` recovers
     the day-sigma step the row was taken at. The effect therefore grows
     with ``T`` at a fixed ``delta``: 0.0725, 0.19, 0.25 and 0.4225 on the
-    market factor over 20, 40, 80 and 160 ticks, four names at seed 99.
+    market factor over 20, 40, 80 and 160 ticks, on
+    ``Universe.random(4, seed=99)`` at engine seed 42, at 2ddca7b.
     The effect of one tick normal on its own is not identified from a daily
     target, and a row for it would be a number without a meaning. The
     market stream's other draws (the stash and settlement uniforms) drive
@@ -606,16 +612,20 @@ def attribute(world: Any, window: Any, target: Any,
     # control's, on all seven streams. The economy chain is the one that
     # can break it, because its draw count depends on its own state.
     control_positions = control.engine.stream_positions()
-    moved: list[str] = []
     for head, patches in plan:
         arm, = world.fork("arm")
         patch_draws(arm.engine, patches)
         value = _run_arm(target, arm, horizon, record)
-        if arm.engine.stream_positions() != control_positions:
-            moved.append(f"{head['stream']} {head['kind']} {head['index']} "
-                         f"({head['perturbation']})")
+        # Carried on the row rather than counted here, so a caller that
+        # shards the plan across workers and merges the rows can state the
+        # comparison over the merge. Counted here it was a caveat outside
+        # the set a sharded tool restates, and a one-row probe published
+        # "all 1 arms matched" above a table of ninety-six.
+        positions = arm.engine.stream_positions()
         rows.append(dict(head, control=base, treatment=value,
-                         effect=value - base))
+                         effect=value - base,
+                         draws=_total_draws(positions),
+                         positions_match=positions == control_positions))
 
     # The rows are single-draw finite differences through a market with
     # feedback, so they do not decompose the target and their sum is not
@@ -665,9 +675,9 @@ def attribute(world: Any, window: Any, target: Any,
     if target.kind == "pnl" or getattr(world.agent, "act", None) is not None:
         if not hasattr(world.agent, "state"):
             caveats.append(
-                "the agent runs in every arm and publishes no state() hook; "
-                "an agent whose decisions are not a function of what it "
-                "sees puts its own noise into every effect.")
+                "the agent runs in every arm and publishes no state() "
+                "hook; an agent that samples its decisions puts its own "
+                "noise into every effect.")
     if shard is not None:
         caveats.append(f"shard {shard[0]} of {shard[1]}: every "
                        f"{shard[1]}-th row from the {shard[0]}-th.")
@@ -678,19 +688,8 @@ def attribute(world: Any, window: Any, target: Any,
             "state, so a perturbation that moves the chain moves the "
             "addresses after it and the rows below it are aimed at draws "
             "the arm did not take. Every arm's stream positions were "
-            "compared against the control's, and the next caveat names "
-            "any that moved.")
-    if moved:
-        caveats.append(
-            f"{len(moved)} of {len(plan)} arms consumed a different number "
-            "of draws from the control, so their rows are not a common "
-            "random numbers comparison: " + ", ".join(moved[:5])
-            + ("" if len(moved) <= 5 else ", and more."))
-    else:
-        caveats.append(
-            f"all {len(plan)} arms matched the control's draw positions on "
-            "all seven streams, so every effect is the draw's rather than "
-            "a reshuffle.")
+            "compared against the control's, and the row caveats report "
+            "what that comparison found.")
     dropped = [s for s in wanted if s not in traced]
     if dropped:
         caveats.append(
@@ -713,7 +712,36 @@ def attribute(world: Any, window: Any, target: Any,
                        control=base, rows=rows, caveats=caveats, delta=delta,
                        joint=joint_effect, interaction=interaction,
                        joint_rows=len(joint_rows),
+                       control_draws=_total_draws(control_positions),
                        plan_caveats=plan_caveats + counted_joint)
+
+
+def _total_draws(positions: dict) -> int:
+    """Every draw the seven streams have taken, as one number.
+
+    Carried on each row beside ``positions_match`` so the flag can be
+    checked against something rather than taken on trust: an arm that
+    matched the control took the same total, and one that did not took a
+    different one.
+    """
+    return sum(int(u) + int(n) for u, n in positions.values())
+
+
+#: What the suite can and cannot state about the comparison above.
+#:
+#: The reporting side is tested on rows a test constructs, because no arm
+#: reachable from a real market moves the schedule: forcing an economy
+#: uniform to each end of the unit interval over a twenty-day window,
+#: 720 arms across five engine seeds, moved 0 of them. So a flag hardcoded
+#: to ``True`` would pass every test here, and what rules it out is that
+#: the same comparison decides the caveat a caller reads. Provoking a
+#: moved arm needs a mechanism whose draw count answers to one draw, and
+#: the economy chain does not answer to one at any perturbation this
+#: attribution can install.
+_COMPARISON_LIMIT = (
+    "no arm reachable from a real market moves the schedule, so the "
+    "comparison's own computation is stated by the caveat it decides "
+    "rather than by a test that provokes a mismatch")
 
 
 def row_caveats(rows: Sequence[dict], *, target: Any, last: int,
@@ -730,6 +758,23 @@ def row_caveats(rows: Sequence[dict], *, target: Any, last: int,
     from and are what makes a column of zeros legible.
     """
     out: list[str] = []
+    # The common-random-numbers comparison, over whatever rows this is
+    # given: one call's, or several merged.
+    matched = [r for r in rows if r.get("positions_match") is not False]
+    moved = [r for r in rows if r.get("positions_match") is False]
+    if moved:
+        named = ", ".join(f"{r['stream']} {r['kind']} {r['index']} "
+                          f"({r['perturbation']})" for r in moved[:5])
+        out.append(
+            f"{len(moved)} of {len(rows)} arms consumed a different number "
+            "of draws from the control, so their rows are not a common "
+            "random numbers comparison: " + named
+            + ("" if len(moved) <= 5 else ", and more."))
+    elif matched:
+        out.append(
+            f"all {len(rows)} arms matched the control's draw positions on "
+            "all seven streams, so every effect is what that one draw did "
+            "to the target.")
     fired = sum(1 for r in rows if r["perturbation"] == "fire")
     if fired:
         # Which row is the control's own state is readable only where
@@ -777,9 +822,9 @@ def row_caveats(rows: Sequence[dict], *, target: Any, last: int,
             why = (f"the horizon is day {horizon} and the window ends on "
                    f"day {last}, so the last day's events are never seen")
         else:
-            why = ("the horizon reaches past the window, so this is the "
-                   "draws saying nothing rather than the measurement "
-                   "stopping short")
+            why = ("the horizon reaches past the window, so the "
+                   "measurement had room and the draws moved the target "
+                   "by zero")
         out.append(f"every {s} row measured exactly zero: {why}.")
     return out
 

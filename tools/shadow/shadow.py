@@ -62,6 +62,10 @@ sys.path.insert(0, HERE)
 import data as realdata  # noqa: E402
 
 TICKS = 390
+#: Days between partial records. A run a dead-man timer or a spot reclaim
+#: ends leaves what it solved, and the interval is named so a test can
+#: reach a reclaim without solving ten days to get there.
+PARTIAL_EVERY = 10
 CLOCK = (9, 30, 3)
 
 
@@ -469,10 +473,10 @@ def fd_jacobian(forward: Forward, r_obs: np.ndarray, x: np.ndarray,
     refreshes, so the one it happens to end on is an estimate. The report
     publishes a column norm from it as a sensitivity and reads the same
     column for a binding clamp, and both want a measurement. On one of
-    four synthetic days, six names at seeds 11 to 14 with 40 ticks and
-    sigma 1e-3, the optimiser's column for a name read 0.00196 against
-    0.01820 fresh, a gap of 89 percent on the worst column; the other
-    three days agreed exactly.
+    four synthetic days, ``Universe.random(6, seed=3)`` at engine seeds
+    11 to 14 with 40 ticks and sigma 1e-3, at 2ddca7b, the optimiser's column
+    for a name read 0.00196 against 0.01820 fresh, a gap of 89 percent on
+    the worst column; the other three days agreed exactly.
 
     Costs one forward evaluation per unknown, about 40 on the real
     forty-name roster, against roughly 400 the day already spends.
@@ -625,6 +629,10 @@ def shadow(args) -> dict:
     tickers = realdata.TICKERS
     engine = tf.Engine(seed=args.seed, universe=universe, model=args.preset)
     params = dict(engine.model_params)
+    # The numeric dials alone: `model_params` also carries the preset's
+    # fingerprint, which is a string and is recorded in the provenance.
+    dials = {k: float(v) for k, v in params.items()
+             if isinstance(v, (int, float))}
     intensities = (float(params["jump_intensity_market"]),
                    float(params["jump_intensity_idio"]))
     n = len(tickers)
@@ -685,7 +693,7 @@ def shadow(args) -> dict:
             "mispricing_mean": float(column(engine, "mispricing_s").mean()),
             "level_gap_mean_abs": float(np.mean(np.abs(np.log(model / real[k + 1])))),
         })
-        if (k + 1) % 10 == 0:
+        if (k + 1) % PARTIAL_EVERY == 0:
             done = k + 1
             print(f"  day {done}/{last - first} {d['dates'][session]} "
                   f"res {days[-1]['max_abs_residual']:.2e} evals "
@@ -700,6 +708,7 @@ def shadow(args) -> dict:
                        "checkpoint": encode(checkpoint),
                        "intensities": intensities, "tickers": tickers,
                        "betas": betas,
+                       "model_params": dials,
                        # The record travels with the checkpoint. Without
                        # it a resumed run shipped only what it recorded
                        # after the resume: five committed days gave 1200
@@ -707,9 +716,20 @@ def shadow(args) -> dict:
                        # through, and 720 rows and 18 bars resumed at day
                        # 2, with prices and stream positions identical
                        # either way.
-                       "truth_rows": len(prior_truth) + len(carried_truth),
-                       "truth": prior_truth + carried_truth,
-                       "bars": prior_bars + carried_bars,
+                       # Trimmed the same way the final record is. Left
+                       # untrimmed, a run reclaimed twice carried its first
+                       # resume day twice and the second trim removed only
+                       # the second: seven days reclaimed after day 2 and
+                       # again after day 4 gave 3600 truth rows against
+                       # 3360, with one day holding 18 bars where every
+                       # other held 12.
+                       "truth_rows": len(trim_overlap(prior_truth,
+                                                      carried_truth,
+                                                      resume_day)),
+                       "truth": trim_overlap(prior_truth, carried_truth,
+                                             resume_day),
+                       "bars": trim_overlap(prior_bars, carried_bars,
+                                            resume_day),
                        "provenance": dict(d["provenance"],
                                           **build_provenance(
                                               engine, args.preset)),
@@ -746,6 +766,9 @@ def shadow(args) -> dict:
             "bar_rows": len(bars), "seconds": time.time() - started,
             "tickers": tickers, "betas": betas,
             "null": null,
+            # The dials the run used, so a render computes what depends on
+            # them rather than carrying a number for one preset.
+            "model_params": dials,
             "real_idio_sd": real_idio_sd(d, betas, first, last)}
 
 
@@ -786,9 +809,11 @@ def estimator_null(universe, seed: int, days: int, *, sigma: float,
     minimises the posterior under a standard-normal prior on an
     under-determined system -- one market innovation, one per sector and
     one per name against one close per name -- so the estimate is shrunk
-    and its moments are not the prior's. Measured on six names at 40
-    ticks the idiosyncratic block came back with a standard deviation of
-    0.62 against a true 0.88, and the vector norm at 2.12 against 4.03.
+    and its moments are not the prior's. Measured on
+    ``Universe.random(6, seed=3)`` at engine seeds 11 upward, 40 ticks,
+    sigma 1e-3, at 2ddca7b: the idiosyncratic block came back with a standard
+    deviation of 0.62 against a true 0.88, and the vector norm at 2.12
+    against 4.03.
     A row flagged against 1 can be the shrinkage rather than a mechanism.
 
     So the null is measured the way the solver's own settings are: days
@@ -842,15 +867,39 @@ def estimator_null(universe, seed: int, days: int, *, sigma: float,
 #: -208 basis points was recovered and no upward jump was, at any size up
 #: to +112 basis points. A jump at z = 3.46 is a jump of 0.1 basis points
 #: and no estimator should claim it.
-JUMP_RECOVERY = (
-    "the greedy jump step recovers a DOWNWARD market jump and not an "
-    "upward one. The jump size is jump_mean_market + jump_sigma_market * "
-    "z with a negative mean, so an upward jump needs a normal past +3.46 "
-    "whose prior the likelihood cannot repay. Measured on planted jumps, "
-    "six names at 40 ticks: every downward jump from -85 to -208 basis "
-    "points recovered, no upward jump recovered at any size to +112. So "
-    "the fired counts below are a lower bound on downward jumps and say "
-    "nothing about upward ones.")
+def upward_threshold(model: dict) -> float:
+    """The normal at which this preset's market jump has size zero.
+
+    ``jump_mean_market + jump_sigma_market * z``, so the jump is zero at
+    ``-mean/sigma`` and upward above it. The number is the preset's, not
+    a constant: pt-v12 through pt-v15 put it at 2.979 and pt-v16 at
+    3.465, and a report run under one preset used to publish the other's.
+    """
+    sigma = float(model.get("jump_sigma_market", 0.0))
+    if sigma == 0.0:
+        return float("inf")
+    return -float(model.get("jump_mean_market", 0.0)) / sigma
+
+
+def jump_recovery(model: dict) -> str:
+    """What the greedy jump step recovers, at this preset's dials.
+
+    Measured on planted market jumps, ``Universe.random(6, seed=3)`` at
+    engine seeds 11 upward, 40 ticks, sigma 1e-3, preset pt-v16, at 2ddca7b:
+    every downward jump from -85 to -208 basis points recovered and no
+    upward jump at any size to +112.
+    """
+    return (
+        "the greedy jump step recovers a DOWNWARD market jump and an "
+        "upward one only where the prior can afford it. The jump size is "
+        "jump_mean_market + jump_sigma_market * z with a negative mean, "
+        f"so this preset's jump is zero at z = {upward_threshold(model):.2f} "
+        "and upward above it, where the prior on that normal outweighs "
+        "what the likelihood can repay. Measured on planted jumps, six "
+        "names at 40 ticks: every downward jump from -85 to -208 basis "
+        "points recovered, and no upward jump at any size to +112. So the "
+        "fired counts below are a lower bound, and they carry downward "
+        "jumps alone.")
 
 
 # -- diagnostics ---------------------------------------------------------
@@ -986,7 +1035,7 @@ def render(run: dict) -> str:
     gap = vm - vr
     lines = [f"# Shadow run: {run['year']} ({run['args']['year']})"
              + (" PARTIAL, the run was still going" if run.get("partial") else ""),
-             "", "## Days the solve does not reach", ""]
+             "", "## Days short of their closes", ""]
     if not failed:
         lines.append(f"Every one of the {N} days reached its observed closes "
                      f"within five sigma ({5 * run['args']['sigma']:.0e} in "
@@ -1048,7 +1097,12 @@ def render(run: dict) -> str:
               f"{run['provenance']['model_fingerprint']}), seed "
               f"{run['args']['seed']}, sigma {run['args']['sigma']} in log "
               "return units",
-              f"- jump intensities (market, idio) {run['intensities']}",
+              # Formatted from the two numbers rather than from the
+              # container, which JSON turns from a tuple into a list and
+              # `str` then renders with brackets: a re-render of a saved
+              # run differed from the original on this line alone.
+              "- jump intensities (market, idio) "
+              f"({run['intensities'][0]}, {run['intensities'][1]})",
               f"- order flow: {run['provenance']['order_flow']}",
               f"- fundamentals: {run['provenance']['fundamentals']}",
               f"- data: {run['provenance']['source']}; fetched "
@@ -1063,8 +1117,9 @@ def render(run: dict) -> str:
               "The series is a maximum a posteriori estimate on an "
               "under-determined system: one market innovation, one per "
               "sector and one per name against one close per name, under a "
-              "standard-normal prior. The prior shrinks it, so the prior's "
-              "own null is not the estimator's.", ""]
+              "standard-normal prior. The prior shrinks it, so the "
+              "estimator has a null of its own and the comparison below "
+              "is drawn against that one.", ""]
     null = run.get("null")
     if null:
         lines += [
@@ -1080,8 +1135,9 @@ def render(run: dict) -> str:
         lines += ["The expected column is an i.i.d. standard normal, which "
                   "is the prior's null and not the estimator's, because "
                   "--null-days was 0. A standard deviation flagged against "
-                  "1 may be the shrinkage rather than a mechanism.", ""]
-    lines += [JUMP_RECOVERY, "",
+                  "1 may be reporting the shrinkage where it reads as a "
+                  "mechanism.", ""]
+    lines += [jump_recovery(run.get("model_params") or {}), "",
               "| statistic | value | expected | mechanism class "
               "| flag |", "|---|---|---|---|---|"]
     for row in diagnostics(run):

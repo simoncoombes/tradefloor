@@ -163,6 +163,15 @@ otherwise, so a second call continues the first instead of repeating its
 numbers. A caller that wants the old behaviour passes `first_day=0`. This
 moves the day column of a recorded second run, from 0 and 1 to 2 and 3.
 
+The state hash covers the two snapshot fields this adds, the per-stream
+draw counts and the table of substitutions, in the order the snapshot
+carries them. Both decide what the engine draws next, so two states
+alike in every column and differing by one installed substitution
+diverge from that point, and a commitment that skipped the table would
+call them one state. A ledger written before this change carries leaves
+computed without them, and a leaf written after it hashes to a different
+value for the same market.
+
 A restore drops the day marks, which described the run it replaced. The
 log costs 32 bytes a record, pinned beside the type: at 60 names and 390
 ticks the market stream takes 145,470 draws a day, 4.7 MB a day and 1.17

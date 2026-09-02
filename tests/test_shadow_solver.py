@@ -261,8 +261,8 @@ def test_an_upward_market_jump_is_not_recoverable(short_days):
         fwd, r_obs = _planted_day(41 + i, z, rng)
         out = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
         assert out["jump_market"] is None
-    assert "upward" in shadow.JUMP_RECOVERY
-    assert "downward" in shadow.JUMP_RECOVERY
+    said = shadow.jump_recovery(model)
+    assert "upward" in said and "DOWNWARD" in said
 
 
 def test_a_day_with_no_jump_fires_none(short_days):
@@ -446,10 +446,15 @@ def _saved_run(short_days_ticks=40, days=3, sensitivity=True):
         provenance["sensitivity"] = ("fresh finite difference at the "
                                      "accepted solution")
     return {
+        # The shape `shadow()` writes, tuples included: a fixture that
+        # carries a list where the tool carries a tuple makes the JSON
+        # round trip a no-op for that field and hides a real difference.
         "args": {"year": "calm", "preset": "pt-v16", "seed": 7,
                  "sigma": 1e-3, "days": days, "null_days": 0},
         "year": "2017", "sessions": [0, days], "days": out_days,
-        "provenance": provenance, "intensities": [0.05, 0.006],
+        "provenance": provenance, "intensities": (0.05, 0.006),
+        "model_params": {"jump_mean_market": -0.00852183,
+                         "jump_sigma_market": 0.00245976},
         "tickers": tickers, "truth_rows": 0, "bars": [], "bar_rows": 0,
         "seconds": 1.0, "null": None,
         "real_idio_sd": {t: 0.02 for t in tickers},
@@ -495,3 +500,193 @@ def test_the_render_mode_writes_the_report_and_solves_nothing(
     assert shadow.main(["--render", str(saved), "--out", str(out)]) == 0
     written = (out / "shadow.md").read_text(encoding="utf-8")
     assert written == shadow.render(run)
+
+
+# -- the run assembles its own record -----------------------------------------
+
+def _panel(names, days, seed=5):
+    """A synthetic panel of the shape `data.load` returns.
+
+    The tool reads real bars it may not fetch in a test, so the panel is
+    generated. Every field the run touches is here and nothing else is.
+    """
+    rng = np.random.default_rng(seed)
+    dates = [f"2017-{1 + i // 28:02d}-{1 + i % 28:02d}" for i in range(days)]
+    index = list(np.exp(np.cumsum(rng.normal(0, 0.008, days))) * 100.0)
+    closes, volumes = {}, {}
+    for t in names:
+        closes[t] = list(np.exp(np.cumsum(rng.normal(0, 0.012, days)))
+                         * float(rng.uniform(30.0, 90.0)))
+        volumes[t] = [float(rng.uniform(1e6, 5e6)) for _ in range(days)]
+    return {"which": "calm", "start": dates[0], "end": dates[-1],
+            "dates": dates, "closes": closes, "volumes": volumes,
+            "index": index, "vix": [15.0 + float(v) for v in
+                                    rng.normal(0, 1.0, days)],
+            "provenance": {"source": "a generated panel",
+                           "url_template": "https://example.invalid/{t}",
+                           "fetched": {t: "2026-01-01" for t in names}}}
+
+
+@pytest.fixture
+def synthetic_year(monkeypatch, short_days):
+    """`shadow()` over a generated panel, so the run itself can be tested."""
+    names = realdata.TICKERS[:6]
+    # 252 sessions precede the year, because the run estimates each name's
+    # beta over the prior year and refuses a window that cannot provide
+    # them.
+    panel = _panel(names, 262)
+    monkeypatch.setattr(realdata, "TICKERS", names)
+    monkeypatch.setattr(shadow.realdata, "TICKERS", names)
+    monkeypatch.setattr(shadow.realdata, "load", lambda which: panel)
+    monkeypatch.setattr(shadow.realdata, "year_slice",
+                        lambda d, year: (253, 261))
+    # a reclaim every two days, so a test reaches one without solving ten
+    monkeypatch.setattr(shadow, "PARTIAL_EVERY", 2)
+    return panel
+
+
+def _args(out, **kw):
+    import argparse
+    base = dict(year="calm", preset=None, seed=7, sigma=1e-3, days=0,
+                resume=None, out=str(out), lab=False, null_days=0,
+                render=None)
+    base.update(kw)
+    #  makes the directory; a test calling  directly makes
+    # its own, because the run writes its partial records into it.
+    os.makedirs(base["out"], exist_ok=True)
+    return argparse.Namespace(**base)
+
+
+def test_a_run_assembles_the_record_it_reports(synthetic_year, tmp_path):
+    """The line that joins the carried record to the resumed engine's own.
+
+    Tested through `shadow()` rather than through its helpers: a test that
+    exercises `trim_overlap` and `record_of` alone leaves the assembly
+    unguarded, and replacing it with the resumed engine's rows alone is
+    the original defect exactly.
+    """
+    pytest.importorskip("pyarrow")
+    whole = shadow.shadow(_args(tmp_path / "a"))
+    assert whole["truth_rows"] > 0
+    assert whole["bar_rows"] > 0
+
+    part = shadow.shadow(_args(tmp_path / "b", days=4))
+    partial = tmp_path / "b" / "shadow-partial.json"
+    assert partial.exists(), sorted(p.name for p in (tmp_path / "b").iterdir())
+    resumed = shadow.shadow(_args(tmp_path / "c", resume=str(partial)))
+
+    # The whole record, and every day in it once. The values of the day a
+    # resume re-runs are the resumed engine's rather than the original's,
+    # which is what a resume is; what the run has to get right is that the
+    # record is complete and counts each day once.
+    import collections
+    assert resumed["truth_rows"] == whole["truth_rows"]
+    assert resumed["bar_rows"] == whole["bar_rows"]
+    assert (collections.Counter(r["day"] for r in resumed["bars"])
+            == collections.Counter(r["day"] for r in whole["bars"]))
+    assert (collections.Counter(r["day"] for r in resumed["truth"])
+            == collections.Counter(r["day"] for r in whole["truth"]))
+    # and the days the resume did not re-run are carried verbatim
+    cut = min(r["day"] for r in resumed["days"] if r["day"] >= 0)
+    before = [r for r in resumed["truth"] if r["day"] < 3]
+    assert before == [r for r in whole["truth"] if r["day"] < 3]
+    assert before and cut is not None
+
+
+def test_a_run_reclaimed_twice_counts_each_day_once(synthetic_year, tmp_path):
+    """The partial record trims the overlap the final record trims.
+
+    Left untrimmed, the first resume day was carried twice and the second
+    trim removed only the second: seven days reclaimed after day 2 and
+    again after day 4 gave 3600 truth rows against 3360, with one day
+    holding 18 bars where every other held 12.
+    """
+    pytest.importorskip("pyarrow")
+    import collections
+    whole = shadow.shadow(_args(tmp_path / "a"))
+
+    shadow.shadow(_args(tmp_path / "b", days=4))
+    first = tmp_path / "b" / "shadow-partial.json"
+    shadow.shadow(_args(tmp_path / "c", days=6, resume=str(first)))
+    second = tmp_path / "c" / "shadow-partial.json"
+    twice = shadow.shadow(_args(tmp_path / "d", resume=str(second)))
+
+    assert twice["truth_rows"] == whole["truth_rows"]
+    assert twice["bar_rows"] == whole["bar_rows"]
+    per_day = collections.Counter(r["day"] for r in twice["bars"])
+    assert len(set(per_day.values())) == 1, per_day
+
+
+# -- the search fix is guarded -------------------------------------------------
+
+def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
+        short_days):
+    """The trial reuses the no-jump solve's Jacobian, whose columns say
+    nothing about the jump normal it has just added. Where that trial
+    fails to pay for the indicator it is retried with a Jacobian of its
+    own, and this is a planted day where the retry is what finds it.
+    """
+    # The day the retry decides, from a twelve-day sweep: the generator is
+    # advanced through six days that plant nothing, and the seventh plants
+    # a market jump of -2.27. On that day the reused Jacobian leaves the
+    # trial at 28.08 against a no-jump 25.48, so it is rejected, and a
+    # Jacobian of its own reaches 12.46 and is accepted.
+    rng = np.random.default_rng(7)
+    for i in range(6):
+        _planted_day(11 + i, None, rng)
+    fwd, r_obs = _planted_day(17, -2.27, rng)
+    found = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
+    assert found["jump_market"] is not None
+    assert found["jump_market"] < 0.0
+
+    # the same day without the retry: the trial keeps the base Jacobian
+    m0 = fwd.layout.size
+    base = shadow.solve(fwd, r_obs, fwd.jump_patches(None, {}),
+                        np.zeros(m0), sigma=1e-3)
+    cost_no = (base["cost"] - shadow.log_p(1.0 - INTENSITIES[0])
+               - fwd.n * shadow.log_p(1.0 - INTENSITIES[1]))
+
+    def jumps_m(tail):
+        return fwd.jump_patches(float(tail[0]), {})
+
+    x0 = np.append(base["x"][:m0], 0.0)
+    plain = shadow.solve(fwd, r_obs, jumps_m, x0, extra=1, sigma=1e-3,
+                         J0=base["jacobian"][:, :m0])
+    cost_plain = (plain["cost"] - shadow.log_p(INTENSITIES[0])
+                  - fwd.n * shadow.log_p(1.0 - INTENSITIES[1]))
+    assert cost_plain >= cost_no, "the plain trial would have found it"
+
+    retry = shadow.solve(fwd, r_obs, jumps_m, x0, extra=1, sigma=1e-3)
+    cost_retry = (retry["cost"] - shadow.log_p(INTENSITIES[0])
+                  - fwd.n * shadow.log_p(1.0 - INTENSITIES[1]))
+    assert cost_retry < cost_no
+
+
+# -- the recovery envelope is the preset's -------------------------------------
+
+def test_the_upward_threshold_is_the_presets_own():
+    """`-mean/sigma`, computed, not a constant: pt-v12 through pt-v15 put
+    it at 2.979 and pt-v16 at 3.465, and a report under one preset used to
+    publish the other's."""
+    for name, want in (("pt-v16", 3.465), ("pt-v14", 2.979)):
+        model = tf.ModelParams.from_preset(name).to_dict()
+        got = shadow.upward_threshold(model)
+        assert got == pytest.approx(want, abs=0.001), name
+        assert f"{got:.2f}" in shadow.jump_recovery(model)
+    assert shadow.upward_threshold({"jump_sigma_market": 0.0}) == float("inf")
+
+
+def test_the_generated_report_meets_the_house_style(short_days, tmp_path):
+    """The report is pasted into a pull request body, so it is prose this
+    repository governs. `prose.py` reads a path, so the report is written
+    and handed to it the way the site's pages are.
+    """
+    import subprocess
+    report = tmp_path / "shadow.md"
+    report.write_text(shadow.render(_saved_run()), encoding="utf-8")
+    proc = subprocess.run(
+        [sys.executable, os.path.join(ROOT, "tools", "prose", "prose.py"),
+         str(report)],
+        capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "0 findings" in proc.stdout, proc.stdout
