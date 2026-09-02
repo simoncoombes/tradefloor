@@ -74,6 +74,15 @@ already committed to. Sixty days puts every shipped scenario's own shock
 run-up -- see the per-cell seeds and days named in
 `tests/test_fingerprint.py`.
 
+A :class:`Cell` is one un-forked :meth:`~tradefloor.counterfactual.World.run`
+and cannot express a checkpoint-fork-intervene experiment -- two arms
+sharing a history, one of them changed. That is a real gap, not a
+hypothetical one: the FinRobot fixture this package tests against
+(`tests/fixtures/finrobot/rate-shock.json`) is recorded exactly that
+shape, so no cell built here can replay it, and
+`tests/test_fingerprint.py` reproduces that world by hand instead of
+going through :func:`battery`.
+
 :attr:`Battery.renderer_key` names P6's own default rendering, a
 :class:`~tradefloor.render.TextRenderer` at every default --
 `TextRenderer().key()`, computed rather than typed, so this file cannot go
@@ -128,9 +137,9 @@ BATTERY_VERSION = 1
 
 #: Instruments per cell. Fixed across every cell and every version so that
 #: only the seed varies what a roster IS, not how big it is. Small enough
-#: that the whole six-cell, sixty-day battery runs in a couple of seconds
-#: with a scripted agent (`tests/test_fingerprint.py` times it), large
-#: enough that a decision naming one symbol is not a coin flip.
+#: to keep the whole six-cell, sixty-day battery cheap against a scripted
+#: agent, large enough that a decision naming one symbol is not a coin
+#: flip.
 _ROSTER_SIZE = 6
 
 
@@ -264,21 +273,33 @@ def _decisions_for_trace(trace: Sequence[dict[str, Any]], *,
     own cadence, which the battery does not touch -- shows the SAME
     `decision()` publish at every row in between, because `World` re-reads
     the agent's last publish on every step rather than only on the ones it
-    changed. A row is kept here only when its publish differs from the row
-    before it. For a `FrameworkAdapter` that is exactly the steps a call
-    happened: its published dict carries the step it was asked on, so two
-    genuinely distinct real answers can never compare equal even when their
-    actions do, and a repeated stale publish always does. A scripted agent
-    that publishes the identical dict twice IN A ROW has the repeat folded
-    into one entry here -- if keeping two such decisions distinct matters,
-    publish something that says which call it was, the way every adapter
-    already does.
+    changed. A row is kept here only when its publish differs from the
+    last REAL publish seen. For a `FrameworkAdapter` that is exactly the
+    steps a call happened: its published dict carries the step it was
+    asked on, so two genuinely distinct real answers can never compare
+    equal even when their actions do, and a repeated stale publish always
+    does. A scripted agent that publishes the identical dict twice IN A
+    ROW has the repeat folded into one entry here -- if keeping two such
+    decisions distinct matters, publish something that says which call it
+    was, the way every adapter already does.
+
+    A refused row -- ``row["decision"]`` is `None`, which `World` writes
+    on a step `on_refusal="skip"` skipped rather than on a step nobody
+    has asked yet -- is skipped here too, and comparison against it is
+    not: the row before a refusal and the row after it are compared to
+    EACH OTHER, not through a `None` in between. The alternative --
+    treating a refusal as resetting what "the last decision" means --
+    would double-count the agent's next stable answer as a fresh
+    decision for no reason but a step it never got to publish through,
+    which is exactly the kind of thing this function exists not to see.
     """
     out: list[dict[str, Any]] = []
     previous: Any = None
     for row in trace:
         raw = row.get("decision")
-        if raw is not None and raw != previous:
+        if raw is None:
+            continue
+        if raw != previous:
             step = row["step"]
             shape = _shape(_decision_from_publish(raw, cell=cell, step=step))
             out.append({"cell": cell, "step": step,
@@ -315,8 +336,16 @@ def _decision_from_shape(shape: Sequence[Sequence[Any]]) -> Decision:
 # ---------------------------------------------------------------------------
 
 def fingerprint(agent: Any,
-                battery: Battery = _build(BATTERY_VERSION)) -> "Fingerprint":
+                battery: Battery | None = None) -> "Fingerprint":
     """Run ``agent`` on every cell of ``battery`` and hash what it ordered.
+
+    ``battery`` left at ``None`` (its default) builds
+    :func:`battery`'s own default version fresh, inside this call rather
+    than once at import time -- a default built at import time would be
+    a single shared object no later change to :func:`battery` could ever
+    reach, silently, and the one that matters here is
+    :attr:`Battery.renderer_key`, which :func:`battery` documents as
+    computed live specifically so it cannot drift.
 
     ``agent`` gets an independent copy per cell -- ``agent.fork()`` when
     the agent has one, the same
@@ -338,6 +367,9 @@ def fingerprint(agent: Any,
             "implements it, and a plain policy under test has to publish "
             "{'actions': [...], 'rationale': ...} the same way to be "
             "fingerprinted.")
+
+    if battery is None:
+        battery = _build(BATTERY_VERSION)
 
     from . import Universe  # deferred: Universe lives on the package
                              # __init__, which is still running the first

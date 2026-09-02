@@ -233,6 +233,43 @@ def test_canonical_decisions_are_blind_to_price_fill_and_net_worth():
     assert _digest(before) == _digest(after)
 
 
+def test_a_refusal_does_not_reset_decision_deduplication():
+    """A stable answer either side of a refused step collapses into one
+    entry, exactly as it would with no refusal in between.
+
+    `row["decision"]` is `None` on a refused row (`World` writes this
+    under `on_refusal="skip"`), and a refusal is not the same fact as
+    "nobody has asked yet": the agent's last REAL answer is still the
+    one the next real answer should be compared against. Comparing
+    against the refused row's `None` instead would report the agent as
+    having changed its mind on a step it never got to publish through.
+    """
+    D = {"actions": [{"symbol": "A", "side": "BUY", "quantity": 10.0}],
+        "rationale": "x"}
+    E = {"actions": [{"symbol": "B", "side": "SELL", "quantity": 5.0}],
+        "rationale": "y"}
+
+    no_refusal = [{"step": 0, "decision": D}, {"step": 1, "decision": D}]
+    with_refusal = [{"step": 0, "decision": D},
+                    {"step": 1, "decision": None},
+                    {"step": 2, "decision": D}]
+
+    assert (_decisions_for_trace(no_refusal, cell=0)
+            == _decisions_for_trace(with_refusal, cell=0))
+    with_refusal_result = _decisions_for_trace(with_refusal, cell=0)
+    assert len(with_refusal_result) == 1
+    assert with_refusal_result[0]["step"] == 0
+
+    # A refusal between two DIFFERENT real decisions still records both,
+    # so this is dedup surviving a refusal, not a refusal suppressing a
+    # genuine change.
+    two_real_decisions = [{"step": 0, "decision": D},
+                          {"step": 1, "decision": None},
+                          {"step": 2, "decision": E}]
+    result = _decisions_for_trace(two_real_decisions, cell=0)
+    assert [entry["step"] for entry in result] == [0, 2]
+
+
 # ---------------------------------------------------------------------------
 # The recorded FinRobot fixture: two independently derived digests agree
 # ---------------------------------------------------------------------------
