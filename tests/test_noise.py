@@ -356,3 +356,16 @@ def test_the_market_log_length_is_the_schedule():
     # and one uniform per name, and settlement's four uniforms per name
     per_tick = 1 + sectors + names + names + 4 * names
     assert len(engine.draw_log("market", -1000, 1000)) == TICKS * per_tick
+
+
+def test_a_second_trace_widens_the_range_downward():
+    """The other direction. A first trace on a later day and a second on
+    an earlier one has to reach back: without the downward half the range
+    stays where the first call put it and the earlier days are not
+    logged."""
+    engine = fresh()
+    engine.trace_draws("jumps", 2, 2)
+    engine.trace_draws("jumps", 0, 0)
+    run(engine, 3)
+    days = sorted({e.day for e in noise.draw_log(engine, "jumps", 0, 2)})
+    assert days == [0, 1, 2]
