@@ -723,9 +723,12 @@ struct DayBuffer {
     shock: Vec<f64>,
     absorbed: Vec<f64>,
     /// Empty on a day whose sessions ran without the depth counterfactual.
-    /// A session that ran with it appends; one that did not appends nothing,
-    /// so a day with a mixed set of sessions ends short and `prints` refuses
-    /// it rather than serving a column that stops part way through the day.
+    ///
+    /// A session that ran with it appends; one that did not appends nothing.
+    /// A day whose sessions disagree therefore ends SHORT, and `prints`
+    /// reports that day without the two columns rather than serving a column
+    /// that stops part way through it. `settle_depth_counterfactual` is
+    /// documented as a setting to choose before a run for this reason.
     unbounded_print: Vec<f64>,
     liquidity_share: Vec<f64>,
 }
