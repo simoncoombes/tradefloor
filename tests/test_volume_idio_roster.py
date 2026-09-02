@@ -418,3 +418,59 @@ def test_every_shipped_preset_holds_the_states_at_zero_across_a_roster_change():
     e = mutating_run()
     assert widths(e) == (8, 8)
     assert states(e) == [0.0] * 8
+
+
+# --------------------------------------------------------------------------
+# The day ledger over a changed roster
+# --------------------------------------------------------------------------
+
+def test_a_roster_changing_run_hashes_and_verifies():
+    """The restriction this fix lifts on the per-day state hash.
+
+    `tradefloor.manifest.state_hash` reads each per-slot array at the width
+    the snapshot carries and refuses one that disagrees with the roster.
+    While `volume_idio` kept its construction width, the twin raised on any
+    snapshot taken after a listing or a delisting, so a run whose roster
+    changed could not be hashed from Python and its ledger leaves could not
+    be recomputed. Measured on `dev` at `c85ee28`, which carries the ledger
+    and not this fix: the twin raises "snapshot column 'volume_idio' carries
+    64 bytes and this roster needs 72" on the first snapshot after a
+    listing.
+
+    Both halves are asserted, because the hash is what broke and the ledger
+    is what it cost. A leaf the Python side cannot recompute is a day the
+    sampled verifier cannot check, and the run below changes its roster
+    twice and verifies through it.
+    """
+    from tradefloor import manifest as mf  # noqa: PLC0415
+    from tradefloor.manifest import state_hash  # noqa: PLC0415
+
+    universe = list(tf.Universe.random(8, seed=UNIVERSE_SEED))
+    e = tf.Engine(seed=SEED, universe=universe)
+    ledger = tf.DayLedger()
+
+    e.run_days(3, record=False, ticks_per_day=30, ledger=ledger)
+    assert e.state_hash() == state_hash(e.state_snapshot()), \
+        "the twin disagrees before the roster changes at all"
+
+    e.list_instrument(IPO)
+    e.run_days(3, record=False, ticks_per_day=30, ledger=ledger)
+    # The hash before the width, so a build without this fix fails here on
+    # the restriction itself rather than on the width sitting behind it.
+    assert e.state_hash() == state_hash(e.state_snapshot()), \
+        "the twin disagrees after a listing"
+    assert widths(e) == (9, 9)
+
+    e.delist(0)
+    e.run_days(3, record=False, ticks_per_day=30, ledger=ledger)
+    assert e.state_hash() == state_hash(e.state_snapshot()), \
+        "the twin disagrees after a delisting"
+    assert widths(e) == (8, 8)
+
+    # Nine days, each with its own leaf, and the sampled verifier checks
+    # three of them against the root through both roster changes.
+    assert len(ledger.leaves) == 9
+    assert len(set(ledger.leaves)) == 9
+    manifest = tf.RunManifest.of(e, seed=SEED, universe=universe,
+                                 ledger=ledger)
+    mf.verify(manifest, ledger, 3, seed=5).check()

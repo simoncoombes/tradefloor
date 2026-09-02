@@ -5,9 +5,9 @@
 **A run can commit to the state it held at the end of every day**, and a
 sampled check verifies k days for the cost of k days.
 
-**The per-name volume states follow the roster**, which moves the
-volume-idio generator position of any run that lists or delists and breaks
-old checkpoints of such runs.
+**The per-name volume states follow the roster**, moving the volume-idio
+generator of any run that lists or delists, breaking such runs' old
+checkpoints and letting the day ledger check them.
 
 <!-- release-note-ends -->
 
@@ -98,6 +98,17 @@ restore.** It carries the array at the construction width, which its own
 roster disagrees with. `restore_state` refuses it, and the error names both
 widths and issue #148. Reproduce such a run from its seed and its order log
 to get a snapshot at the roster's width.
+
+A run whose roster changes can now be checked day by day. The ledger's
+per-day hash reads each per-slot array at the width the snapshot carries,
+so while `volume_idio` kept its construction width the Python twin refused
+every snapshot taken after a listing or a delisting. Measured on `c85ee28`,
+which carries the ledger without this fix: the twin raises on the first
+snapshot after a listing, saying the column carries 64 bytes where the
+roster needs 72. On this branch the twin agrees with the engine through a
+listing and a delisting, and the sampled verifier checks a nine-day run
+across both.
+
 ### The measured comparison
 
 Two builds ran the same three runs on `Universe.random(8, seed=99)` at seed
