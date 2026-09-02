@@ -25,6 +25,7 @@ and `tradefloor.manifest.state_hash` computes the same digest in Python
 from `state_snapshot()`. Nothing about a trajectory moves: the manifest
 field is additive under the schema it already had, and `reproduce()`
 behaves the same with the field and without it.
+
 ### The measured cost
 
 On `Universe.random(8, seed=99)`, seed 42, twelve days at 30 ticks a day,
@@ -47,19 +48,18 @@ so it carries the root, the count and the hash version.
 
 `tradefloor.manifest.state_hash` hashes each per-slot array at the width
 the snapshot carries and refuses a snapshot whose arrays disagree with the
-roster. Before tradefloor issue #148, `volume_idio` is sized at
-construction and is the one per-slot array `add_company` and
-`remove_company` do not resize, so a snapshot taken after a listing or a
-delisting is refused and a run whose roster changed cannot be checked by
-the Python side. `Engine.state_hash` in Rust hashes the same array at the
-same width, so such a run's leaf is self-consistent and `verify` passes
-over it.
+roster. `volume_idio` was sized at construction and was the one per-slot
+array `add_company` and `remove_company` left alone, so a snapshot taken
+after a listing or a delisting was refused and a run whose roster changed
+could not be checked by the Python side. The resize landed in this same
+release, so such a snapshot is accepted now, the Python side checks the
+run, and its hash agrees with `Engine.state_hash` in Rust.
 
 No price depends on the width. Every shipped preset holds
 `volume_idio_sigma` and `volume_idio_persistence` at 0.0, so every value
-in the array is exactly 0.0. Issue #148 is where the resize is being made,
-and the test here reads the widths off the snapshot rather than pinning
-them, so it states the same relationship before and after that lands.
+in the array is exactly 0.0. The test here reads the widths off the
+snapshot rather than pinning them, so it passed through the resize
+unchanged.
 
 ### The session flag at a close
 
