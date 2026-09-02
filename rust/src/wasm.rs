@@ -71,6 +71,7 @@ use crate::engine::{Engine, SessionBuffer, SessionRequest};
 use crate::economy::{create_initial_economy_state, create_initial_central_bank_state, InitialEconomyOptions};
 use crate::market::GameTime;
 use crate::market::TickCompany;
+use crate::rng::{stream, DrawKind};
 
 /// The library version, so a page can report what it is running.
 #[wasm_bindgen]
@@ -227,6 +228,160 @@ impl Sim {
         }
         Ok(())
     }
+
+    // ── Draw surgery ─────────────────────────────────────────────────
+
+    /// An independent copy of the current state: same prices, same macro
+    /// state, same generator positions, same installed patches.
+    ///
+    /// One clone per call rather than a batch — `Vec<Sim>` is not a shape
+    /// wasm-bindgen is trusted to return here (see the design note this
+    /// binding set comes from), and a page forks one arm at a time.
+    ///
+    /// The new `Sim` gets a fresh, empty session buffer rather than a
+    /// copy of the parent's: the buffer holds the LAST session's per-tick
+    /// output for reading, not simulation state, so nothing about the
+    /// copy's own future trajectory depends on what is in it.
+    #[wasm_bindgen(js_name = fork)]
+    pub fn fork(&self) -> Sim {
+        Sim {
+            inner: self.inner.clone(),
+            buffer: SessionBuffer::new(),
+            tickers: self.tickers.clone(),
+            day_count: self.day_count,
+        }
+    }
+
+    /// Install substitutions: flat `(stream, kind, index, value)`
+    /// quadruples, `entries.len()` a multiple of four.
+    ///
+    /// `stream` is one of the seven ids [`crate::rng::stream`] declares
+    /// (`0..=6`); `kind` is `0.0` for a uniform or `1.0` for a normal —
+    /// [`crate::rng::DrawKind`]'s own discriminants, so the page and this
+    /// binding read the same two numbers the same way. The generator
+    /// still advances at every patched address; only the value the
+    /// consumer receives there changes —
+    /// [`crate::engine::Engine::patch_draw`] documents the contract this
+    /// wraps.
+    ///
+    /// A quadruple naming a stream or kind outside those ranges is
+    /// refused rather than silently dropped or clamped to the nearest
+    /// valid one, which would install a patch at an address the caller
+    /// never named. This is the one binding on this surface that returns
+    /// `Result` rather than the plain value the design note's signature
+    /// shows: every OTHER binding here that can fail already does, for
+    /// the reason this file's own module docs give — a Rust panic
+    /// reaches JavaScript as an unlabelled trap — and a malformed flat
+    /// array is exactly the input a caller can send by mistake.
+    #[wasm_bindgen(js_name = patchDraws)]
+    pub fn patch_draws(&mut self, entries: &[f64]) -> Result<(), JsError> {
+        let parsed = parse_patch_entries(entries).map_err(|e| JsError::new(&e))?;
+        for (stream_id, kind, index, value) in parsed {
+            self.inner.patch_draw(stream_id, kind, index, value);
+        }
+        Ok(())
+    }
+
+    /// The installed overlay, in the same flat `(stream, kind, index,
+    /// value)` form `patchDraws` takes — installing `drawPatches()`'s
+    /// result on an empty `Sim` reproduces the overlay.
+    ///
+    /// Ordered by stream id, then by kind and index within a stream (the
+    /// order [`crate::rng::DrawOverlay`]'s table already keeps), so the
+    /// result is one exact list a test can pin rather than a set a
+    /// caller must sort first.
+    #[wasm_bindgen(js_name = drawPatches)]
+    pub fn draw_patches(&self) -> Vec<f64> {
+        let mut out = Vec::new();
+        for id in 0..=stream::VOLUME_IDIO {
+            if let Some(overlay) = self.inner.draw_overlay(id) {
+                for (&(kind, index), &value) in &overlay.table {
+                    out.push(id as f64);
+                    out.push(kind as u8 as f64);
+                    out.push(index as f64);
+                    out.push(value);
+                }
+            }
+        }
+        out
+    }
+
+    /// `(uniforms, normals)` taken so far on each stream, flattened in
+    /// stream-id order `0..=6`: fourteen values, a pair per stream, the
+    /// address the next draw of each kind on that stream would take.
+    #[wasm_bindgen(js_name = streamPositions)]
+    pub fn stream_positions(&self) -> Vec<f64> {
+        self.inner
+            .stream_positions()
+            .iter()
+            .flat_map(|&(u, n)| [u as f64, n as f64])
+            .collect()
+    }
+
+    /// The jumps stream's uniform index for the market jump of `day`.
+    ///
+    /// The arithmetic `python/tradefloor/counterfactual.py`'s
+    /// `World._jump_address` uses: the stream's current uniform
+    /// position, plus `1 + companies` per day from here to `day` — one
+    /// market uniform and one per active company, the market's first,
+    /// each day the jumps stream sees. Valid while the active roster does
+    /// not change between here and `day`; nothing on this wasm surface
+    /// lists or delists a company.
+    ///
+    /// `day` at or before the days already run saturates the "how many
+    /// days ahead" term at zero rather than underflowing a `u64`
+    /// subtraction, since this binding's frozen signature returns a
+    /// plain `f64` rather than a `Result`: a caller asking about a day
+    /// already closed gets the stream's current position back rather
+    /// than a trap or a wrapped-around, meaninglessly large number. It is
+    /// the caller's job to ask about a day at or ahead of [`Sim::day`],
+    /// the way the page does.
+    #[wasm_bindgen(js_name = jumpAddress)]
+    pub fn jump_address(&self, day: u32) -> f64 {
+        let (uniforms, _normals) =
+            self.inner.stream_positions()[stream::JUMPS as usize];
+        let per_day = 1 + self.tickers.len() as u64;
+        let ahead = day.saturating_sub(self.day_count) as u64;
+        (uniforms + ahead * per_day) as f64
+    }
+}
+
+/// Parse and validate a flat `patchDraws` argument into `(stream, kind,
+/// index, value)` quadruples.
+///
+/// Pure Rust, no wasm-bindgen type in its signature, deliberately: a
+/// `JsError` is itself a handle onto a JS `Error` object, so
+/// `JsError::new` calls into an imported JS function and panics on a
+/// non-wasm target with "cannot call wasm-bindgen imported functions on
+/// non-wasm targets" -- which took the first version of this file's own
+/// test suite by surprise, on the three tests that exercised the error
+/// path. Keeping validation here, and turning its `Err(String)` into a
+/// `JsError` only at [`Sim::patch_draws`]'s boundary, is what lets those
+/// three run under a plain host `cargo test` alongside the rest.
+fn parse_patch_entries(entries: &[f64]) -> Result<Vec<(u32, DrawKind, u64, f64)>, String> {
+    if entries.len() % 4 != 0 {
+        return Err(format!(
+            "patchDraws takes (stream, kind, index, value) quadruples; \
+             got {} values, not a multiple of four",
+            entries.len()));
+    }
+    let mut out = Vec::with_capacity(entries.len() / 4);
+    for quad in entries.chunks_exact(4) {
+        let stream_id = quad[0] as u32;
+        if stream_id > stream::VOLUME_IDIO {
+            return Err(format!(
+                "unknown stream id {stream_id}; expected 0..={}",
+                stream::VOLUME_IDIO));
+        }
+        let kind = match quad[1] as u32 {
+            0 => DrawKind::Uniform,
+            1 => DrawKind::Normal,
+            other => return Err(format!(
+                "unknown draw kind {other}; 0 (uniform) or 1 (normal)")),
+        };
+        out.push((stream_id, kind, quad[2] as u64, quad[3]));
+    }
+    Ok(out)
 }
 
 /// The cross-binding determinism probe.
@@ -241,4 +396,155 @@ pub fn price_digest(size: usize, universe_seed: u32, seed: u32,
     crate::engine::fixed_simulation_digest(
         size, universe_seed, seed, days, ticks, preset)
         .ok_or_else(|| JsError::new(&format!("unknown preset {preset:?}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // A small, fast roster and preset shared by most tests here: big
+    // enough that `jump_address`'s `1 + companies` term is not
+    // accidentally 1, small enough that a handful of days costs nothing.
+    // `wasm-bindgen`'s macro expands to plain Rust on any target, so
+    // these run under the host `cargo test --features wasm` and need no
+    // wasm32 target or JS runtime -- they exercise `Sim` exactly as a
+    // page would, minus the FFI marshalling.
+    fn sim() -> Sim {
+        Sim::new(5, 11, 3, "pt-v3").expect("a valid roster and preset")
+    }
+
+    #[test]
+    fn fresh_sim_has_no_patches_and_zero_positions() {
+        let sim = sim();
+        assert!(sim.draw_patches().is_empty());
+        assert_eq!(sim.stream_positions(), vec![0.0; 14]);
+    }
+
+    #[test]
+    fn patch_draws_round_trips_through_draw_patches() {
+        let mut sim = sim();
+        // Two streams and both kinds, so the round trip cannot pass by
+        // one field happening to be right: market/uniform/0, then
+        // jumps/normal/2, in stream-id order -- the order draw_patches
+        // documents.
+        let entries = vec![
+            stream::MARKET as f64, 0.0, 0.0, 0.25,
+            stream::JUMPS as f64, 1.0, 2.0, -1.5,
+        ];
+        sim.patch_draws(&entries).expect("both quadruples are well-formed");
+        assert_eq!(sim.draw_patches(), entries);
+    }
+
+    // The three tests below exercise `parse_patch_entries`, the pure
+    // function `patch_draws` validates through, rather than
+    // `Sim::patch_draws` itself: `JsError::new` calls into an imported JS
+    // function and panics with "cannot call wasm-bindgen imported
+    // functions on non-wasm targets" under a plain host `cargo test`, so
+    // a test that needs `patch_draws` to actually RETURN an `Err` cannot
+    // run here. `patch_draws_round_trips_through_draw_patches` above
+    // already proves the success path through the real method, and
+    // `patch_draws` calls `parse_patch_entries` in full before installing
+    // anything on `self.inner`, so a parse failure here means the real
+    // method installs nothing either.
+
+    #[test]
+    fn patch_draws_refuses_a_length_not_a_multiple_of_four() {
+        let err = parse_patch_entries(&[0.0, 0.0, 0.0]);
+        assert!(err.is_err(), "three values is not a whole quadruple");
+    }
+
+    #[test]
+    fn patch_draws_refuses_an_unknown_stream() {
+        // 7 is one past volume_idio (6), the highest valid stream id.
+        let err = parse_patch_entries(&[7.0, 0.0, 0.0, 0.5]);
+        assert!(err.is_err(), "stream id 7 does not name a stream");
+    }
+
+    #[test]
+    fn patch_draws_refuses_an_unknown_kind() {
+        let err = parse_patch_entries(&[stream::MARKET as f64, 2.0, 0.0, 0.5]);
+        assert!(err.is_err(), "2 names neither uniform (0) nor normal (1)");
+    }
+
+    #[test]
+    fn a_fork_is_independent() {
+        let mut parent = sim();
+        let mut child = parent.fork();
+        child.patch_draws(&[stream::JUMPS as f64, 0.0, 0.0, 1.0])
+            .expect("a well-formed quadruple");
+        assert!(parent.draw_patches().is_empty(),
+                "patching the fork installed an overlay on the parent");
+        assert_eq!(child.draw_patches().len(), 4);
+
+        // And the other direction: a patch installed on the parent AFTER
+        // the fork was taken does not reach the fork either.
+        parent.patch_draws(&[stream::MARKET as f64, 0.0, 0.0, 0.1])
+            .expect("a well-formed quadruple");
+        assert_eq!(child.draw_patches().len(), 4,
+                   "the fork must be unaffected by the parent's later patch");
+    }
+
+    #[test]
+    fn jump_address_predicts_the_stream_position_it_names() {
+        let mut sim = sim();
+        let day = 3u32;
+        let addr = sim.jump_address(day);
+        sim.run_days(day as usize, 10).expect("ticks > 0");
+        // Stream id JUMPS's uniform half sits at the even slot of its
+        // pair in the flattened streamPositions layout.
+        let jumps_uniforms = sim.stream_positions()[(stream::JUMPS as usize) * 2];
+        assert_eq!(addr, jumps_uniforms,
+                   "jumpAddress(day) must equal the position the jumps \
+                    stream actually reaches after running that many days");
+    }
+
+    #[test]
+    fn jump_address_of_a_day_already_run_does_not_panic() {
+        let mut sim = sim();
+        sim.run_days(2, 10).expect("ticks > 0");
+        // day 0 is behind sim.day (2): saturating_sub floors the "how
+        // many days ahead" term at zero instead of wrapping a u64
+        // subtraction into a huge, meaningless address.
+        let addr = sim.jump_address(0);
+        assert!(addr.is_finite());
+        let jumps_uniforms = sim.stream_positions()[(stream::JUMPS as usize) * 2];
+        assert_eq!(addr, jumps_uniforms,
+                   "a day already run saturates to the stream's current \
+                    position rather than a wrapped-around one");
+    }
+
+    #[test]
+    fn patching_a_market_normal_changes_the_trajectory() {
+        // market_factor_z is the market stream's first normal, drawn
+        // unconditionally on every tick (rng.rs Site::MarketFactorZ) --
+        // unlike the jump uniform's comparison against an intensity, so
+        // this cannot land on a day nothing was going to do anyway.
+        let mut control = sim();
+        let mut shock = control.fork();
+        shock.patch_draws(&[stream::MARKET as f64, 1.0, 0.0, 6.0])
+            .expect("a well-formed quadruple");
+        control.run_days(1, 10).expect("ticks > 0");
+        shock.run_days(1, 10).expect("ticks > 0");
+        assert_ne!(control.prices(), shock.prices(),
+                   "patching the market stream's first normal to 6.0 must \
+                    move at least one price");
+    }
+
+    #[test]
+    fn patching_the_jump_uniform_does_not_change_the_draw_count() {
+        // "The generator still advances at every patched address; only
+        // the value the consumer receives changes" (Engine::patch_draw).
+        // A patch that also shifted the draw count would desynchronise
+        // every later address from the one a caller computed for it.
+        let mut control = sim();
+        let mut shock = control.fork();
+        let addr = shock.jump_address(2);
+        shock.patch_draws(&[stream::JUMPS as f64, 0.0, addr, 1.0])
+            .expect("a well-formed quadruple");
+        control.run_days(3, 10).expect("ticks > 0");
+        shock.run_days(3, 10).expect("ticks > 0");
+        assert_eq!(control.stream_positions(), shock.stream_positions(),
+                   "installing a patch must not change how many draws a \
+                    stream takes");
+    }
 }
