@@ -391,3 +391,74 @@ def test_the_arms_are_compared_on_all_seven_streams():
     assert set(control.engine.stream_positions()) == set(noise.STREAMS)
     matched = [c for c in attribution.caveats if "matched the control" in c]
     assert len(matched) == 1
+
+
+def test_the_default_horizon_holds_for_a_target_that_names_no_day():
+    """The half of the horizon rule a column target hides.
+
+    A column sets the horizon from its own day, so a test written on one
+    passes whether or not the default reaches past the window. A target
+    that names no day takes the default and nothing else, which is what
+    states the rule: at the window's last day every event row is exactly
+    zero, and one day past it they are not.
+    """
+    root = world()
+    for target in (noise.pnl(),
+                   lambda arm: float(arm.summary()["pnl_since"])):
+        reached = noise.attribute(root, (1, 1), target, "event",
+                                  streams=["jumps"])
+        assert reached.horizon == 2
+        assert any(r["effect"] != 0.0 for r in reached.rows)
+
+        short = noise.attribute(root, (1, 1), target, "event",
+                                streams=["jumps"], horizon=1)
+        assert short.horizon == 1
+        assert all(r["effect"] == 0.0 for r in short.rows)
+        zero = [c for c in short.caveats if "measured exactly zero" in c]
+        assert len(zero) == 1
+        assert "the last day's events are never seen" in zero[0]
+
+
+def test_the_arms_comparison_is_carried_on_the_rows():
+    """A sharded plan merges its rows, so the comparison has to survive the
+    merge. Counted where the arms run, it was a caveat a tool could not
+    restate, and a one-row probe published a count of one above a table of
+    ninety-six."""
+    root = world()
+    whole = noise.attribute(root, (1, 1), noise.pnl(), "event",
+                            streams=["jumps"], horizon=3)
+    # the flag is the comparison, checkable against the draws beside it
+    assert all(r["positions_match"] is True for r in whole.rows)
+    assert whole.control_draws > 0
+    for row in whole.rows:
+        assert row["positions_match"] == (row["draws"] == whole.control_draws)
+    stated = [c for c in whole.plan_caveats if "arms matched" in c]
+    assert len(stated) == 1
+    assert f"all {len(whole.rows)} arms matched" in stated[0]
+
+    probe = noise.attribute(root, (1, 1), noise.pnl(), "event",
+                            streams=["jumps"], horizon=3, shard=(0, 10 ** 9))
+    assert len(probe.rows) == 1
+    # the probe's own count is one, and it is inside the set a tool drops
+    assert any("all 1 arms matched" in c for c in probe.plan_caveats)
+    # restated over the merged rows it is the whole plan's
+    restated = noise.row_caveats(whole.rows, target=whole.target, last=1,
+                                 horizon=3, event_streams=["jumps"])
+    assert any(f"all {len(whole.rows)} arms matched" in c for c in restated)
+
+
+def test_an_arm_that_moved_the_schedule_is_named():
+    """The other side of the comparison, stated on a row the caller marks
+    rather than on a market that will not misbehave to order."""
+    rows = [{"stream": "economy", "kind": "uniform", "index": 4,
+             "perturbation": "u=0", "effect": 0.1,
+             "positions_match": False},
+            {"stream": "economy", "kind": "uniform", "index": 5,
+             "perturbation": "u=1", "effect": 0.0,
+             "positions_match": True}]
+    said = noise.row_caveats(rows, target=noise.pnl(), last=1, horizon=2,
+                             event_streams=["economy"])
+    named = [c for c in said if "consumed a different number" in c]
+    assert len(named) == 1
+    assert "1 of 2 arms" in named[0]
+    assert "economy uniform 4 (u=0)" in named[0]
