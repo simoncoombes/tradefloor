@@ -185,7 +185,9 @@ def test_the_floor_is_unmeasurable_where_the_book_moves_with_the_target():
     assert found.flip is None
     assert found.decision_low != found.decision_high
     assert "which no intervention touched" in found.caveats[0]
-    assert found.low <= VIX_THRESHOLD / found.seen_low * found.low
+    # The bracket still closed on the threshold: the level the low arm
+    # opened with sits at or below it and the high arm's above it.
+    assert found.seen_low <= VIX_THRESHOLD < found.seen_high
 
 
 def test_a_supplied_floor_is_used_and_declared():
@@ -323,9 +325,13 @@ def test_every_reported_boundary_carries_two_manifests_that_reproduce():
         assert manifest.scenario is not None
         assert manifest.strategy_reference, "the agent's own citation"
     assert low.result["digest"] != high.result["digest"]
-    shared = WARMUP * STEPS_PER_DAY
-    assert low.order_log[:1] == high.order_log[:1]
-    assert low.order_log != high.order_log
+    # Lineage: both logs carry the shared history as a prefix and part
+    # where the probe day's pin differs.
+    parted = next(i for i, (a, b) in enumerate(zip(low.order_log,
+                                                    high.order_log))
+                  if a != b)
+    assert parted > 0
+    assert low.order_log[:parted] == high.order_log[:parted]
     assert low.label != high.label
     fields = {item for m in (low, high) for item in m.scenario.fields}
     assert "federal_funds_rate" in fields
