@@ -81,13 +81,17 @@ class Scripted(CallableAgentAdapter):
 
     ``spread`` is the number of distinct answers ``reask`` rotates
     through; zero re-asks the function itself, which is deterministic.
+    ``reask_fn`` replaces both: it takes the recorded prompt and returns
+    the raw answer, so a test can refuse or vary on re-ask alone.
     ``calls`` is shared across forks, so a test can count the floor's
     calls wherever they landed.
     """
 
-    def __init__(self, fn=None, *, spread=0, calls=None, **kwargs):
+    def __init__(self, fn=None, *, spread=0, reask_fn=None, calls=None,
+                 **kwargs):
         super().__init__(fn, **kwargs)
         self.spread = spread
+        self.reask_fn = reask_fn
         self.calls = [] if calls is None else calls
 
     def reask(self, entry):
@@ -95,6 +99,8 @@ class Scripted(CallableAgentAdapter):
         # answer per input, so a replaying agent has no floor to measure.
         refuse_replay_reask(self.mode, type(self).__name__)
         self.calls.append(entry["step"])
+        if self.reask_fn is not None:
+            return self.reask_fn(entry["prompt"])
         if not self.spread:
             return self.call(None, entry["prompt"])
         which = len(self.calls) % self.spread
@@ -102,8 +108,38 @@ class Scripted(CallableAgentAdapter):
 
     def fork_kwargs(self):
         kwargs = super().fork_kwargs()
-        kwargs.update(spread=self.spread, calls=self.calls)
+        kwargs.update(spread=self.spread, reask_fn=self.reask_fn,
+                      calls=self.calls)
         return kwargs
+
+
+def _above(prompt):
+    return prompt["macro"]["federal_funds_rate"] > THRESHOLD
+
+
+def _per_arm_counter():
+    """Re-ask calls counted per arm, keyed by the rate the prompt shows."""
+    seen = {}
+
+    def count(prompt):
+        rate = prompt["macro"]["federal_funds_rate"]
+        seen[rate] = seen.get(rate, 0) + 1
+        return seen[rate]
+
+    return count
+
+
+def size_change(payload):
+    """Buys 100 at or below THRESHOLD and 1,000 above: one net either way."""
+    symbol = payload["assets"][0]["symbol"]
+    return {"actions": [{"symbol": symbol, "side": "BUY",
+                         "quantity": 1000 if _above(payload) else 100}]}
+
+
+def symbol_change(payload):
+    """Buys the second name above THRESHOLD, the first at or below it."""
+    symbol = payload["assets"][1 if _above(payload) else 0]["symbol"]
+    return {"actions": [{"symbol": symbol, "side": "BUY", "quantity": 100}]}
 
 
 def build(fn=threshold, *, spread=0, days=WARMUP, agent=None, **over):
@@ -210,20 +246,152 @@ def test_a_supplied_floor_is_used_and_declared():
 
 def test_identical_inputs_never_report_a_flip():
     """An agent that answers differently on byte-identical inputs is noise,
-    whatever the recorded decisions say."""
+    whatever the recorded decisions say, and no floor is asked for."""
     seen = []
 
     def flaky(payload):
         seen.append(1)
         return _order(payload, "BUY" if len(seen) % 2 else "SELL")
 
-    found = search(build(flaky), "commodity.oil", operation="multiply",
+    world = build(flaky)
+    found = search(world, "commodity.oil", operation="multiply",
                    bracket=(0.6, 1.5), steps=3)
-    assert found.status in ("no flip", "unseen")
+    assert found.status == "unseen"
     assert found.flip is None
-    if found.status == "unseen":
-        assert found.floor["identical_inputs"] is True
-        assert any("byte-identical" in c for c in found.caveats)
+    assert found.decision_low != found.decision_high
+    assert found.floor is None
+    assert world.agent.calls == [], "no re-ask was spent on it"
+    assert any("byte-identical" in c for c in found.caveats)
+
+
+# --------------------------------------------------------------------------
+# Floors that were never measured
+# --------------------------------------------------------------------------
+
+def test_an_arm_whose_re_asks_all_refuse_has_no_floor():
+    """resample averages an arm over the answers that parsed, so an arm
+    refusing every re-ask reads as a stable arm with no spread. That is
+    no floor, and no flip is reported over it."""
+    def refuse_above(prompt):
+        return "not a decision" if _above(prompt) else threshold(prompt)
+
+    agent = Scripted(threshold, reask_fn=refuse_above, mode="live",
+                     every=STEPS_PER_DAY)
+    found = rate_search(build(agent=agent), steps=3)
+    assert found.status == "floor unmeasurable"
+    assert found.flip is None
+    assert found.floor is not None, "the resample ran and is carried"
+    high = found.floor["arms"]["treatment"]
+    assert found.floor["noise"][high]["parsed"] == 0
+    assert found.floor["noise"][high]["refusals"] == FLOOR_CALLS
+    assert found.floor["separation"]["net"] is None
+    assert found.floor_gap != 0.0, "the number that used to pass as a gap"
+    assert f"arm {high!r} returned 0 executable decision(s)" in \
+        found.caveats[0]
+    assert f"in {FLOOR_CALLS} calls ({FLOOR_CALLS} refused)" in \
+        found.caveats[0]
+    assert any("counted as refusals" in c for c in found.caveats)
+    assert len(agent.calls) == 2 * FLOOR_CALLS
+
+
+def test_two_arms_that_refuse_everything_are_not_inside_a_floor():
+    agent = Scripted(threshold, reask_fn=lambda prompt: "no", mode="live",
+                     every=STEPS_PER_DAY)
+    found = rate_search(build(agent=agent), steps=2)
+    assert found.status == "floor unmeasurable"
+    assert found.floor_gap == 0.0
+    assert not any("inside the agent's own spread" in c
+               for c in found.caveats)
+    assert "returned 0 executable decision(s)" in found.caveats[0]
+
+
+def test_one_parsed_answer_is_not_a_floor_of_zero():
+    """A single sample has a population stdev of zero by construction."""
+    count = _per_arm_counter()
+
+    def once_above(prompt):
+        if _above(prompt) and count(prompt) > 1:
+            return "no"
+        return threshold(prompt)
+
+    agent = Scripted(threshold, reask_fn=once_above, mode="live",
+                     every=STEPS_PER_DAY)
+    found = rate_search(build(agent=agent), steps=2)
+    assert found.status == "floor unmeasurable"
+    high = found.floor["arms"]["treatment"]
+    assert found.floor["noise"][high]["parsed"] == 1
+    assert "returned 1 executable decision(s)" in found.caveats[0]
+    assert f"({FLOOR_CALLS - 1} refused)" in found.caveats[0]
+
+
+def test_refusals_beside_enough_parsed_answers_are_declared_not_fatal():
+    """Two refusals in eight per arm leave six parsed answers, a measured
+    zero floor, and a reported flip that says what was refused."""
+    count = _per_arm_counter()
+
+    def refuse_some(prompt):
+        return "no" if count(prompt) % 3 == 0 else threshold(prompt)
+
+    agent = Scripted(threshold, reask_fn=refuse_some, mode="live",
+                     every=STEPS_PER_DAY)
+    found = rate_search(build(agent=agent), steps=2)
+    assert found.status == "flip"
+    for arm in found.floor["noise"].values():
+        assert arm["parsed"] == FLOOR_CALLS - 2
+        assert arm["refusals"] == 2
+    assert found.separation is None
+    assert found.floor_gap == found.net_gap == -2.0
+    assert any(f"4 of the {2 * FLOOR_CALLS} floor calls" in c
+               for c in found.flip.caveats)
+    assert any("the floor is zero" in c for c in found.flip.caveats)
+
+
+@pytest.mark.parametrize("fn, low, high", [
+    (size_change, "BUY 100 AAA", "BUY 1,000 AAA"),
+    (symbol_change, "BUY 100 AAA", "BUY 100 AAB"),
+])
+def test_a_change_the_net_cannot_see_is_named_not_swallowed(fn, low, high):
+    """A change of quantity or of symbol closes a bracket and is invisible
+    to net, the measure the floor is computed on. It is its own status,
+    apart from a measured change that was too small."""
+    world = build(fn)
+    found = rate_search(world, steps=2)
+    assert found.status == "same net"
+    assert found.flip is None
+    assert found.net_gap == 0.0
+    assert boundary.describe_shape(found.shape_low) == low
+    assert boundary.describe_shape(found.shape_high) == high
+    assert found.floor is None and found.floor_gap is None
+    assert world.agent.calls == [], "no re-ask was spent on it"
+    assert any("agree in net" in c for c in found.caveats)
+    assert not any("inside the agent's own spread" in c
+               for c in found.caveats)
+
+
+def test_the_two_gaps_are_told_apart():
+    """The recorded gap and the resampled-means gap differ whenever the
+    agent is not deterministic, and both are named where they appear."""
+    count = _per_arm_counter()
+
+    def hold_sometimes(prompt):
+        # The high arm answers SELL, SELL, HOLD, HOLD...: a mean net of
+        # -0.5 against a recorded SELL of -1.
+        if _above(prompt) and count(prompt) > 2:
+            return _order(prompt, "HOLD")
+        return threshold(prompt)
+
+    agent = Scripted(threshold, reask_fn=hold_sometimes, mode="live",
+                     every=STEPS_PER_DAY)
+    found = rate_search(build(agent=agent), steps=2)
+    assert found.net_gap == -2.0, "recorded: BUY (+1) to SELL (-1)"
+    assert found.floor_gap == pytest.approx(-1.25), "means: +1 to -0.25"
+    assert found.floor_gap != found.net_gap
+    assert found.separation == pytest.approx(
+        abs(found.floor_gap) / found.floor["separation"]["floor_net"])
+    text = (found.flip or found).render()
+    assert "recorded" in text and "resampled" in text
+    row = found.row()
+    assert row["net_gap"] == -2.0 and row["floor_gap"] == found.floor_gap
 
 
 # --------------------------------------------------------------------------
@@ -343,7 +511,10 @@ def test_a_flip_serialises_with_its_manifests():
     assert payload["status"] == "flip"
     assert len(payload["flip"]["manifests"]) == 2
     assert payload["flip"]["floor"]["n"] == FLOOR_CALLS
+    assert payload["flip"]["floor_gap"] == payload["flip"]["net_gap"]
     assert [p["outcome"] for p in payload["probes"]] == ["decided"] * 4
+    text = found.flip.render()
+    assert "net gap, recorded" in text and "net gap, resampled" in text
 
 
 # --------------------------------------------------------------------------
@@ -679,6 +850,9 @@ def test_the_map_table_has_the_declared_columns():
     assert set(row["status"] for row in rows) <= set(STATUSES)
     assert rows[0]["reported"] is True and rows[1]["reported"] is False
     assert rows[0]["decision_low"] != rows[0]["decision_high"]
+    assert rows[0]["net_gap"] == rows[0]["floor_gap"] == -2.0
+    assert rows[0]["floor"] == 0.0 and rows[0]["separation"] is None
+    assert rows[1]["floor_gap"] is None
     assert rows[0]["probes"] == 4 and rows[0]["unreachable"] == 0
     assert isinstance(rows[0]["caveats"], list) and rows[0]["caveats"]
     assert rows[2]["low"] is None

@@ -42,14 +42,23 @@ A closed bracket is a candidate, and a language model is the one
 stochastic part of the experiment. Before a flip is reported,
 :func:`tradefloor.resample` asks the two bracketing arms' exact inputs
 :data:`FLOOR_CALLS` times each, and the flip is reported only when the
-between-arm gap in ``net`` (buys minus sells, in actions) exceeds one
-within-arm standard deviation, the ``separation`` that function computes.
-Two arms that answered identically every time have a floor of zero, and a
-non-zero gap stands on it. Two arms whose inputs were byte-identical never
-report a flip: the intervention did not reach the agent, so the recorded
-difference is agent noise. An agent that cannot be asked again, because it
-has no ``reask`` hook or is replaying a recording, cannot report a flip at
-all, and the search says so in its caveats.
+gap between the two arms' mean ``net`` answers (buys minus sells, in
+actions) exceeds one within-arm standard deviation, the ``separation``
+that function computes. Two arms that answered identically every time
+have a floor of zero, and a non-zero gap stands on it.
+
+Three things stop a candidate short of that test, each with its own
+status. Two arms whose inputs were byte-identical never report a flip
+(``unseen``): the intervention did not reach the agent, so the recorded
+difference is agent noise. Two recorded decisions that agree in ``net``
+(``same net``), a change of quantity or of symbol, cannot clear a floor
+measured on ``net``, and no floor is asked for. And a floor rests on the
+answers that parsed: ``resample`` averages an arm over its executable
+answers, so an arm whose re-asks all refused reads as a perfectly stable
+arm with no spread. An arm with fewer than two parsed answers therefore
+leaves the floor unmeasured (``floor unmeasurable``), as does an agent
+that cannot be asked again at all, because it has no ``reask`` hook or is
+replaying a recording. The search says which in its caveats.
 
 ## What it measures, and what it cannot
 
@@ -74,7 +83,8 @@ recording does not hold raises, and the probe is recorded as unreachable
 rather than skipped. Measured on the shipped FinRobot recording,
 ``tests/fixtures/finrobot/rate-shock.json``, on its own four-name roster at
 seed 4242 after the twenty recorded days, with ``multiply`` over the
-bracket (0.5, 1.4) and two halvings, at commit f47c149: of the nine
+bracket (0.5, 1.4) and two halvings, on the engine, roster and recording
+of commit f47c149 (main) with the search in this module: of the nine
 targets a multiplier can move there, the five the prompt shows (the two
 rates, VIX, inflation and quoted depth) are unreachable at the first probe,
 and the four it does not show (oil, growth, unemployment, the tariff rate)
@@ -124,7 +134,9 @@ STATUSES = (
     "flip",                # the bracket closed and the gap clears the floor
     "inside floor",        # the bracket closed and the gap does not
     "unseen",              # the bracketing arms sent identical inputs
-    "floor unmeasurable",  # the bracket closed and resample could not run
+    "same net",            # the two decisions agree in net: a change of
+                           # quantity or symbol the floor cannot see
+    "floor unmeasurable",  # the bracket closed and no floor was measured
     "no flip",             # the two bracket ends drew the same decision
     "unreachable",         # a probe's prompt is outside the recording
     "unusable",            # a probe's agent returned no executable decision
@@ -136,12 +148,16 @@ STATUSES = (
 #: The outcomes one probe can have.
 OUTCOMES = ("decided", "unusable", "unreachable")
 
-#: The columns of :meth:`BoundaryMap.table`, in order.
+#: The columns of :meth:`BoundaryMap.table`, in order. Two gaps, and they
+#: are different numbers whenever the agent is not deterministic:
+#: ``net_gap`` is between the two RECORDED decisions the bracket closed
+#: on, ``floor_gap`` between the two arms' RESAMPLED mean answers, and
+#: ``separation`` is ``floor_gap`` over ``floor``.
 COLUMNS = (
     "scenario", "target", "operation", "day", "step", "status",
     "low", "high", "seen_low", "seen_high",
-    "decision_low", "decision_high", "net_gap", "floor", "separation",
-    "reported", "probes", "unreachable", "caveats",
+    "decision_low", "decision_high", "net_gap", "floor_gap", "floor",
+    "separation", "reported", "probes", "unreachable", "caveats",
 )
 
 _SYMBOL = {"multiply": "x", "add": "", "set": "="}
@@ -450,13 +466,13 @@ class Flip:
 
     __slots__ = ("target", "operation", "day", "step", "scenario", "low",
                  "high", "seen_low", "seen_high", "decision_low",
-                 "decision_high", "net_gap", "separation", "floor",
-                 "manifests", "agreement", "probes", "caveats")
+                 "decision_high", "net_gap", "floor_gap", "separation",
+                 "floor", "manifests", "agreement", "probes", "caveats")
 
     def __init__(self, *, target: str, operation: str, day: int, step: int,
                  scenario: str, low: float, high: float, seen_low: Any,
                  seen_high: Any, decision_low: dict, decision_high: dict,
-                 net_gap: float, separation: float | None,
+                 net_gap: float, floor_gap: float, separation: float | None,
                  floor: dict | None, manifests: tuple, agreement: Agreement,
                  probes: list, caveats: list[str]) -> None:
         self.target = target
@@ -470,10 +486,16 @@ class Flip:
         self.seen_high = seen_high
         self.decision_low = decision_low
         self.decision_high = decision_high
-        #: Net of the high decision minus net of the low one, in actions.
+        #: Net of the RECORDED high decision minus net of the recorded low
+        #: one, in actions: the gap between the two decisions the bracket
+        #: closed on, one draw each.
         self.net_gap = net_gap
-        #: The floor's between-arm gap in within-arm standard deviations,
-        #: or None where neither arm varied.
+        #: The gap between the two arms' RESAMPLED mean net answers, the
+        #: number ``separation`` and the floor are computed against. It
+        #: equals ``net_gap`` only for a deterministic agent.
+        self.floor_gap = floor_gap
+        #: ``floor_gap`` in within-arm standard deviations, or None where
+        #: neither arm varied.
         self.separation = separation
         self.floor = floor
         self.manifests = manifests
@@ -498,8 +520,8 @@ class Flip:
             "seen_low": self.seen_low, "seen_high": self.seen_high,
             "decision_low": self.decision_low,
             "decision_high": self.decision_high,
-            "net_gap": self.net_gap, "separation": self.separation,
-            "floor": self.floor,
+            "net_gap": self.net_gap, "floor_gap": self.floor_gap,
+            "separation": self.separation, "floor": self.floor,
             "manifests": [json.loads(m.to_json()) for m in self.manifests],
             "agreement": self.agreement.as_dict(),
             "probes": [p.as_dict() for p in self.probes],
@@ -515,7 +537,9 @@ class Flip:
             f"{target.show(self.seen_high)}",
             f"  {'decision below':<22} {describe_shape(self.shape_low)}",
             f"  {'decision above':<22} {describe_shape(self.shape_high)}",
-            f"  {'net gap':<22} {self.net_gap:+.2f}",
+            f"  {'net gap, recorded':<22} {self.net_gap:+.2f}",
+            f"  {'net gap, resampled':<22} {self.floor_gap:+.2f} between "
+            "the arms' mean answers",
             f"  {'separation':<22} "
             + ("zero floor" if self.separation is None
                else f"{self.separation:.2f} within-arm stdevs"),
@@ -541,7 +565,8 @@ class Search:
     __slots__ = ("scenario", "target", "operation", "day", "step",
                  "bracket", "probes", "status", "low", "high", "seen_low",
                  "seen_high", "decision_low", "decision_high", "floor",
-                 "net_gap", "separation", "agreement", "flip", "caveats")
+                 "net_gap", "floor_gap", "separation", "agreement", "flip",
+                 "caveats")
 
     def __init__(self, *, scenario: str, target: str, operation: str,
                  day: int, bracket: tuple[float, float]) -> None:
@@ -560,7 +585,10 @@ class Search:
         self.decision_low: dict | None = None
         self.decision_high: dict | None = None
         self.floor: dict | None = None
+        #: Between the two recorded decisions; see :class:`Flip`.
         self.net_gap: float | None = None
+        #: Between the two arms' resampled mean answers; see :class:`Flip`.
+        self.floor_gap: float | None = None
         self.separation: float | None = None
         self.agreement: Agreement | None = None
         self.flip: Flip | None = None
@@ -601,8 +629,8 @@ class Search:
             "seen_low": self.seen_low, "seen_high": self.seen_high,
             "decision_low": self.decision_low,
             "decision_high": self.decision_high,
-            "net_gap": self.net_gap, "separation": self.separation,
-            "floor": self.floor,
+            "net_gap": self.net_gap, "floor_gap": self.floor_gap,
+            "separation": self.separation, "floor": self.floor,
             "agreement": (None if self.agreement is None
                           else self.agreement.as_dict()),
             "reported": self.reported,
@@ -623,7 +651,8 @@ class Search:
                           else float(self.seen_high)),
             "decision_low": describe_shape(self.shape_low),
             "decision_high": describe_shape(self.shape_high),
-            "net_gap": self.net_gap, "floor": self.floor_net,
+            "net_gap": self.net_gap, "floor_gap": self.floor_gap,
+            "floor": self.floor_net,
             "separation": self.separation, "reported": self.reported,
             "probes": len(self.probes), "unreachable": len(self.unreachable),
             "caveats": list(self.caveats),
@@ -707,12 +736,53 @@ def _measure_floor(low_arm: World, high_arm: World, step: int,
         return None, str(exc)
 
 
-def _floor_caveats(measured: Resample, supplied: bool,
-                   step: int) -> list[str]:
-    """What the floor says, computed from the resample it came from."""
-    out = []
+def _parsed_counts(measured: Resample) -> str:
     left, right = measured.control, measured.treatment
     noise = measured.noise
+    return (f"the low arm parsed {noise[left]['parsed']} of "
+            f"{noise[left]['samples']} calls into {noise[left]['distinct']} "
+            f"distinct answer(s) and the high arm {noise[right]['parsed']} "
+            f"of {noise[right]['samples']} into {noise[right]['distinct']}")
+
+
+def _refusal_caveat(measured: Resample) -> list[str]:
+    """The refusals inside the floor, when there were any."""
+    noise = measured.noise
+    refusals = (noise[measured.control]["refusals"]
+                + noise[measured.treatment]["refusals"])
+    if not refusals:
+        return []
+    return [f"{refusals} of the {2 * measured.n} floor calls returned no "
+            "executable decision and were counted as refusals, not "
+            "retried; the means and spreads rest on the answers that "
+            "parsed"]
+
+
+def _unmeasured(measured: Resample) -> str | None:
+    """Why the floor is unmeasured, or None when both arms carry a spread.
+
+    :func:`resample` averages an arm over the answers that parsed, so an
+    arm whose re-asks all refused comes back with a mean of zero and a
+    spread of zero, the same numbers a perfectly stable arm reports. One
+    parsed answer has a spread of zero by construction as well. Neither
+    is a floor of zero; both are no floor, and a flip must not be
+    reported over them.
+    """
+    for label in (measured.control, measured.treatment):
+        stats = measured.noise[label]
+        if stats["parsed"] < 2:
+            return (f"arm {label!r} returned {stats['parsed']} executable "
+                    f"decision(s) in {stats['samples']} calls "
+                    f"({stats['refusals']} refused), and a spread needs at "
+                    "least 2")
+    return None
+
+
+def _floor_caveats(measured: Resample, supplied: bool) -> list[str]:
+    """What a measured floor says, computed from the resample it came
+    from. Called once :func:`_unmeasured` has passed both arms."""
+    out = []
+    left, right = measured.control, measured.treatment
     sep = measured.separation["net"]
     gap = measured.separation["gap_net"]
     floor = measured.separation["floor_net"]
@@ -723,36 +793,28 @@ def _floor_caveats(measured: Resample, supplied: bool,
             "was not measured on this search's bracketing arms")
     if measured.identical_inputs:
         out.append(
-            f"the two bracketing arms sent the agent byte-identical inputs "
-            f"at step {step}: the intervention had not reached the agent, "
-            "so a difference between the recorded decisions is agent noise "
-            "and no flip is reported")
-        return out
-    answers = (f"the low arm gave {noise[left]['distinct']} distinct "
-               f"answer(s) in {noise[left]['samples']} calls and the high "
-               f"arm {noise[right]['distinct']} in {noise[right]['samples']}")
+            "the floor's two inputs were byte-identical, so the gap of "
+            f"{gap:+.2f} between its arms' mean answers is agent noise and "
+            "nothing else, and no flip is reported over it")
+    parsed = _parsed_counts(measured)
     if sep is None:
         out.append(
-            f"the floor is zero: {answers}, with no spread in either, so the "
-            f"net gap of {gap:+.2f} between the arms' mean answers stands "
+            f"the floor is zero: {parsed}, with no spread in either, so the "
+            f"gap of {gap:+.2f} between the arms' mean answers stands "
             "against no within-arm spread at all")
     else:
         verdict = ("and the flip clears it" if sep > 1.0
                    else "and the flip sits inside the agent's own spread, so "
                         "it is not reported")
         out.append(
-            f"the net gap of {gap:+.2f} between the arms' mean answers is "
+            f"the gap of {gap:+.2f} between the arms' mean answers is "
             f"{sep:.2f} times the larger within-arm stdev of {floor:.2f}; "
-            f"{answers}, {verdict}")
-    refusals = noise[left]["refusals"] + noise[right]["refusals"]
-    if refusals:
-        out.append(
-            f"{refusals} of the {2 * measured.n} floor calls returned no "
-            "executable decision and were counted as refusals, not retried")
-    return out
+            f"{parsed}, {verdict}")
+    return out + _refusal_caveat(measured)
 
 
 def _clears(measured: Resample) -> bool:
+    """The floor rule, on a floor :func:`_unmeasured` has passed."""
     if measured.identical_inputs:
         return False
     sep = measured.separation["net"]
@@ -957,11 +1019,30 @@ def search(world: World, target: str, *, at: int | None = None,
             f"{len(distinct)} distinct decisions across {len(result.probes)} "
             "probes: the closed bracket holds one change of decision and the "
             "others are unreported")
+    # Two verdicts need no floor, and a floor costs a live agent
+    # 2 * FLOOR_CALLS calls, so they come first. Identical inputs mean
+    # the intervention never reached the agent; equal nets mean the
+    # change is one the floor's measure cannot see.
+    left = _entry_prompt(arms[low], result.step)
+    right = _entry_prompt(arms[high], result.step)
+    if left is not None and left == right:
+        result.status = "unseen"
+        result.caveats = [
+            "the two bracketing arms sent the agent byte-identical inputs "
+            f"at step {result.step}: the intervention had not reached the "
+            "agent, so the difference between the recorded decisions is "
+            "agent noise; no flip is reported and no floor was asked for"
+        ] + caveats + _context_caveats(base, day, result.step)
+        return result
     if result.net_gap == 0.0:
-        caveats.append(
+        result.status = "same net"
+        result.caveats = [
             "the two decisions differ in shape and agree in net (buys minus "
-            "sells): the floor is measured on net, so this change cannot "
-            "clear it")
+            "sells): a change of quantity or of symbol, which a floor "
+            "measured on net cannot see; no flip is reported and no floor "
+            "was asked for"
+        ] + caveats + _context_caveats(base, day, result.step)
+        return result
 
     measured, reason = _measure_floor(arms[low], arms[high], result.step,
                                       floor)
@@ -974,12 +1055,21 @@ def search(world: World, target: str, *, at: int | None = None,
         return result
 
     result.floor = measured.as_dict()
+    result.floor_gap = measured.separation["gap_net"]
     result.separation = measured.separation["net"]
-    caveats = (_floor_caveats(measured, floor is not None, result.step)
-               + caveats)
+    unmeasured = _unmeasured(measured)
+    if unmeasured is not None:
+        result.status = "floor unmeasurable"
+        result.caveats = [
+            "the bracket closed and no flip is reported: the agent's floor "
+            f"is unmeasured. {unmeasured}; {_parsed_counts(measured)}"
+        ] + _refusal_caveat(measured) + caveats
+        result.caveats += _context_caveats(base, day, result.step)
+        return result
+
+    caveats = _floor_caveats(measured, floor is not None) + caveats
     if not _clears(measured):
-        result.status = ("unseen" if measured.identical_inputs
-                         else "inside floor")
+        result.status = "inside floor"
         result.caveats = caveats + _context_caveats(base, day, result.step)
         return result
 
@@ -999,9 +1089,10 @@ def search(world: World, target: str, *, at: int | None = None,
         seen_low=probes[low].seen, seen_high=probes[high].seen,
         decision_low=probes[low].decision,
         decision_high=probes[high].decision, net_gap=result.net_gap,
-        separation=result.separation, floor=result.floor,
-        manifests=manifests, agreement=result.agreement,
-        probes=list(result.probes), caveats=list(caveats))
+        floor_gap=result.floor_gap, separation=result.separation,
+        floor=result.floor, manifests=manifests,
+        agreement=result.agreement, probes=list(result.probes),
+        caveats=list(caveats))
     return result
 
 
@@ -1111,7 +1202,8 @@ class BoundaryMap:
             "high": pa.float64(), "seen_low": pa.float64(),
             "seen_high": pa.float64(), "decision_low": pa.string(),
             "decision_high": pa.string(), "net_gap": pa.float64(),
-            "floor": pa.float64(), "separation": pa.float64(),
+            "floor_gap": pa.float64(), "floor": pa.float64(),
+            "separation": pa.float64(),
             "reported": pa.bool_(), "probes": pa.int64(),
             "unreachable": pa.int64(), "caveats": pa.list_(pa.string()),
         }
