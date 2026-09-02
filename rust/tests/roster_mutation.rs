@@ -517,11 +517,18 @@ fn a_snapshot_at_a_stale_width_is_refused_and_the_error_says_why() {
 
     let stale = vec![0.0; 8]; // what a pre-fix snapshot of this run holds
     let err = e.set_volume_idio(&stale).expect_err("a stale width must fail");
-    assert!(err.contains('8'), "the error must name the width it was given");
-    assert!(err.contains('9'), "the error must name the roster's width");
+    // The bound phrases, not the bare digits. `err.contains('8')` is
+    // satisfied by the "#148" in the message whatever the widths are, and
+    // the two format arguments are both `usize` and positional, so swapping
+    // them produces a message that reads backwards and passes. Measured: a
+    // build with the arguments swapped passed the digit form of this test.
+    assert!(err.contains("carries 8"),
+            "the error must name the width the snapshot carries");
+    assert!(err.contains("holds 9"),
+            "the error must name the width the roster holds");
     assert!(err.contains("#148"), "the error must name the issue");
 
-    // The refusal leaves the engine alone rather than half-written.
+    // The array itself is untouched by the refusal.
     assert_eq!(e.volume_idio().len(), 9);
     for v in e.volume_idio() {
         assert_eq!(v.to_bits(), 0.0f64.to_bits());

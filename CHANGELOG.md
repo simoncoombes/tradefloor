@@ -101,17 +101,22 @@ to get a snapshot at the roster's width.
 ### The measured comparison
 
 Two builds ran the same three runs on `Universe.random(8, seed=99)` at seed
-42 under pt-v16, one at `f47c149` and one with the fix. The fixed-roster
-run of three days held every field: its price digest, its whole state
-snapshot, its draw count and all seven generator positions.
+42 under pt-v16, one at `f47c149` and one with the fix. Digests here are
+`tradefloor.manifest.market_digest`, which the package ships, so a reader
+can recompute them. The fixed-roster run of three days held every field,
+including its market digest of
+`f12c3ff678c769867bec02bbd44882f8fdf5c3273fde7dd41f80d8d6266be0e3`, its
+whole state snapshot and all seven generator positions.
 
 The roster-changing run listed one instrument after day one and delisted
-index 0 after day two. Its price digest held at
-`7bd337ec5e38dbb86853da8cbfeaaa934cc2028e7747b4a4538c44169fd55825` and its
-draw count held at 73,739. Four fields moved: the volume-idio generator
-position, the snapshot digest that carries it, the array width after the
-listing, which went from 8 to 9, and the survivors' states after the
-delisting under a model with `volume_idio_sigma` at 0.4.
+index 0 after day two. Its market digest held at
+`37b5a9e719764f4b6df2b8d85291d0ce6f326146d838bd28a8d5a9b6734cdb78`, and its
+`draws_consumed` count, which totals the market, economy and external
+streams and does not reach the volume-idio stream, held at 73,739. Four
+fields moved: the volume-idio generator position, the snapshot digest that
+carries it, the array width after the listing, which went from 8 to 9, and
+the survivors' states after the delisting under a model with
+`volume_idio_sigma` at 0.4.
 
 That last arm is one no shipped preset reaches. At sigma 0.0 every slot
 holds exactly 0.0, so a survivor reading its neighbour's slot reads the
@@ -144,6 +149,11 @@ would continue plausibly under states belonging to other names. The error
 now names the width the snapshot carries, the width the roster holds and
 issue #148, so a reader meets the explanation where the failure happens.
 
+The refusal is the last write `restore_state` attempts, and every write
+before it stands. An engine that has caught this error holds the snapshot's
+price columns, generator positions, day accumulators, market-open flag,
+common volume state and remembered stress, and keeps only its own per-name
+volume array. Drop that engine rather than running it on.
 
 ## 0.6.2
 

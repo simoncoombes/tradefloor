@@ -402,6 +402,17 @@ impl Engine {
     /// market continues plausibly under states belonging to other names.
     /// The caller is told which two numbers disagree and where the mismatch
     /// came from.
+    ///
+    /// # The writes that already stand when this refuses
+    ///
+    /// In `PyEngine::restore_state` this is the LAST write, so by the time
+    /// it refuses, the price columns, the generator positions, the day
+    /// accumulators, the market-open flag, the common volume state and the
+    /// remembered stress have all been taken from the snapshot. Only this
+    /// array keeps the engine's own values. An engine that has caught this
+    /// error therefore holds another run's market beside its own per-name
+    /// volume states, and it should be dropped rather than run on.
+    /// `tests/test_volume_idio_roster.py` asserts that state field by field.
     pub fn set_volume_idio(&mut self, values: &[f64]) -> Result<(), String> {
         if values.len() != self.volume_idio.len() {
             return Err(format!(

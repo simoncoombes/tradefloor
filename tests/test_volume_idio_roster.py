@@ -210,10 +210,57 @@ def test_a_snapshot_at_a_stale_width_is_refused():
 
     message = str(caught.value)
     assert "#148" in message, "the error must name the issue"
-    assert "8" in message and "9" in message, \
-        "the error must name both widths"
+    # The bound phrases, not the bare digits. "8" in message is satisfied by
+    # the "#148" whatever the widths are, and the two format arguments are
+    # both integers and positional, so swapping them gives a message that
+    # reads backwards and passes the looser form.
+    assert "carries 8" in message, \
+        "the error must name the width the snapshot carries"
+    assert "holds 9" in message, \
+        "the error must name the width the roster holds"
     assert widths(target) == (9, 9), \
-        "a refused restore must leave the engine alone"
+        "the refusal leaves the array at the roster's width"
+
+
+def test_a_refused_restore_leaves_the_engine_partly_written():
+    """The guard is the LAST step of `restore_state`, so it is not atomic.
+
+    By the time the width is checked, every price column, the generator
+    positions, the day accumulators, the market-open flag, the common volume
+    state and the remembered stress have all been written from the snapshot.
+    Only the per-name volume array keeps its own values, because the write
+    that would have replaced it is the one that refused.
+
+    An engine that caught this error holds another run's market and its own
+    per-name volume states. Asserted rather than described, because the
+    changelog and `set_volume_idio` both tell a reader to stop using it, and
+    a reader deserves to know what they are holding.
+    """
+    donor = engine(8)
+    donor.run_days(1)
+    donor.list_instrument(IPO)
+    donor.run_days(2)
+    stale = donor.state_snapshot()
+    donor_rng = stream_state(donor.state_snapshot(), "market")
+    stale["volume_idio"] = stale["volume_idio"][: 8 * 8]
+
+    target = engine(8)
+    target.list_instrument(IPO)
+    target.run_days(1)
+    own_prices = target.prices()
+    own_states = states(target)
+
+    with pytest.raises(tf.ValidationError):
+        target.restore_state(stale)
+
+    assert target.prices() == donor.prices(), \
+        "the price columns were written before the refusal"
+    assert target.prices() != own_prices
+    assert stream_state(target.state_snapshot(), "market") == donor_rng, \
+        "the generator positions were written before the refusal"
+    assert states(target) == own_states, \
+        "the per-name volume array is the one write that did not happen"
+    assert widths(target) == (9, 9)
 
 
 def test_a_snapshot_at_the_matching_width_is_accepted():
