@@ -1179,12 +1179,17 @@ def render(run: dict) -> str:
             t = run["tickers"][i]
             lines.append(f"| {t} | {med[i]:.4f} | {real_sd[i]:.4f} | "
                          f"{med[i] / real_sd[i]:.2f} |")
+    # A run saved before the preset was resolved into the provenance
+    # carries only its fingerprint, which for a shipped preset is the
+    # same name.
+    preset_name = (run["provenance"].get("preset")
+                   or run["provenance"]["model_fingerprint"])
     lines += ["", "## Setup", "",
               f"- sessions {run['sessions'][0]}..{run['sessions'][1]} of the "
               f"fetched window, {N} days solved, "
               f"{run['seconds']:.0f} s, {sum(d['evals'] for d in days)} "
               "forward evaluations",
-              f"- preset {run['provenance']['preset']} (fingerprint "
+              f"- preset {preset_name} (fingerprint "
               f"{run['provenance']['model_fingerprint']}), seed "
               f"{run['args']['seed']}, sigma {run['args']['sigma']} in log "
               "return units",
@@ -1198,7 +1203,8 @@ def render(run: dict) -> str:
               f"- fundamentals: {run['provenance']['fundamentals']}",
               f"- data: {run['provenance']['source']}; fetched "
               f"{sorted(set(run['provenance']['fetched'].values()))}",
-              f"- url template: {run['provenance']['url_template']}",
+              "- url template: "
+              + run["provenance"].get("url_template", "not recorded"),
               "- the fetched panel is not committed, and is reproduced from "
               "that template on those dates; a cloud run archives it beside "
               "this report as shadow-data.tgz",
@@ -1258,8 +1264,8 @@ def render(run: dict) -> str:
               "element of the state vector)",
               f"- universe stress, max: "
               f"{max((d['universe_stress'] or 0) for d in days)}",
-              f"- truth rows recorded: {run['truth_rows']}, daily bars "
-              f"{run.get('bar_rows', len(run.get('bars', ())))}"]
+              f"- truth rows recorded: {run.get('truth_rows', 0)}, daily "
+              f"bars {run.get('bar_rows', len(run.get('bars', ())))}"]
     return "\n".join(lines) + "\n"
 
 
