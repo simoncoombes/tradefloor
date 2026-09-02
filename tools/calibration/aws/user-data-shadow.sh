@@ -37,7 +37,15 @@ while true; do
   date -u +"%Y-%m-%dT%H:%M:%SZ" > /tmp/stream-alive
   aws s3 cp /tmp/stream-alive "$BUCKET/STREAM-ALIVE" 2>&1 || echo "STREAM UPLOAD FAILED"
   aws s3 cp /var/log/pretium-run.log "$BUCKET/run.log" || true
-  aws s3 cp /home/ec2-user/out "$BUCKET/partial/" --recursive --exclude "*.whl" --quiet || true
+  # Only files the solver has finished writing. The final shadow.json is
+  # written over several minutes, and a heartbeat that copied it mid-write
+  # put a truncated 930 MB object in the bucket that parsed nowhere; the
+  # run it came from was then lost with the instance, because the final
+  # step below never uploaded the real one. The partial records are small
+  # and rewritten whole, so they are safe to stream.
+  aws s3 cp /home/ec2-user/out "$BUCKET/partial/" --recursive \
+    --exclude "*.whl" --exclude "*/shadow.json" --exclude "*.tmp" \
+    --quiet || true
   sleep 45
 done
 STREAM
@@ -110,7 +118,10 @@ else
 fi
 
 aws s3 cp /var/log/pretium-run.log "$BUCKET/run.log" || true
-for f in /home/ec2-user/out/*; do aws s3 cp "$f" "$BUCKET/" || true; done
+# Recursive, because the runs write into out/<run>/ and `aws s3 cp` on a
+# directory without --recursive fails silently in this loop: that is how a
+# whole crisis run's shadow.json and shadow.md never left the box.
+aws s3 cp /home/ec2-user/out "$BUCKET/" --recursive || true
 aws s3 cp /tmp/DONE "$BUCKET/DONE" || true
 
 shutdown -h now

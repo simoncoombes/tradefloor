@@ -749,3 +749,50 @@ def test_a_render_leaves_a_fixed_solvers_run_alone(synthetic_year, tmp_path):
     text = (out2 / "shadow.md").read_text(encoding="utf-8")
     assert "optimiser's own Jacobian" in text
     assert "recomputed at render time" not in text
+
+
+def test_a_recompute_refuses_another_preset(synthetic_year, tmp_path):
+    """The run records the preset it was GIVEN, which is None when it took
+    the default, so a rebuild takes whatever the default is at render time.
+    The fingerprint it recorded is what says which market it was.
+    """
+    run = shadow.shadow(_args(tmp_path / "a"))
+    old = json.loads(json.dumps(run))
+    old["provenance"].pop("solver")
+    old["provenance"]["model_fingerprint"] = "pt-v14"
+    with pytest.raises(SystemExit) as caught:
+        shadow.recompute_sensitivity(old, shadow.realdata.load("calm"))
+    said = str(caught.value)
+    assert "pt-v14" in said and run["provenance"]["model_fingerprint"] in said
+    # and the run's own fingerprint recomputes
+    assert shadow.recompute_sensitivity(
+        json.loads(json.dumps(run)), shadow.realdata.load("calm"))["days"]
+
+
+def test_a_partial_run_recomputes_and_says_it_is_partial(synthetic_year,
+                                                         tmp_path):
+    """The crisis report is a partial, so the partial path is the one that
+    carries it. The columns come back equal to the fixed solver's and the
+    title says the run was still going.
+    """
+    run = shadow.shadow(_args(tmp_path / "a", days=4))
+    partial = json.loads((tmp_path / "a" / "shadow-partial.json")
+                         .read_text(encoding="utf-8"))
+    assert partial["partial"] is True
+    solved = {d["day"]: d for d in run["days"]}
+
+    old = json.loads(json.dumps(partial))
+    old["provenance"].pop("solver", None)
+    for day in old["days"]:
+        day["sensitivity"] = [0.0] * len(day["sensitivity"])
+        day["clamped"] = ["WRONG"]
+
+    back = shadow.recompute_sensitivity(old, shadow.realdata.load("calm"))
+    assert back["days"]
+    for fresh in back["days"]:
+        want = solved[fresh["day"]]
+        assert fresh["sensitivity"] == want["sensitivity"], fresh["day"]
+        assert fresh["clamped"] == want["clamped"], fresh["day"]
+    text = shadow.render(back)
+    assert "PARTIAL, the run was still going" in text
+    assert "recomputed at render time" in text

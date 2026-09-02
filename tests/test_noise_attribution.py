@@ -180,6 +180,14 @@ def test_the_table_is_arrow_and_the_shard_is_a_slice():
     assert isinstance(table, pa.Table)
     assert table.num_rows == len(whole.rows)
     assert table.column_names == [c for c, _ in noise.Attribution.COLUMNS]
+    # Every field a row carries reaches the table. Compared against the
+    # column list alone this assertion cannot fail, which is how the two
+    # fields carrying the arms comparison stayed out of the table while
+    # the rows held them.
+    assert set(table.column_names) == set(whole.rows[0])
+    got = table.to_pylist()
+    assert all(r["positions_match"] is True for r in got)
+    assert all(r["draws"] == whole.control_draws for r in got)
     part = noise.attribute(root, 1, noise.column("price", 1), "event",
                            streams=["jumps"], shard=(1, 3))
     assert part.rows == whole.rows[1::3]

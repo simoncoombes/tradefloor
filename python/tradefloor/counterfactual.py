@@ -173,6 +173,7 @@ from .manifest import RunManifest, market_digest
 from .portfolio import Portfolio
 from .interventions import Intervention
 from . import noise as _noise
+from .render import Renderer, check_renderer
 from .scenario import Scenario
 from .universe_util import fingerprint_of
 
@@ -2350,3 +2351,540 @@ def resample(control: World, treatment: World, *, at: int | None = None,
     return Resample(at=at, n=n, control=left, treatment=right, noise=noise,
                     separation=separation, identical_inputs=not differing,
                     differing_lines=differing, intervened_fields=touched)
+
+
+# ---------------------------------------------------------------------------
+# Observation invariance: the same world, shown differently
+# ---------------------------------------------------------------------------
+
+
+class Invariance:
+    """How much a decision changed because the market changed, against how
+    much it changed because the market was described differently.
+
+    :func:`invariance` forks one world once per renderer, runs each fork
+    the same number of days under the same agent, and reports two things
+    side by side: :attr:`presentation`, the first step at which any two
+    renderers' arms came apart, and :attr:`floor`, the same agent's own
+    noise on one renderer's identical, repeated input. A presentation
+    effect smaller than the floor is not a finding; it is the agent
+    answering the same question twice, the way :func:`resample` already
+    reads a between-arm gap against a within-arm one.
+
+    It cannot say a difference is a defect. An agent may read basis points
+    more reliably than dollars, or a compact table better than nine lines a
+    name. :attr:`presentation` says where two renderings first diverged and
+    what diverged -- the decision, the orders, the resulting prices, the
+    portfolio -- not which renderer was right. :meth:`agreement_rate` and
+    :meth:`most_agreed` say which renderer's decisions the others matched
+    most often, which is as close to "right" as this function gets.
+    """
+
+    __slots__ = ("renderers", "days", "decisions", "presentation", "floor",
+                "unrecorded", "stopped_early", "days_compared")
+
+    def __init__(self, *, renderers: Sequence[str], days: int,
+                decisions: dict[str, list], presentation: list[Comparison],
+                floor: "Resample | None",
+                unrecorded: Sequence[str] = (),
+                stopped_early: dict[str, int] | None = None,
+                days_compared: dict[tuple[str, str], int] | None = None,
+                ) -> None:
+        #: The renderer keys :func:`invariance` was called with, in the
+        #: order given. `presentation`'s pairs and `decisions`' keys both
+        #: name renderers from this list, minus whichever are in
+        #: :attr:`unrecorded`.
+        self.renderers = list(renderers)
+        self.days = days
+        #: Per renderer key, the agent's STANDING decision at every
+        #: post-fork step -- one entry a step, not one a day. Between two
+        #: actual decision points this repeats the last one, the same
+        #: way `World.run`'s own trace does (`_decision` returns whatever
+        #: the agent last published, not `None`, until it decides
+        #: again); `None` marks only a REFUSED step. The shared pre-fork
+        #: history is left out: every arm ran it identically by
+        #: construction, so it says nothing about presentation. A
+        #: renderer in :attr:`unrecorded` has no entry here; a renderer
+        #: in :attr:`stopped_early` has a TRUNCATED one, covering only
+        #: the days it actually completed.
+        self.decisions = decisions
+        #: One :class:`Comparison` per pair of MEASURED renderers (both
+        #: outside :attr:`unrecorded`), control and treatment ordered as
+        #: they appear in :attr:`renderers`. Its :attr:`~Comparison.divergence`
+        #: is a :class:`Divergence` whose `intervention_step` and
+        #: `intervention_day` are always `None` here -- nothing was
+        #: intervened on, only shown differently -- and whose `decision`,
+        #: `orders`, `prices` and `portfolio` are the steps this
+        #: experiment is about.
+        self.presentation = list(presentation)
+        #: :func:`resample` between two forks of the SAME renderer
+        #: (`renderers[0]`), or `None` when `invariance` was called with
+        #: `floor=False`, or when `renderers[0]` itself could not replay.
+        #: Its `identical_inputs` is always True: nothing was intervened
+        #: on here either, and the whole point is a between-arm gap
+        #: measured on one unchanging question.
+        self.floor = floor
+        #: Renderer keys :func:`invariance` could not measure: against a
+        #: replaying agent, a renderer whose text does not match what was
+        #: recorded raises a
+        #: :class:`~tradefloor.integrations.common.DecisionError` at its
+        #: first post-fork decision -- :class:`~tradefloor.integrations.common.ReplayMiss`
+        #: on the three adapters built on the shared base, and FinRobot's
+        #: own :class:`~tradefloor.integrations.finrobot.DecisionError` on
+        #: FinRobot, which carries no `ReplayMiss` of its own and raises
+        #: the same class for a genuine replay miss and for a malformed
+        #: recorded response -- and that renderer is reported here rather
+        #: than taking the whole call down. ONLY a renderer that completed
+        #: ZERO post-fork days lands here; one that got partway is in
+        #: :attr:`stopped_early` instead, with what it DID measure kept
+        #: rather than thrown away. Typically every renderer but the one
+        #: the recording was made under. Empty against a live agent,
+        #: which answers any renderer's text.
+        self.unrecorded = list(unrecorded)
+        #: Renderer keys that completed at least one post-fork day but
+        #: not all `days` of them, mapped to the STEP whose decision
+        #: never arrived. Most often this means `days` asked for more
+        #: than a replayed transcript covers for that renderer -- the
+        #: renderer that matches the recording typically gets this far
+        #: rather than landing in :attr:`unrecorded`, which is why the
+        #: two are kept apart: an arm that genuinely ran most of the
+        #: experiment is a different thing from one that never started,
+        #: and :attr:`decisions` keeps what a stopped-early arm measured
+        #: rather than discarding it.
+        self.stopped_early = dict(stopped_early or {})
+        #: `(control key, treatment key) -> days both arms of that pair
+        #: actually completed`, for every pair in :attr:`presentation`.
+        #: Equal to :attr:`days` unless one side is in
+        #: :attr:`stopped_early`, in which case it is that side's
+        #: shorter count: :func:`compare` diffs two traces with `zip`,
+        #: which silently stops at the shorter one, so a pair's
+        #: :class:`Divergence` reading "never" is a claim about however
+        #: many days this dict says, not necessarily :attr:`days`.
+        self.days_compared = dict(days_compared or {})
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "renderers": list(self.renderers),
+            "days": self.days,
+            "decisions": copy.deepcopy(self.decisions),
+            "presentation": [c.as_dict() for c in self.presentation],
+            "floor": None if self.floor is None else self.floor.as_dict(),
+            "unrecorded": list(self.unrecorded),
+            "stopped_early": dict(self.stopped_early),
+            # A list of rows, not a dict with a tuple key: tuple keys do
+            # not survive `json.dumps`, and `as_dict()` is meant to.
+            "days_compared": [
+                {"renderer_a": a, "renderer_b": b, "days": n}
+                for (a, b), n in self.days_compared.items()
+            ],
+        }
+
+    def agreement_rate(self) -> dict[str, float]:
+        """For each measured renderer, the mean fraction of post-fork
+        steps at which its decision equalled each OTHER measured
+        renderer's, over every renderer it shares a step with.
+
+        Compared by equality on the same dictionary :func:`compare` diffs
+        on -- the actions and the rationale, published by
+        :meth:`~tradefloor.integrations.common.FrameworkAdapter.decision`
+        -- at matching positions in :attr:`decisions`, which are aligned
+        because every measured arm ran the same number of days from the
+        same fork. Since :attr:`decisions` holds the agent's STANDING
+        decision at every STEP, not one entry a day, an agent asked once
+        a day (the default cadence) has each real decision counted
+        `steps_per_day` times over -- consistent across renderers, since
+        every measured arm runs the same cadence, but a rate near the
+        agent's own repeat-length is not automatically a strong
+        agreement; read it against how often the agent actually decides.
+        Empty when fewer than two renderers were measured.
+        """
+        keys = [k for k in self.renderers if k in self.decisions]
+        totals: dict[str, list[float]] = {k: [] for k in keys}
+        for i in range(len(keys)):
+            for j in range(i + 1, len(keys)):
+                a, b = keys[i], keys[j]
+                da, db = self.decisions[a], self.decisions[b]
+                n = min(len(da), len(db))
+                if n == 0:
+                    continue
+                matched = sum(1 for x, y in zip(da[:n], db[:n]) if x == y)
+                rate = matched / n
+                totals[a].append(rate)
+                totals[b].append(rate)
+        return {k: (sum(v) / len(v) if v else 0.0) for k, v in totals.items()}
+
+    def most_agreed(self) -> str | None:
+        """The renderer key with the STRICTLY highest :meth:`agreement_rate`,
+        or `None` when fewer than two renderers were measured, or when two
+        or more renderers tie for the highest rate.
+
+        A tie is not a finding, and reporting one of the tied renderers as
+        the winner -- which a naive `max` would, by whichever happened to
+        come first in :attr:`renderers` -- would print a result this
+        function has no basis for: this package's whole premise is that it
+        cannot say which renderer is right, and a "winner" drawn from list
+        order is exactly the claim it must not make. Two renderers that
+        fully agree with each other tie at `1.0` and this returns `None`
+        for them, correctly -- there is nothing to prefer between two
+        renderings the agent read identically.
+        """
+        rates = self.agreement_rate()
+        if len(rates) < 2:
+            return None
+        best = max(rates.values())
+        winners = [key for key, rate in rates.items() if rate == best]
+        return winners[0] if len(winners) == 1 else None
+
+    def table(self) -> Any:
+        """One row per pair of renderers, where their arms first came
+        apart, as a :class:`pyarrow.Table`.
+
+        Columns: `renderer_a`, `renderer_b`, `fork_agreed` (whether
+        :func:`agree` found the two arms identical at the fork, before
+        either renderer had rendered a step), `days_compared` (from
+        :attr:`days_compared` -- how many days this ROW actually covers,
+        which is :attr:`days` unless one side is in
+        :attr:`stopped_early`), and the first post-fork step at which
+        `decision`, `orders`, `prices` and `portfolio` diverged, `None`
+        where they never did over `days_compared` days -- NOT necessarily
+        :attr:`days`, and a reader comparing rows across a table where
+        `days_compared` varies is comparing spans of different length.
+
+        Lazily imports `pyarrow`, a TEST and TOOLING dependency the library
+        itself does not carry; see `tests/test_arrow.py`.
+        """
+        try:
+            import pyarrow as pa
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError(
+                "Invariance.table() needs pyarrow. Install it with: "
+                "pip install pyarrow"
+            ) from exc
+
+        rows = []
+        for comparison in self.presentation:
+            d = comparison.divergence
+            left = comparison.control.get("label", "")
+            right = comparison.treatment.get("label", "")
+            rows.append({
+                "renderer_a": left,
+                "renderer_b": right,
+                "fork_agreed": (None if comparison.agreement is None
+                               else comparison.agreement.identical),
+                "days_compared": self.days_compared.get(
+                    (left, right), self.days),
+                "decision_diverges_at": d.decision,
+                "orders_diverge_at": d.orders,
+                "prices_diverge_at": d.prices,
+                "portfolio_diverges_at": d.portfolio,
+            })
+        if not rows:
+            # Unreachable through `invariance()`, which refuses fewer than
+            # two renderers and so always produces at least one pair; only
+            # a caller constructing `Invariance` by hand with an empty
+            # `presentation` can reach this. `pa.table([])` cannot infer a
+            # schema from nothing, so the columns are named explicitly
+            # rather than left for the caller to discover by failing.
+            schema = pa.schema([
+                ("renderer_a", pa.string()), ("renderer_b", pa.string()),
+                ("fork_agreed", pa.bool_()),
+                ("days_compared", pa.int64()),
+                ("decision_diverges_at", pa.int64()),
+                ("orders_diverge_at", pa.int64()),
+                ("prices_diverge_at", pa.int64()),
+                ("portfolio_diverges_at", pa.int64()),
+            ])
+            return pa.table(
+                {name: [] for name in schema.names}, schema=schema)
+        return pa.Table.from_pylist(rows)
+
+    def render(self) -> str:
+        out = [f"  invariance over {self.days} days asked for, "
+              f"{len(self.renderers)} renderers: "
+              + ", ".join(self.renderers)]
+        if self.unrecorded:
+            out.append(f"  unrecorded (no reply for this text in the "
+                       f"transcript): {', '.join(self.unrecorded)}")
+        if self.stopped_early:
+            # States what is known -- the step -- and not why: the
+            # renderer's text may never have matched a recording, or a
+            # LIVE call may have raised partway through, and this
+            # function cannot always tell which (see `invariance`'s own
+            # docstring on FinRobot's exception hierarchy).
+            stopped = ", ".join(f"{key!r} at step {step}" for key, step
+                                in self.stopped_early.items())
+            out.append(f"  stopped early (no further reply after this "
+                       f"step; decisions kept up to it): {stopped}")
+        out.append("")
+        for comparison in self.presentation:
+            left = comparison.control.get("label", "control")
+            right = comparison.treatment.get("label", "treatment")
+            d = comparison.divergence
+            agreed = ("agreed at the fork" if (comparison.agreement is None
+                      or comparison.agreement.identical)
+                      else "DID NOT AGREE at the fork")
+            out.append(f"  {left} vs {right}, {agreed}")
+            covered = self.days_compared.get((left, right), self.days)
+            if covered < self.days:
+                out.append(f"  compared over {covered} of {self.days} "
+                           "days asked for -- one side stopped early; "
+                           "every row below reads over that shorter span")
+            out.append(d.render())
+            out.append("")
+        most = self.most_agreed()
+        if most is not None:
+            rate = self.agreement_rate()[most]
+            out.append(f"  the agent agreed with {most!r} most often "
+                       f"({rate:.0%} of steps, averaged over the other "
+                       "measured renderers)")
+        if self.floor is not None:
+            out.append(f"  the agent's own noise floor, {self.floor.n} "
+                       f"calls each on {self.renderers[0]!r} and an "
+                       "identical clone of it:")
+            out.append(self.floor.render())
+        return "\n".join(out)
+
+    def __repr__(self) -> str:
+        return (f"Invariance({len(self.renderers)} renderers, "
+                f"{len(self.presentation)} pairs, "
+                f"unrecorded={len(self.unrecorded)}, "
+                f"stopped_early={len(self.stopped_early)}, "
+                f"floor={'measured' if self.floor is not None else None})")
+
+
+def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
+               floor: bool = True) -> Invariance:
+    """Fork `world` once per renderer, run each `days` days, and report how
+    much the agent's decisions moved.
+
+    ```python
+    from tradefloor.render import TextRenderer, JSONRenderer
+
+    report = invariance(
+        world, [TextRenderer(units="usd"), TextRenderer(units="bps"),
+               JSONRenderer()],
+        days=10)
+    print(report.render())
+    ```
+
+    Each renderer gets its own fork of `world`, taken in one call to
+    :meth:`World.fork` so every arm shares identical pre-fork state, and
+    its own copy of `world.agent` with `renderer` replaced -- everything
+    else about the agent (its framework, its instructions, its cadence)
+    stays what `world` was already running. `world.agent` must carry a
+    `renderer` attribute, which every adapter under
+    `tradefloor.integrations` does; a plain policy with no rendering step
+    has nothing for this function to vary.
+
+    On a `LangGraphAdapter` built with its own `input_builder=` (not the
+    default), the swap changes nothing a live graph actually receives:
+    a caller's own builder does not read `self.renderer`, only the
+    adapter's DEFAULT one does. This function does not detect that case
+    and will run every arm anyway, quietly measuring nothing -- the
+    graph sees the same input on every arm, so every comparison finds no
+    presentation effect, which looks identical to a real one. Pass a
+    `LangGraphAdapter` at its default `input_builder` to this function,
+    or vary the renderer some other way (a custom `input_builder` reading
+    `self.renderer` itself) if the graph needs its own.
+
+    `floor`, true by default, forks one more arm under `renderers[0]` --
+    the first renderer, taken as the reference -- and calls
+    :func:`resample` between it and the `renderers[0]` arm above, asking
+    the agent's own first post-fork decision again several times. Both
+    arms saw identical input, so the resulting gap is the agent's own
+    noise and nothing else, which is what :attr:`Invariance.floor`
+    measures a presentation effect against. Set it false to skip the extra
+    fork and the extra calls.
+
+    Against a replaying agent, a renderer whose text does not match what
+    the transcript was recorded under raises a
+    :class:`~tradefloor.integrations.common.DecisionError` at its first
+    post-fork decision. This function catches that PER ARM: the renderer
+    is reported in :attr:`Invariance.unrecorded` rather than the whole
+    call failing, which is what lets a single recorded transcript still
+    answer "what would a different rendering have looked like" even
+    though only one rendering was ever actually asked. A live framework
+    failure is a different kind of failure and is not caught here; it
+    propagates. A malformed recorded response would, ideally, be a third
+    kind and also propagate -- three of the four adapters raise
+    :class:`~tradefloor.integrations.common.ReplayMiss`, a distinct
+    subclass, for exactly this reason, and a narrower catch would leave
+    it alone. FinRobot does not: it raises the same
+    :class:`~tradefloor.integrations.finrobot.DecisionError` for a
+    replay miss and for a response that failed to parse, so on FinRobot
+    the two are indistinguishable from here and this function reports
+    both as unrecorded rather than reaching into one adapter's exception
+    hierarchy by name to tell them apart. In practice this is the
+    narrower, likelier case: every shipped fixture is checked elsewhere
+    for exactly this (`tests/test_integrations.py`'s
+    `test_a_committed_recording_is_valid_without_its_framework`).
+
+    This depends on the exception reaching this function at all. `World`
+    built with `on_refusal="skip"` -- not the default -- swallows a
+    generic `DecisionError` as a refused step rather than raising it, and
+    re-raises only `ReplayMiss` specifically. A FinRobot fork under a
+    `world` configured that way will not report a non-matching renderer
+    as unrecorded; it will report a run full of refusals instead. Forks
+    inherit `on_refusal` from `world`, unchanged.
+
+    Raises :class:`~tradefloor._core.ValidationError` on fewer than two
+    renderers, on two renderers sharing a :meth:`~.Renderer.key`, on an
+    object without both `render` and `key`, or on an agent with no
+    `renderer` attribute, all at the call, before anything runs.
+    """
+    if len(renderers) < 2:
+        raise ValidationError(
+            f"invariance needs at least 2 renderers to compare, got "
+            f"{len(renderers)}. One renderer has nothing to be invariant "
+            "against.")
+    if not hasattr(world.agent, "renderer"):
+        raise ValidationError(
+            f"{type(world.agent).__name__} has no `renderer` attribute, so "
+            "there is nothing for invariance() to vary between forks. "
+            "FinRobotAdapter, LangGraphAdapter, PydanticAIAdapter and "
+            "OpenAIAgentsAdapter all carry one; a hand-written policy or "
+            "CallableAgentAdapter renders nothing and is not a subject for "
+            "this experiment.")
+    for i, renderer in enumerate(renderers):
+        check_renderer(renderer, where=f"renderers[{i}]")
+
+    keys = [r.key() for r in renderers]
+    if len(set(keys)) != len(keys):
+        raise ValidationError(
+            f"renderers must have distinct keys, got {keys}. invariance "
+            "reports one column per renderer, and two sharing a key would "
+            "be reported, and forked, as one.")
+
+    # `DecisionError`, not the narrower `ReplayMiss`: FinRobot raises its
+    # own `DecisionError` for a replay miss, with no `ReplayMiss`
+    # subclass of its own -- see the docstring above -- so catching only
+    # `ReplayMiss` would let a non-matching renderer take the whole call
+    # down on FinRobot specifically while working as documented on the
+    # other three adapters. Imported here rather than at module level
+    # for the same reason `resample._ask_again` does: `integrations` is
+    # reached explicitly, never pulled in by `import tradefloor` alone.
+    from .integrations.common import DecisionError
+
+    labels = list(keys)
+    if floor:
+        floor_label = f"{keys[0]} (floor)"
+        while floor_label in labels:
+            floor_label += " (floor)"
+        labels = labels + [floor_label]
+
+    forks = world.fork(*labels)
+    renderer_forks = forks[:len(keys)]
+
+    # Every pairwise agreement, taken BEFORE the renderer swap below: at
+    # this point every fork still carries the SAME renderer `world.agent`
+    # did, so this is proof the shared start was identical, not a report
+    # on the very difference this function exists to measure. Taken
+    # after the swap, `agree()`'s agent-state check would see the
+    # renderer itself as the divergence on any adapter whose `state()`
+    # publishes it (FinRobotAdapter does), and report every pair as a
+    # failed fork on that adapter alone -- a comparison artefact, not a
+    # finding.
+    agreements = {}
+    for i in range(len(renderer_forks)):
+        for j in range(i + 1, len(renderer_forks)):
+            agreements[(i, j)] = agree(renderer_forks[i], renderer_forks[j])
+    floor_agreement = (agree(forks[0], forks[-1]) if floor else None)
+    # `Resample` carries no `agreement` slot of its own -- `resample()`
+    # takes two already-forked worlds and has never needed one, because it
+    # is normally called on arms whose fork already had a `Comparison` to
+    # attach to. Here the check is worth making anyway, since a floor
+    # resting on a fork that was not actually identical would understate
+    # itself, but the finding belongs in the error a caller would see, not
+    # in a field bolted onto a type this package does not own.
+    if floor and not floor_agreement.identical:
+        raise ValidationError(
+            f"the two forks built for the noise floor disagree at the "
+            f"fork: {floor_agreement.differences}. This should not happen "
+            "-- World.fork() is meant to guarantee an identical start -- "
+            "and a floor measured past it would not be pure agent noise.")
+
+    for fork_world, renderer in zip(forks, renderers):
+        fork_world.agent.renderer = renderer
+    if floor:
+        forks[-1].agent.renderer = renderers[0]
+
+    def _run(fork_world: "World") -> int:
+        """Days of `fork_world` actually completed before a
+        `DecisionError`, if any.
+
+        A day at a time -- proven equal to one `fork_world.run(days=days)`
+        call for a fork that never fails, see `tests/test_render.py`'s
+        day-by-day equivalence check -- rather than the whole span in one
+        call, so a failure partway through leaves the days that DID
+        succeed in the trace instead of discarding them. `days` more than
+        a transcript covers used to report the reference renderer itself
+        as unrecorded, having genuinely replayed most of the run; now it
+        reports exactly how far it got.
+        """
+        completed = 0
+        for _ in range(days):
+            try:
+                fork_world.run(days=1)
+            except DecisionError:
+                return completed
+            completed += 1
+        return completed
+
+    completed = [_run(fork_world) for fork_world in renderer_forks]
+    unrecorded = [key for key, n in zip(keys, completed) if n == 0]
+    # A step, not a day: `fork_world.step` is exactly the step whose
+    # decision never arrived, because `World.run` raises before
+    # advancing `_step` past the step that failed.
+    stopped_early = {
+        key: fork_world.step
+        for key, fork_world, n in zip(keys, renderer_forks, completed)
+        if 0 < n < days
+    }
+
+    decisions = {
+        key: [row["decision"]
+             for row in fork_world.trace[fork_world.fork_step:]]
+        for key, fork_world, n in zip(keys, renderer_forks, completed)
+        if n > 0
+    }
+
+    presentation = []
+    # Keyed by (control label, treatment label) -- exactly
+    # `comparison.control["label"]`, `comparison.treatment["label"]` for
+    # the matching `Comparison`, since `World.fork` used the renderer
+    # keys as labels -- so `render()` and `table()` can look this up
+    # from the `Comparison` alone, with nothing extra to keep paired up.
+    days_compared: dict[tuple[str, str], int] = {}
+    for i in range(len(renderer_forks)):
+        if completed[i] == 0:
+            continue
+        for j in range(i + 1, len(renderer_forks)):
+            if completed[j] == 0:
+                continue
+            a, b = renderer_forks[i], renderer_forks[j]
+            presentation.append(compare(a, b, agreement=agreements[(i, j)]))
+            # `compare()` diffs two traces with `zip()`, which silently
+            # stops at the shorter one -- correct for what it measures,
+            # but a pair where one arm stopped early is compared over
+            # FEWER days than `days`, and nothing about a "never
+            # diverged" row says so without this.
+            days_compared[(keys[i], keys[j])] = min(completed[i], completed[j])
+
+    floor_result = None
+    if floor:
+        # Attempted unconditionally: the floor's own fork is an
+        # independent replay of `renderers[0]`'s text, and while it is
+        # deterministic to reach the same outcome as `completed[0]` --
+        # same seed, same renderer, same market -- checking it rather
+        # than inferring it costs one more replay attempt and nothing
+        # else. `resample` only needs the FIRST post-fork decision, so
+        # one completed day is enough on both sides even if either later
+        # stops early.
+        floor_completed = _run(forks[-1])
+        if completed[0] > 0 and floor_completed > 0:
+            floor_result = resample(forks[0], forks[-1])
+
+    return Invariance(renderers=keys, days=days, decisions=decisions,
+                      presentation=presentation, floor=floor_result,
+                      stopped_early=stopped_early, unrecorded=unrecorded,
+                      days_compared=days_compared)

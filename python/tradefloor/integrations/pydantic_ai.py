@@ -209,6 +209,7 @@ import json
 from typing import Any
 
 from .._core import ValidationError
+from ..render import JSONRenderer, Renderer, check_renderer
 from .common import (DECISION_SCHEMA_VERSION, MAX_PARTICIPATION, AdapterInfo,
                      DecisionError, FrameworkAdapter, FrameworkError,
                      IntegrationError, Transcript, check_prior,
@@ -328,6 +329,7 @@ class PydanticAIAdapter(FrameworkAdapter):
                  instructions: str = MANDATE,
                  bind_output_type: bool = True,
                  request_limit: int | None = REQUEST_LIMIT,
+                 renderer: Renderer | None = None,
                  info: AdapterInfo | None = None, every: int = 6,
                  fundamentals: dict[str, dict[str, Any]] | None = None,
                  max_participation: float = MAX_PARTICIPATION,
@@ -395,6 +397,15 @@ class PydanticAIAdapter(FrameworkAdapter):
         self.instructions = instructions
         self.bind_output_type = bind_output_type
         self.request_limit = request_limit
+        #: What turns the payload into the text half of the record and the
+        #: replay key -- `run(instructions=...)` carries `self.instructions`
+        #: separately and never passes through this. Defaults to
+        #: :class:`~tradefloor.render.JSONRenderer`, which reproduces this
+        #: adapter's own historical `render(payload)` character for
+        #: character.
+        if renderer is not None:
+            check_renderer(renderer, where="renderer")
+        self.renderer: Renderer = renderer if renderer is not None else JSONRenderer()
 
         # Here rather than at the first decision. Everything this needs is
         # known before the market opens, and a replay that refuses twenty
@@ -425,7 +436,7 @@ class PydanticAIAdapter(FrameworkAdapter):
         an outage has to be named before it gets there. See the module
         docstring for the reasoning on each.
         """
-        prompt = render(payload)
+        prompt = self.renderer.render(payload)
         key = digest(prompt)
         # Declared before the branch, so a replayed run's record carries the
         # same chain a live one does: observation, exact input, response,
@@ -586,6 +597,12 @@ class PydanticAIAdapter(FrameworkAdapter):
         published["bind_output_type"] = self.bind_output_type
         return published
 
+    def provenance(self) -> dict[str, Any]:
+        """The base's provenance, plus which renderer produced the text."""
+        out = super().provenance()
+        out["renderer"] = self.renderer.key()
+        return out
+
     def fork_kwargs(self) -> dict[str, Any]:
         """The constructor arguments a fork is rebuilt with.
 
@@ -602,7 +619,8 @@ class PydanticAIAdapter(FrameworkAdapter):
                       recorder=self.recorder, prior=self.prior,
                       instructions=self.instructions,
                       bind_output_type=self.bind_output_type,
-                      request_limit=self.request_limit)
+                      request_limit=self.request_limit,
+                      renderer=self.renderer)
         return kwargs
 
     def __repr__(self) -> str:
