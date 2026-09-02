@@ -71,3 +71,6 @@ Thumbs.db
 # and are committed, under tests/fixtures/. See CONTRIBUTING.md.
 examples/**/artifacts/
 tools/boundary/artifacts/
+
+# real bars fetched by tools/shadow; vendor data is never committed
+tools/shadow/data/
