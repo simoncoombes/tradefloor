@@ -462,3 +462,37 @@ def test_an_arm_that_moved_the_schedule_is_named():
     assert len(named) == 1
     assert "1 of 2 arms" in named[0]
     assert "economy uniform 4 (u=0)" in named[0]
+
+
+def test_the_caveats_meet_the_house_style(tmp_path):
+    """The caveats are copied verbatim into the amplification report, which
+    goes into a pull request body, so they are prose this repository
+    governs. `prose.py` reads a path, so they are written out and handed to
+    it the way every other surface is.
+    """
+    import os
+    import subprocess
+    import sys
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    said = []
+    for streams, target, horizon in (
+            (["jumps"], noise.column("price", 3), 3),
+            (["economy"], noise.pnl(), 3),
+            (["market"], noise.column("price", 2), None),
+            (["jumps", "news"], noise.pnl(), 1)):
+        attribution = noise.attribute(world(model=JUMPY), (1, 1), target,
+                                      "both", streams=streams,
+                                      horizon=horizon)
+        said.extend(attribution.caveats)
+    assert len(said) > 8
+    page = tmp_path / "caveats.md"
+    page.write_text(
+        "## Caveats\n\n"
+        + "\n".join(f"- {c}" for c in said) + "\n",
+        encoding="utf-8")
+    proc = subprocess.run(
+        [sys.executable, os.path.join(root, "tools", "prose", "prose.py"),
+         str(page)], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "0 findings" in proc.stdout, proc.stdout
