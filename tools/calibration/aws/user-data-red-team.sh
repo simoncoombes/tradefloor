@@ -19,10 +19,11 @@ BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/red-team
 # needs rather than assuming dev already carries it.
 BRANCH=feat/realism-red-team
 # 64: at 252 days a 40-name panel is lighter than the 504-day figure
-# CONTRIBUTING.md measures (about 1.6 GB resident, six workers the
-# practical ceiling on a LAPTOP). 64 is this run's starting point for a
-# large box (c7g/c8g.16xlarge class or bigger); watch the first minute of
-# run.log for a worker being killed (OOM) and relaunch lower if so.
+# gate_batch.py's module docstring measures (about 1.6 GB resident, six
+# workers the practical ceiling on a LAPTOP). 64 is this run's starting
+# point for a large box (c7g/c8g.16xlarge class or bigger); watch the
+# first minute of run.log for a worker being killed (OOM) and relaunch
+# lower if so.
 WORKERS=64
 
 dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2

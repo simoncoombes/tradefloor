@@ -84,12 +84,21 @@ one is evidence the calibration did not have.
 ```python
 from tools.calibration import red_team
 
-result = red_team.search("pt-v16", seeds=range(1, 201),
-                         roster_seeds=range(1, 21),
-                         scenarios=tradefloor.Scenario.available(),
-                         days=252, budget=600, workers=8)
-worst = result.worst["leverage_effect"]
-worst.manifest.reproduce()          # replays the exact cell, or raises
+# The `if __name__ == "__main__":` guard is required here, not decorative:
+# `workers > 1` runs cells under a `ProcessPoolExecutor`, which on
+# spawn-based platforms (Windows, macOS) re-executes whichever module is
+# `__main__` to bootstrap each worker. Call `search(..., workers > 1)`
+# only from code that is itself the `__main__` module -- the CLI's `main`
+# below is one such place; a bare script-level call without this guard is
+# another way to write it, and calling it from inside a test runner's own
+# process is the one place this does not work (see `ROSTER_N`'s docstring).
+if __name__ == "__main__":
+    result = red_team.search("pt-v16", seeds=range(1, 201),
+                             roster_seeds=range(1, 21),
+                             scenarios=tradefloor.Scenario.available(),
+                             days=252, budget=600, workers=8)
+    worst = result.worst["leverage_effect"]
+    worst.manifest.reproduce()      # replays the exact cell, or raises
 ```
 
 ## Usage
@@ -141,6 +150,24 @@ from tradefloor import envelope, facts  # noqa: E402
 #: overrides this module attribute directly (`red_team.ROSTER_N = 6`)
 #: rather than threading a parameter through `search`, which keeps
 #: `search`'s signature exactly the four axes, the horizon and the budget.
+#:
+#: `search` reads this attribute exactly ONCE, before building any job, and
+#: bakes the value it saw into every job tuple (see `_measure_cell`). That
+#: is not a style choice: `workers > 1` runs jobs under a
+#: `ProcessPoolExecutor`, and on Windows and macOS (both spawn-based) a
+#: pooled worker re-imports this module fresh rather than inheriting the
+#: caller's already-mutated one, so a worker reading this attribute itself
+#: would see 40 regardless of what a test had patched it to. Threading the
+#: resolved value through the job is what makes a monkeypatched grid behave
+#: the same under `workers=1` and `workers>1` -- confirmed by
+#: `test_cli_pooled_workers_agree_with_the_sequential_path` in
+#: `tests/test_red_team.py`, which drives both through the CLI rather than
+#: calling `search` in-process at `workers>1`: on this platform, spawning a
+#: pool from code a test RUNNER (not this script) launched re-executes the
+#: RUNNER's own `__main__` to bootstrap the worker, which hangs rather than
+#: failing cleanly. The CLI's own `if __name__ == "__main__":` guard is the
+#: supported entry point for `workers > 1`; call `search(..., workers>1)`
+#: directly only from code that is itself the `__main__` module.
 ROSTER_N = 40
 
 
@@ -162,26 +189,31 @@ def _grid_order(seeds: Sequence[int], roster_seeds: Sequence[int],
     return grid
 
 
-def _measure_cell(job: tuple[str, int, int, str, int]) -> dict[str, Any]:
+def _measure_cell(job: tuple[str, int, int, str, int, int]) -> dict[str, Any]:
     """One grid cell: build its inputs fresh, measure, capture a manifest.
 
-    `job` is `(preset, seed, roster_seed, scenario_name, days)`. Runs
-    standalone -- under `ProcessPoolExecutor` when `search` is called with
-    `workers > 1`, or directly in the caller's process otherwise -- and
-    builds its own `Universe` and `Scenario` rather than receiving either
-    as an argument. A loaded `Scenario` is stateful (`Scenario.apply`'s
-    docstring: "one scenario object driving two runs AT ONCE shares one
-    clock between them"), so sharing one instance across cells would need
-    either strict sequencing or a fresh `.copy()` per cell; building fresh
-    from the name every call sidesteps the question entirely; it is the
-    default constructor cost of one YAML read.
+    `job` is `(preset, seed, roster_seed, scenario_name, days, roster_n)`.
+    Runs standalone -- under `ProcessPoolExecutor` when `search` is called
+    with `workers > 1`, or directly in the caller's process otherwise --
+    and builds its own `Universe` and `Scenario` rather than receiving
+    either as an argument. A loaded `Scenario` is stateful
+    (`Scenario.apply`'s docstring: "one scenario object driving two runs AT
+    ONCE shares one clock between them"), so sharing one instance across
+    cells would need either strict sequencing or a fresh `.copy()` per
+    cell; building fresh from the name every call sidesteps the question
+    entirely; it is the default constructor cost of one YAML read.
+
+    `roster_n` travels IN the job rather than being read off the module's
+    `ROSTER_N` here, because this function may run in a freshly spawned
+    process that does not see a caller's monkeypatched module attribute --
+    see `ROSTER_N`'s docstring.
 
     Returns the per-statistic verdicts from `facts.compare_to_real_markets`
     and the cell's manifest, already serialised to JSON so the result
     crosses a process boundary as plain data.
     """
-    preset, seed, roster_seed, scenario_name, days = job
-    universe = tf.Universe.random(ROSTER_N, seed=roster_seed)
+    preset, seed, roster_seed, scenario_name, days, roster_n = job
+    universe = tf.Universe.random(roster_n, seed=roster_seed)
     scenario = tf.Scenario.load(scenario_name)
 
     # The instrumentlib.evaluate_panel shim: substitute facts.Engine for the
@@ -208,7 +240,7 @@ def _measure_cell(job: tuple[str, int, int, str, int]) -> dict[str, Any]:
     engine = captured[0]
     manifest = tf.RunManifest.of(
         engine, seed=seed, universe=universe, scenario=scenario,
-        universe_source={"generator": "Universe.random", "n": ROSTER_N,
+        universe_source={"generator": "Universe.random", "n": roster_n,
                          "seed": roster_seed},
         label=(f"P4 red team: {preset} seed={seed} roster_seed={roster_seed} "
               f"scenario={scenario_name}"),
@@ -344,9 +376,16 @@ def _report_worst(worst: dict[str, Finding], budget: dict[str, Any]) -> str:
         lines.append("no statistic had a scaled_distance to rank (empty "
                      "search, or every band-distance denominator missing)")
         return "\n".join(lines)
+    # The scenario field's width (22) is a minimum, not a cap: Python's
+    # `:<22s` never truncates a longer string, it just stops padding, so a
+    # scenario name at or past 22 characters (the longest shipped one,
+    # `geopolitical_conflict`, is already 21) does not lose the separator
+    # before the manifest filename -- that separator is the literal space
+    # in the f-string, not part of the field width, so it survives
+    # regardless of how long the name that precedes it is.
     head = (f"{'statistic':24s} {'median':>10s} {'worst':>10s} "
            f"{'band':>16s} {'scaled':>7s} {'seed':>6s} {'roster':>7s} "
-           f"scenario              manifest")
+           f"{'scenario':<22s} manifest")
     lines.append(head)
     lines.append("-" * len(head))
     for finding in sorted(worst.values(), key=lambda f: -f.scaled_distance):
@@ -359,7 +398,7 @@ def _report_worst(worst: dict[str, Finding], budget: dict[str, Any]) -> str:
             f"{finding.statistic:24s} {median_s:>10s} {finding.value:>10.4f} "
             f"{band_s:>16s} {finding.scaled_distance:>7.2f} "
             f"{finding.seed:>6d} {finding.roster_seed:>7d} "
-            f"{finding.scenario:<22s}{_manifest_filename(finding.statistic)}"
+            f"{finding.scenario:<22s} {_manifest_filename(finding.statistic)}"
             f"{held}"
         )
     return "\n".join(lines)
@@ -485,6 +524,16 @@ def search(preset: str, seeds: Sequence[int], roster_seeds: Sequence[int],
     horizon-and-budget shape the design settled on, kept separate from
     them for that reason.
 
+    Call with `workers > 1` only from code that is itself the `__main__`
+    module (the CLI's `main` below is such a place). Spawning a pool
+    re-executes whatever module Python considers `__main__` to bootstrap
+    each worker; called from inside a test runner's own process, that
+    re-execution targets the RUNNER, not this one, and hangs rather than
+    failing cleanly. `ROSTER_N`'s docstring has the full explanation, and
+    `tests/test_cli_pooled_workers_agree_with_the_sequential_path` in
+    `tests/test_red_team.py` is why `workers > 1` is covered through the
+    CLI rather than by calling this function directly.
+
     Raises `tradefloor.ValidationError` if `scenarios` names anything
     outside `tradefloor.Scenario.available()`, if `budget` is not positive,
     or if any of `seeds`, `roster_seeds`, `scenarios` is empty.
@@ -510,7 +559,11 @@ def search(preset: str, seeds: Sequence[int], roster_seeds: Sequence[int],
 
     grid = _grid_order(seeds, roster_seeds, scenarios)
     cells = grid[:budget]
-    jobs = [(preset, seed, roster_seed, scenario, days)
+    # ROSTER_N is read here, ONCE, and carried in every job explicitly --
+    # see ROSTER_N's own docstring for why a pooled worker cannot be
+    # trusted to read the module attribute itself.
+    roster_n = ROSTER_N
+    jobs = [(preset, seed, roster_seed, scenario, days, roster_n)
            for seed, roster_seed, scenario in cells]
 
     started = time.perf_counter()
@@ -552,7 +605,7 @@ def search(preset: str, seeds: Sequence[int], roster_seeds: Sequence[int],
     budget_report: dict[str, Any] = {
         "preset": preset,
         "days": days,
-        "roster_size": ROSTER_N,
+        "roster_size": roster_n,
         "requested_budget": budget,
         "cells_run": len(cells),
         "cells_planned": len(grid),

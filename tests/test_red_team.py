@@ -7,10 +7,22 @@ under test depends on the roster being 40 names or the run being a full
 year; the search's own module docstring explains why the roster size is a
 module constant rather than a `search()` parameter, which is what makes
 this monkeypatch the way to shrink it.
+
+`workers > 1` is deliberately NOT exercised by calling `red_team.search`
+directly: on this platform, spawning a `ProcessPoolExecutor` from code a
+test RUNNER launched re-executes the runner's own `__main__` to bootstrap
+the pool worker rather than this module's, which hangs rather than
+failing cleanly (confirmed by hand; not reproduced here on purpose --
+red_team.py's `ROSTER_N` and `search` docstrings carry the full
+explanation). `test_cli_pooled_workers_agree_with_the_sequential_path`
+below drives the CLI as a subprocess instead, which is both the
+supported way to use `workers > 1` and a clean way to test it.
 """
 
 from __future__ import annotations
 
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -28,6 +40,9 @@ pytest.importorskip("pyarrow", reason="facts.measure reads bars via Arrow")
 #: Small enough for a sub-second cell at a six-name roster, large enough to
 #: clear facts.measure's default min_observations=30.
 DAYS = 35
+
+TOOL = str(Path(__file__).resolve().parent.parent
+          / "tools" / "calibration" / "red_team.py")
 
 
 @pytest.fixture
@@ -212,3 +227,90 @@ def test_manifest_filename_is_stable_between_report_and_disk():
     # points at a file that does not exist.
     assert (red_team._manifest_filename("leverage_effect")
            == "manifest-leverage_effect.json")
+
+
+def test_held_out_seed_marker_renders_only_for_a_held_out_seed():
+    # gate_pick.HELDOUT is seeds 1-30. One finding on a held-out seed, one
+    # on a seed the calibration search could have drawn from -- the report
+    # must mark the first and not the second.
+    import gate_pick
+
+    assert 5 in gate_pick.HELDOUT
+    assert 50 not in gate_pick.HELDOUT
+
+    held = red_team.Finding(
+        statistic="leverage_effect", value=-0.9, band=(-0.16, 0.0),
+        scaled_distance=12.0, seed=5, roster_seed=1, scenario="recession",
+        manifest=None,
+    )
+    not_held = red_team.Finding(
+        statistic="return_acf1", value=0.5, band=(-0.08, 0.06),
+        scaled_distance=9.0, seed=50, roster_seed=1, scenario="recession",
+        manifest=None,
+    )
+    budget = {
+        "preset": "pt-v16", "days": 252, "roster_size": 40,
+        "requested_budget": 2, "cells_run": 2, "cells_planned": 2,
+        "seeds": [5, 50], "roster_seeds": [1], "scenarios": ["recession"],
+        "unsearched": {"seeds": [], "roster_seeds": [], "scenarios": []},
+        "fixed": {"macro": "engine default (nothing pinned beyond a "
+                          "scenario)",
+                 "scenario_magnitude": "shipped default for each "
+                                       "scenario"},
+        "workers": 1, "wall_s": 0.01,
+    }
+    report = red_team.Search(
+        worst={held.statistic: held, not_held.statistic: not_held},
+        budget=budget,
+    ).report()
+
+    held_line = next(line for line in report.splitlines()
+                     if line.startswith("leverage_effect"))
+    not_held_line = next(line for line in report.splitlines()
+                         if line.startswith("return_acf1"))
+    assert "[held-out seed]" in held_line
+    assert "[held-out seed]" not in not_held_line
+
+
+def test_cli_pooled_workers_agree_with_the_sequential_path(tmp_path):
+    # Drives the CLI as a subprocess at both worker counts, on the true
+    # ROSTER_N (40) rather than the tiny_roster fixture -- see this file's
+    # module docstring for why this runs through the CLI rather than
+    # calling search(..., workers=2) in-process.
+    args = ["--preset", "pt-v16", "--seeds", "1,2", "--rosters", "1",
+           "--scenarios", "recession", "--days", str(DAYS), "--budget", "2"]
+    out_seq = tmp_path / "sequential"
+    out_pooled = tmp_path / "pooled"
+
+    for out_dir, workers in ((out_seq, "1"), (out_pooled, "2")):
+        proc = subprocess.run(
+            [sys.executable, TOOL, *args, "--workers", workers,
+             "--out", str(out_dir)],
+            capture_output=True, text=True, timeout=180,
+        )
+        assert proc.returncode == 0, (
+            f"--workers {workers} exited {proc.returncode}\n"
+            f"{proc.stderr[-2000:]}"
+        )
+
+    seq_budget = json.loads((out_seq / "budget.json").read_text())
+    pooled_budget = json.loads((out_pooled / "budget.json").read_text())
+
+    # workers changes nothing about which cells run.
+    assert seq_budget["unsearched"] == pooled_budget["unsearched"]
+    assert seq_budget["cells_run"] == pooled_budget["cells_run"]
+    assert seq_budget["roster_size"] == pooled_budget["roster_size"] == 40
+
+    # And the SAME cell wins: the pooled run's manifest carries the true
+    # roster size (this is the ROSTER_N-through-the-job-tuple fix; before
+    # it, a pooled worker's fresh import would read the module's own
+    # default rather than any value the caller resolved) and the same
+    # winning seed as the sequential run.
+    seq_manifest = tradefloor.RunManifest.from_json(
+        (out_seq / "manifest-annualised_vol_pct.json").read_text())
+    pooled_manifest = tradefloor.RunManifest.from_json(
+        (out_pooled / "manifest-annualised_vol_pct.json").read_text())
+    assert len(pooled_manifest.universe) == 40
+    assert seq_manifest.seed == pooled_manifest.seed
+    assert (seq_manifest.universe.fingerprint
+           == pooled_manifest.universe.fingerprint)
