@@ -41,6 +41,9 @@ from .externality import Externality, externalities
 from .sweep import sweep
 from . import boundary
 from .boundary import BoundaryMap, Flip, flip, map_boundaries
+
+from . import explain
+from .explain import Explanation, Node
 from . import manifest
 from .manifest import DayLedger, RunManifest, Verification
 from . import spec
@@ -112,6 +115,7 @@ __all__ = [
     "Agreement", "Comparison", "Resample",
     "Divergence",
     "boundary", "flip", "map_boundaries", "Flip", "BoundaryMap",
+    "explain", "Explanation", "Node",
     "Intervention", "Firing", "ScenarioValidationError", "interventions",
     "TARGETS", "UNSUPPORTED_TARGETS", "yaml_subset",
     "manifest", "RunManifest", "DayLedger", "Verification",

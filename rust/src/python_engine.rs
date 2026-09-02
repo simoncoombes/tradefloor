@@ -767,6 +767,44 @@ fn draw_kind(name: &str) -> PyResult<crate::rng::DrawKind> {
     })
 }
 
+/// One kept day: the engine as it stood before that day opened, and where
+/// that day's inputs begin in the run log.
+///
+/// `Box` because the copy is a `PyEngine` and a `PyEngine` holds the store,
+/// so the type is recursive. The copy's own store is empty, which is what
+/// makes the recursion one level deep however many days are kept.
+#[derive(Clone)]
+struct KeptOpen {
+    engine: Box<PyEngine>,
+    log_start: usize,
+}
+
+/// The days `explain` can reach, and the copies it reaches them through.
+///
+/// Bookkeeping, off until [`PyEngine::keep_explanations`] asks for it, and
+/// outside [`PyEngine::state_snapshot`] and [`PyEngine::state_hash`]: a copy
+/// taken here is read and never run, so an engine with a window open produces
+/// the same market as one without. The known-answer digest is the same digest
+/// with the window open, which `tests/test_explain.py` states.
+///
+/// The cost is one engine copy per kept day, without the recorded tape, so a
+/// window is asked for over the days a caller means to explain rather than
+/// over a whole run.
+#[derive(Clone, Default)]
+struct Explanations {
+    window: Option<(i64, i64)>,
+    opens: std::collections::BTreeMap<i64, KeptOpen>,
+}
+
+impl Explanations {
+    fn wants(&self, day: i64) -> bool {
+        match self.window {
+            Some((from, to)) => from <= day && day <= to,
+            None => false,
+        }
+    }
+}
+
 #[pyclass(name = "Engine", module = "tradefloor._core")]
 #[derive(Clone)]
 pub struct PyEngine {
@@ -827,6 +865,9 @@ pub struct PyEngine {
     /// and recording them would create a second source of truth that could
     /// disagree with the first.
     log: Vec<crate::python_log::LogEntry>,
+    /// What `explain` reaches a day through. Recording only: nothing here is
+    /// read by the tick, the snapshot or the hash.
+    explanations: Explanations,
 }
 
 /// The day stamp, kept off the Python surface.
@@ -852,6 +893,31 @@ impl PyEngine {
     /// Two `run_days(2)` calls in a row reached the same split without any
     /// `first_day` at all.
     fn open_market_on(&mut self, day: i64) {
+        // The explanation copy is taken before anything about the day has
+        // happened, so a fork of it runs the day from its own open under the
+        // inputs the log records from here on. Taken with the store moved
+        // out, because cloning `self` with the store in place would copy
+        // every day already kept, once per day kept.
+        if self.explanations.wants(day) {
+            let held = std::mem::take(&mut self.explanations);
+            let mut copy = self.clone();
+            self.explanations = held;
+            // The tape is a consequence, and a copy of a year of it per kept
+            // day is what makes this unaffordable. A replay records the one
+            // day it runs, which is the day being explained.
+            copy.recorded.clear();
+            copy.recorded_macro.clear();
+            copy.recorded_book.clear();
+            copy.day_buffer.clear();
+            let log_start = self.log.len();
+            self.explanations.opens.insert(
+                day,
+                KeptOpen {
+                    engine: Box::new(copy),
+                    log_start,
+                },
+            );
+        }
         self.log.push(crate::python_log::LogEntry::OpenMarket);
         // A new day's tape starts here. Without this, a run that never closed
         // would grow one unbounded "day".
@@ -862,6 +928,29 @@ impl PyEngine {
         // belong to the day they close rather than to the one after.
         self.inner.set_current_day(day);
         self.inner.open_market();
+    }
+
+    /// The log entries of the day whose open sits at `log_start`.
+    ///
+    /// From that open to the close that ends the day, inclusive. A day ends
+    /// at an explicit `close_market` or at a session that carried
+    /// `close_at_end`, which are the two spellings of one close, and a day
+    /// that never closed runs to the end of the log.
+    fn day_inputs(&self, py: Python<'_>, log_start: usize) -> PyResult<Vec<PyObject>> {
+        let mut out = Vec::new();
+        for entry in self.log.iter().skip(log_start) {
+            out.push(entry.to_py(py)?);
+            match entry {
+                crate::python_log::LogEntry::CloseMarket => break,
+                crate::python_log::LogEntry::RunSession { close_at_end, .. }
+                    if *close_at_end =>
+                {
+                    break
+                }
+                _ => {}
+            }
+        }
+        Ok(out)
     }
 }
 
@@ -918,6 +1007,7 @@ impl PyEngine {
             recorded_macro: Vec::new(),
             recorded_book: Vec::new(),
             log: Vec::new(),
+            explanations: Explanations::default(),
         })
     }
 
@@ -1700,6 +1790,87 @@ impl PyEngine {
         self.inner
             .market_day_layout(day)
             .map(|v| v.iter().map(|l| (l.company, l.first, l.stride, l.ticks)).collect())
+    }
+
+    /// Keep what [`Self::explain`] needs for days `from_day` to `to_day`.
+    ///
+    /// Two records, both read-only. Every stream's draw log is turned on over
+    /// the window, starting one day early because the jump a day's `truth`
+    /// table carries was drawn at the close before it. And the engine is
+    /// copied at each of those days' opens, so a day can be run again from
+    /// the state it ran from the first time, under the inputs the run log
+    /// holds for it.
+    ///
+    /// Neither moves a trajectory. The log records what a consumer received
+    /// and the copy is never run by the engine that holds it, so a market
+    /// with a window open is the market it would have been without one and
+    /// `tests/known_answer.py` reports the shipped digest either way.
+    ///
+    /// Both `run_days` and `World.run` open through one path, so both fill
+    /// this. The cost is one engine copy per kept day, taken without the
+    /// recorded tape, so ask for the days you mean to explain rather than
+    /// for a whole run.
+    fn keep_explanations(&mut self, from_day: i64, to_day: i64) -> PyResult<()> {
+        if to_day < from_day {
+            return Err(ValidationError::new_err(format!(
+                "keep_explanations takes a window, and day {to_day} is \
+                 before day {from_day}"
+            )));
+        }
+        self.explanations.window = Some((from_day, to_day));
+        for id in 0..7u32 {
+            self.inner.enable_draw_log(id, from_day - 1, to_day);
+        }
+        Ok(())
+    }
+
+    /// One name's day, from its move down to the draws that seeded it.
+    ///
+    /// Returns a `tradefloor.explain.Explanation`. The tree, the replays and
+    /// the caveats are built in `python/tradefloor/explain.py`; this hands
+    /// that module the engine, the window and the day's own inputs, which is
+    /// the bookkeeping a binding owns.
+    ///
+    /// Raises when `day` was not kept, naming the days that were. The store
+    /// is opt-in, so a caller who has not asked for it is told what to ask
+    /// for rather than handed a tree with no leaves.
+    fn explain(slf: &Bound<'_, Self>, ticker: &str, day: i64) -> PyResult<PyObject> {
+        let py = slf.py();
+        let (sector, window, kept, opened, inputs) = {
+            let me = slf.borrow();
+            // The sector factor's tag is a position in the engine's own
+            // sector table, and no column carries it, so it is resolved
+            // here rather than guessed at from the roster.
+            let sector = me
+                .tickers
+                .iter()
+                .position(|t| t == ticker)
+                .and_then(|i| me.inner.companies().get(i).map(|c| c.sector.clone()))
+                .and_then(|key| crate::sectors::keys().iter().position(|k| *k == key))
+                .unwrap_or(0);
+            let window = me.explanations.window;
+            let kept: Vec<i64> = me.explanations.opens.keys().copied().collect();
+            match me.explanations.opens.get(&day) {
+                Some(k) => {
+                    let entries = me.day_inputs(py, k.log_start)?;
+                    (
+                        sector,
+                        window,
+                        kept,
+                        Some((*k.engine).clone()),
+                        Some(entries),
+                    )
+                }
+                None => (sector, window, kept, None, None),
+            }
+        };
+        let module = py.import_bound("tradefloor.explain")?;
+        Ok(module
+            .call_method1(
+                "_explain",
+                (slf, ticker, day, sector, window, kept, opened, inputs),
+            )?
+            .unbind())
     }
 
     #[getter]
