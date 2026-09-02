@@ -305,8 +305,8 @@ pub struct Engine {
     /// downstream is worth comparing.
     draws: StreamDraws,
     /// The day the engine is on, for the draw log and the day marks. Set by
-    /// the caller that knows it (`set_current_day`, `close_day`); zero on a
-    /// fresh engine.
+    /// the caller that knows it (`set_current_day`), at each open, so the
+    /// draws a close takes carry the day they close; zero on a fresh engine.
     current_day: i64,
     /// One mark per opened day: the day, the seven streams' draw positions
     /// at the open, the active company indices and the sector count, and
