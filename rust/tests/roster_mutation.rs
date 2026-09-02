@@ -196,6 +196,63 @@ fn removal_preserves_the_order_of_everything_after_it() {
 }
 
 #[test]
+fn every_per_slot_column_shifts_with_the_roster() {
+    // A per-slot column that did not shift with a removal would report each
+    // remaining company's tick against its neighbour's slot, and every value
+    // would still look plausible. Checked on LENGTH and on the value, because
+    // a short column reads as a company that never moved.
+    let mut e = engine(9, 5);
+    e.set_settle_depth_counterfactual(true);
+    e.open_market();
+    tick(&mut e, 0);
+
+    let columns = |e: &Engine| {
+        [
+            e.tick_shock().len(),
+            e.tick_absorbed().len(),
+            e.tick_fundamental().len(),
+            e.tick_anchor().len(),
+            e.tick_components().len(),
+            e.tick_unbounded_print().len(),
+            e.tick_liquidity_share().len(),
+        ]
+    };
+    assert_eq!(columns(&e), [5; 7]);
+
+    // The value that has to move with the company, not with the index.
+    let anchor_of_c3 = e.tick_anchor()[3];
+    let shock_of_c3 = e.tick_shock()[3];
+    e.remove_company(1);
+    assert_eq!(e.ids(), vec!["C0", "C2", "C3", "C4"]);
+    assert_eq!(columns(&e), [4; 7]);
+    assert_eq!(e.tick_anchor()[2], anchor_of_c3);
+    assert_eq!(e.tick_shock()[2], shock_of_c3);
+
+    e.add_company(company("NEW", 12.0));
+    assert_eq!(columns(&e), [5; 7]);
+    assert_eq!(e.tick_shock()[4], 0.0, "a listing has not moved yet");
+
+    // And the next tick fills every slot rather than the first four.
+    tick(&mut e, 1);
+    assert_eq!(e.tick_unbounded_print().len(), 5);
+    assert!(e.tick_unbounded_print().iter().all(|v| v.is_finite()));
+}
+
+#[test]
+fn the_counterfactual_columns_stay_empty_while_the_arm_is_off() {
+    // Emptiness is what tells the reporting surface no arm ran, so a roster
+    // edit must not turn an empty pair into a one-row column.
+    let mut e = engine(9, 3);
+    e.open_market();
+    tick(&mut e, 0);
+    assert!(e.tick_unbounded_print().is_empty());
+    e.add_company(company("NEW", 12.0));
+    assert!(e.tick_unbounded_print().is_empty());
+    assert!(e.tick_liquidity_share().is_empty());
+    assert_eq!(e.tick_shock().len(), 4);
+}
+
+#[test]
 fn add_returns_the_index_the_column_will_use() {
     let mut e = engine(1, 3);
     let index = e.add_company(company("NEW", 12.0));

@@ -1811,6 +1811,18 @@ impl Engine {
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);
         self.volume_idio.push(0.0);
+        // The print decomposition, on the same argument as everything above
+        // it: these are per-SLOT columns, and a roster edit that grew
+        // `companies` without growing them would leave the new name reading
+        // as a company that never moved.
+        self.tick_shock.push(0.0);
+        self.tick_absorbed.push(0.0);
+        // Only where the arm is running. Empty means no arm, and pushing
+        // into an empty pair would turn that into a one-row column.
+        if !self.tick_unbounded_print.is_empty() {
+            self.tick_unbounded_print.push(f64::NAN);
+            self.tick_liquidity_share.push(0.0);
+        }
         self.companies.len() - 1
     }
 
@@ -1851,6 +1863,21 @@ impl Engine {
         }
         if index < self.volume_idio.len() {
             self.volume_idio.remove(index);
+        }
+        // Removed rather than left behind, because the tail shifts down by
+        // one and a column that did not shift with it would report every
+        // remaining company's move against its neighbour's slot.
+        if index < self.tick_shock.len() {
+            self.tick_shock.remove(index);
+        }
+        if index < self.tick_absorbed.len() {
+            self.tick_absorbed.remove(index);
+        }
+        if index < self.tick_unbounded_print.len() {
+            self.tick_unbounded_print.remove(index);
+        }
+        if index < self.tick_liquidity_share.len() {
+            self.tick_liquidity_share.remove(index);
         }
         Some(self.companies.remove(index))
     }
