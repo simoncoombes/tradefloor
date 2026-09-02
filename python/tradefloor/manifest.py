@@ -215,6 +215,11 @@ _SNAPSHOT_KEYS = (
     "market_open", "market_variance", "forced_flow_spent", "volume_state",
     "universe_stress", "volume_idio", "session_news", "economy",
     "central_bank", "day_count",
+    # Added by the draw-addressing layer, and hashed for the reason the
+    # refusal above exists: an installed overlay decides what the engine
+    # draws next, so two states alike in every column but one patched draw
+    # are not the same state.
+    "draw_counts", "draw_overlay",
 )
 
 #: The generator sequence :func:`verify` draws its sample of days from.
@@ -284,6 +289,10 @@ def _bits(buf: bytearray, value: float) -> None:
 
 def _u32(buf: bytearray, value: int) -> None:
     buf.extend(struct.pack(">I", int(value)))
+
+
+def _u64(buf: bytearray, value: int) -> None:
+    buf.extend(struct.pack(">Q", int(value)))
 
 
 def _i64(buf: bytearray, value: int) -> None:
@@ -535,6 +544,33 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _text(buf, bank["forward_guidance"])
 
     _u32(buf, snapshot["day_count"])
+
+    # The draw-addressing layer's two fields, in the order the snapshot
+    # carries them: the seven streams' uniform and normal positions
+    # flattened in pairs, then the substitutions installed on them. Both
+    # decide what the engine draws next, so a leaf that skipped them would
+    # call two states the same when one is patched and the other is not.
+    counts = list(snapshot["draw_counts"])
+    if len(counts) != 14:
+        raise ValidationError(
+            "draw_counts must be 14 numbers, a uniform and a normal count "
+            f"for each of the seven streams, got {len(counts)}."
+        )
+    for value in counts:
+        _f64(buf, value)
+    overlay = list(snapshot["draw_overlay"])
+    _u32(buf, len(overlay))
+    for entry in overlay:
+        if len(entry) != 4:
+            raise ValidationError(
+                "each draw_overlay entry is (stream, kind, index, value), "
+                f"got {len(entry)} fields."
+            )
+        stream, kind, index, value = entry
+        _u32(buf, stream)
+        _u32(buf, kind)
+        _u64(buf, index)
+        _f64(buf, value)
     return hashlib.sha256(bytes(buf)).hexdigest()
 
 
