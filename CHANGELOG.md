@@ -30,22 +30,6 @@ from `state_snapshot()`. Nothing about a trajectory moves: the manifest
 field is additive under the schema it already had, and `reproduce()`
 behaves the same with the field and without it.
 
-### The prints table
-
-**Every print says what it was made of.** `Engine.prints()` is a table
-beside `bars` and `truth`, one row per instrument per tick: the print, the
-model price behind it, and the two log distances between them. `shock` is
-the distance from the last print to the model price, `absorbed` is the
-distance from there to the tape, and the two sum to the print's own move.
-
-**A depth counterfactual measures liquidity's share.**
-`Engine.settle_depth_counterfactual(True)` settles every open tick a second
-time against every resting level, under the same four uniforms and from the
-same book state, and adds `unbounded_print` and `liquidity_share` to that
-table. It takes no draw and its fills reach no company field, so the market
-and the known-answer digest are the same with it on. A run takes three to
-four times as long with it on, so it stays off until a caller asks for it.
-
 ### The measured cost
 
 On `Universe.random(8, seed=99)`, seed 42, twelve days at 30 ticks a day,
@@ -186,6 +170,22 @@ keeps the engine's own, because the error propagates out of the guard and
 the later writes are attempted and never reached. An engine that has caught
 this error holds one run's market beside another run's macro state, so drop
 it rather than running it on.
+
+### The prints table
+
+**Every print says what it was made of.** `Engine.prints()` is a table
+beside `bars` and `truth`, one row per instrument per tick: the print, the
+model price behind it, and the two log distances between them. `shock` is
+the distance from the last print to the model price, `absorbed` is the
+distance from there to the tape, and the two sum to the print's own move.
+
+**A depth counterfactual measures liquidity's share.**
+`Engine.settle_depth_counterfactual(True)` settles every open tick a second
+time against every resting level, under the same four uniforms and from the
+same book state, and adds `unbounded_print` and `liquidity_share` to that
+table. It takes no draw and its fills reach no company field, so the market
+and the known-answer digest are the same with it on. A run takes three to
+four times as long with it on, so it stays off until a caller asks for it.
 
 ### The depth bound
 
