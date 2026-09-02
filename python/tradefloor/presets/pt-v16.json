@@ -142,6 +142,22 @@
     "volume_persistence": 0.7,
     "volume_variance_gain": 0.028403829887593345
   },
+  "mechanisms": {
+    "jumps": {
+      "spec": "91bff1985be6a9c7b98b2cdc8b8ab01d7e7fda91728219bc5b01e0268434b64f",
+      "stream": "jumps",
+      "doses": {
+        "jump_intensity_market": 0.0565753337,
+        "jump_mean_market": -0.008521833617959641,
+        "jump_sigma_market": 0.0024597567320385947,
+        "jump_intensity_idio": 0.0068895346,
+        "jump_sigma_idio": 0.0752080062,
+        "jump_vix_coupling": 0.2626,
+        "market_vol_vix_anchor": 15.98426471,
+        "jump_momentum_share": 0.0
+      }
+    }
+  },
   "default_since": "0.6.0",
   "measured": {
     "tradefloor_version": "0.6.0",
