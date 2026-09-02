@@ -169,7 +169,6 @@ def run_day_with(engine: Engine, day: int, patches: Sequence[Patch],
     patch_draws(fork, patches)
     for stream in streams:
         fork.trace_draws(stream, day, day)
-    fork.set_day(day)
     fork.run_days(1, hour=hour, minute=minute, day_of_week=day_of_week,
                   ticks_per_day=ticks_per_day, volatility=volatility,
                   record=True, first_day=day)

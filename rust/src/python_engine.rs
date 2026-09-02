@@ -1497,9 +1497,12 @@ impl PyEngine {
 
     // ── Draw addressing (phase 1) ─────────────────────────────────────────
 
-    /// The day the next `open_market` opens, for the draw log and the day
-    /// marks. `run_days` sets it from `first_day`; a caller driving
-    /// `open_market` and `run_session` by hand sets it here.
+    /// The day the draws taken from now on carry in the draw log and the
+    /// day marks. `open_market` stamps the engine's own day counter and
+    /// `run_days` stamps `first_day` after each open, so this is for a
+    /// caller that drives the core between an open and a close and wants
+    /// the draws numbered its own way, or an embedder taking draws through
+    /// `draw_uniform` on a closed market.
     fn set_day(&mut self, day: i64) {
         self.inner.set_current_day(day);
     }
