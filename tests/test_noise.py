@@ -40,6 +40,13 @@ def prices(engine):
     return struct.unpack("<%dd" % (len(raw) // 8), raw)
 
 
+def columns(engine):
+    out = state(engine)
+    out.pop("draws")
+    out.pop("draws_by_stream")
+    return out
+
+
 def state(engine):
     n = len(engine.tickers)
     out = {}
@@ -163,7 +170,10 @@ def test_a_snapshot_taken_with_an_overlay_restores_with_the_overlay():
 
     run(source, 3, first=2)
     run(restored, 3, first=2)
-    assert state(restored) == state(source)
+    # The draw counters restart on a restored engine, which test_forking
+    # pins; the market, the positions and the overlay do not.
+    assert columns(restored) == columns(source)
+    assert restored.stream_positions() == source.stream_positions()
 
 
 def test_a_snapshot_without_the_new_keys_still_restores():
