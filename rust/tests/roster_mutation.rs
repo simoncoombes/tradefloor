@@ -206,9 +206,12 @@ fn every_per_slot_column_shifts_with_the_roster() {
     e.open_market();
     tick(&mut e, 0);
 
-    // EVERY per-slot column beside `companies`. A column missing from this
-    // list is a column neither roster mutation is tested on, which is the
-    // exact shape of the defect this test was written for.
+    // EVERY per-slot array beside `companies`. An array missing from this
+    // list is one neither roster mutation is tested on, which is the exact
+    // shape of the defect this test was written for -- twice, once for the
+    // print columns and once for `tick_clamp` a round later. `volume_idio`
+    // is here for the same reason: issue #148 resized it and nothing walked
+    // it through a listing.
     let columns = |e: &Engine| {
         [
             e.tick_shock().len(),
@@ -219,9 +222,10 @@ fn every_per_slot_column_shifts_with_the_roster() {
             e.tick_components().len(),
             e.tick_unbounded_print().len(),
             e.tick_liquidity_share().len(),
+            e.volume_idio().len(),
         ]
     };
-    assert_eq!(columns(&e), [5; 8]);
+    assert_eq!(columns(&e), [5; 9]);
 
     // The value that has to move with the company, not with the index.
     let anchor_of_c3 = e.tick_anchor()[3];
@@ -229,13 +233,13 @@ fn every_per_slot_column_shifts_with_the_roster() {
     let clamp_of_c3 = e.tick_clamp()[3];
     e.remove_company(1);
     assert_eq!(e.ids(), vec!["C0", "C2", "C3", "C4"]);
-    assert_eq!(columns(&e), [4; 8]);
+    assert_eq!(columns(&e), [4; 9]);
     assert_eq!(e.tick_anchor()[2], anchor_of_c3);
     assert_eq!(e.tick_shock()[2], shock_of_c3);
     assert_eq!(e.tick_clamp()[2], clamp_of_c3);
 
     e.add_company(company("NEW", 12.0));
-    assert_eq!(columns(&e), [5; 8]);
+    assert_eq!(columns(&e), [5; 9]);
     assert_eq!(e.tick_shock()[4], 0.0, "a listing has not moved yet");
     assert_eq!(e.tick_clamp()[4], 0.0);
 
