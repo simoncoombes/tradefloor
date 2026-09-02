@@ -303,8 +303,16 @@ def pnl() -> Target:
 
 def column(name: str, day: int, ticker: str | None = None) -> Target:
     """An engine column at the close of ``day``: one name's value, or the
-    mean across the roster when ``ticker`` is ``None``. The arms run to
-    ``day`` even when the window ends earlier."""
+    mean across the roster when ``ticker`` is ``None``.
+
+    Read at ``day``, whatever the horizon. The arms run to ``day`` when the
+    window ends earlier, and past it when the window ends later; in the
+    second case the value is taken as the arm passes ``day`` rather than
+    where the arm stops. Read at the stop, a window of ``(1, 3)`` with a
+    target at day 1 reported day 3's mean price under a label that read
+    ``at day 1``: 98.275 against day 1's own 98.2075, on a four-name roster
+    at seed 99.
+    """
     return Target("column", name=name, day=int(day), ticker=ticker)
 
 
@@ -326,7 +334,23 @@ class Attribution:
 
     def __init__(self, *, target: Target, window: tuple[int, int],
                  horizon: int, control: float, rows: list[dict],
-                 caveats: list[str], delta: float) -> None:
+                 caveats: list[str], delta: float, joint: float = 0.0,
+                 interaction: float = 0.0, joint_rows: int = 0,
+                 plan_caveats: list[str] | None = None) -> None:
+        #: The caveats whose text counts rows, so a caller that shards the
+        #: plan can drop them and restate them over the merged rows.
+        #: :func:`row_caveats` rebuilds all but the interaction line, which
+        #: needs an arm rather than a row.
+        self.plan_caveats = list(plan_caveats or ())
+        #: The target's move with every changing patch installed at once,
+        #: as a difference from ``control``.
+        self.joint = joint
+        #: ``joint`` minus the sum of the rows that make it up. Non-zero
+        #: because the market has feedback, so the rows do not decompose
+        #: the target and are never presented as a total.
+        self.interaction = interaction
+        #: How many rows the joint arm installed.
+        self.joint_rows = joint_rows
         self.target = target
         self.window = window
         self.horizon = horizon
@@ -402,7 +426,10 @@ def attribute(world: Any, window: Any, target: Any,
     is installed, the arm runs the same days with the same agent, and the
     target is read again. The effect is the difference. Every arm shares
     every other draw with the control, so the difference is the draw's and
-    not a reshuffle: ``draws_by_stream`` is identical across arms.
+    not a reshuffle: ``stream_positions`` is identical across arms, on all
+    seven streams. ``draws_by_stream`` reports three of them and cannot
+    see jumps, news, volume or the per-name volume stream, which is four
+    of the five attributed at event level.
 
     Two perturbations, by what a draw is:
 
@@ -418,19 +445,27 @@ def attribute(world: Any, window: Any, target: Any,
 
     # Granularity
 
-    ``"event"`` attributes the jumps, economy, news and volume streams one
-    logged draw at a time. ``"day"`` attributes the market stream by day
-    aggregate: all of one name's factor normals on one day move together
-    by ``delta / sqrt(ticks)``, and so do the day's market factor normals
-    and each sector's. ``"both"`` does both. ``streams`` narrows either.
+    ``"event"`` attributes the jumps, economy, news, volume and per-name
+    volume streams one logged draw at a time. ``"day"`` attributes the
+    market stream by day aggregate: all of one name's factor normals on
+    one day move together by ``delta / sqrt(ticks)``, and so do the day's
+    market factor normals and each sector's. ``"both"`` does both, and
+    ``streams`` narrows either.
 
     The day aggregate is the identified quantity. One name's daily return
-    is a sum over its tick normals, so a common shift of ``delta /
-    sqrt(T)`` across ``T`` ticks moves the day by ``delta`` in the units
-    of one tick's noise; the effect of one tick normal on its own is not
-    identified from a daily target, and a row for it would be a number
-    without a meaning. The market stream's other draws (the stash and
-    settlement uniforms) drive microstructure and are not attributed;
+    is a sum over its ``T`` tick normals, and that sum has a standard
+    deviation of ``sqrt(T)`` in the units of one tick's noise. A common
+    shift of ``delta / sqrt(T)`` on each of them moves the sum by
+    ``delta * sqrt(T)`` in those units, which is ``delta`` standard
+    deviations OF THE DAY'S OWN SUM. So a row's ``delta`` is per tick and
+    the quantity it states is per day, and ``delta * sqrt(count)`` recovers
+    the day-sigma step the row was taken at. The effect therefore grows
+    with ``T`` at a fixed ``delta``: 0.0725, 0.19, 0.25 and 0.4225 on the
+    market factor over 20, 40, 80 and 160 ticks, four names at seed 99.
+    The effect of one tick normal on its own is not identified from a daily
+    target, and a row for it would be a number without a meaning. The
+    market stream's other draws (the stash and settlement uniforms) drive
+    microstructure and are not attributed;
     the caveats say so whenever the market stream is in the call.
 
     # What it cannot do
@@ -475,13 +510,11 @@ def attribute(world: Any, window: Any, target: Any,
         raise ValidationError(
             "target is noise.statistic(name), noise.pnl(), noise.column(...) "
             f"or a callable of the world, got {target!r}")
-    if target.kind == "column":
-        horizon = max(int(target.day), last if horizon is None else int(horizon))
-    horizon = last if horizon is None else int(horizon)
-    if horizon < last:
+    if target.kind == "column" and int(target.day) < world.day:
         raise ValidationError(
-            f"the horizon (day {horizon}) is before the window's last day "
-            f"({last}); the arms must run through the window.")
+            f"the target reads day {target.day}, which has run; this world "
+            f"is on day {world.day}. A value fixed before the window cannot "
+            "move with a draw inside it.")
     wanted = list(STREAMS if streams is None else streams)
     for s in wanted:
         DrawAddress(s, "uniform", 0).check()
@@ -495,6 +528,22 @@ def attribute(world: Any, window: Any, target: Any,
             f"nothing to attribute: {granularity!r} over {wanted} names no "
             "stream. Event level covers " + ", ".join(EVENT_STREAMS)
             + "; day aggregate covers the market stream.")
+    # An event lands at its day's close and is first seen at the next open,
+    # so a horizon that stops on the window's last day gives every event row
+    # nothing to move and every one of them measures exactly zero. The
+    # default therefore reaches one day past the window whenever an event
+    # stream is attributed. A caller who passes a horizon gets it as given,
+    # and the caveats say what a column of zeros means under it.
+    if horizon is None:
+        horizon = last + 1 if event_streams else last
+        if target.kind == "column" and int(target.day) > horizon:
+            horizon = int(target.day)
+    else:
+        horizon = int(horizon)
+    if horizon < last:
+        raise ValidationError(
+            f"the horizon (day {horizon}) is before the window's last day "
+            f"({last}); the arms must run through the window.")
     days = horizon - world.day + 1
     # A statistic reads the daily bars, so the arms record; whether the run
     # is long enough for it is facts' to say, on the real bars.
@@ -503,8 +552,7 @@ def attribute(world: Any, window: Any, target: Any,
     control, = world.fork("control")
     for s in traced:
         control.trace_draws(s, first, last)
-    control.run(days, record=record)
-    base = _evaluate(target, control)
+    base = _run_arm(target, control, horizon, record)
 
     plan: list[tuple[dict, list[Patch]]] = []
     for s in event_streams:
@@ -556,10 +604,36 @@ def attribute(world: Any, window: Any, target: Any,
     for head, patches in plan:
         arm, = world.fork("arm")
         patch_draws(arm.engine, patches)
-        arm.run(days, record=record)
-        value = _evaluate(target, arm)
+        value = _run_arm(target, arm, horizon, record)
         rows.append(dict(head, control=base, treatment=value,
                          effect=value - base))
+
+    # The rows are single-draw finite differences through a market with
+    # feedback, so they do not decompose the target and their sum is not
+    # the joint effect. One more arm installs every changing patch at once
+    # and the gap is measured rather than left to the reader: nine unfire
+    # rows over an eight-name roster summed to -3.96 against a joint of
+    # -3.85, a residual of 0.106.
+    joint_patches: list[Patch] = []
+    joint_rows: list[dict] = []
+    seen: set = set()
+    for (head, patches), row in zip(plan, rows):
+        # a zero row is the control's own state, so it installs nothing
+        if row["effect"] == 0.0:
+            continue
+        key = (row["stream"], row["kind"], row["index"])
+        if key in seen:
+            continue
+        seen.add(key)
+        joint_patches.extend(patches)
+        joint_rows.append(row)
+    joint_effect = 0.0
+    interaction = 0.0
+    if joint_patches:
+        joint, = world.fork("joint")
+        patch_draws(joint.engine, joint_patches)
+        joint_effect = _run_arm(target, joint, horizon, record) - base
+        interaction = joint_effect - sum(r["effect"] for r in joint_rows)
 
     caveats: list[str] = []
     if day_streams:
@@ -570,17 +644,10 @@ def attribute(world: Any, window: Any, target: Any,
         caveats.append(
             "the market stream's stash and settlement uniforms drive "
             "microstructure and were not perturbed.")
-    fired = sum(1 for r in rows if r["perturbation"] == "fire")
-    if fired:
-        caveats.append(
-            f"{fired} event uniforms were forced to each end of the unit "
-            "interval (fire, unfire) rather than perturbed; the row with "
-            "zero effect is the control's own state.")
-    odd = sum(1 for r in rows if r["perturbation"] in ("u=0", "u=1"))
-    if odd:
-        caveats.append(
-            f"{odd} uniforms outside the event sites were forced to 0 and "
-            "to 1; which end is which event is their consumer's to say.")
+    plan_caveats = row_caveats(rows, target=target, last=last,
+                               horizon=horizon,
+                               event_streams=event_streams)
+    caveats.extend(plan_caveats)
     if horizon > last:
         caveats.append(
             f"the arms ran to day {horizon}, past the window's last day "
@@ -595,8 +662,97 @@ def attribute(world: Any, window: Any, target: Any,
     if shard is not None:
         caveats.append(f"shard {shard[0]} of {shard[1]}: every "
                        f"{shard[1]}-th row from the {shard[0]}-th.")
+    dropped = [s for s in wanted if s not in traced]
+    if dropped:
+        caveats.append(
+            ", ".join(dropped) + " named and not attributed: event level "
+            "covers " + ", ".join(EVENT_STREAMS) + " and day aggregate "
+            "covers the market stream.")
+    counted_joint: list[str] = []
+    if joint_patches:
+        summed = sum(r["effect"] for r in joint_rows)
+        counted_joint.append(
+            f"the {len(joint_rows)} rows with a non-zero effect do not "
+            "decompose the target. Installed together they move it by "
+            f"{joint_effect!r}, against {summed!r} added row by row, an "
+            f"interaction residual of {interaction!r}. Each row is a "
+            "single-draw finite difference through a market with feedback, "
+            "so the rows are not additive and no total is claimed for "
+            "them.")
+    caveats.extend(counted_joint)
     return Attribution(target=target, window=(first, last), horizon=horizon,
-                       control=base, rows=rows, caveats=caveats, delta=delta)
+                       control=base, rows=rows, caveats=caveats, delta=delta,
+                       joint=joint_effect, interaction=interaction,
+                       joint_rows=len(joint_rows),
+                       plan_caveats=plan_caveats + counted_joint)
+
+
+def row_caveats(rows: Sequence[dict], *, target: Any, last: int,
+                horizon: int, event_streams: Sequence[str]) -> list[str]:
+    """The caveats whose text carries a count of rows.
+
+    Separated from the rest so a caller that shards a plan across workers
+    and merges the rows can state them over the merged set. A tool that
+    took them from a one-row probe published "1 event uniforms were forced
+    to each end" above a table holding 18 of them.
+
+    ``rows`` is what :class:`Attribution` carries, from one call or from
+    several merged. The other arguments describe the call the rows came
+    from and are what makes a column of zeros legible.
+    """
+    out: list[str] = []
+    fired = sum(1 for r in rows if r["perturbation"] == "fire")
+    if fired:
+        # Which row is the control's own state is readable only where
+        # exactly one of the pair is zero. Where both are zero the pair
+        # says nothing about the control, and at a horizon that has not
+        # reached the effect every pair is in that state.
+        pairs: dict = {}
+        for r in rows:
+            if r["perturbation"] in ("fire", "unfire"):
+                key = (r["stream"], r["kind"], r["index"])
+                pairs.setdefault(key, []).append(r["effect"])
+        one_zero = sum(1 for v in pairs.values()
+                       if len(v) == 2 and sum(1 for e in v if e == 0.0) == 1)
+        both_zero = sum(1 for v in pairs.values()
+                        if len(v) == 2 and all(e == 0.0 for e in v))
+        text = (f"{fired} event uniforms were forced to each end of the "
+                "unit interval (fire, unfire) rather than perturbed.")
+        if one_zero:
+            text += (f" On {one_zero} of them exactly one row is zero, "
+                     "which is the control's own state.")
+        if both_zero:
+            text += (f" On {both_zero} both rows are zero, so neither "
+                     "names the control's state.")
+        out.append(text)
+    odd = sum(1 for r in rows if r["perturbation"] in ("u=0", "u=1"))
+    if odd:
+        out.append(
+            f"{odd} uniforms outside the event sites were forced to 0 and "
+            "to 1; which end is which event is their consumer's to say.")
+    # An event lands at its day's close and is first seen at the next open,
+    # so a column of exact zeros usually means the measurement stopped
+    # before the effect rather than that the draws did nothing. Which one
+    # stopped it is computed here rather than guessed at by the reader.
+    for s in event_streams:
+        stream_rows = [r for r in rows if r["stream"] == s]
+        if not stream_rows or any(r["effect"] != 0.0 for r in stream_rows):
+            continue
+        column_target = getattr(target, "kind", None) == "column"
+        if column_target and int(target.day) <= last:
+            why = (f"the target reads day {target.day}, and an event of "
+                   f"day {target.day} or later is first seen at the open "
+                   "after it, so no draw in the window can reach this "
+                   "value")
+        elif horizon <= last:
+            why = (f"the horizon is day {horizon} and the window ends on "
+                   f"day {last}, so the last day's events are never seen")
+        else:
+            why = ("the horizon reaches past the window, so this is the "
+                   "draws saying nothing rather than the measurement "
+                   "stopping short")
+        out.append(f"every {s} row measured exactly zero: {why}.")
+    return out
 
 
 def _ticker(world: Any, site: str, tag: int) -> str | None:
@@ -605,6 +761,29 @@ def _ticker(world: Any, site: str, tag: int) -> str | None:
         tickers = world.engine.tickers
         return tickers[tag] if 0 <= tag < len(tickers) else None
     return None
+
+
+def _run_arm(target: Target, arm: Any, horizon: int, record: bool) -> float:
+    """Run one arm to ``horizon``, reading the target where it is defined.
+
+    Every target but a column is a property of the whole run and is read at
+    the horizon. A column names a day, so the arm stops there, the column
+    is read, and the remaining days run afterwards. Reading at the horizon
+    instead reported a later day's value under the target's own label.
+    """
+    if target.kind == "column":
+        to_target = int(target.day) - arm.day + 1
+        if to_target > 0:
+            arm.run(to_target, record=record)
+        value = _evaluate(target, arm)
+        rest = horizon - arm.day + 1
+        if rest > 0:
+            arm.run(rest, record=record)
+        return value
+    days = horizon - arm.day + 1
+    if days > 0:
+        arm.run(days, record=record)
+    return _evaluate(target, arm)
 
 
 def _evaluate(target: Target, arm: Any) -> float:

@@ -99,9 +99,26 @@ def attribute_preset(preset: str, a: argparse.Namespace) -> dict:
             rows.extend(part)
     rows.sort(key=lambda r: (r["stream"], r["day"], r["site"], r["tag"],
                              r["index"], r["perturbation"]))
+    # The probe is one row, so every caveat whose text counts rows counts
+    # one. Those are dropped by identity rather than by matching their
+    # words, and restated over the merged rows: a filter on the strings
+    # published "1 event uniforms were forced to each end" above a table
+    # holding 18, and left the same miscount on the non-event uniforms.
+    # The interaction line is not among them, because it needs an arm with
+    # every patch installed and no shard has one.
+    kept = [c for c in probe.caveats
+            if c not in probe.plan_caveats and "shard" not in c]
+    kept += noise.row_caveats(rows, target=probe.target, last=last,
+                              horizon=a.days - 1,
+                              event_streams=[s for s in a.streams
+                                             if s in noise.EVENT_STREAMS])
+    kept.append(
+        "the rows are single-draw finite differences and are not additive; "
+        "this report does not install them together, so it states no total "
+        "and no interaction residual.")
     return {"preset": preset, "model_fingerprint": fingerprint,
             "digest_at_fork": digest, "control": probe.control,
-            "caveats": [c for c in probe.caveats if "shard" not in c],
+            "caveats": kept,
             "rows": rows, "seconds": time.time() - started}
 
 
@@ -157,16 +174,64 @@ def by_site(rows: list[dict]) -> list[dict]:
     return out
 
 
-def verdict(ratio, corr) -> str:
+#: The three cut-offs the verdict column turns into words. They are
+#: conventions chosen for this report, not thresholds any measurement set,
+#: and they are printed in the report beside the column they decide so a
+#: reader is never left to infer them. What decides whether a verdict is
+#: offered at all is the standard error beside the correlation, which is a
+#: measurement.
+CORRELATION_FLOOR = 0.5
+AMPLIFIED_ABOVE = 1.25
+DAMPED_BELOW = 0.8
+
+
+def verdict(ratio, corr, rows=None, nonzero=None) -> str:
+    """A word for a (ratio, correlation) pair, or a reason for withholding.
+
+    A correlation over few rows is not separable from zero: its standard
+    error is about ``1 / sqrt(rows)``, so a site with 200 rows and a
+    correlation of 0.06 sits inside one standard error of nothing and
+    cannot support "different mechanism", which is what it used to be
+    given. The verdict is withheld there and the reader is told why.
+
+    ``nonzero`` is how many of the site's rows contribute anything under
+    A. A site whose 16 rows rest on 8 contributing pairs is not 16 rows of
+    evidence, and a handful cannot carry a categorical claim at all.
+    """
     if ratio is None:
         return "no effect under A"
-    if corr is not None and corr < 0.5:
+    if nonzero is not None and nonzero < 3:
+        return f"too few contributing rows ({nonzero})"
+    if corr is None:
+        return "correlation undefined"
+    if rows:
+        se = 1.0 / math.sqrt(rows)
+        if abs(corr) < 2 * se:
+            return f"correlation within 2 se ({2 * se:.2f})"
+    if corr < CORRELATION_FLOOR:
         return "different mechanism"
-    if ratio > 1.25:
+    if ratio > AMPLIFIED_ABOVE:
         return "amplified"
-    if ratio < 0.8:
+    if ratio < DAMPED_BELOW:
         return "damped"
     return "same gain"
+
+
+def who(row: dict) -> str:
+    """What a row is about, for a table column.
+
+    A site that names an instrument prints its ticker. A site that names
+    none still carries a tag, and printing neither left two sector rows on
+    one day separable only by their numbers.
+    """
+    if row.get("ticker"):
+        return str(row["ticker"])
+    if row["site"] == "sector_z":
+        return f"sector {row['tag']}"
+    if row["site"] in ("market_factor_z", "jump_market_u", "jump_market_z",
+                       "volume_z"):
+        return "market"
+    return f"tag {row['tag']}"
 
 
 def render(a: dict, b: dict, diff: dict, args: argparse.Namespace,
@@ -198,23 +263,37 @@ def render(a: dict, b: dict, diff: dict, args: argparse.Namespace,
              "address. A ratio away from one with a high correlation is the "
              "same mechanism at another gain; a low correlation is a "
              "different mechanism reading the draw.", "",
-             "| stream | site | perturbation | rows | sum abs A | sum abs B "
-             "| B/A | corr | verdict |",
-             "|---|---|---|---|---|---|---|---|---|"]
+             f"The verdict reads a correlation below {CORRELATION_FLOOR} as "
+             f"a different mechanism, a ratio above {AMPLIFIED_ABOVE} as "
+             f"amplified and one below {DAMPED_BELOW} as damped. Those "
+             "three numbers are conventions chosen for this report and no "
+             "measurement set them. The standard error column is 1 over "
+             "the square root of the row count, and a correlation inside "
+             "two of them cannot support a verdict, so none is given. The "
+             "nonzero columns are how many rows contribute anything under "
+             "each preset, which is what the correlation is actually "
+             "taken over.", "",
+             "| stream | site | perturbation | rows | nonzero A | nonzero B "
+             "| sum abs A | sum abs B | B/A | corr | se | verdict |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for s in diff["by_site"]:
         ratio = "n/a" if s["amplification"] is None else f"{s['amplification']:.2f}"
         corr = "n/a" if s["correlation"] is None else f"{s['correlation']:.2f}"
+        se = f"{1.0 / math.sqrt(s['rows']):.2f}" if s["rows"] else "n/a"
+        said = verdict(s["amplification"], s["correlation"], s["rows"],
+                       s["nonzero_a"])
         lines.append(f"| {s['stream']} | {s['site']} | {s['perturbation']} | "
-                     f"{s['rows']} | {s['sum_abs_a']:.3g} | "
-                     f"{s['sum_abs_b']:.3g} | {ratio} | {corr} | "
-                     f"{verdict(s['amplification'], s['correlation'])} |")
+                     f"{s['rows']} | {s['nonzero_a']} | {s['nonzero_b']} | "
+                     f"{s['sum_abs_a']:.3g} | "
+                     f"{s['sum_abs_b']:.3g} | {ratio} | {corr} | {se} | "
+                     f"{said} |")
     lines += ["", "## Largest differences", "",
-              "| stream | site | day | ticker | perturbation | effect A | "
+              "| stream | site | day | what | perturbation | effect A | "
               "effect B | B minus A |", "|---|---|---|---|---|---|---|---|"]
     top = sorted(diff["rows"], key=lambda r: -abs(r["difference"]))[:20]
     for r in top:
         lines.append(f"| {r['stream']} | {r['site']} | {r['day']} | "
-                     f"{r['ticker'] or ''} | {r['perturbation']} | "
+                     f"{who(r)} | {r['perturbation']} | "
                      f"{r['effect_a']:.3g} | {r['effect_b']:.3g} | "
                      f"{r['difference']:+.3g} |")
     lines += ["", "## Caveats", ""]

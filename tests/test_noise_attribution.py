@@ -7,6 +7,7 @@ and what the statistics refactor kept.
 """
 
 import math
+import struct
 
 import pytest
 
@@ -101,20 +102,40 @@ def test_day_aggregate_rows_cover_every_name_and_every_tick():
 
 def test_arms_share_every_other_draw():
     """Common random numbers: the arms and the control consume the same
-    draws per stream, so an effect is the draw's and not a reshuffle."""
+    draws per stream, so an effect is the draw's and not a reshuffle.
+
+    Stated on ``stream_positions``, which reports all seven streams.
+    ``draws_by_stream`` reports three, and four of the five streams
+    attributed at event level are invisible to it, so it cannot state this
+    claim. Swept over every arm the plan builds rather than one.
+    """
     root = world().run(1)
     control, = root.fork("control")
-    control.run(1)
-    attribution = noise.attribute(root, 1, noise.column("price", 1),
-                                  "event", streams=["news"])
-    assert attribution.rows
-    # every arm ran the same schedule: an arm re-run here from the plan
-    arm, = root.fork("arm")
-    row = attribution.rows[0]
-    noise.patch_draws(arm.engine, [noise.Patch(
-        noise.DrawAddress(row["stream"], row["kind"], row["index"]), 0.0)])
-    arm.run(1)
-    assert arm.engine.draws_by_stream() == control.engine.draws_by_stream()
+    control.run(2)
+    assert set(control.engine.stream_positions()) == set(noise.STREAMS)
+    assert len(control.engine.draws_by_stream()) == 3
+    blind = set(noise.STREAMS) - set(control.engine.draws_by_stream())
+    assert blind == {"jumps", "news", "volume", "volume_idio"}
+
+    attribution = noise.attribute(root, (1, 1), noise.column("price", 2),
+                                  "event", streams=["news", "jumps"])
+    assert len(attribution.rows) > 1
+    seen = set()
+    checked = 0
+    for row in attribution.rows:
+        key = (row["stream"], row["kind"], row["index"], row["perturbation"])
+        if key in seen:
+            continue
+        seen.add(key)
+        arm, = root.fork("arm")
+        noise.patch_draws(arm.engine, [noise.Patch(
+            noise.DrawAddress(row["stream"], row["kind"], row["index"]),
+            row["delta"])])
+        arm.run(2)
+        assert (arm.engine.stream_positions()
+                == control.engine.stream_positions()), row
+        checked += 1
+    assert checked == len(attribution.rows)
 
 
 def test_a_statistic_target_reads_facts_off_the_recorded_arms():
@@ -191,3 +212,147 @@ def test_a_callable_target_and_run_record():
     assert recorded.trace == plain.trace
     assert [e["op"] for e in recorded.order_log].count("record") == 1
     assert [e["op"] for e in plain.order_log].count("record") == 0
+
+
+# -- the day a column target names -------------------------------------------
+
+def test_a_column_target_is_read_at_its_own_day():
+    """Read at the horizon, a target at day 1 with a window ending at day 3
+    reported day 3's value under a label that read `at day 1`."""
+    root = world()
+    early = noise.attribute(root, (1, 3), noise.column("price", 1), "day",
+                            streams=["market"])
+    late = noise.attribute(root, (1, 3), noise.column("price", 3), "day",
+                           streams=["market"])
+    # two different days out of one window, and they differ
+    assert early.control != late.control
+    # each equals a world run straight to that day
+    for attribution, day in ((early, 1), (late, 3)):
+        probe = world()
+        probe.run(day + 1)
+        values = struct.unpack("<%dd" % len(probe.engine.tickers),
+                               probe.engine.column("price"))
+        assert attribution.control == sum(values) / len(values)
+    # the label names the day the value came from
+    assert "at day 1" in early.target.label()
+    assert "at day 3" in late.target.label()
+
+
+def test_a_column_target_before_the_window_is_refused():
+    root = world().run(2)
+    with pytest.raises(tf.ValidationError, match="which has run"):
+        noise.attribute(root, (2, 2), noise.column("price", 1), "day",
+                        streams=["market"])
+
+
+# -- the horizon an event needs ----------------------------------------------
+
+def test_the_default_horizon_reaches_the_open_after_an_event():
+    """A jump lands at its day's close and is first seen at the next open,
+    so a horizon stopping on the window's last day measures every event row
+    as exactly zero."""
+    root = world()
+    reached = noise.attribute(root, (1, 1), noise.column("price", 2),
+                              "event", streams=["jumps"])
+    assert reached.horizon == 2
+    assert any(r["effect"] != 0.0 for r in reached.rows)
+
+    short = noise.attribute(root, (1, 1), noise.column("price", 1), "event",
+                            streams=["jumps"], horizon=1)
+    assert short.horizon == 1
+    assert all(r["effect"] == 0.0 for r in short.rows)
+    zero = [c for c in short.caveats if "measured exactly zero" in c]
+    assert len(zero) == 1
+    assert "first seen at the open after it" in zero[0]
+    # and the fire/unfire caveat does not claim a zero row names the
+    # control's state when both rows of every pair are zero
+    forced = [c for c in short.caveats if "forced to each end" in c][0]
+    assert "neither names the control's state" in forced
+    assert "exactly one row is zero" not in forced
+
+
+# -- the rows do not decompose the target -------------------------------------
+
+def test_the_rows_carry_an_interaction_residual():
+    """Single-draw finite differences through a market with feedback do not
+    add up to the joint effect, and the gap is measured rather than left
+    for the reader."""
+    root = world(model=JUMPY)
+    attribution = noise.attribute(root, (1, 1), noise.column("price", 3),
+                                  "event", streams=["jumps"], horizon=3)
+    changing = [r for r in attribution.rows if r["effect"] != 0.0]
+    assert changing
+    assert attribution.joint_rows == len(changing)
+    summed = sum(r["effect"] for r in changing)
+    assert attribution.interaction == attribution.joint - summed
+    assert attribution.interaction != 0.0
+    note = [c for c in attribution.caveats
+            if "do not" in c and "decompose" in c]
+    assert len(note) == 1
+    assert "interaction residual" in note[0]
+    assert "no total is claimed" in note[0]
+
+
+# -- what delta means ---------------------------------------------------------
+
+def test_the_day_step_is_delta_in_the_day_sums_own_sigma():
+    """The published per-tick step times sqrt(count) is delta.
+
+    One name's day is a sum over T tick normals whose sd is sqrt(T) tick
+    sigmas, so a common shift of delta/sqrt(T) moves that sum by delta of
+    its OWN sd. The derivation, not the constant: this holds for every
+    tick count rather than pinning one.
+    """
+    for steps, ticks in ((1, 20), (2, 20), (1, 40)):
+        root = World(seed=SEED, universe=UNIVERSE, agent=Buyer(),
+                     steps_per_day=steps, ticks_per_step=ticks)
+        attribution = noise.attribute(root, (1, 1), noise.column("price", 1),
+                                      "day", streams=["market"], delta=2.0)
+        for row in attribution.rows:
+            assert row["count"] == steps * ticks
+            assert row["delta"] * math.sqrt(row["count"]) == pytest.approx(2.0)
+
+
+def test_the_day_effect_grows_with_the_tick_count():
+    """A fixed delta is a fixed number of day sigmas, and a day with more
+    ticks carries more noise, so the effect grows with T. Measured on the
+    market factor over 20, 40, 80 and 160 ticks, four names at seed 99."""
+    universe = tf.Universe.random(4, seed=99)
+    effects = []
+    for ticks in (20, 40, 80, 160):
+        root = World(seed=SEED, universe=universe, agent=Buyer(),
+                     steps_per_day=1, ticks_per_step=ticks)
+        attribution = noise.attribute(root, (1, 1),
+                                      noise.column("price", 1), "day",
+                                      streams=["market"], delta=1.0)
+        row = [r for r in attribution.rows
+               if r["site"] == "market_factor_z"][0]
+        effects.append(abs(row["effect"]))
+    assert effects == sorted(effects)
+    assert effects[-1] > 4 * effects[0]
+
+
+# -- the counted caveats can be restated over merged rows ---------------------
+
+def test_row_caveats_restate_the_counts_over_merged_rows():
+    """A sharded plan merges its rows, and the caveats that count rows have
+    to be taken over the merge. Read off a one-row probe they said 1 where
+    the merged table held 18."""
+    root = world(model=JUMPY)
+    whole = noise.attribute(root, (1, 1), noise.column("price", 3), "event",
+                            streams=["jumps"], horizon=3)
+    probe = noise.attribute(root, (1, 1), noise.column("price", 3), "event",
+                            streams=["jumps"], horizon=3,
+                            shard=(0, 10 ** 9))
+    assert len(probe.rows) == 1
+    restated = noise.row_caveats(whole.rows, target=whole.target, last=1,
+                                 horizon=3, event_streams=["jumps"])
+    assert restated == [c for c in whole.plan_caveats
+                        if "interaction residual" not in c]
+    # the probe's own counted caveats are the ones a tool must drop
+    assert probe.plan_caveats != restated
+    assert any(c.startswith("1 event uniforms") for c in probe.plan_caveats)
+    # the restated count is the whole plan's, derived from the rows
+    fired = sum(1 for r in whole.rows if r["perturbation"] == "fire")
+    assert fired > 1
+    assert any(c.startswith(f"{fired} event uniforms") for c in restated)
