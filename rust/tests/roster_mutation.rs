@@ -247,3 +247,319 @@ fn a_roster_can_be_emptied_and_refilled() {
     tick(&mut e, 2);
     assert!(e.prices()[0] > 0.0);
 }
+
+// -- The per-name volume array, issue #148 --------------------------------
+//
+// `volume_idio` is the fifth per-slot array and was the one the two
+// mutations above left alone. Three separate things read it, and each one
+// broke differently while the width was stale.
+//
+//   `update_volume_idio` draws once per SLOT, before the zero check, so the
+//   per-day draw count was the array's construction width rather than the
+//   roster's.
+//
+//   The tick reads each company's state at its own index, so after a
+//   delisting every survivor read its old neighbour's state. Invisible on
+//   every shipped preset, because all sixteen hold `volume_idio_sigma` at
+//   0.0 and every entry stays exactly 0.0.
+//
+//   A snapshot carries the array, and `set_volume_idio` refuses a width its
+//   roster disagrees with, so a checkpoint of a roster-changing run held a
+//   width that could not be restored.
+//
+// Fixing it moves the volume-idio stream position of any run that lists or
+// delists, and moves nothing else. The tests below state both halves.
+
+use tradefloor::engine::DayCloseRequest;
+use tradefloor::market::AvgVolumePolicy;
+use tradefloor::params::ModelParams;
+use tradefloor::rng::{stream, GameRng};
+
+/// One market close, which is where `update_volume_idio` runs.
+fn close(e: &mut Engine) {
+    let n = e.len();
+    let innovations = vec![None; n];
+    let variances = vec![0.000225; n];
+    e.close_market(&DayCloseRequest {
+        daily_innovations: &innovations,
+        sector_base_variances: &variances,
+        avg_volume: AvgVolumePolicy::Hold,
+    });
+}
+
+/// A model with the per-name volume process switched ON.
+///
+/// Built here rather than added to `params.rs`, because every shipped preset
+/// holds both coefficients at 0.0 and this work adds no preset and no dial.
+/// At zero sigma every slot holds exactly 0.0, so the slots are
+/// indistinguishable and a test asking whether a survivor kept its OWN value
+/// would pass on any implementation. This is the model under which the slots
+/// differ from each other.
+fn idio_on() -> ModelParams {
+    let mut p = Engine::default_model();
+    p.volume_idio_persistence = 0.9;
+    p.volume_idio_sigma = 0.4;
+    p
+}
+
+fn engine_with(seed: u32, n: usize, params: ModelParams) -> Engine {
+    let companies = (0..n)
+        .map(|i| company(&format!("C{i}"), 100.0 + i as f64))
+        .collect();
+    Engine::with_params(
+        seed,
+        companies,
+        tradefloor::economy::create_initial_economy_state(&Default::default()),
+        tradefloor::economy::create_initial_central_bank_state(0),
+        tradefloor::sectors::keys().iter().map(|s| s.to_string()).collect(),
+        params,
+    )
+}
+
+#[test]
+fn a_listing_widens_the_per_name_volume_array_and_starts_the_new_slot_at_zero() {
+    // 0.0 is what the constructor gives every company, so a listing starts
+    // with the state a company present from the first tick would hold.
+    let mut e = engine(42, 8);
+    assert_eq!(e.volume_idio().len(), 8);
+
+    e.add_company(company("IPO", 33.0));
+    assert_eq!(e.len(), 9);
+    assert_eq!(
+        e.volume_idio().len(),
+        9,
+        "the array is positional against the roster and must be its width"
+    );
+    assert_eq!(e.volume_idio()[8].to_bits(), 0.0f64.to_bits());
+}
+
+#[test]
+fn a_delisting_narrows_the_per_name_volume_array() {
+    let mut e = engine(42, 8);
+    e.remove_company(3);
+    assert_eq!(e.len(), 7);
+    assert_eq!(e.volume_idio().len(), 7);
+}
+
+#[test]
+fn every_survivor_of_a_delisting_keeps_its_own_state() {
+    // The claim the shipped presets cannot state. Under `idio_on` the eight
+    // slots hold eight different numbers, so removing the wrong one, or none
+    // at all, is visible: the survivors' values would shift by one place.
+    let mut e = engine_with(42, 8, idio_on());
+    e.open_market();
+    close(&mut e);
+    let before: Vec<f64> = e.volume_idio().to_vec();
+    assert_eq!(before.len(), 8);
+    for (i, v) in before.iter().enumerate() {
+        assert!(*v != 0.0, "slot {i} did not move, so this test is vacuous");
+    }
+    for i in 1..before.len() {
+        assert!(
+            before[i].to_bits() != before[0].to_bits(),
+            "slot {i} equals slot 0, so a shift by one place would be invisible"
+        );
+    }
+
+    let removed = 2;
+    e.remove_company(removed);
+
+    let after: Vec<f64> = e.volume_idio().to_vec();
+    let expected: Vec<f64> = before
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| *i != removed)
+        .map(|(_, v)| *v)
+        .collect();
+    assert_eq!(after.len(), 7);
+    for (i, (a, b)) in after.iter().zip(&expected).enumerate() {
+        assert_eq!(
+            a.to_bits(),
+            b.to_bits(),
+            "survivor {i} holds another company's state"
+        );
+    }
+}
+
+#[test]
+fn every_survivor_of_a_listing_keeps_its_own_state() {
+    // A listing appends, so nothing before it may move. The mirror of the
+    // delisting case, under the same model and for the same reason.
+    let mut e = engine_with(42, 8, idio_on());
+    e.open_market();
+    close(&mut e);
+    let before: Vec<f64> = e.volume_idio().to_vec();
+
+    e.add_company(company("IPO", 33.0));
+
+    let after = e.volume_idio();
+    assert_eq!(after.len(), 9);
+    for (i, (a, b)) in after.iter().zip(&before).enumerate() {
+        assert_eq!(a.to_bits(), b.to_bits(), "company {i} moved on a listing");
+    }
+}
+
+#[test]
+fn a_roster_edit_moves_no_streams_position() {
+    // A mutation is bookkeeping. It resizes an array and draws nothing, so
+    // all seven positions, and all seven Box-Muller spares, stay where the
+    // last close left them.
+    let mut e = engine_with(42, 6, idio_on());
+    e.open_market();
+    for m in 0..5 {
+        tick(&mut e, m);
+    }
+    close(&mut e);
+    let before = e.rng_state();
+
+    e.add_company(company("IPO", 33.0));
+    assert_eq!(e.rng_state(), before, "a listing moved a stream");
+
+    e.remove_company(0);
+    assert_eq!(e.rng_state(), before, "a delisting moved a stream");
+}
+
+#[test]
+fn the_per_day_draw_count_is_the_rosters_width_from_the_mutation_onward() {
+    // The authorised change, stated as the schedule rather than as a number
+    // copied out of a run. Four companies for one day, then five for one
+    // day, is nine draws from the volume-idio stream, and the reference
+    // generator below is the same substream stepped nine times.
+    //
+    // Before issue #148 was fixed this run drew eight, because the array
+    // stayed at its construction width. That is what the width assertions
+    // here stand in for: the pre-fix engine is not available to compare
+    // against, and the stale width is the whole of what it did differently.
+    const SEED: u32 = 42;
+    let mut e = engine_with(SEED, 4, idio_on());
+    e.open_market();
+    close(&mut e);
+    assert_eq!(e.volume_idio().len(), 4);
+
+    e.add_company(company("IPO", 33.0));
+    assert_eq!(e.volume_idio().len(), 5);
+    e.open_market();
+    close(&mut e);
+
+    let mut reference = GameRng::substream(SEED, stream::VOLUME_IDIO);
+    for _ in 0..(4 + 5) {
+        reference.next_normal();
+    }
+    assert_eq!(
+        e.rng_state().volume_idio,
+        reference.snapshot(),
+        "the stream advanced by something other than 4 then 5 draws"
+    );
+
+    // A delisting narrows the next day's count the same way.
+    e.remove_company(0);
+    e.open_market();
+    close(&mut e);
+    for _ in 0..4 {
+        reference.next_normal();
+    }
+    assert_eq!(e.rng_state().volume_idio, reference.snapshot());
+}
+
+#[test]
+fn a_fixed_roster_draws_what_it_always_drew() {
+    // The other half of the authorised change: a run that never mutates its
+    // roster takes the draws it always took, so nothing about it moves.
+    const SEED: u32 = 42;
+    let mut e = engine_with(SEED, 4, idio_on());
+    for _ in 0..3 {
+        e.open_market();
+        close(&mut e);
+    }
+
+    let mut reference = GameRng::substream(SEED, stream::VOLUME_IDIO);
+    for _ in 0..(4 * 3) {
+        reference.next_normal();
+    }
+    assert_eq!(e.rng_state().volume_idio, reference.snapshot());
+}
+
+#[test]
+fn a_shipped_preset_holds_every_slot_at_zero_across_a_roster_change() {
+    // Why no shipped price path moves. All sixteen presets hold
+    // `volume_idio_sigma` and `volume_idio_persistence` at 0.0, the update
+    // returns before writing, and the tick reads the same 0.0 whatever the
+    // width is. The fix changes which draws the stream has taken and leaves
+    // every state exactly where it was.
+    let mut e = engine(42, 6);
+    assert_eq!(e.params().volume_idio_sigma, 0.0);
+    assert_eq!(e.params().volume_idio_persistence, 0.0);
+
+    e.open_market();
+    close(&mut e);
+    e.add_company(company("IPO", 33.0));
+    e.open_market();
+    close(&mut e);
+    e.remove_company(0);
+    e.open_market();
+    close(&mut e);
+
+    assert_eq!(e.volume_idio().len(), e.len());
+    for (i, v) in e.volume_idio().iter().enumerate() {
+        assert_eq!(v.to_bits(), 0.0f64.to_bits(), "slot {i} moved");
+    }
+}
+
+#[test]
+fn a_snapshot_at_a_stale_width_is_refused_and_the_error_says_why() {
+    // The restore path. A checkpoint written before this fix, by a run that
+    // listed or delisted, carries the array at its construction width. It is
+    // refused rather than padded, because the states are positional and a
+    // pad attaches each one to whichever company now sits at that index.
+    let mut e = engine(42, 8);
+    e.add_company(company("IPO", 33.0));
+    assert_eq!(e.volume_idio().len(), 9);
+
+    let stale = vec![0.0; 8]; // what a pre-fix snapshot of this run holds
+    let err = e.set_volume_idio(&stale).expect_err("a stale width must fail");
+    // The bound phrases, not the bare digits. `err.contains('8')` is
+    // satisfied by the "#148" in the message whatever the widths are, and
+    // the two format arguments are both `usize` and positional, so swapping
+    // them produces a message that reads backwards and passes. Measured: a
+    // build with the arguments swapped passed the digit form of this test.
+    assert!(err.contains("carries 8"),
+            "the error must name the width the snapshot carries");
+    assert!(err.contains("holds 9"),
+            "the error must name the width the roster holds");
+    assert!(err.contains("#148"), "the error must name the issue");
+
+    // The array itself is untouched by the refusal.
+    assert_eq!(e.volume_idio().len(), 9);
+    for v in e.volume_idio() {
+        assert_eq!(v.to_bits(), 0.0f64.to_bits());
+    }
+
+    // A matching width still restores.
+    let good = vec![0.25; 9];
+    e.set_volume_idio(&good).expect("a matching width restores");
+    assert_eq!(e.volume_idio()[8], 0.25);
+}
+
+#[test]
+fn the_same_edits_reproduce_the_same_per_name_volume_states() {
+    // Reproducibility, under the model that can see these states at all.
+    let run = || {
+        let mut e = engine_with(7, 4, idio_on());
+        e.open_market();
+        close(&mut e);
+        e.add_company(company("IPO", 33.0));
+        e.open_market();
+        close(&mut e);
+        e.remove_company(1);
+        e.open_market();
+        close(&mut e);
+        (e.volume_idio().to_vec(), e.rng_state().volume_idio)
+    };
+    let (a_states, a_rng) = run();
+    let (b_states, b_rng) = run();
+    assert_eq!(a_rng, b_rng);
+    assert_eq!(a_states.len(), 4);
+    for (i, (x, y)) in a_states.iter().zip(&b_states).enumerate() {
+        assert_eq!(x.to_bits(), y.to_bits(), "company {i}");
+    }
+}

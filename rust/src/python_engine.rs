@@ -2105,17 +2105,10 @@ impl PyEngine {
     /// Each per-slot array is hashed at the width the engine holds for it.
     /// That is the invariant, whatever the roster does.
     ///
-    /// Before tradefloor issue #148 one array makes that width differ from
-    /// the roster's. `volume_idio` is sized at construction and is the one
-    /// per-slot array `add_company` and `remove_company` do not resize, so
-    /// after a listing or a delisting this walks it at the constructor's
-    /// width. The leaf stays self-consistent and such a run still verifies,
-    /// because the recording and the replay read the same array, and no
-    /// price depends on the width: every shipped preset holds
-    /// `volume_idio_sigma` and `volume_idio_persistence` at 0.0, so every
-    /// value is exactly 0.0. The Python twin refuses such a snapshot rather
-    /// than hashing a width it cannot check. #148 is where the resize is
-    /// being made, and this second paragraph goes when it lands.
+    /// Every per-slot array follows the roster, `volume_idio` included
+    /// since the resize that landed with this one, so the width this walks
+    /// after a listing or a delisting is the roster's and the Python twin
+    /// accepts the same snapshot.
     ///
     /// `tradefloor.manifest.state_hash(engine.state_snapshot())` computes
     /// the same digest in Python, and a test holds the two equal.
