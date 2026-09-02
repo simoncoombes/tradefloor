@@ -9,6 +9,10 @@ sampled check verifies k days for the cost of k days.
 generator of any run that lists or delists, breaking such runs' old
 checkpoints and letting the day ledger check them.
 
+**Every print decomposes into the shock that arrived, the depth that
+absorbed it and the breaker's share, with a counterfactual against
+unbounded depth on request.**
+
 **Every draw has an address**, a table of substitutions can replace one,
 and a second `run_days` call numbers days from the engine's own counter.
 
@@ -234,6 +238,121 @@ keeps the engine's own, because the error propagates out of the guard and
 the later writes are attempted and never reached. An engine that has caught
 this error holds one run's market beside another run's macro state, so drop
 it rather than running it on.
+
+### The prints table
+
+**Every print says what it was made of.** `Engine.prints()` is a table
+beside `bars` and `truth`, one row per instrument per tick: the print, the
+model price behind it, and the two log distances between them. `shock` is
+the distance from the last print to the model price, `absorbed` is the
+distance from there to the tape, and the two sum to the print's own move.
+
+**A depth counterfactual measures liquidity's share.**
+`Engine.settle_depth_counterfactual(True)` settles every open tick a second
+time against every resting level, under the same four uniforms and from the
+same book state, and adds `unbounded_print` and `liquidity_share` to that
+table. It takes no draw and its fills reach no company field, so the market
+and the known-answer digest are the same with it on. A run takes three to
+four times as long with it on, so it stays off until a caller asks for it.
+
+### The depth bound
+
+`settle_price_through_book` quotes only the levels a tick's flow can reach:
+`min(BOOK_LEVELS, max(2, ceil(tick_volume / level_size) + 1))`, computed
+before any draw. Quoting all ten was measured at roughly four times the
+settlement cost for depth ordinary flow never touches. `SettleOptions`
+gains `depth_multiplier`, read at that one site and nowhere else. The four
+settlement uniforms, `fair_value` and `buy_fraction` are all decided
+without it, so the same tick settled twice at two multipliers is a
+controlled comparison rather than two markets.
+
+At the shipped `1.0` the bound is returned untouched rather than multiplied
+by one, so the change is a no-op a reader can check by looking. The
+counterfactual runs at `f64::INFINITY`, which lifts the bound to every
+level the maker quotes.
+
+The second settlement runs inside the tick, on its own book, between the
+real settlement and the maker-inventory carry, so it sees the state the
+real one saw. It is served the four uniforms the real settlement was
+served, rewound, so the stream position and `draws_by_stream` hold at the
+values they had. It is skipped on the recorded-stream replay path, where
+settlement draws from the caller's source and there is no buffer to rewind.
+
+### The absorption column and the share
+
+`absorbed` is measured against the printed tape, so it holds the second
+circuit breaker as well as the book. On a halted name the breaker is what
+absorbed the shock, and booking it to the book would be the more flattering
+of two wrong answers.
+
+`liquidity_share` is `log(print / unbounded_print)` over the print's own log
+move. It comes out NEGATIVE on most rows that carry one. The depth bound
+truncates a walk: an order that exhausts a shallow book stops there, while
+against every resting level it keeps filling and prints further from where
+it started. So the real print sits between the last print and the unbounded
+print. The unbounded book's move is `1 - share` times the printed move, so
+a share of -1 says the deeper book would have moved the price twice as far,
+and nothing bounds the ratio by one. Measured over three days of twelve
+names, 1,409 of the 1,516 rows where the bound moved a print are negative.
+
+The share is exactly zero where the two prints coincide, which covers every
+tick that did not settle, and NaN where the print did not move and the
+deeper book would have moved it. Dividing anyway would put an infinity in
+the column, and one infinity turns every mean taken over it into an
+infinity too; that case was measured at 7 rows in 14,040.
+
+The counterfactual prints one tick from the real state. It cannot say what
+a deeper book would have done to the next tick, because the maker inventory
+it would have left is discarded and the tick after this one is the one that
+actually ran.
+
+### The breaker's own column
+
+`absorbed` is measured to the printed price, so it carries the second
+circuit breaker as well as the book. `clamp` is the breaker's own part and
+`absorbed - clamp` is the book's.
+
+The two cancel, so one column could not carry both. Measured over three
+stressed runs of eight names, the book and the breaker pull opposite
+ways on every clamped print without exception, and on 90 of 146, 22 of 41
+and 22 of 37 they cancel to the last bit. `absorbed` then reads exactly 0.0
+on a name the breaker had just moved 513 basis points, which is the same
+value it takes on a tick that never settled at all. Where it is non-zero the
+clamp is a median 54% to 111% of it, and up to 26.8 times it.
+
+`shock + absorbed` is still the print's own log move, so nothing that read
+the two-term split has to change. The three-term form is
+`shock + (absorbed - clamp) + clamp`, measured to a worst error of 2.91e-16
+over 9,504 rows.
+
+### One metadata key on the prints schema
+
+The table carries a single `caveat` entry, computed from the state the
+caller is in. `arrow::Schema::metadata` is a `HashMap` and the IPC writer
+serialises it in that map's iteration order, which `RandomState` reseeds per
+map, so three keys produced two different digests for one table inside a
+single process. The field's type belongs to `arrow`, so nothing on this side
+can supply a hasher; one entry has no order to vary. The two keys that went
+were both derivable from the schema, and a consumer asking whether the depth
+counterfactual ran should read the column list, which is the more reliable
+answer.
+
+A day whose sessions disagreed about the counterfactual gets a third caveat
+of its own. Its columns are shorter than the day, so both are dropped rather
+than served with a gap, and the caveat names that case instead of telling
+the caller to set an option they already set.
+
+### The reading in the liquidity-crisis example
+
+`examples/experiments/liquidity-crisis` runs both arms with the
+counterfactual on and reports what the book paid for. `market.liquidity` at
+40% is a claim about depth, and the column reads it back off the tape. On
+the last day of the post-fork window, flow reached the end of the quoted
+depth on 0.76% of control prints and 2.04% of crisis prints, at the same
+median share of -1.002 in both, and the mean distance from the model price
+to the print was 23.3 and 34.7 basis points. The crisis changes how often
+the book runs out rather than how far a print goes when it does. The arms
+are the same arms, and their exposure numbers are unchanged.
 
 ## 0.6.2
 

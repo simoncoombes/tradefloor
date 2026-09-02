@@ -493,6 +493,89 @@ def bands(series: Sequence[dict], names: Sequence[str]) -> dict:
     } for n in names}
 
 
+def depth_reading(world, day: int | None = None) -> dict[str, Any]:
+    """How much of one day's prints the book paid for, in one arm.
+
+    `Engine.settle_depth_counterfactual` settles every open tick a second
+    time against every resting level, under the same four uniforms and from
+    the same book state. The two prints then differ only where the flow ran
+    out of quoted book, and `liquidity_share` says how far the depth bound
+    moved the print as a multiple of the move the print made.
+
+    The share is NEGATIVE on most rows that carry one. The bound truncates a
+    walk: an order that exhausts a shallow book stops there, while against
+    every resting level it keeps filling and prints further from where it
+    started. The unbounded book's move is `1 - share` times the printed
+    move.
+
+    This is the reading the crisis arm exists to move. `market.liquidity`
+    scales the volume column the maker quotes off, so the crisis book is
+    thinner at every level and ordinary flow reaches the end of it more
+    often. The exposure numbers say what the AGENT did about that; this
+    says what the market did to it, and the two are measured on the same
+    ticks.
+
+    Per day, because the engine holds one day's tape at a time:
+    :meth:`World.run` opens a market for each day and the buffer is cleared
+    with it. Call `world.engine.record(world.day - 1)` after the run and
+    this reads that day.
+
+    `pyarrow` is imported here rather than at module scope. The library
+    hands its tables over through the Arrow C Data Interface and depends on
+    no dataframe package; this study borrows one to read them.
+    """
+    try:
+        import pyarrow as pa
+    except ImportError as exc:  # pragma: no cover -- an optional extra
+        raise MissingInput(
+            "the depth reading needs pyarrow to read the prints table:\n"
+            "    pip install pyarrow") from exc
+
+    table = pa.table(world.engine.prints(day=day)).to_pydict()
+    if "unbounded_print" not in table:
+        raise MissingInput(
+            "this arm ran without the depth counterfactual. Call "
+            "engine.settle_depth_counterfactual(True) before the run.")
+
+    rows = len(table["print"])
+    moved = [
+        i for i in range(rows)
+        if table["print"][i] != table["unbounded_print"][i]
+    ]
+    # SIGNED, and finite only. The share is negative wherever the depth
+    # bound truncated a walk, which is most rows that carry one, so taking
+    # an absolute value here would hide the direction the column exists to
+    # report. A print that did not move has no move to apportion and the
+    # column says NaN there rather than an infinity; counted below rather
+    # than dropped in silence.
+    shares = sorted(
+        table["liquidity_share"][i] for i in moved
+        if table["liquidity_share"][i] == table["liquidity_share"][i]
+    )
+    # ABSOLUTE, and labelled so everywhere it is reported. Absorption is
+    # signed with the move, so up ticks and down ticks cancel and the signed
+    # mean over a session is near zero: -0.4 basis points against 27.0 for
+    # the absolute mean on the control arm. The question is how far a print
+    # sits from the model price, which is a distance.
+    absorbed = [abs(v) for v in table["absorbed"]]
+    return {
+        "day": table["day"][0] if rows else None,
+        "rows": rows,
+        "instruments": len(world.engine.tickers),
+        "moved": len(moved),
+        "moved_fraction": len(moved) / rows if rows else 0.0,
+        "median_share": shares[len(shares) // 2] if shares else None,
+        "shares_negative": sum(1 for v in shares if v < 0),
+        "undefined_share": len(moved) - len(shares),
+        "mean_abs_absorbed_bps": 1e4 * sum(absorbed) / rows if rows else 0.0,
+    }
+
+
+def depth_readings(worlds: dict) -> dict[str, dict[str, Any]]:
+    """:func:`depth_reading` for every arm, on each arm's recorded day."""
+    return {name: depth_reading(world) for name, world in worlds.items()}
+
+
 def separation(stats: dict, control: str, arm: str, field: str) -> dict:
     """One arm's gap from control, in units of the larger within-arm stdev.
 

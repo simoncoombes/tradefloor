@@ -78,6 +78,7 @@ strategy. `tf.rank` runs many seeds and compares them with a paired sign test.
 | | |
 |---|---|
 | `engine.truth()` | why each price moved: nine factors that sum to the move, to 1e-16 |
+| `engine.prints()` | how each print was arrived at: the shock that arrived and the depth that absorbed it |
 | counterfactual TCA | the same seed with your orders and without them |
 | `tf.rank` | many seeds, paired sign tests |
 | `RunManifest` | version, preset, seed, universe, macro, scenario. `reproduce()` stops on a mismatch |
