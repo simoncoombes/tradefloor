@@ -41,17 +41,32 @@ shared history is the same object in all of them.
 
 ## What one number in the matrix holds
 
-An effect on b is b's P&L change. It arrives as prices, and two things
-reach b through prices: the impact a's flow left on the market, and b's own
-reaction to the market a made. Both are in the number and this cannot split
-them. Splitting them needs a third arm in which b sees a's prices and
+An effect on b is b's P&L change. It arrives as prices, by three routes,
+and the number holds all three without separating them.
+
+The direct one: a's flow reaches the market as part of the merged
+``order_flow`` of a session, and the prices of the names a traded come out
+different. b holds or trades some of those names.
+
+The market-wide one: a's flow moves the cap-weighted index, the fear gauge
+reacts to that same day, VIX sets the shared factor's variance target, and
+the nudge reaches every name's volatility two closes later.
+:meth:`tradefloor.Execution.moved` documents and measures this channel, and
+says plainly that it is not a rounding error. It reaches b through names a
+never touched, so ``matrix[a][b]`` is non-zero for two agents whose traded
+sets are disjoint, and it grows with the horizon because the reaction has
+to cross two closes. :meth:`Externality.caveats` names those entries when
+a result carries them, and hands over the control `tca.py` gives, which is
+to pin the gauge in both worlds.
+
+And b's own reaction to the market a made, which is in the number too.
+Separating that one needs a third arm in which b sees a's prices and
 answers as though it did not, and there is no such arm.
 
-The channel is impact rather than liquidity. Agents in a cohort take no
-levels from each other, because :meth:`Portfolio.execute` reads the ladder
-and removes nothing, so a's whole effect on b travels through the merged
-``order_flow`` of a session and the prices it produced. `counterfactual.py`
-carries the measurement.
+None of the three is the order book. Agents in a cohort take no levels
+from each other, because :meth:`Portfolio.execute` reads the ladder and
+removes nothing, so nothing here is a queue. `counterfactual.py` carries
+that measurement.
 
 Removal is inaction from the fork day on. The removed agent keeps the
 positions it held at the fork, and a frozen holding sends no flow, so it
@@ -87,15 +102,15 @@ class Externality:
     """
 
     __slots__ = ("labels", "matrix", "diagonal", "diagonal_bps", "cohort_pnl",
-                 "trades", "agreement", "days", "fork_day", "fork_step",
-                 "held_at_fork")
+                 "trades", "traded", "agreement", "days", "fork_day",
+                 "fork_step", "held_at_fork")
 
     #: The columns :meth:`table` produces, in order. One row per ordered
     #: pair of labels, so an N-agent cohort is N squared rows.
     COLUMNS = ("removed", "affected", "kind", "value")
 
     def __init__(self, *, labels, matrix, diagonal, diagonal_bps, cohort_pnl,
-                 trades, agreement, days, fork_day, fork_step,
+                 trades, traded, agreement, days, fork_day, fork_step,
                  held_at_fork) -> None:
         self.labels = tuple(labels)
         self.matrix = matrix
@@ -106,6 +121,10 @@ class Externality:
         self.diagonal_bps = diagonal_bps
         self.cohort_pnl = cohort_pnl
         self.trades = trades
+        #: The tickers each agent filled over the window, in the full arm.
+        #: Two agents with disjoint sets still reach each other, through
+        #: the fear gauge, and :meth:`caveats` reads this to say so.
+        self.traded = traded
         self.agreement = agreement
         self.days = days
         self.fork_day = fork_day
@@ -138,10 +157,11 @@ class Externality:
                 f"stopped trading with a position on." if self.held_at_fork
                 else "")
         out = [
-            "An effect is a P&L change and nothing finer. The impact the "
-            "removed agent's flow left on prices and the affected agent's "
-            "own reaction to those prices are both in the number, because "
-            "both arrive as prices.",
+            "An effect is a P&L change and nothing finer. The prices the "
+            "removed agent's flow moved directly, the market-wide move its "
+            "flow put through the fear gauge, and the affected agent's own "
+            "reaction to the prices both of those left are all three in the "
+            "number, because all three arrive as prices.",
             f"Removal is inaction from day {self.fork_day} on. The removed "
             f"agent sends no order and is asked nothing; it keeps the "
             f"positions it held at the fork, and a frozen holding sends no "
@@ -153,6 +173,21 @@ class Externality:
                 "THE ARMS DID NOT START IDENTICAL, so every number here "
                 "describes more than one changed variable. The arms differ "
                 "in " + ", ".join(self.agreement.differences) + ".")
+        crossed = [f"{a} on {b}" for a in self.labels for b in self.labels
+                   if a != b and self.matrix[a][b] != 0.0
+                   and not (set(self.traded[a]) & set(self.traded[b]))]
+        if crossed:
+            out.append(
+                f"{len(crossed)} entries move an agent that shares no "
+                f"traded name with the one removed ({', '.join(crossed)}). "
+                f"Order flow reaches names its sender never touched: the "
+                f"fear gauge reacts same-day to the cap-weighted market "
+                f"return, VIX sets the shared factor's variance target, and "
+                f"the nudge reaches every name's volatility two closes "
+                f"later. tradefloor.Execution.moved documents and measures "
+                f"that channel. To hold those entries at zero, pin the "
+                f"gauge in both worlds by building the cohort with "
+                f"pins={{'vix': 15.0}} and running this again.")
         idle = [b for b in self.labels if not self.trades[b]]
         if idle:
             out.append(
@@ -220,6 +255,7 @@ class Externality:
             "fork_step": self.fork_step,
             "cohort_pnl": dict(self.cohort_pnl),
             "trades": dict(self.trades),
+            "traded": {b: list(names) for b, names in self.traded.items()},
             "matrix": {a: dict(row) for a, row in self.matrix.items()},
             "diagonal": dict(self.diagonal),
             "diagonal_bps": dict(self.diagonal_bps),
@@ -347,6 +383,13 @@ def externalities(world: World, days: int = 1) -> Externality:
     present = {b: full.summary(agent=b) for b in labels}
     cohort_pnl = {b: present[b]["pnl_since"] for b in labels}
     trades = {b: present[b]["trades"] for b in labels}
+    # The names each agent actually filled over the window. Two agents with
+    # disjoint sets still reach each other through the fear gauge, and the
+    # caveat that says so needs to know which pairs those are.
+    traded = {b: tuple(sorted({fill["ticker"]
+                               for fill in full.portfolios[b].fills
+                               if fill["step"] >= fork_step}))
+              for b in labels}
 
     matrix: dict[str, dict[str, float]] = {}
     diagonal: dict[str, float] = {}
@@ -363,7 +406,8 @@ def externalities(world: World, days: int = 1) -> Externality:
 
     return Externality(labels=labels, matrix=matrix, diagonal=diagonal,
                        diagonal_bps=diagonal_bps, cohort_pnl=cohort_pnl,
-                       trades=trades, agreement=agreement, days=days,
+                       trades=trades, traded=traded,
+                       agreement=agreement, days=days,
                        fork_day=fork_day, fork_step=fork_step,
                        held_at_fork=held)
 

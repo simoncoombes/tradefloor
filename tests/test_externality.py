@@ -555,6 +555,130 @@ def test_two_agents_that_never_trade_give_a_zero_matrix():
     assert any("separable" in line for line in result.caveats())
 
 
+class OnceOnly:
+    """Buys its own slice of the roster once, at a chosen step, then stops."""
+
+    def __init__(self, lo: int, hi: int, at: int,
+                 shares: float = 500.0) -> None:
+        self.lo, self.hi, self.at, self.shares = lo, hi, at, shares
+
+    def act(self, obs) -> dict[str, float]:
+        if obs.step != self.at:
+            return {}
+        return {t: self.shares for t in obs.tickers[self.lo:self.hi]}
+
+
+def test_an_idle_agents_column_moves_through_marking():
+    """What the idle caveat attributes the movement to.
+
+    An agent that filled nothing over the window has the same cash and
+    the same quantities in both arms, so the only thing that can move its
+    P&L between them is the price its holdings mark against. The caveat
+    says exactly that, and this is the check that it is saying the right
+    thing rather than a plausible thing.
+
+    The two figures agree to about 1.5e-11 on 25.0 rather than to the
+    bit, because `pnl_since` reaches the total by differencing two net
+    worths and this sums the per-position differences, which is a
+    different summation order over the same values.
+    """
+    universe = list(tf.Universe.random(20, seed=11))
+    world = World(seed=SEED, universe=universe, cash=20_000_000.0,
+                  agents={"idle": OnceOnly(0, 10, at=0),
+                          "active": OnceOnly(10, 20, at=9)})
+    world.run(days=1)
+    fork = world.step
+    result = externalities(world, days=3)
+    assert result.trades["idle"] == 0, "the idle fixture traded in the window"
+
+    (full,) = world.fork("full")
+    arm = world.without("active")
+    full.run(days=3)
+    arm.run(days=3)
+    held = full.portfolios["idle"].positions
+    assert held, "the idle fixture holds nothing, so there is nothing to mark"
+    tickers = full.engine.tickers
+    in_full = dict(zip(tickers, _prices(full.engine)))
+    in_arm = dict(zip(tickers, _prices(arm.engine)))
+    marking = sum(position.quantity * (in_arm[t] - in_full[t])
+                  for t, position in held.items())
+
+    assert result.matrix["active"]["idle"] == pytest.approx(marking,
+                                                            rel=1e-9)
+
+
+class Half:
+    """Buys a fixed size in its own half of the roster, every third step."""
+
+    def __init__(self, lo: int, hi: int, shares: float = 500.0) -> None:
+        self.lo, self.hi, self.shares = lo, hi, shares
+
+    def act(self, obs) -> dict[str, float]:
+        if obs.step % 3:
+            return {}
+        return {t: self.shares for t in obs.tickers[self.lo:self.hi]}
+
+
+def _disjoint(pins=None, days: int = 4):
+    universe = list(tf.Universe.random(20, seed=11))
+    world = World(seed=SEED, universe=universe, cash=20_000_000.0, pins=pins,
+                  agents={"low": Half(0, 10), "high": Half(10, 20)})
+    return externalities(world, days=days)
+
+
+def test_two_agents_on_disjoint_names_still_move_each_other():
+    """The fear gauge, which is a channel the book cannot explain.
+
+    `tca.Execution.moved` documents it: order flow reaches names its
+    sender never touched, because the gauge reacts same-day to the
+    cap-weighted market return, VIX sets the shared factor's variance
+    target, and the nudge reaches every name's volatility two closes
+    later. So a cohort of two agents on disjoint halves of a roster has a
+    non-zero matrix, and a reader who believed the effect could only
+    travel through shared names would read it as a defect.
+
+    Measured on `Universe.random(20, seed=11)` at seed 42, 20,000,000 of
+    cash and 500-share orders every third step, four days: -1,523.87 and
+    -400.00 with the gauge free. The assertions below pin the derivation
+    rather than those two figures.
+    """
+    result = _disjoint()
+    assert not (set(result.traded["low"]) & set(result.traded["high"])), (
+        "the fixture's agents share a traded name, so this measures the "
+        "direct channel and not the one it is about")
+    assert result.matrix["low"]["high"] != 0.0
+    assert result.matrix["high"]["low"] != 0.0
+    assert any("shares no traded name" in line for line in result.caveats())
+
+
+def test_a_pinned_fear_gauge_removes_the_whole_cross_effect():
+    """The control `tca.py` hands the reader, run as a test.
+
+    Pinning VIX in both worlds collapses every entry between agents on
+    disjoint names to exactly zero, which is what makes the attribution
+    in the caveat a measurement rather than a story. The existence test
+    above would pass on any leak; this one says which leak it is.
+    """
+    result = _disjoint(pins={"vix": 15.0})
+    assert result.matrix["low"]["high"] == 0.0
+    assert result.matrix["high"]["low"] == 0.0
+    assert not any("shares no traded name" in line
+                   for line in result.caveats())
+
+
+def test_one_day_leaks_nothing_across_disjoint_names():
+    """The reaction has to cross two closes, so one day cannot carry it.
+
+    `tca.py` says a one-day analysis is structurally immune because its
+    final prices predate the first repriced variance target. The same
+    holds here, and it is why the zero matrix at one day is not evidence
+    that the channel is absent.
+    """
+    result = _disjoint(days=1)
+    assert result.matrix["low"]["high"] == 0.0
+    assert result.matrix["high"]["low"] == 0.0
+
+
 def test_the_matrix_is_the_pnl_the_removal_changed():
     """The off-diagonal against the arms it was computed from.
 
