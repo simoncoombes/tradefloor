@@ -13,18 +13,27 @@ Three things are checked, each a claim the emitter relies on:
    branches. When it does not, the fix is draw hoisting: :func:`hoist`
    takes every draw out of the branches, unconditionally and in source
    order, binds each to a name, and uses the name inside the branch. The
-   hoisted body has the same value on the branch taken and the same
-   effect on both, and the stream position no longer depends on the
-   condition. Hoisting changes what the mechanism does to the stream, so
-   the checker proposes it and never applies it silently.
+   hoisted body has the same effect on every branch, and the stream
+   position no longer depends on the condition. It has the same value on
+   the branch taken while at most one branch draws, which is the shape
+   the shipped mechanisms have; :func:`hoist` documents what happens when
+   two branches draw. Hoisting changes what the mechanism does to the
+   stream, so the checker proposes it and never applies it silently.
 
 3. At the default doses the body reduces to the identity on state and
    price. :func:`prove_inert` evaluates the body with the dials at their
    defaults, uniforms as symbols in ``[0, 1)``, normals and state as
    symbols, and requires every write to be either unreachable (its guard
-   decidably false) or the identity (writing a field its own value, or
-   adding a decided zero). Anything it cannot decide is a failure to
-   prove, reported as such; the prover does not guess.
+   decidably false) or the identity, which here means writing a field its
+   own value. Anything it cannot decide is a failure to prove, reported
+   as such; the prover does not guess.
+
+   The one identity the prover assumes is that a decided zero absorbs a
+   multiply. It assumes nothing about addition, because ``x + 0.0`` and
+   ``x += 0.0`` both turn a field holding ``-0.0`` into ``+0.0`` and the
+   prover has no sign for a symbolic field. A mechanism that wants to be
+   inert guards its write, which is what ``mechanisms/jumps.py`` does and
+   what its comment gives this as the reason for.
 """
 from __future__ import annotations
 
@@ -184,13 +193,24 @@ def hoist(body: tuple) -> tuple:
 
     Each draw found inside an ``If`` expression, a ``When`` or an ``IfSome``
     is replaced by a ``Var`` and a ``Let`` of that draw is inserted before
-    the statement, in the order the draws appear in the source. The value
-    on the branch taken is unchanged; the effect is now the same on every
-    branch. What changes is the stream: the draws are taken whether or not
-    the branch is, so a hoisted mechanism consumes the stream differently
-    from the unhoisted one, and applying this to a shipped mechanism moves
-    every later draw on its stream for every preset. The checker returns
-    the rewrite; it does not install it.
+    the statement, in the order the draws appear in the source. The effect
+    is now the same on every branch. What changes is the stream: the draws
+    are taken whether or not the branch is, so a hoisted mechanism consumes
+    the stream differently from the unhoisted one, and applying this to a
+    shipped mechanism moves every later draw on its stream for every
+    preset. The checker returns the rewrite; it does not install it.
+
+    **The value on the branch taken survives only while at most one branch
+    draws.** Each draw gets its own hoisted name in source order, so a
+    branch reads the names its own draws became. Where two branches draw,
+    the second branch reads names the first branch's draws took, and the
+    values move. For ``Set("x", If(gain < 0.5, Draw(u) + Draw(u),
+    Draw(u)))`` against the stream 0.11, 0.22, 0.33, the else branch reads
+    0.11 unhoisted and 0.33 hoisted, because its one draw becomes the third
+    hoisted name. The then branch reads 0.33 either way. Both shipped
+    mechanisms draw on at most one branch, and
+    ``test_hoisting_moves_the_value_when_two_branches_draw`` states the
+    case that does not.
     """
     out = []
     counter = [0]
@@ -296,16 +316,20 @@ def _decide(op: str, left: Any, right: Any) -> Any:
 def _arith(op: str, a: Any, b: Any) -> Any:
     if isinstance(a, float) and isinstance(b, float):
         return {"+": a + b, "-": a - b, "*": a * b, "/": a / b if b else float("nan")}[op]
-    # a decided zero absorbs a multiply, and adding a decided zero to a
-    # symbol is the symbol: the two identities the inertness proof needs
+    # A decided zero absorbs a multiply. That is the one identity the
+    # inertness proof assumes, and it is sound for the use it is put to:
+    # the result feeds a comparison against zero, which reads -0.0 and
+    # +0.0 alike.
     if op == "*" and (a == 0.0 or b == 0.0):
         return 0.0
-    if op == "+" and a == 0.0:
-        return b
-    if op == "+" and b == 0.0:
-        return a
-    if op == "-" and b == 0.0:
-        return a
+    # Three additive identities used to collapse to the symbol here:
+    # x + 0.0, 0.0 + x and x - 0.0. The first two are wrong on one input.
+    # For x holding -0.0, x + 0.0 is +0.0, a different bit pattern, and
+    # the prover has no sign for a symbolic field, so it cannot decide
+    # them. x - 0.0 does keep the sign and was sound, and it went with
+    # them because no mechanism needs it and one rule about addition is
+    # easier to hold than three. A mechanism that wants an inert write
+    # guards it, which is what mechanisms/jumps.py does.
     return Sym(f"({a!r} {op} {b!r})")
 
 
@@ -389,8 +413,20 @@ def _prove_body(body: tuple, mech: Mechanism, doses: dict, env: dict,
             if not reachable:
                 proof.writes.append(f"{stmt.path}: unreachable at the defaults")
                 continue
-            if isinstance(stmt, Add) and value == 0.0:
-                proof.writes.append(f"{stmt.path}: adds a decided zero")
+            # An Add of a decided zero is not accepted: adding +0.0 to a
+            # field holding -0.0 changes its bits, and the prover has no
+            # sign for the field. See _arith and the module docstring.
+            if isinstance(stmt, Add):
+                if value == 0.0:
+                    proof.failures.append(
+                        f"{stmt.path} adds a decided zero on a path the "
+                        "defaults reach; that is the identity except on a "
+                        "field holding -0.0, which the prover cannot rule "
+                        "out")
+                else:
+                    proof.failures.append(
+                        f"{stmt.path} adds {value!r} on a path the defaults "
+                        "reach")
                 continue
             if isinstance(stmt, Set) and isinstance(value, Sym) and value.name == f"state.{stmt.path}":
                 proof.writes.append(f"{stmt.path}: written its own value")
@@ -418,11 +454,98 @@ def _prove_body(body: tuple, mech: Mechanism, doses: dict, env: dict,
 
 # -- the whole check ------------------------------------------------------------
 
+def _resolve_expr(expr: Any, mech: Mechanism, dials: set, states: set,
+                  bound: set) -> None:
+    """Report every name in an expression that nothing declares."""
+    if isinstance(expr, Dial):
+        if expr.name not in dials:
+            raise SpecError(f"{mech.name} reads dial {expr.name!r}, which it "
+                            "does not declare")
+        return
+    if isinstance(expr, State):
+        if expr.path not in states:
+            raise SpecError(f"{mech.name} reads state {expr.path!r}, which it "
+                            "does not declare")
+        return
+    if isinstance(expr, Var):
+        if expr.name not in bound:
+            raise SpecError(f"{mech.name} reads {expr.name!r}, which no Let, "
+                            "ForCompanies or IfSome binds")
+        return
+    if isinstance(expr, (Const, Draw)):
+        return
+    if isinstance(expr, Neg):
+        _resolve_expr(expr.expr, mech, dials, states, bound)
+        return
+    if isinstance(expr, Bin):
+        _resolve_expr(expr.left, mech, dials, states, bound)
+        _resolve_expr(expr.right, mech, dials, states, bound)
+        return
+    if isinstance(expr, If):
+        _resolve_expr(expr.cond, mech, dials, states, bound)
+        _resolve_expr(expr.then, mech, dials, states, bound)
+        _resolve_expr(expr.otherwise, mech, dials, states, bound)
+        return
+    if isinstance(expr, Call):
+        if expr.fn not in MATHX:
+            raise SpecError(f"{mech.name} calls {expr.fn!r}, which is not on "
+                            "the mathx surface")
+        for arg in expr.args:
+            _resolve_expr(arg, mech, dials, states, bound)
+        return
+    if isinstance(expr, Extern):
+        if expr.name not in {e.name for e in mech.externs}:
+            raise SpecError(f"{mech.name} calls extern {expr.name!r}, which "
+                            "it does not declare")
+        for arg in expr.args:
+            _resolve_expr(arg, mech, dials, states, bound)
+        return
+    raise SpecError(f"not an expression: {expr!r}")
+
+
+def _resolve_body(body: tuple, mech: Mechanism, dials: set, states: set,
+                  bound: set) -> None:
+    """Report every undeclared name in a body, binding as it walks.
+
+    Without this every such name escaped the checker and surfaced from the
+    emitter as a bare KeyError naming neither the mechanism nor the field.
+    """
+    bound = set(bound)
+    for stmt in body:
+        if isinstance(stmt, Let):
+            _resolve_expr(stmt.expr, mech, dials, states, bound)
+            bound.add(stmt.name)
+        elif isinstance(stmt, (Set, Add)):
+            if stmt.path not in states:
+                raise SpecError(f"{mech.name} writes state {stmt.path!r}, "
+                                "which it does not declare")
+            _resolve_expr(stmt.expr, mech, dials, states, bound)
+        elif isinstance(stmt, When):
+            _resolve_expr(stmt.cond, mech, dials, states, bound)
+            _resolve_body(stmt.body, mech, dials, states, bound)
+        elif isinstance(stmt, IfSome):
+            if stmt.path not in states:
+                raise SpecError(f"{mech.name} reads state {stmt.path!r}, "
+                                "which it does not declare")
+            _resolve_body(stmt.body, mech, dials, states, bound | {stmt.name})
+        elif isinstance(stmt, ForCompanies):
+            _resolve_body(stmt.body, mech, dials, states, bound | {stmt.name})
+        else:
+            raise SpecError(f"not a statement: {stmt!r}")
+
+
+def resolve_names(mech: Mechanism) -> None:
+    """Report a dial, state path or variable that nothing declares."""
+    _resolve_body(mech.body, mech, {d.name for d in mech.dials},
+                  {s.path for s in mech.state}, set())
+
+
 def check(mech: Mechanism) -> dict:
     """Run every check and return what was found; raises on a type error."""
     if mech.stream not in ("market", "economy", "external", "jumps", "volume",
                            "news", "volume_idio"):
         raise SpecError(f"{mech.stream!r} is not a stream")
+    resolve_names(mech)
     effect = effect_of_body(mech.body, mech)
     proof = prove_inert(mech)
     return {"effect": effect, "proof": proof, "digest": mech.digest()}

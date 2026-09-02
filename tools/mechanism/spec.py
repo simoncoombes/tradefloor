@@ -211,11 +211,48 @@ class Mechanism:
 
     def digest(self) -> str:
         """The identity of the specification: its dials, defaults, state,
-        stream and body, serialised canonically. Two specs that emit the
-        same Rust have the same digest; a changed default changes it."""
-        body = json.dumps(to_json(self), sort_keys=True,
+        stream and body, serialised canonically.
+
+        Two specs that emit the same Rust have the same digest, so the
+        digest covers what the emitter reads and leaves out prose it does
+        not. A dial's doc string, an extern's and the mechanism's own
+        reach no generated line, and editing one holds the digest still.
+        A declared state field's doc string becomes the doc comment on
+        the generated struct field, so that one is covered. A changed
+        default changes the digest.
+
+        The digest is stamped into the header comment of the generated
+        Rust and into the ``spec`` field of every preset record, where a
+        reader reads a change as a changed mechanism. Prose was excluded
+        so that reading holds.
+        """
+        body = json.dumps(emitted_form(self), sort_keys=True,
                           separators=(",", ":"))
         return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
+def emitted_form(node: Any) -> Any:
+    """The canonical form with the prose the emitter never reads removed.
+
+    Every ``doc`` field is dropped except a declared state field's, which
+    the emitter writes as the doc comment above the struct field it
+    generates. :func:`to_json` keeps everything and is what a reader
+    inspects; this is what the digest hashes.
+    """
+    form = to_json(node)
+
+    def strip(value: Any) -> Any:
+        if isinstance(value, list):
+            return [strip(v) for v in value]
+        if not isinstance(value, dict):
+            return value
+        out = {k: strip(v) for k, v in value.items()}
+        if "doc" in out and not (out.get("node") == "StateSpec"
+                                 and out.get("declared") is True):
+            del out["doc"]
+        return out
+
+    return strip(form)
 
 
 def to_json(node: Any) -> Any:

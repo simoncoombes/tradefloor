@@ -49,8 +49,14 @@ class EmitError(Exception):
 
 
 def literal(value: float) -> str:
-    """A constant as Rust: zero and one as themselves, anything else pinned
-    to its bits with the decimal beside it."""
+    """A constant as Rust: zero, one and minus one as themselves, anything
+    else pinned to its bits with the decimal beside it.
+
+    The three that pass through are exactly representable and parse to the
+    same bits from any reader, so pinning them buys nothing. Negative zero
+    is pinned, because ``-0.0`` and ``0.0`` read alike and are different
+    values.
+    """
     if value in (0.0, 1.0, -1.0) and not (value == 0.0 and str(value).startswith("-")):
         return f"{value!r}"
     return f"f64::from_bits({bits(value)}) /* {value!r} */"
@@ -82,7 +88,7 @@ class Emitter:
             raise EmitError("a draw is a statement: bind it with Let (the "
                             "checker's hoist() produces that form)")
         if isinstance(e, Neg):
-            return f"-{self.expr(e.expr, index)}"
+            return f"-{self.operand(e.expr, index)}"
         if isinstance(e, Bin):
             return f"{self.operand(e.left, index)} {e.op} {self.operand(e.right, index)}"
         if isinstance(e, Call):
@@ -99,12 +105,26 @@ class Emitter:
                     f"else {{ {self.expr(e.otherwise, index)} }}")
         raise EmitError(f"not an expression: {e!r}")
 
+    #: The expression forms that are not self-delimiting in Rust, so an
+    #: operand of one of them carries parentheses. A Call and an Extern
+    #: bring their own brackets and a leaf is one token.
+    COMPOUND = (Bin, Neg, If)
+
     def operand(self, e, index: str) -> str:
-        """An operand of a binary operation: a nested binary operation is
-        parenthesised whatever its precedence, so the emitted tree is the
-        specification's tree and nothing is reassociated; a leaf is not."""
+        """An operand of a binary operation or of a negation, parenthesised
+        whatever its precedence, so the emitted tree is the specification's
+        tree and nothing is reassociated.
+
+        Every compound form needs this, not only ``Bin``. ``Neg`` over
+        ``Bin`` emitted ``-gain + offset``, which Rust reads as
+        ``(-gain) + offset`` while the spec node is ``-(gain + offset)``;
+        at gain 1.0 and offset 3.0 that is 2.0 against the specified -4.0.
+        ``If`` as an operand emitted a bare ``if`` block beside an
+        operator, and ``Neg`` over ``Neg`` emitted ``--x``, neither of
+        which Rust parses.
+        """
         text = self.expr(e, index)
-        return f"({text})" if isinstance(e, Bin) else text
+        return f"({text})" if isinstance(e, self.COMPOUND) else text
 
     def cond(self, e, index: str) -> str:
         if isinstance(e, Bin) and e.op in ("<", "<=", ">", ">=", "==", "!="):
@@ -227,18 +247,36 @@ def write(mech: Mechanism) -> str:
     return generated
 
 
+def binding_path(spec, mech: Mechanism) -> str:
+    """A declared field's spelling inside the Python binding.
+
+    ``StateSpec.rust`` is how the target function reads the field, rooted
+    at the engine itself: ``self.economy.fear``. The binding holds the
+    engine as ``self.inner``, so the same field is
+    ``self.inner.economy.fear`` there. Concatenating the two roots gave
+    ``self.inner.self.economy.fear``, which compiles nowhere.
+    """
+    if not spec.rust.startswith("self."):
+        raise EmitError(
+            f"{mech.name} declares state {spec.path!r} with the Rust spelling "
+            f"{spec.rust!r}, which is not rooted at the engine; the emitter "
+            "cannot write a binding path for it")
+    return "self.inner." + spec.rust[len("self."):]
+
+
 def state_generation(mech: Mechanism) -> dict[str, str]:
-    """The four texts a declared state field needs, keyed by where they go."""
+    """The five texts a declared state field needs, keyed by where they go."""
     fields, defaults, snapshot, restore, python = [], [], [], [], []
     for s in mech.state:
         if not s.declared:
             continue
         name = s.path.split(".")[-1]
+        path = binding_path(s, mech)
         fields.append(f"    /// {s.doc}\n    pub {name}: f64,")
         defaults.append(f"            {name}: {literal(float(s.default))},")
-        snapshot.append(f'        out.set_item("{name}", self.inner.{s.rust})?;')
+        snapshot.append(f'        out.set_item("{name}", {path})?;')
         restore.append(f'        if let Some(v) = state.get_item("{name}")? {{\n'
-                       f'            self.inner.{s.rust} = v.extract::<f64>()?;\n'
+                       f'            {path} = v.extract::<f64>()?;\n'
                        f'        }}')
         python.append(f"    @property\n    def {name}(self) -> float: ...")
     return {"struct_fields": "\n".join(fields), "defaults": "\n".join(defaults),

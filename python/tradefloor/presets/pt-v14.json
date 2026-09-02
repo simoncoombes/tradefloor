@@ -144,7 +144,7 @@
   },
   "mechanisms": {
     "jumps": {
-      "spec": "91bff1985be6a9c7b98b2cdc8b8ab01d7e7fda91728219bc5b01e0268434b64f",
+      "spec": "1ea5fbb370f52316c9e045375ba800ecb4bb52292e9fe9e9b3a48c3457a9925e",
       "stream": "jumps",
       "doses": {
         "jump_intensity_market": 0.0565753337,
