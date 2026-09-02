@@ -143,9 +143,37 @@ def test_the_book_share_equals_the_distance_from_the_anchor_to_the_print():
 
 
 def test_every_node_replays_to_the_contribution_it_sits_under():
-    # check() reports three families of miss at once: the sum, every
-    # node's replay, and the replay against the tape the run recorded.
+    # check() reports four families of miss at once: the sum, every
+    # node's replay, the nine columns against the tape the run recorded,
+    # and the printed close against the same tape.
     _, result = one()
+    assert result.check() == []
+
+
+def test_the_replay_reproduces_the_close_the_run_printed():
+    """The comparison the per-node replays cannot make.
+
+    Every node's replay runs the same day the same way, so a replay that
+    rebuilt the WRONG day agrees with itself at every node and reports
+    nothing. The tape is the only thing outside that loop, and the close
+    is what the nine columns do not cover: they say the mispricing path
+    was rebuilt, and the print is settled through the book after it.
+    """
+    e, result = one()
+    bars = pa.table(e.bars(grain="day")).to_pydict()
+    close = {(bars["day"][k], bars["instrument_id"][k]): bars["close"][k]
+             for k in range(len(bars["day"]))}
+    assert result._recorded_close == close[(1, 0)]
+    # To the bit, not to a tolerance: the same day from the same state
+    # under the same draws prints the same price.
+    assert result._base.levels["close"] == result._recorded_close
+    assert result.root.inputs["close"] == result._recorded_close
+
+
+def test_an_unrecorded_run_has_no_close_to_compare_against():
+    e = engine(record=False)
+    result = e.explain(e.tickers[0], 1)
+    assert result._recorded_close is None
     assert result.check() == []
 
 

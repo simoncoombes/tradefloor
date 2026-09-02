@@ -431,6 +431,12 @@ class Explanation:
         self._walk = tuple(_walk(self.root, "", None))
         self._by_path = {path: node for path, node, _ in self._walk}
         self._recorded = _recorded_factors(engine, self.day, self._index)
+        #: The close the run itself printed on this day, where its tape
+        #: holds one. The nine columns agreeing says the mispricing path
+        #: was rebuilt; the print is settled through the book after that,
+        #: so it is compared on its own.
+        self._recorded_close = _recorded_close(engine, self.day,
+                                               self._index)
         self.caveats = self._caveats()
 
     # -- the tree ---------------------------------------------------------
@@ -600,6 +606,13 @@ class Explanation:
                 misses.append(
                     f"{name} replayed to {got!r} against {recorded!r} on "
                     "the tape the run itself recorded")
+        if self._recorded_close is not None:
+            got = self._base.levels["close"]
+            if got != self._recorded_close:
+                misses.append(
+                    f"the replayed close is {got!r} against "
+                    f"{self._recorded_close!r} on the tape the run itself "
+                    "recorded")
         return misses
 
     # -- walking the tree -------------------------------------------------
@@ -839,6 +852,28 @@ def _recorded_factors(engine: Engine, day: int,
         return None
     return {name: math.fsum(table[name][k] for k in rows)
             for name in Engine.FACTORS}
+
+
+def _recorded_close(engine: Engine, day: int, index: int) -> float | None:
+    """The close one name printed on ``day``, off the run's own tape.
+
+    ``None`` when the run did not record the day. Compared to the bit
+    rather than to a tolerance: a replay of the same day from the same
+    state under the same draws prints the same price, and a difference of
+    one cent is a difference.
+    """
+    if int(day) < 0 or engine.recorded_days == 0:
+        return None
+    try:
+        stream = engine.bars(day=int(day), grain="day")
+    except ValidationError:
+        return None
+    table = _table(stream)
+    ids = table["instrument_id"]
+    rows = [k for k in range(len(ids)) if ids[k] == index]
+    if not rows:
+        return None
+    return float(table["close"][rows[-1]])
 
 
 def _replay_inputs(engine: Engine, inputs: Sequence[dict],
