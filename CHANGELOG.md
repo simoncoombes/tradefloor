@@ -62,6 +62,7 @@ could not stop it.
 A second trace widens the log's range in both directions and keeps what
 was already recorded, so a caller tracing a window on top of an earlier
 trace loses nothing.
+
 ### Draw addressing and the patching layer
 
 A draw's address is its stream, whether it was a uniform or a normal, and
