@@ -790,14 +790,18 @@ def test_the_fear_scale_dials_act_when_the_co_jump_is_on():
     reference set to the running market sigma is bit-identical to off,
     because every scale it applies is then exactly 1.0 — the identity that
     lets a search carry the dial at the incumbent's value at no cost."""
-    # A low trigger threshold so the short probe FIRES: the state power
-    # only shows where a fire's draw flips, and devcheck14 measured that
-    # at the shipped 1.75 threshold a one-session probe never fires.
-    fear = dict(vix_selfex_gain=0.5, vix_selfex_vol_jump=0.5, vix_har_weight=0.5,
-                vix_selfex_threshold=0.25)
+    # The state power only shows where a fire's draw FLIPS, and it
+    # multiplies the rate by (vix / anchor)^power: at the shipped anchor
+    # the VIX sits on it and the multiplier is exactly one (devcheck15).
+    # So the probe halves the anchor, opens the trigger on every day
+    # (threshold below zero) and runs a tiny base rate: the base almost
+    # never fires, the powered form fires almost surely, and the first
+    # flipped draw moves every column downstream.
+    fear = dict(vix_selfex_gain=0.01, vix_selfex_vol_jump=0.5, vix_har_weight=0.5,
+                vix_selfex_threshold=-3.0, market_vol_vix_anchor=8.0)
     base = market_state(run_market(tradefloor.ModelParams.from_preset(**fear)))
     for name, value in [("vix_selfex_level_ref", 0.005),
-                        ("vix_selfex_vix_power", 3.0)]:
+                        ("vix_selfex_vix_power", 8.0)]:
         custom = tradefloor.ModelParams.from_preset(**fear, **{name: value})
         moved = market_state(run_market(custom))
         assert moved["draws"] == base["draws"], f"{name} moved the draw schedule"
