@@ -956,9 +956,11 @@ impl Engine {
     /// that [`Engine::tick_unbounded_print`] and
     /// [`Engine::tick_liquidity_share`] have something in them.
     ///
-    /// The cost is roughly one settlement per active company per open tick,
-    /// which is the largest single item in a tick, so this is a measurement
-    /// setting rather than something to leave on.
+    /// It adds a second settlement per active company per open tick, and
+    /// that settlement quotes every level rather than the two ordinary flow
+    /// reaches. Measured at 2.4x the wall time of the whole tick loop: 0.225
+    /// against 0.539 seconds, best of three, 24 names over three days of 390
+    /// ticks at seed 42 on pt-v16. It stays off until a caller asks for it.
     pub fn set_settle_depth_counterfactual(&mut self, on: bool) {
         self.settle_depth_counterfactual = on;
         let n = self.companies.len();
@@ -3267,18 +3269,28 @@ mod tests {
     }
 
     /// Every print splits into a shock and an absorption that add back up to
-    /// the move, and liquidity's share is finite on every row.
+    /// the move, and liquidity's share is never an infinity.
+    ///
+    /// Seed 42 over a full session rather than a short one, because the two
+    /// branches worth guarding are both rare. On this session 51 rows carry a
+    /// counterfactual print that differs from the real one and 2 carry a
+    /// share of NaN; a 60-tick session at another seed reached neither, so
+    /// the assertions below ran over rows that could not fail them. Both
+    /// counts are asserted, so a session that stops reaching a branch fails
+    /// here rather than going quiet.
     #[test]
     fn every_print_decomposes_into_its_shock_and_its_absorption() {
         let innovations = vec![None; 3];
         let variances = vec![0.000225; 3];
-        let mut e = engine(1234);
+        let mut e = engine(42);
         e.set_settle_depth_counterfactual(true);
         let mut buf = SessionBuffer::new();
-        e.run_session(&session(60, &innovations, &variances), &mut buf);
+        e.run_session(&session(390, &innovations, &variances), &mut buf);
 
         let n = buf.companies;
         let mut checked = 0usize;
+        let mut undefined = 0usize;
+        let mut bound_moved = 0usize;
         // From tick one, so every row has a previous print on the same tape.
         for t in 1..buf.ticks_written {
             for i in 0..n {
@@ -3290,21 +3302,38 @@ mod tests {
                     (split - moved).abs() < 1e-12,
                     "row {row}: shock + absorbed is {split}, the move is {moved}"
                 );
+                if buf.unbounded_print[row] != buf.prices[row] {
+                    bound_moved += 1;
+                }
                 // Never an infinity. A share is NaN only where there was no
                 // move to apportion, which is a statement about the row
                 // rather than an escaped division.
                 let share = buf.liquidity_share[row];
                 assert!(!share.is_infinite(), "row {row}: liquidity share is {share}");
                 if share.is_nan() {
+                    undefined += 1;
                     assert_eq!(
                         buf.prices[row], previous,
                         "row {row}: a NaN share needs a print that did not move"
+                    );
+                    assert_ne!(
+                        buf.unbounded_print[row], buf.prices[row],
+                        "row {row}: a NaN share needs a counterfactual that moved"
                     );
                 }
                 checked += 1;
             }
         }
         assert!(checked > 0, "the session wrote no rows to check");
+        assert!(
+            bound_moved > 0,
+            "no row had the depth bound move its print, so the counterfactual \
+             assertions above ran over rows that could not fail them"
+        );
+        assert!(
+            undefined > 0,
+            "no row carried an undefined share, so the NaN branch is unguarded"
+        );
     }
 
     #[test]

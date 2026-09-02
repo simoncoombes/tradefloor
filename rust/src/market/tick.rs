@@ -415,15 +415,28 @@ pub struct TickOutcome {
     pub unbounded_print: Vec<f64>,
     /// Liquidity's share of the print's move, per active company.
     ///
-    /// `log(print / unbounded_print) / log(print / the last print)`: the
-    /// fraction of the move that the depth bound put there rather than the
-    /// shock. Zero when the two prints coincide, which covers every tick
-    /// that did not settle, and NaN when the print did not move and the
+    /// `log(print / unbounded_print) / log(print / the last print)`: how far
+    /// the depth bound moved the print, as a multiple of the move the print
+    /// actually made. Zero when the two prints coincide, which covers every
+    /// tick that did not settle, and NaN when the print did not move and the
     /// deeper book would have moved it. Empty alongside `unbounded_print`.
     ///
-    /// A ratio of two log distances rather than a share of one quantity, so
-    /// it is not bounded by one: the shock and the book can pull opposite
-    /// ways and leave a small move with a large ratio.
+    /// # It is normally NEGATIVE, and it is not a percentage
+    ///
+    /// The bound TRUNCATES a walk. A market order that exhausts a shallow
+    /// book stops there; against every resting level it keeps filling and
+    /// prints further from where it started. So the real print sits between
+    /// the last print and the unbounded print, the numerator opposes the
+    /// denominator, and the share comes out below zero. Measured on
+    /// `Universe.random(12, seed=111)` at seed 42 over three days of pt-v16:
+    /// 1,409 rows negative against 100 positive, of 1,516 where the bound
+    /// moved the print at all.
+    ///
+    /// Read it through the identity it satisfies: the unbounded book's move
+    /// away from the last print is `1 - share` times the printed move. A
+    /// share of -1 means the deeper book would have moved the price twice as
+    /// far. Nothing bounds it by one, so a small printed move against a large
+    /// truncation gives a large ratio.
     pub liquidity_share: Vec<f64>,
 }
 

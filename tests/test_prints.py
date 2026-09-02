@@ -173,13 +173,12 @@ def test_the_shock_and_the_absorption_sum_to_the_print_move():
     absorbed = table["absorbed"]
     rows = len(prints)
     checked = 0
-    # From the second tick of each day, where the previous row on the same
-    # tape is in the table. The first tick of a day differences against
-    # yesterday's close, which is a row this table does not carry.
-    for row in range(rows):
-        tick = table["tick"][row]
-        if tick == 0:
-            continue
+    # Every row but the twelve the run opens on. The table is tick-major
+    # over concatenated days, so `row - NAMES` is the same instrument's
+    # previous print INCLUDING across a day boundary: the close does not
+    # move a price, so the first tick of day 1 differences against the last
+    # print of day 0 and the identity holds there too.
+    for row in range(NAMES, rows):
         previous = prints[row - NAMES]
         moved = math.log(prints[row] / previous)
         assert abs(shock[row] + absorbed[row] - moved) < 1e-12, (
@@ -187,7 +186,7 @@ def test_the_shock_and_the_absorption_sum_to_the_print_move():
             f"is not the move {moved}"
         )
         checked += 1
-    assert checked == (TICKS - 1) * NAMES * DAYS
+    assert checked == TICKS * NAMES * DAYS - NAMES
 
 
 def test_the_model_price_is_where_the_shock_lands():
@@ -202,15 +201,35 @@ def test_the_model_price_is_where_the_shock_lands():
 def test_a_tick_that_printed_nothing_new_absorbed_nothing():
     """No settlement means the print IS the model price.
 
-    A closed or empty tick has an absorption of exactly zero rather than a
-    small number, because nothing stood between the model and the tape.
+    Such a tick has an absorption of exactly zero rather than a small
+    number, because nothing stood between the model and the tape.
+
+    Run in the PRE-MARKET session, from 07:00, where every tick prices and
+    none settles. An open session at the shipped roster and seeds produced
+    no such row at all, so the same assertion inside a regular run never
+    executed its body: 0 rows of 14,040 over three days.
     """
-    table = pa.table(run(counterfactual=False, days=1, ticks=60).prints()).to_pydict()
+    universe = tradefloor.Universe.random(NAMES, seed=ROSTER_SEED)
+    engine = tradefloor.Engine(seed=RUN_SEED, universe=universe)
+    engine.open_market()
+    engine.run_session(7, 0, 3, 60)
+    table = pa.table(engine.prints()).to_pydict()
+
+    checked = 0
     for row, (printed, model) in enumerate(
         zip(table["print"], table["model_price"])
     ):
-        if printed == model:
-            assert table["absorbed"][row] == 0.0, row
+        assert printed == model, (
+            f"row {row}: a pre-market tick prints the model price, "
+            f"{printed} against {model}"
+        )
+        assert table["absorbed"][row] == 0.0, row
+        checked += 1
+    assert checked == 60 * NAMES, checked
+    # And the shock is still measured, because fair value moved even though
+    # no book touched it. A column of zeros here would mean the pre-market
+    # rows carry no information at all.
+    assert any(v != 0.0 for v in table["shock"])
 
 
 # ── The counterfactual ────────────────────────────────────────────────────
@@ -258,6 +277,76 @@ def test_the_share_is_never_an_infinity():
         if math.isnan(share):
             assert table["tick"][row] > 0
             assert prints[row] == prints[row - NAMES], row
+
+
+def test_the_share_is_negative_where_the_bound_truncates_the_walk():
+    """The sign is the finding, so it is asserted rather than described.
+
+    The depth bound TRUNCATES a walk. An order that exhausts a shallow book
+    stops there; against every resting level it keeps filling and prints
+    further from where it started. So the real print lies between the last
+    print and the unbounded print, the numerator opposes the denominator,
+    and the share comes out below zero.
+
+    Asserted as the derivation on every negative row, and as a count so the
+    run cannot pass by carrying no such rows at all. A positive share is the
+    other case, where the deeper book printed nearer the last price or past
+    it on the far side; it is counted rather than characterised, because the
+    identity in the next test already covers every row.
+    """
+    table = pa.table(run(counterfactual=True).prints()).to_pydict()
+    prints = table["print"]
+    negative = 0
+    positive = 0
+    for row, share in enumerate(table["liquidity_share"]):
+        if table["tick"][row] == 0 or share == 0.0 or math.isnan(share):
+            continue
+        previous = prints[row - NAMES]
+        printed_move = math.log(prints[row] / previous)
+        unbounded_move = math.log(table["unbounded_print"][row] / previous)
+        if share < 0:
+            negative += 1
+            # A negative share is the truncation case, and it says two
+            # things at once: the deeper book moved the price the same way
+            # and moved it further.
+            assert unbounded_move * printed_move > 0, (
+                f"row {row}: a negative share needs both moves to point the "
+                f"same way, {unbounded_move} against {printed_move}"
+            )
+            assert abs(unbounded_move) > abs(printed_move), (
+                f"row {row}: a negative share needs the deeper book to have "
+                f"moved further, {unbounded_move} against {printed_move}"
+            )
+        else:
+            positive += 1
+    assert negative > 0, "no row had the bound truncate a walk"
+    assert negative > positive, (
+        f"the bound is expected to truncate far more often than it extends: "
+        f"{negative} against {positive}"
+    )
+
+
+def test_the_unbounded_move_is_one_minus_the_share_times_the_printed_move():
+    """The identity every surface documents the share through.
+
+    A share of -1 means the deeper book would have moved the price twice as
+    far. This is what makes the column readable without a sign convention to
+    remember.
+    """
+    table = pa.table(run(counterfactual=True).prints()).to_pydict()
+    prints = table["print"]
+    checked = 0
+    for row, share in enumerate(table["liquidity_share"]):
+        if table["tick"][row] == 0 or math.isnan(share):
+            continue
+        previous = prints[row - NAMES]
+        if prints[row] == previous:
+            continue
+        printed_move = math.log(prints[row] / previous)
+        unbounded_move = math.log(table["unbounded_print"][row] / previous)
+        assert abs(unbounded_move - printed_move * (1 - share)) < 1e-9, row
+        checked += 1
+    assert checked > 0
 
 
 def test_the_share_reconstructs_from_the_two_prints():

@@ -43,22 +43,31 @@ the depth bound was reached. It takes no draw and its fills reach no
 company field, so the arms above are the same arms and their exposure
 numbers are the same numbers.
 
-| arm | prints | the bound reached | median share | mean absorbed |
-|---|---:|---:|---:|---:|
-| control | 9,360 | 71, or 0.76% | 1.002 | 23.3 bps |
-| crisis | 9,360 | 191, or 2.04% | 1.793 | 34.7 bps |
+| arm | prints | depth reached | median share | negative | mean \|absorbed\| |
+|---|---:|---:|---:|---:|---:|
+| control | 9,360 | 71, or 0.76% | -1.002 | 62 of 71 | 23.3 bps |
+| crisis | 9,360 | 191, or 2.04% | -1.002 | 172 of 191 | 34.7 bps |
 
 `market.liquidity` at 40% is a claim about depth, and these columns read it
-back off the tape. The crisis book runs out under ordinary flow 2.7 times
-as often, and a print that reaches the end of it settles further from the
-price the model wanted. The absorption column carries the circuit breaker
-alongside the book, because the breaker lands between the book's last trade
-and what is published.
+back off the tape. The crisis changes how OFTEN flow runs out of book
+rather than how far it goes when it does: 2.7 times as many prints reach
+the end of the quoted depth, at the same median share. The mean distance
+from the model price to the print rises with that count.
 
-The median share is one log distance over another, so a value above one
-means the depth bound moved the print further than the print itself moved.
-The counterfactual prints one tick from the real state, so it says nothing
-about what a deeper book would have done to the tick after.
+The share is negative because the depth bound truncates a walk. An order
+that exhausts a shallow book stops there, while against every resting level
+it keeps filling and prints further from where it started, so the real
+print sits between the last print and the unbounded one. A share of -1.0
+says the deeper book would have moved the price twice as far, since the
+unbounded move is `1 - share` times the printed one.
+
+The absorption column is a distance and is reported as one, because
+absorption is signed with the move and the signed mean cancels to -0.4
+basis points across up and down ticks. It carries the circuit breaker
+alongside the book, because the breaker lands between the book's last trade
+and what is published. The counterfactual prints one tick from the real
+state, so it says nothing about what a deeper book would have done to the
+tick after.
 
 Measured on day 39, the last day of the post-fork window, over 390 ticks
 and the twenty-four names drawn from `data/edgar-2026-08-31.json`. Seed

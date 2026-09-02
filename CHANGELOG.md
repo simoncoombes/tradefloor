@@ -43,8 +43,9 @@ distance from there to the tape, and the two sum to the print's own move.
 time against every resting level, under the same four uniforms and from the
 same book state, and adds `unbounded_print` and `liquidity_share` to that
 table. It takes no draw and its fills reach no company field, so the market
-and the known-answer digest are the same with it on. It roughly quadruples
-what a settlement costs, so it stays off until a caller asks for it.
+and the known-answer digest are the same with it on. It costs 2.4 times
+the wall time of a run, measured over 24 names and three days, so it stays
+off until a caller asks for it.
 
 ### The measured cost
 
@@ -218,13 +219,20 @@ absorbed the shock, and booking it to the book would be the more flattering
 of two wrong answers.
 
 `liquidity_share` is `log(print / unbounded_print)` over the print's own log
-move. It is one log distance over another, so it runs past one where
-the shock and the book pull opposite ways and leave a small move. It is exactly zero
-where the two prints coincide, which covers every tick that did not settle,
-and NaN where the print did not move and the deeper book would have moved
-it. Dividing anyway would put an infinity in the column, and one infinity
-turns every mean taken over it into an infinity too; the case was measured
-at 7 rows in 14,040 on three days of twelve names.
+move. It comes out NEGATIVE on most rows that carry one. The depth bound
+truncates a walk: an order that exhausts a shallow book stops there, while
+against every resting level it keeps filling and prints further from where
+it started. So the real print sits between the last print and the unbounded
+print. The unbounded book's move is `1 - share` times the printed move, so
+a share of -1 says the deeper book would have moved the price twice as far,
+and nothing bounds the ratio by one. Measured over three days of twelve
+names, 1,409 of the 1,516 rows where the bound moved a print are negative.
+
+The share is exactly zero where the two prints coincide, which covers every
+tick that did not settle, and NaN where the print did not move and the
+deeper book would have moved it. Dividing anyway would put an infinity in
+the column, and one infinity turns every mean taken over it into an
+infinity too; that case was measured at 7 rows in 14,040.
 
 The counterfactual prints one tick from the real state. It cannot say what
 a deeper book would have done to the next tick, because the maker inventory
@@ -235,11 +243,13 @@ actually ran.
 
 `examples/experiments/liquidity-crisis` runs both arms with the
 counterfactual on and reports what the book paid for. `market.liquidity` at
-40% is a claim about depth, and the column reads it back off the tape: on
-the last day of the post-fork window the depth bound moved 0.76% of control
-prints and 2.04% of crisis prints, with a mean absorption of 23.3 and 34.7
-basis points. The arms are the same arms, and their exposure numbers are
-unchanged.
+40% is a claim about depth, and the column reads it back off the tape. On
+the last day of the post-fork window, flow reached the end of the quoted
+depth on 0.76% of control prints and 2.04% of crisis prints, at the same
+median share of -1.002 in both, and the mean distance from the model price
+to the print was 23.3 and 34.7 basis points. The crisis changes how often
+the book runs out rather than how far a print goes when it does. The arms
+are the same arms, and their exposure numbers are unchanged.
 
 ## 0.6.2
 

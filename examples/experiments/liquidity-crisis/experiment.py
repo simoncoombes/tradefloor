@@ -498,9 +498,15 @@ def depth_reading(world, day: int | None = None) -> dict[str, Any]:
 
     `Engine.settle_depth_counterfactual` settles every open tick a second
     time against every resting level, under the same four uniforms and from
-    the same book state. The two prints then differ only where the depth
-    bound bound, so `liquidity_share` says how much of a move the book put
-    there rather than the shock.
+    the same book state. The two prints then differ only where the flow ran
+    out of quoted book, and `liquidity_share` says how far the depth bound
+    moved the print as a multiple of the move the print made.
+
+    The share is NEGATIVE on most rows that carry one. The bound truncates a
+    walk: an order that exhausts a shallow book stops there, while against
+    every resting level it keeps filling and prints further from where it
+    started. The unbounded book's move is `1 - share` times the printed
+    move.
 
     This is the reading the crisis arm exists to move. `market.liquidity`
     scales the volume column the maker quotes off, so the crisis book is
@@ -536,13 +542,21 @@ def depth_reading(world, day: int | None = None) -> dict[str, Any]:
         i for i in range(rows)
         if table["print"][i] != table["unbounded_print"][i]
     ]
-    # Finite shares only. A print that did not move has no move to
-    # apportion and the column says NaN there rather than an infinity;
-    # counted below rather than dropped in silence.
+    # SIGNED, and finite only. The share is negative wherever the depth
+    # bound truncated a walk, which is most rows that carry one, so taking
+    # an absolute value here would hide the direction the column exists to
+    # report. A print that did not move has no move to apportion and the
+    # column says NaN there rather than an infinity; counted below rather
+    # than dropped in silence.
     shares = sorted(
-        abs(table["liquidity_share"][i]) for i in moved
+        table["liquidity_share"][i] for i in moved
         if table["liquidity_share"][i] == table["liquidity_share"][i]
     )
+    # ABSOLUTE, and labelled so everywhere it is reported. Absorption is
+    # signed with the move, so up ticks and down ticks cancel and the signed
+    # mean over a session is near zero: -0.4 basis points against 27.0 for
+    # the absolute mean on the control arm. The question is how far a print
+    # sits from the model price, which is a distance.
     absorbed = [abs(v) for v in table["absorbed"]]
     return {
         "day": table["day"][0] if rows else None,
@@ -551,8 +565,9 @@ def depth_reading(world, day: int | None = None) -> dict[str, Any]:
         "moved": len(moved),
         "moved_fraction": len(moved) / rows if rows else 0.0,
         "median_share": shares[len(shares) // 2] if shares else None,
+        "shares_negative": sum(1 for v in shares if v < 0),
         "undefined_share": len(moved) - len(shares),
-        "mean_absorbed_bps": 1e4 * sum(absorbed) / rows if rows else 0.0,
+        "mean_abs_absorbed_bps": 1e4 * sum(absorbed) / rows if rows else 0.0,
     }
 
 

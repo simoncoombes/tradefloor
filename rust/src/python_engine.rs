@@ -2761,11 +2761,22 @@ impl PyEngine {
     ///   `prints()`        every recorded day, one batch each
     ///   `prints(day=N)`   that day alone
     ///
+    /// `absorbed` is measured to the PRINTED price, so it carries the second
+    /// circuit breaker as well as the book. On a halted name the breaker is
+    /// what absorbed the shock, and booking that to the book would be the
+    /// more flattering of two wrong answers.
+    ///
     /// `unbounded_print` and `liquidity_share` are present only when
     /// `settle_depth_counterfactual(True)` was set before the run, and the
     /// schema metadata says which case the table is. Asking for several days
     /// that disagree raises rather than dropping the columns, because a table
     /// whose meaning changes half way down is worse than an error.
+    ///
+    /// `liquidity_share` is NEGATIVE on most rows that carry one, because
+    /// the depth bound truncates a walk rather than adding to it: an order
+    /// that exhausts a shallow book stops there, while against every resting
+    /// level it keeps filling and prints further out. The unbounded move is
+    /// `1 - liquidity_share` times the printed move.
     #[pyo3(signature = (*, day = None))]
     fn prints(&self, day: Option<u32>) -> PyResult<crate::python_arrow::PyArrowStream> {
         let (batches, counterfactual) = if self.recorded.is_empty() {

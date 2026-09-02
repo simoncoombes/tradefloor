@@ -232,16 +232,27 @@ pub fn truth_batch(
 /// **The counterfactual.** `unbounded_print` is what the same tick printed
 /// when it was settled a second time against every resting level, under the
 /// same four uniforms and from the same book state. `liquidity_share` is
-/// `log(print / unbounded_print) / log(print / the last print)`: the fraction
-/// of the move the depth bound put there. Both columns are absent unless
-/// `Engine.settle_depth_counterfactual(True)` was set before the run, and the
-/// schema metadata says which case a reader is holding.
+/// `log(print / unbounded_print) / log(print / the last print)`: how far the
+/// depth bound moved the print, as a multiple of the move the print made.
+/// Both columns are absent unless `Engine.settle_depth_counterfactual(True)`
+/// was set before the run, and the schema metadata says which case a reader
+/// is holding.
 ///
-/// `liquidity_share` is a ratio of two log distances rather than a part of
-/// one quantity, so it is not bounded by one. It is exactly zero where the
-/// two prints coincide, which is most rows, and NaN on the rows where the
-/// print did not move and the deeper book would have moved it. Filter the
-/// NaN before taking a mean.
+/// **The share is normally negative.** The bound TRUNCATES a walk: an order
+/// that exhausts a shallow book stops there, while against every resting
+/// level it keeps filling and prints further from where it started. So the
+/// real print sits between the last print and the unbounded print and the
+/// ratio comes out below zero. On the roster and seeds this table's tests
+/// name, 1,409 of the 1,516 rows where the bound moved a print are negative.
+///
+/// Read it through the identity it satisfies: the unbounded book's move away
+/// from the last print is `1 - share` times the printed move, so a share of
+/// -1 means the deeper book would have moved the price twice as far. Nothing
+/// bounds it by one. It is exactly zero where the two prints coincide, which
+/// is most rows, and NaN where the print did not move and the deeper book
+/// would have moved it, so filter the NaN before taking a mean. A mean over
+/// the signed column is near zero because up moves and down moves cancel;
+/// the useful statistic is taken over the rows where the bound moved a print.
 ///
 /// # What it cannot say
 ///
@@ -269,15 +280,22 @@ pub fn prints_schema(counterfactual: bool) -> SchemaRef {
     // how a caveat becomes false.
     let present: Vec<&str> = fields.iter().map(|f| f.name().as_str()).collect();
     let caveat = if counterfactual {
-        "unbounded_print is the same tick settled against every resting \
-         level, under the same draws and from the same book state. It is \
-         one tick from the real state and says nothing about the next one. \
-         liquidity_share is a ratio of log distances, so it is not bounded \
-         by one, and it is NaN where the print did not move."
+        "absorbed is measured to the printed price, so it carries the \
+         circuit breaker as well as the book; on a halted name the breaker \
+         is what absorbed the shock. unbounded_print is the same tick \
+         settled against every resting level, under the same draws and from \
+         the same book state; it is one tick from the real state and says \
+         nothing about the next one. liquidity_share is NEGATIVE where the \
+         depth bound truncated a walk, which is most rows that carry one, \
+         it is not bounded by one, and it is NaN where the print did not \
+         move. The unbounded move is (1 - liquidity_share) times the \
+         printed move."
     } else {
-        "The depth counterfactual did not run, so unbounded_print and \
-         liquidity_share are absent. Set Engine.settle_depth_counterfactual \
-         (True) before the run to get them."
+        "absorbed is measured to the printed price, so it carries the \
+         circuit breaker as well as the book; on a halted name the breaker \
+         is what absorbed the shock. The depth counterfactual did not run, \
+         so unbounded_print and liquidity_share are absent. Set \
+         Engine.settle_depth_counterfactual(True) before the run to get them."
     };
     let metadata = std::collections::HashMap::from([
         (
