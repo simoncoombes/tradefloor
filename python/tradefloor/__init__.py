@@ -36,6 +36,8 @@ from . import counterfactual
 from .counterfactual import (Agreement, Comparison, Divergence, Resample,
                              World, agree, compare, resample)
 from .sweep import sweep
+from . import boundary
+from .boundary import BoundaryMap, Flip, flip, map_boundaries
 from . import manifest
 from .manifest import RunManifest
 from . import spec
@@ -104,6 +106,7 @@ __all__ = [
     "counterfactual", "World", "agree", "compare", "resample",
     "Agreement", "Comparison", "Resample",
     "Divergence",
+    "boundary", "flip", "map_boundaries", "Flip", "BoundaryMap",
     "Intervention", "Firing", "ScenarioValidationError", "interventions",
     "TARGETS", "UNSUPPORTED_TARGETS", "yaml_subset",
     "manifest", "RunManifest",
