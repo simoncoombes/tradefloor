@@ -120,6 +120,30 @@ use crate::mathx;
 /// names the call site; the engine sets it before each group of draws and
 /// it is part of the schedule contract, pinned by a test that walks one
 /// day. The log is off by default and costs one branch per draw.
+///
+/// # What it costs, measured
+///
+/// One [`DrawRecord`] is 32 bytes: `index` 8, `value` 8, `day` 8, `tag` 4,
+/// `kind` 1, `site` 1, padded to the alignment of its widest field. The
+/// assertion below the type fails to compile if that changes.
+///
+/// The draw count is a schedule quantity, so the memory follows from the
+/// roster and the tick count rather than from a benchmark. At 60 names and
+/// 390 ticks the market stream takes
+/// `390 * (1 market factor + 12 sectors + 60 idiosyncratic normals + 60
+/// stash uniforms + 240 settlement uniforms)` = 145,470 draws a day, which
+/// is 4.7 MB a day and 1.17 GB over a 252-day year held in one engine. The
+/// other six streams together add 313 draws a day at that roster, which is
+/// four orders of magnitude smaller.
+/// `test_the_market_log_length_is_the_schedule` states the derivation
+/// against the log rather than pinning the number.
+///
+/// The time cost did not resolve. Twelve interleaved runs of three days at
+/// that roster gave medians of 0.2510 s with no log, 0.2497 s logging the
+/// market stream and 0.2351 s logging all seven, so the logged runs came out
+/// at 0.995 and 0.937 of the unlogged one. A shared machine cannot separate
+/// those, and a second measurement on the same design reported 1.043 and
+/// 1.033. Read both as no measurable cost rather than as a number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 pub enum DrawKind {
@@ -213,6 +237,10 @@ pub struct DrawRecord {
     pub site: Site,
     pub tag: u32,
 }
+
+/// The log's memory is quoted per record in this module's documentation, so
+/// the size is pinned where a change to the type has to meet it.
+const _: () = assert!(std::mem::size_of::<DrawRecord>() == 32);
 
 /// The per-generator table of substitutions and the optional log.
 #[derive(Debug, Clone, Default)]
