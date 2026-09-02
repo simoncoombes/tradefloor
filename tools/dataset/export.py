@@ -70,11 +70,12 @@ so the per-slot width question ``tradefloor.manifest.state_hash`` raises
 about ``volume_idio`` (tradefloor issue #148) never arises for a ledger
 this package writes. It does not turn on
 ``Engine.settle_depth_counterfactual``, so ``prints.arrow`` carries
-whatever base column set the installed build ships, without
+whatever base column set the installed build ships (``clamp`` beside
+``shock`` and ``absorbed`` as of P2's review), without
 ``unbounded_print`` or ``liquidity_share`` -- never a fixed count, since
-``Engine.prints()`` is due a ``clamp`` column beside ``shock`` and
-``absorbed`` (see :data:`_UNITS`, which resolves an unlisted column
-against every table's own schema rather than typing one out). It
+:data:`_UNITS` resolves an unlisted column against every table's own
+schema rather than typing one out, and a build that adds one more
+reaches the card with no edit here. It
 discards intraday volume: ``bars.arrow`` sums each instrument's volume
 to one figure per day, and neither ``truth.arrow`` nor ``prints.arrow``
 carries a volume column at any grain, so how volume distributed across a
@@ -302,11 +303,21 @@ def _maybe_read_prints(engine: Any) -> "tuple[pa.Table | None, dict[str, Any]]":
         }
     prints = _read_table(engine.prints())
     meta = prints.schema.metadata or {}
+    # "on" / "off" is derived from column presence, not read out of the
+    # schema metadata: an earlier build carried a `depth_counterfactual`
+    # metadata key, and P2's fix for the HashMap-ordering non-determinism
+    # this package's own reproducibility test found (see the pull request,
+    # "Where the design note did not fit") collapsed the metadata to one
+    # `caveat` entry, which reading that key against would now silently
+    # read empty every time rather than fail. `unbounded_print` and
+    # `liquidity_share` are the two columns `Engine.settle_depth_counterfactual`
+    # adds and nothing else does, so their presence is the arm's own signal
+    # and needs no metadata shape to stay correct.
     info = {
         "present": True,
         "columns": prints.column_names,
-        "depth_counterfactual": meta.get(b"depth_counterfactual", b"")
-        .decode("utf-8"),
+        "depth_counterfactual":
+            "on" if "unbounded_print" in prints.column_names else "off",
         "caveat": meta.get(b"caveat", b"").decode("utf-8"),
     }
     return prints, info
@@ -365,8 +376,8 @@ def export(seed: int, *, universe: Sequence[Instrument], days: int,
     rows: dict[str, int | None] = {}
     written_bytes: dict[str, int] = {}
     # Each table's OWN column names, read off the table rather than typed
-    # out, so a column the engine adds (`Engine.prints()` is due a `clamp`
-    # column) reaches the card the next time this runs, with no edit here.
+    # out, so a column the engine adds -- `Engine.prints()` gained `clamp`
+    # this way, per P2's review -- reaches the card with no edit here.
     columns: dict[str, list[str] | None] = {}
 
     bars = _read_table(engine.bars(grain="day"))
@@ -438,10 +449,11 @@ def export(seed: int, *, universe: Sequence[Instrument], days: int,
 # than iterated in its own right, so a column this dict does not yet name
 # still renders in the card -- with `_UNKNOWN_UNIT` in place of a unit --
 # instead of silently vanishing from the documentation the day the engine
-# grows one. `Engine.prints()` is due a `clamp` column beside `shock` and
-# `absorbed` (tradefloor issue tracked in P2's review); this dict is not
-# updated for it ahead of that landing, on purpose, so the fallback path
-# is exercised by that column for real rather than only by a test.
+# grows one. `clamp` (`Engine.prints()`, P2's review) proved that path for
+# real before this entry was added for it: rebuilt against the base that
+# carries the column, it rendered with `_UNKNOWN_UNIT` until this dict was
+# updated by hand with its real meaning, read off the schema's own caveat
+# metadata rather than guessed.
 _UNITS: dict[str, dict[str, str]] = {
     "bars": {
         "day": "day index, 0-based",
@@ -471,6 +483,8 @@ _UNITS: dict[str, dict[str, str]] = {
         "print": "dollars", "model_price": "dollars",
         "shock": "log distance, last print to model price",
         "absorbed": "log distance, model price to print",
+        "clamp": "log distance, the circuit breaker's own share of "
+                "absorbed (book = absorbed - clamp)",
     },
     "macro": {
         "day": "day index", "vix": "points",

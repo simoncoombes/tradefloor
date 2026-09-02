@@ -101,20 +101,19 @@ def test_bars_truth_prints_macro_reproduce_from_the_manifest(
 ):
     """"every file re-derives from its manifest: reproduce() passes and
     the re-exported tables are byte-identical" (the design note's Tests
-    section), checked by content equality rather than by comparing the
-    written FILES' raw bytes.
-
-    ``prints.arrow``'s raw bytes are not a safe comparison across two
-    writes of the identical table: its schema carries metadata built from
-    a Rust ``std::collections::HashMap``
-    (``rust/src/python_arrow.rs::prints_schema``), whose iteration order
-    -- and therefore the byte order the Arrow IPC footer serialises the
-    metadata in -- is randomised per process. Two writes of the SAME
-    table can therefore differ byte for byte while
-    ``pyarrow.Table.equals`` reports them identical, which is what this
-    test asserts instead. ``bars``, ``truth`` and ``macro`` carry no such
-    metadata and this project's own writers add none, so those three are
-    also checked directly against the files on disk.
+    section), checked here as content equality between a table rebuilt
+    from the reproduced engine and the table this session originally
+    wrote -- a claim about reproduction fidelity, which is what
+    ``pyarrow.Table.equals`` states directly, rather than a claim about
+    two on-disk writes sharing one byte layout. That second, stronger
+    claim is what `test_running_export_twice_is_fully_deterministic`
+    checks, and it now holds for all seven files including
+    ``prints.arrow``: earlier, its schema carried metadata built from a
+    Rust ``std::collections::HashMap``
+    (``rust/src/python_arrow.rs::prints_schema``), whose randomised
+    iteration order let two writes of the identical table differ byte for
+    byte while still comparing equal here; P2's fix collapsed that
+    metadata to one entry, which has no order left to randomise.
     """
     manifest_text = toy_written.files["manifest"].read_text(encoding="utf-8")
     manifest = tf.RunManifest.from_json(manifest_text)
@@ -130,21 +129,28 @@ def test_bars_truth_prints_macro_reproduce_from_the_manifest(
 
 
 def test_running_export_twice_is_fully_deterministic(tmp_path):
+    """All seven files, byte for byte, including ``prints.arrow``.
+
+    Before P2's fix for the schema-metadata ``HashMap`` non-determinism
+    this test originally found (see this package's pull request, "Where
+    the design note did not fit"), ``prints.arrow`` could differ byte for
+    byte between two writes of the identical table, because its schema
+    metadata's key order was randomised per process. The base this
+    branch now carries collapses that metadata to one entry, which has
+    no order to randomise, and this asserts the stronger guarantee
+    directly rather than falling back to content equality.
+    """
     universe = tf.Universe.random(5, seed=7)
     out1, out2 = tmp_path / "a", tmp_path / "b"
     w1 = export.export(9, universe=universe, days=6, scenario=None,
                        model="pt-v16", out=out1)
     w2 = export.export(9, universe=universe, days=6, scenario=None,
                        model="pt-v16", out=out2)
-    for name in ("bars", "truth", "macro", "labels", "manifest", "ledger"):
+    for name in ("bars", "truth", "prints", "macro", "labels", "manifest",
+                "ledger"):
         assert w1.files[name].read_bytes() == w2.files[name].read_bytes(), (
             f"{name} was not byte-identical across two runs of the same "
             "seed, universe, days and model")
-    # prints.arrow: content-identical, not necessarily byte-identical.
-    # See test_bars_truth_prints_macro_reproduce_from_the_manifest.
-    t1 = pa.ipc.open_file(w1.files["prints"]).read_all()
-    t2 = pa.ipc.open_file(w2.files["prints"]).read_all()
-    assert t1.equals(t2)
     assert w1.card["market_digest"] == w2.card["market_digest"]
     assert w1.card["day_ledger_root"] == w2.card["day_ledger_root"]
 
@@ -413,6 +419,35 @@ def test_card_names_prints_absent_when_the_engine_lacks_it(toy_written):
         "saying the file is absent")
 
 
+def test_depth_counterfactual_is_read_from_column_presence(toy_written):
+    """P2's fix for the schema-metadata HashMap non-determinism this
+    package's own reproducibility test found collapsed `prints_schema`'s
+    metadata to a single `caveat` entry, dropping the `depth_counterfactual`
+    key `_maybe_read_prints` used to read. It now derives "on" / "off"
+    from whether `unbounded_print` is one of the table's own columns --
+    the one column only `Engine.settle_depth_counterfactual(True)` adds --
+    so it needs no particular metadata shape to stay correct.
+    """
+    off_engine = tf.Engine(seed=1, universe=tf.Universe.random(3, seed=1))
+    off_engine.open_market()
+    off_engine.run_session(9, 30, 3, 20)
+    _, off_info = export._maybe_read_prints(off_engine)
+    assert off_info["depth_counterfactual"] == "off"
+    assert "unbounded_print" not in off_info["columns"]
+
+    on_engine = tf.Engine(seed=1, universe=tf.Universe.random(3, seed=1))
+    on_engine.settle_depth_counterfactual(True)
+    on_engine.open_market()
+    on_engine.run_session(9, 30, 3, 20)
+    _, on_info = export._maybe_read_prints(on_engine)
+    assert on_info["depth_counterfactual"] == "on"
+    assert "unbounded_print" in on_info["columns"]
+    assert "liquidity_share" in on_info["columns"]
+
+    # export()'s own runs never turn the arm on, so the toy run stays "off".
+    assert toy_written.card["prints"]["depth_counterfactual"] == "off"
+
+
 def test_card_refuses_an_empty_batch():
     with pytest.raises(tf.ValidationError, match="at least one"):
         export.card([])
@@ -449,6 +484,9 @@ def test_export_records_each_tables_own_column_names(toy_written):
     assert set(columns["truth"]) >= {"day", "tick", "instrument_id",
                                      "mispricing_s", "jump"}
     assert columns["prints"] == toy_written.card["prints"]["columns"]
+    # `clamp` (`Engine.prints()`, P2's review) is on the base this branch
+    # now carries, so it must show up here without any change on this side.
+    assert "clamp" in columns["prints"]
     assert "universe_stress" in columns["macro"]
     assert columns["labels"] == ["day", "instrument_id", "jump", "regime",
                                  "scenario_firing"]
@@ -457,27 +495,33 @@ def test_export_records_each_tables_own_column_names(toy_written):
 def test_card_documents_a_column_it_does_not_yet_know_the_unit_for(
     toy_written,
 ):
-    """`_UNITS` is not updated ahead of `Engine.prints()` gaining a
-    `clamp` column, on purpose: this proves the fallback path a real new
-    column will take, by injecting one under a name `_UNITS` has never
-    heard of and checking the card still lists it rather than dropping it.
+    """`clamp` (`Engine.prints()`, P2's review) proved this fallback path
+    for real once, before `_UNITS` was updated with its actual meaning
+    (see the comment above `_UNITS` and this package's pull request for
+    the measurement). This proves the same GENERAL path with a name
+    `_UNITS` will never know, so the test keeps meaning what it says
+    regardless of which real columns this dict has since learned about.
     """
     import copy
 
     stamped = copy.deepcopy(toy_written.card)
     stamped["columns"]["prints"] = ["day", "tick", "instrument_id",
                                     "print", "model_price", "shock",
-                                    "absorbed", "clamp"]
+                                    "absorbed", "clamp", "a_future_column"]
     stamped["prints"] = {**stamped["prints"],
                          "columns": stamped["columns"]["prints"]}
     stand_in = export.Written(seed=toy_written.seed, files=toy_written.files,
                               card=stamped)
     text = export.card([stand_in])
-    assert "| clamp | " in text
+    assert "| a_future_column | " in text
     assert export._UNKNOWN_UNIT in text
-    # every column _UNITS DOES know is still there, unaffected
+    # every column _UNITS DOES know -- clamp included -- is still there,
+    # unaffected, and clamp specifically no longer takes the fallback
     assert "| shock | " in text
     assert "| absorbed | " in text
+    assert "| clamp | " in text
+    lines = [line for line in text.splitlines() if line.startswith("| clamp |")]
+    assert lines and export._UNKNOWN_UNIT not in lines[0]
 
 
 def test_card_names_the_intraday_volume_gap_under_bars(toy_written):
