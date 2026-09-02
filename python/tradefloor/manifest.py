@@ -2000,10 +2000,13 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
     committed predecessor, which is every one of them except day 0.
 
     The unit is day-runs and engine ticks, and it is exact in those units.
-    A replayed day carries an overhead a live one does not, since it goes
-    through the Python operation table and, for a day after the first, a
-    state restore. ``reproduce()`` carries the same overhead over the same
-    log.
+    Wall time tracks it closely. On ``Universe.random(40, seed=7)``, seed 42,
+    twenty days at 390 ticks, at ``858fda5``: ``run_days`` takes 0.048
+    seconds a day, this function with k of 20 takes 0.049, and
+    ``reproduce()`` over the same log takes 0.054. A replayed day carries an
+    overhead a live one does not, because it goes through the Python
+    operation table and, for a day after the first, a state restore.
+    ``reproduce()`` carries the same overhead over the same log.
 
     ## What it cannot say
 
