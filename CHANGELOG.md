@@ -2,18 +2,12 @@
 
 ## Unreleased
 
-**A run can commit to the state it held at the end of every day.** A
-`DayLedger` takes a canonical hash of the engine's state at every close,
-and a `RunManifest` written with one carries the Merkle root over those
-hashes. `tradefloor.manifest.verify` recomputes k random days from their
-committed predecessors and checks each leaf against the root, so checking
-k days costs k days of simulation whatever the length of the run.
-`Engine.state_hash` covers every field a state snapshot carries, including
-the macro chain and the generator positions the market digest leaves out,
-and `tradefloor.manifest.state_hash` computes the same digest in Python
-from `state_snapshot()`. Nothing about a trajectory moves: the manifest
-field is additive under the schema it already had, and `reproduce()`
-behaves the same with the field and without it.
+**A run can commit to the state it held at the end of every day**, and a
+sampled check verifies k days for the cost of k days.
+
+**The per-name volume states follow the roster**, moving the volume-idio
+generator of any run that lists or delists, breaking such runs' old
+checkpoints and letting the day ledger check them.
 
 **Every draw has an address**, a table of substitutions can replace one,
 and a second `run_days` call numbers days from the engine's own counter.
@@ -29,63 +23,20 @@ the draws that reproduce its observed closes.
 
 <!-- release-note-ends -->
 
-### Implied draws and the shadow run
+### The day ledger
 
-For each real trading day, `tools/shadow/shadow.py` finds the day
-aggregates under which the engine reproduces the day's observed closes,
-feeds them in and walks the engine along the real path. The estimate is
-the maximum a posteriori vector per day, by Levenberg-Marquardt on the
-forward map, and the report says so: the series is shrunk by the prior on
-an under-determined system, so the run measures the estimator's own null
-on days the engine generated from a standard normal and compares against
-that rather than against the prior's.
-
-The sensitivity column is a finite difference taken fresh at the accepted
-solution, because the optimiser's carried Jacobian is updated by secant
-between refreshes and differed from a fresh one by a factor of nine on one
-day of four. The binding clamp verdict reads the same fresh column.
-
-The greedy jump step recovers a downward market jump and not an upward
-one: the jump's mean is negative, so an upward jump needs a normal whose
-prior the likelihood cannot repay. Measured on planted jumps, every
-downward jump from -85 to -208 basis points was recovered and no upward
-jump at any size to +112, and the two fired-count rows carry that
-envelope.
-
-A run writes its per-day solutions beside its report, so `--render`
-regenerates the report on corrected code without solving again, and a
-resumed run carries its whole record through the checkpoint rather than
-only the prices and the stream positions.
-
-### Noise attribution
-
-`tradefloor.noise.attribute` forks one arm per draw from a common state,
-installs one patch, runs the same days with the same agent, and reports
-the difference. Event streams are attributed one logged draw at a time
-and the market stream by day aggregate, where a common shift of delta
-over the square root of the tick count moves a day's sum by delta
-standard deviations of that sum. Every arm's draw positions are compared
-against the control's on all seven streams, and the result is a caveat
-either way.
-
-The rows are single-draw differences through a market with feedback, so
-they do not decompose the target. One more arm installs every changing
-patch at once and the result carries the joint move and the residual
-between it and the sum of the rows, with a caveat that claims no total.
-
-An event lands at its day's close and is first seen at the next open, so
-the default horizon reaches one day past the window whenever an event
-stream is attributed, and a stream whose rows are all zero says which of
-the target's day or the horizon stopped the measurement short. A column
-target is read at the day it names rather than wherever the arms stopped.
-
-### The amplification report
-
-`tools/calibration/amplification.py` compares two presets draw for draw
-and names the gain per site. The verdict names the gain first and adds a
-mechanism reading only where the correlation supports one, with the row
-count, the contributing count and a standard error beside it, and the
-three cut-offs printed as the conventions they are.
+**A run can commit to the state it held at the end of every day.** A
+`DayLedger` takes a canonical hash of the engine's state at every close,
+and a `RunManifest` written with one carries the Merkle root over those
+hashes. `tradefloor.manifest.verify` recomputes k random days from their
+committed predecessors and checks each leaf against the root, so checking
+k days costs k days of simulation whatever the length of the run.
+`Engine.state_hash` covers every field a state snapshot carries, including
+the macro chain and the generator positions the market digest leaves out,
+and `tradefloor.manifest.state_hash` computes the same digest in Python
+from `state_snapshot()`. Nothing about a trajectory moves: the manifest
+field is additive under the schema it already had, and `reproduce()`
+behaves the same with the field and without it.
 
 ### Draw surgery in a world
 
@@ -113,7 +64,6 @@ could not stop it.
 A second trace widens the log's range in both directions and keeps what
 was already recorded, so a caller tracing a window on top of an earlier
 trace loses nothing.
-
 ### Draw addressing and the patching layer
 
 A draw's address is its stream, whether it was a uniform or a normal, and
@@ -172,19 +122,18 @@ so it carries the root, the count and the hash version.
 
 `tradefloor.manifest.state_hash` hashes each per-slot array at the width
 the snapshot carries and refuses a snapshot whose arrays disagree with the
-roster. Before tradefloor issue #148, `volume_idio` is sized at
-construction and is the one per-slot array `add_company` and
-`remove_company` do not resize, so a snapshot taken after a listing or a
-delisting is refused and a run whose roster changed cannot be checked by
-the Python side. `Engine.state_hash` in Rust hashes the same array at the
-same width, so such a run's leaf is self-consistent and `verify` passes
-over it.
+roster. `volume_idio` was sized at construction and was the one per-slot
+array `add_company` and `remove_company` left alone, so a snapshot taken
+after a listing or a delisting was refused and a run whose roster changed
+could not be checked by the Python side. The resize landed in this same
+release, so such a snapshot is accepted now, the Python side checks the
+run, and its hash agrees with `Engine.state_hash` in Rust.
 
 No price depends on the width. Every shipped preset holds
 `volume_idio_sigma` and `volume_idio_persistence` at 0.0, so every value
-in the array is exactly 0.0. Issue #148 is where the resize is being made,
-and the test here reads the widths off the snapshot rather than pinning
-them, so it states the same relationship before and after that lands.
+in the array is exactly 0.0. The test here reads the widths off the
+snapshot rather than pinning them, so it passed through the resize
+unchanged.
 
 ### The session flag at a close
 
@@ -195,6 +144,160 @@ chain, the generators and the draw count are identical across them, which
 is why nothing saw the flag until a leaf covered it. The flag is left
 where it is: clearing it would change the trajectory of a run that calls
 `run_session` twice without opening a market between them.
+
+### The per-name volume states
+
+**The per-name volume states follow the roster.** `volume_idio` holds one
+state per company and is positional against the roster, alongside the four
+per-slot arrays `add_company` and `remove_company` already carried. It was
+in neither, so its width stayed at whatever the engine was constructed
+with. A listing left the new company without a slot of its own, a delisting
+left every survivor reading its old neighbour's state, and the per-day draw
+count from the volume-idio stream followed the stale width.
+
+This reaches the volume-idio generator position, and the state snapshot, of
+any run that lists or delists an instrument. Such a run draws once per
+company per day from the mutation onward, so its position on every later
+day differs from the position the same run reached in 0.6.2, and its
+snapshot records the array at the roster's width.
+
+The change reaches nothing else. All sixteen shipped presets hold
+`volume_idio_sigma` and `volume_idio_persistence` at 0.0, so every state
+stays exactly 0.0 and no shipped price path moves. The known-answer digest
+holds at KAT 13. A run with a fixed roster agrees with 0.6.2 on its prices,
+its snapshot and all seven generator positions.
+
+**A checkpoint of a roster-changing run saved before this will not
+restore.** It carries the array at the construction width, which its own
+roster disagrees with. `restore_state` refuses it, and the error names both
+widths and issue #148. Reproduce such a run from its seed and its order log
+to get a snapshot at the roster's width.
+
+A run whose roster changes can now be checked day by day. The ledger's
+per-day hash reads each per-slot array at the width the snapshot carries,
+so while `volume_idio` kept its construction width the Python twin refused
+every snapshot taken after a listing or a delisting. Measured on `c85ee28`,
+which carries the ledger without this fix: the twin raises on the first
+snapshot after a listing, saying the column carries 64 bytes where the
+roster needs 72. On this branch the twin agrees with the engine through a
+listing and a delisting, and the sampled verifier checks a nine-day run
+across both.
+
+### The measured comparison
+
+Two builds ran the same three runs on `Universe.random(8, seed=99)` at seed
+42 under pt-v16, one at `f47c149` and one with the fix. Digests here are
+`tradefloor.manifest.market_digest`, which the package ships, so a reader
+can recompute them. The fixed-roster run of three days held every field,
+including its market digest of
+`f12c3ff678c769867bec02bbd44882f8fdf5c3273fde7dd41f80d8d6266be0e3`, its
+whole state snapshot and all seven generator positions.
+
+The roster-changing run listed one instrument after day one and delisted
+index 0 after day two. Its market digest held at
+`37b5a9e719764f4b6df2b8d85291d0ce6f326146d838bd28a8d5a9b6734cdb78`, and its
+`draws_consumed` count, which totals the market, economy and external
+streams and does not reach the volume-idio stream, held at 73,739. Four
+fields moved: the volume-idio generator position, the snapshot digest that
+carries it, the array width after the listing, which went from 8 to 9, and
+the survivors' states after the delisting under a model with
+`volume_idio_sigma` at 0.4.
+
+That last arm is one no shipped preset reaches. At sigma 0.0 every slot
+holds exactly 0.0, so a survivor reading its neighbour's slot reads the
+same number and the defect has no visible consequence. The test that states
+the claim builds its own `ModelParams` in the test, so this work adds no
+preset and no dial.
+
+### The draw schedule
+
+`update_volume_idio` draws once per slot at every close, before the check
+that skips the write at zero coefficients. The count is therefore the
+array's width, which from this release is the roster's width. A run that
+never mutates its roster takes the count it always took, because the
+constructor already sized the array to the roster.
+
+The volume-idio stream is derived from the root seed alone, so its position
+after a run is a function of the seed and the draw count. The tests rest on
+that. Eight names for three days, twelve for two and twenty-four for one
+all reach one position, and the roster-changing run reaches the position of
+a twenty-five-name run of a single day. The pre-fix count appears in the
+tests as a fixed-roster run of the construction width, so no digest is
+copied into an assertion.
+
+### The stale checkpoints
+
+`set_volume_idio` refused a width its roster disagreed with before this
+change, and that refusal is kept. A pad or a truncation would attach each
+state to whichever company now sits at that index, and the restored market
+would continue plausibly under states belonging to other names. The error
+now names the width the snapshot carries, the width the roster holds and
+issue #148, so a reader meets the explanation where the failure happens.
+
+That guard is the boundary of the restore. Everything `restore_state`
+writes before it takes the snapshot's value, and everything it writes after
+keeps the engine's own, because the error propagates out of the guard and
+the later writes are attempted and never reached. An engine that has caught
+this error holds one run's market beside another run's macro state, so drop
+it rather than running it on.
+
+### Noise attribution
+
+`tradefloor.noise.attribute` forks one arm per draw from a common state,
+installs one patch, runs the same days with the same agent, and reports
+the difference. Event streams are attributed one logged draw at a time
+and the market stream by day aggregate, where a common shift of delta
+over the square root of the tick count moves a day's sum by delta
+standard deviations of that sum. Every arm's draw positions are compared
+against the control's on all seven streams, and the result is a caveat
+either way.
+
+The rows are single-draw differences through a market with feedback, so
+they do not decompose the target. One more arm installs every changing
+patch at once and the result carries the joint move and the residual
+between it and the sum of the rows, with a caveat that claims no total.
+
+An event lands at its day's close and is first seen at the next open, so
+the default horizon reaches one day past the window whenever an event
+stream is attributed, and a stream whose rows are all zero says which of
+the target's day or the horizon stopped the measurement short. A column
+target is read at the day it names rather than wherever the arms stopped.
+
+### The amplification report
+
+`tools/calibration/amplification.py` compares two presets draw for draw
+and names the gain per site. The verdict names the gain first and adds a
+mechanism reading only where the correlation supports one, with the row
+count, the contributing count and a standard error beside it, and the
+three cut-offs printed as the conventions they are.
+
+### Implied draws and the shadow run
+
+For each real trading day, `tools/shadow/shadow.py` finds the day
+aggregates under which the engine reproduces the day's observed closes,
+feeds them in and walks the engine along the real path. The estimate is
+the maximum a posteriori vector per day, by Levenberg-Marquardt on the
+forward map, and the report says so: the series is shrunk by the prior on
+an under-determined system, so the run measures the estimator's own null
+on days the engine generated from a standard normal and compares against
+that rather than against the prior's.
+
+The sensitivity column is a finite difference taken fresh at the accepted
+solution, because the optimiser's carried Jacobian is updated by secant
+between refreshes and differed from a fresh one by a factor of nine on one
+day of four. The binding clamp verdict reads the same fresh column.
+
+The greedy jump step recovers a downward market jump and not an upward
+one: the jump's mean is negative, so an upward jump needs a normal whose
+prior the likelihood cannot repay. Measured on planted jumps, every
+downward jump from -85 to -208 basis points was recovered and no upward
+jump at any size to +112, and the two fired-count rows carry that
+envelope.
+
+A run writes its per-day solutions beside its report, so `--render`
+regenerates the report on corrected code without solving again, and a
+resumed run carries its whole record through the checkpoint rather than
+only the prices and the stream positions.
 
 ## 0.6.2
 
