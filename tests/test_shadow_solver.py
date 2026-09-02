@@ -141,6 +141,9 @@ def test_a_resumed_engine_continues_bit_for_bit(short_days):
         x = np.random.default_rng(20 + k).normal(size=fwd.layout.size)
         checkpoint = fwd.commit(x, fwd.jump_patches(None, {}))
     other = tf.Engine(seed=11, universe=universe)
+    # through JSON, as the partial record carries it
+    import json
+    checkpoint = shadow.decode(json.loads(json.dumps(shadow.encode(checkpoint))))
     shadow.resume(other, checkpoint)
     assert np.array_equal(shadow.prices(other), shadow.prices(engine))
     assert other.stream_positions() == engine.stream_positions()

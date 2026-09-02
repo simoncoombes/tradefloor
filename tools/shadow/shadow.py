@@ -274,6 +274,31 @@ class Forward:
                              p.address.index, p.value) for p in market]}
 
 
+def encode(value):
+    """A snapshot as JSON can carry it: byte buffers as base64 under one
+    key, tuples as lists, everything else as it is."""
+    import base64
+    if isinstance(value, bytes):
+        return {"__bytes__": base64.b64encode(value).decode("ascii")}
+    if isinstance(value, dict):
+        return {k: encode(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [encode(v) for v in value]
+    return value
+
+
+def decode(value):
+    """The inverse of ``encode``."""
+    import base64
+    if isinstance(value, dict):
+        if set(value) == {"__bytes__"}:
+            return base64.b64decode(value["__bytes__"])
+        return {k: decode(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [decode(v) for v in value]
+    return value
+
+
 def resume(engine, checkpoint: dict) -> None:
     """Rebuild the state ``commit`` left from its checkpoint.
 
@@ -282,7 +307,7 @@ def resume(engine, checkpoint: dict) -> None:
     patch, open, run, record: the engine is then where the run was after
     that day's commit, bit for bit, and the next day solves from it.
     """
-    engine.restore_state(checkpoint["snapshot"])
+    engine.restore_state(decode(checkpoint["snapshot"]))
     noise.patch_draws(engine, [
         noise.Patch(noise.DrawAddress(s, k, i), v)
         for s, k, i, v in checkpoint["patches"]])
@@ -554,7 +579,7 @@ def shadow(args) -> dict:
             # or a spot reclaim ends still leaves what it solved.
             partial = {"args": vars(args), "year": year, "partial": True,
                        "sessions": [first, session + 1], "days": days,
-                       "checkpoint": checkpoint,
+                       "checkpoint": encode(checkpoint),
                        "intensities": intensities, "tickers": tickers,
                        "betas": betas, "truth_rows": 0, "truth": [],
                        "provenance": dict(d["provenance"], **build_provenance(engine)),
