@@ -69,8 +69,17 @@ It does not mutate the roster: no run here lists or delists an instrument,
 so the per-slot width question ``tradefloor.manifest.state_hash`` raises
 about ``volume_idio`` (tradefloor issue #148) never arises for a ledger
 this package writes. It does not turn on
-``Engine.settle_depth_counterfactual``, so ``prints.arrow`` carries the
-seven-column shape, not the nine-column one. It does not publish anything:
+``Engine.settle_depth_counterfactual``, so ``prints.arrow`` carries
+whatever base column set the installed build ships, without
+``unbounded_print`` or ``liquidity_share`` -- never a fixed count, since
+``Engine.prints()`` is due a ``clamp`` column beside ``shock`` and
+``absorbed`` (see :data:`_UNITS`, which resolves an unlisted column
+against every table's own schema rather than typing one out). It
+discards intraday volume: ``bars.arrow`` sums each instrument's volume
+to one figure per day, and neither ``truth.arrow`` nor ``prints.arrow``
+carries a volume column at any grain, so how volume distributed across a
+session is not recoverable from this dataset; the card names this gap
+under its ``bars.arrow`` column table. It does not publish anything:
 :func:`export` writes to a path you give it and :func:`card` returns text;
 nothing here uploads, and the tests that exercise this module write to a
 pytest ``tmp_path`` and nothing else.
@@ -355,16 +364,22 @@ def export(seed: int, *, universe: Sequence[Instrument], days: int,
     files: dict[str, Path] = {}
     rows: dict[str, int | None] = {}
     written_bytes: dict[str, int] = {}
+    # Each table's OWN column names, read off the table rather than typed
+    # out, so a column the engine adds (`Engine.prints()` is due a `clamp`
+    # column) reaches the card the next time this runs, with no edit here.
+    columns: dict[str, list[str] | None] = {}
 
     bars = _read_table(engine.bars(grain="day"))
     files["bars"] = seed_dir / "bars.arrow"
     written_bytes["bars"] = _write_table(files["bars"], bars)
     rows["bars"] = bars.num_rows
+    columns["bars"] = bars.column_names
 
     truth = _read_table(engine.truth())
     files["truth"] = seed_dir / "truth.arrow"
     written_bytes["truth"] = _write_table(files["truth"], truth)
     rows["truth"] = truth.num_rows
+    columns["truth"] = truth.column_names
 
     prints, prints_info = _maybe_read_prints(engine)
     if prints is not None:
@@ -373,16 +388,19 @@ def export(seed: int, *, universe: Sequence[Instrument], days: int,
         rows["prints"] = prints.num_rows
     else:
         rows["prints"] = None
+    columns["prints"] = prints_info.get("columns")
 
     macro = _read_table(engine.macro_table())
     files["macro"] = seed_dir / "macro.arrow"
     written_bytes["macro"] = _write_table(files["macro"], macro)
     rows["macro"] = macro.num_rows
+    columns["macro"] = macro.column_names
 
     labels = _labels_table(truth, macro, cycles, firings, days)
     files["labels"] = seed_dir / "labels.arrow"
     written_bytes["labels"] = _write_table(files["labels"], labels)
     rows["labels"] = labels.num_rows
+    columns["labels"] = labels.column_names
 
     manifest = tf.RunManifest.of(engine, seed=seed, universe=roster,
                                  scenario=run_scenario, ledger=ledger)
@@ -406,6 +424,7 @@ def export(seed: int, *, universe: Sequence[Instrument], days: int,
         "day_ledger_root": ledger.root(),
         "rows": rows,
         "bytes": written_bytes,
+        "columns": columns,
         "prints": prints_info,
     }
     return Written(seed=seed, files=files, card=card)
@@ -414,54 +433,65 @@ def export(seed: int, *, universe: Sequence[Instrument], days: int,
 # -- the data card -----------------------------------------------------------
 
 
-_UNITS = {
-    "bars": (
-        ("day", "day index, 0-based"),
-        ("bar", "bucket index within the day (always 0 at day grain)"),
-        ("instrument_id", "index into the roster"),
-        ("open", "dollars"), ("high", "dollars"), ("low", "dollars"),
-        ("close", "dollars"), ("volume", "shares"),
-    ),
-    "truth": (
-        ("day", "day index"), ("tick", "tick index within the day"),
-        ("instrument_id", "index into the roster"),
-        ("mispricing_s", "log deviation from fair value"),
-        ("fundamental_value", "dollars"), ("anchor_price", "dollars"),
-        ("reversion", "log-return contribution"),
-        ("momentum", "log-return contribution"),
-        ("crowd_lean", "log-return contribution"),
-        ("company_news", "log-return contribution"),
-        ("order_flow_impact", "log-return contribution"),
-        ("short_squeeze_effect", "log-return contribution"),
-        ("random_noise", "log-return contribution"),
-        ("circuit_breaker", "log-return contribution"),
-        ("jump", "log-return contribution"),
-    ),
-    "prints": (
-        ("day", "day index"), ("tick", "tick index within the day"),
-        ("instrument_id", "index into the roster"),
-        ("print", "dollars"), ("model_price", "dollars"),
-        ("shock", "log distance, last print to model price"),
-        ("absorbed", "log distance, model price to print"),
-    ),
-    "macro": (
-        ("day", "day index"), ("vix", "points"),
-        ("federal_funds_rate", "fractional"),
-        ("corporate_bond_yield", "fractional"),
-        ("inflation_rate", "fractional"),
-        ("unemployment_rate", "fractional"),
-        ("gdp_growth", "fractional"),
-        ("qe_pe_boost", "fractional"),
-        ("fear_greed_index", "points, 0 to 100"),
-        ("universe_stress", "VIX points above the crisis threshold"),
-    ),
-    "labels": (
-        ("day", "day index"), ("instrument_id", "index into the roster"),
-        ("jump", "log-return contribution, summed over the day"),
-        ("regime", "cycle phase name, with a -crisis suffix"),
-        ("scenario_firing", "count of interventions fired that day"),
-    ),
+# Column -> unit, by table. Looked up against each table's OWN recorded
+# column list (`Written.card["columns"][table]`, filled in `export`) rather
+# than iterated in its own right, so a column this dict does not yet name
+# still renders in the card -- with `_UNKNOWN_UNIT` in place of a unit --
+# instead of silently vanishing from the documentation the day the engine
+# grows one. `Engine.prints()` is due a `clamp` column beside `shock` and
+# `absorbed` (tradefloor issue tracked in P2's review); this dict is not
+# updated for it ahead of that landing, on purpose, so the fallback path
+# is exercised by that column for real rather than only by a test.
+_UNITS: dict[str, dict[str, str]] = {
+    "bars": {
+        "day": "day index, 0-based",
+        "bar": "bucket index within the day (always 0 at day grain)",
+        "instrument_id": "index into the roster",
+        "open": "dollars", "high": "dollars", "low": "dollars",
+        "close": "dollars", "volume": "shares",
+    },
+    "truth": {
+        "day": "day index", "tick": "tick index within the day",
+        "instrument_id": "index into the roster",
+        "mispricing_s": "log deviation from fair value",
+        "fundamental_value": "dollars", "anchor_price": "dollars",
+        "reversion": "log-return contribution",
+        "momentum": "log-return contribution",
+        "crowd_lean": "log-return contribution",
+        "company_news": "log-return contribution",
+        "order_flow_impact": "log-return contribution",
+        "short_squeeze_effect": "log-return contribution",
+        "random_noise": "log-return contribution",
+        "circuit_breaker": "log-return contribution",
+        "jump": "log-return contribution",
+    },
+    "prints": {
+        "day": "day index", "tick": "tick index within the day",
+        "instrument_id": "index into the roster",
+        "print": "dollars", "model_price": "dollars",
+        "shock": "log distance, last print to model price",
+        "absorbed": "log distance, model price to print",
+    },
+    "macro": {
+        "day": "day index", "vix": "points",
+        "federal_funds_rate": "fractional",
+        "corporate_bond_yield": "fractional",
+        "inflation_rate": "fractional",
+        "unemployment_rate": "fractional",
+        "gdp_growth": "fractional",
+        "qe_pe_boost": "fractional",
+        "fear_greed_index": "points, 0 to 100",
+        "universe_stress": "VIX points above the crisis threshold",
+    },
+    "labels": {
+        "day": "day index", "instrument_id": "index into the roster",
+        "jump": "log-return contribution, summed over the day",
+        "regime": "cycle phase name, with a -crisis suffix",
+        "scenario_firing": "count of interventions fired that day",
+    },
 }
+
+_UNKNOWN_UNIT = "not documented here yet; see the engine's own schema"
 
 _LABEL_DEFINITIONS = (
     ("jump", "The day's sum of truth.arrow's own jump column for this "
@@ -586,14 +616,33 @@ def card(written: Sequence[Written]) -> str:
 
     out.append("## Columns")
     out.append("")
+    recorded_columns = first.card.get("columns") or {}
     for table_name in ("bars", "truth", "prints", "macro", "labels"):
+        columns = recorded_columns.get(table_name)
+        if columns is None:
+            if table_name == "prints":
+                continue  # reported as absent above; no schema to list
+            # A `Written` built without a "columns" entry (`export` always
+            # records one; a hand-built `Written` in a test may not) falls
+            # back to the units table's own keys, in the order declared.
+            columns = list(_UNITS[table_name])
         out.append(f"### {table_name}.arrow")
         out.append("")
         out.append("| column | unit |")
         out.append("|---|---|")
-        for column, unit in _UNITS[table_name]:
-            out.append(f"| {column} | {unit} |")
+        for column in columns:
+            out.append(
+                f"| {column} | {_UNITS[table_name].get(column, _UNKNOWN_UNIT)} |"
+            )
         out.append("")
+        if table_name == "bars":
+            out.append(
+                "volume here is a day total. Neither truth.arrow nor "
+                "prints.arrow carries a volume column at any grain, so "
+                "how volume distributed across the session is not in "
+                "this dataset."
+            )
+            out.append("")
 
     out.append("## Label definitions")
     out.append("")

@@ -431,6 +431,51 @@ def test_card_names_the_cli_command_when_the_cli_attached_it(toy_written):
     assert "--names 8" in text
 
 
+def test_export_records_each_tables_own_column_names(toy_written):
+    columns = toy_written.card["columns"]
+    assert columns["bars"] == ["day", "bar", "instrument_id", "open",
+                               "high", "low", "close", "volume"]
+    assert set(columns["truth"]) >= {"day", "tick", "instrument_id",
+                                     "mispricing_s", "jump"}
+    assert columns["prints"] == toy_written.card["prints"]["columns"]
+    assert "universe_stress" in columns["macro"]
+    assert columns["labels"] == ["day", "instrument_id", "jump", "regime",
+                                 "scenario_firing"]
+
+
+def test_card_documents_a_column_it_does_not_yet_know_the_unit_for(
+    toy_written,
+):
+    """`_UNITS` is not updated ahead of `Engine.prints()` gaining a
+    `clamp` column, on purpose: this proves the fallback path a real new
+    column will take, by injecting one under a name `_UNITS` has never
+    heard of and checking the card still lists it rather than dropping it.
+    """
+    import copy
+
+    stamped = copy.deepcopy(toy_written.card)
+    stamped["columns"]["prints"] = ["day", "tick", "instrument_id",
+                                    "print", "model_price", "shock",
+                                    "absorbed", "clamp"]
+    stamped["prints"] = {**stamped["prints"],
+                         "columns": stamped["columns"]["prints"]}
+    stand_in = export.Written(seed=toy_written.seed, files=toy_written.files,
+                              card=stamped)
+    text = export.card([stand_in])
+    assert "| clamp | " in text
+    assert export._UNKNOWN_UNIT in text
+    # every column _UNITS DOES know is still there, unaffected
+    assert "| shock | " in text
+    assert "| absorbed | " in text
+
+
+def test_card_names_the_intraday_volume_gap_under_bars(toy_written):
+    text = export.card([toy_written])
+    idx = text.index("### bars.arrow")
+    nxt = text.index("### truth.arrow")
+    assert "volume" in text[idx:nxt] and "day total" in text[idx:nxt]
+
+
 # --------------------------------------------------------------------------
 # The worker pool: sweep.py's bounded window
 # --------------------------------------------------------------------------
