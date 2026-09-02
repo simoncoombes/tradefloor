@@ -319,6 +319,12 @@ def main() -> int:
             print(f"  crisis co-movement  {cm:.3f}   "
                   f"(real {lo} to {hi})  {'ok' if ok else 'OUT OF RANGE'}",
                   flush=True)
+        # Round 172: the lever over the REAL span (held 50 over held 12),
+        # beside the 65/5 form, when both windows were measured.
+        if "vix12" in v and "vix50" in v:
+            v["vol_lever_span"] = (v["vix50"]["annualised_vol_pct"]
+                                   / v["vix12"]["annualised_vol_pct"])
+            print(f"  lever over the real span (50/12): {v['vol_lever_span']:.2f}", flush=True)
         if "vix5" in v and "vix65" in v:
             lever = (v["vix65"]["annualised_vol_pct"]
                      / v["vix5"]["annualised_vol_pct"])
