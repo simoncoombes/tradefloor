@@ -7,6 +7,7 @@ schedule, and the year slicing and the idiosyncratic sd read the data
 shape the tool feeds them.
 """
 
+import math
 import os
 import sys
 
@@ -23,6 +24,8 @@ import data as realdata  # noqa: E402
 import shadow  # noqa: E402
 
 UNIVERSE = tf.Universe.random(6, seed=3)
+#: pt-v16's own market and idiosyncratic jump intensities.
+INTENSITIES = (0.0565753337, 0.0068895346)
 
 
 @pytest.fixture
@@ -158,3 +161,238 @@ def test_a_resumed_engine_continues_bit_for_bit(short_days):
         x = np.random.default_rng(23).normal(size=fwd.layout.size)
         fwd.commit(x, fwd.jump_patches(None, {}))
     assert np.array_equal(shadow.prices(other), shadow.prices(engine))
+
+
+# -- what a resumed run carries ----------------------------------------------
+
+def test_a_resumed_run_carries_its_whole_record(short_days):
+    """Prices and stream positions matching is necessary and was all the
+    resume test checked. The run also ships the engine's truth table and
+    daily bars, and a resumed engine has only what it recorded after the
+    resume: five committed days gave 1200 truth rows and 30 daily bars run
+    straight through, and 720 rows and 18 bars resumed at day 2.
+    """
+    pytest.importorskip("pyarrow")
+    universe = tf.Universe.random(6, seed=3)
+
+    def commit_days(engine, first, last, checkpoint=None):
+        for k in range(first, last):
+            fwd = shadow.Forward(engine, k, 6)
+            x = np.random.default_rng(30 + k).normal(size=fwd.layout.size)
+            checkpoint = fwd.commit(x, fwd.jump_patches(None, {}))
+            engine.record(k)
+        return checkpoint
+
+    whole = tf.Engine(seed=11, universe=universe)
+    commit_days(whole, 0, 5)
+    whole_truth, whole_bars = shadow.record_of(whole)
+    assert whole_truth and whole_bars
+
+    part = tf.Engine(seed=11, universe=universe)
+    checkpoint = commit_days(part, 0, 3)
+    carried_truth, carried_bars = shadow.record_of(part)
+    assert len(carried_truth) < len(whole_truth)
+
+    other = tf.Engine(seed=11, universe=universe)
+    shadow.resume(other, checkpoint)
+    commit_days(other, 3, 5)
+    own_truth, own_bars = shadow.record_of(other)
+    # the resumed engine alone is short of the run
+    assert len(own_truth) < len(whole_truth)
+    assert len(own_bars) < len(whole_bars)
+    # `resume` restores the boundary before its checkpoint day and re-runs
+    # part of it, so the two records overlap on that day and the tool
+    # counts it once
+    cut = checkpoint["day"]
+    assert any(r["day"] == cut for r in own_truth)
+    assert shadow.trim_overlap(carried_truth, own_truth, cut) == whole_truth
+    assert shadow.trim_overlap(carried_bars, own_bars, cut) == whole_bars
+    # kept whole, the overlap would show up twice
+    assert len(carried_truth) + len(own_truth) > len(whole_truth)
+
+
+# -- what the greedy jump step recovers --------------------------------------
+
+def _planted_day(seed, z, rng):
+    engine = tf.Engine(seed=seed, universe=UNIVERSE)
+    engine.open_market()
+    engine.run_session(9, 30, 3, shadow.TICKS)
+    fwd = shadow.Forward(engine, 1, len(UNIVERSE))
+    x_true = rng.normal(size=fwd.layout.size)
+    r_obs = fwd.returns(x_true, fwd.jump_patches(z, {}))
+    return fwd, r_obs
+
+
+def test_a_planted_downward_market_jump_is_recovered(short_days):
+    """The direction the step fires in, on days whose jump is known.
+
+    The jump size is jump_mean_market + jump_sigma_market * z and the
+    mean is negative, so a downward jump sits at a normal the prior can
+    afford. Four planted downward jumps, six names at 40 ticks, seeds 11
+    upward, sigma 1e-3: all four found, none spurious.
+    """
+    rng = np.random.default_rng(7)
+    found = 0
+    spurious = 0
+    for i, z in enumerate((-2.27, -1.85, -2.18, -3.10)):
+        fwd, r_obs = _planted_day(11 + i, z, rng)
+        out = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
+        if out["jump_market"] is not None:
+            found += 1
+            assert out["jump_market"] < 0.0
+        spurious += len(out["jump_company"])
+    assert found == 4
+    assert spurious == 0
+
+
+def test_an_upward_market_jump_is_not_recoverable(short_days):
+    """The direction it cannot fire in, and why.
+
+    An upward jump needs a normal past -mean/sigma, which the preset puts
+    at +3.46, and the prior on that normal costs more than the likelihood
+    can repay. Reported rather than left for a reader to infer from a
+    count of zero.
+    """
+    model = dict(tf.ModelParams.from_preset().to_dict())
+    zero_at = -model["jump_mean_market"] / model["jump_sigma_market"]
+    assert 3.0 < zero_at < 4.0
+    rng = np.random.default_rng(7)
+    for i, z in enumerate((4.14, 6.0, 8.0)):
+        fwd, r_obs = _planted_day(41 + i, z, rng)
+        out = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
+        assert out["jump_market"] is None
+    assert "upward" in shadow.JUMP_RECOVERY
+    assert "downward" in shadow.JUMP_RECOVERY
+
+
+def test_a_day_with_no_jump_fires_none(short_days):
+    rng = np.random.default_rng(7)
+    for i in range(4):
+        fwd, r_obs = _planted_day(61 + i, None, rng)
+        out = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
+        assert out["jump_market"] is None
+        assert out["jump_company"] == {}
+
+
+# -- the sensitivity is measured ----------------------------------------------
+
+def test_the_sensitivity_is_a_fresh_jacobian_at_the_solution(short_days):
+    """Published as a sensitivity and read for a binding clamp, so it is a
+    finite difference at the accepted solution rather than whatever the
+    optimiser was carrying when it stopped."""
+    rng = np.random.default_rng(5)
+    seen_gap = False
+    for seed in (11, 12, 13, 14):
+        engine = tf.Engine(seed=seed, universe=UNIVERSE)
+        engine.open_market()
+        engine.run_session(9, 30, 3, shadow.TICKS)
+        fwd = shadow.Forward(engine, 1, len(UNIVERSE))
+        x_true = rng.normal(size=fwd.layout.size)
+        r_obs = fwd.returns(x_true, fwd.jump_patches(None, {}))
+        base = shadow.solve(fwd, r_obs, fwd.jump_patches(None, {}),
+                            np.zeros(fwd.layout.size), sigma=1e-3)
+        out = shadow.solve_day(fwd, r_obs, (0.0, 0.0), sigma=1e-3)
+        S = len(fwd.layout.sectors)
+        fresh = shadow.fd_jacobian(fwd, r_obs, base["x"],
+                                   fwd.jump_patches(None, {}), 0)
+        want = np.linalg.norm(fresh[:, 1 + S:1 + S + fwd.n], axis=0)
+        assert np.allclose(out["jacobian_idio_norm"], want, rtol=1e-9)
+        carried = np.linalg.norm(base["jacobian"][:, 1 + S:1 + S + fwd.n],
+                                 axis=0)
+        if not np.allclose(carried, want, rtol=1e-3):
+            seen_gap = True
+    # the two differ on at least one day, which is why it matters
+    assert seen_gap
+
+
+# -- the layout is a partition ------------------------------------------------
+
+def test_each_unknown_moves_its_own_addresses_and_no_others(short_days):
+    """The unknown-to-address mapping is the tool's core contract. A unit
+    vector on unknown k moves exactly unknown k's addresses, each by
+    1/sqrt(T), and the unknowns partition the addresses with none shared.
+    """
+    engine = tf.Engine(seed=11, universe=UNIVERSE)
+    fwd = shadow.Forward(engine, 0, len(UNIVERSE))
+    layout = fwd.layout
+    step = 1.0 / np.sqrt(layout.ticks)
+    zero = {(p.address.stream, p.address.kind, p.address.index): p.value
+            for p in layout.patches(np.zeros(layout.size))}
+    owned = []
+    for k in range(layout.size):
+        e = np.zeros(layout.size)
+        e[k] = 1.0
+        moved = set()
+        for p in layout.patches(e):
+            key = (p.address.stream, p.address.kind, p.address.index)
+            if p.value != zero[key]:
+                assert p.value == pytest.approx(zero[key] + step)
+                moved.add(key)
+        assert len(moved) == layout.ticks, k
+        owned.append(moved)
+    # a partition: disjoint, and together every address the layout writes
+    for i in range(len(owned)):
+        for j in range(i + 1, len(owned)):
+            assert not (owned[i] & owned[j]), (i, j)
+    assert len(set().union(*owned)) == layout.ticks * layout.size
+
+
+# -- the idiosyncratic sd is the residual, not the return --------------------
+
+def test_the_idiosyncratic_sd_removes_the_systematic_part():
+    """A fixture whose beta term is large enough that dropping it leaves
+    the band. With beta 2.0 against an index sd of 0.02 the systematic
+    part is 0.04 beside an idiosyncratic 0.01, so the raw return's sd is
+    four times the answer.
+    """
+    rng = np.random.default_rng(4)
+    n = 400
+    steps = rng.normal(0, 0.02, n)
+    idx = np.exp(np.cumsum(steps))
+    closes = {}
+    for t in realdata.TICKERS:
+        own = rng.normal(0, 0.01, n)
+        closes[t] = list(np.exp(np.cumsum(2.0 * steps + own)))
+    data = {"index": list(idx), "closes": closes}
+    betas = {t: 2.0 for t in realdata.TICKERS}
+    sd = shadow.real_idio_sd(data, betas, 1, n)
+    assert all(0.008 < v < 0.012 for v in sd.values()), sd
+    # the raw return's sd, which is what dropping the beta term leaves
+    raw = float(np.std(np.diff(np.log(closes[realdata.TICKERS[0]]))))
+    assert raw > 0.03
+
+
+# -- the solver settings the lab measured ------------------------------------
+
+def test_the_jacobian_refresh_is_reached(short_days):
+    """The refresh interval is the lab's setting and the suite cannot
+    separate its effect at six names. What it can state is that the branch
+    runs: a solve with refresh off takes fewer forward evaluations than
+    one that retakes the Jacobian every few steps.
+    """
+    engine = tf.Engine(seed=11, universe=UNIVERSE)
+    fwd = shadow.Forward(engine, 0, len(UNIVERSE))
+    x_true = np.random.default_rng(9).normal(size=fwd.layout.size)
+    r_obs = fwd.returns(x_true, fwd.jump_patches(None, {}))
+    counts = {}
+    for refresh in (0, shadow.SOLVER["refresh"]):
+        fwd.evals = 0
+        shadow.solve(fwd, r_obs, fwd.jump_patches(None, {}),
+                     np.zeros(fwd.layout.size), sigma=1e-3, refresh=refresh)
+        counts[refresh] = fwd.evals
+    assert counts[shadow.SOLVER["refresh"]] > counts[0]
+
+
+# -- the prior at the ends of the interval ------------------------------------
+
+def test_an_intensity_of_zero_or_one_does_not_raise(short_days):
+    """math.log(0) is a domain error and both ends are values the surface
+    accepts. No shipped preset sets either."""
+    assert shadow.log_p(0.0) == shadow.LOG_FLOOR
+    assert shadow.log_p(1.0) == 0.0
+    assert shadow.log_p(0.5) == pytest.approx(math.log(0.5))
+    rng = np.random.default_rng(7)
+    fwd, r_obs = _planted_day(71, None, rng)
+    for intensities in ((1.0, 0.5), (0.5, 0.0), (0.0, 0.0), (1.0, 1.0)):
+        out = shadow.solve_day(fwd, r_obs, intensities, sigma=1e-3)
+        assert out["residual"]
