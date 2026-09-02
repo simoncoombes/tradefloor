@@ -132,6 +132,10 @@ def _moved(value):
         out = dict(value)
         out["ticker"] = None if out["ticker"] is not None else "ZZZ"
         return out
+    if isinstance(value, tuple):
+        # One overlay entry: (stream, kind, index, value). Moving the
+        # value rather than the address keeps it a well-formed entry.
+        return tuple(value[:-1]) + (_moved(value[-1]),)
     if isinstance(value, list):
         if not value:
             return [{"ticker": "ZZZ", "sector": "technology",
@@ -180,6 +184,12 @@ def _mutations(label, value):
         last = len(value) // 8 - 1
         if last > 0:
             yield f"{label}[{last}]", _slot(value, last)
+    elif label == "draw_overlay" and not value:
+        # An empty overlay perturbs to one installed substitution. The
+        # generic empty-list perturbation is a news event, which is the
+        # only empty list this walk met before draw addressing added a
+        # second one, and it is not this field's shape.
+        yield label, [(0, 0, 0, 0.5)]
     elif isinstance(value, list) and value:
         for i, element in enumerate(value):
             yield (f"{label}[{i}]",
