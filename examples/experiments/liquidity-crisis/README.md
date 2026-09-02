@@ -34,6 +34,37 @@ the crisis values occupy a narrower range than the control values, and run
 figure sits below the other three controls. We do not know why the model
 produced that trajectory.
 
+## Liquidity's share of the print
+
+Both arms also run with the depth counterfactual on. It settles every open
+tick a second time against every resting level, under the same four
+uniforms and from the same book state, so the two prints differ only where
+the depth bound was reached. It takes no draw and its fills reach no
+company field, so the arms above are the same arms and their exposure
+numbers are the same numbers.
+
+| arm | prints | the bound reached | median share | mean absorbed |
+|---|---:|---:|---:|---:|
+| control | 9,360 | 71, or 0.76% | 1.002 | 23.3 bps |
+| crisis | 9,360 | 191, or 2.04% | 1.793 | 34.7 bps |
+
+`market.liquidity` at 40% is a claim about depth, and these columns read it
+back off the tape. The crisis book runs out under ordinary flow 2.7 times
+as often, and a print that reaches the end of it settles further from the
+price the model wanted. The absorption column carries the circuit breaker
+alongside the book, because the breaker lands between the book's last trade
+and what is published.
+
+The median share is one log distance over another, so a value above one
+means the depth bound moved the print further than the print itself moved.
+The counterfactual prints one tick from the real state, so it says nothing
+about what a deeper book would have done to the tick after.
+
+Measured on day 39, the last day of the post-fork window, over 390 ticks
+and the twenty-four names drawn from `data/edgar-2026-08-31.json`. Seed
+4242, universe seed 4242, preset `pt-v16`, at commit `ae8d3d6`. The
+notebook prints this table from `ex.depth_readings(worlds)`.
+
 ## Reading it
 
 `notebook.ipynb` carries its output, so it reads on GitHub without a
