@@ -21,9 +21,8 @@ and a second `run_days` call numbers days from the engine's own counter.
 **A surgery replaces one draw**, a window of them, or another world's,
 and the record says whether it could bite.
 
-**Every draw's effect on a target is measured** by a finite difference
-under common random numbers, and the rows carry the residual that says
-they do not add up to their joint effect.
+**Each draw's effect on a target is measured** by a finite difference,
+and the rows carry the residual by which they miss the joint effect.
 
 <!-- release-note-ends -->
 
