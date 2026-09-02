@@ -99,10 +99,18 @@ def attribute_preset(preset: str, a: argparse.Namespace) -> dict:
             rows.extend(part)
     rows.sort(key=lambda r: (r["stream"], r["day"], r["site"], r["tag"],
                              r["index"], r["perturbation"]))
+    # The probe's caveats count its one row; the counts are the merged rows'.
+    fired = sum(1 for r in rows if r["perturbation"] == "fire")
+    caveats = [c for c in probe.caveats
+               if "shard" not in c and "forced to each end" not in c]
+    if fired:
+        caveats.append(
+            f"{fired} event uniforms were forced to each end of the unit "
+            "interval (fire, unfire) rather than perturbed; the row with "
+            "zero effect is the control's own state.")
     return {"preset": preset, "model_fingerprint": fingerprint,
             "digest_at_fork": digest, "control": probe.control,
-            "caveats": [c for c in probe.caveats if "shard" not in c],
-            "rows": rows, "seconds": time.time() - started}
+            "caveats": caveats, "rows": rows, "seconds": time.time() - started}
 
 
 def key(row: dict) -> tuple:
