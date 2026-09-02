@@ -122,13 +122,21 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-from typing import Any, NamedTuple, Sequence
+from typing import TYPE_CHECKING, Any, NamedTuple, Sequence
 
 from ._core import ValidationError
 from .counterfactual import Resample, World, _gross, _net, _shape
-from .integrations.common import Action, Decision
 from .render import TextRenderer
 from .scenario import Scenario
+
+if TYPE_CHECKING:
+    # Runtime imports happen inside the two functions that build one:
+    # `integrations.common` pulls in the `integrations` subpackage, and
+    # `import tradefloor` must never do that on its own -- see
+    # `tests/test_integrations.py::
+    # test_importing_tradefloor_does_not_import_the_integrations`, which
+    # a top-level import here failed.
+    from .integrations.common import Action, Decision
 
 #: The cell set :func:`battery` returns by default. Bump this, and add a
 #: new entry to the version table below, to ship a different battery; `1`
@@ -251,6 +259,8 @@ def _decision_from_publish(raw: dict[str, Any], *, cell: int,
     two shapes, so the one function this package was told to share with
     `counterfactual` stays the only place a decision is canonicalised.
     """
+    from .integrations.common import Action, Decision
+
     try:
         actions = [Action(a["symbol"], a["side"], a["quantity"])
                   for a in raw["actions"]]
@@ -327,6 +337,8 @@ def _group_by_cell(
 
 
 def _decision_from_shape(shape: Sequence[Sequence[Any]]) -> Decision:
+    from .integrations.common import Action, Decision
+
     return Decision([Action(symbol, side, quantity)
                      for symbol, side, quantity in shape])
 
