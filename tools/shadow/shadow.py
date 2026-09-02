@@ -299,6 +299,38 @@ def decode(value):
     return value
 
 
+def trim_overlap(carried: list, own: list, day) -> list:
+    """``carried`` plus ``own``, with the day they both hold counted once.
+
+    A resume re-runs part of its checkpoint day, so the resumed engine
+    records rows for a day the partial already carried. What it
+    re-recorded is dropped from the tail of the carried rows, which is
+    where that day sits.
+    """
+    if day is None or not carried:
+        return list(carried) + list(own)
+    again = sum(1 for r in own if r["day"] == day)
+    return list(carried[:len(carried) - again]) + list(own)
+
+
+def record_of(engine) -> tuple[list, list]:
+    """What the engine has recorded so far: the truth rows and daily bars.
+
+    Both need pyarrow and both come back empty without it, which is what
+    the run already did with the truth table.
+    """
+    try:
+        import pyarrow as pa
+    except ImportError:
+        return [], []
+    truth = pa.table(engine.truth()).to_pylist()
+    try:
+        bars = pa.table(engine.bars(grain="day")).to_pylist()
+    except Exception:
+        bars = []
+    return truth, bars
+
+
 def resume(engine, checkpoint: dict) -> None:
     """Rebuild the state ``commit`` left from its checkpoint.
 
@@ -429,6 +461,60 @@ def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
             "converged": bool(converged)}
 
 
+def fd_jacobian(forward: Forward, r_obs: np.ndarray, x: np.ndarray,
+                jumps, extra: int, *, step: float | None = None) -> np.ndarray:
+    """A finite-difference Jacobian at ``x``, taken fresh.
+
+    The optimiser carries a Jacobian that is Broyden-updated between
+    refreshes, so the one it happens to end on is an estimate. The report
+    publishes a column norm from it as a sensitivity and reads the same
+    column for a binding clamp, and both want a measurement. On one of
+    four synthetic days, six names at seeds 11 to 14 with 40 ticks and
+    sigma 1e-3, the optimiser's column for a name read 0.00196 against
+    0.01820 fresh, a gap of 89 percent on the worst column; the other
+    three days agreed exactly.
+
+    Costs one forward evaluation per unknown, about 40 on the real
+    forty-name roster, against roughly 400 the day already spends.
+    """
+    step = SOLVER["step"] if step is None else step
+    m = len(x)
+
+    def jump_list(xx):
+        return jumps(xx[m - extra:]) if callable(jumps) else jumps
+
+    def resid(xx):
+        return forward.returns(xx, jump_list(xx)) - r_obs
+
+    r = resid(x)
+    J = np.zeros((len(r), m))
+    for k in range(m):
+        xk = x.copy()
+        xk[k] += step
+        J[:, k] = (resid(xk) - r) / step
+    return J
+
+
+#: The prior weight of an outcome a probability of zero forbids.
+#: ``-log(0)`` is infinite, and an intensity of exactly zero or one is a
+#: value the surface accepts: at ``jump_intensity_market = 1.0`` the term
+#: ``log(1 - p)`` raised a domain error before the first day was solved,
+#: and at ``jump_intensity_idio = 0.0`` the term ``log(p)`` did the same
+#: as soon as a candidate's implied innovation passed 2.0. No shipped
+#: preset sets either end. A finite floor keeps the impossible branch
+#: unaffordable without stopping the solve.
+LOG_FLOOR = -745.0
+
+
+def log_p(p: float) -> float:
+    """``log(p)`` with the ends of the unit interval kept finite."""
+    if p <= 0.0:
+        return LOG_FLOOR
+    if p >= 1.0:
+        return 0.0
+    return math.log(p)
+
+
 def solve_day(forward: Forward, r_obs: np.ndarray, intensities: tuple,
               *, sigma: float, candidates: int = 5) -> dict:
     """The day's MAP: continuous aggregates, then the jump indicators.
@@ -442,21 +528,40 @@ def solve_day(forward: Forward, r_obs: np.ndarray, intensities: tuple,
     """
     p_market, p_idio = intensities
     m0 = forward.layout.size
-    base = solve(forward, r_obs, forward.jump_patches(None, {}),
-                 np.zeros(m0), sigma=sigma)
+    base_jumps = forward.jump_patches(None, {})
+    base = solve(forward, r_obs, base_jumps, np.zeros(m0), sigma=sigma)
     fired_market = None
     fired: dict[int, float] = {}
     best = base
-    best_cost = base["cost"] - math.log(1 - p_market) - forward.n * math.log(1 - p_idio)
+    # what produced `best`, so the sensitivity can be measured at it
+    best_jumps, best_extra = base_jumps, 0
+    best_cost = (base["cost"] - log_p(1.0 - p_market)
+                 - forward.n * log_p(1.0 - p_idio))
     if forward.day > 0:
         # the market jump
         def jumps_m(tail):
             return forward.jump_patches(float(tail[0]), fired)
-        trial = solve(forward, r_obs, jumps_m, np.append(best["x"][:m0], 0.0),
+        x0_m = np.append(best["x"][:m0], 0.0)
+        trial = solve(forward, r_obs, jumps_m, x0_m,
                       extra=1, sigma=sigma, J0=base["jacobian"][:, :m0])
-        cost = trial["cost"] - math.log(p_market) - forward.n * math.log(1 - p_idio)
+        cost = (trial["cost"] - log_p(p_market)
+                - forward.n * log_p(1.0 - p_idio))
+        if cost >= best_cost:
+            # The reused Jacobian is the base solve's and its columns say
+            # nothing about the jump normal just added, so a trial that
+            # fails to pay for the indicator is retried with a Jacobian of
+            # its own before the day is called jump-free. On a planted
+            # market jump of -2.27 the reused start left the cost at the
+            # no-jump 25.48 and a start of its own reached 12.46, so the
+            # jump was there and the search was what missed it.
+            retry = solve(forward, r_obs, jumps_m, x0_m, extra=1, sigma=sigma)
+            retry_cost = (retry["cost"] - log_p(p_market)
+                          - forward.n * log_p(1.0 - p_idio))
+            if retry_cost < cost:
+                trial, cost = retry, retry_cost
         if cost < best_cost:
             best, best_cost, fired_market = trial, cost, float(trial["x"][-1])
+            best_jumps, best_extra = jumps_m, 1
         # the names, largest implied innovation first
         order = np.argsort(-np.abs(best["x"][1 + len(forward.layout.sectors):m0]))
         for i in [int(k) for k in order[:candidates]]:
@@ -479,24 +584,30 @@ def solve_day(forward: Forward, r_obs: np.ndarray, intensities: tuple,
                           J0=best["jacobian"][:, :len(x0) - 1])
             n_fired = len(tried)
             cost = (trial["cost"]
-                    - (math.log(p_market) if fired_market is not None else math.log(1 - p_market))
-                    - n_fired * math.log(p_idio)
-                    - (forward.n - n_fired) * math.log(1 - p_idio))
+                    - (log_p(p_market) if fired_market is not None
+                       else log_p(1.0 - p_market))
+                    - n_fired * log_p(p_idio)
+                    - (forward.n - n_fired) * log_p(1.0 - p_idio))
             if cost < best_cost:
                 best, best_cost = trial, cost
+                best_jumps, best_extra = jumps_i, extra
                 fired = tried
                 fired[i] = float(trial["x"][-1])
                 if fired_market is not None:
                     fired_market = float(trial["x"][m0])
     x = best["x"][:m0]
     S = len(forward.layout.sectors)
+    # Measured at the accepted solution rather than taken from the
+    # optimiser's carried Jacobian: see fd_jacobian for what the two
+    # differed by.
+    fresh = fd_jacobian(forward, r_obs, best["x"], best_jumps, best_extra)
     return {"x_market": float(x[0]), "x_sector": x[1:1 + S].tolist(),
             "x_idio": x[1 + S:].tolist(), "jump_market": fired_market,
             "jump_company": {int(k): v for k, v in fired.items()},
             "residual": best["residual"].tolist(), "cost": best_cost,
             "converged": best["converged"],
             "jacobian_idio_norm": np.linalg.norm(
-                best["jacobian"][:, 1 + S:1 + S + forward.n], axis=0).tolist(),
+                fresh[:, 1 + S:1 + S + forward.n], axis=0).tolist(),
             "evals": forward.evals,
             "jumps": forward.jump_patches(fired_market, fired),
             "x": x}
@@ -523,6 +634,9 @@ def shadow(args) -> dict:
     started = time.time()
     start_k = 0
     checkpoint = None
+    prior_truth: list = []
+    prior_bars: list = []
+    resume_day = None
     if args.resume:
         with open(args.resume, encoding="utf-8") as f:
             saved = json.load(f)
@@ -532,6 +646,9 @@ def shadow(args) -> dict:
                              "or seed; a resume continues one run")
         days = saved["days"]
         checkpoint = saved["checkpoint"]
+        prior_truth = list(saved.get("truth", ()))
+        prior_bars = list(saved.get("bars", ()))
+        resume_day = checkpoint["day"]
         resume(engine, checkpoint)
         start_k = checkpoint["day"] + 1
         print(f"  resumed after day {checkpoint['day']} "
@@ -577,12 +694,25 @@ def shadow(args) -> dict:
                   flush=True)
             # A partial record every ten days, so a run a dead-man timer
             # or a spot reclaim ends still leaves what it solved.
+            carried_truth, carried_bars = record_of(engine)
             partial = {"args": vars(args), "year": year, "partial": True,
                        "sessions": [first, session + 1], "days": days,
                        "checkpoint": encode(checkpoint),
                        "intensities": intensities, "tickers": tickers,
-                       "betas": betas, "truth_rows": 0, "truth": [],
-                       "provenance": dict(d["provenance"], **build_provenance(engine)),
+                       "betas": betas,
+                       # The record travels with the checkpoint. Without
+                       # it a resumed run shipped only what it recorded
+                       # after the resume: five committed days gave 1200
+                       # truth rows and 30 daily bars run straight
+                       # through, and 720 rows and 18 bars resumed at day
+                       # 2, with prices and stream positions identical
+                       # either way.
+                       "truth_rows": len(prior_truth) + len(carried_truth),
+                       "truth": prior_truth + carried_truth,
+                       "bars": prior_bars + carried_bars,
+                       "provenance": dict(d["provenance"],
+                                          **build_provenance(
+                                              engine, args.preset)),
                        "real_idio_sd": real_idio_sd(d, betas, first, last),
                        "seconds": time.time() - started}
             with open(os.path.join(args.out, "shadow-partial.json"), "w",
@@ -591,33 +721,128 @@ def shadow(args) -> dict:
             with open(os.path.join(args.out, "shadow-partial.md"), "w",
                       encoding="utf-8") as f:
                 f.write(render(partial))
-    truth = []
-    try:
-        import pyarrow as pa
-        truth = pa.table(engine.truth()).to_pylist()
-    except ImportError:
-        pass
+    # The estimator's own null, measured on this run's roster: the
+    # diagnostics compare a shrunk estimate against it rather than against
+    # the prior it was shrunk under.
+    null = None
+    if getattr(args, "null_days", 0):
+        null = estimator_null(universe, args.seed + 10 ** 6,
+                              int(args.null_days), sigma=args.sigma)
+    own_truth, own_bars = record_of(engine)
+    # `resume` restores the boundary before its checkpoint day and re-runs
+    # part of that day, so the carried record and the resumed engine's own
+    # overlap. The overlap is exactly what the resumed engine re-recorded
+    # for that day, so it comes off the tail of the carried rows: five
+    # committed days recorded 2400 truth rows and 60 daily bars run
+    # straight through, and a resume at day 2 recorded 1200 and 30 of its
+    # own, with the carried 1440 and 36 trimmed to 1200 and 30.
+    truth = trim_overlap(prior_truth, own_truth, resume_day)
+    bars = trim_overlap(prior_bars, own_bars, resume_day)
     return {"args": vars(args), "year": year, "sessions": [first, last],
-            "provenance": dict(d["provenance"], **build_provenance(engine)),
-            "intensities": intensities, "days": days, "truth_rows": len(truth),
-            "truth": truth, "seconds": time.time() - started,
+            "provenance": dict(d["provenance"],
+                               **build_provenance(engine, args.preset)),
+            "intensities": intensities, "days": days,
+            "truth_rows": len(truth), "truth": truth, "bars": bars,
+            "bar_rows": len(bars), "seconds": time.time() - started,
             "tickers": tickers, "betas": betas,
+            "null": null,
             "real_idio_sd": real_idio_sd(d, betas, first, last)}
 
 
-def build_provenance(engine) -> dict:
+def build_provenance(engine, preset=None) -> dict:
     try:
         commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
                                 capture_output=True, text=True,
                                 check=True).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         commit = "unknown"
+    # The resolved preset, not the argument. `--preset` defaults to None
+    # and the Setup line printed it, so a documented invocation reported
+    # "preset None (fingerprint pt-v16)". A shipped preset's fingerprint is
+    # its name, which is what the engine resolved to.
     return {"tradefloor": tf.version(), "commit": commit,
+            "preset": preset or engine.model_fingerprint,
             "model_fingerprint": engine.model_fingerprint,
             "order_flow": "zero; no agent trades in a shadow run",
             "fundamentals": "synthetic donors from Universe.random(40, seed=111), "
                             "same sector, per-share figures scaled to the real "
                             "starting price"}
+
+
+def estimator_null(universe, seed: int, days: int, *, sigma: float,
+                   ticks: int | None = None) -> dict:
+    """The moments the solver returns on draws that ARE standard normal.
+
+    The diagnostics table compares the implied series against an i.i.d.
+    standard normal, and that is not the estimator's null. :func:`solve`
+    minimises the posterior under a standard-normal prior on an
+    under-determined system -- one market innovation, one per sector and
+    one per name against one close per name -- so the estimate is shrunk
+    and its moments are not the prior's. Measured on six names at 40
+    ticks the idiosyncratic block came back with a standard deviation of
+    0.62 against a true 0.88, and the vector norm at 2.12 against 4.03.
+    A row flagged against 1 can be the shrinkage rather than a mechanism.
+
+    So the null is measured the way the solver's own settings are: days
+    the engine generated with draws from N(0, 1), solved from zero, and
+    the moments of what came back published as the comparison. Returns
+    the market and idiosyncratic standard deviations, the excess
+    kurtoses and the ratio of the solved vector norm to the true one,
+    with the number of days behind them.
+    """
+    ticks = TICKS if ticks is None else ticks
+    rng = np.random.default_rng(seed)
+    xm_true, xm_got, xi_true, xi_got, norms = [], [], [], [], []
+    for k in range(days):
+        engine = tf.Engine(seed=seed + k, universe=universe)
+        engine.open_market()
+        engine.run_session(CLOCK[0], CLOCK[1], CLOCK[2], ticks)
+        fwd = Forward(engine, 1, len(universe))
+        x_true = rng.normal(size=fwd.layout.size)
+        r_obs = fwd.returns(x_true, fwd.jump_patches(None, {}))
+        out = solve_day(fwd, r_obs, (0.0, 0.0), sigma=sigma)
+        S = len(fwd.layout.sectors)
+        xm_true.append(float(x_true[0]))
+        xm_got.append(float(out["x_market"]))
+        xi_true.extend(x_true[1 + S:].tolist())
+        xi_got.extend(out["x_idio"])
+        norms.append((float(np.linalg.norm(x_true)),
+                      float(np.linalg.norm(out["x"]))))
+    xm_got = np.array(xm_got)
+    xi_got = np.array(xi_got)
+    kurt = (lambda v: float(((v - v.mean()) ** 4).mean() / v.var() ** 2 - 3)
+            if len(v) > 3 else float("nan"))
+    nt = np.array([a for a, _ in norms])
+    ns = np.array([b for _, b in norms])
+    return {"days": days, "names": len(universe), "ticks": ticks,
+            "market_sd": float(xm_got.std()),
+            "idio_sd": float(xi_got.std()),
+            "market_kurtosis": kurt(xm_got),
+            "idio_kurtosis": kurt(xi_got),
+            "norm_ratio": float(np.median(ns) / np.median(nt)),
+            "market_corr": float(np.corrcoef(xm_true, xm_got)[0, 1])
+            if days > 2 else float("nan"),
+            "idio_corr": float(np.corrcoef(np.array(xi_true), xi_got)[0, 1])}
+
+
+#: What the greedy jump step can recover, measured. The market jump's
+#: size is ``jump_mean_market + jump_sigma_market * z`` and the mean is
+#: negative, so an UPWARD jump needs a normal beyond ``-mean/sigma``,
+#: which at pt-v16 is +3.46 and costs 6.0 nats of prior before the
+#: likelihood has said anything. Planted market jumps on six names at 40
+#: ticks, seeds 11 upward, sigma 1e-3: every downward jump from -85 to
+#: -208 basis points was recovered and no upward jump was, at any size up
+#: to +112 basis points. A jump at z = 3.46 is a jump of 0.1 basis points
+#: and no estimator should claim it.
+JUMP_RECOVERY = (
+    "the greedy jump step recovers a DOWNWARD market jump and not an "
+    "upward one. The jump size is jump_mean_market + jump_sigma_market * "
+    "z with a negative mean, so an upward jump needs a normal past +3.46 "
+    "whose prior the likelihood cannot repay. Measured on planted jumps, "
+    "six names at 40 ticks: every downward jump from -85 to -208 basis "
+    "points recovered, no upward jump recovered at any size to +112. So "
+    "the fired counts below are a lower bound on downward jumps and say "
+    "nothing about upward ones.")
 
 
 # -- diagnostics ---------------------------------------------------------
@@ -630,9 +855,22 @@ def acf(x: np.ndarray, lag: int) -> float:
 
 
 def diagnostics(run: dict) -> list[dict]:
-    """The implied innovation series against an i.i.d. standard normal,
-    each statistic mapped to the mechanism class that would move it."""
+    """The implied series against the estimator's own null.
+
+    The series is a maximum a posteriori estimate on an under-determined
+    system, not the draws themselves: one market innovation, one per
+    sector and one per name against one close per name, under a
+    standard-normal prior. The prior shrinks it, so an i.i.d. standard
+    normal is the prior's null and not the estimator's, and a flag taken
+    against 1 can be the shrinkage rather than a mechanism.
+
+    Where the run carries a measured null (:func:`estimator_null`), the
+    standard deviation rows compare against it and say so. Where it does
+    not, they compare against 1 and the caveat says which null the reader
+    is looking at.
+    """
     days = run["days"]
+    null = run.get("null")
     N = len(days)
     xm = np.array([d["x_market"] for d in days])
     xi = np.array([d["x_idio"] for d in days])
@@ -646,14 +884,27 @@ def diagnostics(run: dict) -> list[dict]:
     lead = np.corrcoef(xm[:-1], np.abs(xm[1:]))[0, 1] if N > 2 else float("nan")
     fired_m = sum(1 for d in days if d["jump_market"] is not None)
     fired_c = sum(len(d["jump_company"]) for d in days)
+    n_names = len(days[0]["x_idio"])
     rows = [
         {"statistic": "market innovation, mean", "value": float(xm.mean()),
          "expected": f"0 +- {se_a:.2f}", "mechanism": "drift",
          "flag": abs(xm.mean()) > 2 * se_a},
         {"statistic": "market innovation, sd", "value": float(xm.std()),
-         "expected": f"1 +- {1 / math.sqrt(2 * N):.2f}",
+         "expected": (f"{null['market_sd']:.2f} +- "
+                      f"{1 / math.sqrt(2 * N):.2f}, the estimator's own"
+                      if null else f"1 +- {1 / math.sqrt(2 * N):.2f}"),
          "mechanism": "market variance level",
-         "flag": abs(xm.std() - 1) > 2 / math.sqrt(2 * N)},
+         "flag": abs(xm.std() - (null["market_sd"] if null else 1.0))
+         > 2 / math.sqrt(2 * N)},
+        {"statistic": "idio innovation, sd (pooled)",
+         "value": float(pooled.std()),
+         "expected": (f"{null['idio_sd']:.2f} +- "
+                      f"{1 / math.sqrt(2 * len(pooled)):.2f}, the "
+                      "estimator's own" if null
+                      else f"1 +- {1 / math.sqrt(2 * len(pooled)):.2f}"),
+         "mechanism": "idiosyncratic variance level",
+         "flag": abs(pooled.std() - (null["idio_sd"] if null else 1.0))
+         > 2 / math.sqrt(2 * len(pooled))},
         {"statistic": "market innovation, excess kurtosis", "value": kurt(xm),
          "expected": f"0 +- {se_k:.2f}", "mechanism": "jumps (tail weight)",
          "flag": abs(kurt(xm)) > 2 * se_k},
@@ -673,16 +924,47 @@ def diagnostics(run: dict) -> list[dict]:
         {"statistic": "corr(market innovation, next |market innovation|)",
          "value": float(lead), "expected": f"0 +- {se_a:.2f}",
          "mechanism": "leverage (sign asymmetry)", "flag": abs(lead) > 2 * se_a},
-        {"statistic": "market jumps fired", "value": float(fired_m),
-         "expected": f"{run['intensities'][0] * N:.1f} at the preset's intensity",
+        {"statistic": "market jumps fired (downward only)",
+         "value": float(fired_m),
+         "expected": f"{run['intensities'][0] * N:.1f} at the preset's "
+                     "intensity, upward jumps not recoverable",
          "mechanism": "jumps (frequency)",
          "flag": fired_m > 2 * run["intensities"][0] * N + 2},
-        {"statistic": "company jumps fired", "value": float(fired_c),
-         "expected": f"{run['intensities'][1] * N * len(days[0]['x_idio']):.1f}",
+        {"statistic": "company jumps fired (downward only)",
+         "value": float(fired_c),
+         "expected": (f"{run['intensities'][1] * N * n_names:.1f}"
+                      ", upward jumps not recoverable"),
          "mechanism": "jumps (frequency)",
          "flag": fired_c > 2 * run["intensities"][1] * N * len(days[0]["x_idio"]) + 2},
     ]
     return rows
+
+
+def clamp_cell(names: list) -> str:
+    """The clamped names for one table cell.
+
+    A forty-name roster put thirty-five tickers in a single cell, which no
+    table renders. A count and one name carry the same fact; the full list
+    is in the JSON beside the report.
+    """
+    if not names:
+        return "none"
+    if len(names) <= 3:
+        return ", ".join(names)
+    return f"{len(names)} names, including {names[0]}"
+
+
+def scalar(value) -> float:
+    """One number from a field that may be a vector.
+
+    ``market_variance`` is a state vector, and printing it with ``str``
+    put a raw six-element Python list in a report line that reads as a
+    single number.
+    """
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(np.asarray(value).ravel()[0])
 
 
 def render(run: dict) -> str:
@@ -696,7 +978,7 @@ def render(run: dict) -> str:
     gap = vm - vr
     lines = [f"# Shadow run: {run['year']} ({run['args']['year']})"
              + (" PARTIAL, the run was still going" if run.get("partial") else ""),
-             "", "## Where the solve fails", ""]
+             "", "## Days the solve does not reach", ""]
     if not failed:
         lines.append(f"Every one of the {N} days reached its observed closes "
                      f"within five sigma ({5 * run['args']['sigma']:.0e} in "
@@ -712,13 +994,13 @@ def render(run: dict) -> str:
         for d in sorted(failed, key=lambda d: -d["max_abs_residual"])[:25]:
             lines.append(f"| {d['day']} | {d['date']} | {d['worst']} | "
                          f"{d['max_abs_residual']:.2e} | {d['converged']} | "
-                         f"{', '.join(d['clamped']) or 'none'} |")
+                         f"{clamp_cell(d['clamped'])} |")
     sens = np.array([d["sensitivity"] for d in days if "sensitivity" in d])
     res = np.array([d["max_abs_residual"] for d in days])
     if len(sens):
         real_sd = np.array([run["real_idio_sd"][t] for t in run["tickers"]])
         med = np.median(sens, axis=0)
-        lines += ["", "## How far one unit of innovation moves a close", "",
+        lines += ["", "## Close sensitivity to one unit of innovation", "",
                   "The Jacobian's column for each name's day innovation, in log "
                   "return per unit z (median over the days), beside the name's "
                   "real daily idiosyncratic sd over the year. A ratio well "
@@ -744,7 +1026,7 @@ def render(run: dict) -> str:
               f"fetched window, {N} days solved, "
               f"{run['seconds']:.0f} s, {sum(d['evals'] for d in days)} "
               "forward evaluations",
-              f"- preset {run['args']['preset']} (fingerprint "
+              f"- preset {run['provenance']['preset']} (fingerprint "
               f"{run['provenance']['model_fingerprint']}), seed "
               f"{run['args']['seed']}, sigma {run['args']['sigma']} in log "
               "return units",
@@ -753,10 +1035,33 @@ def render(run: dict) -> str:
               f"- fundamentals: {run['provenance']['fundamentals']}",
               f"- data: {run['provenance']['source']}; fetched "
               f"{sorted(set(run['provenance']['fetched'].values()))}",
+              f"- url template: {run['provenance']['url_template']}",
               f"- tradefloor {run['provenance']['tradefloor']}, commit "
               f"{run['provenance']['commit']}",
               "", "## The implied innovations", "",
-              "| statistic | value | i.i.d. N(0,1) expects | mechanism class "
+              "The series is a maximum a posteriori estimate on an "
+              "under-determined system: one market innovation, one per "
+              "sector and one per name against one close per name, under a "
+              "standard-normal prior. The prior shrinks it, so the prior's "
+              "own null is not the estimator's.", ""]
+    null = run.get("null")
+    if null:
+        lines += [
+            f"The expected column is measured, on {null['days']} days the "
+            f"engine generated with draws from N(0, 1) at {null['names']} "
+            f"names and {null['ticks']} ticks: the solver returned a market "
+            f"sd of {null['market_sd']:.2f} and an idiosyncratic sd of "
+            f"{null['idio_sd']:.2f}, with a vector norm "
+            f"{null['norm_ratio']:.2f} of the truth and correlations of "
+            f"{null['market_corr']:+.2f} and {null['idio_corr']:+.2f} "
+            "against the draws that made the day.", ""]
+    else:
+        lines += ["The expected column is an i.i.d. standard normal, which "
+                  "is the prior's null and not the estimator's, because "
+                  "--null-days was 0. A standard deviation flagged against "
+                  "1 may be the shrinkage rather than a mechanism.", ""]
+    lines += [JUMP_RECOVERY, "",
+              "| statistic | value | expected | mechanism class "
               "| flag |", "|---|---|---|---|---|"]
     for row in diagnostics(run):
         lines.append(f"| {row['statistic']} | {row['value']:.3f} | "
@@ -780,10 +1085,13 @@ def render(run: dict) -> str:
               f"{days[0]['mispricing_mean']:+.4f} to "
               f"{days[-1]['mispricing_mean']:+.4f}",
               f"- market variance, first and last day: "
-              f"{days[0]['market_variance']} to {days[-1]['market_variance']}",
+              f"{scalar(days[0]['market_variance']):.6g} to "
+              f"{scalar(days[-1]['market_variance']):.6g} (the first "
+              "element of the state vector)",
               f"- universe stress, max: "
               f"{max((d['universe_stress'] or 0) for d in days)}",
-              f"- truth rows recorded: {run['truth_rows']}"]
+              f"- truth rows recorded: {run['truth_rows']}, daily bars "
+              f"{run.get('bar_rows', len(run.get('bars', ())))}"]
     return "\n".join(lines) + "\n"
 
 
@@ -853,9 +1161,15 @@ def lab(args) -> str:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    p.add_argument("--year", choices=list(realdata.YEARS), required=True)
+    # `--year` is what the lab ignores, so the lab does not require it.
+    p.add_argument("--year", choices=list(realdata.YEARS), default=None)
     p.add_argument("--lab", action="store_true",
                    help="run the solver lab on synthetic days instead of the year")
+    p.add_argument("--null-days", type=int, default=6,
+                   help="days of engine-generated draws used to measure the "
+                        "estimator's own null; 0 skips it and the "
+                        "diagnostics compare against an i.i.d. standard "
+                        "normal instead")
     p.add_argument("--preset", default=None)
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--sigma", type=float, default=1e-3)
@@ -866,6 +1180,8 @@ def main(argv=None) -> int:
                         "checkpoint day")
     p.add_argument("--out", required=True)
     args = p.parse_args(argv)
+    if not args.lab and args.year is None:
+        p.error("--year is required unless --lab is given")
     os.makedirs(args.out, exist_ok=True)
     if args.lab:
         text = lab(args)
