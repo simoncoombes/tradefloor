@@ -394,21 +394,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     decodes each one against a length it computes from the roster. That is
     the invariant, whatever the roster does.
 
-    Before tradefloor issue #148 one array makes that width differ from the
-    roster's. ``volume_idio`` is sized at construction and is
-    the one per-slot array ``add_company`` and ``remove_company`` do not
-    resize, so a snapshot taken after a listing or a delisting is refused
-    and a run whose roster changed cannot be checked here.
-    ``Engine.state_hash`` in Rust hashes the same array at the same width,
-    so such a run's leaf is self-consistent and :func:`verify` passes over
-    it. No price depends on the width: every shipped preset holds
-    ``volume_idio_sigma`` and ``volume_idio_persistence`` at 0.0, so every
-    value in that array is exactly 0.0. Issue #148 is where the resize is
-    being made, and
-    ``test_the_twin_hashes_exactly_the_snapshots_whose_widths_agree`` reads
-    the widths off the snapshot rather than pinning them, so it states the
-    same relationship on either side of that. This second paragraph goes
-    when #148 lands.
+    Every per-slot array follows the roster, ``volume_idio`` included since
+    the resize that landed with this one, so a snapshot taken after a
+    listing or a delisting is accepted and a run whose roster changed is
+    checked here like any other.
 
     ## The encoding
 

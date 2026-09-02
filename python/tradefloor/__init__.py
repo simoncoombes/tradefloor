@@ -34,10 +34,13 @@ from . import loss
 from .checkpoint import Checkpoint, branch
 from . import counterfactual
 from . import noise
-from .counterfactual import (Agreement, Comparison, Divergence, Resample,
-                             World, agree, compare, resample)
+from .counterfactual import (Agreement, Comparison, Divergence, Invariance,
+                             Resample, World, agree, compare, invariance,
+                             resample)
 from . import externality
 from .externality import Externality, externalities
+from . import render
+from .render import JSONRenderer, Renderer, TextRenderer
 from .sweep import sweep
 from . import boundary
 from .boundary import BoundaryMap, Flip, flip, map_boundaries
@@ -55,6 +58,11 @@ from . import yaml_subset
 from .tca import Execution
 from .baselines import capture_ratio, reference_agents
 from .ranking import AgentRecord, Ranking, rank
+from . import fingerprint
+from .fingerprint import (
+    BATTERY_VERSION, Battery, Cell, Fingerprint, FingerprintComparison,
+    battery, commit, reveal, sealed_battery,
+)
 from ._core import (  # noqa: F401
     ArrowStream,
     Engine,
@@ -112,9 +120,13 @@ __all__ = [
     "Agreement", "Comparison", "Resample",
     "Divergence",
     "boundary", "flip", "map_boundaries", "Flip", "BoundaryMap",
+    "invariance", "Invariance", "render", "Renderer", "TextRenderer",
+    "JSONRenderer",
     "Intervention", "Firing", "ScenarioValidationError", "interventions",
     "TARGETS", "UNSUPPORTED_TARGETS", "yaml_subset",
     "manifest", "RunManifest", "DayLedger", "Verification",
+    "fingerprint", "BATTERY_VERSION", "Battery", "Cell", "Fingerprint",
+    "FingerprintComparison", "battery", "commit", "reveal", "sealed_battery",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
     "market_status", "model_preset", "run_many", "sector_daily_sigma", "sectors",
