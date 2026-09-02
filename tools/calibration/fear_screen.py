@@ -394,6 +394,36 @@ def _grid(name):
                 "d88r85k10c15": cell(0.85, k=1.0, cap=1.5),
                 "d88r78k10c15": cell(0.78, k=1.0, cap=1.5),
                 "d85k10c15": cell(k=1.0, cap=1.5, vix_selfex_decay=0.85)}
+    elif name == "combo2":
+        # Round 171.13: the decay x capped-power interaction, one step in.
+        # combo1 measured decay 0.88 losing the state power's rv gain and
+        # pushing the spike asymmetry over 1.28; level1 measured cap 2.0
+        # keeping every gate at decay 0.94. The middle, with controls.
+        REF = 0.007593024924589399
+        ovl = {"vix_selfex_gain": 0.25, "vix_selfex_threshold": 1.75,
+               "vix_selfex_size_coupling": 0.5, "vix_decay_ratio": 0.85,
+               "vix_selfex_relax_slope": 0.03, "vix_selfex_min": 2.0,
+               "vix_selfex_scale": 4.0, "vix_selfex_vol_jump": 0.75,
+               "vix_har_weight": 0.18, "vix_har_mid": 0.3, "vix_har_vrp": 1.0,
+               "vix_selfex_level_ref": REF}
+        def cell(decay, k, cap, **extra):
+            c = dict(ovl, vix_selfex_decay=decay)
+            if k:
+                c["vix_selfex_vix_power"] = k
+            if cap:
+                c["vix_selfex_vix_cap"] = cap
+            c.update(extra)
+            return c
+        return {"v16": {},
+                "d94k10c20": cell(0.94, 1.0, 2.0),      # level1's 5/5, the control
+                "d91": cell(0.91, 0.0, 0.0),
+                "d91k10c15": cell(0.91, 1.0, 1.5),
+                "d91k10c20": cell(0.91, 1.0, 2.0),
+                "d91k15c15": cell(0.91, 1.5, 1.5),
+                "d91k10c25": cell(0.91, 1.0, 2.5),
+                "d94k10c25": cell(0.94, 1.0, 2.5),
+                "d94k07c20": cell(0.94, 0.7, 2.0),
+                "d88k10c20": cell(0.88, 1.0, 2.0)}      # combo1's, the other control
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):
