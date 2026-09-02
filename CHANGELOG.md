@@ -25,8 +25,7 @@ and the record says whether it could bite.
 and the rows carry the residual by which they miss the joint effect.
 
 **A shadow run walks the engine along a real year**, solving each day for
-the draws that reproduce its observed closes, and re-renders its report
-from the saved solve.
+the draws that reproduce its observed closes.
 
 <!-- release-note-ends -->
 
