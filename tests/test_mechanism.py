@@ -160,9 +160,20 @@ def test_the_spec_digest_moves_with_a_default():
 # -- the record ------------------------------------------------------------------
 
 def test_the_record_carries_the_mechanism_set_beside_the_fingerprint():
+    """Read from the repository's record files, which are what the wheel
+    ships; the installed package on a developer box may be an older wheel
+    whose records predate the field."""
+    import glob
+    import json
+
     import tradefloor as tf
-    for name in tf.preset_records():
-        record = tf.preset_record(name)
+    paths = sorted(glob.glob(os.path.join(ROOT, "python", "tradefloor",
+                                          "presets", "*.json")))
+    assert paths
+    for path in paths:
+        with open(path, encoding="utf-8") as f:
+            record = json.load(f)
+        name = record["preset"]
         assert record["fingerprint"] == name
         assert record["schema"] == 1
         jumps = record["mechanisms"]["jumps"]
