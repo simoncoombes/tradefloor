@@ -301,7 +301,13 @@ envelope.
 A run writes its per-day solutions beside its report, so `--render`
 regenerates the report on corrected code without solving again, and a
 resumed run carries its whole record through the checkpoint rather than
-only the prices and the stream positions.
+only the prices and the stream positions. A render that recomputes a
+column leaves the recomputed run beside the report too, so a reader who
+wants the column rather than its median does not pay the 38 minutes
+again. The window a fetch asks for is midnight UTC on the dates it names,
+so the url is a function of the date and not of the machine's zone: a box
+in UTC and a machine four hours west asked for windows four hours apart
+and one close of 25,914 came back 1.13e-06 apart.
 
 ### The prints table
 
