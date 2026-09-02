@@ -27,7 +27,35 @@ and the rows carry the residual by which they miss the joint effect.
 **A shadow run walks the engine along a real year**, solving each day for
 the draws that reproduce its observed closes.
 
+**A mechanism is a specification the engine's Rust is generated from**,
+checked for its draw effect and proven inert at its shipped doses.
+
 <!-- release-note-ends -->
+
+### The mechanism language
+
+`tools/mechanism` holds a declarative specification of one mechanism: its
+dials with defaults, the state it reads and writes, the stream it draws
+from, and a body. A checker types every expression by its draw effect and
+refuses a count that depends on a dial or on state, requires equal effect
+on both branches of a conditional and proposes draw hoisting where they
+differ, and proves the body inert at its defaults by evaluating it with
+uniforms as symbols. Anything it cannot decide is a failure to prove; it
+assumes only that a decided zero absorbs a multiply, because adding zero
+is the identity everywhere except on a field holding negative zero.
+
+An emitter turns a checked mechanism into Rust that uses only the `mathx`
+surface, keeps source order, parenthesises every compound operand, never
+emits `mul_add` and pins recorded constants to their bits, and refuses a
+mechanism the prover rejected. The market and company jump mechanism is
+re-expressed and the body of `Engine::apply_jumps` is generated from it,
+with the known-answer digest as the proof that the emitted Rust is the
+shipped mechanism. The specification's digest covers what the emitter
+reads and leaves out prose it does not, and every declared dose is the
+value a build has.
+
+Preset records gain a mechanism set beside the untouched fingerprint: the
+specification digest, the stream and the doses the preset runs.
 
 ### Implied draws and the shadow run
 
