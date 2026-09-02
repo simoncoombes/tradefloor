@@ -820,6 +820,85 @@ def test_invariance_asked_for_more_days_than_the_fixture_covers_stops_early():
 
 
 # ---------------------------------------------------------------------------
+# invariance(): a pair where one arm stops early, not at the first step
+# ---------------------------------------------------------------------------
+
+
+class _FlakyFinRobot(fr.FinRobotAdapter):
+    """A live-mode `FinRobotAdapter` that answers normally for
+    `good_for` decisions, then raises on every one after -- for the
+    renderer whose `key()` equals `fail_key` only. The real fixture
+    cannot exercise a pair where one arm stops PARTWAY through: a
+    mismatched renderer's text never matches the recording, so it
+    fails on the very first post-fork step, not partway. This is a
+    live agent instead, so it can fail on a specific later call."""
+
+    def __init__(self, *, fail_key: str | None = None, good_for: int = 3,
+                **kwargs) -> None:
+        kwargs.setdefault("mode", "live")
+        kwargs.setdefault("llm_config", {"config_list": [{"model": "none"}]})
+        super().__init__(**kwargs)
+        self.fail_key = fail_key
+        self.good_for = good_for
+        self._calls = 0
+
+    def _ask(self, prompt, key, obs):
+        self._calls += 1
+        if (self.fail_key is not None and self.renderer.key() == self.fail_key
+                and self._calls > self.good_for):
+            raise fr.DecisionError(
+                "scripted failure after good_for decisions")
+        return json.dumps({"actions": [], "rationale": "hold"})
+
+    def fork(self):
+        # `FinRobotAdapter.fork` is hand-written, not `fork_kwargs()`-based
+        # (it does not subclass `common.FrameworkAdapter`), and its
+        # constructor call knows nothing about this subclass's extra
+        # arguments -- overriding `fork_kwargs()` here is silently never
+        # called. `super().fork()` still does the real work (a fresh
+        # `type(self)(...)`, with `history`/`record`/`_decision` copied
+        # over), so this only has to reattach what it drops.
+        twin = super().fork()
+        twin.fail_key = self.fail_key
+        twin.good_for = self.good_for
+        return twin
+
+
+def test_invariance_reports_the_actual_span_when_one_arm_stops_early():
+    """Round 3, the one remaining finding: `compare()` diffs two traces
+    with `zip()`, which silently stops at the shorter one, so a pair
+    where one arm stopped early and the other ran the full span must
+    not be reported as if both covered `days` -- a "never diverged" row
+    is a claim about `days_compared`, not necessarily `days`."""
+    bps = TextRenderer(units="bps")
+    usd = TextRenderer()
+    agent = _FlakyFinRobot(fail_key=bps.key(), good_for=3, fundamentals={})
+    world = small_world(n=4, days=1, agent=agent)
+    fork_step = world.step
+
+    report = invariance(world, [usd, bps], days=8, floor=False)
+
+    assert report.unrecorded == []
+    assert set(report.stopped_early) == {bps.key()}
+    # Stopped after 3 good decisions, not on the first post-fork step.
+    assert report.stopped_early[bps.key()] == \
+        fork_step + agent.good_for * world.steps_per_day
+    assert report.stopped_early[bps.key()] > fork_step
+
+    assert len(report.presentation) == 1
+    assert report.days_compared[(usd.key(), bps.key())] == 3
+    assert len(report.decisions[bps.key()]) == \
+        3 * world.steps_per_day, "the 3 good days are kept, not discarded"
+
+    text = report.render()
+    assert "compared over 3 of 8 days asked for" in text
+
+    pytest.importorskip("pyarrow")
+    table = report.table()
+    assert table.column("days_compared").to_pylist() == [3]
+
+
+# ---------------------------------------------------------------------------
 # invariance(): a scripted agent with a known floor
 # ---------------------------------------------------------------------------
 

@@ -1985,13 +1985,15 @@ class Invariance:
     """
 
     __slots__ = ("renderers", "days", "decisions", "presentation", "floor",
-                "unrecorded", "stopped_early")
+                "unrecorded", "stopped_early", "days_compared")
 
     def __init__(self, *, renderers: Sequence[str], days: int,
                 decisions: dict[str, list], presentation: list[Comparison],
                 floor: "Resample | None",
                 unrecorded: Sequence[str] = (),
-                stopped_early: dict[str, int] | None = None) -> None:
+                stopped_early: dict[str, int] | None = None,
+                days_compared: dict[tuple[str, str], int] | None = None,
+                ) -> None:
         #: The renderer keys :func:`invariance` was called with, in the
         #: order given. `presentation`'s pairs and `decisions`' keys both
         #: name renderers from this list, minus whichever are in
@@ -2054,6 +2056,15 @@ class Invariance:
         #: and :attr:`decisions` keeps what a stopped-early arm measured
         #: rather than discarding it.
         self.stopped_early = dict(stopped_early or {})
+        #: `(control key, treatment key) -> days both arms of that pair
+        #: actually completed`, for every pair in :attr:`presentation`.
+        #: Equal to :attr:`days` unless one side is in
+        #: :attr:`stopped_early`, in which case it is that side's
+        #: shorter count: :func:`compare` diffs two traces with `zip`,
+        #: which silently stops at the shorter one, so a pair's
+        #: :class:`Divergence` reading "never" is a claim about however
+        #: many days this dict says, not necessarily :attr:`days`.
+        self.days_compared = dict(days_compared or {})
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -2064,6 +2075,12 @@ class Invariance:
             "floor": None if self.floor is None else self.floor.as_dict(),
             "unrecorded": list(self.unrecorded),
             "stopped_early": dict(self.stopped_early),
+            # A list of rows, not a dict with a tuple key: tuple keys do
+            # not survive `json.dumps`, and `as_dict()` is meant to.
+            "days_compared": [
+                {"renderer_a": a, "renderer_b": b, "days": n}
+                for (a, b), n in self.days_compared.items()
+            ],
         }
 
     def agreement_rate(self) -> dict[str, float]:
@@ -2128,9 +2145,14 @@ class Invariance:
 
         Columns: `renderer_a`, `renderer_b`, `fork_agreed` (whether
         :func:`agree` found the two arms identical at the fork, before
-        either renderer had rendered a step), and the first post-fork step
-        at which `decision`, `orders`, `prices` and `portfolio` diverged,
-        `None` where they never did over :attr:`days` days.
+        either renderer had rendered a step), `days_compared` (from
+        :attr:`days_compared` -- how many days this ROW actually covers,
+        which is :attr:`days` unless one side is in
+        :attr:`stopped_early`), and the first post-fork step at which
+        `decision`, `orders`, `prices` and `portfolio` diverged, `None`
+        where they never did over `days_compared` days -- NOT necessarily
+        :attr:`days`, and a reader comparing rows across a table where
+        `days_compared` varies is comparing spans of different length.
 
         Lazily imports `pyarrow`, a TEST and TOOLING dependency the library
         itself does not carry; see `tests/test_arrow.py`.
@@ -2146,11 +2168,15 @@ class Invariance:
         rows = []
         for comparison in self.presentation:
             d = comparison.divergence
+            left = comparison.control.get("label", "")
+            right = comparison.treatment.get("label", "")
             rows.append({
-                "renderer_a": comparison.control.get("label", ""),
-                "renderer_b": comparison.treatment.get("label", ""),
+                "renderer_a": left,
+                "renderer_b": right,
                 "fork_agreed": (None if comparison.agreement is None
                                else comparison.agreement.identical),
+                "days_compared": self.days_compared.get(
+                    (left, right), self.days),
                 "decision_diverges_at": d.decision,
                 "orders_diverge_at": d.orders,
                 "prices_diverge_at": d.prices,
@@ -2166,6 +2192,7 @@ class Invariance:
             schema = pa.schema([
                 ("renderer_a", pa.string()), ("renderer_b", pa.string()),
                 ("fork_agreed", pa.bool_()),
+                ("days_compared", pa.int64()),
                 ("decision_diverges_at", pa.int64()),
                 ("orders_diverge_at", pa.int64()),
                 ("prices_diverge_at", pa.int64()),
@@ -2176,17 +2203,22 @@ class Invariance:
         return pa.Table.from_pylist(rows)
 
     def render(self) -> str:
-        out = [f"  invariance over {self.days} days, "
+        out = [f"  invariance over {self.days} days asked for, "
               f"{len(self.renderers)} renderers: "
               + ", ".join(self.renderers)]
         if self.unrecorded:
             out.append(f"  unrecorded (no reply for this text in the "
                        f"transcript): {', '.join(self.unrecorded)}")
         if self.stopped_early:
+            # States what is known -- the step -- and not why: the
+            # renderer's text may never have matched a recording, or a
+            # LIVE call may have raised partway through, and this
+            # function cannot always tell which (see `invariance`'s own
+            # docstring on FinRobot's exception hierarchy).
             stopped = ", ".join(f"{key!r} at step {step}" for key, step
                                 in self.stopped_early.items())
-            out.append(f"  stopped early (ran out of recorded days, "
-                       f"decisions kept up to the stop): {stopped}")
+            out.append(f"  stopped early (no further reply after this "
+                       f"step; decisions kept up to it): {stopped}")
         out.append("")
         for comparison in self.presentation:
             left = comparison.control.get("label", "control")
@@ -2196,6 +2228,11 @@ class Invariance:
                       or comparison.agreement.identical)
                       else "DID NOT AGREE at the fork")
             out.append(f"  {left} vs {right}, {agreed}")
+            covered = self.days_compared.get((left, right), self.days)
+            if covered < self.days:
+                out.append(f"  compared over {covered} of {self.days} "
+                           "days asked for -- one side stopped early; "
+                           "every row below reads over that shorter span")
             out.append(d.render())
             out.append("")
         most = self.most_agreed()
@@ -2416,6 +2453,12 @@ def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
     }
 
     presentation = []
+    # Keyed by (control label, treatment label) -- exactly
+    # `comparison.control["label"]`, `comparison.treatment["label"]` for
+    # the matching `Comparison`, since `World.fork` used the renderer
+    # keys as labels -- so `render()` and `table()` can look this up
+    # from the `Comparison` alone, with nothing extra to keep paired up.
+    days_compared: dict[tuple[str, str], int] = {}
     for i in range(len(renderer_forks)):
         if completed[i] == 0:
             continue
@@ -2424,6 +2467,12 @@ def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
                 continue
             a, b = renderer_forks[i], renderer_forks[j]
             presentation.append(compare(a, b, agreement=agreements[(i, j)]))
+            # `compare()` diffs two traces with `zip()`, which silently
+            # stops at the shorter one -- correct for what it measures,
+            # but a pair where one arm stopped early is compared over
+            # FEWER days than `days`, and nothing about a "never
+            # diverged" row says so without this.
+            days_compared[(keys[i], keys[j])] = min(completed[i], completed[j])
 
     floor_result = None
     if floor:
@@ -2441,5 +2490,5 @@ def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
 
     return Invariance(renderers=keys, days=days, decisions=decisions,
                       presentation=presentation, floor=floor_result,
-                      stopped_early=stopped_early,
-                      unrecorded=unrecorded)
+                      stopped_early=stopped_early, unrecorded=unrecorded,
+                      days_compared=days_compared)
