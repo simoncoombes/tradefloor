@@ -71,9 +71,10 @@ def test_unfiring_a_jump_moves_nothing_before_its_day():
     assert unfired.surgeries == [{
         "kind": "unfire", "day": 4, "step": 4 * STEPS, "stream": "jumps",
         "address": tuple(market[0].address), "value": noise.NO_FIRE,
-        # the record says whether the jump it defeats could have fired;
-        # this preset fires on every day, so it could
-        "intensity": 1.0, "fires": True}]
+        # the record says whether the jump it defeats could have fired,
+        # and whether the surgery can stop it; this preset fires on every
+        # day and one is the highest intensity the surgery can stop
+        "intensity": 1.0, "fires": True, "stoppable": True}]
 
     report = compare(control, unfired, agreement=agreement)
     assert report.divergence.intervention_day == 4
@@ -309,6 +310,7 @@ def test_unfire_records_that_a_zero_intensity_jump_cannot_fire():
     record = shock.surgeries[0]
     assert record["intensity"] == 0.0
     assert record["fires"] is False
+    assert record["stoppable"] is True
     control.run(2)
     shock.run(2)
     # and the arms agree, which is what the record predicted
@@ -324,25 +326,109 @@ def test_unfire_records_that_a_certain_jump_fires():
     record = shock.surgeries[0]
     assert record["intensity"] == 1.0
     assert record["fires"] is True
+    assert record["stoppable"] is True
     control.run(2)
     shock.run(2)
     assert compare(control, shock).divergence.prices is not None
 
 
-def test_the_intensity_is_read_from_the_model_and_the_vix():
-    """Read, not assumed: the coupled form scales the base intensity by
-    the VIX ratio, so a preset that moves either dial moves this."""
+def _fired_on(model, day, *, universe=UNIVERSE):
+    """Whether the market jump of `day` fired, without asking the model.
+
+    The reviewer's oracle: suppress that day's market jump uniform in a
+    fork and see whether prices move two days later, since the jump lands
+    at the close and surfaces at the next open. Uses no intensity and no
+    formula, so it is an independent answer.
+    """
+    base = World(seed=SEED, universe=universe, agent=Buyer(),
+                 steps_per_day=STEPS, ticks_per_step=TICKS,
+                 model=model).run(day)
+    control, suppressed = base.fork("control", "suppressed")
+    suppressed.unfire(day)
+    control.run(2)
+    suppressed.run(2)
+    return compare(control, suppressed).divergence.prices is not None
+
+
+def test_the_intensity_is_the_threshold_the_jump_fires_on():
+    """The engine answers, and the answer is the threshold it uses.
+
+    Held together by behaviour rather than by reading the source: a market
+    uniform patched just under the reported intensity fires and one just
+    over it does not, so an accessor that drifted from `apply_jumps` would
+    fail here.
+    """
     w = world().run(1)
-    model = dict(w.engine.model_params)
-    base = model["jump_intensity_market"]
-    coupling = model["jump_vix_coupling"]
-    anchor = model["market_vol_vix_anchor"]
-    ratio = w.engine.macro_state.vix / anchor
-    want = base * ((1.0 - coupling) + coupling * ratio * ratio)
-    assert w._market_jump_intensity() == want
-    assert 0.0 < want < 1.0
-    w.unfire(1)
-    assert w.surgeries[0]["fires"] is None
+    intensity = w.engine.market_jump_intensity()
+    assert 0.0 < intensity < 1.0
+    for offset, expect_move in ((-1e-9, True), (+1e-9, False)):
+        probe = world().run(1)
+        address = probe._jump_address(1)
+        control, patched = probe.fork("control", "patched")
+        noise.patch_draws(patched.engine, [
+            noise.Patch(address, intensity + offset)])
+        noise.patch_draws(control.engine, [
+            noise.Patch(address, noise.NO_FIRE)])
+        control.run(3)
+        patched.run(3)
+        moved = compare(control, patched).divergence.prices is not None
+        assert moved is expect_move, (offset, intensity)
+
+
+def test_fires_agrees_with_whether_the_jump_fired():
+    """`fires` against the oracle, at four intensities.
+
+    Zero cannot fire and one fires on every day, which is what the record
+    claims outright. Between them the draw decides it and the record says
+    None rather than guessing.
+    """
+    seen = {}
+    for intensity in (0.0, 0.25, 0.5, 1.0):
+        model = tf.ModelParams.from_preset(
+            "pt-v16", jump_intensity_market=intensity,
+            jump_vix_coupling=0.0)
+        w = world(model).run(1)
+        assert w.engine.market_jump_intensity() == intensity
+        w.unfire(1)
+        record = w.surgeries[0]
+        fired = _fired_on(model, 1)
+        seen[intensity] = (record["fires"], fired)
+        if record["fires"] is not None:
+            assert record["fires"] is fired, intensity
+    assert seen[0.0] == (False, False)
+    assert seen[1.0] == (True, True)
+    # and the two in between are not claimed either way
+    assert seen[0.25][0] is None and seen[0.5][0] is None
+
+
+def test_an_intensity_above_one_cannot_be_stopped_and_says_so():
+    """The value installed is 1.0 and the engine fires on `u < intensity`,
+    so above one the surgery's own value is under the threshold: the jump
+    fires in both arms and the arm comes back identical to its control."""
+    model = tf.ModelParams.from_preset("pt-v16",
+                                       jump_intensity_market=1.5,
+                                       jump_vix_coupling=0.0)
+    base = world(model).run(1)
+    control, unfired = base.fork("control", "unfired")
+    unfired.unfire(1)
+    record = unfired.surgeries[0]
+    assert record["intensity"] == 1.5
+    assert record["fires"] is True
+    assert record["stoppable"] is False
+    control.run(3)
+    unfired.run(3)
+    assert compare(control, unfired).divergence.prices is None
+    # at one and below the surgery bites
+    stoppable = tf.ModelParams.from_preset("pt-v16",
+                                           jump_intensity_market=1.0,
+                                           jump_vix_coupling=0.0)
+    base = world(stoppable).run(1)
+    control, unfired = base.fork("control", "unfired")
+    unfired.unfire(1)
+    assert unfired.surgeries[0]["stoppable"] is True
+    control.run(3)
+    unfired.run(3)
+    assert compare(control, unfired).divergence.prices is not None
 
 
 # -- the day a surgery may name ----------------------------------------------

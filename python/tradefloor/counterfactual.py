@@ -829,8 +829,8 @@ class World:
 
         # Whether the jump would have fired
 
-        The record carries ``intensity``, the market jump intensity read
-        from the model at the moment of the call, and ``fires``. An
+        The record carries ``intensity``, which the ENGINE reports for
+        its own dials and its current VIX, and ``fires``. An
         intensity of zero makes ``u < intensity`` false for every ``u`` in
         ``[0, 1)``, so the jump cannot fire and ``fires`` is ``False``: the
         surgery is a no-op and the record says so, rather than leaving an
@@ -844,6 +844,16 @@ class World:
         it is the intensity of today rather than of ``day``, and only the
         zero case is exact for both, since a zero intensity stays zero
         whatever the VIX does.
+
+        # What it cannot stop, and says
+
+        ``stoppable`` is false above an intensity of one. The value
+        installed is ``1.0`` and the engine fires on ``u < intensity``, so
+        at an intensity above one the installed value is itself under the
+        threshold: the jump fires in the surgery's arm as well and the arm
+        comes back identical to its control. Reported rather than left as
+        a record saying ``fires`` with nothing to show for it. No shipped
+        preset sets an intensity above one.
         """
         self._refuse_open_market("unfire")
         day = int(day)
@@ -857,7 +867,11 @@ class World:
                            [_noise.Patch(address, _noise.NO_FIRE)])
         self.engine.trace_draws("jumps", day, day)
         self._expect(day, address, _noise.NO_FIRE, "jump_market_u")
-        intensity = self._market_jump_intensity()
+        # Asked of the engine, not restated here. A Python copy of the
+        # scaling diverged from the engine on a zero anchor, and the test
+        # that guarded it wrote the formula a third time and compared two
+        # Python copies.
+        intensity = float(self.engine.market_jump_intensity())
         fires: bool | None
         if intensity <= 0.0:
             fires = False
@@ -865,33 +879,17 @@ class World:
             fires = True
         else:
             fires = None
+        # The value installed is 1.0 and the engine fires on `u < intensity`,
+        # so above an intensity of one the installed value is itself under
+        # the threshold and the jump fires in the surgery's arm too.
+        stoppable = intensity <= 1.0
         self.surgeries.append({
             "kind": "unfire", "day": day, "step": day * self.steps_per_day,
             "stream": "jumps", "address": tuple(address),
             "value": _noise.NO_FIRE,
-            "intensity": intensity, "fires": fires})
+            "intensity": intensity, "fires": fires,
+            "stoppable": stoppable})
         return self
-
-    def _market_jump_intensity(self) -> float:
-        """The market jump intensity this engine is running, right now.
-
-        The mechanism reads ``jump_intensity_market`` and, where
-        ``jump_vix_coupling`` is not zero, scales it by
-        ``(1 - coupling) + coupling * ratio * ratio`` for
-        ``ratio = vix / market_vol_vix_anchor``. Read from the model and
-        the macro state rather than assumed, so a preset that moves either
-        dial moves this with it.
-        """
-        model = dict(self.engine.model_params)
-        base = float(model.get("jump_intensity_market", 0.0))
-        coupling = float(model.get("jump_vix_coupling", 0.0))
-        if coupling == 0.0:
-            return base
-        anchor = float(model.get("market_vol_vix_anchor", 0.0))
-        if anchor == 0.0:
-            return base
-        ratio = float(self.engine.macro_state.vix) / anchor
-        return base * ((1.0 - coupling) + coupling * ratio * ratio)
 
     def window(self, stream: str, days: Any, surgery_seed: int) -> "World":
         """Re-randomise ``stream`` over ``days`` under a surgery generator.
