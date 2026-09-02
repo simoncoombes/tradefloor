@@ -398,11 +398,11 @@ def every_tracked_file() -> list[str]:
 
 
 def test_no_tracked_file_carries_a_control_byte():
-    """Any byte below 0x20 outside tab, newline and carriage return.
+    """Any byte below 0x20 outside tab, newline and carriage return, and DEL.
 
-    At `f47c149` this walk reads 592 files and reports nothing, so the rule
-    arrives green over the whole tree rather than over a list chosen to make
-    it pass.
+    At `f47c149` this walk reads 592 files and reports nothing, for the C0
+    range and for DEL alike, so the rule arrives green over the whole tree
+    rather than over a list chosen to make it pass.
     """
     findings, seen, undecodable = [], [], []
     for path in every_tracked_file():
@@ -463,10 +463,12 @@ def test_the_walk_would_catch_a_control_byte(tmp_path):
 def test_the_ascii_punctuation_rule_does_not_see_a_control_byte():
     """Why this rule is separate from the one beside it.
 
-    `NON_ASCII_PUNCTUATION` lists five characters above 127. A backspace is
-    below 128, so a file holding one satisfies that rule completely. The two
-    rules cover different things and neither implies the other.
+    `NON_ASCII_PUNCTUATION` lists five characters above 127. A backspace and
+    a DEL are both below 128, so a file holding either satisfies that rule
+    completely. The two rules cover different things and neither implies the
+    other.
     """
-    line = f"a line with a {chr(8)} byte in it"
-    assert not [ch for ch in NON_ASCII_PUNCTUATION if ch in line]
-    assert prose.control_bytes("f.md", line)
+    for code in (0x08, 0x7F):
+        line = f"a line with a {chr(code)} byte in it"
+        assert not [ch for ch in NON_ASCII_PUNCTUATION if ch in line]
+        assert prose.control_bytes("f.md", line), f"0x{code:02X}"

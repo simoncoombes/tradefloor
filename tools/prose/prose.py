@@ -14,9 +14,10 @@ Every rule reports the file, the line and the text, so a failure is
 actionable rather than a score.
 
 One rule here is not about style. `control_bytes` reads the raw file and
-reports any byte below 0x20 outside tab, newline and carriage return. Such
-a byte is invisible in an editor, in a diff and in a review, and it passes
-every check that asks whether a file is ASCII, because 0x08 is below 128.
+reports any byte below 0x20 outside tab, newline and carriage return, and
+DEL at 0x7F. Such a byte is invisible in an editor, in a diff and in a
+review, and it passes every check that asks whether a file is ASCII,
+because every one of them is ASCII.
 """
 
 from __future__ import annotations
@@ -54,6 +55,17 @@ SIGNIFICANCE = [
 #: regex in a test made that assertion match nothing while the suite
 #: reported green, which is what this rule exists to catch.
 ALLOWED_CONTROL = frozenset({0x09, 0x0A, 0x0D})
+
+#: DEL. It sits above the printable range rather than below it, so a rule
+#: written as "below 0x20" passes it, and it is as invisible as a backspace
+#: and as ASCII. Its own constant, so the rule below reads as the two places
+#: a control character hides rather than as one range with an exception.
+DEL = 0x7F
+
+
+def is_control(code: int) -> bool:
+    """The rule: C0 outside tab, newline and return, and DEL."""
+    return (code < 0x20 and code not in ALLOWED_CONTROL) or code == DEL
 
 #: Definition by negation.
 NEGATION = [
@@ -174,14 +186,14 @@ def control_bytes(label: str, text: str) -> list[str]:
     The reported excerpt goes through `repr`, so the byte appears as `\\x08`
     rather than being written to a terminal that would act on it.
 
-    The rule covers 0x00 to 0x1F. 0x7F is equally invisible and is outside
-    it, so a DEL byte passes this check today.
+    The rule covers 0x00 to 0x1F, tab, newline and carriage return excepted,
+    and DEL at 0x7F. See `is_control`.
     """
     out: list[str] = []
     line, col = 1, 1
     for i, ch in enumerate(text):
         code = ord(ch)
-        if code < 0x20 and code not in ALLOWED_CONTROL:
+        if is_control(code):
             out.append(f"{label}:{line}: control byte 0x{code:02X} at column "
                        f"{col}: {text[max(0, i - 8):i + 9]!r}")
         if ch == "\n":

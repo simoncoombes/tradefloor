@@ -189,21 +189,50 @@ def test_tab_newline_and_return_are_allowed(tmp_path):
 
 
 def test_the_rule_covers_the_range_it_claims():
-    """Every byte from 0x00 to 0x1F, tab, newline and return excepted.
+    """Every byte from 0x00 to 0x1F, tab, newline and return excepted, and
+    DEL at 0x7F.
 
     Stated over the whole range rather than on one example, because a rule
     written for the backspace that prompted it would pass the next byte.
     """
-    from prose import ALLOWED_CONTROL, control_bytes  # noqa: PLC0415
+    from prose import ALLOWED_CONTROL, DEL, control_bytes  # noqa: PLC0415
 
     assert ALLOWED_CONTROL == {0x09, 0x0A, 0x0D}
-    for code in range(0x00, 0x20):
+    assert DEL == 0x7F
+    for code in [*range(0x00, 0x20), DEL]:
         findings = control_bytes("f.md", f"text {chr(code)} more text")
         if code in ALLOWED_CONTROL:
             assert not findings, f"0x{code:02X} should be allowed"
         else:
             assert len(findings) == 1, f"0x{code:02X} went unreported"
             assert f"0x{code:02X}" in findings[0]
+
+
+def test_del_is_reported_although_it_is_not_below_0x20():
+    """The byte a range written as "below 0x20" passes.
+
+    DEL sits above the printable characters, so a rule phrased as a single
+    lower range misses it, and it is as invisible and as ASCII as the
+    backspace that prompted this one.
+    """
+    from prose import control_bytes  # noqa: PLC0415
+
+    findings = control_bytes("f.md", f"a line with a {chr(0x7F)} in it")
+    assert len(findings) == 1, findings
+    assert "control byte 0x7F" in findings[0]
+
+
+def test_printable_ascii_and_ordinary_text_report_nothing():
+    """The other side of the boundary, so the rule cannot be vacuously wide.
+
+    0x20 is the space and 0x7E is the tilde, and both bound the printable
+    range this rule must leave alone.
+    """
+    from prose import control_bytes  # noqa: PLC0415
+
+    printable = "".join(chr(c) for c in range(0x20, 0x7F))
+    assert not control_bytes("f.md", printable)
+    assert not control_bytes("f.md", "Ordinary prose, with punctuation.")
 
 
 def test_the_published_prose_carries_no_control_byte():
