@@ -319,10 +319,12 @@ def solve(forward: Forward, r_obs: np.ndarray, jumps: list, x0: np.ndarray,
                 x, r, cost = x_new, r_new, cost_new
                 lam = max(lam / 3, 1e-6)
                 accepted = True
-                # converged: the posterior stopped moving, which is the
-                # optimiser's claim; whether the closes were reached is a
-                # separate question the residual answers
-                converged = improvement < tol
+                # converged: a near Gauss-Newton step (small damping) moved
+                # the posterior by less than tol, which is the optimiser's
+                # claim; a small step taken under heavy damping is not one.
+                # Whether the closes were reached is a separate question the
+                # residual answers.
+                converged = improvement < tol and lam <= 1e-3
                 break
             lam *= 10
         if not accepted:
@@ -355,8 +357,7 @@ def solve_day(forward: Forward, r_obs: np.ndarray, intensities: tuple,
         def jumps_m(tail):
             return forward.jump_patches(float(tail[0]), fired)
         trial = solve(forward, r_obs, jumps_m, np.append(best["x"][:m0], 0.0),
-                      extra=1, sigma=sigma, J0=base["jacobian"][:, :m0],
-                      restarts=0)
+                      extra=1, sigma=sigma, J0=base["jacobian"][:, :m0])
         cost = trial["cost"] - math.log(p_market) - forward.n * math.log(1 - p_idio)
         if cost < best_cost:
             best, best_cost, fired_market = trial, cost, float(trial["x"][-1])
@@ -379,7 +380,7 @@ def solve_day(forward: Forward, r_obs: np.ndarray, intensities: tuple,
                                  [fired_market] if fired_market is not None else [],
                                  [0.0]])
             trial = solve(forward, r_obs, jumps_i, x0, extra=extra, sigma=sigma,
-                          J0=best["jacobian"][:, :len(x0) - 1], restarts=0)
+                          J0=best["jacobian"][:, :len(x0) - 1])
             n_fired = len(tried)
             cost = (trial["cost"]
                     - (math.log(p_market) if fired_market is not None else math.log(1 - p_market))
