@@ -19,11 +19,11 @@ every test that only needs to read its output.
 from __future__ import annotations
 
 import importlib.util
-import json
 import subprocess
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -149,16 +149,33 @@ def test_running_export_twice_is_fully_deterministic(tmp_path):
     assert w1.card["day_ledger_root"] == w2.card["day_ledger_root"]
 
 
-def test_written_files_carry_no_carriage_return(toy_written):
-    # The defect `tests/test_portable_writes.py` exists to catch
-    # elsewhere in this library: a text file written through Python's
-    # text mode gains a CRLF on Windows and hashes differently from the
-    # same file written on Linux. manifest.json, ledger.json and card.md
-    # are all written through `export._write_text`, which encodes and
-    # writes bytes for exactly this reason.
+def test_written_files_carry_no_carriage_return(toy_written, tmp_path):
+    """The defect `tests/test_portable_writes.py` exists to catch
+    elsewhere in this library: a text file written through Python's text
+    mode gains a CRLF on Windows and hashes differently from the same
+    file written on Linux. manifest.json, ledger.json and card.md are
+    all written through `export._write_text`, which encodes and writes
+    bytes for exactly this reason.
+
+    manifest.json and ledger.json are single-line canonical JSON and
+    carry no ``\\n`` at all, so a CR check against them cannot fail for
+    this defect -- there is no newline for text mode to turn into a
+    CRLF. card.md is genuinely multi-line, so it is checked here too,
+    built directly with :func:`export.card` rather than through the
+    CLI, and read with ``read_bytes`` rather than ``read_text`` --
+    ``read_text`` normalises ``\\r\\n`` back to ``\\n`` on read, on the
+    same machine that would have written it, which is the exact masking
+    case ``_write_bytes``'s own docstring names as not being evidence.
+    """
     cr = chr(13).encode("ascii")
     for name in ("manifest", "ledger"):
         assert cr not in toy_written.files[name].read_bytes()
+
+    card_path = tmp_path / "card.md"
+    text = export.card([toy_written])
+    assert "\n" in text, "card.md must be multi-line for this check to mean anything"
+    export._write_text(card_path, text)
+    assert cr not in card_path.read_bytes()
 
 
 # --------------------------------------------------------------------------
@@ -223,6 +240,48 @@ def test_labels_regime_decomposes_into_a_cycle_name_and_the_crisis_flag(
         assert regime.endswith("-crisis") == crisis, (
             f"day {day}: regime {regime!r}, universe_stress "
             f"{stress_by_day[day]}")
+
+
+def test_labels_regime_shows_the_crisis_suffix_exactly_on_crisis_days(
+    tmp_path,
+):
+    """``toy_written``'s twenty days never enter a crisis (this module's
+    docstring states every regime read ``expansion`` in that window), so
+    the test above cannot tell a ``_regime`` that always drops the
+    ``-crisis`` suffix from a correct one -- the equality it checks is
+    vacuously true when ``crisis`` is False on every row. This drives a
+    VIX shock into a real crisis window and checks both directions on a
+    single run: the suffix present on every crisis day, and absent on
+    every day that is not, so neither "always append" nor "never append"
+    can pass it.
+    """
+    universe = tf.Universe.random(6, seed=3)
+    scenario = tf.Scenario("crisis-toy").shock(
+        "macro.vix", operation="add", value=60.0, at=3, duration=4)
+    written = export.export(1, universe=universe, days=15,
+                            scenario=scenario, model="pt-v16", out=tmp_path)
+    labels = pa.ipc.open_file(written.files["labels"]).read_all()
+    macro = pa.ipc.open_file(written.files["macro"]).read_all()
+    stress_by_day = dict(zip(macro.column("day").to_pylist(),
+                             macro.column("universe_stress").to_pylist()))
+
+    crisis_days = {d for d, s in stress_by_day.items() if s > 0.0}
+    calm_days = {d for d, s in stress_by_day.items() if s == 0.0}
+    assert crisis_days, "the shock produced no crisis day; strengthen it"
+    assert calm_days, "the shock left no calm day to contrast against"
+
+    for day, regime in zip(labels.column("day").to_pylist(),
+                           labels.column("regime").to_pylist()):
+        if day in crisis_days:
+            assert regime.endswith("-crisis"), (
+                f"day {day} has universe_stress "
+                f"{stress_by_day[day]} but regime {regime!r} carries no "
+                "-crisis suffix")
+        else:
+            assert not regime.endswith("-crisis"), (
+                f"day {day} is calm (universe_stress "
+                f"{stress_by_day[day]}) but regime {regime!r} carries a "
+                "spurious -crisis suffix")
 
 
 def test_scenario_firing_counts_what_scenario_apply_returns(tmp_path):
@@ -409,6 +468,73 @@ def test_the_worker_pool_never_exceeds_the_requested_width():
     assert state["peak"] >= 2, (
         "no overlap was observed; this run cannot tell a bounded window "
         "apart from an accidentally serial one")
+
+
+def test_the_deque_itself_bounds_outstanding_submissions(monkeypatch):
+    """The test above cannot tell `_run_batch`'s own bounded-deque logic
+    (`export.py`, ``if len(pending) == workers: break``) apart from
+    ``ThreadPoolExecutor(max_workers=workers)`` alone doing the job: both
+    are set to the SAME ``workers`` value, so a mutation to either one
+    alone leaves the other still capping peak concurrency at 3, and the
+    test above still passes.
+
+    This isolates the deque by replacing ``ThreadPoolExecutor`` with a
+    wrapper whose own concurrency cap is twenty times wider, so nothing
+    but `_run_batch`'s own submission logic can be bounding how many
+    futures are SUBMITTED-BUT-NOT-YET-COLLECTED at once -- the quantity
+    that actually determines how many of `export`'s in-progress tables
+    can be resident, since a future submitted but not started still holds
+    its result once the call finishes, until `.result()` is read.
+    """
+    outstanding = {"current": 0, "peak": 0}
+    lock = threading.Lock()
+
+    class _CountingFuture:
+        def __init__(self, inner):
+            self._inner = inner
+
+        def result(self, *args, **kwargs):
+            try:
+                return self._inner.result(*args, **kwargs)
+            finally:
+                with lock:
+                    outstanding["current"] -= 1
+
+    class _WideExecutor:
+        """`_run_batch`'s own interface (`submit`, a context manager),
+        wrapping a real pool at twenty times the requested width so its
+        cap is never what binds concurrency."""
+
+        def __init__(self, max_workers: int) -> None:
+            self._inner = ThreadPoolExecutor(max_workers=max_workers * 20)
+
+        def submit(self, fn, *args):
+            with lock:
+                outstanding["current"] += 1
+                outstanding["peak"] = max(outstanding["peak"],
+                                          outstanding["current"])
+            return _CountingFuture(self._inner.submit(fn, *args))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc_info):
+            return self._inner.__exit__(*exc_info)
+
+    monkeypatch.setattr(export, "ThreadPoolExecutor", _WideExecutor)
+
+    def slow(seed: int) -> int:
+        time.sleep(0.03)
+        return seed
+
+    seeds = list(range(1, 9))
+    results = export._run_batch(seeds, slow, workers=3)
+    assert results == seeds
+    assert outstanding["peak"] <= 3, (
+        f"{outstanding['peak']} futures were outstanding at once against "
+        "a requested width of 3, with the executor's own cap widened out "
+        "of the way -- the deque's own backpressure is not bounding "
+        "submission")
 
 
 def test_the_worker_pool_refuses_zero_workers():
