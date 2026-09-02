@@ -13,6 +13,7 @@ sector names. The index is ^GSPC and the fear index ^VIX.
 """
 from __future__ import annotations
 
+import calendar
 import json
 import os
 import time
@@ -59,7 +60,18 @@ YEARS = {"calm": ("2015-10-01", "2018-01-01"),
 
 
 def epoch(day: str) -> int:
-    return int(time.mktime(time.strptime(day, "%Y-%m-%d")))
+    """Midnight UTC on ``day``, as a Unix timestamp.
+
+    In UTC, because the value goes into the url a report prints as its
+    provenance, and `time.mktime` reads midnight in the machine's own
+    zone. A box in UTC and a machine four hours west of it asked for
+    windows four hours apart and Yahoo answered with the same sessions at
+    a different float rounding: one Visa close came back 67.53675 on one
+    and 67.53683 on the other, 1.13e-06 relative, which reaches the
+    recompute through the universe it builds and the observed returns it
+    differences.
+    """
+    return calendar.timegm(time.strptime(day, "%Y-%m-%d"))
 
 
 def fetch(symbol: str, start: str, end: str) -> dict:

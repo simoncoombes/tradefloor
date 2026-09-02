@@ -1130,8 +1130,12 @@ def render(run: dict) -> str:
     vm = np.array([d["vix_model"] for d in days])
     vr = np.array([d["vix_real"] for d in days])
     gap = vm - vr
+    # The marker is a noun phrase because the title is a heading and the
+    # house style governs it: "PARTIAL, the run was still going" carried a
+    # comma and a finite verb, and prose.py read the report at two
+    # findings for the title alone.
     lines = [f"# Shadow run: {run['year']} ({run['args']['year']})"
-             + (" PARTIAL, the run was still going" if run.get("partial") else ""),
+             + (f" (partial record of {N} days)" if run.get("partial") else ""),
              "", "## Days short of their closes", ""]
     if not failed:
         lines.append(f"Every one of the {N} days reached its observed closes "
@@ -1392,6 +1396,7 @@ def main(argv=None) -> int:
         # saved per-day solutions unless the caller says otherwise. The
         # panel the run used has to be readable, which is what the archive
         # beside it is for.
+        recomputed = False
         if not saved["provenance"].get("solver") and not args.no_recompute:
             print("  recomputing the sensitivity and the clamp from "
                   f"{len(saved['days'])} saved days", flush=True)
@@ -1400,10 +1405,27 @@ def main(argv=None) -> int:
                 saved, realdata.load(saved["args"]["year"]))
             print(f"  recomputed in {time.time() - started:.0f} s",
                   flush=True)
+            recomputed = True
         text = render(saved)
         name = "shadow-partial.md" if saved.get("partial") else "shadow.md"
         with open(os.path.join(args.out, name), "w", encoding="utf-8") as f:
             f.write(text)
+        if recomputed:
+            # The recomputed columns cost 9.2 s a day to produce and the
+            # report prints a median and a count of them, so a reader who
+            # wants the column itself would pay for the whole year again.
+            # The run is already in memory, so it is written beside the
+            # report, under a temporary name first for the reason the
+            # solver writes that way. Its own name, rather than the saved
+            # run's, because `--out` is allowed to be the directory the
+            # run was read from and a render must not overwrite its input.
+            out = os.path.join(
+                args.out, "shadow-partial-recomputed.json"
+                if saved.get("partial") else "shadow-recomputed.json")
+            with open(out + ".tmp", "w", encoding="utf-8") as f:
+                json.dump(saved, f)
+            os.replace(out + ".tmp", out)
+            print(f"  wrote the recomputed run to {out}", flush=True)
         sys.stdout.write(text)
         return 0
     if not args.lab and args.year is None:
