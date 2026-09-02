@@ -34,6 +34,47 @@ the crisis values occupy a narrower range than the control values, and run
 figure sits below the other three controls. We do not know why the model
 produced that trajectory.
 
+## Liquidity's share of the print
+
+Both arms also run with the depth counterfactual on. It settles every open
+tick a second time against every resting level, under the same four
+uniforms and from the same book state, so the two prints differ only where
+the depth bound was reached. It takes no draw and its fills reach no
+company field, so the arms above are the same arms and their exposure
+numbers are the same numbers.
+
+| arm | prints | depth reached | median share | negative | mean \|absorbed\| |
+|---|---:|---:|---:|---:|---:|
+| control | 9,360 | 71, or 0.76% | -1.002 | 62 of 71 | 23.3 bps |
+| crisis | 9,360 | 191, or 2.04% | -1.002 | 172 of 191 | 34.7 bps |
+
+`market.liquidity` at 40% is a claim about depth, and these columns read it
+back off the tape. The crisis changes how OFTEN flow runs out of book
+rather than how far it goes when it does: 2.7 times as many prints reach
+the end of the quoted depth, at the same median share. The mean distance
+from the model price to the print rises with that count.
+
+The share is negative because the depth bound truncates a walk. An order
+that exhausts a shallow book stops there, while against every resting level
+it keeps filling and prints further from where it started, so the real
+print sits between the last print and the unbounded one. A share of -1.0
+says the deeper book would have moved the price twice as far, since the
+unbounded move is `1 - share` times the printed one.
+
+The absorption column is a distance and is reported as one, because
+absorption is signed with the move and the signed mean cancels to -0.4
+basis points across up and down ticks. It carries the circuit breaker
+alongside the book, and the `clamp` column is the breaker's own part of it.
+Neither arm halted a name on this day: `clamp` is zero on all 9,360 rows of
+each, so both figures above are the book alone. The counterfactual prints
+one tick from the real state, so it says nothing about what a deeper book
+would have done to the tick after.
+
+Measured on day 39, the last day of the post-fork window, over 390 ticks
+and the twenty-four names drawn from `data/edgar-2026-08-31.json`. Seed
+4242, universe seed 4242, preset `pt-v16`, at commit `679ef3d`. The
+notebook prints this table from `ex.depth_readings(worlds)`.
+
 ## Reading it
 
 `notebook.ipynb` carries its output, so it reads on GitHub without a

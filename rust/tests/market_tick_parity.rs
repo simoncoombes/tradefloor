@@ -291,6 +291,8 @@ fn check_scenario(file: &str) {
                 // variance process and pin behaviour at its baseline level.
                 market_sigma_daily: MARKET_FACTOR_SIGMA,
                 settle_draws: SettleDrawPolicy::FourOrZero,
+                // The depth counterfactual, off. It reaches no company field.
+                settle_depth_counterfactual: false,
                 // The shipped preset: the parity contract is against the
                 // reference model, which is what PT_V1 carries.
                 params: &tradefloor::params::PT_V1,

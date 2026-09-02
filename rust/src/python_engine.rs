@@ -511,6 +511,25 @@ impl PyEngine {
         self.day_buffer
             .anchor
             .extend_from_slice(&self.buffer.anchor[..n]);
+        self.day_buffer
+            .shock
+            .extend_from_slice(&self.buffer.shock[..n]);
+        self.day_buffer
+            .absorbed
+            .extend_from_slice(&self.buffer.absorbed[..n]);
+        self.day_buffer
+            .clamp
+            .extend_from_slice(&self.buffer.clamp[..n]);
+        // Appended only when the session actually carried the arm, so a day
+        // that ran without it holds an EMPTY pair rather than a padded one.
+        if !self.buffer.unbounded_print.is_empty() {
+            self.day_buffer
+                .unbounded_print
+                .extend_from_slice(&self.buffer.unbounded_print[..n]);
+            self.day_buffer
+                .liquidity_share
+                .extend_from_slice(&self.buffer.liquidity_share[..n]);
+        }
         for k in 0..8 {
             self.day_buffer.components[k]
                 .extend_from_slice(&self.buffer.components[k][..n]);
@@ -704,6 +723,18 @@ struct DayBuffer {
     fundamental: Vec<f64>,
     anchor: Vec<f64>,
     components: [Vec<f64>; 9],
+    shock: Vec<f64>,
+    absorbed: Vec<f64>,
+    clamp: Vec<f64>,
+    /// Empty on a day whose sessions ran without the depth counterfactual.
+    ///
+    /// A session that ran with it appends; one that did not appends nothing.
+    /// A day whose sessions disagree therefore ends SHORT, and `prints`
+    /// reports that day without the two columns rather than serving a column
+    /// that stops part way through it. `settle_depth_counterfactual` is
+    /// documented as a setting to choose before a run for this reason.
+    unbounded_print: Vec<f64>,
+    liquidity_share: Vec<f64>,
 }
 
 impl DayBuffer {
@@ -714,6 +745,11 @@ impl DayBuffer {
         self.mispricing.clear();
         self.fundamental.clear();
         self.anchor.clear();
+        self.shock.clear();
+        self.absorbed.clear();
+        self.clamp.clear();
+        self.unbounded_print.clear();
+        self.liquidity_share.clear();
         for column in self.components.iter_mut() {
             column.clear();
         }
@@ -2763,6 +2799,11 @@ impl PyEngine {
             fundamental: self.day_buffer.fundamental.clone(),
             anchor: self.day_buffer.anchor.clone(),
             components: std::array::from_fn(|k| self.day_buffer.components[k].clone()),
+            shock: self.day_buffer.shock.clone(),
+            absorbed: self.day_buffer.absorbed.clone(),
+            clamp: self.day_buffer.clamp.clone(),
+            unbounded_print: self.day_buffer.unbounded_print.clone(),
+            liquidity_share: self.day_buffer.liquidity_share.clone(),
         });
         let e = self.inner.economy();
         self.recorded_macro.push(crate::python_arrow::MacroRow {
@@ -2838,6 +2879,11 @@ impl PyEngine {
                 fundamental: Vec::new(),
                 anchor: Vec::new(),
                 components: std::array::from_fn(|_| Vec::new()),
+                shock: Vec::new(),
+                absorbed: Vec::new(),
+                clamp: Vec::new(),
+                unbounded_print: Vec::new(),
+                liquidity_share: Vec::new(),
             }]
         } else {
             self.select_recorded(day)?
@@ -2965,6 +3011,171 @@ impl PyEngine {
         Ok(crate::python_arrow::PyArrowStream::new(
             "truth",
             crate::python_arrow::truth_schema(),
+            batches,
+        ))
+    }
+
+    /// Settle every open tick a second time against unbounded depth.
+    ///
+    /// Off by default. With it on, `prints()` carries `unbounded_print` and
+    /// `liquidity_share`: what the same tick would have printed against every
+    /// resting level, under the same four uniforms and from the same book
+    /// state, and how much of the print's move that difference accounts for.
+    ///
+    /// The market does not change. The second settlement runs on its own
+    /// book, takes no draw, and its fills reach no company field, so the
+    /// known-answer digest is the same digest with the arm on. What it costs
+    /// is roughly one settlement per active company per open tick, which is
+    /// the largest single item in a tick.
+    ///
+    /// Set it before the FIRST session of a day. A day whose sessions
+    /// disagree records fewer counterfactual values than it has rows, and
+    /// `prints()` drops both columns for that whole day rather than serving
+    /// one with a gap in it. The table's schema caveat names that case, so a
+    /// caller who switched the arm mid-day is told why the columns are gone
+    /// rather than being told to do what they just did. Days that disagree
+    /// with EACH OTHER are a different matter and raise.
+    ///
+    /// The run log does not carry it, because the log carries INPUTS and this
+    /// is not one: no draw, no price and no company field depends on it. A
+    /// replay therefore rebuilds the same market and the same `shock` and
+    /// `absorbed` columns, and rebuilds the arm only if it is asked for
+    /// again.
+    #[pyo3(signature = (on = true))]
+    fn settle_depth_counterfactual(&mut self, on: bool) {
+        self.inner.set_settle_depth_counterfactual(on);
+    }
+
+    /// The `prints` table: how each print was arrived at.
+    ///
+    /// `truth` says what moved fair value. This says what happened between
+    /// fair value and the tape: `shock` is the log distance from the last
+    /// print to the model price, `absorbed` is the log distance from the
+    /// model price to the print, and the two sum to the print's own log move.
+    ///
+    ///   `prints()`        every recorded day, one batch each
+    ///   `prints(day=N)`   that day alone
+    ///
+    /// `absorbed` is measured to the PRINTED price, so it carries the second
+    /// circuit breaker as well as the book. `clamp` is the breaker's own
+    /// part of it, and `absorbed - clamp` is the book's.
+    ///
+    /// Read them apart. On every clamped print measured, the book and the
+    /// breaker pull opposite ways, and on roughly three fifths of them they
+    /// cancel to the last bit, so `absorbed` alone reads exactly zero on a
+    /// name the breaker had just moved 513 basis points -- the same value it
+    /// takes on a tick that never settled. `clamp` is what tells those two
+    /// rows apart.
+    ///
+    /// `unbounded_print` and `liquidity_share` are present only when
+    /// `settle_depth_counterfactual(True)` was set before the run, and the
+    /// schema metadata says which case the table is. Asking for several days
+    /// that disagree raises rather than dropping the columns, because a table
+    /// whose meaning changes half way down is worse than an error.
+    ///
+    /// `liquidity_share` is NEGATIVE on most rows that carry one, because
+    /// the depth bound truncates a walk rather than adding to it: an order
+    /// that exhausts a shallow book stops there, while against every resting
+    /// level it keeps filling and prints further out. The unbounded move is
+    /// `1 - liquidity_share` times the printed move.
+    #[pyo3(signature = (*, day = None))]
+    fn prints(&self, day: Option<u32>) -> PyResult<crate::python_arrow::PyArrowStream> {
+        use crate::python_arrow::DepthColumns;
+        // Which of the three shapes a set of buffers is in. A column the
+        // length of the table is the arm; an empty one is no arm; anything
+        // between is a day whose sessions disagreed, and that day is served
+        // WITHOUT the columns rather than with a gap in them.
+        let state = |len: usize, rows: usize| {
+            if len == 0 || rows == 0 {
+                DepthColumns::Absent
+            } else if len >= rows {
+                DepthColumns::Present
+            } else {
+                DepthColumns::PartialDay
+            }
+        };
+        let ran = |s: DepthColumns| match s {
+            DepthColumns::Present => "with",
+            DepthColumns::Absent => "without",
+            DepthColumns::PartialDay => "part way through",
+        };
+
+        let (batches, depth) = if self.recorded.is_empty() {
+            let ticks = self.buffer.ticks_written;
+            let instruments = self.buffer.companies;
+            let depth = state(
+                self.written(&self.buffer.unbounded_print).len(),
+                ticks * instruments,
+            );
+            (
+                vec![crate::python_arrow::prints_batch(
+                    // Nothing is recorded, so there is no day to select and
+                    // the argument is the label on the rows, as it is on the
+                    // same path in `bars` and `truth`.
+                    day.unwrap_or(0),
+                    ticks,
+                    instruments,
+                    self.written(&self.buffer.prices),
+                    self.written(&self.buffer.anchor),
+                    self.written(&self.buffer.shock),
+                    self.written(&self.buffer.absorbed),
+                    self.written(&self.buffer.clamp),
+                    self.written(&self.buffer.unbounded_print),
+                    self.written(&self.buffer.liquidity_share),
+                    depth,
+                )
+                .map_err(crate::python_arrow::arrow_err)?],
+                depth,
+            )
+        } else {
+            let selected = self.select_recorded(day)?;
+            // Decided across the whole selection, and a disagreement between
+            // DAYS is reported rather than resolved. A run that switched the
+            // arm on half way through has two kinds of day in it, and picking
+            // either one for the schema mislabels the other. A disagreement
+            // WITHIN one day is a different thing: `PartialDay` is a shape,
+            // and the caveat on it names the case.
+            let rows = |d: &crate::python_arrow::RecordedDay| d.ticks * d.instruments;
+            let depth = selected
+                .first()
+                .map(|d| state(d.unbounded_print.len(), rows(d)))
+                .unwrap_or(DepthColumns::Absent);
+            for d in &selected {
+                let has = state(d.unbounded_print.len(), rows(d));
+                if has != depth {
+                    return Err(ValidationError::new_err(format!(
+                        "day {} ran {} the depth counterfactual and the rest ran {} it. \
+                         Ask for one day at a time, or re-run with one setting.",
+                        d.day,
+                        ran(has),
+                        ran(depth),
+                    )));
+                }
+            }
+            let mut out = Vec::with_capacity(selected.len());
+            for d in &selected {
+                out.push(
+                    crate::python_arrow::prints_batch(
+                        d.day,
+                        d.ticks,
+                        d.instruments,
+                        &d.prices,
+                        &d.anchor,
+                        &d.shock,
+                        &d.absorbed,
+                        &d.clamp,
+                        &d.unbounded_print,
+                        &d.liquidity_share,
+                        depth,
+                    )
+                    .map_err(crate::python_arrow::arrow_err)?,
+                );
+            }
+            (out, depth)
+        };
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "prints",
+            crate::python_arrow::prints_schema(depth),
             batches,
         ))
     }

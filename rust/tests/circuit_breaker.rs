@@ -123,6 +123,8 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
             // variance process and pin behaviour at its baseline level.
             market_sigma_daily: MARKET_FACTOR_SIGMA,
             settle_draws: SettleDrawPolicy::FourAlways,
+            // The depth counterfactual, off. It reaches no company field.
+            settle_depth_counterfactual: false,
                 params: &tradefloor::params::PT_V1,
         },
         &mut rng,
@@ -255,6 +257,8 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
                     settle_draws: SettleDrawPolicy::FourAlways,
+                    // The depth counterfactual, off. It reaches no company field.
+                    settle_depth_counterfactual: false,
                 params: &tradefloor::params::PT_V1,
                 },
                 &mut rng,
@@ -301,6 +305,8 @@ fn the_band_holds_in_extended_hours_too() {
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
                     settle_draws: SettleDrawPolicy::FourAlways,
+                    // The depth counterfactual, off. It reaches no company field.
+                    settle_depth_counterfactual: false,
                 params: &tradefloor::params::PT_V1,
                 },
                 &mut rng,
@@ -357,6 +363,8 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
                     settle_draws: SettleDrawPolicy::FourAlways,
+                    // The depth counterfactual, off. It reaches no company field.
+                    settle_depth_counterfactual: false,
                 params: &tradefloor::params::PT_V1,
                 },
                 &mut rng,
