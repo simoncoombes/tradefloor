@@ -18,9 +18,8 @@ behaves the same with the field and without it.
 **Every draw has an address**, a table of substitutions can replace one,
 and a second `run_days` call numbers days from the engine's own counter.
 
-**A surgery replaces one draw**, re-randomises a stream over a window or
-transplants another world's draws, and the record says what it installed
-and whether it could bite.
+**A surgery replaces one draw**, a window of them, or another world's,
+and the record says whether it could bite.
 
 <!-- release-note-ends -->
 
