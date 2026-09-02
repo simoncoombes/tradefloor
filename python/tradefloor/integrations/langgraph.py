@@ -149,7 +149,7 @@ import json
 from typing import Any, Callable
 
 from .._core import ValidationError
-from ..render import JSONRenderer, Renderer
+from ..render import JSONRenderer, Renderer, check_renderer
 from .common import (DECISION_SCHEMA_VERSION, MAX_PARTICIPATION, AdapterInfo,
                      Decision, DecisionError, FrameworkAdapter,
                      FrameworkError, MissingDependencyError, Transcript,
@@ -569,6 +569,8 @@ class LangGraphAdapter(FrameworkAdapter):
         #: of the record. Defaults to :class:`~tradefloor.render.JSONRenderer`,
         #: which reproduces this adapter's own historical body -- sorted,
         #: indented JSON -- character for character; see :meth:`_render_prompt`.
+        if renderer is not None:
+            check_renderer(renderer, where="renderer")
         self.renderer: Renderer = renderer if renderer is not None else JSONRenderer()
         self.config = dict(config) if config else None
         self.thread_id = thread_id

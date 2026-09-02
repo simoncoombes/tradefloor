@@ -209,7 +209,7 @@ import json
 from typing import Any
 
 from .._core import ValidationError
-from ..render import JSONRenderer, Renderer
+from ..render import JSONRenderer, Renderer, check_renderer
 from .common import (DECISION_SCHEMA_VERSION, MAX_PARTICIPATION, AdapterInfo,
                      DecisionError, FrameworkAdapter, FrameworkError,
                      IntegrationError, Transcript, check_prior,
@@ -403,6 +403,8 @@ class PydanticAIAdapter(FrameworkAdapter):
         #: :class:`~tradefloor.render.JSONRenderer`, which reproduces this
         #: adapter's own historical `render(payload)` character for
         #: character.
+        if renderer is not None:
+            check_renderer(renderer, where="renderer")
         self.renderer: Renderer = renderer if renderer is not None else JSONRenderer()
 
         # Here rather than at the first decision. Everything this needs is

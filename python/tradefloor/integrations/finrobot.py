@@ -168,7 +168,7 @@ from typing import Any, Sequence
 
 from .._core import ValidationError
 from ..counterfactual import MACRO_FIELDS
-from ..render import Renderer, TextRenderer
+from ..render import Renderer, TextRenderer, check_renderer
 from .common import (AdapterInfo, FrameworkError, IntegrationError,
                      MissingDependencyError)
 from .common import DecisionError as _CommonDecisionError
@@ -1001,9 +1001,14 @@ class FinRobotAdapter:
     ``renderer`` is what turns the observation into the text FinRobot reads,
     in place of the ``detail=`` argument :func:`observe` and :func:`render`
     took directly until this argument existed. Left at ``None``, it defaults
-    to ``TextRenderer(detail=panel or None)`` -- a renderer that reproduces
-    this adapter's own historical text character for character, which is
-    what lets the shipped fixtures keep replaying. Pass a
+    to ``TextRenderer(detail=panel or None, union_held=True)`` -- a
+    renderer that reproduces this adapter's own historical text character
+    for character, which is what lets the shipped fixtures keep replaying.
+    ``union_held`` is this adapter's own setting and not
+    :func:`observe`'s or :func:`render`'s: it restores the "a name you
+    hold is always detailed" guarantee this class always gave, without
+    changing what those two functions publish for a caller who reaches
+    them directly -- see :class:`~tradefloor.render.TextRenderer`. Pass a
     :class:`~tradefloor.render.Renderer` of your own -- another
     :class:`~tradefloor.render.TextRenderer` with different ``units``,
     ``order`` or ``language``, or a :class:`~tradefloor.render.JSONRenderer`
@@ -1081,8 +1086,11 @@ class FinRobotAdapter:
         #: history -- see the class docstring -- and stays a real object on
         #: every path, including the default one, because :meth:`provenance`
         #: and :meth:`state` both publish its :meth:`~.Renderer.key`.
-        self.renderer: Renderer = (renderer if renderer is not None
-                                   else TextRenderer(detail=panel or None))
+        if renderer is not None:
+            check_renderer(renderer, where="renderer")
+        self.renderer: Renderer = (
+            renderer if renderer is not None
+            else TextRenderer(detail=panel or None, union_held=True))
         self.arm = arm
 
         #: Prices this adapter has been shown, oldest first. The agent's own
@@ -1169,7 +1177,7 @@ class FinRobotAdapter:
             out["detail_panel"] = list(self.panel)
         # Always, unlike `detail_panel`: every recording this adapter has
         # ever made was rendered by SOME configuration, the pre-`renderer`
-        # ones included, and `TextRenderer(detail=panel or None)` names that
+        # ones included, and this default renderer's key names that
         # configuration exactly. See `render.Renderer.key`.
         out["renderer"] = self.renderer.key()
         return out

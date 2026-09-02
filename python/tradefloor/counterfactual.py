@@ -148,7 +148,7 @@ from .harness import Observation, session_clock
 from .manifest import RunManifest, market_digest
 from .portfolio import Portfolio
 from .interventions import Intervention
-from .render import Renderer
+from .render import Renderer, check_renderer
 from .scenario import Scenario
 from .universe_util import fingerprint_of
 
@@ -1979,38 +1979,64 @@ class Invariance:
     more reliably than dollars, or a compact table better than nine lines a
     name. :attr:`presentation` says where two renderings first diverged and
     what diverged -- the decision, the orders, the resulting prices, the
-    portfolio -- not which renderer was right.
+    portfolio -- not which renderer was right. :meth:`agreement_rate` and
+    :meth:`most_agreed` say which renderer's decisions the others matched
+    most often, which is as close to "right" as this function gets.
     """
 
-    __slots__ = ("renderers", "days", "decisions", "presentation", "floor")
+    __slots__ = ("renderers", "days", "decisions", "presentation", "floor",
+                "unrecorded")
 
     def __init__(self, *, renderers: Sequence[str], days: int,
                 decisions: dict[str, list], presentation: list[Comparison],
-                floor: "Resample | None") -> None:
+                floor: "Resample | None",
+                unrecorded: Sequence[str] = ()) -> None:
         #: The renderer keys :func:`invariance` was called with, in the
         #: order given. `presentation`'s pairs and `decisions`' keys both
-        #: name renderers from this list.
+        #: name renderers from this list, minus whichever are in
+        #: :attr:`unrecorded`.
         self.renderers = list(renderers)
         self.days = days
-        #: Per renderer key, the decision published at every post-fork
-        #: step (`None` on a step the agent was not asked). The shared
-        #: pre-fork history is left out: every arm ran it identically by
-        #: construction, so it says nothing about presentation.
+        #: Per renderer key, the agent's STANDING decision at every
+        #: post-fork step -- one entry a step, not one a day. Between two
+        #: actual decision points this repeats the last one, the same
+        #: way `World.run`'s own trace does (`_decision` returns whatever
+        #: the agent last published, not `None`, until it decides
+        #: again); `None` marks only a REFUSED step. The shared pre-fork
+        #: history is left out: every arm ran it identically by
+        #: construction, so it says nothing about presentation. A
+        #: renderer in :attr:`unrecorded` has no entry here.
         self.decisions = decisions
-        #: One :class:`Comparison` per pair of renderers, control and
-        #: treatment ordered as they appear in :attr:`renderers`. Its
-        #: :attr:`~Comparison.divergence` is a :class:`Divergence` whose
-        #: `intervention_step` and `intervention_day` are always `None`
-        #: here -- nothing was intervened on, only shown differently --
-        #: and whose `decision`, `orders`, `prices` and `portfolio` are
-        #: the steps this experiment is about.
+        #: One :class:`Comparison` per pair of MEASURED renderers (both
+        #: outside :attr:`unrecorded`), control and treatment ordered as
+        #: they appear in :attr:`renderers`. Its :attr:`~Comparison.divergence`
+        #: is a :class:`Divergence` whose `intervention_step` and
+        #: `intervention_day` are always `None` here -- nothing was
+        #: intervened on, only shown differently -- and whose `decision`,
+        #: `orders`, `prices` and `portfolio` are the steps this
+        #: experiment is about.
         self.presentation = list(presentation)
         #: :func:`resample` between two forks of the SAME renderer
         #: (`renderers[0]`), or `None` when `invariance` was called with
-        #: `floor=False`. Its `identical_inputs` is always True: nothing
-        #: was intervened on here either, and the whole point is a
-        #: between-arm gap measured on one unchanging question.
+        #: `floor=False`, or when `renderers[0]` itself could not replay.
+        #: Its `identical_inputs` is always True: nothing was intervened
+        #: on here either, and the whole point is a between-arm gap
+        #: measured on one unchanging question.
         self.floor = floor
+        #: Renderer keys :func:`invariance` could not measure: against a
+        #: replaying agent, a renderer whose text does not match what was
+        #: recorded raises a
+        #: :class:`~tradefloor.integrations.common.DecisionError` at its
+        #: first post-fork decision -- :class:`~tradefloor.integrations.common.ReplayMiss`
+        #: on the three adapters built on the shared base, and FinRobot's
+        #: own :class:`~tradefloor.integrations.finrobot.DecisionError` on
+        #: FinRobot, which carries no `ReplayMiss` of its own and raises
+        #: the same class for a genuine replay miss and for a malformed
+        #: recorded response -- and that renderer is reported here rather
+        #: than taking the whole call down. Typically every renderer but
+        #: the one the recording was made under. Empty against a live
+        #: agent, which answers any renderer's text.
+        self.unrecorded = list(unrecorded)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -2019,7 +2045,51 @@ class Invariance:
             "decisions": copy.deepcopy(self.decisions),
             "presentation": [c.as_dict() for c in self.presentation],
             "floor": None if self.floor is None else self.floor.as_dict(),
+            "unrecorded": list(self.unrecorded),
         }
+
+    def agreement_rate(self) -> dict[str, float]:
+        """For each measured renderer, the mean fraction of post-fork
+        steps at which its decision equalled each OTHER measured
+        renderer's, over every renderer it shares a step with.
+
+        Compared by equality on the same dictionary :func:`compare` diffs
+        on -- the actions and the rationale, published by
+        :meth:`~tradefloor.integrations.common.FrameworkAdapter.decision`
+        -- at matching positions in :attr:`decisions`, which are aligned
+        because every measured arm ran the same number of days from the
+        same fork. Since :attr:`decisions` holds the agent's STANDING
+        decision at every STEP, not one entry a day, an agent asked once
+        a day (the default cadence) has each real decision counted
+        `steps_per_day` times over -- consistent across renderers, since
+        every measured arm runs the same cadence, but a rate near the
+        agent's own repeat-length is not automatically a strong
+        agreement; read it against how often the agent actually decides.
+        Empty when fewer than two renderers were measured.
+        """
+        keys = [k for k in self.renderers if k in self.decisions]
+        totals: dict[str, list[float]] = {k: [] for k in keys}
+        for i in range(len(keys)):
+            for j in range(i + 1, len(keys)):
+                a, b = keys[i], keys[j]
+                da, db = self.decisions[a], self.decisions[b]
+                n = min(len(da), len(db))
+                if n == 0:
+                    continue
+                matched = sum(1 for x, y in zip(da[:n], db[:n]) if x == y)
+                rate = matched / n
+                totals[a].append(rate)
+                totals[b].append(rate)
+        return {k: (sum(v) / len(v) if v else 0.0) for k, v in totals.items()}
+
+    def most_agreed(self) -> str | None:
+        """The renderer key with the highest :meth:`agreement_rate`, or
+        `None` when fewer than two renderers were measured. A tie goes to
+        whichever renderer appears first in :attr:`renderers`."""
+        rates = self.agreement_rate()
+        if len(rates) < 2:
+            return None
+        return max(rates, key=lambda k: (rates[k], -self.renderers.index(k)))
 
     def table(self) -> Any:
         """One row per pair of renderers, where their arms first came
@@ -2078,6 +2148,9 @@ class Invariance:
         out = [f"  invariance over {self.days} days, "
               f"{len(self.renderers)} renderers: "
               + ", ".join(self.renderers)]
+        if self.unrecorded:
+            out.append(f"  unrecorded (no reply for this text in the "
+                       f"transcript): {', '.join(self.unrecorded)}")
         out.append("")
         for comparison in self.presentation:
             left = comparison.control.get("label", "control")
@@ -2089,15 +2162,23 @@ class Invariance:
             out.append(f"  {left} vs {right}, {agreed}")
             out.append(d.render())
             out.append("")
+        most = self.most_agreed()
+        if most is not None:
+            rate = self.agreement_rate()[most]
+            out.append(f"  the agent agreed with {most!r} most often "
+                       f"({rate:.0%} of steps, averaged over the other "
+                       "measured renderers)")
         if self.floor is not None:
-            out.append("  the agent's own noise floor, on "
-                       f"{self.renderers[0]!r} asked twice more:")
+            out.append(f"  the agent's own noise floor, {self.floor.n} "
+                       f"calls each on {self.renderers[0]!r} and an "
+                       "identical clone of it:")
             out.append(self.floor.render())
         return "\n".join(out)
 
     def __repr__(self) -> str:
         return (f"Invariance({len(self.renderers)} renderers, "
                 f"{len(self.presentation)} pairs, "
+                f"unrecorded={len(self.unrecorded)}, "
                 f"floor={'measured' if self.floor is not None else None})")
 
 
@@ -2125,6 +2206,17 @@ def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
     `tradefloor.integrations` does; a plain policy with no rendering step
     has nothing for this function to vary.
 
+    On a `LangGraphAdapter` built with its own `input_builder=` (not the
+    default), the swap changes nothing a live graph actually receives:
+    a caller's own builder does not read `self.renderer`, only the
+    adapter's DEFAULT one does. This function does not detect that case
+    and will run every arm anyway, quietly measuring nothing -- the
+    graph sees the same input on every arm, so every comparison finds no
+    presentation effect, which looks identical to a real one. Pass a
+    `LangGraphAdapter` at its default `input_builder` to this function,
+    or vary the renderer some other way (a custom `input_builder` reading
+    `self.renderer` itself) if the graph needs its own.
+
     `floor`, true by default, forks one more arm under `renderers[0]` --
     the first renderer, taken as the reference -- and calls
     :func:`resample` between it and the `renderers[0]` arm above, asking
@@ -2134,10 +2226,41 @@ def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
     measures a presentation effect against. Set it false to skip the extra
     fork and the extra calls.
 
+    Against a replaying agent, a renderer whose text does not match what
+    the transcript was recorded under raises a
+    :class:`~tradefloor.integrations.common.DecisionError` at its first
+    post-fork decision. This function catches that PER ARM: the renderer
+    is reported in :attr:`Invariance.unrecorded` rather than the whole
+    call failing, which is what lets a single recorded transcript still
+    answer "what would a different rendering have looked like" even
+    though only one rendering was ever actually asked. A live framework
+    failure is a different kind of failure and is not caught here; it
+    propagates. A malformed recorded response would, ideally, be a third
+    kind and also propagate -- three of the four adapters raise
+    :class:`~tradefloor.integrations.common.ReplayMiss`, a distinct
+    subclass, for exactly this reason, and a narrower catch would leave
+    it alone. FinRobot does not: it raises the same
+    :class:`~tradefloor.integrations.finrobot.DecisionError` for a
+    replay miss and for a response that failed to parse, so on FinRobot
+    the two are indistinguishable from here and this function reports
+    both as unrecorded rather than reaching into one adapter's exception
+    hierarchy by name to tell them apart. In practice this is the
+    narrower, likelier case: every shipped fixture is checked elsewhere
+    for exactly this (`tests/test_integrations.py`'s
+    `test_a_committed_recording_is_valid_without_its_framework`).
+
+    This depends on the exception reaching this function at all. `World`
+    built with `on_refusal="skip"` -- not the default -- swallows a
+    generic `DecisionError` as a refused step rather than raising it, and
+    re-raises only `ReplayMiss` specifically. A FinRobot fork under a
+    `world` configured that way will not report a non-matching renderer
+    as unrecorded; it will report a run full of refusals instead. Forks
+    inherit `on_refusal` from `world`, unchanged.
+
     Raises :class:`~tradefloor._core.ValidationError` on fewer than two
-    renderers, on two renderers sharing a :meth:`~.Renderer.key`, or on an
-    agent with no `renderer` attribute, all at the call, before anything
-    runs.
+    renderers, on two renderers sharing a :meth:`~.Renderer.key`, on an
+    object without both `render` and `key`, or on an agent with no
+    `renderer` attribute, all at the call, before anything runs.
     """
     if len(renderers) < 2:
         raise ValidationError(
@@ -2152,6 +2275,8 @@ def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
             "OpenAIAgentsAdapter all carry one; a hand-written policy or "
             "CallableAgentAdapter renders nothing and is not a subject for "
             "this experiment.")
+    for i, renderer in enumerate(renderers):
+        check_renderer(renderer, where=f"renderers[{i}]")
 
     keys = [r.key() for r in renderers]
     if len(set(keys)) != len(keys):
@@ -2159,6 +2284,16 @@ def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
             f"renderers must have distinct keys, got {keys}. invariance "
             "reports one column per renderer, and two sharing a key would "
             "be reported, and forked, as one.")
+
+    # `DecisionError`, not the narrower `ReplayMiss`: FinRobot raises its
+    # own `DecisionError` for a replay miss, with no `ReplayMiss`
+    # subclass of its own -- see the docstring above -- so catching only
+    # `ReplayMiss` would let a non-matching renderer take the whole call
+    # down on FinRobot specifically while working as documented on the
+    # other three adapters. Imported here rather than at module level
+    # for the same reason `resample._ask_again` does: `integrations` is
+    # reached explicitly, never pulled in by `import tradefloor` alone.
+    from .integrations.common import DecisionError
 
     labels = list(keys)
     if floor:
@@ -2168,38 +2303,22 @@ def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
         labels = labels + [floor_label]
 
     forks = world.fork(*labels)
-    for fork_world, renderer in zip(forks, renderers):
-        fork_world.agent.renderer = renderer
-    if floor:
-        forks[-1].agent.renderer = renderers[0]
-
     renderer_forks = forks[:len(keys)]
-    # Every pairwise agreement, taken HERE -- right after the fork and the
-    # renderer swap, before any arm has run a step. `agree()` is only proof
-    # of an identical start if nothing has happened yet; called after
-    # `run()` it would report the divergence this function exists to
-    # measure as a failed fork, which is a different and wrong story.
+
+    # Every pairwise agreement, taken BEFORE the renderer swap below: at
+    # this point every fork still carries the SAME renderer `world.agent`
+    # did, so this is proof the shared start was identical, not a report
+    # on the very difference this function exists to measure. Taken
+    # after the swap, `agree()`'s agent-state check would see the
+    # renderer itself as the divergence on any adapter whose `state()`
+    # publishes it (FinRobotAdapter does), and report every pair as a
+    # failed fork on that adapter alone -- a comparison artefact, not a
+    # finding.
     agreements = {}
     for i in range(len(renderer_forks)):
         for j in range(i + 1, len(renderer_forks)):
             agreements[(i, j)] = agree(renderer_forks[i], renderer_forks[j])
     floor_agreement = (agree(forks[0], forks[-1]) if floor else None)
-
-    for fork_world in forks:
-        fork_world.run(days=days)
-
-    decisions = {
-        key: [row["decision"]
-             for row in fork_world.trace[fork_world.fork_step:]]
-        for key, fork_world in zip(keys, renderer_forks)
-    }
-
-    presentation = []
-    for i in range(len(renderer_forks)):
-        for j in range(i + 1, len(renderer_forks)):
-            a, b = renderer_forks[i], renderer_forks[j]
-            presentation.append(compare(a, b, agreement=agreements[(i, j)]))
-
     # `Resample` carries no `agreement` slot of its own -- `resample()`
     # takes two already-forked worlds and has never needed one, because it
     # is normally called on arms whose fork already had a `Comparison` to
@@ -2213,7 +2332,50 @@ def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
             f"fork: {floor_agreement.differences}. This should not happen "
             "-- World.fork() is meant to guarantee an identical start -- "
             "and a floor measured past it would not be pure agent noise.")
-    floor_result = (resample(forks[0], forks[-1]) if floor else None)
+
+    for fork_world, renderer in zip(forks, renderers):
+        fork_world.agent.renderer = renderer
+    if floor:
+        forks[-1].agent.renderer = renderers[0]
+
+    def _run(fork_world: "World") -> bool:
+        try:
+            fork_world.run(days=days)
+            return True
+        except DecisionError:
+            return False
+
+    ran = [_run(fork_world) for fork_world in renderer_forks]
+    unrecorded = [key for key, ok in zip(keys, ran) if not ok]
+
+    decisions = {
+        key: [row["decision"]
+             for row in fork_world.trace[fork_world.fork_step:]]
+        for key, fork_world, ok in zip(keys, renderer_forks, ran) if ok
+    }
+
+    presentation = []
+    for i in range(len(renderer_forks)):
+        if not ran[i]:
+            continue
+        for j in range(i + 1, len(renderer_forks)):
+            if not ran[j]:
+                continue
+            a, b = renderer_forks[i], renderer_forks[j]
+            presentation.append(compare(a, b, agreement=agreements[(i, j)]))
+
+    floor_result = None
+    if floor:
+        # Attempted unconditionally: the floor's own fork is an
+        # independent replay of `renderers[0]`'s text, and while it is
+        # deterministic to reach the same outcome as `ran[0]` -- same
+        # seed, same renderer, same market -- checking it rather than
+        # inferring it from `ran[0]` costs one more replay attempt and
+        # nothing else.
+        floor_ok = _run(forks[-1])
+        if ran[0] and floor_ok:
+            floor_result = resample(forks[0], forks[-1])
 
     return Invariance(renderers=keys, days=days, decisions=decisions,
-                      presentation=presentation, floor=floor_result)
+                      presentation=presentation, floor=floor_result,
+                      unrecorded=unrecorded)

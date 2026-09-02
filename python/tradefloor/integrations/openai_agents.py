@@ -194,7 +194,7 @@ from __future__ import annotations
 from typing import Any
 
 from .._core import ValidationError
-from ..render import JSONRenderer, Renderer
+from ..render import JSONRenderer, Renderer, check_renderer
 from .common import (MAX_PARTICIPATION, AdapterInfo, DecisionError,
                      FrameworkAdapter, check_prior, decision_model, digest,
                      moment_of, refuse_replay_reask, replay_response,
@@ -524,6 +524,8 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         #: rendered text the way FinRobot and LangGraph do. Defaults to
         #: :class:`~tradefloor.render.JSONRenderer`, which reproduces this
         #: adapter's own historical second message character for character.
+        if renderer is not None:
+            check_renderer(renderer, where="renderer")
         self.renderer: Renderer = renderer if renderer is not None else JSONRenderer()
         #: The cloned agent carrying the bound output type, built on the
         #: first live call and reused. Derived, so it is rebuilt rather than

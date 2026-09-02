@@ -111,14 +111,46 @@ def test_textrenderer_and_jsonrenderer_satisfy_the_protocol():
 
 
 def test_renderers_are_pure_stdlib_no_engine_no_observation():
-    """`render.py` imports nothing beyond the standard library and
-    `._core.ValidationError` -- no engine, no `Observation`, no adapter.
-    A renderer that could reach either would put the ground-truth
-    boundary `serialize_observation` guards behind a formatting choice."""
+    """`render.py` imports the standard library, `._core.ValidationError`,
+    and -- inside `TextRenderer.render`, lazily, to avoid a load-time
+    cycle with `counterfactual.py` -- `.counterfactual.MACRO_FIELDS`, a
+    plain tuple of field names. Nothing else, and nothing engine-shaped:
+    a renderer that could reach `Engine` or `Observation` would put the
+    ground-truth boundary `serialize_observation` guards behind a
+    formatting choice.
+
+    Checked over the parsed import statements themselves, module-level
+    and local both, rather than `dir(render_module)`: `dir()` only lists
+    names bound in the module's OWN namespace, so it cannot see a local
+    import inside a method body at all, which is exactly where
+    `MACRO_FIELDS` is imported.
+    """
+    import ast
     import tradefloor.render as render_module
-    names = {n for n in dir(render_module) if not n.startswith("_")}
-    # Nothing engine-shaped is even importable from this module.
-    assert "Engine" not in names and "Observation" not in names
+
+    tree = ast.parse(pathlib.Path(render_module.__file__).read_text(
+        encoding="utf-8"))
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            # `_core` and `counterfactual` are only allowed as PACKAGE-
+            # RELATIVE imports (`from ._core import ...`, `node.level >=
+            # 1`) -- this module reaching for an absolute, unrelated
+            # top-level package that happened to share one of these
+            # names would be a different thing entirely.
+            name = node.module
+            if name in ("_core", "counterfactual"):
+                assert node.level >= 1, (
+                    f"{name!r} imported absolutely, not package-relative")
+            imported.add(name)
+
+    allowed = {"json", "typing", "__future__", "_core", "counterfactual"}
+    assert imported <= allowed, (
+        f"render.py imports {imported - allowed}, outside the allowed "
+        f"{allowed}")
+    assert "numpy" not in imported and "pyarrow" not in imported
 
 
 # ---------------------------------------------------------------------------
@@ -165,12 +197,13 @@ def test_default_textrenderer_plus_objective_matches_finrobot_render():
     assert got == fr.render(payload, objective="Manage the book.")
 
 
-def test_textrenderer_detail_matches_finrobots_adapter_level_union():
+def test_textrenderer_union_held_matches_finrobots_adapter_level_union():
     """`observe(detail=X)` bakes X in as given; `FinRobotAdapter._detail`
     used to union X with whatever is held before calling it.
-    `TextRenderer(detail=X)` does that union itself, from the payload
-    alone -- this proves the two paths agree once the union is done the
-    same way."""
+    `TextRenderer(detail=X, union_held=True)` does that union itself,
+    from the payload alone -- this proves the two paths agree once the
+    union is done the same way. `union_held` defaults to `False`; see
+    `test_bare_render_does_not_union_detail_with_held` for that side."""
     world = small_world(n=12, days=3)
     world.portfolio.execute(world.engine, world.engine.tickers[9], 500)
     obs = _observation(world)
@@ -185,8 +218,76 @@ def test_textrenderer_detail_matches_finrobots_adapter_level_union():
     old = fr.render(payload_baked)
 
     payload_plain = fr.observe(obs, history=[], fundamentals=facts)
-    new = TextRenderer(detail=panel).render(payload_plain)
+    new = TextRenderer(detail=panel, union_held=True).render(payload_plain)
     assert old == new
+
+
+def test_bare_render_does_not_union_detail_with_held():
+    """The reading the delegation is settled on: `TextRenderer`'s default
+    (`union_held=False`) renders `detail` exactly, matching what
+    `observe(detail=X)` and `render(payload)`, called directly with no
+    adapter, have always published -- the union was `FinRobotAdapter`'s
+    own behaviour, applied to the argument it built before calling
+    `observe`, not a property `render` gave every caller.
+
+    A held position outside the given `detail` gets no full block here,
+    on the default. `union_held=True` is the opt in, checked above."""
+    world = small_world(n=12, days=3)
+    world.portfolio.execute(world.engine, world.engine.tickers[9], 500)
+    obs = _observation(world)
+    facts = {t: {"sector": "technology"} for t in obs.tickers}
+    panel = [obs.tickers[0], obs.tickers[1]]
+    held_ticker = obs.tickers[9]
+    assert held_ticker not in panel
+
+    payload = fr.observe(obs, history=[], fundamentals=facts, detail=panel)
+    text = fr.render(payload)
+    assert held_ticker not in _detail_section(text)
+
+    plain = fr.observe(obs, history=[], fundamentals=facts)
+    default_text = TextRenderer(detail=panel).render(plain)
+    assert default_text == text
+    assert held_ticker not in _detail_section(default_text)
+
+
+def _detail_section(text: str) -> str:
+    """The `Detail` section's own body, up to `Portfolio`.
+
+    Not `text[idx:]` to the end of the string: `Portfolio`'s own
+    `Positions:` block lists every held name regardless of whether it
+    earned a full block above, so a naive suffix would find a held
+    ticker there and report a detail block that was never rendered.
+    """
+    marker = "\nDetail\n------\n"
+    idx = text.find(marker)
+    if idx == -1:
+        return ""
+    body = text[idx + len(marker):]
+    end = body.find("\n\nPortfolio\n---------\n")
+    return body if end == -1 else body[:end]
+
+
+def test_a_panelled_finrobot_adapters_recorded_payload_carries_no_detail_key():
+    """A stated consequence, not a bug: `FinRobotAdapter.act` no longer
+    calls `observe(detail=...)` -- the renderer does the union itself,
+    from the payload, at render time -- so `payload["detail"]` and
+    `payload["sectors"]`, which a PANELLED adapter's recorded payload
+    always carried before this package, are gone from a NEW recording's
+    `self.record[i]["payload"]`. The rendered TEXT this same entry's
+    `"prompt"` carries is unchanged -- `TextRenderer(union_held=True)`
+    reproduces it, proven above -- only the payload stored alongside it.
+    No in-repo reader of either key exists outside `finrobot.render`'s
+    own old body, which this package also removed, but a reader
+    comparing an OLD panelled recording against a NEW one would see this
+    shape change in `"payload"` and nowhere else."""
+    world = small_world(n=6, days=1, agent=_ScriptedFinRobot(
+        panel=["AAA"], fundamentals={}))
+    entry = world.agent.record[0]
+    assert "detail" not in entry["payload"]
+    assert "sectors" not in entry["payload"]
+    # The prompt is what a reader actually compares two recordings by,
+    # and it still carries the panel's effect: a full block for "AAA".
+    assert "AAA" in _detail_section(entry["prompt"])
 
 
 def test_textrenderer_detail_drops_an_unlisted_symbol():
@@ -368,6 +469,24 @@ def test_jsonrenderer_sorts_keys_so_dict_order_cannot_move_the_digest():
         == JSONRenderer().render({"a": 1, "b": 2})
 
 
+def test_jsonrenderer_refuses_a_fundamentals_value_it_cannot_encode():
+    """`fundamentals` is caller-supplied and passed through unconverted;
+    a `Decimal` in one is not an allowlist defect, and `JSONRenderer`
+    raises `json`'s own `TypeError` naming the type rather than silently
+    coercing it -- the reading LangGraph's and PydanticAI's own
+    historical `render` already took with no `default=` hook. OpenAI
+    Agents' prior `default=float` would have coerced this silently; see
+    the class docstring for why that reading lost."""
+    import decimal
+
+    world = small_world(n=2, days=1)
+    obs = _observation(world)
+    facts = {obs.tickers[0]: {"market_cap": decimal.Decimal("1e9")}}
+    payload = ci.serialize_observation(obs, history=[], fundamentals=facts)
+    with pytest.raises(TypeError):
+        JSONRenderer().render(payload)
+
+
 # ---------------------------------------------------------------------------
 # Every adapter's default renderer reproduces its shipped fixture
 # ---------------------------------------------------------------------------
@@ -385,8 +504,9 @@ def test_finrobot_default_renderer_replays_the_shipped_fixture():
     agent = fr.FinRobotAdapter(mode="replay", transcript=transcript,
                                fundamentals=example.FUNDAMENTALS,
                                objective=example.OBJECTIVE,
-                               every=example.DECISION_EVERY,
-                               renderer=TextRenderer(), arm="shared")
+                               every=example.DECISION_EVERY, arm="shared")
+    assert agent.renderer.key() == "text/en/usd/roster/full", (
+        "not the default any more; this test must exercise it")
     world = World(seed=example.SEED, universe=example.universe(),
                  agent=agent, pins=example.BASE_PINS, cash=example.CASH,
                  steps_per_day=example.STEPS_PER_DAY,
@@ -411,8 +531,9 @@ def test_langgraph_default_renderer_replays_the_shipped_fixture():
 
     agent = LangGraphAdapter(mode="replay", transcript=transcript,
                              fundamentals=example.FUNDAMENTALS,
-                             every=example.DECISION_EVERY,
-                             renderer=JSONRenderer(), arm="shared")
+                             every=example.DECISION_EVERY, arm="shared")
+    assert agent.renderer.key() == "json", (
+        "not the default any more; this test must exercise it")
     world = World(seed=example.SEED, universe=example.universe(),
                  agent=agent, cash=example.CASH, pins=example.BASE_PINS)
     world.run(days=example.WARMUP_DAYS)
@@ -431,8 +552,9 @@ def test_pydantic_ai_default_renderer_replays_the_shipped_fixture():
         pytest.skip("no committed PydanticAI fixture")
     transcript = ci.Transcript.load(fixture_path)
 
-    agent = PydanticAIAdapter(mode="replay", transcript=transcript,
-                              renderer=JSONRenderer())
+    agent = PydanticAIAdapter(mode="replay", transcript=transcript)
+    assert agent.renderer.key() == "json", (
+        "not the default any more; this test must exercise it")
     world = World(seed=example.SEED, universe=example.universe(),
                  agent=agent, cash=example.CASH, pins=example.PINS)
     world.run(days=example.SHARED_DAYS)
@@ -452,8 +574,9 @@ def test_openai_agents_default_renderer_replays_the_shipped_fixture():
         pytest.skip("no committed OpenAI Agents fixture")
     transcript = ci.Transcript.load(fixture_path)
 
-    agent = OpenAIAgentsAdapter(mode="replay", transcript=transcript,
-                                renderer=JSONRenderer())
+    agent = OpenAIAgentsAdapter(mode="replay", transcript=transcript)
+    assert agent.renderer.key() == "json", (
+        "not the default any more; this test must exercise it")
     card = tf.evaluate({"pm": agent}, seed=example.SEED,
                        universe=example.universe(), days=example.DAYS)["pm"]
 
@@ -473,6 +596,12 @@ def test_finrobot_provenance_carries_the_renderer_key():
                                llm_config={"config_list": [{"model": "m"}]},
                                renderer=TextRenderer(units="bps"))
     assert agent.provenance()["renderer"] == "text/en/bps/roster/full"
+
+
+def test_pydantic_ai_provenance_carries_the_renderer_key():
+    agent = PydanticAIAdapter(mode="replay", transcript=ci.Transcript(),
+                              renderer=TextRenderer(language="fr"))
+    assert agent.provenance()["renderer"] == "text/fr/usd/roster/full"
 
 
 def test_langgraph_provenance_carries_the_renderer_key():
@@ -527,6 +656,111 @@ def test_two_identical_renderers_give_identical_decisions_on_the_fixture():
     assert [e["decision"] for e in a.record] == \
         [e["decision"] for e in b.record]
     assert [e["prompt"] for e in a.record] == [e["prompt"] for e in b.record]
+
+
+# ---------------------------------------------------------------------------
+# invariance(): the fork agreement, on a real FinRobotAdapter
+# ---------------------------------------------------------------------------
+
+
+class _ScriptedFinRobot(fr.FinRobotAdapter):
+    """A live-mode `FinRobotAdapter` with `_ask` replaced by a fixed
+    answer, so `invariance()` can run two REAL `FinRobotAdapter` forks
+    -- not a hand-rolled double -- with no network call. Mirrors
+    `tests/test_finrobot.py`'s own `Scripted`, which the docstring there
+    explains: `_ask` is the one method that reaches outside the process,
+    and everything below it -- the render, the parse, the validation --
+    runs unmodified."""
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("mode", "live")
+        kwargs.setdefault("llm_config", {"config_list": [{"model": "none"}]})
+        super().__init__(**kwargs)
+
+    def _ask(self, prompt, key, obs):
+        return json.dumps({"actions": [], "rationale": "hold"})
+
+
+def test_invariance_fork_agreement_holds_on_a_real_finrobot_adapter():
+    """The regression `agree()`-before-the-swap fixes. `FinRobotAdapter`
+    is the one adapter whose `state()` publishes `"renderer"`
+    (`test_the_fork_agreement_covers_the_panel`'s neighbour); calling
+    `agree()` after the swap instead of before would see that field
+    differ between every pair and report `fork_agreed=False` on every
+    FinRobot run, unconditionally, which is a comparison artefact and
+    not a finding. A double with no `renderer` in its own `state()`
+    (`_KnownFloorAgent`, used elsewhere in this file) cannot exercise
+    this at all, which is why this test builds a real adapter."""
+    agent = _ScriptedFinRobot(fundamentals={})
+    world = small_world(n=4, days=1, agent=agent)
+    report = invariance(world, [TextRenderer(), TextRenderer(units="bps")],
+                        days=1, floor=False)
+    assert len(report.presentation) == 1
+    comparison = report.presentation[0]
+    assert comparison.agreement is not None
+    assert comparison.agreement.identical, (
+        "the forks disagreed at the fork, before either renderer ran a "
+        f"step: {comparison.agreement.differences}")
+
+    pytest.importorskip("pyarrow")
+    assert report.table().column("fork_agreed").to_pylist() == [True]
+
+
+# ---------------------------------------------------------------------------
+# invariance(): against a recorded agent, only the matching renderer replays
+# ---------------------------------------------------------------------------
+
+
+def test_invariance_reports_a_non_matching_renderer_as_unrecorded():
+    """The design note's claim: "against a recorded agent only renderers
+    with recordings replay; the others are reported as unrecorded."
+    Against the real shipped fixture, recorded under FinRobotAdapter's
+    default renderer, a second renderer with different text has no
+    entry for its first post-fork prompt and must not take the call
+    down."""
+    example = _load("test_render_finrobot_unrecorded",
+                    REPO / "examples" / "integrations" / "finrobot"
+                    / "rate_shock.py")
+    fixture_path = REPO / "tests" / "fixtures" / "finrobot" / "rate-shock.json"
+    if not fixture_path.exists():
+        pytest.skip("no committed FinRobot fixture")
+    transcript = fr.Transcript.load(fixture_path)
+
+    agent = fr.FinRobotAdapter(mode="replay", transcript=transcript,
+                               fundamentals=example.FUNDAMENTALS,
+                               objective=example.OBJECTIVE,
+                               every=example.DECISION_EVERY, arm="shared")
+    world = World(seed=example.SEED, universe=example.universe(),
+                 agent=agent, pins=example.BASE_PINS, cash=example.CASH,
+                 steps_per_day=example.STEPS_PER_DAY,
+                 ticks_per_step=example.TICKS_PER_STEP)
+    world.run(days=example.WARMUP_DAYS)
+
+    matching = TextRenderer()
+    other = TextRenderer(units="bps")
+    report = invariance(world, [matching, other],
+                        days=example.BRANCH_DAYS, floor=False)
+
+    assert report.unrecorded == [other.key()]
+    assert matching.key() in report.decisions
+    assert other.key() not in report.decisions
+    assert report.presentation == [], (
+        "a pair needs both sides measured; only one renderer replayed")
+    # One entry per post-fork STEP, not per day -- see `Invariance.decisions`
+    # -- and every one of them is the agent's then-STANDING decision, which
+    # `World.run`'s trace repeats between actual decision points rather than
+    # leaving `None`; only a refused step is `None`. At the default cadence
+    # (one decision a day) the standing decision changes at each day
+    # boundary and holds for `STEPS_PER_DAY` rows.
+    decisions = report.decisions[matching.key()]
+    assert len(decisions) == example.BRANCH_DAYS * example.STEPS_PER_DAY
+    assert all(d is not None for d in decisions)
+    changes = sum(1 for a, b in zip(decisions, decisions[1:]) if a != b)
+    assert changes == example.BRANCH_DAYS - 1, (
+        "the standing decision should change once per day boundary and "
+        "hold in between")
+    # The report says so in text, not only in the field.
+    assert other.key() in report.render()
 
 
 # ---------------------------------------------------------------------------
@@ -635,8 +869,19 @@ def test_invariance_separates_a_presentation_effect_from_the_floor():
     assert report.floor.identical_inputs, (
         "the floor's two arms must see byte-identical input, or the gap "
         "measured is not pure agent noise")
-    floor_net = report.floor.noise[report.floor.control]["stdev_net"]
-    assert floor_net >= 0
+    # `_net` counts BUY minus SELL actions, not shares -- see
+    # `counterfactual._net`. This scripted agent only ever sends one BUY,
+    # so `_net` is the constant 1.0 on every call and `stdev_net` is 0.0
+    # by construction, which would make the assertion below pass whether
+    # or not a real floor exists. `_gross` -- shares moved, which is
+    # where `spread` actually shows up -- is the statistic this agent's
+    # noise lives in, so it is the one the separation is measured
+    # against.
+    floor_gross = report.floor.noise[report.floor.control]["stdev_gross"]
+    assert floor_gross > 0, (
+        "the scripted agent's own noise (spread=20) must show up as a "
+        "real, nonzero floor, or there is nothing to separate the "
+        "presentation effect from")
 
     # The separation the report exists to show: the presentation gap (one
     # base-quantity's worth, ~2x the scripted agent's own base) dwarfs the
@@ -649,9 +894,8 @@ def test_invariance_separates_a_presentation_effect_from_the_floor():
     assert presentation_gap >= 100 - 20, (
         "the presentation effect should be at least a base quantity's "
         "worth, net of one noise draw")
-    assert presentation_gap > floor_net or floor_net == 0, (
-        "the presentation effect should exceed the agent's own noise, or "
-        "there is nothing here to separate")
+    assert presentation_gap > floor_gross, (
+        "the presentation effect should exceed the agent's own noise")
 
 
 def test_invariance_floor_false_skips_the_extra_fork():
