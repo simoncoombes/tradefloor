@@ -475,6 +475,66 @@ def test_compare_of_a_fingerprint_with_itself_differs_nowhere():
     assert result.total == result.total  # every position compared
 
 
+def test_compare_pads_the_shorter_side_and_counts_padding_as_differing():
+    """Two fingerprints with unequal per-cell decision counts -- the
+    branch of `compare()` that pads the shorter side with `None` rather
+    than truncating to the shorter length.
+
+    Both agents publish a size that is a function of `obs.step` alone,
+    never of how many times either has been asked, so ``full`` and
+    ``partial`` publish byte-identical decisions on every step they BOTH
+    answer -- the only source of a difference is ``partial`` refusing
+    from step 20 on, which is not a scattered refusal but a threshold,
+    so it costs only TRAILING decisions and never shifts the ordinal
+    alignment of the ones before it. `_FAST_BATTERY`'s two cells are 24
+    steps each (4 days x 6 steps a day): 24 decisions from ``full`` per
+    cell, 20 from ``partial`` (refused from step 20 through 23), 4
+    padded positions per cell, 8 in total across both cells.
+    """
+    class StepThreshold:
+        def __init__(self, refuse_from: int | None = None):
+            self.refuse_from = refuse_from
+            self._last = None
+
+        def act(self, obs):
+            if (self.refuse_from is not None
+                    and obs.step >= self.refuse_from):
+                raise DecisionError(f"refuses from step {self.refuse_from}")
+            ticker = obs.tickers[0]
+            qty = 1000.0 + obs.step
+            self._last = {"actions": [{"symbol": ticker, "side": "BUY",
+                                       "quantity": qty}], "rationale": ""}
+            return {ticker: qty}
+
+        def decision(self):
+            return self._last
+
+    full = tf.fingerprint.fingerprint(StepThreshold(), battery=_FAST_BATTERY)
+    partial = tf.fingerprint.fingerprint(StepThreshold(refuse_from=20),
+                                         battery=_FAST_BATTERY)
+    assert len(full.decisions) == 48   # 24 steps x 2 cells, nothing refused
+    assert len(partial.decisions) == 40  # 20 steps x 2 cells
+
+    forward = full.compare(partial, floor=None)
+    backward = partial.compare(full, floor=None)
+
+    # The count is the same whichever side calls compare(): comparing a
+    # position for equality does not care which fingerprint is "self".
+    assert forward.differing == backward.differing == 8
+    assert forward.total == backward.total == 48
+
+    # Every cell's padded positions -- the 4 trailing steps `partial`
+    # never answered -- are exactly what is reported as differing, and
+    # nothing before them is: `full` and `partial` agree step for step
+    # up to the refusal, so a truncating comparison would have reported
+    # 0 differences here and hidden the very steps `partial` went silent
+    # on.
+    for row in forward.cells:
+        assert row["self_decisions"] == 24
+        assert row["other_decisions"] == 20
+        assert row["differing"] == 4
+
+
 def test_compare_refuses_two_different_battery_versions():
     fp = tf.fingerprint.fingerprint(Scripted(), battery=_FAST_BATTERY)
     other = tf.Fingerprint(digest="0" * 64, decisions=[], battery=2,
