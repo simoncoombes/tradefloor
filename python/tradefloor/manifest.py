@@ -2161,8 +2161,9 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
     root_note = "" if root_ok else (
         f"the ledger's root is {ledger.root()[:12]}... and the manifest "
         f"commits to {root[:12]}.... A leaf was edited after the manifest "
-        "was written, so no sampled day's leaf proves against the "
-        "manifest's root. The replay verdicts below say which day moved."
+        "was written. Membership cannot be judged day by day against a root "
+        "that does not match, so no proof is reported below and the replay "
+        "verdicts are what say which day moved."
     )
     replay_failures: list[str] = []
     proof_failures: list[str] = []

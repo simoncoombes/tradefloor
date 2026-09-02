@@ -708,6 +708,67 @@ def test_a_tampered_snapshot_fails_on_the_day_that_follows_it():
     )
 
 
+def _tamper_leaf(ledger):
+    """Edit a leaf, which moves the root."""
+    leaf = ledger.leaves[4]
+    ledger.leaves[4] = ("1" if leaf[0] == "0" else "0") + leaf[1:]
+
+
+def _tamper_snapshot(ledger):
+    """Edit a predecessor state, which leaves the root alone."""
+    snapshot = ledger.snapshots[4]
+    columns = dict(snapshot["columns"])
+    prices = list(struct.unpack("<8d", columns["price"]))
+    prices[0] += 1.0
+    columns["price"] = struct.pack("<8d", *prices)
+    snapshot["columns"] = columns
+
+
+@pytest.mark.parametrize("tamper", [None, _tamper_leaf, _tamper_snapshot],
+                         ids=["clean", "edited-leaf", "edited-state"])
+def test_the_failure_count_is_over_days_and_cannot_exceed_the_sample(tamper):
+    """The count is a count of days, whatever else went wrong.
+
+    Asserted as the derivation rather than as a number, because the defect
+    this guards was a number that happened to be one larger than k. A root
+    mismatch is one fact about the ledger and belongs to no day, so counting
+    it among them produced "10 of 9 sampled days" and no assertion in this
+    file bound the arithmetic.
+
+    Runs over a clean ledger, an edited leaf and an edited predecessor state,
+    so the invariant holds when the root moves and when it does not.
+    """
+    _, ledger, manifest = run()
+    if tamper is not None:
+        ledger = tf.DayLedger.from_json(ledger.to_json())
+        tamper(ledger)
+
+    report = mf.verify(manifest, ledger, DAYS, seed=5)
+
+    assert len(report.replay_failures) <= report.k
+    assert report.replayed + len(report.replay_failures) == report.k
+    named = {int(entry.split(":")[0].split()[1])
+             for entry in report.replay_failures}
+    assert named <= set(report.days), (
+        "a replay failure named a day this verification did not sample"
+    )
+    assert report.ok == (report.root_ok and not report.replay_failures
+                         and not report.proof_failures)
+
+    if report.ok:
+        assert tamper is None
+        return
+
+    with pytest.raises(tf.ValidationError) as raised:
+        report.check()
+    message = str(raised.value)
+    if report.replay_failures:
+        assert f"{len(report.replay_failures)} of " in message
+        for day in set(report.days) - named:
+            assert f"day {day}:" not in message, message
+    assert f"{report.k + 1} of " not in message
+
+
 def test_a_root_mismatch_is_not_counted_as_a_failed_day():
     """One edited leaf is one edited day, however many proofs it breaks.
 
