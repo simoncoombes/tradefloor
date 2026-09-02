@@ -517,6 +517,9 @@ impl PyEngine {
         self.day_buffer
             .absorbed
             .extend_from_slice(&self.buffer.absorbed[..n]);
+        self.day_buffer
+            .clamp
+            .extend_from_slice(&self.buffer.clamp[..n]);
         // Appended only when the session actually carried the arm, so a day
         // that ran without it holds an EMPTY pair rather than a padded one.
         if !self.buffer.unbounded_print.is_empty() {
@@ -722,6 +725,7 @@ struct DayBuffer {
     components: [Vec<f64>; 9],
     shock: Vec<f64>,
     absorbed: Vec<f64>,
+    clamp: Vec<f64>,
     /// Empty on a day whose sessions ran without the depth counterfactual.
     ///
     /// A session that ran with it appends; one that did not appends nothing.
@@ -743,6 +747,7 @@ impl DayBuffer {
         self.anchor.clear();
         self.shock.clear();
         self.absorbed.clear();
+        self.clamp.clear();
         self.unbounded_print.clear();
         self.liquidity_share.clear();
         for column in self.components.iter_mut() {
@@ -2512,6 +2517,7 @@ impl PyEngine {
             components: std::array::from_fn(|k| self.day_buffer.components[k].clone()),
             shock: self.day_buffer.shock.clone(),
             absorbed: self.day_buffer.absorbed.clone(),
+            clamp: self.day_buffer.clamp.clone(),
             unbounded_print: self.day_buffer.unbounded_print.clone(),
             liquidity_share: self.day_buffer.liquidity_share.clone(),
         });
@@ -2591,6 +2597,7 @@ impl PyEngine {
                 components: std::array::from_fn(|_| Vec::new()),
                 shock: Vec::new(),
                 absorbed: Vec::new(),
+                clamp: Vec::new(),
                 unbounded_print: Vec::new(),
                 liquidity_share: Vec::new(),
             }]
@@ -2737,9 +2744,13 @@ impl PyEngine {
     /// is roughly one settlement per active company per open tick, which is
     /// the largest single item in a tick.
     ///
-    /// Set it before the run. A day whose sessions disagree about it records
-    /// a short column, and `prints()` refuses that day rather than serving a
-    /// column that stops part way through.
+    /// Set it before the FIRST session of a day. A day whose sessions
+    /// disagree records fewer counterfactual values than it has rows, and
+    /// `prints()` drops both columns for that whole day rather than serving
+    /// one with a gap in it. The table's schema caveat names that case, so a
+    /// caller who switched the arm mid-day is told why the columns are gone
+    /// rather than being told to do what they just did. Days that disagree
+    /// with EACH OTHER are a different matter and raise.
     ///
     /// The run log does not carry it, because the log carries INPUTS and this
     /// is not one: no draw, no price and no company field depends on it. A
@@ -2762,9 +2773,15 @@ impl PyEngine {
     ///   `prints(day=N)`   that day alone
     ///
     /// `absorbed` is measured to the PRINTED price, so it carries the second
-    /// circuit breaker as well as the book. On a halted name the breaker is
-    /// what absorbed the shock, and booking that to the book would be the
-    /// more flattering of two wrong answers.
+    /// circuit breaker as well as the book. `clamp` is the breaker's own
+    /// part of it, and `absorbed - clamp` is the book's.
+    ///
+    /// Read them apart. On every clamped print measured, the book and the
+    /// breaker pull opposite ways, and on roughly three fifths of them they
+    /// cancel to the last bit, so `absorbed` alone reads exactly zero on a
+    /// name the breaker had just moved 513 basis points -- the same value it
+    /// takes on a tick that never settled. `clamp` is what tells those two
+    /// rows apart.
     ///
     /// `unbounded_print` and `liquidity_share` are present only when
     /// `settle_depth_counterfactual(True)` was set before the run, and the
@@ -2779,10 +2796,33 @@ impl PyEngine {
     /// `1 - liquidity_share` times the printed move.
     #[pyo3(signature = (*, day = None))]
     fn prints(&self, day: Option<u32>) -> PyResult<crate::python_arrow::PyArrowStream> {
-        let (batches, counterfactual) = if self.recorded.is_empty() {
+        use crate::python_arrow::DepthColumns;
+        // Which of the three shapes a set of buffers is in. A column the
+        // length of the table is the arm; an empty one is no arm; anything
+        // between is a day whose sessions disagreed, and that day is served
+        // WITHOUT the columns rather than with a gap in them.
+        let state = |len: usize, rows: usize| {
+            if len == 0 || rows == 0 {
+                DepthColumns::Absent
+            } else if len >= rows {
+                DepthColumns::Present
+            } else {
+                DepthColumns::PartialDay
+            }
+        };
+        let ran = |s: DepthColumns| match s {
+            DepthColumns::Present => "with",
+            DepthColumns::Absent => "without",
+            DepthColumns::PartialDay => "part way through",
+        };
+
+        let (batches, depth) = if self.recorded.is_empty() {
             let ticks = self.buffer.ticks_written;
             let instruments = self.buffer.companies;
-            let on = !self.buffer.unbounded_print.is_empty();
+            let depth = state(
+                self.written(&self.buffer.unbounded_print).len(),
+                ticks * instruments,
+            );
             (
                 vec![crate::python_arrow::prints_batch(
                     // Nothing is recorded, so there is no day to select and
@@ -2795,40 +2835,36 @@ impl PyEngine {
                     self.written(&self.buffer.anchor),
                     self.written(&self.buffer.shock),
                     self.written(&self.buffer.absorbed),
-                    if on {
-                        self.written(&self.buffer.unbounded_print)
-                    } else {
-                        &[]
-                    },
-                    if on {
-                        self.written(&self.buffer.liquidity_share)
-                    } else {
-                        &[]
-                    },
+                    self.written(&self.buffer.clamp),
+                    self.written(&self.buffer.unbounded_print),
+                    self.written(&self.buffer.liquidity_share),
+                    depth,
                 )
                 .map_err(crate::python_arrow::arrow_err)?],
-                on,
+                depth,
             )
         } else {
             let selected = self.select_recorded(day)?;
-            // Decided across the whole selection, and the disagreement is
-            // reported rather than resolved. A run that switched the arm on
-            // half way through has two kinds of day in it, and picking either
-            // one for the schema mislabels the other.
+            // Decided across the whole selection, and a disagreement between
+            // DAYS is reported rather than resolved. A run that switched the
+            // arm on half way through has two kinds of day in it, and picking
+            // either one for the schema mislabels the other. A disagreement
+            // WITHIN one day is a different thing: `PartialDay` is a shape,
+            // and the caveat on it names the case.
             let rows = |d: &crate::python_arrow::RecordedDay| d.ticks * d.instruments;
-            let on = selected
+            let depth = selected
                 .first()
-                .map(|d| d.unbounded_print.len() >= rows(d) && rows(d) > 0)
-                .unwrap_or(false);
+                .map(|d| state(d.unbounded_print.len(), rows(d)))
+                .unwrap_or(DepthColumns::Absent);
             for d in &selected {
-                let has = d.unbounded_print.len() >= rows(d) && rows(d) > 0;
-                if has != on {
+                let has = state(d.unbounded_print.len(), rows(d));
+                if has != depth {
                     return Err(ValidationError::new_err(format!(
                         "day {} ran {} the depth counterfactual and the rest ran {} it. \
                          Ask for one day at a time, or re-run with one setting.",
                         d.day,
-                        if has { "with" } else { "without" },
-                        if on { "with" } else { "without" },
+                        ran(has),
+                        ran(depth),
                     )));
                 }
             }
@@ -2843,17 +2879,19 @@ impl PyEngine {
                         &d.anchor,
                         &d.shock,
                         &d.absorbed,
-                        if on { &d.unbounded_print } else { &[] },
-                        if on { &d.liquidity_share } else { &[] },
+                        &d.clamp,
+                        &d.unbounded_print,
+                        &d.liquidity_share,
+                        depth,
                     )
                     .map_err(crate::python_arrow::arrow_err)?,
                 );
             }
-            (out, on)
+            (out, depth)
         };
         Ok(crate::python_arrow::PyArrowStream::new(
             "prints",
-            crate::python_arrow::prints_schema(counterfactual),
+            crate::python_arrow::prints_schema(depth),
             batches,
         ))
     }

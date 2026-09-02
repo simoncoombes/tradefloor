@@ -405,6 +405,19 @@ pub struct TickOutcome {
     /// book's last trade and what is published. `shock + absorbed` is the
     /// print's log move away from the last print.
     pub absorbed: Vec<f64>,
+    /// How far the second circuit breaker moved the print, per active
+    /// company, in log units.
+    ///
+    /// `log(the print / what the book settled)`, so zero on every tick the
+    /// breaker left alone. `absorbed - clamp` is the book's own share of the
+    /// distance from the model price to the tape.
+    ///
+    /// Separate because the two cancel. On every clamped row measured the
+    /// book and the breaker pull opposite ways, and on roughly three fifths
+    /// of them they cancel to the last bit, so `absorbed` reads exactly zero
+    /// on a name the breaker had just moved 513 basis points -- the same
+    /// value it takes on a tick that never settled at all.
+    pub clamp: Vec<f64>,
     /// What the same tick would have printed against unbounded depth, per
     /// active company.
     ///
@@ -510,6 +523,7 @@ pub fn simulate_market_tick(
             },
             shock: Vec::new(),
             absorbed: Vec::new(),
+            clamp: Vec::new(),
             unbounded_print: Vec::new(),
             liquidity_share: Vec::new(),
         };
@@ -916,6 +930,7 @@ pub fn simulate_market_tick(
     // of a day.
     let mut shock_col = vec![0.0; active_count];
     let mut absorbed_col = vec![0.0; active_count];
+    let mut clamp_col = vec![0.0; active_count];
     // The counterfactual arm needs the buffered uniforms, which exist only on
     // the engine's own generated schedule. Under `FourOrZero` the settlement
     // draws lazily from the caller's recorded stream and a second settlement
@@ -1001,6 +1016,11 @@ pub fn simulate_market_tick(
             if depth_arm {
                 if let Some(buffer) = predrawn.as_mut() {
                     buffer.rewind();
+                    // A second build rather than a clone of the real book,
+                    // and the two are the same thing here: `build_live_book`
+                    // is a pure function of the company and the options, and
+                    // the only option that differs is the depth multiplier.
+                    // The arm's book IS the first one with more levels.
                     let deep = settle_price_through_book(
                         &micro,
                         fair_value,
@@ -1022,7 +1042,14 @@ pub fn simulate_market_tick(
 
             // Breaker #2 — the PRINT. See the module header for why this one
             // is the load-bearing clamp.
+            //
+            // The settled price is kept so the clamp can be reported apart
+            // from the book. They pull opposite ways on every clamped row
+            // and cancel exactly on most of them, so one column carrying
+            // both says a halted name absorbed nothing.
+            let settled_price = new_price;
             new_price = breaker(new_price);
+            clamp_col[i] = mathx::log(new_price / settled_price);
 
             // Carry maker inventory forward. This is what makes impact
             // PERSIST: a large buy leaves the maker short, so it keeps quoting
@@ -1087,6 +1114,7 @@ pub fn simulate_market_tick(
         shared_factors: shared,
         shock: shock_col,
         absorbed: absorbed_col,
+        clamp: clamp_col,
         unbounded_print: unbounded_col,
         liquidity_share: share_col,
     }

@@ -239,6 +239,42 @@ a deeper book would have done to the next tick, because the maker inventory
 it would have left is discarded and the tick after this one is the one that
 actually ran.
 
+### The breaker's own column
+
+`absorbed` is measured to the printed price, so it carries the second
+circuit breaker as well as the book. `clamp` is the breaker's own part and
+`absorbed - clamp` is the book's.
+
+The two cancel, so one column could not carry both. Measured over three
+stressed runs of eight names, the book and the breaker pull opposite
+ways on every clamped print without exception, and on 90 of 146, 22 of 41
+and 22 of 37 they cancel to the last bit. `absorbed` then reads exactly 0.0
+on a name the breaker had just moved 513 basis points, which is the same
+value it takes on a tick that never settled at all. Where it is non-zero the
+clamp is a median 54% to 111% of it, and up to 26.8 times it.
+
+`shock + absorbed` is still the print's own log move, so nothing that read
+the two-term split has to change. The three-term form is
+`shock + (absorbed - clamp) + clamp`, measured to a worst error of 2.91e-16
+over 9,504 rows.
+
+### One metadata key on the prints schema
+
+The table carries a single `caveat` entry, computed from the state the
+caller is in. `arrow::Schema::metadata` is a `HashMap` and the IPC writer
+serialises it in that map's iteration order, which `RandomState` reseeds per
+map, so three keys produced two different digests for one table inside a
+single process. The field's type belongs to `arrow`, so nothing on this side
+can supply a hasher; one entry has no order to vary. The two keys that went
+were both derivable from the schema, and a consumer asking whether the depth
+counterfactual ran should read the column list, which is the more reliable
+answer.
+
+A day whose sessions disagreed about the counterfactual gets a third caveat
+of its own. Its columns are shorter than the day, so both are dropped rather
+than served with a gap, and the caveat names that case instead of telling
+the caller to set an option they already set.
+
 ### The reading in the liquidity-crisis example
 
 `examples/experiments/liquidity-crisis` runs both arms with the

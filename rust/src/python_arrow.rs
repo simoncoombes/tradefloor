@@ -261,7 +261,36 @@ pub fn truth_batch(
 /// inventory it would have left is discarded and the tick after this one is
 /// the one that actually ran. A study wanting the compounded answer runs two
 /// markets, not one market and an arm.
-pub fn prints_schema(counterfactual: bool) -> SchemaRef {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DepthColumns {
+    /// The depth counterfactual ran for every session of every day served,
+    /// so `unbounded_print` and `liquidity_share` are here.
+    Present,
+    /// It did not run, so the two columns are absent.
+    Absent,
+    /// It ran for some of a day's sessions and not others. The day's columns
+    /// are shorter than the day, so they are dropped rather than served with
+    /// a gap in them, and the caveat says which case a reader is holding.
+    PartialDay,
+}
+
+/// The schema, and the one metadata key it carries.
+///
+/// # One key, because the metadata order is not ours to fix
+///
+/// `arrow::Schema::metadata` is a `std::collections::HashMap`, and the IPC
+/// writer serialises it in that map's iteration order. `RandomState` reseeds
+/// per map, so two writes of one table in ONE process produced different
+/// footer bytes and two different digests -- measured, not reasoned about.
+/// Nothing on this side can supply a hasher, because the field's type belongs
+/// to `arrow`.
+///
+/// So the map holds exactly one entry, where iteration order cannot vary.
+/// That costs nothing, because the two keys it used to carry beside the
+/// caveat were both derivable from the schema itself: a consumer asking
+/// whether the arm ran reads the column list, which is the more reliable
+/// answer anyway.
+pub fn prints_schema(depth: DepthColumns) -> SchemaRef {
     let mut fields = vec![
         Field::new("day", DataType::UInt32, false),
         Field::new("tick", DataType::UInt32, false),
@@ -270,50 +299,57 @@ pub fn prints_schema(counterfactual: bool) -> SchemaRef {
         Field::new("model_price", DataType::Float64, false),
         Field::new("shock", DataType::Float64, false),
         Field::new("absorbed", DataType::Float64, false),
+        Field::new("clamp", DataType::Float64, false),
     ];
-    if counterfactual {
+    if depth == DepthColumns::Present {
         fields.push(Field::new("unbounded_print", DataType::Float64, false));
         fields.push(Field::new("liquidity_share", DataType::Float64, false));
     }
-    // Computed from the columns that are actually here, so the metadata
+    // Computed from the state the caller is actually in, so the caveat
     // cannot describe a table this is not. A retyped sentence per branch is
     // how a caveat becomes false.
-    let present: Vec<&str> = fields.iter().map(|f| f.name().as_str()).collect();
-    let caveat = if counterfactual {
-        "absorbed is measured to the printed price, so it carries the \
-         circuit breaker as well as the book; on a halted name the breaker \
-         is what absorbed the shock. unbounded_print is the same tick \
-         settled against every resting level, under the same draws and from \
-         the same book state; it is one tick from the real state and says \
-         nothing about the next one. liquidity_share is NEGATIVE where the \
-         depth bound truncated a walk, which is most rows that carry one, \
-         it is not bounded by one, and it is NaN where the print did not \
-         move. The unbounded move is (1 - liquidity_share) times the \
-         printed move."
-    } else {
-        "absorbed is measured to the printed price, so it carries the \
-         circuit breaker as well as the book; on a halted name the breaker \
-         is what absorbed the shock. The depth counterfactual did not run, \
-         so unbounded_print and liquidity_share are absent. Set \
-         Engine.settle_depth_counterfactual(True) before the run to get them."
-    };
-    let metadata = std::collections::HashMap::from([
-        (
-            "depth_counterfactual".to_string(),
-            if counterfactual { "on" } else { "off" }.to_string(),
+    let absorbed = "absorbed is measured to the printed price, so it carries \
+                    the circuit breaker as well as the book. clamp is the \
+                    breaker's own part and book = absorbed - clamp is the \
+                    book's. Read them apart: on a halted print the two pull \
+                    opposite ways and often cancel exactly, so absorbed alone \
+                    reads zero on a name the breaker had just moved. ";
+    let caveat = match depth {
+        DepthColumns::Present => format!(
+            "{absorbed}unbounded_print is the same tick settled against every \
+             resting level, under the same draws and from the same book \
+             state; it is one tick from the real state and says nothing \
+             about the next one. liquidity_share is NEGATIVE where the depth \
+             bound truncated a walk, which is most rows that carry one, it \
+             is not bounded by one, and it is NaN where the print did not \
+             move. The unbounded move is (1 - liquidity_share) times the \
+             printed move."
         ),
-        ("columns".to_string(), present.join(",")),
-        ("caveat".to_string(), caveat.to_string()),
-    ]);
+        DepthColumns::Absent => format!(
+            "{absorbed}The depth counterfactual did not run, so \
+             unbounded_print and liquidity_share are absent. Set \
+             Engine.settle_depth_counterfactual(True) before the run to get \
+             them."
+        ),
+        DepthColumns::PartialDay => format!(
+            "{absorbed}The depth counterfactual was switched part way \
+             through a day, so that day recorded fewer counterfactual values \
+             than it has rows. unbounded_print and liquidity_share are \
+             dropped for the whole day rather than served with a gap in \
+             them. Set Engine.settle_depth_counterfactual before the first \
+             session of a day."
+        ),
+    };
+    let metadata = std::collections::HashMap::from([("caveat".to_string(), caveat)]);
     Arc::new(Schema::new_with_metadata(fields, metadata))
 }
 
 /// Build the `prints` batch from a session's buffers.
 ///
-/// The counterfactual columns are included when both are the length of the
-/// table, which is exactly when the arm ran for this day. A short column is
-/// an error rather than a pad: padding one would put a real value on the
-/// wrong row for the rest of the day.
+/// `depth` says which of the three shapes to build, and the caller decides
+/// it, because only the caller can see whether every day it is serving
+/// agrees. A `Present` state with a buffer shorter than the table is an
+/// error rather than a pad.
 #[allow(clippy::too_many_arguments)]
 pub fn prints_batch(
     day: u32,
@@ -323,8 +359,10 @@ pub fn prints_batch(
     model_price: &[f64],
     shock: &[f64],
     absorbed: &[f64],
+    clamp: &[f64],
     unbounded_print: &[f64],
     liquidity_share: &[f64],
+    depth: DepthColumns,
 ) -> Result<RecordBatch, String> {
     let rows = ticks * instruments;
     for (name, len) in [
@@ -332,6 +370,7 @@ pub fn prints_batch(
         ("model_price", model_price.len()),
         ("shock", shock.len()),
         ("absorbed", absorbed.len()),
+        ("clamp", clamp.len()),
     ] {
         if len < rows {
             return Err(format!(
@@ -339,8 +378,12 @@ pub fn prints_batch(
             ));
         }
     }
-    let counterfactual = !unbounded_print.is_empty() || !liquidity_share.is_empty();
-    if counterfactual && (unbounded_print.len() < rows || liquidity_share.len() < rows) {
+    // The caller decides the state; this only refuses a state the buffers
+    // cannot support, because a short column served as a full one would put
+    // a real value on the wrong row for the rest of the day.
+    if depth == DepthColumns::Present
+        && (unbounded_print.len() < rows || liquidity_share.len() < rows)
+    {
         return Err(format!(
             "counterfactual buffer shorter than {ticks} ticks x {instruments} instruments"
         ));
@@ -365,12 +408,13 @@ pub fn prints_batch(
         Arc::new(Float64Array::from(model_price[..rows].to_vec())),
         Arc::new(Float64Array::from(shock[..rows].to_vec())),
         Arc::new(Float64Array::from(absorbed[..rows].to_vec())),
+        Arc::new(Float64Array::from(clamp[..rows].to_vec())),
     ];
-    if counterfactual {
+    if depth == DepthColumns::Present {
         columns.push(Arc::new(Float64Array::from(unbounded_print[..rows].to_vec())));
         columns.push(Arc::new(Float64Array::from(liquidity_share[..rows].to_vec())));
     }
-    RecordBatch::try_new(prints_schema(counterfactual), columns).map_err(|e| e.to_string())
+    RecordBatch::try_new(prints_schema(depth), columns).map_err(|e| e.to_string())
 }
 
 /// A reader over a fixed set of batches.
@@ -647,6 +691,7 @@ pub struct RecordedDay {
     /// The print decomposition. See [`prints_schema`].
     pub shock: Vec<f64>,
     pub absorbed: Vec<f64>,
+    pub clamp: Vec<f64>,
     /// The depth counterfactual, EMPTY on a day that ran without it. A day
     /// carries its own answer because the arm can be switched between days,
     /// and a table that reported one day's setting for all of them would be

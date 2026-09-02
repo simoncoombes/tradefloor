@@ -95,6 +95,9 @@ struct Run {
     printed: f64,
     unbounded: f64,
     share: f64,
+    shock: f64,
+    absorbed: f64,
+    clamp: f64,
     fair_value: f64,
     volume: f64,
     band: (f64, f64),
@@ -136,6 +139,9 @@ fn tick(c: TickCompany, uniform: f64, volatility: f64) -> (Run, TickCompany, Tic
         printed: roster[0].stock.price,
         unbounded: outcome.unbounded_print[0],
         share: outcome.liquidity_share[0],
+        shock: outcome.shock[0],
+        absorbed: outcome.absorbed[0],
+        clamp: outcome.clamp[0],
         fair_value: outcome.fair_values[0],
         volume: outcome.volumes[0].floor(),
         band: (
@@ -257,6 +263,103 @@ fn the_arm_settles_from_the_price_the_real_settlement_saw() {
         run.unbounded != from_after,
         "the arm's print matches the settlement from the POST-tick price"
     );
+}
+
+/// The breaker's share of the absorption is reported apart from the book's.
+///
+/// On the same tick the clamp test uses, the deeper book walks past the
+/// ceiling and the breaker pulls it back. `clamp` is that pull; `absorbed`
+/// is the whole distance from the model price to the tape; the difference is
+/// the book. The two oppose, and one column carrying both would report a
+/// halted print as having absorbed nothing.
+#[test]
+fn the_clamp_is_the_breakers_share_and_the_book_is_the_rest() {
+    // A previous close that puts the ceiling below where the real settlement
+    // wants to print, so the REAL print is clamped rather than the arm's.
+    let (run, _, _) = tick(thin_ask_book(80.0), 0.02, 1.0);
+    assert!(
+        run.clamp != 0.0,
+        "this tick does not halt the print, so it cannot test the column"
+    );
+    assert_eq!(
+        run.printed, run.band.1,
+        "a clamped print sits on the band edge"
+    );
+
+    let moved = (run.printed / run.last_print).ln();
+    let book = run.absorbed - run.clamp;
+    assert!(
+        (run.shock + book + run.clamp - moved).abs() < 1e-12,
+        "shock {} + book {book} + clamp {} should be the move {moved}",
+        run.shock,
+        run.clamp
+    );
+    assert!(
+        book * run.clamp < 0.0,
+        "the book and the breaker pull opposite ways on a clamped print: \
+         book {book}, clamp {}",
+        run.clamp
+    );
+}
+
+/// The arm does not run on the recorded-stream replay path, and reports
+/// nothing rather than reporting the real print twice.
+///
+/// Under `SettleDrawPolicy::FourOrZero` the settlement draws lazily from the
+/// caller's source and there is no buffer to rewind, so a second settlement
+/// would take draws off a recorded tape. The arm is skipped. Without the
+/// policy half of the condition the columns would still be allocated, the
+/// settlement would never run, and the fallback would write the real print
+/// into `unbounded_print` with a share of zero: a table saying unbounded
+/// depth would have printed the same, on a run where nothing was measured.
+#[test]
+fn the_arm_reports_nothing_on_the_replay_path() {
+    let economy = create_initial_economy_state(&InitialEconomyOptions::default());
+    let mut roster = vec![thin_ask_book(100.0)];
+    let outcome = simulate_market_tick(
+        &mut roster,
+        &TickInputs {
+            prev_day_down: false,
+            forced_flow_eff: 1.0,
+            universe_stress: 0.0,
+            volume_state: 0.0,
+            volume_idio: &[],
+            economy: &economy,
+            market_status: MarketStatus::Open,
+            intraday_t: 0.5,
+            volatility_multiplier: 1.0,
+            news: &[],
+            news_impact_queue: &[],
+            order_volumes: &[],
+            sector_keys: &sectors(),
+            market_sigma_daily: MARKET_FACTOR_SIGMA,
+            settle_draws: SettleDrawPolicy::FourOrZero,
+            settle_depth_counterfactual: true,
+            params: &tradefloor::params::PT_V1,
+        },
+        &mut Fixed(0.02),
+    );
+    assert_eq!(outcome.active_indices.len(), 1, "the tick should have run");
+    assert!(
+        outcome.unbounded_print.is_empty(),
+        "the replay path has no buffer to rewind, so it must report no \
+         counterfactual: {:?}",
+        outcome.unbounded_print
+    );
+    assert!(outcome.liquidity_share.is_empty());
+    // The decomposition is NOT skipped: it costs no draw and needs no
+    // buffer, so a replay still says how far the print sat from the model
+    // price.
+    assert_eq!(outcome.shock.len(), 1);
+    assert_eq!(outcome.absorbed.len(), 1);
+}
+
+/// The same tick under the generated schedule DOES report one, so the test
+/// above is about the policy rather than about the inputs.
+#[test]
+fn the_same_tick_reports_a_counterfactual_under_the_generated_schedule() {
+    let (run, _, _) = tick(thin_ask_book(100.0), 0.02, 1.0);
+    assert!(run.unbounded != run.printed);
 }
 
 /// The share is negative where the depth bound truncated the walk.

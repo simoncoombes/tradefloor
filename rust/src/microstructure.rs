@@ -552,12 +552,25 @@ pub fn settle_price_through_book(
     // an infinite `tick_volume` AND an infinite `level_size` make this NaN,
     // which must yield an EMPTY book and an early return costing zero draws.
     // Any integer cast turns that NaN into one quoted level and four draws.
+    //
+    // The `min` is also what keeps the unbounded-depth arm finite. At
+    // `depth_multiplier = f64::INFINITY` the inner term is infinite, and
+    // `quote_ladder`'s `while (i as f64) < n` pushes one level per iteration
+    // for as long as the comparison holds. Without this cap the arm asks for
+    // 34 GB and the process aborts rather than failing a test, so the bound
+    // is asserted rather than left to be read.
     let levels_needed = mathx::min(
         BOOK_LEVELS,
         scaled_depth(
             mathx::max(2.0, (tick_volume / level_size).ceil() + 1.0),
             options.depth_multiplier,
         ),
+    );
+    // NaN is a legitimate value here and means an empty book; an infinity is
+    // not, and would mean the cap above stopped capping.
+    debug_assert!(
+        !levels_needed.is_infinite(),
+        "levels_needed must stay bounded by BOOK_LEVELS, got {levels_needed}"
     );
     let mut book = build_live_book(
         company,

@@ -64,10 +64,11 @@ unbounded move is `1 - share` times the printed one.
 The absorption column is a distance and is reported as one, because
 absorption is signed with the move and the signed mean cancels to -0.4
 basis points across up and down ticks. It carries the circuit breaker
-alongside the book, because the breaker lands between the book's last trade
-and what is published. The counterfactual prints one tick from the real
-state, so it says nothing about what a deeper book would have done to the
-tick after.
+alongside the book, and the `clamp` column is the breaker's own part of it.
+Neither arm halted a name on this day: `clamp` is zero on all 9,360 rows of
+each, so both figures above are the book alone. The counterfactual prints
+one tick from the real state, so it says nothing about what a deeper book
+would have done to the tick after.
 
 Measured on day 39, the last day of the post-fork window, over 390 ticks
 and the twenty-four names drawn from `data/edgar-2026-08-31.json`. Seed

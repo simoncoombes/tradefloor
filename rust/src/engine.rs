@@ -259,6 +259,9 @@ pub struct Engine {
     /// no previous row to difference against.
     tick_shock: Vec<f64>,
     tick_absorbed: Vec<f64>,
+    /// How far the print breaker moved this tick's print, per slot. The
+    /// book's own share is `tick_absorbed - tick_clamp`.
+    tick_clamp: Vec<f64>,
     /// The depth counterfactual, per company slot. Empty unless
     /// [`Engine::set_settle_depth_counterfactual`] turned it on, which is
     /// how the reporting surface knows whether it has an arm to report.
@@ -528,6 +531,7 @@ impl Engine {
             // a move of zero is the true reading rather than a missing one.
             tick_shock: vec![0.0; companies_len],
             tick_absorbed: vec![0.0; companies_len],
+            tick_clamp: vec![0.0; companies_len],
             // Empty until the counterfactual is switched on, so emptiness is
             // the one signal that says whether an arm ran.
             tick_unbounded_print: Vec::new(),
@@ -802,6 +806,9 @@ impl Engine {
         for slot in self.tick_absorbed.iter_mut() {
             *slot = 0.0;
         }
+        for slot in self.tick_clamp.iter_mut() {
+            *slot = 0.0;
+        }
         // The counterfactual columns are prices, so their zero is the price
         // the company is carrying: unbounded depth does not move a name that
         // did not settle. Written before the copy below so an inactive slot
@@ -852,6 +859,11 @@ impl Engine {
             }
             if let Some(v) = outcome.absorbed.get(n) {
                 if let Some(slot_v) = self.tick_absorbed.get_mut(*slot) {
+                    *slot_v = *v;
+                }
+            }
+            if let Some(v) = outcome.clamp.get(n) {
+                if let Some(slot_v) = self.tick_clamp.get_mut(*slot) {
                     *slot_v = *v;
                 }
             }
@@ -933,6 +945,13 @@ impl Engine {
     /// breaker's clamp here. Zero for a company that did not tick.
     pub fn tick_absorbed(&self) -> &[f64] {
         &self.tick_absorbed
+    }
+
+    /// How far the print breaker moved each company's print this tick. Zero
+    /// where it did not fire, and `tick_absorbed - tick_clamp` is the book's
+    /// own share.
+    pub fn tick_clamp(&self) -> &[f64] {
+        &self.tick_clamp
     }
 
     /// What each company would have printed this tick against unbounded
@@ -1077,6 +1096,8 @@ impl Engine {
         self.tick_shock.resize(self.companies.len(), 0.0);
         self.tick_absorbed.clear();
         self.tick_absorbed.resize(self.companies.len(), 0.0);
+        self.tick_clamp.clear();
+        self.tick_clamp.resize(self.companies.len(), 0.0);
         // Resized only while the arm is on, so a roster that changed between
         // days does not leave a short column behind -- and emptiness keeps
         // meaning "no arm ran" rather than "no companies".
@@ -1539,6 +1560,7 @@ impl Engine {
                     anchor: &self.tick_anchor,
                     shock: &self.tick_shock,
                     absorbed: &self.tick_absorbed,
+                    clamp: &self.tick_clamp,
                     unbounded_print: &self.tick_unbounded_print,
                     liquidity_share: &self.tick_liquidity_share,
                 },
@@ -1819,6 +1841,7 @@ impl Engine {
         // as a company that never moved.
         self.tick_shock.push(0.0);
         self.tick_absorbed.push(0.0);
+        self.tick_clamp.push(0.0);
         // Only where the arm is running. Empty means no arm, and pushing
         // into an empty pair would turn that into a one-row column.
         if !self.tick_unbounded_print.is_empty() {
@@ -1874,6 +1897,9 @@ impl Engine {
         }
         if index < self.tick_absorbed.len() {
             self.tick_absorbed.remove(index);
+        }
+        if index < self.tick_clamp.len() {
+            self.tick_clamp.remove(index);
         }
         if index < self.tick_unbounded_print.len() {
             self.tick_unbounded_print.remove(index);
@@ -2687,6 +2713,9 @@ pub struct SessionBuffer {
     /// arrived and the depth that absorbed it, in log units.
     pub shock: Vec<f64>,
     pub absorbed: Vec<f64>,
+    /// How far the print breaker moved each print. `absorbed - clamp` is the
+    /// book's own share of the distance from the model price to the tape.
+    pub clamp: Vec<f64>,
     /// The depth counterfactual, each `ticks * companies` when it ran and
     /// EMPTY when it did not. Emptiness is the signal, which is why these
     /// two are not resized alongside the columns above.
@@ -2706,6 +2735,7 @@ pub struct TickTruth<'a> {
     pub anchor: &'a [f64],
     pub shock: &'a [f64],
     pub absorbed: &'a [f64],
+    pub clamp: &'a [f64],
     pub unbounded_print: &'a [f64],
     pub liquidity_share: &'a [f64],
 }
@@ -2725,6 +2755,7 @@ impl SessionBuffer {
             self.anchor.resize(needed, f64::NAN);
             self.shock.resize(needed, 0.0);
             self.absorbed.resize(needed, 0.0);
+            self.clamp.resize(needed, 0.0);
             for column in self.components.iter_mut() {
                 column.resize(needed, 0.0);
             }
@@ -2763,6 +2794,7 @@ impl SessionBuffer {
             self.anchor[base + i] = truth.anchor.get(i).copied().unwrap_or(f64::NAN);
             self.shock[base + i] = truth.shock.get(i).copied().unwrap_or(0.0);
             self.absorbed[base + i] = truth.absorbed.get(i).copied().unwrap_or(0.0);
+            self.clamp[base + i] = truth.clamp.get(i).copied().unwrap_or(0.0);
             // Guarded on the buffer rather than on the source: a session that
             // sized these columns and then met an engine with the arm off
             // would otherwise write NaN into a column it had promised.
