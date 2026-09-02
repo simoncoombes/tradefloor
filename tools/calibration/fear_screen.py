@@ -463,6 +463,67 @@ def _grid(name):
                 "Ck15c20": cell(vix_selfex_vix_power=1.5),
                 "Cg20": cell(vix_selfex_gain=0.20),
                 "Cch06": cell(vix_selfex_vol_jump=0.6)}
+    elif name == "g03c05":
+        # Round 172.9: the fund4 frontier under the adopted card (verify0312,
+        # feasible on every horizon, one clustering row out at -4.2 sd). The
+        # five fear gates re-measured on the cell beside the overlay it grew
+        # from (the claw-back cell + ramp 5) and the shipped default.
+        ovl = {
+                "vix_selfex_gain": 0.25,
+                "vix_selfex_threshold": 1.75,
+                "vix_selfex_size_coupling": 0.5,
+                "vix_decay_ratio": 0.85,
+                "vix_selfex_relax_slope": 0.03,
+                "vix_selfex_min": 2.0,
+                "vix_selfex_scale": 4.0,
+                "vix_selfex_vol_jump": 0.75,
+                "vix_har_weight": 0.18,
+                "vix_har_mid": 0.3,
+                "vix_har_vrp": 1.0,
+                "vix_selfex_level_ref": 0.007593024924589399,
+                "vix_selfex_vix_power": 1.0,
+                "vix_selfex_vix_cap": 2.0,
+                "vix_selfex_kick_clawback": 1.0,
+                "vix_selfex_kick_confirm": 1.0,
+                "crisis_blend_ramp": 5.0
+            }
+        g03c05 = {
+                "vix_selfex_gain": 0.25,
+                "vix_selfex_threshold": 1.75,
+                "vix_selfex_size_coupling": 0.5,
+                "vix_decay_ratio": 0.85,
+                "vix_selfex_relax_slope": 0.03,
+                "vix_selfex_min": 2.0,
+                "vix_selfex_scale": 4.0,
+                "vix_selfex_vol_jump": 0.75,
+                "vix_har_weight": 0.18,
+                "vix_har_mid": 0.3,
+                "vix_har_vrp": 1.0,
+                "vix_selfex_level_ref": 0.007593024924589399,
+                "vix_selfex_vix_power": 1.0,
+                "vix_selfex_vix_cap": 2.0,
+                "vix_selfex_kick_clawback": 1.0,
+                "vix_selfex_kick_confirm": 1.0,
+                "crisis_blend_ramp": 5.0,
+                "market_factor_sigma": 0.0068121429,
+                "idio_sigma_scale": 0.48794954,
+                "jump_sigma_idio": 0.071591575,
+                "jump_sigma_market": 0.0023414776,
+                "endogenous_news_sigma": 0.016668061,
+                "sector_factor_sigma": 0.0081703313,
+                "market_vol_gamma": 0.02235702,
+                "market_vol_alpha": 0.26917153,
+                "garch_gamma": 0.10774656,
+                "garch_alpha": 0.097226615,
+                "crisis_vix_threshold": 32.082189,
+                "market_beta_down_asym": 0.0067591808,
+                "sector_loading_beta_slope": 0.52944912,
+                "vix_cycle_amplitude": 0.89696652,
+                "vix_mean_reversion": 0.05,
+                "vix_realised_vol_weight": 0.39605567,
+                "volume_move_response": 1.0094553
+            }
+        return {"v16": {}, "ovl": ovl, "g03c05": g03c05}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):
