@@ -360,6 +360,40 @@ def _grid(name):
                 cells[f"d{int(dcy * 100)}e{int(ed * 100)}"] = {
                     **ovl, "vix_selfex_decay": dcy, "vix_selfex_excite_decay": ed}
         return cells
+    elif name == "combo1":
+        # Round 171.11: the fund4 overlay candidates — the frozen fear cell
+        # with the decay at 0.88 (persist1: acf5 -4.9 -> -2.1sd at a small
+        # fear price), the capped state power (171.9) and the level
+        # reference (171.8/171.9), in combination.
+        REF = 0.007593024924589399
+        ovl = {"vix_selfex_gain": 0.25, "vix_selfex_threshold": 1.75,
+               "vix_selfex_size_coupling": 0.5, "vix_decay_ratio": 0.85,
+               "vix_selfex_relax_slope": 0.03, "vix_selfex_min": 2.0,
+               "vix_selfex_scale": 4.0, "vix_selfex_vol_jump": 0.75,
+               "vix_har_weight": 0.18, "vix_har_mid": 0.3, "vix_har_vrp": 1.0,
+               "vix_selfex_decay": 0.88}
+        def cell(r=1.0, k=0.0, cap=0.0, **extra):
+            c = dict(ovl)
+            c["vix_selfex_level_ref"] = REF
+            if r != 1.0:
+                c["market_factor_sigma"] = float(f"{REF * r:.8g}")
+            if k:
+                c["vix_selfex_vix_power"] = k
+            if cap:
+                c["vix_selfex_vix_cap"] = cap
+            c.update(extra)
+            return c
+        return {"v16": {},
+                "d88": cell(),
+                "d88k10c10": cell(k=1.0, cap=1.0),
+                "d88k10c15": cell(k=1.0, cap=1.5),
+                "d88k10c20": cell(k=1.0, cap=2.0),
+                "d88k05c15": cell(k=0.5, cap=1.5),
+                "d88k15c15": cell(k=1.5, cap=1.5),
+                "d88r85": cell(0.85),
+                "d88r85k10c15": cell(0.85, k=1.0, cap=1.5),
+                "d88r78k10c15": cell(0.78, k=1.0, cap=1.5),
+                "d85k10c15": cell(k=1.0, cap=1.5, vix_selfex_decay=0.85)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):
