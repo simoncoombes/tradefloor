@@ -1,0 +1,182 @@
+{
+  "replications": 4,
+  "ordering_holds_on_means": 3,
+  "per_arm": {
+    "control": {
+      "mean_of_means": 0.7786483930163872,
+      "stdev_of_means": 0.09917382956949307,
+      "min": 0.6366175082334374,
+      "max": 0.9164962845276587
+    },
+    "crisis": {
+      "mean_of_means": 0.65837393171866,
+      "stdev_of_means": 0.03918056110028931,
+      "min": 0.6265990822468295,
+      "max": 0.7251583173011342
+    }
+  },
+  "rows": [
+    {
+      "index": 1,
+      "transcript": "run-01.json",
+      "mean_exposure": {
+        "control": 0.7718451793357196,
+        "crisis": 0.6354915969921242
+      },
+      "risk_language": {
+        "control": 13,
+        "crisis": 20
+      },
+      "decisions": 20,
+      "ordering_strict": 17,
+      "ordering_days": 20,
+      "ordering_failures": [
+        20,
+        21,
+        22
+      ],
+      "holds_on_means": true,
+      "agent_change": {
+        "control": 0.09775666240367886,
+        "crisis": -0.1592272813050225
+      },
+      "decision_counts": {
+        "control": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "crisis": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        }
+      },
+      "refusals": 0
+    },
+    {
+      "index": 2,
+      "transcript": "run-02.json",
+      "mean_exposure": {
+        "control": 0.9164962845276587,
+        "crisis": 0.7251583173011342
+      },
+      "risk_language": {
+        "control": 11,
+        "crisis": 18
+      },
+      "decisions": 20,
+      "ordering_strict": 20,
+      "ordering_days": 20,
+      "ordering_failures": [],
+      "holds_on_means": true,
+      "agent_change": {
+        "control": 0.07894457602701066,
+        "crisis": -0.17938572044779977
+      },
+      "decision_counts": {
+        "control": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "crisis": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        }
+      },
+      "refusals": 0
+    },
+    {
+      "index": 3,
+      "transcript": "run-03.json",
+      "mean_exposure": {
+        "control": 0.789634599968733,
+        "crisis": 0.6265990822468295
+      },
+      "risk_language": {
+        "control": 16,
+        "crisis": 19
+      },
+      "decisions": 20,
+      "ordering_strict": 20,
+      "ordering_days": 20,
+      "ordering_failures": [],
+      "holds_on_means": true,
+      "agent_change": {
+        "control": -0.05369329432467196,
+        "crisis": -0.2170507929621719
+      },
+      "decision_counts": {
+        "control": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "crisis": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        }
+      },
+      "refusals": 0
+    },
+    {
+      "index": 4,
+      "transcript": "run-04.json",
+      "mean_exposure": {
+        "control": 0.6366175082334374,
+        "crisis": 0.646246730334552
+      },
+      "risk_language": {
+        "control": 13,
+        "crisis": 19
+      },
+      "decisions": 20,
+      "ordering_strict": 8,
+      "ordering_days": 20,
+      "ordering_failures": [
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31
+      ],
+      "holds_on_means": false,
+      "agent_change": {
+        "control": -0.16483229718233994,
+        "crisis": -0.24104498941413666
+      },
+      "decision_counts": {
+        "control": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "crisis": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        }
+      },
+      "refusals": 0
+    }
+  ],
+  "gaps": {
+    "control - crisis": {
+      "mean_gap": 0.1202744612977272,
+      "min_gap": -0.00962922210111461,
+      "spread": 0.09917382956949307,
+      "ratio": 1.2127641114579377,
+      "positive_in": 3
+    }
+  }
+}
