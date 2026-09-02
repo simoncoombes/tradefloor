@@ -380,21 +380,22 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     verifies against itself either way, because a replay runs the spelling
     its own log holds.
 
-    On this build it refuses a snapshot from a run whose roster changed, and
-    that is the reader-side half of this package going missing rather than a
-    cosmetic limit. ``volume_idio``, the per-name volume state, is sized at
-    construction and is the one per-slot array ``add_company`` and
-    ``remove_company`` do not maintain, so after a listing or a delisting its
-    width disagrees with the roster and the length check refuses.
-    ``Engine.state_hash`` in Rust hashes that array at the width the engine
-    was built with, so a roster-changing run's leaf covers a stale count of
-    values. Such a run still verifies, because the recording and the replay
-    read the same array, and no price depends on the width: every shipped
-    preset holds ``volume_idio_sigma`` and ``volume_idio_persistence`` at
-    0.0, so every value in the array is exactly 0.0. The fix belongs in the
-    engine and moves a trajectory, since ``update_volume_idio`` draws once
-    per slot before its zero check and resizing the array would change that
-    stream's draw count.
+    It hashes each per-slot array at the width the snapshot carries, and
+    refuses a snapshot whose arrays disagree with the roster, since it
+    decodes each one against a length it computes from the roster. Before
+    tradefloor issue #148, ``volume_idio`` is sized at construction and is
+    the one per-slot array ``add_company`` and ``remove_company`` do not
+    resize, so a snapshot taken after a listing or a delisting is refused
+    and a run whose roster changed cannot be checked here.
+    ``Engine.state_hash`` in Rust hashes the same array at the same width,
+    so such a run's leaf is self-consistent and :func:`verify` passes over
+    it. No price depends on the width: every shipped preset holds
+    ``volume_idio_sigma`` and ``volume_idio_persistence`` at 0.0, so every
+    value in that array is exactly 0.0. Issue #148 is where the resize is
+    being made, and
+    ``test_the_twin_hashes_exactly_the_snapshots_whose_widths_agree`` reads
+    the widths off the snapshot rather than pinning them, so it states the
+    same relationship on either side of that.
 
     ## The encoding
 
@@ -2019,13 +2020,9 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
     committed predecessor, which is every one of them except day 0.
 
     The unit is day-runs and engine ticks, and it is exact in those units.
-    Wall time tracks it closely. On ``Universe.random(40, seed=7)``, seed 42,
-    twenty days at 390 ticks, at ``858fda5``: ``run_days`` takes 0.048
-    seconds a day, this function with k of 20 takes 0.049, and
-    ``reproduce()`` over the same log takes 0.054. A replayed day carries an
-    overhead a live one does not, because it goes through the Python
-    operation table and, for a day after the first, a state restore.
-    ``reproduce()`` carries the same overhead over the same log.
+    Wall time tracks it, and the ratio is the part worth quoting: seconds on
+    one machine say as much about what else was running as about this
+    function.
 
     ## What it cannot say
 

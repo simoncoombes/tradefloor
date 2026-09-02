@@ -30,29 +30,28 @@ day-runs and which of the two costs was paid.
 ### The ledger size
 
 The states sit in the ledger, beside the manifest rather than inside it.
-On `Universe.random(40, seed=7)`, seed 42, 252 days at 30
-ticks a day with `record=False`, the ledger writes 4.88 MB with the states
-and 16.9 kB without them, next to a 61.8 kB manifest. A manifest is meant to be read, so it carries the root, the
-count and the hash version.
+On `Universe.random(40, seed=7)`, seed 42, 252 days at 30 ticks a day with
+`record=False`, the ledger writes 4.88 MB with the states and 16.9 kB
+without them, next to a 61.8 kB manifest. A manifest is meant to be read,
+so it carries the root, the count and the hash version.
 
 ### The per-name volume array and a changed roster
 
-`tradefloor.manifest.state_hash` refuses a snapshot taken after a listing
-or a delisting, so the reader-side check does not serve a run whose roster
-changed. `volume_idio` is sized at construction and is the one per-slot
-array `add_company` and `remove_company` do not maintain, so its width
-disagrees with the roster after either. `Engine.state_hash` in Rust walks
-it at the constructor's width, so such a run's leaf covers a stale count of
-values and `verify` passes over it, since the recording and the replay read
-the same array.
+`tradefloor.manifest.state_hash` hashes each per-slot array at the width
+the snapshot carries and refuses a snapshot whose arrays disagree with the
+roster. Before tradefloor issue #148, `volume_idio` is sized at
+construction and is the one per-slot array `add_company` and
+`remove_company` do not resize, so a snapshot taken after a listing or a
+delisting is refused and a run whose roster changed cannot be checked by
+the Python side. `Engine.state_hash` in Rust hashes the same array at the
+same width, so such a run's leaf is self-consistent and `verify` passes
+over it.
 
-No price moves. Every shipped preset holds `volume_idio_sigma` and
-`volume_idio_persistence` at 0.0, so every value in the array is exactly
-0.0 and a shift is a shift between equal values. The fix belongs in the
-engine and moves a trajectory: `update_volume_idio` draws once per slot
-before its zero check, so resizing the array changes that stream's draw
-count and every leaf of a roster-changing run with it. A test pins the
-current widths and fails the day the engine carries the array.
+No price depends on the width. Every shipped preset holds
+`volume_idio_sigma` and `volume_idio_persistence` at 0.0, so every value
+in the array is exactly 0.0. Issue #148 is where the resize is being made,
+and the test here reads the widths off the snapshot rather than pinning
+them, so it states the same relationship before and after that lands.
 
 ### The session flag at a close
 

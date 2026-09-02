@@ -9,7 +9,6 @@ behaves the same with the ledger block and without it.
 """
 
 import json
-import re
 import struct
 
 import pytest
@@ -543,23 +542,66 @@ def test_the_caveat_says_when_a_day_came_from_construction():
                in caveat for caveat in without.caveats)
 
 
-def test_a_caveat_never_puts_a_number_in_front_of_the_wrong_plural():
+def _says(text, phrase):
+    """Whether `phrase` appears in `text` as whole words.
+
+    Written on split words rather than a regex, and that is a scar. The
+    first version of the guard below used a word boundary in a raw f-string
+    and shipped two literal backspace bytes instead of the two characters
+    that spell one, so the compiled pattern was the phrase wrapped in a
+    control character no caveat can contain. The assertion was vacuously
+    true for every input, it survived a local run and five CI targets, and
+    it was weaker than the bare substring test it replaced. There is no
+    escape sequence here to get wrong.
+    """
+    stripped = text
+    for mark in ".,;:()":
+        stripped = stripped.replace(mark, " ")
+    words = stripped.split()
+    target = phrase.split()
+    return any(words[i:i + len(target)] == target
+               for i in range(len(words) - len(target) + 1))
+
+
+def test_a_caveat_never_puts_a_number_before_the_wrong_plural(monkeypatch):
     """These strings are read by a person, so "1 days" is a defect.
 
     Every count in a caveat goes through `_count`, which is the only reason
-    the singular case reads. Checked at k of 1 because that is where every
-    number in the sentence lands on one.
-    """
-    _, ledger, manifest = run()
-    joined = " ".join(mf.verify(manifest, ledger, 1, seed=12).caveats)
-    for wrong in ("1 days", "1 day-runs", "1 engine ticks"):
-        # Word-bounded: a bare substring test reads "11 days" as "1 days"
-        # and fails on a sentence that is correct.
-        assert not re.search(rf"{wrong}", joined), joined
-    assert "1 day-run" in joined
+    the singular case reads. Checked on a one-day run verified at k of 1,
+    which is where every number in the sentence lands on one.
 
-    plural = " ".join(mf.verify(manifest, ledger, 4, seed=7).caveats)
-    assert "4 day-runs" in plural
+    Then checked again against a subject that is broken on purpose, because
+    the first version of this test could not fail. `_count` is replaced by
+    one that always pluralises, and the same phrases that must be absent
+    above must be present below. Without that half, a guard can report green
+    over a defect it is named for, which is what happened here.
+    """
+    wrong = ("1 days", "1 day-runs")
+    _, ledger, manifest = run(days=1)
+
+    joined = " ".join(mf.verify(manifest, ledger, 1, seed=3).caveats)
+    assert [w for w in wrong if _says(joined, w)] == [], joined
+    assert _says(joined, "1 day") and _says(joined, "1 day-run")
+
+    monkeypatch.setattr(mf, "_count", lambda n, noun: f"{n} {noun}s")
+    broken = " ".join(mf.verify(manifest, ledger, 1, seed=3).caveats)
+    assert [w for w in wrong if _says(broken, w)] == list(wrong), (
+        "the guard cannot see a broken _count, so it is not a guard: "
+        + broken
+    )
+
+
+def test_the_word_match_reads_whole_words():
+    """The reason the guard is word-bounded at all.
+
+    A bare substring test finds "1 days" inside "11 days", which is a
+    correct sentence, and fails on it. That is the defect the first version
+    tried to avoid and introduced a worse one doing.
+    """
+    assert not _says("The root covers the other 11 days.", "1 days")
+    assert _says("recomputed 1 days on this build", "1 days")
+    assert not _says("The sample cost 1 day-runs.", "1 day-run")
+    assert _says("The sample cost 1 day-run.", "1 day-run")
 
 
 def test_an_empty_ledger_has_no_root_and_no_proof():
@@ -841,94 +883,86 @@ def test_a_session_closed_day_ledgers_like_an_explicit_close():
     )
 
 
-#: The per-slot arrays a snapshot carries, and the number of f64 slots each
-#: holds per instrument. `volume_idio` is deliberately absent: it is the one
-#: the engine does not resize, which is what the test below pins.
+#: Every per-slot array a snapshot carries, and the f64 slots each holds per
+#: instrument. The columns are added at runtime, since the snapshot names
+#: them itself.
 _PER_SLOT = {"attribution": 9, "tick_components": 8, "tick_fundamental": 1,
-             "tick_anchor": 1}
+             "tick_anchor": 1, "volume_idio": 1}
 
 
 def _slots(buffer, per_instrument):
     return len(buffer) // 8 // per_instrument
 
 
-@pytest.mark.parametrize("change", ["list", "delist"])
-def test_the_per_name_volume_array_does_not_follow_the_roster(change):
-    """A gap in the engine, pinned here so it cannot go quiet.
+def _widths(snapshot):
+    """Each per-slot array in a snapshot, by the instruments it holds."""
+    out = {name: _slots(snapshot[name], per)
+           for name, per in _PER_SLOT.items()}
+    for name, buffer in snapshot["columns"].items():
+        out[f"columns.{name}"] = _slots(buffer, 1)
+    return out
 
-    `volume_idio` is sized once at construction and is the one per-slot array
-    `add_company` and `remove_company` do not maintain. Every other per-slot
-    array follows the roster. Nothing has read the array per slot until this
-    package hashed it, which is why the gap surfaced here.
 
-    Two consequences, and both are narrower than they look. The Python twin
-    refuses any snapshot taken after a listing or a delisting, so the
-    reader-side check cannot serve a run whose roster changed. The Rust leaf
-    walks the array at the constructor's width, so such a run's leaf covers a
-    stale count of values. No price moves either way: every shipped preset
-    holds `volume_idio_sigma` and `volume_idio_persistence` at 0.0, so every
-    value in the array is exactly 0.0 and a shift is a shift between equal
-    values.
+@pytest.mark.parametrize("change", ["none", "list", "delist"])
+def test_the_twin_hashes_exactly_the_snapshots_whose_widths_agree(change):
+    """What the Python twin can check follows from the widths it is handed.
 
-    The fix belongs in the engine and moves a trajectory, because
-    `update_volume_idio` draws once per slot before its zero check, so
-    resizing the array changes that stream's draw count and every leaf of a
-    roster-changing run with it. This package cannot take that, so it states
-    it instead.
+    The twin decodes each per-slot array against a length it computes from
+    the roster, so it can hash a snapshot when every array holds one slot per
+    instrument and must refuse one when any array does not. This asserts that
+    relationship rather than either outcome, so it states the correct thing
+    whatever the engine does with the arrays.
 
-    Written to FAIL the day `add_company` and `remove_company` carry the
-    array. That is the prompt to delete this test, lift the paragraph from
-    both `state_hash` docstrings, and check whether any recorded ledger was
-    written under the old widths.
+    That matters right now. On a build before tradefloor issue #148,
+    `volume_idio` is sized at construction and is the one per-slot array
+    `add_company` and `remove_company` do not resize, so the `list` and
+    `delist` cases take the refusing branch and `none` takes the hashing
+    branch. When #148 lands they all take the hashing branch and this test
+    goes on asserting the same thing. A test that pinned the refusal would
+    fail on the day the defect was fixed, which is the failure this file
+    keeps finding elsewhere.
+
+    No price rides on it either way. Every shipped preset holds
+    `volume_idio_sigma` and `volume_idio_persistence` at 0.0, so every value
+    in that array is exactly 0.0 and a width that lags the roster shifts
+    zeros past zeros.
     """
-    built = len(UNIVERSE)
     engine = tf.Engine(seed=SEED, universe=UNIVERSE)
     engine.open_market()
     engine.run_session(9, 30, 3, TICKS)
     engine.close_market()
-    assert _slots(engine.state_snapshot()["volume_idio"], 1) == built
-    assert state_hash(engine.state_snapshot()) == engine.state_hash()
 
     if change == "list":
         engine.list_instrument(tf.Instrument(
             "NEWCO", "technology", initial_price=40.0,
             shares_outstanding=1e8, eps=2.0, book_value_per_share=10.0,
             revenue_growth=0.05, avg_volume=5e5, beta=1.1))
-    else:
+    elif change == "delist":
         engine.delist(0)
 
     snapshot = engine.state_snapshot()
     roster = len(snapshot["tickers"])
-    assert roster == (built + 1 if change == "list" else built - 1)
+    widths = _widths(snapshot)
+    lagging = sorted(name for name, width in widths.items()
+                     if width != roster)
 
-    for name, per_instrument in _PER_SLOT.items():
-        assert _slots(snapshot[name], per_instrument) == roster, (
-            f"{name} no longer follows the roster, so the array below is not "
-            "the only one out of step"
+    if not lagging:
+        assert engine.state_hash() == state_hash(snapshot), (
+            "every per-slot array holds one slot per instrument, so the twin "
+            "has everything it needs and must agree with the engine"
         )
-    for name in snapshot["columns"]:
-        assert _slots(snapshot["columns"][name], 1) == roster
+    else:
+        named = lagging[0].split(".")[-1]
+        with pytest.raises(tf.ValidationError, match=named):
+            state_hash(snapshot)
 
-    assert _slots(snapshot["volume_idio"], 1) == built, (
-        "volume_idio now follows the roster. The engine gap this test pins "
-        "is fixed: delete the test and the paragraph in both state_hash "
-        "docstrings, and check any ledger recorded under the old widths."
-    )
-
-    # The reader-side hole. The twin refuses rather than hashing a width it
-    # cannot check against the roster, which is what made the gap visible.
-    with pytest.raises(tf.ValidationError, match="volume_idio"):
-        state_hash(snapshot)
-
-    # The Rust leaf still computes, over the constructor's width.
-    assert len(engine.state_hash()) == 64
-
-    # Why no price moves: the array is all zeros on every shipped preset.
-    values = set(struct.unpack("<%dd" % built, snapshot["volume_idio"]))
-    assert values == {0.0}
+    # The dials behind the array the widths currently turn on, so the "no
+    # price rides on it" claim above is measured rather than remembered.
     model = dict(engine.model_params)
     assert model["volume_idio_sigma"] == 0.0
     assert model["volume_idio_persistence"] == 0.0
+    assert set(struct.unpack("<%dd" % widths["volume_idio"],
+                             snapshot["volume_idio"])) == {0.0}
 
 
 def test_a_run_that_lists_and_delists_still_verifies():
@@ -943,11 +977,12 @@ def test_a_run_that_lists_and_delists_still_verifies():
     column holds.
 
     This checks the Rust leaf and nothing else, which is the whole of what
-    `verify` computes. It cannot also check the Python twin: the twin refuses
-    every snapshot taken after a roster change, for the reason
-    `test_the_per_name_volume_array_does_not_follow_the_roster` above pins.
-    So a roster-changing run is covered here on one side only, and the day
-    that gap closes this test should grow the second side.
+    `verify` computes. It cannot also check the Python twin, because on a
+    build before tradefloor issue #148 the twin refuses every snapshot taken
+    after a roster change:
+    `test_the_twin_hashes_exactly_the_snapshots_whose_widths_agree` above
+    says why, and derives it rather than pinning it. So a roster-changing run
+    is covered here on one side today, and on both once #148 lands.
     """
     engine = tf.Engine(seed=SEED, universe=UNIVERSE)
     ledger = tf.DayLedger()
