@@ -382,8 +382,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
 
     It hashes each per-slot array at the width the snapshot carries, and
     refuses a snapshot whose arrays disagree with the roster, since it
-    decodes each one against a length it computes from the roster. Before
-    tradefloor issue #148, ``volume_idio`` is sized at construction and is
+    decodes each one against a length it computes from the roster. That is
+    the invariant, whatever the roster does.
+
+    Before tradefloor issue #148 one array makes that width differ from the
+    roster's. ``volume_idio`` is sized at construction and is
     the one per-slot array ``add_company`` and ``remove_company`` do not
     resize, so a snapshot taken after a listing or a delisting is refused
     and a run whose roster changed cannot be checked here.
@@ -395,7 +398,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     being made, and
     ``test_the_twin_hashes_exactly_the_snapshots_whose_widths_agree`` reads
     the widths off the snapshot rather than pinning them, so it states the
-    same relationship on either side of that.
+    same relationship on either side of that. This second paragraph goes
+    when #148 lands.
 
     ## The encoding
 
