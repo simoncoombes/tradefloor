@@ -1,5 +1,49 @@
 # Changelog
 
+## Unreleased
+
+**A run can commit to the state it held at the end of every day.** A
+`DayLedger` takes a canonical hash of the engine's state at every close,
+and a `RunManifest` written with one carries the Merkle root over those
+hashes. `tradefloor.manifest.verify` recomputes k random days from their
+committed predecessors and checks each leaf against the root, so checking
+k days costs k days of simulation whatever the length of the run.
+`Engine.state_hash` covers every field a state snapshot carries, including
+the macro chain and the generator positions the market digest leaves out,
+and `tradefloor.manifest.state_hash` computes the same digest in Python
+from `state_snapshot()`. Nothing about a trajectory moves: the manifest
+field is additive under the schema it already had, and `reproduce()`
+behaves the same with the field and without it.
+
+<!-- release-note-ends -->
+
+### The measured cost
+
+On `Universe.random(8, seed=99)`, seed 42, twelve days at 30 ticks a day,
+verifying k days runs k days of ticks and no more, for k of 1, 3 and 12.
+The whole run is 360 ticks, so a four-day verification is a third of what
+replaying it costs. A ledger written without the states reaches day d by
+running to it, so three sampled days cost 31 day-runs, and `Verification`
+reports which of the two was paid along with the days it drew.
+
+### The ledger size
+
+The states sit in the ledger, beside the manifest rather than inside it.
+On `Universe.random(40, seed=7)`, seed 42, 252 days, the ledger writes
+4.88 MB with the states and 16.9 kB without them, next to a 61.8 kB
+manifest. A manifest is meant to be read, so it carries the root, the
+count and the hash version.
+
+### The session flag at a close
+
+`run_session(close_at_end=True)` leaves the binding's session flag set
+where `close_market()` clears it, so the two spellings of one close
+produce different leaves for the same market. The columns, the macro
+chain, the generators and the draw count are identical across them, which
+is why nothing saw the flag until a leaf covered it. The flag is left
+where it is: clearing it would change the trajectory of a run that calls
+`run_session` twice without opening a market between them.
+
 ## 0.6.2
 
 **A scenario reaches the agent.** `market.liquidity` is the one scenario
