@@ -13,11 +13,14 @@ have to be re-read for verbs and commas.
 Every rule reports the file, the line and the text, so a failure is
 actionable rather than a score.
 
-One rule here is not about style. `control_bytes` reads the raw file and
-reports any byte below 0x20 outside tab, newline and carriage return, and
-DEL at 0x7F. Such a byte is invisible in an editor, in a diff and in a
-review, and it passes every check that asks whether a file is ASCII,
-because every one of them is ASCII.
+One rule here is not about style. `control_bytes` reads the whole file,
+before either parse, and reports any byte below 0x20 outside tab, newline
+and carriage return, and DEL at 0x7F. Such a byte is invisible in an editor,
+in a diff and in a review, and it passes every check that asks whether a
+file is ASCII, because every one of them is ASCII.
+
+A finding exits non-zero, so a hook or a CI step that tests the status sees
+one.
 """
 
 from __future__ import annotations
@@ -54,6 +57,15 @@ SIGNIFICANCE = [
 #: passes it, because 0x08 is below 128. Two literal backspaces inside a
 #: regex in a test made that assertion match nothing while the suite
 #: reported green, which is what this rule exists to catch.
+#:
+#: Carriage return earns its place from the two callers that can see one.
+#: This repository is LF everywhere: `.gitattributes` sets `* text=auto
+#: eol=lf`, so a checkout holds LF on every platform, and 0 of its 592
+#: tracked files carry a CRLF or a lone CR. The checker path cannot see one
+#: either, because `read_text` translates newlines before this rule reads
+#: the text. What can see one is a caller that reads BYTES, which is how
+#: `tests/test_brand_commitments.py` walks the tree, and the vendored copy
+#: in `tradefloor-docs`, whose tree sets no such attribute.
 ALLOWED_CONTROL = frozenset({0x09, 0x0A, 0x0D})
 
 #: DEL. It sits above the printable range rather than below it, so a rule
@@ -66,6 +78,7 @@ DEL = 0x7F
 def is_control(code: int) -> bool:
     """The rule: C0 outside tab, newline and return, and DEL."""
     return (code < 0x20 and code not in ALLOWED_CONTROL) or code == DEL
+
 
 #: Definition by negation.
 NEGATION = [
@@ -176,12 +189,17 @@ def excerpt(text: str, at: int, span: int = 34) -> str:
 
 
 def control_bytes(label: str, text: str) -> list[str]:
-    """Control bytes, read over the RAW file rather than its parsed blocks.
+    """Control bytes, read over the WHOLE file rather than its parsed blocks.
 
     Every other rule here reads paragraphs, so none of them sees a heading,
     a fenced code block, or a line the markdown parser dropped. A control
-    byte hides in exactly those places, so this reads the file as it was
-    written and reports the line and the column.
+    byte hides in exactly those places, so this runs before either parse and
+    reports the line and the column.
+
+    `text` is the decoded file with its newlines already translated by
+    `read_text`, so a carriage return never reaches this rule on the checker
+    path. Every other byte it reports arrives untouched, and a caller that
+    reads bytes and decodes them itself sees carriage returns too.
 
     The reported excerpt goes through `repr`, so the byte appears as `\\x08`
     rather than being written to a terminal that would act on it.
@@ -246,7 +264,7 @@ def from_markdown(path: pathlib.Path) -> list[str]:
 def from_page(path: pathlib.Path) -> list[str]:
     """The rendered page: its headings and its paragraphs."""
     text = path.read_text(encoding="utf-8")
-    # As in `from_markdown`: the raw file, before the markup is stripped.
+    # As in `from_markdown`: the whole file, before the markup is stripped.
     control = control_bytes(path.name, text)
     src = text.split("<template")[0]
     src = re.sub(r"<(script|style|pre|code)[^>]*>.*?</\1>", " ", src, flags=re.S)
@@ -257,7 +275,7 @@ def from_page(path: pathlib.Path) -> list[str]:
     return control + check_text(path.name, blocks, headings)
 
 
-def main() -> None:
+def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("paths", nargs="*")
     ap.add_argument("--quiet", action="store_true",
@@ -289,7 +307,15 @@ def main() -> None:
         for f in findings:
             print(f"  {f}")
     print(f"{len(findings)} findings across {len(targets)} files")
+    # A finding exits non-zero, so a hook, a CI step or a shell script that
+    # tests the status sees it. It printed one and returned 0 until now,
+    # which made every caller that trusted the status pass over a real
+    # finding. `tools/release/check.py` reads the last line rather than the
+    # status and was unaffected either way. `tradefloor-docs` vendors this
+    # file, so its build starts failing on a finding rather than printing
+    # one, which is the point.
+    return 1 if findings else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

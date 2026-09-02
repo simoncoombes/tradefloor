@@ -177,15 +177,72 @@ def test_the_excerpt_escapes_the_byte_rather_than_printing_it(tmp_path):
 def test_tab_newline_and_return_are_allowed(tmp_path):
     """The three a text file legitimately holds.
 
-    Carriage return is on the list because `.gitattributes` normalises line
-    endings on the way in, so a working tree on Windows holds CRLF and a
-    rule that rejected it would fail on every checkout there.
+    This repository is LF everywhere, because `.gitattributes` sets
+    `* text=auto eol=lf`, and no tracked file carries a CRLF or a lone CR.
+    The checker path cannot see a carriage return either, since `read_text`
+    translates newlines before the rule reads the text, which is why this
+    test cannot pin the allowance and `test_the_rule_covers_the_range_it_claims`
+    states it against `control_bytes` directly. The entry earns its place
+    from the callers that read BYTES: the tree walk in
+    `tests/test_brand_commitments.py`, and the copy of this checker that
+    `tradefloor-docs` vendors into a tree with no such attribute.
     """
     page = tmp_path / "page.md"
     page.write_text("a line\twith a tab\r\nand a second line here\n",
                     encoding="utf-8")
     out = run_checker(page)
     assert "control byte" not in out.stdout, out.stdout
+
+
+def test_a_carriage_return_is_allowed_when_a_caller_reads_bytes():
+    """The allowance, stated where it can actually be reached.
+
+    `control_bytes` takes decoded text, so a caller that reads bytes and
+    decodes them itself hands it a carriage return intact. Removing 0x0D
+    from `ALLOWED_CONTROL` makes this fail, where no test going through the
+    command line could tell the difference.
+    """
+    from prose import control_bytes  # noqa: PLC0415
+
+    text = b"line one\r\nline two\r\n".decode("utf-8")
+    assert "\r" in text, "the fixture must carry a real carriage return"
+    assert not control_bytes("f.md", text)
+
+
+def test_a_finding_exits_non_zero(tmp_path):
+    """A hook or a CI step that tests the status has to see a finding.
+
+    The checker printed a finding and returned 0 until now, so any caller
+    trusting the status passed over one. `tools/release/check.py` reads the
+    last line instead and caught them either way. `tradefloor-docs` vendors
+    this file, so its build now fails on a finding rather than printing it.
+    """
+    page = tmp_path / "page.md"
+    page.write_text(f"A paragraph with a {BACKSPACE} byte, and more words.\n",
+                    encoding="utf-8")
+    out = run_checker(page)
+    assert "control byte 0x08" in out.stdout, out.stdout
+    assert out.returncode == 1, "a finding must exit non-zero"
+
+
+def test_a_style_finding_exits_non_zero_too(tmp_path):
+    """The status follows findings, rather than this one rule."""
+    page = tmp_path / "page.md"
+    page.write_text("# Why this heading is a sentence\n\n"
+                    "A paragraph with enough words to pass the length rule.\n",
+                    encoding="utf-8")
+    out = run_checker(page)
+    assert "noun phrase" in out.stdout, out.stdout
+    assert out.returncode == 1
+
+
+def test_a_clean_file_exits_zero(tmp_path):
+    page = tmp_path / "page.md"
+    page.write_text("A clean paragraph with enough words to pass every rule.\n",
+                    encoding="utf-8")
+    out = run_checker(page)
+    assert out.stdout.strip().endswith("0 findings across 1 files"), out.stdout
+    assert out.returncode == 0
 
 
 def test_the_rule_covers_the_range_it_claims():

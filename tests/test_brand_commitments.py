@@ -25,6 +25,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import typing
 
 import pytest
 
@@ -397,6 +398,45 @@ def every_tracked_file() -> list[str]:
     return [f for f in out.stdout.split("\n") if f]
 
 
+class TreeScan(typing.NamedTuple):
+    """What one walk of the tree saw, including everything it could not read.
+
+    Three ways a file leaves the scan without being checked, and each one
+    gets its own list. A single "skipped" bucket, or no bucket at all, is how
+    a walk reports green over a file it never opened.
+    """
+
+    findings: list[str]
+    seen: list[str]
+    undecodable: list[str]
+    missing: list[str]
+
+
+def scan_tree(paths: list[str] | None = None) -> TreeScan:
+    """Apply the control-byte rule to each path, and account for all of them.
+
+    Bytes rather than `read_text`, so a carriage return survives to the rule
+    instead of being translated to a newline on the way in.
+    """
+    findings: list[str] = []
+    seen: list[str] = []
+    undecodable: list[str] = []
+    missing: list[str] = []
+    for path in (every_tracked_file() if paths is None else paths):
+        p = ROOT / path
+        if not p.is_file():
+            missing.append(path)
+            continue
+        try:
+            text = p.read_bytes().decode("utf-8")
+        except UnicodeDecodeError:
+            undecodable.append(path)
+            continue
+        seen.append(path)
+        findings += prose.control_bytes(path, text)
+    return TreeScan(findings, seen, undecodable, missing)
+
+
 def test_no_tracked_file_carries_a_control_byte():
     """Any byte below 0x20 outside tab, newline and carriage return, and DEL.
 
@@ -404,43 +444,62 @@ def test_no_tracked_file_carries_a_control_byte():
     range and for DEL alike, so the rule arrives green over the whole tree
     rather than over a list chosen to make it pass.
     """
-    findings, seen, undecodable = [], [], []
-    for path in every_tracked_file():
-        p = ROOT / path
-        if not p.is_file():
-            continue
-        raw = p.read_bytes()
-        try:
-            text = raw.decode("utf-8")
-        except UnicodeDecodeError:
-            undecodable.append(path)
-            continue
-        seen.append(path)
-        findings += prose.control_bytes(path, text)
+    scan = scan_tree()
 
     # A walk that read nothing would report green, which is the shape of the
     # failure this guard exists to catch one level down. Named files rather
     # than a count, so the check survives the tree growing.
     for required in ("README.md", "tools/prose/prose.py",
                      "tests/test_brand_commitments.py", "rust/src/engine.rs"):
-        assert required in seen, f"the walk missed {required}"
-    assert len(seen) > 400, f"the walk read only {len(seen)} files"
+        assert required in scan.seen, f"the walk missed {required}"
+    assert len(scan.seen) > 400, f"the walk read only {len(scan.seen)} files"
+
+    # A tracked file that is not on disk was counted by neither the scan nor
+    # the two checks above, because both survive one file going missing. It
+    # is named here instead, since a silent skip and a pass are the same
+    # colour and this walk is the argument that nothing is excluded.
+    assert not scan.missing, (
+        "these files are tracked and not on disk, so the scan could not "
+        "read them:\n  " + "\n  ".join(scan.missing[:20])
+    )
 
     # Every tracked file decodes as UTF-8 today. A binary one arriving is a
-    # decision about scope rather than something to pass over quietly, since
-    # a silent skip and a pass are the same colour.
-    assert not undecodable, (
+    # decision about scope rather than something to pass over quietly.
+    assert not scan.undecodable, (
         "these tracked files are not UTF-8, so the scan passed over them. "
         "Decide whether they belong in this walk rather than leaving them "
-        "skipped:\n  " + "\n  ".join(undecodable[:20])
+        "skipped:\n  " + "\n  ".join(scan.undecodable[:20])
     )
 
-    assert not findings, (
-        f"{len(findings)} control bytes in tracked files. They are invisible "
-        "in an editor and in a diff, and they make anything quoting them, "
-        "such as a regex in a test, match something other than what it "
-        "reads as.\n  " + "\n  ".join(findings[:20])
+    assert not scan.findings, (
+        f"{len(scan.findings)} control bytes in tracked files. They are "
+        "invisible in an editor and in a diff, and they make anything "
+        "quoting them, such as a regex in a test, match something other "
+        "than what it reads as.\n  " + "\n  ".join(scan.findings[:20])
     )
+
+
+def test_a_tracked_file_missing_from_disk_is_named():
+    """The skip the guard above used to make in silence.
+
+    Deleting one of the six files the checker walks by default left the guard
+    passing and saying nothing, because the named-file assertions and the
+    count both survive one file going missing. The path is collected and
+    named now, so the walk accounts for every entry `git ls-files` gives it.
+    """
+    scan = scan_tree(["README.md", "no/such/tracked/file.md"])
+    assert scan.missing == ["no/such/tracked/file.md"]
+    assert scan.seen == ["README.md"]
+    assert not scan.findings
+
+
+def test_a_file_that_cannot_be_decoded_is_named(tmp_path):
+    """The other silent skip, kept honest the same way."""
+    blob = tmp_path / "blob.bin"
+    blob.write_bytes(bytes([0xFF, 0xFE, 0x00, 0x01]))
+    scan = scan_tree([str(blob)])
+    assert scan.undecodable == [str(blob)]
+    assert not scan.seen
 
 
 def test_the_walk_would_catch_a_control_byte(tmp_path):
