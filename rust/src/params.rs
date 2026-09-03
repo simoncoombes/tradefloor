@@ -2815,8 +2815,25 @@ impl ModelParams {
         // This one holds the earnings share of nominal output constant, so
         // the valuation grows with the output the economy already
         // integrates. It delivers 252/365 of growth plus inflation per
-        // trading year, which is +4.353 measured over the certified year,
-        // and it goes negative in a contraction.
+        // trading year, measured at +4.342 by median over thirty seeds on
+        // the certified year at `measured/ede43c5`, which is this preset
+        // before the oil seasonality and cycle clock dials joined it.
+        //
+        // The rate falls with growth and inflation wherever the cycle takes
+        // them. An earlier form of this comment said it goes negative in a
+        // contraction, and that is true of the DAILY rate and not of a
+        // year. Measured: negative on 83.5 per cent of contraction days and
+        // 99.9 per cent of trough days.
+        //
+        // Whether a contraction YEAR is negative depends on how long the
+        // phase lasts, and that clock has just changed under this preset.
+        // Read once a day, which is every preset before pt-v18, a
+        // contraction lasts 4.4 months, ends well inside the window it
+        // would have to fill, and a calendar year holding one nets about
+        // +0.2 and is negative on 39 of 157 such seed-years. pt-v18 reads
+        // the hazard per month, where the phase outlasts a certified year.
+        // The year-level outcome under that clock is registered and being
+        // measured rather than assumed here.
         p.earnings_nominal_growth = 1.0;
         p
     }
