@@ -200,6 +200,32 @@ def _provenance(**extra: Any) -> dict[str, Any]:
 # -- the caveat engine -----------------------------------------------------
 
 
+#: Draw addresses per node in a tool result. The tree holds thousands
+#: and a model reads the count, so the rest is weight on the wire.
+ADDRESS_SAMPLE = 4
+
+
+def _trim_addresses(tree: dict[str, Any], keep: int) -> tuple[int, int]:
+    """Trim each node's address list in place, and report the counts.
+
+    Returns how many addresses survived and how many were dropped, so the
+    result can say what it is showing instead of appearing to show
+    everything.
+    """
+    shown = dropped = 0
+    addresses = tree.get("addresses") or []
+    if len(addresses) > keep:
+        tree["addresses"] = addresses[:keep]
+        shown, dropped = keep, len(addresses) - keep
+    else:
+        shown = len(addresses)
+    for child in tree["children"]:
+        a, b = _trim_addresses(child, keep)
+        shown += a
+        dropped += b
+    return shown, dropped
+
+
 def _nodes(tree: dict[str, Any]) -> int:
     """How many nodes an explanation tree holds, counted over the tree.
 
@@ -1468,6 +1494,13 @@ def explain(
 
     misses = result.check()
     tree = json.loads(result.to_json())["root"]
+    # The addresses are the bulk of the payload and they do not shrink
+    # with the roster: one name's day carries the same few thousand
+    # whatever the market size, which is 88 KB of a 97 KB result. Trimmed
+    # to a sample per node, with the count kept, so a model reading this
+    # gets the shape of the evidence rather than the whole of it.
+    kept, dropped = _trim_addresses(tree, ADDRESS_SAMPLE)
+    contributions = [child["name"] for child in tree["children"]]
     return {
         "ok": True,
         "ticker": result.ticker,
@@ -1475,14 +1508,19 @@ def explain(
         "move": result.move,
         "tree": tree,
         "render": result.render(depth=max(0, min(depth, 4))),
-        "checked": {"nodes": _nodes(tree), "misses": misses},
+        "checked": {"nodes": _nodes(tree), "misses": misses,
+                    "addresses": kept + dropped,
+                    "addresses_shown": kept},
         "reading_note": (
-            "`move` is the day's log move in the printed price. The eleven "
-            "contributions under it sum to that move; nine are the "
-            "`truth()` columns and two are the valuation's own move and "
-            "the order book's share. `misses` is empty when every node "
-            "replayed to the contribution it sits under, which is the "
-            "claim this tool makes rather than asserts."
+            "`move` is the day's log move in the printed price. The "
+            f"{len(contributions)} contributions under it sum to that "
+            f"move: {', '.join(contributions)}. `misses` is empty when "
+            "every node replayed to the contribution it sits under, which "
+            "is the claim this tool makes rather than asserts. Each draw "
+            f"node states its own count and carries at most "
+            f"{ADDRESS_SAMPLE} of its addresses here; `addresses` is how "
+            "many the tree holds and `addresses_shown` how many are in "
+            "this result."
         ),
         "caveats": list(result.caveats) + _caveats(
             days=day + 1, n_seeds=1, signals=set(), max_leverage=None,

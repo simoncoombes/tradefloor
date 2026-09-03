@@ -112,6 +112,39 @@ def test_the_nine_truth_columns_sum_to_the_change_in_mispricing():
         "tape's columns")
 
 
+def test_a_measured_contribution_leaves_a_residual_a_remainder_cannot():
+    """The guard that separates a measurement from a remainder.
+
+    Both contributions are computed from the day before's closing levels
+    rather than as what the mispricing leaves over. A remainder would make
+    the eleven sum to the move whatever the engine had done, and the sum
+    test could not tell the two apart, because a remainder and the direct
+    computation agree to 1e-15.
+
+    What tells them apart is the residual itself. Measured, it is float
+    rounding and never exactly zero; as a remainder it is exactly zero by
+    construction. The fallback branch, where the day before is not on the
+    tape, IS a remainder, so the two branches are measured here side by
+    side on the same engine and day.
+    """
+    e = engine()
+    residuals = []
+    for day in (1, 2):
+        for name in e.tickers[:6]:
+            result = e.explain(name, day)
+            total = math.fsum(child.value for child in result.root.children)
+            residuals.append(result.move - total)
+    assert all(r != 0.0 for r in residuals), residuals
+    assert all(abs(r) < ex.TOLERANCE for r in residuals), max(residuals)
+
+    # The same day on a run with no tape behind it, where `book` IS the
+    # remainder and the residual therefore vanishes.
+    remainder = engine(record=False).explain(e.tickers[0], 1)
+    total = math.fsum(child.value for child in remainder.root.children)
+    assert remainder.move - total == 0.0
+    assert remainder._previous is None
+
+
 def test_the_book_share_equals_the_distance_from_the_anchor_to_the_print():
     """``book`` is stated as a remainder, so it is checked as a measurement.
 
@@ -170,11 +203,52 @@ def test_the_replay_reproduces_the_close_the_run_printed():
     assert result.root.inputs["close"] == result._recorded_close
 
 
+def test_the_recorded_columns_are_read_and_matched():
+    """check()'s third claim, pinned positively.
+
+    Making `_recorded` return None unconditionally switches the claim off
+    and every other test still passes, so the claim needs a test that
+    fails when it stops being made.
+    """
+    e, result = one()
+    assert result._recorded is not None
+    assert sorted(result._recorded) == sorted(tf.Engine.FACTORS)
+    table = pa.table(e.truth(day=1)).to_pydict()
+    rows = rows_for(table, 0)
+    for name, value in result._recorded.items():
+        assert value == pytest.approx(
+            math.fsum(table[name][k] for k in rows), abs=1e-15), name
+        assert result._base.factors[name] == pytest.approx(
+            value, abs=ex.TOLERANCE), name
+
+
 def test_an_unrecorded_run_has_no_close_to_compare_against():
     e = engine(record=False)
     result = e.explain(e.tickers[0], 1)
     assert result._recorded_close is None
     assert result.check() == []
+
+
+def test_a_check_costs_one_day_run_per_distinct_overlay():
+    """What a check() costs, as a count rather than as a clock.
+
+    A replay is a function of its patch set, so nodes whose draws are the
+    same share one run: the eleven contributions and their mechanisms
+    collapse onto the overlays their draw nodes make, and every node with
+    no draw under it shares the empty one. Fifteen distinct overlays over
+    53 nodes, and neither number moves with the roster, which is what
+    makes the cost readable without a stopwatch on a shared machine.
+    """
+    for size in (8, 12):
+        roster = tf.Universe.random(size, seed=ROSTER_SEED)
+        e = tf.Engine(seed=ENGINE_SEED, universe=roster, model=PRESET)
+        e.keep_explanations(1, 1)
+        e.run_days(3, record=True)
+        result = e.explain(e.tickers[0], 1)
+        assert result.check() == []
+        assert len(result._runs) == 15, size
+        assert len(result._walk) == 53, size
+        assert len(ex._addresses(result.root)) == 2736, size
 
 
 def test_a_leaf_replays_to_its_parent():
@@ -209,6 +283,98 @@ def test_a_changed_draw_moves_the_day():
     assert moved.move != base.move
     assert abs(moved.factors["random_noise"]
                - base.factors["random_noise"]) > 1e-9
+
+
+#: Which draw nodes a one-address slip is visible in, measured on
+#: `Universe.random(12, seed=111)` at seed 42, day 1, `pt-v16`: the day's
+#: close moves for these two and is bit-identical for the other eight.
+#: A slip on the market factor moves every name and a slip on this name's
+#: settlement uniforms moves its own prints, while a slip on its
+#: idiosyncratic, sector, news or jump draws lands on a neighbour's slot
+#: and does not reach this close inside the day.
+SLIPS_SHOW = ("market_factor_z", "settle_u")
+
+
+def test_a_mis_addressed_node_changes_the_day_where_it_can():
+    """What makes check()'s node claim able to fail at all, and how far.
+
+    A replay installs the values the log delivered against the node's own
+    addresses, in log order. Read back at the address instead, a patch
+    carries the value that address already delivers, so it is a no-op
+    whatever the address is and a node aimed one draw late replayed
+    clean. Paired positionally it does not, wherever the slipped draw
+    reaches this name's day.
+
+    Both halves are measured here, because a claim that every slip is
+    caught would be false: the eight nodes below slip onto another name's
+    slot and this name's close does not move inside the day.
+    """
+    _, result = one()
+    base = result._run(())
+    moved, unmoved = [], []
+    for _path, node, _parent in result._walk:
+        if node.kind != "draw":
+            continue
+        values = result._draw_values[id(node)]
+        assert len(values) == len(node.addresses), node.name
+        late = tuple(noise.Patch(a._replace(index=a.index + 1), v)
+                     for a, v in zip(node.addresses, values))
+        (moved if result._run(late).move != base.move
+         else unmoved).append(node.name)
+    assert tuple(moved) == SLIPS_SHOW, moved
+    assert set(unmoved) == {"news_u", "news_z", "sector_z", "factor_idio_z",
+                            "jump_market_u", "jump_market_z",
+                            "jump_company_u", "jump_company_z"}, unmoved
+
+
+def test_the_market_addresses_are_this_names_own_slots():
+    """One half a replay cannot check: whose draws these are.
+
+    A node built off another company's tag carries that company's
+    addresses AND its values, so installing them is a no-op and check()
+    stays clean. The day mark decides which slots belong to which name,
+    so the addresses are checked against that arithmetic instead, which
+    the draw log did not supply.
+    """
+    e, result = one()
+    layout = noise.market_day_layout(e, 1)
+    first, stride, ticks = layout[0]
+    expected = tuple(noise.DrawAddress("market", "normal", first + t * stride)
+                     for t in range(ticks))
+    idio = next(node for _, node, _ in result._walk
+                if node.kind == "draw" and node.name == "factor_idio_z")
+    assert idio.addresses == expected
+    assert layout[1][0] != first, "the neighbour shares this name's slots"
+    assert idio.addresses[0].index != layout[1][0]
+
+
+def test_every_draw_node_holds_this_names_own_draws():
+    """The other half: every address belongs to the name being explained.
+
+    Read straight off the engine's log rather than through the tree, so a
+    node filtered on the wrong tag is caught by the tag the log records
+    for the address it carries, whatever values came with it.
+    """
+    e, result = one()
+    scope_of = {(stream, site): scope for m in ex.MECHANISMS
+                for stream, site, scope in m.sites}
+    wanted = {"company": 0, "sector": result._sector}
+    seen = 0
+    for _path, node, _parent in result._walk:
+        if node.kind != "draw":
+            continue
+        stream = node.addresses[0].stream
+        day = int(node.inputs["day"])
+        logged = {entry.address: entry for entry
+                  in noise.draw_log(e, stream, day, day)}
+        scope = scope_of[(stream, node.name)]
+        for address in node.addresses:
+            entry = logged[address]
+            assert entry.site == node.name, (node.name, entry.site)
+            if scope in wanted:
+                assert entry.tag == wanted[scope], (node.name, entry.tag)
+            seen += 1
+    assert seen == len(ex._addresses(result.root)) == 2736
 
 
 def test_replay_refuses_a_node_from_another_explanation():
@@ -414,6 +580,36 @@ def test_the_jump_contribution_is_the_one_the_tape_books_to_the_day():
 # --------------------------------------------------------------------------
 
 
+def test_the_valuation_moves_when_the_fundamental_does():
+    """The eleventh contribution, on a path where it is not zero.
+
+    `fair_value` is zero on every shipped preset, because earnings and the
+    sector anchor are fixed for a run and the QE channel is off, so a test
+    that only ran the defaults would assert nothing about it. Here the QE
+    valuation channel is turned on and the macro path moves it between the
+    two days.
+    """
+    roster = tf.Universe.random(ROSTER_SIZE, seed=ROSTER_SEED)
+    model = tf.ModelParams.from_preset(PRESET, qe_pe_gain=2.0,
+                                       qe_pe_stock_gain=2.0)
+    e = tf.Engine(seed=ENGINE_SEED, universe=roster, model=model)
+    e.keep_explanations(2, 2)
+    e.run_days(2, record=True)
+    e.pin_macro(qe_pe_boost=0.4)
+    e.run_days(1, record=True)
+    result = e.explain(e.tickers[0], 2)
+    contributions = {child.name: child.value
+                     for child in result.root.children}
+    assert contributions["fair_value"] != 0.0
+    assert abs(contributions["fair_value"]) > 0.1
+    assert math.fsum(contributions.values()) == pytest.approx(
+        result.move, abs=ex.TOLERANCE)
+    assert result.check() == []
+    # And zero on the shipped default, which is what the docstring says.
+    assert {c.name: c.value for c in one()[1].root.children}["fair_value"] \
+        == 0.0
+
+
 def test_a_preset_that_draws_no_news_says_which_stream_was_silent():
     """The case the two silence caveats exist for.
 
@@ -608,6 +804,56 @@ def test_every_mechanism_names_a_rust_function_that_exists():
             assert body(name), name
 
 
+#: The dials and the state each contribution declares, written out here
+#: and hand-verified against the Rust named on the mechanism. A second
+#: copy, deliberately: four of the eleven name the same 505-line tick
+#: function, which reads 108 of the model params, so "the name appears in
+#: the named function" accepts any dial for any of those four and cannot
+#: see reversion and momentum swapping theirs. This table can, because it
+#: is per contribution. It has to be edited with the module's own.
+EXPECTED = {
+    "reversion": (("s_phi_tick",), ("mispricing_s",)),
+    "momentum": (("momentum_theta",), ("mispricing_momentum",)),
+    "crowd_lean": (("crowd_valuation_gain", "crowd_momentum_gain",
+                    "crowd_lean_cap", "forced_flow_gain",
+                    "forced_flow_threshold", "forced_flow_beta_exponent"),
+                   ("mispricing_s", "mispricing_momentum", "beta")),
+    "company_news": (("news_sector_weight", "news_market_weight",
+                      "news_peer_weight", "news_peer_weight_down",
+                      "news_peer_vix_coupling", "endogenous_news_intensity",
+                      "endogenous_news_sigma"), ()),
+    "order_flow_impact": (("order_flow_coefficient",
+                           "informed_flow_fraction"), ("avg_volume",)),
+    "short_squeeze_effect": ((), ("short_interest", "last_daily_return")),
+    "random_noise": (("idio_sigma_scale", "idio_sigma_beta_exponent",
+                      "sector_loading", "sector_loading_beta_slope",
+                      "market_factor_sigma", "market_beta_down_asym",
+                      "crisis_blend_source", "crisis_blend_gain",
+                      "crash_amplifier_slope", "crash_amplifier_threshold"),
+                     ("garch_variance", "beta", "market_cap")),
+    "circuit_breaker": (("price_breaker_fraction", "price_hard_cap"),
+                        ("price",)),
+    "jump": (("jump_intensity_market", "jump_intensity_idio",
+              "jump_mean_market", "jump_sigma_market", "jump_sigma_idio",
+              "jump_vix_coupling", "jump_momentum_share",
+              "market_vol_vix_anchor"),
+             ("mispricing_s", "mispricing_s_prev_close")),
+    "fair_value": (("fair_value_book_floor", "qe_pe_gain",
+                    "qe_pe_stock_gain"), ()),
+    "book": ((), ("price",)),
+}
+
+
+def test_each_contribution_declares_the_dials_and_state_it_is_meant_to():
+    # Exact lists, in order, so a dial moving from one contribution to
+    # another fails here even though both name the same Rust function.
+    assert sorted(EXPECTED) == sorted(m.factor for m in ex.MECHANISMS)
+    for mech in ex.MECHANISMS:
+        dials, state = EXPECTED[mech.factor]
+        assert mech.dials == dials, mech.factor
+        assert mech.state == state, mech.factor
+
+
 def test_every_declared_dial_is_a_model_param_that_its_rust_reads():
     dials = set(tf.Engine(seed=1, universe=tf.Universe.random(2, seed=1),
                           model=PRESET).model_params)
@@ -622,11 +868,11 @@ def test_every_declared_dial_is_a_model_param_that_its_rust_reads():
             assert re.search(r"\b(?:params|p|out|self)\." + name + r"\b",
                              text), (mech.factor, name, mech.function)
             declared += 1
-    # A count as an invariant, so a table that lost its dials cannot pass
-    # by declaring none: eight of the eleven read at least one dial and
-    # the table names thirty-one in all.
-    assert declared >= 31
-    assert sum(1 for m in ex.MECHANISMS if m.dials) >= 8
+    # Exact, not a floor. A floor let nine of random_noise's ten dials be
+    # dropped and still pass, because the table declares more than the
+    # floor asked for.
+    assert declared == 40
+    assert sum(1 for m in ex.MECHANISMS if m.dials) == 9
 
 
 def test_every_declared_state_field_is_a_column_that_its_rust_reads():
@@ -638,8 +884,8 @@ def test_every_declared_state_field_is_a_column_that_its_rust_reads():
             e.column(name)
             assert re.search(r"\b" + name + r"\b", text), (mech.factor, name)
             declared += 1
-    assert declared >= 13
-    assert sum(1 for m in ex.MECHANISMS if m.state) >= 8
+    assert declared == 15
+    assert sum(1 for m in ex.MECHANISMS if m.state) == 9
 
 
 def test_every_declared_macro_field_is_a_macro_field_that_its_rust_reads():
@@ -819,8 +1065,13 @@ def resolves(sha: str) -> bool:
     guard that never runs.
     """
     def cat() -> bool:
-        return subprocess.run(["git", "cat-file", "-e", sha + "^{commit}"],
-                              cwd=ROOT, capture_output=True).returncode == 0
+        # An ancestor of HEAD, not merely an object the repository still
+        # holds. After a rebase the old commit is still present, reachable
+        # from the reflog, and `cat-file -e` reports it as if the citation
+        # were live.
+        return subprocess.run(
+            ["git", "merge-base", "--is-ancestor", sha, "HEAD"],
+            cwd=ROOT, capture_output=True).returncode == 0
 
     if cat():
         return True
@@ -885,6 +1136,35 @@ def test_the_mcp_tool_returns_a_checked_tree():
     assert [c["name"] for c in out["tree"]["children"]] == list(ex.FACTORS)
     total = math.fsum(c["value"] for c in out["tree"]["children"])
     assert abs(out["move"] - total) < ex.TOLERANCE
+
+
+def test_the_mcp_tool_result_is_bounded_and_says_what_it_trimmed():
+    """A tool result is read by a model, so its size is a design choice.
+
+    The addresses are the bulk of the tree and they do not shrink with
+    the roster: one name's day carries the same few thousand at every
+    market size, which was 88 KB of a 97 KB result. The tool samples them
+    and reports both counts, so the number of addresses is still readable
+    where the addresses themselves are not.
+    """
+    mcp = mcp_module()
+    small = mcp.explain(universe_size=8, day=1)
+    big = mcp.explain(universe_size=40, day=1)
+    for out in (small, big):
+        assert len(json.dumps(out)) < 40_000
+        assert out["checked"]["addresses"] == 2736
+        assert out["checked"]["addresses_shown"] < 100
+        assert str(out["checked"]["addresses_shown"]) not in ("0",)
+        assert "at most" in out["reading_note"]
+    # The count does not move with the roster; the tree it came from does
+    # not either, which is the point the reading note makes.
+    assert small["checked"]["addresses"] == big["checked"]["addresses"]
+    deepest = small["tree"]["children"][6]["children"][0]["children"]
+    drawn = [c for c in deepest if c["kind"] == "draw"]
+    assert drawn, deepest
+    for child in drawn:
+        assert len(child["addresses"]) <= mcp.ADDRESS_SAMPLE
+        assert child["inputs"]["count"] >= len(child["addresses"])
 
 
 def test_the_mcp_tool_is_read_only_and_repeatable():

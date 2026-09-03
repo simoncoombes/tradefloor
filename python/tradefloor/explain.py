@@ -35,6 +35,12 @@ Where the day before is not on the tape its closing levels are unknown,
 ``fair_value`` reads zero and ``book`` is what the mispricing leaves
 over, which the caveats say.
 
+``fair_value`` is zero unless the fundamental value moves, and on every
+shipped preset it does not: earnings and the sector anchor are fixed for
+a run and the QE channel is off, so the valuation holds still and the
+whole move is mispricing and book. It moves under a scenario that moves
+the macro path, and ``tests/test_explain.py`` measures one.
+
 Under each contribution sits one ``mechanism`` node, named for the Rust
 function that computes it, carrying the dials that function reads as its
 ``inputs``. Under the mechanism sit the state it read at the open, one
@@ -423,6 +429,11 @@ class Explanation:
                         for entries in self._logged.values()
                         for entry in entries}
         self._previous = _levels(engine, self.day - 1, self._index)
+        #: Each draw node's values, in the order the log delivered
+        #: them, keyed by the node. A replay installs these against
+        #: the node's own addresses, which is what makes a
+        #: mis-addressed node change the day it replays.
+        self._draw_values: dict[int, tuple[float, ...]] = {}
         self._runs: dict[tuple, _Day] = {}
         base = self._run(())
         self._base = base
@@ -481,13 +492,22 @@ class Explanation:
                        and (tag is None or entry.tag == tag)]
             if not entries:
                 continue
-            out.append(Node(
+            node = Node(
                 kind="draw", name=site,
                 value=math.fsum(entry.value for entry in entries),
                 inputs={"count": float(len(entries)),
                         "day": float(self.day + mech.offset)},
                 addresses=tuple(entry.address for entry in entries),
-                children=()))
+                children=())
+            # The values a replay installs, kept in the order the log
+            # delivered them rather than re-read at the address they are
+            # installed at. Read back at the address, a patch is the value
+            # that address already delivers and the overlay is a no-op
+            # whatever the address is, so a node addressing the wrong draw
+            # replayed clean and `check()` could not fail on it.
+            self._draw_values[id(node)] = tuple(entry.value
+                                                for entry in entries)
+            out.append(node)
         return out
 
     # -- running the day again --------------------------------------------
@@ -567,11 +587,24 @@ class Explanation:
         "replaying any leaf reproduces its parent"; :meth:`check` makes it
         for every node.
 
-        The patches are the values the draws already delivered, so a
-        replay reproduces the day rather than perturbing it. What it
-        establishes is that the copy, the addresses and the log agree: a
-        patch aimed at the wrong address installs a different draw and
-        the day comes back different.
+        The patches are the values the log delivered, installed
+        against the node's own addresses in log order, so a replay of a
+        correctly addressed node reproduces the day. What it establishes
+        is that the copy, the log and the overlay rebuild the day, and
+        that the addresses a node carries are the ones its values came
+        from wherever the difference reaches this name: a node aimed one
+        draw late installs the right values in the wrong places.
+
+        How far that reaches is measured rather than assumed. On the
+        market factor and on this name's settlement uniforms a slip of
+        one address moves the close; on its idiosyncratic, sector, news
+        and jump draws the slip lands on a neighbour's slot and the close
+        is bit-identical inside the day. Nor does a replay establish that
+        a node addresses the right NAME at all, since a node built off
+        another company's tag carries that company's addresses and values
+        together. `tests/test_explain.py` measures both limits and checks
+        the tags against the log and the market slots against
+        `noise.market_day_layout`.
         """
         path, _ = self._locate(node)
         measured = self._run(self._patches(node))
@@ -580,10 +613,11 @@ class Explanation:
     def check(self) -> list[str]:
         """Replay every node, and report what did not come back.
 
-        Three claims, each stated as a line per miss. The eleven
+        Four claims, each stated as a line per miss. The eleven
         contributions sum to the move. Every node's replay reproduces the
         contribution it sits under. And where the run recorded this day,
-        the replay reproduces what the run itself recorded.
+        the replay reproduces both the nine columns the run recorded and
+        the close it printed.
         """
         misses: list[str] = []
         total = math.fsum(child.value for child in self.root.children)
@@ -641,18 +675,27 @@ class Explanation:
         return self.root
 
     def _patches(self, node: Node) -> tuple[Patch, ...]:
-        out: list[Patch] = []
-        for address in _addresses(node):
-            out.append(Patch(address, self._logged_value(address)))
-        return tuple(out)
+        """The overlay a replay of ``node`` installs.
 
-    def _logged_value(self, address: DrawAddress) -> float:
-        try:
-            return self._values[address]
-        except KeyError:  # pragma: no cover - the tree builds these
-            raise ValidationError(
-                f"{address} is in the tree and not in the day's draw "
-                "log") from None
+        Each draw node's addresses are paired POSITIONALLY with the values
+        the log delivered at that site, in log order, rather than each
+        address being looked up to find its own value. The difference is
+        the whole of what a replay can catch: read back at the address, a
+        patch carries the value that address already delivers, so it is a
+        no-op whatever the address is and a node aimed one draw late
+        replayed clean.
+        """
+        out: list[Patch] = []
+        for leaf in _draw_nodes(node):
+            values = self._draw_values.get(id(leaf), ())
+            if len(values) != len(leaf.addresses):
+                raise ValidationError(  # pragma: no cover - built together
+                    f"the {leaf.name} node carries "
+                    f"{len(leaf.addresses)} addresses and "
+                    f"{len(values)} logged values")
+            out.extend(Patch(address, value)
+                       for address, value in zip(leaf.addresses, values))
+        return tuple(out)
 
     # -- what this call could and could not do ----------------------------
 
@@ -800,9 +843,9 @@ _STATE_FIELDS: tuple[str, ...] = tuple(
 
 
 #: The streams the mechanism table reads, which are the ones a tree can
-#: address. The other three of the seven seed the macro chain, the shared
-#: volume level and the embedder's own subsystems, and no contribution
-#: here names them.
+#: address. The other four of the seven seed the macro chain, the shared
+#: volume level, the per-name volume level and the embedder's own
+#: subsystems, and no contribution here names them.
 _STREAMS: tuple[str, ...] = tuple(
     dict.fromkeys(stream for m in MECHANISMS for stream, _, _ in m.sites))
 
@@ -816,9 +859,9 @@ def _logged_draws(engine: Engine, day: int
     that delivered a logged draw, which is what the caveats report as on.
 
     Only the streams :data:`_STREAMS` names are read, because the log of
-    one of them is the size of the tape: the market stream takes 673
+    one of them is the size of the tape: the market stream takes 613
     draws per tick at a hundred names, and fetching the four the tree
-    cannot address would double what a call holds for nothing.
+    cannot address would add to what a call holds for nothing.
     """
     out: dict[tuple[str, int], tuple] = {}
     traced: set[str] = set()
@@ -954,6 +997,16 @@ def _walk(node: Node, path: str, parent: Node | None):
     yield here, node, parent
     for child in node.children:
         yield from _walk(child, here, node)
+
+
+def _draw_nodes(node: Node) -> tuple[Node, ...]:
+    """Every draw node at or under ``node``, in tree order."""
+    if node.kind == "draw":
+        return (node,)
+    out: list[Node] = []
+    for child in node.children:
+        out.extend(_draw_nodes(child))
+    return tuple(out)
 
 
 def _addresses(node: Node) -> tuple[DrawAddress, ...]:
