@@ -809,6 +809,19 @@ def recompute_sensitivity(run: dict, d: dict) -> dict:
     universe, betas = build_universe(d, run["sessions"][0])
     engine = tf.Engine(seed=run["args"]["seed"], universe=universe,
                        model=run["args"].get("preset"))
+    # The run records the preset it was GIVEN, which is None when it took
+    # the default, so a rebuild takes whatever the default is at render
+    # time. The fingerprint the run recorded is what says which market it
+    # was: forcing a pt-v16 run's recompute to pt-v14 moved a day's
+    # sensitivity column by 89 percent and published it under the original
+    # run's fingerprint without complaint.
+    recorded = run["provenance"].get("model_fingerprint")
+    if recorded and engine.model_fingerprint != recorded:
+        raise SystemExit(
+            f"this run was solved under {recorded} and rebuilds as "
+            f"{engine.model_fingerprint}; a recompute of one market cannot "
+            "be published under another's name. Pass --preset "
+            f"{recorded} to render it.")
     first, last = run["sessions"]
     n = len(universe)
     real = np.array([np.array([d["closes"][t][k] for t in realdata.TICKERS])
@@ -1403,8 +1416,14 @@ def main(argv=None) -> int:
         sys.stdout.write(text)
         return 0
     run = shadow(args)
-    with open(os.path.join(args.out, "shadow.json"), "w", encoding="utf-8") as f:
+    # Written under a temporary name and renamed when it is complete, so
+    # nothing watching the directory can copy a half-written file and no
+    # partial write can be mistaken for the whole run.
+    final = os.path.join(args.out, "shadow.json")
+    tmp = final + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(run, f)
+    os.replace(tmp, final)
     text = render(run)
     with open(os.path.join(args.out, "shadow.md"), "w", encoding="utf-8") as f:
         f.write(text)

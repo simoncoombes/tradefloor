@@ -168,6 +168,7 @@ from typing import Any, Sequence
 
 from .._core import ValidationError
 from ..counterfactual import MACRO_FIELDS
+from ..render import Renderer, TextRenderer, _sector_rows, check_renderer
 from .common import (AdapterInfo, FrameworkError, IntegrationError,
                      MissingDependencyError)
 from .common import DecisionError as _CommonDecisionError
@@ -487,39 +488,6 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
     return payload
 
 
-def _sector_rows(assets: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-    """A per-sector summary, computed from the asset rows above and nothing
-    else.
-
-    The sector comes from the fundamentals the CALLER supplied, on the same
-    terms as every other company fact: an analyst reads it off a filing, and
-    the adapter does not go looking for it on the engine. A name with no
-    sector supplied lands in ``unclassified`` rather than in a guess.
-
-    The five-day return is the mean across the sector's names, equally
-    weighted, over the names that have one. Equal weighting because the
-    alternative weights by position, and a sector the book is flat in would
-    then report no return at all.
-    """
-    buckets: dict[str, list[dict[str, Any]]] = {}
-    for asset in assets:
-        sector = asset["fundamentals"].get("sector") or "unclassified"
-        buckets.setdefault(str(sector), []).append(asset)
-    rows = []
-    for sector in sorted(buckets):
-        members = buckets[sector]
-        returns = [m["return_5d"] for m in members
-                   if m["return_5d"] is not None]
-        rows.append({
-            "sector": sector,
-            "names": len(members),
-            "held": sum(1 for m in members if m["position"]),
-            "exposure": sum(m["position"] * m["price"] for m in members),
-            "return_5d": (sum(returns) / len(returns)) if returns else None,
-        })
-    return rows
-
-
 def _window_return(rows: Sequence[Sequence[float]], i: int,
                    steps: int) -> float | None:
     """Return over the last ``steps`` observations, or None if unseen.
@@ -549,190 +517,38 @@ def _volatility(rows: Sequence[Sequence[float]], i: int) -> float | None:
 def render(payload: dict[str, Any], *, objective: str = "") -> str:
     """The payload as the text FinRobot receives.
 
-    Text and not raw JSON: the assistant is a chat agent and reads prose
-    better than a nested object, and a rendered block is what somebody
-    auditing the recorded transcript has to read. Generated from ``payload``
-    alone, so nothing outside the allowlist can appear here by accident.
+    A thin wrapper over :class:`tradefloor.render.TextRenderer`. This
+    function and :class:`~tradefloor.render.TextRenderer` were briefly two
+    implementations of the same text -- this one written first, the other
+    added generalised over ``units``, ``order`` and ``language`` for the
+    P6 observation-invariance experiment -- and ``tests/test_render.py``
+    proved them character for character equal before this wrapper existed.
+    Keeping both would have meant one drifting from the other the first
+    time either changed, silently, with nothing to say so; this is the
+    fix. ``objective``, when given, is appended as its own section here
+    rather than inside the renderer, the same choice
+    :meth:`FinRobotAdapter.act` makes for its own default renderer -- a
+    renderer renders the payload, and a mandate is the caller's.
 
     A payload carrying ``detail`` renders in the large-universe form: a
-    sector summary, one compact row per symbol, and a full block for the
-    symbols named. Every other payload renders exactly as it always has,
-    which ``test_finrobot.py`` pins byte for byte.
+    sector summary, one compact row per symbol, and a full block for
+    EXACTLY the symbols ``payload["detail"]`` names -- no union with
+    whatever is held, because this function calls
+    :class:`~tradefloor.render.TextRenderer` at its default
+    ``union_held=False``, which is what makes it byte-identical to what
+    a direct caller of :func:`observe` and this function has always
+    published. The union that includes a held name whether or not it is
+    in the panel is :class:`FinRobotAdapter`'s OWN setting
+    (``union_held=True``, on its default renderer only); see
+    :class:`~tradefloor.render.TextRenderer` for why the two callers
+    read ``detail`` differently. Every other payload renders exactly as
+    it always has, which ``test_finrobot.py``'s fixture-replay tests pin
+    byte for byte.
     """
-    macro = payload["macro"]
-    out = [
-        "SIMULATED MARKET",
-        "",
-        f"Day {payload['day']}, decision step {payload['step']}.",
-        "",
-        "Macro",
-        "-----",
-    ]
-    for field in OBSERVABLE_MACRO:
-        out.append(f"{field:<22} {_num(macro.get(field))}")
-
-    detail = payload.get("detail")
-    if detail is None:
-        out += ["", "Assets", "------"]
-        for asset in payload["assets"]:
-            out.append("")
-            out += _asset_block(asset)
-    else:
-        out += _universe_block(payload, set(detail))
-
-    book = payload["portfolio"]
-    out += [
-        "",
-        "Portfolio",
-        "---------",
-        f"cash                   {_money(book['cash'])}",
-        f"net worth              {_money(book['net_worth'])}",
-        f"gross exposure         {_num(book['gross_exposure'])}x",
-        # The funding cap, and what is left under it. `max_order_shares`
-        # above says what the MARKET absorbs per order; these say what this
-        # BOOK can hold before the leverage limit refuses the trade, and it
-        # is usually the smaller of the two. Stating one without the other
-        # is what produced twelve rejections and no trades on the native
-        # OpenAI path: the agent sized to the limit it was shown.
-        f"max leverage           {_num(book['max_leverage'])}"
-        + ("" if book["max_leverage"] is None else "x"),
-        f"buying power           {_money(book['buying_power'])}",
-        "",
-        "Positions:",
-    ]
-    held = [a for a in payload["assets"] if a["position"]]
-    if not held:
-        out.append("  none")
-    for asset in held:
-        out.append(f"  {asset['symbol']:<8} {_qty(asset['position'])} shares"
-                   f"  ({_money(asset['position'] * asset['price'])})")
-
+    body = TextRenderer(detail=payload.get("detail")).render(payload)
     if objective:
-        out += ["", "Objective", "---------", objective]
-    return "\n".join(out)
-
-
-def _asset_block(asset: dict[str, Any]) -> list[str]:
-    """One asset in full. The nine lines a detailed name has always got."""
-    out = [
-        asset["symbol"],
-        f"  price                {_money(asset['price'])}",
-        f"  return, 1 day        {_pct(asset['return_1d'])}",
-        f"  return, 5 days       {_pct(asset['return_5d'])}",
-        f"  step volatility      {_pct(asset['volatility'])}",
-        f"  bid / ask            {_money(asset['best_bid'])}"
-        f" / {_money(asset['best_ask'])}",
-        f"  avg daily volume     {_qty(asset['avg_daily_volume'])}",
-        f"  your position        {_qty(asset['position'])} shares",
-        f"  max order this step  {_qty(asset['max_order_shares'])} shares",
-    ]
-    for key, value in sorted(asset["fundamentals"].items()):
-        out.append(f"  {key:<20} {_num(value)}")
-    return out
-
-
-#: Column widths for the compact universe table. Fixed rather than measured
-#: off the data, so the rendering of one market does not shift when another
-#: market has a longer ticker, and two runs of one experiment produce the
-#: same text.
-_ROW = "{symbol:<8} {sector:<24}{price:>13}{ret:>10}{position:>16}{cap:>16}"
-
-
-def _universe_block(payload: dict[str, Any],
-                    detail: set[str]) -> list[str]:
-    """The large-universe rendering: sectors, every symbol, some in full.
-
-    Three sections in the order an analyst reads them. The sector summary
-    says where the market moved. The universe table lists every tradable
-    symbol with the four numbers a decision to look closer is made on, and
-    the order cap it would be held to. The detail section then carries the
-    full block for the held names and the standing panel.
-
-    Every symbol in the table is a legal action whether or not it has a
-    detail block, which the table says in a sentence, because an agent that
-    read the detail section as the tradable set would be trading a universe
-    nobody restricted it to.
-    """
-    out = ["", "Sectors", "-------",
-           f"{'sector':<24}{'names':>7}{'held':>7}{'exposure':>18}"
-           f"{'5d':>10}"]
-    for row in payload.get("sectors", ()):
-        out.append(f"{row['sector']:<24}{row['names']:>7,}{row['held']:>7,}"
-                   f"{_money(row['exposure']):>18}"
-                   f"{_short_pct(row['return_5d']):>10}")
-
-    out += [
-        "",
-        "Universe",
-        "--------",
-        f"All {len(payload['assets'])} symbols below are tradable. A dash "
-        "means the figure is not available yet.",
-        "Full detail for your holdings and for a standing panel follows the "
-        "table.",
-        "",
-        _ROW.format(symbol="symbol", sector="sector", price="price",
-                    ret="5d", position="position", cap="max order"),
-    ]
-    for asset in payload["assets"]:
-        # Neither field is truncated to its column. A clipped symbol would
-        # name an instrument this market does not list, so `orders_from`
-        # would refuse the order the observation invited, and the agent
-        # would be scored on a rendering decision. A row that runs wide is
-        # the cheaper defect.
-        out.append(_ROW.format(
-            symbol=asset["symbol"],
-            sector=str(asset["fundamentals"].get("sector")
-                       or "unclassified"),
-            price=_short_money(asset["price"]),
-            ret=_short_pct(asset["return_5d"]),
-            position=_short_qty(asset["position"]),
-            cap=_short_qty(asset["max_order_shares"]),
-        ))
-
-    shown = [a for a in payload["assets"] if a["symbol"] in detail]
-    out += ["", "Detail", "------",
-            f"{len(shown)} of {len(payload['assets'])} symbols, being every "
-            "name you hold plus a standing panel."]
-    for asset in shown:
-        out.append("")
-        out += _asset_block(asset)
-    return out
-
-
-def _num(value: Any) -> str:
-    if value is None:
-        return "not available"
-    if isinstance(value, float):
-        return f"{value:.4f}"
-    return str(value)
-
-
-def _money(value: Any) -> str:
-    return "not available" if value is None else f"{value:,.2f}"
-
-
-def _pct(value: Any) -> str:
-    return "not available" if value is None else f"{value * 100:+.2f}%"
-
-
-def _qty(value: Any) -> str:
-    return "not available" if value is None else f"{value:,.0f}"
-
-
-#: The compact table's own formatters. A missing value renders as one
-#: character rather than as "not available", which is thirteen and would
-#: push every column out of line on the row that had one. The table says
-#: what the dash means in the sentence above it.
-def _short_money(value: Any) -> str:
-    return "-" if value is None else f"{value:,.2f}"
-
-
-def _short_pct(value: Any) -> str:
-    return "-" if value is None else f"{value * 100:+.2f}%"
-
-
-def _short_qty(value: Any) -> str:
-    return "-" if value is None else f"{value:,.0f}"
+        return f"{body}\n\nObjective\n---------\n{objective}"
+    return body
 
 
 # -- FinRobot -> Tradefloor -------------------------------------------------
@@ -1156,6 +972,25 @@ class FinRobotAdapter:
     EXPERIMENT and must be chosen before the run: :meth:`state` publishes it
     so :func:`tradefloor.agree` checks both arms carry the same one, and
     :meth:`fork` copies it.
+
+    ``renderer`` is what turns the observation into the text FinRobot reads,
+    in place of the ``detail=`` argument :func:`observe` and :func:`render`
+    took directly until this argument existed. Left at ``None``, it defaults
+    to ``TextRenderer(detail=panel or None, union_held=True)`` -- a
+    renderer that reproduces this adapter's own historical text character
+    for character, which is what lets the shipped fixtures keep replaying.
+    ``union_held`` is this adapter's own setting and not
+    :func:`observe`'s or :func:`render`'s: it restores the "a name you
+    hold is always detailed" guarantee this class always gave, without
+    changing what those two functions publish for a caller who reaches
+    them directly -- see :class:`~tradefloor.render.TextRenderer`. Pass a
+    :class:`~tradefloor.render.Renderer` of your own -- another
+    :class:`~tradefloor.render.TextRenderer` with different ``units``,
+    ``order`` or ``language``, or a :class:`~tradefloor.render.JSONRenderer`
+    -- to change what FinRobot is shown without changing ``panel`` or any
+    other argument here. :meth:`fork` copies whichever renderer this
+    instance holds, and :meth:`state` publishes its :meth:`~.Renderer.key`
+    so two arms built by hand cannot silently disagree about it.
     """
 
     def __init__(self, *, mode: str = "replay",
@@ -1170,6 +1005,7 @@ class FinRobotAdapter:
                  every: int = 6,
                  max_participation: float = MAX_PARTICIPATION,
                  panel: Sequence[str] = (),
+                 renderer: Renderer | None = None,
                  arm: str = "", info: AdapterInfo | None = None) -> None:
         if mode not in ("replay", "live"):
             raise ValidationError(
@@ -1220,6 +1056,16 @@ class FinRobotAdapter:
         #: holds. Sorted and frozen on construction so a caller cannot
         #: change one arm's panel after the fork.
         self.panel: tuple[str, ...] = tuple(sorted({str(s) for s in panel}))
+        #: What turns the observation into text. Built from ``panel`` when
+        #: nobody passed one, so the default reproduces this adapter's own
+        #: history -- see the class docstring -- and stays a real object on
+        #: every path, including the default one, because :meth:`provenance`
+        #: and :meth:`state` both publish its :meth:`~.Renderer.key`.
+        if renderer is not None:
+            check_renderer(renderer, where="renderer")
+        self.renderer: Renderer = (
+            renderer if renderer is not None
+            else TextRenderer(detail=panel or None, union_held=True))
         self.arm = arm
 
         #: Prices this adapter has been shown, oldest first. The agent's own
@@ -1304,6 +1150,11 @@ class FinRobotAdapter:
             # every shipped fixture starts claiming a field it never
             # carried.
             out["detail_panel"] = list(self.panel)
+        # Always, unlike `detail_panel`: every recording this adapter has
+        # ever made was rendered by SOME configuration, the pre-`renderer`
+        # ones included, and this default renderer's key names that
+        # configuration exactly. See `render.Renderer.key`.
+        out["renderer"] = self.renderer.key()
         return out
 
     # -- the agent protocol ----------------------------------------------
@@ -1325,9 +1176,16 @@ class FinRobotAdapter:
 
         payload = observe(obs, history=self.history,
                           fundamentals=self.fundamentals,
-                          max_participation=self.max_participation,
-                          detail=self._detail(obs))
-        prompt = render(payload, objective=self.objective)
+                          max_participation=self.max_participation)
+        # `self.renderer` decides which symbols get a full block: its
+        # `detail` was the standing panel at construction, and it unions
+        # that with whatever `payload["assets"][i]["position"]` says is
+        # held right now -- see `TextRenderer`. `observe` above builds the
+        # same allowlisted payload for every renderer; nothing about
+        # rendering choices reaches it.
+        body = self.renderer.render(payload)
+        prompt = (f"{body}\n\nObjective\n---------\n{self.objective}"
+                 if self.objective else body)
         key = digest(prompt)
         try:
             response = self._ask(prompt, key, obs)
@@ -1377,24 +1235,6 @@ class FinRobotAdapter:
         })
         return orders
 
-    def _detail(self, obs: Any) -> list[str] | None:
-        """Which symbols get a full block this step, or None for all of them.
-
-        Every name the book holds, plus the standing panel. Held names are
-        in it unconditionally: an agent asked to manage a position it cannot
-        see the bid, the volatility or the order cap for is being asked a
-        different question from the one the other arm gets, and which names
-        are held diverges after the fork.
-
-        The panel does not. It is fixed before the run and identical in both
-        arms, which :meth:`state` publishes so :func:`tradefloor.agree`
-        checks it at the fork.
-        """
-        if not self.panel:
-            return None
-        held = [t for t in obs.tickers if obs.position(t)]
-        return sorted(set(self.panel).union(held))
-
     def decision(self) -> dict[str, Any] | None:
         """The last validated decision, as ``World`` records it every step.
 
@@ -1423,6 +1263,14 @@ class FinRobotAdapter:
             # Two arms running different panels would be answering different
             # questions, and nothing else in this dictionary would say so.
             "panel": list(self.panel),
+            # The renderer's identity, not the panel's, is what actually
+            # decided the text -- two arms could carry the same panel and
+            # different `units` or `order` and answer different questions
+            # with `panel` alone reporting them identical. Named `renderer`
+            # rather than `renderer_key`: the credential scan every adapter's
+            # published state runs through treats a trailing `key` as one,
+            # correctly, for the fields that usually end that way.
+            "renderer": self.renderer.key(),
             "mandate_version": MANDATE_VERSION,
         }
 
@@ -1450,7 +1298,7 @@ class FinRobotAdapter:
             fundamentals=self.fundamentals, objective=self.objective,
             mandate=self.mandate, agent_config=self.agent_config,
             every=self.every, max_participation=self.max_participation,
-            panel=self.panel, arm=self.arm,
+            panel=self.panel, renderer=self.renderer, arm=self.arm,
             # Passed rather than left to rebuild. It rebuilds identically
             # from the arguments above, but a caller who supplied their own
             # `info` would silently lose it in both arms.

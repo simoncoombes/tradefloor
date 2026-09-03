@@ -618,3 +618,23 @@ def test_an_accessor_of_a_binding_below_a_draw_is_refused():
 def test_both_generated_regions_are_listed():
     names = [name for name, _ in emit.regions(JUMPS)]
     assert names == ["jumps", "jumps.intensity_market"]
+
+
+def test_an_accessor_of_a_binding_that_is_not_there_is_refused():
+    """The other refusal in the accessor emitter.
+
+    Asking the jump mechanism for an absent name walks into its first
+    draw, so the purity guard answers first and this one never runs.
+    A mechanism whose top-level bindings are all pure reaches it, and
+    without it the emitter writes a region whose return line names
+    nothing.
+    """
+    mech = toy((Let("a", Dial("gain")),
+                Let("b", Bin("*", Var("a"), Const(2.0))),
+                Set("x", Var("b"))))
+    said = emit.accessor_body(mech, "b")
+    assert "let a = p.gain;" in said
+    assert "let b = a * f64::from_bits" in said
+    assert said.rstrip().endswith("// mechanism:toy.b end")
+    with pytest.raises(emit.EmitError, match="no pure binding"):
+        emit.accessor_body(mech, "nowhere")
