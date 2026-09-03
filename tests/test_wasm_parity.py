@@ -249,3 +249,23 @@ def test_jump_address_matches_world_unfire():
     stream, kind, index = world.surgeries[-1]["address"]
     assert (stream, kind) == ("jumps", "uniform")
     assert index == SURGERY_ADDRESS
+
+
+def test_a_negative_index_is_refused_at_the_same_layer_on_both_sides():
+    """Review found `patchDraws` (`rust/src/wasm.rs`) silently clamping
+    a negative stream, kind or index to 0 via a float-to-int cast that
+    ran before the range check, while the native side already refused
+    the same input -- an asymmetry, not merely an internal
+    inconsistency. Both refuse it now (`rust/src/wasm.rs`'s
+    `non_negative` on the wasm side); this pins the native side's own
+    refusal at the layer the wasm fix mirrors -- the raw binding, not
+    `noise.py`'s `DrawAddress.check()` above it -- so a future change
+    to either layer cannot silently re-open the gap.
+    """
+    universe = pt.Universe.random(SURGERY_CASE["size"],
+                                  seed=SURGERY_CASE["universe_seed"])
+    engine = pt.Engine(universe=universe, seed=SURGERY_CASE["seed"],
+                       model=SURGERY_CASE["preset"])
+    import pytest
+    with pytest.raises(OverflowError):
+        engine.patch_draws([("market", "uniform", -5, 0.5)])

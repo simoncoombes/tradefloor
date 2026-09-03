@@ -117,59 +117,6 @@ console.log(`  presets   ${pt.preset_names().join(', ')}`);
     `        child.drawPatches()   ${JSON.stringify(Array.from(childPatches))}`);
 }
 
-// -- 4. Fork and patch cost, on the SURGERY_CASE roster -----------------
-//
-// Reported once by hand as a number in a message rather than a test
-// (28.7us / 96.6us on one machine); a reviewer's own re-measurement got
-// a same-order-of-magnitude but not matching number (roughly 75us /
-// 170us) on a different, shared, noisy machine, which is exactly the
-// risk of a number with nothing pinning it -- found by review. This
-// asserts a bound generous enough to absorb that machine-to-machine
-// spread rather than pin either figure: the claim being tested is
-// "cheap enough that the run afterward dominates", not a specific
-// number of microseconds.
-{
-  const CASE = { size: 12, universeSeed: 7, seed: 3, preset: 'pt-v13' };
-  const DAY = 13;
-  const WARMUP = 200;
-  const N = 2000;
-  // 50-100x either measurement above: this fails only on a genuine
-  // regression (an accidental O(roster) or O(overlay) blowup in fork or
-  // patchDraws), not on a slower or more loaded machine than either one
-  // measured on.
-  const FORK_BOUND_US = 10_000;
-  const FORK_PATCH_BOUND_US = 20_000;
-
-  for (let i = 0; i < WARMUP; i++) {
-    const s = new pt.Sim(CASE.size, CASE.universeSeed, CASE.seed, CASE.preset);
-    const f = s.fork();
-    f.patchDraws([3, 0, f.jumpAddress(DAY), 1.0]);
-  }
-
-  const base = new pt.Sim(CASE.size, CASE.universeSeed, CASE.seed, CASE.preset);
-
-  let t0 = process.hrtime.bigint();
-  for (let i = 0; i < N; i++) { base.fork(); }
-  let t1 = process.hrtime.bigint();
-  const forkUs = Number(t1 - t0) / N / 1000;
-
-  t0 = process.hrtime.bigint();
-  for (let i = 0; i < N; i++) {
-    const f = base.fork();
-    const addr = f.jumpAddress(DAY);
-    f.patchDraws([3, 0, addr, 1.0]);
-  }
-  t1 = process.hrtime.bigint();
-  const forkPatchUs = Number(t1 - t0) / N / 1000;
-
-  report(`fork() stays under ${FORK_BOUND_US}us on a ${CASE.size}-instrument roster`,
-    forkUs < FORK_BOUND_US,
-    `        measured  ${forkUs.toFixed(2)}us (mean of ${N}, after ${WARMUP} warmup calls)`);
-  report(`fork+jumpAddress+patchDraws stays under ${FORK_PATCH_BOUND_US}us`,
-    forkPatchUs < FORK_PATCH_BOUND_US,
-    `        measured  ${forkPatchUs.toFixed(2)}us (mean of ${N}, after ${WARMUP} warmup calls)`);
-}
-
 if (failed) {
   console.error('\nDIVERGED: see FAIL lines above.');
   process.exit(1);

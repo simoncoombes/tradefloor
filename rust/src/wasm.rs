@@ -382,6 +382,22 @@ fn non_negative(value: f64, field: &str) -> Result<f64, String> {
     Ok(value)
 }
 
+/// Every field of a quadruple, checked -- the same question asked of
+/// `value` as of the other three, not just the three the first review
+/// round named.
+///
+/// `stream`, `kind` and `index` each go through [`non_negative`] before
+/// the cast that follows it. `value` takes no cast (it is already an
+/// `f64`, the type [`crate::engine::Engine::patch_draw`] wants) and no
+/// check: a uniform must lie in `[0, 1)` to be a uniform a consumer can
+/// read and a normal takes any finite value, and neither is enforced on
+/// the native side either -- `python/tradefloor/noise.py`'s `Patch`
+/// documents exactly this, so a caller wanting an event to fire sets a
+/// uniform to `0.0` and one wanting it unfired sets `1.0`
+/// (`World.unfire` is the worked example), and it is the CONSUMER's own
+/// comparison that decides, not this binding. Checking `value` here
+/// would refuse an input the native side accepts, which is a new
+/// asymmetry in the other direction from the one review found.
 fn parse_patch_entries(entries: &[f64]) -> Result<Vec<(u32, DrawKind, u64, f64)>, String> {
     if entries.len() % 4 != 0 {
         return Err(format!(
@@ -404,7 +420,8 @@ fn parse_patch_entries(entries: &[f64]) -> Result<Vec<(u32, DrawKind, u64, f64)>
                 "unknown draw kind {other}; 0 (uniform) or 1 (normal)")),
         };
         let index = non_negative(quad[2], "index")? as u64;
-        out.push((stream_id, kind, index, quad[3]));
+        let value = quad[3]; // deliberately unchecked -- see the doc comment above
+        out.push((stream_id, kind, index, value));
     }
     Ok(out)
 }
@@ -530,6 +547,26 @@ mod tests {
         assert!(parse_patch_entries(&[nan, 0.0, 0.0, 0.5]).is_err());
         assert!(parse_patch_entries(&[stream::MARKET as f64, nan, 0.0, 0.5]).is_err());
         assert!(parse_patch_entries(&[stream::MARKET as f64, 0.0, nan, 0.5]).is_err());
+    }
+
+    #[test]
+    fn patch_draws_accepts_any_value_including_negative_out_of_range_or_nan() {
+        // The fourth field, unlike the first three: no cast, so no clamp
+        // is possible, and no check, deliberately -- matching
+        // python/tradefloor/noise.py's Patch, which enforces neither a
+        // uniform's [0, 1) range nor a normal's finiteness either. Pins
+        // the OTHER direction of parity review asked this file to check
+        // for every field, not just the three that had the clamp bug:
+        // a value this binding refused that the native side accepts
+        // would be its own asymmetry.
+        let cases = [-1.0, 5.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY];
+        for value in cases {
+            let parsed = parse_patch_entries(&[stream::MARKET as f64, 0.0, 0.0, value])
+                .unwrap_or_else(|e| panic!("value {value} must be accepted, got {e}"));
+            let (_, _, _, got) = parsed[0];
+            assert!(got == value || (got.is_nan() && value.is_nan()),
+                    "value must pass through unchanged: sent {value}, got {got}");
+        }
     }
 
     #[test]
