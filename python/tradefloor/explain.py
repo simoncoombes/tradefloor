@@ -83,22 +83,27 @@ the market stream's log is the size of the tape at 613 of that
 stream's draws a tick.
 
 On ``Universe.random(n, seed=111)`` at engine seed 42, three days,
-``pt-v16``, at a4e33d5:
+``pt-v16``, at 099eae7, on one Windows box, three repetitions:
 
-===== ========= ==========
-names    logged       peak
-===== ========= ==========
-   12    66,400   31-39 MB
-   40   197,664      94 MB
-  100   478,944     224 MB
-===== ========= ==========
+===== ========= ========== ==========
+names    logged     peak A     peak B
+===== ========= ========== ==========
+   12    66,400      31 MB      28 MB
+   40   197,664      92 MB      83 MB
+  100   478,944     220 MB     200 MB
+===== ========= ========== ==========
 
-No wall time is quoted. Two readers on this shared machine measured a
-``check()`` at a third of an ``explain`` and at 1.1 to 1.3 times one, on
-the same commit, and a ratio a reader would take as a fact is worse than
-no number at all. The counts above and the peak repeated for both. A
-filtered read on the extension side would remove most of what the call
-holds, and this build does not have one.
+Two columns because two readers measured the same quantity on the same
+machine and got answers ten per cent apart, each repeating to the tenth
+of a megabyte across its own runs. A is this author's and B is the
+reviewer's. Neither is quoted as the number.
+
+No wall time is quoted at all. The same two readers measured a
+``check()`` at a third of an ``explain`` and at 1.1 to 1.3 times one, and
+a ratio a reader would take as a fact is worse than no number. The counts
+above are what both reproduced exactly. A filtered read on the extension
+side would remove most of what a call holds, and this build does not have
+one.
 
 Keeping a window costs a run a copy of the engine per kept day. Its cost
 in time is inside the noise at this size: over three repetitions at a
