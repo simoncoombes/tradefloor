@@ -70,9 +70,10 @@ def test_the_contributions_are_the_declared_eleven_and_nothing_else():
     # contribution, or lost one, would still sum to the move if the
     # arithmetic were rearranged around it.
     _, result = one()
-    assert [child.name for child in result.root.children] == list(ex.FACTORS)
-    assert list(ex.FACTORS)[:9] == list(tf.Engine.FACTORS)
-    assert list(ex.FACTORS)[9:] == ["fair_value", "book"]
+    names = [child.name for child in result.root.children]
+    assert names == list(ex.CONTRIBUTIONS)
+    assert list(ex.CONTRIBUTIONS)[:9] == list(tf.Engine.FACTORS)
+    assert list(ex.CONTRIBUTIONS)[9:] == ["fair_value", "book"]
     assert all(child.kind == "factor" for child in result.root.children)
     assert result.root.kind == "move"
 
@@ -285,10 +286,11 @@ def test_a_changed_draw_moves_the_day():
     idio = next(node for _, node, _ in result._walk
                 if node.kind == "draw" and node.name == "factor_idio_z")
     address = idio.addresses[0]
+    delivered = result._draw_values[id(idio)][0]
     base = result._run(())
-    same = result._run((noise.Patch(address, result._values[address]),))
+    same = result._run((noise.Patch(address, delivered),))
     assert same.move == base.move
-    moved = result._run((noise.Patch(address, result._values[address] + 8.0),))
+    moved = result._run((noise.Patch(address, delivered + 8.0),))
     assert moved.move != base.move
     assert abs(moved.factors["random_noise"]
                - base.factors["random_noise"]) > 1e-9
@@ -327,7 +329,7 @@ def test_a_mis_addressed_node_changes_the_day_where_it_can():
         values = result._draw_values[id(node)]
         assert len(values) == len(node.addresses), node.name
         late = tuple(noise.Patch(a._replace(index=a.index + 1), v)
-                     for a, v in zip(node.addresses, values))
+                     for a, v in zip(node.addresses, values))  # noqa: E501
         (moved if result._run(late).move != base.move
          else unmoved).append(node.name)
     assert tuple(moved) == SLIPS_SHOW, moved
@@ -357,6 +359,29 @@ def test_the_market_addresses_are_this_names_own_slots():
     assert idio.addresses[0].index != layout[1][0]
 
 
+def test_the_sector_index_is_the_names_own_sector():
+    """The sector tag, against the library's order rather than itself.
+
+    The tag `_draws` filters `sector_z` on is the same number the node's
+    addresses were selected by, so a test that reads the tag off the
+    node's own draws passes on any sector. `tf.sectors()` is the
+    canonical order the engine derives the tag from, and a roster of
+    twelve at this seed spans twelve distinct sectors, so a name in
+    technology cannot pass at index 0 by accident.
+    """
+    roster = tf.Universe.random(ROSTER_SIZE, seed=ROSTER_SEED)
+    order = list(tf.sectors())
+    e = tf.Engine(seed=ENGINE_SEED, universe=roster, model=PRESET)
+    e.keep_explanations(1, 1)
+    e.run_days(3, record=True)
+    seen = set()
+    for k, instrument in enumerate(roster):
+        result = e.explain(e.tickers[k], 1)
+        assert result._sector == order.index(instrument.sector), k
+        seen.add(result._sector)
+    assert len(seen) == len(order) == 12, sorted(seen)
+
+
 def test_every_draw_node_holds_this_names_own_draws():
     """The other half: every address belongs to the name being explained.
 
@@ -384,6 +409,38 @@ def test_every_draw_node_holds_this_names_own_draws():
                 assert entry.tag == wanted[scope], (node.name, entry.tag)
             seen += 1
     assert seen == len(ex._addresses(result.root)) == 2736
+
+
+def test_the_patches_a_node_builds_come_from_the_log_and_not_the_address():
+    """The fix to the pairing, exercised through `_patches` itself.
+
+    Reading each value back at the address it is installed at makes every
+    overlay a no-op, whatever the address. The test above measures the
+    engine by building its own patch list, so it would still pass with
+    the pairing reverted; this one goes through `_patches`, on a node
+    whose addresses have been slipped while its values have not.
+    """
+    _, result = one()
+    market = next(node for _, node, _ in result._walk
+                  if node.kind == "draw" and node.name == "market_factor_z")
+    slipped = market._replace(
+        addresses=tuple(a._replace(index=a.index + 1)
+                        for a in market.addresses))
+    result._draw_values[id(slipped)] = result._draw_values[id(market)]
+    straight = result._run(result._patches(market))
+    late = result._run(result._patches(slipped))
+    assert straight.move == result._base.move
+    assert late.move != result._base.move
+    # And the values are the log's, in log order, at the node's own
+    # addresses: the pair is what a patch carries.
+    logged = {entry.address: entry.value
+              for entries in result._logged.values() for entry in entries}
+    for patch in result._patches(market):
+        assert patch.value == logged[patch.address]
+    assert [p.address for p in result._patches(slipped)] == \
+        list(slipped.addresses)
+    assert [p.value for p in result._patches(slipped)] == \
+        [logged[a] for a in market.addresses]
 
 
 def test_replay_refuses_a_node_from_another_explanation():
@@ -1103,7 +1160,7 @@ def sources(mech) -> str:
 
 
 def test_the_table_covers_every_contribution_once():
-    assert len(ex.MECHANISMS) == len(ex.FACTORS) == 11
+    assert len(ex.MECHANISMS) == len(ex.CONTRIBUTIONS) == 11
     assert len({m.factor for m in ex.MECHANISMS}) == 11
 
 
@@ -1311,7 +1368,7 @@ def test_render_names_the_counterfactual_it_cannot_do():
              if not line.startswith("  caveat")]
     assert kinds[0] == "move"
     assert set(kinds[1:]) == {"factor"}
-    assert len(kinds) == 1 + len(ex.FACTORS)
+    assert len(kinds) == 1 + len(ex.CONTRIBUTIONS)
 
 
 def test_render_says_the_book_is_not_split_without_the_print_table():
@@ -1447,7 +1504,8 @@ def test_the_mcp_tool_returns_a_checked_tree():
     assert out["ok"] is True
     assert out["checked"]["misses"] == []
     assert out["checked"]["nodes"] == (55 if HAS_PRINTS else 53)
-    assert [c["name"] for c in out["tree"]["children"]] == list(ex.FACTORS)
+    shown = [c["name"] for c in out["tree"]["children"]]
+    assert shown == list(ex.CONTRIBUTIONS)
     total = math.fsum(c["value"] for c in out["tree"]["children"])
     assert abs(out["move"] - total) < ex.TOLERANCE
 

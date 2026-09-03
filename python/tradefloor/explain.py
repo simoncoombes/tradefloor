@@ -76,20 +76,22 @@ size. What grows is the log the call reads, because the market stream's
 log is the size of the tape at 613 of that stream's draws a tick.
 
 On ``Universe.random(n, seed=111)`` at engine seed 42, three days,
-``pt-v16``, at a4e33d5, three repetitions each:
+``pt-v16``, at a4e33d5:
 
-===== ========= ============== ============== ==========
-names    logged        explain          check       peak
-===== ========= ============== ============== ==========
-   12    66,400  1.46 - 2.31 s  0.50 - 0.70 s   31-39 MB
-   40   197,664  4.13 - 5.72 s  1.24 - 2.21 s      94 MB
-  100   478,944  8.87 - 10.2 s  3.15 - 3.82 s     224 MB
-===== ========= ============== ============== ==========
+===== ========= ==========
+names    logged       peak
+===== ========= ==========
+   12    66,400   31-39 MB
+   40   197,664      94 MB
+  100   478,944     224 MB
+===== ========= ==========
 
-Read the two time columns as an order of magnitude. This is a shared
-machine and three repetitions spread them by more than half again, while
-the counts and the peak repeat. A filtered read on the extension side
-would remove most of both, and this build does not have one.
+No wall time is quoted. Two readers on this shared machine measured a
+``check()`` at a third of an ``explain`` and at 1.1 to 1.3 times one, on
+the same commit, and a ratio a reader would take as a fact is worse than
+no number at all. The counts above and the peak repeated for both. A
+filtered read on the extension side would remove most of what the call
+holds, and this build does not have one.
 
 Keeping a window costs a run a copy of the engine per kept day. Its cost
 in time is inside the noise at this size: over three repetitions at a
@@ -256,7 +258,11 @@ MECHANISMS: tuple[Mechanism, ...] = (
 
 #: The contributions the root carries, in order: the nine ``truth()``
 #: columns and the two that close the arithmetic to the printed move.
-FACTORS: tuple[str, ...] = tuple(m.factor for m in MECHANISMS)
+#:
+#: Named for what they are rather than ``FACTORS``, which is what
+#: ``Engine.FACTORS`` calls the nine. Two names for two different lists
+#: is a trap for anyone importing both.
+CONTRIBUTIONS: tuple[str, ...] = tuple(m.factor for m in MECHANISMS)
 
 #: How the book contribution splits when ``Engine.prints()`` is on the
 #: build, as ``(name, Rust function)`` in the order they are reported.
@@ -301,9 +307,19 @@ class Node(NamedTuple):
     the quantity the node states, in log price units for a ``move``,
     ``factor`` or ``mechanism`` node and in the field's own units for a
     ``state`` node; a ``draw`` node states the sum of the values its
-    addresses delivered. ``inputs`` are the dials and macro fields the
-    node read, by name. ``addresses`` are the draws under this node
+    addresses delivered. ``addresses`` are the draws under this node
     alone, and ``children`` the nodes under it.
+
+    ``inputs`` differs by kind rather than being one thing, and the
+    Arrow table's ``inputs`` column is this map as JSON, so a reader
+    taking it for one thing reads a draw's count as a dial. A
+    ``mechanism`` node's inputs are the dials that function reads, which
+    is the case the name was written for. The ``move`` node's are the
+    close, the previous close and the sum of the contributions under it.
+    A ``draw`` node's are how many draws it holds and the day they were
+    logged under. A ``factor`` node's and a ``state`` node's are empty.
+    The macro fields a mechanism read are ``state`` children beside the
+    engine columns rather than inputs.
     """
 
     kind: str
@@ -526,12 +542,6 @@ class Explanation:
         #: values a replay installs, so a replay of a node reproduces the
         #: run rather than perturbing it.
         self._logged, self._traced = _logged_draws(engine, self.day)
-        #: What each address delivered, by address. A scan of the log per
-        #: address turned one `check()` on a twelve-name day into 78
-        #: million comparisons, which is the whole of its cost.
-        self._values = {entry.address: entry.value
-                        for entries in self._logged.values()
-                        for entry in entries}
         self._previous = _levels(engine, self._label - 1, self._index)
         if self._previous is not None and not _same_roster(
                 engine, self._label - 1, self._label, len(self._roster)):
@@ -1270,5 +1280,5 @@ def _node_from_json(payload: dict) -> Node:
         children=tuple(_node_from_json(c) for c in payload["children"]))
 
 
-__all__ = ["Explanation", "Node", "Mechanism", "MECHANISMS", "FACTORS",
+__all__ = ["Explanation", "Node", "Mechanism", "MECHANISMS", "CONTRIBUTIONS",
            "KINDS", "TOLERANCE"]
