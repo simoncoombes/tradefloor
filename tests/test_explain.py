@@ -590,6 +590,87 @@ def test_the_store_stays_out_of_the_snapshot_and_the_hash():
     assert state_hash(plain.state_snapshot()) == watched.state_hash()
 
 
+def test_a_kept_copy_carries_no_draw_log_and_the_same_counters():
+    """The copy drops what the log holds and keeps everything else.
+
+    The log is a recording buffer and the copy is never asked what it
+    recorded, so its entries are weight: carried, they made the store
+    quadratic in the window, since copy k held k days of a log the size
+    of the tape. What must NOT move is the state: the hash covers
+    draw_counts, and a copy whose counters had shifted would replay a
+    different day.
+
+    Measured on a run that both delists and lists, since a roster change
+    is where a counter would be most likely to slip.
+    """
+    e = swapped()
+    result = e.explain("AAB", 2)
+    copy = result._opened
+    # Nothing logged on the copy, on any of the seven streams.
+    assert {s: len(noise.draw_log(copy, s, -1, 99))
+            for s in noise.STREAMS} == {s: 0 for s in noise.STREAMS}
+    # And the source engine, rebuilt to the same point, is the same state.
+    source = tf.Engine(seed=ENGINE_SEED,
+                       universe=tf.Universe.random(6, seed=ROSTER_SEED),
+                       model=PRESET)
+    source.keep_explanations(0, 5)
+    source.run_days(2, record=True)
+    source.delist(0)
+    source.list_instrument(tf.Instrument("ZZZ", "technology",
+                                         initial_price=50.0,
+                                         shares_outstanding=1e6))
+    assert copy.state_hash() == source.state_hash()
+    assert copy.stream_positions() == source.stream_positions()
+    assert copy.draws_by_stream() == source.draws_by_stream()
+    assert copy.draws_consumed == source.draws_consumed
+    counts = source.state_snapshot()["draw_counts"]
+    assert copy.state_snapshot()["draw_counts"] == counts
+
+
+def test_a_fork_of_a_cleared_copy_runs_the_same_market():
+    # The measurement that matters: a copy whose log was emptied is still
+    # the same engine, so a fork of it run on to the end reproduces the
+    # source's trajectory to the bit.
+    e = swapped()
+    copy = e.explain("AAB", 2)._opened
+    source = tf.Engine(seed=ENGINE_SEED,
+                       universe=tf.Universe.random(6, seed=ROSTER_SEED),
+                       model=PRESET)
+    source.run_days(2, record=True)
+    source.delist(0)
+    source.list_instrument(tf.Instrument("ZZZ", "technology",
+                                         initial_price=50.0,
+                                         shares_outstanding=1e6))
+    a, = copy.fork(1)
+    b, = source.fork(1)
+    a.run_days(6, record=True, first_day=2)
+    b.run_days(6, record=True, first_day=2)
+    assert _f64(a.prices()) == _f64(b.prices())
+    assert a.state_hash() == b.state_hash()
+    assert a.stream_positions() == b.stream_positions()
+    assert a.draws_by_stream() == b.draws_by_stream()
+
+
+def test_the_source_engines_own_log_survives_every_explain():
+    # The tree reads the source's log, so a copy that emptied its own
+    # must leave that one alone, in entries and in order.
+    e = engine()
+
+    def logged():
+        return {s: [(tuple(d.address), d.value, d.day, d.site, d.tag)
+                    for d in noise.draw_log(e, s, -1, 99)]
+                for s in noise.STREAMS}
+
+    before = logged()
+    # 99,668 entries at twelve names over the two kept days plus
+    # the one before them, so the check is over a real log rather
+    # than an empty one.
+    assert sum(len(v) for v in before.values()) == 99_668
+    for day in (1, 2):
+        assert e.explain(e.tickers[0], day).check() == []
+    assert logged() == before
+
+
 def test_a_fork_carries_the_days_its_parent_kept():
     e = engine()
     fork, = e.fork(1)
@@ -965,7 +1046,9 @@ def delisted(delist=True, size=6):
     e.run_days(2, record=True)
     if delist:
         e.delist(0)
-        e.run_days(2, record=True, first_day=2)
+    # Both arms run the same days, so the control can be asked about any
+    # of them rather than only the two before the change.
+    e.run_days(2, record=True, first_day=2)
     return e
 
 
@@ -999,6 +1082,59 @@ def test_a_delisting_does_not_move_which_name_a_day_explains():
     assert contributions(moved.explain("AAA", 0)) == \
         contributions(clean.explain("AAA", 0))
     assert moved.explain("AAA", 0).check() == []
+
+
+def swapped(keep=(0, 5), size=6):
+    """A run that delists one name and lists another between day 1 and
+    day 2, so both days' tapes are the same width while every slot
+    between the two has moved."""
+    roster = tf.Universe.random(size, seed=ROSTER_SEED)
+    e = tf.Engine(seed=ENGINE_SEED, universe=roster, model=PRESET)
+    e.keep_explanations(*keep)
+    e.run_days(2, record=True)
+    e.delist(0)
+    e.list_instrument(tf.Instrument("ZZZ", "technology", initial_price=50.0,
+                                    shares_outstanding=1e6))
+    e.run_days(2, record=True, first_day=2)
+    return e
+
+
+def test_a_listing_that_hides_a_delisting_is_still_caught():
+    """The case a width comparison cannot see.
+
+    A delisting and a listing in one day leave the tape the same width
+    and move every slot between them, so the previous close's levels are
+    another company's while the counts agree. The rosters themselves are
+    compared where the day before was kept, which is exact.
+    """
+    e = swapped()
+    result = e.explain("AAB", 2)
+    assert result._compared == "rosters"
+    assert result._previous_moved is True
+    assert result._previous is None
+    total = math.fsum(child.value for child in result.root.children)
+    assert abs(result.move - total) < ex.TOLERANCE
+    assert result.check() == []
+    line = next(c for c in result.caveats if "not the one day" in c)
+    assert "the roster the day before opened on" in line
+    # A run with no roster change at all says nothing of the sort.
+    assert not any("not the one day" in c
+                   for c in delisted(delist=False).explain("AAB", 2).caveats)
+
+
+def test_a_day_whose_predecessor_was_not_kept_says_how_it_compared():
+    # Without the day before in the window there is no roster to compare
+    # against, only the tape's counts, and the caveat says so rather than
+    # presenting the weaker check as the stronger one.
+    e = swapped(keep=(2, 5))
+    result = e.explain("AAB", 2)
+    assert result._compared == "widths"
+    line = next(c for c in result.caveats if "was not kept" in c)
+    assert "the number of names its tape holds" in line
+    assert "Keep the day before" in line
+    # And the stronger comparison says nothing about widths.
+    assert not any("was not kept" in c
+                   for c in swapped().explain("AAB", 2).caveats)
 
 
 def test_a_moved_roster_is_named_in_the_caveats():

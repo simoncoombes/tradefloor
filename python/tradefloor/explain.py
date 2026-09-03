@@ -17,6 +17,11 @@ each day's open. Both are read-only, so a market with the window open is
 the market it would have been without one. ``explain`` on a day outside
 the window raises and names the days that were kept.
 
+A window costs one engine copy per day kept, and a fork pays it again per
+arm. At forty names over thirty days the peak working set is 333 MB with
+a thirty-day window against 28 MB with none, and a fork of a sixty-day
+window takes 0.136 seconds. Ask for the days you mean to explain.
+
 ``explain`` also needs pyarrow, because the tree's contributions are the
 ``truth()`` table's columns and that table arrives as an Arrow stream. A
 default install raises from the first call with the extra to install; the
@@ -70,10 +75,12 @@ anything that decides a price.
 What a call does is fixed and what it takes in wall time is not, so the
 counts come first. A ``check()`` runs the day once per DISTINCT overlay
 rather than once per node, since a replay is a function of its patch set:
-15 runs over the tree's 53 nodes, and neither number moves with the
-roster. The addressed draws under one name are 2,736 at every roster
-size. What grows is the log the call reads, because the market stream's
-log is the size of the tape at 613 of that stream's draws a tick.
+15 runs, whatever the roster. The tree is 55 nodes where
+``Engine.prints()`` splits the book contribution and 53 where the build
+has no print table, and the addressed draws under one name are 2,736 at
+every roster size. What grows is the log the call reads, because
+the market stream's log is the size of the tape at 613 of that
+stream's draws a tick.
 
 On ``Universe.random(n, seed=111)`` at engine seed 42, three days,
 ``pt-v16``, at a4e33d5:
@@ -379,15 +386,17 @@ def _record_label(inputs: Sequence[dict], day: int) -> int:
     return int(day)
 
 
-def _same_roster(engine: Engine, before: int, after: int,
-                 width: int) -> bool:
+def _same_width(engine: Engine, before: int, after: int,
+                width: int) -> bool:
     """Whether the tape holds the same number of names on both days.
 
-    A slot names a company, and a delisting shifts every slot below it,
-    so a level read from one day's tape at a slot from another day's is
-    another name's. The widths are what the tape can be asked; equal
-    widths do not prove the roster held still, and a listing paired with
-    a delisting in one day is the case they miss.
+    The fallback for a day whose predecessor was not kept, where the
+    tape's counts are all there is to compare. A slot names a company
+    and a delisting shifts every slot below it, so a level read from one
+    day's tape at a slot from another day's is another name's. Equal
+    counts do not prove the roster held still;
+    :meth:`Explanation._held_still` compares the rosters themselves
+    wherever the day before is in the window.
     """
     return all(_instruments(engine, d) in (None, width)
                for d in (before, after))
@@ -449,8 +458,8 @@ def _table(stream: Any) -> dict[str, list]:
 
 def _explain(engine: Engine, ticker: str, day: int, sector: int,
              window: tuple[int, int] | None, kept: Sequence[int],
-             opened: Engine | None,
-             inputs: Sequence[dict] | None) -> "Explanation":
+             opened: Engine | None, inputs: Sequence[dict] | None,
+             before: Sequence[str] | None = None) -> "Explanation":
     """Build the explanation ``Engine.explain`` returns.
 
     Called from the binding, which owns the store and hands over what it
@@ -492,7 +501,8 @@ def _explain(engine: Engine, ticker: str, day: int, sector: int,
     return Explanation(engine=engine, ticker=ticker, day=int(day),
                        sector=int(sector), window=window,
                        kept=tuple(int(d) for d in kept),
-                       opened=opened, inputs=tuple(inputs))
+                       opened=opened, inputs=tuple(inputs),
+                       before=None if before is None else tuple(before))
 
 
 class Explanation:
@@ -516,7 +526,8 @@ class Explanation:
     def __init__(self, *, engine: Engine, ticker: str, day: int,
                  sector: int, window: tuple[int, int] | None,
                  kept: tuple[int, ...], opened: Engine,
-                 inputs: tuple[dict, ...]) -> None:
+                 inputs: tuple[dict, ...],
+                 before: tuple[str, ...] | None = None) -> None:
         self.ticker = ticker
         self.day = int(day)
         self._engine = engine
@@ -543,8 +554,14 @@ class Explanation:
         #: run rather than perturbing it.
         self._logged, self._traced = _logged_draws(engine, self.day)
         self._previous = _levels(engine, self._label - 1, self._index)
-        if self._previous is not None and not _same_roster(
-                engine, self._label - 1, self._label, len(self._roster)):
+        #: The roster the day before opened on, where that day was kept,
+        #: and how the two days were compared. Rosters compare exactly;
+        #: widths do not, and a listing paired with a delisting in one
+        #: day leaves the width alone while moving every slot between
+        #: them, which is the case a width comparison cannot see.
+        self._before = before
+        self._compared = "rosters" if before is not None else "widths"
+        if self._previous is not None and not self._held_still(engine):
             # The roster moved between the two days, so the slot that
             # names this company on one tape does not on the other and
             # the previous close's levels would be another name's.
@@ -578,6 +595,21 @@ class Explanation:
         self._recorded_close = _recorded_close(engine, self._label,
                                                self._index)
         self.caveats = self._caveats()
+
+    def _held_still(self, engine: Engine) -> bool:
+        """Whether the roster is the same on the day before and this one.
+
+        Exact where the day before was kept, since the two copies carry
+        their own rosters. Where it was not, the tape's instrument counts
+        are all there is to compare, and equal counts do not prove the
+        roster held: a listing paired with a delisting in one day leaves
+        the count alone and moves every slot between them. The caveats
+        say which comparison was made.
+        """
+        if self._before is not None:
+            return tuple(self._before) == self._roster
+        return _same_width(engine, self._label - 1, self._label,
+                           len(self._roster))
 
     # -- the tree ---------------------------------------------------------
 
@@ -874,13 +906,24 @@ class Explanation:
                 f"read at {self._label} and the tree is the day the store "
                 f"kept as {self.day}. Both paths the library drives pass "
                 "one number to both.")
-        if getattr(self, "_previous_moved", False):
+        if self._previous_moved:
+            how = ("the roster the day before opened on"
+                   if self._compared == "rosters"
+                   else "the number of names the tape holds for it")
             out.append(
-                f"The tape holds a different number of names on day "
-                f"{self._label - 1} than on day {self._label}, so the "
-                "previous close's levels sit at slots that name other "
-                "companies and the valuation is not separated from the "
-                "book.")
+                f"The roster is not the one day {self._label - 1} ran "
+                f"under, compared by {how}, so the previous close's "
+                "levels sit at slots that name other companies and the "
+                "valuation is not separated from the book.")
+        elif self._compared == "widths" and self._previous is not None:
+            out.append(
+                f"Day {self.day - 1} was not kept, so the roster it ran "
+                "under was compared by the number of names its tape "
+                "holds rather than name by name. A listing and a "
+                "delisting in one day leave that number alone and move "
+                "every slot between them, and the previous close's "
+                "levels would then be another company's. Keep the day "
+                "before the one you explain to close that.")
         silent = [m.factor for m in MECHANISMS if not m.sites]
         blind = [m.factor for m in MECHANISMS
                  if m.sites and not any(child.kind == "draw" for child

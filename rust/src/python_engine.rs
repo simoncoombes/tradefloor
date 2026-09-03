@@ -962,6 +962,13 @@ impl PyEngine {
             copy.recorded_macro.clear();
             copy.recorded_book.clear();
             copy.day_buffer.clear();
+            // And the draw log, which is the size of the tape. Without
+            // this a copy carried every entry logged before its day, so
+            // N kept days held N squared over two days of log and a
+            // thirty-day window at forty names cost 1.6 GB. The copy is
+            // never asked what it recorded: the tree reads the source
+            // engine's log, and the copy is only forked and replayed.
+            copy.inner.clear_draw_log_records();
             let log_start = self.log.len();
             self.explanations.opens.insert(
                 day,
@@ -1879,16 +1886,24 @@ impl PyEngine {
     ///
     /// Both `run_days` and `World.run` open through one path, so both fill
     /// this. The cost is one engine copy per kept day, taken without the
-    /// recorded tape, so ask for the days you mean to explain rather than
-    /// for a whole run.
+    /// recorded tape and without the draw log, so ask for the days you
+    /// mean to explain rather than for a whole run.
     ///
-    /// A fork carries what the parent kept, so the cost is paid again per
-    /// arm: `World.fork` and every counterfactual arm copy the whole
-    /// store. On `Universe.random(40, seed=111)` at `pt-v16` over twenty
-    /// days, `fork(2)` took 0.014 s with no window, 0.066 s at a five-day
-    /// window and 0.890 s at a twenty-day one, so the window and not the
-    /// roster is what a fork pays for. A fork collects no new opens of
-    /// its own past the window it inherited.
+    /// What that costs, on `Universe.random(40, seed=111)` at `pt-v16`
+    /// over thirty days: a peak working set of 333 MB with a thirty-day
+    /// window against 28 MB with none. A fork carries what the parent
+    /// kept, so `World.fork` and every counterfactual arm pay it again
+    /// per arm: `fork(1)` takes 0.011 s at a five-day window, 0.046 s at
+    /// twenty and 0.136 s at sixty. A fork collects no new opens of its
+    /// own past the window it inherited.
+    ///
+    /// The draw log is cleared on the copy because the copy is never
+    /// asked what it recorded: the tree reads the SOURCE engine's log,
+    /// and the copy is only forked and replayed. Carried, it made the
+    /// store quadratic in the window, since copy k held k days of a log
+    /// that is the size of the tape; the same thirty-day window cost
+    /// 1.6 GB and a single fork at sixty days took 24.8 seconds. Found
+    /// by the P1 reviewer on 2026-09-02.
     fn keep_explanations(&mut self, from_day: i64, to_day: i64) -> PyResult<()> {
         if to_day < from_day {
             return Err(ValidationError::new_err(format!(
@@ -1915,10 +1930,19 @@ impl PyEngine {
     /// for rather than handed a tree with no leaves.
     fn explain(slf: &Bound<'_, Self>, ticker: &str, day: i64) -> PyResult<PyObject> {
         let py = slf.py();
-        let (sector, window, kept, opened, inputs) = {
+        let (sector, window, kept, opened, inputs, before) = {
             let me = slf.borrow();
             let window = me.explanations.window;
             let kept: Vec<i64> = me.explanations.opens.keys().copied().collect();
+            // The roster the day BEFORE opened on, where that day was
+            // kept too. Comparing the two rosters is exact where the
+            // widths are not: a listing and a delisting in one day leave
+            // the width alone and move every slot between them.
+            let before: Option<Vec<String>> = me
+                .explanations
+                .opens
+                .get(&(day - 1))
+                .map(|k| k.engine.tickers.clone());
             match me.explanations.opens.get(&day) {
                 Some(k) => {
                     let entries = me.day_inputs(py, k.log_start)?;
@@ -1934,16 +1958,17 @@ impl PyEngine {
                         kept,
                         Some((*k.engine).clone()),
                         Some(entries),
+                        before,
                     )
                 }
-                None => (sector_of(&me, ticker), window, kept, None, None),
+                None => (sector_of(&me, ticker), window, kept, None, None, before),
             }
         };
         let module = py.import_bound("tradefloor.explain")?;
         Ok(module
             .call_method1(
                 "_explain",
-                (slf, ticker, day, sector, window, kept, opened, inputs),
+                (slf, ticker, day, sector, window, kept, opened, inputs, before),
             )?
             .unbind())
     }
