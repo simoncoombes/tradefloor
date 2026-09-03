@@ -629,15 +629,25 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     fails to pay for the indicator it is retried with a Jacobian of its
     own, and this is a planted day where the retry is what finds it.
     """
-    # The day the retry decides, from a twelve-day sweep: the generator is
-    # advanced through six days that plant nothing, and the seventh plants
-    # a market jump of -2.27. On that day the reused Jacobian leaves the
-    # trial at 28.08 against a no-jump 25.48, so it is rejected, and a
-    # Jacobian of its own reaches 12.46 and is accepted.
+    # The day the retry decides, found by sweeping the advance count and the
+    # planted normal: the generator is advanced through ten days that plant
+    # nothing, and the eleventh plants a market jump of -3.10. On that day
+    # the reused Jacobian leaves the trial at 61.95 against a no-jump 41.49,
+    # so it is rejected, and a Jacobian of its own reaches 19.15 and is
+    # accepted.
+    #
+    # This was six days and a jump of -2.27, reading 28.08 against 25.48 and
+    # 12.46, until the universe generator was reconciled to open a drawn
+    # roster at its own fair value. The roster here is generated, so that
+    # re-dealt the day and the reused Jacobian started paying for the
+    # indicator on it: the retry stopped being what found it. The fix is
+    # unchanged and still guarded, on a day that still needs it. Of 378
+    # combinations swept, four were decisive, so a day where the reused
+    # Jacobian is good enough is now much the commoner case.
     rng = np.random.default_rng(7)
-    for i in range(6):
+    for i in range(10):
         _planted_day(11 + i, None, rng)
-    fwd, r_obs = _planted_day(17, -2.27, rng)
+    fwd, r_obs = _planted_day(21, -3.10, rng)
     found = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
     assert found["jump_market"] is not None
     assert found["jump_market"] < 0.0

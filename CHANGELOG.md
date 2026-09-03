@@ -2,8 +2,10 @@
 
 ## Unreleased
 
-**The panel reports the index's annualised drift**, ungraded, because no
-band for a first moment has been derived here yet.
+**A generated roster opens at its own fair value.** Every `Universe.random`
+roster re-rolls; pin 0.6.2 to reproduce one.
+
+**The panel reports the index drift**, ungraded for want of a band.
 
 **A run can commit to the state it held at the end of every day**, and a
 sampled check verifies k days for the cost of k days.
@@ -35,6 +37,72 @@ checked for its draw effect and proven inert at its default doses.
 of the tree replays from the state the day started in.
 
 <!-- release-note-ends -->
+
+### A generated roster opens at its own fair value
+
+`Universe.random` drew a price, then drew a multiple around the sector
+anchor and set earnings to the price divided by it. The multiple's scatter
+ran uniformly from 0.55 to 1.6 of the anchor, which is symmetric in the
+ratio and biased in the log of it: its mean in log is +0.029, so the
+implied earnings came out systematically low and the valuation built on
+them came out below the price it was built from. Book value had the same
+shape against the loss-maker path. A drawn roster therefore opened above
+fair value, at a cross-sectional mean log deviation of +0.050 over two
+hundred rosters of forty names, with 58 per cent of names above fair
+value, and the market spent a year unwinding that on a 60-day half-life.
+
+Both ratios are now drawn log-uniformly between reciprocal endpoints, so
+their mean in log is zero and a name is as likely to open cheap as dear.
+The widths are preserved to within two per cent, so the cross-section is
+as dispersed as it was and no longer tilted. Over two hundred rosters the
+day-zero mean falls from +0.050 to +0.013 and the fraction above fair
+value from 58 to 51 per cent. What remains is the valuation model's
+neutral discount rate sitting 56 basis points below where the economy
+opens, which compresses every profitable name's multiple by about one per
+cent. That is a property of the opening macro state rather than of the
+generator, and correcting it here would bake an economy constant into
+universe generation.
+
+What is centred is the draw, which is the thing that carried the bias. A
+roster of forty names taken from it still scatters, and that scatter is
+sampling error rather than bias: the day-zero deviation has a
+cross-sectional sd of about 0.32, so a forty-name mean carries a standard
+error of about 0.05 and any roster lands that far either side by chance.
+The panel roster is one that draws high, reading +0.048 against the draw's
++0.013, and a different seed is as likely to read low.
+
+Removing that too would mean correcting each roster to its own realised
+mean, which is deliberately not done. The correction depends on the roster
+size, so it is a second pass whose result depends on `n`, and it breaks the
+invariant that a larger universe extends a smaller one. A generator that
+silently re-centred every roster would also report a cross-section tighter
+than the one it drew.
+
+Measured on the panel roster over thirty seeds at 252 days on pt-v16, the
+annualised index drift improves from a median of -22.155 to -18.344 per
+cent a year. Every one of the thirty improves, by between 3.715 and 4.039
+points, because the starting condition is a property of the roster and not
+of the market seed. The drift is still negative on all thirty: the
+remaining terms are a down-tilt in the market factor, a rising rate path
+and an unexplained residual, none of which this touches.
+
+**What this breaks.** The same name and seed no longer give the same
+universe. Every generated name's earnings and book value move, and with
+them every price path, so any published result citing `Universe.random`
+re-rolls; `Universe.random(40, seed=111)` now fingerprints
+9be68b9bc37e7978. Everything else about a generated name is bit-identical,
+because both reconciled fields take exactly one draw each as they did
+before and the stream position is unchanged. The determinism digest does
+not move: the known-answer run builds its instruments by hand and never
+calls the generator.
+
+The certified panel does not move either, which is the same finding the
+new drift row exists for. Over seeds 101 to 110 the fourteen graded
+medians shift by at most 0.26 of their own across-seed noise and all
+fourteen stay in band. Their recorded values, `SEED_SD` and the preset
+records were nonetheless all measured on the roster the old generator
+produced, and none has been re-measured. They are marked stale where they
+are recorded rather than quietly restated.
 
 ### The index drift row
 

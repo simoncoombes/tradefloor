@@ -46,6 +46,23 @@ Every figure below: `Universe.random(40, seed=111)` (fingerprint
 to 6 -- re-measured at known-answer v8 (era digest 1ee64998...), where the
 superseded figures beside them are marked with the era they belonged to.
 
+**That roster no longer exists.** The universe generator was reconciled so
+that a drawn roster opens at its own fair value rather than above it, which
+changed every generated name's earnings and book value, and
+`Universe.random(40, seed=111)` now fingerprints 9be68b9bc37e7978. Every
+figure below, `SEED_SD`, `SEED_SD_504` and the `envelope` module's measured
+tables were all taken on the roster the OLD generator produced, and none of
+them has been re-measured. They are stale, and the stale figures are kept
+rather than quietly swapped, because a figure carrying a fingerprint it was
+not measured under is the defect this module corrected once already.
+
+How stale, measured rather than guessed: over seeds 101 to 110 at 252 days
+on pt-v16, the fourteen graded medians move by at most 0.26 of their own
+`SEED_SD` (the largest is `volume_change_acf1`), and all fourteen sit in
+band before and after. So the verdicts hold and the digits do not. The row
+that moves is the ungraded one: `index_drift_pct` improves by 3.83
+percentage points a year on every one of thirty seeds.
+
 ## What lands
 
 **Stocks move together, and stop being diversifiable in a crisis.** Mean
@@ -790,6 +807,14 @@ SEED_SD_PROVENANCE = {
     "pinned_by": "tests/test_loss.py re-measures two of the thirty seeds "
                  "live and re-derives the sd from the committed per-seed "
                  "table",
+    # The roster above is no longer the one that call returns. Recorded as
+    # data beside the fingerprint it supersedes, so a consumer quoting this
+    # provenance quotes the discrepancy with it rather than presenting a
+    # measurement under a roster it was not taken on.
+    "roster_superseded": "Universe.random(40, seed=111) now fingerprints "
+                         "9be68b9bc37e7978: the generator was reconciled so "
+                         "a drawn roster opens at its own fair value. These "
+                         "values have NOT been re-measured on it.",
 }
 
 #: The first two are MARGINAL: properties of one series taken on its own. The
@@ -927,10 +952,17 @@ def _index_drift_pct(
     year, and it was.
 
     Measured: pt-v16, `Universe.random(40, seed=111)`, 252 days, seeds 1 to
-    30, at `df0fe62` on `origin/dev`, this row reads a median of **-22.155**
-    percent a year, against a real large-cap index's +8 to +10. It is
-    negative on all thirty seeds, minimum -43.797 and maximum -16.360. The
-    derivation is `tradefloor-design/programme/index-drift-investigation.md`.
+    30, at `df0fe62` on `origin/dev`, this row read a median of **-22.155**
+    percent a year, against a real large-cap index's +8 to +10, negative on
+    all thirty seeds, minimum -43.797 and maximum -16.360. The derivation is
+    `tradefloor-design/programme/index-drift-investigation.md`.
+
+    On the same protocol after the universe generator was reconciled to open
+    a drawn roster at its own fair value, it reads **-18.344**, minimum
+    -39.896 and maximum -12.526, and is still negative on all thirty. That
+    change recovered 3.831 points of the 22.155 and every seed improved. The
+    terms that remain are a down-tilt in the market factor, a rising rate
+    path and a residual none of them explains.
 
     # There is no band, deliberately
 

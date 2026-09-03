@@ -442,8 +442,10 @@ pub struct TickOutcome {
     /// the last print and the unbounded print, the numerator opposes the
     /// denominator, and the share comes out below zero. Measured on
     /// `Universe.random(12, seed=111)` at seed 42 over three days of pt-v16:
-    /// 1,409 rows negative against 100 positive, of 1,516 where the bound
-    /// moved the print at all.
+    /// 1,351 rows negative against 72 positive, of 1,436 where the bound
+    /// moved the print at all. It read 1,409 against 100 of 1,516 on the
+    /// roster the universe generator produced before it was reconciled to
+    /// open at fair value, which re-drew the roster and so the market.
     ///
     /// Read it through the identity it satisfies: the unbounded book's move
     /// away from the last print is `1 - share` times the printed move. A

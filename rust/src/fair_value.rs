@@ -247,11 +247,18 @@ pub fn compute_fair_value(
 ///
 /// # Why it is off by default
 ///
-/// It is not a small correction. 42.8% of instruments from `Universe.random`
-/// have `eps * pe` BELOW `book * LOSS_MAKING_PRICE_TO_BOOK`, some at a fifth of
+/// It is not a small correction. 46.7% of instruments from
+/// `Universe.random(4000, seed=7)` have `eps * pe` BELOW
+/// `book * LOSS_MAKING_PRICE_TO_BOOK`, some at a fifth of
 /// it, so switching it on re-values a large part of a typical universe and
 /// re-bases every calibrated statistic. Adopting it is an era boundary and a
 /// recalibration, not a bug fix, and it ships inert until that work is done.
+///
+/// That figure was 42.8% before the universe generator reconciled a drawn
+/// roster to its own fair value, and it named no roster to be re-measured
+/// on. It is measured here on the opening macro state at the commit that
+/// reconciled the generator; a single 40-name roster reads a long way from
+/// it either side, so the large draw is the one to quote.
 pub fn compute_fair_value_with(
     company: &CompanyValuationInputs,
     economy: &EconomyValuationInputs,

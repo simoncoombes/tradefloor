@@ -479,7 +479,13 @@ def test_the_report_names_the_mismatches_rather_than_scoring_them():
     # well against one it gets frankly wrong, and knowing WHICH is the whole
     # value of the exercise.
     text = report(measure(seed=3, universe=UNIVERSE, days=180))
-    assert "TOO HIGH" in text
+    # The claim is that a miss is NAMED and a match is named beside it, not
+    # that this seed misses on a particular side. It read TOO HIGH until the
+    # universe generator was reconciled to open a drawn roster at its own
+    # fair value, which re-drew the roster and moved the one row that misses
+    # here from above its band to below it. Pinning the direction was
+    # pinning an accident of the seed.
+    assert "TOO HIGH" in text or "TOO LOW" in text
     assert "matches" in text
     assert "momentum is mechanically" in text
 
@@ -538,8 +544,37 @@ def test_the_index_drift_row_measures_what_the_graded_rows_cannot_see():
 
     from tradefloor.facts import SEED_SD, panel_statistics
 
+    # Nine of the fourteen centre every argument before they measure it, so
+    # a constant added to a series cancels EXACTLY: `pstdev` subtracts its
+    # own mean, `excess_kurtosis` standardises, `_autocorrelation` and
+    # `_unit_centred` subtract a sample mean they then use on both sides,
+    # and the two asymmetry rows select their days off a z-score of the
+    # equal-weight return, which a constant does not move.
+    # `volume_change_acf1` reads no return series at all.
+    EXACTLY_INVARIANT = (
+        "annualised_vol_pct", "excess_kurtosis", "return_acf1",
+        "cross_sectional_corr", "volume_change_acf1", "corr_asymmetry",
+        "corr_asymmetry_lagged", "sector_excess_corr",
+        "corr_persistence_acf1",
+    )
+    # The other five consume an ABSOLUTE return, and |r + c| is not |r| plus
+    # a constant, so no downstream centring can undo it. They are not
+    # invariant and nothing about their formulas says they should be. What
+    # is asserted of them is that they move by less than the noise the panel
+    # already tolerates between two seeds of the same model, which is the
+    # sense in which the gate could not see the drift.
+    NOT_INVARIANT = (
+        "abs_return_acf1", "abs_return_acf5", "abs_return_acf20",
+        "volume_abs_return_corr", "leverage_effect",
+    )
+    assert sorted(EXACTLY_INVARIANT + NOT_INVARIANT) == sorted(
+        tradefloor.facts.REAL_MARKETS), "the split must cover the graded panel"
+
+    # 150 days, not 120: `corr_persistence_acf1` needs six 21-day windows to
+    # be measurable at all, and a row that comes back None would be counted
+    # as invariant without ever having been measured.
     engine = tradefloor.Engine(seed=5, universe=UNIVERSE)
-    engine.run_days(120, record=True)
+    engine.run_days(150, record=True)
     bars = pa.table(engine.bars(grain="day")).to_pydict()
     before = panel_statistics(bars, UNIVERSE)
 
@@ -557,13 +592,19 @@ def test_the_index_drift_row_measures_what_the_graded_rows_cannot_see():
     moved = after["index_drift_pct"] - before["index_drift_pct"]
     assert moved == pytest.approx(added_pct, abs=1e-9), moved
 
-    # And the graded panel did not see it: every row moves by less than a
-    # quarter of its own across-seed noise.
-    for key in tradefloor.facts.REAL_MARKETS:
-        if before[key] is None or after[key] is None:
-            continue
+    for key in EXACTLY_INVARIANT:
+        assert before[key] is not None and after[key] is not None, key
+        # To machine precision, not to a tolerance fitted to one roster: the
+        # argument from the formula is that a constant cancels, and a bound
+        # loose enough to hide a real sensitivity would not test it.
+        scale = max(abs(before[key]), 1.0)
+        assert abs(after[key] - before[key]) < 1e-12 * scale, (
+            key, before[key], after[key])
+
+    for key in NOT_INVARIANT:
+        assert before[key] is not None and after[key] is not None, key
         delta = abs(after[key] - before[key])
-        assert delta < 0.25 * SEED_SD[key], (key, delta, SEED_SD[key])
+        assert 0.0 < delta < SEED_SD[key], (key, delta, SEED_SD[key])
 
 
 def test_the_index_drift_row_is_reported_and_never_graded():
@@ -615,23 +656,38 @@ def test_the_index_drift_row_keeps_the_names_the_other_rows_drop():
 
     from tradefloor.facts import _index_drift_pct, _daily_series, panel_statistics
 
+    # A name that stops trading a quarter of the way in. The LAST slot, so
+    # nothing re-indexes: delisting from the middle shifts the tail down and
+    # splices two companies into one instrument id, which would make every
+    # number here meaningless while the assertions still passed.
     engine = tradefloor.Engine(seed=7, universe=UNIVERSE)
-    engine.run_days(80, record=True)
+    engine.run_days(20, record=True)
+    engine.delist(len(engine.tickers) - 1)
+    engine.run_days(60, record=True, first_day=20)
     bars = pa.table(engine.bars(grain="day")).to_pydict()
-
-    # A filter at 60 observations drops nothing here, so raise it until it
-    # bites: at 200 no name clears it and the shape rows have nothing left.
-    with pytest.raises(tradefloor.ValidationError):
-        panel_statistics(bars, UNIVERSE, min_observations=200)
-
-    # The drift row reads the same number whatever that threshold is, because
-    # it never consults it.
     series = _daily_series(bars)
-    drift = _index_drift_pct(series)
-    for threshold in (2, 30, 79):
-        assert panel_statistics(
-            bars, UNIVERSE, min_observations=threshold
-        )["index_drift_pct"] == drift
+
+    # The filter has to BITE, or threshold-independence below would be
+    # threshold-irrelevance and would prove nothing. One name carries 20 rows
+    # against everyone else's 80, so a threshold between them drops it.
+    lengths = sorted(len(rows) for rows in series.values())
+    assert lengths[0] == 20 and lengths[-1] == 80, lengths
+    loose = panel_statistics(bars, UNIVERSE, min_observations=2)
+    tight = panel_statistics(bars, UNIVERSE, min_observations=25)
+    assert tight["observations"] < loose["observations"]
+    assert tight["annualised_vol_pct"] != loose["annualised_vol_pct"]
+
+    # And the drift row does not move, because it never consults the filter.
+    assert tight["index_drift_pct"] == loose["index_drift_pct"]
+    assert panel_statistics(
+        bars, UNIVERSE, min_observations=60
+    )["index_drift_pct"] == loose["index_drift_pct"]
+
+    # Not because it ignores the short-lived name: dropping that name really
+    # does change the answer, which is the whole reason for keeping it.
+    survivors = {i: rows for i, rows in series.items() if len(rows) == 80}
+    assert len(survivors) == len(series) - 1
+    assert _index_drift_pct(survivors) != loose["index_drift_pct"]
 
     # And it is None, not zero, when there is no return to measure at all.
     assert _index_drift_pct({}) is None
