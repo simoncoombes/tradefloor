@@ -23,9 +23,9 @@ cargo build --manifest-path rust/Cargo.toml --features wasm \
       --target wasm32-unknown-unknown --release
 mkdir -p "$OUT"
 wasm-bindgen --target nodejs --out-dir "$OUT" \
-      rust/target/wasm32-unknown-unknown/release/pretium.wasm
+      rust/target/wasm32-unknown-unknown/release/tradefloor.wasm
 
-W=rust/target/wasm32-unknown-unknown/release/pretium.wasm
+W=rust/target/wasm32-unknown-unknown/release/tradefloor.wasm
 echo "raw     $(wc -c < "$W") bytes"
 echo "gzip    $(gzip -9 -c "$W" | wc -c) bytes"
 
