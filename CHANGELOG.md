@@ -93,6 +93,11 @@ call them one state. A ledger written before this change carries leaves
 computed without them, and a leaf written after it hashes to a different
 value for the same market.
 
+The market schedule follows the active roster. At ten names and eight
+ticks a day the stream takes 584 draws, 73 a tick, and 536 the day after
+a delisting, with the settlement taking four uniforms per active name per
+tick throughout.
+
 A restore drops the day marks, which described the run it replaced. The
 log costs 32 bytes a record, pinned beside the type: at 60 names and 390
 ticks the market stream takes 145,470 draws a day, 4.7 MB a day and 1.17
