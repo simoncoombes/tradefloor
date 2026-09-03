@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v16",
   "fingerprint": "pt-v16",
-  "coefficient_digest": "eb16d553c6d69821ee71e5372b6130d4d08bfc795cfca11528b14c2e17ad4e7d",
+  "coefficient_digest": "a8f658c32fe7013b3136d8bbe955ed67aafb42d79a559fdcb8a62cf7162a0666",
   "coefficients": {
     "book_levels": 10.0,
     "cascade_symmetry": 0.0,
@@ -92,6 +92,7 @@
     "news_sector_weight": 0.5,
     "oil_baseline": 75.0,
     "oil_opec_symmetry": 0.0,
+    "oil_seasonality_target": 0.0,
     "oil_supply_response": 0.0,
     "order_flow_coefficient": 50.0,
     "phillips_curve_coeff": 0.2,
