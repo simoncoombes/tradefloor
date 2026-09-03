@@ -7,6 +7,7 @@ schedule, and the year slicing and the idiosyncratic sd read the data
 shape the tool feeds them.
 """
 
+import datetime
 import json
 import math
 import os
@@ -682,16 +683,26 @@ def test_the_generated_report_meets_the_house_style(short_days, tmp_path):
     """The report is pasted into a pull request body, so it is prose this
     repository governs. `prose.py` reads a path, so the report is written
     and handed to it the way the site's pages are.
+
+    Both shapes, because the marker a partial appends is part of its
+    title and a full run has no marker to fail on: rendered partial, the
+    same run read two findings against the title alone, a comma and a
+    finite verb, while the full one read none, and the report going into
+    #140 is a partial.
     """
     import subprocess
-    report = tmp_path / "shadow.md"
-    report.write_text(shadow.render(_saved_run()), encoding="utf-8")
-    proc = subprocess.run(
-        [sys.executable, os.path.join(ROOT, "tools", "prose", "prose.py"),
-         str(report)],
-        capture_output=True, text=True)
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert "0 findings" in proc.stdout, proc.stdout
+    run = _saved_run()
+    partial = dict(run, partial=True)
+    for name, payload in (("shadow.md", run),
+                          ("shadow-partial.md", partial)):
+        report = tmp_path / name
+        report.write_text(shadow.render(payload), encoding="utf-8")
+        proc = subprocess.run(
+            [sys.executable, os.path.join(ROOT, "tools", "prose", "prose.py"),
+             str(report)],
+            capture_output=True, text=True)
+        assert proc.returncode == 0, name + proc.stdout + proc.stderr
+        assert "0 findings" in proc.stdout, name + proc.stdout
 
 
 def test_a_recompute_reproduces_a_fixed_solvers_columns(synthetic_year,
@@ -751,6 +762,64 @@ def test_a_render_leaves_a_fixed_solvers_run_alone(synthetic_year, tmp_path):
     assert "recomputed at render time" not in text
 
 
+def test_a_render_writes_the_columns_it_recomputed(synthetic_year, tmp_path):
+    """A recompute costs 9.2 s a day, so what it computed is written
+    beside the report rather than only summarised in it.
+
+    The report prints one median and one count of the sensitivity column
+    and names the days a clamp binds. Reading the column itself meant
+    paying for the year again: at 251 days that is 38 minutes. The file
+    the render leaves carries the same columns, and rendering it a second
+    time reproduces the report byte for byte, so the two cannot drift.
+    """
+    run = shadow.shadow(_args(tmp_path / "a"))
+    old = json.loads(json.dumps(run))
+    old["provenance"].pop("solver")
+    for day in old["days"]:
+        day["sensitivity"] = [0.0] * len(day["sensitivity"])
+    older = tmp_path / "old.json"
+    older.write_text(json.dumps(old), encoding="utf-8")
+    out = tmp_path / "out"
+    assert shadow.main(["--render", str(older), "--out", str(out)]) == 0
+    left = out / "shadow-recomputed.json"
+    assert left.exists(), sorted(p.name for p in out.iterdir())
+    assert not list(out.glob("*.tmp"))
+    back = json.loads(left.read_text(encoding="utf-8"))
+    assert back["provenance"]["solver"] == shadow.SOLVER_VERSION
+    for fresh, want in zip(back["days"], run["days"]):
+        assert fresh["sensitivity"] == want["sensitivity"], fresh["day"]
+    again = tmp_path / "again"
+    assert shadow.main(["--render", str(left), "--out", str(again)]) == 0
+    assert ((again / "shadow.md").read_text(encoding="utf-8")
+            == (out / "shadow.md").read_text(encoding="utf-8"))
+    # A recompute is what writes it, so a run that needs none leaves none.
+    third = tmp_path / "third"
+    assert shadow.main(["--render", str(older), "--no-recompute",
+                        "--out", str(third)]) == 0
+    assert not list(third.glob("*recomputed.json"))
+
+
+def test_the_url_for_a_date_does_not_depend_on_the_local_zone(monkeypatch):
+    """The window a fetch asks for is a function of the date alone.
+
+    `time.mktime` reads midnight in the machine's own zone, so a box in
+    UTC and a machine four hours west asked Yahoo for windows four hours
+    apart. The sessions came back the same and one Visa close came back
+    67.53675 against 67.53683, 1.13e-06 relative, which reaches a
+    recompute through the universe it builds and the returns it
+    differences. Measured on the calm panel, 2015-10-01 to 2018-01-01,
+    42 symbols: one close of 25,914 moved.
+    """
+    for day in ("2015-10-01", "2018-01-01", "2018-10-01", "2021-01-01"):
+        y, m, d = (int(p) for p in day.split("-"))
+        want = datetime.datetime(y, m, d, tzinfo=datetime.timezone.utc)
+        assert realdata.epoch(day) == int(want.timestamp())
+    monkeypatch.setattr(
+        realdata.time, "mktime",
+        lambda *_: pytest.fail("epoch read the machine's own zone"))
+    assert realdata.epoch("2015-10-01") == 1443657600
+
+
 def test_a_recompute_refuses_another_preset(synthetic_year, tmp_path):
     """The run records the preset it was GIVEN, which is None when it took
     the default, so a rebuild takes whatever the default is at render time.
@@ -794,5 +863,7 @@ def test_a_partial_run_recomputes_and_says_it_is_partial(synthetic_year,
         assert fresh["sensitivity"] == want["sensitivity"], fresh["day"]
         assert fresh["clamped"] == want["clamped"], fresh["day"]
     text = shadow.render(back)
-    assert "PARTIAL, the run was still going" in text
+    title = text.splitlines()[0]
+    assert title == (f"# Shadow run: {back['year']} (calm) "
+                     f"(partial record of {len(back['days'])} days)")
     assert "recomputed at render time" in text
