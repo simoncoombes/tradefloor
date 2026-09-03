@@ -79,7 +79,13 @@ page wants what changed, what breaks, what to pin and what got worse. 250 is
 not tight: 0.4.0 (233) and 0.2.0 (240) both moved the default preset and
 explained themselves inside it.
 
-The budget binds the newest section only. The ones below it were published
+**750 words below it.** The detail has a budget of its own, and the same
+test fails over it. It carries the measurement behind each change and names
+the pull request for the account of how the measurement was taken. The
+first cut of 0.6.2 copied five pull-request bodies into the file and
+reached 2,387 words, which is the shape the budget stops.
+
+Both budgets bind the newest section only. The ones below it were published
 under their tags, and rewriting a release note afterwards edits a record
 somebody may have read.
 

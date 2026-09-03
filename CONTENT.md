@@ -86,7 +86,7 @@ where the good ones already sat rather than where an ideal would be.
 | surface | budget | enforced by |
 |---|---|---|
 | release note, above the marker | **250 words** | `tests/test_prose.py` |
-| changelog detail, below the marker | none | |
+| changelog detail, below the marker | **750 words** | `tests/test_prose.py` |
 | line width, all markdown and Python | 79 columns | convention |
 | commit subject | 60 characters | convention |
 | commit body line | 72 columns | convention |
@@ -101,14 +101,23 @@ preset, the largest kind of change this project makes, and explained
 themselves inside the budget. 0.6.0 reached 1,257, which is an unreadable
 release page.
 
-The budget binds the newest section only. The ones below it were published
+**Why 750 for the detail.** It is three times the note, which leaves room
+for one measured paragraph per change in a five-change release, and the
+0.6.1 detail (375 words) sits inside it. The detail had no budget until
+0.6.2, whose first cut carried the five pull-request bodies verbatim and
+reached 2,387 words under a 223-word note; the 0.6.0 detail is 1,259 words
+for the same reason. The pull request is the record of how a change was
+measured, and the detail carries the result, the number behind it and the
+pull request's name.
+
+Both budgets bind the newest section only. The ones below it were published
 under their tags, and rewriting a release note afterwards edits a record
 somebody may have read.
 
 **What goes above the marker:** what changed, what breaks, what to pin, what
 got worse. **What goes below:** how it was measured, why it was done that
-way, and what nearly went wrong. Nothing is deleted to meet the budget; it
-moves.
+way, and what nearly went wrong. What the note cannot carry moves below the
+marker, and what the detail cannot carry stays in the pull request.
 
 ## Per surface
 

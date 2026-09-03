@@ -45,6 +45,13 @@ MARKER = "<!-- release-note-ends -->"
 #: which is what the marker is for.
 BUDGET = 250
 
+#: Words, below the marker, in the newest section. Set on 2026-09-01 after
+#: 0.6.2 carried its five pull-request bodies verbatim: 2,387 words of
+#: detail under a 223-word note, against 375 at 0.6.1. Three times the note
+#: leaves one measured paragraph per change in a five-change release, and
+#: the pull request keeps the rest.
+DETAIL_BUDGET = 750
+
 
 def sections(text: str) -> list[tuple[str, str]]:
     parts = re.split(r"(?m)^(## .+)$", text)
@@ -79,6 +86,21 @@ def test_the_newest_changelog_section_fits_the_release_note_budget():
         f"the {name} release note is {words} words against a budget of "
         f"{BUDGET}. Move detail below {MARKER}, where it is kept but not "
         "published as the release note."
+    )
+
+
+def test_the_newest_changelog_detail_fits_its_budget():
+    """The detail below the marker, newest section only, for the reason the
+    note test gives: the sections below it were published under their tags.
+    """
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    name, body = sections(text)[0]
+    detail = body.split(MARKER)[1] if MARKER in body else ""
+    words = len(detail.split())
+    assert words <= DETAIL_BUDGET, (
+        f"the {name} detail is {words} words against a budget of "
+        f"{DETAIL_BUDGET}. The pull request is the record of how a change "
+        "was measured; the changelog carries the result and names it."
     )
 
 

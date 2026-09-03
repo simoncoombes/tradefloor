@@ -28,6 +28,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MARKER = "<!-- release-note-ends -->"
 BUDGET = 250
+DETAIL_BUDGET = 750
 
 OK, BAD, SKIP = "ok", "FAIL", "skip"
 
@@ -105,6 +106,9 @@ def check_changelog(r: Report, intended: str | None) -> None:
     words = len(body.split(MARKER)[0].split())
     r.add(f"release note within {BUDGET} words",
           OK if words <= BUDGET else BAD, f"{words} words")
+    detail = len((body.split(MARKER)[1] if MARKER in body else "").split())
+    r.add(f"changelog detail within {DETAIL_BUDGET} words",
+          OK if detail <= DETAIL_BUDGET else BAD, f"{detail} words")
 
     for dash in ("—", "–"):
         if dash in body:
