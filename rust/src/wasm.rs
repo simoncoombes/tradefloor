@@ -547,4 +547,63 @@ mod tests {
                    "installing a patch must not change how many draws a \
                     stream takes");
     }
+
+    #[test]
+    fn nothing_in_this_file_can_mutate_the_roster() {
+        // jumpAddress's "1 + companies" term (self.tickers.len(), cached
+        // at construction and never touched again) assumes the active
+        // roster does not change between the call and the target day.
+        // Measured rather than argued: this greps the file rather than
+        // trusting the binding list to stay that way, the same
+        // discipline rng.rs's mathx enforcement uses. Engine::
+        // add_company and Engine::remove_company exist and are what
+        // python_engine.rs's list_instrument/delist call; nothing here
+        // calls either, and there is no other way to reach them from a
+        // Sim, so the roster is fixed for its whole life. If a future
+        // binding changes that, this fails and points at jumpAddress.
+        //
+        // Scoped to the code above this test module: include_str! pulls
+        // in this very assertion's own text, which contains the literal
+        // string being searched for and would make the check pass on
+        // itself. The first version of this test did exactly that and
+        // failed on its own source, caught immediately by running it.
+        let source = include_str!("wasm.rs")
+            .split("mod tests {")
+            .next()
+            .expect("this file has a test module");
+        assert!(!source.contains(".add_company("),
+                "a call to add_company appeared in this file; \
+                 jumpAddress's roster-is-fixed assumption no longer holds");
+        assert!(!source.contains(".remove_company("),
+                "a call to remove_company appeared in this file; \
+                 jumpAddress's roster-is-fixed assumption no longer holds");
+    }
+
+    #[test]
+    fn a_forks_fresh_session_buffer_does_not_change_the_next_days_prices() {
+        // fork() gives the copy an empty SessionBuffer rather than a
+        // clone of the parent's, on the claim that the buffer is
+        // write-only output scratch space: run_session only ever writes
+        // to it (buffer.write_tick, after resizing to the CURRENT
+        // request's shape) and close_day does not receive it as a
+        // parameter at all, so nothing reads it as an input.
+        //
+        // Measured across a day boundary rather than argued from
+        // reading engine.rs: continuing THE SAME Sim into day 2 (whose
+        // buffer already holds day 1's output, non-empty and the right
+        // shape already) must produce identical prices to forking that
+        // Sim right after day 1 (a fresh, empty buffer) and running day
+        // 2 on the fork. Both start from identical engine state; the
+        // buffer's prior contents are the only difference between them.
+        let mut warm = sim();
+        warm.run_day(10).expect("ticks > 0"); // day 1: warm's buffer is now non-empty
+        let mut fresh = warm.fork();           // same engine state, fresh buffer
+
+        warm.run_day(10).expect("ticks > 0");  // day 2 on the warm buffer
+        fresh.run_day(10).expect("ticks > 0"); // day 2 on the fresh buffer
+
+        assert_eq!(warm.prices(), fresh.prices(),
+                   "a fork's fresh session buffer changed day 2's prices \
+                    versus continuing the parent's already-used one");
+    }
 }
