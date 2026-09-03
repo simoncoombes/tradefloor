@@ -39,7 +39,11 @@ Fourteen is the GRADED count and not the row count. A fifteenth row,
 because no defensible band for it has been derived here yet. It is the
 panel's only first moment, and it exists because the fourteen shape
 statistics could all read in band on a market losing a fifth of its value
-in a year -- and did. See `_index_drift_pct` and `REPORTING_ONLY`.
+in a year -- and did. It reports the daily-rebalanced equal-weight
+portfolio, which is the convention a real index band would be stated in;
+every decomposition in this engine is additive in log returns and keeps
+that convention instead, and the two differ by half the cross-sectional
+variance. See `_index_drift_pct` and `REPORTING_ONLY`.
 
 Every figure below: `Universe.random(40, seed=111)` (fingerprint
 5d8de78b55aad752), 252 days, `measure()` per sim seed, median over seeds 1
@@ -61,7 +65,8 @@ on pt-v16, the fourteen graded medians move by at most 0.26 of their own
 `SEED_SD` (the largest is `volume_change_acf1`), and all fourteen sit in
 band before and after. So the verdicts hold and the digits do not. The row
 that moves is the ungraded one: `index_drift_pct` improves by 3.83
-percentage points a year on every one of thirty seeds.
+percentage points a year on every one of thirty seeds, measured in the log
+convention that row carried at the time.
 
 ## What lands
 
@@ -840,7 +845,11 @@ REPORTING_ONLY = {
         "have to be derived from a real index over a matched window. That "
         "derivation does not exist in this project yet, and inventing one "
         "would be worse than having none -- a fabricated band grades every "
-        "future preset against a number nobody measured."
+        "future preset against a number nobody measured. The number is "
+        "already in the units such a band would use, a daily-rebalanced "
+        "equal-weight portfolio return, which runs above the log "
+        "convention the decompositions use by half the cross-sectional "
+        "variance."
     ),
 }
 
@@ -939,7 +948,7 @@ TRADING_DAYS_PER_YEAR = 252
 def _index_drift_pct(
     series: dict[int, list[tuple[int, float, float]]],
 ) -> float | None:
-    """Annualised log drift of the equal-weight index, in percent a year.
+    """Annualised drift of the equal-weight index, in percent a year.
 
     The panel's FIRST MOMENT. Every other row here is a shape statistic --
     a spread, a fourth moment, an autocorrelation, a correlation -- and
@@ -951,18 +960,66 @@ def _index_drift_pct(
     fourteen for fourteen by a market that loses a fifth of its value in a
     year, and it was.
 
-    Measured: pt-v16, `Universe.random(40, seed=111)`, 252 days, seeds 1 to
-    30, at `df0fe62` on `origin/dev`, this row read a median of **-22.155**
-    percent a year, against a real large-cap index's +8 to +10, negative on
-    all thirty seeds, minimum -43.797 and maximum -16.360. The derivation is
-    `tradefloor-design/programme/index-drift-investigation.md`.
+    # Which index, of the two
 
-    On the same protocol after the universe generator was reconciled to open
-    a drawn roster at its own fair value, it reads **-18.344**, minimum
-    -39.896 and maximum -12.526, and is still negative on all thirty. That
-    change recovered 3.831 points of the 22.155 and every seed improved. The
-    terms that remain are a down-tilt in the market factor, a rising rate
-    path and a residual none of them explains.
+    An equal-weight index is a portfolio rebalanced to equal weights every
+    day, so its daily return is the MEAN OF THE SIMPLE RETURNS across
+    names, and this row reports the log of that summed over the window.
+    That is the quantity a real index band would be stated in, since a
+    published index return is a portfolio return.
+
+    The other convention is the mean across names of the daily LOG return,
+    which is what a decomposition has to use, because log returns are
+    additive across time and across the terms of an identity while a
+    portfolio return carries neither. Every attribution in this engine and
+    every figure in the era that produced this row is in that convention,
+    so a number from a decomposition and a number from this row are not
+    the same quantity.
+
+    The two differ by half the cross-sectional variance of the daily
+    returns, which is Jensen's term and is positive whenever the names
+    disperse at all. On `Universe.random(40, seed=111)` at 252 days it was
+    measured at 1.910 points with a standard deviation of 0.190 over eight
+    seeds, so a figure quoted without its convention is wrong by about two
+    points of annual index level.
+
+    # Which seed varies, and for which question
+
+    Two seeds decide a run and they answer different questions. The market
+    seed drives every draw the engine takes, and the universe seed decides
+    the roster it takes them against. Every arm of the pt-v18 era varied
+    the market seed over 1 to 30 on one roster, `Universe.random(40,
+    seed=111)`, held fixed, which is the protocol every figure below was
+    measured on.
+
+    That roster opens 0.78 of a population standard deviation above fair
+    value, so its LEVEL carries a draw as well as a model: the same build
+    reads -8.603 on it against +3.989 and +7.050 on rosters 204 and 209. A
+    paired difference between two arms on the held roster is a property of
+    the model, because the roster's own draw is common to both arms and
+    cancels. A level is a property of that roster, and a level that has to
+    describe the model is measured by varying the universe seed instead.
+
+    # Measured
+
+    All three figures are the LOG convention, on pt-v16,
+    `Universe.random(40, seed=111)`, 252 days, seeds 1 to 30, and each
+    names the commit it was taken at.
+
+    | build | median | min | max | seeds above zero |
+    |---|---|---|---|---|
+    | `df0fe62` on `origin/dev` | -22.155 | -43.797 | -16.360 | 0 of 30 |
+    | the reconciled generator | -18.344 | -39.896 | -12.526 | 0 of 30 |
+
+    The derivation of the first row is
+    `tradefloor-design/programme/index-drift-investigation.md`, and the
+    terms it names are a down tilt in the market factor, a rising rate
+    path, a negative jump mean, an asymmetric stop cascade and the
+    roster's own opening condition. The pt-v18 era gives each of those
+    back and adds a growth term; its own figures are in
+    `tradefloor-design/programme/index-architecture.md`, and they are in
+    the log convention too, so about 1.9 points is added to each of them
+    to read them in this row's convention.
 
     # There is no band, deliberately
 
@@ -970,32 +1027,36 @@ def _index_drift_pct(
     no verdict, no pass and no fail, and `envelope` never sees it. The
     reason is recorded as data in `REPORTING_ONLY` and printed by `report`.
 
-    In short: a band for it is OUTSTANDING, not omitted. The fourteen graded
+    A band for it is OUTSTANDING rather than omitted. The fourteen graded
     rows are shape statistics with published real-market analogues measured
-    at this panel's own method. A first-moment band would have to be derived
-    from a real index over a matched window, and that derivation has not
-    been done here. Shipping a plausible-looking band instead would grade
-    every future preset against a number nobody measured, which is the
-    unprovenanced-band defect this module already corrected once, in 2026-08
-    (see `REAL_MARKETS_PROVENANCE`). A number with no band is honest. A band
-    with no derivation is not.
+    at this panel's own method. A first-moment band would have to be
+    derived from a real index over a matched window, and that derivation
+    has not been done here. Shipping a plausible-looking band instead would
+    grade every future preset against a number nobody measured, which is
+    the unprovenanced-band defect this module already corrected once, in
+    2026-08 (see `REAL_MARKETS_PROVENANCE`). A number with no band is
+    honest, and a band with no derivation grades against nothing. What this
+    row's convention change buys is that the number is already in the units
+    such a band would be stated in, so deriving one later needs no
+    translation.
 
     # Method
 
-    The mean across names of the daily log return of the close, summed over
-    the window, divided by the number of days that carried a return, times
-    252. That is the convention the investigation used, and it differs from
-    summing the daily means with no rescale by 0.09 percentage points on a
-    252-day window -- two orders of magnitude below the quantity itself.
+    For each day, the mean across names of the simple return of the close,
+    turned into a log return and summed over the window, divided by the
+    number of days that carried a return, times 252. The mean of the simple
+    returns is the daily rebalance: every name is held at equal weight at
+    every open, whatever it did the day before.
 
     Two choices worth naming, because both are the difference between this
-    row and a flattering one:
+    row and a flattering one.
 
     **Every name counts, including a short-lived one.** `min_observations`
     filters the other rows, and does not filter this one. A delisted name's
     losses are exactly what an index drift has to carry; dropping it is
     survivorship bias, which is the classic way to measure an index level
-    wrong.
+    wrong. A day on which a name has no return contributes the names that
+    do have one, which is what an index does when a constituent leaves.
 
     **A gap in a name's bars is spanned, not dropped.** A return is formed
     between consecutive RECORDED rows for that name and attributed to the
@@ -1007,11 +1068,14 @@ def _index_drift_pct(
         for k in range(1, len(rows)):
             previous, close = rows[k - 1][1], rows[k][1]
             if previous > 0 and close > 0:
-                by_day.setdefault(rows[k][0], []).append(
-                    math.log(close / previous))
+                # The GROSS return, so the mean below is the portfolio's
+                # and not a name's. Taking logs first and averaging those
+                # gives the other convention, which is 1.9 points lower on
+                # the roster this row is quoted on.
+                by_day.setdefault(rows[k][0], []).append(close / previous)
     if not by_day:
         return None
-    daily = [statistics.mean(values) for values in by_day.values()]
+    daily = [math.log(statistics.mean(values)) for values in by_day.values()]
     return sum(daily) / len(daily) * TRADING_DAYS_PER_YEAR * 100.0
 
 
