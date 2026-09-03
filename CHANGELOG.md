@@ -479,6 +479,27 @@ gained the new name at its inert default and a new digest, through the
 mode that rewrites those two fields and refuses any moved coefficient. The
 determinism digest is unmoved and the default preset is untouched.
 
+### The oil seasonality dial
+
+`oil_seasonality_target` arrived in this branch's fourth commit, whose
+message described only the roster caveat that commit also carried. The
+dial is not mentioned in it, so a reader of that message would take an
+engine change for a documentation change. The paragraphs below correct
+the record here, where a reader of these notes will meet it.
+
+What it does. The daily oil update multiplied the whole price level by a
+seasonal factor, so the factor compounded and its integral over a window
+shorter than its 365-day period read as a trend. At 1.0 the factor moves
+the target the price reverts to instead, and the amplitude is split
+between the two rather than added, so the pair's total is preserved. At
+0.0, which is every preset before pt-v18, the original arithmetic runs in
+its original order.
+
+It is unmeasured on this branch. No arm, no index figure and no day-251
+oil price has been reported for it here, so nothing in these notes rests
+on it. Its measurement and its own record follow separately, from the
+work that built it.
+
 ### The commit the measurements name
 
 Every figure in the section above was measured on a build of a commit
