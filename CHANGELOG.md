@@ -31,8 +31,8 @@ checked for its draw effect and proven inert at its default doses.
 **A day's move decomposes to the draws that seeded it**, and every node
 of the tree replays from the state the day started in.
 
-**A browser build forks a market, patches one draw at a known address
-and re-runs it**, matching the native build's digest exactly.
+**The browser build compiles again**, after a leftover file path from
+an old rename broke it outright.
 
 <!-- release-note-ends -->
 
@@ -503,20 +503,17 @@ to the print was 23.3 and 34.7 basis points. The crisis changes how often
 the book runs out rather than how far a print goes when it does. The arms
 are the same arms, and their exposure numbers are unchanged.
 
-### Draw surgery in the browser
+### The browser build
 
-`Sim` in the WASM binding (`rust/src/wasm.rs`) gains five methods:
-`fork`, `patchDraws`, `drawPatches`, `streamPositions` and
-`jumpAddress`, over flat `f64` vectors with no serde. They expose the
-draw-addressing and patching layer already built for the native side:
-fork a running market, replace one draw at a known address, and
-re-run it, all under the same generator as the Python build.
+`tools/wasm/build.sh` and `check.mjs` still built and checked against
+`pretium.wasm` and `pretium.js` after 27223f2 renamed the crate to
+`tradefloor`, so the wasm32 build failed outright: `wasm-bindgen` had
+nothing at the path it was told to read. Fixed to `tradefloor.wasm`
+and `tradefloor.js` in both files.
 
-A native-side test in `tests/test_wasm_parity.py` pins the digest of
-a control run and the same run with one draw patched, for a fixed
-roster, seed and address, and `tools/wasm/check.mjs` recomputes both
-through the WASM build, so the two sides are compared by value rather
-than each trusted separately.
+`check.mjs`'s one check, comparing the browser build's
+`fixed_simulation_digest` against the native one, is otherwise
+unchanged, and passes again now that the build reaches it.
 
 
 ## 0.6.2
