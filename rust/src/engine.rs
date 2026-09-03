@@ -778,6 +778,18 @@ impl Engine {
         self.stream_rng_mut(stream_id).enable_log(from_day, to_day);
     }
 
+    /// Drop what every stream's log holds, keeping each range.
+    ///
+    /// Recording only: the counters, the ranges and every generator's
+    /// position are untouched, so a run continues identically. It is for
+    /// a copy that will never be asked what it recorded, which is what
+    /// the explanation store keeps.
+    pub fn clear_draw_log_records(&mut self) {
+        for id in 0..7u32 {
+            self.stream_rng_mut(id).clear_log_records();
+        }
+    }
+
     pub fn draw_log(&self, stream_id: u32) -> &[DrawRecord] {
         match self.stream_rng(stream_id).log() {
             Some(log) => &log.records,

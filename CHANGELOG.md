@@ -28,7 +28,49 @@ the draws that reproduce its observed closes.
 **A mechanism is a specification the engine's Rust is generated from**,
 checked for its draw effect and proven inert at its default doses.
 
+**A day's move decomposes to the draws that seeded it**, and every node
+of the tree replays from the state the day started in.
+
 <!-- release-note-ends -->
+
+### The explanation tree
+
+`Engine.explain(ticker, day)` returns a tree. The root is the day's log
+move in the printed price. Its eleven children are the contributions that
+make the move up: the nine `truth()` columns, which sum to the day's
+change in `mispricing_s`, plus the valuation's own move and the change in
+the log distance from the model price to the print. All eleven are
+measured rather than left over, so their sum against the move is an
+identity the engine can fail.
+
+Under each contribution is the Rust function that computed it, the dials
+that function reads, the state it read at the open and the addresses of
+the draws it consumed. A contribution that takes no draw of its own has
+no draw leaf and the caveats name it.
+
+Every node replays. A fork of the engine as it stood before the day
+opened takes the node's logged draw values at their addresses, the day's
+own inputs are replayed from the run log, and the contribution is
+measured again on that run. `check()` does it for every node and reports
+what did not come back, over three claims at once: the eleven sum to the
+move, each node reproduces the contribution it sits under, and where the
+run recorded the day, the replay reproduces the tape. No formula is
+re-implemented in Python, because a replay is the engine running the same
+day from the same state under the same draws.
+
+`Engine.keep_explanations(from_day, to_day)` turns the two records on:
+the draw log on every stream, and a copy of the engine at each of those
+days' opens. The log starts one day early, because the jump a day's
+`truth()` table carries was drawn at the close before it. Both records
+read and neither writes, so a market with a window open is the market it
+would have been without one, and the known-answer digest is the same
+digest either way. The cost is one engine copy per kept day, taken
+without the recorded tape.
+
+`run_days` and `World.run` open a day through one path, so both fill the
+store, and a day an agent traded replays with the flow the agent sent.
+The MCP server gains an `explain` tool, which returns the tree and its
+caveats and exposes no replay.
 
 ### The day ledger
 

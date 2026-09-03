@@ -663,6 +663,28 @@ impl GameRng {
         self.log.as_deref()
     }
 
+    /// Drop the entries the log holds, and keep the range it covers.
+    ///
+    /// For a copy that will never be asked what it recorded. The log is
+    /// a recording buffer: nothing in this generator reads it, the draw
+    /// counters and the range are untouched, and the next draw inside
+    /// the range records as it would have. So a generator whose entries
+    /// are dropped delivers the same values in the same order as one
+    /// whose entries are kept, and the schedule and the derivation
+    /// contract this file states are unaffected.
+    ///
+    /// The explanation store is what needs it. It copies the engine at
+    /// each kept day's open, and a copy carries the log as it stood on
+    /// that day, so N kept days held N squared over two days of it. At
+    /// forty names over thirty days that was 1.6 GB of a store whose own
+    /// documentation called itself one copy per day without the tape.
+    pub fn clear_log_records(&mut self) {
+        if let Some(log) = self.log.as_deref_mut() {
+            log.records.clear();
+            log.records.shrink_to_fit();
+        }
+    }
+
     pub fn set_day(&mut self, day: i64) {
         self.day = day;
     }
