@@ -67,7 +67,7 @@ libm = "0.2.16"
 # canonical preset serialisation, in the core, so a non-shipped preset can
 # never present as a shipped one on any surface, Rust or Python. Pure Rust,
 # no_std-capable, deterministic; already in the tree as a dev-dependency.
-sha2 = "0.10"
+sha2 = "0.11"
 
 # Optional, and NOT carrying `extension-module` here.
 #
@@ -76,7 +76,7 @@ sha2 = "0.10"
 # `cargo test`, which links a normal binary and would fail to resolve them.
 # So the feature is attached to `python` below, which maturin turns on and
 # `cargo test` leaves off.
-pyo3 = { version = "0.22", features = ["abi3-py311"], optional = true }
+pyo3 = { version = "0.29", features = ["abi3-py311"], optional = true }
 
 # Arrow, for the columnar results surface. OPTIONAL and pulled in only by the
 # `python` feature, deliberately: the WASM consumer needs none of it, and arrow
@@ -85,7 +85,7 @@ pyo3 = { version = "0.22", features = ["abi3-py311"], optional = true }
 #
 # `ffi` gives the C Data Interface, which is how a record batch reaches polars,
 # pandas, pyarrow and duckdb without this crate depending on any of them.
-arrow = { version = "53", default-features = false, features = ["ffi"], optional = true }
+arrow = { version = "59", default-features = false, features = ["ffi"], optional = true }
 
 # The browser binding. Optional for the same reason as pyo3: a `cargo test`
 # or a Python wheel build must not drag in wasm-bindgen, and the wasm build
@@ -111,7 +111,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Only to verify the golden vectors against index.json's SHA-256 manifest.
 # A partially regenerated or truncated vector set is otherwise a silent pass.
-sha2 = "0.10"
+sha2 = "0.11"
 
 # ============================================================================
 # Contractual, not tunable. Nothing here may trade accuracy for speed: float
