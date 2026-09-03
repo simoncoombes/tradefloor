@@ -1002,9 +1002,10 @@ class Explanation:
                 f"Day {self.day - 1} was not kept, so the roster it ran "
                 "under is not here to compare against name by name. The "
                 "run log holds no listing or delisting between the two "
-                "opens, and the tape holds the same number of names on "
-                "both, so the previous close's levels are read at this "
-                "name's own slot.")
+                "opens, and a roster moves only through one of those, so "
+                "the previous close's levels are read at this name's own "
+                "slot. This is the weakest evidence any path here reads "
+                "them on.")
         silent = [m.factor for m in MECHANISMS if not m.sites]
         blind = [m.factor for m in MECHANISMS
                  if m.sites and not any(child.kind == "draw" for child

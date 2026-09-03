@@ -1247,18 +1247,34 @@ def test_every_roster_shape_reads_the_right_levels_or_none(
 
 
 def test_a_clean_gap_is_still_explained_rather_than_refused():
-    # The refusal must not swallow ordinary days: with no roster
-    # operation between the two opens the levels are read at this name's
-    # own slot, and the caveat says the log holds none.
+    """The path where the levels are read on the weakest evidence.
+
+    With the day before outside the window there is no roster to compare
+    against, and the run log holding no listing or delisting is the whole
+    of what says the slots held still. It is the only path that reads the
+    previous close's levels without a roster behind it, and until this
+    test nothing entered it: the one other not-kept case is the swap,
+    which returns at the operations check before it gets here.
+
+    The assertion is the book contribution against the value the same day
+    takes with the day before kept, to the bit. Asserting which
+    comparison ran, or that the levels are merely present, passes on a
+    tree that read them at another company's slot.
+    """
     result = roster_arm("none", (2, 5)).explain("AAB", 2)
+    kept = roster_arm("none", (0, 5)).explain("AAB", 2)
     assert result._ops == ()
     assert result._previous is not None
+    assert result._previous == kept._previous
+    book = {c.name: c.value for c in result.root.children}["book"]
+    assert book == {c.name: c.value for c in kept.root.children}["book"]
+    assert book == pytest.approx(0.006782659113, abs=1e-12)
+    assert result.check() == []
     line = next(c for c in result.caveats if "was not kept" in c)
     assert "holds no listing or delisting between the two opens" in line
+    assert "the weakest evidence any path here reads them on" in line
     # And the same run with the day before kept says nothing about it.
-    assert not any("was not kept" in c
-                   for c in roster_arm("none", (0, 5)).explain(
-                       "AAB", 2).caveats)
+    assert not any("was not kept" in c for c in kept.caveats)
 
 
 def test_the_run_log_names_the_operation_that_refused_the_levels():
