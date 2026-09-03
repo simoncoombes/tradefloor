@@ -592,6 +592,72 @@ which reading it wants instead of inheriting one. Every caller outside the
 engine passes 0.0, which is the reference implementation's reading, and the
 economy parity vectors reproduce bit for bit against it.
 
+### The valuation's neutral rate
+
+`compute_target_pe` compresses a multiple by
+`(discount - neutral) * RATE_PE_SENSITIVITY * duration`, so a name sits on
+its sector anchor exactly when the discount rate equals the neutral point.
+That point was the constant 0.04. The economy opens at a corporate bond
+yield of 4.56 per cent and settles at 4.82, and it never visits 4.00, so
+every profitable name opened about one per cent below the price the
+generator drew for it and the market spent the year unwinding that on a
+60-day half-life.
+
+`neutral_discount_rate` is that point, settable, at 0.04 for every preset
+before pt-v18 and 0.0456 for pt-v18. The value is read off the process
+rather than chosen: the rate that zeroes the day-zero term is the yield
+the economy opens at.
+
+The generator is untouched. The multiple
+this rate anchors is the same sector anchor the generator draws its
+multiples around, so the two stay consistent under any neutral rate and a
+roster opens at fair value whenever the engine's discount rate equals it.
+The constant is read by no line of the generator's code. Its reconciliation
+test now runs at three neutral points and asserts the day-zero mean is
+bit-identical across them, which is the claim itself: at a discount rate
+equal to the neutral point the rate adjustment is exactly 1.0 whatever that
+point is.
+
+The name was promoted from the carried read-only surface rather than added
+beside it. `to_pairs` merges that surface with the settable one and sorts,
+so a name moving between them leaves every preset's pairs, fingerprint and
+coefficient digest untouched wherever its value has not moved. Both
+committed preset records are therefore byte for byte as they were, and the
+record test passes without re-recording. A second name would have put two
+entries for one quantity in every record, with `neutral_discount_rate`
+reading 0.04 about an engine using 0.0456.
+
+`tradefloor.fair_value` takes the rate as an optional keyword, absent
+meaning the old constant. A caller recomputing a run's fair value passes
+that run's own value, because a helper holding the old constant while the
+engine moved would disagree with the market it describes and the
+disagreement would read as a print residual.
+
+What it is worth, over five seeds at 252 days on the panel roster, paired
+on the seed. The index gains +0.965 points a year at the median in the log
+convention and +0.965 as a portfolio, on 5 of 5 seeds, in a range of +0.937
+to +1.015. The whole of it is the mispricing channel at +0.965, with the
+fair value channel at -0.005 and the seeds split. What moves is the level
+the market opens at, and the discount path it travels afterwards stays
+where it was. The oil price, the phase and the macro path are
+bit-identical on every seed.
+
+The day-zero level falls by 0.00968 on all five seeds, identically, because
+it is a property of the roster and the valuation and not of the market
+seed. A prediction registered beforehand said 0.0100 to 0.0115 and this
+misses it low. The reason is structural rather than noise: 0.0107 is the
+figure for a name valued on its earnings, and 3 of the 40 names on this
+roster are valued on their book, where the multiple and this rate reach
+nothing. Scaling by the 92.5 per cent that are on the earnings path
+predicts 0.00990, and the remaining 0.00022 is the duration multiplier
+varying from name to name.
+
+The certified panel holds at 13 of 14 over seeds 101 to 110, with the
+leverage effect the only row out at +0.0014 against a ceiling of exactly
+0.00, where the arm without the dial reads +0.0038. That row straddles its
+ceiling across every arm in this era and ten seeds cannot settle it. The
+panel's own drift row, a portfolio return, reads +2.259 against +1.303.
+
 ### The commit the measurements name
 
 Every figure in the section above was measured on a build of a commit

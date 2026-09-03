@@ -741,6 +741,49 @@ pub struct ModelParams {
     /// A value that did no work starts doing some, and it shapes the mean
     /// peak from 183 days to 171 and the mean trough from 159 to 138.
     pub cycle_hazard_per_month: f64,
+    /// The corporate bond yield at which the target multiple sits exactly
+    /// on its sector anchor. 0.04 -- every preset before pt-v18 -- is the
+    /// constant this was, to the bit.
+    ///
+    /// # A neutral point the economy never visits
+    ///
+    /// `compute_target_pe` compresses the multiple by
+    /// `(discount - neutral) * RATE_PE_SENSITIVITY * duration`, so a name
+    /// is valued on its anchor exactly when the discount rate equals this.
+    /// The economy opens at a corporate yield of 4.56 per cent and settles
+    /// at 4.82, and it never visits 4.00. So every profitable name opens
+    /// about one per cent below the price the generator drew for it, which
+    /// is +0.0107 of day-zero mispricing at the opening and +0.014 at the
+    /// corner, and the market spends the year unwinding it on a 60-day
+    /// half-life. At the second sweep's measured -94.872 index points per
+    /// unit of opening level that is 1.0 to 1.3 points of the first year,
+    /// on every seed, and nothing in a stationary year.
+    ///
+    /// # Read off the economy rather than chosen
+    ///
+    /// The value that zeroes the day-zero term is the yield the economy
+    /// opens at, which is 0.0456 as it opens today and 0.0482 at the corner
+    /// the dynamics reach. Both are read off the process, the second from
+    /// the burn-in table, so neither is a matter of degree.
+    ///
+    /// # Why the generator is untouched
+    ///
+    /// The multiple this anchors is the same sector anchor the generator
+    /// draws its multiples around, so the two stay consistent under any
+    /// neutral rate and a roster opens at fair value exactly when the
+    /// engine's discount rate equals this. `NEUTRAL_DISCOUNT_RATE` is read
+    /// by no line of the generator's code; the only other reference is its
+    /// own test.
+    ///
+    /// # Promoted rather than renamed
+    ///
+    /// This name was on the carried read-only surface. `to_pairs` merges
+    /// that surface with the settable one and sorts, so moving the name
+    /// between them leaves every preset's pairs, fingerprint and
+    /// coefficient digest untouched wherever the value has not moved. A new
+    /// name would have added a second entry for one quantity, with this one
+    /// still reading 0.04 about an engine using 0.0456.
+    pub neutral_discount_rate: f64,
     /// How much of the drift the market jump's mean carries is given
     /// back. 0.0 -- every preset before pt-v18 -- is bit-identical. 1.0
     /// subtracts the compensator and makes the jump a martingale.
@@ -1772,6 +1815,7 @@ impl ModelParams {
             oil_opec_symmetry: 0.0,
             oil_seasonality_target: 0.0,
             cycle_hazard_per_month: 0.0,
+            neutral_discount_rate: crate::fair_value::NEUTRAL_DISCOUNT_RATE,
             jump_mean_compensated: 0.0,
             cascade_symmetry: 0.0,
             // Legacy values: the slow component is OFF, and the update
@@ -2799,6 +2843,14 @@ impl ModelParams {
         // change inside 63 per cent of certified years against 3. Read
         // per month on the 30-day month the phase clock already keeps.
         p.cycle_hazard_per_month = 1.0;
+        // The valuation was neutral at a 4.00 per cent discount rate and
+        // the economy opens at a corporate yield of 4.56, so every
+        // profitable name opened about one per cent below the price the
+        // generator drew for it and the year was spent unwinding it. The
+        // value that zeroes that term is the yield the economy opens at,
+        // read off the process rather than chosen. It moves to the corner's
+        // 0.0482 when the burn-in lands.
+        p.neutral_discount_rate = 0.0456;
         // The market jump's negative mean buys skew and a drift together.
         // Compensating it keeps the mean, and so the skew, and returns the
         // drift: a deterministic offset moves no central moment.
@@ -2937,6 +2989,7 @@ impl ModelParams {
             "oil_opec_symmetry" => self.oil_opec_symmetry,
             "oil_seasonality_target" => self.oil_seasonality_target,
             "cycle_hazard_per_month" => self.cycle_hazard_per_month,
+            "neutral_discount_rate" => self.neutral_discount_rate,
             "jump_mean_compensated" => self.jump_mean_compensated,
             "cascade_symmetry" => self.cascade_symmetry,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
@@ -3088,6 +3141,7 @@ impl ModelParams {
             "oil_opec_symmetry" => out.oil_opec_symmetry = value,
             "oil_seasonality_target" => out.oil_seasonality_target = value,
             "cycle_hazard_per_month" => out.cycle_hazard_per_month = value,
+            "neutral_discount_rate" => out.neutral_discount_rate = value,
             "jump_mean_compensated" => out.jump_mean_compensated = value,
             "cascade_symmetry" => out.cascade_symmetry = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
@@ -3311,6 +3365,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "oil_opec_symmetry",
         "oil_seasonality_target",
         "cycle_hazard_per_month",
+        "neutral_discount_rate",
         "oil_supply_response",
         "market_vol_vix_coupling",
         "mispricing_cap",
@@ -3379,7 +3434,6 @@ fn carried_read_only(name: &str) -> Option<f64> {
     }
     Some(match name {
         "daily_shock_cap" => mispricing::DAILY_SHOCK_CAP,
-        "neutral_discount_rate" => fv::NEUTRAL_DISCOUNT_RATE,
         "rate_pe_sensitivity" => fv::RATE_PE_SENSITIVITY,
         "rate_adjustment_floor" => fv::RATE_ADJUSTMENT_FLOOR,
         "growth_duration_scale" => fv::GROWTH_DURATION_SCALE,
@@ -3402,7 +3456,6 @@ fn carried_read_only(name: &str) -> Option<f64> {
 fn carried_read_only_pairs() -> Vec<(String, f64)> {
     let mut out: Vec<(String, f64)> = [
         "daily_shock_cap",
-        "neutral_discount_rate",
         "rate_pe_sensitivity",
         "rate_adjustment_floor",
         "growth_duration_scale",

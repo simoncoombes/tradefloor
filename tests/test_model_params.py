@@ -346,6 +346,13 @@ PERTURBATIONS = [
     # draws until day 180 and the probe runs three. Over 252 days it bites,
     # and what separates the arms is the count of seeds that leave expansion.
     ("cycle_hazard_per_month", 0.5, False),
+    # The yield at which the target multiple sits on its sector anchor.
+    # 0.05 rather than either shipped value: 0.04 is the default this probe
+    # perturbs and 0.0456 is pt-v18's, and an entry landing on a named
+    # preset's value would fingerprint as that preset. It moves the market
+    # on the first tick, because every name's fair value is recomputed from
+    # it before a single price is formed.
+    ("neutral_discount_rate", 0.05, True),
     # How much of the jump's drift is given back. The compensator is
     # subtracted every day whether or not a jump fires, so unlike its two
     # neighbours it bites on the first close.

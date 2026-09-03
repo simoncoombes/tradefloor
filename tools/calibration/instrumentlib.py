@@ -172,6 +172,12 @@ PARAM_SPECS: dict[str, dict] = {
     # the phase clock keeps, and past 1.0 the cycle runs slower than its own
     # scale states.
     "cycle_hazard_per_month": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # The yield at which the target multiple sits on its sector anchor. A
+    # LOG box like the other rate-like dials, and no explicit hard range,
+    # because it ships at 0.04 rather than at zero and the calibration
+    # convention's own [1/4x, 4x] gives 0.01 to 0.16. Both ends are outside
+    # anything the economy reaches, so the box is wide rather than chosen.
+    "neutral_discount_rate": {"kind": "log"},
     # A SHARE of the jump drift returned, so [0, 1]. 1.0 is the
     # martingale and past it the compensator overshoots.
     "jump_mean_compensated": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},

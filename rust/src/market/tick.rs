@@ -825,7 +825,7 @@ pub fn simulate_market_tick(
         };
         let breakdown = compute_fair_value_with(
             &valuation, &econ_view, p.fair_value_book_floor,
-            p.qe_pe_gain, p.qe_pe_stock_gain);
+            p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate);
         let fv = breakdown.fair_value;
 
         // Lazy init: adopt the current premium/discount as the starting `s`,

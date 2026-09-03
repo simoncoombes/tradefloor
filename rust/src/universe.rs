@@ -389,10 +389,21 @@ mod tests {
         // Measured at the valuation model's neutral point, where
         // `target_pe` is the sector anchor exactly, so this test asserts the
         // generator's own contribution and not the economy's opening state.
+        //
+        // Run at BOTH neutral points the presets carry, because the claim
+        // the neutral-rate dial rests on is that a roster opens at fair
+        // value whenever the engine's discount rate equals the neutral rate,
+        // and not that it does so at one particular rate. The generator
+        // draws its multiples around the same sector anchor this rate
+        // anchors, so the two move together and neither value is special to
+        // it. A version of this test at the constant alone would pass
+        // unchanged if the dial were wired to nothing.
         let u = random_universe(4000, 7);
+        let mut means: Vec<f64> = Vec::new();
+        for neutral in [crate::fair_value::NEUTRAL_DISCOUNT_RATE, 0.0456, 0.0482] {
         let economy = crate::fair_value::EconomyValuationInputs {
-            corporate_bond_yield: Some(crate::fair_value::NEUTRAL_DISCOUNT_RATE * 100.0),
-            federal_funds_rate: crate::fair_value::NEUTRAL_DISCOUNT_RATE * 100.0,
+            corporate_bond_yield: Some(neutral * 100.0),
+            federal_funds_rate: neutral * 100.0,
             qe_pe_boost: Some(0.0),
             qe_assets_ratio: None,
         };
@@ -401,7 +412,7 @@ mod tests {
         let mut on_book = 0usize;
         for inst in &u {
             let sector = crate::sectors::by_key(inst.sector).expect("generated");
-            let breakdown = crate::fair_value::compute_fair_value(
+            let breakdown = crate::fair_value::compute_fair_value_with(
                 &crate::fair_value::CompanyValuationInputs {
                     sector_avg_pe: Some(sector.avg_pe),
                     eps: Some(inst.eps),
@@ -409,6 +420,10 @@ mod tests {
                     revenue_growth: Some(inst.revenue_growth),
                 },
                 &economy,
+                0.0,
+                1.0,
+                0.0,
+                neutral,
             );
             let s = crate::mathx::log(inst.initial_price / breakdown.fair_value);
             total += s;
@@ -420,22 +435,38 @@ mod tests {
             }
         }
         let mean = total / u.len() as f64;
+        means.push(mean);
         // The sampling error of a 4000-name mean is about 0.005, so 0.02 is
         // four of them and this bound is loose enough not to be flaky and
         // tight enough to fail the +0.044 the old generator produced.
         assert!(
             mean.abs() < 0.02,
-            "day-zero mean log(price/fair_value) is {mean}, not centred"
+            "at neutral {neutral}, day-zero mean log(price/fair_value) is \n             {mean}, not centred"
         );
         let fraction = above as f64 / u.len() as f64;
         assert!(
             (fraction - 0.5).abs() < 0.03,
-            "{fraction} of names open above fair value, not about half"
+            "at neutral {neutral}, {fraction} of names open above fair value, \n             not about half"
         );
         // Both valuation paths are exercised, or the assertion above could
         // pass while one of the two reconciliations was wrong.
         assert!(on_book > 200, "only {on_book} names on the book path");
         assert!(on_book < 800, "{on_book} names on the book path is not a market");
+        }
+        // BIT-IDENTICAL across the three, which is the claim itself rather
+        // than a consequence of it. At a discount rate equal to the neutral
+        // point the rate adjustment is exactly 1.0 whatever that point is,
+        // so fair value does not depend on it and neither does this mean.
+        //
+        // The absolute bound above is the generator's own guard and it is a
+        // weak guard on the WIRING: with the rate ignored the mean reads
+        // 0.0223 at 0.0482 and fails, and about 0.015 at 0.0456 and passes.
+        // This comparison fails at every rate instead, because a mis-wired
+        // valuation cannot give one answer at three different rates.
+        assert!(
+            means.windows(2).all(|w| w[0].to_bits() == w[1].to_bits()),
+            "the day-zero mean depends on the neutral rate: {means:?}"
+        );
     }
 
     #[test]

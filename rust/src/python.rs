@@ -245,6 +245,7 @@ impl PyFairValue {
     corporate_bond_yield = None,
     qe_pe_boost = None,
     book_value_per_share = None,
+    neutral_discount_rate = None,
 ))]
 #[allow(clippy::too_many_arguments)]
 fn fair_value(
@@ -262,6 +263,14 @@ fn fair_value(
     corporate_bond_yield: Option<f64>,
     qe_pe_boost: Option<f64>,
     book_value_per_share: Option<f64>,
+    // The rate at which the multiple sits on its anchor. Absent means
+    // `NEUTRAL_DISCOUNT_RATE`, which is what every caller before pt-v18
+    // wanted and what the reference implementation does. A caller
+    // recomputing a run's fair value passes that run's own
+    // `neutral_discount_rate`, because a helper holding the old constant
+    // while the engine moved would disagree with the market it is
+    // describing and the disagreement would read as a print residual.
+    neutral_discount_rate: Option<f64>,
 ) -> PyResult<PyFairValue> {
     // Boundary rejections carry the specific type; PyO3's own argument-type
     // errors remain plain TypeError/ValueError, which is correct -- those are
@@ -311,6 +320,9 @@ fn fair_value(
     if let Some(y) = corporate_bond_yield {
         crate::units::check_rate("corporate_bond_yield", y).map_err(Rejected::new_err)?;
     }
+    if let Some(r) = neutral_discount_rate {
+        crate::units::check_rate("neutral_discount_rate", r).map_err(Rejected::new_err)?;
+    }
 
     let economy = crate::fair_value::EconomyValuationInputs {
         corporate_bond_yield: corporate_bond_yield.map(crate::units::fraction_to_percent),
@@ -329,7 +341,18 @@ fn fair_value(
         revenue_growth,
     };
 
-    let b = crate::fair_value::compute_fair_value(&company, &economy);
+    let b = crate::fair_value::compute_fair_value_with(
+        &company,
+        &economy,
+        0.0,
+        1.0,
+        0.0,
+        // NOT converted. `discount_rate` divides the economy's percent by
+        // 100 and compares the result against this, so the neutral point is
+        // a FRACTION like the constant it defaults to, and a round trip
+        // through percent would not return the caller's own bits.
+        neutral_discount_rate.unwrap_or(crate::fair_value::NEUTRAL_DISCOUNT_RATE),
+    );
     Ok(PyFairValue {
         fair_value: b.fair_value,
         target_pe: b.target_pe,
