@@ -1505,7 +1505,7 @@ EXPECTED = {
               "market_vol_vix_anchor"),
              ("mispricing_s", "mispricing_s_prev_close")),
     "fair_value": (("fair_value_book_floor", "qe_pe_gain",
-                    "qe_pe_stock_gain"), ()),
+                    "qe_pe_stock_gain", "earnings_nominal_growth"), ()),
     "book": ((), ("price",)),
 }
 
@@ -1537,7 +1537,7 @@ def test_every_declared_dial_is_a_model_param_that_its_rust_reads():
     # Exact, not a floor. A floor let nine of random_noise's ten dials be
     # dropped and still pass, because the table declares more than the
     # floor asked for.
-    assert declared == 40
+    assert declared == 41
     assert sum(1 for m in ex.MECHANISMS if m.dials) == 9
 
 

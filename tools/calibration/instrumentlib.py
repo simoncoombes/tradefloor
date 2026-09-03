@@ -150,6 +150,11 @@ PARAM_SPECS: dict[str, dict] = {
     # drift of its own, which is the defect inverted rather than a
     # richer model.
     "market_beta_down_asym_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # The SHARE of nominal output growth the valuation's earnings carry.
+    # A share, so [0, 1] rather than an open coefficient: 1.0 holds the
+    # earnings share of nominal output constant, which is the reading the
+    # economy supports, and above it earnings outgrow output for ever.
+    "earnings_nominal_growth": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # A SHARE of demand, so [0, 1]. Above 1.0 supply outruns demand every
     # day and inventory ramps upward instead of downward, which is the
     # defect inverted.

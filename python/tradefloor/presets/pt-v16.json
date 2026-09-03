@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v16",
   "fingerprint": "pt-v16",
-  "coefficient_digest": "d9dbcd5e960be4f71f6fd3e3ade235389e2732be6b120963012a39042721225b",
+  "coefficient_digest": "eb16d553c6d69821ee71e5372b6130d4d08bfc795cfca11528b14c2e17ad4e7d",
   "coefficients": {
     "book_levels": 10.0,
     "cascade_symmetry": 0.0,
@@ -20,6 +20,7 @@
     "daily_credit_floor_gain": 1.0,
     "daily_shock_cap": 0.15,
     "default_sector_anchor_pe": 18.0,
+    "earnings_nominal_growth": 0.0,
     "endogenous_news_intensity": 0.05,
     "endogenous_news_sigma": 0.01751004376,
     "fair_value_book_floor": 0.0,

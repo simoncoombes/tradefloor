@@ -53,11 +53,15 @@ Where the day before is not on the tape its closing levels are unknown,
 ``fair_value`` reads zero and ``book`` is what the mispricing leaves
 over, which the caveats say.
 
-``fair_value`` is zero unless the fundamental value moves, and on every
-shipped preset it does not: earnings and the sector anchor are fixed for
-a run and the QE channel is off, so the valuation holds still and the
-whole move is mispricing and book. It moves under a scenario that moves
-the macro path, and ``tests/test_explain.py`` measures one.
+``fair_value`` is zero on a day the valuation holds still, which is most
+days of most presets: earnings and the sector anchor are fixed for a run,
+the QE channel is off, and the discount rate moves only on the days the
+corporate bond yield does. It moves under a scenario that moves the macro
+path, and ``tests/test_explain.py`` measures one. Under pt-v18 it moves
+on every day, because ``earnings_nominal_growth`` restates earnings and
+book value in the nominal output the economy integrates. That output is
+``gdp`` times ``cpi``, and ``Engine.macro_fields`` carries neither level,
+so the table below declares the dial and not the two levels behind it.
 
 Under each contribution sits one ``mechanism`` node, named for the Rust
 function that computes it, carrying the dials that function reads as its
@@ -270,8 +274,10 @@ MECHANISMS: tuple[Mechanism, ...] = (
         factor="fair_value",
         function="fair_value::compute_fair_value_with",
         macro=("qe_pe_boost",),
-        dials=("fair_value_book_floor", "qe_pe_gain", "qe_pe_stock_gain"),
+        dials=("fair_value_book_floor", "qe_pe_gain", "qe_pe_stock_gain",
+               "earnings_nominal_growth"),
         via=("market::tick::simulate_market_tick",
+             "market::tick::nominal_scale",
              "fair_value::compute_target_pe"),
     ),
     Mechanism(

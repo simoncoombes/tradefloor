@@ -176,6 +176,13 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # entries around it there is no strong-to-implausible top to choose:
     # the top is where the correction is exact.
     "market_beta_down_asym_recentre": (0.0, 1.0),
+    # The SHARE of nominal output growth the valuation carries. Bounded by
+    # its own meaning, as its neighbour above is: 0.0 is a valuation whose
+    # earnings never move, 1.0 holds the earnings share of nominal output
+    # constant, and past 1.0 earnings outgrow the economy every year, which
+    # is an assertion about a quantity this model does not carry. So the box
+    # is the closed unit interval and the top is where the claim stops.
+    "earnings_nominal_growth": (0.0, 1.0),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0

@@ -1188,6 +1188,13 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "it needs a market whose VIX was high and is now held low. This "
         "scenario keeps the VIX in crisis throughout, which makes "
         "every OTHER dial live.",
+    "nominal_output_base":
+        "the run's opening gdp times cpi, read once at construction. Both "
+        "engines here are built from the same macro state, and Macro cannot "
+        "set either level, so their bases are the same number and dropping "
+        "the key restores to it. What reaches this field is a snapshot whose "
+        "economy carries output away from the restoring engine's own, which "
+        "test_earnings_nominal_growth.py restores and then prices against.",
     "central_bank":
         "the meeting calendar runs off day_count, which IS restored, so both "
         "engines schedule the same meetings. A difference needs a run that "

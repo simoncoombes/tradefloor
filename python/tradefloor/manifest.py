@@ -212,7 +212,8 @@ _CENTRAL_BANK_FIELDS = (
 _SNAPSHOT_KEYS = (
     "columns", "rng", "tickers", "model_fingerprint",
     "attribution", "tick_components", "tick_fundamental", "tick_anchor",
-    "market_open", "market_variance", "forced_flow_spent", "volume_state",
+    "market_open", "market_variance", "forced_flow_spent",
+    "nominal_output_base", "volume_state",
     "universe_stress", "volume_idio", "session_news", "economy",
     "central_bank", "day_count",
     # Added by the draw-addressing layer, and hashed for the reason the
@@ -363,8 +364,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     columns instrument by instrument, the seven generator states, the roster
     and the model fingerprint, the day accumulators and the market-open flag,
     the market factor's variance, the volume states, the universe stress, the
-    forced-flow budget, the day's endogenous news, the economy in declared
-    order, the central bank and the day counter.
+    forced-flow budget, the growth term's nominal base, the day's endogenous
+    news, the economy in declared order, the central bank and the day
+    counter.
 
     ``market_digest`` covers nine columns and the draw count, which is what a
     published result is checked against. This covers the macro chain and the
@@ -482,6 +484,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _f64(buf, value)
     _f64(buf, snapshot["universe_stress"])
     _f64(buf, snapshot["forced_flow_spent"])
+    # Nominal output when the run opened, the base of the growth term's
+    # ratio. A constant of the run, hashed for the reason the fields around
+    # it are: two engines alike in every column and holding different bases
+    # value the same earnings differently tomorrow.
+    _f64(buf, snapshot["nominal_output_base"])
 
     news = list(snapshot["session_news"])
     _u32(buf, len(news))

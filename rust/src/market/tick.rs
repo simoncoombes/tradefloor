@@ -200,6 +200,67 @@ pub struct TickCompany {
     pub revenue_growth: Option<f64>,
 }
 
+/// The factor the valuation's fundamentals are restated by, from the
+/// economy's own integrated nominal output.
+///
+/// `1.0` whenever `earnings_nominal_growth` is 0.0, through a BRANCH rather
+/// than through arithmetic that happens to be neutral, so every preset
+/// before pt-v18 reaches `compute_fair_value` with the fundamentals it was
+/// built with and reproduces bit for bit.
+///
+/// # The quantity
+///
+/// `N = gdp * cpi`, nominal output, which the economy compounds daily at
+/// `gdp_growth / 100 / 365` and `inflation_rate / 100 / 365` in
+/// [`crate::economy::daily`]. `base` is `N` when the engine was built, so
+/// the ratio is exactly 1.0 on day 0 and the opening valuation is
+/// unchanged. The economy advances once per market day and the market
+/// annualises by 252, so a certified year carries `252 / 365` of both
+/// annual rates.
+///
+/// # The guard
+///
+/// A base that is not finite and positive gives 1.0. `gdp` and `cpi` are
+/// levels the economy never takes to zero, so this reaches nothing the
+/// engine builds; it is here because a caller may construct
+/// [`TickInputs`] directly, and a NaN entering the valuation would freeze
+/// every book downstream with no indication of where it came from.
+pub fn nominal_scale(p: &ModelParams, economy: &EconomyState, base: f64) -> f64 {
+    if p.earnings_nominal_growth == 0.0 {
+        return 1.0;
+    }
+    if !(base > 0.0) || !base.is_finite() {
+        return 1.0;
+    }
+    let ratio = economy.gdp * economy.cpi / base;
+    // Linear in the dial, so a share of the term is a share of the level
+    // the term adds, which is the shape every other dial in this era has.
+    1.0 + p.earnings_nominal_growth * (ratio - 1.0)
+}
+
+/// Valuation inputs with the fundamentals restated in the price level and
+/// output the economy has reached.
+///
+/// `scale` is `1 + earnings_nominal_growth * (N_t / N_0 - 1)`, from
+/// [`nominal_scale`]. Both fundamentals move together, so the valuation
+/// stays homogeneous of degree one in nominal terms on the earnings path
+/// and on the book path alike, and a loss-maker valued at
+/// `book * LOSS_MAKING_PRICE_TO_BOOK` grows with the same output a
+/// profitable company does. The sector anchor is a multiple and the
+/// revenue growth is a rate, so both are already nominal-neutral and
+/// neither moves.
+pub fn scale_valuation(
+    company: CompanyValuationInputs,
+    scale: f64,
+) -> CompanyValuationInputs {
+    CompanyValuationInputs {
+        sector_avg_pe: company.sector_avg_pe,
+        eps: company.eps.map(|v| v * scale),
+        book_value_per_share: company.book_value_per_share.map(|v| v * scale),
+        revenue_growth: company.revenue_growth,
+    }
+}
+
 impl TickCompany {
     fn valuation(&self) -> CompanyValuationInputs {
         CompanyValuationInputs {
@@ -349,6 +410,15 @@ pub struct TickInputs<'a> {
     /// skipped under `FourOrZero`, where the settlement draws from the
     /// caller's recorded source and there is no buffer to rewind.
     pub settle_depth_counterfactual: bool,
+    /// Nominal output when the run opened: `gdp * cpi` at construction.
+    ///
+    /// Read only by [`nominal_scale`], and only when
+    /// `earnings_nominal_growth` is nonzero, which is pt-v18 and no preset
+    /// before it. A caller building `TickInputs` directly passes the
+    /// opening `economy.gdp * economy.cpi` of the run it is simulating; a
+    /// single-tick caller passes this tick's own, which makes the ratio
+    /// 1.0 and the valuation the one every earlier preset computes.
+    pub nominal_output_base: f64,
     /// The model coefficients (the runtime seam, CALIBRATION.md §5). The
     /// engine passes its own; a caller building `TickInputs` directly
     /// passes [`crate::params::PT_V1`] for the shipped model, which is
@@ -737,10 +807,24 @@ pub fn simulate_market_tick(
     let mut s_components = vec![[0.0f64; 8]; active_count];
     let mut crowd_leans = vec![0.0; active_count];
 
+    // The fundamentals restated in the economy's current price level and
+    // output, once for the whole tick because it is a macro quantity.
+    // Exactly 1.0 under every preset before pt-v18, by the branch in
+    // `nominal_scale`, and 1.0 on day 0 under pt-v18 as well.
+    let nominal = nominal_scale(p, economy, inputs.nominal_output_base);
+
     for i in 0..active_count {
         let idx = active_indices[i];
+        // A BRANCH rather than a multiply by 1.0. The two agree on every
+        // finite value, and the branch is what the preset contract rests
+        // on rather than on an argument about how floats behave.
+        let valuation = if nominal == 1.0 {
+            companies[idx].valuation()
+        } else {
+            scale_valuation(companies[idx].valuation(), nominal)
+        };
         let breakdown = compute_fair_value_with(
-            &companies[idx].valuation(), &econ_view, p.fair_value_book_floor,
+            &valuation, &econ_view, p.fair_value_book_floor,
             p.qe_pe_gain, p.qe_pe_stock_gain);
         let fv = breakdown.fair_value;
 
@@ -1286,4 +1370,93 @@ mod tests {
         }
     }
 
+    /// The economy the scale is read off, at a stated nominal output.
+    fn economy_at(gdp: f64, cpi: f64) -> EconomyState {
+        let mut e = crate::economy::create_initial_economy_state(
+            &crate::economy::InitialEconomyOptions::default());
+        e.gdp = gdp;
+        e.cpi = cpi;
+        e
+    }
+
+    fn with_dial(value: f64) -> crate::params::ModelParams {
+        let mut p = crate::params::PT_V16;
+        p.earnings_nominal_growth = value;
+        p
+    }
+
+    #[test]
+    fn the_scale_is_one_wherever_the_dial_is_off() {
+        // The branch, not the arithmetic: an output ten times the base
+        // still returns a literal 1.0, so no preset before pt-v18 reaches
+        // a multiply at all.
+        let p = with_dial(0.0);
+        for (gdp, cpi) in [(25000.0, 100.0), (250000.0, 100.0),
+                           (25000.0, 1000.0), (0.0, 100.0)] {
+            let e = economy_at(gdp, cpi);
+            assert_eq!(nominal_scale(&p, &e, 2_500_000.0), 1.0);
+        }
+    }
+
+    #[test]
+    fn the_scale_is_the_output_ratio_when_the_dial_is_full() {
+        let p = with_dial(1.0);
+        let base = 2_500_000.0;
+        assert_eq!(nominal_scale(&p, &economy_at(25000.0, 100.0), base), 1.0);
+        assert_eq!(nominal_scale(&p, &economy_at(50000.0, 100.0), base), 2.0);
+        assert_eq!(nominal_scale(&p, &economy_at(25000.0, 200.0), base), 2.0);
+        // Down as well as up, which is what a contraction reaches and what
+        // a flat premium could not do.
+        assert_eq!(nominal_scale(&p, &economy_at(20000.0, 100.0), base), 0.8);
+    }
+
+    #[test]
+    fn a_share_of_the_dial_is_a_share_of_the_level() {
+        // Linear in the dial, so half the dial adds half of what the whole
+        // of it adds. Stated on the level rather than on the log, which is
+        // the shape every other dial in this era has.
+        let base = 2_500_000.0;
+        let e = economy_at(50000.0, 100.0);
+        assert_eq!(nominal_scale(&with_dial(0.5), &e, base), 1.5);
+        assert_eq!(nominal_scale(&with_dial(0.25), &e, base), 1.25);
+    }
+
+    #[test]
+    fn a_base_that_is_not_a_positive_number_gives_one() {
+        // Nothing the engine builds reaches this, because `gdp` and `cpi`
+        // are levels the economy never takes to zero. A caller building
+        // `TickInputs` by hand can, and a NaN entering the valuation would
+        // freeze every book downstream with nothing to say where it came
+        // from.
+        let p = with_dial(1.0);
+        let e = economy_at(25000.0, 100.0);
+        for base in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert_eq!(nominal_scale(&p, &e, base), 1.0);
+        }
+    }
+
+    #[test]
+    fn the_scaled_valuation_moves_both_fundamentals_and_nothing_else() {
+        let company = CompanyValuationInputs {
+            sector_avg_pe: Some(18.0),
+            eps: Some(4.0),
+            book_value_per_share: Some(20.0),
+            revenue_growth: Some(0.05),
+        };
+        let scaled = scale_valuation(company, 1.25);
+        assert_eq!(scaled.eps, Some(5.0));
+        assert_eq!(scaled.book_value_per_share, Some(25.0));
+        // A rate and a multiple, both already nominal-neutral.
+        assert_eq!(scaled.revenue_growth, Some(0.05));
+        assert_eq!(scaled.sector_avg_pe, Some(18.0));
+        // An absent fundamental stays absent rather than becoming zero,
+        // which is the difference between a company the valuation prices
+        // off book and one it prices at nothing.
+        let empty = scale_valuation(CompanyValuationInputs {
+            sector_avg_pe: None, eps: None,
+            book_value_per_share: None, revenue_growth: None,
+        }, 1.25);
+        assert_eq!(empty.eps, None);
+        assert_eq!(empty.book_value_per_share, None);
+    }
 }

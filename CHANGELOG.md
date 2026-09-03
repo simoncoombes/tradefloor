@@ -355,6 +355,70 @@ of 0.00, which is 0.005 of that row's own across-seed noise. It is the
 downside tilt's stated side channel and it has now crossed and re-crossed
 that ceiling twice within this era.
 
+### The valuation's growth term
+
+Price is `fair_value * exp(s)`, the mispricing is stationary around zero
+and `eps` is fixed when an instrument is built, so the only time variation
+in fair value was the discount rate. The expected log change of the index
+over any horizon was therefore zero in a stationary economy and negative
+in one whose yields rise. Returning the five unchosen first moments above
+leaves the index near zero, and a real equal-weight price index returns
+eight to nine per cent a year nominal.
+
+A premium placed in the mispricing process settles at a level. Under a
+constant drift per step the stationary mean solves
+`m = phi * m + c`, so the premium settles at `c / (1 - phi)` on the
+sixty-day half-life and grows no further. Simulated at three, six and nine
+per cent a year it gave levels of +0.010, +0.021 and +0.031 with
+third-year growth of zero.
+
+`earnings_nominal_growth` puts the term in fair value instead, from a
+quantity the economy already integrates. The macro chain compounds `gdp`
+and `cpi` on every day it advances, so `N = gdp * cpi` is nominal output,
+and at 1.0 the valuation reads `eps` and `book_value_per_share` multiplied
+by `N_t / N_0`, with `N_0` read at construction. Both fundamentals move,
+so the valuation stays homogeneous of degree one in nominal terms on the
+earnings path and on the book path alike. The ratio is exactly 1.0 on day
+zero, so the opening valuation and the initial mispricing taken from it
+hold still. At 0.0, which is every preset before pt-v18, the branch is not
+taken and the trajectory is bit-identical.
+
+The term states no rate of its own. It reads the level the economy
+reached, so a contraction year delivers a negative number through the same
+arithmetic, which is the behaviour a mechanism has and a constant lacks.
+
+The clock is the part of this that is easy to get wrong. The economy
+compounds on a 365-day year and advances once per market day, while the
+market trades 252 days and annualises by 252, so a certified year carries
+252/365 of every annual rate. Measured on the panel roster at 252 days
+over six seeds, nominal output grows a median of +4.353 per cent per
+trading year, with mean growth of 3.353 and mean inflation of 2.931 over
+the run, and `(3.353 + 2.931) * 252 / 365` is 4.339 against a measured
+mean of 4.340. A test states that as an identity against the rates a run
+held rather than as a value.
+
+The earnings share of nominal output is held constant, and the model
+carries no quantity for that share, so 1.0 is the only setting read off
+the process rather than chosen. A real price index also earns a return
+above nominal output growth, through buybacks and the drift of that share,
+worth three to four points a year. This model has nothing to derive that
+from, so the gap is named here and left.
+
+The trailing market multiple reads the same restated earnings. The daily
+macro step computes a market-cap-weighted price over earnings and the
+expansion hazard treats a multiple above 28 as fragility, so a day-zero
+earnings figure divided into a price that grew with nominal output would
+report a multiple rising because the mechanism ran.
+
+`N_0` is engine state and rides in the snapshot, so the state hash covers
+one more field and a ledger leaf taken on an earlier build of this release
+verifies against nothing taken now. Both ship in one release and no such
+leaf exists outside this repository. Adding a settable dial also changes
+the shape of every preset's coefficient vector, so both committed records
+gained the new name at its inert default and a new digest, through the
+mode that rewrites those two fields and refuses any moved coefficient. The
+determinism digest is unmoved and the default preset is untouched.
+
 ### The index drift row
 
 `facts.panel_statistics` reports `index_drift_pct`, the annualised log

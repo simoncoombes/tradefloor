@@ -343,6 +343,17 @@ PERTURBATIONS = [
     # touches is evaluated. Over 252 days it bites: the thirty-seed sweep
     # separates the arms.
     ("cascade_symmetry", 0.5, False),
+    # How much of nominal output growth the valuation's earnings carry. It
+    # reads a level the economy compounds daily, so it moves the market as
+    # soon as one day has closed rather than waiting on a branch: over the
+    # probe's three days the ratio reaches about 1.00025 and the perturbed
+    # arm values every name a fraction above the base one.
+    #
+    # 0.5 rather than 1.0 for the reason the recentre entry above gives, and
+    # because a share is the reading this dial has: 1.0 holds the earnings
+    # share of nominal output constant and every value below it lets that
+    # share fall.
+    ("earnings_nominal_growth", 0.5, True),
     # The exponent on the VIX ratio in the market variance target. The
     # endogenous VIX leaves its anchor on day one, so the ratio is never
     # exactly 1.0 and any exponent but the shipped one moves the target.

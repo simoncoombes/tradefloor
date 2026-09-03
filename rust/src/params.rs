@@ -774,6 +774,89 @@ pub struct ModelParams {
     /// earnings path has somewhere monotonic to run; adopting it is an era
     /// boundary and a recalibration, not a bug fix.
     pub fair_value_book_floor: f64,
+    /// How much of nominal output growth the valuation's earnings carry.
+    /// 0.0 -- every preset before pt-v18 -- is bit-identical. 1.0 holds the
+    /// earnings share of nominal output constant.
+    ///
+    /// # Why the model has no expected return without this
+    ///
+    /// Price is `fair_value * exp(s)`, `s` is a stationary AR(2) around
+    /// zero, and `eps` is fixed when an instrument is built, so the only
+    /// time variation in fair value is the discount rate. The expected log
+    /// change of the index over any horizon is therefore zero in a
+    /// stationary economy, and negative in one whose yields rise. A real
+    /// large-cap price index returns 8 to 9 per cent a year nominal on an
+    /// equal-weight basis, and nothing in the architecture could deliver
+    /// it.
+    ///
+    /// A drift placed in `s` cannot deliver it either. Under a constant
+    /// drift `c` per step the stationary mean solves `m = phi * m + c`, so
+    /// a premium injected there is a LEVEL of `c / (1 - phi)`, reached on
+    /// the 60-day half-life and followed by no growth at all. Simulated at
+    /// 3, 6 and 9 per cent a year it gave levels of +0.010, +0.021 and
+    /// +0.031 with third-year growth of zero. An expected return has to
+    /// enter fair value.
+    ///
+    /// # What it scales, exactly
+    ///
+    /// `eps` and `book_value_per_share` are multiplied by
+    /// `1 + this * (N_t / N_0 - 1)` before the valuation reads them, where
+    /// `N = gdp * cpi` is nominal output and `N_0` is its value when the
+    /// engine was built. The multiplier is 1.0 on day 0 by construction,
+    /// so the opening valuation, and the lazy initial `s` taken from it,
+    /// are unchanged.
+    ///
+    /// Both fields, because the valuation is then homogeneous of degree
+    /// one in nominal terms on both of its paths: a profitable company
+    /// through `eps * target_pe` and a loss-making one through
+    /// `book * LOSS_MAKING_PRICE_TO_BOOK`. Scaling only earnings would
+    /// make a loss-maker's fair value fall in real terms every year.
+    ///
+    /// # The clock, which is the part that is easy to get wrong
+    ///
+    /// `N` is integrated by the economy, which compounds `gdp` by
+    /// `gdp_growth / 100 / 365` and `cpi` by `inflation_rate / 100 / 365`
+    /// on every day it advances, while the market trades 252 days to a
+    /// year and annualises by 252. The economy advances once per market
+    /// day, so a certified year of 252 sessions takes 252 of those steps
+    /// and delivers `252 / 365` of every annual rate: growth of 2.50 and
+    /// inflation of 2.00 at the opening state give 4.50 per economy-year
+    /// and 3.11 per trading year.
+    ///
+    /// This term states no rate of its own. It reads the level the economy
+    /// reached, so whatever the macro chain integrated is what the
+    /// valuation carries, and a contraction year delivers a negative
+    /// number through the same arithmetic. Measured on
+    /// `Universe.random(40, seed=111)` over 252 days at pt-v18, seeds 1 to
+    /// 6, it delivers a median of +4.353 per cent per trading year, with
+    /// mean growth of 3.353 and mean inflation of 2.931 over the run;
+    /// `(3.353 + 2.931) * 252 / 365` is 4.339, which is the clock stated as
+    /// a number.
+    ///
+    /// # A company listed mid-run
+    ///
+    /// A company's stored `eps` is in the run's OPENING nominal terms,
+    /// because that is what the ratio is taken against, so
+    /// `Engine::list_instrument` on day 200 takes earnings stated at day
+    /// zero rather than at day 200. A caller holding today's figure
+    /// divides it by the ratio the snapshot gives, `gdp * cpi` over
+    /// `nominal_output_base`. Every preset before pt-v18 holds that ratio
+    /// at 1.0, where the two readings are the same number.
+    ///
+    /// # What it does NOT claim
+    ///
+    /// Earnings are a share of nominal output, and the share is a quantity
+    /// this model does not carry. At 1.0 the share is held constant, which
+    /// is the only value that is read off the process rather than chosen;
+    /// below 1.0 the share falls every year and above 1.0 it rises for
+    /// ever, both of which are assertions about an unmodelled quantity.
+    ///
+    /// A real price index also earns a return above nominal output growth,
+    /// through buybacks and the drift of the earnings share, worth 3 to 4
+    /// points a year. The model has nothing to derive that from, so this
+    /// term does not attempt it and the gap is reported rather than
+    /// closed.
+    pub earnings_nominal_growth: f64,
     /// Weight of the SLOW variance component in the market factor's
     /// two-component mixture. The mixture exists because real
     /// volatility memory decays hyperbolically and a single
@@ -1604,6 +1687,7 @@ impl ModelParams {
             market_vol_slow_persistence: 0.0,
             market_vol_slow_gain: 0.0,
             fair_value_book_floor: 0.0,
+            earnings_nominal_growth: 0.0,
             market_vol_slow_weight: 0.0,
             volume_idio_variance_gain: 0.0,
             volume_idio_persistence: 0.0,
@@ -2580,6 +2664,14 @@ impl ModelParams {
     /// This era gives each of those means back at its source rather than
     /// cancelling them with an offset at the end, so the shapes the
     /// mechanisms were built for survive.
+    ///
+    /// Returning every unchosen mean leaves the index near zero rather
+    /// than near a real index's 8 to 9 per cent, because the architecture
+    /// carries no expected return at all: `s` is stationary and `eps` is
+    /// fixed, so fair value moves only with the discount rate. The last
+    /// dial supplies one from the nominal output the economy already
+    /// integrates. See [`ModelParams::earnings_nominal_growth`] for what
+    /// that leaves unclaimed.
     pub const fn pt_v18() -> ModelParams {
         let mut p = ModelParams::pt_v16();
         // The downside transmission tilt scales one side of a zero-mean
@@ -2611,6 +2703,16 @@ impl ModelParams {
         // returns that is a drift. Matched at the mean of the pair, which
         // chooses no side and preserves their total intervention.
         p.cascade_symmetry = 1.0;
+        // The four dials above give back means the model injected without
+        // anyone choosing them, and a model with every unchosen mean
+        // returned still has no expected return: `s` is stationary and
+        // `eps` is fixed, so fair value moves only with the discount rate.
+        // This one holds the earnings share of nominal output constant, so
+        // the valuation grows with the output the economy already
+        // integrates. It delivers 252/365 of growth plus inflation per
+        // trading year, which is +4.353 measured over the certified year,
+        // and it goes negative in a contraction.
+        p.earnings_nominal_growth = 1.0;
         p
     }
 
@@ -2716,6 +2818,7 @@ impl ModelParams {
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
+            "earnings_nominal_growth" => self.earnings_nominal_growth,
             "market_vol_slow_weight" => self.market_vol_slow_weight,
             "volume_idio_variance_gain" => self.volume_idio_variance_gain,
             "volume_idio_persistence" => self.volume_idio_persistence,
@@ -2864,6 +2967,7 @@ impl ModelParams {
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
+            "earnings_nominal_growth" => out.earnings_nominal_growth = value,
             "market_vol_slow_weight" => out.market_vol_slow_weight = value,
             "volume_idio_variance_gain" => out.volume_idio_variance_gain = value,
             "volume_idio_persistence" => out.volume_idio_persistence = value,
@@ -3036,6 +3140,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "endogenous_news_intensity",
         "endogenous_news_sigma",
         "fair_value_book_floor",
+        "earnings_nominal_growth",
         "garch_alpha",
         "garch_beta",
         "garch_beta_dispersion",

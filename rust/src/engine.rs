@@ -335,6 +335,18 @@ pub struct Engine {
     /// the ticks the day ran. Together they map a `(day, company)` pair to
     /// its market-stream normal indices (`Engine::market_day_layout`).
     day_marks: Vec<DayMark>,
+    /// Nominal output when this engine was built: `gdp * cpi` from the
+    /// economy it was constructed with.
+    ///
+    /// The base of the growth term's ratio, so it is a constant of the run
+    /// rather than state that advances, and it is carried in the snapshot
+    /// for the reason every per-engine field is: an engine restored
+    /// without it would rebase its valuation on the day it was restored
+    /// and grow from there, which reads as a plausible market and is not
+    /// the one the snapshot describes. Inert under every preset before
+    /// pt-v18, where `earnings_nominal_growth` is 0.0 and nothing reads
+    /// it.
+    nominal_output_base: f64,
     /// The model coefficients this engine runs (the runtime seam,
     /// CALIBRATION.md §5). [`crate::params::PT_V1`] unless the engine was
     /// built with [`Engine::with_params`]; immutable for the engine's life,
@@ -549,7 +561,11 @@ impl Engine {
         params: ModelParams,
     ) -> Self {
         let companies_len = companies.len();
+        // Read before the economy moves into the struct, and never
+        // recomputed: this is where the run's nominal output starts.
+        let nominal_output_base = economy.gdp * economy.cpi;
         Self {
+            nominal_output_base,
             market_rng: GameRng::substream(seed, stream::MARKET),
             economy_rng: GameRng::substream(seed, stream::ECONOMY),
             external_rng: GameRng::substream(seed, stream::EXTERNAL),
@@ -971,6 +987,7 @@ impl Engine {
                 market_sigma_daily,
                 settle_draws,
                 settle_depth_counterfactual: self.settle_depth_counterfactual,
+                nominal_output_base: self.nominal_output_base,
                 params: &self.params,
             },
             rng,
@@ -1867,6 +1884,19 @@ impl Engine {
         self.forced_flow_spent = spent;
     }
 
+    /// Nominal output when this engine was built, for checkpoints and
+    /// forks. See the field's own comment for what depends on it.
+    pub fn nominal_output_base(&self) -> f64 {
+        self.nominal_output_base
+    }
+
+    /// Put a restored engine back on the base its snapshot was taken
+    /// under. A restore that reset the economy and left this alone would
+    /// price a market against output it never had.
+    pub fn set_nominal_output_base(&mut self, base: f64) {
+        self.nominal_output_base = base;
+    }
+
     pub fn close_day(&mut self, game_day: i64) {
         let noise = self.attribution_column(random_noise_index());
         let innovations: Vec<Option<f64>> = noise.into_iter().map(Some).collect();
@@ -1904,13 +1934,26 @@ impl Engine {
         let mut weighted_pe = 0.0;
         let mut last_tick_mcap = 0.0;
         let mut last_tick_return_pct = 0.0;
+        // The trailing PE is a price over an EARNINGS figure, and under
+        // `earnings_nominal_growth` the earnings the model believes a
+        // company has are its day-0 figure restated in today's price level
+        // and output. Reading the day-0 figure against a price that grew
+        // with nominal output would report a multiple that rose because
+        // the mechanism ran, and the expansion hazard in
+        // `economy::cycle` treats a multiple above 28 as fragility. Exactly
+        // 1.0 under every preset before pt-v18.
+        let nominal = crate::market::tick::nominal_scale(
+            &self.params, &self.economy, self.nominal_output_base);
         for c in self.companies() {
             if !c.is_public || c.is_bankrupt {
                 continue;
             }
             if let Some(eps) = c.eps {
                 if eps > 0.0 {
-                    let pe = c.stock.price / eps;
+                    // A branch, as at the valuation, so the arithmetic
+                    // before pt-v18 is the arithmetic it always was.
+                    let earnings = if nominal == 1.0 { eps } else { eps * nominal };
+                    let pe = c.stock.price / earnings;
                     if pe > 0.0 && pe < 200.0 {
                         total_mcap += c.stock.market_cap;
                         weighted_pe += pe * c.stock.market_cap;
@@ -2542,6 +2585,11 @@ impl Engine {
         }
         hash_f64(&mut buf, self.universe_stress);
         hash_f64(&mut buf, self.forced_flow_spent);
+        // The growth term's base, in snapshot order. A constant of the run
+        // rather than state that advances, and covered for the reason
+        // every other field here is: two engines that agree on today's
+        // prices and hold different bases price tomorrow differently.
+        hash_f64(&mut buf, self.nominal_output_base);
 
         // The day's endogenous news. Generated at `open_market` and cleared
         // at the next one, so a close-boundary leaf carries the day's events
