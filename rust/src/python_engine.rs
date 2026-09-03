@@ -791,6 +791,23 @@ fn stream_id(name: &str) -> PyResult<u32> {
     })
 }
 
+/// Which sector factor a name draws from, on the roster ``engine`` holds.
+///
+/// The sector factor's tag is a position in the engine's own sector
+/// table, and no column carries it, so it is resolved here rather than
+/// guessed at from the roster. Resolved against whichever engine is
+/// asked, because a kept copy's roster and the live one disagree after a
+/// delisting.
+fn sector_of(engine: &PyEngine, ticker: &str) -> usize {
+    engine
+        .tickers
+        .iter()
+        .position(|t| t == ticker)
+        .and_then(|i| engine.inner.companies().get(i).map(|c| c.sector.clone()))
+        .and_then(|key| crate::sectors::keys().iter().position(|k| *k == key))
+        .unwrap_or(0)
+}
+
 fn draw_kind(name: &str) -> PyResult<crate::rng::DrawKind> {
     Ok(match name {
         "uniform" => crate::rng::DrawKind::Uniform,
@@ -968,20 +985,38 @@ impl PyEngine {
 
     /// The log entries of the day whose open sits at `log_start`.
     ///
-    /// From that open to the close that ends the day, inclusive. A day ends
-    /// at an explicit `close_market` or at a session that carried
-    /// `close_at_end`, which are the two spellings of one close, and a day
-    /// that never closed runs to the end of the log.
+    /// From that open to the close that ends the day, inclusive, plus any
+    /// `record` that follows the close. A day ends at an explicit
+    /// `close_market` or at a session that carried `close_at_end`, which
+    /// are the two spellings of one close, and a day that never closed
+    /// runs to the end of the log.
+    ///
+    /// The trailing records are here because a caller who closes through
+    /// the session records AFTER the close, and stopping at the close
+    /// dropped that entry out of the day. What the entry carries is the
+    /// label the day's rows have on the tape, so losing it left the
+    /// explanation reading the tape at the day the store keyed the open
+    /// by, which is a different day's rows whenever the two disagree.
     fn day_inputs(&self, py: Python<'_>, log_start: usize) -> PyResult<Vec<PyObject>> {
         let mut out = Vec::new();
+        let mut closed = false;
         for entry in self.log.iter().skip(log_start) {
+            if closed {
+                match entry {
+                    crate::python_log::LogEntry::Record { .. } => {
+                        out.push(entry.to_py(py)?);
+                        continue;
+                    }
+                    _ => break,
+                }
+            }
             out.push(entry.to_py(py)?);
             match entry {
-                crate::python_log::LogEntry::CloseMarket => break,
+                crate::python_log::LogEntry::CloseMarket => closed = true,
                 crate::python_log::LogEntry::RunSession { close_at_end, .. }
                     if *close_at_end =>
                 {
-                    break
+                    closed = true
                 }
                 _ => {}
             }
@@ -1846,6 +1881,14 @@ impl PyEngine {
     /// this. The cost is one engine copy per kept day, taken without the
     /// recorded tape, so ask for the days you mean to explain rather than
     /// for a whole run.
+    ///
+    /// A fork carries what the parent kept, so the cost is paid again per
+    /// arm: `World.fork` and every counterfactual arm copy the whole
+    /// store. On `Universe.random(40, seed=111)` at `pt-v16` over twenty
+    /// days, `fork(2)` took 0.014 s with no window, 0.066 s at a five-day
+    /// window and 0.890 s at a twenty-day one, so the window and not the
+    /// roster is what a fork pays for. A fork collects no new opens of
+    /// its own past the window it inherited.
     fn keep_explanations(&mut self, from_day: i64, to_day: i64) -> PyResult<()> {
         if to_day < from_day {
             return Err(ValidationError::new_err(format!(
@@ -1874,21 +1917,17 @@ impl PyEngine {
         let py = slf.py();
         let (sector, window, kept, opened, inputs) = {
             let me = slf.borrow();
-            // The sector factor's tag is a position in the engine's own
-            // sector table, and no column carries it, so it is resolved
-            // here rather than guessed at from the roster.
-            let sector = me
-                .tickers
-                .iter()
-                .position(|t| t == ticker)
-                .and_then(|i| me.inner.companies().get(i).map(|c| c.sector.clone()))
-                .and_then(|key| crate::sectors::keys().iter().position(|k| *k == key))
-                .unwrap_or(0);
             let window = me.explanations.window;
             let kept: Vec<i64> = me.explanations.opens.keys().copied().collect();
             match me.explanations.opens.get(&day) {
                 Some(k) => {
                     let entries = me.day_inputs(py, k.log_start)?;
+                    // Against the COPY's roster, not this engine's. A
+                    // delisting shifts every slot below it, so a name
+                    // resolved against the roster as it is now addresses
+                    // a different company in a day kept before the
+                    // change, and the sector tag with it.
+                    let sector = sector_of(&k.engine, ticker);
                     (
                         sector,
                         window,
@@ -1897,7 +1936,7 @@ impl PyEngine {
                         Some(entries),
                     )
                 }
-                None => (sector, window, kept, None, None),
+                None => (sector_of(&me, ticker), window, kept, None, None),
             }
         };
         let module = py.import_bound("tradefloor.explain")?;

@@ -17,6 +17,11 @@ each day's open. Both are read-only, so a market with the window open is
 the market it would have been without one. ``explain`` on a day outside
 the window raises and names the days that were kept.
 
+``explain`` also needs pyarrow, because the tree's contributions are the
+``truth()`` table's columns and that table arrives as an Arrow stream. A
+default install raises from the first call with the extra to install; the
+library itself still imports nothing.
+
 ## The tree
 
 The root is the move, ``log(close / previous close)``, with the close
@@ -253,6 +258,29 @@ MECHANISMS: tuple[Mechanism, ...] = (
 #: columns and the two that close the arithmetic to the printed move.
 FACTORS: tuple[str, ...] = tuple(m.factor for m in MECHANISMS)
 
+#: How the book contribution splits when ``Engine.prints()`` is on the
+#: build, as ``(name, Rust function)`` in the order they are reported.
+#:
+#: The three are per-tick sums off the print table and their parent is a
+#: change in a level, so they are not a re-split of it in any obvious
+#: sense; that they add up to it is arithmetic worth stating. Writing A
+#: for the anchor's move, which is the other ten contributions, the
+#: identity is that summed shock plus summed absorbed telescopes to the
+#: printed move, so summed absorbed plus (summed shock minus A) is the
+#: move minus A, which is the book contribution. Each is measured on its
+#: own rather than one being taken as what the others leave over.
+#:
+#: The third has a closed form: summed shock minus A works out to minus
+#: the sum of the log distances from the anchor to the print, taken at
+#: the tick BEFORE each settlement. Each tick measures its shock from the
+#: last print, so wherever the tape sits away from the model that gap
+#: enters the shock and leaves again through absorbed.
+DEPTH: tuple[tuple[str, str], ...] = (
+    ("order_book", "microstructure::settle_price_through_book"),
+    ("circuit_breaker_two", "market::tick::simulate_market_tick"),
+    ("anchor_pull", "microstructure::decompose"),
+)
+
 #: The kinds a node can be.
 KINDS = ("move", "factor", "mechanism", "state", "draw")
 
@@ -299,6 +327,9 @@ class _Day(NamedTuple):
     factors: dict[str, float]
     state: dict[str, float]
     levels: dict[str, float]
+    #: The book contribution's three readings off ``prints()``, or an
+    #: empty map on a build without it.
+    depth: dict[str, float]
 
 
 def _count(n: int, noun: str) -> str:
@@ -314,6 +345,48 @@ def _f64(buf: bytes) -> tuple[float, ...]:
 
 def _column(engine: Engine, field: str) -> tuple[float, ...]:
     return _f64(engine.column(field))
+
+
+def _record_label(inputs: Sequence[dict], day: int) -> int:
+    """The label the run's own ``record`` gave this day, or ``day``.
+
+    The store keys an open by the day the engine stamped it with, and
+    ``record`` takes a label of the caller's choosing. Every path the
+    library drives passes the same number to both, so the two agree; a
+    hand loop can pass anything. The tape is keyed by the label, so a
+    tape read at the store's key would be a different day's rows, with
+    the right shape and the wrong values.
+    """
+    for entry in inputs:
+        if entry["op"] == "record":
+            return int(entry["day"])
+    return int(day)
+
+
+def _same_roster(engine: Engine, before: int, after: int,
+                 width: int) -> bool:
+    """Whether the tape holds the same number of names on both days.
+
+    A slot names a company, and a delisting shifts every slot below it,
+    so a level read from one day's tape at a slot from another day's is
+    another name's. The widths are what the tape can be asked; equal
+    widths do not prove the roster held still, and a listing paired with
+    a delisting in one day is the case they miss.
+    """
+    return all(_instruments(engine, d) in (None, width)
+               for d in (before, after))
+
+
+def _instruments(engine: Engine, day: int) -> int | None:
+    """How many names the tape holds for ``day``, or ``None``."""
+    if int(day) < 0 or engine.recorded_days == 0:
+        return None
+    try:
+        table = _table(engine.truth(day=int(day)))
+    except ValidationError:
+        return None
+    ids = table["instrument_id"]
+    return len(set(ids)) if ids else None
 
 
 def _levels(engine: Engine, day: int, index: int) -> dict[str, float] | None:
@@ -371,11 +444,11 @@ def _explain(engine: Engine, ticker: str, day: int, sector: int,
     factor's tag is a position in the engine's own sector table and the
     engine publishes no column for it.
     """
-    if ticker not in engine.tickers:
-        raise ValidationError(
-            f"{ticker!r} is not in this engine's roster, which starts "
-            f"{list(engine.tickers[:8])}")
     if opened is None or inputs is None:
+        if ticker not in engine.tickers:
+            raise ValidationError(
+                f"{ticker!r} is not in this engine's roster, which starts "
+                f"{list(engine.tickers[:8])}")
         if window is None:
             raise ValidationError(
                 f"day {day} has no explanation kept, and none was asked "
@@ -387,6 +460,19 @@ def _explain(engine: Engine, ticker: str, day: int, sector: int,
             f"days {window[0]} to {window[1]} and the days kept are "
             f"{held}. A day is kept at its open, so a window opened after "
             "the day ran cannot reach it.")
+    # Against the roster the DAY had, which the copy carries, rather than
+    # the roster the engine has now. A delisting shifts every slot below
+    # it, so a name resolved against the current roster addresses another
+    # company in a day kept before the change and every read follows it:
+    # the state columns, the tape's instrument_id filter and the company
+    # tag on the draws. A name delisted since is still explainable on a
+    # day it traded; a name listed since was not there to explain.
+    if ticker not in opened.tickers:
+        raise ValidationError(
+            f"{ticker!r} was not on the roster when day {day} opened, "
+            f"which held {len(opened.tickers)} names starting "
+            f"{list(opened.tickers[:8])}. A name listed after a day "
+            "cannot be explained on it.")
     return Explanation(engine=engine, ticker=ticker, day=int(day),
                        sector=int(sector), window=window,
                        kept=tuple(int(d) for d in kept),
@@ -422,8 +508,19 @@ class Explanation:
         self._kept = kept
         self._opened = opened
         self._inputs = inputs
-        self._index = engine.tickers.index(ticker)
+        self._index = opened.tickers.index(ticker)
         self._sector = int(sector)
+        #: The roster the day ran under, and whether it is still the
+        #: engine's. Read from the copy, so a delisting since the day is
+        #: visible to the caveats rather than silent.
+        self._roster = tuple(opened.tickers)
+        self._roster_moved = self._roster != tuple(engine.tickers)
+        #: The label this day's rows carry on the tape, which is the one
+        #: the run's own `record` call gave them. It is the day the store
+        #: keyed the open by on every path the library drives, and a hand
+        #: loop can give a day any label it likes; the tape is read at the
+        #: label and the caveats name both when they differ.
+        self._label = _record_label(inputs, self.day)
         self._dials = dict(engine.model_params)
         #: What every logged draw of the day delivered, by address. The
         #: values a replay installs, so a replay of a node reproduces the
@@ -435,12 +532,26 @@ class Explanation:
         self._values = {entry.address: entry.value
                         for entries in self._logged.values()
                         for entry in entries}
-        self._previous = _levels(engine, self.day - 1, self._index)
+        self._previous = _levels(engine, self._label - 1, self._index)
+        if self._previous is not None and not _same_roster(
+                engine, self._label - 1, self._label, len(self._roster)):
+            # The roster moved between the two days, so the slot that
+            # names this company on one tape does not on the other and
+            # the previous close's levels would be another name's.
+            self._previous = None
+            self._previous_moved = True
+        else:
+            self._previous_moved = False
         #: Each draw node's values, in the order the log delivered
         #: them, keyed by the node. A replay installs these against
         #: the node's own addresses, which is what makes a
         #: mis-addressed node change the day it replays.
         self._draw_values: dict[int, tuple[float, ...]] = {}
+        #: The three readings under the book contribution, by node. A
+        #: node here states a quantity the day recomputes, so a replay
+        #: reports it rather than the contribution above it, which keeps
+        #: a leaf replaying to its own parent.
+        self._depth_nodes: dict[int, str] = {}
         self._runs: dict[tuple, _Day] = {}
         base = self._run(())
         self._base = base
@@ -448,12 +559,13 @@ class Explanation:
         self.root = self._tree(base)
         self._walk = tuple(_walk(self.root, "", None))
         self._by_path = {path: node for path, node, _ in self._walk}
-        self._recorded = _recorded_factors(engine, self.day, self._index)
+        self._recorded = _recorded_factors(engine, self._label,
+                                           self._index)
         #: The close the run itself printed on this day, where its tape
         #: holds one. The nine columns agreeing says the mispricing path
         #: was rebuilt; the print is settled through the book after that,
         #: so it is compared on its own.
-        self._recorded_close = _recorded_close(engine, self.day,
+        self._recorded_close = _recorded_close(engine, self._label,
                                                self._index)
         self.caveats = self._caveats()
 
@@ -471,9 +583,23 @@ class Explanation:
 
     def _factor(self, mech: Mechanism, base: _Day) -> Node:
         value = base.factors[mech.factor]
+        children = (self._mechanism(mech, value, base),)
+        if mech.factor == "book" and base.depth:
+            # The book's own share keeps the settlement's state and draws;
+            # the other two are readings of the same print table and carry
+            # neither, since neither takes a draw of its own.
+            first, rest = children[0], []
+            for name, function in DEPTH[1:]:
+                node = Node(kind="mechanism", name=function,
+                            value=base.depth[name], inputs={},
+                            addresses=(), children=())
+                self._depth_nodes[id(node)] = name
+                rest.append(node)
+            first = first._replace(value=base.depth[DEPTH[0][0]])
+            self._depth_nodes[id(first)] = DEPTH[0][0]
+            children = (first, *rest)
         return Node(kind="factor", name=mech.factor, value=value,
-                    inputs={}, addresses=(),
-                    children=(self._mechanism(mech, value, base),))
+                    inputs={}, addresses=(), children=children)
 
     def _mechanism(self, mech: Mechanism, value: float,
                    base: _Day) -> Node:
@@ -534,7 +660,7 @@ class Explanation:
         fork, = self._opened.fork(1)
         if patches:
             noise.patch_draws(fork, patches)
-        _replay_inputs(fork, self._inputs, self.day)
+        _replay_inputs(fork, self._inputs, self._label)
         measured = self._measure(fork)
         self._runs[key] = measured
         return measured
@@ -545,7 +671,7 @@ class Explanation:
         previous_close = _column(self._opened, "price")[i]
         close = _column(fork, "price")[i]
         move = math.log(close / previous_close)
-        table = _table(fork.truth(day=self.day))
+        table = _table(fork.truth(day=self._label))
         ids = table["instrument_id"]
         rows = [k for k in range(len(ids)) if ids[k] == i]
         factors = {name: math.fsum(table[name][k] for k in rows)
@@ -582,7 +708,9 @@ class Explanation:
                  if isinstance(value, (int, float))}
         for name in _STATE_FIELDS:
             state[name] = _column(self._opened, name)[i]
-        return _Day(move=move, factors=factors, state=state, levels=levels)
+        depth = _depth(fork, self._label, i, anchor=move - factors["book"])
+        return _Day(move=move, factors=factors, state=state, levels=levels,
+                    depth=depth)
 
     def replay(self, node: Node) -> float:
         """Run the day again under ``node``'s draws and read it back.
@@ -615,7 +743,7 @@ class Explanation:
         """
         path, _ = self._locate(node)
         measured = self._run(self._patches(node))
-        return _value_of(self._target(path), measured)
+        return self._value_of(self._target(path), measured)
 
     def check(self) -> list[str]:
         """Replay every node, and report what did not come back.
@@ -635,7 +763,7 @@ class Explanation:
                 f"{total!r} against a move of {self.move!r}, a residual of "
                 f"{residual!r}, over a tolerance of {TOLERANCE!r}")
         for path, node, _ in self._walk:
-            expected = _value_of(self._target(path), self._base)
+            expected = self._value_of(self._target(path), self._base)
             got = self.replay(node)
             if abs(got - expected) > TOLERANCE:
                 misses.append(
@@ -667,19 +795,29 @@ class Explanation:
             "replay takes a node reached from .root of this object.")
 
     def _target(self, path: str) -> Node:
-        """The contribution a node's replay reports.
+        """The quantity a node's replay reports.
 
-        The nearest enclosing ``move`` or ``factor`` node, the node
-        itself where it is one. A ``mechanism``, ``state`` or ``draw``
-        node is not a quantity the engine recomputes on its own, so a
-        replay of one reports the contribution it sits under.
+        The nearest enclosing node the day recomputes on its own: the
+        move, a contribution, or one of the three readings the print
+        table splits the book contribution into. A plain ``mechanism``
+        node carries its contribution's value, and ``state`` and ``draw``
+        nodes are not quantities the engine recomputes, so a replay of
+        one reports what it sits under.
         """
         while path:
             node = self._by_path[path]
-            if node.kind in ("move", "factor"):
+            if node.kind in ("move", "factor") or \
+                    id(node) in self._depth_nodes:
                 return node
             path = path.rsplit(".", 1)[0] if "." in path else ""
         return self.root
+
+    def _value_of(self, target: Node, day: _Day) -> float:
+        """What ``target`` states, read off one run of the day."""
+        if target.kind == "move":
+            return day.move
+        key = self._depth_nodes.get(id(target))
+        return day.depth[key] if key else day.factors[target.name]
 
     def _patches(self, node: Node) -> tuple[Patch, ...]:
         """The overlay a replay of ``node`` installs.
@@ -712,6 +850,27 @@ class Explanation:
             "Every number here was measured by running day "
             f"{self.day} again from the copy taken before it opened, under "
             f"the {len(self._inputs)} inputs the run log holds for it.")
+        if self._roster_moved:
+            out.append(
+                f"The roster held {_count(len(self._roster), 'name')} when "
+                f"this day opened and holds {len(self._engine.tickers)} now, "
+                f"so {self.ticker} is read at the slot it had on the day "
+                "rather than the slot it has now. A tape row older than the "
+                "change carries the older slots too.")
+        if self._label != self.day:
+            out.append(
+                f"The run recorded this day under day {self._label} while "
+                f"the engine opened it as day {self.day}, so the tape is "
+                f"read at {self._label} and the tree is the day the store "
+                f"kept as {self.day}. Both paths the library drives pass "
+                "one number to both.")
+        if getattr(self, "_previous_moved", False):
+            out.append(
+                f"The tape holds a different number of names on day "
+                f"{self._label - 1} than on day {self._label}, so the "
+                "previous close's levels sit at slots that name other "
+                "companies and the valuation is not separated from the "
+                "book.")
         silent = [m.factor for m in MECHANISMS if not m.sites]
         blind = [m.factor for m in MECHANISMS
                  if m.sites and not any(child.kind == "draw" for child
@@ -762,17 +921,29 @@ class Explanation:
             "The jump a day carries was drawn at the close before it, so "
             f"the jump node's addresses are day {jump}'s and a window that "
             "starts at this day still reaches them.")
-        if hasattr(Engine, "prints"):
+        if self._base.depth:
+            three = math.fsum(self._base.depth[name] for name, _ in DEPTH)
+            book = self._base.factors["book"]
             out.append(
-                "The book contribution carries the order book and the "
-                "second circuit breaker together; Engine.prints() separates "
-                "them per print, as absorbed and clamp.")
+                "The book contribution splits three ways under it, from "
+                f"Engine.prints(): the order book's own share, the second "
+                "circuit breaker's, and what the model price picks up by "
+                "being measured from the last print rather than from the "
+                "anchor. Each is a sum over the day's prints and the "
+                "parent is the change in one distance across the day, so "
+                f"they are three readings that add to it ({three!r} "
+                f"against {book!r}) rather than a division of it.")
         else:
             out.append(
                 "This build has no Engine.prints(), so the book "
                 "contribution is one number for the day and is not "
                 "decomposed into the order book's share and the circuit "
                 "breaker's.")
+        if self._base.depth and self._base.depth["circuit_breaker_two"] == 0.0:
+            out.append(
+                "The second circuit breaker did not bind on any print of "
+                "this day, so its share is exactly zero and the order "
+                "book's share is the whole of the absorption.")
         out.append(
             "It measures where the move came from. It does not measure "
             "what the move would have been without a draw, which needs an "
@@ -865,10 +1036,12 @@ def _logged_draws(engine: Engine, day: int
     day carries was drawn at that close. The second return is the streams
     that delivered a logged draw, which is what the caveats report as on.
 
-    Only the streams :data:`_STREAMS` names are read, because the log of
-    one of them is the size of the tape: the market stream takes 613
-    draws per tick at a hundred names, and fetching the four the tree
-    cannot address would add to what a call holds for nothing.
+    Only the streams :data:`_STREAMS` names are read. The four the tree
+    cannot address are cheap rather than costly: on day 1 at a hundred
+    names they hold 111 draws against the three read streams' 239,472, so
+    skipping them saves 0.05 per cent of what a call holds. They are
+    skipped because nothing here can address them, and the caveats
+    report silence over the streams a contribution names.
     """
     out: dict[tuple[str, int], tuple] = {}
     traced: set[str] = set()
@@ -903,6 +1076,36 @@ def _recorded_factors(engine: Engine, day: int,
         return None
     return {name: math.fsum(table[name][k] for k in rows)
             for name in Engine.FACTORS}
+
+
+def _depth(engine: Engine, day: int, index: int,
+           *, anchor: float) -> dict[str, float]:
+    """The book contribution's three readings, off one day's prints.
+
+    Empty on a build without ``Engine.prints()``, which is what makes the
+    child appear when P2 lands rather than on an edit here. ``anchor`` is
+    the anchor's own move over the day, which is every contribution but
+    the book, and the third reading is the summed shock measured against
+    it rather than taken as a remainder.
+    """
+    if not hasattr(engine, "prints"):
+        return {}
+    try:
+        table = _table(engine.prints(day=int(day)))
+    except ValidationError:  # pragma: no cover - the fork records the day
+        return {}
+    ids = table["instrument_id"]
+    rows = [k for k in range(len(ids)) if ids[k] == index]
+    if not rows:  # pragma: no cover - a name with no prints on the day
+        return {}
+    absorbed = math.fsum(table["absorbed"][k] for k in rows)
+    clamp = math.fsum(table["clamp"][k] for k in rows)
+    shock = math.fsum(table["shock"][k] for k in rows)
+    return {"order_book": absorbed - clamp,
+            "circuit_breaker_two": clamp,
+            "anchor_pull": shock - anchor,
+            "shock": shock,
+            "absorbed": absorbed}
 
 
 def _recorded_close(engine: Engine, day: int, index: int) -> float | None:
@@ -1023,10 +1226,7 @@ def _addresses(node: Node) -> tuple[DrawAddress, ...]:
     return tuple(out)
 
 
-def _value_of(target: Node, day: _Day) -> float:
-    if target.kind == "move":
-        return day.move
-    return day.factors[target.name]
+
 
 
 def _row(path: str, node: Node, parent: Node | None) -> dict:

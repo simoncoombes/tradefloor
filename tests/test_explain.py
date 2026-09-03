@@ -235,9 +235,11 @@ def test_a_check_costs_one_day_run_per_distinct_overlay():
     A replay is a function of its patch set, so nodes whose draws are the
     same share one run: the eleven contributions and their mechanisms
     collapse onto the overlays their draw nodes make, and every node with
-    no draw under it shares the empty one. Fifteen distinct overlays over
-    53 nodes, and neither number moves with the roster, which is what
-    makes the cost readable without a stopwatch on a shared machine.
+    no draw under it shares the empty one. Fifteen distinct overlays,
+    and the count does not move with the roster, which is what makes the
+    cost readable without a stopwatch on a shared machine. The tree is 55
+    nodes where the print table splits the book contribution and 53 where
+    the build has no print table.
     """
     for size in (8, 12):
         roster = tf.Universe.random(size, seed=ROSTER_SEED)
@@ -247,7 +249,7 @@ def test_a_check_costs_one_day_run_per_distinct_overlay():
         result = e.explain(e.tickers[0], 1)
         assert result.check() == []
         assert len(result._runs) == 15, size
-        assert len(result._walk) == 53, size
+        assert len(result._walk) == (55 if HAS_PRINTS else 53), size
         assert len(ex._addresses(result.root)) == 2736, size
 
 
@@ -255,10 +257,17 @@ def test_a_leaf_replays_to_its_parent():
     _, result = one()
     leaves = [(path, node) for path, node, _ in result._walk
               if node.kind == "draw"]
-    assert len(leaves) >= 7, [path for path, _ in leaves]
+    assert [name for _, name in
+            ((n, n.name) for _, n in leaves)] == [
+        "news_u", "news_z", "market_factor_z", "sector_z",
+        "factor_idio_z", "jump_market_u", "jump_market_z",
+        "jump_company_u", "jump_company_z", "settle_u"]
     for path, leaf in leaves:
         parent = result._by_path[path.rsplit(".", 1)[0]]
         assert parent.kind == "mechanism"
+        # Its own parent, including where the print table splits the book
+        # contribution and the settlement's leaf sits under the order
+        # book's share rather than under the contribution.
         assert result.replay(leaf) == pytest.approx(parent.value,
                                                     abs=ex.TOLERANCE)
 
@@ -440,10 +449,15 @@ def test_an_inverted_window_is_refused():
         e.keep_explanations(5, 2)
 
 
-def test_an_unknown_ticker_is_refused_with_the_roster():
+def test_an_unknown_ticker_is_refused_with_the_roster_the_day_had():
     e = engine()
-    with pytest.raises(ValidationError, match=r"^'NOPE' is not in this"):
+    with pytest.raises(ValidationError,
+                       match=r"^'NOPE' was not on the roster when day 1"):
         e.explain("NOPE", 1)
+    # And with the roster the ENGINE has, on a day that was never kept,
+    # since there is no copy to read a roster off.
+    with pytest.raises(ValidationError, match=r"^'NOPE' is not in this"):
+        e.explain("NOPE", 3)
 
 
 # --------------------------------------------------------------------------
@@ -711,6 +725,300 @@ def test_a_roster_edit_inside_the_day_is_refused_by_name():
 
 
 # --------------------------------------------------------------------------
+# The depth reading under the book contribution
+# --------------------------------------------------------------------------
+
+HAS_PRINTS = hasattr(tf.Engine, "prints")
+needs_prints = pytest.mark.skipif(
+    not HAS_PRINTS, reason="Engine.prints() is not on this build")
+
+
+def prints_for(e, day, index):
+    table = pa.table(e.prints(day=day)).to_pydict()
+    rows = rows_for(table, index)
+    return {name: math.fsum(table[name][k] for k in rows)
+            for name in ("shock", "absorbed", "clamp")}, table, rows
+
+
+def test_the_book_splits_exactly_when_the_build_has_prints():
+    # The branch is decided by the build, not by an edit here, so the
+    # test states whichever one this build is and cannot pass vacuously.
+    _, result = one()
+    book = next(child for child in result.root.children
+                if child.name == "book")
+    names = [child.name for child in book.children]
+    if HAS_PRINTS:
+        assert names == [function for _, function in ex.DEPTH]
+        assert all(child.kind == "mechanism" for child in book.children)
+    else:
+        assert names == ["microstructure::settle_price_through_book"]
+
+
+@needs_prints
+def test_the_three_readings_add_to_the_book_contribution():
+    """The identity, measured across days, seeds, presets and rosters.
+
+    Each reading is computed on its own: the order book's share is summed
+    absorbed less summed clamp, the breaker's is summed clamp, and the
+    third is summed shock measured against the anchor's own move rather
+    than taken as what the other two leave over.
+
+    This test and the telescoping one below are ONE claim seen twice. The
+    identity reduces to summed shock plus summed absorbed equalling the
+    move, so the two fail together; the other is kept because it stands
+    on prints() alone with no reference to this tree.
+    """
+    worst = 0.0
+    # The tight band is here because clamp is exactly 0.0 on every
+    # shipped preset, so on those the order book's share and the whole
+    # absorption are the same number and a reading that dropped the
+    # breaker would add up anyway.
+    tight = tf.ModelParams.from_preset(PRESET, price_breaker_fraction=0.0005)
+    clamped = 0
+    for preset in (PRESET, "pt-v8", tight):
+        for seed in (1, ENGINE_SEED, 909):
+            for size in (6, 12):
+                roster = tf.Universe.random(size, seed=ROSTER_SEED)
+                e = tf.Engine(seed=seed, universe=roster, model=preset)
+                e.keep_explanations(1, 3)
+                e.run_days(5, record=True)
+                for day in (1, 2, 3):
+                    result = e.explain(e.tickers[0], day)
+                    book = {c.name: c.value
+                            for c in result.root.children}["book"]
+                    children = next(c for c in result.root.children
+                                    if c.name == "book").children
+                    three = math.fsum(child.value for child in children)
+                    worst = max(worst, abs(book - three))
+                    clamped += children[1].value != 0.0
+    assert worst < ex.TOLERANCE, worst
+    assert clamped, "the breaker never bound, so the clamp is untested here"
+    # Float rounding rather than an identity that happens to hold: a
+    # remainder would give exactly zero on every one of the 36.
+    assert worst > 0.0
+
+
+@needs_prints
+def test_the_four_correspondences_the_identity_rests_on():
+    """The claims that bind, since the sum is exact by construction.
+
+    book is the move less the anchor's move, and shock plus absorbed
+    telescopes to the move, so the three adding to book is arithmetic.
+    What can actually fail is the alignment between P2's table and this
+    tree, and each of the four is asserted on its own so a failure names
+    which one broke.
+    """
+    e, result = one()
+    day, i = result._label, result._index
+    sums, table, rows = prints_for(e, day, i)
+    truth = pa.table(e.truth(day=day)).to_pydict()
+    trows = rows_for(truth, i)
+
+    # 1. the print table's model price is the tape's anchor, per tick
+    assert len(rows) == len(trows)
+    assert max(abs(table["model_price"][a] - truth["anchor_price"][b])
+               for a, b in zip(rows, trows)) == 0.0
+
+    # 2. the print before the day's first tick is the previous close
+    first = rows[0]
+    implied = table["print"][first] / math.exp(
+        table["shock"][first] + table["absorbed"][first])
+    assert implied == pytest.approx(
+        result.root.inputs["previous_close"], abs=1e-9)
+
+    # 3. the anchor at that point is the previous day's closing anchor
+    before = pa.table(e.truth(day=day - 1)).to_pydict()
+    brows = rows_for(before, i)
+    assert result._previous["anchor_price"] == \
+        before["anchor_price"][brows[-1]]
+
+    # 4. shock and absorbed telescope over the day to the printed move
+    assert sums["shock"] + sums["absorbed"] == pytest.approx(
+        result.move, abs=ex.TOLERANCE)
+
+
+@needs_prints
+def test_the_breakers_share_is_non_zero_exactly_where_it_binds():
+    """clamp is zero on a day the second breaker left alone.
+
+    The day is found by narrowing the band until one binds rather than by
+    naming a day a preset change could move, and the same run at the
+    shipped band is the control.
+    """
+    roster = tf.Universe.random(ROSTER_SIZE, seed=ROSTER_SEED)
+    tight = tf.ModelParams.from_preset(PRESET, price_breaker_fraction=0.0005)
+    bound, loose = [], []
+    for model, into in ((tight, bound), (PRESET, loose)):
+        e = tf.Engine(seed=ENGINE_SEED, universe=roster, model=model)
+        e.keep_explanations(1, 3)
+        e.run_days(5, record=True)
+        for day in (1, 2, 3):
+            result = e.explain(e.tickers[0], day)
+            book = next(c for c in result.root.children if c.name == "book")
+            share = {name: child.value for (name, _), child
+                     in zip(ex.DEPTH, book.children)}
+            into.append(share["circuit_breaker_two"])
+            assert result.check() == [], (model, day)
+    assert any(v != 0.0 for v in bound), bound
+    assert all(v == 0.0 for v in loose), loose
+    # And the caveat says so on the day it did not bind, and not on one
+    # where it did.
+    e = tf.Engine(seed=ENGINE_SEED, universe=roster, model=tight)
+    e.keep_explanations(1, 1)
+    e.run_days(3, record=True)
+    tightest = e.explain(e.tickers[0], 1)
+    quiet = one()[1]
+    assert any("did not bind" in c for c in quiet.caveats)
+    if next(c for c in tightest.root.children
+            if c.name == "book").children[1].value != 0.0:
+        assert not any("did not bind" in c for c in tightest.caveats)
+
+
+@needs_prints
+def test_the_replayed_print_table_matches_the_one_the_run_recorded():
+    """The split's numbers against the run's own print table.
+
+    It does not show WHICH table the split read, and cannot: the two
+    agree, so swapping the source changes nothing. What it shows is the
+    agreement, which is the same family of claim as check()'s comparison
+    of the nine columns and the close, and check() reports a mismatch in
+    the same place.
+    """
+    e, result = one()
+    assert result._base.depth
+    sums, _, _ = prints_for(e, result._label, result._index)
+    assert result._base.depth["absorbed"] == pytest.approx(
+        sums["absorbed"], abs=1e-15)
+    assert result._base.depth["shock"] == pytest.approx(
+        sums["shock"], abs=1e-15)
+    assert result.check() == []
+
+
+# --------------------------------------------------------------------------
+# The roster and the label the day was recorded under
+# --------------------------------------------------------------------------
+
+
+def delisted(delist=True, size=6):
+    """A run that delists its first name half way, and the same run
+    without the delisting, so the two can be compared name by name."""
+    roster = tf.Universe.random(size, seed=ROSTER_SEED)
+    e = tf.Engine(seed=ENGINE_SEED, universe=roster, model=PRESET)
+    e.keep_explanations(0, 3)
+    e.run_days(2, record=True)
+    if delist:
+        e.delist(0)
+        e.run_days(2, record=True, first_day=2)
+    return e
+
+
+def contributions(result):
+    return {child.name: child.value for child in result.root.children}
+
+
+def test_a_delisting_does_not_move_which_name_a_day_explains():
+    """The slot a name sits at is the slot it sat at on the day.
+
+    A delisting shifts every slot below it, and a name resolved against
+    the roster as it is now addresses another company in a day kept
+    before the change: the state columns, the tape's instrument_id
+    filter, the previous close and the company tag on the draws all
+    follow that one index. Every claim check() makes agrees with the
+    others in that state, because all four are wrong the same way.
+
+    Stated against the DELISTED name rather than only for the right one,
+    since asserting the tree equals the right name's is the same test
+    written so it cannot fail by accident.
+    """
+    moved, clean = delisted(), delisted(delist=False)
+    for day in (0, 1):
+        after = contributions(moved.explain("AAB", day))
+        assert after == contributions(clean.explain("AAB", day)), day
+        assert after != contributions(clean.explain("AAA", day)), day
+        assert moved.explain("AAB", day).check() == [], day
+    # And the name that WAS delisted still explains on a day it traded,
+    # because the copy that day was kept from still carries it.
+    assert "AAA" not in moved.tickers
+    assert contributions(moved.explain("AAA", 0)) == \
+        contributions(clean.explain("AAA", 0))
+    assert moved.explain("AAA", 0).check() == []
+
+
+def test_a_moved_roster_is_named_in_the_caveats():
+    moved = delisted()
+    result = moved.explain("AAB", 0)
+    assert result._roster_moved is True
+    assert result._index == 1
+    line = next(c for c in result.caveats if "roster held" in c)
+    assert "6 names" in line and "holds 5 now" in line
+    # And says nothing of the sort where the roster held still.
+    assert not any("roster held" in c
+                   for c in delisted(delist=False).explain("AAB", 0).caveats)
+
+
+def test_a_name_listed_after_the_day_is_refused_by_name():
+    roster = tf.Universe.random(6, seed=ROSTER_SEED)
+    e = tf.Engine(seed=ENGINE_SEED, universe=roster, model=PRESET)
+    e.keep_explanations(0, 3)
+    e.run_days(2, record=True)
+    e.list_instrument(tf.Instrument("ZZZ", "technology", initial_price=50.0,
+                                    shares_outstanding=1e6))
+    e.run_days(2, record=True, first_day=2)
+    assert "ZZZ" in e.tickers
+    with pytest.raises(ValidationError,
+                       match=r"^'ZZZ' was not on the roster when day 0"):
+        e.explain("ZZZ", 0)
+    # It explains on a day it was there for.
+    assert e.explain("ZZZ", 2).check() == []
+
+
+def labelled(labels, keep=(1, 1), size=6):
+    """A hand loop that closes through the session and records after it,
+    under labels of its own choosing rather than the engine's counter."""
+    roster = tf.Universe.random(size, seed=ROSTER_SEED)
+    e = tf.Engine(seed=ENGINE_SEED, universe=roster, model=PRESET)
+    e.keep_explanations(*keep)
+    for label in labels:
+        e.open_market()
+        e.run_session(9, 30, 3, 390, close_at_end=True)
+        e.record(label)
+    return e
+
+
+def test_a_day_closed_through_the_session_keeps_its_record():
+    # The day is open, session, record, and the close is inside the
+    # session. Stopping the day's inputs at the close dropped the record
+    # out of it, and the label the record carries is what the tape keys
+    # this day's rows by.
+    e = labelled([0, 1, 2])
+    result = e.explain(e.tickers[0], 1)
+    assert [entry["op"] for entry in result._inputs] == [
+        "open_market", "run_session", "record"]
+    assert result._label == 1
+    assert result.check() == []
+
+
+def test_a_tape_label_that_is_not_the_engines_day_is_read_and_named():
+    """The tape is keyed by the label, and the store by the engine's day.
+
+    Every path the library drives passes one number to both. A hand loop
+    can pass anything, and reading the tape at the store's key then
+    compares this day's replay against another day's rows: four column
+    misses and a close miss, all blaming the replay.
+    """
+    e = labelled([1, 2, 3])
+    result = e.explain(e.tickers[0], 1)
+    assert result._label == 2 and result.day == 1
+    assert result.check() == []
+    line = next(c for c in result.caveats if "recorded this day under" in c)
+    assert "day 2" in line and "day 1" in line
+    # The same run under labels that agree says nothing about it.
+    assert not any("recorded this day under" in c
+                   for c in labelled([0, 1, 2]).explain(
+                       e.tickers[0], 1).caveats)
+
+
+# --------------------------------------------------------------------------
 # A world, and a cohort, feed the store
 # --------------------------------------------------------------------------
 
@@ -738,7 +1046,9 @@ def test_a_world_run_feeds_the_store_and_the_day_replays():
     # order_flow_impact at zero and the sum would miss the move.
     w = world(agent=Buyer())
     result = w.engine.explain(w.engine.tickers[0], 1)
-    assert len(result._inputs) >= 8, [e["op"] for e in result._inputs]
+    assert [e["op"] for e in result._inputs] == (
+        ["open_market"] + ["run_session"] * 6
+        + ["record", "close_market"])
     flow = next(child for child in result.root.children
                 if child.name == "order_flow_impact")
     assert flow.value != 0.0
@@ -1007,8 +1317,9 @@ def test_render_names_the_counterfactual_it_cannot_do():
 def test_render_says_the_book_is_not_split_without_the_print_table():
     _, result = one()
     text = result.render()
-    if hasattr(tf.Engine, "prints"):
-        assert "absorbed and clamp" in text
+    if HAS_PRINTS:
+        assert "splits three ways under it" in text
+        assert "three readings that add to it" in text
     else:
         assert "no Engine.prints()" in text
 
@@ -1020,7 +1331,10 @@ def test_render_says_the_book_is_not_split_without_the_print_table():
 
 def test_the_caveats_are_computed_from_the_call():
     _, result = one()
-    assert any(str(len(result._inputs)) in c for c in result.caveats)
+    # The whole clause, not the bare digit: several caveats carry day
+    # numbers, so `4 in any caveat` passes on almost any tree.
+    assert any(f"the {len(result._inputs)} inputs the run log holds"
+               in c for c in result.caveats), result.caveats
     assert any("day 0's" in c for c in result.caveats)
     other = one(day=2)[1]
     assert any("day 1's" in c for c in other.caveats)
@@ -1132,7 +1446,7 @@ def test_the_mcp_tool_returns_a_checked_tree():
     out = mcp.explain(universe_size=8, day=1)
     assert out["ok"] is True
     assert out["checked"]["misses"] == []
-    assert out["checked"]["nodes"] > 30
+    assert out["checked"]["nodes"] == (55 if HAS_PRINTS else 53)
     assert [c["name"] for c in out["tree"]["children"]] == list(ex.FACTORS)
     total = math.fsum(c["value"] for c in out["tree"]["children"])
     assert abs(out["move"] - total) < ex.TOLERANCE
