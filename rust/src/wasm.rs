@@ -670,14 +670,29 @@ mod tests {
         // string being searched for and would make the check pass on
         // itself. The first version of this test did exactly that and
         // failed on its own source, caught immediately by running it.
+        //
+        // Matches the bare function name immediately followed by `(`,
+        // with no required prefix, so a method call (`self.inner.
+        // add_company(`), a fully qualified path (`Engine::
+        // add_company(`) and a fully-crate-qualified one
+        // (`crate::engine::Engine::add_company(`) are all caught by the
+        // same substring. Review found the first version of this guard,
+        // which required a leading `.`, walked past the qualified-path
+        // form silently -- a call spelled that way already appears
+        // elsewhere in this crate (engine.rs, python_batch.rs,
+        // python_engine.rs all call `Engine::with_params` or `Engine::
+        // new` that way), so it was not a theoretical gap. This
+        // programme has hit a guard a differently-spelled call walks
+        // past silently five times before this one; the fix is to match
+        // the function name alone, not the syntax that reaches it.
         let source = include_str!("wasm.rs")
             .split("mod tests {")
             .next()
             .expect("this file has a test module");
-        assert!(!source.contains(".add_company("),
+        assert!(!source.contains("add_company("),
                 "a call to add_company appeared in this file; \
                  jumpAddress's roster-is-fixed assumption no longer holds");
-        assert!(!source.contains(".remove_company("),
+        assert!(!source.contains("remove_company("),
                 "a call to remove_company appeared in this file; \
                  jumpAddress's roster-is-fixed assumption no longer holds");
     }
