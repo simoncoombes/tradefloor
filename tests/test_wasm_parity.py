@@ -33,16 +33,20 @@ CASE = dict(size=12, universe_seed=7, seed=3, days=5, ticks=65,
 #: intended one means two builds have drifted apart, which is the thing
 #: this exists to catch.
 #:
-#: RE-RECORDED ON ONE PLATFORM ONLY. The case runs `Universe.random(12,
-#: seed=7)`, and the universe generator was reconciled so a drawn roster
-#: opens at its own fair value, which moved every generated name's earnings
-#: and book value and so moved this digest. The value below was measured on
-#: windows-x86_64 native at that commit. The wasm32-unknown-unknown build
-#: has NOT been re-run against it, so the cross-binding half of this
-#: check's claim is currently unverified rather than established, and
-#: `tools/wasm/check.mjs` carries the same value on the same footing. The
-#: predecessor, `2b2f314181bde90a9ccabbc8232b03cba2e04221bee85501ffc78ae042cfd8f5`,
-#: was measured on macos-arm64 and node on 2026-08-24 and agreed exactly.
+#: Re-recorded because its input moved, and re-established on both
+#: surfaces rather than asserted from one. The case runs
+#: `Universe.random(12, seed=7)`, and the universe generator was reconciled
+#: so a drawn roster opens at its own fair value, which moved every
+#: generated name's earnings and book value and so moved this digest.
+#:
+#: Measured on windows-x86_64 native AND on wasm32-unknown-unknown through
+#: node, wasm-bindgen 0.2.127, identical. `tools/wasm/build.sh` prints both
+#: sides and `tools/wasm/check.mjs` compares them, and it reports
+#: bit-identical. The predecessor,
+#: `2b2f314181bde90a9ccabbc8232b03cba2e04221bee85501ffc78ae042cfd8f5`, was
+#: measured on macos-arm64 and node on 2026-08-24 and agreed exactly, so
+#: this pin has now been established on three host targets across two
+#: values of it.
 EXPECTED = "1c5acabf07692228c840518b51240abe0e379fdd5272b9a4575206e8f93159ea"
 
 

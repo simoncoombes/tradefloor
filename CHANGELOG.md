@@ -2,10 +2,9 @@
 
 ## Unreleased
 
-**A generated roster opens at its own fair value.** Every `Universe.random`
-roster re-rolls; pin 0.6.2 to reproduce one.
+**Every `Universe.random` roster re-rolls**; pin 0.6.2.
 
-**The panel reports the index drift**, ungraded for want of a band.
+**The panel reports index drift**, ungraded.
 
 **A run can commit to the state it held at the end of every day**, and a
 sampled check verifies k days for the cost of k days.
@@ -35,6 +34,9 @@ checked for its draw effect and proven inert at its default doses.
 
 **A day's move decomposes to the draws that seeded it**, and every node
 of the tree replays from the state the day started in.
+
+**The browser build compiles again**, after a leftover file path from
+an old rename broke it outright.
 
 <!-- release-note-ends -->
 
@@ -602,6 +604,18 @@ median share of -1.002 in both, and the mean distance from the model price
 to the print was 23.3 and 34.7 basis points. The crisis changes how often
 the book runs out rather than how far a print goes when it does. The arms
 are the same arms, and their exposure numbers are unchanged.
+
+### The browser build
+
+`tools/wasm/build.sh` and `check.mjs` still built and checked against
+`pretium.wasm` and `pretium.js` after 27223f2 renamed the crate to
+`tradefloor`, so the wasm32 build failed outright: `wasm-bindgen` had
+nothing at the path it was told to read. Fixed to `tradefloor.wasm`
+and `tradefloor.js` in both files.
+
+`check.mjs`'s one check, comparing the browser build's
+`fixed_simulation_digest` against the native one, is otherwise
+unchanged, and passes again now that the build reaches it.
 
 
 ## 0.6.2
