@@ -54,11 +54,17 @@ superseded figures beside them are marked with the era they belonged to.
 that a drawn roster opens at its own fair value rather than above it, which
 changed every generated name's earnings and book value, and
 `Universe.random(40, seed=111)` now fingerprints 9be68b9bc37e7978. Every
-figure below, `SEED_SD`, `SEED_SD_504` and the `envelope` module's measured
-tables were all taken on the roster the OLD generator produced, and none of
-them has been re-measured. They are stale, and the stale figures are kept
-rather than quietly swapped, because a figure carrying a fingerprint it was
-not measured under is the defect this module corrected once already.
+figure below, `SEED_SD_504` and the `envelope` module's measured tables were
+taken on the roster the OLD generator produced and have not been
+re-measured. They are stale, and the stale figures are kept rather than
+quietly swapped, because a figure carrying a fingerprint it was not measured
+under is the defect this module corrected once already.
+
+`SEED_SD` is the exception and has been re-measured on the current roster,
+which `SEED_SD_PROVENANCE` records. It reads that roster from a committed
+fixture rather than from the generator, so it no longer moves when the
+generator does, and the fourteen scales shift by -6.02 to +5.22 per cent
+against their superseded values.
 
 How stale, measured rather than guessed: over seeds 101 to 110 at 252 days
 on pt-v16, the fourteen graded medians move by at most 0.26 of their own
@@ -691,30 +697,30 @@ REAL_MARKETS_PROVENANCE = {
 #: `tradefloor.loss.seed_sd_from_panels` remains the estimator, and the loss
 #: takes a replacement as a parameter rather than requiring an edit here.
 SEED_SD = {
-    "annualised_vol_pct": 6.46066,
-    "excess_kurtosis": 1.17181,
-    "return_acf1": 0.0532019,
-    "abs_return_acf1": 0.0945748,
-    "abs_return_acf5": 0.0550538,
-    "abs_return_acf20": 0.0466668,
-    "cross_sectional_corr": 0.10875,
-    "volume_abs_return_corr": 0.0433524,
-    "leverage_effect": 0.0759765,
-    "volume_change_acf1": 0.0102341,
-    # Added 2026-08-25 on the SAME protocol as the rest of this table: pt-v1,
-    # Universe.random(40, seed=111), 252 days, seeds 101-130, sample sd. Not
-    # pt-v3, deliberately: this table is the frozen denominator of every
-    # "seed-sd out" figure the project has published, re-derived from the
-    # committed per-seed table in tests/test_loss.py. A first draft
-    # measured these three on pt-v3 with the population estimator and was
-    # caught by that test; the pt-v3 values (0.1435, 0.1451, 0.0071) are
-    # recorded in the calibration record beside the certification medians.
-    "corr_asymmetry": 0.1614765,
-    "corr_asymmetry_lagged": 0.1178216,
-    "sector_excess_corr": 0.0068036,
-    # 2026-08-25, same protocol. The largest seed sd of any correlation-type
-    # statistic: a twelve-point acf1 per seed. See CALIBRATION-FOLLOWUPS.md §64.
-    "corr_persistence_acf1": 0.2789932,
+    "annualised_vol_pct": 6.45368,
+    "excess_kurtosis": 1.17811,
+    "return_acf1": 0.0525798,
+    "abs_return_acf1": 0.0955416,
+    "abs_return_acf5": 0.0567399,
+    "abs_return_acf20": 0.0467066,
+    "cross_sectional_corr": 0.108444,
+    "volume_abs_return_corr": 0.0415843,
+    "leverage_effect": 0.0769232,
+    "volume_change_acf1": 0.0107678,
+    # These four joined the table on 2026-08-25 on the same protocol as the
+    # rest of it. A first draft measured three of them on pt-v3 with the
+    # population estimator and was caught by the test that re-derives this
+    # table; the pt-v3 values (0.1435, 0.1451, 0.0071) are recorded in the
+    # calibration record beside the certification medians. pt-v1 is
+    # deliberate: this table is the frozen denominator of every "seed-sd
+    # out" figure the project publishes, so it stays at the baseline preset
+    # rather than moving with each era.
+    "corr_asymmetry": 0.163194,
+    "corr_asymmetry_lagged": 0.115927,
+    "sector_excess_corr": 0.0063937,
+    # The largest seed sd of any correlation-type statistic: a twelve-point
+    # acf1 per seed. See CALIBRATION-FOLLOWUPS.md section 64.
+    "corr_persistence_acf1": 0.279423,
 }
 
 #: Real-market bands re-derived at a 504-DAY measurement window.
@@ -794,32 +800,63 @@ SEED_SD_504_PROVENANCE = {
 #: Where SEED_SD's values come from, carried as data so any consumer -- the
 #: loss report, a calibration manifest -- can quote it rather than assert it.
 SEED_SD_PROVENANCE = {
-    "source": "re-measured on the shipped preset: facts.measure() on "
-              "Universe.random(40, seed=111), 252 days, seeds 101-130, "
+    "source": "re-measured on the shipped baseline preset: facts.measure() "
+              "on the committed panel roster, 252 days, seeds 101-130, "
               "sample sd across seeds",
-    "date": "2026-08-22",
+    "date": "2026-09-03",
     "model_fingerprint": "pt-v1",
-    "universe_fingerprint": "5d8de78b55aad752307740018791"
-                            "54c0f29aa8fc0c63f3c6a4ac791165ca7380",
+    "universe_fingerprint": "9be68b9bc37e79785765df2f395a9348"
+                            "650a4e9293507680532293fdf78808dd",
     "days": 252,
     "seeds": tuple(range(101, 131)),
     "estimator": "sample standard deviation (n - 1) across seeds",
-    "cross_check": "agrees to six significant figures with the seed_sd of "
-                   "tools/calibration/results/"
-                   "jacobian-pt-v1-2026-08-22-chunk1.json, measured "
-                   "independently by the phase-2 instrument on the same "
-                   "thirty seeds",
+    "roster_note": "the roster is read from tests/fixtures/"
+                   "panel-roster-40.json rather than drawn by "
+                   "Universe.random, so this table no longer moves when the "
+                   "generator does. It moved once for that reason: the "
+                   "generator was reconciled so a drawn roster opens at its "
+                   "own fair value, every roster re-rolled, and all fourteen "
+                   "values went stale on a change that touched no "
+                   "coefficient and no estimator.",
     "pinned_by": "tests/test_loss.py re-measures two of the thirty seeds "
                  "live and re-derives the sd from the committed per-seed "
                  "table",
-    # The roster above is no longer the one that call returns. Recorded as
-    # data beside the fingerprint it supersedes, so a consumer quoting this
-    # provenance quotes the discrepancy with it rather than presenting a
-    # measurement under a roster it was not taken on.
-    "roster_superseded": "Universe.random(40, seed=111) now fingerprints "
-                         "9be68b9bc37e7978: the generator was reconciled so "
-                         "a drawn roster opens at its own fair value. These "
-                         "values have NOT been re-measured on it.",
+    # The cross-check, written as three claims because the single sentence
+    # it replaced implied one larger one.
+    "cross_check": "the base panels of a jacobian.py run on the same "
+                   "roster, preset, horizon and seeds hold the same thirty "
+                   "panels to the bit, all 420 values",
+    "cross_check_detects": "a transcription error in a hand-maintained "
+                           "block of 420 floats, and a platform or "
+                           "interpreter difference when the two sides are "
+                           "run on different machines",
+    "cross_check_cannot_detect": "an estimator defect. Both sides call "
+                                 "facts.measure and derive the scale "
+                                 "through loss.seed_sd_from_panels, so they "
+                                 "share the estimator and cannot disagree "
+                                 "about it. A genuinely independent check "
+                                 "would be a second estimator written "
+                                 "against the recorded bars, which does not "
+                                 "exist.",
+    # A tighter agreement here is agreeing about LESS than the looser one it
+    # replaced, and the difference is worth stating so nobody reads it the
+    # other way.
+    "cross_check_caveat": "this pair is bit-exact and single-platform. The "
+                          "pair it replaces agreed to six significant "
+                          "figures and spanned two platforms, macOS arm64 "
+                          "under CPython 3.11.15 against a table measured "
+                          "elsewhere, so it also carried evidence about "
+                          "portability that this one does not. The market "
+                          "is bit-reproducible across platforms and the "
+                          "statistics derived from it are not: the same "
+                          "panel under CPython 3.11.16 on Linux and 3.13.12 "
+                          "on Windows differs by up to 8.4e-15 relative on "
+                          "excess kurtosis while all three known-answer "
+                          "digests match.",
+    "companion_not_re_measured": "SEED_SD_504 and the envelope module's "
+                                 "measured tables were taken on the "
+                                 "superseded roster and have not been "
+                                 "re-measured on this one.",
 }
 
 #: The first two are MARGINAL: properties of one series taken on its own. The
