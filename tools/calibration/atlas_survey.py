@@ -188,6 +188,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # total intervention, and past 1.0 the two branches would cross and the
     # rule would push oil DOWN on net, which is the asymmetry inverted.
     "oil_opec_symmetry": (0.0, 1.0),
+    # How much of the jump's own drift is given back. 0.0 is the
+    # uncompensated process, 1.0 is the martingale, and past 1.0 the
+    # compensator exceeds the drift and the jump pushes the other way.
+    "jump_mean_compensated": (0.0, 1.0),
     # EMA days on the VIX the market variance target reads (round 99).
     # Measured dead at 3 and 10 along the driven window; 20 trading days
     # is a month of smoothing, past which the fear response is no longer

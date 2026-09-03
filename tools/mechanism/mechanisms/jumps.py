@@ -63,6 +63,13 @@ JUMPS = Mechanism(
                  "vector so the next one is not."),
         DialSpec("jump_momentum_share", 1.0,
                  "the share of a jump herding is allowed to see"),
+        DialSpec("jump_mean_compensated", 0.0,
+                 "how much of the drift the jump mean carries is given "
+                 "back. 0.0 leaves the process uncompensated, which is "
+                 "every preset before pt-v18. 1.0 subtracts the "
+                 "compensator, intensity times mean, so the jump is a "
+                 "martingale: its expectation is zero and every central "
+                 "moment, skew included, is untouched"),
     ),
     state=(
         StateSpec("economy.vix", scope="engine", doc="the VIX today",
@@ -103,13 +110,32 @@ JUMPS = Mechanism(
                          add(Dial("jump_mean_market"),
                              mul(Dial("jump_sigma_market"), Var("z_market"))),
                          Const(0.0))),
+        # The compensator. A jump whose mean is negative injects a drift of
+        # intensity times mean every day, whether or not it fires, and that
+        # drift is a first moment nobody asked the mechanism for: the mean
+        # is there for SKEW. Subtracting the compensator makes the jump a
+        # martingale, which is the standard compensated-Poisson
+        # construction and not a choice of degree. It is a deterministic
+        # offset, so it moves the first moment and leaves every central
+        # moment alone: the skew and the fat tail the jump exists to
+        # produce survive exactly.
+        #
+        # The intensity is the CONDITIONAL one, already scaled by the VIX
+        # coupling above, so the compensator tracks the arrival rate rather
+        # than assuming its day-zero value. A branch, so 0.0 is a decided
+        # zero and every preset that predates the dial is bit-identical.
+        Let("compensator", If(Bin("==", Dial("jump_mean_compensated"), Const(0.0)),
+                              Const(0.0),
+                              mul(Dial("jump_mean_compensated"),
+                                  mul(Var("intensity_market"),
+                                      Dial("jump_mean_market"))))),
         ForCompanies("index", (
             Let("u", Draw("uniform", "JumpCompanyU", Var("index"))),
             Let("z", Draw("normal", "JumpCompanyZ", Var("index"))),
             Let("idio", If(Bin("<", Var("u"), Var("intensity_idio")),
                            mul(Dial("jump_sigma_idio"), Var("z")),
                            Const(0.0))),
-            Let("total", add(Var("market"), Var("idio"))),
+            Let("total", sub(add(Var("market"), Var("idio")), Var("compensator"))),
             # Guarded rather than added: s + 0.0 is not a no-op on a
             # negative zero, and an inert mechanism leaves state it does
             # not touch bit-identical.

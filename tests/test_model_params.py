@@ -331,6 +331,10 @@ PERTURBATIONS = [
     # only every 90 days and the probe runs three, so the branch is never
     # reached and no draw it would change is taken.
     ("oil_opec_symmetry", 0.5, False),
+    # How much of the jump's drift is given back. The compensator is
+    # subtracted every day whether or not a jump fires, so unlike its two
+    # neighbours it bites on the first close.
+    ("jump_mean_compensated", 0.5, True),
     # The exponent on the VIX ratio in the market variance target. The
     # endogenous VIX leaves its anchor on day one, so the ratio is never
     # exactly 1.0 and any exponent but the shipped one moves the target.

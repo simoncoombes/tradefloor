@@ -262,6 +262,55 @@ of exactly 0.000. This is a correctness fix on a rule that was wrong, and
 it is recorded separately so that it is not mistaken for one of the terms
 that moves the number.
 
+### The compensated market jump
+
+`jump_mean_market` is negative so that crashes are larger than rallies.
+That is a real property of index returns and a legitimate thing to want.
+But a jump arriving with probability `lambda` and mean `m` contributes
+`lambda * m` to the expected return every day whether it fires or not, so
+the skew came with a drift: -0.11769 per name per year at the day-zero
+intensity, and 2.6 percentage points of annual index level. The value was
+set once in the pt-v4 era by a search whose objective could not read a
+first moment, and inherited unchanged through eleven presets. The drift was
+never chosen, because nothing the search could read would have shown it.
+
+The obvious repair is to solve for a smaller mean that buys skew without
+the drift. No such value exists. For a compound Poisson jump the drift and
+the skew are both linear in the mean, so trading one against the other is a
+matter of degree and any answer would be a fitted constant.
+
+`jump_mean_compensated` subtracts `lambda * m` instead, which is the
+standard compensated-Poisson construction and makes the jump term a
+martingale. Because the compensator is a DETERMINISTIC offset it moves the
+first moment and leaves every central moment alone, so the skew and the fat
+tail survive at the mean the calibration chose. **The mean does not move at
+all.** The defect was a missing compensator, and the value stands.
+
+`lambda` is the conditional intensity, already scaled by the VIX coupling,
+so the compensator tracks the arrival rate. The investigation measured the
+realised drift at 1.084 times the day-zero closed form for exactly that
+reason, and a compensator on the day-zero rate would have left that 8 per
+cent behind. It shows: over thirty seeds the annualised index drift
+improves from -9.871 to -7.145, a paired +2.799 by median, where switching
+the jump mean off entirely was measured at 2.621.
+
+The central moments hold, measured rather than asserted. Over six seeds the
+paired moves are -0.045 of skew, +0.066 of excess kurtosis and -0.170 of
+annualised volatility, the last two being 0.06 and 0.03 of their own
+across-seed noise. Every one of the thirty seeds improves and two of them
+now finish the year positive, which no arm of this model has done before.
+
+The panel returns to 14 of 14. The leverage effect, which sat 0.008 of its
+own seed noise outside its ceiling after the oil step, is back in band.
+
+**One thing this measurement says that the mechanism did not.** The pooled
+skew of this market is POSITIVE, at +0.12, both with the compensator and
+without it. The market jump's mean is the mechanism the model has for
+negative skew, and at the panel level the skew is the other way. That is
+recorded rather than acted on: it says the jump mean was not buying what it
+was described as buying, which is a question about the mechanism rather
+than about its drift.
+
 ### The index drift row
 
 `facts.panel_statistics` reports `index_drift_pct`, the annualised log

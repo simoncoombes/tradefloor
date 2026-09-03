@@ -660,6 +660,48 @@ pub struct ModelParams {
     /// every 90 days, so this is a small term. It is corrected because it
     /// is wrong rather than because it is large.
     pub oil_opec_symmetry: f64,
+    /// How much of the drift the market jump's mean carries is given
+    /// back. 0.0 -- every preset before pt-v18 -- is bit-identical. 1.0
+    /// subtracts the compensator and makes the jump a martingale.
+    ///
+    /// # The mean is there for skew, and it also buys a drift
+    ///
+    /// `jump_mean_market` is negative so that crashes are larger than
+    /// rallies, which is a real property of index returns and a legitimate
+    /// thing to want. But a jump that arrives with probability `lambda`
+    /// and mean `m` contributes `lambda * m` to the expected return every
+    /// day whether it fires or not, so the skew comes with a drift nobody
+    /// asked for. At pt-v16 that is -0.11769 per name per year at the
+    /// day-zero intensity, and 2.6 percentage points of annual index
+    /// level.
+    ///
+    /// The value was set once in the pt-v4 era by a search whose objective
+    /// could not read a first moment, and inherited unchanged through
+    /// eleven presets. So the drift was never chosen; it was never
+    /// visible.
+    ///
+    /// # Compensated rather than re-derived
+    ///
+    /// The obvious repair is to solve for a smaller mean that buys skew
+    /// without the drift. There is no such value: for a compound Poisson
+    /// jump the drift and the skew are both linear in the mean, so trading
+    /// one against the other is a matter of degree and any answer would be
+    /// a fitted constant.
+    ///
+    /// Subtracting `lambda * m` instead is the standard compensated-Poisson
+    /// construction. It makes the jump term a martingale, and because the
+    /// compensator is a DETERMINISTIC offset it moves the first moment and
+    /// leaves every central moment untouched. The skew and the fat tail
+    /// survive exactly, at the mean the calibration chose, and the drift
+    /// goes to zero. The mean therefore does not move at all: what was
+    /// wrong was the missing compensator and not the value.
+    ///
+    /// `lambda` is the CONDITIONAL intensity, already scaled by the VIX
+    /// coupling, so the compensator tracks the arrival rate. The
+    /// investigation measured the realised drift at 1.084 times the
+    /// day-zero closed form for exactly that reason, and a compensator on
+    /// the day-zero rate would have left that 8 per cent behind.
+    pub jump_mean_compensated: f64,
     /// Persistence of the SLOW variance component (Engle-Lee style). The
     /// market factor's variance carries two timescales from the pt-v4 era:
     /// the fast one above tracks the VIX-scaled target, this one carries
@@ -1513,6 +1555,7 @@ impl ModelParams {
             market_beta_down_asym_recentre: 0.0,
             oil_supply_response: 0.0,
             oil_opec_symmetry: 0.0,
+            jump_mean_compensated: 0.0,
             // Legacy values: the slow component is OFF, and the update
             // reduces to the single-component form bit for bit.
             market_vol_slow_persistence: 0.0,
@@ -2516,6 +2559,10 @@ impl ModelParams {
         // it pushes oil up on net. Symmetrised at the mean of its own two
         // branches, which removes the direction without choosing a side.
         p.oil_opec_symmetry = 1.0;
+        // The market jump's negative mean buys skew and a drift together.
+        // Compensating it keeps the mean, and so the skew, and returns the
+        // drift: a deterministic offset moves no central moment.
+        p.jump_mean_compensated = 1.0;
         p
     }
 
@@ -2616,6 +2663,7 @@ impl ModelParams {
             "market_beta_down_asym_recentre" => self.market_beta_down_asym_recentre,
             "oil_supply_response" => self.oil_supply_response,
             "oil_opec_symmetry" => self.oil_opec_symmetry,
+            "jump_mean_compensated" => self.jump_mean_compensated,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
@@ -2762,6 +2810,7 @@ impl ModelParams {
             "market_beta_down_asym_recentre" => out.market_beta_down_asym_recentre = value,
             "oil_supply_response" => out.oil_supply_response = value,
             "oil_opec_symmetry" => out.oil_opec_symmetry = value,
+            "jump_mean_compensated" => out.jump_mean_compensated = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
@@ -2955,6 +3004,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "informed_flow_fraction",
         "jump_intensity_idio",
         "jump_intensity_market",
+        "jump_mean_compensated",
         "jump_mean_market",
         "jump_momentum_share",
         "jump_sigma_idio",

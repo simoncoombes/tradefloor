@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v16",
   "fingerprint": "pt-v16",
-  "coefficient_digest": "04ebfb3f2026ba7a455de1b3125e16fc590751837a5210809215227539de9bd3",
+  "coefficient_digest": "9daa9ad0961386b7e42b8819cac512e0bc57afb325c2860c1cd73b8e273f5db1",
   "coefficients": {
     "book_levels": 10.0,
     "crash_amplifier_slope": 0.2,
@@ -53,6 +53,7 @@
     "inventory_limit_levels": 12.0,
     "jump_intensity_idio": 0.0068895346,
     "jump_intensity_market": 0.0565753337,
+    "jump_mean_compensated": 0.0,
     "jump_mean_market": -0.008521833617959641,
     "jump_momentum_share": 0.0,
     "jump_sigma_idio": 0.0752080062,
@@ -147,7 +148,7 @@
   },
   "mechanisms": {
     "jumps": {
-      "spec": "e7ae6ae4ff89a5cf4459e7c32b5bab8c9e596d26ebcdba0b59ab7cc279a35a83",
+      "spec": "39073377cfbc0ef059453c7909d6e713ae5ce4a40d117c157b31040ecd9df39a",
       "stream": "jumps",
       "doses": {
         "jump_intensity_market": 0.0565753337,
@@ -157,7 +158,8 @@
         "jump_sigma_idio": 0.0752080062,
         "jump_vix_coupling": 0.2626,
         "market_vol_vix_anchor": 15.98426471,
-        "jump_momentum_share": 0.0
+        "jump_momentum_share": 0.0,
+        "jump_mean_compensated": 0.0
       }
     }
   },
