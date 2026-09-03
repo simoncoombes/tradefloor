@@ -567,24 +567,49 @@ triples it. The 9.7 years above assumes this placement. Dividing before the
 clamp gives 9.59 instead, and the whole of that difference sits in the two
 short phases.
 
-So the 0.3 clamp becomes a cap on a monthly rate, the largest daily
-probability is 0.01, and a value that did no work starts doing some. It
-binds for a peak past month 5.40 and a trough past month 2.57, and nowhere
-else: an expansion reaches it at month 338, a recovery at month 358, and a
-contraction's hazard falls with duration. It shapes the mean peak from 183
-days to 171 and the mean trough from 159 to 138. Under the daily reading it
-bound nowhere, which a five-seed certified year confirms at 0 of 249 rolls
-clamped, and it binds nowhere inside a certified year afterwards either, at
-0 of 360.
+So the 0.3 clamp becomes a cap on a monthly rate and the largest daily
+probability is 0.01. On the hazard alone it binds for a peak past month
+5.40 and a trough past month 2.57 and nowhere else, since an expansion
+reaches it at month 338, a recovery at month 358, and a contraction's
+hazard falls with duration. It shapes the mean peak from 183 days to 171
+and the mean trough from 159 to 138.
 
-Inside one year the correction is worth nothing. Over five seeds at 252 days the paired median is +0.000 with a mean
-of +0.129, two seeds up and three bit-identical, and the three identical
-ones are exactly the seeds that never left an expansion under the fast
-clock. What moves is the phase: seeds leaving expansion by day 251 fall
-from 2 of 5 to 0 of 5, and the mean days spent in expansion rise from 237.2
-to 252.0. Beyond a year the clock decides how often a contraction
-multiplies the credit spread and how much of a long study sits outside an
-expansion, and that arm is measured elsewhere.
+Counted over thirty seeds at 1008 days, the clamp binds on 527 of 2082
+peak rolls and 153 of 203 trough rolls on the hazard alone, against none
+of either drawn per day, and on none of 18352 expansion or 1495
+contraction rolls under either reading. A certified year reaches no trough
+at all and records 0 of 2121 rolls clamped.
+
+With the ladder a trough differs, and it differed before this dial
+existed. A trough adds 0.1 for a policy rate under 3.0 and 0.05 for
+unemployment over 8.0 against a hazard of 0.265 at its two-month minimum,
+so the clamp binds on its first eligible roll under either reading, at 203
+of 203 read per month and 97 of 97 drawn per day. The clamp was already
+doing work in a trough, and what changed is that phases now last long
+enough to reach one.
+
+Inside one year the correction is worth nothing. Over thirty seeds at 252
+days the paired median is +0.000 with a mean of +0.205, fourteen seeds up,
+five down and eleven bit-identical, and the eleven are exactly the eleven
+that never left an expansion under the fast clock. The two sets are equal
+seed for seed. What moves is the phase: seeds leaving
+expansion by day 251 fall from 19 of 30 to 1 of 30, and the mean days in
+expansion rise from 226.2 to 250.7.
+
+Beyond a year the clock decides how much of a study sits outside an
+expansion, and four years show it. The spread between the best and worst
+year's median drift falls from 12.252 points to 5.142 over thirty seeds at
+1008 days. What remains is the run's own shape: year one carries the
+roster's opening level decaying against the growth term, years two and
+three run at +3.6 and +3.3, and year four falls back to +0.6 as the first
+contractions arrive.
+
+The phase lengths quoted above are the hazard alone. The condition ladder
+adds to it, so each bounds a phase's length from above. A contraction is
+where that bites: its four conditions sum to 0.25 against a
+base hazard of 0.081 at month four, so a deep contraction runs 7.7 months
+where a mild one runs 23. The ratio of thirty is unaffected, since both
+readings exclude the ladder equally.
 
 Two entry points changed shape. `check_cycle_transition` and
 `get_cycle_transition_probability` each take the dial, so a caller states

@@ -189,10 +189,12 @@ pub fn check_cycle_transition(
     let p = adjust_transition_probability(economy, weibull_hazard(months, shape, scale));
     // The cap on the hazard, at 0.3 of whatever unit the hazard carries.
     // Under the reference implementation's reading that is a 30 per cent
-    // chance on any one day and it binds nowhere, because no phase lasts
-    // long enough to reach it. Under the monthly reading it caps a rate per
-    // month, so the largest daily probability is 0.01, and it binds for a
-    // peak past month 5.40 and a trough past month 2.57.
+    // chance on any one day; under the monthly reading it caps a rate per
+    // month and the largest daily probability is 0.01. On the hazard alone
+    // it binds for a peak past month 5.40 and a trough past month 2.57, and
+    // under either reading a trough with its own ladder saturates it on the
+    // first eligible roll. See `ModelParams::cycle_hazard_per_month` for
+    // the counts.
     let transition_probability = per_day(clamp(p, 0.0, 0.3), per_month);
 
     if rng.next_f64() < transition_probability {

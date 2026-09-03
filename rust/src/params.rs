@@ -713,6 +713,16 @@ pub struct ModelParams {
     /// and a 252-day run opening at the start of an expansion leaves it 63
     /// per cent of the time against 3.
     ///
+    /// Both figures are the hazard alone. The condition ladder below adds
+    /// to it and never subtracts except through the expansion guard, so
+    /// each is an upper bound on a phase's length rather than its length.
+    /// A contraction is where that bites: the ladder's four conditions sum
+    /// to 0.25 against a base hazard of 0.081 at month four, so a deep one
+    /// runs 7.7 months where a mild one runs 23. The ratio of thirty is
+    /// unaffected, since both readings exclude the ladder equally, and the
+    /// ladder is scaled with the base rather than beside it, because the
+    /// conversion below is applied after it.
+    ///
     /// `months_in_current_phase` advances by exactly `1/30` a day, so the
     /// month this model keeps is 30 days and the divisor is read off the
     /// engine's own clock rather than chosen. At 1.0 the daily probability
@@ -732,14 +742,27 @@ pub struct ModelParams {
     /// entirely in the two short phases.
     ///
     /// So the clamp becomes a cap on a monthly rate and the largest daily
-    /// probability is 0.01. It binds for a peak past month 5.40 and a
-    /// trough past month 2.57, and nowhere else, since an expansion reaches
-    /// it at month 338 and a recovery at month 358 and a contraction's
-    /// hazard falls with duration. Under the daily reading it bound
-    /// nowhere: both phases ended long before those durations, and a
-    /// five-seed certified year on pt-v18 records 0 of 249 rolls clamped.
-    /// A value that did no work starts doing some, and it shapes the mean
-    /// peak from 183 days to 171 and the mean trough from 159 to 138.
+    /// probability is 0.01. On the hazard alone it binds for a peak past
+    /// month 5.40 and a trough past month 2.57 and nowhere else, since an
+    /// expansion reaches it at month 338, a recovery at month 358, and a
+    /// contraction's hazard falls with duration. It shapes the mean peak
+    /// from 183 days to 171 and the mean trough from 159 to 138.
+    ///
+    /// Measured over thirty seeds at 1008 days on the era's roster, at
+    /// commit 6dfe09b. Read per month the clamp binds on 527 of 2082 peak
+    /// rolls and 153 of 203 trough rolls on the hazard alone, and on 0 of
+    /// 18352 expansion and 0 of 1495 contraction rolls. Drawn per day it
+    /// binds on none of them.
+    ///
+    /// WITH the ladder the trough is different, and it was different
+    /// before this dial existed. A trough adds 0.1 for a policy rate under
+    /// 3.0 and 0.05 for unemployment over 8.0, against a hazard of 0.265
+    /// at its two-month minimum, so the clamp binds on its first eligible
+    /// roll under either reading: 203 of 203 read per month and 97 of 97
+    /// drawn per day, over the same runs. So the clamp was already doing
+    /// work in a trough, and what changed is that phases now last long
+    /// enough to reach one. A certified year reaches no trough at all and
+    /// records 0 of 2121 rolls clamped under either reading.
     pub cycle_hazard_per_month: f64,
     /// The corporate bond yield at which the target multiple sits exactly
     /// on its sector anchor. 0.04 -- every preset before pt-v18 -- is the
