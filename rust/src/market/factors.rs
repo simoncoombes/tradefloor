@@ -557,17 +557,41 @@ pub fn calculate_live_factors(
         short_squeeze_effect = mathx::min(0.02, short_squeeze_effect);
     }
 
+    // The two stop ladders, and how far they are matched. At symmetry 0.0
+    // each side keeps its own literals and the arithmetic below is the
+    // shipped arithmetic. At 1.0 both use the mean of the pair: threshold
+    // 0.025, tiers 0.007, 0.0045, 0.0025 and 0.0005. That chooses neither
+    // side and preserves the pair's total intervention exactly, 0.029
+    // before and after.
+    //
+    // The GATES are untouched either way. A stop-loss sits under every
+    // long, so the downside carries no condition beyond its threshold; a
+    // buy-stop needs shorts to exist, so the upside keeps its short
+    // interest gate. Those are finance rather than an accident.
+    let (down_gate, down_a, down_b, down_c, down_d,
+         up_gate, up_a, up_b, up_c, up_d) =
+        if params.cascade_symmetry == 0.0 {
+            (0.02, 0.008, 0.005, 0.003, 0.001,
+             0.03, 0.006, 0.004, 0.002, 0.000)
+        } else {
+            let g = params.cascade_symmetry;
+            (0.02 + 0.005 * g, 0.008 - 0.001 * g, 0.005 - 0.0005 * g,
+             0.003 - 0.0005 * g, 0.001 - 0.0005 * g,
+             0.03 - 0.005 * g, 0.006 + 0.001 * g, 0.004 + 0.0005 * g,
+             0.002 + 0.0005 * g, 0.000 + 0.0005 * g)
+        };
+
     // Downside stop cascade — denser stops at the -3/-5/-7% levels.
-    if daily_return < -0.02 {
+    if daily_return < -down_gate {
         let drop = daily_return.abs();
         let stop_cascade = if drop > 0.07 {
-            0.008
+            down_a
         } else if drop > 0.05 {
-            0.005
+            down_b
         } else if drop > 0.03 {
-            0.003
+            down_c
         } else {
-            0.001
+            down_d
         };
         short_squeeze_effect -= stop_cascade;
     }
@@ -575,13 +599,20 @@ pub fn calculate_live_factors(
     // Upside cascade — short sellers' buy-stops trigger on rallies. Note this
     // is NOT exclusive with the squeeze block above: a heavily-shorted name up
     // 8% gets both, which is the point.
-    if daily_return > 0.03 && short_interest_ratio > 0.1 {
+    //
+    // The fourth tier is 0.0 at symmetry 0.0, where the shipped ladder has
+    // only three and this branch is the band between the gate and 3 per
+    // cent that the shipped rule never reaches, since its gate IS 3 per
+    // cent. It becomes reachable and non-zero together.
+    if daily_return > up_gate && short_interest_ratio > 0.1 {
         let buy_cascade = if daily_return > 0.07 {
-            0.006
+            up_a
         } else if daily_return > 0.05 {
-            0.004
+            up_b
+        } else if daily_return > 0.03 {
+            up_c
         } else {
-            0.002
+            up_d
         };
         short_squeeze_effect += buy_cascade;
     }

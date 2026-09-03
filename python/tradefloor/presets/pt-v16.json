@@ -2,9 +2,10 @@
   "schema": 1,
   "preset": "pt-v16",
   "fingerprint": "pt-v16",
-  "coefficient_digest": "9daa9ad0961386b7e42b8819cac512e0bc57afb325c2860c1cd73b8e273f5db1",
+  "coefficient_digest": "d9dbcd5e960be4f71f6fd3e3ade235389e2732be6b120963012a39042721225b",
   "coefficients": {
     "book_levels": 10.0,
+    "cascade_symmetry": 0.0,
     "crash_amplifier_slope": 0.2,
     "crash_amplifier_threshold": 2.0,
     "crisis_blend_cap": 0.98,

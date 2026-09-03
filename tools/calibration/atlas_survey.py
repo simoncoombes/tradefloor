@@ -192,6 +192,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # uncompensated process, 1.0 is the martingale, and past 1.0 the
     # compensator exceeds the drift and the jump pushes the other way.
     "jump_mean_compensated": (0.0, 1.0),
+    # How far the two stop ladders are matched. 0.0 is the shipped pair,
+    # 1.0 is the mirror at the mean of the two, and past 1.0 the ladders
+    # cross and the upside becomes the larger one, which is the asymmetry
+    # inverted rather than a wider search.
+    "cascade_symmetry": (0.0, 1.0),
     # EMA days on the VIX the market variance target reads (round 99).
     # Measured dead at 3 and 10 along the driven window; 20 trading days
     # is a month of smoothing, past which the fear response is no longer

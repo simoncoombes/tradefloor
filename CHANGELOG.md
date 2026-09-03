@@ -311,6 +311,50 @@ recorded rather than acted on: it says the jump mean was not buying what it
 was described as buying, which is a question about the mechanism rather
 than about its drift.
 
+### The matched stop ladders
+
+Forced flow from resting stop orders runs both ways: stop-losses under
+longs on the way down, buy-stops over shorts on the way up. The two ladders
+expressing it did not match. The downside fired at a 2 per cent move and
+the upside at 3. The downside had four tiers and the upside three. At every
+matched size the downside was the larger: 0.008 against 0.006, 0.005
+against 0.004, 0.003 against 0.002, with a fourth downside tier of 0.001
+that had no partner. Every one of those was a bare literal with no
+parameter, so nothing could reach them and nothing recorded a reason for
+the difference. Over a symmetric distribution of daily returns a ladder
+that subtracts more than it adds is a drift.
+
+`cascade_symmetry` matches the threshold and the tier magnitudes at the
+mean of the two ladders: threshold 0.025, tiers 0.007, 0.0045, 0.0025 and
+0.0005. That is the construction the OPEC rule uses. It chooses neither
+side and preserves the pair's total intervention exactly, 0.029 across both
+ladders before and after.
+
+The GATES are untouched. A stop-loss sits under every long, so the downside
+carries no condition beyond its threshold; a buy-stop needs shorts to
+exist, so the upside keeps its short-interest gate. Those are finance
+rather than an accident, and matching them would have removed a real
+mechanism instead of an unchosen asymmetry.
+
+Over thirty seeds the annualised index drift improves from -7.145 to
+-6.832, a paired +0.370 by median, and every one of the thirty improves.
+The investigation prices the whole squeeze-and-cascade block at 0.574,
+measured by switching it off; matching the ladders while keeping the gates
+recovers two thirds of that and leaves the mechanism in place.
+
+**This one is matched rather than derived, and the difference matters.**
+The tilt, the jump and the oil supply term each had a closed form or a
+stationarity condition behind them, so their values were read off the
+process. Odd symmetry in the return is the structural claim here. The mean
+of the two ladders is a rule for choosing numbers under that claim, and the
+process itself dictates none. Whether these literals should be parameters
+at all stays open for the era's owner to settle.
+
+The panel reads 13 of 14. The leverage effect is +0.0004 against a ceiling
+of 0.00, which is 0.005 of that row's own across-seed noise. It is the
+downside tilt's stated side channel and it has now crossed and re-crossed
+that ceiling twice within this era.
+
 ### The index drift row
 
 `facts.panel_statistics` reports `index_drift_pct`, the annualised log

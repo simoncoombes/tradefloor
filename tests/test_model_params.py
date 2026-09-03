@@ -335,6 +335,14 @@ PERTURBATIONS = [
     # subtracted every day whether or not a jump fires, so unlike its two
     # neighbours it bites on the first close.
     ("jump_mean_compensated", 0.5, True),
+    # How far the two stop ladders are matched. INERT over a probe this
+    # short, and the mechanism says why. Both ladders read the PREVIOUS
+    # completed day's return and neither fires until a name has moved more
+    # than two or three per cent in a day. Three days of a calm market
+    # produce no such day, so no branch is reached and nothing this dial
+    # touches is evaluated. Over 252 days it bites: the thirty-seed sweep
+    # separates the arms.
+    ("cascade_symmetry", 0.5, False),
     # The exponent on the VIX ratio in the market variance target. The
     # endogenous VIX leaves its anchor on day one, so the ratio is never
     # exactly 1.0 and any exponent but the shipped one moves the target.

@@ -702,6 +702,48 @@ pub struct ModelParams {
     /// day-zero closed form for exactly that reason, and a compensator on
     /// the day-zero rate would have left that 8 per cent behind.
     pub jump_mean_compensated: f64,
+    /// How much of the stop-cascade ladder's direction is removed. 0.0 --
+    /// every preset before pt-v18 -- is bit-identical. 1.0 makes the two
+    /// ladders mirror images.
+    ///
+    /// # The asymmetry nobody chose
+    ///
+    /// Forced flow from resting stop orders runs both ways: stop-losses
+    /// under longs on the way down, buy-stops over shorts on the way up.
+    /// The two ladders that express it do not match. The downside fires at
+    /// a 2 per cent move and the upside at 3; the downside has four tiers
+    /// and the upside three; and at every matched size the downside is
+    /// larger, 0.008 against 0.006, 0.005 against 0.004, 0.003 against
+    /// 0.002, with a fourth downside tier of 0.001 that has no partner.
+    /// Every one of those is a bare literal with no parameter, so nothing
+    /// could reach them and nothing recorded a reason for the difference.
+    ///
+    /// Over a symmetric distribution of daily returns a ladder that
+    /// subtracts more than it adds is a drift, which is this era's shape
+    /// again.
+    ///
+    /// # What is matched, and what is deliberately left alone
+    ///
+    /// The GATES stay. A stop-loss sits under every long, so the downside
+    /// needs no condition; a buy-stop needs shorts to exist, so the upside
+    /// keeps `short_interest_ratio > 0.1`. That is defensible finance and
+    /// not an asymmetry anybody left by accident.
+    ///
+    /// The THRESHOLD and the TIER MAGNITUDES are matched, at the mean of
+    /// the two ladders: threshold 0.025, tiers 0.007, 0.0045, 0.0025 and
+    /// 0.0005. That is the same construction the OPEC rule uses. It
+    /// chooses neither side and it preserves the total intervention the
+    /// pair performs exactly, 0.029 across both ladders before and after.
+    ///
+    /// # What is NOT derived here, and is worth saying
+    ///
+    /// Unlike the tilt, the jump and the oil supply term, this one has no
+    /// stationarity condition or closed form behind it. Odd symmetry in
+    /// the return is the structural claim; the mean is a rule for picking
+    /// the numbers under it rather than a value read off the process.
+    /// Whether these literals should become parameters at all is an open
+    /// question for the era's owner rather than something settled here.
+    pub cascade_symmetry: f64,
     /// Persistence of the SLOW variance component (Engle-Lee style). The
     /// market factor's variance carries two timescales from the pt-v4 era:
     /// the fast one above tracks the VIX-scaled target, this one carries
@@ -1556,6 +1598,7 @@ impl ModelParams {
             oil_supply_response: 0.0,
             oil_opec_symmetry: 0.0,
             jump_mean_compensated: 0.0,
+            cascade_symmetry: 0.0,
             // Legacy values: the slow component is OFF, and the update
             // reduces to the single-component form bit for bit.
             market_vol_slow_persistence: 0.0,
@@ -2563,6 +2606,11 @@ impl ModelParams {
         // Compensating it keeps the mean, and so the skew, and returns the
         // drift: a deterministic offset moves no central moment.
         p.jump_mean_compensated = 1.0;
+        // The two stop ladders do not match: the downside fires earlier, has
+        // an extra tier and is larger at every matched size. Over symmetric
+        // returns that is a drift. Matched at the mean of the pair, which
+        // chooses no side and preserves their total intervention.
+        p.cascade_symmetry = 1.0;
         p
     }
 
@@ -2664,6 +2712,7 @@ impl ModelParams {
             "oil_supply_response" => self.oil_supply_response,
             "oil_opec_symmetry" => self.oil_opec_symmetry,
             "jump_mean_compensated" => self.jump_mean_compensated,
+            "cascade_symmetry" => self.cascade_symmetry,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
@@ -2811,6 +2860,7 @@ impl ModelParams {
             "oil_supply_response" => out.oil_supply_response = value,
             "oil_opec_symmetry" => out.oil_opec_symmetry = value,
             "jump_mean_compensated" => out.jump_mean_compensated = value,
+            "cascade_symmetry" => out.cascade_symmetry = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
@@ -2970,6 +3020,7 @@ impl ModelParams {
 /// the list is derived from `to_pairs`' actual coverage in tests.
 pub fn settable_names() -> Vec<&'static str> {
     vec![
+        "cascade_symmetry",
         "crash_amplifier_slope",
         "crash_amplifier_threshold",
         "crisis_blend_cap",
