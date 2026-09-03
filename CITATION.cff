@@ -11,13 +11,12 @@
 # `date-released:` is the day that version was tagged. Both move together at
 # a release; a version without the date it shipped is half a citation.
 #
-# A citation identifies the software. It does not identify a RUN. Reproducing a
-# published result needs four more things: the seed, the universe fingerprint
-# and how it was built, the macro initial conditions, and the order log. The
-# package version and preset name come from the citation itself. All five are
-# at https://tradefloor.dev/citing.html. That page is the reference now: the
-# `docs/` tree this comment used to name left the repository with the
-# documentation site at 0.5.0.
+# A citation identifies the software. A run is identified by its RunManifest,
+# which carries the roster, the macro initial conditions, the scenario, the
+# order log and the strategy, with the package version, the preset and the
+# digest a replay has to reproduce. The manifest is documented at
+# https://tradefloor.dev/evaluate.html#runmanifest, and the citation guidance
+# is at https://tradefloor.dev/install.html#citing-tradefloor.
 
 cff-version: 1.2.0
 message: "If you use this software, please cite it using these metadata."
