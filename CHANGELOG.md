@@ -13,6 +13,9 @@ checkpoints and letting the day ledger check them.
 absorbed it and the breaker's share, with a counterfactual against
 unbounded depth on request.**
 
+**Every draw has an address**, a table of substitutions can replace one,
+and a second `run_days` call numbers days from the engine's own counter.
+
 <!-- release-note-ends -->
 
 ### The day ledger
@@ -29,6 +32,47 @@ and `tradefloor.manifest.state_hash` computes the same digest in Python
 from `state_snapshot()`. Nothing about a trajectory moves: the manifest
 field is additive under the schema it already had, and `reproduce()`
 behaves the same with the field and without it.
+
+### Draw addressing and the patching layer
+
+A draw's address is its stream, whether it was a uniform or a normal, and
+how many draws of that kind the stream had taken. An overlay substitutes
+a value at an address without skipping the generator step, so every
+address after it keeps its value and the draw counts are identical with
+and without one. A log records what each stream delivered, with the day
+and the call site, and `Engine.market_day_layout` maps a day and a company
+to the market normals it drew.
+
+The day a draw carries is stamped at the open it belongs to. Opening a day
+pushes its mark and takes its endogenous news draws, so a day stamped
+after the open left one run carrying two numbers: a three-day run numbered
+from 100 logged five streams on 100, 101 and 102 and the news stream and
+the marks on 0, 1 and 2, and the layout of day 100 resolved to nothing.
+
+`run_days` numbers from the engine's own day counter unless told
+otherwise, so a second call continues the first instead of repeating its
+numbers. A caller that wants the old behaviour passes `first_day=0`. This
+moves the day column of a recorded second run, from 0 and 1 to 2 and 3.
+
+The state hash covers the two snapshot fields this adds, the per-stream
+draw counts and the table of substitutions, in the order the snapshot
+carries them. Both decide what the engine draws next, so two states
+alike in every column and differing by one installed substitution
+diverge from that point, and a commitment that skipped the table would
+call them one state. A ledger written before this change carries leaves
+computed without them, and a leaf written after it hashes to a different
+value for the same market.
+
+The market schedule follows the active roster. At ten names and eight
+ticks a day the stream takes 584 draws, 73 a tick, and 536 the day after
+a delisting, with the settlement taking four uniforms per active name per
+tick throughout.
+
+A restore drops the day marks, which described the run it replaced. The
+log costs 32 bytes a record, pinned beside the type: at 60 names and 390
+ticks the market stream takes 145,470 draws a day, 4.7 MB a day and 1.17
+GB over a year, and its time cost did not resolve above the noise of a
+shared machine.
 
 ### The measured cost
 

@@ -1162,6 +1162,16 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: is a field the guard below is not guarding, and the difference between
 #: those two cases is the whole value of the check.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "draw_counts":
+        "the address counters behind tradefloor.noise. A generator restored "
+        "without them continues from counts of zero, so a patch written "
+        "against the source lands elsewhere or nowhere; with no overlay "
+        "installed nothing reads them, and the trajectory is the same. "
+        "test_noise.py pins both halves.",
+    "draw_overlay":
+        "the substitutions installed by tradefloor.noise. This scenario "
+        "installs none, so there is nothing to drop; test_noise.py restores "
+        "a snapshot with one installed and asserts the continuation keeps it.",
     "model_fingerprint":
         "not state. It is the guard that refuses a snapshot restored onto an "
         "engine running other coefficients, which has its own test; dropping "

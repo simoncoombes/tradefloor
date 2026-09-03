@@ -541,6 +541,7 @@ pub fn simulate_market_tick(
     // variance process, not the constant; when the caller passes the
     // baseline (`MARKET_FACTOR_SIGMA`) this line is bit-identical to the
     // constant-sigma era's spelling, association included.
+    rng.site(crate::rng::Site::MarketFactorZ, 0);
     let market_factor = rng.next_normal() * inputs.market_sigma_daily * tick_scale;
 
     // Crisis correlation: above the crisis threshold, sector factors blend
@@ -598,7 +599,8 @@ pub fn simulate_market_tick(
             * mathx::sqrt(1.0 - p.sector_vix_coupling + p.sector_vix_coupling * (ratio * ratio))
     };
     let mut sector_factors = Vec::with_capacity(inputs.sector_keys.len());
-    for sector in inputs.sector_keys {
+    for (sector_index, sector) in inputs.sector_keys.iter().enumerate() {
+        rng.site(crate::rng::Site::SectorZ, sector_index as u32);
         let idiosyncratic = rng.next_normal() * sector_sigma * tick_scale;
         // Where the blend takes from. At source 0.0 the sector draw is
         // attenuated and the market factor injected through this slot, the
@@ -647,6 +649,7 @@ pub fn simulate_market_tick(
         let imbalance = order_imbalance(vol.buy, vol.sell, company.stock.avg_volume);
 
         // DRAW SITE: one normal, inside the factor computation.
+        rng.site(crate::rng::Site::FactorIdioZ, idx as u32);
         let factors = calculate_live_factors(
             &company.factor_view(),
             inputs.news,
@@ -697,6 +700,7 @@ pub fn simulate_market_tick(
         // DRAW SITE: one uniform, STASHED. It is consumed in phase 3, and
         // drawing it there instead would give the same count on a different
         // stream.
+        rng.site(crate::rng::Site::StashU, idx as u32);
         all_randoms.push(rng.next_f64());
     }
 
@@ -973,6 +977,7 @@ pub fn simulate_market_tick(
             // which guard fired. Under `FourOrZero` the settle draws
             // lazily from the shared source, four or zero, matching what a
             // recorded reference stream actually holds.
+            rng.site(crate::rng::Site::SettleU, idx as u32);
             let mut predrawn = match inputs.settle_draws {
                 SettleDrawPolicy::FourAlways => Some(PredrawnUniforms::new([
                     rng.next_f64(),

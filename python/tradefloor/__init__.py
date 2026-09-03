@@ -33,6 +33,7 @@ from . import facts
 from . import loss
 from .checkpoint import Checkpoint, branch
 from . import counterfactual
+from . import noise
 from .counterfactual import (Agreement, Comparison, Divergence, Invariance,
                              Resample, World, agree, compare, invariance,
                              resample)
@@ -114,6 +115,7 @@ __all__ = [
     "spec", "StrategySpec", "SPEC_VERSION",
     "Scenario", "run_scenario", "facts", "loss", "Checkpoint", "branch", "sweep",
     "counterfactual", "World", "agree", "compare", "resample",
+    "noise",
     "externality", "Externality", "externalities",
     "Agreement", "Comparison", "Resample",
     "Divergence",

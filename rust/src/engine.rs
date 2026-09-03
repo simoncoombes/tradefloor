@@ -67,7 +67,7 @@ use crate::market::{
     TickInputs,
 };
 use crate::params::ModelParams;
-use crate::rng::{stream, GameRng, Rng, RngState};
+use crate::rng::{stream, DrawKind, DrawOverlay, DrawRecord, GameRng, Rng, RngState, Site};
 
 /// The reference MAIN stream's sequence. Not 0 and not 1 —
 /// both are different streams from the same seed, and picking the wrong one
@@ -122,6 +122,37 @@ impl StreamDraws {
     pub fn total(&self) -> usize {
         self.market + self.economy + self.external
     }
+}
+
+/// The draw positions of every stream at one day's open, with what the
+/// market stream's per-tick schedule needs to address a company's normals.
+///
+/// Within one open-market tick the market stream takes, in this order: one
+/// normal for the market factor, one normal per sector, then for each
+/// active company one normal (the idiosyncratic factor) and one uniform
+/// (stashed for phase 3), then four uniforms per active company at
+/// settlement. So the normals per tick are `1 + sectors + active.len()`,
+/// and active company `k` (its position in `active`) draws its normal at
+/// `normals_at_open + tick * per_tick + 1 + sectors + k`. That arithmetic
+/// is `Engine::market_day_layout`; the draw log is the check on it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DayMark {
+    pub day: i64,
+    /// `(uniforms, normals)` per stream, indexed by `crate::rng::stream`.
+    pub positions: [(u64, u64); 7],
+    pub active: Vec<u32>,
+    pub sectors: u32,
+    pub ticks: u32,
+}
+
+/// A company's market-stream normals on one day, as a strided set:
+/// `first + t * stride` for `t` in `0..ticks`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MarketDayLayout {
+    pub company: u32,
+    pub first: u64,
+    pub stride: u64,
+    pub ticks: u32,
 }
 
 /// What the embedder supplies for one tick.
@@ -295,6 +326,15 @@ pub struct Engine {
     /// diagnosing a divergence: if these differ between two runs, nothing
     /// downstream is worth comparing.
     draws: StreamDraws,
+    /// The day the engine is on, for the draw log and the day marks. Set by
+    /// the caller that knows it (`set_current_day`), at each open, so the
+    /// draws a close takes carry the day they close; zero on a fresh engine.
+    current_day: i64,
+    /// One mark per opened day: the day, the seven streams' draw positions
+    /// at the open, the active company indices and the sector count, and
+    /// the ticks the day ran. Together they map a `(day, company)` pair to
+    /// its market-stream normal indices (`Engine::market_day_layout`).
+    day_marks: Vec<DayMark>,
     /// The model coefficients this engine runs (the runtime seam,
     /// CALIBRATION.md §5). [`crate::params::PT_V1`] unless the engine was
     /// built with [`Engine::with_params`]; immutable for the engine's life,
@@ -545,6 +585,8 @@ impl Engine {
             volume_idio: vec![0.0; companies_len],
             sector_keys,
             draws: StreamDraws::default(),
+            current_day: 0,
+            day_marks: Vec::new(),
             params,
         }
     }
@@ -570,6 +612,7 @@ impl Engine {
     /// invalidating every seeded market trajectory it embeds.
     pub fn draw_uniform(&mut self) -> f64 {
         self.draws.external += 1;
+        self.external_rng.site(Site::External, 0);
         self.external_rng.next_f64()
     }
 
@@ -578,6 +621,7 @@ impl Engine {
     /// external stream's own and is never visible to the market.
     pub fn draw_normal(&mut self) -> f64 {
         self.draws.external += 1;
+        self.external_rng.site(Site::External, 0);
         self.external_rng.next_normal()
     }
 
@@ -632,6 +676,126 @@ impl Engine {
         self.draws
     }
 
+    // ── Draw addressing ───────────────────────────────────────────────────
+
+    fn stream_rng(&self, id: u32) -> &GameRng {
+        match id {
+            stream::MARKET => &self.market_rng,
+            stream::ECONOMY => &self.economy_rng,
+            stream::EXTERNAL => &self.external_rng,
+            stream::JUMPS => &self.jump_rng,
+            stream::VOLUME => &self.volume_rng,
+            stream::NEWS => &self.news_rng,
+            stream::VOLUME_IDIO => &self.volume_idio_rng,
+            _ => panic!("unknown stream {id}"),
+        }
+    }
+
+    fn stream_rng_mut(&mut self, id: u32) -> &mut GameRng {
+        match id {
+            stream::MARKET => &mut self.market_rng,
+            stream::ECONOMY => &mut self.economy_rng,
+            stream::EXTERNAL => &mut self.external_rng,
+            stream::JUMPS => &mut self.jump_rng,
+            stream::VOLUME => &mut self.volume_rng,
+            stream::NEWS => &mut self.news_rng,
+            stream::VOLUME_IDIO => &mut self.volume_idio_rng,
+            _ => panic!("unknown stream {id}"),
+        }
+    }
+
+    /// The day the next `open_market` opens. The engine cannot know it on
+    /// its own: `run_session` and `tick` take no day, and only the caller
+    /// that numbers its days does.
+    ///
+    /// A label, not state the market reads: nothing in the tick, the close or
+    /// the macro chain consults it, so moving it cannot move a trajectory.
+    /// `open_market` is the only caller that must run before a draw is taken,
+    /// because the day mark and the day's news draws are taken there.
+    pub fn set_current_day(&mut self, day: i64) {
+        self.current_day = day;
+        for id in 0..7 {
+            self.stream_rng_mut(id).set_day(day);
+        }
+    }
+
+    pub fn current_day(&self) -> i64 {
+        self.current_day
+    }
+
+    /// `(uniforms, normals)` taken so far on each stream, by stream id.
+    pub fn stream_positions(&self) -> [(u64, u64); 7] {
+        let mut out = [(0u64, 0u64); 7];
+        for (id, slot) in out.iter_mut().enumerate() {
+            *slot = self.stream_rng(id as u32).positions();
+        }
+        out
+    }
+
+    /// Install one substitution at `(stream, kind, index)`.
+    pub fn patch_draw(&mut self, stream_id: u32, kind: DrawKind, index: u64, value: f64) {
+        self.stream_rng_mut(stream_id).patch(kind, index, value);
+    }
+
+    pub fn draw_overlay(&self, stream_id: u32) -> Option<&DrawOverlay> {
+        self.stream_rng(stream_id).overlay()
+    }
+
+    pub fn set_draw_overlay(&mut self, stream_id: u32, overlay: Option<DrawOverlay>) {
+        self.stream_rng_mut(stream_id).set_overlay(overlay);
+    }
+
+    /// Record every draw one stream takes on days in `[from_day, to_day]`.
+    pub fn enable_draw_log(&mut self, stream_id: u32, from_day: i64, to_day: i64) {
+        self.stream_rng_mut(stream_id).enable_log(from_day, to_day);
+    }
+
+    pub fn draw_log(&self, stream_id: u32) -> &[DrawRecord] {
+        match self.stream_rng(stream_id).log() {
+            Some(log) => &log.records,
+            None => &[],
+        }
+    }
+
+    pub fn day_marks(&self) -> &[DayMark] {
+        &self.day_marks
+    }
+
+    /// Drop every day mark.
+    ///
+    /// The marks describe the days THIS engine opened, so a restore has to
+    /// drop them: restoring a snapshot replaces the run, and marks kept
+    /// across it named days the restored engine never ran. An engine that
+    /// ran two days, restored a three-day snapshot and ran two more reported
+    /// marks for days 0, 1, 3 and 4. `market_day_layout` reads the newest
+    /// match and so resolved correctly throughout, which is why this was
+    /// invisible. The marks are per-run diagnostic state and a snapshot does
+    /// not carry them, so a restored engine starts with none and gains one
+    /// per day it opens itself.
+    pub fn clear_day_marks(&mut self) {
+        self.day_marks.clear();
+    }
+
+    /// Where each active company's market-stream normals sit on `day`,
+    /// from that day's mark and the per-tick schedule in [`DayMark`].
+    pub fn market_day_layout(&self, day: i64) -> Option<Vec<MarketDayLayout>> {
+        let mark = self.day_marks.iter().rev().find(|m| m.day == day)?;
+        let per_tick = 1 + mark.sectors as u64 + mark.active.len() as u64;
+        let base = mark.positions[stream::MARKET as usize].1;
+        Some(
+            mark.active
+                .iter()
+                .enumerate()
+                .map(|(k, &company)| MarketDayLayout {
+                    company,
+                    first: base + 1 + mark.sectors as u64 + k as u64,
+                    stride: per_tick,
+                    ticks: mark.ticks,
+                })
+                .collect(),
+        )
+    }
+
     // ── The tick ──────────────────────────────────────────────────────────
 
     /// Run one simulated minute.
@@ -655,6 +819,9 @@ impl Engine {
         self.market_rng = rng;
         self.draws.market += consumed;
         outcome.draws_consumed = consumed;
+        if let Some(mark) = self.day_marks.last_mut() {
+            mark.ticks += 1;
+        }
         outcome
     }
 
@@ -1116,6 +1283,25 @@ impl Engine {
         // innovation into the next close's update.
         self.market_vol.open_day();
 
+        // The day mark: every stream's position at the open, the active
+        // roster and the sector count, so a (day, company) pair addresses
+        // its market normals (`market_day_layout`). Ticks are counted as
+        // they run.
+        let active: Vec<u32> = self
+            .companies
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| !c.is_bankrupt && c.is_public)
+            .map(|(i, _)| i as u32)
+            .collect();
+        self.day_marks.push(DayMark {
+            day: self.current_day,
+            positions: self.stream_positions(),
+            active,
+            sectors: self.sector_keys.len() as u32,
+            ticks: 0,
+        });
+
         // Endogenous news for the day (§101, moved here by §117). Two draws
         // per company, ALWAYS, on the NEWS stream: the uniform decides
         // occurrence and the normal decides impact, and at zero intensity
@@ -1132,7 +1318,9 @@ impl Engine {
             let intensity = self.params.endogenous_news_intensity;
             let sigma = self.params.endogenous_news_sigma;
             for i in 0..self.companies.len() {
+                self.news_rng.site(Site::NewsU, i as u32);
                 let u = self.news_rng.next_f64();
+                self.news_rng.site(Site::NewsZ, i as u32);
                 let z = self.news_rng.next_normal();
                 if u < intensity {
                     self.session_news.push(crate::market::NewsEvent {
@@ -1261,7 +1449,9 @@ impl Engine {
         } else {
             p.jump_intensity_idio * rate_scale
         };
+        self.jump_rng.site(Site::JumpMarketU, 0);
         let u_market = self.jump_rng.next_f64();
+        self.jump_rng.site(Site::JumpMarketZ, 0);
         let z_market = self.jump_rng.next_normal();
         let market = if u_market < intensity_market {
             p.jump_mean_market + p.jump_sigma_market * z_market
@@ -1269,7 +1459,9 @@ impl Engine {
             0.0
         };
         for (index, company) in self.companies.iter_mut().enumerate() {
+            self.jump_rng.site(Site::JumpCompanyU, index as u32);
             let u = self.jump_rng.next_f64();
+            self.jump_rng.site(Site::JumpCompanyZ, index as u32);
             let z = self.jump_rng.next_normal();
             let idio = if u < intensity_idio {
                 p.jump_sigma_idio * z
@@ -1338,6 +1530,7 @@ impl Engine {
     /// COMMON component only: every name shares this multiplier. Real volume
     /// persistence is partly idiosyncratic, and that half is not modelled.
     fn update_volume_state(&mut self) {
+        self.volume_rng.site(Site::VolumeZ, 0);
         let z = self.volume_rng.next_normal();
         let p = &self.params;
         // Guarded rather than computed through: at zero persistence and zero
@@ -1373,6 +1566,7 @@ impl Engine {
         let p = &self.params;
         let (rho, sigma) = (p.volume_idio_persistence, p.volume_idio_sigma);
         for i in 0..self.volume_idio.len() {
+            self.volume_idio_rng.site(Site::VolumeIdioZ, i as u32);
             let z = self.volume_idio_rng.next_normal();
             if rho == 0.0 && sigma == 0.0 {
                 continue;
@@ -1434,6 +1628,7 @@ impl Engine {
             if mcap > 0.0 { acc / mcap } else { 0.0 }
         };
 
+        rng.site(Site::EconomyDaily, 0);
         self.economy = update_economy_daily(
             &self.economy,
             &DailyInputs {
@@ -1472,10 +1667,14 @@ impl Engine {
             },
             rng,
         );
+        rng.site(Site::EconomyCycle, 0);
         self.economy = check_cycle_transition(&self.economy, rng);
 
         let meeting =
-            update_central_bank(&self.central_bank, &self.economy, request.timestamp, rng);
+            {
+                rng.site(Site::CentralBank, 0);
+                update_central_bank(&self.central_bank, &self.economy, request.timestamp, rng)
+            };
         let meeting_held = meeting.decision.is_some();
         let decision = meeting.decision;
         let announcement_variant = meeting.announcement_variant;
@@ -2402,6 +2601,38 @@ impl Engine {
 
         hash_u32(&mut buf, day_count);
 
+        // The draw-addressing layer's two snapshot fields. The counts are
+        // the seven streams' uniform and normal positions, flattened the
+        // way the snapshot flattens them; the overlay is the table of
+        // substitutions installed on them, walked stream by stream in the
+        // same order.
+        //
+        // Both are hashed because both decide what the engine does next. Two
+        // engines alike in every column but differing by one patched draw
+        // take different days from here, and a leaf that skipped the table
+        // would commit to a state that does not describe them. The hash
+        // refuses a snapshot carrying a field it does not know for exactly
+        // this reason, and these two arrived after it was written.
+        for (uniforms, normals) in self.stream_positions() {
+            hash_f64(&mut buf, uniforms as f64);
+            hash_f64(&mut buf, normals as f64);
+        }
+        let mut overlay: Vec<(u32, u8, u64, f64)> = Vec::new();
+        for id in 0..7u32 {
+            if let Some(table) = self.draw_overlay(id) {
+                for ((kind, index), value) in &table.table {
+                    overlay.push((id, *kind as u8, *index, *value));
+                }
+            }
+        }
+        hash_u32(&mut buf, overlay.len() as u32);
+        for (stream, kind, index, value) in overlay {
+            hash_u32(&mut buf, stream);
+            hash_u32(&mut buf, u32::from(kind));
+            hash_u64(&mut buf, index);
+            hash_f64(&mut buf, value);
+        }
+
         let mut hasher = Sha256::new();
         hasher.update(&buf);
         let out = hasher.finalize();
@@ -2604,6 +2835,9 @@ impl Rng for Counting<'_> {
     fn next_normal(&mut self) -> f64 {
         self.count += 1;
         self.inner.next_normal()
+    }
+    fn site(&mut self, site: Site, tag: u32) {
+        self.inner.site(site, tag);
     }
 }
 
