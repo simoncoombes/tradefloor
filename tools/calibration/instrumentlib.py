@@ -178,6 +178,12 @@ PARAM_SPECS: dict[str, dict] = {
     # convention's own [1/4x, 4x] gives 0.01 to 0.16. Both ends are outside
     # anything the economy reaches, so the box is wide rather than chosen.
     "neutral_discount_rate": {"kind": "log"},
+    # Days the economy is advanced alone before day zero. A COUNT, so an
+    # absolute box, and its top is the horizon the burn-in that measured it
+    # ran to: the transient table reaches 1095 days and the last field the
+    # valuation reads enters its band at 755.
+    "macro_burn_in_days": {"kind": "abs", "step_unit": 30.0,
+                           "hard_range": (0.0, 1095.0)},
     # A SHARE of the jump drift returned, so [0, 1]. 1.0 is the
     # martingale and past it the compensator overshoots.
     "jump_mean_compensated": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},

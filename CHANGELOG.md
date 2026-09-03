@@ -658,6 +658,53 @@ leverage effect the only row out at +0.0014 against a ceiling of exactly
 ceiling across every arm in this era and ten seeds cannot settle it. The
 panel's own drift row, a portfolio return, reads +2.259 against +1.303.
 
+### The economy's opening state
+
+The economy opened at unemployment 4.00, inflation 2.00 and a corporate
+bond yield of 4.56, and its own dynamics reach 2.50, 2.74 and 4.82. So
+every certified year was measured on a window in which nothing had
+settled, and the travel compressed the multiple one way.
+
+`macro_burn_in_days` advances the economy alone before day zero, at 0 for
+every preset before pt-v18 and 755 for pt-v18. The length is measured
+rather than round: 755 is the day the last field the valuation reads
+enters one stationary standard deviation of its mean and stays there.
+Unemployment takes 119 days, inflation 419 and the ten-year 705.
+
+Three things it does deliberately. The draws come from the economy's own
+substream, so the market's day-zero draws sit where they did, and a
+burn-in consumes economy draws by running the economy. The phase is held
+for the burn-in's length, by restoring both the phase and its age whenever
+a transition fires; restoring the phase alone leaves the age at zero,
+which fires the phase-change shock the next day and lifts growth half a
+point above its target for the rest of the run. The clock is reset at the
+end, so the year still opens at the start of a phase.
+
+The growth term's base is re-read at the end. `gdp` and `cpi` compound on
+all 755 days, so a base left at its pre-burn-in value would open every
+valuation about nine per cent above its own earnings.
+
+What it is worth, five seeds at 252 days paired on the seed, against the
+neutral rate alone. The fair value channel gains +0.942, on 5 of 5 seeds,
+which is the economy sitting still while the year is measured. The whole
+arm gains +0.363 points a year at the median.
+
+The two rows do not compose, and the reason is oil. The neutral rate is
+exact for a year that opens at 4.56, because every seed opens there. With
+the burn-in the economy opens at a corporate yield of 5.236 at the median
+over twelve seeds, with a spread of 4.828 to 5.960, because oil still has
+no resting point: it opens between its own 35.0 floor and 120.8, at a
+standard deviation of 22.7. So no single neutral rate zeroes the day-zero
+term on every seed. 0.0482 is the corner an arm with oil pinned at 75.0
+reaches, and this engine rests half a point above it.
+
+The residual is named instead of fitted. At 0.0482 the mispricing channel
+reads -0.351 on 5 of 5 seeds, which is that unclosed gap measured. The
+value that would zero it at the median seed is near 0.0510 and is worth
+about 0.7 points more. That value is the median of a distribution, so it
+would be a fitted constant, and oil's resting point is what would make it
+derivable.
+
 ### The commit the measurements name
 
 Every figure in the section above was measured on a build of a commit

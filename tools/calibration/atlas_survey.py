@@ -210,6 +210,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # So the box is the closed unit interval and its top is where the unit is
     # right rather than where a search stopped.
     "cycle_hazard_per_month": (0.0, 1.0),
+    # Days the economy is advanced alone before day zero. 0.0 is
+    # construction as every earlier preset does it, 755 is the day the last
+    # field the valuation reads enters its stationary band, and 1095 is the
+    # horizon the burn-in that measured both ran to. Past that the box would
+    # describe a transient nobody has measured.
+    "macro_burn_in_days": (0.0, 1095.0),
     # How much of the jump's own drift is given back. 0.0 is the
     # uncompensated process, 1.0 is the martingale, and past 1.0 the
     # compensator exceeds the drift and the jump pushes the other way.

@@ -784,6 +784,35 @@ pub struct ModelParams {
     /// name would have added a second entry for one quantity, with this one
     /// still reading 0.04 about an engine using 0.0456.
     pub neutral_discount_rate: f64,
+    /// Days the economy is advanced alone, before day zero. 0.0 -- every
+    /// preset before pt-v18 -- draws nothing and leaves construction as it
+    /// was.
+    ///
+    /// # A year spent travelling
+    ///
+    /// The economy opens at unemployment 4.00, inflation 2.00 and a
+    /// corporate yield of 4.56, and its own dynamics reach 2.50, 2.74 and
+    /// 4.82. Everything this project certifies is certified on a window in
+    /// which nothing has settled, and the travel is one-way on the
+    /// multiple.
+    ///
+    /// # The length is measured
+    ///
+    /// 755 is the day the last field enters one stationary standard
+    /// deviation of its mean and stays there, which is the corporate yield
+    /// in the burn-in table. Unemployment takes 119 days, inflation 419 and
+    /// the ten-year 705. Structural unemployment is still moving after
+    /// three years and is left where it is, since the fields the valuation
+    /// reads have all settled by 755.
+    ///
+    /// # What it costs to run
+    ///
+    /// The draws come from the economy's own substream, so the market's
+    /// day-0 draws are where they were. It consumes economy draws, which is
+    /// the only settable field besides the volatility jump that moves a
+    /// draw count, and it does so by running the economy rather than as a
+    /// side effect.
+    pub macro_burn_in_days: f64,
     /// How much of the drift the market jump's mean carries is given
     /// back. 0.0 -- every preset before pt-v18 -- is bit-identical. 1.0
     /// subtracts the compensator and makes the jump a martingale.
@@ -1816,6 +1845,7 @@ impl ModelParams {
             oil_seasonality_target: 0.0,
             cycle_hazard_per_month: 0.0,
             neutral_discount_rate: crate::fair_value::NEUTRAL_DISCOUNT_RATE,
+            macro_burn_in_days: 0.0,
             jump_mean_compensated: 0.0,
             cascade_symmetry: 0.0,
             // Legacy values: the slow component is OFF, and the update
@@ -2850,7 +2880,16 @@ impl ModelParams {
         // value that zeroes that term is the yield the economy opens at,
         // read off the process rather than chosen. It moves to the corner's
         // 0.0482 when the burn-in lands.
-        p.neutral_discount_rate = 0.0456;
+        // The corner the dynamics reach rather than the point they open
+        // at, because the burn-in below now opens the year there. Both
+        // values are the yield the economy rests at under their own
+        // arm, read off the burn-in table.
+        p.neutral_discount_rate = 0.0482;
+        // The economy opens at unemployment 4.00, inflation 2.00 and a
+        // corporate yield of 4.56 and its own dynamics reach 2.50, 2.74
+        // and 4.82, so a certified year was spent travelling. 755 is the
+        // day the last of those fields enters its stationary band.
+        p.macro_burn_in_days = 755.0;
         // The market jump's negative mean buys skew and a drift together.
         // Compensating it keeps the mean, and so the skew, and returns the
         // drift: a deterministic offset moves no central moment.
@@ -2990,6 +3029,7 @@ impl ModelParams {
             "oil_seasonality_target" => self.oil_seasonality_target,
             "cycle_hazard_per_month" => self.cycle_hazard_per_month,
             "neutral_discount_rate" => self.neutral_discount_rate,
+            "macro_burn_in_days" => self.macro_burn_in_days,
             "jump_mean_compensated" => self.jump_mean_compensated,
             "cascade_symmetry" => self.cascade_symmetry,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
@@ -3142,6 +3182,7 @@ impl ModelParams {
             "oil_seasonality_target" => out.oil_seasonality_target = value,
             "cycle_hazard_per_month" => out.cycle_hazard_per_month = value,
             "neutral_discount_rate" => out.neutral_discount_rate = value,
+            "macro_burn_in_days" => out.macro_burn_in_days = value,
             "jump_mean_compensated" => out.jump_mean_compensated = value,
             "cascade_symmetry" => out.cascade_symmetry = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
@@ -3366,6 +3407,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "oil_seasonality_target",
         "cycle_hazard_per_month",
         "neutral_discount_rate",
+        "macro_burn_in_days",
         "oil_supply_response",
         "market_vol_vix_coupling",
         "mispricing_cap",

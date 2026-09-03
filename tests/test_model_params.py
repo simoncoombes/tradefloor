@@ -353,6 +353,13 @@ PERTURBATIONS = [
     # on the first tick, because every name's fair value is recomputed from
     # it before a single price is formed.
     ("neutral_discount_rate", 0.05, True),
+    # Days the economy is advanced alone before day zero. It moves the
+    # market on the first tick, because every name is valued against an
+    # economy that has travelled. It also moves `draws_consumed`, which is
+    # why it is in DRAW_SCHEDULE_MOVERS below: a burn-in consumes economy
+    # draws BY running the economy, so the count is the mechanism rather
+    # than a side effect of it.
+    ("macro_burn_in_days", 30.0, True),
     # How much of the jump's drift is given back. The compensator is
     # subtracted every day whether or not a jump fires, so unlike its two
     # neighbours it bites on the first close.
@@ -415,10 +422,13 @@ PERTURBATIONS = [
 
 
 #: Parameters whose perturbation legitimately changes the draw SCHEDULE, so
-#: the §5.2 guard below skips them. Only the VIX jump qualifies: its arrival
-#: test draws from the shared `economy` stream once a day whenever the
-#: intensity is non-zero, so turning it on consumes three extra draws over
-#: the probe's three days whether or not a jump ever fires.
+#: the §5.2 guard below skips them. Two qualify. The VIX jump's arrival test
+#: draws from the shared `economy` stream once a day whenever the intensity
+#: is non-zero, so turning it on consumes three extra draws over the probe's
+#: three days whether or not a jump ever fires. `macro_burn_in_days` runs
+#: the economy for that many days before day zero, so it consumes a
+#: burn-in's worth of economy draws; there the count IS the mechanism, and a
+#: version that drew nothing would not have advanced anything.
 #:
 #: This is not a violation today, because every shipped preset carries
 #: `vix_jump_intensity` at 0.0 and therefore draws nothing extra. It is a
@@ -426,7 +436,7 @@ PERTURBATIONS = [
 #: economy stream, so its trajectories differ from every earlier preset
 #: through the RNG as well as through the mechanism. Giving the arrival test
 #: its own stream would remove that coupling.
-DRAW_SCHEDULE_MOVERS = frozenset({"vix_jump_intensity"})
+DRAW_SCHEDULE_MOVERS = frozenset({"vix_jump_intensity", "macro_burn_in_days"})
 
 
 def test_the_perturbation_table_covers_the_whole_settable_surface():

@@ -564,7 +564,7 @@ impl Engine {
         // Read before the economy moves into the struct, and never
         // recomputed: this is where the run's nominal output starts.
         let nominal_output_base = economy.gdp * economy.cpi;
-        Self {
+        let mut engine = Self {
             nominal_output_base,
             market_rng: GameRng::substream(seed, stream::MARKET),
             economy_rng: GameRng::substream(seed, stream::ECONOMY),
@@ -604,7 +604,76 @@ impl Engine {
             current_day: 0,
             day_marks: Vec::new(),
             params,
+        };
+        engine.burn_in_economy();
+        engine
+    }
+
+    /// Advance the economy alone to the state its own dynamics reach,
+    /// before day zero.
+    ///
+    /// A BRANCH at 0.0 days, which is every preset before pt-v18: nothing
+    /// runs, nothing is drawn, and construction is what it always was.
+    ///
+    /// # What it fixes
+    ///
+    /// The economy opens at unemployment 4.00, inflation 2.00 and a
+    /// corporate yield of 4.56, and settles at 2.50, 2.74 and 4.82. So a
+    /// certified year is spent travelling rather than at rest, and the
+    /// travel is a one-way cost to the multiple. The length is measured
+    /// rather than round: the last field to enter one stationary standard
+    /// deviation of its mean is the corporate yield, on day 755.
+    ///
+    /// # Three things it does deliberately
+    ///
+    /// The draws come from the economy's own substream, so the market's
+    /// draws for day 0 onward sit exactly where they did. A burn-in
+    /// consumes economy draws by running the economy, which is the
+    /// mechanism rather than a side effect of it.
+    ///
+    /// The phase is held for the burn-in's length, because under the
+    /// hazard as written 755 days would leave an expansion. It is held by
+    /// restoring BOTH the phase and its age whenever a transition fires,
+    /// rather than the phase alone. Restoring the phase alone leaves
+    /// `months_in_current_phase` at zero, which fires the phase-change
+    /// shock on the next day and lifts growth half a point above its
+    /// target for the rest of the burn-in. The transition roll still
+    /// happens and still consumes its uniform either way.
+    ///
+    /// The clock is reset to zero at the end, so the year opens at the
+    /// start of a phase as every certified year has. Keeping the burn-in's
+    /// age would open a random distance into an expansion, which is a
+    /// different certified year and a choice rather than a correction.
+    ///
+    /// # The growth term's base
+    ///
+    /// `gdp` and `cpi` compound on every one of these days, so the base of
+    /// `earnings_nominal_growth` is re-read at the end. Left at the
+    /// pre-burn-in value it would open every valuation about nine per cent
+    /// above its earnings, which is a level jump nobody asked for and
+    /// which the ratio was never meant to carry.
+    fn burn_in_economy(&mut self) {
+        if self.params.macro_burn_in_days <= 0.0 {
+            return;
         }
+        let days = self.params.macro_burn_in_days as i64;
+        let phase = self.economy.cycle_phase;
+        for day in 1..=days {
+            let months_before = self.economy.months_in_current_phase;
+            self.advance_day(&DayAdvanceRequest {
+                volatility: 1.0,
+                active_shocks: &[],
+                market_return_pct: 0.0,
+                game_day: day,
+                timestamp: day * 24 * 60,
+            });
+            if self.economy.cycle_phase != phase {
+                self.economy.cycle_phase = phase;
+                self.economy.months_in_current_phase = months_before + 1.0 / 30.0;
+            }
+        }
+        self.economy.months_in_current_phase = 0.0;
+        self.nominal_output_base = self.economy.gdp * self.economy.cpi;
     }
 
     /// The model coefficients this engine runs. Read-only: an engine's
