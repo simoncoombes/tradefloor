@@ -1005,11 +1005,18 @@ impl PyEngine {
     /// two days' rosters needs the day before to have been kept.
     fn roster_ops_before(&self, log_start: usize) -> Vec<(String, String)> {
         let mut out = Vec::new();
-        let start = self.log[..log_start.min(self.log.len())]
+        // Spelled as a comparison rather than `.min`, because the parity
+        // scan keeps `.min` and `.max` inside `mathx` even on integers.
+        let end = if log_start > self.log.len() {
+            self.log.len()
+        } else {
+            log_start
+        };
+        let start = self.log[..end]
             .iter()
             .rposition(|e| matches!(e, crate::python_log::LogEntry::OpenMarket))
             .unwrap_or(0);
-        for entry in &self.log[start..log_start.min(self.log.len())] {
+        for entry in &self.log[start..end] {
             match entry {
                 crate::python_log::LogEntry::ListInstrument { ticker, .. } => {
                     out.push(("list_instrument".to_string(), ticker.clone()))
