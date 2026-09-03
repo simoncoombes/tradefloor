@@ -481,48 +481,63 @@ determinism digest is unmoved and the default preset is untouched.
 
 ### The oil seasonality dial
 
-`oil_seasonality_target` arrived in this branch's fourth commit, whose
-message described only the roster caveat that commit also carried. The
-dial is not mentioned in it, so a reader of that message would take an
-engine change for a documentation change. The paragraphs below correct
-the record here, where a reader of these notes will meet it.
+The daily oil update multiplied the whole new price by
+`1 + 0.03 * sin(2 pi (day_of_year - 90) / 365)`. A shape applied to a level
+every day compounds, so what a window sees is the product of its factors:
+5.119 over the 252 game-days a certified year passes, and 0.921 over a full
+365. The shape is near neutral over its own period and the horizon slices
+it, taking 162 days of the up leg against 90 of the down. Summing the
+term's own contribution to each day's change over year one gives +365.80 of
+oil price against a net change of +72.10, so it pushed about five times
+harder than the price moved and the mean reversion of 0.03 a day absorbed
+the rest. Oil had no fixed point under it. It was a forced limit cycle with
+a 365-day period that sat on its 150.0 clamp from day 180 on every seed,
+and the inflation term, the meeting rule and the discount rate followed it
+there.
 
-What it does. The daily oil update multiplied the whole price level by a
-seasonal factor, so the factor compounded and its integral over a window
-shorter than its 365-day period read as a trend. At 1.0 the factor moves
-the target the price reverts to instead, and the amplitude is split
-between the two rather than added, so the pair's total is preserved. At
-0.0, which is every preset before pt-v18, the original arithmetic runs in
-its original order.
+`oil_seasonality_target` moves the shape onto the price the process reverts
+toward. At 1.0 the whole amplitude multiplies the target and the level's
+own factor is exactly 1.0, so the shape modulates where the price is pulled
+toward by plus or minus 3 per cent and integrates to +0.672 per cent of oil
+over a certified year. Between the ends the amplitude is split, `1 + g*a`
+on the target and `1 + (1-g)*a` on the level, so its total is conserved and
+only the point of application moves. The 0.03 is the amplitude the term
+already carried, and this dial is a share of it. At 0.0, which is every
+preset before pt-v18, the original arithmetic runs in its original order.
 
 What it is worth, over five seeds at 252 days on the panel roster, paired
 on the seed so the roster's own opening level cancels. The index gains
 +1.303 points a year at the median in the log convention and +1.293 as a
-portfolio, on 5 of 5 seeds, with a range of +1.105 to +1.914. The
-convention gap moves -0.009, so both conventions carry the same gain and
-the move is in the closes. All of the gain arrives through the
-discount rate: the fair value channel carries +1.263 on every seed and
-the mispricing channel +0.021 with the seeds split. Inflation at day 251
-falls 1.055 points and the corporate bond yield 0.795, each on 5 of 5.
+portfolio, on 5 of 5 seeds, in a range of +1.105 to +1.914. The convention
+gap moves -0.009, so both conventions carry the same gain and the move is
+in the closes. All of it arrives through the discount rate, which is the
+route the mechanism predicts: the fair value channel carries +1.263 on
+every seed and the mispricing channel +0.021 with the seeds split.
+Inflation at day 251 falls 1.055 points and the corporate bond yield 0.795,
+each on 5 of 5.
 
-Oil stops reaching its clamp. Days spent at 150.0 fall from a median of
-69 to zero on every seed, and the highest price any seed reaches is 108.6
-where the arm without the dial reaches 150.0. The day-251 median is 93.1,
-against the 86.7 the seasonal term's own arithmetic predicts on a target
-near 85; the difference is the inventory pressure, the dollar drag and
-the OPEC rule, which the compounding factor used to dominate.
+Oil stops reaching its clamp. Days spent at the 150.0 ceiling fall from a
+median of 69 to zero on every seed, and the highest price any seed reaches
+is 108.6 where the arm without the dial reaches 150.0. That is the plainest
+statement of the defect being gone. The day-251 median is 93.1, against the
+86.7 the seasonal term's own arithmetic predicts on a target near 85, and
+the difference is the inventory pressure, the dollar drag and the OPEC
+rule, which the compounding factor used to dominate.
 
-The certified panel reads 14 of 14 over seeds 101 to 110 where the arm
-without the dial reads 13 of 14, and the row that decides it is not
-moved. The leverage effect has a ceiling of exactly 0.00 and reads
-+0.0035 without the dial against -0.0005 with it, on an across-seed noise
-of 0.0760 and a per-seed spread of 0.029 at ten seeds. Between five and
-seven of the ten seeds sit above the ceiling in either arm. The band call
-therefore turns on 0.004, a twentieth of the row's own noise, and the row
-straddles its ceiling rather than crossing it.
+The certified panel moves, and the row that moves it does not resolve. Over
+seeds 101 to 110 the arm without the dial reads 13 of 14 and the arm with
+it 14 of 14, while pt-v18 as it ships, carrying the cycle dial as well,
+reads 13 of 14 again. One row decides all three. The leverage effect has a
+ceiling of exactly 0.00 and reads +0.0035, -0.0005 and +0.0038 across
+those arms, on an across-seed noise of 0.0760 and a per-seed spread of
+0.029 at ten seeds, with between five and seven of the ten seeds above the
+ceiling in every arm. The whole excursion is 0.004, a twentieth of the
+row's own noise. That row has sat outside its band since the oil supply
+commit, and these figures say it straddles a ceiling at a resolution ten
+seeds cannot settle.
 
-The thirty-seed distribution and the four-year arm are measured
-elsewhere, because neither runs on one machine.
+The thirty-seed distribution and the four-year arm are measured elsewhere,
+because neither runs on one machine.
 
 ### The cycle hazard's monthly scale
 
