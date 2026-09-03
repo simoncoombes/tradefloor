@@ -4,39 +4,38 @@
 
 **Every `Universe.random` roster re-rolls**; pin 0.6.2.
 
-**The panel reports index drift**, ungraded.
+**A new preset, pt-v18, returns five first moments the model injected and
+grows fair value with nominal output**, taking the equal-weight index from
+-16.150 per cent a year to -0.340 as a portfolio return, and from -18.344
+to -2.304 in log returns, with the default preset left where it was.
+
+**The index drift row reports a daily-rebalanced portfolio return**, about
+two points above the log convention the decompositions use.
 
 **A run can commit to the state it held at the end of every day**, and a
-sampled check verifies k days for the cost of k days.
+sampled check verifies k days for that cost.
 
 **The per-name volume states follow the roster**, moving the volume-idio
-generator of any run that lists or delists, breaking such runs' old
-checkpoints and letting the day ledger check them.
+generator of any run that lists or delists.
 
 **Every print decomposes into the shock that arrived, the depth that
-absorbed it and the breaker's share, with a counterfactual against
-unbounded depth on request.**
+absorbed it and the breaker's share**, with a counterfactual against
+unbounded depth on request.
 
-**Every draw has an address**, a table of substitutions can replace one,
-and a second `run_days` call numbers days from the engine's own counter.
+**Every draw has an address**, a substitution table replaces one, a
+surgery installs a window of them, and a second `run_days` call numbers
+days from the engine's own counter.
 
-**A surgery replaces one draw**, a window of them, or another world's,
-and the record says whether it could bite.
+**Each draw's effect on a target is measured** by a finite difference, and
+a shadow run solves a real year for the draws behind its closes.
 
-**Each draw's effect on a target is measured** by a finite difference,
-and the rows carry the residual by which they miss the joint effect.
-
-**A shadow run walks the engine along a real year**, solving each day for
-the draws that reproduce its observed closes.
+**The browser build compiles again**, after a stale file path broke it.
 
 **A mechanism is a specification the engine's Rust is generated from**,
-checked for its draw effect and proven inert at its default doses.
+checked for its draw effect and proven inert.
 
 **A day's move decomposes to the draws that seeded it**, and every node
-of the tree replays from the state the day started in.
-
-**The browser build compiles again**, after a leftover file path from
-an old rename broke it outright.
+replays from the state the day started in.
 
 <!-- release-note-ends -->
 
@@ -260,8 +259,8 @@ The rule fires every 90 days, so its bias is about +0.95 of oil price per
 firing and under +3 across a year against a price that moves by 70. Over
 thirty seeds the index drift, in the log convention, moves from -9.865 to
 -9.871, a paired median of exactly 0.000. This is a correctness fix on a
-rule that was wrong, and it is recorded separately so that it is not
-mistaken for one of the terms that moves the number.
+rule that was wrong. It has its own section so a reader can hold it apart
+from the terms that move the number.
 
 ### The compensated market jump
 
@@ -368,11 +367,10 @@ leaves the index near zero, and a real equal-weight price index returns
 eight to nine per cent a year nominal.
 
 A premium placed in the mispricing process settles at a level. Under a
-constant drift per step the stationary mean solves
-`m = phi * m + c`, so the premium settles at `c / (1 - phi)` on the
-sixty-day half-life and grows no further. Simulated at three, six and nine
-per cent a year it gave levels of +0.010, +0.021 and +0.031 with
-third-year growth of zero.
+constant drift per step the stationary mean solves `m = phi * m + c`, so
+the premium reaches `c / (1 - phi)` on the sixty-day half-life and grows
+no further. Simulated at three, six and nine per cent a year it gave
+levels of +0.010, +0.021 and +0.031 with third-year growth of zero.
 
 `earnings_nominal_growth` puts the term in fair value instead, from a
 quantity the economy already integrates. The macro chain compounds `gdp`
@@ -386,8 +384,23 @@ hold still. At 0.0, which is every preset before pt-v18, the branch is not
 taken and the trajectory is bit-identical.
 
 The term states no rate of its own. It reads the level the economy
-reached, so a contraction year delivers a negative number through the same
-arithmetic, which is the behaviour a mechanism has and a constant lacks.
+reached, so the rate falls with growth and inflation wherever the cycle
+takes them, and it goes below zero when the two turn negative together.
+Measured over 1008 days on seed 1, where the cycle leaves expansion and
+the run ends in a trough, nominal output reaches a ratio of 1.0685, which
+is 1.67 per cent a year against the 4.342 a certified year delivers. So
+4.34 is a property of the opening expansion rather than of the model, and
+anyone quoting the term has to say over what window.
+
+The two figures bracket the model's own long-run number, and the cycle
+clock decides where inside them it falls. The business-cycle hazard draws
+a monthly scale once a day, so a phase change arrives about thirty times
+too often: 63 per cent of certified years opening in expansion see one
+against 3 per cent on the per-month reading. The 1.67 is therefore
+measured on a model that leaves expansion far more often than it should,
+and the true figure sits between the two and nearer the upper one. That
+makes the cycle correction worth more than its own row suggested, since
+it decides what this term delivers over any window longer than a year.
 
 The clock is the part of this that is easy to get wrong. The economy
 compounds on a 365-day year and advances once per market day, while the
@@ -399,6 +412,40 @@ the run, and `(3.353 + 2.931) * 252 / 365` is 4.339 against a measured
 mean of 4.340. A test states that as an identity against the rates a run
 held rather than as a value.
 
+Measured over thirty seeds on the panel roster at 252 days, in the log
+convention, which is the one every section above uses.
+
+| quantity | median | mean | min | max | sd |
+|---|---|---|---|---|---|
+| index drift before | -6.832 | -8.208 | -23.706 | +1.410 | 6.418 |
+| index drift after | -2.304 | -3.816 | -19.213 | +5.628 | 6.335 |
+| recovered, paired per seed | +4.383 | +4.392 | +3.996 | +5.165 | 0.200 |
+| nominal output integrated | +4.342 | +4.339 | +4.019 | +4.540 | 0.115 |
+| recovery less nominal | +0.013 | +0.053 | -0.166 | +0.911 | 0.189 |
+
+Every one of the thirty improves, and nine finish the year positive
+against two before. The last row is the claim: the term delivers the
+level the economy integrated and 0.013 of a point besides, with fifteen
+seeds either side of zero, so it reads the economy rather than adding
+anything of its own. In this row's own reporting convention, the
+daily-rebalanced portfolio, the same thirty seeds read a median of -0.340
+with thirteen above zero, against pt-v16's -16.150 with none.
+
+The trailing multiple stays far from the cycle's gate inside the window
+everything here is measured on. Over the same thirty seeds it reads a
+median of 21.547 at day 251, a maximum of 24.220, and crosses 28 on none
+of them.
+
+The certified panel does not move. Thirteen of fourteen rows are in band
+before and after, the largest paired median shift is 0.18 of that row's
+own across-seed noise, and the row outside is the leverage effect at
++0.0035 against a ceiling of exactly 0.00. Its paired median moves -0.0004
+under this step, which is toward the band, and its level sits at a
+twentieth of its own across-seed standard deviation of 0.0760 above a
+boundary drawn at zero. Seven of the ten panel seeds are above that
+boundary and three below. The reading is about a band placed at exactly
+zero rather than about this step.
+
 The earnings share of nominal output is held constant, and the model
 carries no quantity for that share, so 1.0 is the only setting read off
 the process rather than chosen. A real price index also earns a return
@@ -407,10 +454,21 @@ worth three to four points a year. This model has nothing to derive that
 from, so the gap is named here and left.
 
 The trailing market multiple reads the same restated earnings. The daily
-macro step computes a market-cap-weighted price over earnings and the
-expansion hazard treats a multiple above 28 as fragility, so a day-zero
-earnings figure divided into a price that grew with nominal output would
-report a multiple rising because the mechanism ran.
+macro step computes a market-cap-weighted price over earnings, and the
+expansion hazard adds `min(0.1, (pe - 28) * 0.005)` a day above a multiple
+of 28, so a day-zero earnings figure divided into a price that grew with
+nominal output would report a multiple rising because the mechanism ran.
+
+What that is worth was measured on one trajectory rather than argued,
+since the restatement is a single factor across names and the multiple a
+day-zero denominator would give is the engine's own times the ratio on the
+same day. Over 1008 days on seed 1 the restated multiple ends at 30.214
+and crosses 28 on 32 days, for a summed hazard of 0.2536; the day-zero
+denominator gives 32.284, 42 days and 0.6344. Inside a certified year
+neither reaches the gate, because the multiple at day 251 is 21.671 at a
+ratio of 1.0448. So this part of the change is worth nothing over the
+window everything here is measured on and a third of the expansion hazard
+over four years. The second number is what it is in the change for.
 
 `N_0` is engine state and rides in the snapshot, so the state hash covers
 one more field and a ledger leaf taken on an earlier build of this release
@@ -420,6 +478,26 @@ the shape of every preset's coefficient vector, so both committed records
 gained the new name at its inert default and a new digest, through the
 mode that rewrites those two fields and refuses any moved coefficient. The
 determinism digest is unmoved and the default preset is untouched.
+
+### The commit the measurements name
+
+Every figure in the section above was measured on a build of a commit
+that is no longer reachable from this branch. The two commits that carry
+the growth term and the convention change were pushed, the second was
+then amended to rewrap five paragraphs, and the branch was force-pushed,
+which orphaned the commit the sweep had already stamped into its output
+files.
+
+The tree is unaffected. The amended commit differs from the orphaned one
+in CHANGELOG.md prose alone, so the build the numbers came from is the
+build this branch carries. What was lost is the ability to resolve the
+SHA those files name, and resolving it is the whole use of a citation.
+
+So the SHA to cite for every figure here is this branch's second commit,
+and the orphaned one should be read as an earlier spelling of the same
+tree. The rule that produced this is worth keeping: a branch whose
+commits are stamped into measurement output is a branch that is never
+rewritten, and prose is not an exception to that.
 
 ### The index convention
 
@@ -461,12 +539,18 @@ seed=111)` held fixed.
 
 That roster opens 0.78 of a population standard deviation above fair
 value, so its LEVEL carries a draw as well as a model: one build reads
--8.603 on it against +3.989 and +7.050 on rosters 204 and 209. A paired
-difference between two arms on the held roster is a property of the model,
-because the roster's own draw is common to both and cancels. A level is a
-property of that roster, and a level that has to describe the model is
-measured by varying the universe seed instead. The paragraph is in the
-row's docstring as well, since that is where a reader meets the number.
+-8.603 on it against +3.989 and +7.050 on rosters 204 and 209. Those three
+across-roster figures come from the era's roster sweep rather than from
+any arm here, and the design note carries them with the roster's +0.038
+mean log deviation, the population mean of -0.002 and the across-roster
+standard deviation of 0.052 that the 0.78 is computed from.
+
+A paired difference between two arms on the held roster is a property of
+the model, because the roster's own draw is common to both and cancels. A
+level is a property of that roster, and a level that has to describe the
+model is measured by varying the universe seed instead. The paragraph is
+in the row's docstring as well, since that is where a reader meets the
+number.
 
 ### The index drift row
 

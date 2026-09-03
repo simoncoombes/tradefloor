@@ -1939,9 +1939,18 @@ impl Engine {
         // company has are its day-0 figure restated in today's price level
         // and output. Reading the day-0 figure against a price that grew
         // with nominal output would report a multiple that rose because
-        // the mechanism ran, and the expansion hazard in
-        // `economy::cycle` treats a multiple above 28 as fragility. Exactly
-        // 1.0 under every preset before pt-v18.
+        // the mechanism ran, and the expansion hazard in `economy::cycle`
+        // adds `min(0.1, (pe - 28) * 0.005)` a day above a multiple of 28.
+        //
+        // Measured on one trajectory, pt-v18 on `Universe.random(40,
+        // seed=111)` seed 1 over 1008 days: the restated multiple ends at
+        // 30.214 and crosses 28 on 32 days for a summed hazard of 0.2536,
+        // and the day-0 denominator on the same tape gives 32.284, 42 days
+        // and 0.6344. Inside a certified year neither reaches the gate:
+        // the multiple at day 251 is 21.671 at a ratio of 1.0448, so this
+        // is worth nothing over 252 days and a third of the expansion
+        // hazard over four years. Exactly 1.0 under every preset before
+        // pt-v18.
         let nominal = crate::market::tick::nominal_scale(
             &self.params, &self.economy, self.nominal_output_base);
         for c in self.companies() {

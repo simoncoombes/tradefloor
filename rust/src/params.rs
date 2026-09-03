@@ -825,13 +825,22 @@ pub struct ModelParams {
     ///
     /// This term states no rate of its own. It reads the level the economy
     /// reached, so whatever the macro chain integrated is what the
-    /// valuation carries, and a contraction year delivers a negative
-    /// number through the same arithmetic. Measured on
+    /// valuation carries, and the rate falls with growth and inflation
+    /// wherever the cycle takes them. Measured on
     /// `Universe.random(40, seed=111)` over 252 days at pt-v18, seeds 1 to
     /// 6, it delivers a median of +4.353 per cent per trading year, with
     /// mean growth of 3.353 and mean inflation of 2.931 over the run;
     /// `(3.353 + 2.931) * 252 / 365` is 4.339, which is the clock stated as
     /// a number.
+    ///
+    /// That 4.353 is a property of the opening expansion rather than of
+    /// the model. On the same roster, seed 1, over 1008 days, the run
+    /// leaves expansion and ends in a trough, and nominal output reaches a
+    /// ratio of 1.0685, which is 1.67 per cent a year. The term goes below
+    /// 1.0 whenever `gdp * cpi` falls under its opening value, which is
+    /// growth plus inflation turning negative together. A flat premium
+    /// would have paid the same rate through all of that, which is the
+    /// reason this is a mechanism.
     ///
     /// # A company listed mid-run
     ///

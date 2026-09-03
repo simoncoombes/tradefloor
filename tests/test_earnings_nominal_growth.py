@@ -125,6 +125,13 @@ def test_the_dial_at_zero_reproduces_the_market_bit_for_bit():
     preset, so the arm differs in this one field and in nothing else. The
     state hash rather than a spot price, because the claim covers the whole
     market and the macro chain it prices against.
+
+    The macro chain is the half that matters for the trailing multiple.
+    ``market_pe`` reads the same restated earnings the valuation does, it
+    is inside the economy the state hash covers, and the business cycle's
+    expansion hazard reads it, so a multiple that moved with the dial at
+    zero would move a trajectory on every preset before pt-v18. The
+    comparison below covers it because the economy is in the digest.
     """
     off = tf.ModelParams.from_preset("pt-v18", earnings_nominal_growth=0.0)
     zeroed = _engine(off)
@@ -206,6 +213,15 @@ def test_the_scale_is_the_economys_own_ratio():
         got = truth["fundamental_value"][row]
         assert got == pytest.approx(expected, rel=1e-12), (
             f"slot {slot}: engine {got}, derived {expected}")
+        # The channel, stated as the identity rather than as a tolerance.
+        # Against the SAME economy the term is the only difference between
+        # the two valuations, so the log gap is the log of nominal output's
+        # growth exactly, for every name and every tick. A term that
+        # reached the discount rate, the anchor or the growth premium would
+        # leave a residual here.
+        unscaled = _derived(universe[slot], economy, 1.0)
+        assert math.log(got) - math.log(unscaled) == pytest.approx(
+            math.log(scale), rel=0.0, abs=1e-14), (slot, got, unscaled)
         checked += 1
     assert checked == ROSTER * TICKS
 
@@ -235,6 +251,57 @@ def test_an_unscaled_valuation_disagrees_with_the_engine():
     assert disagreed == ROSTER * TICKS, (
         f"{ROSTER * TICKS - disagreed} rows valued at their unscaled "
         "fundamentals")
+
+
+def test_a_loss_maker_grows_off_its_restated_book():
+    """The book path, valued end to end.
+
+    A profitable company is valued on earnings times a multiple and a
+    loss-maker at ``book_value_per_share * LOSS_MAKING_PRICE_TO_BOOK``, so
+    the two paths read different fundamentals and a term that scaled only
+    earnings would leave every loss-maker's fair value falling in real
+    terms for ever. ``Universe.random(8, seed=111)`` carries no loss-maker,
+    which is why this builds one rather than relying on the roster the
+    other arms use.
+    """
+    probe = tf.Instrument("LOSS", "transportation", initial_price=24.0,
+                          shares_outstanding=1e9, eps=-2.5,
+                          book_value_per_share=20.0, revenue_growth=-0.10,
+                          avg_volume=5e6, beta=1.1, short_interest=1e6)
+    universe = tf.Universe([probe])
+    universe.extend(tf.Universe.random(7, seed=UNIVERSE_SEED))
+    engine = tf.Engine(seed=SEED, universe=universe, model="pt-v18")
+
+    days = 120
+    for day in range(days - 1):
+        engine.open_market()
+        engine.run_session(9, 30, 3, TICKS)
+        engine.record(day)
+        engine.close_market()
+
+    economy = engine.state_snapshot()["economy"]
+    base = engine.state_snapshot()["nominal_output_base"]
+    scale = economy["gdp"] * economy["cpi"] / base
+    assert scale > 1.0005, scale
+
+    engine.open_market()
+    engine.run_session(9, 30, 3, TICKS)
+    engine.record(days - 1)
+    truth = pa.table(engine.truth(day=days - 1)).to_pydict()
+
+    # LOSS_MAKING_PRICE_TO_BOOK, from `rust/src/fair_value.rs`. The book
+    # path ignores the multiple and the discount rate, so the whole of the
+    # valuation is this product and the scale is the only thing that can
+    # have moved it.
+    expected = 20.0 * scale * 1.2
+    rows = [truth["fundamental_value"][i]
+            for i, slot in enumerate(truth["instrument_id"]) if slot == 0]
+    assert rows, "the probe was not valued"
+    for value in rows:
+        assert value == pytest.approx(expected, rel=1e-12), (value, expected)
+        # And the unscaled book would be a different number, so a build
+        # that scaled only earnings fails here.
+        assert value != pytest.approx(20.0 * 1.2, rel=1e-9)
 
 
 def test_the_base_survives_a_restore():

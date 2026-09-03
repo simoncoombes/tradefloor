@@ -978,10 +978,41 @@ def _index_drift_pct(
 
     The two differ by half the cross-sectional variance of the daily
     returns, which is Jensen's term and is positive whenever the names
-    disperse at all. On `Universe.random(40, seed=111)` at 252 days it was
-    measured at 1.910 points with a standard deviation of 0.190 over eight
-    seeds, so a figure quoted without its convention is wrong by about two
-    points of annual index level.
+    disperse at all. That is measured rather than argued. On
+    `Universe.random(40, seed=111)` over 252 days, seeds 1 to 30:
+
+    | arm | gap, points a year | half the variance | worst miss |
+    |---|---|---|---|
+    | pt-v16 | +2.067 median, sd 0.297 | +2.066 | 0.010 |
+    | pt-v18 | +1.927 median, sd 0.236 | +1.919 | 0.011 |
+
+    So predicting the gap as half the summed cross-sectional variance is
+    accurate to about a hundredth of a point across sixty seed-years, and
+    the residual is centred at -0.001 with a standard deviation of 0.005.
+    An independent sweep regressed the gap on that variance and read a
+    slope of 1.0081, an intercept of -0.0160 and an r squared of 0.9982,
+    and read +2.064 on the shipped default over thirty seeds with the
+    prediction accurate to a median of 0.011 and a worst case of 0.036.
+
+    # Why a band forces the choice
+
+    The gap is a variance rather than an offset anyone could subtract
+    once. It moves with anything that moves dispersion: across thirty-one
+    rosters it reads 1.914 with a standard deviation of 0.075, and across
+    the arms of one era it runs from 1.494 to 1.952, because an arm that
+    changes dispersion changes the gap by construction.
+
+    So grading the log-mean row against a band derived from a real index
+    would grade a different statistic whose offset from the band's own
+    quantity varies with the preset under test. The row and its band have
+    to name one convention.
+
+    The choice then follows. A band in the log convention exists only by
+    deriving it in that convention from real data, which means computing
+    the cross-sectional variance of a real index's constituents over a
+    matched window rather than taking a published index return, and nobody
+    has done that derivation. Reporting the portfolio number needs no new
+    derivation at all.
 
     # Which seed varies, and for which question
 
@@ -993,33 +1024,49 @@ def _index_drift_pct(
     measured on.
 
     That roster opens 0.78 of a population standard deviation above fair
-    value, so its LEVEL carries a draw as well as a model: the same build
-    reads -8.603 on it against +3.989 and +7.050 on rosters 204 and 209. A
-    paired difference between two arms on the held roster is a property of
-    the model, because the roster's own draw is common to both arms and
+    value, so its LEVEL carries a draw as well as a model: one build reads
+    -8.603 on it against +3.989 and +7.050 on rosters 204 and 209. Those
+    three across-roster figures come from the era's roster sweep and are
+    recorded in the design note `programme/index-architecture.md`, which
+    also carries roster 111's +0.038 mean log deviation, the population
+    mean of -0.002 and the across-roster standard deviation of 0.052 that
+    the 0.78 is computed from.
+
+    A paired difference between two arms on the held roster is a property
+    of the model, because the roster's own draw is common to both arms and
     cancels. A level is a property of that roster, and a level that has to
     describe the model is measured by varying the universe seed instead.
 
     # Measured
 
-    All three figures are the LOG convention, on pt-v16,
-    `Universe.random(40, seed=111)`, 252 days, seeds 1 to 30, and each
-    names the commit it was taken at.
+    Every figure in the table is the LOG convention, on
+    `Universe.random(40, seed=111)`, 252 days, seeds 1 to 30, which are the
+    drift seeds rather than the ten panel seeds beside them. Taking the
+    median over all forty rows of a file that carries both reads -18.525
+    where the drift seeds read -18.344, so the two sets are separated
+    wherever a figure is quoted.
 
     | build | median | min | max | seeds above zero |
     |---|---|---|---|---|
-    | `df0fe62` on `origin/dev` | -22.155 | -43.797 | -16.360 | 0 of 30 |
-    | the reconciled generator | -18.344 | -39.896 | -12.526 | 0 of 30 |
+    | pt-v16 at `df0fe62` | -22.155 | -43.797 | -16.360 | 0 of 30 |
+    | pt-v16, reconciled generator | -18.344 | -39.896 | -12.526 | 0 of 30 |
+    | pt-v18, the finished era | -2.304 | -19.213 | +5.628 | 9 of 30 |
+
+    In this row's own convention the last of those reads -0.340, with a
+    minimum of -16.827, a maximum of +7.686 and 13 of 30 seeds above zero,
+    against pt-v16's -16.150 and 0 of 30. The two conventions are 1.9 to
+    2.1 points apart on this roster and both are quoted so that neither
+    can be read as the other.
 
     The derivation of the first row is
     `tradefloor-design/programme/index-drift-investigation.md`, and the
     terms it names are a down tilt in the market factor, a rising rate
     path, a negative jump mean, an asymmetric stop cascade and the
     roster's own opening condition. The pt-v18 era gives each of those
-    back and adds a growth term; its own figures are in
-    `tradefloor-design/programme/index-architecture.md`, and they are in
-    the log convention too, so about 1.9 points is added to each of them
-    to read them in this row's convention.
+    back and adds a growth term; its own figures are in the design note
+    `programme/index-architecture.md`, and they are in the log convention
+    too, so about 1.9 points is added to each of them to read them in this
+    row's convention.
 
     # There is no band, deliberately
 
