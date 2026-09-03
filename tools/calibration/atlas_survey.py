@@ -183,6 +183,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # other way. So the box is the closed unit interval and its top is
     # where the process is stationary.
     "oil_supply_response": (0.0, 1.0),
+    # How much of the OPEC rule's direction is removed. A share again:
+    # 0.0 is the rule as written, 1.0 is the symmetric form that keeps its
+    # total intervention, and past 1.0 the two branches would cross and the
+    # rule would push oil DOWN on net, which is the asymmetry inverted.
+    "oil_opec_symmetry": (0.0, 1.0),
     # EMA days on the VIX the market variance target reads (round 99).
     # Measured dead at 3 and 10 along the driven window; 20 trading days
     # is a month of smoothing, past which the fear response is no longer

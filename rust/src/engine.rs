@@ -1660,6 +1660,7 @@ impl Engine {
                 usd_crisis_vix_threshold: self.params.usd_crisis_vix_threshold,
                 daily_credit_floor_gain: self.params.daily_credit_floor_gain,
                 oil_supply_response: self.params.oil_supply_response,
+                oil_opec_symmetry: self.params.oil_opec_symmetry,
                 volatility: request.volatility,
                 active_shocks: request.active_shocks,
                 market_return_pct: request.market_return_pct,

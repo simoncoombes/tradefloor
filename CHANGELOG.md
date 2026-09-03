@@ -235,6 +235,33 @@ exceedance is 0.008 of the row's own across-seed noise, so it is a hair.
 The era is uncertified until the five steps are done, and the panel that
 counts is the one measured then.
 
+### The symmetrised OPEC rule
+
+The rule reacts to the oil price against an 80 target. Below it by more
+than 10 it cuts production with probability 0.6 and magnitude 3 to 6; above
+it by more than 10 it raises production with probability 0.5 and magnitude
+2 to 5. Expected `+2.700` against `-1.750`, so the cut is 1.54 times the
+increase and the rule pushes oil up on net. The two branches read as a pair
+that should mirror, and nothing in the code says the difference was
+intended.
+
+`oil_opec_symmetry` at 1.0 gives both sides one probability and one
+magnitude range, each the mean of the two the rule already carries:
+probability 0.55, magnitude 2.5 to 5.5. That is the one symmetric rule that
+preserves the total intervention the rule performs, so it removes the
+direction without choosing a side and without inventing a number. Expected
+impact is then equal and opposite, and zero on net. At 0.0, every preset
+before pt-v18, the original arithmetic runs in the original order and the
+same draws are consumed in the same places.
+
+**It is worth nothing on the drift.** It is corrected because it is wrong.
+The rule fires every 90 days, so its bias is about +0.95 of oil price per
+firing and under +3 across a year against a price that moves by 70. Over
+thirty seeds the index drift moves from -9.865 to -9.871, a paired median
+of exactly 0.000. This is a correctness fix on a rule that was wrong, and
+it is recorded separately so that it is not mistaken for one of the terms
+that moves the number.
+
 ### The index drift row
 
 `facts.panel_statistics` reports `index_drift_pct`, the annualised log

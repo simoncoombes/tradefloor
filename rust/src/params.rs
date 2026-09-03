@@ -633,6 +633,33 @@ pub struct ModelParams {
     /// and a two-sided rate path without any of them being made two-sided
     /// by hand.
     pub oil_supply_response: f64,
+    /// Removes the direction from the OPEC rule while keeping its size.
+    /// 0.0 -- every preset before pt-v18 -- is bit-identical.
+    ///
+    /// # The asymmetry nobody chose
+    ///
+    /// The rule reacts to the oil price against an 80 target. Below it by
+    /// more than 10 it cuts production with probability 0.6 and magnitude
+    /// 3 to 6; above it by more than 10 it raises production with
+    /// probability 0.5 and magnitude 2 to 5. Expected `+2.700` against
+    /// `-1.750`, so the cut is 1.54 times the increase and the rule pushes
+    /// the oil price up on net. Nothing in the code says that was intended
+    /// and the two branches read as a pair that should mirror.
+    ///
+    /// # Symmetrised rather than picked
+    ///
+    /// At 1.0 both branches use one probability and one magnitude range,
+    /// each the mean of the two the rule already carries: probability
+    /// 0.55, magnitude 2.5 to 5.5. That is the unique symmetric rule which
+    /// preserves the total intervention the rule performs, so it removes
+    /// the direction without choosing a side and without inventing a
+    /// number. Expected impact is then equal and opposite either side of
+    /// the target, and zero on net.
+    ///
+    /// It is worth about +0.95 of oil price per firing and the rule fires
+    /// every 90 days, so this is a small term. It is corrected because it
+    /// is wrong rather than because it is large.
+    pub oil_opec_symmetry: f64,
     /// Persistence of the SLOW variance component (Engle-Lee style). The
     /// market factor's variance carries two timescales from the pt-v4 era:
     /// the fast one above tracks the VIX-scaled target, this one carries
@@ -1485,6 +1512,7 @@ impl ModelParams {
             market_beta_down_asym_lag: 0.0,
             market_beta_down_asym_recentre: 0.0,
             oil_supply_response: 0.0,
+            oil_opec_symmetry: 0.0,
             // Legacy values: the slow component is OFF, and the update
             // reduces to the single-component form bit for bit.
             market_vol_slow_persistence: 0.0,
@@ -2484,6 +2512,10 @@ impl ModelParams {
         // driftless, which is the stationarity condition of the process
         // rather than a level chosen to hit a number.
         p.oil_supply_response = 1.0;
+        // The OPEC rule cuts harder than it raises, 2.700 against 1.750, so
+        // it pushes oil up on net. Symmetrised at the mean of its own two
+        // branches, which removes the direction without choosing a side.
+        p.oil_opec_symmetry = 1.0;
         p
     }
 
@@ -2583,6 +2615,7 @@ impl ModelParams {
             "market_beta_down_asym_lag" => self.market_beta_down_asym_lag,
             "market_beta_down_asym_recentre" => self.market_beta_down_asym_recentre,
             "oil_supply_response" => self.oil_supply_response,
+            "oil_opec_symmetry" => self.oil_opec_symmetry,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
@@ -2728,6 +2761,7 @@ impl ModelParams {
             "market_beta_down_asym_lag" => out.market_beta_down_asym_lag = value,
             "market_beta_down_asym_recentre" => out.market_beta_down_asym_recentre = value,
             "oil_supply_response" => out.oil_supply_response = value,
+            "oil_opec_symmetry" => out.oil_opec_symmetry = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
@@ -2942,6 +2976,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_beta_down_asym",
         "market_beta_down_asym_lag",
         "market_beta_down_asym_recentre",
+        "oil_opec_symmetry",
         "oil_supply_response",
         "market_vol_vix_coupling",
         "mispricing_cap",

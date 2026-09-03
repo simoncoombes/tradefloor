@@ -326,6 +326,11 @@ PERTURBATIONS = [
     # the dead zone and the prices are identical. The dial bites around day
     # 120, when the unanswered-demand arm reaches the floor.
     ("oil_supply_response", 0.5, False),
+    # How much of the OPEC rule's direction is removed. INERT over a probe
+    # this short for a plainer reason than its neighbour: the rule fires
+    # only every 90 days and the probe runs three, so the branch is never
+    # reached and no draw it would change is taken.
+    ("oil_opec_symmetry", 0.5, False),
     # The exponent on the VIX ratio in the market variance target. The
     # endogenous VIX leaves its anchor on day one, so the ratio is never
     # exactly 1.0 and any exponent but the shipped one moves the target.

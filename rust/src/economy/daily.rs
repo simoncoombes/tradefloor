@@ -140,6 +140,10 @@ pub struct DailyInputs<'a> {
     /// for why the zero is a defect rather than a modelling choice, and why
     /// 1.0 is the derived value.
     pub oil_supply_response: f64,
+    /// Removes the direction from the OPEC rule while keeping its size.
+    /// 0.0 disables it, which is what every shipped preset sets and what
+    /// the reference implementation does. See `ModelParams::oil_opec_symmetry`.
+    pub oil_opec_symmetry: f64,
 }
 
 impl<'a> Default for DailyInputs<'a> {
@@ -169,6 +173,7 @@ impl<'a> Default for DailyInputs<'a> {
             usd_crisis_vix_threshold: CRISIS_VIX_THRESHOLD,
             daily_credit_floor_gain: 0.0,
             oil_supply_response: 0.0,
+            oil_opec_symmetry: 0.0,
         }
     }
 }
@@ -591,15 +596,30 @@ pub fn update_economy_daily(
         let opec_target = 80.0;
         let price_diff = oil_price - opec_target;
 
+        // The two outer branches are a pair that should mirror and do not:
+        // 0.6 at 3-to-6 against 0.5 at 2-to-5 is an expected +2.700 against
+        // -1.750, so the rule pushes oil UP on net. At symmetry 1.0 both
+        // sides use the mean of the rule's own two probabilities and the
+        // mean of its own two magnitude ranges, which is the one symmetric
+        // rule that keeps the total intervention it performs.
+        //
+        // A branch, so 0.0 takes the original arithmetic in the original
+        // order and consumes the same draws in the same places either way.
+        let (cut_p, cut_lo, raise_p, raise_lo) = if inputs.oil_opec_symmetry == 0.0 {
+            (0.6, 3.0, 0.5, 2.0)
+        } else {
+            let g = inputs.oil_opec_symmetry;
+            (0.6 - 0.05 * g, 3.0 - 0.5 * g, 0.5 + 0.05 * g, 2.0 + 0.5 * g)
+        };
         if price_diff < -10.0 {
             // Well below target: likely a production cut.
-            if rng.next_f64() < 0.6 {
-                opec_impact = 3.0 + rng.next_f64() * 3.0;
+            if rng.next_f64() < cut_p {
+                opec_impact = cut_lo + rng.next_f64() * 3.0;
             }
         } else if price_diff > 10.0 {
             // Well above target: likely a production increase.
-            if rng.next_f64() < 0.5 {
-                opec_impact = -(2.0 + rng.next_f64() * 3.0);
+            if rng.next_f64() < raise_p {
+                opec_impact = -(raise_lo + rng.next_f64() * 3.0);
             }
         } else {
             // In the comfort zone: a small adjustment.
