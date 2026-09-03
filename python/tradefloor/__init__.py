@@ -44,6 +44,9 @@ from .render import JSONRenderer, Renderer, TextRenderer
 from .sweep import sweep
 from . import boundary
 from .boundary import BoundaryMap, Flip, flip, map_boundaries
+
+from . import explain
+from .explain import Explanation, Node
 from . import manifest
 from .manifest import DayLedger, RunManifest, Verification
 from . import spec
@@ -122,6 +125,7 @@ __all__ = [
     "boundary", "flip", "map_boundaries", "Flip", "BoundaryMap",
     "invariance", "Invariance", "render", "Renderer", "TextRenderer",
     "JSONRenderer",
+    "explain", "Explanation", "Node",
     "Intervention", "Firing", "ScenarioValidationError", "interventions",
     "TARGETS", "UNSUPPORTED_TARGETS", "yaml_subset",
     "manifest", "RunManifest", "DayLedger", "Verification",

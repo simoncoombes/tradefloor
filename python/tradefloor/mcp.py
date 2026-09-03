@@ -200,6 +200,42 @@ def _provenance(**extra: Any) -> dict[str, Any]:
 # -- the caveat engine -----------------------------------------------------
 
 
+#: Draw addresses per node in a tool result. The tree holds thousands
+#: and a model reads the count, so the rest is weight on the wire.
+ADDRESS_SAMPLE = 4
+
+
+def _trim_addresses(tree: dict[str, Any], keep: int) -> tuple[int, int]:
+    """Trim each node's address list in place, and report the counts.
+
+    Returns how many addresses survived and how many were dropped, so the
+    result can say what it is showing instead of appearing to show
+    everything.
+    """
+    shown = dropped = 0
+    addresses = tree.get("addresses") or []
+    if len(addresses) > keep:
+        tree["addresses"] = addresses[:keep]
+        shown, dropped = keep, len(addresses) - keep
+    else:
+        shown = len(addresses)
+    for child in tree["children"]:
+        a, b = _trim_addresses(child, keep)
+        shown += a
+        dropped += b
+    return shown, dropped
+
+
+def _nodes(tree: dict[str, Any]) -> int:
+    """How many nodes an explanation tree holds, counted over the tree.
+
+    Reported beside the misses, so "no node missed" is readable as a
+    number of nodes rather than as an empty list that could equally mean
+    nothing was replayed.
+    """
+    return 1 + sum(_nodes(child) for child in tree["children"])
+
+
 def _statistic_line(name: str) -> str:
     """One measured statistic against its real-market band, as a sentence.
 
@@ -1400,6 +1436,98 @@ def explain_price_move(
         "provenance": _provenance(
             seed=seed, day=day,
             universe=uni_doc,
+            model_fingerprint=engine.model_fingerprint,
+        ),
+    }
+
+
+@server.tool(
+    description="Which draws seeded one name's day? Returns a tree from the "
+                "day's log move down to the addresses of the draws behind "
+                "it, with every node replayable and every number measured "
+                "by running the day again."
+)
+def explain(
+    ticker: str | None = None,
+    seed: int = 3,
+    universe_size: int = 12,
+    universe_seed: int = 111,
+    universe_sectors: list[str] | None = None,
+    universe: dict[str, Any] | None = None,
+    day: int = 1,
+    depth: int = 3,
+) -> dict[str, Any]:
+    """One name's day, from its move down to the draws that seeded it.
+
+    `explain_price_move` says which factors moved a price. This says which
+    DRAWS moved those factors, and hands back a tree whose every node can
+    be run again from the state the day started in.
+
+    Read-only, like every tool here: it builds its own engine, runs the
+    days, and returns what it measured. It exposes no replay, because a
+    replay runs engines and a tool call answers inside a conversation.
+    """
+    if not 1 <= day <= MAX_DAYS:
+        return _fail(f"day must be 1..{MAX_DAYS}, got {day}")
+    try:
+        roster, concentrated, uni_doc = _resolve_universe(
+            universe or {"size": universe_size, "seed": universe_seed,
+                         "sectors": universe_sectors})
+    except ValueError as exc:
+        return _fail(str(exc))
+
+    engine = tf.Engine(universe=roster, seed=seed)
+    # Asked for before the days run, because a day is kept at its open.
+    # The run reaches one day past the target so the day before it is on
+    # the tape, which is what separates the valuation's move from the
+    # book's.
+    engine.keep_explanations(day, day)
+    engine.run_days(day + 1, record=True)
+    name = ticker if ticker is not None else engine.tickers[0]
+    if name not in engine.tickers:
+        return _fail(f"unknown ticker {name!r}; roster starts "
+                     f"{list(engine.tickers[:8])}")
+    try:
+        result = engine.explain(name, day)
+    except tf.ValidationError as exc:
+        return _fail(str(exc))
+
+    misses = result.check()
+    tree = json.loads(result.to_json())["root"]
+    # The addresses are the bulk of the payload and they do not shrink
+    # with the roster: one name's day carries the same few thousand
+    # whatever the market size, which is 88 KB of a 97 KB result. Trimmed
+    # to a sample per node, with the count kept, so a model reading this
+    # gets the shape of the evidence rather than the whole of it.
+    kept, dropped = _trim_addresses(tree, ADDRESS_SAMPLE)
+    contributions = [child["name"] for child in tree["children"]]
+    return {
+        "ok": True,
+        "ticker": result.ticker,
+        "day": result.day,
+        "move": result.move,
+        "tree": tree,
+        "render": result.render(depth=max(0, min(depth, 4))),
+        "checked": {"nodes": _nodes(tree), "misses": misses,
+                    "addresses": kept + dropped,
+                    "addresses_shown": kept},
+        "reading_note": (
+            "`move` is the day's log move in the printed price. The "
+            f"{len(contributions)} contributions under it sum to that "
+            f"move: {', '.join(contributions)}. `misses` is empty when "
+            "every node replayed to the contribution it sits under, which "
+            "is the claim this tool makes rather than asserts. Each draw "
+            f"node states its own count and carries at most "
+            f"{ADDRESS_SAMPLE} of its addresses here; `addresses` is how "
+            "many the tree holds and `addresses_shown` how many are in "
+            "this result."
+        ),
+        "caveats": list(result.caveats) + _caveats(
+            days=day + 1, n_seeds=1, signals=set(), max_leverage=None,
+            universe_size=len(roster),
+            sector_concentrated=concentrated),
+        "provenance": _provenance(
+            seed=seed, day=day, universe=uni_doc,
             model_fingerprint=engine.model_fingerprint,
         ),
     }
