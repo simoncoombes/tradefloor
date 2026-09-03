@@ -1252,9 +1252,14 @@ def test_a_clean_gap_is_still_explained_rather_than_refused():
     With the day before outside the window there is no roster to compare
     against, and the run log holding no listing or delisting is the whole
     of what says the slots held still. It is the only path that reads the
-    previous close's levels without a roster behind it, and until this
-    test nothing entered it: the one other not-kept case is the swap,
-    which returns at the operations check before it gets here.
+    previous close's levels without a roster behind it.
+
+    Not a corner: this file's default fixture keeps days 1 and 2 and
+    explains day 1, so day 0 is outside the window and most of the file
+    comes through here. Reading those levels at a neighbouring slot fails
+    18 tests without this one and 19 with it, measured on the current
+    head by deselecting this test alone, so what this adds is a direct
+    assertion where the others catch it through a sum or a replay.
 
     The assertion is the book contribution against the value the same day
     takes with the day before kept, to the bit. Asserting which
