@@ -524,6 +524,59 @@ straddles its ceiling rather than crossing it.
 The thirty-seed distribution and the four-year arm are measured
 elsewhere, because neither runs on one machine.
 
+### The cycle hazard's monthly scale
+
+`weibull_hazard` returns `(shape / scale) * pow(months / scale, shape - 1)`,
+and every scale in `cycle_hazard_params` is in months: 36 for an expansion,
+6 for a peak, 12 for a contraction. A hazard whose scale is in months is a
+rate per month, and `check_cycle_transition` compared it against a uniform
+once a day, so the cycle ran about thirty times too fast. A full cycle took
+2.6 trading years where the same constants read per month give 9.7, and a
+252-day run opening at the start of an expansion left it 63 per cent of the
+time against 3.
+
+`cycle_hazard_per_month` reads the scale on the clock it was written in.
+`months_in_current_phase` advances by 1/30 a day, so the month this model
+keeps is 30 days and the divisor is read off the engine's own clock. At
+0.0, which is every preset before pt-v18 and what the reference
+implementation does, the branch is not taken. At 1.0 the daily probability
+is the monthly rate divided by 30 to the last bit.
+
+The conversion is applied after the condition ladder and after the clamp,
+because every operand before it is a rate per month: the hazard's own cap
+of 0.8, the ladder's additions of 0.1 and 0.15 for inflation, policy and an
+inverted curve, and the clamp at 0.3. Converting earlier would leave the
+ladder as a daily probability against a base hazard near 0.0004 a day, so
+an inverted curve would raise the transition rate by 250 times where it now
+triples it. The 9.7 years above assumes this placement. Dividing before the
+clamp gives 9.59 instead, and the whole of that difference sits in the two
+short phases.
+
+So the 0.3 clamp becomes a cap on a monthly rate, the largest daily
+probability is 0.01, and a value that did no work starts doing some. It
+binds for a peak past month 5.40 and a trough past month 2.57, and nowhere
+else: an expansion reaches it at month 338, a recovery at month 358, and a
+contraction's hazard falls with duration. It shapes the mean peak from 183
+days to 171 and the mean trough from 159 to 138. Under the daily reading it
+bound nowhere, which a five-seed certified year confirms at 0 of 249 rolls
+clamped, and it binds nowhere inside a certified year afterwards either, at
+0 of 360.
+
+Inside one year the correction is worth nothing. Over five seeds at 252 days the paired median is +0.000 with a mean
+of +0.129, two seeds up and three bit-identical, and the three identical
+ones are exactly the seeds that never left an expansion under the fast
+clock. What moves is the phase: seeds leaving expansion by day 251 fall
+from 2 of 5 to 0 of 5, and the mean days spent in expansion rise from 237.2
+to 252.0. Beyond a year the clock decides how often a contraction
+multiplies the credit spread and how much of a long study sits outside an
+expansion, and that arm is measured elsewhere.
+
+Two entry points changed shape. `check_cycle_transition` and
+`get_cycle_transition_probability` each take the dial, so a caller states
+which reading it wants instead of inheriting one. Every caller outside the
+engine passes 0.0, which is the reference implementation's reading, and the
+economy parity vectors reproduce bit for bit against it.
+
 ### The commit the measurements name
 
 Every figure in the section above was measured on a build of a commit

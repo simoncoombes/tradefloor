@@ -167,6 +167,11 @@ PARAM_SPECS: dict[str, dict] = {
     # and 1.0 all of it on the reversion target. Past 1.0 the level carries
     # a negative amplitude, which is the shape inverted.
     "oil_seasonality_target": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # A SHARE of the hazard's unit correction, so [0, 1]. 0.0 draws a rate
+    # whose scale is in months once a day, 1.0 reads it on the 30-day month
+    # the phase clock keeps, and past 1.0 the cycle runs slower than its own
+    # scale states.
+    "cycle_hazard_per_month": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # A SHARE of the jump drift returned, so [0, 1]. 1.0 is the
     # martingale and past it the compensator overshoots.
     "jump_mean_compensated": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},

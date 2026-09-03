@@ -203,6 +203,13 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the shape inverted. So the box is the closed unit interval and its
     # top is where the shape stops compounding.
     "oil_seasonality_target": (0.0, 1.0),
+    # The clock the cycle hazard is read on. 0.0 draws a rate whose scale is
+    # in months once a day, which makes a full cycle 2.6 trading years; 1.0
+    # reads it on the 30-day month the phase clock already keeps, which makes
+    # it 9.7; and past 1.0 the cycle would run slower than the scale states.
+    # So the box is the closed unit interval and its top is where the unit is
+    # right rather than where a search stopped.
+    "cycle_hazard_per_month": (0.0, 1.0),
     # How much of the jump's own drift is given back. 0.0 is the
     # uncompensated process, 1.0 is the martingale, and past 1.0 the
     # compensator exceeds the drift and the jump pushes the other way.

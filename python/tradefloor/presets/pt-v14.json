@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v14",
   "fingerprint": "pt-v14",
-  "coefficient_digest": "72c8951220a5b41e0464e3def173bf8d4d265838880086339b476b61c49e557d",
+  "coefficient_digest": "afe83246c94ad058b3293d084bdab5ec498641688a55bc9e7a6ddf821f8ab769",
   "coefficients": {
     "book_levels": 10.0,
     "cascade_symmetry": 0.0,
@@ -17,6 +17,7 @@
     "crowd_lean_cap": 0.02,
     "crowd_momentum_gain": 0.02,
     "crowd_valuation_gain": 0.006,
+    "cycle_hazard_per_month": 0.0,
     "daily_credit_floor_gain": 0.0,
     "daily_shock_cap": 0.15,
     "default_sector_anchor_pe": 18.0,

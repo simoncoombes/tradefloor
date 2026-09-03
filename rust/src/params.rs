@@ -698,6 +698,49 @@ pub struct ModelParams {
     /// and `1 + (1 - g) * a` on the level, so the total is conserved and
     /// past 1.0 the level would carry the shape inverted.
     pub oil_seasonality_target: f64,
+    /// The clock the business cycle's hazard is read on. 0.0 -- every
+    /// preset before pt-v18 -- is bit-identical.
+    ///
+    /// # A rate per month drawn once a day
+    ///
+    /// `weibull_hazard` returns `(shape / scale) * pow(months / scale,
+    /// shape - 1)`, and every scale in `cycle_hazard_params` is in months:
+    /// 36 for an expansion, 6 for a peak, 12 for a contraction. A hazard
+    /// whose scale is in months is a rate per month, and
+    /// `check_cycle_transition` compares it against a uniform once a day,
+    /// so the cycle runs about thirty times too fast. A full cycle takes
+    /// 2.6 trading years where the same constants read per month give 9.7,
+    /// and a 252-day run opening at the start of an expansion leaves it 63
+    /// per cent of the time against 3.
+    ///
+    /// `months_in_current_phase` advances by exactly `1/30` a day, so the
+    /// month this model keeps is 30 days and the divisor is read off the
+    /// engine's own clock rather than chosen. At 1.0 the daily probability
+    /// is the monthly rate divided by 30 to the last bit.
+    ///
+    /// # The whole ladder is in months
+    ///
+    /// The conversion is applied last, after `adjust_transition_probability`
+    /// and after the clamp, because every operand before it is a rate per
+    /// month: the hazard's own cap of 0.8, the ladder's additions of 0.1
+    /// and 0.15 for inflation, policy and an inverted curve, and the clamp
+    /// at 0.3. Converting earlier would leave the ladder as a daily
+    /// probability against a base hazard near 0.0004 a day, so an inverted
+    /// curve would raise the transition rate by 250 times where it now
+    /// triples it. The 9.7 years above assumes this placement; dividing
+    /// before the clamp instead gives 9.59, and the difference sits
+    /// entirely in the two short phases.
+    ///
+    /// So the clamp becomes a cap on a monthly rate and the largest daily
+    /// probability is 0.01. It binds for a peak past month 5.40 and a
+    /// trough past month 2.57, and nowhere else, since an expansion reaches
+    /// it at month 338 and a recovery at month 358 and a contraction's
+    /// hazard falls with duration. Under the daily reading it bound
+    /// nowhere: both phases ended long before those durations, and a
+    /// five-seed certified year on pt-v18 records 0 of 249 rolls clamped.
+    /// A value that did no work starts doing some, and it shapes the mean
+    /// peak from 183 days to 171 and the mean trough from 159 to 138.
+    pub cycle_hazard_per_month: f64,
     /// How much of the drift the market jump's mean carries is given
     /// back. 0.0 -- every preset before pt-v18 -- is bit-identical. 1.0
     /// subtracts the compensator and makes the jump a martingale.
@@ -1728,6 +1771,7 @@ impl ModelParams {
             oil_supply_response: 0.0,
             oil_opec_symmetry: 0.0,
             oil_seasonality_target: 0.0,
+            cycle_hazard_per_month: 0.0,
             jump_mean_compensated: 0.0,
             cascade_symmetry: 0.0,
             // Legacy values: the slow component is OFF, and the update
@@ -2749,6 +2793,12 @@ impl ModelParams {
         // reversion target the same amplitude modulates where the price is
         // pulled toward and integrates to +0.672 per cent over the year.
         p.oil_seasonality_target = 1.0;
+        // The cycle's Weibull scale is in months and the transition was
+        // drawn against it once a day, so the cycle ran about thirty
+        // times too fast: 2.6 trading years against 9.7, with a phase
+        // change inside 63 per cent of certified years against 3. Read
+        // per month on the 30-day month the phase clock already keeps.
+        p.cycle_hazard_per_month = 1.0;
         // The market jump's negative mean buys skew and a drift together.
         // Compensating it keeps the mean, and so the skew, and returns the
         // drift: a deterministic offset moves no central moment.
@@ -2869,6 +2919,7 @@ impl ModelParams {
             "oil_supply_response" => self.oil_supply_response,
             "oil_opec_symmetry" => self.oil_opec_symmetry,
             "oil_seasonality_target" => self.oil_seasonality_target,
+            "cycle_hazard_per_month" => self.cycle_hazard_per_month,
             "jump_mean_compensated" => self.jump_mean_compensated,
             "cascade_symmetry" => self.cascade_symmetry,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
@@ -3019,6 +3070,7 @@ impl ModelParams {
             "oil_supply_response" => out.oil_supply_response = value,
             "oil_opec_symmetry" => out.oil_opec_symmetry = value,
             "oil_seasonality_target" => out.oil_seasonality_target = value,
+            "cycle_hazard_per_month" => out.cycle_hazard_per_month = value,
             "jump_mean_compensated" => out.jump_mean_compensated = value,
             "cascade_symmetry" => out.cascade_symmetry = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
@@ -3241,6 +3293,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_beta_down_asym_recentre",
         "oil_opec_symmetry",
         "oil_seasonality_target",
+        "cycle_hazard_per_month",
         "oil_supply_response",
         "market_vol_vix_coupling",
         "mispricing_cap",

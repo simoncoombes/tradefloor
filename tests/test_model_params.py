@@ -339,6 +339,13 @@ PERTURBATIONS = [
     # discount rate never hears about it and the valuation never moves. Over
     # 252 days oil leaves that zone in both directions and the dial bites.
     ("oil_seasonality_target", 0.5, False),
+    # The clock the cycle hazard is read on. INERT over a probe this short
+    # for a reason the mechanism states rather than one the value hides: the
+    # engine opens at zero months in phase and an expansion's minimum
+    # duration is six months, so check_cycle_transition returns before it
+    # draws until day 180 and the probe runs three. Over 252 days it bites,
+    # and what separates the arms is the count of seeds that leave expansion.
+    ("cycle_hazard_per_month", 0.5, False),
     # How much of the jump's drift is given back. The compensator is
     # subtracted every day whether or not a jump fires, so unlike its two
     # neighbours it bites on the first close.

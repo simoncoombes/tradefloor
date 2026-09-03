@@ -1688,7 +1688,8 @@ impl Engine {
             rng,
         );
         rng.site(Site::EconomyCycle, 0);
-        self.economy = check_cycle_transition(&self.economy, rng);
+        self.economy =
+            check_cycle_transition(&self.economy, rng, self.params.cycle_hazard_per_month);
 
         let meeting =
             {
