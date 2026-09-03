@@ -994,6 +994,35 @@ impl PyEngine {
         self.inner.open_market();
     }
 
+    /// The roster operations between the previous day's open and this one.
+    ///
+    /// Walks back from `log_start` to the open before it and reports every
+    /// `list_instrument` and `delist` in that gap, as `(operation, what)`.
+    /// A roster operation there moves the slots the previous day's tape is
+    /// keyed by, so a level read from it at today's slot is another
+    /// company's. The log is what KNOWS: comparing the two days' tape
+    /// widths misses a listing paired with a delisting, and comparing the
+    /// two days' rosters needs the day before to have been kept.
+    fn roster_ops_before(&self, log_start: usize) -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        let start = self.log[..log_start.min(self.log.len())]
+            .iter()
+            .rposition(|e| matches!(e, crate::python_log::LogEntry::OpenMarket))
+            .unwrap_or(0);
+        for entry in &self.log[start..log_start.min(self.log.len())] {
+            match entry {
+                crate::python_log::LogEntry::ListInstrument { ticker, .. } => {
+                    out.push(("list_instrument".to_string(), ticker.clone()))
+                }
+                crate::python_log::LogEntry::Delist { index } => {
+                    out.push(("delist".to_string(), index.to_string()))
+                }
+                _ => {}
+            }
+        }
+        out
+    }
+
     /// The log entries of the day whose open sits at `log_start`.
     ///
     /// From that open to the close that ends the day, inclusive, plus any
@@ -1894,8 +1923,10 @@ impl PyEngine {
     /// mean to explain rather than for a whole run.
     ///
     /// What that costs, on `Universe.random(40, seed=111)` at `pt-v16`
-    /// over thirty days: a peak working set of 333 MB with a thirty-day
-    /// window against 28 MB with none. A fork carries what the parent
+    /// over thirty days, as the PROCESS peak working set rather than a
+    /// Python-side allocation figure, since the store is Rust memory:
+    /// 333 MB with a thirty-day window against 28 MB with none, on a
+    /// process that imports the library and nothing else. A fork carries what the parent
     /// kept, so `World.fork` and every counterfactual arm pay it again
     /// per arm: `fork(1)` takes 0.011 s at a five-day window, 0.046 s at
     /// twenty and 0.136 s at sixty. A fork collects no new opens of its
@@ -1934,7 +1965,7 @@ impl PyEngine {
     /// for rather than handed a tree with no leaves.
     fn explain(slf: &Bound<'_, Self>, ticker: &str, day: i64) -> PyResult<PyObject> {
         let py = slf.py();
-        let (sector, window, kept, opened, inputs, before) = {
+        let (sector, window, kept, opened, inputs, before, ops) = {
             let me = slf.borrow();
             let window = me.explanations.window;
             let kept: Vec<i64> = me.explanations.opens.keys().copied().collect();
@@ -1950,6 +1981,7 @@ impl PyEngine {
             match me.explanations.opens.get(&day) {
                 Some(k) => {
                     let entries = me.day_inputs(py, k.log_start)?;
+                    let ops = me.roster_ops_before(k.log_start);
                     // Against the COPY's roster, not this engine's. A
                     // delisting shifts every slot below it, so a name
                     // resolved against the roster as it is now addresses
@@ -1963,16 +1995,28 @@ impl PyEngine {
                         Some((*k.engine).clone()),
                         Some(entries),
                         before,
+                        ops,
                     )
                 }
-                None => (sector_of(&me, ticker), window, kept, None, None, before),
+                None => (
+                    sector_of(&me, ticker),
+                    window,
+                    kept,
+                    None,
+                    None,
+                    before,
+                    Vec::new(),
+                ),
             }
         };
         let module = py.import_bound("tradefloor.explain")?;
         Ok(module
             .call_method1(
                 "_explain",
-                (slf, ticker, day, sector, window, kept, opened, inputs, before),
+                (
+                    slf, ticker, day, sector, window, kept, opened, inputs,
+                    before, ops,
+                ),
             )?
             .unbind())
     }

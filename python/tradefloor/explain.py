@@ -17,10 +17,15 @@ each day's open. Both are read-only, so a market with the window open is
 the market it would have been without one. ``explain`` on a day outside
 the window raises and names the days that were kept.
 
-A window costs one engine copy per day kept, and a fork pays it again per
-arm. At forty names over thirty days the peak working set is 333 MB with
-a thirty-day window against 28 MB with none, and a fork of a sixty-day
-window takes 0.136 seconds. Ask for the days you mean to explain.
+A window costs one engine copy per day kept, and a fork pays it again
+per arm. Measured as the PROCESS peak working set, which is the figure
+that sees the store, at forty names over thirty days on the same box:
+333 MB with a thirty-day window against 28 MB with none, and a fork of a
+sixty-day window takes 0.136 seconds. The 28 MB is a process that
+imports the library and nothing else, which is 23 MB before any engine
+is built, so a harness carrying pyarrow or numpy starts higher and the
+reviewer measured 89 MB and 437 MB for the same pair. Ask for the days
+you mean to explain.
 
 ``explain`` also needs pyarrow, because the tree's contributions are the
 ``truth()`` table's columns and that table arrives as an Arrow stream. A
@@ -83,7 +88,7 @@ the market stream's log is the size of the tape at 613 of that
 stream's draws a tick.
 
 On ``Universe.random(n, seed=111)`` at engine seed 42, three days,
-``pt-v16``, at 099eae7, on one Windows box, three repetitions:
+``pt-v16``, at 099eae7, on one Windows 11 box, three repetitions:
 
 ===== ========= ========== ==========
 names    logged     peak A     peak B
@@ -93,7 +98,14 @@ names    logged     peak A     peak B
   100   478,944     220 MB     200 MB
 ===== ========= ========== ==========
 
-Two columns because two readers measured the same quantity on the same
+Peak here is PYTHON-SIDE allocation, from ``tracemalloc``, over one
+``explain`` and one ``check``. It counts the draw log the call
+materialises and not the engine copies the store holds, which are Rust
+memory ``tracemalloc`` cannot see and which report as zero to it. The
+window's own cost below is a process figure and the two are not
+comparable.
+
+Two columns because two readers measured that same quantity on the same
 machine and got answers ten per cent apart, each repeating to the tenth
 of a megabyte across its own runs. A is this author's and B is the
 reviewer's. Neither is quoted as the number.
@@ -483,7 +495,8 @@ def _table(stream: Any) -> dict[str, list]:
 def _explain(engine: Engine, ticker: str, day: int, sector: str,
              window: tuple[int, int] | None, kept: Sequence[int],
              opened: Engine | None, inputs: Sequence[dict] | None,
-             before: Sequence[str] | None = None) -> "Explanation":
+             before: Sequence[str] | None = None,
+             ops: Sequence[tuple[str, str]] = ()) -> "Explanation":
     """Build the explanation ``Engine.explain`` returns.
 
     Called from the binding, which owns the store and hands over what it
@@ -527,7 +540,8 @@ def _explain(engine: Engine, ticker: str, day: int, sector: str,
                        sector=sector, window=window,
                        kept=tuple(int(d) for d in kept),
                        opened=opened, inputs=tuple(inputs),
-                       before=None if before is None else tuple(before))
+                       before=None if before is None else tuple(before),
+                       ops=tuple(tuple(op) for op in ops))
 
 
 class Explanation:
@@ -552,7 +566,8 @@ class Explanation:
                  sector: str, window: tuple[int, int] | None,
                  kept: tuple[int, ...], opened: Engine,
                  inputs: tuple[dict, ...],
-                 before: tuple[str, ...] | None = None) -> None:
+                 before: tuple[str, ...] | None = None,
+                 ops: tuple[tuple[str, str], ...] = ()) -> None:
         self.ticker = ticker
         self.day = int(day)
         self._engine = engine
@@ -607,7 +622,13 @@ class Explanation:
         #: paired with a delisting in one day leaves the width alone
         #: while moving every slot between them.
         self._before = before
-        self._compared = "rosters" if before is not None else "widths"
+        #: Every roster operation the run log holds between the previous
+        #: day's open and this one. The log is what KNOWS: a width
+        #: comparison misses a listing paired with a delisting, and a
+        #: roster comparison needs the day before to have been kept.
+        self._ops = tuple(ops)
+        self._compared = ("rosters" if before is not None
+                          else "the run log")
         self._previous_index, self._previous_moved = self._slot_before(
             engine, ticker)
         self._previous = (
@@ -662,6 +683,15 @@ class Explanation:
                                      f"the copy day {self.day - 1} was "
                                      "kept from")
             return slot, slot != self._index
+        # No copy to compare against, so the run log decides. It records
+        # every listing and delisting with its position, so an operation
+        # between the two opens is a fact rather than an inference, and
+        # the levels are refused rather than read at a slot that may name
+        # another company. The widths are checked as well, since a
+        # disagreement there without a logged operation is a state
+        # nothing here understands.
+        if self._ops:
+            return None, True
         if _same_width(engine, self._label - 1, self._label,
                        len(self._roster)):
             return self._index, False
@@ -970,22 +1000,29 @@ class Explanation:
                 "at the slot it held then. The roster the day before "
                 "opened on is what says which slot that was.")
         elif self._previous_moved:
-            how = ("the roster the day before opened on"
-                   if self._compared == "rosters"
-                   else "the number of names the tape holds for it")
+            if self._ops:
+                named = ", ".join(f"{kind} {what}" for kind, what
+                                  in self._ops)
+                why = ("the run log holds "
+                       + _count(len(self._ops), "roster operation")
+                       + f" between the two opens ({named})")
+            elif self._compared == "rosters":
+                why = "the roster the day before opened on names it nowhere"
+            else:
+                why = ("the tape holds a different number of names on the "
+                       "two days")
             out.append(
                 f"{self.ticker} has no levels on day {self._label - 1}, "
-                f"compared by {how}, so the valuation is not separated "
-                "from the book on this day.")
-        elif self._compared == "widths" and self._previous is not None:
+                f"because {why}, so the valuation is not separated from "
+                "the book on this day.")
+        elif self._compared == "the run log" and self._previous is not None:
             out.append(
                 f"Day {self.day - 1} was not kept, so the roster it ran "
-                "under was compared by the number of names its tape "
-                "holds rather than name by name. A listing and a "
-                "delisting in one day leave that number alone and move "
-                "every slot between them, and the previous close's "
-                "levels would then be another company's. Keep the day "
-                "before the one you explain to close that.")
+                "under is not here to compare against name by name. The "
+                "run log holds no listing or delisting between the two "
+                "opens, and the tape holds the same number of names on "
+                "both, so the previous close's levels are read at this "
+                "name's own slot.")
         silent = [m.factor for m in MECHANISMS if not m.sites]
         blind = [m.factor for m in MECHANISMS
                  if m.sites and not any(child.kind == "draw" for child

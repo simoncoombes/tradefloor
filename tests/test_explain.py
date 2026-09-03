@@ -1185,19 +1185,90 @@ def test_the_roster_comparison_is_load_bearing():
     assert right._previous_index != right._index
 
 
-def test_a_day_whose_predecessor_was_not_kept_says_how_it_compared():
-    # Without the day before in the window there is no roster to compare
-    # against, only the tape's counts, and the caveat says so rather than
-    # presenting the weaker check as the stronger one.
-    e = swapped(keep=(2, 5))
-    result = e.explain("AAB", 2)
-    assert result._compared == "widths"
+#: Every shape a roster can take across the pair of days an explanation
+#: reads, with what each one does to the previous close's levels. The
+#: two the run log settles are the ones no comparison of rosters can
+#: reach, because the day before was not kept.
+ROSTER_SHAPES = (
+    ("none", (0, 5), 0, False, True),
+    ("none", (2, 5), 0, False, True),
+    ("delist", (0, 5), 1, True, True),
+    ("delist", (2, 5), 1, True, False),
+    ("swap", (0, 5), 2, True, True),
+    ("swap", (2, 5), 2, True, False),
+)
+
+
+def roster_arm(kind, keep):
+    """A run that leaves the roster alone, delists a name, or delists one
+    and lists another, between day 1 and day 2."""
+    roster = tf.Universe.random(6, seed=ROSTER_SEED)
+    e = tf.Engine(seed=ENGINE_SEED, universe=roster, model=PRESET)
+    e.keep_explanations(*keep)
+    e.run_days(2, record=True)
+    if kind in ("delist", "swap"):
+        e.delist(0)
+    if kind == "swap":
+        e.list_instrument(tf.Instrument("ZZZ", "technology",
+                                        initial_price=50.0,
+                                        shares_outstanding=1e6))
+    e.run_days(2, record=True, first_day=2)
+    return e
+
+
+@pytest.mark.parametrize("kind,keep,ops,moved,levels", ROSTER_SHAPES)
+def test_every_roster_shape_reads_the_right_levels_or_none(
+        kind, keep, ops, moved, levels):
+    """The previous close's levels, over every shape the roster can take.
+
+    Where the day before was kept its roster names the slot. Where it was
+    not, the RUN LOG decides: it records every listing and delisting with
+    its position, so an operation between the two opens is a fact, and
+    the levels are refused rather than read at a slot that may name
+    another company. A width comparison cannot see a listing paired with
+    a delisting, which is the fifth and sixth rows here.
+
+    The book contribution is the assertion that bites. Read at the wrong
+    slot it comes back at 2.85 against 0.0055, so a test that only
+    checked which comparison ran would pass on a refusal made for the
+    wrong reason.
+    """
+    result = roster_arm(kind, keep).explain("AAB", 2)
+    assert len(result._ops) == ops
+    assert result._previous_moved is moved
+    assert (result._previous is not None) is levels
+    assert result._compared == ("rosters" if keep[0] == 0
+                                else "the run log")
+    book = {c.name: c.value for c in result.root.children}["book"]
+    assert abs(book) < 0.1, (kind, keep, book)
+    total = math.fsum(child.value for child in result.root.children)
+    assert abs(result.move - total) < ex.TOLERANCE
+    assert result.check() == []
+
+
+def test_a_clean_gap_is_still_explained_rather_than_refused():
+    # The refusal must not swallow ordinary days: with no roster
+    # operation between the two opens the levels are read at this name's
+    # own slot, and the caveat says the log holds none.
+    result = roster_arm("none", (2, 5)).explain("AAB", 2)
+    assert result._ops == ()
+    assert result._previous is not None
     line = next(c for c in result.caveats if "was not kept" in c)
-    assert "the number of names its tape holds" in line
-    assert "Keep the day before" in line
-    # And the stronger comparison says nothing about widths.
+    assert "holds no listing or delisting between the two opens" in line
+    # And the same run with the day before kept says nothing about it.
     assert not any("was not kept" in c
-                   for c in swapped().explain("AAB", 2).caveats)
+                   for c in roster_arm("none", (0, 5)).explain(
+                       "AAB", 2).caveats)
+
+
+def test_the_run_log_names_the_operation_that_refused_the_levels():
+    result = roster_arm("swap", (2, 5)).explain("AAB", 2)
+    line = next(c for c in result.caveats if "has no levels" in c)
+    assert "2 roster operations" in line
+    assert "delist 0" in line and "list_instrument ZZZ" in line
+    single = roster_arm("delist", (2, 5)).explain("AAB", 2)
+    assert "1 roster operation between" in next(
+        c for c in single.caveats if "has no levels" in c)
 
 
 def test_a_moved_roster_is_named_in_the_caveats():
