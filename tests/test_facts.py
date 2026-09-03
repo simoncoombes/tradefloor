@@ -513,3 +513,125 @@ def test_correlation_persistence_is_reported_and_judged_with_its_noise_stated():
     for table in (tradefloor.facts.SEED_SD, tradefloor.facts.SEED_SD_504):
         assert max(corr_type, key=table.get) == "corr_persistence_acf1"
     assert "corr_persistence_acf1" in compare_to_real_markets(year)
+
+
+# --------------------------------------------------------------------------
+# The first moment: measured, and deliberately not graded
+# --------------------------------------------------------------------------
+
+
+def test_the_index_drift_row_measures_what_the_graded_rows_cannot_see():
+    """The reason the fifteenth row exists, as one assertion.
+
+    Add a constant to every name's daily log return and the graded panel
+    barely notices: nine of the fourteen are exactly invariant because they
+    centre their arguments, and the five built on an absolute return move by
+    a fraction of their own seed noise. So a market losing a fifth of its
+    value a year can read fourteen of fourteen, which is what
+    `tradefloor-design/programme/index-drift-investigation.md` found.
+
+    This row is the one that moves, and it moves by exactly the drift added.
+    """
+    import math
+
+    import pyarrow as pa
+
+    from tradefloor.facts import SEED_SD, panel_statistics
+
+    engine = tradefloor.Engine(seed=5, universe=UNIVERSE)
+    engine.run_days(120, record=True)
+    bars = pa.table(engine.bars(grain="day")).to_pydict()
+    before = panel_statistics(bars, UNIVERSE)
+
+    # +20 percentage points a year of log drift, added to every name on every
+    # day by rescaling its close by exp(d * day). The rescale adds exactly `d`
+    # to that name's daily log return and leaves volume untouched.
+    added_pct = 20.0
+    d = added_pct / 100.0 / 252.0
+    shifted = dict(bars)
+    shifted["close"] = [close * math.exp(d * day)
+                        for close, day in zip(bars["close"], bars["day"])]
+    after = panel_statistics(shifted, UNIVERSE)
+
+    # The instrument fired, or its silence would prove nothing.
+    moved = after["index_drift_pct"] - before["index_drift_pct"]
+    assert moved == pytest.approx(added_pct, abs=1e-9), moved
+
+    # And the graded panel did not see it: every row moves by less than a
+    # quarter of its own across-seed noise.
+    for key in tradefloor.facts.REAL_MARKETS:
+        if before[key] is None or after[key] is None:
+            continue
+        delta = abs(after[key] - before[key])
+        assert delta < 0.25 * SEED_SD[key], (key, delta, SEED_SD[key])
+
+
+def test_the_index_drift_row_is_reported_and_never_graded():
+    """Reporting only, and the absence of a band is structural rather than
+    remembered.
+
+    A first-moment band would have to be derived from a real index over a
+    matched window and that derivation does not exist here, so the row earns
+    no verdict, cannot pass, cannot fail, and `envelope` refuses it outright
+    rather than scoring it against a band nobody measured.
+    """
+    from tradefloor import envelope
+    from tradefloor.facts import REAL_MARKETS, REPORTING_ONLY
+
+    year = measure(seed=2, universe=UNIVERSE, days=252)
+    assert isinstance(year["index_drift_pct"], float)
+
+    # Not graded: absent from the band table, from every verdict, and from
+    # the certified set, all three of which are separate surfaces.
+    assert "index_drift_pct" not in REAL_MARKETS
+    assert "index_drift_pct" not in compare_to_real_markets(year)
+    assert "index_drift_pct" not in envelope.CERTIFIED
+    with pytest.raises(tradefloor.ValidationError):
+        envelope.score({"index_drift_pct": year["index_drift_pct"]})
+
+    # Reported, with the reason computed from REPORTING_ONLY rather than
+    # retyped, so the printed caveat cannot drift from the recorded one.
+    text = report(year)
+    assert tradefloor.facts.LABELS["index_drift_pct"] in text
+    assert "no band" in text
+    assert REPORTING_ONLY["index_drift_pct"].split(":")[0] in text
+
+    # Every ungraded row carries a reason. A row with neither a band nor a
+    # recorded reason is the defect this pairing exists to prevent.
+    for key in tradefloor.facts.LABELS:
+        if key not in REAL_MARKETS:
+            assert key in REPORTING_ONLY, key
+
+
+def test_the_index_drift_row_keeps_the_names_the_other_rows_drop():
+    """Survivorship: `min_observations` filters the shape rows and must not
+    filter this one.
+
+    An index drift that drops its short-lived names is measuring the survivors,
+    which is the classic way to read an index level wrong. The delisted name's
+    returns are exactly the ones a first moment has to carry.
+    """
+    import pyarrow as pa
+
+    from tradefloor.facts import _index_drift_pct, _daily_series, panel_statistics
+
+    engine = tradefloor.Engine(seed=7, universe=UNIVERSE)
+    engine.run_days(80, record=True)
+    bars = pa.table(engine.bars(grain="day")).to_pydict()
+
+    # A filter at 60 observations drops nothing here, so raise it until it
+    # bites: at 200 no name clears it and the shape rows have nothing left.
+    with pytest.raises(tradefloor.ValidationError):
+        panel_statistics(bars, UNIVERSE, min_observations=200)
+
+    # The drift row reads the same number whatever that threshold is, because
+    # it never consults it.
+    series = _daily_series(bars)
+    drift = _index_drift_pct(series)
+    for threshold in (2, 30, 79):
+        assert panel_statistics(
+            bars, UNIVERSE, min_observations=threshold
+        )["index_drift_pct"] == drift
+
+    # And it is None, not zero, when there is no return to measure at all.
+    assert _index_drift_pct({}) is None

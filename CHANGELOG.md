@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+**The panel reports the index's annualised drift**, ungraded, because no
+band for a first moment has been derived here yet.
+
 **A run can commit to the state it held at the end of every day**, and a
 sampled check verifies k days for the cost of k days.
 
@@ -32,6 +35,38 @@ checked for its draw effect and proven inert at its default doses.
 of the tree replays from the state the day started in.
 
 <!-- release-note-ends -->
+
+### The index drift row
+
+`facts.panel_statistics` reports `index_drift_pct`, the annualised log
+drift of the equal-weight index over the measured window. It is the
+panel's only first moment. The other fourteen statistics are shape
+measurements, and a market can hold every one of them in band while
+losing a fifth of its value in a year: nine are exactly invariant to a
+constant drift added to every name because they centre their arguments
+before measuring them, and the five built on an absolute return move by
+less than a tenth of their own across-seed noise. A test states that,
+adding a known drift to a recorded run and asserting the new row moves by
+exactly the amount added while no graded row moves by a quarter of its
+noise.
+
+It carries no real-market band, so it earns no verdict, cannot pass,
+cannot fail, and `envelope.score` refuses it as an unknown statistic. That
+is a gap held open on purpose. The fourteen graded bands were each derived
+from a real reference panel at this module's own estimators; a first-moment
+band would have to be derived from a real index over a matched window, and
+that work has not been done here. Shipping a plausible-looking band instead
+would grade every future preset against a number nobody measured, which is
+the unprovenanced-band defect this module already corrected once. The
+reason is carried as data in `facts.REPORTING_ONLY` and printed by
+`facts.report` beside the number, rather than retyped into prose that can
+drift from it.
+
+Two method choices are worth naming, because each is the difference
+between this row and a flattering one. Every name counts, including one
+too short-lived for the shape rows, since dropping it is survivorship bias
+on exactly the quantity being measured. And a gap in a name's bars is
+spanned rather than dropped, so the sum over the window is exact.
 
 ### The explanation tree
 

@@ -34,6 +34,13 @@ clustering at lag one left its band, the leverage effect entered its
 band -- see "Where the bands come from" below. A verdict is a comparison
 of a measurement against a band, and both halves now carry provenance.
 
+Fourteen is the GRADED count and not the row count. A fifteenth row,
+`index_drift_pct`, is measured and reported and deliberately not graded,
+because no defensible band for it has been derived here yet. It is the
+panel's only first moment, and it exists because the fourteen shape
+statistics could all read in band on a market losing a fifth of its value
+in a year -- and did. See `_index_drift_pct` and `REPORTING_ONLY`.
+
 Every figure below: `Universe.random(40, seed=111)` (fingerprint
 5d8de78b55aad752), 252 days, `measure()` per sim seed, median over seeds 1
 to 6 -- re-measured at known-answer v8 (era digest 1ee64998...), where the
@@ -292,6 +299,7 @@ from __future__ import annotations
 
 import math
 import statistics
+import textwrap
 from typing import Any, Mapping, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
@@ -791,6 +799,26 @@ SEED_SD_PROVENANCE = {
 #: constant rather than a presentation detail.
 MARGINAL = ("annualised_vol_pct", "excess_kurtosis")
 
+#: Panel rows that are MEASURED AND REPORTED BUT NOT GRADED, against the
+#: reason no band exists for them. A key here is deliberately absent from
+#: `REAL_MARKETS`, so it earns no verdict, cannot pass, cannot fail, and
+#: cannot enter `envelope.CERTIFIED` -- and `report` says why at the point
+#: it prints the number, reading this dict rather than a retyped sentence.
+#:
+#: A row with no band is worth having anyway. The alternative is not
+#: reporting the quantity, and an unreported quantity is one nobody
+#: measures; see `_index_drift_pct` for the case that put this here.
+REPORTING_ONLY = {
+    "index_drift_pct": (
+        "no real-market band: the other fourteen are SHAPE statistics with "
+        "published real-market analogues, and a first-moment band would "
+        "have to be derived from a real index over a matched window. That "
+        "derivation does not exist in this project yet, and inventing one "
+        "would be worse than having none -- a fabricated band grades every "
+        "future preset against a number nobody measured."
+    ),
+}
+
 #: Row labels for `report`. The dict order of REAL_MARKETS above is the print
 #: order, and these name the rows.
 LABELS = {
@@ -808,6 +836,7 @@ LABELS = {
     "corr_asymmetry_lagged": "corr, after down vs up",
     "sector_excess_corr": "same-sector excess corr",
     "corr_persistence_acf1": "corr persistence acf(1)",
+    "index_drift_pct": "index drift %/yr",
 }
 
 
@@ -876,6 +905,82 @@ def _daily_series(bars: dict) -> dict[int, list[tuple[int, float, float]]]:
             (bars["day"][k], bars["close"][k], bars["volume"][k])
         )
     return {i: sorted(rows) for i, rows in grouped.items()}
+
+
+#: Sessions in a year, for annualising a per-session quantity.
+TRADING_DAYS_PER_YEAR = 252
+
+
+def _index_drift_pct(
+    series: dict[int, list[tuple[int, float, float]]],
+) -> float | None:
+    """Annualised log drift of the equal-weight index, in percent a year.
+
+    The panel's FIRST MOMENT. Every other row here is a shape statistic --
+    a spread, a fourth moment, an autocorrelation, a correlation -- and
+    every one of them is invariant, or nearly so, to what the index level
+    does. Nine of the fourteen are exactly invariant to adding a constant
+    drift to every name on every day, because they centre their arguments
+    before they measure them; the five that are not move by less than a
+    tenth of their own seed noise under it. So the panel could be read
+    fourteen for fourteen by a market that loses a fifth of its value in a
+    year, and it was.
+
+    Measured: pt-v16, `Universe.random(40, seed=111)`, 252 days, seeds 1 to
+    30, at `df0fe62` on `origin/dev`, this row reads a median of **-22.155**
+    percent a year, against a real large-cap index's +8 to +10. It is
+    negative on all thirty seeds, minimum -43.797 and maximum -16.360. The
+    derivation is `tradefloor-design/programme/index-drift-investigation.md`.
+
+    # There is no band, deliberately
+
+    This row is REPORTING ONLY. It is absent from `REAL_MARKETS`, so it has
+    no verdict, no pass and no fail, and `envelope` never sees it. The
+    reason is recorded as data in `REPORTING_ONLY` and printed by `report`.
+
+    In short: a band for it is OUTSTANDING, not omitted. The fourteen graded
+    rows are shape statistics with published real-market analogues measured
+    at this panel's own method. A first-moment band would have to be derived
+    from a real index over a matched window, and that derivation has not
+    been done here. Shipping a plausible-looking band instead would grade
+    every future preset against a number nobody measured, which is the
+    unprovenanced-band defect this module already corrected once, in 2026-08
+    (see `REAL_MARKETS_PROVENANCE`). A number with no band is honest. A band
+    with no derivation is not.
+
+    # Method
+
+    The mean across names of the daily log return of the close, summed over
+    the window, divided by the number of days that carried a return, times
+    252. That is the convention the investigation used, and it differs from
+    summing the daily means with no rescale by 0.09 percentage points on a
+    252-day window -- two orders of magnitude below the quantity itself.
+
+    Two choices worth naming, because both are the difference between this
+    row and a flattering one:
+
+    **Every name counts, including a short-lived one.** `min_observations`
+    filters the other rows, and does not filter this one. A delisted name's
+    losses are exactly what an index drift has to carry; dropping it is
+    survivorship bias, which is the classic way to measure an index level
+    wrong.
+
+    **A gap in a name's bars is spanned, not dropped.** A return is formed
+    between consecutive RECORDED rows for that name and attributed to the
+    later day, so the sum over the window is exact even where a name is
+    missing days. It is the sum that this statistic reports.
+    """
+    by_day: dict[int, list[float]] = {}
+    for rows in series.values():
+        for k in range(1, len(rows)):
+            previous, close = rows[k - 1][1], rows[k][1]
+            if previous > 0 and close > 0:
+                by_day.setdefault(rows[k][0], []).append(
+                    math.log(close / previous))
+    if not by_day:
+        return None
+    daily = [statistics.mean(values) for values in by_day.values()]
+    return sum(daily) / len(daily) * TRADING_DAYS_PER_YEAR * 100.0
 
 
 #: Window, in sessions, for the correlation-persistence diagnostic. The
@@ -1237,6 +1342,12 @@ def panel_statistics(
         "abs_return_acf1": statistics.median(abs_acf1),
         "abs_return_acf5": statistics.median(abs_acf5),
         "abs_return_acf20": statistics.median(abs_acf20),
+        # The panel's one first-moment row, reported and NOT graded. It is
+        # built from `series` rather than from `pooled`, because `pooled`
+        # has already dropped every name under `min_observations` and an
+        # index drift that drops its losers is not one. See
+        # `_index_drift_pct`.
+        "index_drift_pct": _index_drift_pct(series),
     }
     # The four dependence statistics carry the same keys whether or not they
     # could be measured, so a caller reading the result does not have to test
@@ -1327,6 +1438,20 @@ def report(facts: dict[str, Any]) -> str:
         "dependence: how things move together",
     ]
     lines += [row(key) for key in REAL_MARKETS if key not in MARGINAL]
+
+    # The ungraded rows, derived from the two tables rather than listed, so
+    # a row can never be printed as graded because a list went stale.
+    ungraded = [key for key in LABELS if key not in REAL_MARKETS]
+    if ungraded:
+        lines += ["", "reporting only: measured, not graded"]
+        for key in ungraded:
+            value = facts.get(key)
+            shown = "n/a" if value is None else f"{value:.3f}"
+            lines.append(f"{LABELS[key]:22s} {shown:>10s}  {'no band':>14s}")
+            reason = REPORTING_ONLY.get(key)
+            if reason:
+                lines += textwrap.wrap(reason, 72,
+                                       initial_indent="  ", subsequent_indent="  ")
     lines += [
         "",
         "Read the two sections against each other. A model can get the shape",
