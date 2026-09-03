@@ -495,10 +495,34 @@ between the two rather than added, so the pair's total is preserved. At
 0.0, which is every preset before pt-v18, the original arithmetic runs in
 its original order.
 
-It is unmeasured on this branch. No arm, no index figure and no day-251
-oil price has been reported for it here, so nothing in these notes rests
-on it. Its measurement and its own record follow separately, from the
-work that built it.
+What it is worth, over five seeds at 252 days on the panel roster, paired
+on the seed so the roster's own opening level cancels. The index gains
++1.303 points a year at the median in the log convention and +1.293 as a
+portfolio, on 5 of 5 seeds, with a range of +1.105 to +1.914. The
+convention gap moves -0.009, so both conventions carry the same gain and
+the move is in the closes. All of the gain arrives through the
+discount rate: the fair value channel carries +1.263 on every seed and
+the mispricing channel +0.021 with the seeds split. Inflation at day 251
+falls 1.055 points and the corporate bond yield 0.795, each on 5 of 5.
+
+Oil stops reaching its clamp. Days spent at 150.0 fall from a median of
+69 to zero on every seed, and the highest price any seed reaches is 108.6
+where the arm without the dial reaches 150.0. The day-251 median is 93.1,
+against the 86.7 the seasonal term's own arithmetic predicts on a target
+near 85; the difference is the inventory pressure, the dollar drag and
+the OPEC rule, which the compounding factor used to dominate.
+
+The certified panel reads 14 of 14 over seeds 101 to 110 where the arm
+without the dial reads 13 of 14, and the row that decides it is not
+moved. The leverage effect has a ceiling of exactly 0.00 and reads
++0.0035 without the dial against -0.0005 with it, on an across-seed noise
+of 0.0760 and a per-seed spread of 0.029 at ten seeds. Between five and
+seven of the ten seeds sit above the ceiling in either arm. The band call
+therefore turns on 0.004, a twentieth of the row's own noise, and the row
+straddles its ceiling rather than crossing it.
+
+The thirty-seed distribution and the four-year arm are measured
+elsewhere, because neither runs on one machine.
 
 ### The commit the measurements name
 
