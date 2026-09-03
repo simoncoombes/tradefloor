@@ -176,6 +176,13 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # entries around it there is no strong-to-implausible top to choose:
     # the top is where the correction is exact.
     "market_beta_down_asym_recentre": (0.0, 1.0),
+    # The share of oil demand supply answers on the daily step. Bounded by
+    # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
+    # the value that makes the inventory random walk driftless, and past 1.0
+    # supply would exceed demand every day and inventory would ramp the
+    # other way. So the box is the closed unit interval and its top is
+    # where the process is stationary.
+    "oil_supply_response": (0.0, 1.0),
     # EMA days on the VIX the market variance target reads (round 99).
     # Measured dead at 3 and 10 along the driven window; 20 trading days
     # is a month of smoothing, past which the fear response is no longer

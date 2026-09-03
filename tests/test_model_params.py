@@ -317,6 +317,15 @@ PERTURBATIONS = [
     # named preset breaks the assertion below for a reason that has
     # nothing to do with the parameter.
     ("market_beta_down_asym_recentre", 0.5, True),
+    # How much of oil demand supply answers. INERT over a probe this short,
+    # and the reason is the mechanism rather than a wiring gap. Inventory
+    # opens at 50 and the oil price feels it only outside the 40-to-60 dead
+    # zone, where the pressure term is exactly zero. Demand draws inventory
+    # down by about 0.45 a day, so half of that is 0.22 a day and three days
+    # separate the two arms by well under one unit: both are still deep in
+    # the dead zone and the prices are identical. The dial bites around day
+    # 120, when the unanswered-demand arm reaches the floor.
+    ("oil_supply_response", 0.5, False),
     # The exponent on the VIX ratio in the market variance target. The
     # endogenous VIX leaves its anchor on day one, so the ratio is never
     # exactly 1.0 and any exponent but the shipped one moves the target.

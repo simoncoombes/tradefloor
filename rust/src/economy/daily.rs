@@ -134,6 +134,12 @@ pub struct DailyInputs<'a> {
     /// reference implementation does. 1.0 enforces both floors in full. See
     /// the block at the end of `update_economy_daily`.
     pub daily_credit_floor_gain: f64,
+    /// How much of oil demand supply answers on the daily step. 0.0
+    /// disables it, which is what every shipped preset sets and what the
+    /// reference implementation does. See `ModelParams::oil_supply_response`
+    /// for why the zero is a defect rather than a modelling choice, and why
+    /// 1.0 is the derived value.
+    pub oil_supply_response: f64,
 }
 
 impl<'a> Default for DailyInputs<'a> {
@@ -162,6 +168,7 @@ impl<'a> Default for DailyInputs<'a> {
             crisis_vix_threshold: CRISIS_VIX_THRESHOLD,
             usd_crisis_vix_threshold: CRISIS_VIX_THRESHOLD,
             daily_credit_floor_gain: 0.0,
+            oil_supply_response: 0.0,
         }
     }
 }
@@ -535,7 +542,22 @@ pub fn update_economy_daily(
     let oil_last_opec = economy.oil_last_opec_day;
 
     let oil_demand_factor = economy.gdp_growth * 0.15;
-    let oil_supply_factor = 0.0;
+    // Supply answers demand, or does not. At 0.0 this is the literal zero
+    // the reference implementation writes, and a BRANCH rather than a
+    // multiply so a negative `gdp_growth` cannot turn a `-0.0` into a
+    // `+0.0` and move a trajectory by a signed zero.
+    //
+    // The zero is why inventory only ever falls: demand draws it down every
+    // day and nothing puts it back, so it reaches its floor and the
+    // pressure term saturates into a standing push on the oil price. At 1.0
+    // supply matches demand in expectation and inventory is driftless,
+    // which is the stationarity condition of this process and not a level
+    // chosen to hit a number.
+    let oil_supply_factor = if inputs.oil_supply_response == 0.0 {
+        0.0
+    } else {
+        oil_demand_factor * inputs.oil_supply_response
+    };
     let inventory_change =
         oil_demand_factor - oil_supply_factor + random_normal(rng, 0.0, 0.5 * volatility);
     let new_oil_inventory = clamp(oil_inventory - inventory_change, 0.0, 100.0);

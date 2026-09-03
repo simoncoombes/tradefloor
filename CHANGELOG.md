@@ -179,6 +179,62 @@ digest, through a `--coefficients` mode that rewrites those two fields and
 refuses to run if any existing coefficient moved. Every measured block in
 those records is byte for byte as it was, and no preset was re-measured.
 
+### The supply term behind the one-way rate path
+
+The corporate bond yield rose on 24 of 30 seeds over a year and was
+non-decreasing on most of them. The yield itself is recomputed at every
+meeting as the ten-year plus a spread, so it carries no memory of its own.
+It rose because the central bank hiked, the bank hiked because inflation
+rose, and inflation rose because the oil price did.
+
+The oil price rose because a supply term was left at zero. Oil demand draws
+inventory down by `gdp_growth * 0.15` every day and `oil_supply_factor` is
+the literal `0.0`, so inventory falls monotonically from its opening 50
+whatever the world does. It reaches its floor around day 120 of a 252-day
+run and stays there. The inventory pressure term is `(40 - inventory) *
+0.08`, so at the floor it saturates at a standing push of `+3.2` a day on
+the price, which oil's own mean reversion of 0.03 a day cannot hold. Oil
+pins at its 150 clamp, and everything downstream follows.
+
+So the one-way rate path lives in a supply term at zero, four steps
+upstream. The yield is the last link in that chain.
+
+`oil_supply_response` answers demand with supply. At 0.0, which is every
+preset before pt-v18 and what the reference implementation does, the branch
+is not taken and the trajectory is bit-identical. At 1.0 supply matches
+demand in expectation, `inventory_change` is the noise term alone, and
+inventory is a driftless random walk. That value is derived rather than
+chosen: it is the stationarity condition of the process, read off the
+process, using the coefficient already there. The pressure term is already
+two-sided, pushing up below 40 and down above 60, so a driftless inventory
+gives a two-sided oil price and a two-sided rate path without any of them
+being made two-sided by hand.
+
+Measured over five seeds, the corporate bond yield is monotone on 1 of 5
+where it was monotone on 4 of 5, and its rise over the year falls from
++0.0200 to +0.0133. Over thirty seeds the annualised index drift improves
+from -11.347 to -9.865, a paired +1.178 by median and +1.294 by mean, and
+every one of the thirty improves.
+
+**That is a third of what the rate path is worth, and the rest is still
+there.** The investigation prices the whole rate path at 3.805 points. Oil
+still reaches 145.8 by day 251 and inflation still rises monotonically on
+every seed, so answering demand with supply removed one driver and not the
+family. What remains has been localised rather than guessed at: the
+inventory walk is now driftless but wide enough to spend real time against
+its floor, and the inflation process itself carries several one-sided terms
+of its own, a wage-pressure floor at zero and a Phillips term that only
+pushes one way while unemployment falls to 2.5 per cent. Naming which of
+those dominates is the next measurement rather than this one's conclusion.
+
+**And it costs one row.** `leverage_effect` reads +0.0006 against a ceiling
+of 0.00, so the panel is 13 of 14 rather than 14 of 14. That row is the
+stated side channel of the downside tilt, and the investigation found it
+leaving the same band when the tilt was switched off entirely. The
+exceedance is 0.008 of the row's own across-seed noise, so it is a hair.
+The era is uncertified until the five steps are done, and the panel that
+counts is the one measured then.
+
 ### The index drift row
 
 `facts.panel_statistics` reports `index_drift_pct`, the annualised log

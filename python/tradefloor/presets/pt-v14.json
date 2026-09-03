@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v14",
   "fingerprint": "pt-v14",
-  "coefficient_digest": "2211d0f45448685ff8e4bedcba88d9282ced5c4ff0f1508d2a2a5d4b84cda6e2",
+  "coefficient_digest": "bb9e5a8a8cc92c3e135447c15580eab7be86da26f556deb444e8cc82c3057068",
   "coefficients": {
     "book_levels": 10.0,
     "crash_amplifier_slope": 0.2,
@@ -88,6 +88,7 @@
     "news_peer_weight_down": 0.05,
     "news_sector_weight": 0.5,
     "oil_baseline": 75.0,
+    "oil_supply_response": 0.0,
     "order_flow_coefficient": 50.0,
     "phillips_curve_coeff": 0.2,
     "price_breaker_fraction": 0.25,

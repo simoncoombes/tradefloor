@@ -597,6 +597,42 @@ pub struct ModelParams {
     /// offset added before it would itself be amplified, delivering the
     /// form times `E[A]` rather than the form.
     pub market_beta_down_asym_recentre: f64,
+    /// How much of oil DEMAND is answered by supply on the daily step.
+    /// 0.0 -- every preset before pt-v18 -- is bit-identical, and it is what
+    /// the reference implementation does.
+    ///
+    /// # The zero nobody chose
+    ///
+    /// `update_economy_daily` draws inventory down by
+    /// `gdp_growth * 0.15` every day and replenishes it by a hardcoded
+    /// `oil_supply_factor = 0.0`. Inventory therefore falls monotonically
+    /// from its opening 50 whatever the world does, reaches its floor
+    /// around day 120 of a 252-day run, and stays there. The inventory
+    /// pressure term is `(40 - inventory) * 0.08`, so at the floor it
+    /// saturates at a standing `+3.2` a day on the oil price, which oil's
+    /// own mean reversion of 0.03 a day cannot hold. Oil then pins at its
+    /// 150 clamp, and from there the chain is mechanical: oil raises
+    /// inflation, inflation makes the central bank hike, the hike raises
+    /// the ten-year and the corporate yield, the higher discount rate
+    /// compresses every target multiple, and every price falls.
+    ///
+    /// That is the whole of the one-way rate path. It is not a rate
+    /// mechanism at all; it is a supply term left at zero.
+    ///
+    /// # Why 1.0 is derived and not fitted
+    ///
+    /// At 1.0 supply equals demand in expectation, so `inventory_change`
+    /// is the noise term alone and inventory is driftless. That is the
+    /// stationarity condition of the inventory process, read off the
+    /// process itself, and the `0.15` it uses is the coefficient already
+    /// there. Nothing here is tuned to a target: the value that makes a
+    /// random walk driftless is not a matter of degree.
+    ///
+    /// The pressure term is already two-sided, pushing up below 40 and
+    /// down above 60, so a driftless inventory gives a two-sided oil price
+    /// and a two-sided rate path without any of them being made two-sided
+    /// by hand.
+    pub oil_supply_response: f64,
     /// Persistence of the SLOW variance component (Engle-Lee style). The
     /// market factor's variance carries two timescales from the pt-v4 era:
     /// the fast one above tracks the VIX-scaled target, this one carries
@@ -1448,6 +1484,7 @@ impl ModelParams {
             market_beta_down_asym: 0.0,
             market_beta_down_asym_lag: 0.0,
             market_beta_down_asym_recentre: 0.0,
+            oil_supply_response: 0.0,
             // Legacy values: the slow component is OFF, and the update
             // reduces to the single-component form bit for bit.
             market_vol_slow_persistence: 0.0,
@@ -2438,6 +2475,15 @@ impl ModelParams {
         // it, because a hotter conditional sigma injects proportionally
         // more. Recentred against the conditional sigma, so both go.
         p.market_beta_down_asym_recentre = 1.0;
+        // Oil demand drew inventory down every day against a supply term
+        // hardcoded to zero, so inventory hit its floor around day 120 and
+        // the inventory pressure term saturated at a standing push on the
+        // oil price. That is what made the rate path one-way: oil raised
+        // inflation, inflation made the bank hike, and the hike compressed
+        // every multiple. At 1.0 supply answers demand and inventory is
+        // driftless, which is the stationarity condition of the process
+        // rather than a level chosen to hit a number.
+        p.oil_supply_response = 1.0;
         p
     }
 
@@ -2536,6 +2582,7 @@ impl ModelParams {
             "market_beta_down_asym" => self.market_beta_down_asym,
             "market_beta_down_asym_lag" => self.market_beta_down_asym_lag,
             "market_beta_down_asym_recentre" => self.market_beta_down_asym_recentre,
+            "oil_supply_response" => self.oil_supply_response,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
@@ -2680,6 +2727,7 @@ impl ModelParams {
             "market_beta_down_asym" => out.market_beta_down_asym = value,
             "market_beta_down_asym_lag" => out.market_beta_down_asym_lag = value,
             "market_beta_down_asym_recentre" => out.market_beta_down_asym_recentre = value,
+            "oil_supply_response" => out.oil_supply_response = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
@@ -2894,6 +2942,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_beta_down_asym",
         "market_beta_down_asym_lag",
         "market_beta_down_asym_recentre",
+        "oil_supply_response",
         "market_vol_vix_coupling",
         "mispricing_cap",
         "mispricing_half_life_days",

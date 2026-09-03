@@ -150,6 +150,10 @@ PARAM_SPECS: dict[str, dict] = {
     # drift of its own, which is the defect inverted rather than a
     # richer model.
     "market_beta_down_asym_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # A SHARE of demand, so [0, 1]. Above 1.0 supply outruns demand every
+    # day and inventory ramps upward instead of downward, which is the
+    # defect inverted.
+    "oil_supply_response": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "market_vol_vix_smooth": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 60.0)},
     "qe_pe_stock_gain": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 20.0)},
     "universe_stress_weight": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 2.0)},
