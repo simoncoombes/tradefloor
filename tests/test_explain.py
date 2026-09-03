@@ -377,6 +377,7 @@ def test_the_sector_index_is_the_names_own_sector():
     seen = set()
     for k, instrument in enumerate(roster):
         result = e.explain(e.tickers[k], 1)
+        assert result._sector_key == instrument.sector, k
         assert result._sector == order.index(instrument.sector), k
         seen.add(result._sector)
     assert len(seen) == len(order) == 12, sorted(seen)
@@ -1099,27 +1100,89 @@ def swapped(keep=(0, 5), size=6):
     return e
 
 
-def test_a_listing_that_hides_a_delisting_is_still_caught():
-    """The case a width comparison cannot see.
+def test_a_listing_that_hides_a_delisting_reads_the_slot_it_held():
+    """The case a width comparison cannot see, read at the right slot.
 
     A delisting and a listing in one day leave the tape the same width
-    and move every slot between them, so the previous close's levels are
-    another company's while the counts agree. The rosters themselves are
-    compared where the day before was kept, which is exact.
+    and move every slot between them, so the previous day's tape holds
+    this name at a slot it no longer has. The day before's own copy
+    carries the roster that names it, so the levels are read there
+    rather than the valuation collapsing into the book.
     """
     e = swapped()
     result = e.explain("AAB", 2)
     assert result._compared == "rosters"
+    assert (result._previous_index, result._index) == (1, 0)
     assert result._previous_moved is True
-    assert result._previous is None
+    # AAB's own levels on day 1, read off that day's tape at slot 1.
+    before = pa.table(e.truth(day=1)).to_pydict()
+    rows = rows_for(before, 1)
+    theirs = before["anchor_price"][rows[-1]]
+    assert result._previous["anchor_price"] == theirs
+    assert result._previous["fundamental_value"] == \
+        before["fundamental_value"][rows[-1]]
+    # And AAA's, which is what slot 0 holds on that tape, is not it.
+    wrong = rows_for(before, 0)
+    mistaken = before["anchor_price"][wrong[-1]]
+    assert result._previous["anchor_price"] != mistaken
     total = math.fsum(child.value for child in result.root.children)
     assert abs(result.move - total) < ex.TOLERANCE
     assert result.check() == []
-    line = next(c for c in result.caveats if "not the one day" in c)
-    assert "the roster the day before opened on" in line
+    line = next(c for c in result.caveats if "sat at slot" in c)
+    assert "slot 1 on day 1" in line and "slot 0 on day 2" in line
     # A run with no roster change at all says nothing of the sort.
-    assert not any("not the one day" in c
+    assert not any("sat at slot" in c
                    for c in delisted(delist=False).explain("AAB", 2).caveats)
+
+
+def test_the_slot_a_name_is_read_at_has_to_hold_that_name():
+    """The invariant that ends the class rather than testing an instance.
+
+    Every claim this module makes resolves the slot the same way, so all
+    four agree with a wrong one and a tree built at another company's
+    slot is a self-consistent description of that company under this
+    name. The invariant fires on every call instead of on the roster
+    shape a test happens to build.
+    """
+    roster = [instrument.ticker
+              for instrument in tf.Universe.random(6, seed=ROSTER_SEED)]
+    ex._the_slot_names_the_name(roster, 1, roster[1], "a roster")
+    with pytest.raises(ValidationError, match=r"^slot 0 of a roster holds"):
+        ex._the_slot_names_the_name(roster, 0, roster[1], "a roster")
+    with pytest.raises(ValidationError, match=r"holds 'nothing'"):
+        ex._the_slot_names_the_name(roster, 99, roster[1], "a roster")
+    # And it is wired into both places a slot is resolved: a call that
+    # reaches either one on a real tree passes.
+    e = swapped()
+    result = e.explain("AAB", 2)
+    assert result._roster[result._index] == "AAB"
+    assert result._before[result._previous_index] == "AAB"
+
+
+def test_the_roster_comparison_is_load_bearing():
+    """The guard that decides the previous slot, made able to fail.
+
+    Reading the previous day's tape at the slot the name holds NOW is
+    the defect; the comparison is what stops it. A guard that answers
+    the same way whatever the rosters are gives the wrong levels back
+    with no miss, so this fixes the answer rather than the machinery and
+    watches the numbers move.
+    """
+    e = swapped()
+    right = e.explain("AAB", 2)
+    before = pa.table(e.truth(day=1)).to_pydict()
+    theirs = rows_for(before, right._index)
+    # The levels the same call would have read without the comparison,
+    # which are the ones AAA left on that tape.
+    assert right._previous["anchor_price"] != \
+        before["anchor_price"][theirs[-1]]
+    # And the tree built on those wrong levels does not add up, which is
+    # what the sum identity is for.
+    wrong_book = right.move - math.fsum(
+        child.value for child in right.root.children
+        if child.name not in ("book", "fair_value"))
+    assert abs(wrong_book) < 1.0
+    assert right._previous_index != right._index
 
 
 def test_a_day_whose_predecessor_was_not_kept_says_how_it_compared():

@@ -386,6 +386,25 @@ def _record_label(inputs: Sequence[dict], day: int) -> int:
     return int(day)
 
 
+def _the_slot_names_the_name(roster: Sequence[str], slot: int,
+                             ticker: str, whose: str) -> None:
+    """Refuse a slot that does not hold the name it was resolved for.
+
+    An invariant rather than a test, because every claim this module
+    makes resolves the slot the same way and so agrees with a wrong one:
+    a tree built at another company's slot is a self-consistent
+    description of that company under this name, and check() reports
+    nothing. Written once here and called wherever a slot is resolved.
+    """
+    if not 0 <= slot < len(roster) or roster[slot] != ticker:
+        raise ValidationError(
+            f"slot {slot} of {whose} holds "
+            f"{roster[slot] if 0 <= slot < len(roster) else 'nothing'!r} "
+            f"and was resolved for {ticker!r}. Every column, tag and tape "
+            "row this explanation reads is at that slot, so it would "
+            "describe another company under this name.")
+
+
 def _same_width(engine: Engine, before: int, after: int,
                 width: int) -> bool:
     """Whether the tape holds the same number of names on both days.
@@ -456,18 +475,19 @@ def _table(stream: Any) -> dict[str, list]:
     return pa.table(stream).to_pydict()
 
 
-def _explain(engine: Engine, ticker: str, day: int, sector: int,
+def _explain(engine: Engine, ticker: str, day: int, sector: str,
              window: tuple[int, int] | None, kept: Sequence[int],
              opened: Engine | None, inputs: Sequence[dict] | None,
              before: Sequence[str] | None = None) -> "Explanation":
     """Build the explanation ``Engine.explain`` returns.
 
     Called from the binding, which owns the store and hands over what it
-    holds: the engine, the name's sector index, the window asked for, the
-    days kept, the copy taken before this day's open and this day's own
-    inputs. The sector index comes from the binding because the sector
-    factor's tag is a position in the engine's own sector table and the
-    engine publishes no column for it.
+    holds: the engine, the name's sector, the window asked for, the days
+    kept, the copy taken before this day's open and this day's own
+    inputs. The sector arrives as its KEY and the tag is derived here
+    from :func:`tradefloor.sectors`, because a tag the binding worked out
+    and handed over would be one derivation used twice, and the check on
+    it would agree with a wrong answer.
     """
     if opened is None or inputs is None:
         if ticker not in engine.tickers:
@@ -499,7 +519,7 @@ def _explain(engine: Engine, ticker: str, day: int, sector: int,
             f"{list(opened.tickers[:8])}. A name listed after a day "
             "cannot be explained on it.")
     return Explanation(engine=engine, ticker=ticker, day=int(day),
-                       sector=int(sector), window=window,
+                       sector=sector, window=window,
                        kept=tuple(int(d) for d in kept),
                        opened=opened, inputs=tuple(inputs),
                        before=None if before is None else tuple(before))
@@ -524,7 +544,7 @@ class Explanation:
                ("inputs", "string"))
 
     def __init__(self, *, engine: Engine, ticker: str, day: int,
-                 sector: int, window: tuple[int, int] | None,
+                 sector: str, window: tuple[int, int] | None,
                  kept: tuple[int, ...], opened: Engine,
                  inputs: tuple[dict, ...],
                  before: tuple[str, ...] | None = None) -> None:
@@ -536,7 +556,29 @@ class Explanation:
         self._opened = opened
         self._inputs = inputs
         self._index = opened.tickers.index(ticker)
-        self._sector = int(sector)
+        # The slot names the name, checked here rather than tested for.
+        # Every read downstream is at this index: the state columns, the
+        # tape's instrument filter, the previous close and the company
+        # tag on the draws. All four of check()'s claims resolve it the
+        # same way, so all four agree with a wrong slot, and two tests
+        # catch only the roster shapes they build. This fires on every
+        # call instead.
+        _the_slot_names_the_name(opened.tickers, self._index, ticker,
+                                 f"the copy day {day} was kept from")
+        # From the library's published order rather than from a number
+        # the binding computed: the engine's own sector table and
+        # `tradefloor.sectors()` are two sources for one tag, and two
+        # derivations disagree where one is wrong.
+        from . import sectors as _sector_keys
+
+        order = list(_sector_keys())
+        if sector not in order:
+            raise ValidationError(
+                f"{ticker!r} is in sector {sector!r}, which is not one of "
+                "the twelve tradefloor.sectors() publishes: "
+                + ", ".join(order))
+        self._sector_key = sector
+        self._sector = order.index(sector)
         #: The roster the day ran under, and whether it is still the
         #: engine's. Read from the copy, so a delisting since the day is
         #: visible to the caveats rather than silent.
@@ -553,22 +595,19 @@ class Explanation:
         #: values a replay installs, so a replay of a node reproduces the
         #: run rather than perturbing it.
         self._logged, self._traced = _logged_draws(engine, self.day)
-        self._previous = _levels(engine, self._label - 1, self._index)
         #: The roster the day before opened on, where that day was kept,
-        #: and how the two days were compared. Rosters compare exactly;
-        #: widths do not, and a listing paired with a delisting in one
-        #: day leaves the width alone while moving every slot between
-        #: them, which is the case a width comparison cannot see.
+        #: and how the two days were compared. Rosters name the slot the
+        #: name held then, which is what the previous day's tape is keyed
+        #: by; widths only say the roster is the same size, and a listing
+        #: paired with a delisting in one day leaves the width alone
+        #: while moving every slot between them.
         self._before = before
         self._compared = "rosters" if before is not None else "widths"
-        if self._previous is not None and not self._held_still(engine):
-            # The roster moved between the two days, so the slot that
-            # names this company on one tape does not on the other and
-            # the previous close's levels would be another name's.
-            self._previous = None
-            self._previous_moved = True
-        else:
-            self._previous_moved = False
+        self._previous_index, self._previous_moved = self._slot_before(
+            engine, ticker)
+        self._previous = (
+            None if self._previous_index is None
+            else _levels(engine, self._label - 1, self._previous_index))
         #: Each draw node's values, in the order the log delivered
         #: them, keyed by the node. A replay installs these against
         #: the node's own addresses, which is what makes a
@@ -596,20 +635,32 @@ class Explanation:
                                                self._index)
         self.caveats = self._caveats()
 
-    def _held_still(self, engine: Engine) -> bool:
-        """Whether the roster is the same on the day before and this one.
+    def _slot_before(self, engine: Engine,
+                     ticker: str) -> tuple[int | None, bool]:
+        """Where this name sat on the day before, and whether it moved.
 
-        Exact where the day before was kept, since the two copies carry
-        their own rosters. Where it was not, the tape's instrument counts
-        are all there is to compare, and equal counts do not prove the
-        roster held: a listing paired with a delisting in one day leaves
-        the count alone and moves every slot between them. The caveats
-        say which comparison was made.
+        The previous day's tape is keyed by the slots that day had, so
+        the levels are read at the slot the name held THEN rather than at
+        the slot it holds now. Where the day before was kept its copy
+        carries that roster and the answer is exact; a name absent from
+        it has no previous levels at all. Where it was not kept, the
+        tape's instrument counts are all there is, and equal counts do
+        not prove the roster held: a listing paired with a delisting in
+        one day leaves the count alone and moves every slot between them.
+        The caveats say which of the two was done.
         """
         if self._before is not None:
-            return tuple(self._before) == self._roster
-        return _same_width(engine, self._label - 1, self._label,
-                           len(self._roster))
+            if ticker not in self._before:
+                return None, True
+            slot = list(self._before).index(ticker)
+            _the_slot_names_the_name(self._before, slot, ticker,
+                                     f"the copy day {self.day - 1} was "
+                                     "kept from")
+            return slot, slot != self._index
+        if _same_width(engine, self._label - 1, self._label,
+                       len(self._roster)):
+            return self._index, False
+        return None, True
 
     # -- the tree ---------------------------------------------------------
 
@@ -906,15 +957,21 @@ class Explanation:
                 f"read at {self._label} and the tree is the day the store "
                 f"kept as {self.day}. Both paths the library drives pass "
                 "one number to both.")
-        if self._previous_moved:
+        if self._previous_moved and self._previous is not None:
+            out.append(
+                f"{self.ticker} sat at slot {self._previous_index} on day "
+                f"{self._label - 1} and sits at slot {self._index} on day "
+                f"{self._label}, so the previous close's levels are read "
+                "at the slot it held then. The roster the day before "
+                "opened on is what says which slot that was.")
+        elif self._previous_moved:
             how = ("the roster the day before opened on"
                    if self._compared == "rosters"
                    else "the number of names the tape holds for it")
             out.append(
-                f"The roster is not the one day {self._label - 1} ran "
-                f"under, compared by {how}, so the previous close's "
-                "levels sit at slots that name other companies and the "
-                "valuation is not separated from the book.")
+                f"{self.ticker} has no levels on day {self._label - 1}, "
+                f"compared by {how}, so the valuation is not separated "
+                "from the book on this day.")
         elif self._compared == "widths" and self._previous is not None:
             out.append(
                 f"Day {self.day - 1} was not kept, so the roster it ran "

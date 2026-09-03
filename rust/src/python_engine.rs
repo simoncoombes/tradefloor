@@ -791,21 +791,25 @@ fn stream_id(name: &str) -> PyResult<u32> {
     })
 }
 
-/// Which sector factor a name draws from, on the roster ``engine`` holds.
+/// Which sector a name belongs to, on the roster `engine` holds.
 ///
-/// The sector factor's tag is a position in the engine's own sector
-/// table, and no column carries it, so it is resolved here rather than
-/// guessed at from the roster. Resolved against whichever engine is
-/// asked, because a kept copy's roster and the live one disagree after a
+/// The KEY rather than its position, so the Python side derives the
+/// sector factor's tag from `tradefloor.sectors()` instead of taking a
+/// number this function worked out. Two derivations of one tag from two
+/// sources disagree where one of them is wrong; one derivation used
+/// twice agrees with itself. Resolved against whichever engine is asked,
+/// because a kept copy's roster and the live one differ after a
 /// delisting.
-fn sector_of(engine: &PyEngine, ticker: &str) -> usize {
+///
+/// Empty where the name is not on that engine's roster, which the caller
+/// refuses before it reaches the tag.
+fn sector_of(engine: &PyEngine, ticker: &str) -> String {
     engine
         .tickers
         .iter()
         .position(|t| t == ticker)
         .and_then(|i| engine.inner.companies().get(i).map(|c| c.sector.clone()))
-        .and_then(|key| crate::sectors::keys().iter().position(|k| *k == key))
-        .unwrap_or(0)
+        .unwrap_or_default()
 }
 
 fn draw_kind(name: &str) -> PyResult<crate::rng::DrawKind> {
