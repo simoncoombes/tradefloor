@@ -644,6 +644,67 @@ def test_the_index_drift_row_is_reported_and_never_graded():
             assert key in REPORTING_ONLY, key
 
 
+def test_the_index_drift_row_is_the_daily_rebalanced_portfolio():
+    """The convention, against a portfolio built a second way.
+
+    An equal-weight index is a portfolio rebalanced to equal weights every
+    day, so its daily return is the mean of the SIMPLE returns across
+    names. This rebuilds that portfolio from the bars, compounding a
+    notional level day by day, and the row has to be its annualised log
+    growth. Nothing here reads the row's own arithmetic, so a row that
+    averaged log returns instead fails.
+
+    The other convention is computed beside it, because a reader putting a
+    figure from a decomposition against this row has to carry the term
+    between them. Every attribution in this engine is additive in log
+    returns and a portfolio return is not, so the decompositions keep the
+    log convention and this row does not.
+    """
+    import math
+    import statistics
+
+    import pyarrow as pa
+
+    from tradefloor.facts import _daily_series, panel_statistics
+
+    engine = tradefloor.Engine(seed=11, universe=UNIVERSE)
+    engine.run_days(150, record=True)
+    bars = pa.table(engine.bars(grain="day")).to_pydict()
+    series = _daily_series(bars)
+
+    gross: dict[int, list[float]] = {}
+    for rows in series.values():
+        for k in range(1, len(rows)):
+            previous, close = rows[k - 1][1], rows[k][1]
+            if previous > 0 and close > 0:
+                gross.setdefault(rows[k][0], []).append(close / previous)
+    days = sorted(gross)
+
+    level = 1.0
+    for day in days:
+        level *= statistics.mean(gross[day])
+    portfolio = math.log(level) / len(days) * 252 * 100.0
+    row = panel_statistics(bars, UNIVERSE)["index_drift_pct"]
+    assert row == pytest.approx(portfolio, rel=1e-12)
+
+    # The log convention, and the term that separates the two. Jensen's
+    # inequality puts the portfolio above the log mean by about half the
+    # cross-sectional variance, and the agreement below is what says the
+    # gap is that term rather than a bug in either.
+    logs = [statistics.mean([math.log(g) for g in gross[day]])
+            for day in days]
+    log_convention = sum(logs) / len(days) * 252 * 100.0
+    variances = [statistics.pvariance([math.log(g) for g in gross[day]])
+                 for day in days if len(gross[day]) > 1]
+    half_variance = sum(variances) / len(variances) / 2 * 252 * 100.0
+    assert row > log_convention
+    assert row - log_convention == pytest.approx(half_variance, rel=0.01)
+
+    # And the two really are different numbers on this market, or the
+    # comparison above would hold on a build that never changed convention.
+    assert abs(row - log_convention) > 1.0
+
+
 def test_the_index_drift_row_keeps_the_names_the_other_rows_drop():
     """Survivorship: `min_observations` filters the shape rows and must not
     filter this one.

@@ -82,11 +82,12 @@ than the one it drew.
 
 Measured on the panel roster over thirty seeds at 252 days on pt-v16, the
 annualised index drift improves from a median of -22.155 to -18.344 per
-cent a year. Every one of the thirty improves, by between 3.715 and 4.039
-points, because the starting condition is a property of the roster and not
-of the market seed. The drift is still negative on all thirty: the
-remaining terms are a down-tilt in the market factor, a rising rate path
-and an unexplained residual, none of which this touches.
+cent a year, in the log convention. Every one of the thirty improves, by
+between 3.715 and 4.039 points, because the starting condition is a
+property of the roster and not of the market seed. The drift is still
+negative on all thirty: the remaining terms are a down-tilt in the market
+factor, a rising rate path and an unexplained residual, none of which this
+touches.
 
 **What this breaks.** The same name and seed no longer give the same
 universe. Every generated name's earnings and book value move, and with
@@ -108,7 +109,8 @@ are recorded rather than quietly restated.
 
 ### The pt-v18 era and the downside transmission tilt
 
-The equal-weight index drifted -22.155 per cent a year at pt-v16, measured
+The equal-weight index drifted -22.155 per cent a year at pt-v16 in the
+log convention, measured
 over thirty seeds on the panel roster at 252 days, against a real large-cap
 index's +8 to +10. It was negative on every seed. Almost none of that was
 chosen. It is the sum of mechanisms that each moved the first moment as
@@ -152,8 +154,9 @@ new bit-pinned transcendental or a fitted constant, and a fitted constant
 is tuning rather than fixing. What it leaves is measured below rather than
 argued.
 
-Measured over thirty seeds, the annualised index drift improves from
--18.344 to -11.347 per cent a year, and every one of the thirty improves.
+Measured over thirty seeds in the log convention, the annualised index
+drift improves from -18.344 to -11.347 per cent a year, and every one of
+the thirty improves.
 The paired difference is +7.879 by median and +8.251 by mean. Set that
 against the investigation's finding that switching the tilt OFF entirely is
 worth 7.940: recentring recovers essentially all of the drift the tilt
@@ -212,8 +215,9 @@ being made two-sided by hand.
 
 Measured over five seeds, the corporate bond yield is monotone on 1 of 5
 where it was monotone on 4 of 5, and its rise over the year falls from
-+0.0200 to +0.0133. Over thirty seeds the annualised index drift improves
-from -11.347 to -9.865, a paired +1.178 by median and +1.294 by mean, and
++0.0200 to +0.0133. Over thirty seeds the annualised index drift, in the
+log convention, improves from -11.347 to -9.865, a paired +1.178 by median
+and +1.294 by mean, and
 every one of the thirty improves.
 
 **That is a third of what the rate path is worth, and the rest is still
@@ -257,7 +261,8 @@ same draws are consumed in the same places.
 **It is worth nothing on the drift.** It is corrected because it is wrong.
 The rule fires every 90 days, so its bias is about +0.95 of oil price per
 firing and under +3 across a year against a price that moves by 70. Over
-thirty seeds the index drift moves from -9.865 to -9.871, a paired median
+thirty seeds the index drift, in the log convention, moves from -9.865 to
+-9.871, a paired median
 of exactly 0.000. This is a correctness fix on a rule that was wrong, and
 it is recorded separately so that it is not mistaken for one of the terms
 that moves the number.
@@ -291,7 +296,8 @@ so the compensator tracks the arrival rate. The investigation measured the
 realised drift at 1.084 times the day-zero closed form for exactly that
 reason, and a compensator on the day-zero rate would have left that 8 per
 cent behind. It shows: over thirty seeds the annualised index drift
-improves from -9.871 to -7.145, a paired +2.799 by median, where switching
+improves in the log convention from -9.871 to -7.145, a paired +2.799 by
+median, where switching
 the jump mean off entirely was measured at 2.621.
 
 The central moments hold, measured rather than asserted. Over six seeds the
@@ -336,8 +342,9 @@ exist, so the upside keeps its short-interest gate. Those are finance
 rather than an accident, and matching them would have removed a real
 mechanism instead of an unchosen asymmetry.
 
-Over thirty seeds the annualised index drift improves from -7.145 to
--6.832, a paired +0.370 by median, and every one of the thirty improves.
+Over thirty seeds the annualised index drift, in the log convention,
+improves from -7.145 to -6.832, a paired +0.370 by median, and every one
+of the thirty improves.
 The investigation prices the whole squeeze-and-cascade block at 0.574,
 measured by switching it off; matching the ladders while keeping the gates
 recovers two thirds of that and leaves the mechanism in place.
@@ -419,11 +426,58 @@ gained the new name at its inert default and a new digest, through the
 mode that rewrites those two fields and refuses any moved coefficient. The
 determinism digest is unmoved and the default preset is untouched.
 
+### The index convention
+
+`index_drift_pct` reported the mean across names of the daily log return.
+An equal-weight index is a portfolio rebalanced to equal weights every
+day, so its daily return is the mean of the SIMPLE returns, and the row
+now reports that. The two are different quantities and the row is graded,
+when a band for it exists, against a published index return, which is a
+portfolio return.
+
+The decompositions keep the log convention, and they have to. Log returns
+are additive across time and across the terms of an identity, so a
+contribution table that sums to a move can be written in them and cannot
+be written in a portfolio return. Every attribution this engine reports is
+in log returns, and so is every figure in the sections above.
+
+The two differ by half the cross-sectional variance of the daily returns,
+which is positive wherever the names disperse at all. On the panel roster
+at 252 days it was measured at 1.910 points a year with a standard
+deviation of 0.190 over eight seeds, so a figure quoted without its
+convention is wrong by about two points of annual index level. A test
+rebuilds the portfolio from the bars, compounding a notional level day by
+day, and asserts the row is its annualised log growth; a second assertion
+puts the gap against half the cross-sectional variance, so the difference
+is the term it should be rather than an error in either.
+
+Both conventions are named wherever a figure appears: in the row's own
+docstring, in this file's sections above, and in the reason
+`facts.REPORTING_ONLY` carries and `facts.report` prints beside the
+number.
+
+### The protocol behind every figure
+
+Two seeds decide a run, and every figure in the sections above was
+measured with one of them held. The market seed drives every draw the
+engine takes; the universe seed decides the roster it takes them against.
+Each arm above varied the market seed over 1 to 30 on `Universe.random(40,
+seed=111)` held fixed.
+
+That roster opens 0.78 of a population standard deviation above fair
+value, so its LEVEL carries a draw as well as a model: one build reads
+-8.603 on it against +3.989 and +7.050 on rosters 204 and 209. A paired
+difference between two arms on the held roster is a property of the model,
+because the roster's own draw is common to both and cancels. A level is a
+property of that roster, and a level that has to describe the model is
+measured by varying the universe seed instead. The paragraph is in the
+row's docstring as well, since that is where a reader meets the number.
+
 ### The index drift row
 
-`facts.panel_statistics` reports `index_drift_pct`, the annualised log
-drift of the equal-weight index over the measured window. It is the
-panel's only first moment. The other fourteen statistics are shape
+`facts.panel_statistics` reports `index_drift_pct`, the annualised drift
+of the equal-weight index over the measured window. It is the panel's only
+first moment. The other fourteen statistics are shape
 measurements, and a market can hold every one of them in band while
 losing a fifth of its value in a year: nine are exactly invariant to a
 constant drift added to every name because they centre their arguments
