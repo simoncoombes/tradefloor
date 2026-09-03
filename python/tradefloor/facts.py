@@ -1037,6 +1037,18 @@ def _index_drift_pct(
     cancels. A level is a property of that roster, and a level that has to
     describe the model is measured by varying the universe seed instead.
 
+    How much that costs is measured. A roster sweep puts roster 111 at
+    1.12 standard deviations dearer than the population at the open, and
+    index drift moves at about minus a hundred points per unit of opening
+    mispricing, so this roster carries a handicap near six points a year.
+    Across a hundred rosters, pt-v18 without the growth term reads a
+    portfolio median of +1.55 a year with 65 of 101 rosters above zero,
+    where roster 111 reads about minus five. So every level in the table
+    below is that roster's and reads about six points worse than the model
+    does. An earlier and smaller sample in the design note puts the same
+    roster at 0.78 standard deviations, and the two have not been
+    reconciled.
+
     # Measured
 
     Every figure in the table is the LOG convention, on

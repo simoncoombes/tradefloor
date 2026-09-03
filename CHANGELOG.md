@@ -6,8 +6,8 @@
 
 **A new preset, pt-v18, returns five first moments the model injected and
 grows fair value with nominal output**, taking the equal-weight index from
--16.150 per cent a year to -0.340 as a portfolio return, and from -18.344
-to -2.304 in log returns, with the default preset left where it was.
+-16.150 per cent a year to -0.340 as a portfolio return, on a roster six
+points dearer than the population. The default preset is where it was.
 
 **The index drift row reports a daily-rebalanced portfolio return**, about
 two points above the log convention the decompositions use.
@@ -548,9 +548,22 @@ standard deviation of 0.052 that the 0.78 is computed from.
 A paired difference between two arms on the held roster is a property of
 the model, because the roster's own draw is common to both and cancels. A
 level is a property of that roster, and a level that has to describe the
-model is measured by varying the universe seed instead. The paragraph is
-in the row's docstring as well, since that is where a reader meets the
-number.
+model is measured by varying the universe seed instead.
+
+How much that costs is measured. A roster sweep puts roster 111 at 1.12
+standard deviations dearer than the population at the open, and index
+drift moves at about minus a hundred points per unit of opening
+mispricing, so this roster carries a handicap near six points a year.
+Across a hundred rosters the preset this branch started from reads a
+portfolio median of +1.55 a year with 65 of 101 rosters above zero, where
+roster 111 reads about minus five. So every level in this section is that
+roster's and reads about six points worse than the model does, while
+every paired recovery is the model's. The design note holds an earlier and
+smaller sample that puts the same roster at 0.78 standard deviations, and
+the two have not been reconciled.
+
+The paragraph is in the row's docstring as well, since that is where a
+reader meets the number.
 
 ### The index drift row
 

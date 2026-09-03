@@ -331,6 +331,14 @@ PERTURBATIONS = [
     # only every 90 days and the probe runs three, so the branch is never
     # reached and no draw it would change is taken.
     ("oil_opec_symmetry", 0.5, False),
+    # WHERE oil's seasonal shape acts. It moves the oil price on the first
+    # day, and INERT on the market all the same, because oil reaches a price
+    # only through the inflation term at daily.rs, which is a dead zone
+    # between 50 and 80. Oil opens at 75 and the seasonal down leg takes both
+    # arms to about 73 on day one, so both sit inside the dead zone, the
+    # discount rate never hears about it and the valuation never moves. Over
+    # 252 days oil leaves that zone in both directions and the dial bites.
+    ("oil_seasonality_target", 0.5, False),
     # How much of the jump's drift is given back. The compensator is
     # subtracted every day whether or not a jump fires, so unlike its two
     # neighbours it bites on the first close.

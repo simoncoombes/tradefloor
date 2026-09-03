@@ -195,6 +195,14 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # total intervention, and past 1.0 the two branches would cross and the
     # rule would push oil DOWN on net, which is the asymmetry inverted.
     "oil_opec_symmetry": (0.0, 1.0),
+    # Where oil's seasonal shape acts, as a share of its own amplitude.
+    # Bounded by meaning again: 0.0 puts the whole shape on the price
+    # level, where the daily factors compound to 5.119 over a certified
+    # year, 1.0 puts the whole of it on the reversion target, where it
+    # integrates to +0.672 per cent, and past 1.0 the level would carry
+    # the shape inverted. So the box is the closed unit interval and its
+    # top is where the shape stops compounding.
+    "oil_seasonality_target": (0.0, 1.0),
     # How much of the jump's own drift is given back. 0.0 is the
     # uncompensated process, 1.0 is the martingale, and past 1.0 the
     # compensator exceeds the drift and the jump pushes the other way.

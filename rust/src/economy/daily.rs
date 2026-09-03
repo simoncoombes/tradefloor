@@ -144,6 +144,13 @@ pub struct DailyInputs<'a> {
     /// 0.0 disables it, which is what every shipped preset sets and what
     /// the reference implementation does. See `ModelParams::oil_opec_symmetry`.
     pub oil_opec_symmetry: f64,
+    /// The share of oil's seasonal amplitude carried by the reversion
+    /// target rather than by the price level. 0.0 puts all of it on the
+    /// level, which is what every shipped preset sets and what the
+    /// reference implementation does. See
+    /// `ModelParams::oil_seasonality_target` for why a shape applied to a
+    /// level compounds over a window shorter than its own period.
+    pub oil_seasonality_target: f64,
 }
 
 impl<'a> Default for DailyInputs<'a> {
@@ -174,6 +181,7 @@ impl<'a> Default for DailyInputs<'a> {
             daily_credit_floor_gain: 0.0,
             oil_supply_response: 0.0,
             oil_opec_symmetry: 0.0,
+            oil_seasonality_target: 0.0,
         }
     }
 }
@@ -580,9 +588,15 @@ pub fn update_economy_daily(
     // `(day - 1) % 365 + 1` — JavaScript's `%` keeps the sign of the
     // dividend, and so does Rust's, so a day of 0 gives -1 % 365 = -1 and a
     // dayOfYear of 0 in both. Reproduced rather than corrected.
+    //
+    // The AMPLITUDE, not the factor. WHERE it acts is decided at the
+    // reversion target below, because a shape multiplied into a level every
+    // day compounds: the product of these factors is 5.119 over the 252
+    // game-days a certified year passes and 0.921 over a full 365, so a
+    // window shorter than the period reads a near-neutral shape as a trend.
     let day_of_year = ((day - 1) % 365) + 1;
-    let oil_seasonality =
-        1.0 + 0.03 * mathx::sin(2.0 * std::f64::consts::PI * (day_of_year as f64 - 90.0) / 365.0);
+    let oil_seasonal_amplitude =
+        0.03 * mathx::sin(2.0 * std::f64::consts::PI * (day_of_year as f64 - 90.0) / 365.0);
 
     let oil_usd_drag = -(economy.usd_index - 100.0) * 0.08;
 
@@ -629,7 +643,26 @@ pub fn update_economy_daily(
         }
     }
 
-    let oil_target = OIL_BASELINE + economy.gdp_growth * 3.0 + shock_oil_impact * 10.0;
+    let oil_target_level = OIL_BASELINE + economy.gdp_growth * 3.0 + shock_oil_impact * 10.0;
+    // Where the seasonal shape acts, as a share of its own amplitude. A
+    // BRANCH at 0.0, so every preset before pt-v18 runs the reference
+    // implementation's arithmetic in its own order: the whole amplitude
+    // multiplies the new price level and the target carries none of it.
+    //
+    // Above 0.0 the amplitude is SPLIT, so its total is conserved and only
+    // the point of application moves. At 1.0 the target carries all of it
+    // and the level's factor is exactly 1.0, which makes the shape modulate
+    // where the price is pulled toward by plus or minus 3 per cent instead
+    // of compounding on the price itself.
+    let (oil_target, oil_level_seasonality) = if inputs.oil_seasonality_target == 0.0 {
+        (oil_target_level, 1.0 + oil_seasonal_amplitude)
+    } else {
+        let g = inputs.oil_seasonality_target;
+        (
+            oil_target_level * (1.0 + g * oil_seasonal_amplitude),
+            1.0 + (1.0 - g) * oil_seasonal_amplitude,
+        )
+    };
     let oil_mean_rev = (oil_target - economy.oil_price) * 0.03;
     let oil_volatility = 2.0 * volatility;
     new_state.oil_price = clamp(
@@ -640,7 +673,7 @@ pub fn update_economy_daily(
             + opec_impact
             + random_normal(rng, 0.0, oil_volatility)
             + shock_oil_impact * 0.1)
-            * oil_seasonality,
+            * oil_level_seasonality,
         35.0,
         150.0,
     );

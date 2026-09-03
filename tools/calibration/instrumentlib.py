@@ -162,6 +162,11 @@ PARAM_SPECS: dict[str, dict] = {
     # A SHARE of the asymmetry removed, so [0, 1]. Past 1.0 the branches
     # cross and the rule pushes the other way.
     "oil_opec_symmetry": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # WHERE the seasonal shape acts, as a SHARE of its own amplitude, so
+    # [0, 1]. 0.0 puts all of it on the price level, where it compounds,
+    # and 1.0 all of it on the reversion target. Past 1.0 the level carries
+    # a negative amplitude, which is the shape inverted.
+    "oil_seasonality_target": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # A SHARE of the jump drift returned, so [0, 1]. 1.0 is the
     # martingale and past it the compensator overshoots.
     "jump_mean_compensated": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},

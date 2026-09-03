@@ -660,6 +660,44 @@ pub struct ModelParams {
     /// every 90 days, so this is a small term. It is corrected because it
     /// is wrong rather than because it is large.
     pub oil_opec_symmetry: f64,
+    /// Where oil's seasonal shape acts: on the price the process reverts
+    /// toward, or on the price level itself. 0.0 -- every preset before
+    /// pt-v18 -- is bit-identical.
+    ///
+    /// # A shape applied to a level compounds
+    ///
+    /// The daily step multiplies the whole new oil price by
+    /// `1 + 0.03 * sin(2 pi (day_of_year - 90) / 365)`. Applied to a level
+    /// every day the factors multiply, so what a window sees is their
+    /// product: 5.119 over the 252 game-days a certified year passes, and
+    /// 0.921 over a full 365. The shape is near neutral over its own
+    /// period and the horizon slices it asymmetrically, taking 162 days of
+    /// the up leg against 90 of the down.
+    ///
+    /// Summing the term's own contribution to each day's change over year
+    /// one gives +365.80 of oil price against a net change of +72.10, so it
+    /// pushes about five times harder than the price moves and the mean
+    /// reversion of 0.03 a day absorbs the rest. Oil has no fixed point
+    /// under it. It is a forced limit cycle with a 365-day period that sits
+    /// on its 150.0 clamp from day 180 on every seed, and the inflation
+    /// term, the meeting rule and the discount rate follow it there.
+    ///
+    /// # The target rather than the level, at the same amplitude
+    ///
+    /// At 1.0 the whole amplitude multiplies the reversion target and none
+    /// of it multiplies the level, so the shape modulates where the price
+    /// is pulled toward by plus or minus 3 per cent and integrates to
+    /// +0.672 per cent of oil over a certified year. The amplitude is the
+    /// 0.03 the term already carries and this dial is a share of it, so
+    /// what changes is where a shape acts rather than how large it is.
+    /// Nothing here is fitted: a seasonal shape has to be neutral over the
+    /// WINDOW as well as over its own period, and moving it off the level
+    /// is what makes that possible without touching its size.
+    ///
+    /// Between the ends the amplitude is split, `1 + g * a` on the target
+    /// and `1 + (1 - g) * a` on the level, so the total is conserved and
+    /// past 1.0 the level would carry the shape inverted.
+    pub oil_seasonality_target: f64,
     /// How much of the drift the market jump's mean carries is given
     /// back. 0.0 -- every preset before pt-v18 -- is bit-identical. 1.0
     /// subtracts the compensator and makes the jump a martingale.
@@ -1689,6 +1727,7 @@ impl ModelParams {
             market_beta_down_asym_recentre: 0.0,
             oil_supply_response: 0.0,
             oil_opec_symmetry: 0.0,
+            oil_seasonality_target: 0.0,
             jump_mean_compensated: 0.0,
             cascade_symmetry: 0.0,
             // Legacy values: the slow component is OFF, and the update
@@ -2703,6 +2742,13 @@ impl ModelParams {
         // it pushes oil up on net. Symmetrised at the mean of its own two
         // branches, which removes the direction without choosing a side.
         p.oil_opec_symmetry = 1.0;
+        // Oil's seasonal shape multiplied the price level every day, so it
+        // compounded: the product of its factors over a certified year is
+        // 5.119, against 0.921 over a full 365 days. The shape was near
+        // neutral over its own period and the horizon sliced it. On the
+        // reversion target the same amplitude modulates where the price is
+        // pulled toward and integrates to +0.672 per cent over the year.
+        p.oil_seasonality_target = 1.0;
         // The market jump's negative mean buys skew and a drift together.
         // Compensating it keeps the mean, and so the skew, and returns the
         // drift: a deterministic offset moves no central moment.
@@ -2822,6 +2868,7 @@ impl ModelParams {
             "market_beta_down_asym_recentre" => self.market_beta_down_asym_recentre,
             "oil_supply_response" => self.oil_supply_response,
             "oil_opec_symmetry" => self.oil_opec_symmetry,
+            "oil_seasonality_target" => self.oil_seasonality_target,
             "jump_mean_compensated" => self.jump_mean_compensated,
             "cascade_symmetry" => self.cascade_symmetry,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
@@ -2971,6 +3018,7 @@ impl ModelParams {
             "market_beta_down_asym_recentre" => out.market_beta_down_asym_recentre = value,
             "oil_supply_response" => out.oil_supply_response = value,
             "oil_opec_symmetry" => out.oil_opec_symmetry = value,
+            "oil_seasonality_target" => out.oil_seasonality_target = value,
             "jump_mean_compensated" => out.jump_mean_compensated = value,
             "cascade_symmetry" => out.cascade_symmetry = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
@@ -3192,6 +3240,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_beta_down_asym_lag",
         "market_beta_down_asym_recentre",
         "oil_opec_symmetry",
+        "oil_seasonality_target",
         "oil_supply_response",
         "market_vol_vix_coupling",
         "mispricing_cap",
