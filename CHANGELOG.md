@@ -28,6 +28,9 @@ the draws that reproduce its observed closes.
 **A mechanism is a specification the engine's Rust is generated from**,
 checked for its draw effect and proven inert at its default doses.
 
+**A browser page forks a market, patches one draw through five WASM
+bindings**, and re-runs both arms to show the day they diverge.
+
 <!-- release-note-ends -->
 
 ### The day ledger
@@ -452,6 +455,24 @@ median share of -1.002 in both, and the mean distance from the model price
 to the print was 23.3 and 34.7 basis points. The crisis changes how often
 the book runs out rather than how far a print goes when it does. The arms
 are the same arms, and their exposure numbers are unchanged.
+
+### Draw surgery in the browser
+
+`Sim` in the WASM binding (`rust/src/wasm.rs`) gains five methods:
+`fork`, `patchDraws`, `drawPatches`, `streamPositions` and
+`jumpAddress`, over flat `f64` vectors with no serde. They expose the
+draw-addressing and patching layer already built for the native side,
+so a page can fork a running market, replace one draw, and re-run it
+under the same generator as the Python build.
+
+`tools/wasm/surgery.html` and `surgery.mjs` are a minimal
+demonstration built on them: it forks a market, stops one day's
+market jump from firing, and draws both arms so the day they diverge
+is visible. A native-side test in `tests/test_wasm_parity.py` pins
+the digest of both the control run and the patched one for a fixed
+case, and `tools/wasm/check.mjs` recomputes both through the WASM
+build, so the two sides are compared by value rather than each
+trusted separately.
 
 
 ## 0.6.2

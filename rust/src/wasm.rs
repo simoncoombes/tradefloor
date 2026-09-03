@@ -234,7 +234,7 @@ impl Sim {
     /// An independent copy of the current state: same prices, same macro
     /// state, same generator positions, same installed patches.
     ///
-    /// One clone per call rather than a batch — `Vec<Sim>` is not a shape
+    /// One clone per call rather than a batch -- `Vec<Sim>` is not a shape
     /// wasm-bindgen is trusted to return here (see the design note this
     /// binding set comes from), and a page forks one arm at a time.
     ///
@@ -256,23 +256,24 @@ impl Sim {
     /// quadruples, `entries.len()` a multiple of four.
     ///
     /// `stream` is one of the seven ids [`crate::rng::stream`] declares
-    /// (`0..=6`); `kind` is `0.0` for a uniform or `1.0` for a normal —
+    /// (`0..=6`); `kind` is `0.0` for a uniform or `1.0` for a normal --
     /// [`crate::rng::DrawKind`]'s own discriminants, so the page and this
     /// binding read the same two numbers the same way. The generator
     /// still advances at every patched address; only the value the
-    /// consumer receives there changes —
+    /// consumer receives there changes --
     /// [`crate::engine::Engine::patch_draw`] documents the contract this
     /// wraps.
     ///
-    /// A quadruple naming a stream or kind outside those ranges is
-    /// refused rather than silently dropped or clamped to the nearest
-    /// valid one, which would install a patch at an address the caller
-    /// never named. This is the one binding on this surface that returns
-    /// `Result` rather than the plain value the design note's signature
-    /// shows: every OTHER binding here that can fail already does, for
-    /// the reason this file's own module docs give — a Rust panic
-    /// reaches JavaScript as an unlabelled trap — and a malformed flat
-    /// array is exactly the input a caller can send by mistake.
+    /// A quadruple naming a negative or out-of-range stream or kind, or a
+    /// negative index, is refused rather than silently dropped or
+    /// clamped to the nearest valid one, which would install a patch at
+    /// an address the caller never named. This is the one binding on
+    /// this surface that returns `Result` rather than the plain value
+    /// the design note's signature shows: every OTHER binding here that
+    /// can fail already does, for the reason this file's own module docs
+    /// give -- a Rust panic reaches JavaScript as an unlabelled trap --
+    /// and a malformed flat array is exactly the input a caller can send
+    /// by mistake.
     #[wasm_bindgen(js_name = patchDraws)]
     pub fn patch_draws(&mut self, entries: &[f64]) -> Result<(), JsError> {
         let parsed = parse_patch_entries(entries).map_err(|e| JsError::new(&e))?;
@@ -283,7 +284,7 @@ impl Sim {
     }
 
     /// The installed overlay, in the same flat `(stream, kind, index,
-    /// value)` form `patchDraws` takes — installing `drawPatches()`'s
+    /// value)` form `patchDraws` takes -- installing `drawPatches()`'s
     /// result on an empty `Sim` reproduces the overlay.
     ///
     /// Ordered by stream id, then by kind and index within a stream (the
@@ -322,7 +323,7 @@ impl Sim {
     ///
     /// The arithmetic `python/tradefloor/counterfactual.py`'s
     /// `World._jump_address` uses: the stream's current uniform
-    /// position, plus `1 + companies` per day from here to `day` — one
+    /// position, plus `1 + companies` per day from here to `day` -- one
     /// market uniform and one per active company, the market's first,
     /// each day the jumps stream sees. Valid while the active roster does
     /// not change between here and `day`; nothing on this wasm surface
@@ -358,6 +359,29 @@ impl Sim {
 /// path. Keeping validation here, and turning its `Err(String)` into a
 /// `JsError` only at [`Sim::patch_draws`]'s boundary, is what lets those
 /// three run under a plain host `cargo test` alongside the rest.
+/// A quadruple's stream, kind or index field, checked before the `as`
+/// cast that follows it rather than after.
+///
+/// `f64 as u32` / `f64 as u64` saturates rather than panicking or
+/// wrapping: a negative value casts to `0`, and so does NaN. Casting
+/// first and range-checking the result, this function's first version,
+/// let a negative stream, kind or index land at `0` -- MARKET, Uniform
+/// or index `0` -- silently, exactly the "clamped to the nearest valid
+/// one" outcome `patchDraws`'s own doc comment says this binding
+/// refuses. Found by review, measured directly against the real
+/// `Sim::patch_draws`, not argued from reading the cast.
+///
+/// `!(value >= 0.0)` rather than `value < 0.0`: the negated form also
+/// rejects NaN, the same idiom `lib.rs` documents for this crate's
+/// guards generally.
+fn non_negative(value: f64, field: &str) -> Result<f64, String> {
+    if !(value >= 0.0) {
+        return Err(format!(
+            "{field} must be non-negative, got {value}"));
+    }
+    Ok(value)
+}
+
 fn parse_patch_entries(entries: &[f64]) -> Result<Vec<(u32, DrawKind, u64, f64)>, String> {
     if entries.len() % 4 != 0 {
         return Err(format!(
@@ -367,19 +391,20 @@ fn parse_patch_entries(entries: &[f64]) -> Result<Vec<(u32, DrawKind, u64, f64)>
     }
     let mut out = Vec::with_capacity(entries.len() / 4);
     for quad in entries.chunks_exact(4) {
-        let stream_id = quad[0] as u32;
+        let stream_id = non_negative(quad[0], "stream")? as u32;
         if stream_id > stream::VOLUME_IDIO {
             return Err(format!(
                 "unknown stream id {stream_id}; expected 0..={}",
                 stream::VOLUME_IDIO));
         }
-        let kind = match quad[1] as u32 {
+        let kind = match non_negative(quad[1], "kind")? as u32 {
             0 => DrawKind::Uniform,
             1 => DrawKind::Normal,
             other => return Err(format!(
                 "unknown draw kind {other}; 0 (uniform) or 1 (normal)")),
         };
-        out.push((stream_id, kind, quad[2] as u64, quad[3]));
+        let index = non_negative(quad[2], "index")? as u64;
+        out.push((stream_id, kind, index, quad[3]));
     }
     Ok(out)
 }
@@ -464,6 +489,47 @@ mod tests {
     fn patch_draws_refuses_an_unknown_kind() {
         let err = parse_patch_entries(&[stream::MARKET as f64, 2.0, 0.0, 0.5]);
         assert!(err.is_err(), "2 names neither uniform (0) nor normal (1)");
+    }
+
+    // `f64 as u32` / `f64 as u64` saturates a negative value to 0 rather
+    // than panicking, and the first version of parse_patch_entries cast
+    // before checking, so a negative stream, kind or index silently
+    // landed at 0 -- MARKET, Uniform or index 0 -- instead of being
+    // refused. Found by review; these three pin the fix, one field at a
+    // time, so a regression in any one of them is unambiguous about
+    // which check broke.
+
+    #[test]
+    fn patch_draws_refuses_a_negative_stream() {
+        let err = parse_patch_entries(&[-1.0, 0.0, 0.0, 0.5]);
+        assert!(err.is_err(),
+                "-1 must not silently become stream 0 (MARKET)");
+    }
+
+    #[test]
+    fn patch_draws_refuses_a_negative_kind() {
+        let err = parse_patch_entries(&[stream::MARKET as f64, -1.0, 0.0, 0.5]);
+        assert!(err.is_err(),
+                "-1 must not silently become kind 0 (Uniform)");
+    }
+
+    #[test]
+    fn patch_draws_refuses_a_negative_index() {
+        let err = parse_patch_entries(&[stream::MARKET as f64, 0.0, -5.0, 0.5]);
+        assert!(err.is_err(), "-5 must not silently become index 0");
+    }
+
+    #[test]
+    fn patch_draws_refuses_nan_in_stream_kind_or_index() {
+        // NaN also saturates to 0 under `as u32`/`as u64`, and NaN
+        // compared with `>=` is false either way its operands are
+        // written, so the same non_negative guard catches it without a
+        // separate is_nan check -- worth pinning as its own case since
+        // it is a different reason to reach the same cast.
+        let nan = f64::NAN;
+        assert!(parse_patch_entries(&[nan, 0.0, 0.0, 0.5]).is_err());
+        assert!(parse_patch_entries(&[stream::MARKET as f64, nan, 0.0, 0.5]).is_err());
+        assert!(parse_patch_entries(&[stream::MARKET as f64, 0.0, nan, 0.5]).is_err());
     }
 
     #[test]
