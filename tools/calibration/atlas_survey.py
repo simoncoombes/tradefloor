@@ -167,6 +167,15 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the box the way ramp=50 does above: strong-to-implausible.
     "market_beta_down_asym": (0.0, 0.1),
     "market_beta_down_asym_lag": (0.0, 0.1),
+    # The SHARE of the first moment the contemporaneous wire injects that
+    # is given back. Bounded by its own meaning rather than by a
+    # convention: 0.0 is the wire as pt-v16 ships it, 1.0 returns the whole
+    # of what it injects, and past 1.0 the dial would inject an upward
+    # drift of its own, which is the defect inverted rather than a wider
+    # search. So the box is the closed unit interval, and unlike the
+    # entries around it there is no strong-to-implausible top to choose:
+    # the top is where the correction is exact.
+    "market_beta_down_asym_recentre": (0.0, 1.0),
     # EMA days on the VIX the market variance target reads (round 99).
     # Measured dead at 3 and 10 along the driven window; 20 trading days
     # is a month of smoothing, past which the fear response is no longer

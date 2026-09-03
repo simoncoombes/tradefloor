@@ -116,6 +116,14 @@ pub struct SharedFactors {
     /// Yesterday's session closed with a down market factor. Read only by
     /// the lagged transmission wire (`market_beta_down_asym_lag`).
     pub prev_day_down: bool,
+    /// The CONDITIONAL per-tick sigma `market_factor` was drawn with, which
+    /// is `market_sigma_daily / sqrt(390)` and not
+    /// `params.market_factor_sigma`. Carried rather than recomputed
+    /// because the two differ by the whole of the factor's variance
+    /// process, and the one quantity that can recentre the downside tilt
+    /// exactly is the sigma the draw actually used. Read only by
+    /// `market_beta_down_asym_recentre`.
+    pub market_sigma_tick: f64,
 }
 
 impl SharedFactors {
@@ -502,7 +510,36 @@ pub fn calculate_live_factors(
         1.0
     };
 
-    let random_noise = market_component * crash_amplifier + sector_component + idiosyncratic_noise;
+    // Give back the first moment the downside tilt injects, AFTER the
+    // amplifier. `market_beta_down_asym` scales one side of a zero-mean
+    // draw, which moves its mean, and a mean here is a drift: for
+    // `f ~ N(0, s^2)`, `E[f 1{f<0}] = -s / sqrt(2 pi)`, so the tilt adds
+    // `a * beta * -s / sqrt(2 pi)` to every name every tick whether the
+    // market is calm or not.
+    //
+    // `s` is the CONDITIONAL sigma of this tick's draw, so the correction
+    // tracks the variance process instead of assuming the baseline. AFTER
+    // the amplifier because an offset added before it would be amplified
+    // too, delivering the form times `E[A]` rather than the form. What
+    // that leaves is the amplifier's own effect on the tilt, which has no
+    // closed form and is about one per cent; see the parameter's doc.
+    //
+    // A branch, and gated on BOTH dials being nonzero, so every preset
+    // that predates this parameter is bit-identical and so is any preset
+    // that sets it without the tilt it corrects.
+    let tilt_recentre = if params.market_beta_down_asym_recentre == 0.0
+        || params.market_beta_down_asym == 0.0
+    {
+        0.0
+    } else {
+        params.market_beta_down_asym_recentre
+            * params.market_beta_down_asym
+            * beta
+            * shared.market_sigma_tick
+            / SQRT_TWO_PI
+    };
+    let random_noise =
+        market_component * crash_amplifier + tilt_recentre + sector_component + idiosyncratic_noise;
 
     // ── Forced flow ───────────────────────────────────────────────────────
     // Squeezes and stop cascades react to a move that ALREADY happened —
@@ -564,6 +601,22 @@ fn truthy(value: Option<f64>) -> f64 {
         _ => 0.0,
     }
 }
+
+/// `sqrt(2 pi)`, the denominator of a standard normal's half-moment:
+/// `E[f 1{f<0}] = -sigma / sqrt(2 pi)`.
+///
+/// A literal because `sqrt` is not a const function, and safe as a literal
+/// because IEEE-754 specifies `sqrt` exactly, so there is one right answer
+/// on every target and `the_half_moment_denominator_is_sqrt_two_pi` asserts
+/// this is it, bit for bit, against the language's own `PI`. That test is
+/// the reason this is not a second source of truth: a mistyped digit fails
+/// it rather than shipping a slightly wrong recentring.
+///
+/// Note what this deliberately is NOT: `erf`. Recentring needs only the
+/// half-moment of a normal, which is elementary. The normal TAIL would
+/// need `erf`, `mathx` exposes none, and adding one would be a new
+/// bit-pinned transcendental with its own known-answer obligation.
+const SQRT_TWO_PI: f64 = 2.5066282746310002;
 
 /// Order imbalance from a tick's pending orders, from the reference
 /// implementation.
@@ -630,6 +683,8 @@ mod tests {
             sector_factors: vec![("technology".into(), 0.0)],
             crisis_spike: 0.0,
             prev_day_down: false,
+            market_sigma_tick: crate::params::PT_V1.market_factor_sigma
+                / crate::mathx::sqrt(390.0),
         }
     }
 
@@ -640,6 +695,18 @@ mod tests {
         s: &SharedFactors,
     ) -> LiveFactors {
         calculate_live_factors(c, news, imbalance, 1.0, s, &crate::params::PT_V1, &mut Fixed(0.0))
+    }
+
+    /// `factors` under explicit parameters, for the dials whose whole
+    /// question is what a preset sets them to.
+    fn factors_with(
+        p: &crate::params::ModelParams,
+        c: &FactorCompany,
+        news: &[NewsEvent],
+        imbalance: f64,
+        s: &SharedFactors,
+    ) -> LiveFactors {
+        calculate_live_factors(c, news, imbalance, 1.0, s, p, &mut Fixed(0.0))
     }
 
     #[test]
@@ -844,6 +911,109 @@ mod tests {
             factors(&thin, &[], 0.5, &shared()).order_flow_impact
                 > factors(&liquid, &[], 0.5, &shared()).order_flow_impact
         );
+    }
+
+    #[test]
+    fn the_half_moment_denominator_is_sqrt_two_pi() {
+        // SQRT_TWO_PI is a literal because `sqrt` is not const. This is
+        // what stops it being a second source of truth: it must equal the
+        // language's own PI put through the same `sqrt` the rest of this
+        // crate uses, to the bit.
+        assert_eq!(SQRT_TWO_PI, mathx::sqrt(2.0 * std::f64::consts::PI));
+    }
+
+    #[test]
+    fn recentring_returns_the_mean_the_downside_tilt_injects() {
+        // The claim, measured rather than argued: with the tilt on, the
+        // market channel's mean over a symmetric factor is negative, and
+        // with the recentring on it is zero. Averaged over a symmetric
+        // grid of factor draws, which is what makes the two arms
+        // comparable without an RNG.
+        let mut params = crate::params::PT_V16;
+        assert_ne!(params.market_beta_down_asym, 0.0, "the tilt must be on");
+        let sigma_tick = params.market_factor_sigma / mathx::sqrt(390.0);
+
+        // A symmetric grid, WEIGHTED BY THE NORMAL DENSITY. The weight is
+        // the whole point: the correction gives back `E[f 1{f<0}]` for a
+        // NORMAL factor, which is `-sigma / sqrt(2 pi)`. Averaging over a
+        // uniform grid instead measures `E[f 1{f<0}]` for a uniform one,
+        // which on [-4, 4] sigmas is -1.0 sigma against the normal's
+        // -0.399, so a correct correction would look 60 per cent short.
+        // This test asserted exactly that and failed the code for it.
+        let grid: Vec<f64> = (1..=400)
+            .map(|k| k as f64 * 0.01)
+            .flat_map(|z| [z, -z])
+            .collect();
+
+        let mean_of = |p: &crate::params::ModelParams| -> f64 {
+            let company = company();
+            let mut total = 0.0;
+            let mut weight_sum = 0.0;
+            for z in &grid {
+                let w = mathx::exp(-z * z / 2.0);
+                let s = SharedFactors {
+                    market_factor: z * sigma_tick,
+                    sector_factors: vec![("technology".into(), 0.0)],
+                    crisis_spike: 0.0,
+                    prev_day_down: false,
+                    market_sigma_tick: sigma_tick,
+                };
+                total += w * factors_with(p, &company, &[], 0.0, &s).random_noise;
+                weight_sum += w;
+            }
+            total / weight_sum
+        };
+
+        let injected = mean_of(&params);
+        assert!(
+            injected < 0.0,
+            "the tilt should inject a NEGATIVE mean, got {injected}"
+        );
+
+        params.market_beta_down_asym_recentre = 1.0;
+        let corrected = mean_of(&params);
+
+        // What remains is the crash amplifier's own effect on the tilt,
+        // which this deliberately does not correct. It is a small
+        // fraction of the term, and it is the ONLY thing left.
+        let residual = corrected / injected;
+        assert!(
+            residual.abs() < 0.05,
+            "recentring left {residual} of the injected mean, expected \
+             only the amplifier's few per cent"
+        );
+        // And it did not overshoot into a positive drift.
+        assert!(corrected <= 0.0, "recentring overshot to {corrected}");
+    }
+
+    #[test]
+    fn recentring_is_inert_without_the_tilt_it_corrects() {
+        // Gated on BOTH dials. A preset that sets the recentring without
+        // the tilt has nothing to give back and must be bit-identical, or
+        // the dial would inject the drift it exists to remove.
+        let company = company();
+        let s = shared();
+        let mut params = crate::params::PT_V16;
+        params.market_beta_down_asym = 0.0;
+        let without = factors_with(&params, &company, &[], 0.0, &s).random_noise;
+        params.market_beta_down_asym_recentre = 1.0;
+        let with = factors_with(&params, &company, &[], 0.0, &s).random_noise;
+        assert_eq!(without, with);
+    }
+
+    #[test]
+    fn every_preset_before_pt_v18_is_bit_identical_under_the_new_dial() {
+        // The parameter ships at 0.0 and the branch is at zero, so adding
+        // it moved no trajectory. Asserted against the presets rather than
+        // argued from the branch.
+        for name in crate::params::ModelParams::preset_names() {
+            let p = crate::params::ModelParams::preset(name).expect("named");
+            if *name == "pt-v18" {
+                assert_eq!(p.market_beta_down_asym_recentre, 1.0, "{name}");
+                continue;
+            }
+            assert_eq!(p.market_beta_down_asym_recentre, 0.0, "{name}");
+        }
     }
 
     #[test]

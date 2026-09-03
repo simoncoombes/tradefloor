@@ -106,6 +106,79 @@ records were nonetheless all measured on the roster the old generator
 produced, and none has been re-measured. They are marked stale where they
 are recorded rather than quietly restated.
 
+### The pt-v18 era and the downside transmission tilt
+
+The equal-weight index drifted -22.155 per cent a year at pt-v16, measured
+over thirty seeds on the panel roster at 252 days, against a real large-cap
+index's +8 to +10. It was negative on every seed. Almost none of that was
+chosen. It is the sum of mechanisms that each moved the first moment as
+a by-product of shaping something else, under a panel of fourteen shape
+statistics that cannot see a first moment and read fourteen for fourteen
+throughout.
+
+pt-v18 is the era that gives those first moments back at their source.
+pt-v17 is reserved by the open recomposition era, and a preset name is the
+identity every published result cites, so this era takes the next free
+number and the gap is deliberate.
+
+The first of them is the downside transmission tilt. It scales one side of
+a zero-mean draw, which moves that draw's mean, and a mean in a price
+process is a drift: for a normal factor, the expectation of the down half
+is minus sigma over the square root of two pi, so the tilt adds a negative
+amount to every name on every tick whether the market is calm or not.
+Nobody chose that. It is the by-product of a correlation mechanism that is
+otherwise doing exactly what it was built to do.
+
+`market_beta_down_asym_recentre` gives it back. At 0.0, which is every
+preset before pt-v18, the branch is not taken and the trajectory is
+bit-identical. At 1.0 the whole injected mean is returned.
+
+Three things about the form are worth stating, because each was a choice.
+The sigma is the CONDITIONAL sigma of the tick's own draw and not the
+baseline constant, so the correction tracks the factor's variance process
+instead of assuming it away, and it cannot be defeated by a VIX coupling or
+a pinned scenario: a hotter tick injects more and gives back more. Beta is
+per name, because the injection into a name IS its beta times the form, so
+using one instead would leave a residual proportional to beta minus one,
+which is a cross-sectional bias as well as a mean one. And the offset is
+applied after the crash amplifier, because an offset added before it would
+itself be amplified.
+
+What is deliberately NOT corrected is the amplifier's own effect on the
+tilt. The true injected mean is the closed form times a ratio that has no
+closed form, measured between 1.00 and 1.38 across conditional sigmas and
+sitting near 1.01 at the ones that occur. Correcting it would need either a
+new bit-pinned transcendental or a fitted constant, and a fitted constant
+is tuning rather than fixing. What it leaves is measured below rather than
+argued.
+
+Measured over thirty seeds, the annualised index drift improves from
+-18.344 to -11.347 per cent a year, and every one of the thirty improves.
+The paired difference is +7.879 by median and +8.251 by mean. Set that
+against the investigation's finding that switching the tilt OFF entirely is
+worth 7.940: recentring recovers essentially all of the drift the tilt
+costs while keeping the correlation asymmetry it exists to produce.
+
+The mechanism reading agrees with the drift reading. The tilt's own
+contribution to the noise attribution is -0.389 per name per year at
+pt-v16; with the tilt switched off it is -0.049, and with the tilt on and
+recentred it is -0.052. Recentring lands within 0.007 of switching the
+mechanism off, on a term worth 0.342, and that gap is the amplifier
+residual named above. The -0.049 both arms share is not this correction
+falling short; it is what the noise channel carries with no tilt at all.
+
+The certified panel does not move. Over ten seeds the fourteen graded
+medians shift by at most 0.55 of their own across-seed noise and all
+fourteen stay in band, including the correlation asymmetry the tilt was
+built for.
+
+Adding a settable dial changes the SHAPE of every preset's coefficient
+vector, because the digest is taken over the whole settable surface. Both
+committed preset records therefore gained the new name at 0.0 and a new
+digest, through a `--coefficients` mode that rewrites those two fields and
+refuses to run if any existing coefficient moved. Every measured block in
+those records is byte for byte as it was, and no preset was re-measured.
+
 ### The index drift row
 
 `facts.panel_statistics` reports `index_drift_pct`, the annualised log

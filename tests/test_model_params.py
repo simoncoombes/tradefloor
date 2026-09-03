@@ -306,6 +306,17 @@ PERTURBATIONS = [
     # The lagged twin, on the session AFTER a down day. Ships at 0.0 and the
     # probe runs three days, which is enough to carry one across.
     ("market_beta_down_asym_lag", 0.05, True),
+    # Gives back the first moment the contemporaneous tilt injects. It is
+    # gated on that tilt being nonzero, and pt-v16 ships it at 0.025, so
+    # the probe's market moves. On a preset with the tilt at 0.0 this dial
+    # is inert by construction, which its own unit test states.
+    #
+    # 0.5 and not 1.0: pt-v18 IS the default plus this dial at 1.0, so
+    # that perturbation reproduces a named preset and the vector stops
+    # fingerprinting as `custom-`. Any entry here that lands exactly on a
+    # named preset breaks the assertion below for a reason that has
+    # nothing to do with the parameter.
+    ("market_beta_down_asym_recentre", 0.5, True),
     # The exponent on the VIX ratio in the market variance target. The
     # endogenous VIX leaves its anchor on day one, so the ratio is never
     # exactly 1.0 and any exponent but the shipped one moves the target.

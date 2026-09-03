@@ -522,6 +522,10 @@ pub fn simulate_market_tick(
                 sector_factors: Vec::new(),
                 crisis_spike: 0.0,
                 prev_day_down: false,
+                // No tick ran, so no draw had a sigma. Zero rather than
+                // the constant: a reader of a closed market's factors
+                // should not find a plausible sigma there.
+                market_sigma_tick: 0.0,
             },
             shock: Vec::new(),
             absorbed: Vec::new(),
@@ -623,6 +627,10 @@ pub fn simulate_market_tick(
         sector_factors,
         crisis_spike: vix_correlation_spike,
         prev_day_down: inputs.prev_day_down,
+        // The same expression the draw above multiplied the normal by, so
+        // the recentring reads the sigma that was actually used rather
+        // than one recomputed from the constant.
+        market_sigma_tick: inputs.market_sigma_daily * tick_scale,
     };
 
     let intraday_vol_mult = intraday_vol(inputs.intraday_t);

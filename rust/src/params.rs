@@ -550,6 +550,53 @@ pub struct ModelParams {
     /// its structure) is the measured motivation: real down-moves
     /// continue, and the contemporaneous wire alone cannot express that.
     pub market_beta_down_asym_lag: f64,
+    /// How much of the first moment `market_beta_down_asym` injects is
+    /// given back. 0.0 -- every preset before pt-v18 -- is bit-identical.
+    /// 1.0 returns the whole of it.
+    ///
+    /// # Why the tilt injects a first moment at all
+    ///
+    /// It scales one side of a zero-mean draw. Scaling only the down ticks
+    /// of a symmetric factor moves its mean, and a mean in the price
+    /// process is a drift: `E[f 1{f<0}]` for `f ~ N(0, s^2)` is
+    /// `-s / sqrt(2 pi)`, so the tilt adds `a * beta * -s / sqrt(2 pi)` to
+    /// every name every tick. Nobody chose that; it is the by-product of a
+    /// correlation mechanism, and it cost the equal-weight index 7.9
+    /// percentage points a year at pt-v16.
+    ///
+    /// # What is given back, exactly
+    ///
+    /// `this * a * beta * s / sqrt(2 pi)`, where `s` is the CONDITIONAL
+    /// per-tick sigma the factor was actually drawn with rather than
+    /// `market_factor_sigma`. Every quantity in it is known exactly at the
+    /// point it is applied, so the correction is arithmetic and not an
+    /// estimate, and it cannot be defeated by the factor's variance
+    /// process, its VIX coupling or a scenario that pins VIX: a hotter
+    /// tick injects more and gives back more, in the same ratio.
+    ///
+    /// `beta` is per name because it is not a correction but the algebra of
+    /// the line being corrected -- the injection into name `i` IS `beta_i`
+    /// times the form. Using 1.0 instead would leave a residual
+    /// proportional to `beta_i - 1`, which is a cross-sectional bias as
+    /// well as a mean one.
+    ///
+    /// # What is NOT given back, deliberately
+    ///
+    /// The crash amplifier. It multiplies the market channel above a
+    /// threshold in baseline sigmas, and it is exactly the tail the tilt
+    /// scales, so the true injected mean is the form above times
+    /// `E[f 1{f<0} A] / E[f 1{f<0}]`. That ratio has no closed form. It
+    /// was measured at 1.00 to 1.38 across conditional sigmas and sits
+    /// near 1.01 at the sigmas that occur, so correcting it would mean
+    /// either a new bit-pinned transcendental or a fitted constant, and a
+    /// fitted constant is the thing this project calls tuning rather than
+    /// fixing. The residual is therefore known, signed and about one per
+    /// cent of the term, and it is left rather than approximated.
+    ///
+    /// The offset is applied AFTER the amplifier for the same reason. An
+    /// offset added before it would itself be amplified, delivering the
+    /// form times `E[A]` rather than the form.
+    pub market_beta_down_asym_recentre: f64,
     /// Persistence of the SLOW variance component (Engle-Lee style). The
     /// market factor's variance carries two timescales from the pt-v4 era:
     /// the fast one above tracks the VIX-scaled target, this one carries
@@ -1307,6 +1354,9 @@ pub const PT_V15: ModelParams = ModelParams::pt_v15();
 /// pt-v15 with the QE valuation channel silenced -- see
 /// [`ModelParams::pt_v16`].
 pub const PT_V16: ModelParams = ModelParams::pt_v16();
+/// pt-v16 with the first moments its mechanisms inject given back -- see
+/// [`ModelParams::pt_v18`], including why the number skips pt-v17.
+pub const PT_V18: ModelParams = ModelParams::pt_v18();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -1397,6 +1447,7 @@ impl ModelParams {
             market_vol_vix_exponent: 2.0,
             market_beta_down_asym: 0.0,
             market_beta_down_asym_lag: 0.0,
+            market_beta_down_asym_recentre: 0.0,
             // Legacy values: the slow component is OFF, and the update
             // reduces to the single-component form bit for bit.
             market_vol_slow_persistence: 0.0,
@@ -2353,6 +2404,43 @@ impl ModelParams {
         p
     }
 
+    /// The index-drift era: give back the first moments the model injects
+    /// without anyone having chosen them.
+    ///
+    /// # Why pt-v18 and not pt-v17
+    ///
+    /// pt-v17 is reserved by the open recomposition era on the
+    /// `preset/pt-v17` branch, whose doc comments already name it. Two
+    /// eras cannot share a name, and a preset name is the identity every
+    /// published result cites, so this one takes the next number rather
+    /// than the next slot. The gap is deliberate and this note is the
+    /// record of why.
+    ///
+    /// # What it corrects
+    ///
+    /// The equal-weight index drifted -22.155 per cent a year at pt-v16
+    /// over thirty seeds on `Universe.random(40, seed=111)` at 252 days,
+    /// against a real large-cap index's +8 to +10, and it was negative on
+    /// every seed. None of that was a modelling choice: it is the sum of
+    /// mechanisms that each moved the mean as a by-product of shaping
+    /// something else, and of a panel of fourteen shape statistics that
+    /// could not see a first moment and read fourteen for fourteen anyway.
+    ///
+    /// This era gives each of those means back at its source rather than
+    /// cancelling them with an offset at the end, so the shapes the
+    /// mechanisms were built for survive.
+    pub const fn pt_v18() -> ModelParams {
+        let mut p = ModelParams::pt_v16();
+        // The downside transmission tilt scales one side of a zero-mean
+        // draw, so it injects `a * beta * -s / sqrt(2 pi)` per name per
+        // tick. Worth -7.940 points of annual index drift at pt-v16, and
+        // the volatility path's -1.670 acts THROUGH it rather than beside
+        // it, because a hotter conditional sigma injects proportionally
+        // more. Recentred against the conditional sigma, so both go.
+        p.market_beta_down_asym_recentre = 1.0;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -2383,6 +2471,7 @@ impl ModelParams {
             "pt-v14" => Some(PT_V14),
             "pt-v15" => Some(PT_V15),
             "pt-v16" => Some(PT_V16),
+            "pt-v18" => Some(PT_V18),
             _ => None,
         }
     }
@@ -2391,7 +2480,7 @@ impl ModelParams {
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
           "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15",
-          "pt-v16"]
+          "pt-v16", "pt-v18"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -2446,6 +2535,7 @@ impl ModelParams {
             "market_vol_vix_exponent" => self.market_vol_vix_exponent,
             "market_beta_down_asym" => self.market_beta_down_asym,
             "market_beta_down_asym_lag" => self.market_beta_down_asym_lag,
+            "market_beta_down_asym_recentre" => self.market_beta_down_asym_recentre,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
@@ -2589,6 +2679,7 @@ impl ModelParams {
             "market_vol_vix_exponent" => out.market_vol_vix_exponent = value,
             "market_beta_down_asym" => out.market_beta_down_asym = value,
             "market_beta_down_asym_lag" => out.market_beta_down_asym_lag = value,
+            "market_beta_down_asym_recentre" => out.market_beta_down_asym_recentre = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
@@ -2802,6 +2893,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_vix_exponent",
         "market_beta_down_asym",
         "market_beta_down_asym_lag",
+        "market_beta_down_asym_recentre",
         "market_vol_vix_coupling",
         "mispricing_cap",
         "mispricing_half_life_days",

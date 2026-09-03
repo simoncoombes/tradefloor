@@ -145,6 +145,11 @@ PARAM_SPECS: dict[str, dict] = {
     "market_vol_vix_exponent": {"kind": "abs", "step_unit": 0.05, "hard_range": (1.0, 4.0)},
     "market_beta_down_asym": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
     "market_beta_down_asym_lag": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
+    # A SHARE of the injected first moment, so its range is [0, 1] and
+    # not an open coefficient: above 1.0 it would inject an upward
+    # drift of its own, which is the defect inverted rather than a
+    # richer model.
+    "market_beta_down_asym_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "market_vol_vix_smooth": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 60.0)},
     "qe_pe_stock_gain": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 20.0)},
     "universe_stress_weight": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 2.0)},
