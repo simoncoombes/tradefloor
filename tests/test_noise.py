@@ -317,6 +317,16 @@ def test_addresses_and_kinds_are_checked():
         noise.market_day_layout(engine, 5)
 
 
+def test_a_second_trace_widens_the_range_and_keeps_the_records():
+    engine = fresh()
+    engine.trace_draws("jumps", 0, 0)
+    run(engine, 1)
+    engine.trace_draws("jumps", 2, 2)
+    run(engine, 2, first=1)
+    days = sorted({e.day for e in noise.draw_log(engine, "jumps", 0, 2)})
+    assert days == [0, 1, 2]
+
+
 # -- the day a draw carries --------------------------------------------------
 
 def test_every_stream_and_the_marks_carry_the_day_run_days_was_given():
@@ -423,3 +433,16 @@ def test_the_market_log_length_is_the_schedule():
     # and one uniform per name, and settlement's four uniforms per name
     per_tick = 1 + sectors + names + names + 4 * names
     assert len(engine.draw_log("market", -1000, 1000)) == TICKS * per_tick
+
+
+def test_a_second_trace_widens_the_range_downward():
+    """The other direction. A first trace on a later day and a second on
+    an earlier one has to reach back: without the downward half the range
+    stays where the first call put it and the earlier days are not
+    logged."""
+    engine = fresh()
+    engine.trace_draws("jumps", 2, 2)
+    engine.trace_draws("jumps", 0, 0)
+    run(engine, 3)
+    days = sorted({e.day for e in noise.draw_log(engine, "jumps", 0, 2)})
+    assert days == [0, 1, 2]

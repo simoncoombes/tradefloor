@@ -47,6 +47,30 @@ Every test forked on a day boundary, so nothing caught it. This module cannot
 reach that state: :meth:`World.run` takes whole days, and :meth:`World.fork`
 refuses an open market.
 
+## Draw surgery
+
+An intervention changes a macro field. A surgery changes a draw: the
+random number one consumer received, at one address, with every other
+draw of every stream left where it was (`tradefloor.noise` states the
+address contract). Four are offered on a world, each recorded in
+``surgeries`` beside the interventions:
+
+- :meth:`World.point` replaces one draw.
+- :meth:`World.unfire` stops the market jump of one day from firing.
+- :meth:`World.window` re-randomises one stream over a range of days
+  under a generator derived from the seed, the stream and a surgery
+  seed by a documented contract.
+- :meth:`World.transplant` copies another world's draws of one stream
+  over a range of days into this one, address for address.
+
+A surgery arm forks from the same state as its control, so :func:`agree`
+is taken at the fork before the surgery and :func:`compare` reads the
+gap after it, exactly as for an intervention. A surgery aimed at a day
+is checked after that day runs: the draw log must show the patched
+address drawn on that day, at the site it was aimed at, and a schedule
+that moved in between raises rather than reporting a surgery that
+landed somewhere else.
+
 ## The agent is the subject, not the apparatus
 
 Everything here takes the agent as a parameter and touches nothing about it
@@ -148,6 +172,7 @@ from .harness import Observation, session_clock
 from .manifest import RunManifest, market_digest
 from .portfolio import Portfolio
 from .interventions import Intervention
+from . import noise as _noise
 from .render import Renderer, check_renderer
 from .scenario import Scenario
 from .universe_util import fingerprint_of
@@ -270,7 +295,8 @@ class World:
                  "engine", "_portfolios", "_agents", "_single", "_frozen",
                  "trace", "pins",
                  "interventions", "applied", "rejected", "fork_step",
-                 "on_refusal", "_day", "_step", "_adv", "_ran")
+                 "on_refusal", "surgeries", "_expected", "_day", "_step",
+                 "_adv", "_ran")
 
     def __init__(
         self,
@@ -321,6 +347,15 @@ class World:
         # above, which is this module's own one-field-at-a-time record.
         self.applied: list[Intervention] = []
         self._ran: Scenario | None = None
+        #: Every draw surgery made on this world, in order: the kind, the
+        #: day it aims at, the stream and what was installed. Beside
+        #: `interventions` rather than in it, because a surgery is not a
+        #: macro field and a scenario cannot carry one.
+        self.surgeries: list[dict[str, Any]] = []
+        # Surgeries still to be checked, by the day they aim at: after
+        # that day runs, `_verify_surgery` reads the draw log and confirms
+        # each patch landed where it was aimed.
+        self._expected: dict[int, list[tuple]] = {}
         self.engine = Engine(seed=self.seed, universe=self.universe,
                              macro_state=macro, model=model)
         # One book per label, against the one engine above. `cash` and
@@ -577,6 +612,7 @@ class World:
                 self._step += 1
 
             self.engine.close_market()
+            self._verify_surgery(day)
             if ledger is not None:
                 ledger.close(self.engine)
             self._day += 1
@@ -970,6 +1006,10 @@ class World:
             # copied and its contents shared safely. Each arm may then
             # `apply` a scenario of its own on top.
             child.applied = list(self.applied)
+            # The engine copy carries the overlay; the record and the
+            # checks still owed travel with it.
+            child.surgeries = copy.deepcopy(self.surgeries)
+            child._expected = copy.deepcopy(self._expected)
             child._day = self._day
             child._step = self._step
             child.fork_step = self._step
@@ -1030,6 +1070,323 @@ class World:
                 "accumulators, and a fork taken there restores a market that "
                 "looks correct and diverges from its parent tomorrow. Close "
                 "the day first.")
+
+    # -- draw surgery -----------------------------------------------------
+
+    def trace_draws(self, stream: str, from_day: int, to_day: int) -> "World":
+        """Record what ``stream`` delivers on days ``from_day..to_day``.
+
+        Opt-in, because the market stream takes several hundred draws per
+        tick at a hundred names and a log of a whole run is the size of the
+        tape. Read it back with :meth:`draws`. A transplant reads the
+        SOURCE world's log, so a source is traced before it runs the days
+        to be copied. Named as the engine method it wraps; ``trace`` is the
+        world's step record.
+        """
+        self.engine.trace_draws(stream, int(from_day), int(to_day))
+        return self
+
+    def draws(self, stream: str, from_day: int,
+              to_day: int) -> list[_noise.LoggedDraw]:
+        """The draws ``stream`` delivered on those days, where traced."""
+        return _noise.draw_log(self.engine, stream, int(from_day),
+                               int(to_day))
+
+    def point(self, address: Any, value: float) -> "World":
+        """Replace one draw: what the consumer at ``address`` receives.
+
+        The generator still advances at that address, so every other draw
+        of every stream is where it was. The address must lie ahead of the
+        stream's position; a draw already taken cannot be replaced, and
+        asking is refused rather than the patch being kept for nothing.
+
+        A point surgery names an address, not a day, so it does not get
+        the check after its day that the other surgeries do. Use
+        :meth:`unfire`, :meth:`window` or :meth:`transplant` when the day
+        is the point.
+        """
+        self._refuse_open_market("point")
+        address = _noise.DrawAddress(*address).check()
+        self._refuse_passed(address)
+        _noise.patch_draws(self.engine, [_noise.Patch(address, float(value))])
+        self.surgeries.append({
+            "kind": "point", "day": self._day, "step": self._step,
+            "stream": address.stream, "address": tuple(address),
+            "value": float(value)})
+        return self
+
+    def unfire(self, day: int) -> "World":
+        """Stop the market jump of ``day`` from firing, and nothing else.
+
+        # The comparison, and the value
+
+        ``Engine::apply_jumps`` runs at the close of every day. It takes
+        one uniform ``u`` on the jumps stream, then one normal, and the
+        market jump fires when ``u < intensity``, where ``intensity`` is
+        ``jump_intensity_market`` scaled by the VIX coupling. ``u`` lies
+        in ``[0, 1)``. The value installed is ``1.0``: never below an
+        intensity of at most one, which is what a daily probability is.
+        The normal is still drawn, so the company jumps that follow, and
+        every later day, are exactly where they were. That is what makes
+        the unfired arm a control for the jump: ``draws_by_stream`` is
+        identical and every price up to and including the close of
+        ``day`` is identical, because the jump lands at that close and is
+        first seen at the next open.
+
+        What it cannot do: stop an intensity above one. A market whose
+        daily intensity exceeds one fires every day by construction, and
+        ``1.0`` is below it too. No shipped preset sets one.
+
+        # The address
+
+        The jumps stream takes one uniform for the market and one per
+        ACTIVE company each day, the market's first, so the market uniform
+        of ``day`` sits at the stream's current uniform position plus that
+        many per day until then. The count moves with the active set, and
+        both directions were measured: a ten-name roster took 11 uniforms
+        and 11 normals on a day, and 10 of each on the day after
+        ``delist(0)``. A listing moves it the same way.
+
+        So the arithmetic assumes the active set does not change between
+        the surgery and the day, and the check after ``day`` runs is what
+        holds that assumption to account: the draw log must show the
+        patched address at the market jump site on that day, with the value
+        that was installed, and a schedule that moved raises rather than
+        reporting a surgery that landed on a company.
+
+        # Whether the jump would have fired
+
+        The record carries ``intensity``, which the ENGINE reports for
+        its own dials and its current VIX, and ``fires``. An
+        intensity of zero makes ``u < intensity`` false for every ``u`` in
+        ``[0, 1)``, so the jump cannot fire and ``fires`` is ``False``: the
+        surgery is a no-op and the record says so, rather than leaving an
+        unfired arm that is identical to its control and silent about why.
+        An intensity of one or more fires on every day, so ``fires`` is
+        ``True``. Between the two the draw decides it, ``fires`` is
+        ``None``, and the control arm is what shows it.
+
+        ``intensity`` is read when ``unfire`` is called. Where the VIX
+        coupling is on it moves with the VIX, so for a day that has not run
+        it is the intensity of today rather than of ``day``, and only the
+        zero case is exact for both, since a zero intensity stays zero
+        whatever the VIX does.
+
+        # What it cannot stop, and says
+
+        ``stoppable`` is false above an intensity of one. The value
+        installed is ``1.0`` and the engine fires on ``u < intensity``, so
+        at an intensity above one the installed value is itself under the
+        threshold: the jump fires in the surgery's arm as well and the arm
+        comes back identical to its control. Reported rather than left as
+        a record saying ``fires`` with nothing to show for it. No shipped
+        preset sets an intensity above one.
+        """
+        self._refuse_open_market("unfire")
+        day = int(day)
+        if day < self._day:
+            raise ValidationError(
+                f"day {day} has run; this world is on day {self._day}. A "
+                "draw already taken cannot be replaced, so unfire names a "
+                "day from today on.")
+        address = self._jump_address(day)
+        _noise.patch_draws(self.engine,
+                           [_noise.Patch(address, _noise.NO_FIRE)])
+        self.engine.trace_draws("jumps", day, day)
+        self._expect(day, address, _noise.NO_FIRE, "jump_market_u")
+        # Asked of the engine, not restated here. A Python copy of the
+        # scaling diverged from the engine on a zero anchor, and the test
+        # that guarded it wrote the formula a third time and compared two
+        # Python copies.
+        intensity = float(self.engine.market_jump_intensity())
+        fires: bool | None
+        if intensity <= 0.0:
+            fires = False
+        elif intensity >= 1.0:
+            fires = True
+        else:
+            fires = None
+        # The value installed is 1.0 and the engine fires on `u < intensity`,
+        # so above an intensity of one the installed value is itself under
+        # the threshold and the jump fires in the surgery's arm too.
+        stoppable = intensity <= 1.0
+        self.surgeries.append({
+            "kind": "unfire", "day": day, "step": day * self.steps_per_day,
+            "stream": "jumps", "address": tuple(address),
+            "value": _noise.NO_FIRE,
+            "intensity": intensity, "fires": fires,
+            "stoppable": stoppable})
+        return self
+
+    def window(self, stream: str, days: Any, surgery_seed: int) -> "World":
+        """Re-randomise ``stream`` over ``days`` under a surgery generator.
+
+        ``days`` is ``(first, last)`` inclusive, or one day. Every draw the
+        stream takes on those days is replaced by the next draw of a
+        generator derived from this world's seed, the stream and
+        ``surgery_seed`` per the surgery derivation contract in
+        ``rust/src/rng.rs`` (``GameRng::surgery``), which a golden test
+        pins. The same ``surgery_seed`` on the same world reproduces the
+        window; a different one is a different window; every other stream
+        delivers exactly what it did.
+
+        # How the addresses are found
+
+        The engine is forked and the fork runs the days to ``last`` with
+        the stream traced and nothing else: no agent orders and no macro
+        pins. The market, news, jumps and volume streams take a number of
+        draws per day fixed by the roster and the tick count, so their
+        addresses on those days are the fork's. The economy chain's count
+        depends on its own state, so a window on it can be aimed a draw
+        wide by the surgery itself; the check after each day of the
+        window confirms every patched address was drawn on the day it was
+        aimed at, and raises if the schedule moved.
+
+        The fork costs one run of the days to ``last`` and, for the market
+        stream, a log the size of the tape over the window.
+        """
+        self._refuse_open_market("window")
+        first, last = _days(days)
+        self._refuse_past(first, "window")
+        stream = _noise.DrawAddress(stream, "uniform", 0).check().stream
+        probe, = self.engine.fork(1)
+        probe.trace_draws(stream, first, last)
+        hour, minute, day_of_week = self.start
+        probe.run_days(last - self._day + 1, hour=hour, minute=minute,
+                       day_of_week=day_of_week,
+                       ticks_per_day=self.steps_per_day * self.ticks_per_step,
+                       volatility=1.0, record=False, first_day=self._day)
+        logged = _noise.draw_log(probe, stream, first, last)
+        if not logged:
+            raise ValidationError(
+                f"{stream} takes no draws on days {first}..{last}, so there "
+                "is nothing to re-randomise.")
+        patches = _noise.surgery_patches(
+            self.seed, stream, surgery_seed, [e.address for e in logged])
+        _noise.patch_draws(self.engine, patches)
+        self.engine.trace_draws(stream, first, last)
+        for entry, item in zip(logged, patches):
+            self._expect(entry.day, item.address, item.value, None)
+        self.surgeries.append({
+            "kind": "window", "day": first,
+            "step": first * self.steps_per_day, "stream": stream,
+            "days": (first, last), "surgery_seed": int(surgery_seed),
+            "draws": len(patches)})
+        return self
+
+    def transplant(self, source: "World", stream: str, days: Any) -> "World":
+        """Copy ``source``'s draws of ``stream`` on ``days`` into this world.
+
+        Address for address: what ``source`` received at each address the
+        stream took on those days, this world receives at the same
+        address. The source must have been traced on those days before it
+        ran them (:meth:`trace_draws`); an untraced source has no record to copy
+        and the call says so rather than running it again.
+
+        The addresses are the source's. On a world with the same roster
+        and tick count they name the same draws of the same days, and the
+        check after each day confirms it. A source with a different roster
+        size is refused up front: its schedule puts the same address on a
+        different day, which is a different experiment. Two worlds of
+        different seeds may transplant between them; the address then
+        names a position in the schedule rather than a draw of the same
+        generator, and the record carries the source's seed and label.
+        """
+        self._refuse_open_market("transplant")
+        first, last = _days(days)
+        self._refuse_past(first, "transplant")
+        if len(source.universe) != len(self.universe):
+            raise ValidationError(
+                f"{source.label or 'the source'} lists "
+                f"{len(source.universe)} instruments and this world "
+                f"{len(self.universe)}, so the same address falls on "
+                "different days in the two schedules.")
+        logged = source.draws(stream, first, last)
+        if not logged:
+            raise ValidationError(
+                f"{source.label or 'the source'} has no draw log for "
+                f"{stream} on days {first}..{last}. Trace the source before "
+                f"it runs those days: source.trace_draws({stream!r}, {first}, "
+                f"{last}).")
+        patches = [_noise.Patch(e.address, e.value) for e in logged]
+        for item in patches:
+            self._refuse_passed(item.address)
+        _noise.patch_draws(self.engine, patches)
+        self.engine.trace_draws(stream, first, last)
+        for entry in logged:
+            self._expect(entry.day, entry.address, entry.value, None)
+        self.surgeries.append({
+            "kind": "transplant", "day": first,
+            "step": first * self.steps_per_day, "stream": stream,
+            "days": (first, last), "source": source.label,
+            "source_seed": source.seed, "draws": len(patches)})
+        return self
+
+    def _jump_address(self, day: int) -> _noise.DrawAddress:
+        uniforms, _ = self.engine.stream_positions()["jumps"]
+        per_day = 1 + len(self.engine.tickers)
+        return _noise.DrawAddress("jumps", "uniform",
+                                  uniforms + (day - self._day) * per_day)
+
+    def _refuse_past(self, first: int, what: str) -> None:
+        if first < self._day:
+            raise ValidationError(
+                f"day {first} has run; this world is on day {self._day}. A "
+                f"draw already taken cannot be replaced, so a {what} starts "
+                "today or later.")
+
+    def _refuse_passed(self, address: _noise.DrawAddress) -> None:
+        uniforms, normals = self.engine.stream_positions()[address.stream]
+        position = uniforms if address.kind == "uniform" else normals
+        if address.index < position:
+            raise ValidationError(
+                f"{address.stream} {address.kind} {address.index} has been "
+                f"drawn; the stream is at {position}. A draw already taken "
+                "cannot be replaced.")
+
+    def _expect(self, day: int, address: _noise.DrawAddress, value: float,
+                site: str | None) -> None:
+        self._expected.setdefault(int(day), []).append((address, value, site))
+
+    def _verify_surgery(self, day: int) -> None:
+        """Confirm every surgery aimed at ``day`` landed where it was aimed.
+
+        Read from the draw log after the day ran. A patch is keyed by an
+        address, and an address is a count, so anything that changes how
+        many draws a day takes between the surgery and the day moves
+        where the patch lands. The log says where it did land, and a
+        surgery that landed elsewhere is an error here rather than a
+        result somewhere else.
+        """
+        expected = self._expected.pop(day, None)
+        if not expected:
+            return
+        logs: dict[str, dict] = {}
+        for address, value, site in expected:
+            if address.stream not in logs:
+                logs[address.stream] = {
+                    e.address: e for e in self.draws(address.stream, day, day)}
+            entry = logs[address.stream].get(address)
+            where = (f"{address.stream} {address.kind} {address.index} on "
+                     f"day {day}")
+            if entry is None:
+                raise ValidationError(
+                    f"the surgery aimed at {where} did not land: that address "
+                    f"was not drawn on day {day}. The schedule moved between "
+                    "the surgery and the day, which a listing does; the "
+                    "patch is still installed and lands wherever the "
+                    "address is drawn.")
+            if site is not None and entry.site != site:
+                raise ValidationError(
+                    f"the surgery aimed at {where} landed on {entry.site} "
+                    f"(company {entry.tag}) rather than {site}. The schedule "
+                    "moved between the surgery and the day, which a listing "
+                    "does.")
+            if entry.value != value:
+                raise ValidationError(
+                    f"the surgery aimed at {where} delivered {entry.value!r} "
+                    f"rather than {value!r}: the overlay in place is not the "
+                    "one installed.")
 
     # -- reporting --------------------------------------------------------
 
@@ -1181,6 +1538,21 @@ def _fields_of(row: dict[str, Any], label: str) -> dict[str, Any]:
     return row if agents is None else agents[label]
 
 
+def _days(days: Any) -> tuple[int, int]:
+    """``(first, last)`` inclusive from one day or a pair."""
+    if isinstance(days, int):
+        return days, days
+    try:
+        first, last = (int(d) for d in days)
+    except (TypeError, ValueError):
+        raise ValidationError(
+            f"days is one day or a (first, last) pair, got {days!r}")
+    if last < first:
+        raise ValidationError(
+            f"days runs backwards: ({first}, {last})")
+    return first, last
+
+
 def _execution_cost(fills: Sequence[dict]) -> float:
     """What the fills cost against the mid they were sent into.
 
@@ -1281,6 +1653,12 @@ def agree(a: World, b: World) -> Agreement:
     and the central bank -- but they are listed beside it rather than folded
     into it, because a reader checking that a portfolio survived a fork should
     not have to know that a dict of eighteen columns implies it.
+
+    A draw surgery is engine state. The snapshot carries the overlay a
+    surgery installs, so after one the ``whole engine state`` row reads
+    DIFFERENT while ``generator state`` reads identical: the generators
+    are where they were, and what a consumer will receive is not. Take the
+    agreement at the fork, before the surgery, as for an intervention.
 
     What is NOT here, and why. ``draws_consumed`` and ``order_log`` are both
     zero and empty on a freshly branched engine -- :func:`tradefloor.branch`
@@ -1549,6 +1927,13 @@ def compare(control: World, treatment: World,
                     else None)
     if intervention is None and treatment.applied:
         earliest = min(item.at for item in treatment.applied)
+        intervention = {"day": earliest,
+                        "step": earliest * treatment.steps_per_day}
+    # A surgery arm: the earliest day a surgery aims at is the day the
+    # treatment departs from the control, so it is what the divergence
+    # table quotes.
+    if intervention is None and treatment.surgeries:
+        earliest = min(item["day"] for item in treatment.surgeries)
         intervention = {"day": earliest,
                         "step": earliest * treatment.steps_per_day}
 

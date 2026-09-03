@@ -16,6 +16,9 @@ unbounded depth on request.**
 **Every draw has an address**, a table of substitutions can replace one,
 and a second `run_days` call numbers days from the engine's own counter.
 
+**A surgery replaces one draw**, a window of them, or another world's,
+and the record says whether it could bite.
+
 <!-- release-note-ends -->
 
 ### The day ledger
@@ -32,6 +35,33 @@ and `tradefloor.manifest.state_hash` computes the same digest in Python
 from `state_snapshot()`. Nothing about a trajectory moves: the manifest
 field is additive under the schema it already had, and `reproduce()`
 behaves the same with the field and without it.
+
+### Draw surgery in a world
+
+Four surgeries sit on a world beside its interventions. `point` replaces
+one draw, `unfire` stops a day's market jump, `window` re-randomises one
+stream over a range of days under a generator derived from the seed, the
+stream and a surgery seed, and `transplant` copies another world's draws
+of one stream address for address. Each is checked after its day runs:
+the draw log must show the patched address drawn on that day, at the site
+it was aimed at, with the value that was installed, and a schedule that
+moved in between raises rather than reporting a surgery that landed
+somewhere else. A delisting moves the schedule as a listing does, because
+the jumps stream takes one uniform per active company.
+
+`unfire` says what it did. `Engine.market_jump_intensity` reports the
+threshold `apply_jumps` compares its market uniform against, so the
+record carries whether the jump could fire and whether the surgery could
+stop it. At an intensity of zero the jump cannot fire and the surgery is
+a no-op; above one the value the surgery installs is itself under the
+threshold, so the jump fires in both arms and the record says the surgery
+could not stop it.
+
+### The draw log's range
+
+A second trace widens the log's range in both directions and keeps what
+was already recorded, so a caller tracing a window on top of an earlier
+trace loses nothing.
 
 ### Draw addressing and the patching layer
 
