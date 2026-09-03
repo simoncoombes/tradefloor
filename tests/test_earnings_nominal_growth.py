@@ -82,21 +82,64 @@ def _market(engine) -> str:
     return state_hash(snapshot)
 
 
-def _derived(instrument, economy, scale: float) -> float:
-    """Fair value from the public helper, on fundamentals this test scales.
+def _anchor(sector: str) -> float:
+    """The sector's multiple, which is the one valuation input that does not
+    depend on the discount rate.
 
-    Nothing here reads the engine's own multiplier, which is what makes the
-    comparison a check rather than a restatement.
+    Taken from ``tradefloor.fair_value`` because it is a table this test has
+    no other way to read, and it is safe to take from there for the reason
+    the assertion below states: two calls at discount rates on opposite
+    sides of neutral return the same anchor.
     """
-    return tf.fair_value(
-        sector=instrument.sector,
-        eps=instrument.eps * scale,
-        book_value_per_share=instrument.book_value_per_share * scale,
-        revenue_growth=instrument.revenue_growth,
-        corporate_bond_yield=economy["corporate_bond_yield"] / 100.0,
-        federal_funds_rate=economy["federal_funds_rate"] / 100.0,
-        qe_pe_boost=0.0,
-    ).fair_value
+    def once(rate):
+        return tf.fair_value(
+            sector=sector, eps=1.0, book_value_per_share=1.0,
+            revenue_growth=0.0, corporate_bond_yield=rate,
+            federal_funds_rate=rate, qe_pe_boost=0.0).sector_anchor_pe
+
+    low, high = once(0.02), once(0.10)
+    assert low == high, (sector, low, high)
+    return low
+
+
+def _derived(instrument, economy, scale: float, model) -> float:
+    """Fair value rebuilt from the coefficients the engine under test runs.
+
+    NOT through ``tradefloor.fair_value``. That helper delegates to the
+    two-argument form, which carries the module's own neutral discount rate
+    rather than the one the model holds, so the two sides of the identity
+    below would share every input except the term AND the rate. Today they
+    agree only because the shipped presets and the module constant both hold
+    0.04, and a test resting on a coincidence between two surfaces is one
+    change away from lying in either direction: it would go red for a preset
+    that moves the neutral rate, and it would go quiet if the engine stopped
+    applying the term while the helper stopped too.
+
+    So every coefficient comes from the model, and the identity is a
+    statement about one build rather than about two surfaces agreeing.
+    """
+    p = model.to_dict()
+    # The two channels this derivation leaves out, asserted rather than
+    # assumed, so a preset that switches either on fails here instead of
+    # silently disagreeing with the engine.
+    assert p["qe_pe_stock_gain"] == 0.0, p["qe_pe_stock_gain"]
+    assert p["fair_value_book_floor"] == 0.0, p["fair_value_book_floor"]
+
+    discount = economy["corporate_bond_yield"] / 100.0
+    duration = 1.0 + max(0.0, instrument.revenue_growth) * p[
+        "growth_duration_scale"]
+    rate_adjustment = max(
+        p["rate_adjustment_floor"],
+        1.0 - (discount - p["neutral_discount_rate"])
+        * p["rate_pe_sensitivity"] * duration)
+    qe_adjustment = 1.0 + p["qe_pe_gain"] * economy["qe_pe_boost"]
+
+    eps = instrument.eps * scale
+    if eps > 0.0:
+        target_pe = _anchor(instrument.sector) * rate_adjustment * qe_adjustment
+        return max(p["fair_value_floor"], eps * target_pe)
+    book = instrument.book_value_per_share * scale
+    return max(p["fair_value_floor"], book * p["loss_making_price_to_book"])
 
 
 def test_every_preset_before_pt_v18_carries_the_dial_at_zero():
@@ -199,17 +242,17 @@ def test_the_scale_is_the_economys_own_ratio():
         f"the economy grew by {scale - 1.0:.6f} over {days} days, which is "
         "too little to separate a scaled valuation from an unscaled one"
     )
-    # ``qe_pe_gain`` is 0.0 on this preset, so the engine's QE adjustment is
-    # exactly 1.0 while ``tradefloor.fair_value`` computes ``1 + boost``.
-    # The two agree where the boost is zero, which an expansion holds.
-    assert economy["qe_pe_boost"] == 0.0
+    # No assertion on the QE boost is needed any more. The derivation reads
+    # ``qe_pe_gain`` from the model, so it computes the engine's adjustment
+    # rather than the helper's, and the two agree at any boost.
+    model = tf.ModelParams.from_preset("pt-v18")
 
     _run(engine, 1, first=days - 1)
     truth = pa.table(engine.truth(day=days - 1)).to_pydict()
 
     checked = 0
     for row, slot in enumerate(truth["instrument_id"]):
-        expected = _derived(universe[slot], economy, scale)
+        expected = _derived(universe[slot], economy, scale, model)
         got = truth["fundamental_value"][row]
         assert got == pytest.approx(expected, rel=1e-12), (
             f"slot {slot}: engine {got}, derived {expected}")
@@ -219,7 +262,7 @@ def test_the_scale_is_the_economys_own_ratio():
         # growth exactly, for every name and every tick. A term that
         # reached the discount rate, the anchor or the growth premium would
         # leave a residual here.
-        unscaled = _derived(universe[slot], economy, 1.0)
+        unscaled = _derived(universe[slot], economy, 1.0, model)
         assert math.log(got) - math.log(unscaled) == pytest.approx(
             math.log(scale), rel=0.0, abs=1e-14), (slot, got, unscaled)
         checked += 1
@@ -242,9 +285,10 @@ def test_an_unscaled_valuation_disagrees_with_the_engine():
     _run(engine, 1, first=days - 1)
     truth = pa.table(engine.truth(day=days - 1)).to_pydict()
 
+    model = tf.ModelParams.from_preset("pt-v18")
     disagreed = 0
     for row, slot in enumerate(truth["instrument_id"]):
-        unscaled = _derived(universe[slot], economy, 1.0)
+        unscaled = _derived(universe[slot], economy, 1.0, model)
         if truth["fundamental_value"][row] != pytest.approx(
                 unscaled, rel=1e-9):
             disagreed += 1
