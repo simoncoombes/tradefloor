@@ -257,8 +257,8 @@ impl Sim {
     ///
     /// `stream` is one of the seven ids [`crate::rng::stream`] declares
     /// (`0..=6`); `kind` is `0.0` for a uniform or `1.0` for a normal --
-    /// [`crate::rng::DrawKind`]'s own discriminants, so the page and this
-    /// binding read the same two numbers the same way. The generator
+    /// [`crate::rng::DrawKind`]'s own discriminants, so a caller and
+    /// this binding read the same two numbers the same way. The generator
     /// still advances at every patched address; only the value the
     /// consumer receives there changes --
     /// [`crate::engine::Engine::patch_draw`] documents the contract this
@@ -335,8 +335,7 @@ impl Sim {
     /// plain `f64` rather than a `Result`: a caller asking about a day
     /// already closed gets the stream's current position back rather
     /// than a trap or a wrapped-around, meaninglessly large number. It is
-    /// the caller's job to ask about a day at or ahead of [`Sim::day`],
-    /// the way the page does.
+    /// the caller's job to ask about a day at or ahead of [`Sim::day`].
     #[wasm_bindgen(js_name = jumpAddress)]
     pub fn jump_address(&self, day: u32) -> f64 {
         let (uniforms, _normals) =

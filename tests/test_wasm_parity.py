@@ -161,10 +161,10 @@ def _run_surgery_case(patch_day):
     """Build SURGERY_CASE's roster and run it, unfiring `patch_day`'s
     market jump first if given (`None` runs the control).
 
-    Mirrors what the page's five wasm bindings do exactly: `Sim::new`,
-    then (if patching) the `jumpAddress` arithmetic and `patchDraws`,
-    then `runDays`. No agent and no `World`, because the wasm `Sim`
-    trades nothing either -- `rust/src/wasm.rs`'s `run_day` calls
+    Mirrors what the five wasm bindings do exactly: `Sim::new`, then
+    (if patching) the `jumpAddress` arithmetic and `patchDraws`, then
+    `runDays`. No agent and no `World`, because the wasm `Sim` trades
+    nothing either -- `rust/src/wasm.rs`'s `run_day` calls
     `run_session` with `order_volumes: &[]`.
     """
     universe = pt.Universe.random(SURGERY_CASE["size"],

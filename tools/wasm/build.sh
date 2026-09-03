@@ -30,15 +30,3 @@ echo "raw     $(wc -c < "$W") bytes"
 echo "gzip    $(gzip -9 -c "$W" | wc -c) bytes"
 
 node tools/wasm/check.mjs "$OUT"
-
-# The nodejs target above is what check.mjs's `require` needs; a browser
-# page needs the `web` target instead (an ES module with an async `init()`
-# that fetches and instantiates the .wasm itself, rather than a
-# `require()`-based CommonJS module) -- the two targets' generated JS are
-# not interchangeable, so this is a second wasm-bindgen invocation into its
-# own directory rather than a flag on the first one. tools/wasm/surgery.mjs
-# imports from here; "$OUT/web" keeps it out of "$OUT" itself, where
-# check.mjs's `require(...tradefloor.js)` would otherwise resolve the
-# wrong target if the two were merged into one directory.
-wasm-bindgen --target web --out-dir "$OUT/web" \
-      rust/target/wasm32-unknown-unknown/release/tradefloor.wasm
