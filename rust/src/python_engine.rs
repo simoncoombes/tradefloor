@@ -795,10 +795,13 @@ fn stream_id(name: &str) -> PyResult<u32> {
 ///
 /// The KEY rather than its position, so the Python side derives the
 /// sector factor's tag from `tradefloor.sectors()` instead of taking a
-/// number this function worked out. Two derivations of one tag from two
-/// sources disagree where one of them is wrong; one derivation used
-/// twice agrees with itself. Resolved against whichever engine is asked,
-/// because a kept copy's roster and the live one differ after a
+/// number this function worked out. Not two sources: that wrapper reads
+/// the same array, and an engine refuses an unknown sector at
+/// construction, so the two cannot disagree. What it buys is that the
+/// tag becomes recomputable from published values, so a check can derive
+/// it independently of the code under it rather than reading back an
+/// integer this function produced. Resolved against whichever engine is
+/// asked, because a kept copy's roster and the live one differ after a
 /// delisting.
 ///
 /// Empty where the name is not on that engine's roster, which the caller
@@ -1930,10 +1933,12 @@ impl PyEngine {
     /// mean to explain rather than for a whole run.
     ///
     /// What that costs, on `Universe.random(40, seed=111)` at `pt-v16`
-    /// over thirty days, as the PROCESS peak working set rather than a
-    /// Python-side allocation figure, since the store is Rust memory:
-    /// 333 MB with a thirty-day window against 28 MB with none, on a
-    /// process that imports the library and nothing else. A fork carries what the parent
+    /// over thirty days with `record=True`, as the PROCESS peak working
+    /// set rather than a Python-side allocation figure, since the store
+    /// is Rust memory: 436 to 457 MB with a thirty-day window against 89
+    /// to 92 MB with none, two readers on one machine. Recorded, because
+    /// `Engine.explain` reads the day off `truth()` and a window is only
+    /// useful on a run that recorded. A fork carries what the parent
     /// kept, so `World.fork` and every counterfactual arm pay it again
     /// per arm: `fork(1)` takes 0.011 s at a five-day window, 0.046 s at
     /// twenty and 0.136 s at sixty. A fork collects no new opens of its

@@ -19,12 +19,15 @@ the window raises and names the days that were kept.
 
 A window costs one engine copy per day kept, and a fork pays it again
 per arm. Measured as the PROCESS peak working set, which is the figure
-that sees the store, at forty names over thirty days on the same box:
-333 MB with a thirty-day window against 28 MB with none, and a fork of a
-sixty-day window takes 0.136 seconds. The 28 MB is a process that
-imports the library and nothing else, which is 23 MB before any engine
-is built, so a harness carrying pyarrow or numpy starts higher and the
-reviewer measured 89 MB and 437 MB for the same pair. Ask for the days
+that sees the store, at forty names over thirty days on the same box and
+with ``record=True``: 436 to 457 MB with a thirty-day window against 89
+to 92 MB with none, the lower of each pair the reviewer's and the higher
+this author's. A fork of a sixty-day window takes 0.13 seconds.
+
+Recorded because ``explain`` reads the day off ``truth()``, so a window
+is only useful on a run that recorded. The same pair unrecorded is 333
+and 28 MB, and quoting those would describe a configuration this feature
+refuses: 61 MB of the difference is the tape itself. Ask for the days
 you mean to explain.
 
 ``explain`` also needs pyarrow, because the tree's contributions are the
@@ -422,34 +425,6 @@ def _the_slot_names_the_name(roster: Sequence[str], slot: int,
             "describe another company under this name.")
 
 
-def _same_width(engine: Engine, before: int, after: int,
-                width: int) -> bool:
-    """Whether the tape holds the same number of names on both days.
-
-    The fallback for a day whose predecessor was not kept, where the
-    tape's counts are all there is to compare. A slot names a company
-    and a delisting shifts every slot below it, so a level read from one
-    day's tape at a slot from another day's is another name's. Equal
-    counts do not prove the roster held still;
-    :meth:`Explanation._held_still` compares the rosters themselves
-    wherever the day before is in the window.
-    """
-    return all(_instruments(engine, d) in (None, width)
-               for d in (before, after))
-
-
-def _instruments(engine: Engine, day: int) -> int | None:
-    """How many names the tape holds for ``day``, or ``None``."""
-    if int(day) < 0 or engine.recorded_days == 0:
-        return None
-    try:
-        table = _table(engine.truth(day=int(day)))
-    except ValidationError:
-        return None
-    ids = table["instrument_id"]
-    return len(set(ids)) if ids else None
-
-
 def _levels(engine: Engine, day: int, index: int) -> dict[str, float] | None:
     """The day's closing fundamental value and anchor price for one name.
 
@@ -586,9 +561,14 @@ class Explanation:
         _the_slot_names_the_name(opened.tickers, self._index, ticker,
                                  f"the copy day {day} was kept from")
         # From the library's published order rather than from a number
-        # the binding computed: the engine's own sector table and
-        # `tradefloor.sectors()` are two sources for one tag, and two
-        # derivations disagree where one is wrong.
+        # the binding computed. The data has one origin, since
+        # `tradefloor.sectors()` wraps the same array the engine reads
+        # and an engine refuses an unknown sector at construction, so the
+        # two cannot disagree. What changes is that the tag is now
+        # RECOMPUTABLE from published values: a check can derive it from
+        # the roster and that order, both of which it reads independently
+        # of the code under it, where before it could only read back the
+        # integer the binding handed over.
         from . import sectors as _sector_keys
 
         order = list(_sector_keys())
@@ -687,15 +667,17 @@ class Explanation:
         # every listing and delisting with its position, so an operation
         # between the two opens is a fact rather than an inference, and
         # the levels are refused rather than read at a slot that may name
-        # another company. The widths are checked as well, since a
-        # disagreement there without a logged operation is a state
-        # nothing here understands.
+        # another company.
+        #
+        # A width comparison stood here as a second check and is gone. It
+        # was reached zero times across the whole suite once the log was
+        # asked first, and neither the author nor the reviewer could
+        # construct the state that reaches it: a roster moves only
+        # through a listing or a delisting, and both are logged. A branch
+        # nobody can reach reads as protection while being none.
         if self._ops:
             return None, True
-        if _same_width(engine, self._label - 1, self._label,
-                       len(self._roster)):
-            return self._index, False
-        return None, True
+        return self._index, False
 
     # -- the tree ---------------------------------------------------------
 
