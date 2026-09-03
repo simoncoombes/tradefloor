@@ -216,6 +216,13 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # horizon the burn-in that measured both ran to. Past that the box would
     # describe a transient nobody has measured.
     "macro_burn_in_days": (0.0, 1095.0),
+    # The share of earnings returned as net buybacks. 0.0 is a model with
+    # no share retirement, a third is the US large-cap filing record this
+    # era declares, and 1.0 returns the whole of earnings every year. Past
+    # that a company returns more than it earns, which is a claim about
+    # leverage this model does not carry, so the box is the closed unit
+    # interval and its top is where the earnings run out.
+    "buyback_payout_share": (0.0, 1.0),
     # How much of the jump's own drift is given back. 0.0 is the
     # uncompensated process, 1.0 is the martingale, and past 1.0 the
     # compensator exceeds the drift and the jump pushes the other way.

@@ -730,6 +730,67 @@ about 0.7 points more. That value is the median of a distribution, so it
 would be a fitted constant, and oil's resting point is what would make it
 derivable.
 
+### The buyback yield
+
+Rows so far give back means the model injected and grow the valuation with
+the economy's own output. What they leave is the return a real price index
+earns above nominal output growth, and the model had no quantity to derive
+it from.
+
+`buyback_payout_share` is the share of earnings a company returns as net
+buybacks, at 0.0 for every preset before pt-v18 and a third for pt-v18.
+Retiring stock makes earnings and book per share grow faster than the
+company does, by the buyback yield `payout_share * eps / price`. That yield
+is earnings over price, so the term pays more where the multiple is low and
+less where it is high.
+
+This is the one CHOSEN constant in the era and it is marked as such. Every
+other dial here is derived: a stationarity condition, a symmetric mean, a
+unit, a measured transient, the yield the economy opens at. This one states
+how US large-cap companies behave, from the filing record where total
+shareholder return runs near half of earnings split between dividends and
+net buybacks. A reader can check it against that source, which a value
+fitted to this engine's own distribution would not allow.
+
+The yield it implies is a check on the share, in that order. The model's
+median annual earnings yield is 0.0555, so a third of it is a buyback
+yield of 1.85 per cent, and US large-cap net buybacks over 2000 to 2025 run
+near 1.5 to 2.0 per cent of market value.
+
+The yield is evaluated at today's price and held over the elapsed time. The
+exact factor is the exponential of the payout share times the integral of
+the earnings yield, which needs a per-name accumulator and a nineteenth
+column in the state hash. Measured against that integral on real price
+paths: over 252 days on 200 name-seeds the difference is +0.026 points of
+annual index return at the median, and over 1008 days on 120 name-seeds it
+is -0.015. The multiple mean-reverts, so today's yield estimates the
+period's average at both horizons, and the residual is named here rather
+than removed.
+
+A loss-maker neither retires stock nor issues it. A negative earnings yield
+would grow the share count, and a company cannot return earnings it does
+not have. That clamp carries none of the drift hazard this era keeps
+finding in one-sided terms, because `eps` is fixed for a name at
+construction, so it selects a fixed share of the roster once rather than
+branching on a zero-mean quantity every day. On the panel roster it is 3
+names of 40, and their measured lift is -0.05 points against +1.77 for the
+index.
+
+What it is worth, five seeds at 252 days paired on the seed: +1.765 points
+a year at the median in the log convention and +1.738 as a portfolio, on 5
+of 5 seeds, in a range of +1.672 to +2.011. The whole of it is the fair
+value channel at +1.771, with the mispricing channel at -0.019. The oil
+price, the phase and the macro path are bit-identical on every seed.
+
+The shape is measured as well as the size. Across 185 name-seeds with
+positive earnings the rank correlation between a name's lift and its
+opening earnings yield is +0.773, and the cheapest quartile by yield gains
++2.543 points against +1.154 for the dearest. The term pays an earnings
+yield, which is the property that separates it from a flat premium.
+
+The certified panel reads 14 of 14 over seeds 101 to 110, and its own drift
+row, a portfolio return, reads +4.193.
+
 ### The commit the measurements name
 
 Every figure in the section above was measured on a build of a commit

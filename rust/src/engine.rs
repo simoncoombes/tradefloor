@@ -1057,6 +1057,7 @@ impl Engine {
                 settle_draws,
                 settle_depth_counterfactual: self.settle_depth_counterfactual,
                 nominal_output_base: self.nominal_output_base,
+                elapsed_days: self.current_day,
                 params: &self.params,
             },
             rng,
