@@ -62,28 +62,35 @@ anything that decides a price.
 
 ## What a call costs
 
-The tree reads the day's draw log, and the market stream's log is the
-size of the tape: 613 of that stream's draws a tick at a hundred names,
-239,070 over one day. On ``Universe.random(n, seed=111)`` at engine seed
-42, three days, ``pt-v16``, at 8273f24, one ``explain`` call and one
-``check`` on it cost:
+What a call does is fixed and what it takes in wall time is not, so the
+counts come first. A ``check()`` runs the day once per DISTINCT overlay
+rather than once per node, since a replay is a function of its patch set:
+15 runs over the tree's 53 nodes, and neither number moves with the
+roster. The addressed draws under one name are 2,736 at every roster
+size. What grows is the log the call reads, because the market stream's
+log is the size of the tape at 613 of that stream's draws a tick.
 
-===== ========== ========= ==========
-names   explain     check        peak
-===== ========== ========= ==========
-   12     1.03 s    0.29 s    38.7 MB
-   40     2.30 s    0.96 s    94.3 MB
-  100     5.57 s    2.27 s   224.0 MB
-===== ========== ========= ==========
+On ``Universe.random(n, seed=111)`` at engine seed 42, three days,
+``pt-v16``, at a4e33d5, three repetitions each:
 
-The addressed draws under one name are 2,736 at every roster size, so
-what grows is the log the call reads rather than the tree it builds. A
-filtered read on the extension side would remove it, and this build does
-not have one.
+===== ========= ============== ============== ==========
+names    logged        explain          check       peak
+===== ========= ============== ============== ==========
+   12    66,400  1.46 - 2.31 s  0.50 - 0.70 s   31-39 MB
+   40   197,664  4.13 - 5.72 s  1.24 - 2.21 s      94 MB
+  100   478,944  8.87 - 10.2 s  3.15 - 3.82 s     224 MB
+===== ========= ============== ============== ==========
 
-Keeping a window costs a run some time and some memory of its own: at a
-hundred names over twenty days, 3.13 seconds against 2.43 seconds
-without one, on the same roster and seed.
+Read the two time columns as an order of magnitude. This is a shared
+machine and three repetitions spread them by more than half again, while
+the counts and the peak repeat. A filtered read on the extension side
+would remove most of both, and this build does not have one.
+
+Keeping a window costs a run a copy of the engine per kept day. Its cost
+in time is inside the noise at this size: over three repetitions at a
+hundred names for twenty days, a windowed run took 0.95, 1.02 and 1.56
+times an unwindowed one, so the measurement says the overhead is smaller
+than what else the machine is doing.
 
 ## The jump slot's day
 
