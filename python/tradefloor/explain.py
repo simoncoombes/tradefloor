@@ -669,12 +669,16 @@ class Explanation:
         # the levels are refused rather than read at a slot that may name
         # another company.
         #
-        # A width comparison stood here as a second check and is gone. It
-        # was reached zero times across the whole suite once the log was
-        # asked first, and neither the author nor the reviewer could
-        # construct the state that reaches it: a roster moves only
-        # through a listing or a delisting, and both are logged. A branch
-        # nobody can reach reads as protection while being none.
+        # A width comparison stood here as a second check and is gone.
+        # A roster moves only through `list_instrument` or `delist`, the
+        # run log records both, and the log is asked first, so the widths
+        # could only ever agree with the answer already given. That is a
+        # claim about the log being complete, which is checkable against
+        # it. An earlier draft of this comment said instead that nobody
+        # could construct the state reaching the branch, which was
+        # measured and withdrawn: the branch was entered on the ordinary
+        # path below and only its refusing arm was unreachable. A wrong
+        # reason beside a right change is how the change gets undone.
         if self._ops:
             return None, True
         return self._index, False
