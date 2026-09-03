@@ -527,12 +527,21 @@ class World:
 
     # -- running ----------------------------------------------------------
 
-    def run(self, days: int = 1, *, ledger: Any = None) -> "World":
+    def run(self, days: int = 1, *, record: bool = False,
+            ledger: Any = None) -> "World":
         """Advance ``days`` whole days, agent trading, and record every step.
 
         Whole days only. A world stopped mid-day could not be forked safely,
         and offering a half-day advance would mean offering the fork that goes
         with it. See the module docstring.
+
+        ``record`` also records each day on the engine before its close,
+        the way :func:`tradefloor.facts.measure` does, so ``engine.bars``
+        and ``engine.truth`` carry the run and
+        :func:`tradefloor.facts.panel_statistics` can read it. Off by default:
+        a record is an entry in the order log, and a world that recorded
+        would checkpoint and replay differently from one that did not.
+        Nothing about the market moves either way.
 
         The loop is the one :func:`tradefloor.evaluate` runs, deliberately:
         the same clock, the same order of observe-execute-settle, and the
@@ -611,6 +620,8 @@ class World:
                 self.trace.append(self._row(day, macro, asked, done))
                 self._step += 1
 
+            if record:
+                self.engine.record(day)
             self.engine.close_market()
             self._verify_surgery(day)
             if ledger is not None:

@@ -19,6 +19,9 @@ and a second `run_days` call numbers days from the engine's own counter.
 **A surgery replaces one draw**, a window of them, or another world's,
 and the record says whether it could bite.
 
+**Each draw's effect on a target is measured** by a finite difference,
+and the rows carry the residual by which they miss the joint effect.
+
 <!-- release-note-ends -->
 
 ### The day ledger
@@ -245,6 +248,36 @@ the later writes are attempted and never reached. An engine that has caught
 this error holds one run's market beside another run's macro state, so drop
 it rather than running it on.
 
+### Noise attribution
+
+`tradefloor.noise.attribute` forks one arm per draw from a common state,
+installs one patch, runs the same days with the same agent, and reports
+the difference. Event streams are attributed one logged draw at a time
+and the market stream by day aggregate, where a common shift of delta
+over the square root of the tick count moves a day's sum by delta
+standard deviations of that sum. Every arm's draw positions are compared
+against the control's on all seven streams, and the result is a caveat
+either way.
+
+The rows are single-draw differences through a market with feedback, so
+they do not decompose the target. One more arm installs every changing
+patch at once and the result carries the joint move and the residual
+between it and the sum of the rows, with a caveat that claims no total.
+
+An event lands at its day's close and is first seen at the next open, so
+the default horizon reaches one day past the window whenever an event
+stream is attributed, and a stream whose rows are all zero says which of
+the target's day or the horizon stopped the measurement short. A column
+target is read at the day it names rather than wherever the arms stopped.
+
+### The amplification report
+
+`tools/calibration/amplification.py` compares two presets draw for draw
+and names the gain per site. The verdict names the gain first and adds a
+mechanism reading only where the correlation supports one, with the row
+count, the contributing count and a standard error beside it, and the
+three cut-offs printed as the conventions they are.
+
 ### The prints table
 
 **Every print says what it was made of.** `Engine.prints()` is a table
@@ -359,6 +392,7 @@ median share of -1.002 in both, and the mean distance from the model price
 to the print was 23.3 and 34.7 basis points. The crisis changes how often
 the book runs out rather than how far a print goes when it does. The arms
 are the same arms, and their exposure numbers are unchanged.
+
 
 ## 0.6.2
 
@@ -620,7 +654,6 @@ action to order", and it began at the rendered input -- so nothing joined a
 decision back to what the agent was shown, and an adapter that builds its
 framework input from the payload rather than from text had nothing to
 re-ask.
-
 
 
 ### The refusal policy
