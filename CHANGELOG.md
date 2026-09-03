@@ -22,6 +22,9 @@ and the record says whether it could bite.
 **Each draw's effect on a target is measured** by a finite difference,
 and the rows carry the residual by which they miss the joint effect.
 
+**A shadow run walks the engine along a real year**, solving each day for
+the draws that reproduce its observed closes.
+
 <!-- release-note-ends -->
 
 ### The day ledger
@@ -277,6 +280,40 @@ and names the gain per site. The verdict names the gain first and adds a
 mechanism reading only where the correlation supports one, with the row
 count, the contributing count and a standard error beside it, and the
 three cut-offs printed as the conventions they are.
+
+### Implied draws and the shadow run
+
+For each real trading day, `tools/shadow/shadow.py` finds the day
+aggregates under which the engine reproduces the day's observed closes,
+feeds them in and walks the engine along the real path. The estimate is
+the maximum a posteriori vector per day, by Levenberg-Marquardt on the
+forward map, and the report says so: the series is shrunk by the prior on
+an under-determined system, so the run measures the estimator's own null
+on days the engine generated from a standard normal and compares against
+that rather than against the prior's.
+
+The sensitivity column is a finite difference taken fresh at the accepted
+solution, because the optimiser's carried Jacobian is updated by secant
+between refreshes and differed from a fresh one by a factor of nine on one
+day of four. The binding clamp verdict reads the same fresh column.
+
+The greedy jump step recovers a downward market jump and not an upward
+one: the jump's mean is negative, so an upward jump needs a normal whose
+prior the likelihood cannot repay. Measured on planted jumps, every
+downward jump from -85 to -208 basis points was recovered and no upward
+jump at any size to +112, and the two fired-count rows carry that
+envelope.
+
+A run writes its per-day solutions beside its report, so `--render`
+regenerates the report on corrected code without solving again, and a
+resumed run carries its whole record through the checkpoint rather than
+only the prices and the stream positions. A render that recomputes a
+column leaves the recomputed run beside the report too, so a reader who
+wants the column rather than its median does not pay the 38 minutes
+again. The window a fetch asks for is midnight UTC on the dates it names,
+so the url is a function of the date and not of the machine's zone: a box
+in UTC and a machine four hours west asked for windows four hours apart
+and one close of 25,914 came back 1.13e-06 apart.
 
 ### The prints table
 

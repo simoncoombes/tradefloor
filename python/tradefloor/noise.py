@@ -471,7 +471,8 @@ def attribute(world: Any, window: Any, target: Any,
     the quantity it states is per day, and ``delta * sqrt(count)`` recovers
     the day-sigma step the row was taken at. The effect therefore grows
     with ``T`` at a fixed ``delta``: 0.0725, 0.19, 0.25 and 0.4225 on the
-    market factor over 20, 40, 80 and 160 ticks, four names at seed 99.
+    market factor over 20, 40, 80 and 160 ticks, on
+    ``Universe.random(4, seed=99)`` at engine seed 42, at 2ddca7b.
     The effect of one tick normal on its own is not identified from a daily
     target, and a row for it would be a number without a meaning. The
     market stream's other draws (the stash and settlement uniforms) drive
