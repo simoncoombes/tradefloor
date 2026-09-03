@@ -58,6 +58,32 @@ def coefficient_digest(values: dict[str, float]) -> str:
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
+def mechanism_set(values: dict[str, float]) -> dict[str, dict]:
+    """The mechanism set with doses, beside the coefficient vector.
+
+    Additive (schema 1 stays 1): a reader that knows the coefficient
+    vector keeps working, and one that knows this field can say which
+    mechanisms a preset runs, at which specification and which doses.
+    The specification digest comes from `tools/mechanism`, the doses are
+    the preset's own coefficients for the mechanism's dials. The preset's
+    `fingerprint` is untouched.
+    """
+    for sub in ("mechanism", "mechanism/mechanisms"):
+        path = str(ROOT / "tools" / sub)
+        if path not in sys.path:
+            sys.path.insert(0, path)
+    from emit import shipped
+
+    out = {}
+    for mech in shipped():
+        out[mech.name] = {
+            "spec": mech.digest(),
+            "stream": mech.stream,
+            "doses": {d.name: values.get(d.name, d.default) for d in mech.dials},
+        }
+    return out
+
+
 def git(*args: str) -> str:
     out = subprocess.run(["git", *args], cwd=ROOT, capture_output=True,
                          text=True, encoding="utf-8")
@@ -83,6 +109,7 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
         "fingerprint": name,
         "coefficient_digest": coefficient_digest(values),
         "coefficients": {k: values[k] for k in sorted(values)},
+        "mechanisms": mechanism_set(values),
         "default_since": DEFAULT_SINCE.get(name),
         "measured": measured,
         "panel_252": p["panel_252"],
@@ -110,15 +137,22 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--panel", required=True,
+    ap.add_argument("--panel", required=False,
                     help="a preset_panel.py artefact")
     ap.add_argument("--check", action="store_true",
                     help="compare against the committed records and report "
                          "every difference, writing nothing")
+    ap.add_argument("--mechanisms", action="store_true",
+                    help="rewrite only the mechanism set of every committed "
+                         "record from the build's coefficients; no panel needed")
     args = ap.parse_args()
+    if args.mechanisms:
+        return write_mechanisms()
 
     import tradefloor
 
+    if args.panel is None:
+        ap.error("--panel is required unless --mechanisms is given")
     panel = json.loads(pathlib.Path(args.panel).read_text(encoding="utf-8"))
     OUT.mkdir(exist_ok=True)
 
@@ -136,8 +170,8 @@ def main() -> int:
                 # The measurement block carries a commit and a wall time, so
                 # comparing it would report drift on every re-run. What has
                 # to agree is the SCIENCE.
-                for field in ("coefficient_digest", "panel_252", "panel_504",
-                              "in_band", "misses", "crisis_lever"):
+                for field in ("coefficient_digest", "mechanisms", "panel_252",
+                              "panel_504", "in_band", "misses", "crisis_lever"):
                     if have.get(field) != record[field]:
                         drift.append(f"{path.name}: {field} differs")
         else:
@@ -149,6 +183,25 @@ def main() -> int:
             print(f"  {d}")
         print(f"{len(drift)} differences")
         return 1 if drift else 0
+    return 0
+
+
+def write_mechanisms() -> int:
+    """Set the mechanism field on every committed record, from the build."""
+    import tradefloor
+
+    for path in sorted(OUT.glob("*.json")):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        values = tradefloor.ModelParams.from_preset(record["preset"]).to_dict()
+        record["mechanisms"] = mechanism_set(values)
+        ordered = {}
+        for key, value in record.items():
+            ordered[key] = value
+            if key == "coefficients":
+                ordered["mechanisms"] = record["mechanisms"]
+        path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8", newline="\n")
+        print(f"  {path.name}: mechanisms {sorted(record['mechanisms'])}")
     return 0
 
 
