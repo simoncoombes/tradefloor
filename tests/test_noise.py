@@ -247,6 +247,64 @@ def test_the_layout_matches_the_log():
         assert logged[company] == [first + t * stride for t in range(ticks)]
 
 
+def test_the_schedule_and_the_layout_follow_a_changed_roster():
+    """The market schedule and the day layout track the active roster.
+
+    The two tests above pin the schedule on one roster and never change
+    it, and the known-answer digest runs one roster too, so a settlement
+    change that added or moved a market draw on a day after a listing
+    would not fail either. That is not hypothetical: a dev merge into this
+    stack rewrote the tick's circuit-breaker clamp in place and reshaped
+    the settlement's no-trade construction.
+
+    Measured on ``Universe.random(10, seed=99)`` at seed 42, eight ticks a
+    day, over four days at 19438ff: 584 market draws on the first day at
+    73 a tick, 536 at 67 the day after a delisting, 584 again after a
+    listing, and 584 after a listing and a delisting in one gap. The
+    settlement takes four uniforms per active name per tick throughout,
+    320, 288, 320, 320.
+    """
+    engine = tf.Engine(seed=SEED, universe=tf.Universe.random(10, seed=99))
+    ticks = 8
+    engine.trace_draws("market", 0, 3)
+    listings = [tf.Instrument("IPO", "energy", initial_price=33.0,
+                              shares_outstanding=5e7, eps=1.5),
+                tf.Instrument("IPOB", "energy", initial_price=21.0,
+                              shares_outstanding=4e7, eps=1.1)]
+    for day in range(4):
+        engine.run_days(1, hour=9, minute=30, day_of_week=3,
+                        ticks_per_day=ticks, volatility=1.0, record=True)
+        mark = engine.day_marks()[day]
+        active = len(mark["active"])
+        assert active == len(engine)
+        entries = noise.draw_log(engine, "market", day, day)
+        sites = [e.site for e in entries]
+        per_tick = (["market_factor_z"] + ["sector_z"] * mark["sectors"]
+                    + ["factor_idio_z", "stash_u"] * active
+                    + ["settle_u"] * 4 * active)
+        assert sites == per_tick * ticks, day
+        assert sites.count("settle_u") == 4 * active * ticks, day
+        assert "unset" not in sites, day
+        # and the day's arithmetic still names the normals the log holds
+        layout = noise.market_day_layout(engine, day)
+        logged = {}
+        for entry in entries:
+            if entry.site == "factor_idio_z":
+                logged.setdefault(entry.tag, []).append(entry.address.index)
+        assert set(layout) == set(logged) and len(layout) == active, day
+        for company, (first, stride, count) in layout.items():
+            assert count == ticks
+            assert logged[company] == [first + t * stride
+                                       for t in range(count)], (day, company)
+        if day == 0:
+            engine.delist(0)
+        elif day == 1:
+            engine.list_instrument(listings[0])
+        elif day == 2:
+            engine.list_instrument(listings[1])
+            engine.delist(0)
+
+
 def test_addresses_and_kinds_are_checked():
     with pytest.raises(ValueError):
         DrawAddress("weather", "uniform", 0).check()
