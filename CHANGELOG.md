@@ -7,8 +7,7 @@
 **A settable law makes order-flow impact keep responding to size past ten
 times a name's average minute volume**, where the shipped multiplier stops.
 `order_flow_impact_law` at 1.0 unclamps that law at both ends and crosses
-it to a square root at the knee. A four-hundredfold order costs seven times
-what it did and a twelve-hundredfold twelve times.
+it to a square root at the knee.
 
 It ships at 0.0, no preset turns it on, and the three known-answer digests
 do not move. The repair changes what the library tells a user a trade costs
@@ -16,9 +15,7 @@ rather than what the market does, because the order-flow channel is
 reachable only through injected flow.
 
 Two limits. Where the repair's range ends is a property of the name, and
-past that point a quoted cost reports where the session breaker sits. On
-the `analyse` surface it changes nothing at all, because the book caps the
-fill first.
+past that point a quoted cost reports where the session breaker sits.
 
 **A new preset, pt-v18, returns five first moments the model injected and
 grows fair value with nominal output**, taking the equal-weight index from
@@ -93,6 +90,13 @@ Both rosters give those six figures to three decimals. The realised
 0.882 and 0.776 against 1, so the price surface compresses the shock a
 little and the shock itself is exact.
 
+What that is worth to a caller: over the same thirty seeds the median cost
+of an order four hundred times a name's average minute volume is seven
+times what it was, and at twelve hundred times it is twelve times. Below
+the knee the change runs the other way and is mostly invisible, because a
+price is on a cent grid and the median cost of the smallest orders reads
+0.00 basis points under both laws.
+
 Nothing a graded row can see. The order-flow channel is reachable only
 through `TickInputs.order_volumes`, which is the empty slice at every
 construction site but the two `order_flow=` paths, so a certified run
@@ -114,9 +118,12 @@ is the same place; every other name on that roster is clear.
 `mispricing_cap` is not what binds, with `s` at about three per cent of
 its 0.9.
 
-On the `analyse` surface the change is invisible: 25 of 25 runs are
-identical under the two laws on both rosters, because the book caps the
-fill at displayed depth and identical fills mean identical flow.
+Anyone reaching for `analyse` to see this fix will see nothing. 25 of 25
+runs are identical under the two laws on both rosters, because that surface
+fills against displayed book depth and identical fills mean identical flow,
+so the book binds before the cost law does at every size tried. The bound
+belongs to the book, and `flow_impact` is the surface where this change is
+legible.
 
 Depth is a separate defect and this does not touch it. `order_imbalance`
 already returns the dimensionless quantity the cited law works in, and
