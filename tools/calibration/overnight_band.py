@@ -80,6 +80,16 @@ def concentration(values, top=TOP):
     return sum(sq[:k]) / total
 
 
+def excess_kurtosis(values):
+    if len(values) < 4:
+        return None
+    m = statistics.fmean(values)
+    v = statistics.pvariance(values)
+    if v <= 0.0:
+        return None
+    return statistics.fmean((x - m) ** 4 for x in values) / (v * v) - 3.0
+
+
 def pearson(xs, ys):
     mx, my = statistics.fmean(xs), statistics.fmean(ys)
     num = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
@@ -205,6 +215,14 @@ def main(argv=None):
             "index_concentration_night": concentration(ig),
             "proxy_share": pvg / (pvg + pvi),
             "proxy_concentration_night": concentration(pg),
+            # The tail a variance ratio cannot see: the largest night, the
+            # name-nights beyond two and five percent as a fraction of all
+            # name-nights, and the excess kurtosis of nights against sessions.
+            "largest_night": max(abs(g) for g in pooled_g),
+            "nights_beyond_2pct": sum(1 for g in pooled_g if abs(g) > 0.02) / len(pooled_g),
+            "nights_beyond_5pct": sum(1 for g in pooled_g if abs(g) > 0.05) / len(pooled_g),
+            "night_excess_kurtosis": excess_kurtosis(pooled_g),
+            "session_excess_kurtosis": excess_kurtosis(pooled_i),
             "names": len(shares),
             "sessions": len(wd),
         }
@@ -239,6 +257,13 @@ def main(argv=None):
           % (index_above, len(calm), INDEX_PROXY, proxy_above, len(calm)))
     print("cross-sectional correlation, night over session: min %.3f max %.3f" % (min(xs_ratio), max(xs_ratio)))
     print("pooled reversal slope in [-0.15, 0.0] in %d of %d" % (neg, len(calm)))
+    print()
+    print("the tail per window: largest night, name-nights beyond 2 and 5 percent, excess kurtosis of nights and sessions")
+    for r in table:
+        print("  %-24s largest %.3f  >2pct %.4f  >5pct %.4f  kurt night %6.2f  kurt session %6.2f%s"
+              % (r["window"], r["largest_night"], r["nights_beyond_2pct"], r["nights_beyond_5pct"],
+                 r["night_excess_kurtosis"], r["session_excess_kurtosis"],
+                 "   crisis" if r["crisis"] else ""))
     if args.out:
         with open(args.out, "w", encoding="utf-8") as f:
             json.dump({"start": START, "end": END, "first_window": FIRST_WINDOW,
