@@ -6,30 +6,33 @@
 
 **A new preset, pt-v18, returns five first moments the model injected and
 grows fair value with nominal output**, taking the equal-weight index from
--16.150 per cent a year to -0.340 as a portfolio return, on a roster six
-points dearer than the population. The default preset is where it was.
+-16.150 per cent a year to -0.340 on a roster six points dearer than the
+population; the default preset is where it was.
 
 **The index drift and two fear rows are graded**, and the certified set
 splits into shape, level and crisis.
 
-**A run can commit to the state it held at the end of every day**, and a
+**An overnight process moves prices between sessions**, off on every
+preset, and the day bar opens at the session's open.
+
+**A run can commit to the state it held at every day's end**, and a
 sampled check verifies k days for that cost.
 
-**The per-name volume states follow the roster**, moving the volume-idio
-generator of any run that lists or delists.
+**The per-name volume states follow the roster** through any listing or
+delisting.
 
 **Every print decomposes into the shock that arrived, the depth that
-absorbed it and the breaker's share**, with a counterfactual against
-unbounded depth on request.
+absorbed it and the breaker's share**, with an unbounded-depth
+counterfactual on request.
 
 **Every draw has an address**, a substitution table replaces one, a
-surgery installs a window of them, and a second `run_days` call numbers
-days from the engine's own counter.
+surgery installs a window, and a second `run_days` call numbers days from
+the engine's counter.
 
 **Each draw's effect on a target is measured** by a finite difference, and
-a shadow run solves a real year for the draws behind its closes.
+a shadow run solves a real year's closes for their draws.
 
-**The browser build compiles again**, after a stale file path broke it.
+**The browser build compiles again** after a stale path broke it.
 
 **A mechanism is a specification the engine's Rust is generated from**,
 checked for its draw effect and proven inert.
@@ -38,6 +41,58 @@ checked for its draw effect and proven inert.
 replays from the state the day started in.
 
 <!-- release-note-ends -->
+
+### The overnight process
+
+Nothing moved a price between sessions. The price after `open_market` was
+the price after the previous `close_market` on every name-night, so the
+engine's true overnight variance share was identically zero against a
+real 0.23 to 0.43, the forty-name reference panel over nine non-crisis
+windows with a median of 0.33 by `tools/calibration/overnight_band.py`,
+which reads the daily bars `tools/shadow/data.py` now fetches with the
+open kept. And the day bar's `open` read the first tick's print, one tick
+of movement presented as a gap (#179). A recorded day now carries the
+engine's own open mark, taken at `open_market` before any tick, and the
+day bar opens there; on the engine as it stands that mark is the previous
+close, so the row reads exactly zero, which is the correct reading of a
+model with no overnight process.
+
+`overnight_variance_ratio`, zero on every preset and bit-identical there,
+turns on `Engine::apply_overnight`, which does two things at each open
+before the day's marks are set. It realises in the opening print the
+state that changed between the sessions, the close's jump on `s` and the
+macro step in fair value, so the jump's discontinuity lands where a real
+gap sits; and it adds a draw on `s` with the session's own factor
+composition scaled by the square root of the dial, because the reference
+panel's nights and sessions read the same cross-sectional correlation.
+The move reverts on the mispricing's own half-life and stays out of the
+momentum roll. The session band anchors on the post-gap open, so the gap
+sits outside it: the intent `market/mod.rs` has stated since D6,
+delivered after describing an unexercised path since it was written.
+
+The draws come from an eighth stream, `overnight`, taken unconditionally
+and outside the three `draws_consumed` counts, so all three known-answer
+digests hold at the zero every preset carries. The state snapshot widens
+with it, 24 generator numbers, 16 draw counts and a tenth attribution
+slot `overnight` that the truth table carries on the day's first row, so
+every state hash and ledger leaf changes value while an earlier snapshot
+still restores; every stream and component count is derived from one
+constant per side rather than written out.
+
+Measured on thirty seeds at 252 days on the certification roster, the
+share follows `(J + 0.7 r (1 - J)) / (1 + 0.7 r (1 - J))` with the
+realised jump `J` at 0.188: 0.231, 0.271, 0.306 and 0.354 at ratios of
+0.10, 0.20, 0.30 and 0.45, entering the real band near 0.11 and reaching
+the real median near 0.375, where the night's tail counts and kurtosis
+sit inside their real ranges and its concentration sits on the band's
+floor. The reversal reads -0.03 against a real -0.02, the level row does
+not move, and thirteen of the fourteen shape rows hold at every ratio.
+Two things the measurement found, both for the decision on adopting the
+dial: nothing downstream answers the night, since the GARCH innovation
+and the forced-flow trigger read the session and never the gap, and
+`volume_abs_return_corr` goes red at any ratio above zero because a gap
+carries no volume against it. No preset carries the dial; the response
+curve is in the design repository's `programme/overnight-process.md`.
 
 ### The graded level row and the split of the certified set
 
