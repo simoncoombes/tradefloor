@@ -533,9 +533,14 @@ def test_the_derivation_tracks_every_parameter_that_reaches_the_valuation():
     model by name. A carried parameter added later that reaches fair value
     would escape this guard, which is the gap to know about.
 
-    The payout share is held at zero here, so this covers the derivation in
-    its input-only form. The composed form is covered by the test that
-    supplies a price.
+    Each perturbation runs TWICE, at a payout share of zero and at the
+    shipped value, because one pass cannot see a dial that only bites when
+    payouts are on. That is the PAIR problem the perturbation table carries
+    three times over, where a dial moves nothing because a second dial it
+    depends on ships at zero, and the table's treatment is a comment per
+    member because a table cannot do better. A loop can. Dropping the payout
+    factor from the derivation passes the first pass and fails the second,
+    which was checked.
 
     A parameter that moves the ECONOMY rather than the valuation is not a
     false failure, because the derivation is handed the economy the engine
@@ -543,13 +548,13 @@ def test_the_derivation_tracks_every_parameter_that_reaches_the_valuation():
 
     # What it costs
 
-    One two-day, four-name, two-tick engine run per settable parameter. On
-    this roster that is 116 runs in 1.6 to 1.8 seconds, against 4.1 to 4.8
-    for the whole file, on a four-core Windows box under load. A range
-    rather than a figure, because three runs here spanned that much and a
-    single reading would imply a precision the measurement does not have. The number sits here
-    rather than in an assertion, because a wall time asserted in a test
-    fails flakily and never honestly.
+    One two-day, four-name, two-tick engine run per settable parameter per
+    pass. On this roster that is 232 runs in 2.2 to 2.4 seconds, against 4.5
+    to 4.7 for the whole file, on a four-core Windows box under load. A
+    range rather than a figure, because repeated runs spanned that much and
+    a single reading would imply a precision the measurement does not have.
+    The number sits here rather than in an assertion, because a wall time
+    asserted in a test fails flakily and never honestly.
     """
     import test_model_params as params_table
 
@@ -561,10 +566,12 @@ def test_the_derivation_tracks_every_parameter_that_reaches_the_valuation():
         sorted(perturbed ^ set(tf.ModelParams.settable())))
 
     universe = _universe(4)
+    probe_ticks, names = 2, 4
+
     def identity_holds(model):
         engine = tf.Engine(seed=SEED, universe=universe, model=model)
         engine.open_market()
-        engine.run_session(9, 30, 3, 2)
+        engine.run_session(9, 30, 3, probe_ticks)
         engine.record(0)
         engine.close_market()
         economy = engine.state_snapshot()["economy"]
@@ -572,63 +579,94 @@ def test_the_derivation_tracks_every_parameter_that_reaches_the_valuation():
         scale_now = economy["gdp"] * economy["cpi"] / base
         dial = model.to_dict()["earnings_nominal_growth"]
         scale = 1.0 + dial * (scale_now - 1.0)
+        opening = struct.unpack("<%dd" % names, engine.column("price"))
         engine.open_market()
-        engine.run_session(9, 30, 3, 2)
+        engine.run_session(9, 30, 3, probe_ticks)
         engine.record(1)
+        path = struct.unpack("<%dd" % (probe_ticks * names),
+                             engine.session_prices())
         truth = pa.table(engine.truth(day=1)).to_pydict()
         for row, slot in enumerate(truth["instrument_id"]):
+            tick = truth["tick"][row]
+            price = (opening[slot] if tick == 0
+                     else path[(tick - 1) * names + slot])
             got = truth["fundamental_value"][row]
-            want = _derived(universe[slot], economy, scale, model)
+            # The price is always supplied, so the derivation composes both
+            # terms. At a payout share of zero the factor is exactly 1.0 by
+            # its own branch, which makes the first pass below identical to
+            # deriving the nominal term alone.
+            want = _derived(universe[slot], economy, scale, model,
+                            price=price, day=1)
             if got != pytest.approx(want, rel=1e-9):
                 return False, (slot, got, want)
         return True, None
 
-    held, detail = identity_holds(tf.ModelParams.from_preset(
-        "pt-v18", buyback_payout_share=0.0))
-    assert held, ("the identity does not hold unperturbed, so nothing below "
-                  f"means anything: {detail}")
+    # TWO PASSES, at the payout share off and at the shipped value. One pass
+    # cannot see a dial that only bites when payouts are on, which is the
+    # PAIR problem the perturbation table itself carries three times: a dial
+    # that moves nothing because a second dial it depends on ships at zero.
+    # The table's own treatment is a comment per member, because a table
+    # cannot do better. A loop can, so this runs the loop twice.
+    #
+    # Two passes rather than a cross product. Conditional-on-payouts is the
+    # live case, and the general cross product is a much larger thing that
+    # nothing has asked for.
+    shares = (0.0, tf.ModelParams.from_preset(
+        "pt-v18").to_dict()["buyback_payout_share"])
+    assert shares[1] != 0.0, "the second pass would repeat the first"
+
+    for share in shares:
+        held, detail = identity_holds(tf.ModelParams.from_preset(
+            "pt-v18", buyback_payout_share=share))
+        assert held, ("the identity does not hold unperturbed at payout "
+                      f"share {share}, so nothing below means anything: "
+                      f"{detail}")
 
     broke, rejected, undeliverable, applied = [], [], [], 0
     for name, value, _expected in params_table.PERTURBATIONS:
         if name == "buyback_payout_share":
-            # Held at zero by this arm, so it cannot be perturbed here. Its
-            # own test supplies a price and derives both terms.
+            # Set by the pass rather than by the table, and both of its
+            # shipped states are covered by the two passes.
             continue
-        try:
-            model = tf.ModelParams.from_preset(
-                "pt-v18", **{name: value, "buyback_payout_share": 0.0})
-        except tf.ValidationError:
-            rejected.append(name)
-            continue
-        applied += 1
-        try:
-            held, detail = identity_holds(model)
-        except AssertionError:
-            # `_derived` refused the parameter by name rather than
-            # disagreeing with the engine quietly, which is the outcome
-            # UNDERIVABLE describes.
-            undeliverable.append(name)
-            continue
-        if not held:
-            broke.append((name, detail))
+        for share in shares:
+            try:
+                model = tf.ModelParams.from_preset(
+                    "pt-v18", **{name: value,
+                                 "buyback_payout_share": share})
+            except tf.ValidationError:
+                rejected.append(name)
+                continue
+            applied += 1
+            try:
+                held, detail = identity_holds(model)
+            except AssertionError:
+                # `_derived` refused the parameter by name rather than
+                # disagreeing with the engine quietly, which is the outcome
+                # UNDERIVABLE describes.
+                undeliverable.append(name)
+                continue
+            if not held:
+                broke.append((name, share, detail))
 
     assert broke == [], (
         "these parameters reach the valuation and the derivation does not "
-        f"model them: {[n for n, _ in broke]}. Add the term, or if the "
+        f"model them: {sorted({n for n, _, _ in broke})}. Add the term, or "
+        "if the "
         "parameter cannot reach fair value, the identity broke for another "
         f"reason and that is the finding. Detail: {broke[:3]}")
 
     # Both directions on the refusals, so UNDERIVABLE cannot become a list
     # of excuses: every refusal is one this file has stated a reason for,
     # and every stated reason still refuses.
-    assert sorted(undeliverable) == sorted(UNDERIVABLE), (
+    assert sorted(set(undeliverable)) == sorted(UNDERIVABLE), (
         undeliverable, sorted(UNDERIVABLE))
 
     # Every name in the table is settable, which the scope check above
     # already established, so nothing should have been refused.
     assert rejected == [], rejected
     # And the probe has to have run, or an empty sweep would pass silently.
-    assert applied == len(perturbed) - 1, (applied, len(perturbed))
+    assert applied == (len(perturbed) - 1) * len(shares), (
+        applied, len(perturbed), len(shares))
 
 
 def test_the_base_survives_a_restore():
