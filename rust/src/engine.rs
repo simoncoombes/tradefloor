@@ -835,10 +835,24 @@ impl Engine {
     /// its own: `run_session` and `tick` take no day, and only the caller
     /// that numbers its days does.
     ///
-    /// A label, not state the market reads: nothing in the tick, the close or
-    /// the macro chain consults it, so moving it cannot move a trajectory.
-    /// `open_market` is the only caller that must run before a draw is taken,
-    /// because the day mark and the day's news draws are taken there.
+    /// It was a label until pt-v18. The sentence here used to read that
+    /// nothing in the tick, the close or the macro chain consults it, so
+    /// moving it could not move a trajectory. `buyback_payout_share` made
+    /// that false: the buyback factor is an earnings yield over elapsed
+    /// time and this is the elapsed time, so under a preset that sets that
+    /// share, moving this number reprices every name.
+    ///
+    /// `open_market` is the only caller that must run before a draw is
+    /// taken, because the day mark and the day's news draws are taken
+    /// there, and `PyEngine::restore_state` pushes the restored day here
+    /// for the mid-day case that no open follows.
+    ///
+    /// The valuation and the draw log want different things from this
+    /// field, elapsed trading days and a label, and they coincide only
+    /// because one counter serves both. Giving the valuation its own
+    /// counter is the better answer and it costs a snapshot field and a
+    /// state-hash entry, beside a `day` key the snapshot already carries,
+    /// so it belongs to a preset boundary rather than to a fix inside one.
     pub fn set_current_day(&mut self, day: i64) {
         self.current_day = day;
         for id in 0..stream::COUNT as u32 {
@@ -1071,6 +1085,7 @@ impl Engine {
                 settle_draws,
                 settle_depth_counterfactual: self.settle_depth_counterfactual,
                 nominal_output_base: self.nominal_output_base,
+                elapsed_days: self.current_day,
                 params: &self.params,
             },
             rng,

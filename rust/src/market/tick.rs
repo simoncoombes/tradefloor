@@ -200,6 +200,84 @@ pub struct TickCompany {
     pub revenue_growth: Option<f64>,
 }
 
+/// Trading days in a year, the clock a market rate is quoted on.
+///
+/// Separate from the economy's 365 by intent. A buyback yield is earnings
+/// over a TRADED price, so it is an annual rate on the market's own
+/// calendar, and an `economy_days_per_year` that unified the macro clocks
+/// would leave this alone.
+pub const MARKET_DAYS_PER_YEAR: f64 = 252.0;
+
+/// The per-share factor a buyback yield has produced by `elapsed_days`.
+///
+/// A company returning a share of its earnings as net buybacks retires
+/// stock, so earnings and book per share grow faster than the company does,
+/// by the buyback yield `b = payout_share * eps / price`. That yield is
+/// earnings over price, so the mechanism pays more when the multiple is low
+/// and less when it is high, which is the behaviour a real buyback
+/// programme has and a flat premium does not.
+///
+/// # What is exact and what is not
+///
+/// The share count obeys `dS/S = -payout * eps(u)/P(u) du`, so the exact
+/// factor is the exponential of the payout share times the INTEGRAL of the
+/// earnings yield. This evaluates the yield at today's price and holds it
+/// over the elapsed time, which is the form the design states and needs no
+/// per-name accumulator. Measured against the integral on real price paths
+/// at pt-v18: over 252 days on 200 name-seeds the difference is +0.026
+/// points of annual index return at the median and +0.009 at the mean, and
+/// over 1008 days on 120 name-seeds it is -0.015 and -0.068. The multiple
+/// mean-reverts, so today's yield estimates the period's average yield at
+/// both horizons. The worst single name is 1.39 points over four years and
+/// the index averages forty of them with errors on both sides.
+///
+/// The yield reads the earnings the growth term has already restated, and
+/// not the earnings this factor itself restates. Solving for the
+/// self-consistent yield is a Lambert W with no bit-pinned implementation
+/// here, and the term it omits is second order: at 1.85 per cent over a
+/// year it understates the yield by 0.03 of a point, against a market
+/// price in the denominator that rises with the same buybacks and pushes
+/// the other way.
+///
+/// # The clamp on a loss-maker
+///
+/// A negative earnings yield would grow the share count, which is dilution
+/// rather than buyback, and a company cannot return earnings it does not
+/// have. So a loss-maker neither retires nor issues. That clamp does not
+/// carry the hazard this era keeps finding in one-sided terms: `eps` is
+/// fixed for a name at construction, so it selects a fixed share of the
+/// roster once rather than branching on a zero-mean quantity every day. On
+/// `Universe.random(40, seed=111)` it is 3 names of 40.
+pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days: i64) -> f64 {
+    if p.buyback_payout_share == 0.0 {
+        return 1.0;
+    }
+    let eps = match eps {
+        Some(e) if e > 0.0 && e.is_finite() => e,
+        _ => return 1.0,
+    };
+    if !(price > 0.0) || !price.is_finite() || elapsed_days <= 0 {
+        return 1.0;
+    }
+    let b = p.buyback_payout_share * eps / price;
+    mathx::exp(b * elapsed_days as f64 / MARKET_DAYS_PER_YEAR)
+
+/// The sector draw's DAILY sigma, which follows VIX when coupled, on the
+/// market factor's own target shape: variance scales with (VIX / anchor)^2,
+/// so sigma scales with its square root. A branch at zero keeps every
+/// preset before the coupling bit-identical; at the anchor the ratio is
+/// exactly 1.0 at any coupling. The draw count is unchanged, so the tape
+/// is too. Shared by the tick and the overnight move.
+pub fn sector_sigma_for(p: &ModelParams, economy: &EconomyState) -> f64 {
+    if p.sector_vix_coupling == 0.0 {
+        p.sector_factor_sigma
+    } else {
+        let ratio = economy.vix / p.market_vol_vix_anchor;
+        p.sector_factor_sigma
+            * mathx::sqrt(1.0 - p.sector_vix_coupling + p.sector_vix_coupling * (ratio * ratio))
+    }
+}
+
 /// The factor the valuation's fundamentals are restated by, from the
 /// economy's own integrated nominal output.
 ///
@@ -225,22 +303,6 @@ pub struct TickCompany {
 /// engine builds; it is here because a caller may construct
 /// [`TickInputs`] directly, and a NaN entering the valuation would freeze
 /// every book downstream with no indication of where it came from.
-/// The sector draw's DAILY sigma, which follows VIX when coupled, on the
-/// market factor's own target shape: variance scales with (VIX / anchor)^2,
-/// so sigma scales with its square root. A branch at zero keeps every
-/// preset before the coupling bit-identical; at the anchor the ratio is
-/// exactly 1.0 at any coupling. The draw count is unchanged, so the tape
-/// is too. Shared by the tick and the overnight move.
-pub fn sector_sigma_for(p: &ModelParams, economy: &EconomyState) -> f64 {
-    if p.sector_vix_coupling == 0.0 {
-        p.sector_factor_sigma
-    } else {
-        let ratio = economy.vix / p.market_vol_vix_anchor;
-        p.sector_factor_sigma
-            * mathx::sqrt(1.0 - p.sector_vix_coupling + p.sector_vix_coupling * (ratio * ratio))
-    }
-}
-
 pub fn nominal_scale(p: &ModelParams, economy: &EconomyState, base: f64) -> f64 {
     if p.earnings_nominal_growth == 0.0 {
         return 1.0;
@@ -437,6 +499,14 @@ pub struct TickInputs<'a> {
     /// single-tick caller passes this tick's own, which makes the ratio
     /// 1.0 and the valuation the one every earlier preset computes.
     pub nominal_output_base: f64,
+    /// Trading days this run has closed, which is the buyback factor's
+    /// clock.
+    ///
+    /// Read only by [`buyback_scale`], and only when
+    /// `buyback_payout_share` is nonzero, which is pt-v18 and no preset
+    /// before it. A single-tick caller passes 0, which makes the factor
+    /// 1.0 and the valuation the one every earlier preset computes.
+    pub elapsed_days: i64,
     /// The model coefficients (the runtime seam, CALIBRATION.md §5). The
     /// engine passes its own; a caller building `TickInputs` directly
     /// passes [`crate::params::PT_V1`] for the shipped model, which is
@@ -827,10 +897,19 @@ pub fn simulate_market_tick(
         // A BRANCH rather than a multiply by 1.0. The two agree on every
         // finite value, and the branch is what the preset contract rests
         // on rather than on an argument about how floats behave.
-        let valuation = if nominal == 1.0 {
+        let grown = if nominal == 1.0 {
             companies[idx].valuation()
         } else {
             scale_valuation(companies[idx].valuation(), nominal)
+        };
+        // Per NAME, unlike the growth term above: the yield is this
+        // company's own earnings over its own price. A BRANCH at 1.0 for
+        // the same reason as the one above.
+        let buyback = buyback_scale(p, grown.eps, current_prices[i], inputs.elapsed_days);
+        let valuation = if buyback == 1.0 {
+            grown
+        } else {
+            scale_valuation(grown, buyback)
         };
         let breakdown = compute_fair_value_with(
             &valuation, &econ_view, p.fair_value_book_floor,

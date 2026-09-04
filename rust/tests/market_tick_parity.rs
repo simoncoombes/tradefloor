@@ -300,6 +300,10 @@ fn check_scenario(file: &str) {
                 // nowhere; this tick's own value is what a single-tick
                 // caller opens at.
                 nominal_output_base: economy.gdp * economy.cpi,
+                // Trading days closed. The buyback factor is off on
+                // every preset these tests pin, so it is read
+                // nowhere; 0 is what a single-tick caller opens at.
+                elapsed_days: 0,
                 params: &tradefloor::params::PT_V1,
             },
             &mut rng,

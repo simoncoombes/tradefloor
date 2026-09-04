@@ -360,6 +360,12 @@ PERTURBATIONS = [
     # draws BY running the economy, so the count is the mechanism rather
     # than a side effect of it.
     ("macro_burn_in_days", 30.0, True),
+    # The share of earnings returned as net buybacks. It reaches the
+    # valuation on the first tick that has a day behind it, and the probe's
+    # first tick is day 0, where the elapsed time is zero and the factor is
+    # exactly 1.0. Over the probe's three days it bites on the second and
+    # third, so the market moves.
+    ("buyback_payout_share", 0.5, True),
     # The overnight move's variance as a fraction of a session's. It moves
     # the market from the second day's open: a name has no `s` before its
     # first tick, so the first session opens where it always did, and every
