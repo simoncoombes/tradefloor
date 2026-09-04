@@ -1577,17 +1577,29 @@ leaf or root compares unequal to a re-run and says nothing, which is the
 case to plan for. An old snapshot put through `manifest.py` is refused
 loudly and told what is missing, by width for the generator, the counts
 and the attribution, and by name for the economy key. An old snapshot
-restored into the engine is accepted: the eighth generator takes the
-position the engine derived from its seed, the counts are padded from
-there and a nine-wide attribution restores with the tenth slot at zero,
-all by the convention the generator ladder already used, while a missing
-economy key is skipped and keeps the value the engine constructed. That
-last case is issue #184, open and undecided.
+restored into the engine is accepted, by the restore's stream ladder:
+every stream added since the split restores from the snapshot when the
+array is long enough to hold it and otherwise keeps the position this
+engine derived from its seed, at 12 numbers for jumps, 15 for volume, 18
+for news, 21 for per-name volume and now 24 for overnight. So the eighth
+generator takes its seed-derived position, the counts are padded from
+that same position, and a nine-wide attribution restores with the tenth
+slot at zero.
+
+A missing economy key behaves differently and worse. `econ_get!` reads
+each field with an optional lookup, so a key the dict does not carry is
+skipped in silence: a snapshot written before this release restores with
+`phase_gdp_target` holding the midpoint the engine constructed, in place
+of the value the run had. Nothing is raised and nothing is logged. At
+the dials' zero nothing reads the field, so no shipped preset is
+affected. That is issue #184, open and undecided.
 
 Neither moves the three known-answer digests, measured on both branches
-rather than argued. That is a property of what those digests cover rather
-than of these changes: the simulation digest covers a trajectory and the
-metadata digest covers the nine reported coefficients, and neither reads
+rather than argued, on four clean builds for the snapshot widening and on
+the gate for the state field. That is a property of what those digests
+cover rather than of these changes: the simulation digest covers a
+trajectory and the metadata digest covers the nine reported coefficients,
+and neither reads
 the snapshot's layout. So a green determinism gate is not evidence that a
 stored artefact survives, and two independent widenings landing in one
 release is what made the gap visible.
