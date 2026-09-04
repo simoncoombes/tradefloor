@@ -4,18 +4,8 @@
 
 **Every `Universe.random` roster re-rolls**; pin 0.6.2.
 
-**A settable law makes order-flow impact keep responding to size past ten
-times a name's average minute volume**, where the shipped multiplier stops.
-`order_flow_impact_law` at 1.0 unclamps that law at both ends and crosses
-it to a square root at the knee.
-
-It ships at 0.0, no preset turns it on, and the three known-answer digests
-do not move. The repair changes what the library tells a user a trade costs
-rather than what the market does, because the order-flow channel is
-reachable only through injected flow.
-
-Two limits. Where the repair's range ends is a property of the name, and
-past that point a quoted cost reports where the session breaker sits.
+**A settable law keeps order-flow impact responding past ten times average
+minute volume**: `order_flow_impact_law`.
 
 **A new preset, pt-v18, returns five first moments the model injected and
 grows fair value with nominal output**, taking the equal-weight index from
@@ -73,6 +63,15 @@ Toth, Lemperiere, Deremble, de Lataillade, Kockelkoren and Bouchaud
 (Risk 18(7) 58-62, 2005) measure 0.6 on the same object. The crossover is
 the first paper's own claim: they derive the square root from their
 linear model by a scaling argument, in their abstract.
+
+At 1.0 the dial unclamps that law at both ends and crosses it to a square
+root at the knee. It ships at 0.0, no preset turns it on, and the three
+known-answer digests do not move. The repair changes what the library
+tells a user a trade costs rather than what the market does, because the
+order-flow channel is reachable only through injected flow.
+
+Two limits. Where the repair's range ends is a property of the name, and
+past that point a quoted cost reports where the session breaker sits.
 
 Measured on two rosters, six names on seed 3 and twelve on seed 11, thirty
 seeds each, reading the accumulated `order_flow_impact` attribution before
