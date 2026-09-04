@@ -416,7 +416,8 @@ def one(job):
 
 
 def summarise(kind: str, rows: list[dict]) -> str:
-    med = {k: st.median([r[k] for r in rows if r.get(k) is not None]) for k in rows[0]}
+    med = {k: facts.aggregate_value(k, [r[k] for r in rows if r.get(k) is not None])
+           for k in rows[0] if any(r.get(k) is not None for r in rows)}
     if kind == "driven":
         return (f"  driven 2020-21 ({len(rows)} seeds): return sd "
                 f"{med['ret_sd']:.4f} vs real AAPL {med['real_ret_sd']:.4f} "
@@ -430,10 +431,13 @@ def summarise(kind: str, rows: list[dict]) -> str:
                 f"xs {med['cross_sectional_corr']:.3f} kurt {med['excess_kurtosis']:.2f} "
                 f"vol {med['annualised_vol_pct']:.1f}")
     days = 504 if kind == "p504" else 252
-    sc = envelope.score(med, horizon_days=days)["statistics"]
-    out = [k for k, v in sc.items() if not v.get("in_band", True)]
-    n = len(facts.REAL_MARKETS)
-    return (f"  {kind:12s} {days}d ({len(rows)} seeds): {n - len(out)}/{n} in band; vol "
+    scored = envelope.score(med, horizon_days=days)
+    sc = scored["statistics"]
+    out = [k for k, v in sc.items() if not v.get("in_band", True) and k in facts.SHAPE]
+    level = [f"{k} {med[k]:+.2f}" for k in facts.LEVEL if k in med]
+    n = len(facts.SHAPE)
+    return (f"  {kind:12s} {days}d ({len(rows)} seeds): {n - len(out)}/{n} shape in band; "
+            f"level {', '.join(level) or 'n/a'}; vol "
             f"{med['annualised_vol_pct']:.1f} kurt {med['excess_kurtosis']:.2f} xs "
             f"{med['cross_sectional_corr']:.3f} sector_ex {med['sector_excess_corr']:+.4f} "
             f"persist {med['corr_persistence_acf1']:+.3f} acf1/5/20 {med['abs_return_acf1']:.3f}/"

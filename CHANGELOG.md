@@ -9,8 +9,8 @@ grows fair value with nominal output**, taking the equal-weight index from
 -16.150 per cent a year to -0.340 as a portfolio return, on a roster six
 points dearer than the population. The default preset is where it was.
 
-**The index drift row reports a daily-rebalanced portfolio return**, about
-two points above the log convention the decompositions use.
+**The index drift and two fear rows are graded**, and the certified set
+splits into shape, level and crisis.
 
 **A run can commit to the state it held at the end of every day**, and a
 sampled check verifies k days for that cost.
@@ -38,6 +38,69 @@ checked for its draw effect and proven inert.
 replays from the state the day started in.
 
 <!-- release-note-ends -->
+
+### The graded level row and the split of the certified set
+
+The panel's first moment, `index_drift_pct`, was measured and reported
+and deliberately not graded, because no band for it had been derived.
+Its band is now derived from real series through `tools/shadow/data.py`,
+which keeps the unadjusted close beside the adjusted one and accepts
+sessions before 1970: `^GSPC` from 1950 gives the cap-weighted price
+return, +7.75 a year as the mean of 75 calendar-year log returns with a
+standard error of 1.87; `RSP` on its unadjusted close against `^GSPC`
+gives the equal-weight premium in price terms, -0.38 over 22 calendar
+years with a standard error of 1.24, and `^SPXEW` cross-checks it at
+-0.85. The centre is 7.37 with a standard error of 2.25, and the band is
+the centre plus or minus the larger of two standard errors and the
+model's own resolution at thirty seeds, so 2.9 to 11.9. The derivation
+is `tools/calibration/index_band.py` and the provenance in
+`facts.REAL_MARKETS_PROVENANCE` is three URLs and a fetch date. A band
+chosen so the current model passes was refused.
+
+The certified set splits along `facts.SHAPE`, `facts.LEVEL` and
+`facts.CRISIS`. The fourteen shape rows fill `envelope.CERTIFIED` and a
+green panel means what it meant. The level row is read as a thirty-seed
+mean (`facts.AGGREGATE`), because its seed standard deviation of about
+6.5 points a year is a large fraction of its band, and its certified
+value goes in `envelope.CERTIFIED_LEVEL`, held red until the model earns
+it; `envelope.score` reports the counts per group, `envelope.certified`
+and `describe_simulator` carry the groups and name a row whose certified
+value is not yet measured, and `report` prints the level in its own
+section. The rows stay structural in the loss until `facts.SEED_SD`
+carries their seed sds on the pinned protocol, at which point they join
+the live targets so that a search charges for the level it moves.
+
+The level row's protocol varies the roster with the seed,
+`facts.LEVEL_PROTOCOL`: a level is a property of the roster as much as
+of the model, the held roster opens 0.78 of a population standard
+deviation above fair value, and its first-year handicap exceeds the
+band's half-width, so thirty market seeds on one roster would certify
+that roster. The certified value is the mean over seeds 101 to 130 of a
+run on `Universe.random(40, seed=s)` with market seed `s`.
+
+### The fear gauge rows
+
+`fear_gauge_dn1` and `fear_gauge_dn3` read the median change in the
+volatility index on sessions whose cap-weighted close-to-close return is
+at or below -1 and -3 percent. Two rows because the defect is a channel
+that saturates on the down side: a graded row on the -3 percent bucket
+alone would have scored it as mildly out of band for three eras, and
+mildly out of band is the verdict that gets tuned at rather than fixed;
+the -1 percent row reads inside its band on the same model. The -3
+percent row is pooled across the certification seeds, because about a
+third of 252-day runs hold no such session, and it reports its session
+count beside its value. `measure` records each day before the close, so
+the macro row for day d holds the gauge the session opened with and the
+change answering session d is row d+1 minus row d; `fear_statistics`
+pairs them that way and a test pins the convention with two correlations
+that swap under the wrong pairing. The bands come from `^VIX` against
+`^GSPC` since 1990 through `tools/calibration/fear_band.py`: the -1
+percent row by the panel's shared rule over its ten windows, 0.70 to
+4.03; the -3 percent row across every window since 1990 holding at
+least five such sessions, 2.60 to 9.58, with the pooled median of +5.73
+agreeing with the +6.03 the engine cites from FRED. A -5 percent bucket
+and the up-side response are reported without bands. Every free-run
+figure is held to its free-run value and never to a solved one.
 
 ### A generated roster opens at its own fair value
 
@@ -524,17 +587,31 @@ statement of the defect being gone. The day-251 median is 93.1, against the
 the difference is the inventory pressure, the dollar drag and the OPEC
 rule, which the compounding factor used to dominate.
 
-The certified panel moves, and the row that moves it does not resolve. Over
-seeds 101 to 110 the arm without the dial reads 13 of 14 and the arm with
-it 14 of 14, while pt-v18 as it ships, carrying the cycle dial as well,
-reads 13 of 14 again. One row decides all three. The leverage effect has a
-ceiling of exactly 0.00 and reads +0.0035, -0.0005 and +0.0038 across
-those arms, on an across-seed noise of 0.0760 and a per-seed spread of
-0.029 at ten seeds, with between five and seven of the ten seeds above the
-ceiling in every arm. The whole excursion is 0.004, a twentieth of the
-row's own noise. That row has sat outside its band since the oil supply
-commit, and these figures say it straddles a ceiling at a resolution ten
-seeds cannot settle.
+The certified panel moves, and the row that moves it cannot be decided
+here. Over seeds 101 to 110 the arm without the dial reads 13 of 14 and
+the arm with it 14 of 14, while pt-v18 as it ships, carrying the cycle
+dial as well, reads 13 of 14 again. One row decides all three: the
+leverage effect, at +0.0035, -0.0005 and +0.0038 against a ceiling of
+exactly 0.00, on an across-seed noise of 0.0769 and a per-seed spread of
+0.029 at ten seeds, with between five and seven of the ten seeds above
+the ceiling in every arm. Those three arms span 0.0043, a twentieth of
+the row's own noise, so ten seeds cannot say which side of a boundary at
+zero this model belongs on.
+
+The ceiling is the larger term and it describes the band's derivation.
+`REAL_MARKETS_PROVENANCE` records that this band's top was derived at
++0.05 and clamped INWARD to 0.00, because every retrieved source agrees
+the effect's sign is negative and a top above zero would certify a
+reversed leverage effect as real-market behaviour. The nine non-crisis
+reference windows run -0.113 to +0.014, and the single positive reading
+is the 2020-21 meme-stock year. So the clamp moves the boundary by 0.05,
+eleven times the 0.0043 these arms span, and the clamp decides the
+verdict while the model's own level stays far inside it.
+
+The derivation record states that the two inward clamps it needed decide
+no current verdict. On this era's arms the leverage clamp decides every
+one of them, and each verdict this section reports for that row, in
+either direction, is a reading of the clamp.
 
 The thirty-seed distribution and the four-year arm are measured elsewhere,
 because neither runs on one machine.
@@ -790,6 +867,46 @@ yield, which is the property that separates it from a flat premium.
 
 The certified panel reads 14 of 14 over seeds 101 to 110, and its own drift
 row, a portfolio return, reads +4.193.
+
+### The sequential base and two misattributed figures
+
+Each step in this era was measured against the branch as it stood when that
+step landed. That is the right thing for a changelog, which describes commits,
+and the wrong thing for a decomposition, which describes mechanisms: a step
+measured against a moving base carries whatever else moved with it.
+
+Two figures above are affected. The burn-in's +0.363 was measured against the
+neutral rate as it then stood, at 0.0456, while the burn-in's own commit moved
+that rate to 0.0482. Isolated, with the rate held on both sides over thirty
+seeds, the burn-in reads -0.028 and the rate step carries the figure. And the
+oil rows are worth MORE than they are credited here, because the sequential
+measurement charged part of each to whatever landed next.
+
+The burn-in still does what its own falsifier said. The economy after
+construction opens at the corner its dynamics reach, at unemployment 2.50
+against 4.00. What it does not do is move the index.
+
+### The one-year horizon of every figure above
+
+Six of the era's terms have now been measured at 1008 days as well as 252,
+and they do not behave alike. A term working through the mispricing is a
+ONE-OFF LEVEL SHIFT, because `s` is a stationary process and a persistent
+injection settles at an offset rather than drifting; removing it buys that
+offset once. The tilt keeps 0.28 of its one-year worth when annualised over
+four and the oil seasonality keeps 0.11.
+
+A term working through fair value compounds: the growth term keeps 0.88. A
+term changing the cycle clock is worth exactly nothing inside a certified year
+and +1.824 a year over four, which makes it the second largest term at that
+horizon having been the smallest at this one.
+
+The buyback yield is not among the six. It is measured at 252 days only, and
+a term paying an earnings yield out of a mean-reverting multiple has no reason
+to behave like either group without being measured at the longer horizon.
+
+So the era is worth about +18 at a certified year and about +10 annualised
+over four, with a different ranking. A reader applying this section to a
+multi-year study gets both the size and the order wrong.
 
 ### The commit the measurements name
 
