@@ -858,10 +858,25 @@ pub struct ModelParams {
     /// At 1.0 the target is drawn once on phase entry, uniformly over the
     /// range the table already declares, and held for the phase. The
     /// contraction range is (-3.0, 0.0), whose uniform mean is its own
-    /// midpoint, so this is expected to widen the depth distribution
-    /// without moving its median. Between the ends the draw is scaled
-    /// toward the midpoint. No constant is invented: the numbers are the
-    /// ones the table states.
+    /// midpoint, so this widens the depth distribution without moving its
+    /// median. Measured over thirty seeds at a hundred years: the median
+    /// moves 0.06 and episodes past a three per cent fall go from 20 to 34
+    /// of about 450. Between the ends the draw is scaled toward the
+    /// midpoint. No constant is invented: the numbers are the ones the
+    /// table states.
+    ///
+    /// # Zero on every preset until the four items are composed
+    ///
+    /// This is the era's one shippable dial for the recession item and it
+    /// is still 0.0 in pt-v18, deliberately. Four items are landing dials
+    /// into one preset and each is measured alone, so a preset assembled
+    /// by turning them on one at a time has no arm that sees the pair
+    /// terms. This item supplies the evidence for that rule rather than an
+    /// exception to it: its two dials each improve the depth spread alone
+    /// and together they are worse than neither, because the pair
+    /// eliminates shallow recessions. Two dials from ONE item already did
+    /// it. Composition is one step, measured together, and it belongs to
+    /// whoever runs it.
     pub phase_target_range_draw: f64,
     /// The corporate bond yield at which the target multiple sits exactly
     /// on its sector anchor. 0.04 -- every preset before pt-v18 -- is the
@@ -3035,11 +3050,6 @@ impl ModelParams {
         // change inside 63 per cent of certified years against 3. Read
         // per month on the 30-day month the phase clock already keeps.
         p.cycle_hazard_per_month = 1.0;
-        // Every phase declares a growth range and both read sites took its
-        // midpoint, so the declared width did nothing and an episode's
-        // depth was a length times one shock draw spanning 2.0 to 3.0.
-        // Drawn from the range the table already states.
-        p.phase_target_range_draw = 1.0;
         // The valuation was neutral at a 4.00 per cent discount rate and
         // the economy opens at a corporate yield of 4.56, so every
         // profitable name opened about one per cent below the price the

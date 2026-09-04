@@ -1523,13 +1523,19 @@ both of which took `(lo + hi) / 2.0`, so the declared width did nothing.
 `phase_target_range_draw` draws the target once on phase entry, uniformly
 over the range the table already states, and holds it for the phase. Over
 thirty seeds at a hundred years it widens the depth distribution without
-moving its median, which is what a uniform draw over (-3.0, 0.0) should
-do: the median moves 0.06 and episodes past a three per cent fall go from
-20 to 34 of about 450.
+moving its median. A uniform draw over (-3.0, 0.0) has the midpoint as its
+mean, so the median was expected to hold: it moves 0.06, and episodes past
+a three per cent fall go from 20 to 34 of about 450.
+
+Both dials are 0.0 on every preset, pt-v18 included. Four items are
+landing dials into one preset and each is measured alone, so a preset
+assembled by turning them on one at a time has no arm that sees the pair
+terms. This item is the evidence for that rather than an exception to it,
+as the last paragraph here shows.
 
 `trough_growth_floor` moves the trough's range floor from -1.0 to 0.0. It
-is 0.0 on every preset including pt-v18, and it is kept rather than
-deleted because its measurement is why the next change is known.
+stays in the surface rather than being deleted, because its measurement is
+why the next change is known.
 
 It was built to close the nine points between the engine's two frequency
 rulers, the share of days in a contraction against the share with output
