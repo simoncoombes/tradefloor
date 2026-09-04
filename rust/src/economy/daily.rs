@@ -101,6 +101,14 @@ pub struct DailyInputs<'a> {
     pub vix_return_gain_up: f64,
     pub vix_return_clamp: f64,
     pub vix_target_shock_cap: f64,
+    /// Upper bound on the VIX state. See `ModelParams::vix_ceiling`, which
+    /// carries the reasoning; 80.0 reproduces the literal this replaces.
+    pub vix_ceiling: f64,
+    /// A constant added to the VIX target BEFORE the realised-volatility
+    /// blend, so it is scaled by `1 - vix_realised_vol_weight` exactly as the
+    /// anchor is. See `ModelParams::vix_target_offset`, which carries the
+    /// reasoning and the limitation.
+    pub vix_target_offset: f64,
     /// Monthly fraction of the inflation gap closed toward the 2% target.
     /// Threaded like `vix_mean_reversion`: the shipped 0.55 was a literal
     /// inside the inflation update, which made inflation's persistence and
@@ -178,6 +186,8 @@ impl<'a> Default for DailyInputs<'a> {
             inflation_floor: INFLATION_FLOOR,
             crisis_vix_threshold: CRISIS_VIX_THRESHOLD,
             usd_crisis_vix_threshold: CRISIS_VIX_THRESHOLD,
+            vix_ceiling: 80.0,
+            vix_target_offset: 0.0,
             daily_credit_floor_gain: 0.0,
             oil_supply_response: 0.0,
             oil_opec_symmetry: 0.0,
@@ -823,6 +833,17 @@ pub fn update_economy_daily(
     // back, so the VIX was a function of the business cycle and not of the
     // market: it tracked trailing realised volatility at +0.28 against a
     // real +0.82, and never once crossed its own crisis threshold in a year
+    // A constant level on the target, before the blend, so it scales by
+    // `1 - weight` exactly as the phase anchor does. It exists because an
+    // ASYMMETRIC return gain injects a standing positive excursion, and the
+    // offset cancels it. Guarded rather than added: `x + 0.0` is not a no-op
+    // on a negative zero, which is the same reason `apply_jumps` guards its
+    // own total, and a dial that ships inert must leave the state it does not
+    // touch bit-identical.
+    if inputs.vix_target_offset != 0.0 {
+        target_vix += inputs.vix_target_offset;
+    }
+
     // (§68). At weight zero this branch is not taken and every preset
     // reproduces bit for bit.
     if inputs.vix_realised_vol_weight != 0.0 {
@@ -858,7 +879,7 @@ pub fn update_economy_daily(
             + random_normal(rng, 0.0, 0.15 * volatility)
             + fear_jump,
         10.0,
-        80.0,
+        inputs.vix_ceiling,
     );
 
     // ── Treasury yields ───────────────────────────────────────────────────

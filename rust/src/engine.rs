@@ -1740,6 +1740,8 @@ impl Engine {
                 vix_return_gain_up: self.params.vix_return_gain_up,
                 vix_return_clamp: self.params.vix_return_clamp,
                 vix_target_shock_cap: self.params.vix_target_shock_cap,
+                vix_ceiling: self.params.vix_ceiling,
+                vix_target_offset: self.params.vix_target_offset,
                 inflation_reversion: self.params.inflation_reversion,
                 inflation_ceiling: self.params.inflation_ceiling,
                 inflation_floor: self.params.inflation_floor,
