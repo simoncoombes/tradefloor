@@ -730,6 +730,42 @@ about 0.7 points more. That value is the median of a distribution, so it
 would be a fitted constant, and oil's resting point is what would make it
 derivable.
 
+### The sequential base and two misattributed figures
+
+Each step in this era was measured against the branch as it stood when that
+step landed. That is the right thing for a changelog, which describes commits,
+and the wrong thing for a decomposition, which describes mechanisms: a step
+measured against a moving base carries whatever else moved with it.
+
+Two figures above are affected. The burn-in's +0.363 was measured against the
+neutral rate as it then stood, at 0.0456, while the burn-in's own commit moved
+that rate to 0.0482. Isolated, with the rate held on both sides over thirty
+seeds, the burn-in reads -0.028 and the rate step carries the figure. And the
+oil rows are worth MORE than they are credited here, because the sequential
+measurement charged part of each to whatever landed next.
+
+The burn-in still does what its own falsifier said. The economy after
+construction opens at the corner its dynamics reach, at unemployment 2.50
+against 4.00. What it does not do is move the index.
+
+### The one-year horizon of every figure above
+
+Six of the era's terms have now been measured at 1008 days as well as 252,
+and they do not behave alike. A term working through the mispricing is a
+ONE-OFF LEVEL SHIFT, because `s` is a stationary process and a persistent
+injection settles at an offset rather than drifting; removing it buys that
+offset once. The tilt keeps 0.28 of its one-year worth when annualised over
+four and the oil seasonality keeps 0.11.
+
+A term working through fair value compounds: the growth term keeps 0.88. A
+term changing the cycle clock is worth exactly nothing inside a certified year
+and +1.824 a year over four, which makes it the second largest term at that
+horizon having been the smallest at this one.
+
+So the era is worth about +18 at a certified year and about +10 annualised
+over four, with a different ranking. A reader applying this section to a
+multi-year study gets both the size and the order wrong.
+
 ### The commit the measurements name
 
 Every figure in the section above was measured on a build of a commit
