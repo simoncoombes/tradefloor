@@ -1567,10 +1567,10 @@ impl Engine {
             return;
         }
         let p = &self.params;
-        let scale = mathx::sqrt(ratio);
+        let scale = crate::mathx::sqrt(ratio);
         let market_sigma_daily = self.market_vol.sigma_daily();
         let sector_sigma = crate::market::tick::sector_sigma_for(p, &self.economy);
-        let econ_view = EconomyValuationInputs {
+        let econ_view = crate::fair_value::EconomyValuationInputs {
             corporate_bond_yield: Some(self.economy.corporate_bond_yield),
             federal_funds_rate: self.economy.federal_funds_rate,
             qe_pe_boost: Some(self.economy.qe_pe_boost),
@@ -1593,7 +1593,8 @@ impl Engine {
                 }
                 None => 0.0,
             };
-            let daily_sigma = mathx::sqrt(mathx::max(company.stock.garch_variance, 0.0001));
+            let daily_sigma =
+                crate::mathx::sqrt(crate::mathx::max(company.stock.garch_variance, 0.0001));
             let idio = daily_sigma
                 * crate::market::factors::idio_scale_for(p, beta)
                 * crate::market::factors::cap_size_multiplier_with(p, company.stock.market_cap)
@@ -1617,12 +1618,15 @@ impl Engine {
             } else {
                 crate::market::tick::scale_valuation(company.valuation(), nominal)
             };
-            let fv = compute_fair_value_with(
+            let fv = crate::fair_value::compute_fair_value_with(
                 &valuation, &econ_view, p.fair_value_book_floor,
                 p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate,
             )
             .fair_value;
-            let price = mathx::min(mathx::max(fv * mathx::exp(after), 0.01), p.price_hard_cap);
+            let price = crate::mathx::min(
+                crate::mathx::max(fv * crate::mathx::exp(after), 0.01),
+                p.price_hard_cap,
+            );
             company.stock.price = price;
             company.stock.market_cap = price * company.stock.shares_outstanding;
         }
