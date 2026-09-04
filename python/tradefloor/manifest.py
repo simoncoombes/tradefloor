@@ -191,7 +191,7 @@ _ECONOMY_FIELDS = (
     "previous_day_market_return", "rolling_market_return_30d",
     "market_pe", "qe_pe_boost",
     "fiscal_stimulus", "government_debt_to_gdp",
-    "months_in_current_phase", "recession_probability",
+    "months_in_current_phase", "phase_gdp_target", "recession_probability",
 )
 
 #: Every key the economy sub-dict carries: the scalars above, the four-point

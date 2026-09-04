@@ -1764,6 +1764,8 @@ impl Engine {
                 oil_supply_response: self.params.oil_supply_response,
                 oil_opec_symmetry: self.params.oil_opec_symmetry,
                 oil_seasonality_target: self.params.oil_seasonality_target,
+                trough_growth_floor: self.params.trough_growth_floor,
+                phase_target_range_draw: self.params.phase_target_range_draw,
                 volatility: request.volatility,
                 active_shocks: request.active_shocks,
                 market_return_pct: request.market_return_pct,
@@ -2725,7 +2727,7 @@ impl Engine {
         hash_opt_f64(&mut buf, e.market_pe);
         for value in [e.qe_pe_boost, e.fiscal_stimulus,
                       e.government_debt_to_gdp, e.months_in_current_phase,
-                      e.recession_probability] {
+                      e.phase_gdp_target, e.recession_probability] {
             hash_f64(&mut buf, value);
         }
         for value in e.gdp_trend {

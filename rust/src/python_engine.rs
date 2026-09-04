@@ -2687,7 +2687,7 @@ impl PyEngine {
             previous_day_market_return, rolling_market_return_30d,
             market_pe, qe_pe_boost,
             fiscal_stimulus, government_debt_to_gdp,
-            months_in_current_phase, recession_probability,
+            months_in_current_phase, phase_gdp_target, recession_probability,
         );
         econ.set_item("gdp_trend", economy.gdp_trend.to_vec())?;
         econ.set_item("cycle_phase", economy.cycle_phase.as_str())?;
@@ -3025,7 +3025,7 @@ impl PyEngine {
                 previous_day_market_return, rolling_market_return_30d,
                 market_pe, qe_pe_boost,
                 fiscal_stimulus, government_debt_to_gdp,
-                months_in_current_phase, recession_probability,
+                months_in_current_phase, phase_gdp_target, recession_probability,
             );
             if let Some(v) = d.get_item("gdp_trend")? {
                 let trend: Vec<f64> = v.extract()?;

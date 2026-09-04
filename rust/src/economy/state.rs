@@ -305,6 +305,14 @@ pub struct EconomyState {
     // Cycle
     pub cycle_phase: CyclePhase,
     pub months_in_current_phase: f64,
+    /// The growth rate this phase is pulling toward, held for the phase.
+    ///
+    /// Written on a phase change and read at the monthly and quarterly
+    /// updates. Under every preset before pt-v18 the two read sites take
+    /// `(lo + hi) / 2.0` of the phase's declared range and never look
+    /// here, so this stays at its initial value and no behaviour reads
+    /// it. See [`crate::params::ModelParams::phase_target_range_draw`].
+    pub phase_gdp_target: f64,
     pub recession_probability: f64,
 }
 
@@ -432,6 +440,14 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
 
         cycle_phase,
         months_in_current_phase: 0.0,
+        // The opening phase is GIVEN rather than entered, so it takes the
+        // declared midpoint even when the draw is on. Nothing reads this
+        // until the first phase change under `phase_target_range_draw`,
+        // and nothing reads it at all when that dial is 0.0.
+        phase_gdp_target: {
+            let r = phase_characteristics(cycle_phase).gdp_growth_range;
+            (r.0 + r.1) / 2.0
+        },
         recession_probability: match cycle_phase {
             CyclePhase::Contraction => 0.5,
             CyclePhase::Trough => 0.3,

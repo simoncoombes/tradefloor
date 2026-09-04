@@ -346,6 +346,14 @@ PERTURBATIONS = [
     # draws until day 180 and the probe runs three. Over 252 days it bites,
     # and what separates the arms is the count of seeds that leave expansion.
     ("cycle_hazard_per_month", 0.5, False),
+    # Both wait on a phase the probe never reaches. The floor moves only
+    # the trough's growth range, and a certified year reaches no trough at
+    # all, let alone three days from an opening expansion. The draw is taken
+    # on a phase-change day and the engine opens at zero months in phase
+    # with a six-month minimum, so the probe sees neither the draw nor its
+    # effect, and it consumes no economy draws over the three days.
+    ("trough_growth_floor", 0.5, False),
+    ("phase_target_range_draw", 0.5, False),
     # The yield at which the target multiple sits on its sector anchor.
     # 0.05 rather than either shipped value: 0.04 is the default this probe
     # perturbs and 0.0456 is pt-v18's, and an entry landing on a named

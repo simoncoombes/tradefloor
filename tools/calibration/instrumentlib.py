@@ -172,6 +172,8 @@ PARAM_SPECS: dict[str, dict] = {
     # the phase clock keeps, and past 1.0 the cycle runs slower than its own
     # scale states.
     "cycle_hazard_per_month": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "trough_growth_floor": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "phase_target_range_draw": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # The yield at which the target multiple sits on its sector anchor. A
     # LOG box like the other rate-like dials, and no explicit hard range,
     # because it ships at 0.04 rather than at zero and the calibration

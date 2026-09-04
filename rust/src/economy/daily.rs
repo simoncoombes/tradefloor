@@ -53,6 +53,38 @@ fn random_normal(rng: &mut impl Rng, mean: f64, std_dev: f64) -> f64 {
     mean + rng.next_normal() * std_dev
 }
 
+/// The phase's growth range as the dials leave it.
+///
+/// Only the trough declares a negative floor under a positive top, and
+/// only its floor moves. At 0.0 the table's own tuple is returned by a
+/// BRANCH rather than by arithmetic, so every preset before pt-v18 reads
+/// the identical pair of doubles.
+fn effective_gdp_range(
+    phase: &PhaseCharacteristics,
+    cycle: CyclePhase,
+    trough_floor: f64,
+) -> (f64, f64) {
+    if trough_floor == 0.0 || cycle != CyclePhase::Trough {
+        phase.gdp_growth_range
+    } else {
+        let (lo, hi) = phase.gdp_growth_range;
+        (lo * (1.0 - trough_floor), hi)
+    }
+}
+
+/// The growth rate a phase pulls toward.
+///
+/// At `range_draw` 0.0 this is the declared range's midpoint, which is
+/// what both read sites computed before the dial existed, and the stored
+/// per-phase value is not read at all.
+fn phase_growth_target(stored: f64, range: (f64, f64), range_draw: f64) -> f64 {
+    if range_draw == 0.0 {
+        (range.0 + range.1) / 2.0
+    } else {
+        stored
+    }
+}
+
 /// Inputs that the caller supplies per day.
 #[derive(Debug, Clone, Copy)]
 pub struct DailyInputs<'a> {
@@ -151,6 +183,15 @@ pub struct DailyInputs<'a> {
     /// `ModelParams::oil_seasonality_target` for why a shape applied to a
     /// level compounds over a window shorter than its own period.
     pub oil_seasonality_target: f64,
+    /// Where the trough phase's growth range begins. 0.0 is the shipped
+    /// `(-1.0, 0.5)` and is what every preset before pt-v18 sets. See
+    /// [`crate::params::ModelParams::trough_growth_floor`].
+    pub trough_growth_floor: f64,
+    /// Whether a phase's growth target is drawn from its declared range
+    /// or fixed at the midpoint. 0.0 takes NO draw and reproduces the
+    /// shipped behaviour exactly. See
+    /// [`crate::params::ModelParams::phase_target_range_draw`].
+    pub phase_target_range_draw: f64,
 }
 
 impl<'a> Default for DailyInputs<'a> {
@@ -160,6 +201,8 @@ impl<'a> Default for DailyInputs<'a> {
             active_shocks: &[],
             market_return_pct: 0.0,
             game_day: 0,
+            trough_growth_floor: 0.0,
+            phase_target_range_draw: 0.0,
             vix_mean_reversion: VIX_MEAN_REVERSION,
             vix_decay_ratio: 1.0,
             vix_jump_intensity: 0.0,
@@ -252,12 +295,31 @@ pub fn update_economy_daily(
         if shock != 0.0 {
             new_state.gdp_growth = clamp(economy.gdp_growth + shock, gdp_floor, 6.0);
         }
+
+        // DRAW SITE (uniform) -- only when `phase_target_range_draw` is on.
+        //
+        // Placed after the shock draw above so the stream position of
+        // every existing consumer is unchanged while the dial is 0.0, and
+        // guarded by a BRANCH rather than by a zero coefficient, because a
+        // draw taken and multiplied by zero still moves every later
+        // consumer that day.
+        if inputs.phase_target_range_draw != 0.0 {
+            let r = effective_gdp_range(
+                &phase, economy.cycle_phase, inputs.trough_growth_floor);
+            let mid = (r.0 + r.1) / 2.0;
+            let drawn = r.0 + rng.next_f64() * (r.1 - r.0);
+            new_state.phase_gdp_target =
+                mid + inputs.phase_target_range_draw * (drawn - mid);
+        }
     }
 
     // ── Quarterly GDP ─────────────────────────────────────────────────────
     if is_quarter_start {
-        let target_gdp =
-            (phase.gdp_growth_range.0 + phase.gdp_growth_range.1) / 2.0 + shock_gdp_impact;
+        let range = effective_gdp_range(
+            &phase, economy.cycle_phase, inputs.trough_growth_floor);
+        let target_gdp = phase_growth_target(
+            new_state.phase_gdp_target, range, inputs.phase_target_range_draw)
+            + shock_gdp_impact;
         new_state.gdp_growth = clamp(
             new_state.gdp_growth
                 + (target_gdp - new_state.gdp_growth) * 0.25
@@ -272,7 +334,10 @@ pub fn update_economy_daily(
 
     // ── Monthly releases ──────────────────────────────────────────────────
     if is_month_start {
-        let phase_gdp_target = (phase.gdp_growth_range.0 + phase.gdp_growth_range.1) / 2.0;
+        let range = effective_gdp_range(
+            &phase, economy.cycle_phase, inputs.trough_growth_floor);
+        let phase_gdp_target = phase_growth_target(
+            new_state.phase_gdp_target, range, inputs.phase_target_range_draw);
         let gdp_gap = phase_gdp_target - new_state.gdp_growth;
         // Asymmetry correction: pull twice as hard when GDP is moving against
         // the phase, so it does not fall fast and recover slowly.
@@ -996,4 +1061,74 @@ pub fn update_economy_daily(
     }
 
     new_state
+}
+
+#[cfg(test)]
+mod phase_table_dials {
+    use super::*;
+
+    const PHASES: [CyclePhase; 5] = [
+        CyclePhase::Expansion, CyclePhase::Peak, CyclePhase::Contraction,
+        CyclePhase::Trough, CyclePhase::Recovery,
+    ];
+
+    /// At the dial's zero every phase reports the table's own pair, and the
+    /// comparison is on bits rather than on a tolerance, because the claim
+    /// is that no preset before pt-v18 can see this dial exist.
+    #[test]
+    fn a_zero_floor_returns_the_declared_range_unchanged() {
+        for phase in PHASES {
+            let c = phase_characteristics(phase);
+            assert_eq!(effective_gdp_range(&c, phase, 0.0), c.gdp_growth_range,
+                       "{phase:?} moved at a zero floor");
+        }
+    }
+
+    /// The floor is the trough's alone. Asserted against every other phase
+    /// rather than against the two that happen to declare a negative end,
+    /// so a table that gains one is caught here rather than in a sweep.
+    #[test]
+    fn the_floor_moves_the_trough_and_nothing_else() {
+        for phase in PHASES {
+            let c = phase_characteristics(phase);
+            let moved = effective_gdp_range(&c, phase, 1.0);
+            if phase == CyclePhase::Trough {
+                assert_eq!(moved.0, 0.0, "the trough floor did not reach zero");
+                assert_eq!(moved.1, c.gdp_growth_range.1,
+                           "the trough's upper end moved");
+            } else {
+                assert_eq!(moved, c.gdp_growth_range, "{phase:?} moved");
+            }
+        }
+    }
+
+    /// The dial is a share of the distance to zero, so a half dial is a
+    /// half floor. Derived from the declared endpoint rather than written
+    /// out, so a table edit moves the expectation with it.
+    #[test]
+    fn a_partial_floor_is_a_share_of_the_distance() {
+        let c = phase_characteristics(CyclePhase::Trough);
+        let half = effective_gdp_range(&c, CyclePhase::Trough, 0.5);
+        assert_eq!(half.0, c.gdp_growth_range.0 / 2.0);
+    }
+
+    /// At zero the stored per-phase target is not consulted at all, which
+    /// is what lets the field exist without any preset reading it. The
+    /// stored value passed here is one no range contains.
+    #[test]
+    fn a_zero_draw_ignores_the_stored_target() {
+        for phase in PHASES {
+            let c = phase_characteristics(phase);
+            let mid = (c.gdp_growth_range.0 + c.gdp_growth_range.1) / 2.0;
+            assert_eq!(phase_growth_target(999.0, c.gdp_growth_range, 0.0), mid,
+                       "{phase:?} read the stored target at a zero draw");
+        }
+    }
+
+    /// And at one it is the only thing consulted.
+    #[test]
+    fn a_full_draw_reads_the_stored_target() {
+        let c = phase_characteristics(CyclePhase::Contraction);
+        assert_eq!(phase_growth_target(-2.75, c.gdp_growth_range, 1.0), -2.75);
+    }
 }

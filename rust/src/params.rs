@@ -779,6 +779,63 @@ pub struct ModelParams {
     /// enough to reach one. A certified year reaches no trough at all and
     /// records 0 of 2121 rolls clamped under either reading.
     pub cycle_hazard_per_month: f64,
+    /// Where the trough phase's growth range begins. 0.0 -- every preset
+    /// before pt-v18 -- is the shipped `(-1.0, 0.5)` and bit-identical.
+    ///
+    /// # A second falling phase the engine does not call a recession
+    ///
+    /// `phase_characteristics` gives a trough `gdp_growth_range` of
+    /// (-1.0, 0.5), a midpoint of -0.25, so output is still falling
+    /// through a phase named for the bottom of the cycle. Measured over a
+    /// hundred years on thirty seeds, 95 per cent of trough days carry
+    /// falling output at pt-v18 and the share passes 100 at pt-v16.
+    ///
+    /// That is the whole of the engine's disagreement between its two
+    /// frequency rulers. The share of days in a contraction reads 18.21
+    /// and the share with output falling reads 27.31, while contraction
+    /// or trough reads 27.61: the second and third agree to 0.3 points,
+    /// so the nine-point gap IS this phase. The NBER's two rulers agree
+    /// to 1.2 points, 10.72 per cent of months in a contraction against
+    /// 11.93 per cent of quarters with real GDP falling, because a
+    /// contraction there IS the falling-output period.
+    ///
+    /// At 1.0 the lower end moves to 0.0 and the upper end keeps the 0.5
+    /// the table already states. Zero is the only non-arbitrary floor,
+    /// being the boundary between falling and rising output, so nothing
+    /// here is fitted. Between the ends the floor moves proportionally.
+    ///
+    /// This cannot be reached from the hazard. Whatever the clock does,
+    /// the phase keeps its negative target, so the repair is in the phase
+    /// table rather than in `cycle.rs`.
+    pub trough_growth_floor: f64,
+    /// Whether a phase's growth target is drawn from its declared range
+    /// or fixed at the range's midpoint. 0.0 -- every preset before
+    /// pt-v18 -- takes NO draw and is bit-identical.
+    ///
+    /// # A declared range the mechanism reduces to its midpoint
+    ///
+    /// `gdp_growth_range` is stated for all five phases and read at
+    /// exactly two sites, both of which take `(lo + hi) / 2.0`. The
+    /// declared WIDTH is discarded everywhere, so the table reads as a
+    /// specification and behaves as a list of five midpoints. `max_months`
+    /// is the same shape in the same struct: declared for every phase and
+    /// read by nothing.
+    ///
+    /// What that costs is the depth distribution. An episode's fall is its
+    /// mean growth times its length, and with the rate pinned to a
+    /// midpoint the only varying input is the single phase-entry shock,
+    /// which spans 2.0 to about 3.0. A ratio of 1.5 to 1 in the one
+    /// varying input cannot produce the 9.95 to 1 span between the
+    /// mildest and deepest post-1980 recession, at any sample size.
+    ///
+    /// At 1.0 the target is drawn once on phase entry, uniformly over the
+    /// range the table already declares, and held for the phase. The
+    /// contraction range is (-3.0, 0.0), whose uniform mean is its own
+    /// midpoint, so this is expected to widen the depth distribution
+    /// without moving its median. Between the ends the draw is scaled
+    /// toward the midpoint. No constant is invented: the numbers are the
+    /// ones the table states.
+    pub phase_target_range_draw: f64,
     /// The corporate bond yield at which the target multiple sits exactly
     /// on its sector anchor. 0.04 -- every preset before pt-v18 -- is the
     /// constant this was, to the bit.
@@ -1919,6 +1976,8 @@ impl ModelParams {
             oil_opec_symmetry: 0.0,
             oil_seasonality_target: 0.0,
             cycle_hazard_per_month: 0.0,
+            trough_growth_floor: 0.0,
+            phase_target_range_draw: 0.0,
             neutral_discount_rate: crate::fair_value::NEUTRAL_DISCOUNT_RATE,
             macro_burn_in_days: 0.0,
             buyback_payout_share: 0.0,
@@ -2949,6 +3008,17 @@ impl ModelParams {
         // change inside 63 per cent of certified years against 3. Read
         // per month on the 30-day month the phase clock already keeps.
         p.cycle_hazard_per_month = 1.0;
+        // A trough declared a growth range of (-1.0, 0.5), so output kept
+        // falling through the phase named for the bottom of the cycle and
+        // 95 per cent of trough days carried a negative rate. That is the
+        // whole nine-point gap between the engine's two frequency rulers,
+        // where the NBER's two agree to 1.2 points.
+        p.trough_growth_floor = 1.0;
+        // Every phase declares a growth range and both read sites took its
+        // midpoint, so the declared width did nothing and an episode's
+        // depth was a length times one shock draw spanning 2.0 to 3.0.
+        // Drawn from the range the table already states.
+        p.phase_target_range_draw = 1.0;
         // The valuation was neutral at a 4.00 per cent discount rate and
         // the economy opens at a corporate yield of 4.56, so every
         // profitable name opened about one per cent below the price the
@@ -3111,6 +3181,8 @@ impl ModelParams {
             "oil_opec_symmetry" => self.oil_opec_symmetry,
             "oil_seasonality_target" => self.oil_seasonality_target,
             "cycle_hazard_per_month" => self.cycle_hazard_per_month,
+            "trough_growth_floor" => self.trough_growth_floor,
+            "phase_target_range_draw" => self.phase_target_range_draw,
             "neutral_discount_rate" => self.neutral_discount_rate,
             "macro_burn_in_days" => self.macro_burn_in_days,
             "buyback_payout_share" => self.buyback_payout_share,
@@ -3265,6 +3337,8 @@ impl ModelParams {
             "oil_opec_symmetry" => out.oil_opec_symmetry = value,
             "oil_seasonality_target" => out.oil_seasonality_target = value,
             "cycle_hazard_per_month" => out.cycle_hazard_per_month = value,
+            "trough_growth_floor" => out.trough_growth_floor = value,
+            "phase_target_range_draw" => out.phase_target_range_draw = value,
             "neutral_discount_rate" => out.neutral_discount_rate = value,
             "macro_burn_in_days" => out.macro_burn_in_days = value,
             "buyback_payout_share" => out.buyback_payout_share = value,
@@ -3491,6 +3565,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "oil_opec_symmetry",
         "oil_seasonality_target",
         "cycle_hazard_per_month",
+        "trough_growth_floor",
+        "phase_target_range_draw",
         "neutral_discount_rate",
         "macro_burn_in_days",
         "buyback_payout_share",

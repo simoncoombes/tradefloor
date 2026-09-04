@@ -210,6 +210,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # So the box is the closed unit interval and its top is where the unit is
     # right rather than where a search stopped.
     "cycle_hazard_per_month": (0.0, 1.0),
+    "trough_growth_floor": (0.0, 1.0),
+    "phase_target_range_draw": (0.0, 1.0),
     # Days the economy is advanced alone before day zero. 0.0 is
     # construction as every earlier preset does it, 755 is the day the last
     # field the valuation reads enters its stationary band, and 1095 is the
