@@ -1516,6 +1516,43 @@ and `tradefloor.js` in both files.
 `fixed_simulation_digest` against the native one, is otherwise
 unchanged, and passes again now that the build reaches it.
 
+### Two widenings re-date stored artefacts
+
+NOT ON DEV YET. Both changes below sit on branches, so this section
+describes what will be true if they land and carries no entry above the
+marker until they do. It is written now because the measurements are
+fresh.
+
+`EconomyState` gains `phase_gdp_target`, the growth target a phase pulls
+toward, held for the phase. `Engine.state_snapshot` separately widens in
+three places: the generator array from 21 numbers to 24, the draw counts
+from 14 to 16, and each name's attribution from nine values to ten. The
+truth table gains a column of the same name, which the schema records
+and every hash ignores. Both enter `Engine::state_hash`, so every
+recorded state hash changes value on every trajectory, the default preset
+included, and `manifest.py` builds each ledger leaf from the same
+snapshot, so every leaf changes and the root with it.
+
+What a stored copy does depends on which artefact it is. A stored hash,
+leaf or root compares unequal to a re-run and says nothing, which is the
+case to plan for. An old snapshot put through `manifest.py` is refused
+loudly and told what is missing, by width for the generator, the counts
+and the attribution, and by name for the economy key. An old snapshot
+restored into the engine is accepted: the eighth generator takes the
+position the engine derived from its seed, the counts are padded from
+there and a nine-wide attribution restores with the tenth slot at zero,
+all by the convention the generator ladder already used, while a missing
+economy key is skipped and keeps the value the engine constructed. That
+last case is issue #184, open and undecided.
+
+Neither moves the three known-answer digests, measured on both branches
+rather than argued. That is a property of what those digests cover rather
+than of these changes: the simulation digest covers a trajectory and the
+metadata digest covers the nine reported coefficients, and neither reads
+the snapshot's layout. So a green determinism gate is not evidence that a
+stored artefact survives, and two independent widenings landing in one
+release is what made the gap visible.
+
 
 ## 0.6.2
 
