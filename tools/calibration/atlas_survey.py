@@ -125,7 +125,7 @@ from calibrate import calibration_box     # noqa: E402
 
 import tradefloor                            # noqa: E402
 from tradefloor import atlas                 # noqa: E402
-from tradefloor.facts import REAL_MARKETS    # noqa: E402
+from tradefloor.facts import REAL_MARKETS, aggregate_panels  # noqa: E402
 
 #: Measured by `facts.measure`, judged by nothing yet, recorded per horizon
 #: as `<stat>_<days>` beside the thirteen. See CALIBRATION-FOLLOWUPS.md §64.
@@ -1136,9 +1136,13 @@ def cmd_collect(args) -> int:
         panels = {days: [rows[f"{index}:panel{days}:{s}"]["panel"]
                          for s in seeds] for days in meta["horizons"]}
         for days, batch in panels.items():
-            for stat in REAL_MARKETS:
-                outputs[f"{stat}_{days}"] = statistics.median(
-                    p[stat] for p in batch)
+            # The graded rows by their own estimators: a level row as a
+            # mean, a pooled row over the samples of every seed, and a row
+            # absent from every panel omitted rather than medianed over
+            # None, which is how a batch with no session at -3 percent on
+            # one seed stopped the collect.
+            for stat, value in aggregate_panels(batch).items():
+                outputs[f"{stat}_{days}"] = value
             # Diagnostics: measured, unbanded, recorded so the map can see
             # them. Correlation persistence (§64) is the first.
             for stat in DIAGNOSTIC_STATS:

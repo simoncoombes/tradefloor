@@ -713,8 +713,7 @@ class Evaluator:
         # rank candidates. At margin 0 they are equal, which the caller
         # asserts once at the baseline rather than trusting.
         breakdown = band_distance_loss(panels)
-        medians = {key: statistics.median(p[key] for p in panels)
-                   for key in panels[0]}
+        medians = panel_medians(panels)
         margined = search_loss(panels, self.margin,
                                self.room_target, self.room_weight)
         far_margined = None
@@ -794,6 +793,28 @@ def panel_rows(row: dict) -> list[str]:
             f" d={stat['distance']:.4f}"
             + (f"  {scaled:.3f} sd" if scaled is not None else ""))
     return lines
+
+
+def panel_medians(panels: list[dict]) -> dict[str, float]:
+    """One value per statistic from per-seed panels, by each row's estimator.
+
+    The graded rows come through `facts.aggregate_panels`, which reads a
+    level row as a mean, a pooled row over its samples, and omits a row
+    absent from every panel; the supplementary rows are medians over the
+    panels that carry them as numbers. A panel also carries identity
+    fields, session counts and sample lists, none of which is a statistic,
+    and a median over every key of the first panel was how this raised
+    TypeError on the first run after the pooled fear row joined the panel.
+    """
+    from tradefloor import facts
+
+    out = facts.aggregate_panels(panels)
+    for key in lib.SUPPLEMENTARY_STATS:
+        values = [p.get(key) for p in panels]
+        numeric = [v for v in values if isinstance(v, (int, float))]
+        if numeric:
+            out[key] = statistics.median(numeric)
+    return out
 
 
 def main() -> None:
@@ -970,9 +991,12 @@ def main() -> None:
     # ── Stage 0: the baseline, on both seed tiers ────────────────────────
     base_search = ev.batch([{}], search_seeds, "baseline")[0]
     base_train = ev.batch([{}], train_seeds, "baseline")[0]
+    # A graded row absent from every panel of a tier (the pooled fear row
+    # on a tier with no session at -3 percent) has no median to offset.
     subset_offsets = {
         key: base_search["medians"][key] - base_train["medians"][key]
         for key in facts.REAL_MARKETS
+        if key in base_search["medians"] and key in base_train["medians"]
     }
     say(f"pt-v1 L_real: {base_train['loss_real']:.4f} on {len(train_seeds)} "
         f"train seeds, {base_search['loss_real']:.4f} on the "
