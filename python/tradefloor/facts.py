@@ -1078,13 +1078,23 @@ SEED_SD_LEVEL_PROVENANCE = {
                           "graded value stands on the pooled session count "
                           "reported beside it",
         "fear_gauge_dn1": "the table freezes its scale at pt-v1, where the "
-                          "fear channel has no gain: on the level protocol "
-                          "the row reads 0.021 at the median with an sd of "
-                          "0.026 across seeds, against 0.950 and 0.149 at "
-                          "pt-v16, so the rule would record a dead channel's "
-                          "noise as the row's scale. The row's room_sd reads "
-                          "None until a rule for a row whose mechanism "
-                          "postdates pt-v1 is decided",
+                          "return channel cannot answer a session: "
+                          "vix_return_source is 0.0 there, so the gauge reads "
+                          "the last tick's cap-weighted move rather than the "
+                          "day's, clamped at 0.03 percent of it with a gain "
+                          "of 25.0 and a reversion of 0.12, a ceiling of 0.75 "
+                          "on the target and about 0.09 on the day, which "
+                          "rust/src/economy/state.rs states beside "
+                          "VIX_RETURN_GAIN. pt-v9 moved the source to the "
+                          "session and the clamp to 15.0 in the same step, a "
+                          "change of units rather than a loosening, so the "
+                          "two clamps do not compare as numbers. On the level "
+                          "protocol the row reads 0.021 at the median with an "
+                          "sd of 0.026 across seeds at pt-v1, against 0.950 "
+                          "and 0.149 at pt-v16, so the rule would record the "
+                          "noise draw's sd under the name of a response. The "
+                          "row's room_sd reads None until a rule for a row "
+                          "whose mechanism postdates pt-v1 is decided",
     },
 }
 
