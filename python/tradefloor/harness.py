@@ -63,17 +63,19 @@ if TYPE_CHECKING:
 # prices. An "explanation" that could only ever name a shock would be unable
 # to say "nothing happened; it drifted back toward fair value", which is the
 # correct answer most of the time.
-# The eighth, `jump`, arrived on 2026-08-26: `apply_jumps` moves `s` after
-# the tick loop, so the seven above did not reconstruct a day on which one
-# fired, on any preset carrying jumps (§74).
+# The ninth, `jump`, arrived on 2026-08-26: `apply_jumps` moves `s` after
+# the tick loop, so the eight above did not reconstruct a day on which one
+# fired, on any preset carrying jumps (§74). The tenth, `overnight`, arrived
+# on 2026-09-04: `apply_overnight` moves `s` at the open before any tick,
+# and the tape books it on the day's first row.
 FACTOR_NAMES: tuple[
     Literal["reversion"], Literal["momentum"], Literal["crowd_lean"],
     Literal["company_news"], Literal["order_flow_impact"],
     Literal["short_squeeze_effect"], Literal["random_noise"],
-    Literal["circuit_breaker"], Literal["jump"],
+    Literal["circuit_breaker"], Literal["jump"], Literal["overnight"],
 ] = ("reversion", "momentum", "crowd_lean", "company_news",
      "order_flow_impact", "short_squeeze_effect", "random_noise",
-     "circuit_breaker", "jump")
+     "circuit_breaker", "jump", "overnight")
 
 
 def _f64(buf: bytes) -> list[float]:
