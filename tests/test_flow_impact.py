@@ -245,27 +245,45 @@ def test_the_shipped_law_cannot_tell_three_orders_apart_and_the_measured_one_can
     test came to compare one million shares against eight million and
     measure a rounding.
     """
-    thin, minute = _thin_and_its_minute()
+    # The MOST liquid name, not the thinnest, and the reason is the test
+    # below: on the thinnest name the corrected law moves the close past the
+    # 25 per cent session breaker, the price rails, and two railed runs are
+    # byte-identical for a reason that has nothing to do with the law. The
+    # most liquid name is the one furthest from that bound, and a thousand
+    # times ITS average minute volume is still deep in the tail because
+    # participation is relative to the name.
+    liquid = max(UNIVERSE, key=lambda i: i.avg_volume)
+    minute = max(liquid.avg_volume / 390.0, 100.0)
     off, on = _laws()
     sizes = (10.0 * minute, 100.0 * minute, 1000.0 * minute)
 
     def runs(model):
         return [tradefloor.flow_impact(
             seed=42, universe=UNIVERSE, model=model,
-            order_flow={thin.ticker: (size, 0.0)}, ticks=390,
-        ).impact for size in sizes]
+            order_flow={liquid.ticker: (size, 0.0)}, ticks=390,
+        ) for size in sizes]
 
     shipped = runs(off)
-    assert shipped[0] == shipped[1] == shipped[2], (
+    assert (shipped[0].impact == shipped[1].impact == shipped[2].impact), (
         "the shipped law is supposed to be indifferent to size up here")
 
     measured = runs(on)
-    assert measured[0] != measured[1]
-    assert measured[1] != measured[2]
-    assert measured[0] != measured[2]
+    # Checked before the inequalities, so a roster that starts railing fails
+    # with the cause named rather than looking like the law stopped working.
+    at = measured[0].tickers.index(liquid.ticker)
+    for run in measured:
+        move = abs(run.impact[at]) / run.baseline[at]
+        assert move < 0.20, (
+            "this name now moves %.1f per cent and the breaker is at 25, so "
+            "these runs may be railing rather than following the law" % (move * 100))
+
+    impacts = [run.impact for run in measured]
+    assert impacts[0] != impacts[1]
+    assert impacts[1] != impacts[2]
+    assert impacts[0] != impacts[2]
     # The smallest sits exactly on the knee, where the two laws meet, so the
     # change is confined above it rather than applied everywhere.
-    assert measured[0] == shipped[0]
+    assert impacts[0] == shipped[0].impact
 
 
 def test_the_measured_shock_follows_the_square_root_above_the_knee():
@@ -313,6 +331,14 @@ def test_above_the_knee_the_session_breaker_binds_before_the_cost_law_does():
     reader comparing costs at institutional size on a thin name still sees
     a surface that barely responds -- for a different reason, which is
     worth naming.
+
+    The breaker clamps the PRICE, so it takes the impact vector with it and
+    not only the cost: two railed runs are byte-identical. Measured on the
+    thinnest name, `price_breaker_fraction` is 0.25 and the close moves
+    +13.412, +24.879 and +24.358 per cent at ten, a hundred and a thousand
+    times its average minute volume, so the second is already at the bound
+    and the third is the same place. `mispricing_cap` is not what binds:
+    `s` sits at about three per cent of its 0.9 there.
 
     Asserted as the DISAGREEMENT between the two, not as either level, so
     it stays true whatever the breaker is set to and does not pin a

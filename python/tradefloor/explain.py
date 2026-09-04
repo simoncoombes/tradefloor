@@ -225,6 +225,12 @@ MECHANISMS: tuple[Mechanism, ...] = (
         state=("avg_volume",),
         dials=("order_flow_coefficient", "informed_flow_fraction",
                "order_flow_impact_law"),
+        # `order_flow_impact_law` is read where the imbalance is COMPUTED and
+        # not where it is consumed: the tick calls `order_imbalance_with` and
+        # hands `calculate_live_factors` the product. That is the mirror of
+        # the case this field was added for, where a dial is read by the
+        # caller and passed in as an argument.
+        via=("market::factors::order_imbalance_with",),
     ),
     Mechanism(
         factor="short_squeeze_effect",

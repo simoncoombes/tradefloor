@@ -29,8 +29,10 @@ market does.
 
 Two limits are worth quoting with it. The repair restores size response over
 a range and then a different mechanism takes over, because on a thin name
-the corrected law charges enough that the close rails the session breaker
-and the cost stops following the shock while the shock is still growing. And
+the corrected law charges enough that the close rails the 25 per cent
+session breaker. That clamps the PRICE, so the whole print stops following
+the shock while the shock is still growing, and two railed runs are
+byte-identical. And
 none of the graded rows can see any of this: they are moments,
 autocorrelations, correlations and median responses, and this lives at the
 tail of the size distribution, so a green panel is not evidence either way.
