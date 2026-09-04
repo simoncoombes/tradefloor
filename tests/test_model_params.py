@@ -366,10 +366,25 @@ PERTURBATIONS = [
     # response time to an economy displacement, not a phase it never
     # reaches and not a magnitude too small to see.
     #
-    # That also refutes the reason `vix_jump_intensity` gives below.
-    # Draw consumption over the probe's three days cannot be what moves
-    # the market there, because this dial consumes draws from an EARLIER
-    # site in the same function and does not move it.
+    # So the reason `vix_jump_intensity` gives below is INCOMPLETE and
+    # not wrong. Draw consumption alone cannot be what moves the market
+    # there: this dial consumes draws from an earlier site in the same
+    # function and does not move it. What matters is WHICH draw the
+    # displacement lands on. The jump's arrival test sits one line above
+    # the VIX's own noise term with nothing between them, and the VIX
+    # feeds the market factor's variance the same day, while this dial
+    # displaces the GDP block and has to reach prices through the
+    # valuation.
+    #
+    # The rule, which is drift-vix's and better than the one this entry
+    # started with: a displaced draw moves a probe in proportion to how
+    # directly its consumer reaches the observable, and how soon.
+    #
+    # That predicts this dial DOES move the market over a longer window,
+    # because the path is slow rather than blocked. Registered by
+    # drift-vix before anyone runs it: it moves within 20 sessions. If it
+    # does not, the valuation path is blocked and that is the larger
+    # finding.
     ("phase_target_range_draw", 0.5, False),
     # The yield at which the target multiple sits on its sector anchor.
     # 0.05 rather than either shipped value: 0.04 is the default this probe
