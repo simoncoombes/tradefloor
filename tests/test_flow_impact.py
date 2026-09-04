@@ -204,6 +204,13 @@ def test_the_measured_law_keeps_charging_for_size_above_the_knee():
 
     The smallest size sits at the knee, where both laws give the same 1.5,
     so this also shows the change is confined above it.
+
+    DELIBERATELY IN THE TAIL. Ten, a hundred and a thousand times the
+    name's average minute volume are not typical orders, and that is the
+    point: the shipped law is least wrong at typical size, so a test there
+    would pass on both laws and be reading the body. That is how the
+    original size test came to compare one million shares against eight
+    million on the roster's most liquid name and measure a rounding.
     """
     thin = min(UNIVERSE, key=lambda i: i.avg_volume)
     # Derived from the name rather than written as three round numbers, so

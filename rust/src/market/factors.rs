@@ -713,7 +713,8 @@ fn participation_multiplier(participation: f64) -> f64 {
 /// so every preset that predates the dial is bit-identical. At 1.0 the
 /// participation multiplier follows the measured law instead of the clamped
 /// one. `ModelParams::order_flow_impact_law` carries the sources, the
-/// clock, and what the change does not claim.
+/// clock, and what the change does not claim. It does NOT restate the
+/// depth exponent; that is issue #183.
 ///
 /// `order_imbalance` keeps its signature and its behaviour because it is
 /// public API, re-exported through `market::mod`. This is the
@@ -734,6 +735,16 @@ pub fn order_imbalance_with(
     // literal keeps the sign of the zero identical on both laws, and that is
     // what makes a run with no injected flow bit-identical rather than
     // merely equal.
+    //
+    // A NOTE FOR WHOEVER REVISES THE LAW BELOW. The shipped call site
+    // multiplies a raw imbalance by the multiplier, and with no injected
+    // flow that raw imbalance is a literal zero. Zero times a FINITE
+    // multiplier is zero; zero times an infinity is NaN, and a NaN reaching
+    // a price is a moved trajectory and a moved known-answer digest. So a
+    // participation term must stay finite at zero participation even though
+    // this early return means it is not evaluated there today. Putting a
+    // division or a logarithm in `participation_multiplier` breaks that,
+    // and `the_multiplier_is_finite_at_zero_participation` is what says so.
     if !(total_vol > 0.0) {
         return 0.0;
     }
@@ -1291,6 +1302,21 @@ mod tests {
             let k = exponent(&on, phi);
             assert!((k - 1.0).abs() < 1e-12, "phi {phi} gave exponent {k}");
         }
+    }
+
+    #[test]
+    fn the_multiplier_is_finite_at_zero_participation() {
+        // Not reachable through `order_imbalance_with` today, which returns
+        // early on zero volume. This guards the law itself, because the
+        // early return is not what the digests rest on: the call site
+        // multiplies a literal zero by whatever comes back, and zero times
+        // an infinity is NaN. A division or a logarithm added to the law
+        // fails here rather than in a trajectory nobody re-runs.
+        let m = participation_multiplier(0.0);
+        assert!(m.is_finite(), "{m}");
+        let product = 0.0 * m;
+        assert_eq!(product, 0.0);
+        assert!(product.is_sign_positive(), "{product}");
     }
 
     #[test]
