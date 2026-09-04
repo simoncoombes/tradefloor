@@ -132,13 +132,26 @@ CERTIFIED: dict[str, float] = {
 
 #: The LEVEL rows the default preset reads at the certified horizon,
 #: measured as a thirty-seed mean on the certification roster and seeds
-#: (`facts.AGGREGATE`), and held RED. Empty until that measurement lands:
-#: the row was graded on 2026-09-03 and its certified value is measured on
-#: the pinned protocol rather than copied from an arm run on other seeds.
-CERTIFIED_LEVEL: dict[str, float] = {}
+#: (`facts.AGGREGATE`), and held RED. Measured on 2026-09-04 on the pinned
+#: protocol rather than copied from an arm run on other seeds: seeds 101 to
+#: 130, 252 days, the roster varying with the seed, because a level that
+#: describes the MODEL cannot be measured on one draw. The same preset reads
+#: +1.9740 on a held roster, which passes nothing it does not also pass here
+#: but sits 3.3 points lower, so the protocol is part of the number.
+CERTIFIED_LEVEL: dict[str, float] = {
+    # The default preset loses 13.6 per cent a year while holding all
+    # fourteen shape rows in band. That is the whole reason this row exists.
+    "index_drift_pct": -13.6431,
+}
 
 #: The CRISIS rows, reserved for the fear gauge; same rule.
-CERTIFIED_CRISIS: dict[str, float] = {}
+CERTIFIED_CRISIS: dict[str, float] = {
+    # The -1 per cent row sits INSIDE its band at 0.70 to 4.03. The -3 per
+    # cent row is below its floor of 2.60. A single row at -1 per cent would
+    # have scored this defect as passing, which is why there are two.
+    "fear_gauge_dn1": 0.9500,
+    "fear_gauge_dn3": 1.9557,
+}
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
 #: estimators as `facts.REAL_MARKETS`. Scoring a 504-day measurement against

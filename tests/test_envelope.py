@@ -41,11 +41,27 @@ def test_all_fourteen_are_in_band_at_the_certified_horizon():
     # table, and it never joins this count.
     assert len(in_band) == 14, sorted(set(env.CERTIFIED) - set(in_band))
     from tradefloor.facts import LEVEL, CRISIS
+    # Which of the new rows the default preset is EXPECTED to fail, named
+    # rather than assumed of all of them. The -1 per cent fear row passes at
+    # pt-v16 and was predicted to, before it was measured: one bucket cannot
+    # separate a low gain from a saturating channel, and a row at -1 per cent
+    # alone would have scored this defect as passing for three eras. That it
+    # passes is the ARGUMENT for the second bucket, not a sign the band moved.
+    EXPECTED_RED = {"index_drift_pct", "fear_gauge_dn3"}
     for k, v in list(env.CERTIFIED_LEVEL.items()) + list(env.CERTIFIED_CRISIS.items()):
         assert k in LEVEL + CRISIS
-        assert band_distance(v, *REAL_MARKETS[k]) != 0, (
-            f"{k} reads in band at the default preset; the row is held red "
-            "until the level is right, and a pass here means the band moved")
+        red = band_distance(v, *REAL_MARKETS[k]) != 0
+        if k in EXPECTED_RED:
+            assert red, (
+                f"{k} reads in band at the default preset; the row is held "
+                "red until the level is right, and a pass here means the "
+                "band moved")
+        else:
+            assert not red, (
+                f"{k} reads OUT of band at the default preset and was "
+                "expected in. Either the measurement moved or this row "
+                "belongs in EXPECTED_RED, and which it is decides whether "
+                "the second bucket is still earning its place")
     assert "volume_change_acf1" in in_band
     assert "sector_excess_corr" in in_band
 
