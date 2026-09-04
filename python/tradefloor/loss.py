@@ -142,9 +142,12 @@ CONSTRAINTS = (
 #: The level row `index_drift_pct` sits here for now and is the exception
 #: to the rule above: it is meant to be charged for, because a search that
 #: cannot read the level spends it freely, which is how a market losing a
-#: fifth of its value a year certified clean. It joins `LIVE_TARGETS` when
-#: `facts.SEED_SD` carries its seed sd on the pinned protocol, which this
-#: function refuses to run without.
+#: fifth of its value a year certified clean. `facts.SEED_SD` has carried
+#: its seed sd on the pinned protocol since 2026-09-04, so the one-tuple
+#: edit that promotes it now runs; it is not made here because it changes
+#: the objective every recorded calibration score was measured under, at
+#: the default preset by 16.5 points against a scale of 9.6, and that is
+#: a decision about the search rather than about the row.
 STRUCTURAL = tuple(
     key for key in REAL_MARKETS
     if key not in LIVE_TARGETS and key not in CONSTRAINTS

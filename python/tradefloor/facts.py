@@ -898,6 +898,14 @@ SEED_SD = {
     # The largest seed sd of any correlation-type statistic: a twelve-point
     # acf1 per seed. See CALIBRATION-FOLLOWUPS.md section 64.
     "corr_persistence_acf1": 0.279423,
+    # The level row, on its own protocol and at the table's preset: pt-v1
+    # on `LEVEL_PROTOCOL`, the roster varying with the seed, seeds 101 to
+    # 130, 252 days, measured 2026-09-04 on the box run named in
+    # `SEED_SD_LEVEL_PROVENANCE`. The only entry not on the held roster,
+    # and the only one that moves when the roster generator does, by the
+    # protocol's own definition. The two crisis rows carry no entry, for
+    # the two reasons the same provenance states.
+    "index_drift_pct": 9.55716,
 }
 
 #: Real-market bands re-derived at a 504-DAY measurement window.
@@ -1036,6 +1044,50 @@ SEED_SD_PROVENANCE = {
                                  "re-measured on this one.",
 }
 
+#: The provenance of the `SEED_SD` entries measured on `LEVEL_PROTOCOL`
+#: rather than on the held panel roster, and the reason each crisis row
+#: carries none. A consumer that scales a row by its seed sd reads
+#: `SEED_SD.get(row)` and reports None where there is no entry; it never
+#: substitutes a neighbour's.
+SEED_SD_LEVEL_PROVENANCE = {
+    "rows": ("index_drift_pct",),
+    "source": "facts.measure() at pt-v1 on Universe.random(40, seed=s) with "
+              "market seed s, 252 days, seeds 101-130, sample sd across "
+              "seeds; the box run era-level of 2026-09-04 on feat/level-row "
+              "at 6326337, four arms through programme/scripts/level-jobs.sh "
+              "in the tradefloor-design repository, of which the pt-v1 arm "
+              "is this one",
+    "date": "2026-09-04",
+    "model_fingerprint": "pt-v1",
+    "estimator": "sample standard deviation (n - 1) across seeds",
+    "roster_note": "drawn per seed by Universe.random rather than read from "
+                   "the committed fixture, so this entry moves when the "
+                   "generator does, by the protocol's own definition, where "
+                   "the held-roster entries do not",
+    "pinned_by": "tests/test_loss.py re-measures two of the thirty seeds "
+                 "live on the level protocol and re-derives the sd from the "
+                 "committed per-seed table those panels must match",
+    "same_run_at_the_default": "pt-v16 on the same protocol and seeds reads "
+                               "an sd of 7.0888, the figure beside "
+                               "envelope.CERTIFIED_LEVEL; the entry above "
+                               "is at pt-v1 because the table freezes its "
+                               "denominators there",
+    "unmeasured": {
+        "fear_gauge_dn3": "pooled over every seed's sessions, so no per-seed "
+                          "value exists to take a standard deviation of; its "
+                          "graded value stands on the pooled session count "
+                          "reported beside it",
+        "fear_gauge_dn1": "the table freezes its scale at pt-v1, where the "
+                          "fear channel has no gain: on the level protocol "
+                          "the row reads 0.021 at the median with an sd of "
+                          "0.026 across seeds, against 0.950 and 0.149 at "
+                          "pt-v16, so the rule would record a dead channel's "
+                          "noise as the row's scale. The row's room_sd reads "
+                          "None until a rule for a row whose mechanism "
+                          "postdates pt-v1 is decided",
+    },
+}
+
 #: The first two are MARGINAL: properties of one series taken on its own. The
 #: other six are DEPENDENCE: how returns move together across time, across
 #: stocks, with volume, and asymmetrically with their own sign. Which half a
@@ -1090,13 +1142,29 @@ AGGREGATE = {"index_drift_pct": "mean", "fear_gauge_dn3": "pooled"}
 #: and the held roster sits 0.78 of that above the population. Thirty
 #: market seeds on one roster certify that roster; thirty rosters certify
 #: the model. So the level row's certified value is the mean over seeds
-#:101 to 130 of a run on `Universe.random(40, seed=s)` with market seed
+#: 101 to 130 of a run on `Universe.random(40, seed=s)` with market seed
 #: `s`, and its seed sd is measured on the same protocol. See the note on
 #: which seed varies in `_index_drift_pct`.
+#:
+#: The CRISIS rows are certified on the same run. A gauge's answer to a
+#: down day, pooled or medianed over thirty rosters, describes the model
+#: rather than roster 111, and one protocol for every graded row outside
+#: the shape set keeps `envelope` to two tables under one rule. The same
+#: preset reads +1.9740 on the level row with roster 111 held against
+#: -13.6431 with the roster varying, a gap of 3.3 points on one preset at
+#: thirty seeds each, so the protocol is part of a level figure's value
+#: and not a detail of its measurement: a reader cannot compare a level
+#: figure with any other unless both name their protocol, and a value
+#: from one protocol is never compared with a band or a certified value
+#: from the other. The consumers that hold one roster
+#: (`tools/calibration/shapley.py`) withhold the verdict on these rows
+#: and say why.
 LEVEL_PROTOCOL = {
+    "groups": ("level", "crisis"),
     "seeds": tuple(range(101, 131)),
     "roster": "Universe.random(40, seed=<seed>)",
-    "estimator": "mean across seeds",
+    "estimator": "mean across seeds for the level row; the crisis rows by "
+                 "AGGREGATE, the median across seeds or the pooled median",
     "days": 252,
 }
 
@@ -1150,7 +1218,10 @@ REPORTING_ONLY: dict[str, str] = {
         "no band: a session at -5 percent or worse is too rare for a "
         "certified window, 22 in the real series since 1990 and three in "
         "2,520 model sessions across ten seeds, so the row is a diagnostic "
-        "of the saturating channel and the -3 percent row is the graded one"
+        "of the saturating channel and the -3 percent row is the graded one. "
+        "An empty cell here is a property of the WINDOW and not of the "
+        "model: most real 252-session windows hold no such session either, "
+        "so a blank reads as nothing to measure rather than as a failure"
     ),
     "fear_gauge_up1": (
         "no band: the up-side response is reported so the down-side "
@@ -1479,7 +1550,27 @@ def _index_drift_pct(
     below is that roster's and reads about six points worse than the model
     does. An earlier and smaller sample in the design note puts the same
     roster at 0.78 standard deviations, and the two have not been
-    reconciled.
+    reconciled. The handicap was then measured directly, on 2026-09-04 at
+    thirty seeds each: pt-v18 reads +1.974 in this row's convention with
+    roster 111 held and +5.281 with the roster varying, 3.3 points, and
+    pt-v16 reads -13.643 varying, so the direct figure is about half the
+    six estimated from the sweep's slope. A level figure therefore carries
+    its protocol as part of its value, and no two level figures compare
+    unless both name theirs (`LEVEL_PROTOCOL`).
+
+    # Which horizon
+
+    The certified value is the first 252 sessions from the opening, and it
+    is not the level a longer study sees. The era that produced this row
+    was decomposed at both horizons in `programme/terms-by-horizon.md` in
+    the design repository: six of its ten terms are one-off level shifts
+    that work through the mispricing, and `s` is a stationary process at a
+    60-day half-life, so a persistent injection settles at an offset that
+    is bought once and does not compound, with four-year to one-year
+    ratios from 0.11 to 0.36. The growth term compounds at 0.88, and the
+    cycle clock is worth nothing inside a year and +1.8 a year over four.
+    So the ranking of the terms inverts with the horizon, and a reader of
+    a multi-year run has to take this row as the first-year figure it is.
 
     # Measured
 

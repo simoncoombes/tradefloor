@@ -144,11 +144,17 @@ CERTIFIED_LEVEL: dict[str, float] = {
     "index_drift_pct": -13.6431,
 }
 
-#: The CRISIS rows, reserved for the fear gauge; same rule.
+#: The CRISIS rows, reserved for the fear gauge, measured on the same run
+#: and protocol as the level row (`facts.LEVEL_PROTOCOL`).
 CERTIFIED_CRISIS: dict[str, float] = {
-    # The -1 per cent row sits INSIDE its band at 0.70 to 4.03. The -3 per
-    # cent row is below its floor of 2.60. A single row at -1 per cent would
-    # have scored this defect as passing, which is why there are two.
+    # The -1 per cent row sits INSIDE its band at 0.70 to 4.03, by a quarter
+    # of a point on a band whose trimmed across-window sd is 0.64, so the
+    # pass is well within one standard deviation of the floor. It is a pass
+    # and it is not evidence that the small-session response is right: the
+    # row earns its place as the control that makes the -3 per cent row's
+    # failure mean something, since a single row at -1 per cent would have
+    # scored a saturating channel as passing for three eras. The -3 per
+    # cent row is below its floor of 2.60, pooled over 96 sessions.
     "fear_gauge_dn1": 0.9500,
     "fear_gauge_dn3": 1.9557,
 }

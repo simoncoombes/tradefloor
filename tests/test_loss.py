@@ -27,6 +27,7 @@ import tradefloor
 from tradefloor.facts import (
     REAL_MARKETS,
     SEED_SD,
+    SEED_SD_LEVEL_PROVENANCE,
     band_distance,
     compare_to_real_markets,
     fingerprint_of,
@@ -493,6 +494,23 @@ THIRTY_SEED_PANELS = {
         -0.2715167067, -0.2058593593, -0.1890258437, 0.2687012725, 0.1884511226],
 }
 
+# The thirty per-seed panels the level row's SEED_SD entry was measured
+# from, on its own protocol: pt-v1, Universe.random(40, seed=s) with market
+# seed s, 252 days, seeds 101-130 (facts.LEVEL_PROTOCOL), the pt-v1 arm of
+# the box run era-level of 2026-09-04 at 6326337. Committed as data for the
+# same reason as the table above; the live re-measurement below is what
+# keeps it honest.
+THIRTY_SEED_LEVEL_PANELS = {
+    "seeds": tuple(range(101, 131)),
+    "index_drift_pct": [
+        6.555978522, 8.769086434, 10.32963337, -1.437036827, -20.460801,
+        -1.722901744, 6.035332724, -1.050153126, 1.90984402, 2.755458971,
+        1.501244373, 13.29726623, 10.90805558, 5.411631874, -10.07679501,
+        -5.771630368, -8.114883963, -8.460163246, -6.406017545, -22.06291507,
+        -4.812104226, -4.085363997, 3.770262104, -1.882990479, 2.040531268,
+        -5.531987442, 1.644564451, -4.599167669, 25.44166539, 7.678302214],
+}
+
 
 def test_the_shipped_seed_sds_are_reproducible_by_re_measurement():
     """SEED_SD is a measurement, and this recomputes it from its protocol.
@@ -524,6 +542,8 @@ def test_the_shipped_seed_sds_are_reproducible_by_re_measurement():
         panel = measure(seed=seed, universe=universe, days=252, model="pt-v1")
         assert panel["model_fingerprint"] == "pt-v1"
         for key in SEED_SD:
+            if key in SEED_SD_LEVEL_PROVENANCE["rows"]:
+                continue  # its own protocol; the test below re-derives it
             # The tolerance is a FLOOR rather than slack, and tightening it
             # breaks this suite on a machine that is not the one the table
             # was measured on. The market is bit-reproducible across
@@ -548,8 +568,48 @@ def test_the_shipped_seed_sds_are_reproducible_by_re_measurement():
                 THIRTY_SEED_PANELS[key][position], rel=1e-6, abs=1e-9
             ), (seed, key)
     for key, shipped in SEED_SD.items():
+        if key in SEED_SD_LEVEL_PROVENANCE["rows"]:
+            continue
         derived = st.stdev(THIRTY_SEED_PANELS[key])
         assert derived == pytest.approx(shipped, rel=1e-4), key
+
+
+def test_the_level_rows_seed_sd_is_reproducible_on_its_own_protocol():
+    """The level row's SEED_SD entry, recomputed the way it was measured.
+
+    The entry is on `facts.LEVEL_PROTOCOL`, the roster drawn per seed, so
+    the test above cannot cover it: it holds the panel roster. Two of the
+    thirty seeds are re-run live on `Universe.random(40, seed=s)` at pt-v1
+    and held to the committed per-seed table, and the sd is re-derived
+    from that table. The first assertion is the one that matters when a
+    row is added: every SEED_SD entry is re-derived by this test or the
+    one above, so a new entry has to be placed in one of the two tables
+    and cannot slip between them.
+    """
+    import statistics as st
+
+    from tradefloor.facts import LEVEL, LEVEL_PROTOCOL
+
+    level_rows = {k for k in THIRTY_SEED_LEVEL_PANELS if k != "seeds"}
+    held_rows = {k for k in THIRTY_SEED_PANELS if k != "seeds"}
+    assert set(SEED_SD) == held_rows | level_rows
+    assert held_rows.isdisjoint(level_rows)
+    assert set(SEED_SD_LEVEL_PROVENANCE["rows"]) == level_rows <= set(LEVEL)
+    assert THIRTY_SEED_LEVEL_PANELS["seeds"] == LEVEL_PROTOCOL["seeds"]
+    for seed in (101, 130):
+        position = THIRTY_SEED_LEVEL_PANELS["seeds"].index(seed)
+        universe = tradefloor.Universe.random(40, seed=seed)
+        panel = measure(seed=seed, universe=universe,
+                        days=LEVEL_PROTOCOL["days"], model="pt-v1")
+        assert panel["model_fingerprint"] == "pt-v1"
+        for key in level_rows:
+            # The same floor as the test above, for the same reason.
+            assert panel[key] == pytest.approx(
+                THIRTY_SEED_LEVEL_PANELS[key][position], rel=1e-6, abs=1e-9
+            ), (seed, key)
+    for key in level_rows:
+        derived = st.stdev(THIRTY_SEED_LEVEL_PANELS[key])
+        assert derived == pytest.approx(SEED_SD[key], rel=1e-4), key
 
 
 def test_substituting_the_seed_sds_is_a_parameter_not_an_edit():
