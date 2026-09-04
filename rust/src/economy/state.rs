@@ -440,10 +440,14 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
 
         cycle_phase,
         months_in_current_phase: 0.0,
-        // The opening phase is GIVEN rather than entered, so it takes the
-        // declared midpoint even when the draw is on. Nothing reads this
-        // until the first phase change under `phase_target_range_draw`,
-        // and nothing reads it at all when that dial is 0.0.
+        // The midpoint, which is what every preset before pt-v18 uses for
+        // the whole run because nothing reads this field at their dial's
+        // zero. Under `phase_target_range_draw` it is overwritten on the
+        // FIRST simulated day rather than at the first phase change: the
+        // draw is gated on `months_in_current_phase < 1/30 + 0.001` and
+        // the engine opens at zero months in phase, so the opening phase
+        // is drawn for like any other. This value is what the field holds
+        // between construction and that first day.
         phase_gdp_target: {
             let r = phase_characteristics(cycle_phase).gdp_growth_range;
             (r.0 + r.1) / 2.0

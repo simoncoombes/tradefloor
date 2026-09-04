@@ -346,14 +346,19 @@ PERTURBATIONS = [
     # draws until day 180 and the probe runs three. Over 252 days it bites,
     # and what separates the arms is the count of seeds that leave expansion.
     ("cycle_hazard_per_month", 0.5, False),
-    # Both wait on a phase the probe never reaches. The floor moves only
-    # the trough's growth range, and a certified year reaches no trough at
-    # all, let alone three days from an opening expansion. The draw is taken
-    # on a phase-change day and the engine opens at zero months in phase
-    # with a six-month minimum, so the probe sees neither the draw nor its
-    # effect, and it consumes no economy draws over the three days.
+    # The floor waits on a phase the probe never reaches: it moves only the
+    # trough's growth range, and a certified year reaches no trough at all,
+    # let alone three days from an opening expansion.
     ("trough_growth_floor", 0.5, False),
-    ("phase_target_range_draw", 0.5, False),
+    # The draw is NOT inert, and reading it off the entry above was the
+    # mistake. That entry waits on `min_months`, six months for an
+    # expansion, so the hazard cannot draw until day 180. This dial is
+    # gated on `months_in_current_phase < 1/30 + 0.001` instead, and the
+    # engine opens at zero months in phase, so the block fires on the
+    # probe's FIRST day: a draw is taken, the opening phase gets a target
+    # off its declared range, and both the monthly and quarterly updates
+    # read it. Two dials in the same phase machinery with different gates.
+    ("phase_target_range_draw", 0.5, True),
     # The yield at which the target multiple sits on its sector anchor.
     # 0.05 rather than either shipped value: 0.04 is the default this probe
     # perturbs and 0.0456 is pt-v18's, and an entry landing on a named
