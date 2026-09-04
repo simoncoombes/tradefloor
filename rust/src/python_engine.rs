@@ -530,7 +530,7 @@ impl PyEngine {
                 .liquidity_share
                 .extend_from_slice(&self.buffer.liquidity_share[..n]);
         }
-        for k in 0..8 {
+        for k in 0..crate::market::factors::S_COMPONENT_KEYS.len() {
             self.day_buffer.components[k]
                 .extend_from_slice(&self.buffer.components[k][..n]);
         }
@@ -539,11 +539,11 @@ impl PyEngine {
         // first tick of the next day: `s` there already includes it. Zeroed
         // here and filled from the pending value on that first row, so the
         // columns sum to the change in `s` tick by tick (§74).
-        let before = self.day_buffer.components[8].len();
-        self.day_buffer.components[8].resize(self.day_buffer.components[0].len(), 0.0);
+        let before = self.day_buffer.components[crate::market::factors::JUMP_SLOT].len();
+        self.day_buffer.components[crate::market::factors::JUMP_SLOT].resize(self.day_buffer.components[0].len(), 0.0);
         if !self.pending_jump.is_empty() {
             for (i, v) in self.pending_jump.iter().enumerate() {
-                if let Some(slot) = self.day_buffer.components[8].get_mut(before + i) {
+                if let Some(slot) = self.day_buffer.components[crate::market::factors::JUMP_SLOT].get_mut(before + i) {
                     *slot += v;
                 }
             }
@@ -554,11 +554,11 @@ impl PyEngine {
         // first tick of the same day: `s` there already includes it. Zeroed
         // here and filled from the pending value on that first row, as the
         // jump is, so the columns sum to the change in `s` tick by tick.
-        let before = self.day_buffer.components[9].len();
-        self.day_buffer.components[9].resize(self.day_buffer.components[0].len(), 0.0);
+        let before = self.day_buffer.components[crate::market::factors::OVERNIGHT_SLOT].len();
+        self.day_buffer.components[crate::market::factors::OVERNIGHT_SLOT].resize(self.day_buffer.components[0].len(), 0.0);
         if !self.pending_overnight.is_empty() {
             for (i, v) in self.pending_overnight.iter().enumerate() {
-                if let Some(slot) = self.day_buffer.components[9].get_mut(before + i) {
+                if let Some(slot) = self.day_buffer.components[crate::market::factors::OVERNIGHT_SLOT].get_mut(before + i) {
                     *slot += v;
                 }
             }
@@ -573,7 +573,7 @@ impl PyEngine {
     /// carry it. The engine accumulates it in attribution slot 7; this puts it
     /// on the tape where a reader reconstructing the day will find it.
     fn record_day_jump(&mut self) {
-        let jumps: Vec<f64> = self.inner.attribution().iter().map(|row| row[8]).collect();
+        let jumps: Vec<f64> = self.inner.attribution().iter().map(|row| row[crate::market::factors::JUMP_SLOT]).collect();
         if jumps.iter().any(|v| *v != 0.0) {
             self.pending_jump = jumps;
         }
@@ -737,7 +737,7 @@ struct DayBuffer {
     mispricing: Vec<f64>,
     fundamental: Vec<f64>,
     anchor: Vec<f64>,
-    components: [Vec<f64>; 10],
+    components: [Vec<f64>; crate::market::factors::COMPONENT_COUNT],
     shock: Vec<f64>,
     absorbed: Vec<f64>,
     clamp: Vec<f64>,
@@ -1881,7 +1881,7 @@ impl PyEngine {
     /// The installed overlay, as `(stream, kind, index, value)` tuples.
     fn draw_patches(&self) -> Vec<(String, String, u64, f64)> {
         let mut out = Vec::new();
-        for id in 0..7u32 {
+        for id in 0..crate::rng::stream::COUNT as u32 {
             if let Some(o) = self.inner.draw_overlay(id) {
                 for ((kind, index), value) in &o.table {
                     out.push((stream_name(id).to_string(), kind.name().to_string(), *index, *value));
@@ -1987,7 +1987,7 @@ impl PyEngine {
             )));
         }
         self.explanations.window = Some((from_day, to_day));
-        for id in 0..7u32 {
+        for id in 0..crate::rng::stream::COUNT as u32 {
             self.inner.enable_draw_log(id, from_day - 1, to_day);
         }
         Ok(())
@@ -2570,7 +2570,7 @@ impl PyEngine {
         // round-trip exactly rather than closely. Nine numbers rather than a
         // nested structure so a pre-split snapshot (three numbers) is
         // unmistakable at a glance and on restore.
-        let mut rng_out = Vec::with_capacity(24);
+        let mut rng_out = Vec::with_capacity(3 * crate::rng::stream::COUNT);
         for s in [rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
                   rng.news, rng.volume_idio, rng.overnight] {
             rng_out.push(f64::from_bits(s.state));
@@ -2588,7 +2588,7 @@ impl PyEngine {
             .collect();
         out.set_item("draw_counts", counts)?;
         let mut overlay: Vec<(u32, u8, u64, f64)> = Vec::new();
-        for id in 0..7u32 {
+        for id in 0..crate::rng::stream::COUNT as u32 {
             if let Some(o) = self.inner.draw_overlay(id) {
                 for ((kind, index), value) in &o.table {
                     overlay.push((id, *kind as u8, *index, *value));
@@ -2609,7 +2609,7 @@ impl PyEngine {
         // re-opens the day and re-anchors `previous_close`.
         // Two widths now: the engine's attribution carries the daily jump in
         // an eighth slot, the tick's own decomposition does not (§74).
-        let flat10 = |rows: &[[f64; 10]]| -> Vec<f64> {
+        let flat10 = |rows: &[[f64; crate::market::factors::COMPONENT_COUNT]]| -> Vec<f64> {
             rows.iter().flat_map(|r| r.iter().copied()).collect()
         };
         let flat = |rows: &[[f64; 8]]| -> Vec<f64> {
@@ -2823,7 +2823,7 @@ impl PyEngine {
         // does not carry -- see the bindings below. That is what lets a
         // checkpoint written before a mechanism existed replay exactly as it
         // did then, rather than against a zeroed generator wearing its seed.
-        if !matches!(rng.len(), 9 | 12 | 15 | 18 | 21 | 24) {
+        if rng.len() < 9 || rng.len() % 3 != 0 || rng.len() > 3 * crate::rng::stream::COUNT {
             return Err(ValidationError::new_err(format!(
                 "rng must be 9 numbers (market, economy, external), 12 \
                  (plus jumps), 15 (plus volume), 18 (plus news), 21 \
@@ -2834,19 +2834,20 @@ impl PyEngine {
         }
         let mut counts: Vec<f64> = match snapshot.get_item("draw_counts")? {
             Some(v) => v.extract()?,
-            None => vec![0.0; 16],
+            None => vec![0.0; 2 * crate::rng::stream::COUNT],
         };
         // Fourteen numbers predate the overnight stream. That stream keeps
         // the position this engine holds, as its generator does below, so a
         // snapshot from before the stream restores exactly as it did then.
-        if counts.len() == 14 {
-            let (uniforms, normals) = self.inner.stream_positions()[7];
+        if counts.len() == 2 * (crate::rng::stream::COUNT - 1) {
+            let (uniforms, normals) = self.inner.stream_positions()[crate::rng::stream::COUNT - 1];
             counts.push(uniforms as f64);
             counts.push(normals as f64);
         }
-        if counts.len() != 16 {
+        if counts.len() != 2 * crate::rng::stream::COUNT {
             return Err(ValidationError::new_err(format!(
-                "draw_counts must be 16 numbers, two per stream, got {}",
+                "draw_counts must be {} numbers, two per stream, got {}",
+                2 * crate::rng::stream::COUNT,
                 counts.len()
             )));
         }
@@ -2876,7 +2877,7 @@ impl PyEngine {
         let volume = if rng.len() >= 15 { stream(12) } else { current.volume };
         let news = if rng.len() >= 18 { stream(15) } else { current.news };
         let volume_idio = if rng.len() >= 21 { stream(18) } else { current.volume_idio };
-        let overnight = if rng.len() >= 24 { stream(21) } else { current.overnight };
+        let overnight = if rng.len() >= 3 * crate::rng::stream::COUNT { stream(3 * (crate::rng::stream::COUNT - 1)) } else { current.overnight };
         self.inner.set_rng_state(crate::engine::EngineRngState {
             market: stream(0),
             economy: stream(3),
@@ -2889,7 +2890,7 @@ impl PyEngine {
         });
         if let Some(raw) = snapshot.get_item("draw_overlay")? {
             let entries: Vec<(u32, u8, u64, f64)> = raw.extract()?;
-            for id in 0..8u32 {
+            for id in 0..crate::rng::stream::COUNT as u32 {
                 self.inner.set_draw_overlay(id, None);
             }
             for (id, kind, index, value) in entries {
@@ -3334,7 +3335,7 @@ impl PyEngine {
                 // writes. On this un-recorded path the day has not closed, so
                 // there is no jump yet and the column is zeros (§74).
                 &std::array::from_fn(|k| {
-                    if k < 8 {
+                    if k < crate::market::factors::S_COMPONENT_KEYS.len() {
                         self.written(&self.buffer.components[k]).to_vec()
                     } else {
                         vec![0.0; self.written(&self.buffer.components[0]).len()]
@@ -3860,7 +3861,7 @@ impl PyNewsImpact {
 /// An alias rather than a second list. Declared twice, the two orderings would
 /// eventually disagree and every column would still look plausible -- the
 /// `truth` schema is generated from the same constant for the same reason.
-pub const FACTOR_NAMES: [&str; 10] = [
+pub const FACTOR_NAMES: [&str; crate::market::factors::COMPONENT_COUNT] = [
     crate::market::factors::S_COMPONENT_KEYS[0],
     crate::market::factors::S_COMPONENT_KEYS[1],
     crate::market::factors::S_COMPONENT_KEYS[2],

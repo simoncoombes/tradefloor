@@ -73,7 +73,7 @@ def test_the_contributions_are_the_declared_eleven_and_nothing_else():
     names = [child.name for child in result.root.children]
     assert names == list(ex.CONTRIBUTIONS)
     assert list(ex.CONTRIBUTIONS)[:10] == list(tf.Engine.FACTORS)
-    assert list(ex.CONTRIBUTIONS)[9:] == ["fair_value", "book"]
+    assert list(ex.CONTRIBUTIONS)[10:] == ["fair_value", "book"]
     assert all(child.kind == "factor" for child in result.root.children)
     assert result.root.kind == "move"
 
@@ -250,7 +250,9 @@ def test_a_check_costs_one_day_run_per_distinct_overlay():
         result = e.explain(e.tickers[0], 1)
         assert result.check() == []
         assert len(result._runs) == 15, size
-        assert len(result._walk) == (55 if HAS_PRINTS else 53), size
+        # Five nodes more since the overnight contribution joined: its
+        # factor node, its state and its dial leaves.
+        assert len(result._walk) == (60 if HAS_PRINTS else 58), size
         assert len(ex._addresses(result.root)) == 2736, size
 
 
@@ -1584,9 +1586,10 @@ def test_every_declared_site_is_in_the_draw_schedule():
             assert site in noise.SITES[stream], (mech.factor, site)
             assert scope in ("company", "sector", "market"), scope
             declared += 1
-    assert declared == 10
+    # Thirteen since the overnight move's three sites joined the ten.
+    assert declared == 13
     assert {m.factor for m in ex.MECHANISMS if m.sites} == {
-        "company_news", "random_noise", "jump", "book"}
+        "company_news", "random_noise", "jump", "book", "overnight"}
 
 
 def test_the_state_and_macro_names_do_not_collide():

@@ -115,7 +115,7 @@ def test_arms_share_every_other_draw():
     assert set(control.engine.stream_positions()) == set(noise.STREAMS)
     assert len(control.engine.draws_by_stream()) == 3
     blind = set(noise.STREAMS) - set(control.engine.draws_by_stream())
-    assert blind == {"jumps", "news", "volume", "volume_idio"}
+    assert blind == {"jumps", "news", "volume", "volume_idio", "overnight"}
 
     attribution = noise.attribute(root, (1, 1), noise.column("price", 2),
                                   "event", streams=["news", "jumps"])
@@ -401,7 +401,7 @@ def test_an_economy_attribution_carries_its_caveats():
     assert "draw count depends on its own state" in named[0]
     # and the measurement the caveat promises
     measured = [c for c in attribution.caveats
-                if "draw positions on all seven streams" in c]
+                if "draw positions on all eight streams" in c]
     assert len(measured) == 1
     assert f"all {len(attribution.rows)} arms" in measured[0]
 

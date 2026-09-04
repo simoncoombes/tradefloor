@@ -220,7 +220,7 @@ def test_a_snapshot_covers_every_column():
     # ECONOMY, EXTERNAL, JUMPS, VOLUME, NEWS, VOLUME_IDIO, OVERNIGHT.
     # Written as a count so adding a stream updates one number with a
     # reason beside it; the eighth is the overnight move's.
-    assert len(snapshot["rng"]) == 3 * 8
+    assert len(snapshot["rng"]) == 3 * len(tradefloor.noise.STREAMS)
 
 
 def test_absence_survives_a_snapshot_round_trip():

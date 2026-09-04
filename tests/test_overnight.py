@@ -69,7 +69,7 @@ def test_at_zero_no_price_moves_between_sessions_and_the_stream_still_draws():
             assert bars[(d, i)][0] == bars[(d - 1, i)][1], (d, i)
     snapshot = e.state_snapshot()
     counts = snapshot["draw_counts"]
-    assert len(counts) == 16
+    assert len(counts) == 2 * len(tf.noise.STREAMS)
     # One normal for the market, one per sector the ENGINE keeps (the
     # sector table, not the roster's own), one per name, at each of the
     # four opens, and no uniforms at all; the day mark carries the count.
@@ -144,7 +144,7 @@ def test_a_snapshot_carries_the_overnight_stream_and_restores_the_same_night():
         e.run_session(9, 30, 3, 60)
         e.close_market()
     snapshot = e.state_snapshot()
-    assert len(snapshot["rng"]) == 3 * 8
+    assert len(snapshot["rng"]) == 3 * len(tf.noise.STREAMS)
     twin = tf.Engine(seed=7, universe=UNIVERSE, model=model)
     twin.restore_state(snapshot)
     e.open_market()

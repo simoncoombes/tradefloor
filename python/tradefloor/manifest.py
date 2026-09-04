@@ -449,13 +449,14 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         for column in decoded:
             _f64(buf, column[i])
 
+    from .noise import STREAMS  # the stream count, derived rather than written
     rng = list(snapshot["rng"])
-    if len(rng) != 24:
+    if len(rng) != 3 * len(STREAMS):
         raise ValidationError(
             f"this snapshot carries {len(rng)} generator numbers and the "
-            "state hash covers 24: eight streams of state, increment and "
-            "Box-Muller spare. A snapshot from an earlier stream layout "
-            "froze a market this hash cannot describe."
+            f"state hash covers {3 * len(STREAMS)}: {len(STREAMS)} streams "
+            "of state, increment and Box-Muller spare. A snapshot from an "
+            "earlier stream layout froze a market this hash cannot describe."
         )
     for value in rng:
         _bits(buf, value)
@@ -465,7 +466,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _text(buf, ticker)
     _text(buf, snapshot["model_fingerprint"])
 
-    for name, width in (("attribution", 10), ("tick_components", 8),
+    from ._core import Engine  # the attribution width, one slot per factor
+    for name, width in (("attribution", len(Engine.FACTORS)), ("tick_components", 8),
                         ("tick_fundamental", 1), ("tick_anchor", 1)):
         for value in _column(snapshot[name], n * width, name):
             _f64(buf, value)
@@ -547,10 +549,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # decide what the engine draws next, so a leaf that skipped them would
     # call two states the same when one is patched and the other is not.
     counts = list(snapshot["draw_counts"])
-    if len(counts) != 16:
+    if len(counts) != 2 * len(STREAMS):
         raise ValidationError(
-            "draw_counts must be 16 numbers, a uniform and a normal count "
-            f"for each of the eight streams, got {len(counts)}."
+            f"draw_counts must be {2 * len(STREAMS)} numbers, a uniform and "
+            f"a normal count for each of the {len(STREAMS)} streams, got "
+            f"{len(counts)}."
         )
     for value in counts:
         _f64(buf, value)

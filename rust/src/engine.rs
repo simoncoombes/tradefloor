@@ -141,7 +141,7 @@ impl StreamDraws {
 pub struct DayMark {
     pub day: i64,
     /// `(uniforms, normals)` per stream, indexed by `crate::rng::stream`.
-    pub positions: [(u64, u64); 8],
+    pub positions: [(u64, u64); stream::COUNT],
     pub active: Vec<u32>,
     pub sectors: u32,
     pub ticks: u32,
@@ -272,7 +272,7 @@ pub struct Engine {
     /// missing until 2026-08-26, so on any preset carrying jumps the truth
     /// table's components did not reconstruct the move, §74), and the
     /// overnight move, which `apply_overnight` writes to `s` at the open.
-    attribution: Vec<[f64; 10]>,
+    attribution: Vec<[f64; crate::market::factors::COMPONENT_COUNT]>,
     /// This tick's ground truth, per company slot.
     ///
     /// `attribution` above sums across the day, which is what a scorer wants
@@ -586,7 +586,7 @@ impl Engine {
             companies,
             economy,
             central_bank,
-            attribution: vec![[0.0; 10]; companies_len],
+            attribution: vec![[0.0; crate::market::factors::COMPONENT_COUNT]; companies_len],
             tick_components: vec![[0.0; 8]; companies_len],
             // NaN, not zero: a company that has never ticked has no valuation,
             // and zero is a real one that would silently read as "worthless"
@@ -841,7 +841,7 @@ impl Engine {
     /// because the day mark and the day's news draws are taken there.
     pub fn set_current_day(&mut self, day: i64) {
         self.current_day = day;
-        for id in 0..8 {
+        for id in 0..stream::COUNT as u32 {
             self.stream_rng_mut(id).set_day(day);
         }
     }
@@ -851,8 +851,8 @@ impl Engine {
     }
 
     /// `(uniforms, normals)` taken so far on each stream, by stream id.
-    pub fn stream_positions(&self) -> [(u64, u64); 8] {
-        let mut out = [(0u64, 0u64); 8];
+    pub fn stream_positions(&self) -> [(u64, u64); stream::COUNT] {
+        let mut out = [(0u64, 0u64); stream::COUNT];
         for (id, slot) in out.iter_mut().enumerate() {
             *slot = self.stream_rng(id as u32).positions();
         }
@@ -884,7 +884,7 @@ impl Engine {
     /// a copy that will never be asked what it recorded, which is what
     /// the explanation store keeps.
     pub fn clear_draw_log_records(&mut self) {
-        for id in 0..7u32 {
+        for id in 0..stream::COUNT as u32 {
             self.stream_rng_mut(id).clear_log_records();
         }
     }
@@ -1217,7 +1217,7 @@ impl Engine {
     /// lie this port has already had to correct once. So the four live
     /// components are reported, and the squeeze is kept separate because it is
     /// genuinely a distinct mechanism.
-    pub fn attribution(&self) -> &[[f64; 10]] {
+    pub fn attribution(&self) -> &[[f64; crate::market::factors::COMPONENT_COUNT]] {
         &self.attribution
     }
 
@@ -1327,16 +1327,16 @@ impl Engine {
         let n = self.companies.len();
         // Nine-wide attribution rows predate the overnight slot; they
         // restore with that slot at zero, which is what such a day held.
-        let attribution: Vec<f64> = if n > 0 && attribution.len() == n * 9 {
+        let attribution: Vec<f64> = if n > 0 && attribution.len() == n * (crate::market::factors::COMPONENT_COUNT - 1) {
             attribution
-                .chunks_exact(9)
+                .chunks_exact(crate::market::factors::COMPONENT_COUNT - 1)
                 .flat_map(|c| c.iter().copied().chain(std::iter::once(0.0)))
                 .collect()
         } else {
             attribution.to_vec()
         };
         for (name, len, want) in [
-            ("attribution", attribution.len(), n * 10),
+            ("attribution", attribution.len(), n * crate::market::factors::COMPONENT_COUNT),
             ("tick_components", components.len(), n * 8),
             ("tick_fundamental", fundamental.len(), n),
             ("tick_anchor", anchor.len(), n),
@@ -1346,8 +1346,12 @@ impl Engine {
             }
         }
         self.attribution = attribution
-            .chunks_exact(10)
-            .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9]])
+            .chunks_exact(crate::market::factors::COMPONENT_COUNT)
+            .map(|c| {
+                let mut row = [0.0; crate::market::factors::COMPONENT_COUNT];
+                row.copy_from_slice(c);
+                row
+            })
             .collect();
         self.tick_components = components
             .chunks_exact(8)
@@ -1405,7 +1409,7 @@ impl Engine {
         // caller can still read yesterday's decomposition after the close has
         // run, which is when they would actually want it.
         self.attribution.clear();
-        self.attribution.resize(self.companies.len(), [0.0; 10]);
+        self.attribution.resize(self.companies.len(), [0.0; crate::market::factors::COMPONENT_COUNT]);
         self.tick_components.clear();
         self.tick_components.resize(self.companies.len(), [0.0; 8]);
         self.tick_fundamental.clear();
@@ -1607,7 +1611,7 @@ impl Engine {
                 company.stock.mispricing_s_prev_close = Some(prev + moved);
             }
             if let Some(acc) = self.attribution.get_mut(index) {
-                acc[9] += moved;
+                acc[crate::market::factors::OVERNIGHT_SLOT] += moved;
             }
             self.overnight_moves[index] = moved;
             // The opening print: fair value as of the open times exp(s),
@@ -2334,7 +2338,7 @@ impl Engine {
     /// the new one read a state that was not its own.
     pub fn add_company(&mut self, company: TickCompany) -> usize {
         self.companies.push(company);
-        self.attribution.push([0.0; 10]);
+        self.attribution.push([0.0; crate::market::factors::COMPONENT_COUNT]);
         self.tick_components.push([0.0; 8]);
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);
@@ -2925,7 +2929,7 @@ impl Engine {
             hash_f64(&mut buf, normals as f64);
         }
         let mut overlay: Vec<(u32, u8, u64, f64)> = Vec::new();
-        for id in 0..7u32 {
+        for id in 0..stream::COUNT as u32 {
             if let Some(table) = self.draw_overlay(id) {
                 for ((kind, index), value) in &table.table {
                     overlay.push((id, *kind as u8, *index, *value));

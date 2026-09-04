@@ -503,6 +503,9 @@ def test_attribution_reports_every_component_that_moves_a_price():
         # from pt-v4 (§74, §79).
         "circuit_breaker",
         "jump",
+        # The tenth arrived 2026-09-04: `apply_overnight` moves `s` at the
+        # open before any tick, and the tape books it on the day's first row.
+        "overnight",
     ]
 
 

@@ -54,6 +54,14 @@ pub const JUMP_COMPONENT_KEY: &str = "jump";
 /// tick of a day on any preset that carries the overnight process.
 pub const OVERNIGHT_COMPONENT_KEY: &str = "overnight";
 
+/// The jump's and the overnight move's slots in the engine's attribution,
+/// after the tick's components, and the width of an attribution row. Every
+/// array of components is sized from `COMPONENT_COUNT` rather than written
+/// out, for the reason `rng::stream::COUNT` gives.
+pub const JUMP_SLOT: usize = S_COMPONENT_KEYS.len();
+pub const OVERNIGHT_SLOT: usize = JUMP_SLOT + 1;
+pub const COMPONENT_COUNT: usize = OVERNIGHT_SLOT + 1;
+
 /// A name's loading on its sector factor, from its beta (§108).
 ///
 /// At slope zero the branch is not taken and the loading is exactly

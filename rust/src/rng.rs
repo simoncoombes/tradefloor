@@ -412,6 +412,13 @@ pub mod stream {
     /// reproduces bit for bit and the known-answer digests do not move.
     pub const OVERNIGHT: u32 = 7;
 
+    /// How many streams there are. Every array indexed by stream id, the
+    /// snapshot's generator and count vectors, the day mark's positions
+    /// and the loops that enable, clear or stamp every stream are sized
+    /// from this rather than written out: the eighth stream was met in
+    /// four places that had written seven, each found by a box.
+    pub const COUNT: usize = 8;
+
     /// Derived streams live at `256 + id`. See the module docs for why the
     /// offset exists.
     pub const STREAM_SEQUENCE_BASE: u32 = 256;

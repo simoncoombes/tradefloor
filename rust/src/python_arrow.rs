@@ -180,7 +180,7 @@ pub fn truth_batch(
     mispricing: &[f64],
     fundamental: &[f64],
     anchor: &[f64],
-    components: &[Vec<f64>; 10],
+    components: &[Vec<f64>; crate::market::factors::COMPONENT_COUNT],
 ) -> Result<RecordBatch, String> {
     let rows = ticks * instruments;
     if mispricing.len() < rows || fundamental.len() < rows || anchor.len() < rows {
@@ -706,7 +706,7 @@ pub struct RecordedDay {
     pub mispricing: Vec<f64>,
     pub fundamental: Vec<f64>,
     pub anchor: Vec<f64>,
-    pub components: [Vec<f64>; 10],
+    pub components: [Vec<f64>; crate::market::factors::COMPONENT_COUNT],
     /// The print decomposition. See [`prints_schema`].
     pub shock: Vec<f64>,
     pub absorbed: Vec<f64>,

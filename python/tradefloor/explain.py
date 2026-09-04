@@ -243,7 +243,11 @@ MECHANISMS: tuple[Mechanism, ...] = (
         sites=(("market", "market_factor_z", "market"),
                ("market", "sector_z", "sector"),
                ("market", "factor_idio_z", "company")),
-        via=("market::tick::simulate_market_tick",),
+        # The sector loading and the idiosyncratic scale moved out of the
+        # factor function into two helpers the overnight move shares.
+        via=("market::tick::simulate_market_tick",
+             "market::factors::sector_loading_for",
+             "market::factors::idio_scale_for"),
     ),
     Mechanism(
         factor="circuit_breaker",
@@ -278,6 +282,9 @@ MECHANISMS: tuple[Mechanism, ...] = (
         sites=(("overnight", "overnight_market_z", "market"),
                ("overnight", "overnight_sector_z", "sector"),
                ("overnight", "overnight_idio_z", "company")),
+        via=("market::factors::sector_loading_for",
+             "market::factors::idio_scale_for",
+             "market::tick::sector_sigma_for"),
     ),
     Mechanism(
         factor="fair_value",
