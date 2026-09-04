@@ -39,7 +39,7 @@ replays from the state the day started in.
 
 <!-- release-note-ends -->
 
-### The band rule is code and names its centre
+### One band rule with a named centre
 
 REALISM-BANDS.md's rule for a window-derived band drops "the single most
 extreme window" before taking the noise scale, and never said from what.
@@ -52,7 +52,7 @@ median's. The median is also the centre the trim's purpose needs, since a
 mean is pulled toward the member the trim is meant to drop. So
 `facts.BAND_RULE` now states the rule with its centre, `facts.trimmed_sd`,
 `shared_rule`, `round_outward` and `band_from_windows` implement it once,
-and `fear_band.py` and the test import them. No shipped band moves.
+and `fear_band.py` and the test import them, with no shipped band moving.
 
 The band step is now derivable. Seven of ten shipped 252-bar bands did not
 come out of the rule applied to `REAL_MARKETS_WINDOWS`, because the rule's
