@@ -797,7 +797,8 @@ REAL_MARKETS_PROVENANCE = {
 #:
 #: The 2019-07 window straddles the COVID crash and is EXCLUDED from band
 #: derivation, reported beside each band as the crisis reading. Every summary
-#: in `REAL_MARKETS_PROVENANCE` is taken over the nine non-crisis windows, and
+#: in `REAL_MARKETS_PROVENANCE` is taken over the nine non-crisis windows by
+#: `BAND_RULE` below, and
 #: `tests/test_reference_windows.py` derives all nine reproducible triples
 #: from this table rather than trusting that they match.
 #:
@@ -837,6 +838,115 @@ REAL_MARKETS_WINDOWS = {
     "not_derivable": {
         "abs_return_acf5": "its provenance summarises a different window set, "
                            "an eight-value list rather than these nine",
+    },
+}
+
+#: The band rule every window-derived band on this panel is built with, as
+#: code rather than as a sentence three tools and a test each paraphrased.
+#: REALISM-BANDS.md states it: over the non-crisis windows, s is the sample sd
+#: with the single most extreme window dropped, the band is [min - s, max + s]
+#: and each edge is rounded outward at the rule's precision. "Most extreme"
+#: needs a centre, and the sentence never named one. It is the MEDIAN, for the
+#: reason the trim exists: the trim keeps one draw from inflating the noise
+#: scale it is priced in, and a mean is pulled toward the very member the trim
+#: is meant to drop, so a mean-centred trim can drop a different window when a
+#: cluster sits on the other side of it. Two shipped edges sit where the two
+#: centres disagree, the 252-bar `cross_sectional_corr` floor and the 505-bar
+#: `sector_excess_corr` ceiling, and both are the median's. Before this
+#: constant existed the test helper and one design-repo tool trimmed around
+#: the mean and the two band tools around the median; every band they had
+#: produced was checked against both, and only those two edges differed.
+BAND_RULE = (
+    "over the non-crisis windows: s is the across-window sample sd with the "
+    "single window farthest from the MEDIAN dropped; band = [min - s, max + s] "
+    "over the untrimmed windows; each edge rounded outward, to two decimal "
+    "places, or to two significant figures for volatility and kurtosis"
+)
+
+#: The rows whose band edges round to two significant figures rather than two
+#: decimal places: the two whose scale is tens rather than hundredths.
+TWO_SIGNIFICANT_FIGURES = frozenset({"annualised_vol_pct", "excess_kurtosis"})
+
+
+def trimmed_sd(values: Sequence[float]) -> float:
+    """The across-window sd with the window farthest from the median dropped.
+
+    Fewer than three values cannot be trimmed and give the plain sample sd,
+    or zero for a single value, which is what the two band tools did.
+    """
+    values = list(values)
+    if len(values) < 3:
+        return statistics.stdev(values) if len(values) > 1 else 0.0
+    centre = statistics.median(values)
+    kept = sorted(values, key=lambda v: abs(v - centre))[:-1]
+    return statistics.stdev(kept)
+
+
+def shared_rule(values: Sequence[float]) -> tuple[float, float, float]:
+    """`BAND_RULE` before rounding: (min - s, max + s, s) over the values."""
+    values = list(values)
+    s = trimmed_sd(values)
+    return (min(values) - s, max(values) + s, s)
+
+
+def round_outward(value: float, edge: str, key: str) -> float:
+    """One band edge rounded away from the interior at the rule's precision."""
+    if key in TWO_SIGNIFICANT_FIGURES:
+        if value == 0:
+            return 0.0
+        magnitude = math.floor(math.log10(abs(value)))
+        quantum = 10.0 ** (magnitude - 1)
+    else:
+        quantum = 0.01
+    if edge == "low":
+        return math.floor(value / quantum) * quantum
+    if edge == "high":
+        return math.ceil(value / quantum) * quantum
+    raise ValueError(f"edge must be 'low' or 'high', not {edge!r}")
+
+
+def band_from_windows(key: str, values: Sequence[float]) -> tuple[float, float]:
+    """`BAND_RULE` in full: the rounded band the windows alone produce for `key`."""
+    low, high, _ = shared_rule(values)
+    return (round_outward(low, "low", key), round_outward(high, "high", key))
+
+
+#: Where a shipped 252-bar band departs from `band_from_windows` on its nine
+#: non-crisis windows, and why: `{row: {edge: (shipped value, kind, reason)}}`.
+#: REALISM-BANDS.md allows an edge to move OUTWARD to a retrieved,
+#: horizon-compatible literature value, and names two INWARD clamps, both sign
+#: corrections every retrieved source supports. This table is those moves as
+#: data, so `tests/test_reference_windows.py` derives every shipped band as
+#: the rule plus its named adjustment and a band that is neither is caught.
+#: A row absent here ships the rule's band exactly. `abs_return_acf5` is
+#: absent because its provenance summarises a different window set and its
+#: band is not derivable from `REAL_MARKETS_WINDOWS` at all.
+#:
+#: Clamp #2 has a cost the table states: the 2020-07..2021-07 window reads
+#: +0.014, inside the rule's ceiling of +0.06 and outside the clamped 0.00, so
+#: the clamp rejects one real year in nine. It decides no current verdict
+#: (every certified reading is negative) and it is what keeps `_verdict`'s
+#: "too weak" wording correct for a reversed effect. Whether the sign prior
+#: outranks the excluded window is a ruling, recorded as open.
+REAL_MARKETS_ADJUSTMENTS: dict[str, dict[str, tuple[float, str, str]]] = {
+    "annualised_vol_pct": {
+        "high": (36.0, "outward",
+                 "Campbell, Lettau, Malkiel & Xu (2022): a typical stock's "
+                 "total annualised vol is about 36 since 1997; the rule's 34 "
+                 "is the windows' 30.7 plus s, rounded"),
+    },
+    "abs_return_acf1": {
+        "low": (0.02, "inward",
+                "clamp #1: zero or negative clustering appears in no "
+                "retrieved source and no observed window; the rule's -0.01 "
+                "would admit a model with no volatility memory"),
+    },
+    "leverage_effect": {
+        "high": (0.0, "inward",
+                 "clamp #2: every retrieved source gives the effect a negative "
+                 "sign, and the rule's +0.06 would certify a reversed effect as "
+                 "real-market behaviour; the cost is the 2020-07..2021-07 "
+                 "window at +0.014, excluded"),
     },
 }
 
