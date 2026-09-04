@@ -80,7 +80,7 @@ def epoch(day: str) -> int:
     return calendar.timegm(time.strptime(day, "%Y-%m-%d"))
 
 
-def fetch(symbol: str, start: str, end: str) -> dict:
+def fetch(symbol: str, start: str, end: str, ohlc: bool = False) -> dict:
     """Daily bars for ``symbol`` between two dates, cached on disk.
 
     Returns ``{"symbol", "url", "fetched", "rows": [[date, close, volume,
@@ -91,9 +91,15 @@ def fetch(symbol: str, start: str, end: str) -> dict:
     (an index reports none). A cache written before the fourth column
     existed carries three-element rows, so a reader of the unadjusted
     close checks the row length rather than assuming it.
+
+    With ``ohlc`` the unadjusted open is kept as a fifth element, which
+    is what an overnight return needs, and the series is cached under its
+    own key so a cache written for the four-column readers, and the
+    fetch time their provenance quotes, is left exactly as it was.
     """
     os.makedirs(CACHE, exist_ok=True)
-    path = os.path.join(CACHE, f"{symbol.strip('^')}_{start}_{end}.json")
+    suffix = "_ohlc" if ohlc else ""
+    path = os.path.join(CACHE, f"{symbol.strip('^')}_{start}_{end}{suffix}.json")
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
             return json.load(f)
@@ -107,16 +113,20 @@ def fetch(symbol: str, start: str, end: str) -> dict:
     adj = res["indicators"]["adjclose"][0]["adjclose"]
     vol = quote.get("volume") or [None] * len(ts)
     raw = quote.get("close") or [None] * len(ts)
+    opens = quote.get("open") or [None] * len(ts)
     rows = []
-    for t, a, v, c in zip(ts, adj, vol, raw):
+    for t, a, v, c, o in zip(ts, adj, vol, raw, opens):
         if a is None or a <= 0:
             continue
         # Not time.gmtime: on Windows it refuses a negative timestamp, and
         # a session before 1970 is one, so a long index history could not be
         # fetched there. The arithmetic form gives the same UTC date.
-        rows.append([_utc_date(t), float(a),
-                     None if v is None else float(v),
-                     None if c is None else float(c)])
+        row = [_utc_date(t), float(a),
+               None if v is None else float(v),
+               None if c is None else float(c)]
+        if ohlc:
+            row.append(None if o is None else float(o))
+        rows.append(row)
     rows.sort()
     out = {"symbol": symbol, "url": url,
            "fetched": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
