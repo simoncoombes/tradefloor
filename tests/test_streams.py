@@ -174,7 +174,7 @@ def test_a_snapshot_carries_every_stream():
     # fires, so a snapshot that omitted it would restore to a different jump
     # sequence while looking correct -- harmless while jumps are inert, and
     # silently wrong the day they are not.
-    assert len(snapshot["rng"]) == 3 * 7
+    assert len(snapshot["rng"]) == 3 * 8
 
     restored = tradefloor.Engine(seed=3, universe=UNIVERSE)
     restored.restore_state(snapshot)

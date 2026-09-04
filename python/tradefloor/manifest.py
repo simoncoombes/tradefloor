@@ -361,7 +361,7 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     ## What it covers
 
     Every field the snapshot carries, in one fixed order: the eighteen
-    columns instrument by instrument, the seven generator states, the roster
+    columns instrument by instrument, the eight generator states, the roster
     and the model fingerprint, the day accumulators and the market-open flag,
     the market factor's variance, the volume states, the universe stress, the
     forced-flow budget, the growth term's nominal base, the day's endogenous
@@ -450,10 +450,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
             _f64(buf, column[i])
 
     rng = list(snapshot["rng"])
-    if len(rng) != 21:
+    if len(rng) != 24:
         raise ValidationError(
             f"this snapshot carries {len(rng)} generator numbers and the "
-            "state hash covers 21: seven streams of state, increment and "
+            "state hash covers 24: eight streams of state, increment and "
             "Box-Muller spare. A snapshot from an earlier stream layout "
             "froze a market this hash cannot describe."
         )
@@ -465,7 +465,7 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _text(buf, ticker)
     _text(buf, snapshot["model_fingerprint"])
 
-    for name, width in (("attribution", 9), ("tick_components", 8),
+    for name, width in (("attribution", 10), ("tick_components", 8),
                         ("tick_fundamental", 1), ("tick_anchor", 1)):
         for value in _column(snapshot[name], n * width, name):
             _f64(buf, value)
@@ -542,15 +542,15 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _u32(buf, snapshot["day_count"])
 
     # The draw-addressing layer's two fields, in the order the snapshot
-    # carries them: the seven streams' uniform and normal positions
+    # carries them: the eight streams' uniform and normal positions
     # flattened in pairs, then the substitutions installed on them. Both
     # decide what the engine draws next, so a leaf that skipped them would
     # call two states the same when one is patched and the other is not.
     counts = list(snapshot["draw_counts"])
-    if len(counts) != 14:
+    if len(counts) != 16:
         raise ValidationError(
-            "draw_counts must be 14 numbers, a uniform and a normal count "
-            f"for each of the seven streams, got {len(counts)}."
+            "draw_counts must be 16 numbers, a uniform and a normal count "
+            f"for each of the eight streams, got {len(counts)}."
         )
     for value in counts:
         _f64(buf, value)

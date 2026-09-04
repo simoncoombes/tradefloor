@@ -106,6 +106,8 @@ pub struct EngineRngState {
     /// it was checkpointed on, which is invisible while news is inert and
     /// silently wrong the day a preset switches it on.
     pub news: RngState,
+    /// The overnight stream, carried for the same reason.
+    pub overnight: RngState,
 }
 
 /// Cumulative draws per stream. Diagnostic, per D-R1: the single most
@@ -139,7 +141,7 @@ impl StreamDraws {
 pub struct DayMark {
     pub day: i64,
     /// `(uniforms, normals)` per stream, indexed by `crate::rng::stream`.
-    pub positions: [(u64, u64); 7],
+    pub positions: [(u64, u64); 8],
     pub active: Vec<u32>,
     pub sectors: u32,
     pub ticks: u32,
@@ -246,6 +248,11 @@ pub struct Engine {
     volume_rng: GameRng,
     volume_idio_rng: GameRng,
     news_rng: GameRng,
+    overnight_rng: GameRng,
+    /// The move each name's `s` took at the last open under the overnight
+    /// process, in roster order, 0.0 where nothing moved. Per-day state
+    /// like the attribution: the tape books it onto the day's first row.
+    overnight_moves: Vec<f64>,
     /// The day's endogenous news, generated once in `open_market` (§117).
     /// A field rather than a local because a tick loop and a single
     /// `run_session` are two spellings of the same day and both must read
@@ -260,11 +267,12 @@ pub struct Engine {
     /// Four entries per company -- company_news, order_flow_impact,
     /// short_squeeze_effect, random_noise -- summed tick by tick and reset at
     /// `open_market`.
-    /// Eight slots: the tick's seven `S_COMPONENT_KEYS` plus the daily
-    /// jump, which `apply_jumps` writes to `s` outside the tick loop. It was
+    /// Ten slots: the tick's eight `S_COMPONENT_KEYS`, the daily jump,
+    /// which `apply_jumps` writes to `s` outside the tick loop (it was
     /// missing until 2026-08-26, so on any preset carrying jumps the truth
-    /// table's components did not reconstruct the move (§74).
-    attribution: Vec<[f64; 9]>,
+    /// table's components did not reconstruct the move, §74), and the
+    /// overnight move, which `apply_overnight` writes to `s` at the open.
+    attribution: Vec<[f64; 10]>,
     /// This tick's ground truth, per company slot.
     ///
     /// `attribution` above sums across the day, which is what a scorer wants
@@ -573,10 +581,12 @@ impl Engine {
             volume_rng: GameRng::substream(seed, stream::VOLUME),
             volume_idio_rng: GameRng::substream(seed, stream::VOLUME_IDIO),
             news_rng: GameRng::substream(seed, stream::NEWS),
+            overnight_rng: GameRng::substream(seed, stream::OVERNIGHT),
+            overnight_moves: vec![0.0; companies_len],
             companies,
             economy,
             central_bank,
-            attribution: vec![[0.0; 9]; companies_len],
+            attribution: vec![[0.0; 10]; companies_len],
             tick_components: vec![[0.0; 8]; companies_len],
             // NaN, not zero: a company that has never ticked has no valuation,
             // and zero is a real one that would silently read as "worthless"
@@ -728,6 +738,7 @@ impl Engine {
             volume: self.volume_rng.snapshot(),
             volume_idio: self.volume_idio_rng.snapshot(),
             news: self.news_rng.snapshot(),
+            overnight: self.overnight_rng.snapshot(),
         }
     }
 
@@ -746,6 +757,7 @@ impl Engine {
         self.volume_rng = GameRng::restore(state.volume);
         self.volume_idio_rng = GameRng::restore(state.volume_idio);
         self.news_rng = GameRng::restore(state.news);
+        self.overnight_rng = GameRng::restore(state.overnight);
     }
 
     /// Cumulative draws across all three streams. The per-stream split is
@@ -772,6 +784,7 @@ impl Engine {
             stream::VOLUME => &self.volume_rng,
             stream::NEWS => &self.news_rng,
             stream::VOLUME_IDIO => &self.volume_idio_rng,
+            stream::OVERNIGHT => &self.overnight_rng,
             _ => panic!("unknown stream {id}"),
         }
     }
@@ -785,6 +798,7 @@ impl Engine {
             stream::VOLUME => &mut self.volume_rng,
             stream::NEWS => &mut self.news_rng,
             stream::VOLUME_IDIO => &mut self.volume_idio_rng,
+            stream::OVERNIGHT => &mut self.overnight_rng,
             _ => panic!("unknown stream {id}"),
         }
     }
@@ -837,8 +851,8 @@ impl Engine {
     }
 
     /// `(uniforms, normals)` taken so far on each stream, by stream id.
-    pub fn stream_positions(&self) -> [(u64, u64); 7] {
-        let mut out = [(0u64, 0u64); 7];
+    pub fn stream_positions(&self) -> [(u64, u64); 8] {
+        let mut out = [(0u64, 0u64); 8];
         for (id, slot) in out.iter_mut().enumerate() {
             *slot = self.stream_rng(id as u32).positions();
         }
@@ -1203,7 +1217,7 @@ impl Engine {
     /// lie this port has already had to correct once. So the four live
     /// components are reported, and the squeeze is kept separate because it is
     /// genuinely a distinct mechanism.
-    pub fn attribution(&self) -> &[[f64; 9]] {
+    pub fn attribution(&self) -> &[[f64; 10]] {
         &self.attribution
     }
 
@@ -1311,8 +1325,18 @@ impl Engine {
         anchor: &[f64],
     ) -> Result<(), String> {
         let n = self.companies.len();
+        // Nine-wide attribution rows predate the overnight slot; they
+        // restore with that slot at zero, which is what such a day held.
+        let attribution: Vec<f64> = if n > 0 && attribution.len() == n * 9 {
+            attribution
+                .chunks_exact(9)
+                .flat_map(|c| c.iter().copied().chain(std::iter::once(0.0)))
+                .collect()
+        } else {
+            attribution.to_vec()
+        };
         for (name, len, want) in [
-            ("attribution", attribution.len(), n * 9),
+            ("attribution", attribution.len(), n * 10),
             ("tick_components", components.len(), n * 8),
             ("tick_fundamental", fundamental.len(), n),
             ("tick_anchor", anchor.len(), n),
@@ -1322,8 +1346,8 @@ impl Engine {
             }
         }
         self.attribution = attribution
-            .chunks_exact(9)
-            .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8]])
+            .chunks_exact(10)
+            .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9]])
             .collect();
         self.tick_components = components
             .chunks_exact(8)
@@ -1381,7 +1405,7 @@ impl Engine {
         // caller can still read yesterday's decomposition after the close has
         // run, which is when they would actually want it.
         self.attribution.clear();
-        self.attribution.resize(self.companies.len(), [0.0; 9]);
+        self.attribution.resize(self.companies.len(), [0.0; 10]);
         self.tick_components.clear();
         self.tick_components.resize(self.companies.len(), [0.0; 8]);
         self.tick_fundamental.clear();
@@ -1458,7 +1482,156 @@ impl Engine {
             }
         }
 
+        // The night, before the day's marks are set, so the session band
+        // anchors on the post-gap open and the gap sits outside it.
+        self.apply_overnight();
+
         reset_daily_prices(&mut self.companies);
+    }
+
+    /// The overnight move, applied once per name at the open, before the
+    /// day's marks are set.
+    ///
+    /// Nothing moved a price between sessions before this: the price after
+    /// `open_market` was the price after the previous `close_market` on
+    /// every name-night, the jump the close wrote to `s` reached the price
+    /// through the next session's ticks, and the day bar's open read the
+    /// first of them (issue #179). Real large caps carry a fifth to two
+    /// fifths of their daily variance overnight: the forty-name reference
+    /// panel reads a median share of 0.33 across nine non-crisis windows,
+    /// band 0.23 to 0.43, by `tools/calibration/overnight_band.py`.
+    ///
+    /// # What the night carries
+    ///
+    /// Two things, and only the second is a draw. The state that changed
+    /// between the close and the open is realised in the OPENING PRINT
+    /// rather than dribbled through the first ticks: the price the session
+    /// opens at is fair value as of the open, with the macro step the close
+    /// advanced inside it, times `exp(s)`, with the close's jump inside
+    /// that. That is what puts the jump's discontinuity where a real
+    /// earnings gap sits, at the open, and it is what gives the night its
+    /// shape: the reference panel's nights put 0.50 to 0.68 of their
+    /// variance in the largest five percent, against 0.36 to 0.49 for the
+    /// sessions and 0.28 for a Gaussian.
+    ///
+    /// And the night's own diffusion: one normal for the market, one per
+    /// sector and one per name on the [`stream::OVERNIGHT`] stream,
+    /// composed exactly as a session's factor structure is, beta on the
+    /// market factor at its conditional daily sigma, the sector loading on
+    /// the sector factor, the name's own GARCH sigma at its idiosyncratic
+    /// scale and size multiplier, and the whole scaled by the square root
+    /// of `overnight_variance_ratio`. The composition is the session's
+    /// because the reference panel's nights and sessions read the same
+    /// cross-sectional correlation, 0.77 to 1.47 times each other across
+    /// windows with no direction; what differs is the size, which the dial
+    /// carries, and the shape, which the jump landing here supplies. The
+    /// session's crash amplifier, downside tilt, forced flow and book are
+    /// session mechanisms and do not run overnight.
+    ///
+    /// The move lands on `s`, the channel news and the jump use, so it
+    /// reverts on the mispricing's own half-life, about one percent of the
+    /// night over the following session, against the panel's pooled
+    /// reversal slope of -0.02 with a window range of -0.10 to -0.01. It
+    /// is kept out of the close's momentum roll, as the jump's carried
+    /// share is, because a gap is not herding.
+    ///
+    /// # Draw discipline
+    ///
+    /// The draws are taken unconditionally on their own stream, one normal
+    /// for the market, one per sector, one per company in roster order, so
+    /// the schedule cannot depend on the dial and no other stream moves. At
+    /// a ratio of exactly 0.0 nothing after the draws runs: no state is
+    /// touched, and every preset before this dial is bit-identical, the
+    /// known-answer digests included, since this stream is not among the
+    /// three `draws_consumed` counts. A name that has not ticked yet has
+    /// no `s` and is left alone, so the first session opens at the
+    /// universe's own prices as it always did.
+    fn apply_overnight(&mut self) {
+        let sectors = self.sector_keys.len();
+        self.overnight_rng.site(Site::OvernightMarketZ, 0);
+        let z_market = self.overnight_rng.next_normal();
+        let mut z_sector = Vec::with_capacity(sectors);
+        for k in 0..sectors {
+            self.overnight_rng.site(Site::OvernightSectorZ, k as u32);
+            z_sector.push(self.overnight_rng.next_normal());
+        }
+        let mut z_idio = Vec::with_capacity(self.companies.len());
+        for i in 0..self.companies.len() {
+            self.overnight_rng.site(Site::OvernightIdioZ, i as u32);
+            z_idio.push(self.overnight_rng.next_normal());
+        }
+        self.overnight_moves.clear();
+        self.overnight_moves.resize(self.companies.len(), 0.0);
+        let ratio = self.params.overnight_variance_ratio;
+        if ratio == 0.0 {
+            return;
+        }
+        let p = &self.params;
+        let scale = mathx::sqrt(ratio);
+        let market_sigma_daily = self.market_vol.sigma_daily();
+        let sector_sigma = crate::market::tick::sector_sigma_for(p, &self.economy);
+        let econ_view = EconomyValuationInputs {
+            corporate_bond_yield: Some(self.economy.corporate_bond_yield),
+            federal_funds_rate: self.economy.federal_funds_rate,
+            qe_pe_boost: Some(self.economy.qe_pe_boost),
+            qe_assets_ratio: Some(self.economy.qe_assets_ratio),
+        };
+        let nominal =
+            crate::market::tick::nominal_scale(p, &self.economy, self.nominal_output_base);
+        for (index, company) in self.companies.iter_mut().enumerate() {
+            if company.is_bankrupt || !company.is_public {
+                continue;
+            }
+            let Some(s) = company.stock.mispricing_s else {
+                continue;
+            };
+            let beta = company.stock.beta.unwrap_or(1.0);
+            let market = beta * market_sigma_daily * z_market;
+            let sector = match self.sector_keys.iter().position(|k| *k == company.sector) {
+                Some(k) => {
+                    crate::market::factors::sector_loading_for(p, beta) * sector_sigma * z_sector[k]
+                }
+                None => 0.0,
+            };
+            let daily_sigma = mathx::sqrt(mathx::max(company.stock.garch_variance, 0.0001));
+            let idio = daily_sigma
+                * crate::market::factors::idio_scale_for(p, beta)
+                * crate::market::factors::cap_size_multiplier_with(p, company.stock.market_cap)
+                * z_idio[index];
+            let night = scale * (market + sector + idio);
+            let after = crate::market::tick::clamp_s(p, s + night);
+            let moved = after - s;
+            company.stock.mispricing_s = Some(after);
+            if let Some(prev) = company.stock.mispricing_s_prev_close {
+                company.stock.mispricing_s_prev_close = Some(prev + moved);
+            }
+            if let Some(acc) = self.attribution.get_mut(index) {
+                acc[9] += moved;
+            }
+            self.overnight_moves[index] = moved;
+            // The opening print: fair value as of the open times exp(s),
+            // the same valuation the first tick would otherwise have
+            // settled the print toward over the session.
+            let valuation = if nominal == 1.0 {
+                company.valuation()
+            } else {
+                crate::market::tick::scale_valuation(company.valuation(), nominal)
+            };
+            let fv = compute_fair_value_with(
+                &valuation, &econ_view, p.fair_value_book_floor,
+                p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate,
+            )
+            .fair_value;
+            let price = mathx::min(mathx::max(fv * mathx::exp(after), 0.01), p.price_hard_cap);
+            company.stock.price = price;
+            company.stock.market_cap = price * company.stock.shares_outstanding;
+        }
+    }
+
+    /// The move each name's `s` took at the last open under the overnight
+    /// process, in roster order; 0.0 where nothing moved.
+    pub fn overnight_moves(&self) -> &[f64] {
+        &self.overnight_moves
     }
 
     /// Close-of-day bookkeeping. Zero draws.
@@ -2157,7 +2330,7 @@ impl Engine {
     /// the new one read a state that was not its own.
     pub fn add_company(&mut self, company: TickCompany) -> usize {
         self.companies.push(company);
-        self.attribution.push([0.0; 9]);
+        self.attribution.push([0.0; 10]);
         self.tick_components.push([0.0; 8]);
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);
@@ -2610,12 +2783,12 @@ impl Engine {
             }
         }
 
-        // The seven generator states, in the order the snapshot's flat `rng`
+        // The eight generator states, in the order the snapshot's flat `rng`
         // array carries them. Raw bit patterns, per the encoding note above.
         let rng = self.rng_state();
         for state in [
             rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
-            rng.news, rng.volume_idio,
+            rng.news, rng.volume_idio, rng.overnight,
         ] {
             hash_u64(&mut buf, state.state);
             hash_u64(&mut buf, state.increment);

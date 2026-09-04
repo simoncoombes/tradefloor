@@ -360,6 +360,11 @@ PERTURBATIONS = [
     # draws BY running the economy, so the count is the mechanism rather
     # than a side effect of it.
     ("macro_burn_in_days", 30.0, True),
+    # The overnight move's variance as a fraction of a session's. It moves
+    # the market from the second day's open: a name has no `s` before its
+    # first tick, so the first session opens where it always did, and every
+    # open after it carries a gap.
+    ("overnight_variance_ratio", 0.5, True),
     # How much of the jump's drift is given back. The compensator is
     # subtracted every day whether or not a jump fires, so unlike its two
     # neighbours it bites on the first close.

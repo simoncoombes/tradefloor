@@ -216,6 +216,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # horizon the burn-in that measured both ran to. Past that the box would
     # describe a transient nobody has measured.
     "macro_burn_in_days": (0.0, 1095.0),
+    # The overnight move's variance as a fraction of a session's. 0.0 is no
+    # overnight process, which is every earlier preset; 1.0 is a night as
+    # large as a session, above anything the real panel reads; past it the
+    # night would carry more than the day, which no window has shown.
+    "overnight_variance_ratio": (0.0, 1.0),
     # How much of the jump's own drift is given back. 0.0 is the
     # uncompensated process, 1.0 is the martingale, and past 1.0 the
     # compensator exceeds the drift and the jump pushes the other way.

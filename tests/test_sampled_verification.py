@@ -258,7 +258,7 @@ def test_the_hash_moves_when_any_snapshot_field_moves():
     def slots(prefix):
         return sum(1 for label in labels if label.startswith(prefix))
 
-    assert slots("rng[") == 21
+    assert slots("rng[") == 24
     assert slots("market_variance[") == 6
     assert slots("economy.gdp_trend[") == 4
     assert slots("tickers[") == len(UNIVERSE)

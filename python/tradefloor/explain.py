@@ -182,7 +182,7 @@ class Mechanism(NamedTuple):
     offset: int = 0
 
 
-#: The Rust that produced each contribution. The nine ``truth()`` columns
+#: The Rust that produced each contribution. The ten ``truth()`` columns
 #: in ``Engine.FACTORS`` order, then the two that close the arithmetic
 #: between the mispricing decomposition and the tape.
 MECHANISMS: tuple[Mechanism, ...] = (
@@ -271,6 +271,15 @@ MECHANISMS: tuple[Mechanism, ...] = (
         offset=-1,
     ),
     Mechanism(
+        factor="overnight",
+        function="engine::Engine::apply_overnight",
+        state=("mispricing_s", "mispricing_s_prev_close", "price"),
+        dials=("overnight_variance_ratio",),
+        sites=(("overnight", "overnight_market_z", "market"),
+               ("overnight", "overnight_sector_z", "sector"),
+               ("overnight", "overnight_idio_z", "company")),
+    ),
+    Mechanism(
         factor="fair_value",
         function="fair_value::compute_fair_value_with",
         macro=("qe_pe_boost",),
@@ -289,11 +298,11 @@ MECHANISMS: tuple[Mechanism, ...] = (
     ),
 )
 
-#: The contributions the root carries, in order: the nine ``truth()``
+#: The contributions the root carries, in order: the ten ``truth()``
 #: columns and the two that close the arithmetic to the printed move.
 #:
 #: Named for what they are rather than ``FACTORS``, which is what
-#: ``Engine.FACTORS`` calls the nine. Two names for two different lists
+#: ``Engine.FACTORS`` calls the ten. Two names for two different lists
 #: is a trap for anyone importing both.
 CONTRIBUTIONS: tuple[str, ...] = tuple(m.factor for m in MECHANISMS)
 

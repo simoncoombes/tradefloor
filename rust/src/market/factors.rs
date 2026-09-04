@@ -48,6 +48,68 @@ use crate::mathx;
 /// preset that carries jumps (§74).
 pub const JUMP_COMPONENT_KEY: &str = "jump";
 
+/// The overnight move's slot in the ENGINE's attribution, after the jump.
+/// `Engine::apply_overnight` moves `mispricing_s` at the open, before any
+/// tick, so a decomposition without it would not reconstruct the first
+/// tick of a day on any preset that carries the overnight process.
+pub const OVERNIGHT_COMPONENT_KEY: &str = "overnight";
+
+/// A name's loading on its sector factor, from its beta (§108).
+///
+/// At slope zero the branch is not taken and the loading is exactly
+/// `sector_loading`, so a preset that sets neither is bit-identical. Shared
+/// by the tick and the overnight move so the two compose a name the same
+/// way; the tick's arithmetic is this function's, operation for operation.
+pub fn sector_loading_for(params: &crate::params::ModelParams, beta: f64) -> f64 {
+    if params.sector_loading_beta_slope == 0.0 {
+        params.sector_loading
+    } else {
+        // Tied to beta rather than to a new draw: a name that moves more
+        // with the market plausibly moves more with its industry too, and
+        // reusing an existing per-name attribute costs no RNG stream and
+        // cannot shift the draw schedule.
+        let b = beta;
+        params.sector_loading * (1.0 + params.sector_loading_beta_slope * (b - 1.0))
+    }
+}
+
+/// A name's idiosyncratic scale, from its beta.
+///
+/// The idiosyncratic scale was one number for every name in the roster:
+/// cap size varies a name's noise through `cap_mult` and GARCH varies it
+/// through the name's own conditional variance, but the SCALE itself did
+/// not vary at all. Real rosters disperse well past that -- interquartile
+/// volatility ratio 1.273..1.486 over ten reference windows against
+/// pt-v12's 1.205 -- and no dial that moves every name together closes a
+/// dispersion gap.
+///
+/// At exponent zero the branch is not taken and the scale is exactly
+/// `idio_sigma_scale`, so a preset that leaves it unset is bit-identical.
+/// Shared by the tick and the overnight move, as `sector_loading_for` is.
+pub fn idio_scale_for(params: &crate::params::ModelParams, beta: f64) -> f64 {
+    if params.idio_sigma_beta_exponent == 0.0 {
+        params.idio_sigma_scale
+    } else if beta <= 0.0 {
+        // A non-positive beta has no exposure to raise to a power, and
+        // `pow` of a negative base with a fractional exponent is NaN. The
+        // homogeneous scale is the honest answer, following
+        // `cap_size_multiplier_with`'s treatment of a non-positive cap.
+        params.idio_sigma_scale
+    } else {
+        // Same choice as `sector_loading_beta_slope`: tied to beta, which
+        // the universe already carries, so it costs no RNG stream and
+        // cannot move the draw schedule.
+        //
+        // Bounded for the same reason the size effect is: a power law is
+        // unbounded as its base leaves the ordinary range, and a degenerate
+        // beta must not be able to silence a name or let one dominate the
+        // roster's whole variance budget.
+        let (lo, hi) = IDIO_BETA_BOUNDS;
+        params.idio_sigma_scale
+            * mathx::clamp(mathx::pow(beta, params.idio_sigma_beta_exponent), lo, hi)
+    }
+}
+
 pub const S_COMPONENT_KEYS: [&str; 8] = [
     "reversion",
     "momentum",
@@ -420,18 +482,10 @@ pub fn calculate_live_factors(
     // systematic loading the model did not let vary, where its exposure to
     // the MARKET varies by beta two lines above.
     //
-    // At slope zero the branch is not taken and the loading is exactly
-    // `sector_loading`, so a preset that sets neither is bit-identical.
-    let sector_loading = if params.sector_loading_beta_slope == 0.0 {
-        params.sector_loading
-    } else {
-        // Tied to beta rather than to a new draw: a name that moves more
-        // with the market plausibly moves more with its industry too, and
-        // reusing an existing per-name attribute costs no RNG stream and
-        // cannot shift the draw schedule.
-        let b = beta;
-        params.sector_loading * (1.0 + params.sector_loading_beta_slope * (b - 1.0))
-    };
+    // The loading and the scale are `sector_loading_for` and
+    // `idio_scale_for`, shared with the overnight move so the two compose
+    // a name the same way; each is the arithmetic that stood here.
+    let sector_loading = sector_loading_for(params, beta);
     let sector_component = sector_loading * shared.sector(&company.sector);
 
     // `garchVariance` is in DAILY units; the tick needs per-tick sigma.
@@ -440,37 +494,7 @@ pub fn calculate_live_factors(
     // term's budget, so total volatility holds still. At 1.0 the multiply
     // is bit-inert.
     let daily_sigma = mathx::sqrt(mathx::max(company.garch_variance, 0.0001));
-    // The idiosyncratic scale was one number for every name in the roster:
-    // cap size varies a name's noise through `cap_mult` and GARCH varies it
-    // through the name's own conditional variance, but the SCALE itself did
-    // not vary at all. Real rosters disperse well past that -- interquartile
-    // volatility ratio 1.273..1.486 over ten reference windows against
-    // pt-v12's 1.205 -- and no dial that moves every name together closes a
-    // dispersion gap.
-    //
-    // At exponent zero the branch is not taken and the scale is exactly
-    // `idio_sigma_scale`, so a preset that leaves it unset is bit-identical.
-    let idio_scale = if params.idio_sigma_beta_exponent == 0.0 {
-        params.idio_sigma_scale
-    } else if beta <= 0.0 {
-        // A non-positive beta has no exposure to raise to a power, and
-        // `pow` of a negative base with a fractional exponent is NaN. The
-        // homogeneous scale is the honest answer, following
-        // `cap_size_multiplier_with`'s treatment of a non-positive cap.
-        params.idio_sigma_scale
-    } else {
-        // Same choice as `sector_loading_beta_slope`: tied to beta, which
-        // the universe already carries, so it costs no RNG stream and
-        // cannot move the draw schedule.
-        //
-        // Bounded for the same reason the size effect is: a power law is
-        // unbounded as its base leaves the ordinary range, and a degenerate
-        // beta must not be able to silence a name or let one dominate the
-        // roster's whole variance budget.
-        let (lo, hi) = IDIO_BETA_BOUNDS;
-        params.idio_sigma_scale
-            * mathx::clamp(mathx::pow(beta, params.idio_sigma_beta_exponent), lo, hi)
-    };
+    let idio_scale = idio_scale_for(params, beta);
     let idiosyncratic_sigma = daily_sigma * idio_scale / mathx::sqrt(390.0);
 
     // DRAW SITE — here, before `crash_amplifier` is computed. The order is

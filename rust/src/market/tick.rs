@@ -225,6 +225,22 @@ pub struct TickCompany {
 /// engine builds; it is here because a caller may construct
 /// [`TickInputs`] directly, and a NaN entering the valuation would freeze
 /// every book downstream with no indication of where it came from.
+/// The sector draw's DAILY sigma, which follows VIX when coupled, on the
+/// market factor's own target shape: variance scales with (VIX / anchor)^2,
+/// so sigma scales with its square root. A branch at zero keeps every
+/// preset before the coupling bit-identical; at the anchor the ratio is
+/// exactly 1.0 at any coupling. The draw count is unchanged, so the tape
+/// is too. Shared by the tick and the overnight move.
+pub fn sector_sigma_for(p: &ModelParams, economy: &EconomyState) -> f64 {
+    if p.sector_vix_coupling == 0.0 {
+        p.sector_factor_sigma
+    } else {
+        let ratio = economy.vix / p.market_vol_vix_anchor;
+        p.sector_factor_sigma
+            * mathx::sqrt(1.0 - p.sector_vix_coupling + p.sector_vix_coupling * (ratio * ratio))
+    }
+}
+
 pub fn nominal_scale(p: &ModelParams, economy: &EconomyState, base: f64) -> f64 {
     if p.earnings_nominal_growth == 0.0 {
         return 1.0;
@@ -262,7 +278,9 @@ pub fn scale_valuation(
 }
 
 impl TickCompany {
-    fn valuation(&self) -> CompanyValuationInputs {
+    /// The valuation inputs as the tick reads them; `pub(crate)` so the
+    /// overnight move prices the open from the same figures.
+    pub(crate) fn valuation(&self) -> CompanyValuationInputs {
         CompanyValuationInputs {
             sector_avg_pe: self.sector_avg_pe,
             eps: self.eps,
@@ -662,18 +680,9 @@ pub fn simulate_market_tick(
         0.0
     };
 
-    // The sector draw's sigma follows VIX when coupled, on the market
-    // factor's own target shape: variance scales with (VIX / anchor)^2, so
-    // sigma scales with its square root. A branch at zero keeps every preset
-    // before this parameter bit-identical; at the anchor the ratio is exactly
-    // 1.0 at any coupling. The draw count is unchanged, so the tape is too.
-    let sector_sigma = if p.sector_vix_coupling == 0.0 {
-        p.sector_factor_sigma
-    } else {
-        let ratio = economy.vix / p.market_vol_vix_anchor;
-        p.sector_factor_sigma
-            * mathx::sqrt(1.0 - p.sector_vix_coupling + p.sector_vix_coupling * (ratio * ratio))
-    };
+    // The sector draw's sigma is `sector_sigma_for`, shared with the
+    // overnight move; the arithmetic is the one that stood here.
+    let sector_sigma = sector_sigma_for(p, economy);
     let mut sector_factors = Vec::with_capacity(inputs.sector_keys.len());
     for (sector_index, sector) in inputs.sector_keys.iter().enumerate() {
         rng.site(crate::rng::Site::SectorZ, sector_index as u32);

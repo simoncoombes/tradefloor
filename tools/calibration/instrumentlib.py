@@ -184,6 +184,12 @@ PARAM_SPECS: dict[str, dict] = {
     # valuation reads enters its band at 755.
     "macro_burn_in_days": {"kind": "abs", "step_unit": 30.0,
                            "hard_range": (0.0, 1095.0)},
+    # The overnight move's variance as a fraction of a session's. A RATIO
+    # of variances, so an absolute box from zero; 1.0 is a night as large
+    # as a session, and the real share of 0.23 to 0.43 sits well below it
+    # even with the jump realised at the open.
+    "overnight_variance_ratio": {"kind": "abs", "step_unit": 0.05,
+                                 "hard_range": (0.0, 2.0)},
     # A SHARE of the jump drift returned, so [0, 1]. 1.0 is the
     # martingale and past it the compensator overshoots.
     "jump_mean_compensated": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},

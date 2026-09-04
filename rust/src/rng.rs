@@ -200,6 +200,12 @@ pub enum Site {
     CentralBank = 16,
     /// The embedder's own draws on the external stream.
     External = 17,
+    /// The overnight move's normals, once per day at the open: one for the
+    /// market, one per sector (the tag is the sector index), one per
+    /// company (the tag is the company index).
+    OvernightMarketZ = 18,
+    OvernightSectorZ = 19,
+    OvernightIdioZ = 20,
 }
 
 impl Site {
@@ -223,6 +229,9 @@ impl Site {
             Site::EconomyCycle => "economy_cycle",
             Site::CentralBank => "central_bank",
             Site::External => "external",
+            Site::OvernightMarketZ => "overnight_market_z",
+            Site::OvernightSectorZ => "overnight_sector_z",
+            Site::OvernightIdioZ => "overnight_idio_z",
         }
     }
 }
@@ -391,6 +400,17 @@ pub mod stream {
     /// would make the common sequence depend on the universe size and
     /// shift every preset that sets only the common half.
     pub const VOLUME_IDIO: u32 = 6;
+
+    /// The overnight move, drawn once at each open: one normal for the
+    /// market, one per sector, one per company, in that order.
+    ///
+    /// Its own stream for the reason every stream here has one. It is
+    /// drawn UNCONDITIONALLY, whatever `overnight_variance_ratio` reads, so
+    /// the schedule cannot depend on the dial; at a ratio of zero the draws
+    /// are taken and nothing is moved, and since this stream is not among
+    /// the three `draws_consumed` counts, every preset before the dial
+    /// reproduces bit for bit and the known-answer digests do not move.
+    pub const OVERNIGHT: u32 = 7;
 
     /// Derived streams live at `256 + id`. See the module docs for why the
     /// offset exists.

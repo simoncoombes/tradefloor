@@ -16,7 +16,7 @@ module is the Python surface over it.
 
 ## Addresses
 
-``DrawAddress(stream, kind, index)``. Streams are the seven the engine
+``DrawAddress(stream, kind, index)``. Streams are the eight the engine
 derives from its seed: ``market``, ``economy``, ``external``, ``jumps``,
 ``volume``, ``news`` and ``volume_idio``. ``kind`` is ``"uniform"`` or
 ``"normal"``. Normals index by normal count and uniforms by uniform
@@ -51,7 +51,7 @@ from typing import Any, Callable, NamedTuple, Sequence
 from ._core import Engine
 
 STREAMS = ("market", "economy", "external", "jumps", "volume", "news",
-           "volume_idio")
+           "volume_idio", "overnight")
 KINDS = ("uniform", "normal")
 
 #: The call sites, in the order each stream meets them. The market
@@ -67,6 +67,8 @@ SITES = {
     "volume": ("volume_z",),
     "volume_idio": ("volume_idio_z",),
     "news": ("news_u", "news_z"),
+    "overnight": ("overnight_market_z", "overnight_sector_z",
+                  "overnight_idio_z"),
     "economy": ("economy_daily", "economy_cycle", "central_bank"),
     "external": ("external",),
 }
@@ -255,7 +257,8 @@ def surgery_patches(seed: int, stream: str, surgery_seed: int,
 #: the unit interval rather than perturbed: 0.0 fires, 1.0 does not.
 EVENT_SITES = frozenset({"jump_market_u", "jump_company_u", "news_u"})
 #: The streams attributed at event level: one row per logged draw.
-EVENT_STREAMS = ("jumps", "economy", "news", "volume", "volume_idio")
+EVENT_STREAMS = ("jumps", "economy", "news", "volume", "volume_idio",
+                 "overnight")
 #: The market stream's sites that are aggregated by day.
 DAY_SITES = {"factor_idio_z": "company", "market_factor_z": "market",
              "sector_z": "sector"}
@@ -338,7 +341,7 @@ class Attribution:
                  interaction: float = 0.0, joint_rows: int = 0,
                  plan_caveats: list[str] | None = None,
                  control_draws: int = 0) -> None:
-        #: Every draw the control took, over the seven streams. Each row
+        #: Every draw the control took, over the eight streams. Each row
         #: carries the same number for its arm, so ``positions_match`` is
         #: checkable rather than asserted.
         self.control_draws = control_draws
@@ -437,7 +440,7 @@ def attribute(world: Any, window: Any, target: Any,
     target is read again. The effect is the difference. Every arm shares
     every other draw with the control, so the difference is the draw's and
     not a reshuffle: ``stream_positions`` is identical across arms, on all
-    seven streams. ``draws_by_stream`` reports three of them and cannot
+    eight streams. ``draws_by_stream`` reports three of them and cannot
     see jumps, news, volume or the per-name volume stream, which is four
     of the five attributed at event level.
 
@@ -614,7 +617,7 @@ def attribute(world: Any, window: Any, target: Any,
     rows: list[dict] = []
     # Common random numbers is the whole claim, so it is measured rather
     # than assumed: every arm's stream positions are compared against the
-    # control's, on all seven streams. The economy chain is the one that
+    # control's, on all eight streams. The economy chain is the one that
     # can break it, because its draw count depends on its own state.
     control_positions = control.engine.stream_positions()
     for head, patches in plan:
@@ -722,7 +725,7 @@ def attribute(world: Any, window: Any, target: Any,
 
 
 def _total_draws(positions: dict) -> int:
-    """Every draw the seven streams have taken, as one number.
+    """Every draw the eight streams have taken, as one number.
 
     Carried on each row beside ``positions_match`` so the flag can be
     checked against something rather than taken on trust: an arm that
@@ -778,7 +781,7 @@ def row_caveats(rows: Sequence[dict], *, target: Any, last: int,
     elif matched:
         out.append(
             f"all {len(rows)} arms matched the control's draw positions on "
-            "all seven streams, so every effect is what that one draw did "
+            "all eight streams, so every effect is what that one draw did "
             "to the target.")
     fired = sum(1 for r in rows if r["perturbation"] == "fire")
     if fired:

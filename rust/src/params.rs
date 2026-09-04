@@ -1343,6 +1343,38 @@ pub struct ModelParams {
     /// searched: 0.580 at `c` = 0.7, 0.491 at `c` = 1.0. That is the same
     /// bookkeeping `idio_sigma_scale` does for the market factor's variance.
     pub jump_vix_coupling: f64,
+    /// The variance of the overnight move as a fraction of a session's,
+    /// per name. Zero is every preset before this dial and is bit-identical.
+    ///
+    /// Nothing moved a price between sessions before it: the price after
+    /// `open_market` was the price after the previous `close_market` on
+    /// every name-night, so the engine's true overnight variance share was
+    /// identically zero against a real 0.23 to 0.43 (the forty-name
+    /// reference panel over nine non-crisis windows, median 0.33, by
+    /// `tools/calibration/overnight_band.py`).
+    ///
+    /// Above zero `Engine::apply_overnight` does two things at each open,
+    /// before the day's marks are set. It realises in the opening print
+    /// the state that changed between the sessions, the close's jump on
+    /// `s` and the macro step in fair value, rather than leaving them for
+    /// the first ticks to settle toward; that is what gives the night its
+    /// shape, since the reference panel's nights put 0.50 to 0.68 of their
+    /// variance in the largest five percent against 0.36 to 0.49 for the
+    /// sessions. And it adds a draw on `s` composed exactly as a session's
+    /// factor structure is, beta on the market factor at its conditional
+    /// daily sigma, the sector loading on the sector factor, the name's own
+    /// GARCH sigma at its idiosyncratic scale, scaled by the square root of
+    /// this dial; the composition is the session's because the panel's
+    /// nights and sessions read the same cross-sectional correlation. The
+    /// move reverts on the mispricing's own half-life and is kept out of
+    /// the momentum roll, as the jump's carried share is.
+    ///
+    /// The session band anchors on the post-gap open, so the gap sits
+    /// outside it, which is the intent market/mod.rs has stated since D6.
+    /// A value is a ratio of variances, so 0.5 is a night carrying half a
+    /// session's variance; with the jump realised at the open the share
+    /// the row reads is more than the ratio alone would give.
+    pub overnight_variance_ratio: f64,
     /// Cross-sectional spread in volatility persistence, in raw `beta`
     /// units. Zero is every preset before pt-v7 and is bit-identical.
     ///
@@ -1899,6 +1931,7 @@ impl ModelParams {
             jump_intensity_idio: 0.0,
             jump_sigma_idio: 0.0,
             jump_vix_coupling: 0.0,
+            overnight_variance_ratio: 0.0,
             garch_beta_dispersion: 0.0,
             jump_momentum_share: 1.0,
             volume_persistence: 0.0,
@@ -3081,6 +3114,7 @@ impl ModelParams {
             "jump_intensity_idio" => self.jump_intensity_idio,
             "jump_sigma_idio" => self.jump_sigma_idio,
             "jump_vix_coupling" => self.jump_vix_coupling,
+            "overnight_variance_ratio" => self.overnight_variance_ratio,
             "garch_beta_dispersion" => self.garch_beta_dispersion,
             "jump_momentum_share" => self.jump_momentum_share,
             "volume_persistence" => self.volume_persistence,
@@ -3231,6 +3265,7 @@ impl ModelParams {
             "jump_intensity_idio" => out.jump_intensity_idio = value,
             "jump_intensity_market" => out.jump_intensity_market = value,
             "jump_mean_market" => out.jump_mean_market = value,
+            "overnight_variance_ratio" => out.overnight_variance_ratio = value,
             "garch_beta_dispersion" => out.garch_beta_dispersion = value,
             "jump_momentum_share" => out.jump_momentum_share = value,
             "jump_sigma_idio" => out.jump_sigma_idio = value,
@@ -3442,6 +3477,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "news_peer_weight_down",
         "news_sector_weight",
         "order_flow_coefficient",
+        "overnight_variance_ratio",
         "price_breaker_fraction",
         "price_hard_cap",
         "qe_pe_gain",

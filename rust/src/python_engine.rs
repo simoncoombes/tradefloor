@@ -549,6 +549,21 @@ impl PyEngine {
             }
             self.pending_jump.clear();
         }
+        // The tenth series is the overnight move. It happens at the open,
+        // before any tick, and the row where its effect is observed is the
+        // first tick of the same day: `s` there already includes it. Zeroed
+        // here and filled from the pending value on that first row, as the
+        // jump is, so the columns sum to the change in `s` tick by tick.
+        let before = self.day_buffer.components[9].len();
+        self.day_buffer.components[9].resize(self.day_buffer.components[0].len(), 0.0);
+        if !self.pending_overnight.is_empty() {
+            for (i, v) in self.pending_overnight.iter().enumerate() {
+                if let Some(slot) = self.day_buffer.components[9].get_mut(before + i) {
+                    *slot += v;
+                }
+            }
+            self.pending_overnight.clear();
+        }
     }
 
     /// Write the day's jump into the eighth component series, on the last
@@ -722,7 +737,7 @@ struct DayBuffer {
     mispricing: Vec<f64>,
     fundamental: Vec<f64>,
     anchor: Vec<f64>,
-    components: [Vec<f64>; 9],
+    components: [Vec<f64>; 10],
     shock: Vec<f64>,
     absorbed: Vec<f64>,
     clamp: Vec<f64>,
@@ -770,6 +785,7 @@ fn stream_name(id: u32) -> &'static str {
         crate::rng::stream::VOLUME => "volume",
         crate::rng::stream::NEWS => "news",
         crate::rng::stream::VOLUME_IDIO => "volume_idio",
+        crate::rng::stream::OVERNIGHT => "overnight",
         _ => "unknown",
     }
 }
@@ -783,9 +799,10 @@ fn stream_id(name: &str) -> PyResult<u32> {
         "volume" => crate::rng::stream::VOLUME,
         "news" => crate::rng::stream::NEWS,
         "volume_idio" => crate::rng::stream::VOLUME_IDIO,
+        "overnight" => crate::rng::stream::OVERNIGHT,
         other => {
             return Err(ValidationError::new_err(format!(
-                "unknown stream {other:?}; one of market, economy, external, jumps, volume, news, volume_idio"
+                "unknown stream {other:?}; one of market, economy, external, jumps, volume, news, volume_idio, overnight"
             )))
         }
     })
@@ -873,6 +890,9 @@ pub struct PyEngine {
     /// The jump the last close applied to `s`, waiting for the row where its
     /// effect is observed: the FIRST tick of the next day (§74).
     pending_jump: Vec<f64>,
+    /// The overnight move the last open applied to `s`, waiting for the
+    /// row where its effect is observed: the first tick of the same day.
+    pending_overnight: Vec<f64>,
     tickers: Vec<String>,
     /// Recorded per-day batches.
     ///
@@ -995,6 +1015,13 @@ impl PyEngine {
         // belong to the day they close rather than to the one after.
         self.inner.set_current_day(day);
         self.inner.open_market();
+        // The overnight move the open applied to `s`, for the tape: booked
+        // onto the day's first row, where its effect is observed, as the
+        // close's jump is booked onto the next day's (§74).
+        let nights: Vec<f64> = self.inner.overnight_moves().to_vec();
+        if nights.iter().any(|v| *v != 0.0) {
+            self.pending_overnight = nights;
+        }
     }
 
     /// The roster operations between the previous day's open and this one.
@@ -1120,6 +1147,7 @@ impl PyEngine {
             ),
             buffer: SessionBuffer::new(),
             pending_jump: Vec::new(),
+            pending_overnight: Vec::new(),
             day_buffer: DayBuffer::default(),
             market_open: false,
             day_count: 0,
@@ -2542,9 +2570,9 @@ impl PyEngine {
         // round-trip exactly rather than closely. Nine numbers rather than a
         // nested structure so a pre-split snapshot (three numbers) is
         // unmistakable at a glance and on restore.
-        let mut rng_out = Vec::with_capacity(15);
+        let mut rng_out = Vec::with_capacity(24);
         for s in [rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
-                  rng.news, rng.volume_idio] {
+                  rng.news, rng.volume_idio, rng.overnight] {
             rng_out.push(f64::from_bits(s.state));
             rng_out.push(f64::from_bits(s.increment));
             rng_out.push(s.spare.unwrap_or(f64::NAN));
@@ -2581,13 +2609,13 @@ impl PyEngine {
         // re-opens the day and re-anchors `previous_close`.
         // Two widths now: the engine's attribution carries the daily jump in
         // an eighth slot, the tick's own decomposition does not (§74).
-        let flat9 = |rows: &[[f64; 9]]| -> Vec<f64> {
+        let flat10 = |rows: &[[f64; 10]]| -> Vec<f64> {
             rows.iter().flat_map(|r| r.iter().copied()).collect()
         };
         let flat = |rows: &[[f64; 8]]| -> Vec<f64> {
             rows.iter().flat_map(|r| r.iter().copied()).collect()
         };
-        out.set_item("attribution", f64_bytes(py, &flat9(self.inner.attribution())))?;
+        out.set_item("attribution", f64_bytes(py, &flat10(self.inner.attribution())))?;
         out.set_item(
             "tick_components",
             f64_bytes(py, &flat(self.inner.tick_components())),
@@ -2795,11 +2823,11 @@ impl PyEngine {
         // does not carry -- see the bindings below. That is what lets a
         // checkpoint written before a mechanism existed replay exactly as it
         // did then, rather than against a zeroed generator wearing its seed.
-        if !matches!(rng.len(), 9 | 12 | 15 | 18 | 21) {
+        if !matches!(rng.len(), 9 | 12 | 15 | 18 | 21 | 24) {
             return Err(ValidationError::new_err(format!(
                 "rng must be 9 numbers (market, economy, external), 12 \
-                 (plus jumps), 15 (plus volume), 18 (plus news) or 21 \
-                 (plus per-name volume), as \
+                 (plus jumps), 15 (plus volume), 18 (plus news), 21 \
+                 (plus per-name volume) or 24 (plus overnight), as \
                  (state, increment, spare) triples, got {}",
                 rng.len()
             )));
@@ -2840,6 +2868,7 @@ impl PyEngine {
         let volume = if rng.len() >= 15 { stream(12) } else { current.volume };
         let news = if rng.len() >= 18 { stream(15) } else { current.news };
         let volume_idio = if rng.len() >= 21 { stream(18) } else { current.volume_idio };
+        let overnight = if rng.len() >= 24 { stream(21) } else { current.overnight };
         self.inner.set_rng_state(crate::engine::EngineRngState {
             market: stream(0),
             economy: stream(3),
@@ -2848,10 +2877,11 @@ impl PyEngine {
             volume,
             news,
             volume_idio,
+            overnight,
         });
         if let Some(raw) = snapshot.get_item("draw_overlay")? {
             let entries: Vec<(u32, u8, u64, f64)> = raw.extract()?;
-            for id in 0..7u32 {
+            for id in 0..8u32 {
                 self.inner.set_draw_overlay(id, None);
             }
             for (id, kind, index, value) in entries {
@@ -3822,7 +3852,7 @@ impl PyNewsImpact {
 /// An alias rather than a second list. Declared twice, the two orderings would
 /// eventually disagree and every column would still look plausible -- the
 /// `truth` schema is generated from the same constant for the same reason.
-pub const FACTOR_NAMES: [&str; 9] = [
+pub const FACTOR_NAMES: [&str; 10] = [
     crate::market::factors::S_COMPONENT_KEYS[0],
     crate::market::factors::S_COMPONENT_KEYS[1],
     crate::market::factors::S_COMPONENT_KEYS[2],
@@ -3832,6 +3862,7 @@ pub const FACTOR_NAMES: [&str; 9] = [
     crate::market::factors::S_COMPONENT_KEYS[6],
     crate::market::factors::S_COMPONENT_KEYS[7],
     crate::market::factors::JUMP_COMPONENT_KEY,
+    crate::market::factors::OVERNIGHT_COMPONENT_KEY,
 ];
 
 /// Every field `column()` accepts, in one place.

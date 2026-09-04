@@ -72,7 +72,7 @@ def test_the_contributions_are_the_declared_eleven_and_nothing_else():
     _, result = one()
     names = [child.name for child in result.root.children]
     assert names == list(ex.CONTRIBUTIONS)
-    assert list(ex.CONTRIBUTIONS)[:9] == list(tf.Engine.FACTORS)
+    assert list(ex.CONTRIBUTIONS)[:10] == list(tf.Engine.FACTORS)
     assert list(ex.CONTRIBUTIONS)[9:] == ["fair_value", "book"]
     assert all(child.kind == "factor" for child in result.root.children)
     assert result.root.kind == "move"
@@ -1537,8 +1537,9 @@ def test_every_declared_dial_is_a_model_param_that_its_rust_reads():
     # Exact, not a floor. A floor let nine of random_noise's ten dials be
     # dropped and still pass, because the table declares more than the
     # floor asked for.
-    assert declared == 41
-    assert sum(1 for m in ex.MECHANISMS if m.dials) == 9
+    # 42 since the overnight move's one dial joined.
+    assert declared == 42
+    assert sum(1 for m in ex.MECHANISMS if m.dials) == 10
 
 
 def test_every_declared_state_field_is_a_column_that_its_rust_reads():
@@ -1550,8 +1551,9 @@ def test_every_declared_state_field_is_a_column_that_its_rust_reads():
             e.column(name)
             assert re.search(r"\b" + name + r"\b", text), (mech.factor, name)
             declared += 1
-    assert declared == 15
-    assert sum(1 for m in ex.MECHANISMS if m.state) == 9
+    # 18 since the overnight move's three state fields joined.
+    assert declared == 18
+    assert sum(1 for m in ex.MECHANISMS if m.state) == 10
 
 
 def test_every_declared_macro_field_is_a_macro_field_that_its_rust_reads():

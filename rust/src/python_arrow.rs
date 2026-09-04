@@ -75,11 +75,13 @@ pub fn bars_schema() -> SchemaRef {
 /// `mispricing_s` isolates the valuation gap. Three quantities that are easy
 /// to conflate, kept apart on purpose.
 ///
-/// **The decomposition.** Eight columns, in `S_COMPONENT_KEYS` order, giving
-/// every contribution to this tick's change in `s`. `reversion`, `momentum`
-/// and `crowd_lean` are the model's own dynamics; `company_news`,
-/// `order_flow_impact`, `short_squeeze_effect` and `random_noise` are the
-/// shocks. They sum to `Δs`.
+/// **The decomposition.** Ten columns, in `FACTOR_NAMES` order, giving
+/// every contribution to this tick's change in `s`: the eight
+/// `S_COMPONENT_KEYS`, then the daily jump and the overnight move, which
+/// land outside the tick loop and are booked onto the row where each is
+/// observed. `reversion`, `momentum` and `crowd_lean` are the model's own
+/// dynamics; `company_news`, `order_flow_impact`, `short_squeeze_effect`
+/// and `random_noise` are the shocks. They sum to `Δs`.
 ///
 /// That they SUM is what makes this a dataset rather than a commentary. A
 /// consumer can difference `mispricing_s` across ticks, add the nine columns,
@@ -171,7 +173,7 @@ pub fn truth_batch(
     mispricing: &[f64],
     fundamental: &[f64],
     anchor: &[f64],
-    components: &[Vec<f64>; 9],
+    components: &[Vec<f64>; 10],
 ) -> Result<RecordBatch, String> {
     let rows = ticks * instruments;
     if mispricing.len() < rows || fundamental.len() < rows || anchor.len() < rows {
@@ -697,7 +699,7 @@ pub struct RecordedDay {
     pub mispricing: Vec<f64>,
     pub fundamental: Vec<f64>,
     pub anchor: Vec<f64>,
-    pub components: [Vec<f64>; 9],
+    pub components: [Vec<f64>; 10],
     /// The print decomposition. See [`prints_schema`].
     pub shock: Vec<f64>,
     pub absorbed: Vec<f64>,
