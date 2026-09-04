@@ -684,6 +684,16 @@ pub struct RecordedDay {
     pub instruments: usize,
     pub prices: Vec<f64>,
     pub volumes: Vec<f64>,
+    /// The price each instrument's SESSION opened at, before its first
+    /// tick: the engine's `open` mark, taken at `open_market`. One per
+    /// instrument, or EMPTY when the recording predates the field, in which
+    /// case the day bar falls back to the first print. `prices` holds the
+    /// print AFTER each tick, so without this the day bar's open was the
+    /// first tick's close, one tick of movement presented as an opening
+    /// price (issue #179). Stored rather than derived from the previous
+    /// close, because an embedder may write prices between sessions and a
+    /// derived open would miss that gap.
+    pub opens: Vec<f64>,
     pub mispricing: Vec<f64>,
     pub fundamental: Vec<f64>,
     pub anchor: Vec<f64>,
@@ -769,14 +779,24 @@ pub fn ohlc_batch(day: &RecordedDay, bucket: usize) -> Result<RecordBatch, Strin
         let first = bar * bucket;
         let last = core::cmp::min(first + bucket, day.ticks);
         for i in 0..n {
-            let mut open = f64::NAN;
-            let mut high = f64::NEG_INFINITY;
-            let mut low = f64::INFINITY;
+            // The first bar of a day opens at the SESSION's open, the price
+            // the day started at, which the recording carries in `opens`; a
+            // later bar opens at its first print, the exchange convention
+            // for an intraday bar. The session open is a print too, the one
+            // the day opened on, so it belongs in the first bar's range.
+            let session_open = if first == 0 && day.opens.len() == n {
+                day.opens[i]
+            } else {
+                f64::NAN
+            };
+            let mut open = session_open;
+            let mut high = if session_open.is_nan() { f64::NEG_INFINITY } else { session_open };
+            let mut low = if session_open.is_nan() { f64::INFINITY } else { session_open };
             let mut close = f64::NAN;
             let mut volume = 0.0;
             for t in first..last {
                 let price = day.prices[t * n + i];
-                if t == first {
+                if t == first && open.is_nan() {
                     open = price;
                 }
                 // `>` and `<` rather than a max/min helper: NaN must not

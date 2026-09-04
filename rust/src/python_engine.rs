@@ -3105,6 +3105,10 @@ impl PyEngine {
             instruments: self.day_buffer.companies,
             prices: self.day_buffer.prices.clone(),
             volumes: self.day_buffer.volumes.clone(),
+            // The session's open, the engine's mark from `open_market`,
+            // which the close leaves alone, so a record taken on either
+            // side of it reads the same value.
+            opens: self.inner.column(PriceField::Open),
             mispricing: self.day_buffer.mispricing.clone(),
             fundamental: self.day_buffer.fundamental.clone(),
             anchor: self.day_buffer.anchor.clone(),
@@ -3182,6 +3186,7 @@ impl PyEngine {
                 instruments: self.buffer.companies,
                 prices: self.written(&self.buffer.prices).to_vec(),
                 volumes: self.written(&self.buffer.volumes).to_vec(),
+                opens: self.inner.column(PriceField::Open),
                 // bars() reads neither, and cloning the ground-truth
                 // buffers to build a table that discards them would be pure
                 // copying. truth() has its own path below.
