@@ -1516,6 +1516,39 @@ and `tradefloor.js` in both files.
 `fixed_simulation_digest` against the native one, is otherwise
 unchanged, and passes again now that the build reaches it.
 
+### The phase table's two dials
+
+`gdp_growth_range` is declared for all five phases and read at two sites,
+both of which took `(lo + hi) / 2.0`, so the declared width did nothing.
+`phase_target_range_draw` draws the target once on phase entry, uniformly
+over the range the table already states, and holds it for the phase. Over
+thirty seeds at a hundred years it widens the depth distribution without
+moving its median, which is what a uniform draw over (-3.0, 0.0) should
+do: the median moves 0.06 and episodes past a three per cent fall go from
+20 to 34 of about 450.
+
+`trough_growth_floor` moves the trough's range floor from -1.0 to 0.0. It
+is 0.0 on every preset including pt-v18, and it is kept rather than
+deleted because its measurement is why the next change is known.
+
+It was built to close the nine points between the engine's two frequency
+rulers, the share of days in a contraction against the share with output
+falling, where the real economy's two rulers agree to about one point. It
+closes 1.52. A target is reached only if the phase lasts long enough to
+approach it, and growth enters a trough near -3.0 after a contraction and
+that phase's own -0.5 entry shock, then reverts by `gap * 0.12` a month.
+Under the shipped range it never crosses zero; at 1.0 it crosses at month
+11 or 12; a trough runs 2 to 6 months. So the binding constraint is the
+reversion rate measured against the phase length, and the declared range
+is beside the point.
+
+The two do not compose. Each improves the model's depth spread alone and
+together they make it worse than neither, because the pair eliminates
+shallow recessions: the mildest episode goes from 0.29 per cent to 0.61,
+and a distribution with no mild episodes cannot reach the 9.95 to 1 span
+between the mildest and deepest post-1980 recession however deep its
+worst gets.
+
 ### Two widenings re-date stored artefacts
 
 NOT ON DEV YET. Both changes below sit on branches, so this section

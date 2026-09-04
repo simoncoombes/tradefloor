@@ -804,9 +804,33 @@ pub struct ModelParams {
     /// being the boundary between falling and rising output, so nothing
     /// here is fitted. Between the ends the floor moves proportionally.
     ///
-    /// This cannot be reached from the hazard. Whatever the clock does,
-    /// the phase keeps its negative target, so the repair is in the phase
-    /// table rather than in `cycle.rs`.
+    /// # It is 0.0 on every preset, including pt-v18, and here is why
+    ///
+    /// This was built to close that nine-point gap and it closes 1.52 of
+    /// it. Thirty seeds at a hundred years: the output ruler moves from
+    /// 27.309 to 25.791 and the contraction share moves 0.10, so the
+    /// mechanism is the one described and its size is a sixth of what the
+    /// accounting implied.
+    ///
+    /// A target is only reached if the phase lasts long enough to
+    /// approach it. Growth enters a trough near -3.0, having left a
+    /// contraction whose realised rate is about -2.5 and then taken this
+    /// phase's own -0.5 entry shock, and it reverts by `gap * 0.12` a
+    /// month and `gap * 0.25` a quarter. Under the shipped range it
+    /// asymptotes to -0.25 and NEVER crosses zero. At 1.0 it crosses at
+    /// month 11 or 12. A trough runs 2 to 6 months, so output falls
+    /// through the whole phase under either setting and this dial changes
+    /// where growth is heading rather than where it is.
+    ///
+    /// So the binding constraint is the reversion rate against the phase
+    /// length, not the declared range, and the repair the evidence points
+    /// at is the -0.5 entry shock at `daily.rs:247`: the only phase after
+    /// a contraction that still pushes growth DOWN on entry is the one
+    /// named for the turn.
+    ///
+    /// Kept at 0.0 rather than deleted because the measurement is the
+    /// reason the next change is known, and the dial is the instrument
+    /// that produced it.
     pub trough_growth_floor: f64,
     /// Whether a phase's growth target is drawn from its declared range
     /// or fixed at the range's midpoint. 0.0 -- every preset before
@@ -817,9 +841,12 @@ pub struct ModelParams {
     /// `gdp_growth_range` is stated for all five phases and read at
     /// exactly two sites, both of which take `(lo + hi) / 2.0`. The
     /// declared WIDTH is discarded everywhere, so the table reads as a
-    /// specification and behaves as a list of five midpoints. `max_months`
-    /// is the same shape in the same struct: declared for every phase and
-    /// read by nothing.
+    /// specification and behaves as a list of five midpoints. That is the
+    /// third instance of one habit in this struct rather than three
+    /// accidents: `max_months` is declared for every phase and read by
+    /// nothing, `gdp_growth_range` is declared and halved to a midpoint,
+    /// and the trough's phase-change shock carries a sign that
+    /// contradicts its own phase.
     ///
     /// What that costs is the depth distribution. An episode's fall is its
     /// mean growth times its length, and with the rate pinned to a
@@ -3008,12 +3035,6 @@ impl ModelParams {
         // change inside 63 per cent of certified years against 3. Read
         // per month on the 30-day month the phase clock already keeps.
         p.cycle_hazard_per_month = 1.0;
-        // A trough declared a growth range of (-1.0, 0.5), so output kept
-        // falling through the phase named for the bottom of the cycle and
-        // 95 per cent of trough days carried a negative rate. That is the
-        // whole nine-point gap between the engine's two frequency rulers,
-        // where the NBER's two agree to 1.2 points.
-        p.trough_growth_floor = 1.0;
         // Every phase declares a growth range and both read sites took its
         // midpoint, so the declared width did nothing and an episode's
         // depth was a length times one shock draw spanning 2.0 to 3.0.
