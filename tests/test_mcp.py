@@ -581,14 +581,39 @@ def test_listing_jobs_needs_no_id():
     assert r["ok"] and isinstance(r["jobs"], list)
 
 
-def test_describe_simulator_reports_nothing_out_of_band():
+def test_describe_simulator_serves_the_envelopes_verdicts_by_group():
     """Two statistics were out until the 2026-08-26 era boundary made pt-v10
-    the default. It holds all fourteen at the certified horizon, so an agent
-    reading this surface is told there is nothing out rather than being told
-    a stale pair."""
+    the default, and every shape row has been in band since. The level and
+    crisis rows joined on 2026-09-03 and the default preset holds two of
+    them red, so an agent reading this surface is told which rows are out
+    and which group each belongs to, rather than a stale pair or a bare
+    total.
+
+    The served verdicts are derived from the envelope here rather than
+    typed: the rows expected red at the default are pinned once, in
+    `tests/test_envelope.py`, and this surface has to mirror whatever that
+    pin holds. A version of this test that listed every level and crisis
+    row as out of band contradicted the registered prediction that the -1
+    percent fear row passes, and failed the day it was measured.
+    """
     d = mcp.describe_simulator()
-    assert set(d["certified"]["statistics_out_of_band"]) == set()
-    assert len(d["certified"]["statistics_in_band"]) == 14
+    from tradefloor import envelope
+    from tradefloor.facts import SHAPE, LEVEL, CRISIS
+    cert = envelope.certified()
+    served_out = set(d["certified"]["statistics_out_of_band"])
+    served_in = set(d["certified"]["statistics_in_band"])
+    assert served_out == {k for k, v in cert["statistics"].items()
+                          if not v["in_band"]}
+    assert served_in == {k for k, v in cert["statistics"].items()
+                         if v["in_band"]}
+    # Every shape row is in band, and the shape group is served whole so a
+    # reader can tell a crisis row in band from the count a gate reads.
+    assert set(SHAPE) <= served_in
+    assert d["certified"]["groups"]["shape"] == list(SHAPE)
+    assert all(k in LEVEL + CRISIS for k in served_in - set(SHAPE))
+    # The row that exists to be red at the default preset is served red.
+    assert "index_drift_pct" in served_out
+    assert set(d["certified"]["statistics_unmeasured"]) == set(cert["unmeasured"])
     assert d["structural_limitations"]
     assert "atlas" in d["not_exposed_here"]
 

@@ -130,6 +130,10 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
                 // nowhere; this tick's own value is what a single-tick
                 // caller opens at.
                 nominal_output_base: economy.gdp * economy.cpi,
+                // Trading days closed. The buyback factor is off on
+                // every preset these tests pin, so it is read
+                // nowhere; 0 is what a single-tick caller opens at.
+                elapsed_days: 0,
                 params: &tradefloor::params::PT_V1,
         },
         &mut rng,
@@ -269,6 +273,10 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
                 // nowhere; this tick's own value is what a single-tick
                 // caller opens at.
                 nominal_output_base: economy.gdp * economy.cpi,
+                // Trading days closed. The buyback factor is off on
+                // every preset these tests pin, so it is read
+                // nowhere; 0 is what a single-tick caller opens at.
+                elapsed_days: 0,
                 params: &tradefloor::params::PT_V1,
                 },
                 &mut rng,
@@ -322,6 +330,10 @@ fn the_band_holds_in_extended_hours_too() {
                 // nowhere; this tick's own value is what a single-tick
                 // caller opens at.
                 nominal_output_base: economy.gdp * economy.cpi,
+                // Trading days closed. The buyback factor is off on
+                // every preset these tests pin, so it is read
+                // nowhere; 0 is what a single-tick caller opens at.
+                elapsed_days: 0,
                 params: &tradefloor::params::PT_V1,
                 },
                 &mut rng,
@@ -385,6 +397,10 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
                 // nowhere; this tick's own value is what a single-tick
                 // caller opens at.
                 nominal_output_base: economy.gdp * economy.cpi,
+                // Trading days closed. The buyback factor is off on
+                // every preset these tests pin, so it is read
+                // nowhere; 0 is what a single-tick caller opens at.
+                elapsed_days: 0,
                 params: &tradefloor::params::PT_V1,
                 },
                 &mut rng,

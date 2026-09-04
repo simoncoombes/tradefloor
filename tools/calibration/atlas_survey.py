@@ -125,7 +125,7 @@ from calibrate import calibration_box     # noqa: E402
 
 import tradefloor                            # noqa: E402
 from tradefloor import atlas                 # noqa: E402
-from tradefloor.facts import REAL_MARKETS    # noqa: E402
+from tradefloor.facts import REAL_MARKETS, aggregate_panels  # noqa: E402
 
 #: Measured by `facts.measure`, judged by nothing yet, recorded per horizon
 #: as `<stat>_<days>` beside the thirteen. See CALIBRATION-FOLLOWUPS.md §64.
@@ -222,6 +222,13 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # horizon the burn-in that measured both ran to. Past that the box would
     # describe a transient nobody has measured.
     "macro_burn_in_days": (0.0, 1095.0),
+    # The share of earnings returned as net buybacks. 0.0 is a model with
+    # no share retirement, a third is the US large-cap filing record this
+    # era declares, and 1.0 returns the whole of earnings every year. Past
+    # that a company returns more than it earns, which is a claim about
+    # leverage this model does not carry, so the box is the closed unit
+    # interval and its top is where the earnings run out.
+    "buyback_payout_share": (0.0, 1.0),
     # How much of the jump's own drift is given back. 0.0 is the
     # uncompensated process, 1.0 is the martingale, and past 1.0 the
     # compensator exceeds the drift and the jump pushes the other way.
@@ -1142,9 +1149,13 @@ def cmd_collect(args) -> int:
         panels = {days: [rows[f"{index}:panel{days}:{s}"]["panel"]
                          for s in seeds] for days in meta["horizons"]}
         for days, batch in panels.items():
-            for stat in REAL_MARKETS:
-                outputs[f"{stat}_{days}"] = statistics.median(
-                    p[stat] for p in batch)
+            # The graded rows by their own estimators: a level row as a
+            # mean, a pooled row over the samples of every seed, and a row
+            # absent from every panel omitted rather than medianed over
+            # None, which is how a batch with no session at -3 percent on
+            # one seed stopped the collect.
+            for stat, value in aggregate_panels(batch).items():
+                outputs[f"{stat}_{days}"] = value
             # Diagnostics: measured, unbanded, recorded so the map can see
             # them. Correlation persistence (§64) is the first.
             for stat in DIAGNOSTIC_STATS:

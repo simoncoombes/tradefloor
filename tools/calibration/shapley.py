@@ -2,10 +2,13 @@
 
 Given a base preset, a target preset and named groups of dial overrides,
 the panel runs on every subset of the groups at the same seeds and roster,
-and each group receives its Shapley share of the change in every realism
-statistic in `facts.REAL_MARKETS`. The shares sum to the target's panel
-minus the base's, statistic by statistic, and the run enumerates every
-subset, so the sum is an identity rather than an estimate.
+and each group receives its Shapley share of the change in every graded
+row that carries a per-seed value: the `facts.SHAPE` rows, the level row
+and the -1 percent fear row. The -3 percent fear row is pooled over every
+seed's sessions (`facts.AGGREGATE`) and carries no share. The shares sum
+to the target's panel minus the base's, statistic by statistic, and the
+run enumerates every subset, so the sum is an identity rather than an
+estimate.
 
 Usage:
 
@@ -47,9 +50,11 @@ because the macro chain draws on macro state and every dial here reaches
 macro state through the market; those branches are part of the effect,
 and the JSON records them as data.
 
-The value of a subset for a statistic is the median over seeds, which is
-how the envelope states a panel, and the Shapley share of a group is the
-average over orderings of its marginal `v(S + g) - v(S)`. A median is an
+The value of a subset for a statistic is the row's own estimator over
+seeds (`facts.aggregate_value`): the median for the shape rows, which is
+how the envelope states a panel, and the mean for the level row, which is
+how its band was set. The Shapley share of a group is the average over
+orderings of its marginal `v(S + g) - v(S)`. A median is an
 order statistic: the seed at the median of `v(S)` can differ from the seed
 at the median of `v(S + g)`, so a difference of medians re-admits some of
 the seed noise the pairing removed. The per-seed shares keep the pairing:
@@ -73,6 +78,15 @@ slice of a difference and a band is a location. The report prints each
 share beside `envelope.CERTIFIED` and the band, and says which statistic a
 group moved into or out of band, alone against the base and last against
 the target, so a reader sees the location and the slice together.
+
+It cannot grade the level or crisis rows against their bands. Those rows
+are certified on `facts.LEVEL_PROTOCOL`, the roster varying with the seed,
+because a level measured on one held roster certifies that roster; this
+tool holds one roster across every subset, which is what a paired share
+needs. So the level row carries shares, as a paired difference on this
+roster, its band is printed as a location with the verdict withheld, and
+the certified value beside it is labelled as the other protocol's
+measurement rather than compared.
 
 It cannot attribute below the group. A dial's own share needs a declaration
 with one dial per group, and the exact enumeration stops at nine groups
@@ -595,25 +609,53 @@ def guard(rows: list[dict]) -> dict:
 # Values and shares
 # ---------------------------------------------------------------------------
 
-def measured_statistics(rows_by_subset: dict[frozenset[str], list[dict]]
-                        ) -> tuple[list[str], list[str]]:
-    """The `REAL_MARKETS` statistics numeric in every row, and the rest."""
+def paired_rows() -> list[str]:
+    """The graded rows a per-seed pairing can carry: every row but the pooled.
+
+    `facts.SHAPE`, `facts.LEVEL` and the `facts.CRISIS` rows read per seed.
+    A pooled row (`facts.AGGREGATE`) is graded over the sessions of every
+    seed together and has no per-seed value to pair, so a share of it
+    would be a difference of two numbers that are not the graded ones.
+    """
     from tradefloor import facts
 
+    return [key for key in facts.SHAPE + facts.LEVEL + facts.CRISIS
+            if facts.AGGREGATE.get(key) != "pooled"]
+
+
+def pooled_rows() -> list[str]:
+    """The graded rows read over pooled sessions, which carry no share."""
+    from tradefloor import facts
+
+    return [key for key in facts.SHAPE + facts.LEVEL + facts.CRISIS
+            if facts.AGGREGATE.get(key) == "pooled"]
+
+
+def measured_statistics(rows_by_subset: dict[frozenset[str], list[dict]]
+                        ) -> tuple[list[str], list[str]]:
+    """The paired rows numeric in every row, and the rest."""
     measured: list[str] = []
     unmeasured: list[str] = []
-    for key in facts.REAL_MARKETS:
+    for key in paired_rows():
         present = all(isinstance(row["panel"].get(key), (int, float))
                       for rows in rows_by_subset.values() for row in rows)
         (measured if present else unmeasured).append(key)
     return measured, unmeasured
 
 
-def median_values(rows_by_subset: dict[frozenset[str], list[dict]],
+def subset_values(rows_by_subset: dict[frozenset[str], list[dict]],
                   stats: list[str]) -> dict[frozenset[str], dict[str, float]]:
-    """The value of each subset: the median over seeds, per statistic."""
+    """The value of each subset per statistic, by the row's own estimator.
+
+    `facts.aggregate_value`: the median over seeds for the shape rows,
+    which is how the envelope states a panel, and the mean for the level
+    row, which is how its band was set.
+    """
+    from tradefloor import facts
+
     return {
-        subset: {key: statistics.median(row["panel"][key] for row in rows)
+        subset: {key: facts.aggregate_value(
+                     key, [row["panel"][key] for row in rows])
                  for key in stats}
         for subset, rows in rows_by_subset.items()
     }
@@ -783,27 +825,52 @@ def ruler(days: int) -> tuple[str, dict[str, tuple[float, float]]]:
 def certified_column(days: int, stats: list[str]) -> dict:
     """The envelope's own value of each statistic, at the matching horizon.
 
-    `envelope.CERTIFIED` at 252 days; `envelope.MEASURED_504` at 504,
-    which is measured on the same preset and roster and is the column a
-    504-day run should sit beside.
-    """
-    from tradefloor import envelope
+    `envelope.CERTIFIED` at 252 days for the shape rows, with the level
+    and crisis rows read from their own tables; `envelope.MEASURED_504` at
+    504, which is measured on the same preset and roster and is the column
+    a 504-day run should sit beside, and which holds the shape rows only,
+    so a level or crisis row reads None there.
 
-    if days == 2 * envelope.CERTIFIED_HORIZON_DAYS:
-        source, table = "envelope.MEASURED_504", envelope.MEASURED_504
-        horizon = days
+    `protocol` says what each certified value was measured on: `held` for
+    a shape row, the panel roster held across the seeds, which is what
+    this tool runs; `level` for a level or crisis row, whose certified
+    value is on `facts.LEVEL_PROTOCOL`, the roster varying with the seed.
+    This tool holds one roster, so a level-protocol value is a different
+    measurement from this run's, and `summarise` withholds the band
+    verdict on those rows rather than grade one protocol with the other's
+    ruler.
+    """
+    from tradefloor import envelope, facts
+
+    far = days == 2 * envelope.CERTIFIED_HORIZON_DAYS
+    if far:
+        source, horizon = "envelope.MEASURED_504", days
     else:
-        source, table = "envelope.CERTIFIED", envelope.CERTIFIED
-        horizon = envelope.CERTIFIED_HORIZON_DAYS
+        source, horizon = "envelope.CERTIFIED", envelope.CERTIFIED_HORIZON_DAYS
+    values: dict[str, float | None] = {}
+    protocol: dict[str, str] = {}
+    for key in stats:
+        if key in facts.SHAPE:
+            table = envelope.MEASURED_504 if far else envelope.CERTIFIED
+            protocol[key] = "held"
+        else:
+            table = ({} if far
+                     else envelope.CERTIFIED_LEVEL if key in facts.LEVEL
+                     else envelope.CERTIFIED_CRISIS)
+            protocol[key] = "level"
+        values[key] = table.get(key)
     return {"preset": envelope.PRESET, "source": source,
-            "horizon_days": horizon,
-            "values": {key: table[key] for key in stats}}
+            "horizon_days": horizon, "values": values,
+            "protocol": protocol,
+            "level_protocol": facts.LEVEL_PROTOCOL["roster"]}
 
 
 def caveats(*, seeds: list[int], days: int, universe: tuple[int, int],
             unmeasured: list[str], crn: dict, ruler_name: str,
             values: dict[frozenset[str], dict[str, float]],
-            names: list[str], inert: tuple[str, ...] | list[str] = ()
+            names: list[str], inert: tuple[str, ...] | list[str] = (),
+            withheld: tuple[str, ...] | list[str] = (),
+            pooled: tuple[str, ...] | list[str] = ()
             ) -> list[str]:
     """The caveats this run earns, computed from the run.
 
@@ -837,6 +904,19 @@ def caveats(*, seeds: list[int], days: int, universe: tuple[int, int],
         out.append(
             "unmeasured at this roster and horizon, so carrying no share: "
             + ", ".join(unmeasured))
+    if pooled:
+        out.append(
+            "pooled over the sessions of every seed, so carrying no "
+            "per-seed value and no share: " + ", ".join(pooled))
+    if withheld:
+        out.append(
+            "band verdict withheld on: " + ", ".join(withheld)
+            + "; these rows are certified on facts.LEVEL_PROTOCOL, the "
+            f"roster varying with the seed ({facts.LEVEL_PROTOCOL['roster']})"
+            ", and this run holds one roster, so the certified column "
+            "beside them is a different measurement and their band is "
+            "printed as a location only; the shares stand, since a share "
+            "is a paired difference on this roster")
     branched = sorted({d["seed"] for d in crn.get("economy_deviations", [])})
     if branched:
         out.append(
@@ -881,9 +961,10 @@ def summarise(rows_by_subset: dict[frozenset[str], list[dict]],
         crn = guard(distinct_rows(rows_by_subset))
     names = list(groups)
     measured, unmeasured = measured_statistics(rows_by_subset)
-    medians = median_values(rows_by_subset, measured)
+    pooled = pooled_rows()
+    values = subset_values(rows_by_subset, measured)
     per_seed = seed_values(rows_by_subset, measured)
-    shares = shapley(medians, names)
+    shares = shapley(values, names)
     seed_shares: dict[str, dict[str, dict[int, float]]] = {
         name: {key: {} for key in measured} for name in names}
     for seed, table in per_seed.items():
@@ -891,7 +972,19 @@ def summarise(rows_by_subset: dict[frozenset[str], list[dict]],
             for key, value in by_stat.items():
                 seed_shares[name][key][seed] = value
     ruler_name, bands = ruler(days)
-    ends = effects(medians, names)
+    certified = certified_column(days, measured)
+    # A band verdict is comparable only on the protocol the row is
+    # certified on. The level and crisis rows are certified with the
+    # roster varying and this tool holds one, so their verdicts are
+    # withheld and their band is carried as a location.
+    withheld = [key for key in measured
+                if certified["protocol"][key] != "held"]
+    comparable = {key: bands[key] for key in measured if key not in withheld}
+    moves = band_moves(values, names, comparable)
+    for name in names:
+        for key in withheld:
+            moves[name][key] = {"alone": None, "last": None}
+    ends = effects(values, names)
     everything = frozenset(names)
     # A group whose per-seed share is 0.0 to the bit everywhere changed no
     # panel: its dials were never read on a path that reached a price.
@@ -908,13 +1001,15 @@ def summarise(rows_by_subset: dict[frozenset[str], list[dict]],
         "days": days,
         "statistics": measured,
         "unmeasured": unmeasured,
+        "pooled": pooled,
+        "withheld": withheld,
         "inert": inert,
         "subsets": {text_key[subset]: {
             "members": sorted(subset),
             "overrides": union(groups, subset),
             "vector": instrumentlib.vector_key(union(groups, subset)),
         } for subset in rows_by_subset},
-        "values": {text_key[s]: v for s, v in medians.items()},
+        "values": {text_key[s]: v for s, v in values.items()},
         "seed_values": {str(seed): {text_key[s]: v for s, v in table.items()}
                         for seed, table in per_seed.items()},
         "shares": shares,
@@ -928,17 +1023,18 @@ def summarise(rows_by_subset: dict[frozenset[str], list[dict]],
                                for key, by_seed in by_stat.items()}
                         for name, by_stat in seed_shares.items()},
         "spread": spread(seed_shares, shares),
-        "change": {key: medians[everything][key] - medians[frozenset()][key]
+        "change": {key: values[everything][key] - values[frozenset()][key]
                    for key in measured},
         "ruler": ruler_name,
         "bands": {key: list(bands[key]) for key in measured},
-        "certified": certified_column(days, measured),
-        "band_moves": band_moves(medians, names, bands),
+        "certified": certified,
+        "band_moves": moves,
         "crn": crn,
         "caveats": caveats(seeds=seeds, days=days, universe=universe,
                            unmeasured=unmeasured, crn=crn,
-                           ruler_name=ruler_name, values=medians,
-                           names=names, inert=inert),
+                           ruler_name=ruler_name, values=values,
+                           names=names, inert=inert, withheld=withheld,
+                           pooled=pooled),
     }
 
 
@@ -996,7 +1092,8 @@ def report(summary: dict, *, provenance: dict | None = None,
         "the target without the group; interact = share minus main; "
         "seeds = median [lo, hi] of the per-seed shares and the seeds "
         "carrying the share's sign; alone/last = the statistic moved into "
-        "(in) or out of (out) band in that context.",
+        "(in) or out of (out) band in that context, and '-' where the "
+        "verdict did not change or is withheld.",
     ]
     kind = next((v["kind"] for by_stat in summary["spread"].values()
                  for v in by_stat.values()), "quartiles")
@@ -1008,18 +1105,28 @@ def report(summary: dict, *, provenance: dict | None = None,
               f"{'interact':>10s}   {'seeds median [lo, hi]':>28s}  "
               f"{'sign':>5s}  {'alone':>5s} {'last':>5s}")
     none, everything = "base", label(groups, frozenset(names))
+    withheld = summary.get("withheld", ())
     for key in summary["statistics"]:
         base_value = summary["values"][none][key]
         target_value = summary["values"][everything][key]
         lo, hi = summary["bands"][key]
-        verdict = (f"base {'in' if _in_band(base_value, (lo, hi)) else 'OUT'}"
-                   f", target "
-                   f"{'in' if _in_band(target_value, (lo, hi)) else 'OUT'}")
+        if key in withheld:
+            verdict = ("verdict withheld: certified on the level protocol, "
+                       "this run holds one roster")
+        else:
+            verdict = (
+                f"base {'in' if _in_band(base_value, (lo, hi)) else 'OUT'}"
+                f", target "
+                f"{'in' if _in_band(target_value, (lo, hi)) else 'OUT'}")
+        cert = certified["values"][key]
+        cert_text = f"{cert:9.4f}" if cert is not None else f"{'n/a':>9s}"
+        if key in withheld and cert is not None:
+            cert_text += " (level protocol)"
         lines += [
             "",
             f"{facts.LABELS.get(key, key):22s} base {base_value:9.4f}   "
             f"target {target_value:9.4f}   certified "
-            f"{certified['values'][key]:9.4f}   band {lo:.2f} to {hi:.2f}   "
+            f"{cert_text}   band {lo:.2f} to {hi:.2f}   "
             f"{verdict}",
             header,
         ]
@@ -1042,6 +1149,9 @@ def report(summary: dict, *, provenance: dict | None = None,
     if summary["unmeasured"]:
         lines += ["", "unmeasured, so carrying no share: "
                   + ", ".join(summary["unmeasured"])]
+    if summary.get("pooled"):
+        lines += ["", "pooled over every seed's sessions, so carrying no "
+                  "share: " + ", ".join(summary["pooled"])]
     return "\n".join(lines)
 
 

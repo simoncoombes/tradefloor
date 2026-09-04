@@ -192,6 +192,11 @@ PARAM_SPECS: dict[str, dict] = {
     # valuation reads enters its band at 755.
     "macro_burn_in_days": {"kind": "abs", "step_unit": 30.0,
                            "hard_range": (0.0, 1095.0)},
+    # A SHARE of earnings, so [0, 1]. Past 1.0 a company returns more than
+    # it earns every year, which is a claim about leverage this model does
+    # not carry.
+    "buyback_payout_share": {"kind": "abs", "step_unit": 0.05,
+                             "hard_range": (0.0, 1.0)},
     # A SHARE of the jump drift returned, so [0, 1]. 1.0 is the
     # martingale and past it the compensator overshoots.
     "jump_mean_compensated": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},

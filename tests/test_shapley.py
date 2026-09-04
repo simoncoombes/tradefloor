@@ -95,7 +95,7 @@ def test_a_group_with_no_dials_contributes_zero():
     rows = shapley.evaluate("pt-v14", groups, TOY_SEEDS, TOY_DAYS,
                             TOY_UNIVERSE, workers=1, progress=lambda *_: None)
     stats, _ = shapley.measured_statistics(rows)
-    values = shapley.median_values(rows, stats)
+    values = shapley.subset_values(rows, stats)
     shares = shapley.shapley(values, list(groups))
     for key in stats:
         assert shares["empty"][key] == 0.0, key
@@ -253,6 +253,70 @@ def test_the_report_prints_the_certified_value_the_band_and_the_caveats(toy):
     assert f"{len(TOY_SEEDS)} seed(s) against the 30" in text
     assert f"{TOY_DAYS} days against the certified horizon" in text
     assert "Universe.random(4, seed=1) against the certified" in text
+
+
+def test_the_level_row_carries_a_share_and_no_band_verdict(toy):
+    """The graded rows outside the shape set, walked by their own rules.
+
+    The level row is paired per seed like a shape row, so it carries a
+    share, and its value per subset is the MEAN the row is graded by
+    rather than the median. Its certified value comes from the level
+    table and was measured with the roster varying, which this tool never
+    does, so the band verdict is withheld and the report says so instead
+    of grading one protocol with the other's ruler. The pooled fear row
+    has no per-seed value and carries no share at all. Before this, the
+    tool raised KeyError on the level row's certified value, on every
+    subset, which is the enumeration defect the split makes visible.
+    """
+    import statistics
+
+    from tradefloor import envelope, facts
+
+    rows, _, summary = toy
+    assert "index_drift_pct" in summary["statistics"]
+    for name in TOY_GROUPS:
+        assert "index_drift_pct" in summary["shares"][name]
+    per_seed = shapley.seed_values(rows, ["index_drift_pct"])
+    base = [table[frozenset()]["index_drift_pct"] for table in per_seed.values()]
+    assert summary["values"]["base"]["index_drift_pct"] == pytest.approx(
+        statistics.fmean(base))
+    assert facts.AGGREGATE["index_drift_pct"] == "mean"
+
+    certified = summary["certified"]
+    assert certified["protocol"]["index_drift_pct"] == "level"
+    assert (certified["values"]["index_drift_pct"]
+            == envelope.CERTIFIED_LEVEL["index_drift_pct"])
+    assert certified["level_protocol"] == facts.LEVEL_PROTOCOL["roster"]
+    assert all(certified["protocol"][key] == "held"
+               for key in summary["statistics"] if key in facts.SHAPE)
+    assert "index_drift_pct" in summary["withheld"]
+    assert all(key not in facts.SHAPE for key in summary["withheld"])
+    for name in TOY_GROUPS:
+        assert summary["band_moves"][name]["index_drift_pct"] == {
+            "alone": None, "last": None}
+    assert any("band verdict withheld" in text and "index_drift_pct" in text
+               for text in summary["caveats"])
+
+    assert summary["pooled"] == ["fear_gauge_dn3"]
+    assert "fear_gauge_dn3" not in summary["statistics"]
+    assert "fear_gauge_dn3" not in summary["unmeasured"]
+    assert "fear_gauge_dn3" not in summary["bands"]
+
+    text = shapley.report(summary)
+    assert "verdict withheld" in text
+    assert "(level protocol)" in text
+    assert "pooled over every seed's sessions" in text
+    assert "fear_gauge_dn3" in text
+
+    # And at the doubled horizon the level table has no measured value, so
+    # the column reads None rather than the 252-day number.
+    far = shapley.certified_column(2 * envelope.CERTIFIED_HORIZON_DAYS,
+                                  ["annualised_vol_pct", "index_drift_pct"])
+    assert far["values"]["annualised_vol_pct"] == envelope.MEASURED_504[
+        "annualised_vol_pct"]
+    assert far["values"]["index_drift_pct"] is None
+    assert far["protocol"] == {"annualised_vol_pct": "held",
+                               "index_drift_pct": "level"}
 
 
 def test_seed_ranges_parse():

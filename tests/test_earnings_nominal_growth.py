@@ -22,6 +22,7 @@ and the direction following the economy rather than a constant.
 from __future__ import annotations
 
 import math
+import struct
 
 import pyarrow as pa
 import pytest
@@ -55,6 +56,20 @@ def _universe(n: int = ROSTER):
 
 def _engine(preset, seed: int = SEED, n: int = ROSTER):
     return tf.Engine(seed=seed, universe=_universe(n), model=preset)
+
+
+def _without_buybacks():
+    """pt-v18 with the buyback share off, for the identity tests.
+
+    The identity below is about ONE term, and pt-v18 carries a second that
+    scales the same two fundamentals. Isolating the subject keeps the
+    derivation a genuine second route to the same number; deriving both
+    would make the test a statement about two terms agreeing.
+
+    The arms that measure the term's SIZE keep the shipped vector, because
+    a size measured on an isolated preset is a size nobody ships.
+    """
+    return tf.ModelParams.from_preset("pt-v18", buyback_payout_share=0.0)
 
 
 def _run(engine, days: int, ticks: int = TICKS, first: int = 0) -> None:
@@ -102,7 +117,38 @@ def _anchor(sector: str) -> float:
     return low
 
 
-def _derived(instrument, economy, scale: float, model) -> float:
+#: What `_derived` cannot reproduce, each with the reason it cannot, so the
+#: guard below can require that the refusals are exactly these. A member that
+#: stops refusing fails there too, which is what stops this becoming a list
+#: of excuses.
+UNDERIVABLE = {
+    "qe_pe_stock_gain": "multiplies the log of economy.qe_assets_ratio, and "
+                        "Engine.state_snapshot does not carry that field, so "
+                        "this side cannot read the value the engine used",
+}
+
+
+def _buyback_scale(share: float, grown_eps: float, price: float,
+                   day: int) -> float:
+    """The payout term, in the engine's own spelling.
+
+    `market::tick::buyback_scale`, which reads the ALREADY-grown earnings, so
+    the two terms compose rather than each scaling the original figure. Every
+    guard the engine applies is applied here: a share of zero, a
+    non-positive or non-finite earnings figure, a non-positive or non-finite
+    price and a day at or before zero each give exactly 1.0.
+    """
+    if share == 0.0:
+        return 1.0
+    if not (grown_eps > 0.0) or not math.isfinite(grown_eps):
+        return 1.0
+    if not (price > 0.0) or not math.isfinite(price) or day <= 0:
+        return 1.0
+    return math.exp(share * grown_eps / price * day / 252.0)
+
+
+def _derived(instrument, economy, scale: float, model, *,
+             price: float | None = None, day: int | None = None) -> float:
     """Fair value rebuilt from the coefficients the engine under test runs.
 
     NOT through ``tradefloor.fair_value``. That helper delegates to the
@@ -119,11 +165,23 @@ def _derived(instrument, economy, scale: float, model) -> float:
     statement about one build rather than about two surfaces agreeing.
     """
     p = model.to_dict()
-    # The two channels this derivation leaves out, asserted rather than
-    # assumed, so a preset that switches either on fails here instead of
-    # silently disagreeing with the engine.
-    assert p["qe_pe_stock_gain"] == 0.0, p["qe_pe_stock_gain"]
-    assert p["fair_value_book_floor"] == 0.0, p["fair_value_book_floor"]
+    # `buyback_payout_share` arrived on this list and has left it, because
+    # the term is modelled below rather than refused. The way it arrived is
+    # still the reason the remaining entry is asserted rather than
+    # commented: it scaled the same two fundamentals the term under test
+    # scales, so the identity went red with a number and no name. A consumer
+    # of a growing set either derives its expectation at runtime or fails
+    # naming the member it does not know. The sweep below does the first.
+    #
+    # One channel cannot be derived at all, and it is refused by name.
+    # `qe_pe_stock_gain` multiplies the log of `economy.qe_assets_ratio`,
+    # and `Engine.state_snapshot` does not carry that field, so nothing on
+    # this side can read the value the engine used.
+    assert p["qe_pe_stock_gain"] == 0.0, UNDERIVABLE["qe_pe_stock_gain"]
+    if price is None:
+        assert p["buyback_payout_share"] == 0.0, (
+            "this arm derives the nominal term alone, so the payout share "
+            "has to be off; pass price= and day= to derive both")
 
     discount = economy["corporate_bond_yield"] / 100.0
     duration = 1.0 + max(0.0, instrument.revenue_growth) * p[
@@ -134,11 +192,23 @@ def _derived(instrument, economy, scale: float, model) -> float:
         * p["rate_pe_sensitivity"] * duration)
     qe_adjustment = 1.0 + p["qe_pe_gain"] * economy["qe_pe_boost"]
 
-    eps = instrument.eps * scale
+    buyback = 1.0 if price is None else _buyback_scale(
+        p["buyback_payout_share"], instrument.eps * scale, price, day)
+    total = scale * buyback
+
+    eps = instrument.eps * total
     if eps > 0.0:
         target_pe = _anchor(instrument.sector) * rate_adjustment * qe_adjustment
-        return max(p["fair_value_floor"], eps * target_pe)
-    book = instrument.book_value_per_share * scale
+        earnings_value = max(p["fair_value_floor"], eps * target_pe)
+        floor = p["fair_value_book_floor"]
+        if floor == 0.0:
+            return earnings_value
+        # At a nonzero floor the loss-maker's anchor applies to profitable
+        # companies too, so fair value is continuous at zero earnings.
+        return max(earnings_value,
+                   instrument.book_value_per_share * total
+                   * p["loss_making_price_to_book"] * floor)
+    book = instrument.book_value_per_share * total
     return max(p["fair_value_floor"], book * p["loss_making_price_to_book"])
 
 
@@ -228,7 +298,7 @@ def test_the_scale_is_the_economys_own_ratio():
     day's economy, or to only one of the two fundamentals fails here.
     """
     days = 120
-    engine = _engine("pt-v18")
+    engine = _engine(_without_buybacks())
     universe = _universe()
     _run(engine, days - 1)
 
@@ -245,7 +315,7 @@ def test_the_scale_is_the_economys_own_ratio():
     # No assertion on the QE boost is needed any more. The derivation reads
     # ``qe_pe_gain`` from the model, so it computes the engine's adjustment
     # rather than the helper's, and the two agree at any boost.
-    model = tf.ModelParams.from_preset("pt-v18")
+    model = _without_buybacks()
 
     _run(engine, 1, first=days - 1)
     truth = pa.table(engine.truth(day=days - 1)).to_pydict()
@@ -278,14 +348,14 @@ def test_an_unscaled_valuation_disagrees_with_the_engine():
     other part of the valuation.
     """
     days = 120
-    engine = _engine("pt-v18")
+    engine = _engine(_without_buybacks())
     universe = _universe()
     _run(engine, days - 1)
     economy = engine.state_snapshot()["economy"]
     _run(engine, 1, first=days - 1)
     truth = pa.table(engine.truth(day=days - 1)).to_pydict()
 
-    model = tf.ModelParams.from_preset("pt-v18")
+    model = _without_buybacks()
     disagreed = 0
     for row, slot in enumerate(truth["instrument_id"]):
         unscaled = _derived(universe[slot], economy, 1.0, model)
@@ -348,6 +418,257 @@ def test_a_loss_maker_grows_off_its_restated_book():
         assert value != pytest.approx(20.0 * 1.2, rel=1e-9)
 
 
+def test_both_terms_compose_on_the_shipped_preset():
+    """The identity on pt-v18 as it ships, with the payout term included.
+
+    The arm above isolates the growth term by holding the payout share at
+    zero. This one derives both, because the preset sets both and a test
+    that only ever runs the isolated arm stops describing what ships.
+
+    The payout factor reads the current price, which `truth` does not
+    carry. It is recovered from `Engine.session_prices`, the session's own
+    path at `ticks_written x instruments`, so this covers EVERY tick rather
+    than the first: a tick prices off the state the previous one left, so
+    tick t reads row t - 1 and tick 0 reads the column snapshotted before
+    the open. That column is asserted unchanged across the open rather than
+    assumed, since the point is to use the number the tick actually read.
+
+    Covering every tick is why the isolated arm above is kept for isolation
+    rather than for reach. Both arms now check the same 240 rows, and the
+    isolated one earns its place by saying what ONE term does on its own.
+
+    The two terms compose rather than each scaling the original earnings:
+    the payout factor is computed on the already-grown figure, which is the
+    order `market::tick` applies them in.
+    """
+    days = 60
+    engine = _engine("pt-v18")
+    universe = _universe()
+    model = tf.ModelParams.from_preset("pt-v18")
+    assert model.to_dict()["buyback_payout_share"] != 0.0, (
+        "this arm exists to cover the payout term and the preset has it off")
+    _run(engine, days - 1)
+
+    opening = engine.state_snapshot()
+    economy = opening["economy"]
+    scale = economy["gdp"] * economy["cpi"] / opening["nominal_output_base"]
+    before = engine.column("price")
+    assert opening["day_count"] == days - 1, opening["day_count"]
+
+    engine.open_market()
+    assert engine.column("price") == before, (
+        "the open moved the price column, so the number below is not the one "
+        "the tick read")
+    opening_prices = struct.unpack("<%dd" % ROSTER, before)
+
+    engine.run_session(9, 30, 3, TICKS)
+    engine.record(days - 1)
+    truth = pa.table(engine.truth(day=days - 1)).to_pydict()
+
+    # The price each tick READ, for every tick rather than the first. The
+    # session's own path is `ticks_written x instruments` row-major, and a
+    # tick prices off the state the previous one left, so tick t reads row
+    # t - 1 and tick 0 reads the column snapshotted above. `truth` carries
+    # no traded price, which is why the path is taken from the session
+    # rather than from the table beside the fundamentals.
+    path = struct.unpack("<%dd" % (TICKS * ROSTER), engine.session_prices())
+
+    def price_read_by(tick: int, slot: int) -> float:
+        if tick == 0:
+            return opening_prices[slot]
+        return path[(tick - 1) * ROSTER + slot]
+
+    checked = 0
+    for row, slot in enumerate(truth["instrument_id"]):
+        tick = truth["tick"][row]
+        want = _derived(universe[slot], economy, scale, model,
+                        price=price_read_by(tick, slot), day=days - 1)
+        got = truth["fundamental_value"][row]
+        assert got == pytest.approx(want, rel=1e-12), (tick, slot, got, want)
+        checked += 1
+    assert checked == ROSTER * TICKS
+
+    # And the payout term is doing something, or this would pass on a build
+    # that dropped it. Derived without a price, the same names differ.
+    nominal_only = _without_buybacks()
+    differing = sum(
+        1 for row, slot in enumerate(truth["instrument_id"])
+        if truth["fundamental_value"][row] != pytest.approx(
+            _derived(universe[slot], economy, scale, nominal_only), rel=1e-9))
+    assert differing == ROSTER * TICKS, differing
+
+
+def test_the_derivation_tracks_every_parameter_that_reaches_the_valuation():
+    """The guard that MEASURES its scope rather than listing it.
+
+    `_derived` reads a named set of coefficients, and a named set is a
+    statement about that set. This derivation was rewritten once precisely
+    to stop depending on two surfaces agreeing, moving from the public
+    helper to the model's own parameters, and it still read a list. The
+    payout dial then scaled the same quantity the growth term scales and the
+    identity had two terms where the derivation modelled one.
+
+    So the scope is measured. Every entry in the project's own perturbation
+    table is applied to the preset in turn, and the identity has to survive
+    each one: the engine's fundamental must equal this derivation on the
+    economy that engine priced against. A parameter that reaches the
+    valuation and is not modelled here breaks the identity and is named.
+
+    The perturbation table is the right source because it is one of the four
+    surfaces a new dial has to touch, so the guard's scope grows with the
+    model rather than with anyone remembering to widen it.
+
+    # The limit, which is why this is a guard and not a proof
+
+    The sweep's scope is the SETTABLE surface, and it proves that rather
+    than assuming it: the perturbation table and `ModelParams.settable()`
+    are asserted equal in both directions below, so a dial that reaches the
+    model without reaching the table fails here rather than going unswept.
+
+    Outside that surface sit thirty carried read-only parameters, which take
+    no override and so cannot be perturbed. Five of them reach the
+    valuation, `rate_pe_sensitivity`, `growth_duration_scale`,
+    `rate_adjustment_floor`, `fair_value_floor` and
+    `loss_making_price_to_book`, and `_derived` reads all five from the
+    model by name. A carried parameter added later that reaches fair value
+    would escape this guard, which is the gap to know about.
+
+    Each perturbation runs TWICE, at a payout share of zero and at the
+    shipped value, because one pass cannot see a dial that only bites when
+    payouts are on. That is the PAIR problem the perturbation table carries
+    three times over, where a dial moves nothing because a second dial it
+    depends on ships at zero, and the table's treatment is a comment per
+    member because a table cannot do better. A loop can. Dropping the payout
+    factor from the derivation passes the first pass and fails the second,
+    which was checked.
+
+    A parameter that moves the ECONOMY rather than the valuation is not a
+    false failure, because the derivation is handed the economy the engine
+    actually priced against rather than a fixed one.
+
+    # What it costs
+
+    One two-day, four-name, two-tick engine run per settable parameter per
+    pass. On this roster that is 232 runs in 2.2 to 2.4 seconds, against 4.5
+    to 4.7 for the whole file, on a four-core Windows box under load. A
+    range rather than a figure, because repeated runs spanned that much and
+    a single reading would imply a precision the measurement does not have.
+    The number sits here rather than in an assertion, because a wall time
+    asserted in a test fails flakily and never honestly.
+    """
+    import test_model_params as params_table
+
+    # The sweep's scope, proved rather than assumed. If a dial reaches the
+    # model without reaching the table, this fails before anything is
+    # measured and the sweep never reports a false all-clear.
+    perturbed = {name for name, _, _ in params_table.PERTURBATIONS}
+    assert perturbed == set(tf.ModelParams.settable()), (
+        sorted(perturbed ^ set(tf.ModelParams.settable())))
+
+    universe = _universe(4)
+    probe_ticks, names = 2, 4
+
+    def identity_holds(model):
+        engine = tf.Engine(seed=SEED, universe=universe, model=model)
+        engine.open_market()
+        engine.run_session(9, 30, 3, probe_ticks)
+        engine.record(0)
+        engine.close_market()
+        economy = engine.state_snapshot()["economy"]
+        base = engine.state_snapshot()["nominal_output_base"]
+        scale_now = economy["gdp"] * economy["cpi"] / base
+        dial = model.to_dict()["earnings_nominal_growth"]
+        scale = 1.0 + dial * (scale_now - 1.0)
+        opening = struct.unpack("<%dd" % names, engine.column("price"))
+        engine.open_market()
+        engine.run_session(9, 30, 3, probe_ticks)
+        engine.record(1)
+        path = struct.unpack("<%dd" % (probe_ticks * names),
+                             engine.session_prices())
+        truth = pa.table(engine.truth(day=1)).to_pydict()
+        for row, slot in enumerate(truth["instrument_id"]):
+            tick = truth["tick"][row]
+            price = (opening[slot] if tick == 0
+                     else path[(tick - 1) * names + slot])
+            got = truth["fundamental_value"][row]
+            # The price is always supplied, so the derivation composes both
+            # terms. At a payout share of zero the factor is exactly 1.0 by
+            # its own branch, which makes the first pass below identical to
+            # deriving the nominal term alone.
+            want = _derived(universe[slot], economy, scale, model,
+                            price=price, day=1)
+            if got != pytest.approx(want, rel=1e-9):
+                return False, (slot, got, want)
+        return True, None
+
+    # TWO PASSES, at the payout share off and at the shipped value. One pass
+    # cannot see a dial that only bites when payouts are on, which is the
+    # PAIR problem the perturbation table itself carries three times: a dial
+    # that moves nothing because a second dial it depends on ships at zero.
+    # The table's own treatment is a comment per member, because a table
+    # cannot do better. A loop can, so this runs the loop twice.
+    #
+    # Two passes rather than a cross product. Conditional-on-payouts is the
+    # live case, and the general cross product is a much larger thing that
+    # nothing has asked for.
+    shares = (0.0, tf.ModelParams.from_preset(
+        "pt-v18").to_dict()["buyback_payout_share"])
+    assert shares[1] != 0.0, "the second pass would repeat the first"
+
+    for share in shares:
+        held, detail = identity_holds(tf.ModelParams.from_preset(
+            "pt-v18", buyback_payout_share=share))
+        assert held, ("the identity does not hold unperturbed at payout "
+                      f"share {share}, so nothing below means anything: "
+                      f"{detail}")
+
+    broke, rejected, undeliverable, applied = [], [], [], 0
+    for name, value, _expected in params_table.PERTURBATIONS:
+        if name == "buyback_payout_share":
+            # Set by the pass rather than by the table, and both of its
+            # shipped states are covered by the two passes.
+            continue
+        for share in shares:
+            try:
+                model = tf.ModelParams.from_preset(
+                    "pt-v18", **{name: value,
+                                 "buyback_payout_share": share})
+            except tf.ValidationError:
+                rejected.append(name)
+                continue
+            applied += 1
+            try:
+                held, detail = identity_holds(model)
+            except AssertionError:
+                # `_derived` refused the parameter by name rather than
+                # disagreeing with the engine quietly, which is the outcome
+                # UNDERIVABLE describes.
+                undeliverable.append(name)
+                continue
+            if not held:
+                broke.append((name, share, detail))
+
+    assert broke == [], (
+        "these parameters reach the valuation and the derivation does not "
+        f"model them: {sorted({n for n, _, _ in broke})}. Add the term, or "
+        "if the "
+        "parameter cannot reach fair value, the identity broke for another "
+        f"reason and that is the finding. Detail: {broke[:3]}")
+
+    # Both directions on the refusals, so UNDERIVABLE cannot become a list
+    # of excuses: every refusal is one this file has stated a reason for,
+    # and every stated reason still refuses.
+    assert sorted(set(undeliverable)) == sorted(UNDERIVABLE), (
+        undeliverable, sorted(UNDERIVABLE))
+
+    # Every name in the table is settable, which the scope check above
+    # already established, so nothing should have been refused.
+    assert rejected == [], rejected
+    # And the probe has to have run, or an empty sweep would pass silently.
+    assert applied == (len(perturbed) - 1) * len(shares), (
+        applied, len(perturbed), len(shares))
+
+
 def test_the_base_survives_a_restore():
     """A restored engine values against the output its run opened at.
 
@@ -378,7 +699,7 @@ def test_the_state_hash_covers_the_base():
     snapshot's, so the pair is checked against each other as well as against
     a mutation.
     """
-    engine = _engine("pt-v18")
+    engine = _engine(_without_buybacks())
     _run(engine, 10)
     snapshot = engine.state_snapshot()
     assert state_hash(snapshot) == engine.state_hash()
@@ -396,7 +717,7 @@ def test_the_term_follows_the_economy_down():
     base, which is what a contraction with deflation reaches, and every
     fundamental comes down with it in the ratio the economy moved.
     """
-    engine = _engine("pt-v18")
+    engine = _engine(_without_buybacks())
     _run(engine, 2)
     snapshot = engine.state_snapshot()
     base = snapshot["nominal_output_base"]
@@ -414,7 +735,7 @@ def test_the_term_follows_the_economy_down():
     shrunk_values = pa.table(
         engine.truth(day=2)).to_pydict()["fundamental_value"]
 
-    other = _engine("pt-v18")
+    other = _engine(_without_buybacks())
     _run(other, 2)
     other.restore_state(snapshot)
     _run(other, 1, first=2)

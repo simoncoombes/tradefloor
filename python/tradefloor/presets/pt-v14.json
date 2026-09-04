@@ -2,9 +2,10 @@
   "schema": 1,
   "preset": "pt-v14",
   "fingerprint": "pt-v14",
-  "coefficient_digest": "c7e9a8e407ed2c5240ae10f83b3a1d256fbeb03316eaaad6c4cc604accd2df70",
+  "coefficient_digest": "e2679476f386b6929d7adae26acefcf30bbdf525788afba999a3d6c6389f42ed",
   "coefficients": {
     "book_levels": 10.0,
+    "buyback_payout_share": 0.0,
     "cascade_symmetry": 0.0,
     "crash_amplifier_slope": 0.2,
     "crash_amplifier_threshold": 2.0,
