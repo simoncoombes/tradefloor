@@ -628,6 +628,60 @@ REAL_MARKETS_PROVENANCE = {
     },
 }
 
+#: The reference panel's per-window readings, as data.
+#:
+#: `REAL_MARKETS_PROVENANCE` carries only three numbers per row, the min,
+#: median and max across windows, which is enough to read a band's derivation
+#: and not enough to re-derive one. This is the table those three summarise:
+#: ten 253-bar windows of the same 40 US large caps, 2015-07 to 2025-07,
+#: measured with THIS module's estimators at THIS panel's method.
+#:
+#: The 2019-07 window straddles the COVID crash and is EXCLUDED from band
+#: derivation, reported beside each band as the crisis reading. Every summary
+#: in `REAL_MARKETS_PROVENANCE` is taken over the nine non-crisis windows, and
+#: `tests/test_reference_windows.py` derives all nine reproducible triples
+#: from this table rather than trusting that they match.
+#:
+#: TEN ROWS OF FOURTEEN. The four correlation-structure rows -- corr_asymmetry,
+#: corr_asymmetry_lagged, sector_excess_corr and corr_persistence_acf1 -- have
+#: no per-window record here, and `abs_return_acf5`'s provenance summarises a
+#: different window set from this one, so its triple is not derivable from
+#: these values and the test excludes it by name rather than by tolerance.
+#:
+#: What this unblocks: any re-derivation of a band, a leave-one-window-out
+#: null of the panel against real data, and any method that needs the
+#: dispersion of a statistic across real years rather than its range.
+REAL_MARKETS_WINDOWS = {
+    "windows": (
+        "2015-07..2016-07", "2016-07..2017-07", "2017-07..2018-07",
+        "2018-07..2019-07", "2019-07..2020-07", "2020-07..2021-07",
+        "2021-07..2022-07", "2022-07..2023-07", "2023-07..2024-07",
+        "2024-07..2025-07",
+    ),
+    #: Index into `windows` of the one excluded from every band derivation.
+    "crisis_index": 4,
+    "roster": "40 US large caps, common to all ten windows",
+    "source": "tradefloor-design/REALISM-BANDS.md, the window table",
+    "values": {
+        "annualised_vol_pct": (25.9, 18.3, 21.5, 25.7, 45.3, 28.2, 30.7, 29.0, 23.4, 29.9),
+        "excess_kurtosis": (5.71, 36.72, 5.64, 11.06, 11.36, 5.60, 10.20, 13.44, 15.13, 13.79),
+        "return_acf1": (0.030, -0.015, -0.046, -0.009, -0.244, -0.046, 0.028, 0.006, 0.018, -0.006),
+        "abs_return_acf1": (0.176, 0.083, 0.165, 0.128, 0.430, 0.071, 0.076, 0.057, 0.039, 0.122),
+        "abs_return_acf5": (0.045, 0.034, 0.066, 0.045, 0.343, 0.073, 0.046, 0.036, 0.036, 0.068),
+        "abs_return_acf20": (0.013, -0.012, 0.001, 0.059, 0.141, 0.020, 0.020, 0.030, -0.015, 0.028),
+        "cross_sectional_corr": (0.477, 0.208, 0.352, 0.357, 0.633, 0.269, 0.346, 0.369, 0.169, 0.297),
+        "volume_abs_return_corr": (0.617, 0.616, 0.584, 0.527, 0.645, 0.544, 0.513, 0.502, 0.503, 0.536),
+        "leverage_effect": (-0.109, -0.020, -0.087, -0.113, -0.128, 0.014, -0.038, -0.043, -0.007, -0.042),
+        "volume_change_acf1": (-0.221, -0.242, -0.255, -0.259, -0.284, -0.266, -0.238, -0.296, -0.263, -0.239),
+    },
+    #: Rows whose provenance triple this table does NOT reproduce, with why.
+    "not_derivable": {
+        "abs_return_acf5": "its provenance summarises a different window set, "
+                           "an eight-value list rather than these nine",
+    },
+}
+
+
 #: The across-seed standard deviation of each statistic at the shipped
 #: preset. It ships beside the bands because a band exit is only comparable
 #: across statistics once it is priced in units of that statistic's own
