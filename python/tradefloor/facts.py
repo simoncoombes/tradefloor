@@ -916,6 +916,128 @@ def _correlation(a: Sequence[float], b: Sequence[float]) -> float | None:
     return sum(x * y for x, y in zip(unit_a, unit_b))
 
 
+def _zumbach_terms(
+    returns: Sequence[float], n: int
+) -> tuple[list[float], list[float], list[float], list[float]]:
+    """The four per-window terms of `zumbach_asymmetry`, for ONE series.
+
+    Kept separate so names can be pooled by their TERMS rather than by
+    concatenating their returns. Concatenation would build windows straddling
+    two companies, which reads the end of one and the start of another as a
+    single trend and returns a plausible number for a quantity nobody
+    computed.
+    """
+    past_trend_sq: list[float] = []
+    future_var: list[float] = []
+    past_var: list[float] = []
+    future_trend_sq: list[float] = []
+    for t in range(n, len(returns) - n):
+        back = returns[t - n:t]
+        fwd = returns[t + 1:t + 1 + n]
+        if len(fwd) < n:
+            break
+        past_trend_sq.append(math.fsum(back) ** 2)
+        past_var.append(math.fsum(x * x for x in back))
+        future_trend_sq.append(math.fsum(fwd) ** 2)
+        future_var.append(math.fsum(x * x for x in fwd))
+    return past_trend_sq, future_var, past_var, future_trend_sq
+
+
+def zumbach_asymmetry(returns: Sequence[float], n: int) -> float | None:
+    """Time-reversal asymmetry of volatility feedback, at horizon `n`.
+
+    `A(n) = corr(P^2, Qp) - corr(Qm, F^2)`, where over a window of `n`
+    sessions either side of `t`, `P` is the past trend, `Qm` the past realised
+    variance, `F` the future trend and `Qp` the future realised variance. It
+    asks whether a past TREND predicts future variance better than past
+    variance predicts a future trend, which for a time-reversible process it
+    does not.
+
+    Positive in equity data at scales of days to weeks (Muller and others
+    1997; Zumbach 2009; Chicheportiche and Bouchaud 2014).
+
+    ## Why this is a null control and not only a target
+
+    A(n) is EXACTLY ZERO in population for any stationary process
+    `r_t = sigma_t * z_t` whose `z` are independent, symmetric and independent
+    of the past, and whose `sigma_t` is any measurable function of past
+    SQUARES. So a reading away from zero identifies a variance law that reads
+    a signed return with memory beyond a day, and nothing else can produce it.
+
+    The proof is three lines. `P^2 = Qm + 2 * sum_{i<j} r_{t-i} r_{t-j}`, and
+    flipping the sign of one past innovation leaves every sigma and every
+    future square unchanged while flipping each cross term, so
+    `Cov(P^2, Qp) = Cov(Qm, Qp)`. `F^2 = Qp + 2 * sum_{i<j} r_{t+i} r_{t+j}`,
+    and each future cross term has conditional mean zero given a past that
+    contains `Qm`, so `Cov(Qm, F^2) = Cov(Qm, Qp)`. Stationarity makes the two
+    denominators equal pairwise. Both correlations are then the same ratio.
+
+    `tests/test_zumbach.py` checks that numerically rather than trusting it:
+    a symmetric GARCH and a one-day-sign GJR read near zero, and a variance
+    reading a six-scale signed sum reads an order of magnitude higher.
+
+    ## What it is NOT
+
+    Two different estimators carry this name in the research record. This is
+    the one the theorem is about. The other,
+    `corr(RV_past(20), r^2_next) - corr(r^2_t, RV_future(20))`, is a different
+    quantity that did not discriminate the models it was tried on, and a band
+    derived for one is not a band for the other.
+
+    Returns None where the series is too short to form a window either side,
+    for the reason `_correlation` does: an undefined reading must not arrive
+    as a number.
+    """
+    if n < 1 or len(returns) < 2 * n + 3:
+        return None
+    a, b, c, d = _zumbach_terms(returns, n)
+    forward = _correlation(a, b)
+    reverse = _correlation(c, d)
+    if forward is None or reverse is None:
+        return None
+    return forward - reverse
+
+
+def zumbach_asymmetry_pooled(
+    series: Sequence[Sequence[float]], n: int
+) -> float | None:
+    """`zumbach_asymmetry` across names, pooled by terms after standardising.
+
+    Pooling is what makes the estimator usable at 252 sessions: it is a
+    fourth-moment object and one name of one year does not carry it. Each name
+    is divided by its OWN sample standard deviation first, so a volatile name
+    does not dominate the pool through its scale, and the windows are formed
+    WITHIN a name before pooling, never across the join between two.
+
+    One difference from the bare form, which is a property rather than a
+    defect: standardising also CENTRES each name, and centring changes the
+    trend terms whenever a name's mean return is not zero. So on a drifting
+    series the two functions differ, and neither is wrong. Pass a single name
+    to this function rather than to `zumbach_asymmetry` if the centred
+    convention is the one wanted.
+    """
+    a: list[float] = []
+    b: list[float] = []
+    c: list[float] = []
+    d: list[float] = []
+    for one in series:
+        if n < 1 or len(one) < 2 * n + 3:
+            continue
+        unit = _unit_centred(one)
+        if unit is None:
+            continue
+        wa, wb, wc, wd = _zumbach_terms(unit, n)
+        a.extend(wa)
+        b.extend(wb)
+        c.extend(wc)
+        d.extend(wd)
+    forward = _correlation(a, b)
+    reverse = _correlation(c, d)
+    if forward is None or reverse is None:
+        return None
+    return forward - reverse
+
+
 def _daily_series(bars: dict) -> dict[int, list[tuple[int, float, float]]]:
     """Group the bars table into per-instrument (day, close, volume) rows.
 
