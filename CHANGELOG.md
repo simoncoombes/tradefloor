@@ -682,11 +682,18 @@ three run at +3.6 and +3.3, and year four falls back to +0.6 as the first
 contractions arrive.
 
 The phase lengths quoted above are the hazard alone. The condition ladder
-adds to it, so each bounds a phase's length from above. A contraction is
-where that bites: its four conditions sum to 0.25 against a
-base hazard of 0.081 at month four, so a deep contraction runs 7.7 months
-where a mild one runs 23. The ratio of thirty is unaffected, since both
-readings exclude the ladder equally.
+adds to it, so each bounds a phase's length from above. The ratio of
+thirty is unaffected, since both readings exclude the ladder equally.
+
+This section first said a contraction's four ladder conditions shorten a
+deep one to 7.7 months against a mild one's 23. That arithmetic assumed
+every condition fires from the fourth month, and the four-year arms
+measure them firing late: growth under -2.0 on day 1, the policy rate
+under 1.0 on day 190 at the median, unemployment over 10.0 on day 239.
+Completed contraction spells read 162 days with one condition fired, 226
+with two and 335 with three, so the ladder lengthens a contraction with
+its depth. The claim is corrected rather than removed, because a reader
+who met it should find out that it was wrong.
 
 Two entry points changed shape. `check_cycle_transition` and
 `get_cycle_transition_probability` each take the dial, so a caller states
