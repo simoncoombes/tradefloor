@@ -454,11 +454,18 @@ def test_both_terms_compose_on_the_shipped_preset():
     scale = economy["gdp"] * economy["cpi"] / opening["nominal_output_base"]
     assert opening["day_count"] == days - 1, opening["day_count"]
 
+    before = engine.column("price")
     engine.open_market()
+    after = engine.column("price")
     # The column AFTER the open is the one tick 0 reads. An overnight process
     # moves it at the open, and the payout term then reads the post-gap
-    # price; on this preset the ratio is zero and the open is the close.
-    opening_prices = struct.unpack("<%dd" % ROSTER, engine.column("price"))
+    # price; on this preset the ratio is zero, so the open must leave the
+    # column alone, and that is asserted rather than assumed.
+    if model.to_dict().get("overnight_variance_ratio", 0.0) == 0.0:
+        assert after == before, (
+            "the price column moved at the open with no overnight process "
+            "to move it, so the number below is not the one the tick read")
+    opening_prices = struct.unpack("<%dd" % ROSTER, after)
 
     engine.run_session(9, 30, 3, TICKS)
     engine.record(days - 1)
@@ -578,13 +585,23 @@ def test_the_derivation_tracks_every_parameter_that_reaches_the_valuation():
         scale_now = economy["gdp"] * economy["cpi"] / base
         dial = model.to_dict()["earnings_nominal_growth"]
         scale = 1.0 + dial * (scale_now - 1.0)
+        before = engine.column("price")
         engine.open_market()
-        # Read AFTER the open, because tick 0 prices off the session's open
-        # and an overnight process moves the column at the open: with
-        # `overnight_variance_ratio` on, the buyback yield reads the post-gap
+        after = engine.column("price")
+        # The derivation reads the price the tick reads, which is the column
+        # AFTER the open: an overnight process moves it there, and with
+        # `overnight_variance_ratio` on the buyback yield reads the post-gap
         # price, so the night reaches fair value through the payout term.
-        # At the ratio's zero the open is the close and this reads the same.
-        opening = struct.unpack("<%dd" % names, engine.column("price"))
+        # With no overnight process the open leaves the column alone, and
+        # that is still asserted, so the next thing to move a price at the
+        # open for some other reason is caught here rather than as a
+        # millionth-level difference in a later gate.
+        if model.to_dict().get("overnight_variance_ratio", 0.0) == 0.0:
+            assert after == before, (
+                "the price column moved at the open with no overnight "
+                "process to move it, so the number below is not the one "
+                "the tick read")
+        opening = struct.unpack("<%dd" % names, after)
         engine.run_session(9, 30, 3, probe_ticks)
         engine.record(1)
         path = struct.unpack("<%dd" % (probe_ticks * names),
