@@ -87,12 +87,16 @@ the real median near 0.375, where the night's tail counts and kurtosis
 sit inside their real ranges and its concentration sits on the band's
 floor. The reversal reads -0.03 against a real -0.02, the level row does
 not move, and thirteen of the fourteen shape rows hold at every ratio.
-Two things the measurement found, both for the decision on adopting the
-dial: nothing downstream answers the night, since the GARCH innovation
-and the forced-flow trigger read the session and never the gap, and
-`volume_abs_return_corr` goes red at any ratio above zero because a gap
-carries no volume against it. No preset carries the dial; the response
-curve is in the design repository's `programme/overnight-process.md`.
+Three things the measurement found, all for the decision on adopting
+the dial. Nothing downstream answers the night's variance, since the
+GARCH innovation and the forced-flow trigger read the session and never
+the gap. The buyback yield reads the post-gap price, so the payout term
+is the one path from the night to fair value, found by the merge gate at
+a millionth on a name whose open had gapped, and none from the night
+back to its own size. And `volume_abs_return_corr` goes red at any ratio
+above zero because a gap carries no volume against it. No preset carries
+the dial; the response curve is in the design repository's
+`programme/overnight-process.md`.
 
 ### The graded level row and the split of the certified set
 
