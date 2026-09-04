@@ -183,6 +183,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # is an assertion about a quantity this model does not carry. So the box
     # is the closed unit interval and the top is where the claim stops.
     "earnings_nominal_growth": (0.0, 1.0),
+    # Two levels rather than a range: 0.0 is the shipped clamped
+    # multiplier and anything above it is the measured law, whose
+    # exponents come from the literature rather than from a search. The
+    # unit interval is the registry's shape, not a claim that 0.5 means
+    # half a law.
+    "order_flow_impact_law": (0.0, 1.0),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0

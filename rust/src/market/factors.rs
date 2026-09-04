@@ -678,6 +678,70 @@ fn truthy_or(value: f64, fallback: f64) -> f64 {
     }
 }
 
+/// The participation at which the shipped multiplier stops responding, and
+/// the slope it responds with below that. Both are read back out of
+/// `order_imbalance` itself by `the_law_constants_are_the_shipped_ones`, so
+/// they cannot drift away from the literals that function still uses.
+const PARTICIPATION_KNEE: f64 = 10.0;
+const PARTICIPATION_SLOPE: f64 = 0.15;
+
+/// The measured participation multiplier: linear below the knee, square
+/// root above it.
+///
+/// Continuous at the knee by construction and not by arrangement -- both
+/// branches evaluate to `PARTICIPATION_SLOPE * PARTICIPATION_KNEE` there,
+/// because `sqrt(1)` is exactly 1.0 in IEEE-754.
+///
+/// The linear branch reaches down to zero on its own, which is why there is
+/// no floor here. The shipped 0.2 was the linear law clamped at precisely
+/// the point it crosses 0.2, since `PARTICIPATION_SLOPE * 4.0 / 3.0` is
+/// that value; removing the clamp continues the same line rather than
+/// introducing a different one.
+fn participation_multiplier(participation: f64) -> f64 {
+    if participation <= PARTICIPATION_KNEE {
+        PARTICIPATION_SLOPE * participation
+    } else {
+        PARTICIPATION_SLOPE
+            * PARTICIPATION_KNEE
+            * mathx::sqrt(participation / PARTICIPATION_KNEE)
+    }
+}
+
+/// `order_imbalance` under `order_flow_impact_law`.
+///
+/// At 0.0 this IS `order_imbalance`, by branch rather than by arithmetic,
+/// so every preset that predates the dial is bit-identical. At 1.0 the
+/// participation multiplier follows the measured law instead of the clamped
+/// one. `ModelParams::order_flow_impact_law` carries the sources, the
+/// clock, and what the change does not claim.
+///
+/// `order_imbalance` keeps its signature and its behaviour because it is
+/// public API, re-exported through `market::mod`. This is the
+/// `cap_size_multiplier` / `cap_size_multiplier_with` pattern already in
+/// this file.
+pub fn order_imbalance_with(
+    params: &crate::params::ModelParams,
+    buy_vol: f64,
+    sell_vol: f64,
+    avg_volume: f64,
+) -> f64 {
+    if params.order_flow_impact_law == 0.0 {
+        return order_imbalance(buy_vol, sell_vol, avg_volume);
+    }
+    let total_vol = buy_vol + sell_vol;
+    // Written as the negation so a NaN total takes this branch too, which is
+    // what `order_imbalance`'s `if total_vol > 0.0` does. Returning the same
+    // literal keeps the sign of the zero identical on both laws, and that is
+    // what makes a run with no injected flow bit-identical rather than
+    // merely equal.
+    if !(total_vol > 0.0) {
+        return 0.0;
+    }
+    let avg_minute_vol = mathx::max(truthy_or(avg_volume, 1_000_000.0) / 390.0, 100.0);
+    let raw_imbalance = (buy_vol - sell_vol) / total_vol;
+    raw_imbalance * participation_multiplier(total_vol / avg_minute_vol)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1096,6 +1160,251 @@ mod tests {
             order_imbalance(1000.0, 0.0, 0.0),
             order_imbalance(1000.0, 0.0, 1_000_000.0)
         );
+    }
+
+    // -- The participation law ---------------------------------------------
+
+    fn law_on() -> crate::params::ModelParams {
+        crate::params::PT_V16
+            .with_override("order_flow_impact_law", 1.0)
+            .unwrap()
+    }
+
+    /// The multiplier alone, at participation `phi`.
+    ///
+    /// A pure one-sided buy, so the raw imbalance is exactly 1.0 and what
+    /// comes back is the participation term by itself. 390,000 shares a day
+    /// is 1,000 a minute, well clear of the 100-share floor, so `phi`
+    /// thousand shares of buying IS a participation of `phi`.
+    fn multiplier(p: &crate::params::ModelParams, phi: f64) -> f64 {
+        order_imbalance_with(p, phi * 1000.0, 0.0, 390_000.0)
+    }
+
+    /// `d log m / d log phi`, measured across one octave.
+    ///
+    /// A power law returns its own exponent. Anything else returns the
+    /// average slope over the octave, which is what makes this readable on
+    /// a clamped function too: a clamp reads zero.
+    fn exponent(p: &crate::params::ModelParams, phi: f64) -> f64 {
+        mathx::log(multiplier(p, 2.0 * phi) / multiplier(p, phi)) / mathx::log(2.0)
+    }
+
+    #[test]
+    fn the_shipped_law_stops_responding_at_both_ends_and_not_just_the_top() {
+        // Issue #166 reports the ceiling. The floor is the same defect at
+        // the other end, and it is measured here rather than read off the
+        // source because the two clamps are written differently -- one is a
+        // `min` inside the product, the other a `max` around it -- and only
+        // the elasticity shows they do the same thing.
+        let off = crate::params::PT_V16;
+        assert_eq!(
+            off.order_flow_impact_law, 0.0,
+            "the shipped law must remain the default"
+        );
+        for (phi, expected, what) in [
+            (0.1, 0.0, "below the floor, size has stopped mattering"),
+            (2.0, 1.0, "in the band, size maps straight through"),
+            (20.0, 0.0, "above the ceiling, size has stopped mattering again"),
+        ] {
+            let k = exponent(&off, phi);
+            assert!((k - expected).abs() < 1e-12, "phi {phi}: {k}, {what}");
+        }
+    }
+
+    #[test]
+    fn the_law_constants_are_read_back_out_of_the_shipped_function() {
+        // `PARTICIPATION_SLOPE` and `PARTICIPATION_KNEE` are named here but
+        // `order_imbalance` still uses its own literals, so the two could
+        // drift apart. Recovered rather than compared against a number
+        // written twice: the slope from two points inside the band, the
+        // ceiling from a participation far outside it, and the knee as
+        // their ratio.
+        let off = crate::params::PT_V16;
+        let slope = (multiplier(&off, 8.0) - multiplier(&off, 4.0)) / 4.0;
+        assert!((slope - PARTICIPATION_SLOPE).abs() < 1e-15, "slope {slope}");
+        let knee = multiplier(&off, 1e9) / slope;
+        assert!((knee - PARTICIPATION_KNEE).abs() < 1e-9, "knee {knee}");
+        // The floor is not an independent constant either: it is what the
+        // same line reaches at four thirds.
+        let floor_crossing = multiplier(&off, 1e-9) / slope;
+        assert!(
+            (floor_crossing - 4.0 / 3.0).abs() < 1e-9,
+            "floor crossing {floor_crossing}"
+        );
+    }
+
+    #[test]
+    fn the_measured_law_leaves_the_band_between_the_clamps_untouched() {
+        // The whole claim of the fix, stated as an equality: the shipped
+        // law is already right where neither clamp binds, so the change is
+        // confined to the two tails. Bit for bit, not approximately.
+        let off = crate::params::PT_V16;
+        let on = law_on();
+        for phi in [1.4, 2.0, 5.0, 9.0, 9.999] {
+            assert_eq!(multiplier(&off, phi), multiplier(&on, phi), "phi {phi}");
+        }
+        // Outside it they differ in OPPOSITE directions, which is the part
+        // the issue's framing as saturation misses. The floor made small
+        // orders too expensive; the ceiling made large ones too cheap.
+        assert!(multiplier(&on, 0.1) < multiplier(&off, 0.1));
+        assert!(multiplier(&on, 100.0) > multiplier(&off, 100.0));
+    }
+
+    #[test]
+    fn the_measured_law_keeps_responding_above_the_knee() {
+        // The test the shipped pair should have been. It fails if the
+        // exponent above the knee is zero, which is what the `min` gave,
+        // and it fails just as loudly at any other clamp, because a higher
+        // ceiling is still a ceiling.
+        //
+        // One half is not chosen here. Toth et al. (Physical Review X 1,
+        // 021006, 2011) measure it for orders large against available
+        // volume; the citation and the reason the two regimes are one law
+        // sit on `ModelParams::order_flow_impact_law`.
+        let on = law_on();
+        for phi in [11.0, 50.0, 1_000.0, 100_000.0] {
+            let k = exponent(&on, phi);
+            assert!((k - 0.5).abs() < 1e-12, "phi {phi} gave exponent {k}");
+        }
+        // Unbounded, so no two sizes are ever the same order to the model.
+        // A hundredfold larger order costs ten times more, at any size.
+        let ratio = multiplier(&on, 1e6) / multiplier(&on, 1e4);
+        assert!((ratio - 10.0).abs() < 1e-9, "{ratio}");
+    }
+
+    #[test]
+    fn the_measured_law_is_linear_below_the_knee_all_the_way_down() {
+        // Cont, Kukanov and Stoikov (Journal of Financial Econometrics
+        // 12(1), 2014) give exponent one at this scale, and the shipped
+        // floor gives zero below four thirds. Asserted across four decades,
+        // so a floor reintroduced anywhere in that range fails here.
+        let on = law_on();
+        for phi in [1e-4, 1e-3, 1e-2, 0.1, 0.5, 1.0, 4.0] {
+            let k = exponent(&on, phi);
+            assert!((k - 1.0).abs() < 1e-12, "phi {phi} gave exponent {k}");
+        }
+    }
+
+    #[test]
+    fn the_two_branches_meet_at_the_knee() {
+        // Continuous by construction and not by arrangement: `sqrt(1)` is
+        // exactly 1.0, so the square-root branch evaluates to the linear
+        // branch's value at the crossover with no constant matched by hand.
+        assert_eq!(
+            participation_multiplier(PARTICIPATION_KNEE),
+            PARTICIPATION_SLOPE * PARTICIPATION_KNEE
+        );
+        let above = participation_multiplier(PARTICIPATION_KNEE * (1.0 + 1e-12));
+        let below = participation_multiplier(PARTICIPATION_KNEE * (1.0 - 1e-12));
+        assert!((above - below).abs() < 1e-9, "{above} vs {below}");
+    }
+
+    #[test]
+    fn the_measured_law_never_stops_responding_to_size() {
+        // Monotone strictly increasing across nine decades of
+        // participation. The shipped law fails this at both ends, and the
+        // second assertion keeps this test honest by requiring that it
+        // does -- otherwise a change that flattened BOTH laws would leave
+        // the first assertion passing on a function that never moves.
+        let on = law_on();
+        let off = crate::params::PT_V16;
+        let mut phi = 1e-4;
+        let mut ties_off = 0;
+        while phi < 1e5 {
+            let next = phi * 2.0;
+            assert!(
+                multiplier(&on, next) > multiplier(&on, phi),
+                "measured law flat between {phi} and {next}"
+            );
+            if multiplier(&off, next) == multiplier(&off, phi) {
+                ties_off += 1;
+            }
+            phi = next;
+        }
+        assert!(
+            ties_off > 0,
+            "the shipped law is supposed to be the one that goes flat"
+        );
+    }
+
+    #[test]
+    fn every_shipped_preset_runs_the_shipped_law() {
+        // The dial ships at 0.0 everywhere, so adding it moved no
+        // trajectory. Asserted against the presets themselves rather than
+        // argued from the branch, and it will fail the day a preset turns
+        // the law on -- which is the day the change stops being free.
+        for name in crate::params::ModelParams::preset_names() {
+            let p = crate::params::ModelParams::preset(name).expect("named");
+            assert_eq!(p.order_flow_impact_law, 0.0, "{name}");
+        }
+    }
+
+    #[test]
+    fn the_dial_at_zero_is_the_shipped_function_bit_for_bit() {
+        let off = crate::params::PT_V16;
+        for (b, s, av) in [
+            (10_000.0, 0.0, 50_000.0),
+            (0.0, 10_000.0, 50_000.0),
+            (1e6, 1e6, 1e6),
+            (0.0, 0.0, 1e6),
+            (1000.0, 0.0, 0.0),
+            (3.0, 7.0, 1e9),
+            (1e9, 1.0, 1e6),
+        ] {
+            assert_eq!(
+                order_imbalance_with(&off, b, s, av),
+                order_imbalance(b, s, av),
+                "{b} {s} {av}"
+            );
+        }
+    }
+
+    #[test]
+    fn no_injected_flow_is_bit_identical_under_either_law() {
+        // Why the known-answer digests do not move. Every
+        // `TickInputs.order_volumes` outside the two `order_flow=` paths is
+        // the empty slice, so the tick reads a default `OrderVolume` and
+        // calls this with two zeros.
+        //
+        // The SIGN is the assertion, not the value. A `-0.0` reaching an
+        // accumulator is the one way a term that is arithmetically nothing
+        // can still move a trajectory, and the two laws arrive at zero by
+        // different routes -- one multiplies by a floor of 0.2, the other
+        // by a slope of 0.0.
+        let on = law_on();
+        let off = crate::params::PT_V16;
+        for (label, p) in [("measured", &on), ("shipped", &off)] {
+            let out = order_imbalance_with(p, 0.0, 0.0, 1e6);
+            assert_eq!(out, 0.0, "{label}");
+            assert!(out.is_sign_positive(), "{label} returned {out}");
+        }
+    }
+
+    #[test]
+    fn the_measured_law_keeps_the_direction_and_neutrality_of_the_shipped_one() {
+        // The properties the two shipped unit tests above assert, re-checked
+        // under the new law. Neither of them fails under it, because both
+        // are about direction and neutrality rather than about the clamps --
+        // but that is a fact worth a test rather than a claim in a report.
+        let on = law_on();
+        let thin = order_imbalance_with(&on, 10_000.0, 0.0, 50_000.0);
+        let liquid = order_imbalance_with(&on, 10_000.0, 0.0, 500e6);
+        assert!(thin > liquid, "{thin} vs {liquid}");
+        assert_eq!(order_imbalance_with(&on, 1e6, 1e6, 1e6), 0.0);
+        assert_eq!(order_imbalance_with(&on, 0.0, 0.0, 1e6), 0.0);
+        assert_eq!(
+            order_imbalance_with(&on, 1000.0, 0.0, 0.0),
+            order_imbalance_with(&on, 1000.0, 0.0, 1_000_000.0)
+        );
+        // Selling is the mirror of buying at every size, under a law that
+        // now has two branches to get that wrong in.
+        for phi in [0.5, 5.0, 500.0] {
+            assert_eq!(
+                order_imbalance_with(&on, 0.0, phi * 1000.0, 390_000.0),
+                -order_imbalance_with(&on, phi * 1000.0, 0.0, 390_000.0),
+                "phi {phi}"
+            );
+        }
     }
 
     // ── Forced flow ───────────────────────────────────────────────────────

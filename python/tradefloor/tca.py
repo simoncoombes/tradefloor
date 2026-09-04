@@ -29,11 +29,15 @@ The split matters because they decay differently, and every serious execution
 model is built on the distinction. Elsewhere it is fitted from data with
 heroic assumptions. Here both worlds are runnable and the split is measured.
 
-Be aware of the bounds before sizing an experiment. The information
-channel's imbalance term is clamped per tick: below about 1.33x the
-instrument's average minute volume a floor applies and the term is flat,
-above 10x it is capped and flat again, and between them it scales. Both
-constants live in ``order_imbalance`` in ``rust/src/market/factors.rs``. In
+Be aware of the bounds before sizing an experiment. Under the shipped
+default the information channel's imbalance term is clamped per tick:
+below about 1.33x the instrument's average minute volume a floor applies
+and the term is flat, above 10x it is capped and flat again, and between
+them it scales. Both constants live in ``order_imbalance`` in
+``rust/src/market/factors.rs``. Setting ``order_flow_impact_law`` to 1.0
+replaces both clamps with the measured law -- linear in participation
+below the knee, square root above it -- so the term never goes flat. The
+band between the clamps is identical either way. In
 practice an ``analyse`` run hits a harder bound first: the book caps the
 fill at the displayed depth, and identical fills mean identical flow and
 identical numbers. Measured on this build, with ``analyse`` and a single

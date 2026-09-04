@@ -18,8 +18,8 @@ TRADED = UNIVERSE[0].ticker
 # perturbs the traded name's own state (its book, its maker inventory, its
 # variance path), and identical draws map through that perturbed state to a
 # per-seed divergence of several bps either way. At this flow size the
-# deterministic push is ALSO a few bps — `order_imbalance` floors at 0.2 for
-# any realistic participation, so raising the flow does not raise the push —
+# deterministic push is ALSO a few bps -- `order_imbalance` is pinned at one
+# of its clamps, so raising the flow does not raise the push --
 # which makes single-seed sign assertions a seed lottery. They passed by luck
 # before the 2026-08 market-factor recalibration re-rolled every trajectory
 # (at the old sigma, seed 6 already read -4 bps for a buyer). The direction
@@ -123,11 +123,13 @@ def test_bigger_size_costs_more():
     #
     # Measured on a THIN name, and at sizes three orders of magnitude apart,
     # because the size channel is narrow and bounded at both ends.
-    # `order_imbalance` multiplies the buy/sell ratio by
-    # `max(0.2, min(total / avg_minute_volume, 10) * 0.15)`, so size enters
-    # only through a multiplier that floors at 0.2 and saturates at 1.5. The
-    # whole size effect is a factor of 7.5, and it is spent by ten times the
-    # name's average minute volume.
+    # Under the SHIPPED law, `order_imbalance` multiplies the buy/sell ratio
+    # by `max(0.2, min(total / avg_minute_volume, 10) * 0.15)`, so size
+    # enters only through a multiplier that floors at 0.2 and saturates at
+    # 1.5. The whole size effect is a factor of 7.5 and it is spent by ten
+    # times the name's average minute volume. That is the default and it is
+    # what this test measures; `order_flow_impact_law` replaces both clamps
+    # with the measured law and widens the band without limit.
     #
     # This read `UNIVERSE[0]` at 1e6 against 8e6 shares until the universe
     # generator was reconciled to open a drawn roster at its own fair value.
@@ -152,11 +154,17 @@ def test_bigger_size_costs_more():
 def test_order_size_stops_mattering_once_the_imbalance_multiplier_saturates():
     """The bound on the test above, asserted rather than left implicit.
 
-    Impact is about PARTICIPATION and the participation term is capped, so
-    beyond ten times a name's average minute volume the model is indifferent
-    to size: a large order and an enormous one are the same order to it.
-    Worth pinning, because a transaction-cost figure read off this surface
-    at institutional size is reading a constant.
+    Impact is about PARTICIPATION and the SHIPPED participation term is
+    capped, so beyond ten times a name's average minute volume the default
+    is indifferent to size: a large order and an enormous one are the same
+    order to it. Worth pinning, because a transaction-cost figure read off
+    this surface at institutional size is reading a constant.
+
+    A property of the default and not of the model. Issue #166 is this
+    ceiling; `order_flow_impact_law` removes it, and the test below is the
+    same three sizes under the measured law. This one stays because the
+    default stays, and it will start failing on the day a preset turns the
+    law on -- which is the notice anyone reading a cost figure needs.
     """
     thin = min(UNIVERSE, key=lambda i: i.avg_volume)
     costs = [
@@ -180,6 +188,48 @@ def test_order_size_stops_mattering_once_the_imbalance_multiplier_saturates():
         order_flow={thin.ticker: (1e5, 9.9e4)}, ticks=390
     ).cost_bps(thin.ticker)
     assert lone > 100.0 * buried, (lone, buried)
+
+
+def test_the_measured_law_keeps_charging_for_size_above_the_knee():
+    """Issue #166, removed and asserted as a contrast rather than a level.
+
+    Same three sizes, same seed, same name, two laws. Under the shipped one
+    they are the same order to the model and cost the same. Under
+    `order_flow_impact_law` they are three different orders.
+
+    The contrast is the assertion. A level would be a measured result pinned
+    in a test, and a bare monotone assertion could be satisfied by noise --
+    but the shipped triple being EXACTLY tied is what says the separation
+    below is the law and not the seed.
+
+    The smallest size sits at the knee, where both laws give the same 1.5,
+    so this also shows the change is confined above it.
+    """
+    thin = min(UNIVERSE, key=lambda i: i.avg_volume)
+    # The name's average minute volume floors at 100 shares, so 1e3 is ten
+    # times it -- the knee exactly -- and the other two are a hundred and a
+    # thousand times it.
+    sizes = (1e3, 1e4, 1e5)
+
+    def costs(model):
+        return [
+            tradefloor.flow_impact(
+                seed=42, universe=UNIVERSE, model=model,
+                order_flow={thin.ticker: (size, 0.0)}, ticks=390,
+            ).cost_bps(thin.ticker)
+            for size in sizes
+        ]
+
+    shipped = costs("pt-v16")
+    measured = costs(
+        tradefloor.ModelParams.from_preset("pt-v16", order_flow_impact_law=1.0)
+    )
+
+    assert shipped[0] == shipped[1] == shipped[2], shipped
+    assert measured[0] < measured[1] < measured[2], measured
+    # And the first is the same under both, because the knee is where the
+    # two laws meet.
+    assert measured[0] == shipped[0], (measured[0], shipped[0])
 
 
 def test_the_two_worlds_differ_only_by_the_flow():

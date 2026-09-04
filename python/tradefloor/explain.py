@@ -223,7 +223,8 @@ MECHANISMS: tuple[Mechanism, ...] = (
         factor="order_flow_impact",
         function="market::factors::calculate_live_factors",
         state=("avg_volume",),
-        dials=("order_flow_coefficient", "informed_flow_fraction"),
+        dials=("order_flow_coefficient", "informed_flow_fraction",
+               "order_flow_impact_law"),
     ),
     Mechanism(
         factor="short_squeeze_effect",
