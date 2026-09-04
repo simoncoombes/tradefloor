@@ -1566,8 +1566,8 @@ fresh.
 toward, held for the phase. `Engine.state_snapshot` separately widens in
 three places: the generator array from 21 numbers to 24, the draw counts
 from 14 to 16, and each name's attribution from nine values to ten. The
-truth table gains a column of the same name, which the schema records
-and every hash ignores. Both enter `Engine::state_hash`, so every
+truth table gains an `overnight` column, which the schema records and
+every hash ignores. Both enter `Engine::state_hash`, so every
 recorded state hash changes value on every trajectory, the default preset
 included, and `manifest.py` builds each ledger leaf from the same
 snapshot, so every leaf changes and the root with it.
