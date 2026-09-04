@@ -770,13 +770,28 @@ pub struct ModelParams {
     ///
     /// Both figures are the hazard alone. The condition ladder below adds
     /// to it and never subtracts except through the expansion guard, so
-    /// each is an upper bound on a phase's length rather than its length.
-    /// A contraction is where that bites: the ladder's four conditions sum
-    /// to 0.25 against a base hazard of 0.081 at month four, so a deep one
-    /// runs 7.7 months where a mild one runs 23. The ratio of thirty is
+    /// each bounds a phase's length from above. The ratio of thirty is
     /// unaffected, since both readings exclude the ladder equally, and the
-    /// ladder is scaled with the base rather than beside it, because the
-    /// conversion below is applied after it.
+    /// ladder is scaled with the base, because the conversion below is
+    /// applied after it.
+    ///
+    /// # A correction to the arithmetic this comment carried
+    ///
+    /// An earlier version said the ladder's four contraction conditions
+    /// sum to 0.25 against a base hazard of 0.081, so a deep contraction
+    /// ran 7.7 months where a mild one ran 23. Every contraction condition
+    /// adds to the hazard, so the ladder can only shorten a phase, but the
+    /// arithmetic assumed all four fire from the phase's fourth month.
+    /// Measured on the four-year arms they fire late: growth under -2.0 on
+    /// day 1 from the phase-change shock, the policy rate under 1.0 on day
+    /// 190 at the median and unemployment over 10.0 on day 239.
+    ///
+    /// A spell's count of fired conditions therefore records how long it
+    /// has already run. Completed contraction spells read 162 days at one
+    /// condition, 226 at two and 335 at three, which sorts them by duration
+    /// rather than by depth and carries no reading of either. A deep
+    /// contraction ended early by its own ladder was looked for and
+    /// measured absent.
     ///
     /// `months_in_current_phase` advances by exactly `1/30` a day, so the
     /// month this model keeps is 30 days and the divisor is read off the
@@ -891,6 +906,43 @@ pub struct ModelParams {
     /// draw count, and it does so by running the economy rather than as a
     /// side effect.
     pub macro_burn_in_days: f64,
+    /// The share of earnings a company returns as net buybacks. 0.0 --
+    /// every preset before pt-v18 -- is bit-identical.
+    ///
+    /// # A CHOSEN constant, and the only one in this era
+    ///
+    /// Every other dial here is derived: a stationarity condition, a
+    /// symmetric mean, a unit, a measured transient, the yield the economy
+    /// opens at. This one is not. It is a statement about how US large-cap
+    /// companies behave, taken from company filings, where total
+    /// shareholder return runs near half of earnings split between
+    /// dividends and net buybacks. A third in net buybacks sits inside that
+    /// record and a reader can check it against the same source.
+    ///
+    /// The era's record marks it CHOSEN for that reason. It is not fitted
+    /// to anything this engine produces, which is the property that makes
+    /// it checkable: a value fitted to our own distribution would be
+    /// unfalsifiable outside it.
+    ///
+    /// # What it buys, and the check that is not its source
+    ///
+    /// The model's own median annual earnings yield is 0.0555 at pt-v18 on
+    /// the era's roster, so a third of it is a buyback yield of 1.85 per
+    /// cent. US large-cap net buybacks over 2000 to 2025 run near 1.5 to
+    /// 2.0 per cent of market value. That agreement is a check on the
+    /// share, in that order: the share comes from the earnings record and
+    /// the yield it implies is then compared against the value record.
+    ///
+    /// # Why it is a yield and not a premium
+    ///
+    /// Earnings over price, so it pays more when the multiple is low and
+    /// less when it is high. A flat premium would pay the same in a market
+    /// priced at forty times earnings as at ten, which is the opposite of
+    /// what a buyback programme does with a fixed budget. See
+    /// [`crate::market::tick::buyback_scale`] for the arithmetic, its
+    /// residual against the exact path integral, and the clamp on a
+    /// loss-maker.
+    pub buyback_payout_share: f64,
     /// How much of the drift the market jump's mean carries is given
     /// back. 0.0 -- every preset before pt-v18 -- is bit-identical. 1.0
     /// subtracts the compensator and makes the jump a martingale.
@@ -1925,6 +1977,7 @@ impl ModelParams {
             cycle_hazard_per_month: 0.0,
             neutral_discount_rate: crate::fair_value::NEUTRAL_DISCOUNT_RATE,
             macro_burn_in_days: 0.0,
+            buyback_payout_share: 0.0,
             jump_mean_compensated: 0.0,
             cascade_symmetry: 0.0,
             // Legacy values: the slow component is OFF, and the update
@@ -2969,6 +3022,13 @@ impl ModelParams {
         // and 4.82, so a certified year was spent travelling. 755 is the
         // day the last of those fields enters its stationary band.
         p.macro_burn_in_days = 755.0;
+        // The one CHOSEN constant in this era. A third of earnings
+        // returned as net buybacks, taken from the US large-cap filing
+        // record rather than from anything this engine produces. It
+        // retires stock, so earnings and book per share grow by the
+        // buyback yield, which is earnings over price and therefore
+        // pays more when the multiple is low.
+        p.buyback_payout_share = 1.0 / 3.0;
         // The market jump's negative mean buys skew and a drift together.
         // Compensating it keeps the mean, and so the skew, and returns the
         // drift: a deterministic offset moves no central moment.
@@ -3110,6 +3170,7 @@ impl ModelParams {
             "cycle_hazard_per_month" => self.cycle_hazard_per_month,
             "neutral_discount_rate" => self.neutral_discount_rate,
             "macro_burn_in_days" => self.macro_burn_in_days,
+            "buyback_payout_share" => self.buyback_payout_share,
             "jump_mean_compensated" => self.jump_mean_compensated,
             "cascade_symmetry" => self.cascade_symmetry,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
@@ -3264,6 +3325,7 @@ impl ModelParams {
             "cycle_hazard_per_month" => out.cycle_hazard_per_month = value,
             "neutral_discount_rate" => out.neutral_discount_rate = value,
             "macro_burn_in_days" => out.macro_burn_in_days = value,
+            "buyback_payout_share" => out.buyback_payout_share = value,
             "jump_mean_compensated" => out.jump_mean_compensated = value,
             "cascade_symmetry" => out.cascade_symmetry = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
@@ -3489,6 +3551,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "cycle_hazard_per_month",
         "neutral_discount_rate",
         "macro_burn_in_days",
+        "buyback_payout_share",
         "oil_supply_response",
         "market_vol_vix_coupling",
         "mispricing_cap",

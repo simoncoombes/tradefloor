@@ -120,7 +120,10 @@ def _job(spec):
 
 
 def _median_panel(rows: list[dict]) -> dict:
-    return {k: statistics.median([r[k] for r in rows]) for k in PANEL}
+    # Each row by its own estimator: medians for the shape rows and a mean
+    # for the level row, which is what the band's width was set against.
+    return {k: facts.aggregate_value(k, [r[k] for r in rows if r.get(k) is not None])
+            for k in PANEL if any(r.get(k) is not None for r in rows)}
 
 
 def _count_in_band(panel: dict, bands: dict) -> tuple[int, list[str]]:

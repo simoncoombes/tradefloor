@@ -162,6 +162,11 @@ def verdict(rows_by_kind: dict[str, list]) -> dict:
         sc = envelope.score(med, horizon_days=days)
         out[kind] = {
             "in_band": sc["in_band"], "of": sc["of"],
+                # The split: a gate reads the shape count; the level and
+                # crisis rows are held red and never added to it.
+                "shape_in_band": sc.get("shape_in_band"), "shape_of": sc.get("shape_of"),
+                "level_in_band": sc.get("level_in_band"), "level_of": sc.get("level_of"),
+                "crisis_in_band": sc.get("crisis_in_band"), "crisis_of": sc.get("crisis_of"),
             "out": [k for k, v in sc["statistics"].items()
                     if not v.get("in_band", True)],
             "median": med,

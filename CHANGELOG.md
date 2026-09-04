@@ -9,8 +9,8 @@ grows fair value with nominal output**, taking the equal-weight index from
 -16.150 per cent a year to -0.340 as a portfolio return, on a roster six
 points dearer than the population. The default preset is where it was.
 
-**The index drift row reports a daily-rebalanced portfolio return**, about
-two points above the log convention the decompositions use.
+**The index drift and two fear rows are graded**, and the certified set
+splits into shape, level and crisis.
 
 **A run can commit to the state it held at the end of every day**, and a
 sampled check verifies k days for that cost.
@@ -38,6 +38,69 @@ checked for its draw effect and proven inert.
 replays from the state the day started in.
 
 <!-- release-note-ends -->
+
+### The graded level row and the split of the certified set
+
+The panel's first moment, `index_drift_pct`, was measured and reported
+and deliberately not graded, because no band for it had been derived.
+Its band is now derived from real series through `tools/shadow/data.py`,
+which keeps the unadjusted close beside the adjusted one and accepts
+sessions before 1970: `^GSPC` from 1950 gives the cap-weighted price
+return, +7.75 a year as the mean of 75 calendar-year log returns with a
+standard error of 1.87; `RSP` on its unadjusted close against `^GSPC`
+gives the equal-weight premium in price terms, -0.38 over 22 calendar
+years with a standard error of 1.24, and `^SPXEW` cross-checks it at
+-0.85. The centre is 7.37 with a standard error of 2.25, and the band is
+the centre plus or minus the larger of two standard errors and the
+model's own resolution at thirty seeds, so 2.9 to 11.9. The derivation
+is `tools/calibration/index_band.py` and the provenance in
+`facts.REAL_MARKETS_PROVENANCE` is three URLs and a fetch date. A band
+chosen so the current model passes was refused.
+
+The certified set splits along `facts.SHAPE`, `facts.LEVEL` and
+`facts.CRISIS`. The fourteen shape rows fill `envelope.CERTIFIED` and a
+green panel means what it meant. The level row is read as a thirty-seed
+mean (`facts.AGGREGATE`), because its seed standard deviation of about
+6.5 points a year is a large fraction of its band, and its certified
+value goes in `envelope.CERTIFIED_LEVEL`, held red until the model earns
+it; `envelope.score` reports the counts per group, `envelope.certified`
+and `describe_simulator` carry the groups and name a row whose certified
+value is not yet measured, and `report` prints the level in its own
+section. The rows stay structural in the loss until `facts.SEED_SD`
+carries their seed sds on the pinned protocol, at which point they join
+the live targets so that a search charges for the level it moves.
+
+The level row's protocol varies the roster with the seed,
+`facts.LEVEL_PROTOCOL`: a level is a property of the roster as much as
+of the model, the held roster opens 0.78 of a population standard
+deviation above fair value, and its first-year handicap exceeds the
+band's half-width, so thirty market seeds on one roster would certify
+that roster. The certified value is the mean over seeds 101 to 130 of a
+run on `Universe.random(40, seed=s)` with market seed `s`.
+
+### The fear gauge rows
+
+`fear_gauge_dn1` and `fear_gauge_dn3` read the median change in the
+volatility index on sessions whose cap-weighted close-to-close return is
+at or below -1 and -3 percent. Two rows because the defect is a channel
+that saturates on the down side: a graded row on the -3 percent bucket
+alone would have scored it as mildly out of band for three eras, and
+mildly out of band is the verdict that gets tuned at rather than fixed;
+the -1 percent row reads inside its band on the same model. The -3
+percent row is pooled across the certification seeds, because about a
+third of 252-day runs hold no such session, and it reports its session
+count beside its value. `measure` records each day before the close, so
+the macro row for day d holds the gauge the session opened with and the
+change answering session d is row d+1 minus row d; `fear_statistics`
+pairs them that way and a test pins the convention with two correlations
+that swap under the wrong pairing. The bands come from `^VIX` against
+`^GSPC` since 1990 through `tools/calibration/fear_band.py`: the -1
+percent row by the panel's shared rule over its ten windows, 0.70 to
+4.03; the -3 percent row across every window since 1990 holding at
+least five such sessions, 2.60 to 9.58, with the pooled median of +5.73
+agreeing with the +6.03 the engine cites from FRED. A -5 percent bucket
+and the up-side response are reported without bands. Every free-run
+figure is held to its free-run value and never to a solved one.
 
 ### A generated roster opens at its own fair value
 
@@ -524,17 +587,31 @@ statement of the defect being gone. The day-251 median is 93.1, against the
 the difference is the inventory pressure, the dollar drag and the OPEC
 rule, which the compounding factor used to dominate.
 
-The certified panel moves, and the row that moves it does not resolve. Over
-seeds 101 to 110 the arm without the dial reads 13 of 14 and the arm with
-it 14 of 14, while pt-v18 as it ships, carrying the cycle dial as well,
-reads 13 of 14 again. One row decides all three. The leverage effect has a
-ceiling of exactly 0.00 and reads +0.0035, -0.0005 and +0.0038 across
-those arms, on an across-seed noise of 0.0760 and a per-seed spread of
-0.029 at ten seeds, with between five and seven of the ten seeds above the
-ceiling in every arm. The whole excursion is 0.004, a twentieth of the
-row's own noise. That row has sat outside its band since the oil supply
-commit, and these figures say it straddles a ceiling at a resolution ten
-seeds cannot settle.
+The certified panel moves, and the row that moves it cannot be decided
+here. Over seeds 101 to 110 the arm without the dial reads 13 of 14 and
+the arm with it 14 of 14, while pt-v18 as it ships, carrying the cycle
+dial as well, reads 13 of 14 again. One row decides all three: the
+leverage effect, at +0.0035, -0.0005 and +0.0038 against a ceiling of
+exactly 0.00, on an across-seed noise of 0.0769 and a per-seed spread of
+0.029 at ten seeds, with between five and seven of the ten seeds above
+the ceiling in every arm. Those three arms span 0.0043, a twentieth of
+the row's own noise, so ten seeds cannot say which side of a boundary at
+zero this model belongs on.
+
+The ceiling is the larger term and it describes the band's derivation.
+`REAL_MARKETS_PROVENANCE` records that this band's top was derived at
++0.05 and clamped INWARD to 0.00, because every retrieved source agrees
+the effect's sign is negative and a top above zero would certify a
+reversed leverage effect as real-market behaviour. The nine non-crisis
+reference windows run -0.113 to +0.014, and the single positive reading
+is the 2020-21 meme-stock year. So the clamp moves the boundary by 0.05,
+eleven times the 0.0043 these arms span, and the clamp decides the
+verdict while the model's own level stays far inside it.
+
+The derivation record states that the two inward clamps it needed decide
+no current verdict. On this era's arms the leverage clamp decides every
+one of them, and each verdict this section reports for that row, in
+either direction, is a reading of the clamp.
 
 The thirty-seed distribution and the four-year arm are measured elsewhere,
 because neither runs on one machine.
@@ -605,11 +682,21 @@ three run at +3.6 and +3.3, and year four falls back to +0.6 as the first
 contractions arrive.
 
 The phase lengths quoted above are the hazard alone. The condition ladder
-adds to it, so each bounds a phase's length from above. A contraction is
-where that bites: its four conditions sum to 0.25 against a
-base hazard of 0.081 at month four, so a deep contraction runs 7.7 months
-where a mild one runs 23. The ratio of thirty is unaffected, since both
-readings exclude the ladder equally.
+adds to it, so each bounds a phase's length from above. The ratio of
+thirty is unaffected, since both readings exclude the ladder equally.
+
+**A claim in this section was wrong and is corrected here.** It said a
+contraction's four ladder conditions shorten a deep one to 7.7 months
+against a mild one's 23. Every contraction condition adds to the hazard,
+so the ladder can only shorten a phase, but that arithmetic assumed all
+four fire from the fourth month, and the four-year arms measure them
+firing late: growth under -2.0 on day 1, the policy rate under 1.0 on day
+190 at the median, unemployment over 10.0 on day 239. A spell's count of
+fired conditions therefore records how long it has already run, so the
+162, 226 and 335 days at one, two and three conditions sort spells by
+duration rather than by depth. A deep contraction ended early by its own
+ladder was looked for and measured absent. The wrong claim is quoted
+rather than deleted, so a reader who met it can find out it was wrong.
 
 Two entry points changed shape. `check_cycle_transition` and
 `get_cycle_transition_probability` each take the dial, so a caller states
@@ -730,6 +817,67 @@ about 0.7 points more. That value is the median of a distribution, so it
 would be a fitted constant, and oil's resting point is what would make it
 derivable.
 
+### The buyback yield
+
+Rows so far give back means the model injected and grow the valuation with
+the economy's own output. What they leave is the return a real price index
+earns above nominal output growth, and the model had no quantity to derive
+it from.
+
+`buyback_payout_share` is the share of earnings a company returns as net
+buybacks, at 0.0 for every preset before pt-v18 and a third for pt-v18.
+Retiring stock makes earnings and book per share grow faster than the
+company does, by the buyback yield `payout_share * eps / price`. That yield
+is earnings over price, so the term pays more where the multiple is low and
+less where it is high.
+
+This is the one CHOSEN constant in the era and it is marked as such. Every
+other dial here is derived: a stationarity condition, a symmetric mean, a
+unit, a measured transient, the yield the economy opens at. This one states
+how US large-cap companies behave, from the filing record where total
+shareholder return runs near half of earnings split between dividends and
+net buybacks. A reader can check it against that source, which a value
+fitted to this engine's own distribution would not allow.
+
+The yield it implies is a check on the share, in that order. The model's
+median annual earnings yield is 0.0555, so a third of it is a buyback
+yield of 1.85 per cent, and US large-cap net buybacks over 2000 to 2025 run
+near 1.5 to 2.0 per cent of market value.
+
+The yield is evaluated at today's price and held over the elapsed time. The
+exact factor is the exponential of the payout share times the integral of
+the earnings yield, which needs a per-name accumulator and a nineteenth
+column in the state hash. Measured against that integral on real price
+paths: over 252 days on 200 name-seeds the difference is +0.026 points of
+annual index return at the median, and over 1008 days on 120 name-seeds it
+is -0.015. The multiple mean-reverts, so today's yield estimates the
+period's average at both horizons, and the residual is named here rather
+than removed.
+
+A loss-maker neither retires stock nor issues it. A negative earnings yield
+would grow the share count, and a company cannot return earnings it does
+not have. That clamp carries none of the drift hazard this era keeps
+finding in one-sided terms, because `eps` is fixed for a name at
+construction, so it selects a fixed share of the roster once rather than
+branching on a zero-mean quantity every day. On the panel roster it is 3
+names of 40, and their measured lift is -0.05 points against +1.77 for the
+index.
+
+What it is worth, five seeds at 252 days paired on the seed: +1.765 points
+a year at the median in the log convention and +1.738 as a portfolio, on 5
+of 5 seeds, in a range of +1.672 to +2.011. The whole of it is the fair
+value channel at +1.771, with the mispricing channel at -0.019. The oil
+price, the phase and the macro path are bit-identical on every seed.
+
+The shape is measured as well as the size. Across 185 name-seeds with
+positive earnings the rank correlation between a name's lift and its
+opening earnings yield is +0.773, and the cheapest quartile by yield gains
++2.543 points against +1.154 for the dearest. The term pays an earnings
+yield, which is the property that separates it from a flat premium.
+
+The certified panel reads 14 of 14 over seeds 101 to 110, and its own drift
+row, a portfolio return, reads +4.193.
+
 ### The sequential base and two misattributed figures
 
 Each step in this era was measured against the branch as it stood when that
@@ -761,6 +909,10 @@ A term working through fair value compounds: the growth term keeps 0.88. A
 term changing the cycle clock is worth exactly nothing inside a certified year
 and +1.824 a year over four, which makes it the second largest term at that
 horizon having been the smallest at this one.
+
+The buyback yield is not among the six. It is measured at 252 days only, and
+a term paying an earnings yield out of a mean-reverting multiple has no reason
+to behave like either group without being measured at the longer horizon.
 
 So the era is worth about +18 at a certified year and about +10 annualised
 over four, with a different ranking. A reader applying this section to a

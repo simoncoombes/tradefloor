@@ -1824,6 +1824,11 @@ impl PyEngine {
     /// Stamped between an open and the close that follows it, this moves the
     /// number the rest of that day's draws carry and leaves the day mark on
     /// the number the open stamped.
+    ///
+    /// It moves the VALUATION too, under a preset that sets
+    /// `buyback_payout_share`, because the buyback factor reads this number
+    /// as its elapsed time. So a stamp taken to label draws reprices every
+    /// name from the next tick. Nothing in this repository calls it.
     fn set_day(&mut self, day: i64) {
         self.inner.set_current_day(day);
     }
@@ -3081,6 +3086,19 @@ impl PyEngine {
         if let Some(v) = snapshot.get_item("day_count")? {
             self.day_count = v.extract()?;
         }
+        // The core's own day, pushed rather than left where construction put
+        // it. `open_market` sets it from `day_count` at every open, so the
+        // two agree at every point a snapshot can be taken; a restore that
+        // stops before the next open is the one path where they part.
+        //
+        // That path used to reach nothing. It reaches the valuation now,
+        // because the buyback factor is `exp(yield * elapsed / 252)` and
+        // elapsed is this number, so a market restored MID-DAY priced its
+        // next tick as though the run had just begun. The forking guard
+        // caught it as a divergence in every column, which is what it is
+        // for: something the engine carries drove the market and was not
+        // restored with it.
+        self.inner.set_current_day(i64::from(self.day_count));
         Ok(())
     }
 

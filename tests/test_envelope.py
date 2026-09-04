@@ -18,9 +18,15 @@ def test_the_certified_panel_covers_every_measured_statistic():
     # A statistic in the panel but absent here would be uncertified and
     # unmentioned, which is the silent kind of gap this module exists to
     # make impossible.
-    assert sorted(env.CERTIFIED) == sorted(REAL_MARKETS)
+    from tradefloor.facts import SHAPE, LEVEL, CRISIS
+    # The split: the shape rows fill the certified table, the level and
+    # crisis rows have tables of their own, and the 504-day bands cover
+    # every graded row while the 504-day measurements cover the shape rows.
+    assert sorted(env.CERTIFIED) == sorted(SHAPE)
+    assert set(env.CERTIFIED_LEVEL) <= set(LEVEL)
+    assert set(env.CERTIFIED_CRISIS) <= set(CRISIS)
     assert sorted(env.BANDS_504) == sorted(REAL_MARKETS)
-    assert sorted(env.MEASURED_504) == sorted(REAL_MARKETS)
+    assert sorted(env.MEASURED_504) == sorted(SHAPE)
 
 
 def test_all_fourteen_are_in_band_at_the_certified_horizon():
@@ -31,7 +37,31 @@ def test_all_fourteen_are_in_band_at_the_certified_horizon():
     is a decision, not a drift."""
     in_band = [k for k, v in env.CERTIFIED.items()
                if band_distance(v, *REAL_MARKETS[k]) == 0]
+    # Fourteen SHAPE rows. The level row is graded and held red in its own
+    # table, and it never joins this count.
     assert len(in_band) == 14, sorted(set(env.CERTIFIED) - set(in_band))
+    from tradefloor.facts import LEVEL, CRISIS
+    # Which of the new rows the default preset is EXPECTED to fail, named
+    # rather than assumed of all of them. The -1 per cent fear row passes at
+    # pt-v16 and was predicted to, before it was measured: one bucket cannot
+    # separate a low gain from a saturating channel, and a row at -1 per cent
+    # alone would have scored this defect as passing for three eras. That it
+    # passes is the ARGUMENT for the second bucket, not a sign the band moved.
+    EXPECTED_RED = {"index_drift_pct", "fear_gauge_dn3"}
+    for k, v in list(env.CERTIFIED_LEVEL.items()) + list(env.CERTIFIED_CRISIS.items()):
+        assert k in LEVEL + CRISIS
+        red = band_distance(v, *REAL_MARKETS[k]) != 0
+        if k in EXPECTED_RED:
+            assert red, (
+                f"{k} reads in band at the default preset; the row is held "
+                "red until the level is right, and a pass here means the "
+                "band moved")
+        else:
+            assert not red, (
+                f"{k} reads OUT of band at the default preset and was "
+                "expected in. Either the measurement moved or this row "
+                "belongs in EXPECTED_RED, and which it is decides whether "
+                "the second bucket is still earning its place")
     assert "volume_change_acf1" in in_band
     assert "sector_excess_corr" in in_band
 
@@ -135,7 +165,7 @@ def test_intervals_report_the_spread_and_both_containment_tests():
     lo, hi = REAL_MARKETS["annualised_vol_pct"]
     panels = []
     for v in (hi - 1.0, hi + 6.0, hi - 3.0):
-        p = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+        p = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
         p["annualised_vol_pct"] = v
         panels.append(p)
     rows = env.intervals(panels)
@@ -211,7 +241,7 @@ def test_the_certified_comment_matches_the_certified_numbers():
     note = src[:src.index("CERTIFIED: dict[str, float] = {")]
     note = note[note.rindex("#: Measured at the certified horizon"):]
 
-    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
     scored = env.score(panel, horizon_days=env.CERTIFIED_HORIZON_DAYS)
     words = {14: "ALL FOURTEEN", 13: "thirteen of fourteen",
              12: "twelve of fourteen"}
@@ -228,7 +258,10 @@ def test_certified_serialises_for_a_manifest():
     d = env.certified()
     assert d["preset"] == env.PRESET
     assert d["certified_horizon_days"] == env.CERTIFIED_HORIZON_DAYS
-    assert len(d["statistics"]) == len(REAL_MARKETS)
+    assert len(d["statistics"]) == (len(env.CERTIFIED) + len(env.CERTIFIED_LEVEL)
+                                    + len(env.CERTIFIED_CRISIS))
+    assert set(d["statistics"]) | set(d["unmeasured"]) == set(REAL_MARKETS)
+    assert set(d["groups"]) == {"shape", "level", "crisis"}
     assert len(d["gaps"]) == len(env.GAPS)
     assert all(g["forbids"] for g in d["gaps"])
 
@@ -252,7 +285,7 @@ def test_score_reads_a_panel_against_its_own_horizon():
     project; the horizon picks the ruler here so a caller cannot pair one
     with the other by accident.
     """
-    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
     panel["excess_kurtosis"] = 5.23
     near = env.score(panel, horizon_days=252)
     far = env.score(panel, horizon_days=504)
@@ -269,14 +302,14 @@ def test_score_reads_a_panel_against_its_own_horizon():
 def test_score_reports_room_not_just_membership():
     # A statistic barely inside is one seed away from not being, and the
     # band loss is flat inside a band so it cannot see the difference.
-    rows = env.score({k: env.CERTIFIED[k] for k in REAL_MARKETS})["statistics"]
+    rows = env.score({k: env.CERTIFIED[k] for k in env.CERTIFIED})["statistics"]
     for name, row in rows.items():
         if row["in_band"]:
             assert row["room_sd"] is None or row["room_sd"] >= 0, name
 
 
 def test_the_shipped_preset_does_not_regress_itself():
-    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
     assert env.regressions(panel) == []
 
 
@@ -289,7 +322,7 @@ def test_a_panel_that_loses_a_statistic_is_named():
     horizon. It was called a win twice before anyone counted the panel
     (CALIBRATION-FOLLOWUPS §33), so this is a function now.
     """
-    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
     low, high = REAL_MARKETS["return_acf1"]
     panel["return_acf1"] = high + 0.014      # pt-v4 measures 0.0739 vs 0.06
     assert env.regressions(panel) == ["return_acf1"]
@@ -304,7 +337,7 @@ def test_a_structural_statistic_the_shipped_preset_holds_is_a_regression():
     certified horizon. A candidate that drops one is now giving up something
     that ships, whether or not the objective was pointed at it.
     """
-    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
     panel["volume_change_acf1"] = -99.0
     assert env.regressions(panel) == ["volume_change_acf1"]
 
@@ -316,7 +349,7 @@ def test_a_row_the_shipped_preset_does_not_hold_cannot_be_lost():
     which keeps this function from calling every candidate a
     regression the moment a statistic leaves the shipped panel.
     """
-    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
     low, _ = REAL_MARKETS["return_acf1"]
     baseline_miss = dict(env.CERTIFIED, return_acf1=low - 1.0)
     with mock.patch.object(env, "CERTIFIED", baseline_miss):
@@ -327,7 +360,7 @@ def test_a_row_the_shipped_preset_does_not_hold_cannot_be_lost():
 def test_regressions_refuses_a_horizon_it_has_no_baseline_for():
     # CERTIFIED is measured at 252. Comparing a 504-day panel against it
     # would be the wrong-ruler error wearing a different hat.
-    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
     with pytest.raises(tradefloor.ValidationError):
         env.regressions(panel, horizon_days=504)
 
