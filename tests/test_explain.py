@@ -1538,7 +1538,12 @@ def test_every_declared_dial_is_a_model_param_that_its_rust_reads():
     # Exact, not a floor. A floor let nine of random_noise's ten dials be
     # dropped and still pass, because the table declares more than the
     # floor asked for.
-    assert declared == 41
+    #
+    # 41 to 42 when `order_flow_impact_law` joined the order_flow_impact
+    # mechanism. An exact count means a new dial fails here until it is
+    # declared, which is the point, so the number moving with a dial is
+    # correct rather than maintenance.
+    assert declared == 42
     assert sum(1 for m in ex.MECHANISMS if m.dials) == 9
 
 

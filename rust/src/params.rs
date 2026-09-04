@@ -297,7 +297,7 @@ pub struct ModelParams {
     /// `calculate_live_factors` multiplies this by `liquidity_factor`,
     /// which divides by the same per-minute volume a second time, so impact
     /// still falls as depth squared where the cited law gives depth. That
-    /// is a separate defect, issue #183, and this dial does not touch it.
+    /// is a separate defect, issue #182, and this dial does not touch it.
     ///
     /// It also changes nothing in a run that injects no order flow.
     /// `TickInputs.order_volumes` is the empty slice at every construction
