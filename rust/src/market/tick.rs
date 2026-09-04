@@ -261,6 +261,7 @@ pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days
     }
     let b = p.buyback_payout_share * eps / price;
     mathx::exp(b * elapsed_days as f64 / MARKET_DAYS_PER_YEAR)
+}
 
 /// The sector draw's DAILY sigma, which follows VIX when coupled, on the
 /// market factor's own target shape: variance scales with (VIX / anchor)^2,
