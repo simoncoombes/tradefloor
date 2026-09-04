@@ -720,21 +720,23 @@ pub struct ModelParams {
     /// ladder is scaled with the base, because the conversion below is
     /// applied after it.
     ///
-    /// # The ladder lengthens a contraction and does not shorten it
+    /// # A correction to the arithmetic this comment carried
     ///
-    /// An earlier version of this comment said the ladder's four
-    /// conditions sum to 0.25 against a base hazard of 0.081, so a deep
-    /// contraction ran 7.7 months where a mild one ran 23. That arithmetic
-    /// assumed every condition fires from the phase's fourth month, and
-    /// they do not. Measured on the four-year arms, growth under -2.0
-    /// fires on day 1 from the phase-change shock, the policy rate under
-    /// 1.0 on day 190 at the median and unemployment over 10.0 on day 239.
+    /// An earlier version said the ladder's four contraction conditions
+    /// sum to 0.25 against a base hazard of 0.081, so a deep contraction
+    /// ran 7.7 months where a mild one ran 23. Every contraction condition
+    /// adds to the hazard, so the ladder can only shorten a phase, but the
+    /// arithmetic assumed all four fire from the phase's fourth month.
+    /// Measured on the four-year arms they fire late: growth under -2.0 on
+    /// day 1 from the phase-change shock, the policy rate under 1.0 on day
+    /// 190 at the median and unemployment over 10.0 on day 239.
     ///
-    /// So the count of conditions a contraction fires measures how long it
-    /// has already lasted. Completed contraction spells under this clock
-    /// read 162 days with one condition fired, 226 with two and 335 with
-    /// three, which is the opposite ordering. A deep contraction ended
-    /// early by its own ladder was looked for and measured absent.
+    /// A spell's count of fired conditions therefore records how long it
+    /// has already run. Completed contraction spells read 162 days at one
+    /// condition, 226 at two and 335 at three, which sorts them by duration
+    /// rather than by depth and carries no reading of either. A deep
+    /// contraction ended early by its own ladder was looked for and
+    /// measured absent.
     ///
     /// `months_in_current_phase` advances by exactly `1/30` a day, so the
     /// month this model keeps is 30 days and the divisor is read off the

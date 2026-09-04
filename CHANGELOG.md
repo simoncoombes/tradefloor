@@ -685,15 +685,18 @@ The phase lengths quoted above are the hazard alone. The condition ladder
 adds to it, so each bounds a phase's length from above. The ratio of
 thirty is unaffected, since both readings exclude the ladder equally.
 
-This section first said a contraction's four ladder conditions shorten a
-deep one to 7.7 months against a mild one's 23. That arithmetic assumed
-every condition fires from the fourth month, and the four-year arms
-measure them firing late: growth under -2.0 on day 1, the policy rate
-under 1.0 on day 190 at the median, unemployment over 10.0 on day 239.
-Completed contraction spells read 162 days with one condition fired, 226
-with two and 335 with three, so the ladder lengthens a contraction with
-its depth. The claim is corrected rather than removed, because a reader
-who met it should find out that it was wrong.
+**A claim in this section was wrong and is corrected here.** It said a
+contraction's four ladder conditions shorten a deep one to 7.7 months
+against a mild one's 23. Every contraction condition adds to the hazard,
+so the ladder can only shorten a phase, but that arithmetic assumed all
+four fire from the fourth month, and the four-year arms measure them
+firing late: growth under -2.0 on day 1, the policy rate under 1.0 on day
+190 at the median, unemployment over 10.0 on day 239. A spell's count of
+fired conditions therefore records how long it has already run, so the
+162, 226 and 335 days at one, two and three conditions sort spells by
+duration rather than by depth. A deep contraction ended early by its own
+ladder was looked for and measured absent. The wrong claim is quoted
+rather than deleted, so a reader who met it can find out it was wrong.
 
 Two entry points changed shape. `check_cycle_transition` and
 `get_cycle_transition_probability` each take the dial, so a caller states
