@@ -685,6 +685,7 @@ def test_the_fear_rows_answer_the_session_they_are_paired_with():
     with the previous one. Both are asserted so the wrong pairing fails
     loudly rather than passing quietly.
     """
+    import statistics
     import pyarrow as pa
     from tradefloor.facts import fear_statistics, FEAR_BUCKETS
 
