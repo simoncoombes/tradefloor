@@ -277,10 +277,15 @@ def test_the_measured_shock_follows_the_square_root_above_the_knee():
 
     The multiplier above the knee is `1.5 * sqrt(participation / 10)` and a
     day's shock is proportional to it, so a hundredfold in size is a
-    tenfold in the shock and a tenfold in size is a sqrt(10). Measured
-    proportional to about 1e-14 relative, by scaling `order_flow_
-    coefficient` on a build without the dial, which is arithmetically the
-    same operation; the tolerance below is three orders looser than that.
+    tenfold in the shock and a tenfold in size is a sqrt(10).
+
+    The 1e-14 figure behind the tolerance is an EMULATION and not a
+    measurement of this law. It was taken on a build that did not carry the
+    dial, by scaling `order_flow_coefficient`, which multiplies the same
+    product by the same factor and is therefore the same arithmetic. It
+    establishes that the shock is proportional to the multiplier; it does
+    not establish that the multiplier is right, which is what the assertion
+    below is for. The tolerance is three orders looser than the figure.
 
     DELIBERATELY IN THE TAIL. Ten, a hundred and a thousand times the
     name's average minute volume are not typical orders, and that is the
@@ -313,6 +318,14 @@ def test_above_the_knee_the_session_breaker_binds_before_the_cost_law_does():
     it stays true whatever the breaker is set to and does not pin a
     measured result. The shipped law reaches the same place by a different
     route, so this is the one property the repair does not change.
+
+    Found by EMULATION before any build carried the dial: scaling
+    `order_flow_coefficient` by sqrt(10) and by 10 is the same arithmetic
+    as the multiplier growing by those factors, and it gave 1341, 2488 and
+    2436 basis points where the law predicts a factor of 3.162 at each
+    step. The third is LOWER than the second. Those three numbers are the
+    emulation's and not this law's, which is why none of them is asserted
+    here.
     """
     thin, minute = _thin_and_its_minute()
     _, on = _laws()

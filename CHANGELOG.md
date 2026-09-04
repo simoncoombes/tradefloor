@@ -4,6 +4,37 @@
 
 **Every `Universe.random` roster re-rolls**; pin 0.6.2.
 
+**A settable law makes order-flow impact keep responding to size past ten
+times a name's average minute volume**, where the shipped multiplier stops.
+The shipped one is a single linear law clamped at both ends: its elasticity
+in participation is zero below four thirds, one between four thirds and ten,
+and zero again above ten, and the floor is not an independent constant
+because 0.15 times four thirds is 0.2. `order_flow_impact_law` at 1.0
+unclamps that line and crosses it to a square root at the knee, which is
+linear below and one half above. It adds no constant: both numbers are the
+ones already in the source, the knee does not move, the branches agree where
+they meet, and the band between the clamps is unchanged to the bit. Linear
+at this scale is Cont, Kukanov and Stoikov (Journal of Financial
+Econometrics 12(1), 2014); the square root is Toth et al. (Physical Review X
+1, 021006, 2011), and the crossover between them is the former's own
+claim: they derive the square root from their linear model by a scaling
+argument.
+
+The dial ships at 0.0 and no preset turns it on, so every trajectory is
+unchanged and the three known-answer digests do not move. They could not
+move in any case: the order-flow channel is reachable only through injected
+flow, and a run that injects none accumulates exactly zero through it. The
+repair changes what the library tells a user a trade costs, not what the
+market does.
+
+Two limits are worth quoting with it. The repair restores size response over
+a range and then a different mechanism takes over, because on a thin name
+the corrected law charges enough that the close rails the session breaker
+and the cost stops following the shock while the shock is still growing. And
+none of the graded rows can see any of this: they are moments,
+autocorrelations, correlations and median responses, and this lives at the
+tail of the size distribution, so a green panel is not evidence either way.
+
 **A new preset, pt-v18, returns five first moments the model injected and
 grows fair value with nominal output**, taking the equal-weight index from
 -16.150 per cent a year to -0.340 as a portfolio return, on a roster six
