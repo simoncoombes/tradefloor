@@ -6,46 +6,20 @@
 
 **A settable law makes order-flow impact keep responding to size past ten
 times a name's average minute volume**, where the shipped multiplier stops.
-The shipped one is a single linear law clamped at both ends: its elasticity
-in participation is zero below four thirds, one between four thirds and ten,
-and zero again above ten, and the floor is not an independent constant
-because 0.15 times four thirds is 0.2. `order_flow_impact_law` at 1.0
-unclamps that line and crosses it to a square root at the knee, which is
-linear below and one half above. It adds no constant: both numbers are the
-ones already in the source, the knee does not move, the branches agree where
-they meet, and the band between the clamps is unchanged to the bit. Linear
-at this scale is Cont, Kukanov and Stoikov (Journal of Financial
-Econometrics 12(1), 2014); the square root is Toth et al. (Physical Review X
-1, 021006, 2011), and the crossover between them is the former's own
-claim: they derive the square root from their linear model by a scaling
-argument.
+`order_flow_impact_law` at 1.0 unclamps a linear law that was clamped at
+both ends and crosses it to a square root at the knee. Measured across
+thirty seeds, a four-hundredfold order costs seven times what it did and a
+twelve-hundredfold twelve times.
 
-The dial ships at 0.0 and no preset turns it on, so every trajectory is
-unchanged and the three known-answer digests do not move. They could not
-move in any case: the order-flow channel is reachable only through injected
-flow, and a run that injects none accumulates exactly zero through it. The
-repair changes what the library tells a user a trade costs, not what the
-market does.
+It ships at 0.0, no preset turns it on, and the three known-answer digests
+do not move. The repair changes what the library tells a user a trade costs
+rather than what the market does, because the order-flow channel is
+reachable only through injected flow.
 
-Two limits are worth quoting with it. The repair restores size response over
-a range and then a different mechanism takes over, because on a thin name
-the corrected law charges enough that the close rails the 25 per cent
-session breaker. That clamps the PRICE, so the whole print stops following
-the shock while the shock is still growing, and two railed runs are
-byte-identical.
-
-Where that range ends is a property of the NAME rather than of the law. On
-the thinnest name of a six-name roster it is somewhere between ten and a
-hundred times average minute volume; on the most liquid it is past a
-thousand. Inside that range a quoted cost reports what the law charges;
-past it the same number reports where the breaker sits. The breaker is doing
-its job, since a name holding inside twenty-five per cent in a session is
-the point of having one. Knowing which of the two a number is makes it
-quotable.
-
-None of the graded rows can see any of this. They are moments,
-autocorrelations, correlations and median responses, and this lives at the
-tail of the size distribution, so a green panel is not evidence either way.
+Two limits. Where the repair's range ends is a property of the name, and
+past that point a quoted cost reports where the session breaker sits. On
+the `analyse` surface it changes nothing at all, because the book caps the
+fill first.
 
 **A new preset, pt-v18, returns five first moments the model injected and
 grows fair value with nominal output**, taking the equal-weight index from
@@ -81,6 +55,75 @@ checked for its draw effect and proven inert.
 replays from the state the day started in.
 
 <!-- release-note-ends -->
+
+### The participation law in order-flow impact
+
+The shipped multiplier is `max(0.2, min(participation, 10) * 0.15)`, and
+its elasticity in participation is zero below four thirds, one between
+four thirds and ten, and zero again above ten. The floor is not an
+independent constant: 0.15 times four thirds is 0.2, so the floor and the
+line meet and the shipped law is one line clamped at both ends. So the
+defect reported as saturation above ten times is wrong on both sides of
+the band, in opposite directions.
+
+`order_flow_impact_law` at 1.0 gives `0.15 * participation` up to the knee
+and `1.5 * sqrt(participation / 10)` above it. It adds no constant: both
+numbers are the ones already in the source, the knee does not move, the
+branches agree at 1.5 where they meet, and the band between the clamps is
+unchanged to the bit. Linear at this scale is Cont, Kukanov and Stoikov
+(Journal of Financial Econometrics 12(1) 47-88, 2014); the square root is
+Toth, Lemperiere, Deremble, de Lataillade, Kockelkoren and Bouchaud
+(Physical Review X 1, 021006, 2011), and Almgren, Thum, Hauptmann and Li
+(Risk 18(7) 58-62, 2005) measure 0.6 on the same object. The crossover is
+the first paper's own claim: they derive the square root from their
+linear model by a scaling argument, in their abstract.
+
+Measured on two rosters, six names on seed 3 and twelve on seed 11, thirty
+seeds each, reading the accumulated `order_flow_impact` attribution before
+the cent grid and the breaker:
+
+| band | shipped | derived | measured law | derived |
+|---|---|---|---|---|
+| below four thirds | 0.000 | 0 | 1.000 | 1 |
+| four thirds to ten | 1.000 | 1 | 1.000 | 1 |
+| above ten | 0.000 | 0 | 0.500 | 0.5 |
+
+Both rosters give those six figures to three decimals. The realised
+`cost_bps` elasticity above the knee is 0.521 on the first roster and
+0.474 on the second against the same 0.5, and inside the band it reads
+0.882 and 0.776 against 1, so the price surface compresses the shock a
+little and the shock itself is exact.
+
+Nothing a graded row can see. The order-flow channel is reachable only
+through `TickInputs.order_volumes`, which is the empty slice at every
+construction site but the two `order_flow=` paths, so a certified run
+accumulates exactly zero through it: 360 attribution values across thirty
+seeds, worst absolute value 0.0. Thirty seeds of five days run under both
+laws are byte-identical across 2,808,000 bytes of price, and the ten-seed
+certified panel returns all sixteen statistics identical to the bit, 14 of
+14 in band either way. None of the graded rows measures an extreme in any
+case: they are moments, autocorrelations, correlations and median
+responses, and this lives at the tail of the size distribution.
+
+Where the range ends is a property of the instrument. `price_breaker_
+fraction` holds a name inside 25 per cent of its previous close and clamps
+the PRICE, so a railed run carries the same impact vector as any other
+railed run. On the thinnest name of a six-name roster the close moves
++13.412, +24.879 and +24.358 per cent at ten, a hundred and a thousand
+times average minute volume, so the second is at the bound and the third
+is the same place; every other name on that roster is clear.
+`mispricing_cap` is not what binds, with `s` at about three per cent of
+its 0.9.
+
+On the `analyse` surface the change is invisible: 25 of 25 runs are
+identical under the two laws on both rosters, because the book caps the
+fill at displayed depth and identical fills mean identical flow.
+
+Depth is a separate defect and this does not touch it. `order_imbalance`
+already returns the dimensionless quantity the cited law works in, and
+`calculate_live_factors` then divides by the same per-minute volume again,
+so impact falls as depth squared where the cited law gives depth, which
+is issue #182 and needs a decision the sources do not supply.
 
 ### The graded level row and the split of the certified set
 
