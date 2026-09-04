@@ -350,15 +350,27 @@ PERTURBATIONS = [
     # trough's growth range, and a certified year reaches no trough at all,
     # let alone three days from an opening expansion.
     ("trough_growth_floor", 0.5, False),
-    # The draw is NOT inert, and reading it off the entry above was the
-    # mistake. That entry waits on `min_months`, six months for an
-    # expansion, so the hazard cannot draw until day 180. This dial is
-    # gated on `months_in_current_phase < 1/30 + 0.001` instead, and the
-    # engine opens at zero months in phase, so the block fires on the
-    # probe's FIRST day: a draw is taken, the opening phase gets a target
-    # off its declared range, and both the monthly and quarterly updates
-    # read it. Two dials in the same phase machinery with different gates.
-    ("phase_target_range_draw", 0.5, True),
+    # Inert on the probe, and the reason is MEASURED rather than argued,
+    # because two readings of this entry were wrong before it.
+    #
+    # The dial is not inert on the economy. It is gated on
+    # `months_in_current_phase < 1/30 + 0.001` and the engine opens at
+    # zero months in phase, so the block fires on the probe's FIRST day.
+    # A three-day probe at 0.0, 0.5 and 1.0 reads `phase_gdp_target` on
+    # day one at 3.0000, 3.3013 and 3.6026, and `gdp_growth` at 3.710108,
+    # 3.839357 and 3.670177. The dial reaches `update_economy_daily`,
+    # takes its draw and moves the economy the same day.
+    #
+    # What it does not do is move the MARKET inside three days, which is
+    # what this table asks. So the condition it waits on is the market's
+    # response time to an economy displacement, not a phase it never
+    # reaches and not a magnitude too small to see.
+    #
+    # That also refutes the reason `vix_jump_intensity` gives below.
+    # Draw consumption over the probe's three days cannot be what moves
+    # the market there, because this dial consumes draws from an EARLIER
+    # site in the same function and does not move it.
+    ("phase_target_range_draw", 0.5, False),
     # The yield at which the target multiple sits on its sector anchor.
     # 0.05 rather than either shipped value: 0.04 is the default this probe
     # perturbs and 0.0456 is pt-v18's, and an entry landing on a named
