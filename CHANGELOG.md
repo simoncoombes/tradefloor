@@ -6,10 +6,9 @@
 
 **A settable law makes order-flow impact keep responding to size past ten
 times a name's average minute volume**, where the shipped multiplier stops.
-`order_flow_impact_law` at 1.0 unclamps a linear law that was clamped at
-both ends and crosses it to a square root at the knee. Measured across
-thirty seeds, a four-hundredfold order costs seven times what it did and a
-twelve-hundredfold twelve times.
+`order_flow_impact_law` at 1.0 unclamps that law at both ends and crosses
+it to a square root at the knee. A four-hundredfold order costs seven times
+what it did and a twelve-hundredfold twelve times.
 
 It ships at 0.0, no preset turns it on, and the three known-answer digests
 do not move. The repair changes what the library tells a user a trade costs
@@ -23,8 +22,8 @@ fill first.
 
 **A new preset, pt-v18, returns five first moments the model injected and
 grows fair value with nominal output**, taking the equal-weight index from
--16.150 per cent a year to -0.340 as a portfolio return, on a roster six
-points dearer than the population. The default preset is where it was.
+about -16 per cent a year to roughly flat. The default preset is where it
+was.
 
 **The index drift and two fear rows are graded**, and the certified set
 splits into shape, level and crisis.
