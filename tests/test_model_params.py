@@ -468,7 +468,7 @@ PERTURBATIONS = [
 
 
 #: Parameters whose perturbation legitimately changes the draw SCHEDULE, so
-#: the §5.2 guard below skips them. Two qualify. The VIX jump's arrival test
+#: the §5.2 guard below skips them. Three qualify. The VIX jump's arrival test
 #: draws from the shared `economy` stream once a day whenever the intensity
 #: is non-zero, so turning it on consumes three extra draws over the probe's
 #: three days whether or not a jump ever fires. `macro_burn_in_days` runs
@@ -482,7 +482,39 @@ PERTURBATIONS = [
 #: economy stream, so its trajectories differ from every earlier preset
 #: through the RNG as well as through the mechanism. Giving the arrival test
 #: its own stream would remove that coupling.
-DRAW_SCHEDULE_MOVERS = frozenset({"vix_jump_intensity", "macro_burn_in_days"})
+#:
+#: `phase_target_range_draw` is the third, and the reason is written out
+#: because this set is where an inconvenience would hide if anyone let it.
+#:
+#: At 0.0 the dial takes NO draw. The site at `daily.rs:310` sits inside
+#: `if inputs.phase_target_range_draw != 0.0`, so every preset written
+#: before the dial is bit-identical to itself and all three known-answer
+#: digests reproduce unmoved on this branch. Nothing is exempted for the
+#: shipped default; the exemption covers the dial turned ON.
+#:
+#: Above 0.0 the draw IS the mechanism. The dial draws a phase's growth
+#: target from the range the phase table already declares, so it needs a
+#: number, and a version that drew nothing would not have drawn anything.
+#: That is the same shape as `macro_burn_in_days` above, where the count is
+#: the mechanism rather than a side effect of it.
+#:
+#: What was REFUSED, so a later reader can see the alternative was weighed.
+#: `daily.rs:287` already takes a uniform on every phase-change day in every
+#: phase and discards it for four phases in five, and reusing it would have
+#: kept the schedule identical. It was refused because the sign is not
+#: neutral: as drawn, a larger uniform gives a deeper entry shock and a
+#: SHALLOWER target, so the two oppose and damp the spread this dial exists
+#: to create, while `1.0 - u` aligns and amplifies them. Choosing between
+#: those on the strength of which one satisfies this test would be choosing
+#: a mechanism to make a test pass. It remains open on modelling grounds.
+#:
+#: The displacement is measured rather than assumed harmless: a
+#: displacement-only null, the dial off with the stream advanced by two
+#: draws at the same point, is run beside the treated arm so the reported
+#: effect is separated from the position shift.
+DRAW_SCHEDULE_MOVERS = frozenset({
+    "vix_jump_intensity", "macro_burn_in_days", "phase_target_range_draw",
+})
 
 
 def test_the_perturbation_table_covers_the_whole_settable_surface():
