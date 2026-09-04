@@ -193,6 +193,15 @@ def test_order_size_stops_mattering_once_the_imbalance_multiplier_saturates():
     assert lone > 100.0 * buried, (lone, buried)
 
 
+# The three tests below are one instrument and not three, and the pair in
+# the middle is the reason. `..._shock_follows_the_square_root...` reads the
+# attribution column, which is the law's own output; `..._breaker_binds...`
+# reads the price, which is the law's output after the clamps. On the gate
+# where the wiring first worked the first passed and the second failed, and
+# THAT is what said the clamp sits between them -- neither test says it
+# alone. A later pass that merges them into one "does size cost more" test
+# would delete the bracket and leave a suite that can see a broken law but
+# not where it broke.
 SHIPPED = "pt-v16"
 
 

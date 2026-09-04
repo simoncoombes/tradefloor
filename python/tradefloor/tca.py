@@ -37,7 +37,17 @@ them it scales. Both constants live in ``order_imbalance`` in
 ``rust/src/market/factors.rs``. Setting ``order_flow_impact_law`` to 1.0
 replaces both clamps with the measured law -- linear in participation
 below the knee, square root above it -- so the term never goes flat. The
-band between the clamps is identical either way. In
+band between the clamps is identical either way.
+
+There is a second bound past it and it is not in the cost law. The session
+breaker holds a name inside ``price_breaker_fraction`` of its previous
+close, 25 per cent by default, and it clamps the PRICE, so a railed run
+carries the same impact vector as any other railed run. Where that bites is
+a property of the instrument: on a thin name it can be between ten and a
+hundred times average minute volume, and on a liquid one past a thousand. A
+cost read at extreme size on a thin name is therefore a breaker reading
+rather than a law reading. Check the close against the bound before
+quoting one. In
 practice an ``analyse`` run hits a harder bound first: the book caps the
 fill at the displayed depth, and identical fills mean identical flow and
 identical numbers. Measured on this build, with ``analyse`` and a single

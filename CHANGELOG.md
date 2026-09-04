@@ -32,8 +32,18 @@ a range and then a different mechanism takes over, because on a thin name
 the corrected law charges enough that the close rails the 25 per cent
 session breaker. That clamps the PRICE, so the whole print stops following
 the shock while the shock is still growing, and two railed runs are
-byte-identical. And
-none of the graded rows can see any of this: they are moments,
+byte-identical.
+
+Where that range ends is a property of the NAME rather than of the law. On
+the thinnest name of a six-name roster it is somewhere between ten and a
+hundred times average minute volume; on the most liquid it is past a
+thousand. Inside that range a quoted cost reports what the law charges;
+past it the same number reports where the breaker sits. The breaker is doing
+its job, since a name holding inside twenty-five per cent in a session is
+the point of having one. Knowing which of the two a number is makes it
+quotable.
+
+None of the graded rows can see any of this. They are moments,
 autocorrelations, correlations and median responses, and this lives at the
 tail of the size distribution, so a green panel is not evidence either way.
 
