@@ -14,6 +14,7 @@ sector names. The index is ^GSPC and the fear index ^VIX.
 from __future__ import annotations
 
 import calendar
+import datetime
 import json
 import os
 import time
@@ -59,6 +60,11 @@ YEARS = {"calm": ("2015-10-01", "2018-01-01"),
          "crisis": ("2018-10-01", "2021-01-01")}
 
 
+def _utc_date(t: int) -> str:
+    """The UTC calendar date of a Unix timestamp, for any sign of ``t``."""
+    return (datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds=int(t))).strftime("%Y-%m-%d")
+
+
 def epoch(day: str) -> int:
     """Midnight UTC on ``day``, as a Unix timestamp.
 
@@ -77,9 +83,14 @@ def epoch(day: str) -> int:
 def fetch(symbol: str, start: str, end: str) -> dict:
     """Daily bars for ``symbol`` between two dates, cached on disk.
 
-    Returns ``{"symbol", "url", "fetched", "rows": [[date, close, volume]]}``
-    with the adjusted close. Rows with a missing or non-positive close are
-    dropped, and volume is kept where reported (an index reports none).
+    Returns ``{"symbol", "url", "fetched", "rows": [[date, close, volume,
+    unadjusted]]}`` with the adjusted close second, which Yahoo adjusts for
+    dividends as well as splits, and the unadjusted close fourth, which is
+    the price series a price index band is stated in. Rows with a missing
+    or non-positive close are dropped, and volume is kept where reported
+    (an index reports none). A cache written before the fourth column
+    existed carries three-element rows, so a reader of the unadjusted
+    close checks the row length rather than assuming it.
     """
     os.makedirs(CACHE, exist_ok=True)
     path = os.path.join(CACHE, f"{symbol.strip('^')}_{start}_{end}.json")
@@ -95,12 +106,17 @@ def fetch(symbol: str, start: str, end: str) -> dict:
     quote = res["indicators"]["quote"][0]
     adj = res["indicators"]["adjclose"][0]["adjclose"]
     vol = quote.get("volume") or [None] * len(ts)
+    raw = quote.get("close") or [None] * len(ts)
     rows = []
-    for t, a, v in zip(ts, adj, vol):
+    for t, a, v, c in zip(ts, adj, vol, raw):
         if a is None or a <= 0:
             continue
-        rows.append([time.strftime("%Y-%m-%d", time.gmtime(t)), float(a),
-                     None if v is None else float(v)])
+        # Not time.gmtime: on Windows it refuses a negative timestamp, and
+        # a session before 1970 is one, so a long index history could not be
+        # fetched there. The arithmetic form gives the same UTC date.
+        rows.append([_utc_date(t), float(a),
+                     None if v is None else float(v),
+                     None if c is None else float(c)])
     rows.sort()
     out = {"symbol": symbol, "url": url,
            "fetched": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),

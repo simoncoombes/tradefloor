@@ -156,6 +156,14 @@ def test_a_statistic_target_reads_facts_off_the_recorded_arms():
 
 
 def test_facts_panel_statistics_is_what_measure_reports():
+    """`measure` is its identity fields, the panel and the fear rows, exactly.
+
+    Rebuilt from the parts on the same engine rather than held to a fixed
+    key set: the fear rows read the macro table, which `panel_statistics`
+    never sees, so they and their session diagnostics come from
+    `fear_statistics`, and a key `measure` reports that none of the three
+    parts produced fails here by name.
+    """
     universe = tf.Universe.random(4, seed=7)
     measured = facts.measure(seed=3, universe=universe, days=40)
     engine = tf.Engine(seed=3, universe=universe)
@@ -165,10 +173,20 @@ def test_facts_panel_statistics_is_what_measure_reports():
         engine.record(day)
         engine.close_market()
     stats = facts.panel_statistics(engine.bars(grain="day"), universe)
+    fear = facts.fear_statistics(engine.bars(grain="day"),
+                                 engine.macro_table(), universe)
+    identity = {"seed": 3, "universe_fingerprint": facts.fingerprint_of(universe),
+                "model_fingerprint": engine.model_fingerprint, "days": 40}
     assert set(stats) <= set(measured)
     assert all(measured[k] == v for k, v in stats.items())
-    assert set(measured) - set(stats) == {
-        "seed", "universe_fingerprint", "model_fingerprint", "days"}
+    assert set(stats).isdisjoint(fear)
+    assert all(measured[k] == v for k, v in fear.items())
+    assert measured == {**identity, **stats, **fear}
+    # The graded rows outside the shape set are the fear part's, and the
+    # noise module's statistic target reads the panel part alone, so a
+    # crisis row is refused there by name rather than read as absent.
+    assert set(facts.CRISIS) <= set(fear)
+    assert set(facts.SHAPE + facts.LEVEL) <= set(stats)
 
 
 def test_the_table_is_arrow_and_the_shard_is_a_slice():
