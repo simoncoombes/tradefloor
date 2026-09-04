@@ -57,6 +57,20 @@ def _engine(preset, seed: int = SEED, n: int = ROSTER):
     return tf.Engine(seed=seed, universe=_universe(n), model=preset)
 
 
+def _without_buybacks():
+    """pt-v18 with the buyback share off, for the identity tests.
+
+    The identity below is about ONE term, and pt-v18 carries a second that
+    scales the same two fundamentals. Isolating the subject keeps the
+    derivation a genuine second route to the same number; deriving both
+    would make the test a statement about two terms agreeing.
+
+    The arms that measure the term's SIZE keep the shipped vector, because
+    a size measured on an isolated preset is a size nobody ships.
+    """
+    return tf.ModelParams.from_preset("pt-v18", buyback_payout_share=0.0)
+
+
 def _run(engine, days: int, ticks: int = TICKS, first: int = 0) -> None:
     for day in range(first, first + days):
         engine.open_market()
@@ -119,11 +133,19 @@ def _derived(instrument, economy, scale: float, model) -> float:
     statement about one build rather than about two surfaces agreeing.
     """
     p = model.to_dict()
-    # The two channels this derivation leaves out, asserted rather than
-    # assumed, so a preset that switches either on fails here instead of
-    # silently disagreeing with the engine.
+    # The three channels this derivation leaves out, asserted rather than
+    # assumed, so a preset that switches any of them on fails here instead
+    # of silently disagreeing with the engine.
+    #
+    # `buyback_payout_share` joined this list when it landed, and the way it
+    # arrived is the reason the list is asserted rather than commented: it
+    # scales the same two fundamentals the term under test scales, so the
+    # identity below went red with a number and no name. A consumer of a
+    # growing set either derives its expectation at runtime or fails naming
+    # the member it does not know.
     assert p["qe_pe_stock_gain"] == 0.0, p["qe_pe_stock_gain"]
     assert p["fair_value_book_floor"] == 0.0, p["fair_value_book_floor"]
+    assert p["buyback_payout_share"] == 0.0, p["buyback_payout_share"]
 
     discount = economy["corporate_bond_yield"] / 100.0
     duration = 1.0 + max(0.0, instrument.revenue_growth) * p[
@@ -228,7 +250,7 @@ def test_the_scale_is_the_economys_own_ratio():
     day's economy, or to only one of the two fundamentals fails here.
     """
     days = 120
-    engine = _engine("pt-v18")
+    engine = _engine(_without_buybacks())
     universe = _universe()
     _run(engine, days - 1)
 
@@ -245,7 +267,7 @@ def test_the_scale_is_the_economys_own_ratio():
     # No assertion on the QE boost is needed any more. The derivation reads
     # ``qe_pe_gain`` from the model, so it computes the engine's adjustment
     # rather than the helper's, and the two agree at any boost.
-    model = tf.ModelParams.from_preset("pt-v18")
+    model = _without_buybacks()
 
     _run(engine, 1, first=days - 1)
     truth = pa.table(engine.truth(day=days - 1)).to_pydict()
@@ -278,14 +300,14 @@ def test_an_unscaled_valuation_disagrees_with_the_engine():
     other part of the valuation.
     """
     days = 120
-    engine = _engine("pt-v18")
+    engine = _engine(_without_buybacks())
     universe = _universe()
     _run(engine, days - 1)
     economy = engine.state_snapshot()["economy"]
     _run(engine, 1, first=days - 1)
     truth = pa.table(engine.truth(day=days - 1)).to_pydict()
 
-    model = tf.ModelParams.from_preset("pt-v18")
+    model = _without_buybacks()
     disagreed = 0
     for row, slot in enumerate(truth["instrument_id"]):
         unscaled = _derived(universe[slot], economy, 1.0, model)
@@ -378,7 +400,7 @@ def test_the_state_hash_covers_the_base():
     snapshot's, so the pair is checked against each other as well as against
     a mutation.
     """
-    engine = _engine("pt-v18")
+    engine = _engine(_without_buybacks())
     _run(engine, 10)
     snapshot = engine.state_snapshot()
     assert state_hash(snapshot) == engine.state_hash()
@@ -396,7 +418,7 @@ def test_the_term_follows_the_economy_down():
     base, which is what a contraction with deflation reaches, and every
     fundamental comes down with it in the ratio the economy moved.
     """
-    engine = _engine("pt-v18")
+    engine = _engine(_without_buybacks())
     _run(engine, 2)
     snapshot = engine.state_snapshot()
     base = snapshot["nominal_output_base"]
@@ -414,7 +436,7 @@ def test_the_term_follows_the_economy_down():
     shrunk_values = pa.table(
         engine.truth(day=2)).to_pydict()["fundamental_value"]
 
-    other = _engine("pt-v18")
+    other = _engine(_without_buybacks())
     _run(other, 2)
     other.restore_state(snapshot)
     _run(other, 1, first=2)
