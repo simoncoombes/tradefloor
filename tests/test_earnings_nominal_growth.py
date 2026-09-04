@@ -452,14 +452,13 @@ def test_both_terms_compose_on_the_shipped_preset():
     opening = engine.state_snapshot()
     economy = opening["economy"]
     scale = economy["gdp"] * economy["cpi"] / opening["nominal_output_base"]
-    before = engine.column("price")
     assert opening["day_count"] == days - 1, opening["day_count"]
 
     engine.open_market()
-    assert engine.column("price") == before, (
-        "the open moved the price column, so the number below is not the one "
-        "the tick read")
-    opening_prices = struct.unpack("<%dd" % ROSTER, before)
+    # The column AFTER the open is the one tick 0 reads. An overnight process
+    # moves it at the open, and the payout term then reads the post-gap
+    # price; on this preset the ratio is zero and the open is the close.
+    opening_prices = struct.unpack("<%dd" % ROSTER, engine.column("price"))
 
     engine.run_session(9, 30, 3, TICKS)
     engine.record(days - 1)
@@ -579,8 +578,13 @@ def test_the_derivation_tracks_every_parameter_that_reaches_the_valuation():
         scale_now = economy["gdp"] * economy["cpi"] / base
         dial = model.to_dict()["earnings_nominal_growth"]
         scale = 1.0 + dial * (scale_now - 1.0)
-        opening = struct.unpack("<%dd" % names, engine.column("price"))
         engine.open_market()
+        # Read AFTER the open, because tick 0 prices off the session's open
+        # and an overnight process moves the column at the open: with
+        # `overnight_variance_ratio` on, the buyback yield reads the post-gap
+        # price, so the night reaches fair value through the payout term.
+        # At the ratio's zero the open is the close and this reads the same.
+        opening = struct.unpack("<%dd" % names, engine.column("price"))
         engine.run_session(9, 30, 3, probe_ticks)
         engine.record(1)
         path = struct.unpack("<%dd" % (probe_ticks * names),
