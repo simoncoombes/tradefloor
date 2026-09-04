@@ -39,7 +39,7 @@ unbounded depth on request.
 surgery installs a window of them, and a second `run_days` call numbers
 days from the engine's own counter.
 
-**Each draw's effect on a target is measured** by a finite difference, and
+**Each draw's effect on a target is measured**, and
 a shadow run solves a real year for the draws behind its closes.
 
 **The browser build compiles again**, after a stale file path broke it.
@@ -118,12 +118,19 @@ is the same place; every other name on that roster is clear.
 `mispricing_cap` is not what binds, with `s` at about three per cent of
 its 0.9.
 
-Anyone reaching for `analyse` to see this fix will see nothing. 25 of 25
-runs are identical under the two laws on both rosters, because that surface
-fills against displayed book depth and identical fills mean identical flow,
-so the book binds before the cost law does at every size tried. The bound
-belongs to the book, and `flow_impact` is the surface where this change is
-legible.
+`flow_impact` is the surface where this change is legible. On `analyse` the
+book caps the fill at displayed depth and identical fills mean identical
+flow, so the book can bind before the cost law does. That bound is measured
+in `tradefloor/tca.py` on its own roster, where requests of twenty and a
+hundred times average minute volume both fill the same 483 shares, and this
+change does not move it.
+
+The arm here that meant to measure that came back empty and is not evidence
+for anything. Every order it placed was refused: it asked for a hundredth
+of a 44-million-share daily volume, about 43 million dollars, against
+`analyse`'s default cash of a million at two times leverage. Its 25 of 25
+runs identical compares two runs in which nothing traded, which is a zero
+measured where the phenomenon cannot occur.
 
 Depth is a separate defect and this does not touch it. `order_imbalance`
 already returns the dimensionless quantity the cited law works in, and
