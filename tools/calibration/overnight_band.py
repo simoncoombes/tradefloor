@@ -103,6 +103,16 @@ def slope(xs, ys):
     return sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / den if den > 0.0 else None
 
 
+def next_day_abs_corr(nights, sessions):
+    """corr(|night d|, |session d+1|) pooled over names and days."""
+    xs, ys = [], []
+    for t in nights:
+        g, s = nights[t], sessions[t]
+        xs.extend(abs(v) for v in g[:-1])
+        ys.extend(abs(v) for v in s[1:])
+    return pearson(xs, ys) if len(xs) > 2 else None
+
+
 def mean_pairwise_corr(series):
     names = list(series)
     out = []
@@ -223,6 +233,13 @@ def main(argv=None):
             "nights_beyond_5pct": sum(1 for g in pooled_g if abs(g) > 0.05) / len(pooled_g),
             "night_excess_kurtosis": excess_kurtosis(pooled_g),
             "session_excess_kurtosis": excess_kurtosis(pooled_i),
+            # Whether the session answers the night: the correlation of a
+            # night's size with the size of the session that follows it and
+            # with the next day's session, pooled over name-days. This is
+            # what a process whose sessions cannot see the gap would lack.
+            "gap_to_session_abs_corr": pearson([abs(g) for g in pooled_g],
+                                               [abs(i) for i in pooled_i]),
+            "gap_to_next_session_abs_corr": next_day_abs_corr(nights, sessions),
             "names": len(shares),
             "sessions": len(wd),
         }
@@ -258,11 +275,13 @@ def main(argv=None):
     print("cross-sectional correlation, night over session: min %.3f max %.3f" % (min(xs_ratio), max(xs_ratio)))
     print("pooled reversal slope in [-0.15, 0.0] in %d of %d" % (neg, len(calm)))
     print()
-    print("the tail per window: largest night, name-nights beyond 2 and 5 percent, excess kurtosis of nights and sessions")
+    print("the tail per window: largest night, name-nights beyond 2 and 5 percent, excess kurtosis of nights and sessions,")
+    print("and whether the session answers the night: corr(|night|, |session|) the same day and the next")
     for r in table:
-        print("  %-24s largest %.3f  >2pct %.4f  >5pct %.4f  kurt night %6.2f  kurt session %6.2f%s"
+        print("  %-24s largest %.3f  >2pct %.4f  >5pct %.4f  kurt night %6.2f  kurt session %6.2f  same %.3f  next %.3f%s"
               % (r["window"], r["largest_night"], r["nights_beyond_2pct"], r["nights_beyond_5pct"],
                  r["night_excess_kurtosis"], r["session_excess_kurtosis"],
+                 r["gap_to_session_abs_corr"], r["gap_to_next_session_abs_corr"],
                  "   crisis" if r["crisis"] else ""))
     if args.out:
         with open(args.out, "w", encoding="utf-8") as f:
