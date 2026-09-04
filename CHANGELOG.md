@@ -118,6 +118,25 @@ is the same place; every other name on that roster is clear.
 `mispricing_cap` is not what binds, with `s` at about three per cent of
 its 0.9.
 
+A large gross flow hides a net order less than it did. Cont, Kukanov and
+Stoikov have impact depending on the net imbalance and not on the gross it
+arrived inside; the shipped law divides the whole participation term back
+out above the knee, so gross size hides a net order almost completely.
+Median cost of a fixed net order on the thinnest name, thirty seeds, as the
+gross around it grows:
+
+| gross padding | shipped | measured |
+|---|---|---|
+| none | 1345.0 | 1345.0 |
+| one times minute volume | 1107.4 | 1219.3 |
+| ten times | 435.6 | 770.9 |
+| a hundred times | 60.7 | 284.5 |
+
+So burying a net order inside a hundredfold gross flow hides it by a factor
+of 22.2 under the shipped law and 4.7 under the measured one. The square
+root halves the exponent on gross size rather than removing it, so this
+moves toward the cited law without arriving at it.
+
 `flow_impact` is the surface where this change is legible. On `analyse` the
 book caps the fill at displayed depth and identical fills mean identical
 flow, so the book can bind before the cost law does. That bound is measured
