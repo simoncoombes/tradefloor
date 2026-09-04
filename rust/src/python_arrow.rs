@@ -122,6 +122,13 @@ pub fn truth_schema() -> SchemaRef {
         DataType::Float64,
         false,
     ));
+    // The overnight move, which `apply_overnight` writes to `s` at the open
+    // before any tick; booked on the day's first row.
+    fields.push(Field::new(
+        crate::market::factors::OVERNIGHT_COMPONENT_KEY,
+        DataType::Float64,
+        false,
+    ));
     Arc::new(Schema::new(fields))
 }
 

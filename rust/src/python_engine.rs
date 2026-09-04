@@ -2832,13 +2832,21 @@ impl PyEngine {
                 rng.len()
             )));
         }
-        let counts: Vec<f64> = match snapshot.get_item("draw_counts")? {
+        let mut counts: Vec<f64> = match snapshot.get_item("draw_counts")? {
             Some(v) => v.extract()?,
-            None => vec![0.0; 14],
+            None => vec![0.0; 16],
         };
-        if counts.len() != 14 {
+        // Fourteen numbers predate the overnight stream. That stream keeps
+        // the position this engine holds, as its generator does below, so a
+        // snapshot from before the stream restores exactly as it did then.
+        if counts.len() == 14 {
+            let (uniforms, normals) = self.inner.stream_positions()[7];
+            counts.push(uniforms as f64);
+            counts.push(normals as f64);
+        }
+        if counts.len() != 16 {
             return Err(ValidationError::new_err(format!(
-                "draw_counts must be 14 numbers, two per stream, got {}",
+                "draw_counts must be 16 numbers, two per stream, got {}",
                 counts.len()
             )));
         }

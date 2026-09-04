@@ -1459,8 +1459,9 @@ def sources(mech) -> str:
 
 
 def test_the_table_covers_every_contribution_once():
-    assert len(ex.MECHANISMS) == len(ex.CONTRIBUTIONS) == 11
-    assert len({m.factor for m in ex.MECHANISMS}) == 11
+    # Twelve since the overnight move joined the ten tape columns.
+    assert len(ex.MECHANISMS) == len(ex.CONTRIBUTIONS) == 12
+    assert len({m.factor for m in ex.MECHANISMS}) == 12
 
 
 def test_every_mechanism_names_a_rust_function_that_exists():
@@ -1504,6 +1505,8 @@ EXPECTED = {
               "jump_vix_coupling", "jump_momentum_share",
               "market_vol_vix_anchor"),
              ("mispricing_s", "mispricing_s_prev_close")),
+    "overnight": (("overnight_variance_ratio",),
+                  ("mispricing_s", "mispricing_s_prev_close", "price")),
     "fair_value": (("fair_value_book_floor", "qe_pe_gain",
                     "qe_pe_stock_gain", "earnings_nominal_growth"), ()),
     "book": ((), ("price",)),

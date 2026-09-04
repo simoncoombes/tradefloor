@@ -841,7 +841,7 @@ impl Engine {
     /// because the day mark and the day's news draws are taken there.
     pub fn set_current_day(&mut self, day: i64) {
         self.current_day = day;
-        for id in 0..7 {
+        for id in 0..8 {
             self.stream_rng_mut(id).set_day(day);
         }
     }

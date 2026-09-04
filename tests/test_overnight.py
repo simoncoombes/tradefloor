@@ -70,9 +70,10 @@ def test_at_zero_no_price_moves_between_sessions_and_the_stream_still_draws():
     snapshot = e.state_snapshot()
     counts = snapshot["draw_counts"]
     assert len(counts) == 16
-    n, sectors = len(UNIVERSE), len({inst.sector for inst in UNIVERSE})
-    # One normal for the market, one per sector, one per name, at each of
-    # the four opens, and no uniforms at all.
+    # One normal for the market, one per sector the ENGINE keeps (the
+    # sector table, not the roster's own), one per name, at each of the
+    # four opens, and no uniforms at all; the day mark carries the count.
+    n, sectors = len(UNIVERSE), e.day_marks()[-1]["sectors"]
     assert counts[14] == 0
     assert counts[15] == 4 * (1 + sectors + n)
 
