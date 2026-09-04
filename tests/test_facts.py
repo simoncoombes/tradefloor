@@ -479,7 +479,13 @@ def test_the_report_names_the_mismatches_rather_than_scoring_them():
     # well against one it gets frankly wrong, and knowing WHICH is the whole
     # value of the exercise.
     text = report(measure(seed=3, universe=UNIVERSE, days=180))
-    assert "TOO HIGH" in text
+    # The claim is that a miss is NAMED and a match is named beside it, not
+    # that this seed misses on a particular side. It read TOO HIGH until the
+    # universe generator was reconciled to open a drawn roster at its own
+    # fair value, which re-drew the roster and moved the one row that misses
+    # here from above its band to below it. Pinning the direction was
+    # pinning an accident of the seed.
+    assert "TOO HIGH" in text or "TOO LOW" in text
     assert "matches" in text
     assert "momentum is mechanically" in text
 
@@ -513,3 +519,236 @@ def test_correlation_persistence_is_reported_and_judged_with_its_noise_stated():
     for table in (tradefloor.facts.SEED_SD, tradefloor.facts.SEED_SD_504):
         assert max(corr_type, key=table.get) == "corr_persistence_acf1"
     assert "corr_persistence_acf1" in compare_to_real_markets(year)
+
+
+# --------------------------------------------------------------------------
+# The first moment: measured, and deliberately not graded
+# --------------------------------------------------------------------------
+
+
+def test_the_index_drift_row_measures_what_the_graded_rows_cannot_see():
+    """The reason the fifteenth row exists, as one assertion.
+
+    Add a constant to every name's daily log return and the graded panel
+    barely notices: nine of the fourteen are exactly invariant because they
+    centre their arguments, and the five built on an absolute return move by
+    a fraction of their own seed noise. So a market losing a fifth of its
+    value a year can read fourteen of fourteen, which is what
+    `tradefloor-design/programme/index-drift-investigation.md` found.
+
+    This row is the one that moves, and it moves by exactly the drift added.
+    """
+    import math
+
+    import pyarrow as pa
+
+    from tradefloor.facts import SEED_SD, panel_statistics
+
+    # Nine of the fourteen centre every argument before they measure it, so
+    # a constant added to a series cancels EXACTLY: `pstdev` subtracts its
+    # own mean, `excess_kurtosis` standardises, `_autocorrelation` and
+    # `_unit_centred` subtract a sample mean they then use on both sides,
+    # and the two asymmetry rows select their days off a z-score of the
+    # equal-weight return, which a constant does not move.
+    # `volume_change_acf1` reads no return series at all.
+    EXACTLY_INVARIANT = (
+        "annualised_vol_pct", "excess_kurtosis", "return_acf1",
+        "cross_sectional_corr", "volume_change_acf1", "corr_asymmetry",
+        "corr_asymmetry_lagged", "sector_excess_corr",
+        "corr_persistence_acf1",
+    )
+    # The other five consume an ABSOLUTE return, and |r + c| is not |r| plus
+    # a constant, so no downstream centring can undo it. They are not
+    # invariant and nothing about their formulas says they should be. What
+    # is asserted of them is that they move by less than the noise the panel
+    # already tolerates between two seeds of the same model, which is the
+    # sense in which the gate could not see the drift.
+    NOT_INVARIANT = (
+        "abs_return_acf1", "abs_return_acf5", "abs_return_acf20",
+        "volume_abs_return_corr", "leverage_effect",
+    )
+    assert sorted(EXACTLY_INVARIANT + NOT_INVARIANT) == sorted(
+        tradefloor.facts.REAL_MARKETS), "the split must cover the graded panel"
+
+    # 150 days, not 120: `corr_persistence_acf1` needs six 21-day windows to
+    # be measurable at all, and a row that comes back None would be counted
+    # as invariant without ever having been measured.
+    engine = tradefloor.Engine(seed=5, universe=UNIVERSE)
+    engine.run_days(150, record=True)
+    bars = pa.table(engine.bars(grain="day")).to_pydict()
+    before = panel_statistics(bars, UNIVERSE)
+
+    # +20 percentage points a year of log drift, added to every name on every
+    # day by rescaling its close by exp(d * day). The rescale adds exactly `d`
+    # to that name's daily log return and leaves volume untouched.
+    added_pct = 20.0
+    d = added_pct / 100.0 / 252.0
+    shifted = dict(bars)
+    shifted["close"] = [close * math.exp(d * day)
+                        for close, day in zip(bars["close"], bars["day"])]
+    after = panel_statistics(shifted, UNIVERSE)
+
+    # The instrument fired, or its silence would prove nothing.
+    moved = after["index_drift_pct"] - before["index_drift_pct"]
+    assert moved == pytest.approx(added_pct, abs=1e-9), moved
+
+    for key in EXACTLY_INVARIANT:
+        assert before[key] is not None and after[key] is not None, key
+        # To machine precision, not to a tolerance fitted to one roster: the
+        # argument from the formula is that a constant cancels, and a bound
+        # loose enough to hide a real sensitivity would not test it.
+        scale = max(abs(before[key]), 1.0)
+        assert abs(after[key] - before[key]) < 1e-12 * scale, (
+            key, before[key], after[key])
+
+    for key in NOT_INVARIANT:
+        assert before[key] is not None and after[key] is not None, key
+        delta = abs(after[key] - before[key])
+        assert 0.0 < delta < SEED_SD[key], (key, delta, SEED_SD[key])
+
+
+def test_the_index_drift_row_is_reported_and_never_graded():
+    """Reporting only, and the absence of a band is structural rather than
+    remembered.
+
+    A first-moment band would have to be derived from a real index over a
+    matched window and that derivation does not exist here, so the row earns
+    no verdict, cannot pass, cannot fail, and `envelope` refuses it outright
+    rather than scoring it against a band nobody measured.
+    """
+    from tradefloor import envelope
+    from tradefloor.facts import REAL_MARKETS, REPORTING_ONLY
+
+    year = measure(seed=2, universe=UNIVERSE, days=252)
+    assert isinstance(year["index_drift_pct"], float)
+
+    # Not graded: absent from the band table, from every verdict, and from
+    # the certified set, all three of which are separate surfaces.
+    assert "index_drift_pct" not in REAL_MARKETS
+    assert "index_drift_pct" not in compare_to_real_markets(year)
+    assert "index_drift_pct" not in envelope.CERTIFIED
+    with pytest.raises(tradefloor.ValidationError):
+        envelope.score({"index_drift_pct": year["index_drift_pct"]})
+
+    # Reported, with the reason computed from REPORTING_ONLY rather than
+    # retyped, so the printed caveat cannot drift from the recorded one.
+    text = report(year)
+    assert tradefloor.facts.LABELS["index_drift_pct"] in text
+    assert "no band" in text
+    assert REPORTING_ONLY["index_drift_pct"].split(":")[0] in text
+
+    # Every ungraded row carries a reason. A row with neither a band nor a
+    # recorded reason is the defect this pairing exists to prevent.
+    for key in tradefloor.facts.LABELS:
+        if key not in REAL_MARKETS:
+            assert key in REPORTING_ONLY, key
+
+
+def test_the_index_drift_row_is_the_daily_rebalanced_portfolio():
+    """The convention, against a portfolio built a second way.
+
+    An equal-weight index is a portfolio rebalanced to equal weights every
+    day, so its daily return is the mean of the SIMPLE returns across
+    names. This rebuilds that portfolio from the bars, compounding a
+    notional level day by day, and the row has to be its annualised log
+    growth. Nothing here reads the row's own arithmetic, so a row that
+    averaged log returns instead fails.
+
+    The other convention is computed beside it, because a reader putting a
+    figure from a decomposition against this row has to carry the term
+    between them. Every attribution in this engine is additive in log
+    returns and a portfolio return is not, so the decompositions keep the
+    log convention and this row does not.
+    """
+    import math
+    import statistics
+
+    import pyarrow as pa
+
+    from tradefloor.facts import _daily_series, panel_statistics
+
+    engine = tradefloor.Engine(seed=11, universe=UNIVERSE)
+    engine.run_days(150, record=True)
+    bars = pa.table(engine.bars(grain="day")).to_pydict()
+    series = _daily_series(bars)
+
+    gross: dict[int, list[float]] = {}
+    for rows in series.values():
+        for k in range(1, len(rows)):
+            previous, close = rows[k - 1][1], rows[k][1]
+            if previous > 0 and close > 0:
+                gross.setdefault(rows[k][0], []).append(close / previous)
+    days = sorted(gross)
+
+    level = 1.0
+    for day in days:
+        level *= statistics.mean(gross[day])
+    portfolio = math.log(level) / len(days) * 252 * 100.0
+    row = panel_statistics(bars, UNIVERSE)["index_drift_pct"]
+    assert row == pytest.approx(portfolio, rel=1e-12)
+
+    # The log convention, and the term that separates the two. Jensen's
+    # inequality puts the portfolio above the log mean by about half the
+    # cross-sectional variance, and the agreement below is what says the
+    # gap is that term rather than a bug in either.
+    logs = [statistics.mean([math.log(g) for g in gross[day]])
+            for day in days]
+    log_convention = sum(logs) / len(days) * 252 * 100.0
+    variances = [statistics.pvariance([math.log(g) for g in gross[day]])
+                 for day in days if len(gross[day]) > 1]
+    half_variance = sum(variances) / len(variances) / 2 * 252 * 100.0
+    assert row > log_convention
+    assert row - log_convention == pytest.approx(half_variance, rel=0.01)
+
+    # And the two really are different numbers on this market, or the
+    # comparison above would hold on a build that never changed convention.
+    assert abs(row - log_convention) > 1.0
+
+
+def test_the_index_drift_row_keeps_the_names_the_other_rows_drop():
+    """Survivorship: `min_observations` filters the shape rows and must not
+    filter this one.
+
+    An index drift that drops its short-lived names is measuring the survivors,
+    which is the classic way to read an index level wrong. The delisted name's
+    returns are exactly the ones a first moment has to carry.
+    """
+    import pyarrow as pa
+
+    from tradefloor.facts import _index_drift_pct, _daily_series, panel_statistics
+
+    # A name that stops trading a quarter of the way in. The LAST slot, so
+    # nothing re-indexes: delisting from the middle shifts the tail down and
+    # splices two companies into one instrument id, which would make every
+    # number here meaningless while the assertions still passed.
+    engine = tradefloor.Engine(seed=7, universe=UNIVERSE)
+    engine.run_days(20, record=True)
+    engine.delist(len(engine.tickers) - 1)
+    engine.run_days(60, record=True, first_day=20)
+    bars = pa.table(engine.bars(grain="day")).to_pydict()
+    series = _daily_series(bars)
+
+    # The filter has to BITE, or threshold-independence below would be
+    # threshold-irrelevance and would prove nothing. One name carries 20 rows
+    # against everyone else's 80, so a threshold between them drops it.
+    lengths = sorted(len(rows) for rows in series.values())
+    assert lengths[0] == 20 and lengths[-1] == 80, lengths
+    loose = panel_statistics(bars, UNIVERSE, min_observations=2)
+    tight = panel_statistics(bars, UNIVERSE, min_observations=25)
+    assert tight["observations"] < loose["observations"]
+    assert tight["annualised_vol_pct"] != loose["annualised_vol_pct"]
+
+    # And the drift row does not move, because it never consults the filter.
+    assert tight["index_drift_pct"] == loose["index_drift_pct"]
+    assert panel_statistics(
+        bars, UNIVERSE, min_observations=60
+    )["index_drift_pct"] == loose["index_drift_pct"]
+
+    # Not because it ignores the short-lived name: dropping that name really
+    # does change the answer, which is the whole reason for keeping it.
+    survivors = {i: rows for i, rows in series.items() if len(rows) == 80}
+    assert len(survivors) == len(series) - 1
+    assert _index_drift_pct(survivors) != loose["index_drift_pct"]
+
+    # And it is None, not zero, when there is no return to measure at all.
+    assert _index_drift_pct({}) is None

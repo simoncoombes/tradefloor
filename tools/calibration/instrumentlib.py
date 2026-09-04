@@ -145,6 +145,51 @@ PARAM_SPECS: dict[str, dict] = {
     "market_vol_vix_exponent": {"kind": "abs", "step_unit": 0.05, "hard_range": (1.0, 4.0)},
     "market_beta_down_asym": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
     "market_beta_down_asym_lag": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
+    # A SHARE of the injected first moment, so its range is [0, 1] and
+    # not an open coefficient: above 1.0 it would inject an upward
+    # drift of its own, which is the defect inverted rather than a
+    # richer model.
+    "market_beta_down_asym_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # The SHARE of nominal output growth the valuation's earnings carry.
+    # A share, so [0, 1] rather than an open coefficient: 1.0 holds the
+    # earnings share of nominal output constant, which is the reading the
+    # economy supports, and above it earnings outgrow output for ever.
+    "earnings_nominal_growth": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # A SHARE of demand, so [0, 1]. Above 1.0 supply outruns demand every
+    # day and inventory ramps upward instead of downward, which is the
+    # defect inverted.
+    "oil_supply_response": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # A SHARE of the asymmetry removed, so [0, 1]. Past 1.0 the branches
+    # cross and the rule pushes the other way.
+    "oil_opec_symmetry": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # WHERE the seasonal shape acts, as a SHARE of its own amplitude, so
+    # [0, 1]. 0.0 puts all of it on the price level, where it compounds,
+    # and 1.0 all of it on the reversion target. Past 1.0 the level carries
+    # a negative amplitude, which is the shape inverted.
+    "oil_seasonality_target": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # A SHARE of the hazard's unit correction, so [0, 1]. 0.0 draws a rate
+    # whose scale is in months once a day, 1.0 reads it on the 30-day month
+    # the phase clock keeps, and past 1.0 the cycle runs slower than its own
+    # scale states.
+    "cycle_hazard_per_month": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # The yield at which the target multiple sits on its sector anchor. A
+    # LOG box like the other rate-like dials, and no explicit hard range,
+    # because it ships at 0.04 rather than at zero and the calibration
+    # convention's own [1/4x, 4x] gives 0.01 to 0.16. Both ends are outside
+    # anything the economy reaches, so the box is wide rather than chosen.
+    "neutral_discount_rate": {"kind": "log"},
+    # Days the economy is advanced alone before day zero. A COUNT, so an
+    # absolute box, and its top is the horizon the burn-in that measured it
+    # ran to: the transient table reaches 1095 days and the last field the
+    # valuation reads enters its band at 755.
+    "macro_burn_in_days": {"kind": "abs", "step_unit": 30.0,
+                           "hard_range": (0.0, 1095.0)},
+    # A SHARE of the jump drift returned, so [0, 1]. 1.0 is the
+    # martingale and past it the compensator overshoots.
+    "jump_mean_compensated": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # A SHARE of the ladders' asymmetry removed, so [0, 1]. Past 1.0 they
+    # cross and the upside ladder becomes the larger of the two.
+    "cascade_symmetry": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "market_vol_vix_smooth": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 60.0)},
     "qe_pe_stock_gain": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 20.0)},
     "universe_stress_weight": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 2.0)},

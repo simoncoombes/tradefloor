@@ -201,6 +201,21 @@ pub const MARKET_VOL_VIX_COUPLING: f64 = 1.0;
 /// 15.1, range 12.9–21.0. Anchoring at the endogenous mean makes the
 /// coupled and autonomous processes agree on the unconditional level, so
 /// the coupling question stays isolated from a level change.
+///
+/// THAT FIGURE NO LONGER REPRODUCES. The same protocol on the shipped
+/// preset reads a mean of 18.7, range 12.4 to 27.6, so the anchor sits
+/// well below the endogenous mean it was chosen to equal and the
+/// coupled and autonomous processes no longer agree on the level.
+///
+/// The gap is NOT attributable to the universe generator reconciling a
+/// drawn roster to its own fair value, which is when it was noticed. That
+/// change moved realised volatility by 0.01 of its own across-seed noise,
+/// and this quantity tracks realised volatility. The 15.1 names no preset
+/// and no commit, and the default has moved several times since it was
+/// written, so what it drifted against cannot be recovered from the figure
+/// itself. The constant is left where it is: moving it moves every
+/// trajectory, and the question of what it should be is a calibration
+/// question rather than a provenance one.
 pub const MARKET_VOL_VIX_ANCHOR: f64 = 15.0;
 
 /// Scale on the per-name idiosyncratic GARCH sigma — the FUNDING side of

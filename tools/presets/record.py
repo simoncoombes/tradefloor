@@ -145,9 +145,17 @@ def main() -> int:
     ap.add_argument("--mechanisms", action="store_true",
                     help="rewrite only the mechanism set of every committed "
                          "record from the build's coefficients; no panel needed")
+    ap.add_argument("--coefficients", action="store_true",
+                    help="rewrite only the coefficient vector and its digest "
+                         "on every committed record, from the build; no panel "
+                         "needed. For an era that ADDS a dial, where every "
+                         "preset gains the new name at its inert default and "
+                         "no measurement has changed")
     args = ap.parse_args()
     if args.mechanisms:
         return write_mechanisms()
+    if args.coefficients:
+        return write_coefficients()
 
     import tradefloor
 
@@ -183,6 +191,46 @@ def main() -> int:
             print(f"  {d}")
         print(f"{len(drift)} differences")
         return 1 if drift else 0
+    return 0
+
+
+def write_coefficients() -> int:
+    """Rewrite the coefficient vector and its digest, and nothing else.
+
+    Adding a settable parameter changes the SHAPE of every preset's
+    coefficient vector, because the digest is taken over the whole of
+    `settable_names()`. Every record therefore goes stale at once, on a
+    field that has nothing to do with what the preset was measured to do,
+    and `--panel` would demand a fresh measurement to fix a bookkeeping
+    change.
+
+    So this touches two fields and leaves the measured blocks byte for
+    byte as they are. What it must NOT be used for is a preset whose
+    coefficients actually moved: that is a new preset, and a new preset
+    needs the panel.
+    """
+    import tradefloor
+
+    for path in sorted(OUT.glob("*.json")):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        # `to_dict()` whole, exactly as `build` passes it, `name` included:
+        # the committed digest was taken over that dict and filtering any
+        # key here would move the digest for a second, invisible reason.
+        values = tradefloor.ModelParams.from_preset(record["preset"]).to_dict()
+        before = record["coefficients"]
+        moved = sorted(k for k in set(before) & set(values)
+                       if before[k] != values[k])
+        if moved:
+            print(f"  REFUSED {path.name}: {len(moved)} existing coefficient(s) "
+                  f"moved, which is a new preset and needs --panel: {moved}")
+            return 1
+        record["coefficient_digest"] = coefficient_digest(values)
+        record["coefficients"] = {k: values[k] for k in sorted(values)}
+        text = json.dumps(record, indent=2, ensure_ascii=False) + chr(10)
+        path.write_text(text, encoding="utf-8", newline=chr(10))
+        added = sorted(set(values) - set(before))
+        print(f"  wrote {path.relative_to(ROOT)}"
+              + (f"  (+{', '.join(added)})" if added else ""))
     return 0
 
 

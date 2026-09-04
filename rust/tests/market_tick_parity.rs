@@ -295,6 +295,11 @@ fn check_scenario(file: &str) {
                 settle_depth_counterfactual: false,
                 // The shipped preset: the parity contract is against the
                 // reference model, which is what PT_V1 carries.
+                // The run's opening nominal output. The growth term is
+                // off on every preset these tests pin, so it is read
+                // nowhere; this tick's own value is what a single-tick
+                // caller opens at.
+                nominal_output_base: economy.gdp * economy.cpi,
                 params: &tradefloor::params::PT_V1,
             },
             &mut rng,

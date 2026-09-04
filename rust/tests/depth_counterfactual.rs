@@ -130,6 +130,11 @@ fn tick(c: TickCompany, uniform: f64, volatility: f64) -> (Run, TickCompany, Tic
             market_sigma_daily: MARKET_FACTOR_SIGMA,
             settle_draws: SettleDrawPolicy::FourAlways,
             settle_depth_counterfactual: true,
+            // The run's opening nominal output. The growth term is
+            // off on every preset these tests pin, so it is read
+            // nowhere; this tick's own value is what a single-tick
+            // caller opens at.
+            nominal_output_base: economy.gdp * economy.cpi,
             params,
         },
         &mut Fixed(uniform),
@@ -335,6 +340,11 @@ fn the_arm_reports_nothing_on_the_replay_path() {
             market_sigma_daily: MARKET_FACTOR_SIGMA,
             settle_draws: SettleDrawPolicy::FourOrZero,
             settle_depth_counterfactual: true,
+            // The run's opening nominal output. The growth term is
+            // off on every preset these tests pin, so it is read
+            // nowhere; this tick's own value is what a single-tick
+            // caller opens at.
+            nominal_output_base: economy.gdp * economy.cpi,
             params: &tradefloor::params::PT_V1,
         },
         &mut Fixed(0.02),

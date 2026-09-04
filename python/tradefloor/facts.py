@@ -34,10 +34,45 @@ clustering at lag one left its band, the leverage effect entered its
 band -- see "Where the bands come from" below. A verdict is a comparison
 of a measurement against a band, and both halves now carry provenance.
 
+Fourteen is the GRADED count and not the row count. A fifteenth row,
+`index_drift_pct`, is measured and reported and deliberately not graded,
+because no defensible band for it has been derived here yet. It is the
+panel's only first moment, and it exists because the fourteen shape
+statistics could all read in band on a market losing a fifth of its value
+in a year -- and did. It reports the daily-rebalanced equal-weight
+portfolio, which is the convention a real index band would be stated in;
+every decomposition in this engine is additive in log returns and keeps
+that convention instead, and the two differ by half the cross-sectional
+variance. See `_index_drift_pct` and `REPORTING_ONLY`.
+
 Every figure below: `Universe.random(40, seed=111)` (fingerprint
 5d8de78b55aad752), 252 days, `measure()` per sim seed, median over seeds 1
 to 6 -- re-measured at known-answer v8 (era digest 1ee64998...), where the
 superseded figures beside them are marked with the era they belonged to.
+
+**That roster no longer exists.** The universe generator was reconciled so
+that a drawn roster opens at its own fair value rather than above it, which
+changed every generated name's earnings and book value, and
+`Universe.random(40, seed=111)` now fingerprints 9be68b9bc37e7978. Every
+figure below, `SEED_SD_504` and the `envelope` module's measured tables were
+taken on the roster the OLD generator produced and have not been
+re-measured. They are stale, and the stale figures are kept rather than
+quietly swapped, because a figure carrying a fingerprint it was not measured
+under is the defect this module corrected once already.
+
+`SEED_SD` is the exception and has been re-measured on the current roster,
+which `SEED_SD_PROVENANCE` records. It reads that roster from a committed
+fixture rather than from the generator, so it no longer moves when the
+generator does, and the fourteen scales shift by -6.02 to +5.22 per cent
+against their superseded values.
+
+How stale, measured rather than guessed: over seeds 101 to 110 at 252 days
+on pt-v16, the fourteen graded medians move by at most 0.26 of their own
+`SEED_SD` (the largest is `volume_change_acf1`), and all fourteen sit in
+band before and after. So the verdicts hold and the digits do not. The row
+that moves is the ungraded one: `index_drift_pct` improves by 3.83
+percentage points a year on every one of thirty seeds, measured in the log
+convention that row carried at the time.
 
 ## What lands
 
@@ -292,6 +327,7 @@ from __future__ import annotations
 
 import math
 import statistics
+import textwrap
 from typing import Any, Mapping, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
@@ -715,30 +751,30 @@ REAL_MARKETS_WINDOWS = {
 #: `tradefloor.loss.seed_sd_from_panels` remains the estimator, and the loss
 #: takes a replacement as a parameter rather than requiring an edit here.
 SEED_SD = {
-    "annualised_vol_pct": 6.46066,
-    "excess_kurtosis": 1.17181,
-    "return_acf1": 0.0532019,
-    "abs_return_acf1": 0.0945748,
-    "abs_return_acf5": 0.0550538,
-    "abs_return_acf20": 0.0466668,
-    "cross_sectional_corr": 0.10875,
-    "volume_abs_return_corr": 0.0433524,
-    "leverage_effect": 0.0759765,
-    "volume_change_acf1": 0.0102341,
-    # Added 2026-08-25 on the SAME protocol as the rest of this table: pt-v1,
-    # Universe.random(40, seed=111), 252 days, seeds 101-130, sample sd. Not
-    # pt-v3, deliberately: this table is the frozen denominator of every
-    # "seed-sd out" figure the project has published, re-derived from the
-    # committed per-seed table in tests/test_loss.py. A first draft
-    # measured these three on pt-v3 with the population estimator and was
-    # caught by that test; the pt-v3 values (0.1435, 0.1451, 0.0071) are
-    # recorded in the calibration record beside the certification medians.
-    "corr_asymmetry": 0.1614765,
-    "corr_asymmetry_lagged": 0.1178216,
-    "sector_excess_corr": 0.0068036,
-    # 2026-08-25, same protocol. The largest seed sd of any correlation-type
-    # statistic: a twelve-point acf1 per seed. See CALIBRATION-FOLLOWUPS.md §64.
-    "corr_persistence_acf1": 0.2789932,
+    "annualised_vol_pct": 6.45368,
+    "excess_kurtosis": 1.17811,
+    "return_acf1": 0.0525798,
+    "abs_return_acf1": 0.0955416,
+    "abs_return_acf5": 0.0567399,
+    "abs_return_acf20": 0.0467066,
+    "cross_sectional_corr": 0.108444,
+    "volume_abs_return_corr": 0.0415843,
+    "leverage_effect": 0.0769232,
+    "volume_change_acf1": 0.0107678,
+    # These four joined the table on 2026-08-25 on the same protocol as the
+    # rest of it. A first draft measured three of them on pt-v3 with the
+    # population estimator and was caught by the test that re-derives this
+    # table; the pt-v3 values (0.1435, 0.1451, 0.0071) are recorded in the
+    # calibration record beside the certification medians. pt-v1 is
+    # deliberate: this table is the frozen denominator of every "seed-sd
+    # out" figure the project publishes, so it stays at the baseline preset
+    # rather than moving with each era.
+    "corr_asymmetry": 0.163194,
+    "corr_asymmetry_lagged": 0.115927,
+    "sector_excess_corr": 0.0063937,
+    # The largest seed sd of any correlation-type statistic: a twelve-point
+    # acf1 per seed. See CALIBRATION-FOLLOWUPS.md section 64.
+    "corr_persistence_acf1": 0.279423,
 }
 
 #: Real-market bands re-derived at a 504-DAY measurement window.
@@ -818,24 +854,63 @@ SEED_SD_504_PROVENANCE = {
 #: Where SEED_SD's values come from, carried as data so any consumer -- the
 #: loss report, a calibration manifest -- can quote it rather than assert it.
 SEED_SD_PROVENANCE = {
-    "source": "re-measured on the shipped preset: facts.measure() on "
-              "Universe.random(40, seed=111), 252 days, seeds 101-130, "
+    "source": "re-measured on the shipped baseline preset: facts.measure() "
+              "on the committed panel roster, 252 days, seeds 101-130, "
               "sample sd across seeds",
-    "date": "2026-08-22",
+    "date": "2026-09-03",
     "model_fingerprint": "pt-v1",
-    "universe_fingerprint": "5d8de78b55aad752307740018791"
-                            "54c0f29aa8fc0c63f3c6a4ac791165ca7380",
+    "universe_fingerprint": "9be68b9bc37e79785765df2f395a9348"
+                            "650a4e9293507680532293fdf78808dd",
     "days": 252,
     "seeds": tuple(range(101, 131)),
     "estimator": "sample standard deviation (n - 1) across seeds",
-    "cross_check": "agrees to six significant figures with the seed_sd of "
-                   "tools/calibration/results/"
-                   "jacobian-pt-v1-2026-08-22-chunk1.json, measured "
-                   "independently by the phase-2 instrument on the same "
-                   "thirty seeds",
+    "roster_note": "the roster is read from tests/fixtures/"
+                   "panel-roster-40.json rather than drawn by "
+                   "Universe.random, so this table no longer moves when the "
+                   "generator does. It moved once for that reason: the "
+                   "generator was reconciled so a drawn roster opens at its "
+                   "own fair value, every roster re-rolled, and all fourteen "
+                   "values went stale on a change that touched no "
+                   "coefficient and no estimator.",
     "pinned_by": "tests/test_loss.py re-measures two of the thirty seeds "
                  "live and re-derives the sd from the committed per-seed "
                  "table",
+    # The cross-check, written as three claims because the single sentence
+    # it replaced implied one larger one.
+    "cross_check": "the base panels of a jacobian.py run on the same "
+                   "roster, preset, horizon and seeds hold the same thirty "
+                   "panels to the bit, all 420 values",
+    "cross_check_detects": "a transcription error in a hand-maintained "
+                           "block of 420 floats, and a platform or "
+                           "interpreter difference when the two sides are "
+                           "run on different machines",
+    "cross_check_cannot_detect": "an estimator defect. Both sides call "
+                                 "facts.measure and derive the scale "
+                                 "through loss.seed_sd_from_panels, so they "
+                                 "share the estimator and cannot disagree "
+                                 "about it. A genuinely independent check "
+                                 "would be a second estimator written "
+                                 "against the recorded bars, which does not "
+                                 "exist.",
+    # A tighter agreement here is agreeing about LESS than the looser one it
+    # replaced, and the difference is worth stating so nobody reads it the
+    # other way.
+    "cross_check_caveat": "this pair is bit-exact and single-platform. The "
+                          "pair it replaces agreed to six significant "
+                          "figures and spanned two platforms, macOS arm64 "
+                          "under CPython 3.11.15 against a table measured "
+                          "elsewhere, so it also carried evidence about "
+                          "portability that this one does not. The market "
+                          "is bit-reproducible across platforms and the "
+                          "statistics derived from it are not: the same "
+                          "panel under CPython 3.11.16 on Linux and 3.13.12 "
+                          "on Windows differs by up to 8.4e-15 relative on "
+                          "excess kurtosis while all three known-answer "
+                          "digests match.",
+    "companion_not_re_measured": "SEED_SD_504 and the envelope module's "
+                                 "measured tables were taken on the "
+                                 "superseded roster and have not been "
+                                 "re-measured on this one.",
 }
 
 #: The first two are MARGINAL: properties of one series taken on its own. The
@@ -844,6 +919,30 @@ SEED_SD_PROVENANCE = {
 #: statistic falls in is the finding this module reports, so the split is a
 #: constant rather than a presentation detail.
 MARGINAL = ("annualised_vol_pct", "excess_kurtosis")
+
+#: Panel rows that are MEASURED AND REPORTED BUT NOT GRADED, against the
+#: reason no band exists for them. A key here is deliberately absent from
+#: `REAL_MARKETS`, so it earns no verdict, cannot pass, cannot fail, and
+#: cannot enter `envelope.CERTIFIED` -- and `report` says why at the point
+#: it prints the number, reading this dict rather than a retyped sentence.
+#:
+#: A row with no band is worth having anyway. The alternative is not
+#: reporting the quantity, and an unreported quantity is one nobody
+#: measures; see `_index_drift_pct` for the case that put this here.
+REPORTING_ONLY = {
+    "index_drift_pct": (
+        "no real-market band: the other fourteen are SHAPE statistics with "
+        "published real-market analogues, and a first-moment band would "
+        "have to be derived from a real index over a matched window. That "
+        "derivation does not exist in this project yet, and inventing one "
+        "would be worse than having none -- a fabricated band grades every "
+        "future preset against a number nobody measured. The number is "
+        "already in the units such a band would use, a daily-rebalanced "
+        "equal-weight portfolio return, which runs above the log "
+        "convention the decompositions use by half the cross-sectional "
+        "variance."
+    ),
+}
 
 #: Row labels for `report`. The dict order of REAL_MARKETS above is the print
 #: order, and these name the rows.
@@ -862,6 +961,7 @@ LABELS = {
     "corr_asymmetry_lagged": "corr, after down vs up",
     "sector_excess_corr": "same-sector excess corr",
     "corr_persistence_acf1": "corr persistence acf(1)",
+    "index_drift_pct": "index drift %/yr",
 }
 
 
@@ -1052,6 +1152,203 @@ def _daily_series(bars: dict) -> dict[int, list[tuple[int, float, float]]]:
             (bars["day"][k], bars["close"][k], bars["volume"][k])
         )
     return {i: sorted(rows) for i, rows in grouped.items()}
+
+
+#: Sessions in a year, for annualising a per-session quantity.
+TRADING_DAYS_PER_YEAR = 252
+
+
+def _index_drift_pct(
+    series: dict[int, list[tuple[int, float, float]]],
+) -> float | None:
+    """Annualised drift of the equal-weight index, in percent a year.
+
+    The panel's FIRST MOMENT. Every other row here is a shape statistic --
+    a spread, a fourth moment, an autocorrelation, a correlation -- and
+    every one of them is invariant, or nearly so, to what the index level
+    does. Nine of the fourteen are exactly invariant to adding a constant
+    drift to every name on every day, because they centre their arguments
+    before they measure them; the five that are not move by less than a
+    tenth of their own seed noise under it. So the panel could be read
+    fourteen for fourteen by a market that loses a fifth of its value in a
+    year, and it was.
+
+    # Which index, of the two
+
+    An equal-weight index is a portfolio rebalanced to equal weights every
+    day, so its daily return is the MEAN OF THE SIMPLE RETURNS across
+    names, and this row reports the log of that summed over the window.
+    That is the quantity a real index band would be stated in, since a
+    published index return is a portfolio return.
+
+    The other convention is the mean across names of the daily LOG return,
+    which is what a decomposition has to use, because log returns are
+    additive across time and across the terms of an identity while a
+    portfolio return carries neither. Every attribution in this engine and
+    every figure in the era that produced this row is in that convention,
+    so a number from a decomposition and a number from this row are not
+    the same quantity.
+
+    The two differ by half the cross-sectional variance of the daily
+    returns, which is Jensen's term and is positive whenever the names
+    disperse at all. That is measured rather than argued. On
+    `Universe.random(40, seed=111)` over 252 days, seeds 1 to 30:
+
+    | arm | gap, points a year | half the variance | worst miss |
+    |---|---|---|---|
+    | pt-v16 | +2.067 median, sd 0.297 | +2.066 | 0.010 |
+    | pt-v18 | +1.927 median, sd 0.236 | +1.919 | 0.011 |
+
+    So predicting the gap as half the summed cross-sectional variance is
+    accurate to about a hundredth of a point across sixty seed-years, and
+    the residual is centred at -0.001 with a standard deviation of 0.005.
+    An independent sweep regressed the gap on that variance and read a
+    slope of 1.0081, an intercept of -0.0160 and an r squared of 0.9982,
+    and read +2.064 on the shipped default over thirty seeds with the
+    prediction accurate to a median of 0.011 and a worst case of 0.036.
+
+    # Why a band forces the choice
+
+    The gap is a variance rather than an offset anyone could subtract
+    once. It moves with anything that moves dispersion: across thirty-one
+    rosters it reads 1.914 with a standard deviation of 0.075, and across
+    the arms of one era it runs from 1.494 to 1.952, because an arm that
+    changes dispersion changes the gap by construction.
+
+    So grading the log-mean row against a band derived from a real index
+    would grade a different statistic whose offset from the band's own
+    quantity varies with the preset under test. The row and its band have
+    to name one convention.
+
+    The choice then follows. A band in the log convention exists only by
+    deriving it in that convention from real data, which means computing
+    the cross-sectional variance of a real index's constituents over a
+    matched window rather than taking a published index return, and nobody
+    has done that derivation. Reporting the portfolio number needs no new
+    derivation at all.
+
+    # Which seed varies, and for which question
+
+    Two seeds decide a run and they answer different questions. The market
+    seed drives every draw the engine takes, and the universe seed decides
+    the roster it takes them against. Every arm of the pt-v18 era varied
+    the market seed over 1 to 30 on one roster, `Universe.random(40,
+    seed=111)`, held fixed, which is the protocol every figure below was
+    measured on.
+
+    That roster opens 0.78 of a population standard deviation above fair
+    value, so its LEVEL carries a draw as well as a model: one build reads
+    -8.603 on it against +3.989 and +7.050 on rosters 204 and 209. Those
+    three across-roster figures come from the era's roster sweep and are
+    recorded in the design note `programme/index-architecture.md`, which
+    also carries roster 111's +0.038 mean log deviation, the population
+    mean of -0.002 and the across-roster standard deviation of 0.052 that
+    the 0.78 is computed from.
+
+    A paired difference between two arms on the held roster is a property
+    of the model, because the roster's own draw is common to both arms and
+    cancels. A level is a property of that roster, and a level that has to
+    describe the model is measured by varying the universe seed instead.
+
+    How much that costs is measured. A roster sweep puts roster 111 at
+    1.12 standard deviations dearer than the population at the open, and
+    index drift moves at about minus a hundred points per unit of opening
+    mispricing, so this roster carries a handicap near six points a year.
+    Across a hundred rosters, pt-v18 without the growth term reads a
+    portfolio median of +1.55 a year with 65 of 101 rosters above zero,
+    where roster 111 reads about minus five. So every level in the table
+    below is that roster's and reads about six points worse than the model
+    does. An earlier and smaller sample in the design note puts the same
+    roster at 0.78 standard deviations, and the two have not been
+    reconciled.
+
+    # Measured
+
+    Every figure in the table is the LOG convention, on
+    `Universe.random(40, seed=111)`, 252 days, seeds 1 to 30, which are the
+    drift seeds rather than the ten panel seeds beside them. Taking the
+    median over all forty rows of a file that carries both reads -18.525
+    where the drift seeds read -18.344, so the two sets are separated
+    wherever a figure is quoted.
+
+    | build | median | min | max | seeds above zero |
+    |---|---|---|---|---|
+    | pt-v16 at `df0fe62` | -22.155 | -43.797 | -16.360 | 0 of 30 |
+    | pt-v16, reconciled generator | -18.344 | -39.896 | -12.526 | 0 of 30 |
+    | pt-v18, the finished era | -2.304 | -19.213 | +5.628 | 9 of 30 |
+
+    In this row's own convention the last of those reads -0.340, with a
+    minimum of -16.827, a maximum of +7.686 and 13 of 30 seeds above zero,
+    against pt-v16's -16.150 and 0 of 30. The two conventions are 1.9 to
+    2.1 points apart on this roster and both are quoted so that neither
+    can be read as the other.
+
+    The derivation of the first row is
+    `tradefloor-design/programme/index-drift-investigation.md`, and the
+    terms it names are a down tilt in the market factor, a rising rate
+    path, a negative jump mean, an asymmetric stop cascade and the
+    roster's own opening condition. The pt-v18 era gives each of those
+    back and adds a growth term; its own figures are in the design note
+    `programme/index-architecture.md`, and they are in the log convention
+    too, so about 1.9 points is added to each of them to read them in this
+    row's convention.
+
+    # There is no band, deliberately
+
+    This row is REPORTING ONLY. It is absent from `REAL_MARKETS`, so it has
+    no verdict, no pass and no fail, and `envelope` never sees it. The
+    reason is recorded as data in `REPORTING_ONLY` and printed by `report`.
+
+    A band for it is OUTSTANDING rather than omitted. The fourteen graded
+    rows are shape statistics with published real-market analogues measured
+    at this panel's own method. A first-moment band would have to be
+    derived from a real index over a matched window, and that derivation
+    has not been done here. Shipping a plausible-looking band instead would
+    grade every future preset against a number nobody measured, which is
+    the unprovenanced-band defect this module already corrected once, in
+    2026-08 (see `REAL_MARKETS_PROVENANCE`). A number with no band is
+    honest, and a band with no derivation grades against nothing. What this
+    row's convention change buys is that the number is already in the units
+    such a band would be stated in, so deriving one later needs no
+    translation.
+
+    # Method
+
+    For each day, the mean across names of the simple return of the close,
+    turned into a log return and summed over the window, divided by the
+    number of days that carried a return, times 252. The mean of the simple
+    returns is the daily rebalance: every name is held at equal weight at
+    every open, whatever it did the day before.
+
+    Two choices worth naming, because both are the difference between this
+    row and a flattering one.
+
+    **Every name counts, including a short-lived one.** `min_observations`
+    filters the other rows, and does not filter this one. A delisted name's
+    losses are exactly what an index drift has to carry; dropping it is
+    survivorship bias, which is the classic way to measure an index level
+    wrong. A day on which a name has no return contributes the names that
+    do have one, which is what an index does when a constituent leaves.
+
+    **A gap in a name's bars is spanned, not dropped.** A return is formed
+    between consecutive RECORDED rows for that name and attributed to the
+    later day, so the sum over the window is exact even where a name is
+    missing days. It is the sum that this statistic reports.
+    """
+    by_day: dict[int, list[float]] = {}
+    for rows in series.values():
+        for k in range(1, len(rows)):
+            previous, close = rows[k - 1][1], rows[k][1]
+            if previous > 0 and close > 0:
+                # The GROSS return, so the mean below is the portfolio's
+                # and not a name's. Taking logs first and averaging those
+                # gives the other convention, which is 1.9 points lower on
+                # the roster this row is quoted on.
+                by_day.setdefault(rows[k][0], []).append(close / previous)
+    if not by_day:
+        return None
+    daily = [math.log(statistics.mean(values)) for values in by_day.values()]
+    return sum(daily) / len(daily) * TRADING_DAYS_PER_YEAR * 100.0
 
 
 #: Window, in sessions, for the correlation-persistence diagnostic. The
@@ -1413,6 +1710,12 @@ def panel_statistics(
         "abs_return_acf1": statistics.median(abs_acf1),
         "abs_return_acf5": statistics.median(abs_acf5),
         "abs_return_acf20": statistics.median(abs_acf20),
+        # The panel's one first-moment row, reported and NOT graded. It is
+        # built from `series` rather than from `pooled`, because `pooled`
+        # has already dropped every name under `min_observations` and an
+        # index drift that drops its losers is not one. See
+        # `_index_drift_pct`.
+        "index_drift_pct": _index_drift_pct(series),
     }
     # The four dependence statistics carry the same keys whether or not they
     # could be measured, so a caller reading the result does not have to test
@@ -1503,6 +1806,20 @@ def report(facts: dict[str, Any]) -> str:
         "dependence: how things move together",
     ]
     lines += [row(key) for key in REAL_MARKETS if key not in MARGINAL]
+
+    # The ungraded rows, derived from the two tables rather than listed, so
+    # a row can never be printed as graded because a list went stale.
+    ungraded = [key for key in LABELS if key not in REAL_MARKETS]
+    if ungraded:
+        lines += ["", "reporting only: measured, not graded"]
+        for key in ungraded:
+            value = facts.get(key)
+            shown = "n/a" if value is None else f"{value:.3f}"
+            lines.append(f"{LABELS[key]:22s} {shown:>10s}  {'no band':>14s}")
+            reason = REPORTING_ONLY.get(key)
+            if reason:
+                lines += textwrap.wrap(reason, 72,
+                                       initial_indent="  ", subsequent_indent="  ")
     lines += [
         "",
         "Read the two sections against each other. A model can get the shape",

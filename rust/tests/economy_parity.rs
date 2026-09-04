@@ -343,7 +343,11 @@ fn cycle_transition_probability_matches_bit_for_bit() {
         e.treasury_yield_10y = bits(i["treasuryYield10Y"].as_str().unwrap());
         e.market_pe = i["marketPE"].as_str().map(bits);
 
-        let (p, next) = get_cycle_transition_probability(&e);
+        // 0.0 is the reference implementation's reading, which is what
+        // these vectors record. `cycle_hazard_per_month` above 0.0 reads
+        // the same scale per month and is a pt-v18 behaviour, so it can
+        // have no golden vector here.
+        let (p, next) = get_cycle_transition_probability(&e, 0.0);
         let want_p = bits(case["output"]["probability"].as_str().unwrap());
         let want_next = case["output"]["nextPhase"].as_str().unwrap();
 
@@ -536,7 +540,8 @@ fn check_trajectory_mode(file: &str, mode: TrajectoryMode) {
             serde_json::from_value(day_doc["draws"]["cycle"].clone()).expect("cycle tape");
         let mut rng = ScriptedRng::new(tape, format!("day {day} cycle"));
         let phase_before = economy.cycle_phase;
-        economy = check_cycle_transition(&economy, &mut rng);
+        // 0.0: the reference implementation's reading, as above.
+        economy = check_cycle_transition(&economy, &mut rng, 0.0);
         problems.extend(rng.finish());
 
         let transitioned = economy.cycle_phase != phase_before;

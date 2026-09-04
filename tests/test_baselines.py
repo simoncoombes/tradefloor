@@ -113,7 +113,15 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # them. Under pt-v14 the same seed read oracle +4.874%, mean_reversion
     # +1.801%, momentum +1.449%, buy_and_hold -0.588%, random -0.988%. The
     # oracle has still never moved.
-    assert ranked == ["oracle", "momentum", "mean_reversion",
+    #
+    # Re-measured again when the universe generator was reconciled to open a
+    # drawn roster at its own fair value, which re-drew every generated
+    # name's earnings and book value and so every trajectory: oracle
+    # +7.132%, mean_reversion +2.450%, momentum +1.932%, random -0.735%,
+    # buy_and_hold -1.103%. Momentum and mean-reversion swapped for the
+    # sixth time, 0.518 points apart, which is the widest that pair has been
+    # at a swap. The bottom pair held and the oracle has still never moved.
+    assert ranked == ["oracle", "mean_reversion", "momentum",
                       "random", "buy_and_hold"]
 
 

@@ -2,39 +2,851 @@
 
 ## Unreleased
 
+**Every `Universe.random` roster re-rolls**; pin 0.6.2.
+
+**A new preset, pt-v18, returns five first moments the model injected and
+grows fair value with nominal output**, taking the equal-weight index from
+-16.150 per cent a year to -0.340 as a portfolio return, on a roster six
+points dearer than the population. The default preset is where it was.
+
+**The index drift row reports a daily-rebalanced portfolio return**, about
+two points above the log convention the decompositions use.
+
 **A run can commit to the state it held at the end of every day**, and a
-sampled check verifies k days for the cost of k days.
+sampled check verifies k days for that cost.
 
 **The per-name volume states follow the roster**, moving the volume-idio
-generator of any run that lists or delists, breaking such runs' old
-checkpoints and letting the day ledger check them.
+generator of any run that lists or delists.
 
 **Every print decomposes into the shock that arrived, the depth that
-absorbed it and the breaker's share, with a counterfactual against
-unbounded depth on request.**
+absorbed it and the breaker's share**, with a counterfactual against
+unbounded depth on request.
 
-**Every draw has an address**, a table of substitutions can replace one,
-and a second `run_days` call numbers days from the engine's own counter.
+**Every draw has an address**, a substitution table replaces one, a
+surgery installs a window of them, and a second `run_days` call numbers
+days from the engine's own counter.
 
-**A surgery replaces one draw**, a window of them, or another world's,
-and the record says whether it could bite.
+**Each draw's effect on a target is measured** by a finite difference, and
+a shadow run solves a real year for the draws behind its closes.
 
-**Each draw's effect on a target is measured** by a finite difference,
-and the rows carry the residual by which they miss the joint effect.
-
-**A shadow run walks the engine along a real year**, solving each day for
-the draws that reproduce its observed closes.
+**The browser build compiles again**, after a stale file path broke it.
 
 **A mechanism is a specification the engine's Rust is generated from**,
-checked for its draw effect and proven inert at its default doses.
+checked for its draw effect and proven inert.
 
 **A day's move decomposes to the draws that seeded it**, and every node
-of the tree replays from the state the day started in.
-
-**The browser build compiles again**, after a leftover file path from
-an old rename broke it outright.
+replays from the state the day started in.
 
 <!-- release-note-ends -->
+
+### A generated roster opens at its own fair value
+
+`Universe.random` drew a price, then drew a multiple around the sector
+anchor and set earnings to the price divided by it. The multiple's scatter
+ran uniformly from 0.55 to 1.6 of the anchor, which is symmetric in the
+ratio and biased in the log of it: its mean in log is +0.029, so the
+implied earnings came out systematically low and the valuation built on
+them came out below the price it was built from. Book value had the same
+shape against the loss-maker path. A drawn roster therefore opened above
+fair value, at a cross-sectional mean log deviation of +0.050 over two
+hundred rosters of forty names, with 58 per cent of names above fair
+value, and the market spent a year unwinding that on a 60-day half-life.
+
+Both ratios are now drawn log-uniformly between reciprocal endpoints, so
+their mean in log is zero and a name is as likely to open cheap as dear.
+The widths are preserved to within two per cent, so the cross-section is
+as dispersed as it was and no longer tilted. Over two hundred rosters the
+day-zero mean falls from +0.050 to +0.013 and the fraction above fair
+value from 58 to 51 per cent. What remains is the valuation model's
+neutral discount rate sitting 56 basis points below where the economy
+opens, which compresses every profitable name's multiple by about one per
+cent. That is a property of the opening macro state rather than of the
+generator, and correcting it here would bake an economy constant into
+universe generation.
+
+What is centred is the draw, which is the thing that carried the bias. A
+roster of forty names taken from it still scatters, and that scatter is
+sampling error rather than bias: the day-zero deviation has a
+cross-sectional sd of about 0.32, so a forty-name mean carries a standard
+error of about 0.05 and any roster lands that far either side by chance.
+The panel roster is one that draws high, reading +0.048 against the draw's
++0.013, and a different seed is as likely to read low.
+
+Removing that too would mean correcting each roster to its own realised
+mean, which is deliberately not done. The correction depends on the roster
+size, so it is a second pass whose result depends on `n`, and it breaks the
+invariant that a larger universe extends a smaller one. A generator that
+silently re-centred every roster would also report a cross-section tighter
+than the one it drew.
+
+Measured on the panel roster over thirty seeds at 252 days on pt-v16, the
+annualised index drift improves from a median of -22.155 to -18.344 per cent
+a year, in the log convention. Every one of the thirty improves, by between
+3.715 and 4.039 points, because the starting condition is a property of the
+roster and not of the market seed. The drift is still negative on all
+thirty: the remaining terms are a down-tilt in the market factor, a rising
+rate path and an unexplained residual, none of which this touches.
+
+**What this breaks.** The same name and seed no longer give the same
+universe. Every generated name's earnings and book value move, and with
+them every price path, so any published result citing `Universe.random`
+re-rolls; `Universe.random(40, seed=111)` now fingerprints
+9be68b9bc37e7978. Everything else about a generated name is bit-identical,
+because both reconciled fields take exactly one draw each as they did
+before and the stream position is unchanged. The determinism digest does
+not move: the known-answer run builds its instruments by hand and never
+calls the generator.
+
+The certified panel does not move either, which is the same finding the
+new drift row exists for. Over seeds 101 to 110 the fourteen graded
+medians shift by at most 0.26 of their own across-seed noise and all
+fourteen stay in band. Their recorded values, `SEED_SD` and the preset
+records were nonetheless all measured on the roster the old generator
+produced, and none has been re-measured. They are marked stale where they
+are recorded rather than quietly restated.
+
+### The pt-v18 era and the downside transmission tilt
+
+The equal-weight index drifted -22.155 per cent a year at pt-v16 in the log
+convention, measured over thirty seeds on the panel roster at 252 days,
+against a real large-cap index's +8 to +10. It was negative on every seed.
+Almost none of that was chosen. It is the sum of mechanisms that each moved
+the first moment as a by-product of shaping something else, under a panel of
+fourteen shape statistics that cannot see a first moment and read fourteen
+for fourteen throughout.
+
+pt-v18 is the era that gives those first moments back at their source.
+pt-v17 is reserved by the open recomposition era, and a preset name is the
+identity every published result cites, so this era takes the next free
+number and the gap is deliberate.
+
+The first of them is the downside transmission tilt. It scales one side of
+a zero-mean draw, which moves that draw's mean, and a mean in a price
+process is a drift: for a normal factor, the expectation of the down half
+is minus sigma over the square root of two pi, so the tilt adds a negative
+amount to every name on every tick whether the market is calm or not.
+Nobody chose that. It is the by-product of a correlation mechanism that is
+otherwise doing exactly what it was built to do.
+
+`market_beta_down_asym_recentre` gives it back. At 0.0, which is every
+preset before pt-v18, the branch is not taken and the trajectory is
+bit-identical. At 1.0 the whole injected mean is returned.
+
+Three things about the form are worth stating, because each was a choice.
+The sigma is the CONDITIONAL sigma of the tick's own draw and not the
+baseline constant, so the correction tracks the factor's variance process
+instead of assuming it away, and it cannot be defeated by a VIX coupling or
+a pinned scenario: a hotter tick injects more and gives back more. Beta is
+per name, because the injection into a name IS its beta times the form, so
+using one instead would leave a residual proportional to beta minus one,
+which is a cross-sectional bias as well as a mean one. And the offset is
+applied after the crash amplifier, because an offset added before it would
+itself be amplified.
+
+What is deliberately NOT corrected is the amplifier's own effect on the
+tilt. The true injected mean is the closed form times a ratio that has no
+closed form, measured between 1.00 and 1.38 across conditional sigmas and
+sitting near 1.01 at the ones that occur. Correcting it would need either a
+new bit-pinned transcendental or a fitted constant, and a fitted constant
+is tuning rather than fixing. What it leaves is measured below rather than
+argued.
+
+Measured over thirty seeds in the log convention, the annualised index drift
+improves from -18.344 to -11.347 per cent a year, and every one of the
+thirty improves. The paired difference is +7.879 by median and +8.251 by
+mean. Set that against the investigation's finding that switching the tilt
+OFF entirely is worth 7.940: recentring recovers essentially all of the
+drift the tilt costs while keeping the correlation asymmetry it exists to
+produce.
+
+The mechanism reading agrees with the drift reading. The tilt's own
+contribution to the noise attribution is -0.389 per name per year at
+pt-v16; with the tilt switched off it is -0.049, and with the tilt on and
+recentred it is -0.052. Recentring lands within 0.007 of switching the
+mechanism off, on a term worth 0.342, and that gap is the amplifier
+residual named above. The -0.049 both arms share is not this correction
+falling short; it is what the noise channel carries with no tilt at all.
+
+The certified panel does not move. Over ten seeds the fourteen graded
+medians shift by at most 0.55 of their own across-seed noise and all
+fourteen stay in band, including the correlation asymmetry the tilt was
+built for.
+
+Adding a settable dial changes the SHAPE of every preset's coefficient
+vector, because the digest is taken over the whole settable surface. Both
+committed preset records therefore gained the new name at 0.0 and a new
+digest, through a `--coefficients` mode that rewrites those two fields and
+refuses to run if any existing coefficient moved. Every measured block in
+those records is byte for byte as it was, and no preset was re-measured.
+
+### The supply term behind the one-way rate path
+
+The corporate bond yield rose on 24 of 30 seeds over a year and was
+non-decreasing on most of them. The yield itself is recomputed at every
+meeting as the ten-year plus a spread, so it carries no memory of its own.
+It rose because the central bank hiked, the bank hiked because inflation
+rose, and inflation rose because the oil price did.
+
+The oil price rose because a supply term was left at zero. Oil demand draws
+inventory down by `gdp_growth * 0.15` every day and `oil_supply_factor` is
+the literal `0.0`, so inventory falls monotonically from its opening 50
+whatever the world does. It reaches its floor around day 120 of a 252-day
+run and stays there. The inventory pressure term is `(40 - inventory) *
+0.08`, so at the floor it saturates at a standing push of `+3.2` a day on
+the price, which oil's own mean reversion of 0.03 a day cannot hold. Oil
+pins at its 150 clamp, and everything downstream follows.
+
+So the one-way rate path lives in a supply term at zero, four steps
+upstream. The yield is the last link in that chain.
+
+`oil_supply_response` answers demand with supply. At 0.0, which is every
+preset before pt-v18 and what the reference implementation does, the branch
+is not taken and the trajectory is bit-identical. At 1.0 supply matches
+demand in expectation, `inventory_change` is the noise term alone, and
+inventory is a driftless random walk. That value is derived rather than
+chosen: it is the stationarity condition of the process, read off the
+process, using the coefficient already there. The pressure term is already
+two-sided, pushing up below 40 and down above 60, so a driftless inventory
+gives a two-sided oil price and a two-sided rate path without any of them
+being made two-sided by hand.
+
+Measured over five seeds, the corporate bond yield is monotone on 1 of 5
+where it was monotone on 4 of 5, and its rise over the year falls from
++0.0200 to +0.0133. Over thirty seeds the annualised index drift, in the log
+convention, improves from -11.347 to -9.865, a paired +1.178 by median and
++1.294 by mean, and every one of the thirty improves.
+
+**That is a third of what the rate path is worth, and the rest is still
+there.** The investigation prices the whole rate path at 3.805 points. Oil
+still reaches 145.8 by day 251 and inflation still rises monotonically on
+every seed, so answering demand with supply removed one driver and not the
+family. What remains has been localised rather than guessed at: the
+inventory walk is now driftless but wide enough to spend real time against
+its floor, and the inflation process itself carries several one-sided terms
+of its own, a wage-pressure floor at zero and a Phillips term that only
+pushes one way while unemployment falls to 2.5 per cent. Naming which of
+those dominates is the next measurement rather than this one's conclusion.
+
+**And it costs one row.** `leverage_effect` reads +0.0006 against a ceiling
+of 0.00, so the panel is 13 of 14 rather than 14 of 14. That row is the
+stated side channel of the downside tilt, and the investigation found it
+leaving the same band when the tilt was switched off entirely. The
+exceedance is 0.008 of the row's own across-seed noise, so it is a hair.
+The era is uncertified until the five steps are done, and the panel that
+counts is the one measured then.
+
+### The symmetrised OPEC rule
+
+The rule reacts to the oil price against an 80 target. Below it by more
+than 10 it cuts production with probability 0.6 and magnitude 3 to 6; above
+it by more than 10 it raises production with probability 0.5 and magnitude
+2 to 5. Expected `+2.700` against `-1.750`, so the cut is 1.54 times the
+increase and the rule pushes oil up on net. The two branches read as a pair
+that should mirror, and nothing in the code says the difference was
+intended.
+
+`oil_opec_symmetry` at 1.0 gives both sides one probability and one
+magnitude range, each the mean of the two the rule already carries:
+probability 0.55, magnitude 2.5 to 5.5. That is the one symmetric rule that
+preserves the total intervention the rule performs, so it removes the
+direction without choosing a side and without inventing a number. Expected
+impact is then equal and opposite, and zero on net. At 0.0, every preset
+before pt-v18, the original arithmetic runs in the original order and the
+same draws are consumed in the same places.
+
+**It is worth nothing on the drift.** It is corrected because it is wrong.
+The rule fires every 90 days, so its bias is about +0.95 of oil price per
+firing and under +3 across a year against a price that moves by 70. Over
+thirty seeds the index drift, in the log convention, moves from -9.865 to
+-9.871, a paired median of exactly 0.000. This is a correctness fix on a
+rule that was wrong. It has its own section so a reader can hold it apart
+from the terms that move the number.
+
+### The compensated market jump
+
+`jump_mean_market` is negative so that crashes are larger than rallies.
+That is a real property of index returns and a legitimate thing to want.
+But a jump arriving with probability `lambda` and mean `m` contributes
+`lambda * m` to the expected return every day whether it fires or not, so
+the skew came with a drift: -0.11769 per name per year at the day-zero
+intensity, and 2.6 percentage points of annual index level. The value was
+set once in the pt-v4 era by a search whose objective could not read a
+first moment, and inherited unchanged through eleven presets. The drift was
+never chosen, because nothing the search could read would have shown it.
+
+The obvious repair is to solve for a smaller mean that buys skew without
+the drift. No such value exists. For a compound Poisson jump the drift and
+the skew are both linear in the mean, so trading one against the other is a
+matter of degree and any answer would be a fitted constant.
+
+`jump_mean_compensated` subtracts `lambda * m` instead, which is the
+standard compensated-Poisson construction and makes the jump term a
+martingale. Because the compensator is a DETERMINISTIC offset it moves the
+first moment and leaves every central moment alone, so the skew and the fat
+tail survive at the mean the calibration chose. **The mean does not move at
+all.** The defect was a missing compensator, and the value stands.
+
+`lambda` is the conditional intensity, already scaled by the VIX coupling,
+so the compensator tracks the arrival rate. The investigation measured the
+realised drift at 1.084 times the day-zero closed form for exactly that
+reason, and a compensator on the day-zero rate would have left that 8 per
+cent behind. It shows: over thirty seeds the annualised index drift improves
+in the log convention from -9.871 to -7.145, a paired +2.799 by median,
+where switching the jump mean off entirely was measured at 2.621.
+
+The central moments hold, measured rather than asserted. Over six seeds the
+paired moves are -0.045 of skew, +0.066 of excess kurtosis and -0.170 of
+annualised volatility, the last two being 0.06 and 0.03 of their own
+across-seed noise. Every one of the thirty seeds improves and two of them
+now finish the year positive, which no arm of this model has done before.
+
+The panel returns to 14 of 14. The leverage effect, which sat 0.008 of its
+own seed noise outside its ceiling after the oil step, is back in band.
+
+**One thing this measurement says that the mechanism did not.** The pooled
+skew of this market is POSITIVE, at +0.12, both with the compensator and
+without it. The market jump's mean is the mechanism the model has for
+negative skew, and at the panel level the skew is the other way. That is
+recorded rather than acted on: it says the jump mean was not buying what it
+was described as buying, which is a question about the mechanism rather
+than about its drift.
+
+### The matched stop ladders
+
+Forced flow from resting stop orders runs both ways: stop-losses under
+longs on the way down, buy-stops over shorts on the way up. The two ladders
+expressing it did not match. The downside fired at a 2 per cent move and
+the upside at 3. The downside had four tiers and the upside three. At every
+matched size the downside was the larger: 0.008 against 0.006, 0.005
+against 0.004, 0.003 against 0.002, with a fourth downside tier of 0.001
+that had no partner. Every one of those was a bare literal with no
+parameter, so nothing could reach them and nothing recorded a reason for
+the difference. Over a symmetric distribution of daily returns a ladder
+that subtracts more than it adds is a drift.
+
+`cascade_symmetry` matches the threshold and the tier magnitudes at the
+mean of the two ladders: threshold 0.025, tiers 0.007, 0.0045, 0.0025 and
+0.0005. That is the construction the OPEC rule uses. It chooses neither
+side and preserves the pair's total intervention exactly, 0.029 across both
+ladders before and after.
+
+The GATES are untouched. A stop-loss sits under every long, so the downside
+carries no condition beyond its threshold; a buy-stop needs shorts to
+exist, so the upside keeps its short-interest gate. Those are finance
+rather than an accident, and matching them would have removed a real
+mechanism instead of an unchosen asymmetry.
+
+Over thirty seeds the annualised index drift, in the log convention,
+improves from -7.145 to -6.832, a paired +0.370 by median, and every one of
+the thirty improves. The investigation prices the whole squeeze-and-cascade
+block at 0.574, measured by switching it off; matching the ladders while
+keeping the gates recovers two thirds of that and leaves the mechanism in
+place.
+
+**This one is matched rather than derived, and the difference matters.**
+The tilt, the jump and the oil supply term each had a closed form or a
+stationarity condition behind them, so their values were read off the
+process. Odd symmetry in the return is the structural claim here. The mean
+of the two ladders is a rule for choosing numbers under that claim, and the
+process itself dictates none. Whether these literals should be parameters
+at all stays open for the era's owner to settle.
+
+The panel reads 13 of 14. The leverage effect is +0.0004 against a ceiling
+of 0.00, which is 0.005 of that row's own across-seed noise. It is the
+downside tilt's stated side channel and it has now crossed and re-crossed
+that ceiling twice within this era.
+
+### The valuation's growth term
+
+Price is `fair_value * exp(s)`, the mispricing is stationary around zero
+and `eps` is fixed when an instrument is built, so the only time variation
+in fair value was the discount rate. The expected log change of the index
+over any horizon was therefore zero in a stationary economy and negative
+in one whose yields rise. Returning the five unchosen first moments above
+leaves the index near zero, and a real equal-weight price index returns
+eight to nine per cent a year nominal.
+
+A premium placed in the mispricing process settles at a level. Under a
+constant drift per step the stationary mean solves `m = phi * m + c`, so
+the premium reaches `c / (1 - phi)` on the sixty-day half-life and grows
+no further. Simulated at three, six and nine per cent a year it gave
+levels of +0.010, +0.021 and +0.031 with third-year growth of zero.
+
+`earnings_nominal_growth` puts the term in fair value instead, from a
+quantity the economy already integrates. The macro chain compounds `gdp`
+and `cpi` on every day it advances, so `N = gdp * cpi` is nominal output,
+and at 1.0 the valuation reads `eps` and `book_value_per_share` multiplied
+by `N_t / N_0`, with `N_0` read at construction. Both fundamentals move,
+so the valuation stays homogeneous of degree one in nominal terms on the
+earnings path and on the book path alike. The ratio is exactly 1.0 on day
+zero, so the opening valuation and the initial mispricing taken from it
+hold still. At 0.0, which is every preset before pt-v18, the branch is not
+taken and the trajectory is bit-identical.
+
+The term states no rate of its own. It reads the level the economy
+reached, so the rate falls with growth and inflation wherever the cycle
+takes them, and it goes below zero when the two turn negative together.
+Measured over 1008 days on seed 1, where the cycle leaves expansion and
+the run ends in a trough, nominal output reaches a ratio of 1.0685, which
+is 1.67 per cent a year against the 4.342 a certified year delivers. So
+4.34 is a property of the opening expansion rather than of the model, and
+anyone quoting the term has to say over what window.
+
+The two figures bracket the model's own long-run number, and the cycle
+clock decides where inside them it falls. The business-cycle hazard draws
+a monthly scale once a day, so a phase change arrives about thirty times
+too often: 63 per cent of certified years opening in expansion see one
+against 3 per cent on the per-month reading. The 1.67 is therefore
+measured on a model that leaves expansion far more often than it should,
+and the true figure sits between the two and nearer the upper one. That
+makes the cycle correction worth more than its own row suggested, since
+it decides what this term delivers over any window longer than a year.
+
+The clock is the part of this that is easy to get wrong. The economy
+compounds on a 365-day year and advances once per market day, while the
+market trades 252 days and annualises by 252, so a certified year carries
+252/365 of every annual rate. Measured on the panel roster at 252 days
+over six seeds, nominal output grows a median of +4.353 per cent per
+trading year, with mean growth of 3.353 and mean inflation of 2.931 over
+the run, and `(3.353 + 2.931) * 252 / 365` is 4.339 against a measured
+mean of 4.340. A test states that as an identity against the rates a run
+held rather than as a value.
+
+Measured over thirty seeds on the panel roster at 252 days, in the log
+convention, which is the one every section above uses.
+
+| quantity | median | mean | min | max | sd |
+|---|---|---|---|---|---|
+| index drift before | -6.832 | -8.208 | -23.706 | +1.410 | 6.418 |
+| index drift after | -2.304 | -3.816 | -19.213 | +5.628 | 6.335 |
+| recovered, paired per seed | +4.383 | +4.392 | +3.996 | +5.165 | 0.200 |
+| nominal output integrated | +4.342 | +4.339 | +4.019 | +4.540 | 0.115 |
+| recovery less nominal | +0.013 | +0.053 | -0.166 | +0.911 | 0.189 |
+
+Every one of the thirty improves, and nine finish the year positive
+against two before. The last row is the claim: the term delivers the
+level the economy integrated and 0.013 of a point besides, with fifteen
+seeds either side of zero, so it reads the economy rather than adding
+anything of its own. In this row's own reporting convention, the
+daily-rebalanced portfolio, the same thirty seeds read a median of -0.340
+with thirteen above zero, against pt-v16's -16.150 with none.
+
+The trailing multiple stays far from the cycle's gate inside the window
+everything here is measured on. Over the same thirty seeds it reads a
+median of 21.547 at day 251, a maximum of 24.220, and crosses 28 on none
+of them.
+
+The certified panel does not move. Thirteen of fourteen rows are in band
+before and after, the largest paired median shift is 0.18 of that row's
+own across-seed noise, and the row outside is the leverage effect at
++0.0035 against a ceiling of exactly 0.00. Its paired median moves -0.0004
+under this step, which is toward the band, and its level sits at a
+twentieth of its own across-seed standard deviation of 0.0760 above a
+boundary drawn at zero. Seven of the ten panel seeds are above that
+boundary and three below. The reading is about a band placed at exactly
+zero rather than about this step.
+
+The earnings share of nominal output is held constant, and the model
+carries no quantity for that share, so 1.0 is the only setting read off
+the process rather than chosen. A real price index also earns a return
+above nominal output growth, through buybacks and the drift of that share,
+worth three to four points a year. This model has nothing to derive that
+from, so the gap is named here and left.
+
+The trailing market multiple reads the same restated earnings. The daily
+macro step computes a market-cap-weighted price over earnings, and the
+expansion hazard adds `min(0.1, (pe - 28) * 0.005)` a day above a multiple
+of 28, so a day-zero earnings figure divided into a price that grew with
+nominal output would report a multiple rising because the mechanism ran.
+
+What that is worth was measured on one trajectory rather than argued,
+since the restatement is a single factor across names and the multiple a
+day-zero denominator would give is the engine's own times the ratio on the
+same day. Over 1008 days on seed 1 the restated multiple ends at 30.214
+and crosses 28 on 32 days, for a summed hazard of 0.2536; the day-zero
+denominator gives 32.284, 42 days and 0.6344. Inside a certified year
+neither reaches the gate, because the multiple at day 251 is 21.671 at a
+ratio of 1.0448. So this part of the change is worth nothing over the
+window everything here is measured on and a third of the expansion hazard
+over four years. The second number is what it is in the change for.
+
+`N_0` is engine state and rides in the snapshot, so the state hash covers
+one more field and a ledger leaf taken on an earlier build of this release
+verifies against nothing taken now. Both ship in one release and no such
+leaf exists outside this repository. Adding a settable dial also changes
+the shape of every preset's coefficient vector, so both committed records
+gained the new name at its inert default and a new digest, through the
+mode that rewrites those two fields and refuses any moved coefficient. The
+determinism digest is unmoved and the default preset is untouched.
+
+### The oil seasonality dial
+
+The daily oil update multiplied the whole new price by
+`1 + 0.03 * sin(2 pi (day_of_year - 90) / 365)`. A shape applied to a level
+every day compounds, so what a window sees is the product of its factors:
+5.119 over the 252 game-days a certified year passes, and 0.921 over a full
+365. The shape is near neutral over its own period and the horizon slices
+it, taking 162 days of the up leg against 90 of the down. Summing the
+term's own contribution to each day's change over year one gives +365.80 of
+oil price against a net change of +72.10, so it pushed about five times
+harder than the price moved and the mean reversion of 0.03 a day absorbed
+the rest. Oil had no fixed point under it. It was a forced limit cycle with
+a 365-day period that sat on its 150.0 clamp from day 180 on every seed,
+and the inflation term, the meeting rule and the discount rate followed it
+there.
+
+`oil_seasonality_target` moves the shape onto the price the process reverts
+toward. At 1.0 the whole amplitude multiplies the target and the level's
+own factor is exactly 1.0, so the shape modulates where the price is pulled
+toward by plus or minus 3 per cent and integrates to +0.672 per cent of oil
+over a certified year. Between the ends the amplitude is split, `1 + g*a`
+on the target and `1 + (1-g)*a` on the level, so its total is conserved and
+only the point of application moves. The 0.03 is the amplitude the term
+already carried, and this dial is a share of it. At 0.0, which is every
+preset before pt-v18, the original arithmetic runs in its original order.
+
+What it is worth, over five seeds at 252 days on the panel roster, paired
+on the seed so the roster's own opening level cancels. The index gains
++1.303 points a year at the median in the log convention and +1.293 as a
+portfolio, on 5 of 5 seeds, in a range of +1.105 to +1.914. The convention
+gap moves -0.009, so both conventions carry the same gain and the move is
+in the closes. All of it arrives through the discount rate, which is the
+route the mechanism predicts: the fair value channel carries +1.263 on
+every seed and the mispricing channel +0.021 with the seeds split.
+Inflation at day 251 falls 1.055 points and the corporate bond yield 0.795,
+each on 5 of 5.
+
+Oil stops reaching its clamp. Days spent at the 150.0 ceiling fall from a
+median of 69 to zero on every seed, and the highest price any seed reaches
+is 108.6 where the arm without the dial reaches 150.0. That is the plainest
+statement of the defect being gone. The day-251 median is 93.1, against the
+86.7 the seasonal term's own arithmetic predicts on a target near 85, and
+the difference is the inventory pressure, the dollar drag and the OPEC
+rule, which the compounding factor used to dominate.
+
+The certified panel moves, and the row that moves it does not resolve. Over
+seeds 101 to 110 the arm without the dial reads 13 of 14 and the arm with
+it 14 of 14, while pt-v18 as it ships, carrying the cycle dial as well,
+reads 13 of 14 again. One row decides all three. The leverage effect has a
+ceiling of exactly 0.00 and reads +0.0035, -0.0005 and +0.0038 across
+those arms, on an across-seed noise of 0.0760 and a per-seed spread of
+0.029 at ten seeds, with between five and seven of the ten seeds above the
+ceiling in every arm. The whole excursion is 0.004, a twentieth of the
+row's own noise. That row has sat outside its band since the oil supply
+commit, and these figures say it straddles a ceiling at a resolution ten
+seeds cannot settle.
+
+The thirty-seed distribution and the four-year arm are measured elsewhere,
+because neither runs on one machine.
+
+### The cycle hazard's monthly scale
+
+`weibull_hazard` returns `(shape / scale) * pow(months / scale, shape - 1)`,
+and every scale in `cycle_hazard_params` is in months: 36 for an expansion,
+6 for a peak, 12 for a contraction. A hazard whose scale is in months is a
+rate per month, and `check_cycle_transition` compared it against a uniform
+once a day, so the cycle ran about thirty times too fast. A full cycle took
+2.6 trading years where the same constants read per month give 9.7, and a
+252-day run opening at the start of an expansion left it 63 per cent of the
+time against 3.
+
+`cycle_hazard_per_month` reads the scale on the clock it was written in.
+`months_in_current_phase` advances by 1/30 a day, so the month this model
+keeps is 30 days and the divisor is read off the engine's own clock. At
+0.0, which is every preset before pt-v18 and what the reference
+implementation does, the branch is not taken. At 1.0 the daily probability
+is the monthly rate divided by 30 to the last bit.
+
+The conversion is applied after the condition ladder and after the clamp,
+because every operand before it is a rate per month: the hazard's own cap
+of 0.8, the ladder's additions of 0.1 and 0.15 for inflation, policy and an
+inverted curve, and the clamp at 0.3. Converting earlier would leave the
+ladder as a daily probability against a base hazard near 0.0004 a day, so
+an inverted curve would raise the transition rate by 250 times where it now
+triples it. The 9.7 years above assumes this placement. Dividing before the
+clamp gives 9.59 instead, and the whole of that difference sits in the two
+short phases.
+
+So the 0.3 clamp becomes a cap on a monthly rate and the largest daily
+probability is 0.01. On the hazard alone it binds for a peak past month
+5.40 and a trough past month 2.57 and nowhere else, since an expansion
+reaches it at month 338, a recovery at month 358, and a contraction's
+hazard falls with duration. It shapes the mean peak from 183 days to 171
+and the mean trough from 159 to 138.
+
+Counted over thirty seeds at 1008 days, the clamp binds on 527 of 2082
+peak rolls and 153 of 203 trough rolls on the hazard alone, against none
+of either drawn per day, and on none of 18352 expansion or 1495
+contraction rolls under either reading. A certified year reaches no trough
+at all and records 0 of 2121 rolls clamped.
+
+With the ladder a trough differs, and it differed before this dial
+existed. A trough adds 0.1 for a policy rate under 3.0 and 0.05 for
+unemployment over 8.0 against a hazard of 0.265 at its two-month minimum,
+so the clamp binds on its first eligible roll under either reading, at 203
+of 203 read per month and 97 of 97 drawn per day. The clamp was already
+doing work in a trough, and what changed is that phases now last long
+enough to reach one.
+
+Inside one year the correction is worth nothing. Over thirty seeds at 252
+days the paired median is +0.000 with a mean of +0.205, fourteen seeds up,
+five down and eleven bit-identical, and the eleven are exactly the eleven
+that never left an expansion under the fast clock. The two sets are equal
+seed for seed. What moves is the phase: seeds leaving
+expansion by day 251 fall from 19 of 30 to 1 of 30, and the mean days in
+expansion rise from 226.2 to 250.7.
+
+Beyond a year the clock decides how much of a study sits outside an
+expansion, and four years show it. The spread between the best and worst
+year's median drift falls from 12.252 points to 5.142 over thirty seeds at
+1008 days. What remains is the run's own shape: year one carries the
+roster's opening level decaying against the growth term, years two and
+three run at +3.6 and +3.3, and year four falls back to +0.6 as the first
+contractions arrive.
+
+The phase lengths quoted above are the hazard alone. The condition ladder
+adds to it, so each bounds a phase's length from above. A contraction is
+where that bites: its four conditions sum to 0.25 against a
+base hazard of 0.081 at month four, so a deep contraction runs 7.7 months
+where a mild one runs 23. The ratio of thirty is unaffected, since both
+readings exclude the ladder equally.
+
+Two entry points changed shape. `check_cycle_transition` and
+`get_cycle_transition_probability` each take the dial, so a caller states
+which reading it wants instead of inheriting one. Every caller outside the
+engine passes 0.0, which is the reference implementation's reading, and the
+economy parity vectors reproduce bit for bit against it.
+
+### The valuation's neutral rate
+
+`compute_target_pe` compresses a multiple by
+`(discount - neutral) * RATE_PE_SENSITIVITY * duration`, so a name sits on
+its sector anchor exactly when the discount rate equals the neutral point.
+That point was the constant 0.04. The economy opens at a corporate bond
+yield of 4.56 per cent and settles at 4.82, and it never visits 4.00, so
+every profitable name opened about one per cent below the price the
+generator drew for it and the market spent the year unwinding that on a
+60-day half-life.
+
+`neutral_discount_rate` is that point, settable, at 0.04 for every preset
+before pt-v18 and 0.0456 for pt-v18. The value is read off the process
+rather than chosen: the rate that zeroes the day-zero term is the yield
+the economy opens at.
+
+The generator is untouched. The multiple
+this rate anchors is the same sector anchor the generator draws its
+multiples around, so the two stay consistent under any neutral rate and a
+roster opens at fair value whenever the engine's discount rate equals it.
+The constant is read by no line of the generator's code. Its reconciliation
+test now runs at three neutral points and asserts the day-zero mean is
+bit-identical across them, which is the claim itself: at a discount rate
+equal to the neutral point the rate adjustment is exactly 1.0 whatever that
+point is.
+
+The name was promoted from the carried read-only surface rather than added
+beside it. `to_pairs` merges that surface with the settable one and sorts,
+so a name moving between them leaves every preset's pairs, fingerprint and
+coefficient digest untouched wherever its value has not moved. Both
+committed preset records are therefore byte for byte as they were, and the
+record test passes without re-recording. A second name would have put two
+entries for one quantity in every record, with `neutral_discount_rate`
+reading 0.04 about an engine using 0.0456.
+
+`tradefloor.fair_value` takes the rate as an optional keyword, absent
+meaning the old constant. A caller recomputing a run's fair value passes
+that run's own value, because a helper holding the old constant while the
+engine moved would disagree with the market it describes and the
+disagreement would read as a print residual.
+
+What it is worth, over five seeds at 252 days on the panel roster, paired
+on the seed. The index gains +0.965 points a year at the median in the log
+convention and +0.965 as a portfolio, on 5 of 5 seeds, in a range of +0.937
+to +1.015. The whole of it is the mispricing channel at +0.965, with the
+fair value channel at -0.005 and the seeds split. What moves is the level
+the market opens at, and the discount path it travels afterwards stays
+where it was. The oil price, the phase and the macro path are
+bit-identical on every seed.
+
+The day-zero level falls by 0.00968 on all five seeds, identically, because
+it is a property of the roster and the valuation and not of the market
+seed. A prediction registered beforehand said 0.0100 to 0.0115 and this
+misses it low. The reason is structural rather than noise: 0.0107 is the
+figure for a name valued on its earnings, and 3 of the 40 names on this
+roster are valued on their book, where the multiple and this rate reach
+nothing. Scaling by the 92.5 per cent that are on the earnings path
+predicts 0.00990, and the remaining 0.00022 is the duration multiplier
+varying from name to name.
+
+The certified panel holds at 13 of 14 over seeds 101 to 110, with the
+leverage effect the only row out at +0.0014 against a ceiling of exactly
+0.00, where the arm without the dial reads +0.0038. That row straddles its
+ceiling across every arm in this era and ten seeds cannot settle it. The
+panel's own drift row, a portfolio return, reads +2.259 against +1.303.
+
+### The economy's opening state
+
+The economy opened at unemployment 4.00, inflation 2.00 and a corporate
+bond yield of 4.56, and its own dynamics reach 2.50, 2.74 and 4.82. So
+every certified year was measured on a window in which nothing had
+settled, and the travel compressed the multiple one way.
+
+`macro_burn_in_days` advances the economy alone before day zero, at 0 for
+every preset before pt-v18 and 755 for pt-v18. The length is measured
+rather than round: 755 is the day the last field the valuation reads
+enters one stationary standard deviation of its mean and stays there.
+Unemployment takes 119 days, inflation 419 and the ten-year 705.
+
+Three things it does deliberately. The draws come from the economy's own
+substream, so the market's day-zero draws sit where they did, and a
+burn-in consumes economy draws by running the economy. The phase is held
+for the burn-in's length, by restoring both the phase and its age whenever
+a transition fires; restoring the phase alone leaves the age at zero,
+which fires the phase-change shock the next day and lifts growth half a
+point above its target for the rest of the run. The clock is reset at the
+end, so the year still opens at the start of a phase.
+
+The growth term's base is re-read at the end. `gdp` and `cpi` compound on
+all 755 days, so a base left at its pre-burn-in value would open every
+valuation about nine per cent above its own earnings.
+
+What it is worth, five seeds at 252 days paired on the seed, against the
+neutral rate alone. The fair value channel gains +0.942, on 5 of 5 seeds,
+which is the economy sitting still while the year is measured. The whole
+arm gains +0.363 points a year at the median.
+
+The two rows do not compose, and the reason is oil. The neutral rate is
+exact for a year that opens at 4.56, because every seed opens there. With
+the burn-in the economy opens at a corporate yield of 5.236 at the median
+over twelve seeds, with a spread of 4.828 to 5.960, because oil still has
+no resting point: it opens between its own 35.0 floor and 120.8, at a
+standard deviation of 22.7. So no single neutral rate zeroes the day-zero
+term on every seed. 0.0482 is the corner an arm with oil pinned at 75.0
+reaches, and this engine rests half a point above it.
+
+The residual is named instead of fitted. At 0.0482 the mispricing channel
+reads -0.351 on 5 of 5 seeds, which is that unclosed gap measured. The
+value that would zero it at the median seed is near 0.0510 and is worth
+about 0.7 points more. That value is the median of a distribution, so it
+would be a fitted constant, and oil's resting point is what would make it
+derivable.
+
+### The commit the measurements name
+
+Every figure in the section above was measured on a build of a commit
+that is no longer reachable from this branch. The two commits that carry
+the growth term and the convention change were pushed, the second was
+then amended to rewrap five paragraphs, and the branch was force-pushed,
+which orphaned the commit the sweep had already stamped into its output
+files.
+
+The tree is unaffected. The amended commit differs from the orphaned one
+in CHANGELOG.md prose alone, so the build the numbers came from is the
+build this branch carries. What was lost is the ability to resolve the
+SHA those files name, and resolving it is the whole use of a citation.
+
+So the SHA to cite for every figure here is this branch's second commit,
+and the orphaned one should be read as an earlier spelling of the same
+tree. The rule that produced this is worth keeping: a branch whose
+commits are stamped into measurement output is a branch that is never
+rewritten, and prose is not an exception to that.
+
+### The index convention
+
+`index_drift_pct` reported the mean across names of the daily log return.
+An equal-weight index is a portfolio rebalanced to equal weights every
+day, so its daily return is the mean of the SIMPLE returns, and the row
+now reports that. The two are different quantities and the row is graded,
+when a band for it exists, against a published index return, which is a
+portfolio return.
+
+The decompositions keep the log convention, and they have to. Log returns
+are additive across time and across the terms of an identity, so a
+contribution table that sums to a move can be written in them and cannot be
+written in a portfolio return. Every attribution this engine reports is in
+log returns, and so is every figure in the sections above.
+
+The two differ by half the cross-sectional variance of the daily returns,
+which is positive wherever the names disperse at all. On the panel roster
+at 252 days it was measured at 1.910 points a year with a standard
+deviation of 0.190 over eight seeds, so a figure quoted without its
+convention is wrong by about two points of annual index level. A test
+rebuilds the portfolio from the bars, compounding a notional level day by
+day, and asserts the row is its annualised log growth; a second assertion
+puts the gap against half the cross-sectional variance, so the difference
+is the term it should be rather than an error in either.
+
+Both conventions are named wherever a figure appears: in the row's own
+docstring, in this file's sections above, and in the reason
+`facts.REPORTING_ONLY` carries and `facts.report` prints beside the
+number.
+
+### The protocol behind every figure
+
+Two seeds decide a run, and every figure in the sections above was
+measured with one of them held. The market seed drives every draw the
+engine takes; the universe seed decides the roster it takes them against.
+Each arm above varied the market seed over 1 to 30 on `Universe.random(40,
+seed=111)` held fixed.
+
+That roster opens 0.78 of a population standard deviation above fair
+value, so its LEVEL carries a draw as well as a model: one build reads
+-8.603 on it against +3.989 and +7.050 on rosters 204 and 209. Those three
+across-roster figures come from the era's roster sweep rather than from
+any arm here, and the design note carries them with the roster's +0.038
+mean log deviation, the population mean of -0.002 and the across-roster
+standard deviation of 0.052 that the 0.78 is computed from.
+
+A paired difference between two arms on the held roster is a property of
+the model, because the roster's own draw is common to both and cancels. A
+level is a property of that roster, and a level that has to describe the
+model is measured by varying the universe seed instead.
+
+How much that costs is measured. A roster sweep puts roster 111 at 1.12
+standard deviations dearer than the population at the open, and index
+drift moves at about minus a hundred points per unit of opening
+mispricing, so this roster carries a handicap near six points a year.
+Across a hundred rosters the preset this branch started from reads a
+portfolio median of +1.55 a year with 65 of 101 rosters above zero, where
+roster 111 reads about minus five. So every level in this section is that
+roster's and reads about six points worse than the model does, while
+every paired recovery is the model's. The design note holds an earlier and
+smaller sample that puts the same roster at 0.78 standard deviations, and
+the two have not been reconciled.
+
+The paragraph is in the row's docstring as well, since that is where a
+reader meets the number.
+
+### The index drift row
+
+`facts.panel_statistics` reports `index_drift_pct`, the annualised drift
+of the equal-weight index over the measured window. It is the panel's only
+first moment. The other fourteen statistics are shape
+measurements, and a market can hold every one of them in band while
+losing a fifth of its value in a year: nine are exactly invariant to a
+constant drift added to every name because they centre their arguments
+before measuring them, and the five built on an absolute return move by
+less than a tenth of their own across-seed noise. A test states that,
+adding a known drift to a recorded run and asserting the new row moves by
+exactly the amount added while no graded row moves by a quarter of its
+noise.
+
+It carries no real-market band, so it earns no verdict, cannot pass,
+cannot fail, and `envelope.score` refuses it as an unknown statistic. That
+is a gap held open on purpose. The fourteen graded bands were each derived
+from a real reference panel at this module's own estimators; a first-moment
+band would have to be derived from a real index over a matched window, and
+that work has not been done here. Shipping a plausible-looking band instead
+would grade every future preset against a number nobody measured, which is
+the unprovenanced-band defect this module already corrected once. The
+reason is carried as data in `facts.REPORTING_ONLY` and printed by
+`facts.report` beside the number, rather than retyped into prose that can
+drift from it.
+
+Two method choices are worth naming, because each is the difference
+between this row and a flattering one. Every name counts, including one
+too short-lived for the shape rows, since dropping it is survivorship bias
+on exactly the quantity being measured. And a gap in a name's bars is
+spanned rather than dropped, so the sum over the window is exact.
 
 ### The explanation tree
 

@@ -174,6 +174,7 @@ pub fn compute_target_pe(
     economy: &EconomyValuationInputs,
     qe_gain: f64,
     qe_stock_gain: f64,
+    neutral_rate: f64,
 ) -> TargetPe {
     let sector_anchor_pe = sector_anchor_pe(company.sector_avg_pe);
     let discount = discount_rate(economy);
@@ -185,7 +186,7 @@ pub fn compute_target_pe(
 
     let rate_adjustment = mathx::max(
         RATE_ADJUSTMENT_FLOOR,
-        1.0 - (discount - NEUTRAL_DISCOUNT_RATE) * RATE_PE_SENSITIVITY * duration_multiplier,
+        1.0 - (discount - neutral_rate) * RATE_PE_SENSITIVITY * duration_multiplier,
     );
 
     // `qe_pe_gain` is 1.0 on every preset before it, so this is bit-inert
@@ -213,7 +214,7 @@ pub fn compute_fair_value(
     company: &CompanyValuationInputs,
     economy: &EconomyValuationInputs,
 ) -> FairValueBreakdown {
-    compute_fair_value_with(company, economy, 0.0, 1.0, 0.0)
+    compute_fair_value_with(company, economy, 0.0, 1.0, 0.0, NEUTRAL_DISCOUNT_RATE)
 }
 
 /// [`compute_fair_value`] with the book floor extended to profitable companies.
@@ -247,22 +248,30 @@ pub fn compute_fair_value(
 ///
 /// # Why it is off by default
 ///
-/// It is not a small correction. 42.8% of instruments from `Universe.random`
-/// have `eps * pe` BELOW `book * LOSS_MAKING_PRICE_TO_BOOK`, some at a fifth of
+/// It is not a small correction. 46.7% of instruments from
+/// `Universe.random(4000, seed=7)` have `eps * pe` BELOW
+/// `book * LOSS_MAKING_PRICE_TO_BOOK`, some at a fifth of
 /// it, so switching it on re-values a large part of a typical universe and
 /// re-bases every calibrated statistic. Adopting it is an era boundary and a
 /// recalibration, not a bug fix, and it ships inert until that work is done.
+///
+/// That figure was 42.8% before the universe generator reconciled a drawn
+/// roster to its own fair value, and it named no roster to be re-measured
+/// on. It is measured here on the opening macro state at the commit that
+/// reconciled the generator; a single 40-name roster reads a long way from
+/// it either side, so the large draw is the one to quote.
 pub fn compute_fair_value_with(
     company: &CompanyValuationInputs,
     economy: &EconomyValuationInputs,
     book_floor: f64,
     qe_gain: f64,
     qe_stock_gain: f64,
+    neutral_rate: f64,
 ) -> FairValueBreakdown {
     let eps = company.eps.unwrap_or(0.0);
 
     if eps > 0.0 {
-        let pe = compute_target_pe(company, economy, qe_gain, qe_stock_gain);
+        let pe = compute_target_pe(company, economy, qe_gain, qe_stock_gain, neutral_rate);
         // The floor is a BRANCH at zero, not arithmetic, for the same reason
         // `market_vol_slow_weight` is: every preset before this parameter
         // existed must reproduce bit for bit, and that is the only spelling
@@ -361,14 +370,14 @@ mod tests {
         // 1.0 is what every preset before the dial carried, and the whole
         // channel is `1 + gain * boost`, so this must be bit-identical to
         // the arithmetic it replaced.
-        let shipped = compute_target_pe(&c, &e, 1.0, 0.0);
+        let shipped = compute_target_pe(&c, &e, 1.0, 0.0, NEUTRAL_DISCOUNT_RATE);
         assert_eq!(shipped.qe_adjustment.to_bits(), (1.20f64).to_bits());
 
         // Half the gain is half the boost.
-        assert_eq!(compute_target_pe(&c, &e, 0.5, 0.0).qe_adjustment.to_bits(),
+        assert_eq!(compute_target_pe(&c, &e, 0.5, 0.0, NEUTRAL_DISCOUNT_RATE).qe_adjustment.to_bits(),
                    (1.10f64).to_bits());
         // Zero removes the channel without removing the valuation.
-        let off = compute_target_pe(&c, &e, 0.0, 0.0);
+        let off = compute_target_pe(&c, &e, 0.0, 0.0, NEUTRAL_DISCOUNT_RATE);
         assert_eq!(off.qe_adjustment.to_bits(), (1.0f64).to_bits());
         assert!(off.target_pe > 0.0);
     }
@@ -384,15 +393,15 @@ mod tests {
         let c = co(Some(20.0), Some(4.0), None, Some(0.1));
 
         // gain 0.0: the ratio cannot matter, to the bit
-        let off_base = compute_target_pe(&c, &base, 1.0, 0.0);
-        let off_high = compute_target_pe(&c, &high, 1.0, 0.0);
+        let off_base = compute_target_pe(&c, &base, 1.0, 0.0, NEUTRAL_DISCOUNT_RATE);
+        let off_high = compute_target_pe(&c, &high, 1.0, 0.0, NEUTRAL_DISCOUNT_RATE);
         assert_eq!(off_base.qe_adjustment.to_bits(), off_high.qe_adjustment.to_bits());
 
         // neutral ratio: no contribution at any gain
         let mut neutral = base.clone();
         neutral.qe_assets_ratio = Some(1.0);
         assert_eq!(
-            compute_target_pe(&c, &neutral, 1.0, 0.13).qe_adjustment.to_bits(),
+            compute_target_pe(&c, &neutral, 1.0, 0.13, NEUTRAL_DISCOUNT_RATE).qe_adjustment.to_bits(),
             off_base.qe_adjustment.to_bits(),
         );
 
@@ -402,7 +411,7 @@ mod tests {
         let term = |r: f64| {
             let mut e = base.clone();
             e.qe_assets_ratio = Some(r);
-            compute_target_pe(&c, &e, 1.0, 0.13).qe_adjustment
+            compute_target_pe(&c, &e, 1.0, 0.13, NEUTRAL_DISCOUNT_RATE).qe_adjustment
         };
         let d1 = term(2.0) - term(1.0);
         let d2 = term(3.0) - term(2.0);
@@ -416,12 +425,14 @@ mod tests {
             &econ(Some(10.0), 3.5, None),
             1.0,
             0.0,
+            NEUTRAL_DISCOUNT_RATE,
         );
         let flat = compute_target_pe(
             &co(Some(20.0), Some(1.0), None, Some(0.0)),
             &econ(Some(10.0), 3.5, None),
             1.0,
             0.0,
+            NEUTRAL_DISCOUNT_RATE,
         );
         assert_eq!(
             shrinking.rate_adjustment.to_bits(),
@@ -436,6 +447,7 @@ mod tests {
             &econ(Some(40.0), 3.5, None),
             1.0,
             0.0,
+            NEUTRAL_DISCOUNT_RATE,
         );
         assert_eq!(extreme.rate_adjustment, RATE_ADJUSTMENT_FLOOR);
     }

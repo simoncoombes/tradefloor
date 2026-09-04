@@ -8,8 +8,11 @@ const require = createRequire(import.meta.url);
 const dir = process.argv[2] ?? 'dist/wasm';
 const pt = require(`${process.cwd()}/${dir}/tradefloor.js`);
 
-// The case pinned in tests/test_wasm_parity.py.
-const EXPECTED = '2b2f314181bde90a9ccabbc8232b03cba2e04221bee85501ffc78ae042cfd8f5';
+// The case pinned in tests/test_wasm_parity.py. Re-recorded when the
+// universe generator was reconciled, which re-drew the roster the case
+// runs on, and checked through this script on wasm32-unknown-unknown
+// against the native value: identical.
+const EXPECTED = '1c5acabf07692228c840518b51240abe0e379fdd5272b9a4575206e8f93159ea';
 const got = pt.priceDigest(12, 7, 3, 5, 65, 'pt-v3');
 
 console.log(`  tradefloor ${pt.version()}`);

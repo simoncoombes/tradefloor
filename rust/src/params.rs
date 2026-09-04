@@ -550,6 +550,376 @@ pub struct ModelParams {
     /// its structure) is the measured motivation: real down-moves
     /// continue, and the contemporaneous wire alone cannot express that.
     pub market_beta_down_asym_lag: f64,
+    /// How much of the first moment `market_beta_down_asym` injects is
+    /// given back. 0.0 -- every preset before pt-v18 -- is bit-identical.
+    /// 1.0 returns the whole of it.
+    ///
+    /// # Why the tilt injects a first moment at all
+    ///
+    /// It scales one side of a zero-mean draw. Scaling only the down ticks
+    /// of a symmetric factor moves its mean, and a mean in the price
+    /// process is a drift: `E[f 1{f<0}]` for `f ~ N(0, s^2)` is
+    /// `-s / sqrt(2 pi)`, so the tilt adds `a * beta * -s / sqrt(2 pi)` to
+    /// every name every tick. Nobody chose that; it is the by-product of a
+    /// correlation mechanism, and it cost the equal-weight index 7.9
+    /// percentage points a year at pt-v16.
+    ///
+    /// # What is given back, exactly
+    ///
+    /// `this * a * beta * s / sqrt(2 pi)`, where `s` is the CONDITIONAL
+    /// per-tick sigma the factor was actually drawn with rather than
+    /// `market_factor_sigma`. Every quantity in it is known exactly at the
+    /// point it is applied, so the correction is arithmetic and not an
+    /// estimate, and it cannot be defeated by the factor's variance
+    /// process, its VIX coupling or a scenario that pins VIX: a hotter
+    /// tick injects more and gives back more, in the same ratio.
+    ///
+    /// `beta` is per name because it is not a correction but the algebra of
+    /// the line being corrected -- the injection into name `i` IS `beta_i`
+    /// times the form. Using 1.0 instead would leave a residual
+    /// proportional to `beta_i - 1`, which is a cross-sectional bias as
+    /// well as a mean one.
+    ///
+    /// # What is NOT given back, deliberately
+    ///
+    /// The crash amplifier. It multiplies the market channel above a
+    /// threshold in baseline sigmas, and it is exactly the tail the tilt
+    /// scales, so the true injected mean is the form above times
+    /// `E[f 1{f<0} A] / E[f 1{f<0}]`. That ratio has no closed form. It
+    /// was measured at 1.00 to 1.38 across conditional sigmas and sits
+    /// near 1.01 at the sigmas that occur, so correcting it would mean
+    /// either a new bit-pinned transcendental or a fitted constant, and a
+    /// fitted constant is the thing this project calls tuning rather than
+    /// fixing. The residual is therefore known, signed and about one per
+    /// cent of the term, and it is left rather than approximated.
+    ///
+    /// The offset is applied AFTER the amplifier for the same reason. An
+    /// offset added before it would itself be amplified, delivering the
+    /// form times `E[A]` rather than the form.
+    pub market_beta_down_asym_recentre: f64,
+    /// How much of oil DEMAND is answered by supply on the daily step.
+    /// 0.0 -- every preset before pt-v18 -- is bit-identical, and it is what
+    /// the reference implementation does.
+    ///
+    /// # The zero nobody chose
+    ///
+    /// `update_economy_daily` draws inventory down by
+    /// `gdp_growth * 0.15` every day and replenishes it by a hardcoded
+    /// `oil_supply_factor = 0.0`. Inventory therefore falls monotonically
+    /// from its opening 50 whatever the world does, reaches its floor
+    /// around day 120 of a 252-day run, and stays there. The inventory
+    /// pressure term is `(40 - inventory) * 0.08`, so at the floor it
+    /// saturates at a standing `+3.2` a day on the oil price, which oil's
+    /// own mean reversion of 0.03 a day cannot hold. Oil then pins at its
+    /// 150 clamp, and from there the chain is mechanical: oil raises
+    /// inflation, inflation makes the central bank hike, the hike raises
+    /// the ten-year and the corporate yield, the higher discount rate
+    /// compresses every target multiple, and every price falls.
+    ///
+    /// That is the whole of the one-way rate path. It is not a rate
+    /// mechanism at all; it is a supply term left at zero.
+    ///
+    /// # Why 1.0 is derived and not fitted
+    ///
+    /// At 1.0 supply equals demand in expectation, so `inventory_change`
+    /// is the noise term alone and inventory is driftless. That is the
+    /// stationarity condition of the inventory process, read off the
+    /// process itself, and the `0.15` it uses is the coefficient already
+    /// there. Nothing here is tuned to a target: the value that makes a
+    /// random walk driftless is not a matter of degree.
+    ///
+    /// The pressure term is already two-sided, pushing up below 40 and
+    /// down above 60, so a driftless inventory gives a two-sided oil price
+    /// and a two-sided rate path without any of them being made two-sided
+    /// by hand.
+    pub oil_supply_response: f64,
+    /// Removes the direction from the OPEC rule while keeping its size.
+    /// 0.0 -- every preset before pt-v18 -- is bit-identical.
+    ///
+    /// # The asymmetry nobody chose
+    ///
+    /// The rule reacts to the oil price against an 80 target. Below it by
+    /// more than 10 it cuts production with probability 0.6 and magnitude
+    /// 3 to 6; above it by more than 10 it raises production with
+    /// probability 0.5 and magnitude 2 to 5. Expected `+2.700` against
+    /// `-1.750`, so the cut is 1.54 times the increase and the rule pushes
+    /// the oil price up on net. Nothing in the code says that was intended
+    /// and the two branches read as a pair that should mirror.
+    ///
+    /// # Symmetrised rather than picked
+    ///
+    /// At 1.0 both branches use one probability and one magnitude range,
+    /// each the mean of the two the rule already carries: probability
+    /// 0.55, magnitude 2.5 to 5.5. That is the unique symmetric rule which
+    /// preserves the total intervention the rule performs, so it removes
+    /// the direction without choosing a side and without inventing a
+    /// number. Expected impact is then equal and opposite either side of
+    /// the target, and zero on net.
+    ///
+    /// It is worth about +0.95 of oil price per firing and the rule fires
+    /// every 90 days, so this is a small term. It is corrected because it
+    /// is wrong rather than because it is large.
+    pub oil_opec_symmetry: f64,
+    /// Where oil's seasonal shape acts: on the price the process reverts
+    /// toward, or on the price level itself. 0.0 -- every preset before
+    /// pt-v18 -- is bit-identical.
+    ///
+    /// # A shape applied to a level compounds
+    ///
+    /// The daily step multiplies the whole new oil price by
+    /// `1 + 0.03 * sin(2 pi (day_of_year - 90) / 365)`. Applied to a level
+    /// every day the factors multiply, so what a window sees is their
+    /// product: 5.119 over the 252 game-days a certified year passes, and
+    /// 0.921 over a full 365. The shape is near neutral over its own
+    /// period and the horizon slices it asymmetrically, taking 162 days of
+    /// the up leg against 90 of the down.
+    ///
+    /// Summing the term's own contribution to each day's change over year
+    /// one gives +365.80 of oil price against a net change of +72.10, so it
+    /// pushes about five times harder than the price moves and the mean
+    /// reversion of 0.03 a day absorbs the rest. Oil has no fixed point
+    /// under it. It is a forced limit cycle with a 365-day period that sits
+    /// on its 150.0 clamp from day 180 on every seed, and the inflation
+    /// term, the meeting rule and the discount rate follow it there.
+    ///
+    /// # The target rather than the level, at the same amplitude
+    ///
+    /// At 1.0 the whole amplitude multiplies the reversion target and none
+    /// of it multiplies the level, so the shape modulates where the price
+    /// is pulled toward by plus or minus 3 per cent and integrates to
+    /// +0.672 per cent of oil over a certified year. The amplitude is the
+    /// 0.03 the term already carries and this dial is a share of it, so
+    /// what changes is where a shape acts rather than how large it is.
+    /// Nothing here is fitted: a seasonal shape has to be neutral over the
+    /// WINDOW as well as over its own period, and moving it off the level
+    /// is what makes that possible without touching its size.
+    ///
+    /// Between the ends the amplitude is split, `1 + g * a` on the target
+    /// and `1 + (1 - g) * a` on the level, so the total is conserved and
+    /// past 1.0 the level would carry the shape inverted.
+    pub oil_seasonality_target: f64,
+    /// The clock the business cycle's hazard is read on. 0.0 -- every
+    /// preset before pt-v18 -- is bit-identical.
+    ///
+    /// # A rate per month drawn once a day
+    ///
+    /// `weibull_hazard` returns `(shape / scale) * pow(months / scale,
+    /// shape - 1)`, and every scale in `cycle_hazard_params` is in months:
+    /// 36 for an expansion, 6 for a peak, 12 for a contraction. A hazard
+    /// whose scale is in months is a rate per month, and
+    /// `check_cycle_transition` compares it against a uniform once a day,
+    /// so the cycle runs about thirty times too fast. A full cycle takes
+    /// 2.6 trading years where the same constants read per month give 9.7,
+    /// and a 252-day run opening at the start of an expansion leaves it 63
+    /// per cent of the time against 3.
+    ///
+    /// Both figures are the hazard alone. The condition ladder below adds
+    /// to it and never subtracts except through the expansion guard, so
+    /// each is an upper bound on a phase's length rather than its length.
+    /// A contraction is where that bites: the ladder's four conditions sum
+    /// to 0.25 against a base hazard of 0.081 at month four, so a deep one
+    /// runs 7.7 months where a mild one runs 23. The ratio of thirty is
+    /// unaffected, since both readings exclude the ladder equally, and the
+    /// ladder is scaled with the base rather than beside it, because the
+    /// conversion below is applied after it.
+    ///
+    /// `months_in_current_phase` advances by exactly `1/30` a day, so the
+    /// month this model keeps is 30 days and the divisor is read off the
+    /// engine's own clock rather than chosen. At 1.0 the daily probability
+    /// is the monthly rate divided by 30 to the last bit.
+    ///
+    /// # The whole ladder is in months
+    ///
+    /// The conversion is applied last, after `adjust_transition_probability`
+    /// and after the clamp, because every operand before it is a rate per
+    /// month: the hazard's own cap of 0.8, the ladder's additions of 0.1
+    /// and 0.15 for inflation, policy and an inverted curve, and the clamp
+    /// at 0.3. Converting earlier would leave the ladder as a daily
+    /// probability against a base hazard near 0.0004 a day, so an inverted
+    /// curve would raise the transition rate by 250 times where it now
+    /// triples it. The 9.7 years above assumes this placement; dividing
+    /// before the clamp instead gives 9.59, and the difference sits
+    /// entirely in the two short phases.
+    ///
+    /// So the clamp becomes a cap on a monthly rate and the largest daily
+    /// probability is 0.01. On the hazard alone it binds for a peak past
+    /// month 5.40 and a trough past month 2.57 and nowhere else, since an
+    /// expansion reaches it at month 338, a recovery at month 358, and a
+    /// contraction's hazard falls with duration. It shapes the mean peak
+    /// from 183 days to 171 and the mean trough from 159 to 138.
+    ///
+    /// Measured over thirty seeds at 1008 days on the era's roster, at
+    /// commit 6dfe09b. Read per month the clamp binds on 527 of 2082 peak
+    /// rolls and 153 of 203 trough rolls on the hazard alone, and on 0 of
+    /// 18352 expansion and 0 of 1495 contraction rolls. Drawn per day it
+    /// binds on none of them.
+    ///
+    /// WITH the ladder the trough is different, and it was different
+    /// before this dial existed. A trough adds 0.1 for a policy rate under
+    /// 3.0 and 0.05 for unemployment over 8.0, against a hazard of 0.265
+    /// at its two-month minimum, so the clamp binds on its first eligible
+    /// roll under either reading: 203 of 203 read per month and 97 of 97
+    /// drawn per day, over the same runs. So the clamp was already doing
+    /// work in a trough, and what changed is that phases now last long
+    /// enough to reach one. A certified year reaches no trough at all and
+    /// records 0 of 2121 rolls clamped under either reading.
+    pub cycle_hazard_per_month: f64,
+    /// The corporate bond yield at which the target multiple sits exactly
+    /// on its sector anchor. 0.04 -- every preset before pt-v18 -- is the
+    /// constant this was, to the bit.
+    ///
+    /// # A neutral point the economy never visits
+    ///
+    /// `compute_target_pe` compresses the multiple by
+    /// `(discount - neutral) * RATE_PE_SENSITIVITY * duration`, so a name
+    /// is valued on its anchor exactly when the discount rate equals this.
+    /// The economy opens at a corporate yield of 4.56 per cent and settles
+    /// at 4.82, and it never visits 4.00. So every profitable name opens
+    /// about one per cent below the price the generator drew for it, which
+    /// is +0.0107 of day-zero mispricing at the opening and +0.014 at the
+    /// corner, and the market spends the year unwinding it on a 60-day
+    /// half-life. At the second sweep's measured -94.872 index points per
+    /// unit of opening level that is 1.0 to 1.3 points of the first year,
+    /// on every seed, and nothing in a stationary year.
+    ///
+    /// # Read off the economy rather than chosen
+    ///
+    /// The value that zeroes the day-zero term is the yield the economy
+    /// opens at, which is 0.0456 as it opens today and 0.0482 at the corner
+    /// the dynamics reach. Both are read off the process, the second from
+    /// the burn-in table, so neither is a matter of degree.
+    ///
+    /// # Why the generator is untouched
+    ///
+    /// The multiple this anchors is the same sector anchor the generator
+    /// draws its multiples around, so the two stay consistent under any
+    /// neutral rate and a roster opens at fair value exactly when the
+    /// engine's discount rate equals this. `NEUTRAL_DISCOUNT_RATE` is read
+    /// by no line of the generator's code; the only other reference is its
+    /// own test.
+    ///
+    /// # Promoted rather than renamed
+    ///
+    /// This name was on the carried read-only surface. `to_pairs` merges
+    /// that surface with the settable one and sorts, so moving the name
+    /// between them leaves every preset's pairs, fingerprint and
+    /// coefficient digest untouched wherever the value has not moved. A new
+    /// name would have added a second entry for one quantity, with this one
+    /// still reading 0.04 about an engine using 0.0456.
+    pub neutral_discount_rate: f64,
+    /// Days the economy is advanced alone, before day zero. 0.0 -- every
+    /// preset before pt-v18 -- draws nothing and leaves construction as it
+    /// was.
+    ///
+    /// # A year spent travelling
+    ///
+    /// The economy opens at unemployment 4.00, inflation 2.00 and a
+    /// corporate yield of 4.56, and its own dynamics reach 2.50, 2.74 and
+    /// 4.82. Everything this project certifies is certified on a window in
+    /// which nothing has settled, and the travel is one-way on the
+    /// multiple.
+    ///
+    /// # The length is measured
+    ///
+    /// 755 is the day the last field enters one stationary standard
+    /// deviation of its mean and stays there, which is the corporate yield
+    /// in the burn-in table. Unemployment takes 119 days, inflation 419 and
+    /// the ten-year 705. Structural unemployment is still moving after
+    /// three years and is left where it is, since the fields the valuation
+    /// reads have all settled by 755.
+    ///
+    /// # What it costs to run
+    ///
+    /// The draws come from the economy's own substream, so the market's
+    /// day-0 draws are where they were. It consumes economy draws, which is
+    /// the only settable field besides the volatility jump that moves a
+    /// draw count, and it does so by running the economy rather than as a
+    /// side effect.
+    pub macro_burn_in_days: f64,
+    /// How much of the drift the market jump's mean carries is given
+    /// back. 0.0 -- every preset before pt-v18 -- is bit-identical. 1.0
+    /// subtracts the compensator and makes the jump a martingale.
+    ///
+    /// # The mean is there for skew, and it also buys a drift
+    ///
+    /// `jump_mean_market` is negative so that crashes are larger than
+    /// rallies, which is a real property of index returns and a legitimate
+    /// thing to want. But a jump that arrives with probability `lambda`
+    /// and mean `m` contributes `lambda * m` to the expected return every
+    /// day whether it fires or not, so the skew comes with a drift nobody
+    /// asked for. At pt-v16 that is -0.11769 per name per year at the
+    /// day-zero intensity, and 2.6 percentage points of annual index
+    /// level.
+    ///
+    /// The value was set once in the pt-v4 era by a search whose objective
+    /// could not read a first moment, and inherited unchanged through
+    /// eleven presets. So the drift was never chosen; it was never
+    /// visible.
+    ///
+    /// # Compensated rather than re-derived
+    ///
+    /// The obvious repair is to solve for a smaller mean that buys skew
+    /// without the drift. There is no such value: for a compound Poisson
+    /// jump the drift and the skew are both linear in the mean, so trading
+    /// one against the other is a matter of degree and any answer would be
+    /// a fitted constant.
+    ///
+    /// Subtracting `lambda * m` instead is the standard compensated-Poisson
+    /// construction. It makes the jump term a martingale, and because the
+    /// compensator is a DETERMINISTIC offset it moves the first moment and
+    /// leaves every central moment untouched. The skew and the fat tail
+    /// survive exactly, at the mean the calibration chose, and the drift
+    /// goes to zero. The mean therefore does not move at all: what was
+    /// wrong was the missing compensator and not the value.
+    ///
+    /// `lambda` is the CONDITIONAL intensity, already scaled by the VIX
+    /// coupling, so the compensator tracks the arrival rate. The
+    /// investigation measured the realised drift at 1.084 times the
+    /// day-zero closed form for exactly that reason, and a compensator on
+    /// the day-zero rate would have left that 8 per cent behind.
+    pub jump_mean_compensated: f64,
+    /// How much of the stop-cascade ladder's direction is removed. 0.0 --
+    /// every preset before pt-v18 -- is bit-identical. 1.0 makes the two
+    /// ladders mirror images.
+    ///
+    /// # The asymmetry nobody chose
+    ///
+    /// Forced flow from resting stop orders runs both ways: stop-losses
+    /// under longs on the way down, buy-stops over shorts on the way up.
+    /// The two ladders that express it do not match. The downside fires at
+    /// a 2 per cent move and the upside at 3; the downside has four tiers
+    /// and the upside three; and at every matched size the downside is
+    /// larger, 0.008 against 0.006, 0.005 against 0.004, 0.003 against
+    /// 0.002, with a fourth downside tier of 0.001 that has no partner.
+    /// Every one of those is a bare literal with no parameter, so nothing
+    /// could reach them and nothing recorded a reason for the difference.
+    ///
+    /// Over a symmetric distribution of daily returns a ladder that
+    /// subtracts more than it adds is a drift, which is this era's shape
+    /// again.
+    ///
+    /// # What is matched, and what is deliberately left alone
+    ///
+    /// The GATES stay. A stop-loss sits under every long, so the downside
+    /// needs no condition; a buy-stop needs shorts to exist, so the upside
+    /// keeps `short_interest_ratio > 0.1`. That is defensible finance and
+    /// not an asymmetry anybody left by accident.
+    ///
+    /// The THRESHOLD and the TIER MAGNITUDES are matched, at the mean of
+    /// the two ladders: threshold 0.025, tiers 0.007, 0.0045, 0.0025 and
+    /// 0.0005. That is the same construction the OPEC rule uses. It
+    /// chooses neither side and it preserves the total intervention the
+    /// pair performs exactly, 0.029 across both ladders before and after.
+    ///
+    /// # What is NOT derived here, and is worth saying
+    ///
+    /// Unlike the tilt, the jump and the oil supply term, this one has no
+    /// stationarity condition or closed form behind it. Odd symmetry in
+    /// the return is the structural claim; the mean is a rule for picking
+    /// the numbers under it rather than a value read off the process.
+    /// Whether these literals should become parameters at all is an open
+    /// question for the era's owner rather than something settled here.
+    pub cascade_symmetry: f64,
     /// Persistence of the SLOW variance component (Engle-Lee style). The
     /// market factor's variance carries two timescales from the pt-v4 era:
     /// the fast one above tracks the VIX-scaled target, this one carries
@@ -580,6 +950,98 @@ pub struct ModelParams {
     /// earnings path has somewhere monotonic to run; adopting it is an era
     /// boundary and a recalibration, not a bug fix.
     pub fair_value_book_floor: f64,
+    /// How much of nominal output growth the valuation's earnings carry.
+    /// 0.0 -- every preset before pt-v18 -- is bit-identical. 1.0 holds the
+    /// earnings share of nominal output constant.
+    ///
+    /// # Why the model has no expected return without this
+    ///
+    /// Price is `fair_value * exp(s)`, `s` is a stationary AR(2) around
+    /// zero, and `eps` is fixed when an instrument is built, so the only
+    /// time variation in fair value is the discount rate. The expected log
+    /// change of the index over any horizon is therefore zero in a
+    /// stationary economy, and negative in one whose yields rise. A real
+    /// large-cap price index returns 8 to 9 per cent a year nominal on an
+    /// equal-weight basis, and nothing in the architecture could deliver
+    /// it.
+    ///
+    /// A drift placed in `s` cannot deliver it either. Under a constant
+    /// drift `c` per step the stationary mean solves `m = phi * m + c`, so
+    /// a premium injected there is a LEVEL of `c / (1 - phi)`, reached on
+    /// the 60-day half-life and followed by no growth at all. Simulated at
+    /// 3, 6 and 9 per cent a year it gave levels of +0.010, +0.021 and
+    /// +0.031 with third-year growth of zero. An expected return has to
+    /// enter fair value.
+    ///
+    /// # What it scales, exactly
+    ///
+    /// `eps` and `book_value_per_share` are multiplied by
+    /// `1 + this * (N_t / N_0 - 1)` before the valuation reads them, where
+    /// `N = gdp * cpi` is nominal output and `N_0` is its value when the
+    /// engine was built. The multiplier is 1.0 on day 0 by construction,
+    /// so the opening valuation, and the lazy initial `s` taken from it,
+    /// are unchanged.
+    ///
+    /// Both fields, because the valuation is then homogeneous of degree
+    /// one in nominal terms on both of its paths: a profitable company
+    /// through `eps * target_pe` and a loss-making one through
+    /// `book * LOSS_MAKING_PRICE_TO_BOOK`. Scaling only earnings would
+    /// make a loss-maker's fair value fall in real terms every year.
+    ///
+    /// # The clock, which is the part that is easy to get wrong
+    ///
+    /// `N` is integrated by the economy, which compounds `gdp` by
+    /// `gdp_growth / 100 / 365` and `cpi` by `inflation_rate / 100 / 365`
+    /// on every day it advances, while the market trades 252 days to a
+    /// year and annualises by 252. The economy advances once per market
+    /// day, so a certified year of 252 sessions takes 252 of those steps
+    /// and delivers `252 / 365` of every annual rate: growth of 2.50 and
+    /// inflation of 2.00 at the opening state give 4.50 per economy-year
+    /// and 3.11 per trading year.
+    ///
+    /// This term states no rate of its own. It reads the level the economy
+    /// reached, so whatever the macro chain integrated is what the
+    /// valuation carries, and the rate falls with growth and inflation
+    /// wherever the cycle takes them. Measured on
+    /// `Universe.random(40, seed=111)` over 252 days at pt-v18, seeds 1 to
+    /// 6, it delivers a median of +4.353 per cent per trading year, with
+    /// mean growth of 3.353 and mean inflation of 2.931 over the run;
+    /// `(3.353 + 2.931) * 252 / 365` is 4.339, which is the clock stated as
+    /// a number.
+    ///
+    /// That 4.353 is a property of the opening expansion rather than of
+    /// the model. On the same roster, seed 1, over 1008 days, the run
+    /// leaves expansion and ends in a trough, and nominal output reaches a
+    /// ratio of 1.0685, which is 1.67 per cent a year. The term goes below
+    /// 1.0 whenever `gdp * cpi` falls under its opening value, which is
+    /// growth plus inflation turning negative together. A flat premium
+    /// would have paid the same rate through all of that, which is the
+    /// reason this is a mechanism.
+    ///
+    /// # A company listed mid-run
+    ///
+    /// A company's stored `eps` is in the run's OPENING nominal terms,
+    /// because that is what the ratio is taken against, so
+    /// `Engine::list_instrument` on day 200 takes earnings stated at day
+    /// zero rather than at day 200. A caller holding today's figure
+    /// divides it by the ratio the snapshot gives, `gdp * cpi` over
+    /// `nominal_output_base`. Every preset before pt-v18 holds that ratio
+    /// at 1.0, where the two readings are the same number.
+    ///
+    /// # What it does NOT claim
+    ///
+    /// Earnings are a share of nominal output, and the share is a quantity
+    /// this model does not carry. At 1.0 the share is held constant, which
+    /// is the only value that is read off the process rather than chosen;
+    /// below 1.0 the share falls every year and above 1.0 it rises for
+    /// ever, both of which are assertions about an unmodelled quantity.
+    ///
+    /// A real price index also earns a return above nominal output growth,
+    /// through buybacks and the drift of the earnings share, worth 3 to 4
+    /// points a year. The model has nothing to derive that from, so this
+    /// term does not attempt it and the gap is reported rather than
+    /// closed.
+    pub earnings_nominal_growth: f64,
     /// Weight of the SLOW variance component in the market factor's
     /// two-component mixture. The mixture exists because real
     /// volatility memory decays hyperbolically and a single
@@ -1307,6 +1769,9 @@ pub const PT_V15: ModelParams = ModelParams::pt_v15();
 /// pt-v15 with the QE valuation channel silenced -- see
 /// [`ModelParams::pt_v16`].
 pub const PT_V16: ModelParams = ModelParams::pt_v16();
+/// pt-v16 with the first moments its mechanisms inject given back -- see
+/// [`ModelParams::pt_v18`], including why the number skips pt-v17.
+pub const PT_V18: ModelParams = ModelParams::pt_v18();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -1397,11 +1862,21 @@ impl ModelParams {
             market_vol_vix_exponent: 2.0,
             market_beta_down_asym: 0.0,
             market_beta_down_asym_lag: 0.0,
+            market_beta_down_asym_recentre: 0.0,
+            oil_supply_response: 0.0,
+            oil_opec_symmetry: 0.0,
+            oil_seasonality_target: 0.0,
+            cycle_hazard_per_month: 0.0,
+            neutral_discount_rate: crate::fair_value::NEUTRAL_DISCOUNT_RATE,
+            macro_burn_in_days: 0.0,
+            jump_mean_compensated: 0.0,
+            cascade_symmetry: 0.0,
             // Legacy values: the slow component is OFF, and the update
             // reduces to the single-component form bit for bit.
             market_vol_slow_persistence: 0.0,
             market_vol_slow_gain: 0.0,
             fair_value_book_floor: 0.0,
+            earnings_nominal_growth: 0.0,
             market_vol_slow_weight: 0.0,
             volume_idio_variance_gain: 0.0,
             volume_idio_persistence: 0.0,
@@ -2353,6 +2828,130 @@ impl ModelParams {
         p
     }
 
+    /// The index-drift era: give back the first moments the model injects
+    /// without anyone having chosen them.
+    ///
+    /// # Why pt-v18 and not pt-v17
+    ///
+    /// pt-v17 is reserved by the open recomposition era on the
+    /// `preset/pt-v17` branch, whose doc comments already name it. Two
+    /// eras cannot share a name, and a preset name is the identity every
+    /// published result cites, so this one takes the next number rather
+    /// than the next slot. The gap is deliberate and this note is the
+    /// record of why.
+    ///
+    /// # What it corrects
+    ///
+    /// The equal-weight index drifted -22.155 per cent a year at pt-v16
+    /// over thirty seeds on `Universe.random(40, seed=111)` at 252 days,
+    /// against a real large-cap index's +8 to +10, and it was negative on
+    /// every seed. None of that was a modelling choice: it is the sum of
+    /// mechanisms that each moved the mean as a by-product of shaping
+    /// something else, and of a panel of fourteen shape statistics that
+    /// could not see a first moment and read fourteen for fourteen anyway.
+    ///
+    /// This era gives each of those means back at its source rather than
+    /// cancelling them with an offset at the end, so the shapes the
+    /// mechanisms were built for survive.
+    ///
+    /// Returning every unchosen mean leaves the index near zero rather
+    /// than near a real index's 8 to 9 per cent, because the architecture
+    /// carries no expected return at all: `s` is stationary and `eps` is
+    /// fixed, so fair value moves only with the discount rate. The last
+    /// dial supplies one from the nominal output the economy already
+    /// integrates. See [`ModelParams::earnings_nominal_growth`] for what
+    /// that leaves unclaimed.
+    pub const fn pt_v18() -> ModelParams {
+        let mut p = ModelParams::pt_v16();
+        // The downside transmission tilt scales one side of a zero-mean
+        // draw, so it injects `a * beta * -s / sqrt(2 pi)` per name per
+        // tick. Worth -7.940 points of annual index drift at pt-v16, and
+        // the volatility path's -1.670 acts THROUGH it rather than beside
+        // it, because a hotter conditional sigma injects proportionally
+        // more. Recentred against the conditional sigma, so both go.
+        p.market_beta_down_asym_recentre = 1.0;
+        // Oil demand drew inventory down every day against a supply term
+        // hardcoded to zero, so inventory hit its floor around day 120 and
+        // the inventory pressure term saturated at a standing push on the
+        // oil price. That is what made the rate path one-way: oil raised
+        // inflation, inflation made the bank hike, and the hike compressed
+        // every multiple. At 1.0 supply answers demand and inventory is
+        // driftless, which is the stationarity condition of the process
+        // rather than a level chosen to hit a number.
+        p.oil_supply_response = 1.0;
+        // The OPEC rule cuts harder than it raises, 2.700 against 1.750, so
+        // it pushes oil up on net. Symmetrised at the mean of its own two
+        // branches, which removes the direction without choosing a side.
+        p.oil_opec_symmetry = 1.0;
+        // Oil's seasonal shape multiplied the price level every day, so it
+        // compounded: the product of its factors over a certified year is
+        // 5.119, against 0.921 over a full 365 days. The shape was near
+        // neutral over its own period and the horizon sliced it. On the
+        // reversion target the same amplitude modulates where the price is
+        // pulled toward and integrates to +0.672 per cent over the year.
+        p.oil_seasonality_target = 1.0;
+        // The cycle's Weibull scale is in months and the transition was
+        // drawn against it once a day, so the cycle ran about thirty
+        // times too fast: 2.6 trading years against 9.7, with a phase
+        // change inside 63 per cent of certified years against 3. Read
+        // per month on the 30-day month the phase clock already keeps.
+        p.cycle_hazard_per_month = 1.0;
+        // The valuation was neutral at a 4.00 per cent discount rate and
+        // the economy opens at a corporate yield of 4.56, so every
+        // profitable name opened about one per cent below the price the
+        // generator drew for it and the year was spent unwinding it. The
+        // value that zeroes that term is the yield the economy opens at,
+        // read off the process rather than chosen. It moves to the corner's
+        // 0.0482 when the burn-in lands.
+        // The corner the dynamics reach rather than the point they open
+        // at, because the burn-in below now opens the year there. Both
+        // values are the yield the economy rests at under their own
+        // arm, read off the burn-in table.
+        p.neutral_discount_rate = 0.0482;
+        // The economy opens at unemployment 4.00, inflation 2.00 and a
+        // corporate yield of 4.56 and its own dynamics reach 2.50, 2.74
+        // and 4.82, so a certified year was spent travelling. 755 is the
+        // day the last of those fields enters its stationary band.
+        p.macro_burn_in_days = 755.0;
+        // The market jump's negative mean buys skew and a drift together.
+        // Compensating it keeps the mean, and so the skew, and returns the
+        // drift: a deterministic offset moves no central moment.
+        p.jump_mean_compensated = 1.0;
+        // The two stop ladders do not match: the downside fires earlier, has
+        // an extra tier and is larger at every matched size. Over symmetric
+        // returns that is a drift. Matched at the mean of the pair, which
+        // chooses no side and preserves their total intervention.
+        p.cascade_symmetry = 1.0;
+        // The four dials above give back means the model injected without
+        // anyone choosing them, and a model with every unchosen mean
+        // returned still has no expected return: `s` is stationary and
+        // `eps` is fixed, so fair value moves only with the discount rate.
+        // This one holds the earnings share of nominal output constant, so
+        // the valuation grows with the output the economy already
+        // integrates. It delivers 252/365 of growth plus inflation per
+        // trading year, measured at +4.342 by median over thirty seeds on
+        // the certified year at `measured/ede43c5`, which is this preset
+        // before the oil seasonality and cycle clock dials joined it.
+        //
+        // The rate falls with growth and inflation wherever the cycle takes
+        // them. An earlier form of this comment said it goes negative in a
+        // contraction, and that is true of the DAILY rate and not of a
+        // year. Measured: negative on 83.5 per cent of contraction days and
+        // 99.9 per cent of trough days.
+        //
+        // Whether a contraction YEAR is negative depends on how long the
+        // phase lasts, and that clock has just changed under this preset.
+        // Read once a day, which is every preset before pt-v18, a
+        // contraction lasts 4.4 months, ends well inside the window it
+        // would have to fill, and a calendar year holding one nets about
+        // +0.2 and is negative on 39 of 157 such seed-years. pt-v18 reads
+        // the hazard per month, where the phase outlasts a certified year.
+        // The year-level outcome under that clock is registered and being
+        // measured rather than assumed here.
+        p.earnings_nominal_growth = 1.0;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -2383,6 +2982,7 @@ impl ModelParams {
             "pt-v14" => Some(PT_V14),
             "pt-v15" => Some(PT_V15),
             "pt-v16" => Some(PT_V16),
+            "pt-v18" => Some(PT_V18),
             _ => None,
         }
     }
@@ -2391,7 +2991,7 @@ impl ModelParams {
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
           "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15",
-          "pt-v16"]
+          "pt-v16", "pt-v18"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -2446,9 +3046,19 @@ impl ModelParams {
             "market_vol_vix_exponent" => self.market_vol_vix_exponent,
             "market_beta_down_asym" => self.market_beta_down_asym,
             "market_beta_down_asym_lag" => self.market_beta_down_asym_lag,
+            "market_beta_down_asym_recentre" => self.market_beta_down_asym_recentre,
+            "oil_supply_response" => self.oil_supply_response,
+            "oil_opec_symmetry" => self.oil_opec_symmetry,
+            "oil_seasonality_target" => self.oil_seasonality_target,
+            "cycle_hazard_per_month" => self.cycle_hazard_per_month,
+            "neutral_discount_rate" => self.neutral_discount_rate,
+            "macro_burn_in_days" => self.macro_burn_in_days,
+            "jump_mean_compensated" => self.jump_mean_compensated,
+            "cascade_symmetry" => self.cascade_symmetry,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
+            "earnings_nominal_growth" => self.earnings_nominal_growth,
             "market_vol_slow_weight" => self.market_vol_slow_weight,
             "volume_idio_variance_gain" => self.volume_idio_variance_gain,
             "volume_idio_persistence" => self.volume_idio_persistence,
@@ -2589,9 +3199,19 @@ impl ModelParams {
             "market_vol_vix_exponent" => out.market_vol_vix_exponent = value,
             "market_beta_down_asym" => out.market_beta_down_asym = value,
             "market_beta_down_asym_lag" => out.market_beta_down_asym_lag = value,
+            "market_beta_down_asym_recentre" => out.market_beta_down_asym_recentre = value,
+            "oil_supply_response" => out.oil_supply_response = value,
+            "oil_opec_symmetry" => out.oil_opec_symmetry = value,
+            "oil_seasonality_target" => out.oil_seasonality_target = value,
+            "cycle_hazard_per_month" => out.cycle_hazard_per_month = value,
+            "neutral_discount_rate" => out.neutral_discount_rate = value,
+            "macro_burn_in_days" => out.macro_burn_in_days = value,
+            "jump_mean_compensated" => out.jump_mean_compensated = value,
+            "cascade_symmetry" => out.cascade_symmetry = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
+            "earnings_nominal_growth" => out.earnings_nominal_growth = value,
             "market_vol_slow_weight" => out.market_vol_slow_weight = value,
             "volume_idio_variance_gain" => out.volume_idio_variance_gain = value,
             "volume_idio_persistence" => out.volume_idio_persistence = value,
@@ -2748,6 +3368,7 @@ impl ModelParams {
 /// the list is derived from `to_pairs`' actual coverage in tests.
 pub fn settable_names() -> Vec<&'static str> {
     vec![
+        "cascade_symmetry",
         "crash_amplifier_slope",
         "crash_amplifier_threshold",
         "crisis_blend_cap",
@@ -2763,6 +3384,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "endogenous_news_intensity",
         "endogenous_news_sigma",
         "fair_value_book_floor",
+        "earnings_nominal_growth",
         "garch_alpha",
         "garch_beta",
         "garch_beta_dispersion",
@@ -2782,6 +3404,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "informed_flow_fraction",
         "jump_intensity_idio",
         "jump_intensity_market",
+        "jump_mean_compensated",
         "jump_mean_market",
         "jump_momentum_share",
         "jump_sigma_idio",
@@ -2802,6 +3425,13 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_vix_exponent",
         "market_beta_down_asym",
         "market_beta_down_asym_lag",
+        "market_beta_down_asym_recentre",
+        "oil_opec_symmetry",
+        "oil_seasonality_target",
+        "cycle_hazard_per_month",
+        "neutral_discount_rate",
+        "macro_burn_in_days",
+        "oil_supply_response",
         "market_vol_vix_coupling",
         "mispricing_cap",
         "mispricing_half_life_days",
@@ -2869,7 +3499,6 @@ fn carried_read_only(name: &str) -> Option<f64> {
     }
     Some(match name {
         "daily_shock_cap" => mispricing::DAILY_SHOCK_CAP,
-        "neutral_discount_rate" => fv::NEUTRAL_DISCOUNT_RATE,
         "rate_pe_sensitivity" => fv::RATE_PE_SENSITIVITY,
         "rate_adjustment_floor" => fv::RATE_ADJUSTMENT_FLOOR,
         "growth_duration_scale" => fv::GROWTH_DURATION_SCALE,
@@ -2892,7 +3521,6 @@ fn carried_read_only(name: &str) -> Option<f64> {
 fn carried_read_only_pairs() -> Vec<(String, f64)> {
     let mut out: Vec<(String, f64)> = [
         "daily_shock_cap",
-        "neutral_discount_rate",
         "rate_pe_sensitivity",
         "rate_adjustment_floor",
         "growth_duration_scale",

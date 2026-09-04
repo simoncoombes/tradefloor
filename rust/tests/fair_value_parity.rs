@@ -201,7 +201,10 @@ fn matches_the_reference_bit_for_bit() {
         // testing the dial rather than the contract. The stock gain is 0.0
         // for the same reason: qe_stock_term returns zero at that gain, which
         // is the shipped default and the only value the reference computes.
-        let pe = compute_target_pe(&company, &economy, 1.0, 0.0);
+        // NEUTRAL_DISCOUNT_RATE, not a preset's dial: these vectors are
+        // the reference implementation's, whose neutral point is the constant.
+        let pe = compute_target_pe(&company, &economy, 1.0, 0.0,
+                                   tradefloor::fair_value::NEUTRAL_DISCOUNT_RATE);
         let t = &case.target_pe;
         for problem in [
             same(

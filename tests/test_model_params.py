@@ -306,6 +306,83 @@ PERTURBATIONS = [
     # The lagged twin, on the session AFTER a down day. Ships at 0.0 and the
     # probe runs three days, which is enough to carry one across.
     ("market_beta_down_asym_lag", 0.05, True),
+    # Gives back the first moment the contemporaneous tilt injects. It is
+    # gated on that tilt being nonzero, and pt-v16 ships it at 0.025, so
+    # the probe's market moves. On a preset with the tilt at 0.0 this dial
+    # is inert by construction, which its own unit test states.
+    #
+    # 0.5 and not 1.0: pt-v18 IS the default plus this dial at 1.0, so
+    # that perturbation reproduces a named preset and the vector stops
+    # fingerprinting as `custom-`. Any entry here that lands exactly on a
+    # named preset breaks the assertion below for a reason that has
+    # nothing to do with the parameter.
+    ("market_beta_down_asym_recentre", 0.5, True),
+    # How much of oil demand supply answers. INERT over a probe this short,
+    # and the reason is the mechanism rather than a wiring gap. Inventory
+    # opens at 50 and the oil price feels it only outside the 40-to-60 dead
+    # zone, where the pressure term is exactly zero. Demand draws inventory
+    # down by about 0.45 a day, so half of that is 0.22 a day and three days
+    # separate the two arms by well under one unit: both are still deep in
+    # the dead zone and the prices are identical. The dial bites around day
+    # 120, when the unanswered-demand arm reaches the floor.
+    ("oil_supply_response", 0.5, False),
+    # How much of the OPEC rule's direction is removed. INERT over a probe
+    # this short for a plainer reason than its neighbour: the rule fires
+    # only every 90 days and the probe runs three, so the branch is never
+    # reached and no draw it would change is taken.
+    ("oil_opec_symmetry", 0.5, False),
+    # WHERE oil's seasonal shape acts. It moves the oil price on the first
+    # day, and INERT on the market all the same, because oil reaches a price
+    # only through the inflation term at daily.rs, which is a dead zone
+    # between 50 and 80. Oil opens at 75 and the seasonal down leg takes both
+    # arms to about 73 on day one, so both sit inside the dead zone, the
+    # discount rate never hears about it and the valuation never moves. Over
+    # 252 days oil leaves that zone in both directions and the dial bites.
+    ("oil_seasonality_target", 0.5, False),
+    # The clock the cycle hazard is read on. INERT over a probe this short
+    # for a reason the mechanism states rather than one the value hides: the
+    # engine opens at zero months in phase and an expansion's minimum
+    # duration is six months, so check_cycle_transition returns before it
+    # draws until day 180 and the probe runs three. Over 252 days it bites,
+    # and what separates the arms is the count of seeds that leave expansion.
+    ("cycle_hazard_per_month", 0.5, False),
+    # The yield at which the target multiple sits on its sector anchor.
+    # 0.05 rather than either shipped value: 0.04 is the default this probe
+    # perturbs and 0.0456 is pt-v18's, and an entry landing on a named
+    # preset's value would fingerprint as that preset. It moves the market
+    # on the first tick, because every name's fair value is recomputed from
+    # it before a single price is formed.
+    ("neutral_discount_rate", 0.05, True),
+    # Days the economy is advanced alone before day zero. It moves the
+    # market on the first tick, because every name is valued against an
+    # economy that has travelled. It also moves `draws_consumed`, which is
+    # why it is in DRAW_SCHEDULE_MOVERS below: a burn-in consumes economy
+    # draws BY running the economy, so the count is the mechanism rather
+    # than a side effect of it.
+    ("macro_burn_in_days", 30.0, True),
+    # How much of the jump's drift is given back. The compensator is
+    # subtracted every day whether or not a jump fires, so unlike its two
+    # neighbours it bites on the first close.
+    ("jump_mean_compensated", 0.5, True),
+    # How far the two stop ladders are matched. INERT over a probe this
+    # short, and the mechanism says why. Both ladders read the PREVIOUS
+    # completed day's return and neither fires until a name has moved more
+    # than two or three per cent in a day. Three days of a calm market
+    # produce no such day, so no branch is reached and nothing this dial
+    # touches is evaluated. Over 252 days it bites: the thirty-seed sweep
+    # separates the arms.
+    ("cascade_symmetry", 0.5, False),
+    # How much of nominal output growth the valuation's earnings carry. It
+    # reads a level the economy compounds daily, so it moves the market as
+    # soon as one day has closed rather than waiting on a branch: over the
+    # probe's three days the ratio reaches about 1.00025 and the perturbed
+    # arm values every name a fraction above the base one.
+    #
+    # 0.5 rather than 1.0 for the reason the recentre entry above gives, and
+    # because a share is the reading this dial has: 1.0 holds the earnings
+    # share of nominal output constant and every value below it lets that
+    # share fall.
+    ("earnings_nominal_growth", 0.5, True),
     # The exponent on the VIX ratio in the market variance target. The
     # endogenous VIX leaves its anchor on day one, so the ratio is never
     # exactly 1.0 and any exponent but the shipped one moves the target.
@@ -345,10 +422,13 @@ PERTURBATIONS = [
 
 
 #: Parameters whose perturbation legitimately changes the draw SCHEDULE, so
-#: the §5.2 guard below skips them. Only the VIX jump qualifies: its arrival
-#: test draws from the shared `economy` stream once a day whenever the
-#: intensity is non-zero, so turning it on consumes three extra draws over
-#: the probe's three days whether or not a jump ever fires.
+#: the §5.2 guard below skips them. Two qualify. The VIX jump's arrival test
+#: draws from the shared `economy` stream once a day whenever the intensity
+#: is non-zero, so turning it on consumes three extra draws over the probe's
+#: three days whether or not a jump ever fires. `macro_burn_in_days` runs
+#: the economy for that many days before day zero, so it consumes a
+#: burn-in's worth of economy draws; there the count IS the mechanism, and a
+#: version that drew nothing would not have advanced anything.
 #:
 #: This is not a violation today, because every shipped preset carries
 #: `vix_jump_intensity` at 0.0 and therefore draws nothing extra. It is a
@@ -356,7 +436,7 @@ PERTURBATIONS = [
 #: economy stream, so its trajectories differ from every earlier preset
 #: through the RNG as well as through the mechanism. Giving the arrival test
 #: its own stream would remove that coupling.
-DRAW_SCHEDULE_MOVERS = frozenset({"vix_jump_intensity"})
+DRAW_SCHEDULE_MOVERS = frozenset({"vix_jump_intensity", "macro_burn_in_days"})
 
 
 def test_the_perturbation_table_covers_the_whole_settable_surface():

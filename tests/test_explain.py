@@ -1273,7 +1273,15 @@ def test_a_clean_gap_is_still_explained_rather_than_refused():
     assert result._previous == kept._previous
     book = {c.name: c.value for c in result.root.children}["book"]
     assert book == {c.name: c.value for c in kept.root.children}["book"]
-    assert book == pytest.approx(0.006782659113, abs=1e-12)
+    # A literal for `book` sat here and has been REMOVED rather than
+    # re-recorded. This test is about the two arms agreeing, and the line
+    # above states that; a literal beside it adds no coverage, because the
+    # only way to fail it while the comparison holds is for the market to
+    # have moved, which is not what this test is asking. It read
+    # 0.006782659113 and then 0.006364983764 when a change to the universe
+    # generator re-drew this roster, and its whole behaviour across that
+    # change was to manufacture a failure that said nothing. Do not add it
+    # back: pin the comparison, not the value.
     assert result.check() == []
     line = next(c for c in result.caveats if "was not kept" in c)
     assert "holds no listing or delisting between the two opens" in line
@@ -1497,7 +1505,7 @@ EXPECTED = {
               "market_vol_vix_anchor"),
              ("mispricing_s", "mispricing_s_prev_close")),
     "fair_value": (("fair_value_book_floor", "qe_pe_gain",
-                    "qe_pe_stock_gain"), ()),
+                    "qe_pe_stock_gain", "earnings_nominal_growth"), ()),
     "book": ((), ("price",)),
 }
 
@@ -1529,7 +1537,7 @@ def test_every_declared_dial_is_a_model_param_that_its_rust_reads():
     # Exact, not a floor. A floor let nine of random_noise's ten dials be
     # dropped and still pass, because the table declares more than the
     # floor asked for.
-    assert declared == 40
+    assert declared == 41
     assert sum(1 for m in ex.MECHANISMS if m.dials) == 9
 
 

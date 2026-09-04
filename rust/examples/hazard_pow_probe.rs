@@ -30,7 +30,7 @@ fn main() {
         e.treasury_yield_10y = bits(i["treasuryYield10Y"].as_str().unwrap());
         e.market_pe = i["marketPE"].as_str().map(bits);
 
-        let (p, _) = get_cycle_transition_probability(&e);
+        let (p, _) = get_cycle_transition_probability(&e, 0.0);
         let want = bits(case["output"]["probability"].as_str().unwrap());
         n += 1;
         if p.to_bits() != want.to_bits() {

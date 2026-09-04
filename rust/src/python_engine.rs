@@ -2615,6 +2615,16 @@ impl PyEngine {
         // a snapshot without it restores to 0.0, which is bit-exact for
         // every run recorded while the reservoir dial shipped 0.0.
         out.set_item("forced_flow_spent", self.inner.forced_flow_spent())?;
+        // Nominal output when the run opened, the base of the growth
+        // term's ratio. A constant of the run rather than advancing state,
+        // and carried for the reason the two above are: an engine restored
+        // without it would rebase its valuation on the restore day and
+        // grow from there, which is a plausible market and not the one the
+        // snapshot describes. A snapshot written before this key
+        // leaves the engine on the base it was built with, and such a
+        // snapshot comes from a build where the growth term did not exist,
+        // so it names a preset carrying the dial at 0.0.
+        out.set_item("nominal_output_base", self.inner.nominal_output_base())?;
         // The common log-volume state. Same reason as the variance above, and
         // the same failure: omitted, a fork re-opens at volume 1.0 mid-regime
         // and diverges through the book (§74).
@@ -2940,6 +2950,11 @@ impl PyEngine {
         // snapshot, whose runs all carried 0.0.
         if let Some(raw) = snapshot.get_item("forced_flow_spent")? {
             self.inner.set_forced_flow_spent(raw.extract()?);
+        }
+        // Restore the growth term's base. Absent means a snapshot from a
+        // build without the term, whose preset carries the dial at 0.0.
+        if let Some(raw) = snapshot.get_item("nominal_output_base")? {
+            self.inner.set_nominal_output_base(raw.extract()?);
         }
         if let Some(raw) = snapshot.get_item("market_variance")? {
             let vals: Vec<f64> = raw.extract()?;

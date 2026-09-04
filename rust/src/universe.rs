@@ -35,6 +35,28 @@ use crate::sectors::{Sector, SECTORS};
 /// cannot perturb the market, and vice versa.
 const UNIVERSE_STREAM: u32 = 21;
 
+/// Widest the P/E scatter reaches from its sector anchor, as a ratio.
+///
+/// The scatter is drawn LOG-uniformly between `anchor / PE_SCATTER` and
+/// `anchor * PE_SCATTER`, so its endpoints are reciprocals and its mean in
+/// log is exactly zero. That is the whole of why this constant is a single
+/// ratio rather than a pair of bounds: a pair can be written down that does
+/// not centre, and one was. See [`random_universe`].
+///
+/// 1.7 rather than a round 2.0 because it preserves the previous scatter's
+/// WIDTH while moving its centre. The old bounds spanned `ln(1.6/0.55)` =
+/// 1.068 in log; these span `2*ln(1.7)` = 1.061, which is inside one per
+/// cent. The cross-section is as dispersed as it was and is no longer
+/// tilted.
+const PE_SCATTER: f64 = 1.7;
+
+/// Widest the book-value scatter reaches from a fairly valued book, as a
+/// ratio. Same construction and the same reason as [`PE_SCATTER`].
+///
+/// 2.4 preserves the previous scatter's width: the old bounds spanned
+/// `ln(1.4/0.25)` = 1.723 in log against this one's `2*ln(2.4)` = 1.751.
+const BOOK_SCATTER: f64 = 2.4;
+
 /// One generated instrument, in the shape the public API accepts.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GeneratedInstrument {
@@ -92,6 +114,85 @@ fn ticker_for(index: usize) -> String {
 /// Sectors are assigned round-robin rather than sampled, so every sector is
 /// represented at any `n >= 12` and no run is missing a whole slice of the
 /// market by chance. Within a sector everything else is drawn.
+///
+/// # A generated roster starts at its own fair value
+///
+/// The price and the fundamentals that value it are drawn here, and they
+/// have to be RECONCILED or the roster opens away from fair value and the
+/// first quarter of every run is spent unwinding that. This generator did
+/// not reconcile them, and the cost was measurable: at pt-v16 the day-zero
+/// cross-sectional mean of `log(price / fair_value)` was **+0.050** over
+/// two hundred rosters of forty names, with 58 per cent of names above
+/// fair value, and the equal-weight index then drifted down for a year on
+/// a 60-day half-life as that unwound.
+///
+/// What that was worth, isolated. On `Universe.random(40, seed=111)` at
+/// 252 days over seeds 1 to 30, with the down tilt, the jump mean and the
+/// whole macro path all switched off so that only the initial condition is
+/// left to unwind, the equal-weight index drifted **-8.417** per cent a
+/// year on the roster the previous generator produced and **-4.585** on
+/// this one. Both arms ran on one build, the old roster loaded back
+/// through `Universe::from_json`, so the roster is the only difference
+/// between them.
+///
+/// The half that survives is that roster's own draw and not a residual
+/// bias: seed 111 still opens at +0.048 against +0.087, which is 54.9 per
+/// cent of its old day-zero mispricing, and it still drifts -4.585 against
+/// -8.417, which is 54.5 per cent of its old day-zero drift. An initial
+/// condition decaying on a fixed half-life predicts exactly that
+/// proportionality, and the two agree to half a percentage point.
+///
+/// Both halves of the reconciliation are the same statement. Fair value is
+/// `eps * target_pe` for a profitable name and `book * LOSS_MAKING_PRICE_TO_BOOK`
+/// for a loss-maker, so in both cases the price sits at fair value exactly
+/// when the drawn ratio is one. The ratio is therefore drawn log-uniformly
+/// between reciprocal endpoints, which puts its mean in log at zero and
+/// half the names on each side of fair value, rather than uniformly over a
+/// range whose midpoint is one. A range that is symmetric in the ratio is
+/// not symmetric in the log of it, and the difference is a bias:
+/// `between(0.55, 1.6)` centres on 1.075, and `E[ln u]` over it is
+/// +0.0293, so the old multiple was systematically above its anchor, the
+/// earnings that price implied systematically below, and the valuation
+/// below the price on which it was built.
+///
+/// # What this does not reconcile
+///
+/// The neutral point of the valuation model, not the opening state of any
+/// particular market. `target_pe` is the sector anchor exactly when the
+/// discount rate is `NEUTRAL_DISCOUNT_RATE`; the world opens 56 basis
+/// points above that, which compresses every profitable name's multiple by
+/// about one per cent and leaves a residual day-zero mispricing of
+/// **+0.0107** on the earnings path and zero on the book path, since the
+/// book path applies no rate adjustment.
+///
+/// That residual is deliberately left here. It is a property of where the
+/// economy opens relative to where the valuation model is neutral, not of
+/// this generator, and correcting it here would bake an economy constant
+/// into universe generation, where nothing would catch it going stale if
+/// the opening state moved. It would also make a roster depend on the
+/// market it is about to be run in, and the independence of the two seeds
+/// is the property the module header exists to defend.
+///
+/// # What is centred is the draw, which is the thing that was biased
+///
+/// The defect was a biased draw and the draw is now unbiased. A roster of
+/// forty names taken from it still scatters, and that scatter is sampling
+/// error rather than bias: the cross-sectional sd of the day-zero
+/// mispricing is about 0.32, so a forty-name mean carries a standard error
+/// of about 0.05 and any roster lands that far either side by chance.
+/// `Universe.random(40, seed=111)` is one that draws high, reading +0.048
+/// where the draw it comes from now averages +0.013. A different seed is as
+/// likely to read low.
+///
+/// Removing that too would mean correcting each roster to its own realised
+/// mean, and that is deliberately not done rather than merely undone. The
+/// correction depends on `n`, so it is a second pass whose result depends
+/// on the roster size, and it would break the invariant that a larger
+/// universe extends a smaller one. That invariant is why the short interest
+/// below is drawn inside this loop rather than in a pass of its own, and it
+/// is worth more than a centred forty-name sample. A generator that
+/// silently re-centred every roster would also be reporting a cross-section
+/// tighter than the one it drew.
 pub fn random_universe(n: usize, seed: u32) -> Vec<GeneratedInstrument> {
     let mut rng = GameRng::new(seed, UNIVERSE_STREAM);
     let mut out = Vec::with_capacity(n);
@@ -107,8 +208,15 @@ pub fn random_universe(n: usize, seed: u32) -> Vec<GeneratedInstrument> {
 
         // P/E scattered around the sector anchor, so a generated name is
         // valued near its sector without every name being identical to it.
-        // The lower bound sits below 1.0 so some names start visibly cheap.
-        let pe_ratio = sector.avg_pe * between(&mut rng, 0.55, 1.6);
+        // Log-uniform between reciprocal endpoints: some names start
+        // visibly cheap, as many start visibly dear, and the roster as a
+        // whole starts on its anchor rather than above it.
+        //
+        // ONE draw, as `between` was, so the stream position after this
+        // line is what it always was and every other field of every name is
+        // untouched.
+        let pe_ratio = sector.avg_pe
+            * log_between(&mut rng, 1.0 / PE_SCATTER, PE_SCATTER);
 
         // Roughly one name in nine loses money. Loss-makers are a real and
         // load-bearing part of a cross-section: they take the book-value
@@ -121,9 +229,22 @@ pub fn random_universe(n: usize, seed: u32) -> Vec<GeneratedInstrument> {
             initial_price / pe_ratio
         };
 
-        // Book value below price for profitable names and above it for many
-        // loss-makers, which is what makes the book path bind.
-        let book_value_per_share = initial_price * between(&mut rng, 0.25, 1.4);
+        // Book value scattered around the book a loss-maker would need to be
+        // fairly valued at this price, which is `price / LOSS_MAKING_PRICE_TO_BOOK`
+        // because the book path values a name at book times that multiple.
+        // Reciprocal endpoints again, so a loss-maker is as likely to open
+        // cheap as dear. Drawn for every name, profitable or not, exactly as
+        // before: `fair_value_book_floor` reads it on the earnings path too,
+        // and the draw order does not depend on which path a name takes.
+        //
+        // Book value stays below price for most profitable names and above
+        // it for many loss-makers, which is what makes the book path bind.
+        let book_centre = initial_price / crate::fair_value::LOSS_MAKING_PRICE_TO_BOOK;
+        let book_value_per_share = log_between(
+            &mut rng,
+            book_centre / BOOK_SCATTER,
+            book_centre * BOOK_SCATTER,
+        );
 
         // Growth correlates loosely with the sector's multiple: a 32x anchor
         // implies the market expects growth, a 10x anchor does not.
@@ -256,6 +377,151 @@ mod tests {
         t.sort_unstable();
         t.dedup();
         assert_eq!(t.len(), 300, "tickers collided");
+    }
+
+    #[test]
+    fn a_generated_roster_opens_at_its_own_fair_value() {
+        // The defect this reconciliation closed: the price was drawn first
+        // and the earnings that value it were drawn from a scatter whose
+        // mean in LOG sat above one, so fair value came out below the price
+        // it was built from and every roster opened overvalued.
+        //
+        // Measured at the valuation model's neutral point, where
+        // `target_pe` is the sector anchor exactly, so this test asserts the
+        // generator's own contribution and not the economy's opening state.
+        //
+        // Run at BOTH neutral points the presets carry, because the claim
+        // the neutral-rate dial rests on is that a roster opens at fair
+        // value whenever the engine's discount rate equals the neutral rate,
+        // and not that it does so at one particular rate. The generator
+        // draws its multiples around the same sector anchor this rate
+        // anchors, so the two move together and neither value is special to
+        // it. A version of this test at the constant alone would pass
+        // unchanged if the dial were wired to nothing.
+        let u = random_universe(4000, 7);
+        let mut means: Vec<f64> = Vec::new();
+        for neutral in [crate::fair_value::NEUTRAL_DISCOUNT_RATE, 0.0456, 0.0482] {
+        let economy = crate::fair_value::EconomyValuationInputs {
+            corporate_bond_yield: Some(neutral * 100.0),
+            federal_funds_rate: neutral * 100.0,
+            qe_pe_boost: Some(0.0),
+            qe_assets_ratio: None,
+        };
+        let mut total = 0.0;
+        let mut above = 0usize;
+        let mut on_book = 0usize;
+        for inst in &u {
+            let sector = crate::sectors::by_key(inst.sector).expect("generated");
+            let breakdown = crate::fair_value::compute_fair_value_with(
+                &crate::fair_value::CompanyValuationInputs {
+                    sector_avg_pe: Some(sector.avg_pe),
+                    eps: Some(inst.eps),
+                    book_value_per_share: Some(inst.book_value_per_share),
+                    revenue_growth: Some(inst.revenue_growth),
+                },
+                &economy,
+                0.0,
+                1.0,
+                0.0,
+                neutral,
+            );
+            let s = crate::mathx::log(inst.initial_price / breakdown.fair_value);
+            total += s;
+            if s > 0.0 {
+                above += 1;
+            }
+            if breakdown.book_value_path {
+                on_book += 1;
+            }
+        }
+        let mean = total / u.len() as f64;
+        means.push(mean);
+        // The sampling error of a 4000-name mean is about 0.005, so 0.02 is
+        // four of them and this bound is loose enough not to be flaky and
+        // tight enough to fail the +0.044 the old generator produced.
+        assert!(
+            mean.abs() < 0.02,
+            "at neutral {neutral}, day-zero mean log(price/fair_value) is \n             {mean}, not centred"
+        );
+        let fraction = above as f64 / u.len() as f64;
+        assert!(
+            (fraction - 0.5).abs() < 0.03,
+            "at neutral {neutral}, {fraction} of names open above fair value, \n             not about half"
+        );
+        // Both valuation paths are exercised, or the assertion above could
+        // pass while one of the two reconciliations was wrong.
+        assert!(on_book > 200, "only {on_book} names on the book path");
+        assert!(on_book < 800, "{on_book} names on the book path is not a market");
+        }
+        // BIT-IDENTICAL across the three, which is the claim itself rather
+        // than a consequence of it. At a discount rate equal to the neutral
+        // point the rate adjustment is exactly 1.0 whatever that point is,
+        // so fair value does not depend on it and neither does this mean.
+        //
+        // The absolute bound above is the generator's own guard and it is a
+        // weak guard on the WIRING: with the rate ignored the mean reads
+        // 0.0223 at 0.0482 and fails, and about 0.015 at 0.0456 and passes.
+        // This comparison fails at every rate instead, because a mis-wired
+        // valuation cannot give one answer at three different rates.
+        assert!(
+            means.windows(2).all(|w| w[0].to_bits() == w[1].to_bits()),
+            "the day-zero mean depends on the neutral rate: {means:?}"
+        );
+    }
+
+    #[test]
+    fn the_valuation_ratios_are_symmetric_in_log_rather_than_in_the_ratio() {
+        // The mechanism behind the test above, stated on its own so a
+        // failure says which half broke. A range symmetric in the ratio is
+        // biased in the log of it, which is the form the valuation reads.
+        // What has to hold is that the range's midpoint IN LOG is zero,
+        // because `log_between` interpolates in log and the valuation
+        // multiplies by the ratio. Asserting the endpoints are reciprocal
+        // would be a proxy for it, and a weaker one.
+        for scatter in [PE_SCATTER, BOOK_SCATTER] {
+            let midpoint_in_log = crate::mathx::log(1.0 / scatter)
+                + crate::mathx::log(scatter);
+            assert!(
+                midpoint_in_log.abs() < 1e-15,
+                "range around {scatter} is off-centre in log by {midpoint_in_log}"
+            );
+        }
+        // The old bounds, kept here as the counter-example: their midpoint
+        // is 1.075 and their geometric mean is 1.0298, and it is the second
+        // number the valuation multiplies by.
+        let midpoint = (0.55 + 1.6) / 2.0;
+        let geometric = crate::mathx::exp((crate::mathx::log(0.55)
+            + crate::mathx::log(1.6))
+            / 2.0);
+        assert!(midpoint > 1.0 && geometric < 1.0);
+        // And the width is preserved, so this is a re-centring and not a
+        // narrowing of the cross-section.
+        let was = crate::mathx::log(1.6 / 0.55);
+        let now = 2.0 * crate::mathx::log(PE_SCATTER);
+        assert!((now / was - 1.0).abs() < 0.02, "pe scatter width moved");
+        let was_book = crate::mathx::log(1.4 / 0.25);
+        let now_book = 2.0 * crate::mathx::log(BOOK_SCATTER);
+        assert!((now_book / was_book - 1.0).abs() < 0.02, "book scatter width moved");
+    }
+
+    #[test]
+    fn reconciling_the_roster_did_not_move_the_stream() {
+        // Both reconciled fields take exactly one draw each, as they did
+        // before, so every OTHER field is bit-identical to what this
+        // generator has always produced. That is what keeps the change
+        // contained to the two quantities it is about.
+        //
+        // Pinned against values recorded from the previous generator at
+        // 70bcbb8, `random_universe(40, 111)`, name 0.
+        let u = random_universe(40, 111);
+        assert_eq!(u[0].ticker, "AAA");
+        assert_eq!(u[0].sector, "technology");
+        assert_eq!(u[0].initial_price, 200.45251589262966);
+        assert_eq!(u[0].shares_outstanding, 19483093.73920724);
+        assert_eq!(u[0].revenue_growth, 0.2776378159318119);
+        assert_eq!(u[0].avg_volume, 75955.40594971534);
+        assert_eq!(u[0].beta, 0.92810710019432);
+        assert_eq!(u[0].short_interest, 3531201.404338788);
     }
 
     #[test]

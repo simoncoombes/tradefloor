@@ -167,6 +167,64 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the box the way ramp=50 does above: strong-to-implausible.
     "market_beta_down_asym": (0.0, 0.1),
     "market_beta_down_asym_lag": (0.0, 0.1),
+    # The SHARE of the first moment the contemporaneous wire injects that
+    # is given back. Bounded by its own meaning rather than by a
+    # convention: 0.0 is the wire as pt-v16 ships it, 1.0 returns the whole
+    # of what it injects, and past 1.0 the dial would inject an upward
+    # drift of its own, which is the defect inverted rather than a wider
+    # search. So the box is the closed unit interval, and unlike the
+    # entries around it there is no strong-to-implausible top to choose:
+    # the top is where the correction is exact.
+    "market_beta_down_asym_recentre": (0.0, 1.0),
+    # The SHARE of nominal output growth the valuation carries. Bounded by
+    # its own meaning, as its neighbour above is: 0.0 is a valuation whose
+    # earnings never move, 1.0 holds the earnings share of nominal output
+    # constant, and past 1.0 earnings outgrow the economy every year, which
+    # is an assertion about a quantity this model does not carry. So the box
+    # is the closed unit interval and the top is where the claim stops.
+    "earnings_nominal_growth": (0.0, 1.0),
+    # The share of oil demand supply answers on the daily step. Bounded by
+    # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
+    # the value that makes the inventory random walk driftless, and past 1.0
+    # supply would exceed demand every day and inventory would ramp the
+    # other way. So the box is the closed unit interval and its top is
+    # where the process is stationary.
+    "oil_supply_response": (0.0, 1.0),
+    # How much of the OPEC rule's direction is removed. A share again:
+    # 0.0 is the rule as written, 1.0 is the symmetric form that keeps its
+    # total intervention, and past 1.0 the two branches would cross and the
+    # rule would push oil DOWN on net, which is the asymmetry inverted.
+    "oil_opec_symmetry": (0.0, 1.0),
+    # Where oil's seasonal shape acts, as a share of its own amplitude.
+    # Bounded by meaning again: 0.0 puts the whole shape on the price
+    # level, where the daily factors compound to 5.119 over a certified
+    # year, 1.0 puts the whole of it on the reversion target, where it
+    # integrates to +0.672 per cent, and past 1.0 the level would carry
+    # the shape inverted. So the box is the closed unit interval and its
+    # top is where the shape stops compounding.
+    "oil_seasonality_target": (0.0, 1.0),
+    # The clock the cycle hazard is read on. 0.0 draws a rate whose scale is
+    # in months once a day, which makes a full cycle 2.6 trading years; 1.0
+    # reads it on the 30-day month the phase clock already keeps, which makes
+    # it 9.7; and past 1.0 the cycle would run slower than the scale states.
+    # So the box is the closed unit interval and its top is where the unit is
+    # right rather than where a search stopped.
+    "cycle_hazard_per_month": (0.0, 1.0),
+    # Days the economy is advanced alone before day zero. 0.0 is
+    # construction as every earlier preset does it, 755 is the day the last
+    # field the valuation reads enters its stationary band, and 1095 is the
+    # horizon the burn-in that measured both ran to. Past that the box would
+    # describe a transient nobody has measured.
+    "macro_burn_in_days": (0.0, 1095.0),
+    # How much of the jump's own drift is given back. 0.0 is the
+    # uncompensated process, 1.0 is the martingale, and past 1.0 the
+    # compensator exceeds the drift and the jump pushes the other way.
+    "jump_mean_compensated": (0.0, 1.0),
+    # How far the two stop ladders are matched. 0.0 is the shipped pair,
+    # 1.0 is the mirror at the mean of the two, and past 1.0 the ladders
+    # cross and the upside becomes the larger one, which is the asymmetry
+    # inverted rather than a wider search.
+    "cascade_symmetry": (0.0, 1.0),
     # EMA days on the VIX the market variance target reads (round 99).
     # Measured dead at 3 and 10 along the driven window; 20 trading days
     # is a month of smoothing, past which the fear response is no longer

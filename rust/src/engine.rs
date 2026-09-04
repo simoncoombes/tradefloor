@@ -335,6 +335,18 @@ pub struct Engine {
     /// the ticks the day ran. Together they map a `(day, company)` pair to
     /// its market-stream normal indices (`Engine::market_day_layout`).
     day_marks: Vec<DayMark>,
+    /// Nominal output when this engine was built: `gdp * cpi` from the
+    /// economy it was constructed with.
+    ///
+    /// The base of the growth term's ratio, so it is a constant of the run
+    /// rather than state that advances, and it is carried in the snapshot
+    /// for the reason every per-engine field is: an engine restored
+    /// without it would rebase its valuation on the day it was restored
+    /// and grow from there, which reads as a plausible market and is not
+    /// the one the snapshot describes. Inert under every preset before
+    /// pt-v18, where `earnings_nominal_growth` is 0.0 and nothing reads
+    /// it.
+    nominal_output_base: f64,
     /// The model coefficients this engine runs (the runtime seam,
     /// CALIBRATION.md §5). [`crate::params::PT_V1`] unless the engine was
     /// built with [`Engine::with_params`]; immutable for the engine's life,
@@ -549,7 +561,11 @@ impl Engine {
         params: ModelParams,
     ) -> Self {
         let companies_len = companies.len();
-        Self {
+        // Read before the economy moves into the struct, and never
+        // recomputed: this is where the run's nominal output starts.
+        let nominal_output_base = economy.gdp * economy.cpi;
+        let mut engine = Self {
+            nominal_output_base,
             market_rng: GameRng::substream(seed, stream::MARKET),
             economy_rng: GameRng::substream(seed, stream::ECONOMY),
             external_rng: GameRng::substream(seed, stream::EXTERNAL),
@@ -588,7 +604,76 @@ impl Engine {
             current_day: 0,
             day_marks: Vec::new(),
             params,
+        };
+        engine.burn_in_economy();
+        engine
+    }
+
+    /// Advance the economy alone to the state its own dynamics reach,
+    /// before day zero.
+    ///
+    /// A BRANCH at 0.0 days, which is every preset before pt-v18: nothing
+    /// runs, nothing is drawn, and construction is what it always was.
+    ///
+    /// # What it fixes
+    ///
+    /// The economy opens at unemployment 4.00, inflation 2.00 and a
+    /// corporate yield of 4.56, and settles at 2.50, 2.74 and 4.82. So a
+    /// certified year is spent travelling rather than at rest, and the
+    /// travel is a one-way cost to the multiple. The length is measured
+    /// rather than round: the last field to enter one stationary standard
+    /// deviation of its mean is the corporate yield, on day 755.
+    ///
+    /// # Three things it does deliberately
+    ///
+    /// The draws come from the economy's own substream, so the market's
+    /// draws for day 0 onward sit exactly where they did. A burn-in
+    /// consumes economy draws by running the economy, which is the
+    /// mechanism rather than a side effect of it.
+    ///
+    /// The phase is held for the burn-in's length, because under the
+    /// hazard as written 755 days would leave an expansion. It is held by
+    /// restoring BOTH the phase and its age whenever a transition fires,
+    /// rather than the phase alone. Restoring the phase alone leaves
+    /// `months_in_current_phase` at zero, which fires the phase-change
+    /// shock on the next day and lifts growth half a point above its
+    /// target for the rest of the burn-in. The transition roll still
+    /// happens and still consumes its uniform either way.
+    ///
+    /// The clock is reset to zero at the end, so the year opens at the
+    /// start of a phase as every certified year has. Keeping the burn-in's
+    /// age would open a random distance into an expansion, which is a
+    /// different certified year and a choice rather than a correction.
+    ///
+    /// # The growth term's base
+    ///
+    /// `gdp` and `cpi` compound on every one of these days, so the base of
+    /// `earnings_nominal_growth` is re-read at the end. Left at the
+    /// pre-burn-in value it would open every valuation about nine per cent
+    /// above its earnings, which is a level jump nobody asked for and
+    /// which the ratio was never meant to carry.
+    fn burn_in_economy(&mut self) {
+        if self.params.macro_burn_in_days <= 0.0 {
+            return;
         }
+        let days = self.params.macro_burn_in_days as i64;
+        let phase = self.economy.cycle_phase;
+        for day in 1..=days {
+            let months_before = self.economy.months_in_current_phase;
+            self.advance_day(&DayAdvanceRequest {
+                volatility: 1.0,
+                active_shocks: &[],
+                market_return_pct: 0.0,
+                game_day: day,
+                timestamp: day * 24 * 60,
+            });
+            if self.economy.cycle_phase != phase {
+                self.economy.cycle_phase = phase;
+                self.economy.months_in_current_phase = months_before + 1.0 / 30.0;
+            }
+        }
+        self.economy.months_in_current_phase = 0.0;
+        self.nominal_output_base = self.economy.gdp * self.economy.cpi;
     }
 
     /// The model coefficients this engine runs. Read-only: an engine's
@@ -971,6 +1056,7 @@ impl Engine {
                 market_sigma_daily,
                 settle_draws,
                 settle_depth_counterfactual: self.settle_depth_counterfactual,
+                nominal_output_base: self.nominal_output_base,
                 params: &self.params,
             },
             rng,
@@ -1473,7 +1559,7 @@ impl Engine {
     #[rustfmt::skip]
     fn apply_jumps(&mut self) {
         // mechanism:jumps begin -- generated by tools/mechanism/emit.py from
-        // tools/mechanism/mechanisms/jumps.py (spec e7ae6ae4ff89); do not edit by hand.
+        // tools/mechanism/mechanisms/jumps.py (spec 39073377cfbc); do not edit by hand.
         // Draws: 1 uniform, 1 normal, 1 uniform per company, 1 normal per company on the jumps stream, unconditionally.
         let p = &self.params;
         let ratio = self.economy.vix / p.market_vol_vix_anchor;
@@ -1485,13 +1571,14 @@ impl Engine {
         self.jump_rng.site(Site::JumpMarketZ, 0);
         let z_market = self.jump_rng.next_normal();
         let market = if u_market < intensity_market { p.jump_mean_market + (p.jump_sigma_market * z_market) } else { 0.0 };
+        let compensator = if p.jump_mean_compensated == 0.0 { 0.0 } else { p.jump_mean_compensated * (intensity_market * p.jump_mean_market) };
         for (index, company) in self.companies.iter_mut().enumerate() {
             self.jump_rng.site(Site::JumpCompanyU, index as u32);
             let u = self.jump_rng.next_f64();
             self.jump_rng.site(Site::JumpCompanyZ, index as u32);
             let z = self.jump_rng.next_normal();
             let idio = if u < intensity_idio { p.jump_sigma_idio * z } else { 0.0 };
-            let total = market + idio;
+            let total = (market + idio) - compensator;
             if total != 0.0 {
                 if let Some(s) = company.stock.mispricing_s {
                     let after = crate::market::tick::clamp_s(&self.params, s + total);
@@ -1659,6 +1746,9 @@ impl Engine {
                 crisis_vix_threshold: self.params.crisis_vix_threshold,
                 usd_crisis_vix_threshold: self.params.usd_crisis_vix_threshold,
                 daily_credit_floor_gain: self.params.daily_credit_floor_gain,
+                oil_supply_response: self.params.oil_supply_response,
+                oil_opec_symmetry: self.params.oil_opec_symmetry,
+                oil_seasonality_target: self.params.oil_seasonality_target,
                 volatility: request.volatility,
                 active_shocks: request.active_shocks,
                 market_return_pct: request.market_return_pct,
@@ -1667,7 +1757,8 @@ impl Engine {
             rng,
         );
         rng.site(Site::EconomyCycle, 0);
-        self.economy = check_cycle_transition(&self.economy, rng);
+        self.economy =
+            check_cycle_transition(&self.economy, rng, self.params.cycle_hazard_per_month);
 
         let meeting =
             {
@@ -1864,6 +1955,19 @@ impl Engine {
         self.forced_flow_spent = spent;
     }
 
+    /// Nominal output when this engine was built, for checkpoints and
+    /// forks. See the field's own comment for what depends on it.
+    pub fn nominal_output_base(&self) -> f64 {
+        self.nominal_output_base
+    }
+
+    /// Put a restored engine back on the base its snapshot was taken
+    /// under. A restore that reset the economy and left this alone would
+    /// price a market against output it never had.
+    pub fn set_nominal_output_base(&mut self, base: f64) {
+        self.nominal_output_base = base;
+    }
+
     pub fn close_day(&mut self, game_day: i64) {
         let noise = self.attribution_column(random_noise_index());
         let innovations: Vec<Option<f64>> = noise.into_iter().map(Some).collect();
@@ -1901,13 +2005,35 @@ impl Engine {
         let mut weighted_pe = 0.0;
         let mut last_tick_mcap = 0.0;
         let mut last_tick_return_pct = 0.0;
+        // The trailing PE is a price over an EARNINGS figure, and under
+        // `earnings_nominal_growth` the earnings the model believes a
+        // company has are its day-0 figure restated in today's price level
+        // and output. Reading the day-0 figure against a price that grew
+        // with nominal output would report a multiple that rose because
+        // the mechanism ran, and the expansion hazard in `economy::cycle`
+        // adds `min(0.1, (pe - 28) * 0.005)` a day above a multiple of 28.
+        //
+        // Measured on one trajectory, pt-v18 on `Universe.random(40,
+        // seed=111)` seed 1 over 1008 days: the restated multiple ends at
+        // 30.214 and crosses 28 on 32 days for a summed hazard of 0.2536,
+        // and the day-0 denominator on the same tape gives 32.284, 42 days
+        // and 0.6344. Inside a certified year neither reaches the gate:
+        // the multiple at day 251 is 21.671 at a ratio of 1.0448, so this
+        // is worth nothing over 252 days and a third of the expansion
+        // hazard over four years. Exactly 1.0 under every preset before
+        // pt-v18.
+        let nominal = crate::market::tick::nominal_scale(
+            &self.params, &self.economy, self.nominal_output_base);
         for c in self.companies() {
             if !c.is_public || c.is_bankrupt {
                 continue;
             }
             if let Some(eps) = c.eps {
                 if eps > 0.0 {
-                    let pe = c.stock.price / eps;
+                    // A branch, as at the valuation, so the arithmetic
+                    // before pt-v18 is the arithmetic it always was.
+                    let earnings = if nominal == 1.0 { eps } else { eps * nominal };
+                    let pe = c.stock.price / earnings;
                     if pe > 0.0 && pe < 200.0 {
                         total_mcap += c.stock.market_cap;
                         weighted_pe += pe * c.stock.market_cap;
@@ -2539,6 +2665,11 @@ impl Engine {
         }
         hash_f64(&mut buf, self.universe_stress);
         hash_f64(&mut buf, self.forced_flow_spent);
+        // The growth term's base, in snapshot order. A constant of the run
+        // rather than state that advances, and covered for the reason
+        // every other field here is: two engines that agree on today's
+        // prices and hold different bases price tomorrow differently.
+        hash_f64(&mut buf, self.nominal_output_base);
 
         // The day's endogenous news. Generated at `open_market` and cleared
         // at the next one, so a close-boundary leaf carries the day's events

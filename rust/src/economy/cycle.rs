@@ -5,6 +5,18 @@
 //! so how long a phase has already lasted changes how likely it is to end.
 //! `shape > 1` means an ageing phase grows fragile (expansions); `shape < 1`
 //! means early exits dominate and late ones linger (contractions).
+//!
+//! # The clock every rate here is on
+//!
+//! Every scale in [`cycle_hazard_params`] is in MONTHS, so
+//! [`weibull_hazard`] returns a rate per month, and so does the condition
+//! ladder that adds to it and the clamp that bounds it.
+//! `months_in_current_phase` advances by `1/30` a day, which makes the month
+//! this model keeps 30 days long. [`check_cycle_transition`] draws once a
+//! day, so the monthly rate is converted at the draw under
+//! `cycle_hazard_per_month`. At 0.0 it is drawn as written, which is the
+//! reference implementation's reading and about thirty times the rate its
+//! own parameters state.
 
 use super::state::*;
 use crate::mathx::{self, clamp_via_min_max as clamp};
@@ -28,7 +40,29 @@ pub fn weibull_hazard(months: f64, shape: f64, scale: f64) -> f64 {
     mathx::min(0.8, (shape / scale) * mathx::pow(t, shape - 1.0))
 }
 
+/// The monthly hazard read on the day it is drawn.
+///
+/// A BRANCH at 0.0, so every preset before pt-v18 compares the monthly rate
+/// against the uniform exactly as the reference implementation does. At 1.0
+/// the arithmetic is `monthly / 30.0` to the last bit, because `30 - 29` is
+/// exact and `x / 1.0` is `x`. In between, the share of the correction
+/// applied is linear in the probability.
+///
+/// See [`crate::params::ModelParams::cycle_hazard_per_month`] for why the
+/// conversion belongs here rather than inside [`weibull_hazard`] or before
+/// the clamp.
+#[inline]
+fn per_day(monthly: f64, per_month: f64) -> f64 {
+    if per_month == 0.0 {
+        monthly
+    } else {
+        monthly * (30.0 - 29.0 * per_month) / 30.0
+    }
+}
+
 /// Phase-specific Weibull parameters.
+///
+/// Every scale is in MONTHS. See this module's own note on the clock.
 pub fn cycle_hazard_params(phase: CyclePhase) -> (f64, f64) {
     match phase {
         // Long expansions get increasingly fragile.
@@ -50,7 +84,10 @@ pub fn cycle_hazard_params(phase: CyclePhase) -> (f64, f64) {
 /// the probability **without rolling the dice**. The original duplicates the
 /// condition ladder between this and [`check_cycle_transition`]; here the two
 /// share [`adjust_transition_probability`], on the evidence recorded there.
-pub fn get_cycle_transition_probability(economy: &EconomyState) -> (f64, CyclePhase) {
+pub fn get_cycle_transition_probability(
+    economy: &EconomyState,
+    per_month: f64,
+) -> (f64, CyclePhase) {
     let phase = phase_characteristics(economy.cycle_phase);
     let months = economy.months_in_current_phase;
     if months < phase.min_months {
@@ -60,7 +97,7 @@ pub fn get_cycle_transition_probability(economy: &EconomyState) -> (f64, CyclePh
     let (shape, scale) = cycle_hazard_params(economy.cycle_phase);
     let p = adjust_transition_probability(economy, weibull_hazard(months, shape, scale));
 
-    (clamp(p, 0.0, 0.3), phase.next_phase)
+    (per_day(clamp(p, 0.0, 0.3), per_month), phase.next_phase)
 }
 
 /// The condition ladder shared, in the original, by both entry points.
@@ -136,7 +173,11 @@ fn adjust_transition_probability(economy: &EconomyState, mut p: f64) -> f64 {
 /// **Draw schedule:** exactly **one uniform**, and only when the minimum
 /// phase duration has elapsed. Below `min_months` the function returns before
 /// drawing, so the count is 0-or-1 and never anything else.
-pub fn check_cycle_transition(economy: &EconomyState, rng: &mut impl Rng) -> EconomyState {
+pub fn check_cycle_transition(
+    economy: &EconomyState,
+    rng: &mut impl Rng,
+    per_month: f64,
+) -> EconomyState {
     let phase = phase_characteristics(economy.cycle_phase);
     let months = economy.months_in_current_phase;
 
@@ -146,8 +187,15 @@ pub fn check_cycle_transition(economy: &EconomyState, rng: &mut impl Rng) -> Eco
 
     let (shape, scale) = cycle_hazard_params(economy.cycle_phase);
     let p = adjust_transition_probability(economy, weibull_hazard(months, shape, scale));
-    // Max 30% chance on any one day.
-    let transition_probability = clamp(p, 0.0, 0.3);
+    // The cap on the hazard, at 0.3 of whatever unit the hazard carries.
+    // Under the reference implementation's reading that is a 30 per cent
+    // chance on any one day; under the monthly reading it caps a rate per
+    // month and the largest daily probability is 0.01. On the hazard alone
+    // it binds for a peak past month 5.40 and a trough past month 2.57, and
+    // under either reading a trough with its own ladder saturates it on the
+    // first eligible roll. See `ModelParams::cycle_hazard_per_month` for
+    // the counts.
+    let transition_probability = per_day(clamp(p, 0.0, 0.3), per_month);
 
     if rng.next_f64() < transition_probability {
         let mut next = economy.clone();

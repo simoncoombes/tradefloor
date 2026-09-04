@@ -120,13 +120,66 @@ def test_a_roster_edit_is_not_a_counterfactual():
 def test_bigger_size_costs_more():
     # Emergent, not modelled: a larger order pushes further because it applies
     # more pressure, not because a coefficient scales with size.
+    #
+    # Measured on a THIN name, and at sizes three orders of magnitude apart,
+    # because the size channel is narrow and bounded at both ends.
+    # `order_imbalance` multiplies the buy/sell ratio by
+    # `max(0.2, min(total / avg_minute_volume, 10) * 0.15)`, so size enters
+    # only through a multiplier that floors at 0.2 and saturates at 1.5. The
+    # whole size effect is a factor of 7.5, and it is spent by ten times the
+    # name's average minute volume.
+    #
+    # This read `UNIVERSE[0]` at 1e6 against 8e6 shares until the universe
+    # generator was reconciled to open a drawn roster at its own fair value.
+    # That name is the roster's most liquid, its average minute volume is
+    # 114,000 shares, and both sizes sat at the top of the multiplier's
+    # range; the entire difference between them was worth about one price
+    # tick on a 97 dollar share. The assertion was reading the rounding and
+    # it happened to round the right way. It is not a size test unless the
+    # sizes straddle the band, so it now straddles it.
+    thin = min(UNIVERSE, key=lambda i: i.avg_volume)
     small = tradefloor.flow_impact(
-        seed=42, universe=UNIVERSE, order_flow={TRADED: (1e6, 0.0)}, ticks=390
+        seed=42, universe=UNIVERSE, order_flow={thin.ticker: (1e1, 0.0)}, ticks=390
     )
     large = tradefloor.flow_impact(
-        seed=42, universe=UNIVERSE, order_flow={TRADED: (8e6, 0.0)}, ticks=390
+        seed=42, universe=UNIVERSE, order_flow={thin.ticker: (1e4, 0.0)}, ticks=390
     )
-    assert large.cost_bps(TRADED) >= small.cost_bps(TRADED)
+    # A wide margin, not a tie-break: 137 bps against 1,327 here, and the
+    # same ordering on seeds 7, 99, 123 and 2026.
+    assert large.cost_bps(thin.ticker) > 2.0 * small.cost_bps(thin.ticker)
+
+
+def test_order_size_stops_mattering_once_the_imbalance_multiplier_saturates():
+    """The bound on the test above, asserted rather than left implicit.
+
+    Impact is about PARTICIPATION and the participation term is capped, so
+    beyond ten times a name's average minute volume the model is indifferent
+    to size: a large order and an enormous one are the same order to it.
+    Worth pinning, because a transaction-cost figure read off this surface
+    at institutional size is reading a constant.
+    """
+    thin = min(UNIVERSE, key=lambda i: i.avg_volume)
+    costs = [
+        tradefloor.flow_impact(
+            seed=42, universe=UNIVERSE,
+            order_flow={thin.ticker: (size, 0.0)}, ticks=390
+        ).cost_bps(thin.ticker)
+        for size in (1e4, 1e6, 1e8)
+    ]
+    assert costs[0] == costs[1] == costs[2], costs
+
+    # And the ratio, not the net, is what the model reads. The same net
+    # imbalance costs two orders of magnitude less when it arrives inside a
+    # larger gross flow.
+    lone = tradefloor.flow_impact(
+        seed=42, universe=UNIVERSE,
+        order_flow={thin.ticker: (1e3, 0.0)}, ticks=390
+    ).cost_bps(thin.ticker)
+    buried = tradefloor.flow_impact(
+        seed=42, universe=UNIVERSE,
+        order_flow={thin.ticker: (1e5, 9.9e4)}, ticks=390
+    ).cost_bps(thin.ticker)
+    assert lone > 100.0 * buried, (lone, buried)
 
 
 def test_the_two_worlds_differ_only_by_the_flow():
