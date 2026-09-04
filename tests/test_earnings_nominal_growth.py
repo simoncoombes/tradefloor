@@ -425,12 +425,17 @@ def test_both_terms_compose_on_the_shipped_preset():
     zero. This one derives both, because the preset sets both and a test
     that only ever runs the isolated arm stops describing what ships.
 
-    The payout factor reads the current price, so this assertion covers the
-    FIRST tick of a day, where that price is the column the engine holds
-    before the session and not an intra-tick quantity this file would have
-    to infer. The test asserts the column is unchanged across the open
-    rather than assuming it, since the whole point is to use the number the
-    tick actually read.
+    The payout factor reads the current price, which `truth` does not
+    carry. It is recovered from `Engine.session_prices`, the session's own
+    path at `ticks_written x instruments`, so this covers EVERY tick rather
+    than the first: a tick prices off the state the previous one left, so
+    tick t reads row t - 1 and tick 0 reads the column snapshotted before
+    the open. That column is asserted unchanged across the open rather than
+    assumed, since the point is to use the number the tick actually read.
+
+    Covering every tick is why the isolated arm above is kept for isolation
+    rather than for reach. Both arms now check the same 240 rows, and the
+    isolated one earns its place by saying what ONE term does on its own.
 
     The two terms compose rather than each scaling the original earnings:
     the payout factor is computed on the already-grown figure, which is the
@@ -454,20 +459,34 @@ def test_both_terms_compose_on_the_shipped_preset():
     assert engine.column("price") == before, (
         "the open moved the price column, so the number below is not the one "
         "the tick read")
-    prices = struct.unpack("<%dd" % ROSTER, before)
+    opening_prices = struct.unpack("<%dd" % ROSTER, before)
 
-    engine.run_session(9, 30, 3, 1)
+    engine.run_session(9, 30, 3, TICKS)
     engine.record(days - 1)
     truth = pa.table(engine.truth(day=days - 1)).to_pydict()
 
+    # The price each tick READ, for every tick rather than the first. The
+    # session's own path is `ticks_written x instruments` row-major, and a
+    # tick prices off the state the previous one left, so tick t reads row
+    # t - 1 and tick 0 reads the column snapshotted above. `truth` carries
+    # no traded price, which is why the path is taken from the session
+    # rather than from the table beside the fundamentals.
+    path = struct.unpack("<%dd" % (TICKS * ROSTER), engine.session_prices())
+
+    def price_read_by(tick: int, slot: int) -> float:
+        if tick == 0:
+            return opening_prices[slot]
+        return path[(tick - 1) * ROSTER + slot]
+
     checked = 0
     for row, slot in enumerate(truth["instrument_id"]):
+        tick = truth["tick"][row]
         want = _derived(universe[slot], economy, scale, model,
-                        price=prices[slot], day=days - 1)
+                        price=price_read_by(tick, slot), day=days - 1)
         got = truth["fundamental_value"][row]
-        assert got == pytest.approx(want, rel=1e-12), (slot, got, want)
+        assert got == pytest.approx(want, rel=1e-12), (tick, slot, got, want)
         checked += 1
-    assert checked == ROSTER
+    assert checked == ROSTER * TICKS
 
     # And the payout term is doing something, or this would pass on a build
     # that dropped it. Derived without a price, the same names differ.
@@ -476,7 +495,7 @@ def test_both_terms_compose_on_the_shipped_preset():
         1 for row, slot in enumerate(truth["instrument_id"])
         if truth["fundamental_value"][row] != pytest.approx(
             _derived(universe[slot], economy, scale, nominal_only), rel=1e-9))
-    assert differing == ROSTER, differing
+    assert differing == ROSTER * TICKS, differing
 
 
 def test_the_derivation_tracks_every_parameter_that_reaches_the_valuation():
