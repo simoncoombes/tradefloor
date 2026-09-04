@@ -1209,6 +1209,14 @@ mod tests {
             let k = exponent(&off, phi);
             assert!((k - expected).abs() < 1e-12, "phi {phi}: {k}, {what}");
         }
+        // And WHERE the ends are, not only that they exist. Mutation
+        // testing found this: with the elasticities alone, a ceiling moved
+        // from ten to twenty still reads 0 at the point sampled above it,
+        // because that point moved inside the new band. The multiplier is
+        // already at its ceiling at exactly ten, and still rising just
+        // below, so a ceiling anywhere else fails one of these two.
+        assert_eq!(multiplier(&off, PARTICIPATION_KNEE), multiplier(&off, 1e9));
+        assert!(multiplier(&off, 9.0) < multiplier(&off, PARTICIPATION_KNEE));
     }
 
     #[test]
