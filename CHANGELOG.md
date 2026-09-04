@@ -67,12 +67,12 @@ entry must ship the rule's band exactly.
 
 The leverage clamp's cost is stated rather than argued away. The 2020-07
 window of the reference panel reads +0.014, inside the rule's ceiling of
-+0.06 and outside the clamped 0.00, so the clamp rejects one real year in
-nine; it decides no current verdict, every certified reading being
-negative, and it is what keeps a reversed effect reading as "too weak"
-rather than "too high". Whether the sign prior outranks the excluded
-window is a ruling, recorded as open in the table and the test that used
-to present the exclusion as the data's own finding.
++0.06 and outside the clamped 0.00, so the clamp rejects one real year
+in nine. No current verdict turns on it, every certified reading being
+negative; a reversed effect would read as "too weak" rather than "too
+high". Whether the sign prior outranks the excluded window is a ruling,
+recorded as open in the table and the test that used to present the
+exclusion as the data's own finding.
 
 ### The graded level row and the split of the certified set
 
