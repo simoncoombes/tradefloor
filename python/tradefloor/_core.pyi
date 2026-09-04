@@ -71,6 +71,7 @@ def fair_value(
     corporate_bond_yield: float | None = ...,
     qe_pe_boost: float | None = ...,
     book_value_per_share: float | None = ...,
+    neutral_discount_rate: float | None = ...,
 ) -> FairValue: ...
 
 class MispricingState:

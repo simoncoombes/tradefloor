@@ -61,11 +61,17 @@ superseded figures beside them are marked with the era they belonged to.
 that a drawn roster opens at its own fair value rather than above it, which
 changed every generated name's earnings and book value, and
 `Universe.random(40, seed=111)` now fingerprints 9be68b9bc37e7978. Every
-figure below, `SEED_SD`, `SEED_SD_504` and the `envelope` module's measured
-tables were all taken on the roster the OLD generator produced, and none of
-them has been re-measured. They are stale, and the stale figures are kept
-rather than quietly swapped, because a figure carrying a fingerprint it was
-not measured under is the defect this module corrected once already.
+figure below, `SEED_SD_504` and the `envelope` module's measured tables were
+taken on the roster the OLD generator produced and have not been
+re-measured. They are stale, and the stale figures are kept rather than
+quietly swapped, because a figure carrying a fingerprint it was not measured
+under is the defect this module corrected once already.
+
+`SEED_SD` is the exception and has been re-measured on the current roster,
+which `SEED_SD_PROVENANCE` records. It reads that roster from a committed
+fixture rather than from the generator, so it no longer moves when the
+generator does, and the fourteen scales shift by -6.02 to +5.22 per cent
+against their superseded values.
 
 How stale, measured rather than guessed: over seeds 101 to 110 at 252 days
 on pt-v16, the fourteen graded medians move by at most 0.26 of their own
@@ -781,6 +787,60 @@ REAL_MARKETS_PROVENANCE = {
     },
 }
 
+#: The reference panel's per-window readings, as data.
+#:
+#: `REAL_MARKETS_PROVENANCE` carries only three numbers per row, the min,
+#: median and max across windows, which is enough to read a band's derivation
+#: and not enough to re-derive one. This is the table those three summarise:
+#: ten 253-bar windows of the same 40 US large caps, 2015-07 to 2025-07,
+#: measured with THIS module's estimators at THIS panel's method.
+#:
+#: The 2019-07 window straddles the COVID crash and is EXCLUDED from band
+#: derivation, reported beside each band as the crisis reading. Every summary
+#: in `REAL_MARKETS_PROVENANCE` is taken over the nine non-crisis windows, and
+#: `tests/test_reference_windows.py` derives all nine reproducible triples
+#: from this table rather than trusting that they match.
+#:
+#: TEN ROWS OF FOURTEEN. The four correlation-structure rows -- corr_asymmetry,
+#: corr_asymmetry_lagged, sector_excess_corr and corr_persistence_acf1 -- have
+#: no per-window record here, and `abs_return_acf5`'s provenance summarises a
+#: different window set from this one, so its triple is not derivable from
+#: these values and the test excludes it by name rather than by tolerance.
+#:
+#: What this unblocks: any re-derivation of a band, a leave-one-window-out
+#: null of the panel against real data, and any method that needs the
+#: dispersion of a statistic across real years rather than its range.
+REAL_MARKETS_WINDOWS = {
+    "windows": (
+        "2015-07..2016-07", "2016-07..2017-07", "2017-07..2018-07",
+        "2018-07..2019-07", "2019-07..2020-07", "2020-07..2021-07",
+        "2021-07..2022-07", "2022-07..2023-07", "2023-07..2024-07",
+        "2024-07..2025-07",
+    ),
+    #: Index into `windows` of the one excluded from every band derivation.
+    "crisis_index": 4,
+    "roster": "40 US large caps, common to all ten windows",
+    "source": "tradefloor-design/REALISM-BANDS.md, the window table",
+    "values": {
+        "annualised_vol_pct": (25.9, 18.3, 21.5, 25.7, 45.3, 28.2, 30.7, 29.0, 23.4, 29.9),
+        "excess_kurtosis": (5.71, 36.72, 5.64, 11.06, 11.36, 5.60, 10.20, 13.44, 15.13, 13.79),
+        "return_acf1": (0.030, -0.015, -0.046, -0.009, -0.244, -0.046, 0.028, 0.006, 0.018, -0.006),
+        "abs_return_acf1": (0.176, 0.083, 0.165, 0.128, 0.430, 0.071, 0.076, 0.057, 0.039, 0.122),
+        "abs_return_acf5": (0.045, 0.034, 0.066, 0.045, 0.343, 0.073, 0.046, 0.036, 0.036, 0.068),
+        "abs_return_acf20": (0.013, -0.012, 0.001, 0.059, 0.141, 0.020, 0.020, 0.030, -0.015, 0.028),
+        "cross_sectional_corr": (0.477, 0.208, 0.352, 0.357, 0.633, 0.269, 0.346, 0.369, 0.169, 0.297),
+        "volume_abs_return_corr": (0.617, 0.616, 0.584, 0.527, 0.645, 0.544, 0.513, 0.502, 0.503, 0.536),
+        "leverage_effect": (-0.109, -0.020, -0.087, -0.113, -0.128, 0.014, -0.038, -0.043, -0.007, -0.042),
+        "volume_change_acf1": (-0.221, -0.242, -0.255, -0.259, -0.284, -0.266, -0.238, -0.296, -0.263, -0.239),
+    },
+    #: Rows whose provenance triple this table does NOT reproduce, with why.
+    "not_derivable": {
+        "abs_return_acf5": "its provenance summarises a different window set, "
+                           "an eight-value list rather than these nine",
+    },
+}
+
+
 #: The across-seed standard deviation of each statistic at the shipped
 #: preset. It ships beside the bands because a band exit is only comparable
 #: across statistics once it is priced in units of that statistic's own
@@ -814,30 +874,30 @@ REAL_MARKETS_PROVENANCE = {
 #: `tradefloor.loss.seed_sd_from_panels` remains the estimator, and the loss
 #: takes a replacement as a parameter rather than requiring an edit here.
 SEED_SD = {
-    "annualised_vol_pct": 6.46066,
-    "excess_kurtosis": 1.17181,
-    "return_acf1": 0.0532019,
-    "abs_return_acf1": 0.0945748,
-    "abs_return_acf5": 0.0550538,
-    "abs_return_acf20": 0.0466668,
-    "cross_sectional_corr": 0.10875,
-    "volume_abs_return_corr": 0.0433524,
-    "leverage_effect": 0.0759765,
-    "volume_change_acf1": 0.0102341,
-    # Added 2026-08-25 on the SAME protocol as the rest of this table: pt-v1,
-    # Universe.random(40, seed=111), 252 days, seeds 101-130, sample sd. Not
-    # pt-v3, deliberately: this table is the frozen denominator of every
-    # "seed-sd out" figure the project has published, re-derived from the
-    # committed per-seed table in tests/test_loss.py. A first draft
-    # measured these three on pt-v3 with the population estimator and was
-    # caught by that test; the pt-v3 values (0.1435, 0.1451, 0.0071) are
-    # recorded in the calibration record beside the certification medians.
-    "corr_asymmetry": 0.1614765,
-    "corr_asymmetry_lagged": 0.1178216,
-    "sector_excess_corr": 0.0068036,
-    # 2026-08-25, same protocol. The largest seed sd of any correlation-type
-    # statistic: a twelve-point acf1 per seed. See CALIBRATION-FOLLOWUPS.md §64.
-    "corr_persistence_acf1": 0.2789932,
+    "annualised_vol_pct": 6.45368,
+    "excess_kurtosis": 1.17811,
+    "return_acf1": 0.0525798,
+    "abs_return_acf1": 0.0955416,
+    "abs_return_acf5": 0.0567399,
+    "abs_return_acf20": 0.0467066,
+    "cross_sectional_corr": 0.108444,
+    "volume_abs_return_corr": 0.0415843,
+    "leverage_effect": 0.0769232,
+    "volume_change_acf1": 0.0107678,
+    # These four joined the table on 2026-08-25 on the same protocol as the
+    # rest of it. A first draft measured three of them on pt-v3 with the
+    # population estimator and was caught by the test that re-derives this
+    # table; the pt-v3 values (0.1435, 0.1451, 0.0071) are recorded in the
+    # calibration record beside the certification medians. pt-v1 is
+    # deliberate: this table is the frozen denominator of every "seed-sd
+    # out" figure the project publishes, so it stays at the baseline preset
+    # rather than moving with each era.
+    "corr_asymmetry": 0.163194,
+    "corr_asymmetry_lagged": 0.115927,
+    "sector_excess_corr": 0.0063937,
+    # The largest seed sd of any correlation-type statistic: a twelve-point
+    # acf1 per seed. See CALIBRATION-FOLLOWUPS.md section 64.
+    "corr_persistence_acf1": 0.279423,
 }
 
 #: Real-market bands re-derived at a 504-DAY measurement window.
@@ -917,32 +977,63 @@ SEED_SD_504_PROVENANCE = {
 #: Where SEED_SD's values come from, carried as data so any consumer -- the
 #: loss report, a calibration manifest -- can quote it rather than assert it.
 SEED_SD_PROVENANCE = {
-    "source": "re-measured on the shipped preset: facts.measure() on "
-              "Universe.random(40, seed=111), 252 days, seeds 101-130, "
+    "source": "re-measured on the shipped baseline preset: facts.measure() "
+              "on the committed panel roster, 252 days, seeds 101-130, "
               "sample sd across seeds",
-    "date": "2026-08-22",
+    "date": "2026-09-03",
     "model_fingerprint": "pt-v1",
-    "universe_fingerprint": "5d8de78b55aad752307740018791"
-                            "54c0f29aa8fc0c63f3c6a4ac791165ca7380",
+    "universe_fingerprint": "9be68b9bc37e79785765df2f395a9348"
+                            "650a4e9293507680532293fdf78808dd",
     "days": 252,
     "seeds": tuple(range(101, 131)),
     "estimator": "sample standard deviation (n - 1) across seeds",
-    "cross_check": "agrees to six significant figures with the seed_sd of "
-                   "tools/calibration/results/"
-                   "jacobian-pt-v1-2026-08-22-chunk1.json, measured "
-                   "independently by the phase-2 instrument on the same "
-                   "thirty seeds",
+    "roster_note": "the roster is read from tests/fixtures/"
+                   "panel-roster-40.json rather than drawn by "
+                   "Universe.random, so this table no longer moves when the "
+                   "generator does. It moved once for that reason: the "
+                   "generator was reconciled so a drawn roster opens at its "
+                   "own fair value, every roster re-rolled, and all fourteen "
+                   "values went stale on a change that touched no "
+                   "coefficient and no estimator.",
     "pinned_by": "tests/test_loss.py re-measures two of the thirty seeds "
                  "live and re-derives the sd from the committed per-seed "
                  "table",
-    # The roster above is no longer the one that call returns. Recorded as
-    # data beside the fingerprint it supersedes, so a consumer quoting this
-    # provenance quotes the discrepancy with it rather than presenting a
-    # measurement under a roster it was not taken on.
-    "roster_superseded": "Universe.random(40, seed=111) now fingerprints "
-                         "9be68b9bc37e7978: the generator was reconciled so "
-                         "a drawn roster opens at its own fair value. These "
-                         "values have NOT been re-measured on it.",
+    # The cross-check, written as three claims because the single sentence
+    # it replaced implied one larger one.
+    "cross_check": "the base panels of a jacobian.py run on the same "
+                   "roster, preset, horizon and seeds hold the same thirty "
+                   "panels to the bit, all 420 values",
+    "cross_check_detects": "a transcription error in a hand-maintained "
+                           "block of 420 floats, and a platform or "
+                           "interpreter difference when the two sides are "
+                           "run on different machines",
+    "cross_check_cannot_detect": "an estimator defect. Both sides call "
+                                 "facts.measure and derive the scale "
+                                 "through loss.seed_sd_from_panels, so they "
+                                 "share the estimator and cannot disagree "
+                                 "about it. A genuinely independent check "
+                                 "would be a second estimator written "
+                                 "against the recorded bars, which does not "
+                                 "exist.",
+    # A tighter agreement here is agreeing about LESS than the looser one it
+    # replaced, and the difference is worth stating so nobody reads it the
+    # other way.
+    "cross_check_caveat": "this pair is bit-exact and single-platform. The "
+                          "pair it replaces agreed to six significant "
+                          "figures and spanned two platforms, macOS arm64 "
+                          "under CPython 3.11.15 against a table measured "
+                          "elsewhere, so it also carried evidence about "
+                          "portability that this one does not. The market "
+                          "is bit-reproducible across platforms and the "
+                          "statistics derived from it are not: the same "
+                          "panel under CPython 3.11.16 on Linux and 3.13.12 "
+                          "on Windows differs by up to 8.4e-15 relative on "
+                          "excess kurtosis while all three known-answer "
+                          "digests match.",
+    "companion_not_re_measured": "SEED_SD_504 and the envelope module's "
+                                 "measured tables were taken on the "
+                                 "superseded roster and have not been "
+                                 "re-measured on this one.",
 }
 
 #: The first two are MARGINAL: properties of one series taken on its own. The
@@ -1142,6 +1233,128 @@ def _correlation(a: Sequence[float], b: Sequence[float]) -> float | None:
     if unit_a is None or unit_b is None:
         return None
     return sum(x * y for x, y in zip(unit_a, unit_b))
+
+
+def _zumbach_terms(
+    returns: Sequence[float], n: int
+) -> tuple[list[float], list[float], list[float], list[float]]:
+    """The four per-window terms of `zumbach_asymmetry`, for ONE series.
+
+    Kept separate so names can be pooled by their TERMS rather than by
+    concatenating their returns. Concatenation would build windows straddling
+    two companies, which reads the end of one and the start of another as a
+    single trend and returns a plausible number for a quantity nobody
+    computed.
+    """
+    past_trend_sq: list[float] = []
+    future_var: list[float] = []
+    past_var: list[float] = []
+    future_trend_sq: list[float] = []
+    for t in range(n, len(returns) - n):
+        back = returns[t - n:t]
+        fwd = returns[t + 1:t + 1 + n]
+        if len(fwd) < n:
+            break
+        past_trend_sq.append(math.fsum(back) ** 2)
+        past_var.append(math.fsum(x * x for x in back))
+        future_trend_sq.append(math.fsum(fwd) ** 2)
+        future_var.append(math.fsum(x * x for x in fwd))
+    return past_trend_sq, future_var, past_var, future_trend_sq
+
+
+def zumbach_asymmetry(returns: Sequence[float], n: int) -> float | None:
+    """Time-reversal asymmetry of volatility feedback, at horizon `n`.
+
+    `A(n) = corr(P^2, Qp) - corr(Qm, F^2)`, where over a window of `n`
+    sessions either side of `t`, `P` is the past trend, `Qm` the past realised
+    variance, `F` the future trend and `Qp` the future realised variance. It
+    asks whether a past TREND predicts future variance better than past
+    variance predicts a future trend, which for a time-reversible process it
+    does not.
+
+    Positive in equity data at scales of days to weeks (Muller and others
+    1997; Zumbach 2009; Chicheportiche and Bouchaud 2014).
+
+    ## Why this is a null control and not only a target
+
+    A(n) is EXACTLY ZERO in population for any stationary process
+    `r_t = sigma_t * z_t` whose `z` are independent, symmetric and independent
+    of the past, and whose `sigma_t` is any measurable function of past
+    SQUARES. So a reading away from zero identifies a variance law that reads
+    a signed return with memory beyond a day, and nothing else can produce it.
+
+    The proof is three lines. `P^2 = Qm + 2 * sum_{i<j} r_{t-i} r_{t-j}`, and
+    flipping the sign of one past innovation leaves every sigma and every
+    future square unchanged while flipping each cross term, so
+    `Cov(P^2, Qp) = Cov(Qm, Qp)`. `F^2 = Qp + 2 * sum_{i<j} r_{t+i} r_{t+j}`,
+    and each future cross term has conditional mean zero given a past that
+    contains `Qm`, so `Cov(Qm, F^2) = Cov(Qm, Qp)`. Stationarity makes the two
+    denominators equal pairwise. Both correlations are then the same ratio.
+
+    `tests/test_zumbach.py` checks that numerically rather than trusting it:
+    a symmetric GARCH and a one-day-sign GJR read near zero, and a variance
+    reading a six-scale signed sum reads an order of magnitude higher.
+
+    ## What it is NOT
+
+    Two different estimators carry this name in the research record. This is
+    the one the theorem is about. The other,
+    `corr(RV_past(20), r^2_next) - corr(r^2_t, RV_future(20))`, is a different
+    quantity that did not discriminate the models it was tried on, and a band
+    derived for one is not a band for the other.
+
+    Returns None where the series is too short to form a window either side,
+    for the reason `_correlation` does: an undefined reading must not arrive
+    as a number.
+    """
+    if n < 1 or len(returns) < 2 * n + 3:
+        return None
+    a, b, c, d = _zumbach_terms(returns, n)
+    forward = _correlation(a, b)
+    reverse = _correlation(c, d)
+    if forward is None or reverse is None:
+        return None
+    return forward - reverse
+
+
+def zumbach_asymmetry_pooled(
+    series: Sequence[Sequence[float]], n: int
+) -> float | None:
+    """`zumbach_asymmetry` across names, pooled by terms after standardising.
+
+    Pooling is what makes the estimator usable at 252 sessions: it is a
+    fourth-moment object and one name of one year does not carry it. Each name
+    is divided by its OWN sample standard deviation first, so a volatile name
+    does not dominate the pool through its scale, and the windows are formed
+    WITHIN a name before pooling, never across the join between two.
+
+    One difference from the bare form, which is a property rather than a
+    defect: standardising also CENTRES each name, and centring changes the
+    trend terms whenever a name's mean return is not zero. So on a drifting
+    series the two functions differ, and neither is wrong. Pass a single name
+    to this function rather than to `zumbach_asymmetry` if the centred
+    convention is the one wanted.
+    """
+    a: list[float] = []
+    b: list[float] = []
+    c: list[float] = []
+    d: list[float] = []
+    for one in series:
+        if n < 1 or len(one) < 2 * n + 3:
+            continue
+        unit = _unit_centred(one)
+        if unit is None:
+            continue
+        wa, wb, wc, wd = _zumbach_terms(unit, n)
+        a.extend(wa)
+        b.extend(wb)
+        c.extend(wc)
+        d.extend(wd)
+    forward = _correlation(a, b)
+    reverse = _correlation(c, d)
+    if forward is None or reverse is None:
+        return None
+    return forward - reverse
 
 
 def _daily_series(bars: dict) -> dict[int, list[tuple[int, float, float]]]:
