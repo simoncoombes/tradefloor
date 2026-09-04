@@ -587,17 +587,31 @@ statement of the defect being gone. The day-251 median is 93.1, against the
 the difference is the inventory pressure, the dollar drag and the OPEC
 rule, which the compounding factor used to dominate.
 
-The certified panel moves, and the row that moves it does not resolve. Over
-seeds 101 to 110 the arm without the dial reads 13 of 14 and the arm with
-it 14 of 14, while pt-v18 as it ships, carrying the cycle dial as well,
-reads 13 of 14 again. One row decides all three. The leverage effect has a
-ceiling of exactly 0.00 and reads +0.0035, -0.0005 and +0.0038 across
-those arms, on an across-seed noise of 0.0760 and a per-seed spread of
-0.029 at ten seeds, with between five and seven of the ten seeds above the
-ceiling in every arm. The whole excursion is 0.004, a twentieth of the
-row's own noise. That row has sat outside its band since the oil supply
-commit, and these figures say it straddles a ceiling at a resolution ten
-seeds cannot settle.
+The certified panel moves, and the row that moves it cannot be decided
+here. Over seeds 101 to 110 the arm without the dial reads 13 of 14 and
+the arm with it 14 of 14, while pt-v18 as it ships, carrying the cycle
+dial as well, reads 13 of 14 again. One row decides all three: the
+leverage effect, at +0.0035, -0.0005 and +0.0038 against a ceiling of
+exactly 0.00, on an across-seed noise of 0.0769 and a per-seed spread of
+0.029 at ten seeds, with between five and seven of the ten seeds above
+the ceiling in every arm. Those three arms span 0.0043, a twentieth of
+the row's own noise, so ten seeds cannot say which side of a boundary at
+zero this model belongs on.
+
+The ceiling is the larger term and it describes the band's derivation.
+`REAL_MARKETS_PROVENANCE` records that this band's top was derived at
++0.05 and clamped INWARD to 0.00, because every retrieved source agrees
+the effect's sign is negative and a top above zero would certify a
+reversed leverage effect as real-market behaviour. The nine non-crisis
+reference windows run -0.113 to +0.014, and the single positive reading
+is the 2020-21 meme-stock year. So the clamp moves the boundary by 0.05,
+eleven times the 0.0043 these arms span, and the clamp decides the
+verdict while the model's own level stays far inside it.
+
+The derivation record states that the two inward clamps it needed decide
+no current verdict. On this era's arms the leverage clamp decides every
+one of them, and each verdict this section reports for that row, in
+either direction, is a reading of the clamp.
 
 The thirty-seed distribution and the four-year arm are measured elsewhere,
 because neither runs on one machine.
@@ -792,6 +806,42 @@ value that would zero it at the median seed is near 0.0510 and is worth
 about 0.7 points more. That value is the median of a distribution, so it
 would be a fitted constant, and oil's resting point is what would make it
 derivable.
+
+### The sequential base and two misattributed figures
+
+Each step in this era was measured against the branch as it stood when that
+step landed. That is the right thing for a changelog, which describes commits,
+and the wrong thing for a decomposition, which describes mechanisms: a step
+measured against a moving base carries whatever else moved with it.
+
+Two figures above are affected. The burn-in's +0.363 was measured against the
+neutral rate as it then stood, at 0.0456, while the burn-in's own commit moved
+that rate to 0.0482. Isolated, with the rate held on both sides over thirty
+seeds, the burn-in reads -0.028 and the rate step carries the figure. And the
+oil rows are worth MORE than they are credited here, because the sequential
+measurement charged part of each to whatever landed next.
+
+The burn-in still does what its own falsifier said. The economy after
+construction opens at the corner its dynamics reach, at unemployment 2.50
+against 4.00. What it does not do is move the index.
+
+### The one-year horizon of every figure above
+
+Six of the era's terms have now been measured at 1008 days as well as 252,
+and they do not behave alike. A term working through the mispricing is a
+ONE-OFF LEVEL SHIFT, because `s` is a stationary process and a persistent
+injection settles at an offset rather than drifting; removing it buys that
+offset once. The tilt keeps 0.28 of its one-year worth when annualised over
+four and the oil seasonality keeps 0.11.
+
+A term working through fair value compounds: the growth term keeps 0.88. A
+term changing the cycle clock is worth exactly nothing inside a certified year
+and +1.824 a year over four, which makes it the second largest term at that
+horizon having been the smallest at this one.
+
+So the era is worth about +18 at a certified year and about +10 annualised
+over four, with a different ranking. A reader applying this section to a
+multi-year study gets both the size and the order wrong.
 
 ### The commit the measurements name
 

@@ -47,15 +47,29 @@ it those tests skip, and a skip and a pass are the same colour.
 ## Tests
 
 ```bash
-pytest tests/                                   # Python, ~1350 tests
+pytest tests/                                   # Python, ~3000 tests
 cargo test --manifest-path rust/Cargo.toml      # Rust, including parity
 python tests/known_answer.py                    # the determinism digest
 ```
 
 The count is there so you can tell a finished run from one that quietly
-collected half of itself. At `ca4fa6a` the suite collected 1,358 tests and a
-full run was 1321 passed and 37 skipped in 204s. Two things move that number
-without anything being wrong. `tests/test_tool_help.py` parametrises over
+collected half of itself, so a stale reference count defeats its own purpose:
+a reader comparing a healthy run against it concludes something is wrong, and
+a reader whose run collected half of a much larger suite sees a number that
+looks right.
+
+RE-DERIVE IT RATHER THAN TRUSTING THIS PARAGRAPH. `pytest tests/ --collect-only
+-q | tail -1` gives the count for the tree in front of you in seconds, and that
+is the number to compare against.
+
+Two readings, both from clean checkouts on a sixteen-core box: at `ca4fa6a`
+the suite collected 1,358 and ran 1,321 passed with 37 skipped in 204s; at
+`5fa94c6` it collects 2,989 and runs 2,801 passed, 187 skipped and 1 xfailed
+in about 590s. So the suite has more than doubled and the wall time has
+roughly tripled, and neither figure is wrong for its own commit. On a
+contended four-core machine the same run has taken over 1,000 seconds of CPU.
+
+Two things move the count without anything being wrong. `tests/test_tool_help.py` parametrises over
 `tools/calibration/*.py`, so adding a tool adds a test: one landed after
 `ca4fa6a` and the tree now collects 1,359. And `tests/test_mcp.py` and
 `tests/test_mcp_integration.py` call `pytest.importorskip("mcp")` at module
