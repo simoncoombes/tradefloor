@@ -350,42 +350,48 @@ PERTURBATIONS = [
     # trough's growth range, and a certified year reaches no trough at all,
     # let alone three days from an opening expansion.
     ("trough_growth_floor", 0.5, False),
-    # Inert on the probe, and the reason is MEASURED rather than argued,
-    # because two readings of this entry were wrong before it.
+    # MOVES the market on the probe, and the entry is a DECOMPOSITION
+    # rather than a verdict, because three readings of it were wrong
+    # before this one.
     #
-    # The dial is not inert on the economy. It is gated on
-    # `months_in_current_phase < 1/30 + 0.001` and the engine opens at
-    # zero months in phase, so the block fires on the probe's FIRST day.
-    # A three-day probe at 0.0, 0.5 and 1.0 reads `phase_gdp_target` on
-    # day one at 3.0000, 3.3013 and 3.6026, and `gdp_growth` at 3.710108,
-    # 3.839357 and 3.670177. The dial reaches `update_economy_daily`,
-    # takes its draw and moves the economy the same day.
+    # The block is gated on `months_in_current_phase < 1/30 + 0.001` and
+    # the clock advances 1/30 a day, so it fires on days 0 and 1 and
+    # never again. `draws_consumed` runs +1 after one day and +2 from
+    # the second and stays there, which is the whole of the exemption
+    # this dial takes in DRAW_SCHEDULE_MOVERS below.
     #
-    # What it does not do is move the MARKET inside three days, which is
-    # what this table asks. So the condition it waits on is the market's
-    # response time to an economy displacement, not a phase it never
-    # reaches and not a magnitude too small to see.
+    # WHICH channel moves the market is separable without a new
+    # instrument, because 0.5 and 1.0 take the SAME draw at the same
+    # stream position and differ only in the coefficient. Measured at 1,
+    # 2, 3, 5, 10 and 20 days: 0.5 and 1.0 are BIT-IDENTICAL in every
+    # column at every horizon, while both differ from 0.0 by the same
+    # amount -- nothing on day one, then 2.1e-3 of a price at the widest
+    # name on days two and three, and 1.5e-3 still at twenty.
     #
-    # So the reason `vix_jump_intensity` gives below is INCOMPLETE and
-    # not wrong. Draw consumption alone cannot be what moves the market
-    # there: this dial consumes draws from an earlier site in the same
-    # function and does not move it. What matters is WHICH draw the
-    # displacement lands on. The jump's arrival test sits one line above
-    # the VIX's own noise term with nothing between them, and the VIX
-    # feeds the market factor's variance the same day, while this dial
-    # displaces the GDP block and has to reach prices through the
-    # valuation.
+    # So the probe's move is the draw's displacement of the ECONOMY
+    # substream, and the coefficient reaches no market column at all
+    # inside twenty sessions. Day 0 is `day % DAYS_PER_MONTH == 0` and
+    # `% DAYS_PER_QUARTER == 0` both, so the drawn target IS read and
+    # the economy does differ between those two arms; the market does
+    # not hear it. Sequence, measured on the same runs: the VIX carries
+    # the displacement at the end of day one (14.8477 against 15.1255,
+    # and 15.1255 for both perturbed arms) before any price column has
+    # moved.
     #
-    # The rule, which is drift-vix's and better than the one this entry
-    # started with: a displaced draw moves a probe in proportion to how
-    # directly its consumer reaches the observable, and how soon.
+    # That sharpens drift-vix's rule rather than refuting it -- a
+    # displaced draw moves a probe in proportion to how directly its
+    # consumer reaches the observable, and how soon. It also resolves
+    # the registered prediction in both directions: the market moves,
+    # in two sessions rather than twenty, and the valuation path the
+    # COEFFICIENT takes shows nothing across the whole span. Whether it
+    # bites over a certified year is what `phasenull` was launched to
+    # measure, and this does not answer it.
     #
-    # That predicts this dial DOES move the market over a longer window,
-    # because the path is slow rather than blocked. Registered by
-    # drift-vix before anyone runs it: it moves within 20 sessions. If it
-    # does not, the valuation path is blocked and that is the larger
-    # finding.
-    ("phase_target_range_draw", 0.5, False),
+    # The `False` that stood here was never exercised. Until the
+    # exemption below landed, this test failed on the draw-count
+    # assertion first and stopped, so the `moves` verdict was argued
+    # and never run.
+    ("phase_target_range_draw", 0.5, True),
     # The yield at which the target multiple sits on its sector anchor.
     # 0.05 rather than either shipped value: 0.04 is the default this probe
     # perturbs and 0.0456 is pt-v18's, and an entry landing on a named
