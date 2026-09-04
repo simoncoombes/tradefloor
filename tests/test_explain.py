@@ -234,13 +234,20 @@ def test_a_check_costs_one_day_run_per_distinct_overlay():
     """What a check() costs, as a count rather than as a clock.
 
     A replay is a function of its patch set, so nodes whose draws are the
-    same share one run: the eleven contributions and their mechanisms
+    same share one run: the twelve contributions and their mechanisms
     collapse onto the overlays their draw nodes make, and every node with
-    no draw under it shares the empty one. Fifteen distinct overlays,
-    and the count does not move with the roster, which is what makes the
-    cost readable without a stopwatch on a shared machine. The tree is 55
-    nodes where the print table splits the book contribution and 53 where
-    the build has no print table.
+    no draw under it shares the empty one. Fifteen distinct overlays
+    until the overnight contribution joined, and nineteen since: its three
+    draw sites are three overlays of their own and their union, which its
+    factor and mechanism nodes share, is a fourth, while its three state
+    nodes share the empty one. The count does not move with the roster,
+    which is what makes the cost readable without a stopwatch on a shared
+    machine. The tree is 63 nodes where the print table splits the book
+    contribution and 61 where the build has no print table: the 55 and 53
+    before the overnight contribution plus its eight, one factor, one
+    mechanism, three state and three draw nodes. The addressed draws under
+    one name are 2,739: the 2,736 before plus one per overnight site for
+    this name on this day, the market's normal, its sector's and its own.
     """
     for size in (8, 12):
         roster = tf.Universe.random(size, seed=ROSTER_SEED)
@@ -249,22 +256,24 @@ def test_a_check_costs_one_day_run_per_distinct_overlay():
         e.run_days(3, record=True)
         result = e.explain(e.tickers[0], 1)
         assert result.check() == []
-        assert len(result._runs) == 15, size
-        # Five nodes more since the overnight contribution joined: its
-        # factor node, its state and its dial leaves.
-        assert len(result._walk) == (60 if HAS_PRINTS else 58), size
-        assert len(ex._addresses(result.root)) == 2736, size
+        assert len(result._runs) == 15 + 4, size
+        assert len(result._walk) == (55 + 8 if HAS_PRINTS else 53 + 8), size
+        assert len(ex._addresses(result.root)) == 2736 + 3, size
 
 
 def test_a_leaf_replays_to_its_parent():
     _, result = one()
     leaves = [(path, node) for path, node, _ in result._walk
               if node.kind == "draw"]
+    # In tree order, which is the mechanism table's order: the overnight
+    # move's three sites sit between the jump's and the book's settlement.
     assert [name for _, name in
             ((n, n.name) for _, n in leaves)] == [
         "news_u", "news_z", "market_factor_z", "sector_z",
         "factor_idio_z", "jump_market_u", "jump_market_z",
-        "jump_company_u", "jump_company_z", "settle_u"]
+        "jump_company_u", "jump_company_z",
+        "overnight_market_z", "overnight_sector_z", "overnight_idio_z",
+        "settle_u"]
     for path, leaf in leaves:
         parent = result._by_path[path.rsplit(".", 1)[0]]
         assert parent.kind == "mechanism"
@@ -319,8 +328,10 @@ def test_a_mis_addressed_node_changes_the_day_where_it_can():
     reaches this name's day.
 
     Both halves are measured here, because a claim that every slip is
-    caught would be false: the eight nodes below slip onto another name's
-    slot and this name's close does not move inside the day.
+    caught would be false: eight of the nodes below slip onto another
+    name's slot and this name's close does not move inside the day, and
+    the overnight move's three are drawn and unread, since its dial ships
+    at zero, so a slipped draw there moves nothing on any name.
     """
     _, result = one()
     base = result._run(())
@@ -337,7 +348,9 @@ def test_a_mis_addressed_node_changes_the_day_where_it_can():
     assert tuple(moved) == SLIPS_SHOW, moved
     assert set(unmoved) == {"news_u", "news_z", "sector_z", "factor_idio_z",
                             "jump_market_u", "jump_market_z",
-                            "jump_company_u", "jump_company_z"}, unmoved
+                            "jump_company_u", "jump_company_z",
+                            "overnight_market_z", "overnight_sector_z",
+                            "overnight_idio_z"}, unmoved
 
 
 def test_the_market_addresses_are_this_names_own_slots():
@@ -411,7 +424,8 @@ def test_every_draw_node_holds_this_names_own_draws():
             if scope in wanted:
                 assert entry.tag == wanted[scope], (node.name, entry.tag)
             seen += 1
-    assert seen == len(ex._addresses(result.root)) == 2736
+    # 2,736 before the overnight move and one more per overnight site.
+    assert seen == len(ex._addresses(result.root)) == 2736 + 3
 
 
 def test_the_patches_a_node_builds_come_from_the_log_and_not_the_address():
@@ -667,8 +681,10 @@ def test_the_source_engines_own_log_survives_every_explain():
     before = logged()
     # 99,668 entries at twelve names over the two kept days plus
     # the one before them, so the check is over a real log rather
-    # than an empty one.
-    assert sum(len(v) for v in before.values()) == 99_668
+    # than an empty one; 75 more since the overnight stream, one normal
+    # for the market, one per sector of the engine's twelve and one per
+    # name of the twelve at each of the three opens.
+    assert sum(len(v) for v in before.values()) == 99_668 + 3 * (1 + 12 + 12)
     for day in (1, 2):
         assert e.explain(e.tickers[0], day).check() == []
     assert logged() == before
@@ -779,7 +795,9 @@ def test_a_preset_that_draws_no_news_says_which_stream_was_silent():
     e.keep_explanations(1, 1)
     e.run_days(3, record=True)
     result = e.explain(e.tickers[0], 1)
-    assert sorted(result._traced) == ["jumps", "market"]
+    # The overnight stream is drawn at every open whatever its dial reads,
+    # so it is traced here beside the two the day reads.
+    assert sorted(result._traced) == ["jumps", "market", "overnight"]
     sites = {node.name for _, node, _ in result._walk
              if node.kind == "draw"}
     assert "news_u" not in sites and "news_z" not in sites
@@ -1831,7 +1849,7 @@ def test_the_mcp_tool_result_is_bounded_and_says_what_it_trimmed():
     big = mcp.explain(universe_size=40, day=1)
     for out in (small, big):
         assert len(json.dumps(out)) < 40_000
-        assert out["checked"]["addresses"] == 2736
+        assert out["checked"]["addresses"] == 2736 + 3
         assert out["checked"]["addresses_shown"] < 100
         assert str(out["checked"]["addresses_shown"]) not in ("0",)
         assert "at most" in out["reading_note"]

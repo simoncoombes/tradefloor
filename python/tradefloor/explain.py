@@ -41,12 +41,12 @@ The root is the move, ``log(close / previous close)``, with the close
 read from the replayed day and the previous close from the copy taken
 before the open.
 
-Its children are eleven contributions, of kind ``factor``. Nine are the
+Its children are twelve contributions, of kind ``factor``. Ten are the
 ``truth()`` columns for the name on that day, in ``Engine.FACTORS``
 order, and they sum to the day's change in ``mispricing_s``. Two more
 close the arithmetic: ``fair_value`` is the day's change in log
 fundamental value and ``book`` is the change in the log distance from the
-model price to the print. All eleven are measured, so their sum against
+model price to the print. All twelve are measured, so their sum against
 the move is an identity the engine can fail;
 :meth:`Explanation.check` states the residual rather than asserting it.
 Where the day before is not on the tape its closing levels are unknown,
@@ -87,12 +87,14 @@ anything that decides a price.
 What a call does is fixed and what it takes in wall time is not, so the
 counts come first. A ``check()`` runs the day once per DISTINCT overlay
 rather than once per node, since a replay is a function of its patch set:
-15 runs, whatever the roster. The tree is 55 nodes where
-``Engine.prints()`` splits the book contribution and 53 where the build
-has no print table, and the addressed draws under one name are 2,736 at
-every roster size. What grows is the log the call reads, because
-the market stream's log is the size of the tape at 613 of that
-stream's draws a tick.
+19 runs, whatever the roster, the 15 before the overnight contribution
+and its three sites plus their union. The tree is 63 nodes where
+``Engine.prints()`` splits the book contribution and 61 where the build
+has no print table, the 55 and 53 before plus the overnight
+contribution's eight, and the addressed draws under one name are 2,739 at
+every roster size, the 2,736 before plus one per overnight site. What
+grows is the log the call reads, because the market stream's log is the
+size of the tape at 613 of that stream's draws a tick.
 
 On ``Universe.random(n, seed=111)`` at engine seed 42, three days,
 ``pt-v16``, at 099eae7, on one Windows 11 box, three repetitions:
@@ -339,7 +341,7 @@ DEPTH: tuple[tuple[str, str], ...] = (
 #: The kinds a node can be.
 KINDS = ("move", "factor", "mechanism", "state", "draw")
 
-#: How close the eleven contributions have to come to the move before
+#: How close the twelve contributions have to come to the move before
 #: :meth:`Explanation.check` calls it a miss, and how close a replayed
 #: value has to come to the recorded one. The truth test holds the
 #: decomposition to 1e-15 over one day's rows; this is the same order,
