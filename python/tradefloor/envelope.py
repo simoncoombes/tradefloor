@@ -107,6 +107,12 @@ CERTIFIED_HORIZON_DAYS = 252
 #: different draw rather than a different market -- `GAPS`
 #: "roster-concentration" measures what changes when the roster's SHAPE
 #: changes, and it changes the count.
+#: The SHAPE rows only. The level and crisis rows are held in
+#: `CERTIFIED_LEVEL` and `CERTIFIED_CRISIS`, because the two kinds are
+#: certified separately: a green panel means the fourteen shape rows are in
+#: band, and the level and crisis rows are reported red beside them until
+#: the model earns them. A row the default preset fails is never widened to
+#: pass and never folded into this count.
 CERTIFIED: dict[str, float] = {
     "annualised_vol_pct": 24.2377,
     "excess_kurtosis": 9.7510,
@@ -124,11 +130,30 @@ CERTIFIED: dict[str, float] = {
     "corr_persistence_acf1": 0.1724,
 }
 
+#: The LEVEL rows the default preset reads at the certified horizon,
+#: measured as a thirty-seed mean on the certification roster and seeds
+#: (`facts.AGGREGATE`), and held RED. Empty until that measurement lands:
+#: the row was graded on 2026-09-03 and its certified value is measured on
+#: the pinned protocol rather than copied from an arm run on other seeds.
+CERTIFIED_LEVEL: dict[str, float] = {}
+
+#: The CRISIS rows, reserved for the fear gauge; same rule.
+CERTIFIED_CRISIS: dict[str, float] = {}
+
 #: Bands re-derived at a 504-day window, from the same reference roster and
 #: estimators as `facts.REAL_MARKETS`. Scoring a 504-day measurement against
 #: the 252-day bands is the wrong ruler, and it flatters the model on
 #: kurtosis while being harsher elsewhere -- these are mostly TIGHTER.
 BANDS_504: dict[str, tuple[float, float]] = {
+    # The level band is an annualised long-run mean whose width is the
+    # centre's own uncertainty, so the same band grades a 504-day reading;
+    # the model's resolution at 504 days is finer, and the centre's is not.
+    "index_drift_pct": (2.9, 11.9),
+    # The fear rows' bands are per-session statistics whose real-side
+    # derivation is per 252-session window, and a 504-day reading pools
+    # twice the sessions against the same real distribution.
+    "fear_gauge_dn1": (0.70, 4.03),
+    "fear_gauge_dn3": (2.60, 9.58),
     "annualised_vol_pct": (16.0, 34.0),
     "excess_kurtosis": (7.1, 22.0),
     "return_acf1": (-0.03, 0.04),
@@ -811,7 +836,21 @@ def check(
                 f"markets' {REAL_DECAY_SLOPE}, and the curve is negative by "
                 f"lag 30 where real markets stay positive to lag 60"
             ))
-        elif CERTIFIED.get(name) is not None and horizon_days <= CERTIFIED_HORIZON_DAYS:
+        elif name not in CERTIFIED:
+            # A level or crisis row: graded, and held red at the shipped
+            # preset until the model earns it, or not yet measured there.
+            value = CERTIFIED_LEVEL.get(name, CERTIFIED_CRISIS.get(name))
+            if value is None:
+                warnings.append(
+                    f"{name} is graded and its certified value has not been "
+                    f"measured on the pinned protocol yet")
+            else:
+                lo, hi = REAL_MARKETS[name]
+                warnings.append(
+                    f"{name} is held red at the certified horizon "
+                    f"({value:.4f} against {(lo, hi)}); a result leaning on "
+                    f"it leans on a row the shipped preset does not hold")
+        elif horizon_days <= CERTIFIED_HORIZON_DAYS:
             lo, hi = REAL_MARKETS[name]
             if band_distance(CERTIFIED[name], lo, hi) == 0:
                 warnings.append(
@@ -914,6 +953,13 @@ def score(panel: Mapping[str, float], *,
     horizon's own seed noise, signed so negative means out. A statistic
     barely inside is one seed away from not being, and the band loss cannot
     see the difference.
+
+    The counts are split by group. `in_band` and `of` total every row
+    scored and are kept for readers that predate the split; a gate asks
+    `shape_in_band` against `shape_of`, because the level and crisis rows
+    are held red at the default preset on purpose and a total that folds
+    them in reads fourteen of seventeen where fourteen of fourteen is the
+    fact. Nothing here answers "is the panel green" without a group.
     """
     if horizon_days < 1:
         raise ValidationError(
@@ -946,12 +992,30 @@ def score(panel: Mapping[str, float], *,
                         else min(measured - low, high - measured) / sd),
             "structural": name in STRUCTURAL,
         }
+    from .facts import SHAPE, LEVEL, CRISIS
+
+    def count(group):
+        names = [n for n in rows if n in group]
+        return sum(1 for n in names if rows[n]["in_band"]), len(names)
+
+    shape_in, shape_of = count(SHAPE)
+    level_in, level_of = count(LEVEL)
+    crisis_in, crisis_of = count(CRISIS)
+    for name in rows:
+        rows[name]["group"] = ("shape" if name in SHAPE else
+                               "level" if name in LEVEL else "crisis")
     return {
         "horizon_days": horizon_days,
         "ruler": "REAL_MARKETS_504" if far else "REAL_MARKETS",
         "statistics": rows,
         "in_band": sum(1 for r in rows.values() if r["in_band"]),
         "of": len(rows),
+        # The split. A gate reads `shape_in_band` against `shape_of`; the
+        # level and crisis counts are reported beside it and never added
+        # to it.
+        "shape_in_band": shape_in, "shape_of": shape_of,
+        "level_in_band": level_in, "level_of": level_of,
+        "crisis_in_band": crisis_in, "crisis_of": crisis_of,
     }
 
 
@@ -1009,24 +1073,42 @@ def regressions(panel: Mapping[str, float], *,
         # one that always did the work: a row the shipped preset does not
         # hold in band cannot be lost by a candidate.
         low, high = REAL_MARKETS[name]
+        # A level or crisis row is held red at the shipped preset, so it has
+        # nothing to lose here; it is absent from `CERTIFIED` and skipped.
+        if name not in CERTIFIED:
+            continue
         if band_distance(CERTIFIED[name], low, high) == 0 and not row["in_band"]:
             lost.append(name)
     return sorted(lost)
 
 
 def certified() -> dict[str, Any]:
-    """The envelope as a plain mapping, for serialising into a manifest."""
-    return {
-        "preset": PRESET,
-        "certified_horizon_days": CERTIFIED_HORIZON_DAYS,
-        "statistics": {
-            k: {
+    """The envelope as a plain mapping, for serialising into a manifest.
+
+    The statistics carry their group. The shape rows are what a green panel
+    certifies; the level and crisis rows are reported with their own
+    verdicts and are red until the model earns them, and a level or crisis
+    row whose certified value has not been measured yet is listed under
+    ``unmeasured`` rather than given a number.
+    """
+    from .facts import SHAPE, LEVEL, CRISIS
+    statistics: dict[str, Any] = {}
+    for table, group in ((CERTIFIED, "shape"), (CERTIFIED_LEVEL, "level"),
+                         (CERTIFIED_CRISIS, "crisis")):
+        for k, v in table.items():
+            statistics[k] = {
                 "measured": v,
                 "band": list(REAL_MARKETS[k]),
                 "in_band": band_distance(v, *REAL_MARKETS[k]) == 0,
+                "group": group,
             }
-            for k, v in CERTIFIED.items()
-        },
+    unmeasured = [k for k in LEVEL + CRISIS if k not in statistics]
+    return {
+        "preset": PRESET,
+        "certified_horizon_days": CERTIFIED_HORIZON_DAYS,
+        "statistics": statistics,
+        "groups": {"shape": list(SHAPE), "level": list(LEVEL), "crisis": list(CRISIS)},
+        "unmeasured": unmeasured,
         "gaps": [
             {
                 "id": g.id,

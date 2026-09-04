@@ -242,12 +242,23 @@ def _statistic_line(name: str) -> str:
     Read from `envelope.CERTIFIED` and `facts.REAL_MARKETS` on every call.
     The numbers move when the preset moves; a sentence typed here would not.
     """
-    measured = envelope.CERTIFIED[name]
     lo, hi = REAL_MARKETS[name]
+    measured = _certified_value(name)
+    if measured is None:
+        return (f"{name} is graded against a real-market band of {lo:g} to "
+                f"{hi:g} and its certified value has not been measured yet")
     verdict = "in band" if band_distance(measured, lo, hi) == 0 else "OUT OF BAND"
     return (f"{name} measures {measured:.4g} against a real-market band of "
             f"{lo:g} to {hi:g} ({verdict}) at the certified "
             f"{envelope.CERTIFIED_HORIZON_DAYS}-day horizon")
+
+
+def _certified_value(name: str) -> float | None:
+    """The default preset's certified reading of a row, whichever group holds it."""
+    for table in (envelope.CERTIFIED, envelope.CERTIFIED_LEVEL, envelope.CERTIFIED_CRISIS):
+        if name in table:
+            return table[name]
+    return None
 
 
 def _caveats(*, days: int, n_seeds: int, signals: set[str],
@@ -602,11 +613,14 @@ server = MCPServer(
 def describe_simulator() -> dict[str, Any]:
     """Orientation, computed from the shipped envelope rather than prose."""
     cert = envelope.certified()
-    in_band, out_band = [], []
+    in_band, out_band, unmeasured = [], [], []
     for name in REAL_MARKETS:
         lo, hi = REAL_MARKETS[name]
-        target = in_band if band_distance(
-            envelope.CERTIFIED[name], lo, hi) == 0 else out_band
+        measured = _certified_value(name)
+        if measured is None:
+            unmeasured.append(name)
+            continue
+        target = in_band if band_distance(measured, lo, hi) == 0 else out_band
         target.append(name)
 
     return {
@@ -622,6 +636,12 @@ def describe_simulator() -> dict[str, Any]:
             "horizon_days": cert["certified_horizon_days"],
             "statistics_in_band": in_band,
             "statistics_out_of_band": out_band,
+            # The split: a green panel certifies the shape rows; the level
+            # and crisis rows are reported red until the model earns them,
+            # and one whose certified value is not yet measured is named
+            # here rather than counted either way.
+            "groups": cert["groups"],
+            "statistics_unmeasured": unmeasured,
             "detail": [_statistic_line(n) for n in REAL_MARKETS],
         },
         "known_gaps": [

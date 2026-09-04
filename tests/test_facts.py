@@ -514,7 +514,7 @@ def test_correlation_persistence_is_reported_and_judged_with_its_noise_stated():
     # (volatility and kurtosis are in other units). Relative to its band it
     # is NOT the noisiest: abs_return_acf5 is, because the 252-day band here
     # is so wide. Both facts are why it sits outside the objective.
-    corr_type = [k for k in tradefloor.facts.REAL_MARKETS
+    corr_type = [k for k in tradefloor.facts.SHAPE
                  if k not in ("annualised_vol_pct", "excess_kurtosis")]
     for table in (tradefloor.facts.SEED_SD, tradefloor.facts.SEED_SD_504):
         assert max(corr_type, key=table.get) == "corr_persistence_acf1"
@@ -568,7 +568,10 @@ def test_the_index_drift_row_measures_what_the_graded_rows_cannot_see():
         "volume_abs_return_corr", "leverage_effect",
     )
     assert sorted(EXACTLY_INVARIANT + NOT_INVARIANT) == sorted(
-        tradefloor.facts.REAL_MARKETS), "the split must cover the graded panel"
+        tradefloor.facts.SHAPE), "the split must cover the shape rows"
+    # The level row is not in either list because it IS the drift: a first
+    # moment moves one for one with a constant added to every return.
+    assert "index_drift_pct" in tradefloor.facts.LEVEL
 
     # 150 days, not 120: `corr_persistence_acf1` needs six 21-day windows to
     # be measurable at all, and a row that comes back None would be counted
@@ -617,31 +620,151 @@ def test_the_index_drift_row_is_reported_and_never_graded():
     rather than scoring it against a band nobody measured.
     """
     from tradefloor import envelope
-    from tradefloor.facts import REAL_MARKETS, REPORTING_ONLY
+    from tradefloor.facts import (REAL_MARKETS, REAL_MARKETS_PROVENANCE, REPORTING_ONLY,
+                                  SHAPE, LEVEL, CRISIS, AGGREGATE, aggregate_panels)
 
     year = measure(seed=2, universe=UNIVERSE, days=252)
     assert isinstance(year["index_drift_pct"], float)
 
-    # Not graded: absent from the band table, from every verdict, and from
-    # the certified set, all three of which are separate surfaces.
-    assert "index_drift_pct" not in REAL_MARKETS
-    assert "index_drift_pct" not in compare_to_real_markets(year)
-    assert "index_drift_pct" not in envelope.CERTIFIED
-    with pytest.raises(tradefloor.ValidationError):
-        envelope.score({"index_drift_pct": year["index_drift_pct"]})
+    # Graded, against a band whose provenance is three URLs and a fetch date,
+    # and placed in the LEVEL group so the certified set can hold it red
+    # without folding it into the shape count.
+    assert "index_drift_pct" in REAL_MARKETS
+    assert "index_drift_pct" in compare_to_real_markets(year)
+    assert "index_drift_pct" in LEVEL and "index_drift_pct" not in SHAPE
+    assert sorted(SHAPE + LEVEL + CRISIS) == sorted(REAL_MARKETS)
+    assert len(SHAPE) == 14
+    prov = REAL_MARKETS_PROVENANCE["index_drift_pct"]
+    assert sum("query1.finance.yahoo.com" in s for s in prov["sources"]) == 3
+    assert "fetched 2026-09-03" in prov["sources"][0]
+    low, high = REAL_MARKETS["index_drift_pct"]
+    assert low < 7.37 < high
+    # A level row is a thirty-seed mean, and the aggregate reads it that way.
+    assert AGGREGATE["index_drift_pct"] == "mean"
+    panels = [{"index_drift_pct": 1.0, "annualised_vol_pct": 20.0},
+              {"index_drift_pct": 2.0, "annualised_vol_pct": 22.0},
+              {"index_drift_pct": 6.0, "annualised_vol_pct": 30.0}]
+    agg = aggregate_panels(panels)
+    assert agg["index_drift_pct"] == pytest.approx(3.0)
+    assert agg["annualised_vol_pct"] == 22.0
 
-    # Reported, with the reason computed from REPORTING_ONLY rather than
-    # retyped, so the printed caveat cannot drift from the recorded one.
+    # Scores like any graded row, with its group named, and the split
+    # counts it apart from the shape rows.
+    scored = envelope.score({"index_drift_pct": year["index_drift_pct"]})
+    assert scored["statistics"]["index_drift_pct"]["group"] == "level"
+    assert scored["level_of"] == 1 and scored["shape_of"] == 0
+    # Not in the shape table of the certified set; its own table is empty
+    # until the thirty-seed measurement on the pinned protocol lands, and
+    # the manifest names it as unmeasured rather than giving it a number.
+    assert "index_drift_pct" not in envelope.CERTIFIED
+    cert = envelope.certified()
+    assert "index_drift_pct" in cert["unmeasured"] or "index_drift_pct" in cert["statistics"]
+
+    # Reported in its own section of the report, as a graded row.
     text = report(year)
     assert tradefloor.facts.LABELS["index_drift_pct"] in text
-    assert "no band" in text
-    assert REPORTING_ONLY["index_drift_pct"].split(":")[0] in text
+    assert "level: the first moment" in text
 
     # Every ungraded row carries a reason. A row with neither a band nor a
     # recorded reason is the defect this pairing exists to prevent.
     for key in tradefloor.facts.LABELS:
         if key not in REAL_MARKETS:
             assert key in REPORTING_ONLY, key
+
+
+def test_the_fear_rows_answer_the_session_they_are_paired_with():
+    """The recording convention, pinned by two correlations that swap.
+
+    `measure` records each day before `close_market`, so the macro row for
+    day d holds the gauge the session opened with and the change that
+    answers session d is row d+1 minus row d. Under the wrong pairing,
+    differencing the recorded column and bucketing by the same row's
+    return, every session is paired with the answer to the session before
+    it, and the two correlations below swap: the gauge change correlates
+    strongly and negatively with the session it answers, and hardly at all
+    with the previous one. Both are asserted so the wrong pairing fails
+    loudly rather than passing quietly.
+    """
+    import pyarrow as pa
+    from tradefloor.facts import fear_statistics, FEAR_BUCKETS
+
+    # First the convention itself, on a short run kept beside the record.
+    engine = tradefloor.Engine(seed=5, universe=UNIVERSE, model="pt-v16")
+    after_close = []
+    for day in range(8):
+        engine.open_market()
+        engine.run_session(9, 30, 3, 390)
+        engine.record(day)
+        engine.close_market()
+        after_close.append(engine.macro_fields["vix"])
+    macro = pa.table(engine.macro_table()).to_pydict()
+    recorded = dict(zip(macro["day"], macro["vix"]))
+    for day in range(1, 8):
+        assert recorded[day] == after_close[day - 1], day
+    assert recorded[0] != after_close[0] or after_close[0] == recorded[0]
+
+    # Then the discriminator, on a free year: the rows' own pairing against
+    # the shifted one.
+    engine = tradefloor.Engine(seed=7, universe=UNIVERSE, model="pt-v16")
+    for day in range(252):
+        engine.open_market()
+        engine.run_session(9, 30, 3, 390)
+        engine.record(day)
+        engine.close_market()
+    bars = pa.table(engine.bars(grain="day")).to_pydict()
+    macro = pa.table(engine.macro_table()).to_pydict()
+    shares = [inst.shares_outstanding for inst in UNIVERSE]
+    level = {}
+    for day, ident, close in zip(bars["day"], bars["instrument_id"], bars["close"]):
+        level[day] = level.get(day, 0.0) + close * shares[ident]
+    gauge = dict(zip(macro["day"], macro["vix"]))
+    days = sorted(level)
+    rets = {d: (level[d] / level[p] - 1.0) * 100.0 for p, d in zip(days, days[1:])}
+    own, prev = [], []
+    for d in days[2:-1]:
+        change = gauge[d + 1] - gauge[d]
+        own.append((rets[d], change))
+        prev.append((rets[d - 1], change))
+
+    def corr(pairs):
+        xs = [x for x, _ in pairs]
+        ys = [y for _, y in pairs]
+        mx, my = statistics.fmean(xs), statistics.fmean(ys)
+        num = sum((x - mx) * (y - my) for x, y in pairs)
+        den = (sum((x - mx) ** 2 for x in xs) * sum((y - my) ** 2 for y in ys)) ** 0.5
+        return num / den
+
+    assert corr(own) < -0.5, corr(own)
+    assert abs(corr(prev)) < 0.25, corr(prev)
+
+    # And the rows themselves read off the same run through the function
+    # `measure` calls, with their counts beside them.
+    rows = fear_statistics(engine.bars(grain="day"), engine.macro_table(), UNIVERSE)
+    assert rows["fear_sessions_scored"] == 250
+    for key in FEAR_BUCKETS:
+        assert key + "_sessions" in rows
+        if rows[key] is not None:
+            assert rows[key + "_sessions"] >= 1
+    assert "fear_gauge_dn3_samples" in rows
+    assert len(rows["fear_gauge_dn3_samples"]) == rows["fear_gauge_dn3_sessions"]
+    assert rows["fear_gauge_dn1_sessions"] >= 5
+
+
+def test_the_fear_rows_are_graded_in_the_crisis_group_and_pooled_where_thin():
+    from tradefloor.facts import (REAL_MARKETS, CRISIS, AGGREGATE, aggregate_panels,
+                                  pooled_sessions, REPORTING_ONLY, LABELS)
+    assert set(CRISIS) == {"fear_gauge_dn1", "fear_gauge_dn3"}
+    assert all(k in REAL_MARKETS for k in CRISIS)
+    assert AGGREGATE["fear_gauge_dn3"] == "pooled"
+    panels = [{"fear_gauge_dn3": None, "fear_gauge_dn3_samples": [], "fear_gauge_dn1": 1.0},
+              {"fear_gauge_dn3": 2.0, "fear_gauge_dn3_samples": [1.0, 3.0], "fear_gauge_dn1": 0.5},
+              {"fear_gauge_dn3": 6.0, "fear_gauge_dn3_samples": [6.0], "fear_gauge_dn1": 2.0}]
+    agg = aggregate_panels(panels)
+    assert agg["fear_gauge_dn3"] == 3.0
+    assert pooled_sessions(panels, "fear_gauge_dn3") == 3
+    assert agg["fear_gauge_dn1"] == 1.0
+    for key in ("fear_gauge_dn5", "fear_gauge_up1"):
+        assert key in REPORTING_ONLY and key in LABELS and key not in REAL_MARKETS
 
 
 def test_the_index_drift_row_is_the_daily_rebalanced_portfolio():

@@ -587,8 +587,17 @@ def test_describe_simulator_reports_nothing_out_of_band():
     reading this surface is told there is nothing out rather than being told
     a stale pair."""
     d = mcp.describe_simulator()
-    assert set(d["certified"]["statistics_out_of_band"]) == set()
+    from tradefloor import envelope
+    from tradefloor.facts import SHAPE
+    # The shape rows are all in band; a level or crisis row is reported out
+    # of band once its certified value is measured, and named as unmeasured
+    # until then, so this surface never counts it as a pass.
+    assert set(d["certified"]["statistics_out_of_band"]) == (
+        set(envelope.CERTIFIED_LEVEL) | set(envelope.CERTIFIED_CRISIS))
+    assert set(d["certified"]["statistics_in_band"]) == set(SHAPE)
     assert len(d["certified"]["statistics_in_band"]) == 14
+    assert set(d["certified"]["statistics_unmeasured"]) == (
+        set(envelope.certified()["unmeasured"]))
     assert d["structural_limitations"]
     assert "atlas" in d["not_exposed_here"]
 

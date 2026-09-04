@@ -76,8 +76,9 @@ import statistics
 from typing import Any, Mapping, Sequence
 
 from ._core import ValidationError
-from .facts import (REAL_MARKETS, REAL_MARKETS_504, SEED_SD, SEED_SD_504,
-                    SEED_SD_PROVENANCE, band_distance)
+from .facts import (AGGREGATE, REAL_MARKETS, REAL_MARKETS_504, SEED_SD,
+                    SEED_SD_504, SEED_SD_PROVENANCE, aggregate_panels,
+                    band_distance)
 
 #: The statistics the calibration search is trying to move into band. This
 #: is the ONE tuple to edit when a model change makes a structural statistic
@@ -137,6 +138,13 @@ CONSTRAINTS = (
 #: promoting a statistic is genuinely a one-tuple edit, and so a statistic
 #: added to `facts.REAL_MARKETS` is excluded-but-reported by default rather
 #: than silently optimised against.
+#:
+#: The level row `index_drift_pct` sits here for now and is the exception
+#: to the rule above: it is meant to be charged for, because a search that
+#: cannot read the level spends it freely, which is how a market losing a
+#: fifth of its value a year certified clean. It joins `LIVE_TARGETS` when
+#: `facts.SEED_SD` carries its seed sd on the pinned protocol, which this
+#: function refuses to run without.
 STRUCTURAL = tuple(
     key for key in REAL_MARKETS
     if key not in LIVE_TARGETS and key not in CONSTRAINTS
@@ -251,6 +259,7 @@ def band_distance_loss(
     rows: dict[str, dict[str, Any]] = {}
     total = 0.0
     used: dict[str, float] = {}
+    graded = aggregate_panels(panels, table.keys())
     for key, (low, high) in table.items():
         in_loss = key in LIVE_TARGETS or key in CONSTRAINTS
         role = (
@@ -258,9 +267,15 @@ def band_distance_loss(
             else "constraint" if key in CONSTRAINTS
             else "structural"
         )
-        values = [p.get(key) for p in panels]
+        if AGGREGATE.get(key) == "pooled":
+            # A pooled row is present on a panel that carries its samples,
+            # empty or not; it is missing only where the panel never
+            # measured it.
+            values = [p.get(key + "_samples") for p in panels]
+        else:
+            values = [p.get(key) for p in panels]
         present = [v for v in values if v is not None]
-        if len(present) < len(values):
+        if len(present) < len(values) or key not in graded:
             if in_loss:
                 # A statistic the search optimises against cannot silently
                 # contribute zero because a candidate broke its
@@ -280,7 +295,10 @@ def band_distance_loss(
             }
             continue
 
-        measured = statistics.median(present)
+        # Each row by its own estimator: a median for the shape rows, a
+        # thirty-seed mean for a level row, a pooled median for a crisis row
+        # (`facts.AGGREGATE`).
+        measured = graded[key]
         distance = band_distance(measured, low, high)
         sd = scales.get(key)
         if in_loss:

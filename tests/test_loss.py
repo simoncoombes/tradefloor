@@ -148,7 +148,7 @@ def test_band_distance_agrees_with_the_verdict_wording_on_every_band():
 # --------------------------------------------------------------------------
 
 
-def test_the_loss_covers_nine_statistics_and_reports_fourteen():
+def test_the_loss_covers_nine_statistics_and_reports_fifteen():
     # Five live targets: lag-5 clustering joined when the instrument found
     # the corner with in-band lag-1 clustering and zero memory behind it.
     assert set(LIVE_TARGETS) == {
@@ -171,9 +171,14 @@ def test_the_loss_covers_nine_statistics_and_reports_fourteen():
     # added 2026-08-25. They enter here by default, outside the objective,
     # until each has been shown to be something a lever can move; promoting
     # one is a decision recorded in loss.py, not a side effect of measuring it.
+    # The level row `index_drift_pct` is structural for now and is the one
+    # row here meant to leave: it joins the live targets when SEED_SD
+    # carries its seed sd on the pinned protocol, so that a search charges
+    # for the level it moves. Until then it is reported and not summed.
     assert set(STRUCTURAL) == {
         "volume_change_acf1", "corr_asymmetry", "corr_asymmetry_lagged",
-        "sector_excess_corr", "corr_persistence_acf1",
+        "sector_excess_corr", "corr_persistence_acf1", "index_drift_pct",
+        "fear_gauge_dn1", "fear_gauge_dn3",
     }
     assert set(LIVE_TARGETS) | set(CONSTRAINTS) | set(STRUCTURAL) == set(
         REAL_MARKETS
@@ -556,6 +561,12 @@ def test_the_panel_rows_carry_their_band_distances(facts):
     for key, row in rows.items():
         assert row["band_distance"] >= 0.0
         assert (row["band_distance"] == 0.0) == row["matches"], key
+        if key not in SEED_SD:
+            # The level row has no seed sd until it is measured on the
+            # pinned protocol, so its distance is reported in its own units
+            # and not in noise units.
+            assert row["scaled_distance"] is None, key
+            continue
         assert row["scaled_distance"] == pytest.approx(
             row["band_distance"] / SEED_SD[key]
         ), key

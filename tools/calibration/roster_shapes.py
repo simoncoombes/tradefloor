@@ -162,6 +162,11 @@ def main() -> int:
                    if not v.get("in_band", True)]
             results[f"{shape}@{days}"] = {
                 "in_band": sc["in_band"], "of": sc["of"],
+                # The split: a gate reads the shape count; the level and
+                # crisis rows are held red and never added to it.
+                "shape_in_band": sc.get("shape_in_band"), "shape_of": sc.get("shape_of"),
+                "level_in_band": sc.get("level_in_band"), "level_of": sc.get("level_of"),
+                "crisis_in_band": sc.get("crisis_in_band"), "crisis_of": sc.get("crisis_of"),
                 "out": out, "undefined": undefined, "median": med}
             g = lambda k: f"{med[k]:9.4f}" if k in med else "      n/a"
             print(f"{shape:16}{days:6}{sc['in_band']:>6}/{sc['of']:<3}"

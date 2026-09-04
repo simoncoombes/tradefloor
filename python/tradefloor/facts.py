@@ -34,16 +34,23 @@ clustering at lag one left its band, the leverage effect entered its
 band -- see "Where the bands come from" below. A verdict is a comparison
 of a measurement against a band, and both halves now carry provenance.
 
-Fourteen is the GRADED count and not the row count. A fifteenth row,
-`index_drift_pct`, is measured and reported and deliberately not graded,
-because no defensible band for it has been derived here yet. It is the
-panel's only first moment, and it exists because the fourteen shape
-statistics could all read in band on a market losing a fifth of its value
-in a year -- and did. It reports the daily-rebalanced equal-weight
-portfolio, which is the convention a real index band would be stated in;
-every decomposition in this engine is additive in log returns and keeps
-that convention instead, and the two differ by half the cross-sectional
-variance. See `_index_drift_pct` and `REPORTING_ONLY`.
+Fourteen is the SHAPE count and not the graded count. A fifteenth row,
+`index_drift_pct`, is the panel's only first moment, and it is graded
+against a band measured from real series on 2026-09-03: the long-run
+price return of the cap-weighted index over 75 years plus the
+equal-weight premium read off two equal-weight series against it, a
+centre of 7.37 with a standard error of 2.25, so a band of 2.9 to 11.9
+(see `REAL_MARKETS_PROVENANCE`). It exists because the fourteen shape
+statistics could all read in band on a market losing a fifth of its
+value in a year -- and did. The certified set is therefore split: `SHAPE`
+rows are graded as a median over the certification seeds, `LEVEL` rows
+as a thirty-seed mean because their seed noise is a large fraction of
+their band, and `CRISIS` rows are reserved for the fear gauge. The level
+row reports the daily-rebalanced equal-weight portfolio, which is the
+convention a real index band is stated in; every decomposition in this
+engine is additive in log returns and keeps that convention instead, and
+the two differ by half the cross-sectional variance. See
+`_index_drift_pct`.
 
 Every figure below: `Universe.random(40, seed=111)` (fingerprint
 5d8de78b55aad752), 252 days, `measure()` per sim seed, median over seeds 1
@@ -322,7 +329,7 @@ from __future__ import annotations
 import math
 import statistics
 import textwrap
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
 from .universe_util import fingerprint_of
@@ -360,6 +367,30 @@ REAL_MARKETS = {
     # and the real windows themselves scatter from -0.05 to +0.40, so this
     # band admits everything and says so; the 504-day band is the ruler.
     "corr_persistence_acf1": (-0.19, 0.54),
+    # The LEVEL row, graded from 2026-09-03. Annualised return of the
+    # daily-rebalanced equal-weight portfolio, percent a year, a price
+    # return. The centre is the cap-weighted S&P 500 price return over 75
+    # calendar years plus the equal-weight premium in price terms, and the
+    # width is two standard errors of that centre, which exceed the model's
+    # own resolution at thirty seeds; the derivation and its three URLs are
+    # in `REAL_MARKETS_PROVENANCE` and reproducible with
+    # tools/calibration/index_band.py. A band chosen so the current model
+    # passes was refused: the default preset reads far below the floor and
+    # the row is held red until the level is right.
+    "index_drift_pct": (2.9, 11.9),
+    # The CRISIS rows, graded from 2026-09-03: the median change in the
+    # volatility index on a session whose cap-weighted index return is at or
+    # below -1 percent, and the same at or below -3 percent. Two rows and not
+    # one, because the defect they exist to catch is a channel that
+    # saturates on the down side: against a real index the model's response
+    # ratio falls from 0.60 at -1 to -3 percent to 0.32 at -3 to -5 and 0.18
+    # below -5, while the up side stays flat. A graded row on the -3 percent
+    # bucket alone would have scored this as mildly out of band for three
+    # eras, and mildly out of band is the verdict that gets tuned at rather
+    # than fixed; the -1 percent row reads inside its band on the same model.
+    # Bands from ^VIX against ^GSPC, 1990 to 2026, in `REAL_MARKETS_PROVENANCE`.
+    "fear_gauge_dn1": (0.70, 4.03),
+    "fear_gauge_dn3": (2.60, 9.58),
 }
 
 #: Where each band comes from, carried as data so a reader can ask the
@@ -656,6 +687,98 @@ REAL_MARKETS_PROVENANCE = {
             "wide enough to admit every preset and is recorded as such.",
         ),
     },
+    # The level row's band is a LONG-RUN MEAN and not a window range, so
+    # `windows` carries the three inputs to the centre instead of a window
+    # spread: the cap-weighted long-run return, the RSP premium the centre
+    # uses, and the ^SPXEW premium that cross-checks it. Its standard error
+    # is the width, because a mean is the hardest statistic on this panel to
+    # know: an annual return has a standard deviation near 16 points, so
+    # even 75 years put the centre inside about two.
+    "index_drift_pct": {
+        "claim": "long-run price return of an equal-weight US large-cap index, "
+                 "percent a year, daily-rebalanced portfolio convention: the "
+                 "cap-weighted S&P 500 price return, +7.75 as the mean of 75 "
+                 "calendar-year log returns 1951-2025 (sd 16.23, se 1.87), plus "
+                 "the equal-weight premium in price terms, -0.38 as the mean of "
+                 "22 calendar-year differences of RSP against ^GSPC on unadjusted "
+                 "closes 2004-2025 (se 1.24); centre 7.37, se 2.25; band = centre "
+                 "+/- max(2 se, the model's resolution at thirty seeds, 2.37)",
+        "windows": (7.75, -0.38, -0.85),
+        "crisis_window": None,
+        "sources": (
+            "tools/calibration/index_band.py, run 2026-09-03 on the cache "
+            "tools/shadow/data.py writes; ^GSPC 1950-01-03 to 2026-09-02, "
+            "19,289 sessions, fetched 2026-09-03T22:11:12Z from "
+            "https://query1.finance.yahoo.com/v8/finance/chart/^GSPC"
+            "?period1=-631152000&period2=1788393600&interval=1d&events=split",
+            "RSP 2003-05-01 to 2026-09-02, 5,873 sessions, fetched "
+            "2026-09-03T22:10:39Z from https://query1.finance.yahoo.com/v8/"
+            "finance/chart/RSP?period1=1049155200&period2=1788393600"
+            "&interval=1d&events=split; unadjusted close, so no dividend "
+            "enters; the fund carries about 0.20 a year of expense and "
+            "rebalances quarterly where the row rebalances daily, so the "
+            "premium read off it sits a few tenths low",
+            "^SPXEW 2006-12-08 to 2026-09-02, 4,949 sessions, fetched "
+            "2026-09-03T22:10:40Z from https://query1.finance.yahoo.com/v8/"
+            "finance/chart/^SPXEW?period1=631152000&period2=1788393600"
+            "&interval=1d&events=split; the equal-weight index itself, premium "
+            "-0.85 over 19 calendar years (se 1.41), the cross-check on RSP",
+        ),
+    },
+    # The real side of both fear rows pairs the ^VIX close on session d
+    # minus the close on d-1 with d's own close-to-close ^GSPC return, which
+    # is the natural pairing there; the MODEL side is inverted by the
+    # recording convention, see `fear_statistics`. Every free-run reading of
+    # the model is held to its free-run figure and never to a solved one: a
+    # shadow solver fits the draws until the closes are the tape's, so a
+    # gauge read downstream of solved closes repeats the tape back.
+    "fear_gauge_dn1": {
+        "claim": "median change in the volatility index on sessions at or below "
+                 "-1 percent, by the panel's shared rule: the statistic per "
+                 "252-session window over the reference panel's ten windows "
+                 "2015-07 to 2025-07, the COVID window excluded and reported as "
+                 "the crisis reading, band = [min - s, max + s] with s the "
+                 "across-window sd with the most extreme window dropped",
+        "windows": (1.34, 2.66, 3.39),
+        "crisis_window": 3.08,
+        "sources": (
+            "tools/calibration/fear_band.py, run 2026-09-04 on the cache "
+            "tools/shadow/data.py writes; ^VIX 1990-01-02 to 2026-09-02, 9,236 "
+            "sessions, fetched 2026-09-04T02:47:57Z from "
+            "https://query1.finance.yahoo.com/v8/finance/chart/^VIX"
+            "?period1=631152000&period2=1788393600&interval=1d&events=split, "
+            "against the ^GSPC fetch of 2026-09-03T22:11:12Z; nine non-crisis "
+            "windows read 1.34 to 3.39 with a trimmed sd of 0.64, the crisis "
+            "window 3.08 over 39 sessions; pooled over 1,124 sessions since "
+            "1990 the median is +1.85",
+        ),
+    },
+    "fear_gauge_dn3": {
+        "claim": "median change in the volatility index on sessions at or below "
+                 "-3 percent, POOLED across the certification seeds because a "
+                 "252-day run holds none on about a third of seeds; the band "
+                 "departs from the shared rule for the same reason, since a "
+                 "calm year holds no such session (2017 held none): it is the "
+                 "shared rule applied across every 252-session window since "
+                 "1990 that holds at least five such sessions, ten windows",
+        "windows": (3.70, 5.30, 8.48),
+        "crisis_window": 7.12,
+        "sources": (
+            "tools/calibration/fear_band.py, run 2026-09-04, the same two "
+            "series; ten windows since 1990 with at least five sessions at -3 "
+            "or worse read 3.70 to 8.48 with a trimmed sd of 1.10; the 2020 "
+            "window 7.12 over 14 sessions; pooled over 107 sessions since "
+            "1990 the median is +5.73, which agrees with the +6.03 the engine "
+            "cites for VIX_RETURN_GAIN in rust/src/economy/state.rs from FRED "
+            "VIXCLS against SP500 over 2,511 common days to 2026-08",
+            "the five-session floor is the rule's own condition and not a "
+            "choice made to include or exclude a window; a threshold at -5 "
+            "was considered and rejected because it was chosen from the 2020 "
+            "tape, where five such sessions exist in one year, and a "
+            "certified window rarely holds one: 22 sessions since 1990, "
+            "three in 2,520 model sessions across ten seeds",
+        ),
+    },
 }
 
 #: The across-seed standard deviation of each statistic at the shipped
@@ -829,6 +952,95 @@ SEED_SD_PROVENANCE = {
 #: constant rather than a presentation detail.
 MARGINAL = ("annualised_vol_pct", "excess_kurtosis")
 
+#: The graded panel in three groups, and the certified set is split along
+#: them. SHAPE rows are the fourteen a market losing a fifth of its value in
+#: a year could hold in band, because each is invariant or nearly so to a
+#: drift; the certification gate has always read them and still does. LEVEL
+#: rows read a first moment, and CRISIS rows are reserved for the fear
+#: gauge's response to a large down day. A level or crisis row the default
+#: preset fails is held RED in `envelope` and never widened to pass: a
+#: graded first moment with a flattering band would certify the failure it
+#: exists to catch. Listed explicitly, so a row added to `REAL_MARKETS`
+#: must be placed in a group on purpose; `test_facts` asserts the three
+#: cover the table.
+SHAPE = (
+    "annualised_vol_pct", "excess_kurtosis", "return_acf1", "abs_return_acf1",
+    "abs_return_acf5", "abs_return_acf20", "cross_sectional_corr",
+    "volume_abs_return_corr", "leverage_effect", "volume_change_acf1",
+    "corr_asymmetry", "corr_asymmetry_lagged", "sector_excess_corr",
+    "corr_persistence_acf1",
+)
+LEVEL = ("index_drift_pct",)
+CRISIS = ("fear_gauge_dn1", "fear_gauge_dn3")
+
+#: How a row is read across seeds. The shape rows are medians over the
+#: certification seeds, which is what every recorded panel and band was
+#: derived with. A level row is a MEAN over thirty seeds: its seed standard
+#: deviation is about 6.5 points a year on a band nine points wide, so a
+#: ten-seed median of a model sitting at the band's centre would fail a
+#: two-point margin about a third of the time, and the mean is the estimator
+#: whose error the band's width was set against.
+#: A POOLED row is read over the sessions of every certification run
+#: together, because its bucket is empty on some runs: about a third of
+#: 252-day runs hold no session at -3 percent or worse, and a median over an
+#: empty bucket and one over a full bucket are the same shape in a table. A
+#: pooled row's per-run panel carries the samples under `<row>_samples` and
+#: their count under `<row>_sessions`, and the graded value is the median
+#: of the pooled samples with the pooled count reported beside it.
+AGGREGATE = {"index_drift_pct": "mean", "fear_gauge_dn3": "pooled"}
+
+#: Which seed the certification varies, per group. The shape rows vary the
+#: market seed on one roster, `Universe.random(40, seed=111)`, held fixed,
+#: which is the protocol every band and every recorded panel was derived
+#: on. A LEVEL row varies the ROSTER with the seed as well: a level is a
+#: property of the roster as much as of the model, because a drawn roster
+#: opens away from fair value by a draw with an across-roster standard
+#: deviation near 0.05 in log, worth about five points of first-year drift,
+#: and the held roster sits 0.78 of that above the population. Thirty
+#: market seeds on one roster certify that roster; thirty rosters certify
+#: the model. So the level row's certified value is the mean over seeds
+#:101 to 130 of a run on `Universe.random(40, seed=s)` with market seed
+#: `s`, and its seed sd is measured on the same protocol. See the note on
+#: which seed varies in `_index_drift_pct`.
+LEVEL_PROTOCOL = {
+    "seeds": tuple(range(101, 131)),
+    "roster": "Universe.random(40, seed=<seed>)",
+    "estimator": "mean across seeds",
+    "days": 252,
+}
+
+
+def aggregate_value(key: str, values: Sequence[float]) -> float:
+    """One graded value for `key` from its per-seed readings."""
+    if AGGREGATE.get(key, "median") == "mean":
+        return statistics.fmean(values)
+    return statistics.median(values)
+
+
+def aggregate_panels(panels: Sequence[Mapping[str, Any]],
+                     keys: Iterable[str] | None = None) -> dict[str, float]:
+    """The graded panel from per-seed panels, each row by its own estimator.
+
+    A row absent from every panel is omitted; a row absent from some is
+    aggregated over the seeds that carry it.
+    """
+    out: dict[str, float] = {}
+    for key in (REAL_MARKETS if keys is None else keys):
+        if AGGREGATE.get(key) == "pooled":
+            pooled = [x for p in panels for x in (p.get(key + "_samples") or ())]
+            if pooled:
+                out[key] = statistics.median(pooled)
+            continue
+        present = [p[key] for p in panels if p.get(key) is not None]
+        if present:
+            out[key] = aggregate_value(key, present)
+    return out
+
+
+def pooled_sessions(panels: Sequence[Mapping[str, Any]], key: str) -> int:
+    """How many sessions a pooled row's graded value stands on."""
+    return sum(len(p.get(key + "_samples") or ()) for p in panels)
+
 #: Panel rows that are MEASURED AND REPORTED BUT NOT GRADED, against the
 #: reason no band exists for them. A key here is deliberately absent from
 #: `REAL_MARKETS`, so it earns no verdict, cannot pass, cannot fail, and
@@ -838,18 +1050,21 @@ MARGINAL = ("annualised_vol_pct", "excess_kurtosis")
 #: A row with no band is worth having anyway. The alternative is not
 #: reporting the quantity, and an unreported quantity is one nobody
 #: measures; see `_index_drift_pct` for the case that put this here.
-REPORTING_ONLY = {
-    "index_drift_pct": (
-        "no real-market band: the other fourteen are SHAPE statistics with "
-        "published real-market analogues, and a first-moment band would "
-        "have to be derived from a real index over a matched window. That "
-        "derivation does not exist in this project yet, and inventing one "
-        "would be worse than having none -- a fabricated band grades every "
-        "future preset against a number nobody measured. The number is "
-        "already in the units such a band would use, a daily-rebalanced "
-        "equal-weight portfolio return, which runs above the log "
-        "convention the decompositions use by half the cross-sectional "
-        "variance."
+#:
+#: Empty since 2026-09-03: `index_drift_pct` sat here from the day it was
+#: added until its band was derived from real series, and the dict stays
+#: so the next measured-but-ungraded row has somewhere to carry its reason.
+REPORTING_ONLY: dict[str, str] = {
+    "fear_gauge_dn5": (
+        "no band: a session at -5 percent or worse is too rare for a "
+        "certified window, 22 in the real series since 1990 and three in "
+        "2,520 model sessions across ten seeds, so the row is a diagnostic "
+        "of the saturating channel and the -3 percent row is the graded one"
+    ),
+    "fear_gauge_up1": (
+        "no band: the up-side response is reported so the down-side "
+        "saturation can be read as a ratio against it; the real up side "
+        "stays flat where the down side falls"
     ),
 }
 
@@ -871,6 +1086,10 @@ LABELS = {
     "sector_excess_corr": "same-sector excess corr",
     "corr_persistence_acf1": "corr persistence acf(1)",
     "index_drift_pct": "index drift %/yr",
+    "fear_gauge_dn1": "VIX move, day <= -1%",
+    "fear_gauge_dn3": "VIX move, day <= -3%",
+    "fear_gauge_dn5": "VIX move, day <= -5%",
+    "fear_gauge_up1": "VIX move, day >= +1%",
 }
 
 
@@ -1424,9 +1643,86 @@ def measure(
         "model_fingerprint": engine.model_fingerprint,
         "days": days,
     }
-    facts.update(panel_statistics(engine.bars(grain="day"), universe,
+    bars = engine.bars(grain="day")
+    facts.update(panel_statistics(bars, universe,
                                   min_observations=min_observations))
+    facts.update(fear_statistics(engine.bars(grain="day"), engine.macro_table(), universe))
     return facts
+
+
+#: The session-return thresholds of the fear rows, percent.
+FEAR_BUCKETS = {"fear_gauge_dn1": -1.0, "fear_gauge_dn3": -3.0, "fear_gauge_dn5": -5.0}
+
+
+def fear_statistics(
+    bars: Any,
+    macro: Any,
+    universe: Sequence[Instrument],
+) -> dict[str, Any]:
+    """The fear gauge rows of a recorded run, from its daily bars and macro table.
+
+    For each session the cap-weighted close-to-close return of the roster,
+    in percent, with the weights the roster's shares outstanding times the
+    close; the alternative, the engine's own last-tick return against
+    `previous_close`, agrees with it to a correlation of +0.9998 over 2,520
+    sessions and differs only where a jump lands between them, and this is
+    the one stated. The gauge change answering session d is the volatility
+    index after day d's macro step minus the index after day d-1's.
+
+    # The alignment, which the obvious implementation gets wrong
+
+    `measure` records each day BEFORE `close_market`, deliberately, so the
+    macro row for day d carries the values the session traded under. The
+    consequence, proved on a five-day run against the gauge read after each
+    close: macro row d holds the gauge the session OPENED with, so the
+    change that answers session d is row d+1 minus row d, and the last
+    recorded session has no answer in the table. Differencing the recorded
+    column and bucketing by the same row's return pairs every session with
+    the answer to the session before it, which is the off-by-one that made
+    a shadow record report this gauge moving against the real one for
+    months. `tests/test_facts.py` pins the convention with two
+    correlations that swap under the wrong pairing.
+
+    Rows: `fear_gauge_dn1`, the median change over sessions at or below -1
+    percent, a per-run row; `fear_gauge_dn3`, the same at or below -3
+    percent, whose per-run value is None on a run holding no such session
+    and whose graded value is pooled across runs (`AGGREGATE`); each with
+    `_sessions` beside it and, for the pooled row, `_samples`;
+    `fear_gauge_dn5` and `fear_gauge_up1` as reported diagnostics.
+    """
+    try:
+        import pyarrow as pa
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError(
+            "fear_statistics reads Arrow tables and needs pyarrow. Install "
+            "it with: pip install tradefloor[arrow]") from exc
+    b = pa.table(bars).to_pydict()
+    m = pa.table(macro).to_pydict()
+    shares = [float(inst.shares_outstanding) for inst in universe]
+    level: dict[int, float] = {}
+    for day, ident, close in zip(b["day"], b["instrument_id"], b["close"]):
+        if close is None:
+            continue
+        level[int(day)] = level.get(int(day), 0.0) + float(close) * shares[int(ident)]
+    gauge = {int(day): float(v) for day, v in zip(m["day"], m["vix"]) if v is not None}
+    days = sorted(level)
+    pairs: list[tuple[float, float]] = []
+    for prev, day in zip(days, days[1:]):
+        if day + 1 not in gauge or day not in gauge or level[prev] <= 0.0:
+            continue
+        ret = (level[day] / level[prev] - 1.0) * 100.0
+        pairs.append((ret, gauge[day + 1] - gauge[day]))
+    out: dict[str, Any] = {"fear_sessions_scored": len(pairs)}
+    for key, threshold in FEAR_BUCKETS.items():
+        samples = [c for r, c in pairs if r <= threshold]
+        out[key] = statistics.median(samples) if samples else None
+        out[key + "_sessions"] = len(samples)
+        if AGGREGATE.get(key) == "pooled" or key == "fear_gauge_dn5":
+            out[key + "_samples"] = samples
+    up = [c for r, c in pairs if r >= 1.0]
+    out["fear_gauge_up1"] = statistics.median(up) if up else None
+    out["fear_gauge_up1_sessions"] = len(up)
+    return out
 
 
 def panel_statistics(
@@ -1587,12 +1883,19 @@ def report(facts: dict[str, Any]) -> str:
         "",
         "marginal: one series on its own",
     ]
-    lines += [row(key) for key in REAL_MARKETS if key in MARGINAL]
+    lines += [row(key) for key in SHAPE if key in MARGINAL]
     lines += [
         "",
         "dependence: how things move together",
     ]
-    lines += [row(key) for key in REAL_MARKETS if key not in MARGINAL]
+    lines += [row(key) for key in SHAPE if key not in MARGINAL]
+    # The first moment, in its own section: the shape rows above can all
+    # read in band on a market that loses a fifth of its value in a year.
+    lines += ["", "level: the first moment, held red until it is right"]
+    lines += [row(key) for key in LEVEL]
+    if CRISIS:
+        lines += ["", "crisis: the fear gauge on a large down day"]
+        lines += [row(key) for key in CRISIS]
 
     # The ungraded rows, derived from the two tables rather than listed, so
     # a row can never be printed as graded because a list went stale.

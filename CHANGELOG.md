@@ -9,8 +9,8 @@ grows fair value with nominal output**, taking the equal-weight index from
 -16.150 per cent a year to -0.340 as a portfolio return, on a roster six
 points dearer than the population. The default preset is where it was.
 
-**The index drift row reports a daily-rebalanced portfolio return**, about
-two points above the log convention the decompositions use.
+**The index drift and two fear rows are graded**, and the certified set
+splits into shape, level and crisis.
 
 **A run can commit to the state it held at the end of every day**, and a
 sampled check verifies k days for that cost.
@@ -38,6 +38,69 @@ checked for its draw effect and proven inert.
 replays from the state the day started in.
 
 <!-- release-note-ends -->
+
+### The graded level row and the split of the certified set
+
+The panel's first moment, `index_drift_pct`, was measured and reported
+and deliberately not graded, because no band for it had been derived.
+Its band is now derived from real series through `tools/shadow/data.py`,
+which keeps the unadjusted close beside the adjusted one and accepts
+sessions before 1970: `^GSPC` from 1950 gives the cap-weighted price
+return, +7.75 a year as the mean of 75 calendar-year log returns with a
+standard error of 1.87; `RSP` on its unadjusted close against `^GSPC`
+gives the equal-weight premium in price terms, -0.38 over 22 calendar
+years with a standard error of 1.24, and `^SPXEW` cross-checks it at
+-0.85. The centre is 7.37 with a standard error of 2.25, and the band is
+the centre plus or minus the larger of two standard errors and the
+model's own resolution at thirty seeds, so 2.9 to 11.9. The derivation
+is `tools/calibration/index_band.py` and the provenance in
+`facts.REAL_MARKETS_PROVENANCE` is three URLs and a fetch date. A band
+chosen so the current model passes was refused.
+
+The certified set splits along `facts.SHAPE`, `facts.LEVEL` and
+`facts.CRISIS`. The fourteen shape rows fill `envelope.CERTIFIED` and a
+green panel means what it meant. The level row is read as a thirty-seed
+mean (`facts.AGGREGATE`), because its seed standard deviation of about
+6.5 points a year is a large fraction of its band, and its certified
+value goes in `envelope.CERTIFIED_LEVEL`, held red until the model earns
+it; `envelope.score` reports the counts per group, `envelope.certified`
+and `describe_simulator` carry the groups and name a row whose certified
+value is not yet measured, and `report` prints the level in its own
+section. The rows stay structural in the loss until `facts.SEED_SD`
+carries their seed sds on the pinned protocol, at which point they join
+the live targets so that a search charges for the level it moves.
+
+The level row's protocol varies the roster with the seed,
+`facts.LEVEL_PROTOCOL`: a level is a property of the roster as much as
+of the model, the held roster opens 0.78 of a population standard
+deviation above fair value, and its first-year handicap exceeds the
+band's half-width, so thirty market seeds on one roster would certify
+that roster. The certified value is the mean over seeds 101 to 130 of a
+run on `Universe.random(40, seed=s)` with market seed `s`.
+
+### The fear gauge rows
+
+`fear_gauge_dn1` and `fear_gauge_dn3` read the median change in the
+volatility index on sessions whose cap-weighted close-to-close return is
+at or below -1 and -3 percent. Two rows because the defect is a channel
+that saturates on the down side: a graded row on the -3 percent bucket
+alone would have scored it as mildly out of band for three eras, and
+mildly out of band is the verdict that gets tuned at rather than fixed;
+the -1 percent row reads inside its band on the same model. The -3
+percent row is pooled across the certification seeds, because about a
+third of 252-day runs hold no such session, and it reports its session
+count beside its value. `measure` records each day before the close, so
+the macro row for day d holds the gauge the session opened with and the
+change answering session d is row d+1 minus row d; `fear_statistics`
+pairs them that way and a test pins the convention with two correlations
+that swap under the wrong pairing. The bands come from `^VIX` against
+`^GSPC` since 1990 through `tools/calibration/fear_band.py`: the -1
+percent row by the panel's shared rule over its ten windows, 0.70 to
+4.03; the -3 percent row across every window since 1990 holding at
+least five such sessions, 2.60 to 9.58, with the pooled median of +5.73
+agreeing with the +6.03 the engine cites from FRED. A -5 percent bucket
+and the up-side response are reported without bands. Every free-run
+figure is held to its free-run value and never to a solved one.
 
 ### A generated roster opens at its own fair value
 
