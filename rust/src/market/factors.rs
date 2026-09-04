@@ -713,7 +713,8 @@ fn participation_multiplier(participation: f64) -> f64 {
 /// so every preset that predates the dial is bit-identical. At 1.0 the
 /// participation multiplier follows the measured law instead of the clamped
 /// one. `ModelParams::order_flow_impact_law` carries the sources, the
-/// clock, and what the change does not claim.
+/// clock, and what the change does not claim. It does NOT restate the
+/// depth exponent; that is issue #183.
 ///
 /// `order_imbalance` keeps its signature and its behaviour because it is
 /// public API, re-exported through `market::mod`. This is the
