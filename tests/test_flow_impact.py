@@ -206,10 +206,12 @@ def test_the_measured_law_keeps_charging_for_size_above_the_knee():
     so this also shows the change is confined above it.
     """
     thin = min(UNIVERSE, key=lambda i: i.avg_volume)
-    # The name's average minute volume floors at 100 shares, so 1e3 is ten
-    # times it -- the knee exactly -- and the other two are a hundred and a
-    # thousand times it.
-    sizes = (1e3, 1e4, 1e5)
+    # Derived from the name rather than written as three round numbers, so
+    # the first size lands on the knee EXACTLY whatever the generator gives
+    # this roster. `order_imbalance` divides by the daily average over 390
+    # and floors that at 100 shares, and this is that denominator.
+    minute = max(thin.avg_volume / 390.0, 100.0)
+    sizes = (10.0 * minute, 100.0 * minute, 1000.0 * minute)
 
     def costs(model):
         return [
