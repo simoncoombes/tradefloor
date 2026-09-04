@@ -6,8 +6,8 @@
 
 **A new preset, pt-v18, returns five first moments the model injected and
 grows fair value with nominal output**, taking the equal-weight index from
--16.150 per cent a year to -0.340 as a portfolio return, on a roster six
-points dearer than the population. The default preset is where it was.
+about -16 per cent a year to roughly flat. The default preset is where it
+was.
 
 **The index drift and two fear rows are graded**, and the certified set
 splits into shape, level and crisis.
@@ -26,10 +26,11 @@ unbounded depth on request.
 surgery installs a window of them, and a second `run_days` call numbers
 days from the engine's own counter.
 
-**Each draw's effect on a target is measured** by a finite difference, and
-a shadow run solves a real year for the draws behind its closes.
+**Each draw's effect on a target is measured**, and a shadow run solves a
+real year for the draws behind its closes.
 
-**The browser build compiles again**, after a stale file path broke it.
+**The browser build compiles again**; 0.6.2 shipped it broken by a crate
+rename its build script did not follow.
 
 **A mechanism is a specification the engine's Rust is generated from**,
 checked for its draw effect and proven inert.
