@@ -28,7 +28,44 @@ import tradefloor
 
 
 UNIVERSE = tradefloor.Universe.random(8, seed=7)
-PRESETS = ["pt-v%d" % i for i in range(1, 13)]
+
+
+def _shipped_presets():
+    """Every shipped preset, from the engine's own list.
+
+    THIS WAS `["pt-v%d" % i for i in range(1, 13)]`, which stopped at
+    pt-v12 and left the DEFAULT and everything after it outside both tests
+    in this file. The tick-loop identity is a correctness property of the
+    engine, not of twelve particular coefficient sets, and the preset most
+    users run had never been held to it.
+
+    `ModelParams::preset_names()` is the one authoritative enumeration and
+    is not on the Python surface, so it is read back out of the refusal
+    every entry point raises for an unknown preset -- the same route
+    `tools/calibration/preset_panel.py` takes, and for the same reason: a
+    hand-maintained second list is what went stale here.
+    """
+    marker = "Shipped presets: "
+    try:
+        tradefloor.model_preset("pt-v0")
+    except Exception as exc:
+        message = str(exc)
+    else:  # pragma: no cover - "pt-v0" is not a preset
+        raise AssertionError("pt-v0 resolved; the refusal route is gone")
+    assert marker in message, message
+    names = [n.strip() for n in message.split(marker, 1)[1].split(",")]
+    names = [n for n in names if n]
+    # The under-enumeration this function exists to prevent, asserted rather
+    # than hoped for: the list must resolve, must reach the default, and
+    # must not have silently shrunk back to the twelve it used to hardcode.
+    for name in names:
+        assert tradefloor.model_preset(name)["name"] == name, name
+    assert tradefloor.model_preset()["name"] in names
+    assert len(names) > 12, names
+    return names
+
+
+PRESETS = _shipped_presets()
 
 
 def _prices(engine):
