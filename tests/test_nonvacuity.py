@@ -317,11 +317,37 @@ def test_shortfall_can_be_both_signs():
 
 
 def test_the_stylised_facts_are_not_all_within_range():
-    # If every statistic matched, `compare_to_real_markets` would be doing no
-    # work and the module's honesty would be untested. Two are known
-    # mismatches; that must stay visible.
+    """`compare_to_real_markets` is doing work: some rows match, some do not.
+
+    AT THE CERTIFIED HORIZON, and it was measured at 120 days against the
+    252-day bands until 2026-09-05 -- the wrong-ruler mistake `facts`'s own
+    header warns about, and which flatters or punishes rows by horizon
+    rather than by model. It also left `corr_persistence_acf1` unmeasured:
+    the row needs six 21-day windows and 120 days does not hold them, so it
+    came back None and was silently absent from a panel this test counts.
+
+    WHAT IT STANDS ON, named rather than left as "two are known mismatches",
+    which had stopped being the count. At 252 days on this seed the misses
+    are `index_drift_pct` and `fear_gauge_dn3` -- both held RED on purpose,
+    and both under active repair -- plus a single-seed excursion. So a
+    future release that fixes the level and the fear gauge could make this
+    test fail, and that failure would be a FINDING: the panel would then be
+    all-matching on one seed, and `compare_to_real_markets` would need a row
+    it can still fail on before it could claim to be doing work.
+    """
     facts = tradefloor.facts.measure(
-        seed=3, universe=tradefloor.Universe.random(40, seed=111), days=120)
+        seed=3, universe=tradefloor.Universe.random(40, seed=111), days=252)
+    # Every graded row is measurable at this horizon; a row absent from the
+    # verdicts would make the counts below quietly weaker.
+    assert set(facts) >= set(tradefloor.facts.REAL_MARKETS)
+    assert all(facts[k] is not None for k in tradefloor.facts.REAL_MARKETS)
     verdicts = tradefloor.facts.compare_to_real_markets(facts)
-    assert any(not v["matches"] for v in verdicts.values())
-    assert any(v["matches"] for v in verdicts.values())
+    assert len(verdicts) == len(tradefloor.facts.REAL_MARKETS)
+    missed = sorted(k for k, v in verdicts.items() if not v["matches"])
+    assert missed, (
+        "every graded row matches on this seed, so this test can no longer "
+        "show that compare_to_real_markets does any work. That is a finding "
+        "about the model, not a regression here: give the panel a row it "
+        "can still fail on, or state why it should not have one"
+    )
+    assert any(v["matches"] for v in verdicts.values()), missed
