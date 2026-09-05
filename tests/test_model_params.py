@@ -271,6 +271,12 @@ PERTURBATIONS = [
     ("vix_return_source", 0.0, True),        # perturbed AWAY from the default, which is 1.0 since pt-v10
     ("vix_return_gain", 150.0, True),         # the channel reads the day since pt-v10, and the harness's days fall
     ("vix_return_gain_up", 60.0, False),     # needs an UP day; under this default the channel reads the DAY and the harness's three sessions fall
+    # The exponent bends the response the gain scales. It moves the market
+    # for the same reason the gain does -- the channel reads the day and
+    # the harness's three sessions fall -- and it is perturbed AWAY from
+    # the linear 1.0, which is the one value at which the branch is
+    # bit-identical to the arithmetic that predates the dial.
+    ("vix_return_exponent", 1.4, True),
     ("vix_return_clamp", 0.12, True),
     ("vix_target_shock_cap", 40.0, False),   # binds only past a 12-point excursion
     ("inflation_ceiling", 10.0, False),       # binds only when inflation reaches 6%

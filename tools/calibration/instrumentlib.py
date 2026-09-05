@@ -259,6 +259,15 @@ PARAM_SPECS: dict[str, dict] = {
     "vix_cycle_amplitude": {"kind": "abs", "step_unit": 0.1,
                             "hard_range": (0.0, 2.0)},
     "vix_return_gain_up": {"kind": "log", "hard_range": (1.0, 250.0)},
+    # The exponent is a SHAPE and its plausible span is narrow: the tape
+    # puts it at 1.200 with a 95 per cent interval of 1.112 to 1.287 and a
+    # count-weighted reading of 1.132. The hard range is opened to 1.0
+    # (the linear form, so a search can always return to what shipped) and
+    # to 2.0, well past anything the measurement supports, so the bound is
+    # a guard rather than a prior. `abs` and not `log`, because the
+    # interesting span is a few hundredths wide.
+    "vix_return_exponent": {"kind": "abs", "step_unit": 0.02,
+                            "hard_range": (1.0, 2.0)},
     # The crisis-fear pair, added with the dials themselves so no search
     # reaches them before a box exists.
     #
