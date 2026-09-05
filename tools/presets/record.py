@@ -147,14 +147,29 @@ def level_reading(art: dict, *, graded: bool) -> dict:
     """
     from tradefloor import facts  # noqa: PLC0415
 
+    # The invariant `load_level` establishes, asserted where it is USED. A
+    # held reading graded against a band is the one thing
+    # `LEVEL_PROTOCOL["comparison_rule"]` forbids, and a caller that got
+    # the pair the wrong way round would produce a well-formed block
+    # saying it.
+    if bool(art["roster_per_seed"]) is not graded:
+        raise SystemExit(
+            f"{art['preset']}: an artefact with roster_per_seed="
+            f"{art['roster_per_seed']} cannot be read as graded={graded}; "
+            "the bands belong to the roster-varying protocol"
+        )
+
     rows = art["rows"]
     keys = tuple(facts.LEVEL) + tuple(facts.CRISIS)
     values = facts.aggregate_panels(rows, keys)
     out: dict[str, object] = {
+        # The roster as the RUN recorded it, not as this function assumes
+        # it: a held run on some other roster would otherwise be labelled
+        # with seed 111.
         "protocol": ("facts.LEVEL_PROTOCOL: "
-                     f"{facts.LEVEL_PROTOCOL['roster']}, roster varying"
+                     f"{art['universe']}, roster varying"
                      if graded else
-                     f"Universe.random(40, seed=111) HELD, "
+                     f"{art['universe']} HELD, "
                      f"seeds {art['seeds'][0]}-{art['seeds'][-1]}"),
         "roster_per_seed": bool(art["roster_per_seed"]),
         "graded": graded,
