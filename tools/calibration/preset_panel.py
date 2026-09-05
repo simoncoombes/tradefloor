@@ -202,7 +202,31 @@ def _median_panel(rows: list[dict]) -> dict:
 
 
 def _count_in_band(panel: dict, bands: dict) -> tuple[int, list[str]]:
-    """How many of the fourteen sit inside their band, and which do not."""
+    """How many of the fourteen sit inside their band, and which do not.
+
+    EVERY ROW IN `PANEL` MUST BE MEASURED, and this says so rather than
+    finding out by subscript. `_median_panel` omits a row that came back
+    None on every seed, and this loop then read `panel[k]` and raised a
+    bare `KeyError` naming a statistic, from a tool whose job is to report
+    counts -- which reads as a crash rather than as the finding it is.
+
+    The constraint is real and it binds the next row added to
+    `envelope.CERTIFIED`: a DISTRIBUTIONAL row is None on some seeds by
+    construction, so it cannot join `PANEL` until this function is given a
+    denominator to report against. A count of "13 of 14" computed over 13
+    measured rows is not the same claim as one computed over 14, and this
+    function has no way to tell a reader which it made. So it refuses, and
+    names what would have to change.
+    """
+    absent = [k for k in PANEL if k not in panel]
+    if absent:
+        raise SystemExit(
+            f"{absent} are in PANEL (envelope.CERTIFIED) but were not "
+            "measurable on any seed, so a count over PANEL would quietly be "
+            "a count over fewer rows. A row that is None on some seeds needs "
+            "this function to report its denominator before it can be "
+            "certified; see facts.AGGREGATE for how a pooled row does it."
+        )
     misses = []
     for k in PANEL:
         lo, hi = bands[k]
