@@ -8,9 +8,7 @@
 minute volume**: `order_flow_impact_law`.
 
 **A new preset, pt-v18, returns five first moments the model injected and
-grows fair value with nominal output**, taking the equal-weight index from
--16.150 per cent a year to -0.340 on a roster six points dearer than the
-population; the default preset is where it was.
+grows fair value with nominal output.** The default is unchanged.
 
 **The index drift and two fear rows are graded**, and the certified set
 splits into shape, level and crisis.
@@ -381,6 +379,13 @@ produced, and none has been re-measured. They are marked stale where they
 are recorded rather than quietly restated.
 
 ### The pt-v18 era and the downside transmission tilt
+
+The index figure this era is usually quoted by, -16.150 per cent a year to
+-0.340, is measured on a HELD roster that opens about six points dearer
+than the population, and the protocol is part of the number: across
+varying rosters the same preset reads higher and clears the band the held
+one fails. Any figure for this row travels with the roster it was taken
+on.
 
 The equal-weight index drifted -22.155 per cent a year at pt-v16 in the log
 convention, measured over thirty seeds on the panel roster at 252 days,
