@@ -501,7 +501,19 @@ pub fn calculate_live_factors(
     // reallocation: the factor's variance share was raised out of THIS
     // term's budget, so total volatility holds still. At 1.0 the multiply
     // is bit-inert.
-    let daily_sigma = mathx::sqrt(mathx::max(company.garch_variance, 0.0001));
+    // THE ABSOLUTE FLOOR, and why it is a parameter now. This 1e-4 was a
+    // dead-stock guard: "a zero variance would make sigma zero and the
+    // price would stop moving entirely". Against a recursion whose own
+    // level is about 6.3e-5 it is not a guard, it is the law -- it binds on
+    // 61 to 90 per cent of name-days in nine of the twelve sectors, and it
+    // is what makes a utility and a bank carry the same idiosyncratic
+    // sigma. The job it was written for is already done, per sector rather
+    // than absolutely, by the `[0.25, 5.0] x sector_base_variance` clamp in
+    // `garch::update_garch_variance_for`, which cannot return zero for a
+    // positive base. So this REMOVES a constant rather than adding one:
+    // shipping at 1e-4 leaves every existing preset bit-identical, and a
+    // preset that sets it to 0.0 has one fewer number in it.
+    let daily_sigma = mathx::sqrt(mathx::max(company.garch_variance, params.idio_sigma_floor));
     let idio_scale = idio_scale_for(params, beta);
     let idiosyncratic_sigma = daily_sigma * idio_scale / mathx::sqrt(390.0);
 
@@ -1693,11 +1705,41 @@ mod tests {
     #[test]
     fn the_garch_variance_floor_stops_a_dead_stock_freezing() {
         // A zero variance would make sigma zero and the price would stop
-        // moving entirely; the 0.0001 floor prevents that.
+        // moving entirely; `idio_sigma_floor` prevents that, and ships at
+        // the 1e-4 this test was written against.
         let mut c = company();
         c.garch_variance = 0.0;
         let mut rng = Fixed(1.0);
         let out = calculate_live_factors(&c, &[], 0.0, 1.0, &shared(), &crate::params::PT_V1, &mut rng).random_noise;
         assert!(out > 0.0, "noise collapsed to {out}");
+    }
+
+    /// The floor is READ FROM THE FIELD, not from a constant beside it.
+    ///
+    /// Both this site and the overnight path in `engine.rs` spelled the
+    /// same 1e-4 inline, and a floor spelled twice is a floor that moves
+    /// once. This asserts the tick's copy follows the field; the overnight
+    /// copy has its own assertion in `engine.rs`.
+    #[test]
+    fn the_idio_sigma_floor_is_the_parameter_and_not_a_constant() {
+        let mut c = company();
+        // Well under the shipped 1e-4, so the floor decides at the default
+        // and the recursion's own value decides once the floor is removed.
+        c.garch_variance = 1.0e-6;
+        let base = crate::params::PT_V1;
+        let mut lifted = crate::params::PT_V1;
+        lifted.idio_sigma_floor = 0.0;
+        let mut r1 = Fixed(1.0);
+        let mut r2 = Fixed(1.0);
+        let floored = calculate_live_factors(&c, &[], 0.0, 1.0, &shared(), &base, &mut r1).random_noise;
+        let free = calculate_live_factors(&c, &[], 0.0, 1.0, &shared(), &lifted, &mut r2).random_noise;
+        // sqrt(1e-4) against sqrt(1e-6) is a factor of ten in sigma, and
+        // the noise is linear in sigma, so the ratio is the evidence.
+        assert!(free < floored, "removing the floor did not lower the noise: {free} vs {floored}");
+        let ratio = floored / free;
+        assert!(
+            (ratio - 10.0).abs() < 1e-9,
+            "expected the floor to be exactly the parameter, ratio {ratio}"
+        );
     }
 }
