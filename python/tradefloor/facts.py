@@ -1011,11 +1011,26 @@ SEED_SD = {
     # The level row, on its own protocol and at the table's preset: pt-v1
     # on `LEVEL_PROTOCOL`, the roster varying with the seed, seeds 101 to
     # 130, 252 days, measured 2026-09-04 on the box run named in
-    # `SEED_SD_LEVEL_PROVENANCE`. The only entry not on the held roster,
-    # and the only one that moves when the roster generator does, by the
-    # protocol's own definition. The two crisis rows carry no entry, for
-    # the two reasons the same provenance states.
+    # `SEED_SD_LEVEL_PROVENANCE`. Not on the held roster, so it moves when
+    # the roster generator does, by the protocol's own definition; the two
+    # crisis rows below share that property and no other entry has it.
     "index_drift_pct": 9.55716,
+    # The two crisis rows, frozen at pt-v16 rather than at pt-v1 under the
+    # rule in `SEED_SD_LEVEL_PROVENANCE["freeze_rule"]`: pt-v1's return
+    # channel cannot answer a down day at all, so its spread is a noise
+    # draw and not this row's scale. Measured 2026-09-05 on the box run
+    # `wsc-seedsd1` at dccc3b0, `LEVEL_PROTOCOL`, seeds 101-130, 252 days.
+    #
+    # `fear_gauge_dn1` is the sample sd across the thirty per-seed medians,
+    # the same estimator as every entry above. `fear_gauge_dn3` is POOLED
+    # (`AGGREGATE`), so there is no per-seed value to take an sd of on half
+    # the runs and the entry is the pooled median's own SAMPLING sd, by
+    # bootstrap over seeds; the spread across the reporting seeds' medians
+    # is 0.229094 and is a different quantity, recorded in the provenance
+    # rather than here because the loss compares the POOLED value to the
+    # band.
+    "fear_gauge_dn1": 0.149230,
+    "fear_gauge_dn3": 0.0828673,
 }
 
 #: Real-market bands re-derived at a 504-DAY measurement window.
@@ -1155,57 +1170,181 @@ SEED_SD_PROVENANCE = {
 }
 
 #: The provenance of the `SEED_SD` entries measured on `LEVEL_PROTOCOL`
-#: rather than on the held panel roster, and the reason each crisis row
-#: carries none. A consumer that scales a row by its seed sd reads
-#: `SEED_SD.get(row)` and reports None where there is no entry; it never
-#: substitutes a neighbour's.
+#: rather than on the held panel roster. A consumer that scales a row by
+#: its seed sd reads `SEED_SD.get(row)` and reports None where there is no
+#: entry; it never substitutes a neighbour's.
 SEED_SD_LEVEL_PROVENANCE = {
-    "rows": ("index_drift_pct",),
-    "source": "facts.measure() at pt-v1 on Universe.random(40, seed=s) with "
-              "market seed s, 252 days, seeds 101-130, sample sd across "
-              "seeds; the box run era-level of 2026-09-04 on feat/level-row "
-              "at 6326337, four arms through programme/scripts/level-jobs.sh "
-              "in the tradefloor-design repository, of which the pt-v1 arm "
-              "is this one",
-    "date": "2026-09-04",
-    "model_fingerprint": "pt-v1",
-    "estimator": "sample standard deviation (n - 1) across seeds",
+    "rows": ("index_drift_pct", "fear_gauge_dn1", "fear_gauge_dn3"),
+    "protocol": "facts.LEVEL_PROTOCOL: facts.measure() on "
+                "Universe.random(40, seed=s) with market seed s, 252 days, "
+                "seeds 101-130",
+    #: WHICH PRESET EACH ROW'S DENOMINATOR IS FROZEN AT, which is the whole
+    #: content of `freeze_rule` and the field a reader should look at
+    #: first. It is not one preset for the whole table.
+    "frozen_at": {
+        "index_drift_pct": "pt-v1",
+        "fear_gauge_dn1": "pt-v16",
+        "fear_gauge_dn3": "pt-v16",
+    },
+    #: THE RULE, stated once and applied per row.
+    #:
+    #: `SEED_SD` is a table of FROZEN denominators. Every "room in seed-sds"
+    #: figure this project publishes divides by it, so re-deriving it at
+    #: each era boundary would silently restate every one of them, and the
+    #: table therefore sits at pt-v1, the baseline preset.
+    #:
+    #: pt-v1 cannot answer for every row. A row whose MECHANISM is inert or
+    #: degenerate at pt-v1 has no response there to take the spread of, and
+    #: freezing it at pt-v1 would record a noise draw's standard deviation
+    #: under the name of a response -- a denominator six times too small,
+    #: on the evidence in `degeneracy_at_pt_v1` below, which is a six-fold
+    #: over-weighting of that row in any objective it enters.
+    #:
+    #: So: a row whose mechanism is inert or degenerate at pt-v1 freezes its
+    #: denominator at the FIRST PRESET THAT GRADED IT, measured on the
+    #: row's own certification protocol, records that preset in `frozen_at`,
+    #: and does not move at later era boundaries. The freeze exists to keep
+    #: published room-in-sd figures stable; no such figure exists for a row
+    #: before the preset that graded it, because the row had no band and no
+    #: entry here, so the later freeze restates nothing.
+    #:
+    #: The two crisis rows were first graded on 2026-09-04 at 8b0690b,
+    #: while pt-v16 was the default and had been since 0.6.0, so the first
+    #: preset that graded them is pt-v16 -- checked against the history
+    #: rather than assumed.
+    "freeze_rule": "a row whose mechanism is inert or degenerate at pt-v1 "
+                   "freezes its denominator at the first preset that graded "
+                   "it, on the row's own certification protocol, and does "
+                   "not move at later era boundaries; every other row "
+                   "freezes at pt-v1",
+    "estimator": {
+        "index_drift_pct": "sample standard deviation (n - 1) across the "
+                           "thirty per-seed values",
+        "fear_gauge_dn1": "sample standard deviation (n - 1) across the "
+                          "thirty per-seed medians",
+        # A pooled row has no per-seed value on half the runs, so its scale
+        # cannot be a spread across seeds. It is the sampling sd of the
+        # POOLED MEDIAN, which is the quantity the loss compares to the
+        # band. SEEDS are resampled, not sessions: sessions inside one run
+        # share a market path, and resampling them would treat 96
+        # correlated draws as 96 independent ones.
+        "fear_gauge_dn3": "bootstrap over SEEDS with replacement, the "
+                          "pooled median recomputed from the per-seed "
+                          "<row>_samples lists on each rep, 20,000 reps, "
+                          "sd of that distribution",
+    },
+    # 100,000 reps and the MEAN OVER FORTY GENERATORS, four million reps
+    # in all, so the shipped constant describes the STATISTIC and not one
+    # generator stream. The rep count was chosen against the measured
+    # spread rather than guessed: over forty generators the worst
+    # deviation from the mean is 3.9 per cent at 2,000 reps, 1.05 at
+    # 20,000 and 0.52 at 100,000, so a single 100,000-rep re-derivation
+    # under any generator agrees inside the one per cent
+    # `tests/test_loss.py` asserts, and the constant carries no pinned
+    # generator to be reproducible.
+    #
+    # A jackknife would be deterministic and was rejected on measurement,
+    # not on principle: the jackknife is inconsistent for a median, and it
+    # shows here -- thirty leave-one-out recomputations take only ten
+    # distinct values and give 0.1027 against the bootstrap's 0.0827 at
+    # pt-v16, while at pt-v1 it errs the other way, 0.0091 against 0.0129.
+    "bootstrap": {"reps": 100000, "generators": 40,
+                  "estimate": "the mean of forty independent 100,000-rep "
+                              "bootstraps, random.Random(1) to (40)",
+                  "resamples": "seeds, with replacement",
+                  "worst_generator_deviation_pct": 0.52},
+    "source": {
+        "index_drift_pct": "the box run era-level of 2026-09-04 on "
+                           "feat/level-row at 6326337, four arms through "
+                           "programme/scripts/level-jobs.sh in the "
+                           "tradefloor-design repository, of which the "
+                           "pt-v1 arm is this one",
+        "crisis_rows": "the box run wsc-seedsd1 of 2026-09-05 on dev at "
+                       "dccc3b0, programme/scripts/wsc-jobs.sh in the "
+                       "tradefloor-design repository, pt-v16 and pt-v1 arms "
+                       "on one build; tradefloor 0.6.2",
+    },
+    "date": {"index_drift_pct": "2026-09-04", "crisis_rows": "2026-09-05"},
     "roster_note": "drawn per seed by Universe.random rather than read from "
-                   "the committed fixture, so this entry moves when the "
+                   "the committed fixture, so these entries move when the "
                    "generator does, by the protocol's own definition, where "
                    "the held-roster entries do not",
     "pinned_by": "tests/test_loss.py re-measures two of the thirty seeds "
-                 "live on the level protocol and re-derives the sd from the "
-                 "committed per-seed table those panels must match",
+                 "live on the level protocol, at each row's frozen preset, "
+                 "and re-derives the sd from the committed per-seed tables "
+                 "those panels must match",
     "same_run_at_the_default": "pt-v16 on the same protocol and seeds reads "
-                               "an sd of 7.0888, the figure beside "
-                               "envelope.CERTIFIED_LEVEL; the entry above "
-                               "is at pt-v1 because the table freezes its "
-                               "denominators there",
-    "unmeasured": {
-        "fear_gauge_dn3": "pooled over every seed's sessions, so no per-seed "
-                          "value exists to take a standard deviation of; its "
-                          "graded value stands on the pooled session count "
-                          "reported beside it",
-        "fear_gauge_dn1": "the table freezes its scale at pt-v1, where the "
-                          "return channel cannot answer a session: "
-                          "vix_return_source is 0.0 there, so the gauge reads "
-                          "the last tick's cap-weighted move rather than the "
-                          "day's, clamped at 0.03 percent of it with a gain "
-                          "of 25.0 and a reversion of 0.12, a ceiling of 0.75 "
-                          "on the target and about 0.09 on the day, which "
-                          "rust/src/economy/state.rs states beside "
-                          "VIX_RETURN_GAIN. pt-v9 moved the source to the "
-                          "session and the clamp to 15.0 in the same step, a "
-                          "change of units rather than a loosening, so the "
-                          "two clamps do not compare as numbers. On the level "
-                          "protocol the row reads 0.021 at the median with an "
-                          "sd of 0.026 across seeds at pt-v1, against 0.950 "
-                          "and 0.149 at pt-v16, so the rule would record the "
-                          "noise draw's sd under the name of a response. The "
-                          "row's room_sd reads None until a rule for a row "
-                          "whose mechanism postdates pt-v1 is decided",
+                               "an sd of 7.0888 on index_drift_pct, the "
+                               "figure beside envelope.CERTIFIED_LEVEL; the "
+                               "entry for that row is at pt-v1 because it "
+                               "freezes there. The wsc-seedsd1 run "
+                               "reproduced both -13.6431 and 7.0888 on dev "
+                               "at dccc3b0, a different build from the one "
+                               "that measured them",
+    #: THE EVIDENCE FOR THE RULE, as data rather than as an argument. Both
+    #: crisis rows measured at pt-v1 on the same run, protocol and build as
+    #: the shipped entries, so the two presets differ in nothing else.
+    #:
+    #: At pt-v1 `vix_return_source` is 0.0, so the gauge reads the last
+    #: tick's cap-weighted move rather than the day's, clamped at 0.03 per
+    #: cent of it with a gain of 25.0 and a reversion of 0.12 -- a ceiling
+    #: of 0.75 on the target and about 0.09 on the day, which
+    #: `rust/src/economy/state.rs` states beside `VIX_RETURN_GAIN`. pt-v9
+    #: moved the source to the session and the clamp to 15.0 in the same
+    #: step, a change of units rather than a loosening, so the two clamps
+    #: do not compare as numbers.
+    #:
+    #: What that costs, measured: the -1 per cent row answers a down day
+    #: with 0.0209 at pt-v1 against 0.9500 at pt-v16, and five of the thirty
+    #: per-seed medians are NEGATIVE -- the gauge falls on a down day. A
+    #: spread taken over that is a spread over noise, and it is 5.8 times
+    #: tighter than the response's. The pooled -3 per cent row is 6.4 times
+    #: tighter the same way, on MORE sessions rather than fewer (187
+    #: against 96), so the gap is the channel and not the sample.
+    "degeneracy_at_pt_v1": {
+        "fear_gauge_dn1": {"median_of_per_seed": 0.020935,
+                           "sd_across_seeds": 0.025919,
+                           "negative_per_seed_medians": 5,
+                           "at_pt_v16": {"median_of_per_seed": 0.949989,
+                                         "sd_across_seeds": 0.149230}},
+        "fear_gauge_dn3": {"pooled_median": 0.025154,
+                           "pooled_sessions": 187, "reporting_seeds": 26,
+                           "bootstrap_sd": 0.012942,
+                           "at_pt_v16": {"pooled_median": 1.955690,
+                                         "pooled_sessions": 96,
+                                         "reporting_seeds": 15,
+                                         "bootstrap_sd": 0.082867}},
     },
+    #: WHAT THE POOLED ROW'S SCALE STANDS ON, and the open question beside
+    #: it. The graded value pools 96 sessions from 15 of the thirty seeds,
+    #: and two of those seeds contribute 58 of the 96. That concentration
+    #: does not decide the estimate -- dropping both moves the pooled median
+    #: from 1.9557 to 1.9190 -- and the bootstrap distribution is tight, a
+    #: 95 per cent interval of 1.86 to 2.11 over 20,000 reps.
+    #:
+    #: THE ALTERNATIVE SCALE IS A RULING, NOT A MEASUREMENT. The spread
+    #: across the reporting seeds' own medians is 0.229094, 2.8 times the
+    #: bootstrap sd, and it answers a different question: how much one
+    #: run's answer varies, rather than how well thirty runs pin the pooled
+    #: one. The bootstrap is shipped because the loss compares the POOLED
+    #: value to the band. The choice is worth 7.6 times in the objective:
+    #: pt-v16's dn3 sits 0.6443 below its floor of 2.60, which is 7.78
+    #: bootstrap sd and a contribution of 60.5, against 2.81 sd and 7.9 on
+    #: the across-seed spread. Nothing in the loss reads these rows yet --
+    #: both are in `loss.STRUCTURAL` -- so the ruling can be taken before
+    #: it prices anything.
+    "pooled_row_scale_alternatives": {
+        "shipped": "bootstrap sd of the pooled median, 0.0828673",
+        "alternative": "sample sd across the reporting seeds' medians, "
+                       "0.229094 over 15 of 30 seeds",
+        "ratio": 2.765,
+        "loss_contribution_at_pt_v16": {"bootstrap": 60.5,
+                                        "across_reporting_seeds": 7.9},
+    },
+    #: Rows on this protocol that carry no `SEED_SD` entry, against the
+    #: reason. Empty since 2026-09-05, and kept so the next such row has
+    #: somewhere to carry its reason rather than being silently absent.
+    "unmeasured": {},
 }
 
 #: The first two are MARGINAL: properties of one series taken on its own. The
@@ -1269,10 +1408,14 @@ AGGREGATE = {"index_drift_pct": "mean", "fear_gauge_dn3": "pooled"}
 #: The CRISIS rows are certified on the same run. A gauge's answer to a
 #: down day, pooled or medianed over thirty rosters, describes the model
 #: rather than roster 111, and one protocol for every graded row outside
-#: the shape set keeps `envelope` to two tables under one rule. The same
-#: preset reads +1.9740 on the level row with roster 111 held against
-#: -13.6431 with the roster varying, a gap of 3.3 points on one preset at
-#: thirty seeds each, so the protocol is part of a level figure's value
+#: the shape set keeps `envelope` to two tables under one rule. The
+#: shipped preset reads -16.7514 on the level row with roster 111 held
+#: against -13.6431 with the roster varying, a gap of 3.11 points on one
+#: preset at thirty seeds each and both halves on one run (wsc-level2 and
+#: wsc-seedsd1, 2026-09-05, dev at dccc3b0). This sentence read "+1.9740
+#: held" until then, which is pt-v18's held figure and not pt-v16's; the
+#: gap it quoted, 3.3, was pt-v18's own. So the protocol is part of a
+#: level figure's value
 #: and not a detail of its measurement: a reader cannot compare a level
 #: figure with any other unless both name their protocol, and a value
 #: from one protocol is never compared with a band or a certified value
@@ -1286,6 +1429,20 @@ LEVEL_PROTOCOL = {
     "estimator": "mean across seeds for the level row; the crisis rows by "
                  "AGGREGATE, the median across seeds or the pooled median",
     "days": 252,
+    # The rule above, as DATA rather than as prose, so a consumer that
+    # publishes a level or crisis figure can carry it beside the number
+    # instead of retyping it. `tools/presets/record.py` does, and the
+    # alternative was a second copy of the sentence that could drift from
+    # this one.
+    "comparison_rule": "a level or crisis figure carries its protocol as "
+                       "part of its value. A figure measured with the "
+                       "roster held is never compared with a band, with a "
+                       "certified value, or with a figure from the "
+                       "roster-varying protocol: pt-v16 reads -16.7514 on "
+                       "index_drift_pct with roster 111 held and -13.6431 "
+                       "with the roster varying, so the protocol is worth "
+                       "more than most of the differences a reader would "
+                       "draw from the numbers",
 }
 
 

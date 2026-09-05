@@ -59,7 +59,8 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
 from ._core import ValidationError
-from .facts import REAL_MARKETS, SEED_SD, SEED_SD_504, band_distance
+from .facts import (REAL_MARKETS, SEED_SD, SEED_SD_504,
+                    SEED_SD_LEVEL_PROVENANCE, band_distance)
 
 #: The preset these measurements describe.
 PRESET = "pt-v16"
@@ -973,6 +974,15 @@ def score(panel: Mapping[str, float], *,
     barely inside is one seed away from not being, and the band loss cannot
     see the difference.
 
+    It reads None where the horizon's noise table has no entry for the row,
+    which at 504 days is every level and crisis row: `facts.SEED_SD_504`
+    covers the fourteen shape rows only. At 252 days all seventeen carry a
+    scale since 2026-09-05, and `sd_protocol` names which protocol each
+    denominator was measured on, because they are not all the same one --
+    see `facts.SEED_SD_LEVEL_PROVENANCE`. A level or crisis `room_sd` is a
+    number only if the value on the numerator came from the same protocol;
+    nothing here can check that, so it is stated rather than assumed.
+
     The counts are split by group. `in_band` and `of` total every row
     scored and are kept for readers that predate the split; a gate asks
     `shape_in_band` against `shape_of`, because the level and crisis rows
@@ -988,6 +998,7 @@ def score(panel: Mapping[str, float], *,
     # imports this module's facts and a top-level import would cycle.
     from .loss import STRUCTURAL
 
+    LEVEL_SCALED = set(SEED_SD_LEVEL_PROVENANCE["rows"])
     far = horizon_days > CERTIFIED_HORIZON_DAYS
     bands = BANDS_504 if far else REAL_MARKETS
     noise = SEED_SD_504 if far else SEED_SD
@@ -1009,6 +1020,20 @@ def score(panel: Mapping[str, float], *,
             "in_band": band_distance(measured, low, high) == 0,
             "room_sd": (None if not sd
                         else min(measured - low, high - measured) / sd),
+            # WHICH PROTOCOL THE DENOMINATOR CAME FROM. The shape rows'
+            # seed sds are measured on the held panel roster and the level
+            # and crisis rows' on `facts.LEVEL_PROTOCOL`, the roster
+            # varying with the seed. A `room_sd` is only meaningful when
+            # the panel on the numerator was measured the same way, and
+            # this function is handed a bare mapping of values that cannot
+            # say which. So it names the denominator rather than guessing
+            # about the numerator, and a caller mixing the two can see it
+            # in the output instead of only in the prose.
+            "sd_protocol": (
+                None if not sd
+                else "facts.LEVEL_PROTOCOL, roster varying"
+                if name in LEVEL_SCALED
+                else "held panel roster (facts.SEED_SD_PROVENANCE)"),
             "structural": name in STRUCTURAL,
         }
     from .facts import SHAPE, LEVEL, CRISIS

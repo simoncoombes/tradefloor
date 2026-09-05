@@ -75,19 +75,80 @@ LEVER_LO, LEVER_HI = 5.0, 65.0
 REAL_LEVER = 6.16
 
 
+#: How the engine quotes its own preset list when it refuses a name, from
+#: `ModelParams::preset_names()` in `rust/src/params.rs`. That list is the
+#: one authoritative enumeration and it is not on the Python surface, so it
+#: is read back out of the refusal. See `presets`.
+_SHIPPED_PREFIX = "Shipped presets: "
+
+
 def presets() -> list[str]:
-    """Every selectable preset, discovered rather than hardcoded."""
-    out = []
+    """Every selectable preset, from the engine's own list.
+
+    THE LIST IS NOT A RANGE. This walked `pt-v1..pt-v199` and broke at the
+    first name that did not resolve once it had found any, which is correct
+    only while the names are contiguous. They stopped being contiguous when
+    pt-v17 was abandoned and pt-v18 shipped: the walk stopped at 17 and
+    pt-v18 -- and every preset after it -- was never measured, so
+    `record.py` could not write a record for the preset that was about to
+    become the default and nothing said why. A gap is a fact about the
+    naming, not the end of the table.
+
+    `ModelParams::preset_names()` is the enumeration the Rust side already
+    keeps, and every Python entry point that refuses an unknown preset
+    quotes it in the refusal. It is not otherwise exposed, so this reads it
+    back from that message. Ugly, and single-sourced: the alternative is a
+    second list that can disagree with the first, which is the class of
+    defect this function just had.
+
+    The scan is kept as a CROSS-CHECK rather than as the answer. Every name
+    it finds must appear in the engine's list; a disagreement is refused
+    loudly, because under-enumerating silently is what cost the gate.
+    """
+    shipped: list[str] = []
+    try:
+        tradefloor.model_preset("pt-v0")
+    except Exception as exc:  # the refusal quotes preset_names()
+        message = str(exc)
+        if _SHIPPED_PREFIX in message:
+            shipped = [n.strip() for n
+                       in message.split(_SHIPPED_PREFIX, 1)[1].split(",")
+                       if n.strip()]
+
+    # Names that actually resolve, so a parse that picked up trailing prose
+    # cannot put an unrunnable name into a measurement.
+    resolvable = []
+    for name in shipped:
+        try:
+            tradefloor.model_preset(name)
+        except Exception:
+            continue
+        resolvable.append(name)
+
+    scanned = []
     for i in range(1, 200):
         name = f"pt-v{i}"
         try:
             tradefloor.model_preset(name)
         except Exception:
-            if out:
-                break
             continue
-        out.append(name)
-    return out
+        scanned.append(name)
+
+    if not resolvable:
+        # The refusal's wording changed. The scan still answers for every
+        # `pt-vN` name, which is all of them today, and says so rather than
+        # returning a shorter list in silence.
+        print("WARNING: could not read the engine's preset list from its "
+              "refusal message; falling back to the pt-vN scan", flush=True)
+        return scanned
+    missing = [n for n in scanned if n not in resolvable]
+    if missing:
+        raise SystemExit(
+            f"the engine's preset list omits {missing}, which resolve: the "
+            "refusal message and the preset table disagree, and measuring "
+            "either list would be measuring the wrong set"
+        )
+    return resolvable
 
 
 def _roster(n: int, seed: int):

@@ -501,6 +501,7 @@ THIRTY_SEED_PANELS = {
 # same reason as the table above; the live re-measurement below is what
 # keeps it honest.
 THIRTY_SEED_LEVEL_PANELS = {
+    "preset": "pt-v1",
     "seeds": tuple(range(101, 131)),
     "index_drift_pct": [
         6.555978522, 8.769086434, 10.32963337, -1.437036827, -20.460801,
@@ -509,6 +510,86 @@ THIRTY_SEED_LEVEL_PANELS = {
         -5.771630368, -8.114883963, -8.460163246, -6.406017545, -22.06291507,
         -4.812104226, -4.085363997, 3.770262104, -1.882990479, 2.040531268,
         -5.531987442, 1.644564451, -4.599167669, 25.44166539, 7.678302214],
+}
+
+
+# The thirty per-seed panels the two CRISIS rows' SEED_SD entries were
+# measured from. Same protocol as the table above -- pt-v16 rather than
+# pt-v1, because `facts.SEED_SD_LEVEL_PROVENANCE["freeze_rule"]` freezes a
+# row whose mechanism is degenerate at pt-v1 at the first preset that
+# graded it. Universe.random(40, seed=s) with market seed s, 252 days,
+# seeds 101-130, the box run wsc-seedsd1 of 2026-09-05 on dev at dccc3b0.
+#
+# `fear_gauge_dn1` is one median per seed. `fear_gauge_dn3` is POOLED
+# (`facts.AGGREGATE`), so what is committed is each seed's SAMPLES: the
+# graded value is the median of all of them together, fifteen of the thirty
+# seeds hold no session at -3 per cent or worse, and an empty list is a
+# reading rather than a gap.
+THIRTY_SEED_CRISIS_PANELS = {
+    "preset": "pt-v16",
+    "seeds": tuple(range(101, 131)),
+    "fear_gauge_dn1": [
+        0.9349067275, 0.9741151724, 1.0548090847, 1.0988191177, 0.8631038899,
+        0.9248006136, 0.9650714035, 1.0246493992, 1.0194869503, 1.0570305778,
+        0.9150522066, 1.0887634646, 1.0177619815, 1.3840566968, 1.4461412001,
+        1.0458034236, 0.855007172, 0.8708437199, 0.8914507456, 0.8354576843,
+        1.0360300676, 0.852766625, 0.9024678775, 0.8365623693, 1.0988407792,
+        0.9669510061, 0.8578589628, 0.8161393856, 0.8112654838, 0.8867696566],
+    "fear_gauge_dn3_samples": [
+        [],  # seed 101
+        [],  # seed 102
+        [],  # seed 103
+        [1.9997282841, 2.1089791304, 1.7190354893, 1.7704240775, 1.7557884945],  # seed 104
+        [],  # seed 105
+        [],  # seed 106
+        [],  # seed 107
+        [1.9493913419, 2.2701109458],  # seed 108
+        [1.9840665238, 2.3552000942, 1.7802992619],  # seed 109
+        # seed 110
+        [
+            2.1142815246, 1.5101288899, 2.3635433066, 2.3425771773,
+            1.9921856566, 1.6456050102, 2.0234758027,
+        ],
+        [1.8740694694, 1.796799872],  # seed 111
+        [],  # seed 112
+        [],  # seed 113
+        # seed 114
+        [
+            1.9182489958, 1.6408580455, 1.8597163364, 3.1160865378,
+            3.1621097578, 3.4531770114, 3.1798137268, 3.5074556015,
+            3.4032192954, 2.9136995055, 3.3788315807, 2.7420245275,
+            3.1400132435, 3.1179050639, 2.7733757398, 2.5332432355,
+            2.265871323, 2.1024834086, 1.8734489809, 1.8134320524,
+            2.097657248, 2.4819782503, 2.1872875295, 2.0879628928,
+            1.8689871483, 1.7615159002,
+        ],
+        # seed 115
+        [
+            2.3037316423, 2.4352619361, 1.7029396453, 2.0143916479,
+            2.0537960488, 1.7657194372, 1.7674442987, 1.863712515,
+            1.5277897428, 2.0423640501, 1.8040754394, 1.5112827707,
+            2.7328734085, 1.8603336415, 2.2990887139, 2.0545907486,
+            1.7835793747, 1.731649987, 1.43476948, 1.6097214107,
+            1.5993790942, 2.1171096096, 1.7014360662, 2.6710022549,
+            2.4365336026, 2.2646973896, 1.9094991487, 1.5902358668,
+            1.4034191729, 1.4650266802, 1.8091409402, 1.3793069762,
+        ],
+        [2.1240676021, 1.8625432954, 1.8028466262],  # seed 116
+        [],  # seed 117
+        [],  # seed 118
+        [],  # seed 119
+        [1.9020460286, 1.7582170392],  # seed 120
+        [1.8527603492, 1.8731649749, 1.9359899381, 2.0800009768, 1.3537288366],  # seed 121
+        [],  # seed 122
+        [],  # seed 123
+        [],  # seed 124
+        [2.1522646024, 2.1994118456, 1.6364253184, 1.9850433374],  # seed 125
+        [1.8805338103, 1.8631601243],  # seed 126
+        [1.5654554253],  # seed 127
+        [2.3117840626],  # seed 128
+        [],  # seed 129
+        [1.9619896151],  # seed 130
+    ],
 }
 
 
@@ -574,42 +655,135 @@ def test_the_shipped_seed_sds_are_reproducible_by_re_measurement():
         assert derived == pytest.approx(shipped, rel=1e-4), key
 
 
-def test_the_level_rows_seed_sd_is_reproducible_on_its_own_protocol():
-    """The level row's SEED_SD entry, recomputed the way it was measured.
+def _bootstrap_pooled_median_sd(sample_lists, reps, rng):
+    """The sampling sd of a POOLED median, resampling SEEDS with replacement.
 
-    The entry is on `facts.LEVEL_PROTOCOL`, the roster drawn per seed, so
-    the test above cannot cover it: it holds the panel roster. Two of the
-    thirty seeds are re-run live on `Universe.random(40, seed=s)` at pt-v1
-    and held to the committed per-seed table, and the sd is re-derived
-    from that table. The first assertion is the one that matters when a
-    row is added: every SEED_SD entry is re-derived by this test or the
-    one above, so a new entry has to be placed in one of the two tables
-    and cannot slip between them.
+    The estimator `facts.SEED_SD_LEVEL_PROVENANCE["estimator"]` names for
+    `fear_gauge_dn3`, written out here rather than imported because the
+    library does not ship it: the constant is measured once and the point
+    of this test is to re-derive it independently of whatever produced it.
+
+    Seeds are the independent unit. Sessions inside one run share a market
+    path, so resampling sessions would treat 96 correlated draws as 96
+    independent ones and report a scale far too small.
     """
     import statistics as st
 
-    from tradefloor.facts import LEVEL, LEVEL_PROTOCOL
+    n = len(sample_lists)
+    draws = []
+    for _ in range(reps):
+        pooled = []
+        for _ in range(n):
+            pooled += sample_lists[rng.randrange(n)]
+        if pooled:
+            draws.append(st.median(pooled))
+    return st.stdev(draws)
 
-    level_rows = {k for k in THIRTY_SEED_LEVEL_PANELS if k != "seeds"}
+
+def test_the_level_rows_seed_sd_is_reproducible_on_its_own_protocol():
+    """Every `SEED_SD` entry on the level protocol, recomputed as measured.
+
+    These entries are on `facts.LEVEL_PROTOCOL`, the roster drawn per
+    seed, so the test above cannot cover them: it holds the panel roster.
+    Two of the thirty seeds are re-run live for each table, at THAT
+    TABLE'S OWN PRESET, and held to the committed per-seed values; the
+    scales are then re-derived from those tables.
+
+    The two tables sit at different presets on purpose, and the first
+    assertions are the ones that matter when a row is added: every
+    `SEED_SD` entry is re-derived by this test or the one above, so a new
+    entry has to be placed in one of the three tables and cannot slip
+    between them, and each table's preset must be the one
+    `SEED_SD_LEVEL_PROVENANCE["frozen_at"]` claims the row is frozen at.
+    """
+    import random
+    import statistics as st
+
+    from tradefloor.facts import CRISIS, LEVEL, LEVEL_PROTOCOL
+
+    tables = (THIRTY_SEED_LEVEL_PANELS, THIRTY_SEED_CRISIS_PANELS)
+
+    def rows_of(table):
+        # A pooled row is committed as its SAMPLES, so the row's name is the
+        # key with that suffix removed. Nothing else in a table is a row.
+        return {k.removesuffix("_samples") for k in table
+                if k not in ("seeds", "preset")}
+
     held_rows = {k for k in THIRTY_SEED_PANELS if k != "seeds"}
+    level_rows = set().union(*(rows_of(table) for table in tables))
     assert set(SEED_SD) == held_rows | level_rows
     assert held_rows.isdisjoint(level_rows)
-    assert set(SEED_SD_LEVEL_PROVENANCE["rows"]) == level_rows <= set(LEVEL)
-    assert THIRTY_SEED_LEVEL_PANELS["seeds"] == LEVEL_PROTOCOL["seeds"]
-    for seed in (101, 130):
-        position = THIRTY_SEED_LEVEL_PANELS["seeds"].index(seed)
-        universe = tradefloor.Universe.random(40, seed=seed)
-        panel = measure(seed=seed, universe=universe,
-                        days=LEVEL_PROTOCOL["days"], model="pt-v1")
-        assert panel["model_fingerprint"] == "pt-v1"
-        for key in level_rows:
-            # The same floor as the test above, for the same reason.
-            assert panel[key] == pytest.approx(
-                THIRTY_SEED_LEVEL_PANELS[key][position], rel=1e-6, abs=1e-9
-            ), (seed, key)
-    for key in level_rows:
-        derived = st.stdev(THIRTY_SEED_LEVEL_PANELS[key])
-        assert derived == pytest.approx(SEED_SD[key], rel=1e-4), key
+    assert set(SEED_SD_LEVEL_PROVENANCE["rows"]) == level_rows
+    assert level_rows <= set(LEVEL) | set(CRISIS)
+    frozen = SEED_SD_LEVEL_PROVENANCE["frozen_at"]
+    assert set(frozen) == level_rows
+    for table in tables:
+        assert table["seeds"] == LEVEL_PROTOCOL["seeds"]
+        for key in rows_of(table):
+            assert frozen[key] == table["preset"], key
+
+    for table in tables:
+        preset = table["preset"]
+        for seed in (101, 130):
+            position = table["seeds"].index(seed)
+            universe = tradefloor.Universe.random(40, seed=seed)
+            panel = measure(seed=seed, universe=universe,
+                            days=LEVEL_PROTOCOL["days"], model=preset)
+            assert panel["model_fingerprint"] == preset
+            for key in table:
+                if key in ("seeds", "preset"):
+                    continue
+                # The same floor as the test above, for the same reason.
+                assert panel[key] == pytest.approx(
+                    table[key][position], rel=1e-6, abs=1e-9
+                ), (preset, seed, key)
+
+    for table in tables:
+        for key in rows_of(table):
+            if key + "_samples" not in table:
+                derived = st.stdev(table[key])
+                assert derived == pytest.approx(SEED_SD[key], rel=1e-4), key
+                continue
+            # A pooled row's scale is a bootstrap, so it is re-derived under
+            # a generator the recorded value never saw. The recorded number
+            # would reproduce to the bit under its own stream, and that
+            # would test the stream rather than the statistic: at the
+            # committed rep count the worst of forty generators lands 0.52
+            # per cent from the mean, so 1 per cent is the tolerance the
+            # estimator's own Monte Carlo error earns, and it is checked
+            # under two generators the recorded value never used.
+            reps = SEED_SD_LEVEL_PROVENANCE["bootstrap"]["reps"]
+            for generator in (1, 2):
+                derived = _bootstrap_pooled_median_sd(
+                    table[key + "_samples"], reps, random.Random(generator))
+                assert derived == pytest.approx(SEED_SD[key], rel=0.01), (
+                    key, generator)
+
+
+def test_the_pooled_rows_scale_is_not_the_spread_across_seeds():
+    """The two candidate scales for a pooled row are different quantities.
+
+    `fear_gauge_dn3` is graded as a median pooled over every seed's
+    sessions, so its scale is the sampling sd of THAT, and the obvious
+    alternative -- the spread across the reporting seeds' own medians --
+    answers a different question and is nearly three times larger. Which
+    one belongs in `SEED_SD` is a decision about the objective; this pins
+    that the shipped entry is the first and records the second's size, so
+    the decision cannot be reversed by accident.
+    """
+    import statistics as st
+
+    samples = THIRTY_SEED_CRISIS_PANELS["fear_gauge_dn3_samples"]
+    reporting = [st.median(xs) for xs in samples if xs]
+    across = st.stdev(reporting)
+    recorded = SEED_SD_LEVEL_PROVENANCE["pooled_row_scale_alternatives"]
+
+    assert len(reporting) == 15, len(reporting)
+    assert across == pytest.approx(0.229094, rel=1e-4)
+    assert across / SEED_SD["fear_gauge_dn3"] == pytest.approx(
+        recorded["ratio"], rel=1e-2)
+    # The shipped entry is the bootstrap, which is the SMALLER of the two.
+    assert SEED_SD["fear_gauge_dn3"] < across
 
 
 def test_substituting_the_seed_sds_is_a_parameter_not_an_edit():

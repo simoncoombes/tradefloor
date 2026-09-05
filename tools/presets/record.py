@@ -39,6 +39,13 @@ SCHEMA = 1
 #: Which release made each preset the default. A record says what a preset
 #: IS; this says what it was to the project, and it is the question a reader
 #: holding an old result actually asks.
+#:
+#: AN ERA BOUNDARY EDITS THIS. The release that moves the default adds the
+#: new preset's name and its version here, and a record generated before
+#: that edit carries `default_since: null` for a preset that IS the
+#: default -- which reads as "never the default" rather than as "not
+#: recorded yet". `check_default_since` refuses that combination, so the
+#: line cannot be forgotten in the direction that publishes a wrong claim.
 DEFAULT_SINCE = {
     "pt-v3": "0.1.0", "pt-v10": "0.2.0", "pt-v12": "0.3.0",
     "pt-v14": "0.4.0", "pt-v16": "0.6.0",
@@ -84,14 +91,161 @@ def mechanism_set(values: dict[str, float]) -> dict[str, dict]:
     return out
 
 
+#: The two artefact shapes `--level` accepts, keyed by what the run varied.
+#: `archprobe-level-panel.py` writes `roster_per_seed: true` for the level
+#: protocol and `false` for the held roster; both are needed, because a
+#: level figure without its protocol is not a figure.
+LEVEL_PROTOCOLS = {True: "roster_varying", False: "roster_held"}
+
+
+def load_level(paths: list[str]) -> dict[str, dict[str, dict]]:
+    """Group `archprobe-level-panel.py` artefacts by preset and protocol.
+
+    Refuses an artefact that is not on the certification seeds and horizon,
+    and refuses two artefacts claiming the same preset and protocol: the
+    second would silently win, and a run measured twice on two builds is
+    exactly the case where that matters.
+    """
+    from tradefloor.facts import LEVEL_PROTOCOL  # noqa: PLC0415
+
+    out: dict[str, dict[str, dict]] = {}
+    for path in paths:
+        art = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+        name = art["preset"]
+        if tuple(art["seeds"]) != tuple(LEVEL_PROTOCOL["seeds"]):
+            raise SystemExit(
+                f"{path}: seeds {art['seeds'][0]}-{art['seeds'][-1]} "
+                f"({len(art['seeds'])}) are not the certification seeds "
+                f"{LEVEL_PROTOCOL['seeds'][0]}-{LEVEL_PROTOCOL['seeds'][-1]}"
+            )
+        if art["days"] != LEVEL_PROTOCOL["days"]:
+            raise SystemExit(
+                f"{path}: {art['days']} days, not the certified "
+                f"{LEVEL_PROTOCOL['days']}"
+            )
+        key = LEVEL_PROTOCOLS[bool(art["roster_per_seed"])]
+        if key in out.setdefault(name, {}):
+            raise SystemExit(
+                f"{path}: a second {key} artefact for {name}; one of the two "
+                "would win silently"
+            )
+        out[name][key] = art
+    return out
+
+
+def level_reading(art: dict, *, graded: bool) -> dict:
+    """One protocol's reading of the level and crisis rows.
+
+    Every estimator comes from `facts` -- `aggregate_panels` reads each row
+    the way the certification does, a mean for the level row and a pooled
+    median for `fear_gauge_dn3` -- so this cannot grade a row by an
+    estimator the envelope does not use.
+
+    `graded` is False for the held-roster reading. The bands belong to the
+    roster-varying protocol, so a held figure carries its value and no
+    verdict; see `facts.LEVEL_PROTOCOL["comparison_rule"]`.
+    """
+    from tradefloor import facts  # noqa: PLC0415
+
+    rows = art["rows"]
+    keys = tuple(facts.LEVEL) + tuple(facts.CRISIS)
+    values = facts.aggregate_panels(rows, keys)
+    out: dict[str, object] = {
+        "protocol": ("facts.LEVEL_PROTOCOL: "
+                     f"{facts.LEVEL_PROTOCOL['roster']}, roster varying"
+                     if graded else
+                     f"Universe.random(40, seed=111) HELD, "
+                     f"seeds {art['seeds'][0]}-{art['seeds'][-1]}"),
+        "roster_per_seed": bool(art["roster_per_seed"]),
+        "graded": graded,
+        "seeds": [art["seeds"][0], art["seeds"][-1]],
+        "n_seeds": len(art["seeds"]),
+        "days": art["days"],
+        "commit": art.get("commit"),
+        "package_version": art.get("package_version"),
+        "model_fingerprint": art.get("model_fingerprint"),
+    }
+    for key in keys:
+        if key not in values:
+            out[key] = None
+            continue
+        how = facts.AGGREGATE.get(key, "median")
+        row: dict[str, object] = {"value": values[key], "estimator": how}
+        if how == "pooled":
+            row["pooled_sessions"] = facts.pooled_sessions(rows, key)
+            row["reporting_seeds"] = sum(
+                1 for r in rows if r.get(key) is not None)
+        else:
+            row["n_seeds"] = sum(1 for r in rows if r.get(key) is not None)
+        if graded:
+            low, high = facts.REAL_MARKETS[key]
+            row["band"] = [low, high]
+            row["distance"] = facts.band_distance(values[key], low, high)
+            row["in_band"] = row["distance"] == 0
+        out[key] = row
+    return out
+
+
+def level_block(arts: dict[str, dict]) -> dict:
+    """The `panel_level` block: both protocols, each labelled, and the rule.
+
+    Additive under schema 1. It is a SEPARATE block from `panel_252`
+    deliberately: `panel_252` is the fourteen shape rows the envelope
+    certifies, and folding a level row into it would put a row held red on
+    purpose into a count that means "green".
+    """
+    from tradefloor.facts import CRISIS, LEVEL, LEVEL_PROTOCOL  # noqa: PLC0415
+
+    missing = [k for k in ("roster_varying", "roster_held") if k not in arts]
+    if missing:
+        raise SystemExit(
+            f"--level needs both protocols; missing {missing}. A level "
+            "figure without the other protocol beside it invites exactly "
+            "the comparison the rule forbids"
+        )
+    return {
+        "rows": list(LEVEL) + list(CRISIS),
+        "comparison_rule": LEVEL_PROTOCOL["comparison_rule"],
+        "roster_varying": level_reading(arts["roster_varying"], graded=True),
+        "roster_held": level_reading(arts["roster_held"], graded=False),
+    }
+
+
+def check_default_since(name: str, record: dict) -> str | None:
+    """A record for the DEFAULT preset must say which release made it so.
+
+    Returns a refusal, or None. `DEFAULT_SINCE` is edited by hand at an era
+    boundary and a record generated in the window between the default
+    moving and that edit publishes `default_since: null`, which a reader
+    takes as "this preset was never the default" rather than as "nobody
+    filled it in".
+    """
+    import tradefloor  # noqa: PLC0415
+
+    if name != tradefloor.model_preset()["name"]:
+        return None
+    if record.get("default_since"):
+        return None
+    return (f"{name} is the engine's default preset and DEFAULT_SINCE has no "
+            f"entry for it, so the record would claim it was never the "
+            f"default. Add {name!r} and its release to DEFAULT_SINCE")
+
+
 def git(*args: str) -> str:
     out = subprocess.run(["git", *args], cwd=ROOT, capture_output=True,
                          text=True, encoding="utf-8")
     return out.stdout.strip() if out.returncode == 0 else ""
 
 
-def build(name: str, panel: dict, values: dict[str, float]) -> dict:
-    """One preset's record, from the panel that measured it."""
+def build(name: str, panel: dict, values: dict[str, float],
+          level: dict[str, dict] | None = None) -> dict:
+    """One preset's record, from the panel that measured it.
+
+    `level` is the `--level` artefacts for this preset, both protocols, and
+    adds the `panel_level` block. Absent, the record carries no level rows
+    at all -- which is what every record written before 2026-09-05 does,
+    and why `main` refuses to REWRITE a record that has one without them.
+    """
     p = panel["presets"][name]
     measured = {
         # The panel names the version and the box it ran on. A figure without
@@ -114,6 +268,7 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
         "measured": measured,
         "panel_252": p["panel_252"],
         "panel_504": p["panel_504"],
+        **({"panel_level": level_block(level)} if level else {}),
         "in_band": {
             "252": p["in_band_252"],
             "504": p["in_band_504"],
@@ -139,6 +294,14 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--panel", required=False,
                     help="a preset_panel.py artefact")
+    ap.add_argument("--level", action="append", default=[], metavar="PATH",
+                    help="an archprobe-level-panel.py artefact (design "
+                         "repo), repeatable. TWO per preset are required: "
+                         "one --roster-per-seed (facts.LEVEL_PROTOCOL, the "
+                         "protocol the level and crisis rows are certified "
+                         "on) and one with the roster held at seed 111. "
+                         "They become the additive panel_level block, each "
+                         "labelled with its protocol")
     ap.add_argument("--check", action="store_true",
                     help="compare against the committed records and report "
                          "every difference, writing nothing")
@@ -164,10 +327,40 @@ def main() -> int:
     panel = json.loads(pathlib.Path(args.panel).read_text(encoding="utf-8"))
     OUT.mkdir(exist_ok=True)
 
+    level = load_level(args.level)
+    unknown = sorted(set(level) - set(panel["presets"]))
+    if unknown:
+        ap.error(f"--level names presets the panel does not measure: {unknown}")
+
+    # PRE-FLIGHT, before anything is written. A record that carries a
+    # `panel_level` and is regenerated from a panel alone comes back
+    # WITHOUT one, and nothing downstream fails: the documentation site
+    # simply stops publishing the level rows. That is the shape of the
+    # stale `DECAY_252` this tool exists because of, so it is refused
+    # rather than warned about, and refused for every preset at once so a
+    # partial rewrite cannot happen.
+    if not args.check:
+        lost = []
+        for name in sorted(panel["presets"]):
+            path = OUT / f"{name}.json"
+            if not path.exists() or name in level:
+                continue
+            if "panel_level" in json.loads(path.read_text(encoding="utf-8")):
+                lost.append(name)
+        if lost:
+            print("  REFUSED: these records carry a panel_level and no "
+                  "--level artefact was given for them, so rewriting would "
+                  f"drop it: {lost}")
+            return 1
+
     drift = []
     for name in sorted(panel["presets"]):
         values = tradefloor.ModelParams.from_preset(name).to_dict()
-        record = build(name, panel, values)
+        record = build(name, panel, values, level.get(name))
+        refusal = check_default_since(name, record)
+        if refusal:
+            print(f"  REFUSED {name}.json: {refusal}")
+            return 1
         text = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
         path = OUT / f"{name}.json"
         if args.check:
@@ -178,8 +371,14 @@ def main() -> int:
                 # The measurement block carries a commit and a wall time, so
                 # comparing it would report drift on every re-run. What has
                 # to agree is the SCIENCE.
-                for field in ("coefficient_digest", "mechanisms", "panel_252",
-                              "panel_504", "in_band", "misses", "crisis_lever"):
+                fields = ["coefficient_digest", "mechanisms", "panel_252",
+                          "panel_504", "in_band", "misses", "crisis_lever"]
+                # Only when this run BUILT one. A --check without --level
+                # says nothing about the level rows rather than reporting
+                # them as drift, and the count line below says which.
+                if "panel_level" in record:
+                    fields.append("panel_level")
+                for field in fields:
                     if have.get(field) != record[field]:
                         drift.append(f"{path.name}: {field} differs")
         else:
@@ -189,7 +388,8 @@ def main() -> int:
     if args.check:
         for d in drift:
             print(f"  {d}")
-        print(f"{len(drift)} differences")
+        print(f"{len(drift)} differences"
+              + ("" if level else "; panel_level NOT checked (no --level)"))
         return 1 if drift else 0
     return 0
 
