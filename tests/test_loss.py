@@ -777,9 +777,16 @@ def test_the_pooled_rows_scale_is_not_the_spread_across_seeds():
     reporting = [st.median(xs) for xs in samples if xs]
     across = st.stdev(reporting)
     recorded = SEED_SD_LEVEL_PROVENANCE["pooled_row_scale_alternatives"]
+    alt = recorded["alternative"]
 
-    assert len(reporting) == 15, len(reporting)
-    assert across == pytest.approx(0.229094, rel=1e-4)
+    # Every figure is re-derived from the committed table and compared to
+    # the module's own field. Nothing is retyped here, so a re-measurement
+    # that moves the table fails this test rather than leaving a stale
+    # number in the provenance nobody reads.
+    assert len(samples) == alt["of_seeds"]
+    assert len(reporting) == alt["reporting_seeds"], len(reporting)
+    assert across == pytest.approx(alt["value"], rel=1e-4)
+    assert recorded["shipped"]["value"] == SEED_SD["fear_gauge_dn3"]
     assert across / SEED_SD["fear_gauge_dn3"] == pytest.approx(
         recorded["ratio"], rel=1e-2)
     # The shipped entry is the bootstrap, which is the SMALLER of the two.

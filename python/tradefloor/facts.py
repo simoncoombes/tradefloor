@@ -1335,10 +1335,17 @@ SEED_SD_LEVEL_PROVENANCE = {
     #: the across-seed spread. Nothing in the loss reads these rows yet --
     #: both are in `loss.STRUCTURAL` -- so the ruling can be taken before
     #: it prices anything.
+    # Numbers as NUMBERS, not inside a sentence: `tests/test_loss.py`
+    # re-derives both from the committed per-seed table and compares them
+    # to these fields, so neither can be retyped into the test and drift
+    # against the module.
     "pooled_row_scale_alternatives": {
-        "shipped": "bootstrap sd of the pooled median, 0.0828673",
-        "alternative": "sample sd across the reporting seeds' medians, "
-                       "0.229094 over 15 of 30 seeds",
+        "shipped": {"estimator": "bootstrap sd of the pooled median",
+                    "value": 0.0828673},
+        "alternative": {"estimator": "sample sd across the reporting "
+                                     "seeds' medians",
+                        "value": 0.229094,
+                        "reporting_seeds": 15, "of_seeds": 30},
         "ratio": 2.765,
         "loss_contribution_at_pt_v16": {"bootstrap": 60.5,
                                         "across_reporting_seeds": 7.9},
