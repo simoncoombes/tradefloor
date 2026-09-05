@@ -1230,8 +1230,10 @@ SEED_SD_LEVEL_PROVENANCE = {
         # correlated draws as 96 independent ones.
         "fear_gauge_dn3": "bootstrap over SEEDS with replacement, the "
                           "pooled median recomputed from the per-seed "
-                          "<row>_samples lists on each rep, 20,000 reps, "
-                          "sd of that distribution",
+                          "<row>_samples lists on each rep, sd of that "
+                          "distribution; the rep count and the number of "
+                          "generators averaged are in `bootstrap` below "
+                          "rather than restated here",
     },
     # 100,000 reps and the MEAN OVER FORTY GENERATORS, four million reps
     # in all, so the shipped constant describes the STATISTIC and not one
