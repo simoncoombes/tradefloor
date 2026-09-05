@@ -3274,6 +3274,66 @@ impl ModelParams {
         }
     }
 
+    /// The GJR persistence of this vector, `alpha + beta + gamma/2`.
+    ///
+    /// The half-weight on gamma is the GJR-GARCH stationarity condition for
+    /// symmetric innovations: the asymmetry term is live on roughly half of
+    /// days. At or above 1.0 the variance recursion grows without bound.
+    pub fn garch_persistence(&self) -> f64 {
+        self.garch_alpha + self.garch_beta + self.garch_gamma / 2.0
+    }
+
+    /// `Err` if this vector's variance process cannot be stationary.
+    ///
+    /// # Why this is not only a test
+    ///
+    /// `every_shipped_preset_has_a_stationary_variance_process` iterates
+    /// [`Self::preset_names`], so it covers the shipped table and NOTHING
+    /// a search constructs. An arm is not a preset, and every calibration
+    /// vector anyone evaluates is an arm. A vector with
+    /// `garch_gamma = 0.55` on pt-v18 reaches a persistence of 1.0198,
+    /// scored 17 of 17 on the graded panel with the best `leverage_effect`
+    /// in its run, and was finite only because
+    /// [`crate::market::garch::garch_beta_for_cap`] clamps the per-name
+    /// beta against `GARCH_PERSISTENCE_CEILING`. A clamp that keeps a
+    /// divergent process finite converts a crash into a passing score, and
+    /// the panel cannot see the difference.
+    ///
+    /// # Why the bound is 1.0 and not the ceiling
+    ///
+    /// `GARCH_PERSISTENCE_CEILING` is 0.97, the bound a calibration SEARCH
+    /// is held inside. It is not the point the process diverges: pt-v1
+    /// ships at 0.99 and is perfectly stationary. Asserting the search
+    /// bound here would refuse a shipped preset, which is the mistake the
+    /// test beside it records making once already.
+    ///
+    /// # Why it is not in `with_override`
+    ///
+    /// Overrides are applied one at a time, so an INTERMEDIATE vector can
+    /// be non-stationary while the vector the caller asked for is fine --
+    /// `from_preset(.., garch_alpha=.., garch_gamma=..)` applies them in
+    /// sorted order and would refuse on a partial state. The check belongs
+    /// where construction FINISHES, which is why the Python constructors
+    /// call it and `with_override` does not.
+    pub fn check_stationary(&self) -> Result<(), String> {
+        let persistence = self.garch_persistence();
+        if persistence.is_finite() && persistence < 1.0 {
+            return Ok(());
+        }
+        Err(format!(
+            "garch_alpha + garch_beta + garch_gamma/2 = {persistence}, at or \
+             above 1.0: the variance recursion grows without bound and the \
+             run is finite only because the per-name beta is clamped against \
+             GARCH_PERSISTENCE_CEILING ({}). A clamped divergent process \
+             still scores on the panel, so it is refused here rather than \
+             measured. alpha {}, beta {}, gamma {}.",
+            crate::market::garch::GARCH_PERSISTENCE_CEILING,
+            self.garch_alpha,
+            self.garch_beta,
+            self.garch_gamma
+        ))
+    }
+
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",

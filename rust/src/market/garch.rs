@@ -369,15 +369,14 @@ mod tests {
     fn every_shipped_preset_has_a_stationary_variance_process() {
         for name in ModelParams::preset_names() {
             let p = ModelParams::preset(name).unwrap();
-            let persistence = p.garch_alpha + p.garch_beta + p.garch_gamma / 2.0;
+            let persistence = p.garch_persistence();
             let half_life = (0.5f64).ln() / persistence.ln();
-            // 1.0, not GARCH_PERSISTENCE_CEILING. That constant is the
-            // bound a calibration SEARCH is held inside, not the point the
-            // process diverges: pt-v1 ships at 0.99 and is perfectly
-            // stationary. Asserting the search bound here failed pt-v1 on
-            // the first run of this test.
+            // Through `check_stationary`, so the shipped table and every
+            // vector a search constructs are held to ONE rule rather than to
+            // two that can drift. The bound is 1.0 and not
+            // GARCH_PERSISTENCE_CEILING for the reason recorded there.
             assert!(
-                persistence < 1.0,
+                p.check_stationary().is_ok(),
                 "{name}: persistence {persistence} at or above 1.0 — variance \
                  grows without bound"
             );
@@ -389,6 +388,35 @@ mod tests {
                  update the module note and §115."
             );
         }
+    }
+
+    /// The hole the preset loop could not see, closed and pinned.
+    ///
+    /// `every_shipped_preset_has_a_stationary_variance_process` iterates
+    /// the shipped table, and an ARM is not a preset — so no vector any
+    /// search evaluates was ever checked. This is that vector: pt-v18 with
+    /// `garch_gamma` at 0.55, persistence 1.0198, which scored 17 of 17 on
+    /// the graded panel with the best `leverage_effect` in its run.
+    #[test]
+    fn a_constructed_arm_is_held_to_the_same_stationarity_rule() {
+        let base = ModelParams::preset("pt-v18").expect("shipped");
+        assert!(base.check_stationary().is_ok(), "pt-v18 is stationary");
+
+        let arm = base.with_override("garch_gamma", 0.55).expect("settable");
+        let persistence = arm.garch_persistence();
+        assert!(
+            persistence > 1.0,
+            "the arm this test exists for is no longer non-stationary \
+             ({persistence}); pick another or delete the test"
+        );
+        let refusal = arm.check_stationary().expect_err("must be refused");
+        assert!(refusal.contains("grows without bound"), "{refusal}");
+
+        // `with_override` itself does NOT refuse: overrides are applied one
+        // at a time and an intermediate vector may be non-stationary while
+        // the one the caller asked for is fine. The refusal belongs where
+        // construction finishes.
+        assert!(base.with_override("garch_gamma", 0.55).is_ok());
     }
 
     #[test]

@@ -952,10 +952,24 @@ def test_a_recomputed_half_life_still_halves_in_its_stated_days():
 
 # -- property 3: the fingerprint cannot lie ---------------------------------
 
+# The custom vector these properties are stated on. It was
+# `garch_alpha=0.12` alone until 2026-09-05, which on pt-v1's beta of 0.80
+# and gamma of 0.34 is a GJR persistence of 1.09 -- a NON-STATIONARY variance
+# process, finite only because the per-name beta is clamped against
+# `GARCH_PERSISTENCE_CEILING`. It ran for months because the stationarity
+# guard iterates the shipped presets and a custom vector is not one; it
+# surfaced the moment `ModelParams` began checking at construction.
+#
+# Beta moves down with alpha up, so the fixture keeps pt-v1's OWN persistence
+# of 0.99 and differs from it in how that persistence is split. Visibly
+# custom, still moves prices, and a model the engine can legally run.
+
+
 def test_the_fingerprint_is_stable_distinct_and_honestly_shaped():
-    a = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
-    b = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
-    c = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.13)
+    a = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12, garch_beta=0.70)
+    b = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12, garch_beta=0.70)
+    c = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.13,
+                                       garch_beta=0.69)
     assert a.fingerprint == b.fingerprint
     assert a.fingerprint != c.fingerprint
     assert a.fingerprint.startswith("custom-")
@@ -1000,7 +1014,7 @@ def test_the_dict_round_trips_and_a_foreign_constant_is_refused():
 
 
 def test_the_engine_reports_the_model_it_runs():
-    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12, garch_beta=0.70)
     engine = tradefloor.Engine(seed=1, universe=UNIVERSE, model=custom)
     assert engine.model_fingerprint == custom.fingerprint
     assert engine.model == custom
@@ -1029,6 +1043,7 @@ def test_a_custom_preset_round_trips_through_a_manifest():
     as JSON, and reproduces on the other side — under the recorded
     coefficients, to the recorded digest."""
     custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12,
+                                             garch_beta=0.70,
                                              market_factor_sigma=0.018)
     engine = run_market(custom)
     manifest = tradefloor.RunManifest.of(engine, seed=42, universe=UNIVERSE)
@@ -1051,11 +1066,19 @@ def test_a_default_manifest_still_reproduces_and_names_its_preset():
 
 
 def test_a_tampered_custom_model_dict_is_refused_before_replay():
-    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12, garch_beta=0.70)
     manifest = tradefloor.RunManifest.of(run_market(custom), seed=42,
                                       universe=UNIVERSE)
     payload = json.loads(manifest.to_json())
-    payload["written_by"]["model"]["garch_alpha"] = 0.19
+    # 0.10 and not 0.19: on this fixture's beta of 0.70 and gamma of 0.34,
+    # 0.19 reaches a GJR persistence of 1.06 and `ModelParams` refuses it at
+    # construction, BEFORE replay can notice the fingerprint no longer
+    # matches. The tamper would still be caught, but for the wrong reason
+    # and by the wrong check, and this test would have gone on passing
+    # while the property it names went untested. A tampered value has to
+    # stay inside the model's validity for the tamper to be the thing that
+    # is caught. 0.10 is stationary at 0.97 and is not 0.12.
+    payload["written_by"]["model"]["garch_alpha"] = 0.10
     with pytest.raises(tradefloor.ValidationError, match="no longer"):
         tradefloor.RunManifest.from_json(json.dumps(payload)).reproduce()
 
@@ -1070,7 +1093,7 @@ def test_a_checkpoint_of_a_custom_run_resumes_under_that_model():
 
 
 def test_a_fork_of_a_custom_run_prices_under_the_parents_model():
-    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12, garch_beta=0.70)
     parent = run_market(custom, days=2)
     child = tradefloor.branch(parent, 1, universe=UNIVERSE, seed=42)[0]
     assert child.model_fingerprint == custom.fingerprint
@@ -1093,7 +1116,7 @@ def test_the_scorecard_carries_the_model_fingerprint():
         def act(self, obs):
             return {}
 
-    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12, garch_beta=0.70)
     small = tradefloor.Universe.random(4, seed=5)
     default = tradefloor.evaluate({"idle": Idle()}, seed=9, universe=small,
                                days=1, steps_per_day=2, ticks_per_step=10)

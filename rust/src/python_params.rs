@@ -84,6 +84,9 @@ impl PyModelParams {
                     .map_err(ValidationError::new_err)?;
             }
         }
+        // Where construction FINISHES, not per override: see
+        // `ModelParams::check_stationary` for why the two are different.
+        params.check_stationary().map_err(ValidationError::new_err)?;
         Ok(Self { inner: params })
     }
 
@@ -145,6 +148,7 @@ impl PyModelParams {
                 }
             }
         }
+        params.check_stationary().map_err(ValidationError::new_err)?;
         Ok(Self { inner: params })
     }
 
