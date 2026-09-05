@@ -1254,3 +1254,219 @@ mod phase_table_dials {
         assert_eq!(phase_growth_target(-2.75, c.gdp_growth_range, 1.0), -2.75);
     }
 }
+
+#[cfg(test)]
+mod vix_level_identity {
+    use super::*;
+    use crate::economy::state::{create_initial_economy_state, InitialEconomyOptions};
+
+    /// A draw-free RNG, so two calls that differ only in a dial can be
+    /// compared BIT FOR BIT rather than to a tolerance. Copied from
+    /// `economy::invariants`, which uses it for the same reason.
+    struct Silent(f64);
+    impl crate::rng::Rng for Silent {
+        fn next_f64(&mut self) -> f64 {
+            self.0
+        }
+        fn next_normal(&mut self) -> f64 {
+            0.0
+        }
+    }
+
+    fn economy() -> EconomyState {
+        create_initial_economy_state(&InitialEconomyOptions::default())
+    }
+
+    /// The arm the design note registers on, as `DailyInputs`. The gains are
+    /// ASYMMETRIC, which is the whole reason an offset existed.
+    fn arm(identity: f64) -> DailyInputs<'static> {
+        DailyInputs {
+            vix_level_identity: identity,
+            vix_index_sigma_pct: 1.04,
+            vix_implied_from_market: 20.7,
+            vix_realised_vol_weight: 0.3,
+            vix_cycle_amplitude: 0.85,
+            vix_mean_reversion: 0.06,
+            vix_decay_ratio: 0.6,
+            vix_return_gain: 30.0,
+            vix_return_gain_up: 14.0,
+            vix_return_source: 1.0,
+            vix_target_offset: -9.16,
+            vix_target_shock_cap: 150.0,
+            // pt-v18's own, and it matters here: the DEFAULT is 0.03, at
+            // which every return in this module clamps to the same value
+            // and two arms that should differ do not. A test that had left
+            // it at the default reported the return source as inert with
+            // the identity off, which is the harness clamping, not the
+            // model.
+            vix_return_clamp: 15.0,
+            market_day_return_pct: -1.7,
+            market_return_pct: -0.02,
+            game_day: 40,
+            ..Default::default()
+        }
+    }
+
+    fn vix_after(inputs: &DailyInputs) -> f64 {
+        update_economy_daily(&economy(), inputs, &mut Silent(0.5)).vix
+    }
+
+    /// THE NEW INPUT IS UNREAD AT THE DEFAULT, asserted on bits over a
+    /// spread rather than at one point.
+    ///
+    /// `vix_index_sigma_pct` is the index's conditional sigma, and the only
+    /// thing that reads it is the excursion's zero-mean correction. If the
+    /// branch guarding that correction were ever wrong -- an `||` for an
+    /// `&&`, a dial compared against the wrong constant -- every preset
+    /// before pt-v19 would move, and it would move by a fraction of a point
+    /// a day, which is exactly the size nothing notices.
+    #[test]
+    fn the_index_sigma_is_not_read_while_the_identity_is_off() {
+        let want = vix_after(&arm(0.0));
+        for i in 0..=800 {
+            let mut inputs = arm(0.0);
+            inputs.vix_index_sigma_pct = i as f64 * 0.05;
+            assert_eq!(vix_after(&inputs), want, "moved at sigma = {}",
+                       i as f64 * 0.05);
+        }
+    }
+
+    /// And the mirror: at the identity it is read, monotonically, because
+    /// the correction it sizes is subtracted from the target.
+    #[test]
+    fn the_index_sigma_is_read_once_the_identity_is_on() {
+        let mut last = f64::INFINITY;
+        for i in 1..=20 {
+            let mut inputs = arm(1.0);
+            inputs.vix_index_sigma_pct = i as f64 * 0.25;
+            let v = vix_after(&inputs);
+            assert!(v < last, "not falling at sigma {}: {v} after {last}",
+                    i as f64 * 0.25);
+            last = v;
+        }
+    }
+
+    /// THE EARNINGS BUMP, which is a literal in the code and not a dial, so
+    /// it cannot be shown retired by moving a value.
+    ///
+    /// Shown by its consequence instead: half a point on the first half of
+    /// a month is a level constant, and under the identity the level is the
+    /// variance. Two days that differ only in where they fall in the month
+    /// must give the same VIX, and with the identity off they must not.
+    #[test]
+    fn the_earnings_bump_is_not_read_under_the_identity() {
+        let (early, late) = (5, 20);
+        let mut a = arm(1.0);
+        a.game_day = early;
+        let mut b = arm(1.0);
+        b.game_day = late;
+        assert_eq!(vix_after(&a), vix_after(&b),
+                   "the month's half still moves the VIX under the identity");
+
+        let mut a = arm(0.0);
+        a.game_day = early;
+        let mut b = arm(0.0);
+        b.game_day = late;
+        assert_ne!(vix_after(&a), vix_after(&b),
+                   "the bump moves nothing even with the identity off; the harness is not reaching the code");
+    }
+
+    /// THE PHASE TABLE, the same way: five constants in the code, not a
+    /// dial. Under the identity the business cycle reaches the VIX through
+    /// the variance processes or not at all, so every phase must give the
+    /// same VIX from the same variance.
+    #[test]
+    fn the_phase_table_is_not_read_under_the_identity() {
+        let phases = [CyclePhase::Expansion, CyclePhase::Peak,
+                      CyclePhase::Contraction, CyclePhase::Trough,
+                      CyclePhase::Recovery];
+        let of = |identity: f64, phase: CyclePhase| {
+            let mut e = economy();
+            e.cycle_phase = phase;
+            update_economy_daily(&e, &arm(identity), &mut Silent(0.5)).vix
+        };
+        let want = of(1.0, CyclePhase::Expansion);
+        for p in phases {
+            assert_eq!(of(1.0, p), want, "{p:?} moved the VIX under the identity");
+        }
+        // The mirror: with it off the table is the level, so every phase
+        // gives a different one.
+        let mut seen: Vec<f64> = phases.iter().map(|p| of(0.0, *p)).collect();
+        seen.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        seen.dedup();
+        assert_eq!(seen.len(), phases.len(),
+                   "the phase table moves nothing even with the identity off");
+    }
+
+    /// THE ZERO-MEAN CORRECTION IS ZERO WHEN THERE IS NOTHING TO CORRECT.
+    ///
+    /// The excursion exists because an ASYMMETRIC gain over a zero-mean
+    /// return does not cancel. At equal gains it does, and the correction
+    /// must be exactly 0.0 -- not nearly, because a preset with symmetric
+    /// gains must not acquire a standing bias from a term that is supposed
+    /// to be about the asymmetry.
+    #[test]
+    fn a_symmetric_response_needs_no_correction() {
+        for i in 0..=200 {
+            let sigma = i as f64 * 0.05;
+            assert_eq!(expected_return_spike(sigma, 17.0, 17.0), 0.0,
+                       "a symmetric response was corrected at sigma {sigma}");
+        }
+    }
+
+    /// And it is the Gaussian absolute moment, which is the identity it
+    /// claims to be. Asserted against `sigma sqrt(2/pi)` computed the other
+    /// way, so the constant in the code cannot drift from the integral it
+    /// stands for.
+    #[test]
+    fn the_correction_is_the_gaussian_absolute_moment() {
+        let two_over_pi = 2.0 / core::f64::consts::PI;
+        for &sigma in &[0.25, 0.8, 1.04, 2.5, 9.0] {
+            for &(g, gu) in &[(30.0, 14.0), (17.0, 5.0), (1.0, 0.0)] {
+                let want = 0.5 * (g - gu) * sigma * mathx::sqrt(two_over_pi);
+                let have = expected_return_spike(sigma, g, gu);
+                assert!((have - want).abs() < 1e-12,
+                        "sigma {sigma}, gains {g}/{gu}: {have} vs {want}");
+            }
+        }
+    }
+
+    /// The correction MOVES WITH THE MARKET's volatility, which is the
+    /// second thing a fitted offset could not do: an offset derived in a
+    /// calm year is the wrong offset in a violent one.
+    #[test]
+    fn the_correction_scales_with_the_index_sigma() {
+        let a = expected_return_spike(1.0, 30.0, 14.0);
+        let b = expected_return_spike(2.0, 30.0, 14.0);
+        assert!((b - 2.0 * a).abs() < 1e-12, "{b} is not twice {a}");
+        assert!(a > 0.0, "an asymmetric down-heavy response has a positive mean");
+    }
+
+    /// THE SPIKE READS THE SESSION UNDER THE IDENTITY, whatever
+    /// `vix_return_source` says, because the correction is sized for a
+    /// session and applying it to a closing MINUTE would be twenty times
+    /// the quantity it corrects.
+    #[test]
+    fn the_identity_reads_the_session_return_at_every_source() {
+        let want = {
+            let mut i = arm(1.0);
+            i.vix_return_source = 1.0;
+            vix_after(&i)
+        };
+        for &s in &[0.0, 0.25, 0.5, 0.75, 1.0] {
+            let mut i = arm(1.0);
+            i.vix_return_source = s;
+            assert_eq!(vix_after(&i), want, "the source moved the VIX at {s}");
+        }
+        // The mirror: with the identity off the source blends the two
+        // returns and they differ here, so every value gives a different
+        // answer.
+        let off: Vec<f64> = [0.0f64, 0.5, 1.0].iter().map(|&s| {
+            let mut i = arm(0.0);
+            i.vix_return_source = s;
+            vix_after(&i)
+        }).collect();
+        assert!(off[0] != off[1] && off[1] != off[2],
+                "the source moves nothing even with the identity off: {off:?}");
+    }
+}
