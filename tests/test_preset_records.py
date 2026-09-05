@@ -41,8 +41,96 @@ def records():
     return sorted(RECORDS.glob("*.json"))
 
 
+def _shipped_preset_names():
+    """Every shipped preset, from the engine's own list.
+
+    `ModelParams::preset_names()` is not on the Python surface, so it is
+    read back out of the refusal that quotes it -- the same route
+    `tools/calibration/preset_panel.py` takes. A hardcoded range is what
+    made pt-v18 invisible to that tool for an entire era.
+    """
+    marker = "Shipped presets: "
+    try:
+        tradefloor.model_preset("pt-v0")
+    except Exception as exc:
+        message = str(exc)
+    else:  # pragma: no cover - "pt-v0" is not a preset
+        raise AssertionError("pt-v0 resolved; the refusal route is gone")
+    assert marker in message, message
+    names = [n.strip() for n in message.split(marker, 1)[1].split(",") if n.strip()]
+    for name in names:
+        assert tradefloor.model_preset(name)["name"] == name, name
+    assert tradefloor.model_preset()["name"] in names
+    return names
+
+
 def load(path):
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+#: Shipped presets with NO record, against the reason, so an absence is a
+#: named decision rather than a gap nobody can see.
+#:
+#: THIS LIST IS THE POINT. A record is the only thing that binds a preset's
+#: coefficients: `test_a_record_describes_the_preset_it_names` iterates the
+#: RECORDS, so a preset without one has nothing holding it to the vector it
+#: was measured as. pt-v18 is how that fails in practice -- it silently
+#: gained `buyback_payout_share = 1/3` inside 6326337..dccc3b0, which moved
+#: its index level by 1.75 points a year and made two published figures
+#: describe a preset that no longer existed. The name did not change, so
+#: nothing said the model had. `coefficient_digest` exists to catch exactly
+#: that and had nothing to compare against.
+#:
+#: A preset added here is a preset nobody is watching. Add one only with a
+#: reason, and delete the entry when the record lands.
+WITHOUT_RECORDS = {
+    "pt-v1": "the baseline. Never the default of a release, and the frozen "
+             "reference every seed sd is measured at rather than a preset "
+             "anyone is asked to run",
+    "pt-v2": "superseded inside an era; never shipped as a default",
+    "pt-v3": "default at 0.1.0, before records existed",
+    "pt-v4": "superseded inside an era; never shipped as a default",
+    "pt-v5": "superseded inside an era; never shipped as a default",
+    "pt-v6": "superseded inside an era; never shipped as a default",
+    "pt-v7": "superseded inside an era; never shipped as a default",
+    "pt-v8": "superseded inside an era; never shipped as a default",
+    "pt-v9": "superseded inside an era; never shipped as a default",
+    "pt-v10": "default at 0.2.0, before records existed",
+    "pt-v11": "superseded inside an era; never shipped as a default",
+    "pt-v12": "default at 0.3.0, before records existed",
+    "pt-v13": "superseded inside an era; never shipped as a default",
+    "pt-v15": "superseded inside an era; never shipped as a default",
+    "pt-v18": "MEASURED BUT UNRECORDED, and the one entry here that is a "
+              "live risk rather than history: it is a candidate for the "
+              "default and it already changed under its own name once. Its "
+              "record is blocked on the era's dial vector settling",
+}
+
+
+def test_every_shipped_preset_either_has_a_record_or_says_why_not():
+    """An absent record is a decision, and it has to be written down.
+
+    The one thing binding a preset's coefficients is its record, so a
+    preset without one can be edited under its own name and nothing fails.
+    That is not hypothetical: pt-v18 gained a dial mid-era and two
+    published figures went stale silently.
+
+    So the SET of presets without records is pinned. A new preset fails
+    this test until someone either writes its record or states here why it
+    does not need one, which is the moment to make that call rather than
+    six weeks later.
+    """
+    have = {load(p)["preset"] for p in records()}
+    shipped = _shipped_preset_names()
+    missing = {n for n in shipped if n not in have}
+    assert missing == set(WITHOUT_RECORDS), (
+        f"presets with no record and no reason: {sorted(missing - set(WITHOUT_RECORDS))}; "
+        f"reasons given for presets that now have a record or do not exist: "
+        f"{sorted(set(WITHOUT_RECORDS) - missing)}"
+    )
+    # And a record for a preset this build does not ship is a record nobody
+    # can check against anything.
+    assert have <= set(shipped), sorted(have - set(shipped))
 
 
 def test_at_least_the_shipped_default_has_a_record():

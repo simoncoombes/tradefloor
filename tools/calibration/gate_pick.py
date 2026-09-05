@@ -416,8 +416,20 @@ def one(job):
 
 
 def summarise(kind: str, rows: list[dict]) -> str:
+    # POOLED rows are skipped, not aggregated. Their graded value is the
+    # median of every seed's samples together and these rows carry scalars
+    # only, so there is nothing here to pool; `facts.aggregate_value`
+    # refuses them rather than returning the median of the reporting seeds'
+    # medians, which is a different statistic. This loop walks every key a
+    # row carries, so it met that refusal the moment it was added -- and
+    # before it was added, it was quietly computing the wrong number for
+    # `fear_gauge_dn3` and feeding it to `envelope.score` below, where only
+    # the shape and level rows are printed. Nothing wrong reached a reader;
+    # nothing stopped it either.
     med = {k: facts.aggregate_value(k, [r[k] for r in rows if r.get(k) is not None])
-           for k in rows[0] if any(r.get(k) is not None for r in rows)}
+           for k in rows[0]
+           if facts.AGGREGATE.get(k) != "pooled"
+           and any(r.get(k) is not None for r in rows)}
     if kind == "driven":
         return (f"  driven 2020-21 ({len(rows)} seeds): return sd "
                 f"{med['ret_sd']:.4f} vs real AAPL {med['real_ret_sd']:.4f} "

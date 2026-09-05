@@ -267,7 +267,17 @@ def build(name: str, panel: dict, values: dict[str, float],
         # the build that produced it cannot be re-derived, which is the whole
         # reason `RunManifest` exists for runs.
         "tradefloor_version": panel["pretium_version"],
-        "commit": git("rev-parse", "HEAD") or None,
+        # THE COMMIT THE PANEL WAS MEASURED AT, not the checkout that wrote
+        # the record. Those are routinely different -- the panel runs on a
+        # box and the record is written here afterwards -- and stamping the
+        # writer's HEAD as the measurement's provenance is a figure that
+        # cannot be re-derived. `written_at` keeps the writer's, because
+        # knowing which tree generated the file is still worth having.
+        #
+        # None means an older panel artefact that predates the field, and
+        # it is reported as None rather than filled in from the writer.
+        "commit": panel.get("commit"),
+        "written_at": git("rev-parse", "HEAD") or None,
         "workers": panel.get("workers"),
         "wall_seconds": round(panel.get("wall_s", 0.0), 1),
         "method": panel["method"],

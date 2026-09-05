@@ -48,6 +48,7 @@ from __future__ import annotations
 import argparse
 import json
 import multiprocessing as mp
+import pathlib
 import statistics
 import sys
 import time
@@ -149,6 +150,19 @@ def presets() -> list[str]:
             "either list would be measuring the wrong set"
         )
     return resolvable
+
+
+def _commit() -> str | None:
+    """This checkout's HEAD, or None outside a repository."""
+    import subprocess  # noqa: PLC0415
+
+    try:
+        out = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
+                             text=True, cwd=str(pathlib.Path(__file__).resolve()
+                                                .parents[2]))
+    except OSError:
+        return None
+    return out.stdout.strip() or None
 
 
 def _roster(n: int, seed: int):
@@ -277,6 +291,14 @@ def main() -> None:
 
     out = {
         "pretium_version": tradefloor.version(),
+        # The commit these numbers were measured at. A version string is not
+        # one: 0.6.2 spans every commit between two releases, and a preset
+        # can change inside that span -- pt-v18 gained a dial mid-version
+        # and moved 1.75 points a year on the level row. Without this,
+        # `record.py` had nothing to stamp but the HEAD of whatever
+        # checkout ran it afterwards, which is a different machine on a
+        # different day.
+        "commit": _commit(),
         # The ENGINE's default, not the envelope's claim about it. This field
         # read `envelope.PRESET` until 0.6.0, so at an era boundary, which is
         # exactly when this tool runs, the artefact labelled itself with the

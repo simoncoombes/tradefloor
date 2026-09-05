@@ -836,8 +836,22 @@ REAL_MARKETS_WINDOWS = {
     },
     #: Rows whose provenance triple this table does NOT reproduce, with why.
     "not_derivable": {
-        "abs_return_acf5": "its provenance summarises a different window set, "
-                           "an eight-value list rather than these nine",
+        "abs_return_acf5": "its provenance summarises a different window "
+                           "set, an eight-value list rather than these "
+                           "nine. RULED 2026-09-05: the band STAYS as "
+                           "shipped and the defect was documentation, not "
+                           "derivation. The eight are the ten windows "
+                           "anchored at the START of the history minus the "
+                           "2020 and 2022 windows, where every other band "
+                           "in this era anchors at the LATEST bar -- so the "
+                           "two sets are differently aligned as well as "
+                           "differently sized. Checked here rather than "
+                           "taken on the ruling: the nine non-crisis values "
+                           "in this table span 0.034 to 0.073, and the "
+                           "provenance's eight span 0.011 to 0.099, so this "
+                           "table cannot produce that list under any "
+                           "exclusion. The anchoring itself is the ruling's "
+                           "and is not re-derived here",
     },
 }
 
@@ -1339,6 +1353,17 @@ SEED_SD_LEVEL_PROVENANCE = {
     # re-derives both from the committed per-seed table and compares them
     # to these fields, so neither can be retyped into the test and drift
     # against the module.
+    #: RULED 2026-09-05: the bootstrap sd ships. It is the sampling sd of
+    #: the pooled median, which is the uncertainty of the quantity the loss
+    #: actually grades, where the alternative measures the variation of a
+    #: DIFFERENT statistic on half the seeds. The alternative also scores
+    #: 7.6 times better, and choosing a scale because it scores better is
+    #: the band-edge habit in a new place.
+    #:
+    #: The ruling picks a value; it does not delete the evidence for the
+    #: other, which is why both stay here as fields with a test pinning
+    #: which one is shipped.
+    "ruling": "bootstrap, 2026-09-05",
     "pooled_row_scale_alternatives": {
         "shipped": {"estimator": "bootstrap sd of the pooled median",
                     "value": 0.0828673},
@@ -1350,13 +1375,28 @@ SEED_SD_LEVEL_PROVENANCE = {
         "loss_contribution_at_pt_v16": {"bootstrap": 60.5,
                                         "across_reporting_seeds": 7.9},
     },
-    #: THE STANDARD ERROR OF A THIRTY-SEED READING, which is the figure a
-    #: reader comparing a level reading to its band actually needs, and is
-    #: not the sd. `index_drift_pct` reads 9.55716/sqrt(30) = 1.745, and
-    #: the band 2.9..11.9 is only +-2.58 of that wide on its own ruler. A
+    #: THE STANDARD ERROR OF A THIRTY-SEED READING, and there are TWO of
+    #: them because they answer two questions. Quoting one for the other is
+    #: how a row gets called thin when it is not, or believed when it is.
+    #:
+    #: 1.745 is `SEED_SD["index_drift_pct"]/sqrt(30)`: the frozen
+    #: denominator's own scale, which is what the OBJECTIVE divides by. The
+    #: band 2.9..11.9 is only +-2.58 of that wide on its own ruler, so a
     #: level arm that moves less than about 3.5 points has not been shown
     #: to move at all at thirty seeds.
+    #:
+    #: A preset's own sampling error is a different number and moves with
+    #: the preset: pt-v18 reads 1.132 on the roster-varying protocol
+    #: against pt-v16's 1.294 (6.1994 and 7.0888 over sqrt(30)). That is
+    #: the one to use for "is THIS row's reading thin", and it must never
+    #: be used as the loss's denominator, which is frozen on purpose.
     "thirty_seed_standard_error": {"index_drift_pct": 1.745},
+    "standard_error_note": "1.745 is the frozen denominator's scale and is "
+                           "what the objective divides by; a preset's own "
+                           "sampling error is a different number that moves "
+                           "with the preset, and answers whether one "
+                           "reading is thin rather than how the loss "
+                           "weights the row",
     #: WHAT A SEED SD IS AND IS NOT, which bounds every entry in `SEED_SD`
     #: rather than only the rows here.
     #:
@@ -1489,8 +1529,41 @@ LEVEL_PROTOCOL = {
 
 
 def aggregate_value(key: str, values: Sequence[float]) -> float:
-    """One graded value for `key` from its per-seed readings."""
-    if AGGREGATE.get(key, "median") == "mean":
+    """One graded value for `key` from its per-seed readings.
+
+    REFUSES A POOLED ROW. A pooled row is not aggregated from per-seed
+    values at all -- its graded value is the median of every seed's
+    SAMPLES together, which is what `aggregate_panels` computes from the
+    `<row>_samples` lists. This function only ever sees per-seed readings,
+    so for a pooled key it can compute the median of the reporting seeds'
+    medians: a real number, a different statistic, and 2.8 times larger
+    than the right one on `fear_gauge_dn3` today.
+
+    It used to return that number. Nothing wrong reached a reader, because
+    the one live caller that passes a pooled key --
+    `gate_pick.summarise`, which walks every key its rows carry -- prints
+    shape and level rows only. That is a property of what that function
+    prints, not of this one, and it stops being true the moment a
+    distributional row is added: `tools/calibration/preset_panel.py` and
+    `tools/calibration/shapley.py` both call this over a key list they do
+    not filter for `AGGREGATE`.
+
+    So it refuses, and names the function that does the job. A caller with
+    per-seed values and a pooled key does not have the inputs the graded
+    value needs, and returning a plausible wrong number is the worse of
+    the two failures.
+    """
+    how = AGGREGATE.get(key, "median")
+    if how == "pooled":
+        raise ValidationError(
+            f"{key!r} is a POOLED row: its graded value is the median of "
+            "every seed's samples together, not an aggregate of per-seed "
+            "values, and per-seed values are all this function is given. "
+            "Use facts.aggregate_panels(panels, keys), which reads the "
+            f"{key}_samples lists, and facts.pooled_sessions to report "
+            "the count it stands on."
+        )
+    if how == "mean":
         return statistics.fmean(values)
     return statistics.median(values)
 
