@@ -1721,6 +1721,38 @@ pub struct ModelParams {
     /// spike plus the inflation and shock adjustments. Shipped 12.0, which
     /// binds long before a real crisis does.
     pub vix_target_shock_cap: f64,
+    /// Upper bound on the VIX state itself, in points.
+    ///
+    /// A CHOSEN constant and not a derived one, declared here so a reader can
+    /// disagree with it. The shipped 80.0 reproduces the literal this dial
+    /// replaces, so at the default nothing moves.
+    ///
+    /// Two facts decide what it may be set to. The real index closed at 82.69
+    /// on 2020-03-16, so any bound below that makes a peak target derived
+    /// from that day unreachable by construction. And the derived response
+    /// peaks at 93.0 when driven over the 2020 tape with the ceiling off, so
+    /// a bound of at least 93 is INERT ON THAT TAPE and one below it
+    /// truncates. That 93 is a statement about one year rather than a bound
+    /// on the process, and a different tape would move it.
+    pub vix_ceiling: f64,
+    /// A constant added to the VIX target, in points. Zero ships and is inert.
+    ///
+    /// It exists because an ASYMMETRIC return gain puts a standing positive
+    /// excursion on the target: the down side is worth more per unit than the
+    /// up side and a session is equally likely either way, so the mean
+    /// excursion is `0.5 * mean|r| * (vix_return_gain - vix_return_gain_up)`
+    /// and the level it adds is that times `1 - vix_realised_vol_weight`. On
+    /// the 2020 tape that is 10.5 points of excursion and 7.34 of level,
+    /// against a measured overshoot of 6.38.
+    ///
+    /// THE LIMITATION, because whoever next changes this market's volatility
+    /// will change the bias this cancels and will not otherwise know. The
+    /// bias is proportional to the mean ABSOLUTE session return, which is a
+    /// property of the run rather than of the model, so one constant cancels
+    /// it exactly at one value of `mean|r|` and approximately elsewhere. A
+    /// calm year carries a smaller bias than a crisis year and the same
+    /// offset over-corrects it.
+    pub vix_target_offset: f64,
     /// VIX level at which crisis behaviour begins.
     ///
     /// Gates the sector-to-market correlation blend, the universe stress
@@ -2009,6 +2041,11 @@ impl ModelParams {
             vix_return_gain_up: crate::economy::VIX_RETURN_GAIN_UP,
             vix_return_clamp: crate::economy::VIX_RETURN_CLAMP,
             vix_target_shock_cap: crate::economy::VIX_TARGET_SHOCK_CAP,
+            // Both reproduce the shipped arithmetic exactly: 80.0 is the
+            // literal the state clamp carried, and a zero offset adds
+            // nothing. Every preset before this dial is bit-identical.
+            vix_ceiling: 80.0,
+            vix_target_offset: 0.0,
             crisis_vix_threshold: crate::economy::CRISIS_VIX_THRESHOLD,
             usd_crisis_vix_threshold: crate::economy::CRISIS_VIX_THRESHOLD,
             daily_credit_floor_gain: 0.0,
@@ -3200,6 +3237,8 @@ impl ModelParams {
             "vix_return_gain_up" => self.vix_return_gain_up,
             "vix_return_source" => self.vix_return_source,
             "vix_target_shock_cap" => self.vix_target_shock_cap,
+            "vix_ceiling" => self.vix_ceiling,
+            "vix_target_offset" => self.vix_target_offset,
             "crisis_vix_threshold" => self.crisis_vix_threshold,
             "usd_crisis_vix_threshold" => self.usd_crisis_vix_threshold,
             "daily_credit_floor_gain" => self.daily_credit_floor_gain,
@@ -3355,6 +3394,8 @@ impl ModelParams {
             "vix_return_gain_up" => out.vix_return_gain_up = value,
             "vix_return_source" => out.vix_return_source = value,
             "vix_target_shock_cap" => out.vix_target_shock_cap = value,
+            "vix_ceiling" => out.vix_ceiling = value,
+            "vix_target_offset" => out.vix_target_offset = value,
             "crisis_vix_threshold" => out.crisis_vix_threshold = value,
             "usd_crisis_vix_threshold" => out.usd_crisis_vix_threshold = value,
             "daily_credit_floor_gain" => out.daily_credit_floor_gain = value,
@@ -3573,6 +3614,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_return_gain_up",
         "vix_return_source",
         "vix_target_shock_cap",
+        "vix_ceiling",
+        "vix_target_offset",
         "volume_idio_persistence",
         "volume_idio_sigma",
         "volume_idio_variance_gain",

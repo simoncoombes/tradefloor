@@ -249,6 +249,25 @@ PARAM_SPECS: dict[str, dict] = {
     "vix_cycle_amplitude": {"kind": "abs", "step_unit": 0.1,
                             "hard_range": (0.0, 2.0)},
     "vix_return_gain_up": {"kind": "log", "hard_range": (1.0, 250.0)},
+    # The crisis-fear pair, added with the dials themselves so no search
+    # reaches them before a box exists.
+    #
+    # The ceiling's box is drawn around the two levels its own docstring
+    # names rather than around the shipped 80.0: the real index closed at
+    # 82.69 on 2020-03-16, and the derived response peaks at 93.0 driven
+    # over that year with the ceiling off. A box from 60 to 100 holds both,
+    # so a search can reach values that truncate the 2020 peak and values
+    # that are inert on that tape, and the difference between them is
+    # something it can measure rather than something the box decided.
+    "vix_ceiling": {"kind": "abs", "step_unit": 1.0, "hard_range": (60.0, 100.0)},
+    # Ships at 0.0, so the multiplicative default cannot serve it and the
+    # range has to be explicit. It cancels a standing POSITIVE excursion an
+    # asymmetric return gain puts on the target, so the useful side is
+    # negative; the box is symmetric because the sign of the asymmetry is
+    # not a constant of the model. On the 2020 tape the bias is 10.5 points
+    # of excursion and 7.34 of level, so +-12 clears both with headroom.
+    "vix_target_offset": {"kind": "abs", "step_unit": 0.5,
+                          "hard_range": (-12.0, 12.0)},
     # The clamp's units follow `vix_return_source`: a FRACTION when the
     # channel reads the closing tick (shipped 0.03) and PERCENTAGE POINTS
     # when it reads the day (pt-v9 uses 15.0). One box has to hold both, so

@@ -167,6 +167,16 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the box the way ramp=50 does above: strong-to-implausible.
     "market_beta_down_asym": (0.0, 0.1),
     "market_beta_down_asym_lag": (0.0, 0.1),
+    # A constant added to the VIX target, in points. Not a share, so its box
+    # is drawn from the bias it exists to cancel rather than from the unit
+    # interval: an asymmetric return gain leaves a standing POSITIVE
+    # excursion on the target, worth 10.5 points of excursion and 7.34 of
+    # level on the 2020 tape against a measured overshoot of 6.38. The
+    # useful side is therefore negative and the top of the box is where the
+    # correction is well past exact. -12 to +12 holds both figures with
+    # headroom and keeps the sign symmetric, because which way the
+    # asymmetry runs is a property of the run rather than of the model.
+    "vix_target_offset": (-12.0, 12.0),
     # The SHARE of the first moment the contemporaneous wire injects that
     # is given back. Bounded by its own meaning rather than by a
     # convention: 0.0 is the wire as pt-v16 ships it, 1.0 returns the whole

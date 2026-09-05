@@ -416,6 +416,23 @@ PERTURBATIONS = [
     # The size of a jump once one arrives. The other half of the pair: with
     # the intensity at 0.0 there is no arrival to scale.
     ("vix_jump_scale", 1.0, False),
+    # An upper bound on the VIX state, shipped at 80.0. INERT at 40.0 for a
+    # reason the probe's own range gives rather than a dead wire: the VIX
+    # reads 14.8477, 15.0094 and 15.0644 over the three days, so a bound at
+    # 40 is never approached and the clamp is never evaluated. Measured on
+    # this build, and the counter-measurement is what makes the verdict a
+    # statement about the probe: at a bound of 14.0 the same three days move
+    # nine columns and 4.819e-3 of a price at the widest name, and at 10.0
+    # they move nine columns and 2.410e-3. The dial is wired; the probe is
+    # calm.
+    ("vix_ceiling", 40.0, False),
+    # A constant added to the VIX target, shipped at 0.0. It reaches the VIX
+    # the same day and the VIX feeds the market factor's variance the same
+    # day, so unlike its neighbours it needs no partner and no branch: at
+    # 0.5 it moves seven columns and 2.028e-3 of a price at the widest name.
+    # Neither dial takes a draw, so `draws_consumed` is unmoved for both and
+    # neither belongs in DRAW_SCHEDULE_MOVERS below.
+    ("vix_target_offset", 0.5, True),
     # -- forced flow ---------------------------------------------------------
     # Gated twice, which is why all five read inert here. `forced_flow_gain`
     # ships at 0.0, so the mechanism is off; and `forced_flow_threshold`
