@@ -814,12 +814,24 @@ def spread(seed_shares: dict[str, dict[str, dict[int, float]]],
 
 
 def ruler(days: int) -> tuple[str, dict[str, tuple[float, float]]]:
-    """The bands a horizon is scored against, and their name."""
-    from tradefloor import envelope, facts
+    """The bands a horizon is scored against, and their name.
 
-    if days == 2 * envelope.CERTIFIED_HORIZON_DAYS:
-        return "envelope.BANDS_504", dict(envelope.BANDS_504)
-    return "facts.REAL_MARKETS", dict(facts.REAL_MARKETS)
+    Refuses a horizon with no band set instead of returning the 252-day one.
+    This read `if days == 504: ... return REAL_MARKETS`, so every other
+    horizon -- 60, 180, 756, the 1,008 the settling study runs -- got the
+    252-day bands and a name that said so truthfully while the comparison
+    itself was wrong.
+    """
+    from tradefloor import envelope
+
+    try:
+        bands, _, name = envelope.RULERS_BY_HORIZON[days]
+    except KeyError:
+        raise SystemExit(
+            f"no band set has been derived at {days} days; the horizons "
+            f"with a ruler are {sorted(envelope.RULERS_BY_HORIZON)}"
+        ) from None
+    return name, dict(bands)
 
 
 def certified_column(days: int, stats: list[str]) -> dict:

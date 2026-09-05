@@ -59,7 +59,9 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
 from ._core import ValidationError
-from .facts import REAL_MARKETS, SEED_SD, SEED_SD_504, band_distance
+from . import facts as _facts
+from .facts import (CERTIFIED_HORIZON_DAYS, REAL_MARKETS, SEED_SD,
+                    SEED_SD_504, band_distance)
 
 #: The preset these measurements describe.
 PRESET = "pt-v16"
@@ -80,7 +82,10 @@ PRESET = "pt-v16"
 #: This comment read "three statistics that are in band here leave it by 504
 #: days" until 2026-08-27, which described pt-v3. `check` refuses to certify
 #: beyond this horizon.
-CERTIFIED_HORIZON_DAYS = 252
+#:
+#: Imported from `facts` rather than restated, so the horizon the bands were
+#: derived at and the horizon the envelope certifies cannot drift apart: they
+#: are one number, and `facts.RULERS_BY_HORIZON` is keyed on it.
 
 #: Measured at the certified horizon: 30 seeds, 40 instruments, 252 days.
 #: ALL FOURTEEN in band, at a band-distance loss of 0.0000, and all fourteen
@@ -187,6 +192,31 @@ BANDS_504: dict[str, tuple[float, float]] = {
     "corr_asymmetry_lagged": (-0.10, 0.47),
     "sector_excess_corr": (0.11, 0.22),
     "corr_persistence_acf1": (0.19, 0.49),
+}
+
+# So `facts.check_ruler_horizon` can identify this table when it arrives as an
+# argument. `facts` cannot name it -- `envelope` imports `facts`, not the
+# other way -- and a table the checker cannot identify is a table it cannot
+# refuse.
+_facts.register_ruler_table(BANDS_504, 504, "envelope.BANDS_504")
+
+#: The seventeen-row ruler per horizon, which is what `score` grades with.
+#: `facts.RULERS_BY_HORIZON` holds the fourteen shape rows at 504;
+#: `BANDS_504` adds the level and crisis rows carrying their 252-day bands,
+#: with the argument for each stated inline above. Keyed on the horizon and
+#: looked up rather than chosen by `horizon_days > 252`, which is what let a
+#: 756-day or 1,008-day panel be scored against the 504-day bands without
+#: anything saying so.
+#:
+#: The names are module-qualified and they name the table this function
+#: ACTUALLY grades with. `score` reported `"REAL_MARKETS_504"` at 504 days
+#: while scoring against `BANDS_504`, which is a different table with three
+#: more rows -- a small thing, and the same shape as every finding this
+#: branch is repairing: a label asserting a provenance the code did not have.
+RULERS_BY_HORIZON: dict[int, tuple[dict[str, tuple[float, float]],
+                                   dict[str, float], str]] = {
+    CERTIFIED_HORIZON_DAYS: (REAL_MARKETS, SEED_SD, "facts.REAL_MARKETS"),
+    504: (BANDS_504, SEED_SD_504, "envelope.BANDS_504"),
 }
 
 #: The same panel at 504 days. ALL FOURTEEN in band against `BANDS_504`,
@@ -979,18 +1009,32 @@ def score(panel: Mapping[str, float], *,
     are held red at the default preset on purpose and a total that folds
     them in reads fourteen of seventeen where fourteen of fourteen is the
     fact. Nothing here answers "is the panel green" without a group.
+
+    A HORIZON WITH NO RULER IS REFUSED. This used to read `far = horizon_days
+    > CERTIFIED_HORIZON_DAYS`, so a 756-day panel -- and the 1,008-day runs
+    the settling study makes -- scored against the 504-day bands with nothing
+    saying so, and 253 scored against the 252-day ones. The lookup below has
+    two keys and refuses everything else by name, because a band set derived
+    at one window is not an approximate ruler for another window: it is a
+    ruler for a different quantity.
     """
     if horizon_days < 1:
         raise ValidationError(
             f"horizon_days must be positive, got {horizon_days}")
+    if horizon_days not in RULERS_BY_HORIZON:
+        raise ValidationError(
+            f"no band set has been derived at {horizon_days} days; the "
+            f"horizons with a ruler are {sorted(RULERS_BY_HORIZON)}. A "
+            f"nearer band set is not an approximation -- the 252-day and "
+            f"504-day tables differ on twelve of fourteen rows and their "
+            f"noise scales differ by factors from 0.80 to 3.23 -- so this "
+            f"refuses rather than picking one.")
     # `loss.STRUCTURAL` names the statistics excluded from the objective by
     # design; imported here rather than at module scope because `loss`
     # imports this module's facts and a top-level import would cycle.
     from .loss import STRUCTURAL
 
-    far = horizon_days > CERTIFIED_HORIZON_DAYS
-    bands = BANDS_504 if far else REAL_MARKETS
-    noise = SEED_SD_504 if far else SEED_SD
+    bands, noise, ruler_name = RULERS_BY_HORIZON[horizon_days]
 
     unknown = sorted(set(panel) - set(REAL_MARKETS))
     if unknown:
@@ -1025,7 +1069,7 @@ def score(panel: Mapping[str, float], *,
                                "level" if name in LEVEL else "crisis")
     return {
         "horizon_days": horizon_days,
-        "ruler": "REAL_MARKETS_504" if far else "REAL_MARKETS",
+        "ruler": ruler_name,
         "statistics": rows,
         "in_band": sum(1 for r in rows.values() if r["in_band"]),
         "of": len(rows),

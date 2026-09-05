@@ -1,4 +1,9 @@
-"""A complete research workflow, start to finish, in about ten seconds.
+"""A complete research workflow, start to finish, in about forty seconds.
+
+It said "about ten seconds" until 2026-09-05, and had not for some time; the
+run prints its own total on the last line, which is the number to trust.
+Roughly half of it is step 8, the realism panel, which runs the 252 days its
+bands were derived at.
 
 Run it:
 
@@ -282,29 +287,41 @@ def main() -> dict:
 
     # 8. What kind of market is this, statistically? The mismatches matter
     #    more than the matches -- they are where a conclusion drawn here stops
-    #    transferring. At the documented method (40 names, 252 days, the
-    #    median over six seeds -- docs/how-realistic-is-this-market.md), four
-    #    of the eight sit in band, and how things move together is now the
-    #    half that mostly matches; what fails is scale and memory: volatility
-    #    runs high, returns trend where real ones do not, the leverage effect
-    #    is too weak, and volume shocks do not persist. Read the in-band half
-    #    with that page's disclosure attached: four of the eight statistics
-    #    were calibration targets this era, so a match there is partly the
-    #    tuning meeting its own target, and held out from the tuning point the
-    #    margins are thin. This run is one seed over 60 days on a different
-    #    universe, so its reads are noisier than the published medians --
-    #    here correlation overshoots its band and the leverage effect loses
-    #    the sign that is stable at the documented method.
+    #    transferring. The documented method is 40 names, 252 days, the median
+    #    over six seeds (docs/how-realistic-is-this-market.md); the counts and
+    #    verdicts it publishes are that method's, and this is ONE seed on a
+    #    different universe, so its reads are noisier. The line printed below
+    #    is the authority for what THIS run did -- a count written into a
+    #    comment goes stale against the run beside it, and this one had.
+    #
+    #    Read the in-band half with that page's disclosure attached: several
+    #    of these statistics were calibration targets this era, so a match
+    #    there is partly the tuning meeting its own target, and held out from
+    #    the tuning point the margins are thin.
+    #
+    #    252 DAYS, NOT 60, AND THE HORIZON IS NOT A SPEED KNOB. Every band in
+    #    `REAL_MARKETS` is derived from 253-bar windows of real data, so it
+    #    grades a 252-day measurement and nothing else. This step ran 60 days
+    #    until 2026-09-05 and handed the result to `compare_to_real_markets`,
+    #    which graded it against those bands anyway -- an autocorrelation over
+    #    a quarter of the window compared with a band for the whole one, and
+    #    `corr_persistence_acf1` is not even defined below 128 days. The
+    #    library now refuses that pairing, and the fifteen seconds this costs
+    #    is the price of the comparison meaning what it says.
     #
     #    `verdict` rather than `direction`, because the leverage effect has a
     #    NEGATIVE reference band: an absent one is numerically above that band,
     #    and printing "above" for a missing effect says the opposite of what
     #    was measured.
     mark = time.time()
-    facts = tf.facts.measure(seed=7, universe=universe, days=60)
+    facts = tf.facts.measure(seed=7, universe=universe,
+                            days=tf.facts.CERTIFIED_HORIZON_DAYS)
     verdicts = tf.facts.compare_to_real_markets(facts)
     report["realism"] = {k: v["verdict"] for k, v in verdicts.items()}
-    print(f"8. stylised facts in {time.time() - mark:.1f}s: "
+    # Named from the panel rather than written down, so a reader can see
+    # which band set produced the verdicts on the line that prints them.
+    ruler = next(iter(verdicts.values()))["ruler"]
+    print(f"8. stylised facts in {time.time() - mark:.1f}s against {ruler}: "
           + ", ".join(f"{k.replace('_', ' ')} {v['verdict']}"
                       for k, v in verdicts.items()))
     # Not all in range, and not none. If every statistic matched, the

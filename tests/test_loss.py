@@ -104,7 +104,12 @@ UNIVERSE = panel_roster()
 
 @pytest.fixture(scope="module")
 def facts():
-    return measure(seed=3, universe=UNIVERSE, days=180)
+    # 252 days, the horizon the bands were derived at. It ran 180 until
+    # 2026-09-05 and every band verdict taken from it was a 180-day
+    # measurement against a 253-bar-window ruler; the library now refuses
+    # that pairing rather than returning a plausible number for it.
+    return measure(seed=3, universe=UNIVERSE,
+                   days=tradefloor.facts.CERTIFIED_HORIZON_DAYS)
 
 
 # --------------------------------------------------------------------------

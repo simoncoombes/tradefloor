@@ -320,8 +320,11 @@ def test_the_stylised_facts_are_not_all_within_range():
     # If every statistic matched, `compare_to_real_markets` would be doing no
     # work and the module's honesty would be untested. Two are known
     # mismatches; that must stay visible.
+    # At the certified horizon: 120 days has no band set, and grading it
+    # against the 252-day bands is the error this suite now refuses.
     facts = tradefloor.facts.measure(
-        seed=3, universe=tradefloor.Universe.random(40, seed=111), days=120)
+        seed=3, universe=tradefloor.Universe.random(40, seed=111),
+        days=tradefloor.facts.CERTIFIED_HORIZON_DAYS)
     verdicts = tradefloor.facts.compare_to_real_markets(facts)
     assert any(not v["matches"] for v in verdicts.values())
     assert any(v["matches"] for v in verdicts.values())

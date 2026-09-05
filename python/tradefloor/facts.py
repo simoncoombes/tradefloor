@@ -1208,6 +1208,212 @@ SEED_SD_LEVEL_PROVENANCE = {
     },
 }
 
+# --------------------------------------------------------------------------
+# Which ruler belongs to which horizon
+#
+# A band table and a noise scale are each derived AT a horizon, and a panel is
+# measured at one. Pairing a 504-day measurement with the 252-day bands has
+# been made repeatedly in this project and was never caught by anything here,
+# because the horizon lived in the caller: `measure` records `days` and
+# nothing read it. `loss.dual_horizon_loss` exists because a search bought one
+# horizon's realism with the other's; `tools/calibration/evaluate_axes.py`
+# graded the one axis whose purpose is a different horizon against the 252-day
+# bands while labelling them "the TRUE bands", and published a `generalises`
+# verdict from it.
+#
+# So the horizon becomes data. Any scoring call can now ask what horizon its
+# panel came from and what horizon its ruler was derived at, and REFUSE the
+# pair when they disagree, rather than computing a number that means nothing.
+
+#: The horizon `REAL_MARKETS` and `SEED_SD` were derived at, and `measure`'s
+#: default. `envelope.CERTIFIED_HORIZON_DAYS` is this value.
+CERTIFIED_HORIZON_DAYS = 252
+
+#: The horizons that HAVE a ruler, and the two tables that make each one up.
+#:
+#: A scoring call looks a horizon up here instead of choosing a table, so a
+#: horizon with no band set is refused BY NAME rather than falling through to
+#: the 252-day set. Adding a horizon means deriving BOTH tables at it: bands
+#: without a noise scale cannot report how far inside a band a statistic sits,
+#: and a noise scale without bands grades nothing.
+#:
+#: No 60-day, 180-day or 756-day entry exists because no band set has been
+#: derived at those horizons. `realism_bands_horizon.py` in the design
+#: repository measured real windows at 756, 1260 and 2520 bars on a 32-name
+#: sub-roster, and none of those tables has had the literature reconciliation
+#: applied, so none of them is a shipped ruler.
+RULERS_BY_HORIZON: dict[int, dict[str, Any]] = {
+    CERTIFIED_HORIZON_DAYS: {
+        "bands": REAL_MARKETS,
+        "bands_name": "facts.REAL_MARKETS",
+        "seed_sd": SEED_SD,
+        "seed_sd_name": "facts.SEED_SD",
+    },
+    504: {
+        "bands": REAL_MARKETS_504,
+        "bands_name": "facts.REAL_MARKETS_504",
+        "seed_sd": SEED_SD_504,
+        "seed_sd_name": "facts.SEED_SD_504",
+    },
+}
+
+#: Every table whose horizon is known, so a ruler handed in as an argument can
+#: be identified rather than trusted. `envelope` registers its own
+#: seventeen-row 504-day table here at import, because a table this module
+#: cannot see is a table this module cannot check.
+_KNOWN_TABLES: list[tuple[Any, int, str]] = [
+    (REAL_MARKETS, CERTIFIED_HORIZON_DAYS, "facts.REAL_MARKETS"),
+    (REAL_MARKETS_504, 504, "facts.REAL_MARKETS_504"),
+    (SEED_SD, CERTIFIED_HORIZON_DAYS, "facts.SEED_SD"),
+    (SEED_SD_504, 504, "facts.SEED_SD_504"),
+]
+
+
+def register_ruler_table(table: Mapping[str, Any], days: int,
+                         name: str) -> None:
+    """Record the horizon a band or noise table was derived at.
+
+    For a table this module does not define. `envelope.BANDS_504` is the
+    seventeen-row 504-day set -- the fourteen shape rows of
+    `REAL_MARKETS_504` plus the level and crisis rows carrying their 252-day
+    bands, each with its argument inline there -- and it is the table
+    `envelope.score` grades a 504-day panel with. Registered rather than
+    copied here, because a second copy of a band table is a second thing to
+    keep in step, and `test_envelope` already pins that these two agree.
+    """
+    for existing, known_days, known_name in _KNOWN_TABLES:
+        if existing is table:
+            if known_days != days:
+                raise ValidationError(
+                    f"{name} is already registered as {known_name} at "
+                    f"{known_days} days; a table cannot be derived at two "
+                    f"horizons")
+            return
+    _KNOWN_TABLES.append((table, int(days), name))
+
+
+def rulers_for_horizon(
+    days: Any, *, what: str = "this measurement",
+) -> tuple[Mapping[str, tuple[float, float]], Mapping[str, float]]:
+    """The bands and the noise scale derived at `days`, or a refusal.
+
+    The refusal is the point. Every horizon this project has measured at
+    other than 252 and 504 -- 60 in a shipped example, 180 in a test, 756 and
+    1008 and 2520 on boxes -- has no band set, and grading one of those
+    against the 252-day bands compares two different quantities and returns a
+    plausible number. So this raises, and names the horizons that do have a
+    ruler.
+    """
+    try:
+        row = RULERS_BY_HORIZON[int(days)]
+    except (KeyError, TypeError, ValueError):
+        raise ValidationError(
+            f"no band set has been derived at {days!r} days, so {what} "
+            f"cannot be graded. The horizons with a ruler are "
+            f"{sorted(RULERS_BY_HORIZON)}. Falling back to the "
+            f"{CERTIFIED_HORIZON_DAYS}-day bands would grade a measurement "
+            f"of one quantity against a ruler for another, which is the "
+            f"error this refusal exists to make impossible; measure at a "
+            f"horizon that has a ruler, or derive one at {days!r} days and "
+            f"register it in RULERS_BY_HORIZON."
+        ) from None
+    return row["bands"], row["seed_sd"]
+
+
+def horizon_of_table(table: Any) -> tuple[int | None, str | None]:
+    """Which horizon a band or noise table was derived at, and its name.
+
+    ``(None, None)`` for a table nobody registered -- a caller's own bands, or
+    a re-estimated noise scale from `loss.seed_sd_from_panels`. Unknown is
+    reported as unknown rather than guessed: an unregistered table is
+    UNCHECKED, and a guess is the fallback this module is removing.
+
+    Identity first, then equality, because `dict(facts.REAL_MARKETS)` is the
+    same ruler and passing a copy is how several callers hand one over.
+    """
+    for known, days, name in _KNOWN_TABLES:
+        if table is known:
+            return days, name
+    for known, days, name in _KNOWN_TABLES:
+        if table == known:
+            return days, name
+    return None, None
+
+
+def horizon_of_panels(panels: Iterable[Any], *,
+                      what: str = "these panels") -> int | None:
+    """The single horizon a set of measured panels was taken at.
+
+    ``None`` when no panel records one -- an already-aggregated median, or a
+    mapping a caller built by hand -- which is unknown rather than 252. A MIX
+    raises: a median over panels taken at two horizons is a statistic of
+    neither, and that is exactly as wrong as the ruler mismatch and harder to
+    see.
+    """
+    seen = set()
+    for panel in panels:
+        if not isinstance(panel, Mapping):
+            continue
+        days = panel.get("days")
+        if days is not None:
+            seen.add(int(days))
+    if not seen:
+        return None
+    if len(seen) > 1:
+        raise ValidationError(
+            f"{what} were measured at {sorted(seen)} days and cannot be "
+            f"aggregated: a median across horizons is a statistic of no "
+            f"horizon, and no ruler grades it.")
+    return next(iter(seen))
+
+
+def check_ruler_horizon(*, panel_days: int | None,
+                        bands: Any = None, seed_sd: Any = None,
+                        what: str = "this call") -> int | None:
+    """Refuse a measurement graded by a ruler derived at another horizon.
+
+    Three disagreements, each of which has happened:
+
+    * a 504-day panel against the 252-day bands -- `evaluate_axes.py`'s
+      horizon axis, and the reason this function exists;
+    * a 60-day panel against the 252-day bands -- `07-research-workflow.py`;
+    * the right bands with the other horizon's noise scale, which
+      `dual_horizon_loss` calls "the wrong-ruler error in a subtler dress"
+      and which rescales every distance without changing a band verdict.
+
+    Returns the horizon the call was checked at, or ``None`` where nothing
+    could be checked, so a caller can record which it was. A table nobody
+    registered is unknown rather than wrong and passes; a caller that can
+    name its table should register it, because silence about an unregistered
+    table is the one place this design still permits the error.
+    """
+    band_days, band_name = (horizon_of_table(bands) if bands is not None
+                            else (None, None))
+    sd_days, sd_name = (horizon_of_table(seed_sd) if seed_sd is not None
+                        else (None, None))
+
+    if band_days is not None and sd_days is not None and band_days != sd_days:
+        raise ValidationError(
+            f"{what} pairs {band_name} (derived at {band_days} days) with "
+            f"{sd_name} (derived at {sd_days} days). Each horizon carries "
+            f"its own bands AND its own noise scale; pairing one with the "
+            f"other divides every distance by the wrong denominator.")
+
+    for ruler_days, ruler_name in ((band_days, band_name), (sd_days, sd_name)):
+        if (panel_days is not None and ruler_days is not None
+                and panel_days != ruler_days):
+            raise ValidationError(
+                f"{what} grades a {panel_days}-day measurement against "
+                f"{ruler_name}, which was derived at {ruler_days} days. "
+                f"Those are two different quantities and the comparison "
+                f"between them is meaningless however plausible its number "
+                f"looks. Score the panel against the ruler for its own "
+                f"horizon (the horizons with one are "
+                f"{sorted(RULERS_BY_HORIZON)}), or re-measure at "
+                f"{ruler_days} days.")
+
+    return panel_days if panel_days is not None else band_days
+
 #: The first two are MARGINAL: properties of one series taken on its own. The
 #: other six are DEPENDENCE: how returns move together across time, across
 #: stocks, with volume, and asymmetrically with their own sign. Which half a
@@ -2241,9 +2447,29 @@ def compare_to_real_markets(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
     "realism score" would average a property this model reproduces well against
     one it gets frankly wrong, and the whole value of the exercise is knowing
     WHICH.
+
+    THE RULER COMES FROM THE PANEL. `measure` records `days`, and this reads
+    it: a 504-day panel is graded against `REAL_MARKETS_504`, and a panel at a
+    horizon with no band set is REFUSED rather than graded against the
+    252-day bands. Until 2026-09-05 this function used `REAL_MARKETS`
+    unconditionally and never looked at `days`, which is how a shipped
+    example came to grade a 60-day run against a ruler derived from 253-bar
+    windows. Each row carries `horizon_days` and `ruler`, so a verdict
+    printed anywhere says which bands produced it.
     """
+    days = facts.get("days")
+    if days is None:
+        raise ValidationError(
+            "this panel does not record what horizon it was measured at, so "
+            "no ruler can be chosen for it. `facts.measure` records `days`; "
+            "a panel assembled by hand must carry it too. Defaulting to the "
+            f"{CERTIFIED_HORIZON_DAYS}-day bands is the error this refusal "
+            "exists to prevent.")
+    bands, scales = rulers_for_horizon(days, what="this panel")
+    ruler_name = RULERS_BY_HORIZON[int(days)]["bands_name"]
+
     out: dict[str, dict[str, Any]] = {}
-    for key, (low, high) in REAL_MARKETS.items():
+    for key, (low, high) in bands.items():
         value = facts.get(key)
         # A statistic that could not be measured -- one instrument, or a run
         # too short to difference volume -- is ABSENT here rather than present
@@ -2252,11 +2478,18 @@ def compare_to_real_markets(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
         if value is None:
             continue
         distance = band_distance(value, low, high)
-        sd = SEED_SD.get(key)
+        sd = scales.get(key)
         out[key] = {
             "measured": value,
             "real_range": (low, high),
             "matches": low <= value <= high,
+            # Which ruler this verdict came from, on the row rather than
+            # beside it, because a verdict travels alone: `report` prints
+            # rows, a certificate serialises rows, and a row that does not
+            # name its bands can be read against the wrong ones by the next
+            # reader as easily as it was computed against them.
+            "horizon_days": int(days),
+            "ruler": ruler_name,
             # `verdict` reads the sign of the band; `direction` is the raw
             # numeric comparison. They differ exactly where it matters: an
             # absent leverage effect is ABOVE its negative band and "too weak"
@@ -2268,8 +2501,10 @@ def compare_to_real_markets(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
             ),
             # How FAR outside, twice over: in the statistic's own units, and
             # in units of its across-seed sampling noise at the baseline
-            # (SEED_SD), so exits are comparable across statistics whose
-            # scales differ by three orders of magnitude. Per-statistic
+            # (`SEED_SD`, or `SEED_SD_504` for a 504-day panel -- the scale
+            # for the panel's OWN horizon, since the two differ by factors
+            # from 0.80 to 3.23), so exits are comparable across statistics
+            # whose scales differ by three orders of magnitude. Per-statistic
             # fields, deliberately -- this function still refuses to add
             # them up, for the reason in the docstring.
             "band_distance": distance,
@@ -2285,8 +2520,14 @@ def report(facts: dict[str, Any]) -> str:
     statistic taken on one series at a time is a different kind of claim from
     one about how two things move together, and this model does not do equally
     well at both.
+
+    The header names the RULER as well as the horizon. A reader who sees "252
+    days" above a table headed "real markets" has no way to tell which band
+    set produced the verdicts, and for two years there was only one answer;
+    now there are two and the report says which.
     """
     verdicts = compare_to_real_markets(facts)
+    ruler = RULERS_BY_HORIZON[int(facts["days"])]["bands_name"]
 
     def row(key: str) -> str:
         verdict = verdicts.get(key)
@@ -2302,6 +2543,7 @@ def report(facts: dict[str, Any]) -> str:
     lines = [
         f"seed {facts['seed']}, {facts['instruments']} instruments, "
         f"{facts['days']} days, {facts['observations']:,} daily returns",
+        f"graded against {ruler}, derived at {facts['days']} days",
         "",
         f"{'statistic':22s} {'measured':>10s}  {'real markets':>14s}   verdict",
         "",
@@ -2321,9 +2563,16 @@ def report(facts: dict[str, Any]) -> str:
         lines += ["", "crisis: the fear gauge on a large down day"]
         lines += [row(key) for key in CRISIS]
 
-    # The ungraded rows, derived from the two tables rather than listed, so
-    # a row can never be printed as graded because a list went stale.
-    ungraded = [key for key in LABELS if key not in REAL_MARKETS]
+    # The ungraded rows, derived from the ruler in use rather than listed, so
+    # a row can never be printed as graded because a list went stale -- and so
+    # a horizon whose band set covers fewer rows says which rows it lost. At
+    # 504 days `REAL_MARKETS_504` holds the fourteen shape rows only, so the
+    # level and crisis rows move into this section: their 504-day bands are
+    # `envelope.BANDS_504`'s judgement to reuse the 252-day ones with an
+    # argument per row, and that judgement is not this module's to make
+    # silently.
+    graded_here, _ = rulers_for_horizon(facts["days"])
+    ungraded = [key for key in LABELS if key not in graded_here]
     if ungraded:
         lines += ["", "reporting only: measured, not graded"]
         for key in ungraded:
@@ -2334,6 +2583,11 @@ def report(facts: dict[str, Any]) -> str:
             if reason:
                 lines += textwrap.wrap(reason, 72,
                                        initial_indent="  ", subsequent_indent="  ")
+            elif key in REAL_MARKETS:
+                lines += textwrap.wrap(
+                    f"graded at {CERTIFIED_HORIZON_DAYS} days; no band for "
+                    f"it has been derived at {facts['days']}.", 72,
+                    initial_indent="  ", subsequent_indent="  ")
     lines += [
         "",
         "Read the two sections against each other. A model can get the shape",
