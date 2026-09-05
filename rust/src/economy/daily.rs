@@ -271,16 +271,31 @@ impl<'a> Default for DailyInputs<'a> {
 /// the measurement it comes from, the exponent's error bar, and what the
 /// up side assumes.
 pub fn return_spike_for(current: f64, gain: f64, gain_up: f64, exponent: f64) -> f64 {
-    if exponent == 1.0 {
+    // THE EXPONENT IS THE DOWN SIDE'S ALONE, and that is a measurement
+    // rather than a simplification. Fitting the two sides separately on
+    // the same 8,960 sessions, same alignment, same estimator:
+    //
+    //   down   scale 1.0033   exponent 1.1996   R^2 0.9947
+    //   up     scale 0.8965   exponent 1.0410   R^2 0.9655
+    //
+    // The down side is convex; the up side is very nearly LINEAR, and at
+    // an R^2 of 0.9655 with a worst bucket missing by 35 per cent on 23
+    // sessions, 1.0410 is not distinguishable from 1.0 by this data. So
+    // the up side keeps the linear form rather than carrying a fourth
+    // decimal the fit does not support, and applying one exponent to
+    // both sides -- which is what the first version of this did -- would
+    // have made the up side wrong to buy nothing.
+    if current >= 0.0 || exponent == 1.0 {
+        // An UP session, or the linear special case, in the arithmetic
+        // that stood here: same multiply, same operand order, so every
+        // preset predating this dial reproduces to the bit.
         if current < 0.0 {
             -current * gain
         } else {
             -current * gain_up
         }
-    } else if current < 0.0 {
-        gain * mathx::pow(-current, exponent)
     } else {
-        -gain_up * mathx::pow(current, exponent)
+        gain * mathx::pow(-current, exponent)
     }
 }
 
@@ -1218,6 +1233,23 @@ mod vix_return_shape {
             assert!(return_spike_for(-2.0, 30.0, 15.0, p) > 0.0, "down at p={p}");
             assert!(return_spike_for(2.0, 30.0, 15.0, p) < 0.0, "up at p={p}");
             assert_eq!(return_spike_for(0.0, 30.0, 15.0, p), 0.0, "zero at p={p}");
+        }
+    }
+
+    /// THE UP SIDE IS LINEAR AT EVERY EXPONENT, because the tape says it
+    /// is: fitted separately the up side reads 1.0410 at an R squared of
+    /// 0.9655, which this data cannot distinguish from 1.0. So the
+    /// exponent must not reach it, and an up session gives the same
+    /// answer whatever the dial says.
+    #[test]
+    fn the_exponent_does_not_reach_the_up_side() {
+        for i in 0..=200 {
+            let r = i as f64 * 0.05;
+            let want = -r * 15.0;
+            for &p in &[1.0, 1.132, 1.200, 1.287, 1.8] {
+                assert_eq!(return_spike_for(r, 30.0, 15.0, p), want,
+                           "the up side moved at r={r}, p={p}");
+            }
         }
     }
 

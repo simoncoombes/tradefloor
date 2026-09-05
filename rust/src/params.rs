@@ -1862,9 +1862,40 @@ pub struct ModelParams {
     /// to 1.79 against a real 4.0 and leaves lag-5 clustering where it was
     /// (§68). What was missing is the feedback above, not the gain.
     pub vix_return_gain: f64,
-    /// The same for an UP day. Shipped 10.0; the real response to a +2% day
-    /// is about half the size of the response to -2%, which the shipped
-    /// 2.5:1 ratio is already close to.
+    /// The same for an UP day. Shipped 10.0.
+    ///
+    /// # The "about half" this used to claim has no provenance, and is wrong
+    ///
+    /// This docstring read: "the real response to a +2% day is about half
+    /// the size of the response to -2%, which the shipped 2.5:1 ratio is
+    /// already close to." That sentence names no series, no window, no
+    /// sample size and no estimator, and it sits directly beneath
+    /// `vix_return_gain`'s claim, which names all four -- so it read as
+    /// though it inherited that provenance when it had none of its own.
+    /// It was the only statement of a real up-to-down ratio anywhere in
+    /// the tree, and a derivation was built on it.
+    ///
+    /// MEASURED, on ^GSPC and ^VIX over 8,960 aligned sessions, by
+    /// fitting each side separately and evaluating the two curves:
+    ///
+    /// | move | down response | up response | up / down |
+    /// |---|---|---|---|
+    /// | 1% | 1.003 | 0.897 | 0.89 |
+    /// | 3% | 3.73 | 2.80 | 0.75 |
+    /// | 6% | 8.58 | 5.75 | 0.67 |
+    ///
+    /// So the real ratio is 0.67 to 0.89, not 0.5, and the model's fear
+    /// asymmetry is about TWICE the real one rather than close to it.
+    ///
+    /// And the ratio is NOT CONSTANT, because the two sides have
+    /// different exponents -- 1.1996 down against 1.0410 up. **No single
+    /// value of this dial can express a ratio that varies with the size
+    /// of the move.** That is the same class of defect as the linear
+    /// response the exponent fixes: the parameter's form cannot represent
+    /// the quantity it names. Expressing it properly needs an up-side
+    /// scale set against the down-side scale at the fit level, 0.894, and
+    /// the residual variation left over is the up side's own exponent,
+    /// which this data cannot resolve.
     pub vix_return_gain_up: f64,
     /// The EXPONENT of the return-to-fear response. 1.0 ships and is the
     /// linear form, bit-identical to the arithmetic that stood here.
@@ -1925,16 +1956,33 @@ pub struct ModelParams {
     /// becomes `scale * vix_return_clamp^p` rather than
     /// `gain * vix_return_clamp`.
     ///
-    /// # The one thing here that is assumed rather than measured
+    /// # The up side was assumed, then measured, and the assumption lost
     ///
-    /// The measurement above is on DOWN sessions. The up side keeps
-    /// `vix_return_gain_up` as its own scale and takes the SAME exponent,
-    /// which is an assumption and not a result: nobody has fitted the up
-    /// side's shape. If the real up-side response is less convex than the
-    /// down side -- which the flat up-side response the docstring above
-    /// describes would suggest -- this over-states the up side's reaction
-    /// to a large rally. Fitting `+r` buckets the same way would settle
-    /// it and needs no new instrument.
+    /// The first version of this dial applied one exponent to BOTH sides
+    /// and said so as an assumption. The up side has since been fitted on
+    /// the same 8,960 sessions with the same alignment, the same
+    /// estimator and the same buckets, taking `-dVIX` on up sessions
+    /// (`programme/scripts/vix-updown-fit.py` in the design repo, and the
+    /// down fit reproduces the figures above exactly, which is what makes
+    /// the instrument trustworthy before it is used on new data):
+    ///
+    /// | side | scale | exponent | R squared | worst bucket |
+    /// |---|---|---|---|---|
+    /// | down | 1.0033 | 1.1996 | 0.9947 | 9.8% |
+    /// | up | 0.8965 | 1.0410 | 0.9655 | 35.0% |
+    ///
+    /// **The down side is convex and the up side is very nearly linear**,
+    /// so ONE exponent across both would have been wrong on the up side
+    /// to buy nothing. The exponent is therefore the down side's alone;
+    /// `return_spike_for` never reaches an up session with it and a test
+    /// pins that at every exponent.
+    ///
+    /// The up side keeps the LINEAR form rather than shipping 1.0410,
+    /// because at an R squared of 0.9655 with a worst bucket missing by
+    /// 35 per cent on 23 sessions this data cannot tell 1.0410 from 1.0.
+    /// The DIRECTION is robust across every bucket; the fourth decimal is
+    /// not, and shipping it would be a chosen constant wearing a
+    /// measurement's clothes.
     pub vix_return_exponent: f64,
     /// The index return is clamped to +/- this before it drives the VIX.
     ///
