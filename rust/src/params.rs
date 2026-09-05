@@ -834,6 +834,105 @@ pub struct ModelParams {
     /// enough to reach one. A certified year reaches no trough at all and
     /// records 0 of 2121 rolls clamped under either reading.
     pub cycle_hazard_per_month: f64,
+    /// Where the trough phase's growth range begins. 0.0 -- every preset
+    /// before pt-v18 -- is the shipped `(-1.0, 0.5)` and bit-identical.
+    ///
+    /// # A second falling phase the engine does not call a recession
+    ///
+    /// `phase_characteristics` gives a trough `gdp_growth_range` of
+    /// (-1.0, 0.5), a midpoint of -0.25, so output is still falling
+    /// through a phase named for the bottom of the cycle. Measured over a
+    /// hundred years on thirty seeds, 95 per cent of trough days carry
+    /// falling output at pt-v18 and the share passes 100 at pt-v16.
+    ///
+    /// That is the whole of the engine's disagreement between its two
+    /// frequency rulers. The share of days in a contraction reads 18.21
+    /// and the share with output falling reads 27.31, while contraction
+    /// or trough reads 27.61: the second and third agree to 0.3 points,
+    /// so the nine-point gap IS this phase. The NBER's two rulers agree
+    /// to 1.2 points, 10.72 per cent of months in a contraction against
+    /// 11.93 per cent of quarters with real GDP falling, because a
+    /// contraction there IS the falling-output period.
+    ///
+    /// At 1.0 the lower end moves to 0.0 and the upper end keeps the 0.5
+    /// the table already states. Zero is the only non-arbitrary floor,
+    /// being the boundary between falling and rising output, so nothing
+    /// here is fitted. Between the ends the floor moves proportionally.
+    ///
+    /// # It is 0.0 on every preset, including pt-v18, and here is why
+    ///
+    /// This was built to close that nine-point gap and it closes 1.52 of
+    /// it. Thirty seeds at a hundred years: the output ruler moves from
+    /// 27.309 to 25.791 and the contraction share moves 0.10, so the
+    /// mechanism is the one described and its size is a sixth of what the
+    /// accounting implied.
+    ///
+    /// A target is only reached if the phase lasts long enough to
+    /// approach it. Growth enters a trough near -3.0, having left a
+    /// contraction whose realised rate is about -2.5 and then taken this
+    /// phase's own -0.5 entry shock, and it reverts by `gap * 0.12` a
+    /// month and `gap * 0.25` a quarter. Under the shipped range it
+    /// asymptotes to -0.25 and NEVER crosses zero. At 1.0 it crosses at
+    /// month 11 or 12. A trough runs 2 to 6 months, so output falls
+    /// through the whole phase under either setting and this dial changes
+    /// where growth is heading rather than where it is.
+    ///
+    /// So the binding constraint is the reversion rate against the phase
+    /// length, not the declared range, and the repair the evidence points
+    /// at is the -0.5 entry shock at `daily.rs:247`: the only phase after
+    /// a contraction that still pushes growth DOWN on entry is the one
+    /// named for the turn.
+    ///
+    /// Kept at 0.0 rather than deleted because the measurement is the
+    /// reason the next change is known, and the dial is the instrument
+    /// that produced it.
+    pub trough_growth_floor: f64,
+    /// Whether a phase's growth target is drawn from its declared range
+    /// or fixed at the range's midpoint. 0.0 -- every preset before
+    /// pt-v18 -- takes NO draw and is bit-identical.
+    ///
+    /// # A declared range the mechanism reduces to its midpoint
+    ///
+    /// `gdp_growth_range` is stated for all five phases and read at
+    /// exactly two sites, both of which take `(lo + hi) / 2.0`. The
+    /// declared WIDTH is discarded everywhere, so the table reads as a
+    /// specification and behaves as a list of five midpoints. That is the
+    /// third instance of one habit in this struct rather than three
+    /// accidents: `max_months` is declared for every phase and read by
+    /// nothing, `gdp_growth_range` is declared and halved to a midpoint,
+    /// and the trough's phase-change shock carries a sign that
+    /// contradicts its own phase.
+    ///
+    /// What that costs is the depth distribution. An episode's fall is its
+    /// mean growth times its length, and with the rate pinned to a
+    /// midpoint the only varying input is the single phase-entry shock,
+    /// which spans 2.0 to about 3.0. A ratio of 1.5 to 1 in the one
+    /// varying input cannot produce the 9.95 to 1 span between the
+    /// mildest and deepest post-1980 recession, at any sample size.
+    ///
+    /// At 1.0 the target is drawn once on phase entry, uniformly over the
+    /// range the table already declares, and held for the phase. The
+    /// contraction range is (-3.0, 0.0), whose uniform mean is its own
+    /// midpoint, so this widens the depth distribution without moving its
+    /// median. Measured over thirty seeds at a hundred years: the median
+    /// moves 0.06 and episodes past a three per cent fall go from 20 to 34
+    /// of about 450. Between the ends the draw is scaled toward the
+    /// midpoint. No constant is invented: the numbers are the ones the
+    /// table states.
+    ///
+    /// # Zero on every preset until the four items are composed
+    ///
+    /// This is the era's one shippable dial for the recession item and it
+    /// is still 0.0 in pt-v18, deliberately. Four items are landing dials
+    /// into one preset and each is measured alone, so a preset assembled
+    /// by turning them on one at a time has no arm that sees the pair
+    /// terms. This item supplies the evidence for that rule rather than an
+    /// exception to it: its two dials each improve the depth spread alone
+    /// and together they are worse than neither, because the pair
+    /// eliminates shallow recessions. Two dials from ONE item already did
+    /// it. Composition is one step, measured together, and it belongs to
+    /// whoever runs it.
+    pub phase_target_range_draw: f64,
     /// The corporate bond yield at which the target multiple sits exactly
     /// on its sector anchor. 0.04 -- every preset before pt-v18 -- is the
     /// constant this was, to the bit.
@@ -2039,6 +2138,8 @@ impl ModelParams {
             oil_opec_symmetry: 0.0,
             oil_seasonality_target: 0.0,
             cycle_hazard_per_month: 0.0,
+            trough_growth_floor: 0.0,
+            phase_target_range_draw: 0.0,
             neutral_discount_rate: crate::fair_value::NEUTRAL_DISCOUNT_RATE,
             macro_burn_in_days: 0.0,
             buyback_payout_share: 0.0,
@@ -3238,6 +3339,8 @@ impl ModelParams {
             "oil_opec_symmetry" => self.oil_opec_symmetry,
             "oil_seasonality_target" => self.oil_seasonality_target,
             "cycle_hazard_per_month" => self.cycle_hazard_per_month,
+            "trough_growth_floor" => self.trough_growth_floor,
+            "phase_target_range_draw" => self.phase_target_range_draw,
             "neutral_discount_rate" => self.neutral_discount_rate,
             "macro_burn_in_days" => self.macro_burn_in_days,
             "buyback_payout_share" => self.buyback_payout_share,
@@ -3396,6 +3499,8 @@ impl ModelParams {
             "oil_opec_symmetry" => out.oil_opec_symmetry = value,
             "oil_seasonality_target" => out.oil_seasonality_target = value,
             "cycle_hazard_per_month" => out.cycle_hazard_per_month = value,
+            "trough_growth_floor" => out.trough_growth_floor = value,
+            "phase_target_range_draw" => out.phase_target_range_draw = value,
             "neutral_discount_rate" => out.neutral_discount_rate = value,
             "macro_burn_in_days" => out.macro_burn_in_days = value,
             "buyback_payout_share" => out.buyback_payout_share = value,
@@ -3625,6 +3730,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "oil_opec_symmetry",
         "oil_seasonality_target",
         "cycle_hazard_per_month",
+        "trough_growth_floor",
+        "phase_target_range_draw",
         "neutral_discount_rate",
         "macro_burn_in_days",
         "buyback_payout_share",

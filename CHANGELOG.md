@@ -35,7 +35,8 @@ the engine's counter.
 **Each draw's effect on a target is measured** by a finite difference, and
 a shadow run solves a real year's closes for their draws.
 
-**The browser build compiles again** after a stale path broke it.
+**The browser build compiles again**; 0.6.2 shipped it broken by a crate
+rename its build script did not follow.
 
 **A mechanism is a specification the engine's Rust is generated from**,
 checked for its draw effect and proven inert.
@@ -1725,6 +1726,94 @@ and `tradefloor.js` in both files.
 `check.mjs`'s one check, comparing the browser build's
 `fixed_simulation_digest` against the native one, is otherwise
 unchanged, and passes again now that the build reaches it.
+
+### The phase table's two dials
+
+`gdp_growth_range` is declared for all five phases and read at two sites,
+both of which took `(lo + hi) / 2.0`, so the declared width did nothing.
+`phase_target_range_draw` draws the target once on phase entry, uniformly
+over the range the table already states, and holds it for the phase. Over
+thirty seeds at a hundred years it widens the depth distribution without
+moving its median. A uniform draw over (-3.0, 0.0) has the midpoint as its
+mean, so the median was expected to hold: it moves 0.06, and episodes past
+a three per cent fall go from 20 to 34 of about 450.
+
+Both dials are 0.0 on every preset, pt-v18 included. Four items are
+landing dials into one preset and each is measured alone, so a preset
+assembled by turning them on one at a time has no arm that sees the pair
+terms. This item is the evidence for that rather than an exception to it,
+as the last paragraph here shows.
+
+`trough_growth_floor` moves the trough's range floor from -1.0 to 0.0. It
+stays in the surface rather than being deleted, because its measurement is
+why the next change is known.
+
+It was built to close the nine points between the engine's two frequency
+rulers, the share of days in a contraction against the share with output
+falling, where the real economy's two rulers agree to about one point. It
+closes 1.52. A target is reached only if the phase lasts long enough to
+approach it, and growth enters a trough near -3.0 after a contraction and
+that phase's own -0.5 entry shock, then reverts by `gap * 0.12` a month.
+Under the shipped range it never crosses zero; at 1.0 it crosses at month
+11 or 12; a trough runs 2 to 6 months. So the binding constraint is the
+reversion rate measured against the phase length, and the declared range
+is beside the point.
+
+The two do not compose. Each improves the model's depth spread alone and
+together they make it worse than neither, because the pair eliminates
+shallow recessions: the mildest episode goes from 0.29 per cent to 0.61,
+and a distribution with no mild episodes cannot reach the 9.95 to 1 span
+between the mildest and deepest post-1980 recession however deep its
+worst gets.
+
+### Two widenings re-date stored artefacts
+
+NOT ON DEV YET. Both changes below sit on branches, so this section
+describes what will be true if they land and carries no entry above the
+marker until they do. It is written now because the measurements are
+fresh.
+
+`EconomyState` gains `phase_gdp_target`, the growth target a phase pulls
+toward, held for the phase. `Engine.state_snapshot` separately widens in
+three places: the generator array from 21 numbers to 24, the draw counts
+from 14 to 16, and each name's attribution from nine values to ten. The
+truth table gains an `overnight` column, which the schema records and
+every hash ignores. Both enter `Engine::state_hash`, so every
+recorded state hash changes value on every trajectory, the default preset
+included, and `manifest.py` builds each ledger leaf from the same
+snapshot, so every leaf changes and the root with it.
+
+What a stored copy does depends on which artefact it is. A stored hash,
+leaf or root compares unequal to a re-run and says nothing, which is the
+case to plan for. An old snapshot put through `manifest.py` is refused
+loudly and told what is missing, by width for the generator, the counts
+and the attribution, and by name for the economy key. An old snapshot
+restored into the engine is accepted, by the restore's stream ladder:
+every stream added since the split restores from the snapshot when the
+array is long enough to hold it and otherwise keeps the position this
+engine derived from its seed, at 12 numbers for jumps, 15 for volume, 18
+for news, 21 for per-name volume and now 24 for overnight. So the eighth
+generator takes its seed-derived position, the counts are padded from
+that same position, and a nine-wide attribution restores with the tenth
+slot at zero.
+
+A missing economy key behaves differently and worse. `econ_get!` reads
+each field with an optional lookup, so a key the dict does not carry is
+skipped in silence: a snapshot written before this release restores with
+`phase_gdp_target` holding the midpoint the engine constructed, in place
+of the value the run had. Nothing is raised and nothing is logged. At
+the dials' zero nothing reads the field, so no shipped preset is
+affected. That is issue #184, open and undecided.
+
+Neither moves the three known-answer digests, measured on both branches
+rather than argued, on four clean builds for the snapshot widening and on
+the gate for the state field. That is a property of what those digests
+cover rather than of these changes: the simulation digest covers a
+trajectory and the metadata digest covers the nine reported coefficients,
+and neither reads
+the snapshot's layout. So a green determinism gate is not evidence that a
+stored artefact survives, and two independent widenings landing in one
+release is what made the gap visible.
 
 
 ## 0.6.2

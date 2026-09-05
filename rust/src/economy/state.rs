@@ -305,6 +305,14 @@ pub struct EconomyState {
     // Cycle
     pub cycle_phase: CyclePhase,
     pub months_in_current_phase: f64,
+    /// The growth rate this phase is pulling toward, held for the phase.
+    ///
+    /// Written on a phase change and read at the monthly and quarterly
+    /// updates. Under every preset before pt-v18 the two read sites take
+    /// `(lo + hi) / 2.0` of the phase's declared range and never look
+    /// here, so this stays at its initial value and no behaviour reads
+    /// it. See [`crate::params::ModelParams::phase_target_range_draw`].
+    pub phase_gdp_target: f64,
     pub recession_probability: f64,
 }
 
@@ -432,6 +440,18 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
 
         cycle_phase,
         months_in_current_phase: 0.0,
+        // The midpoint, which is what every preset before pt-v18 uses for
+        // the whole run because nothing reads this field at their dial's
+        // zero. Under `phase_target_range_draw` it is overwritten on the
+        // FIRST simulated day rather than at the first phase change: the
+        // draw is gated on `months_in_current_phase < 1/30 + 0.001` and
+        // the engine opens at zero months in phase, so the opening phase
+        // is drawn for like any other. This value is what the field holds
+        // between construction and that first day.
+        phase_gdp_target: {
+            let r = phase_characteristics(cycle_phase).gdp_growth_range;
+            (r.0 + r.1) / 2.0
+        },
         recession_probability: match cycle_phase {
             CyclePhase::Contraction => 0.5,
             CyclePhase::Trough => 0.3,

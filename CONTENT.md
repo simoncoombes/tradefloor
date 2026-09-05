@@ -110,6 +110,15 @@ got worse. **What goes below:** how it was measured, why it was done that
 way, and what nearly went wrong. Nothing is deleted to meet the budget; it
 moves.
 
+**Moving is not free for every line, because the two halves have different
+readers.** The text above the marker is what `release.yml` publishes to
+GitHub, and that reader never sees the block below it. So a line that states
+a consequence somebody has to act on cannot be shortened by leaving the
+explanation underneath: "recompute them" with the object below the marker
+reads, to the only audience that line has, as an instruction with nothing to
+act on. Method and reasoning move down at no cost. A compatibility
+consequence either fits above in full or the budget gives.
+
 ## Per surface
 
 ### CHANGELOG.md

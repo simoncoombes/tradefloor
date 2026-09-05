@@ -352,6 +352,52 @@ PERTURBATIONS = [
     # draws until day 180 and the probe runs three. Over 252 days it bites,
     # and what separates the arms is the count of seeds that leave expansion.
     ("cycle_hazard_per_month", 0.5, False),
+    # The floor waits on a phase the probe never reaches: it moves only the
+    # trough's growth range, and a certified year reaches no trough at all,
+    # let alone three days from an opening expansion.
+    ("trough_growth_floor", 0.5, False),
+    # MOVES the market on the probe, and the entry is a DECOMPOSITION
+    # rather than a verdict, because three readings of it were wrong
+    # before this one.
+    #
+    # The block is gated on `months_in_current_phase < 1/30 + 0.001` and
+    # the clock advances 1/30 a day, so it fires on days 0 and 1 and
+    # never again. `draws_consumed` runs +1 after one day and +2 from
+    # the second and stays there, which is the whole of the exemption
+    # this dial takes in DRAW_SCHEDULE_MOVERS below.
+    #
+    # WHICH channel moves the market is separable without a new
+    # instrument, because 0.5 and 1.0 take the SAME draw at the same
+    # stream position and differ only in the coefficient. Measured at 1,
+    # 2, 3, 5, 10 and 20 days: 0.5 and 1.0 are BIT-IDENTICAL in every
+    # column at every horizon, while both differ from 0.0 by the same
+    # amount -- nothing on day one, then 2.1e-3 of a price at the widest
+    # name on days two and three, and 1.5e-3 still at twenty.
+    #
+    # So the probe's move is the draw's displacement of the ECONOMY
+    # substream, and the coefficient reaches no market column at all
+    # inside twenty sessions. Day 0 is `day % DAYS_PER_MONTH == 0` and
+    # `% DAYS_PER_QUARTER == 0` both, so the drawn target IS read and
+    # the economy does differ between those two arms; the market does
+    # not hear it. Sequence, measured on the same runs: the VIX carries
+    # the displacement at the end of day one (14.8477 against 15.1255,
+    # and 15.1255 for both perturbed arms) before any price column has
+    # moved.
+    #
+    # That sharpens drift-vix's rule rather than refuting it -- a
+    # displaced draw moves a probe in proportion to how directly its
+    # consumer reaches the observable, and how soon. It also resolves
+    # the registered prediction in both directions: the market moves,
+    # in two sessions rather than twenty, and the valuation path the
+    # COEFFICIENT takes shows nothing across the whole span. Whether it
+    # bites over a certified year is what `phasenull` was launched to
+    # measure, and this does not answer it.
+    #
+    # The `False` that stood here was never exercised. Until the
+    # exemption below landed, this test failed on the draw-count
+    # assertion first and stopped, so the `moves` verdict was argued
+    # and never run.
+    ("phase_target_range_draw", 0.5, True),
     # The yield at which the target multiple sits on its sector anchor.
     # 0.05 rather than either shipped value: 0.04 is the default this probe
     # perturbs and 0.0456 is pt-v18's, and an entry landing on a named
@@ -456,7 +502,7 @@ PERTURBATIONS = [
 
 
 #: Parameters whose perturbation legitimately changes the draw SCHEDULE, so
-#: the §5.2 guard below skips them. Two qualify. The VIX jump's arrival test
+#: the §5.2 guard below skips them. Three qualify. The VIX jump's arrival test
 #: draws from the shared `economy` stream once a day whenever the intensity
 #: is non-zero, so turning it on consumes three extra draws over the probe's
 #: three days whether or not a jump ever fires. `macro_burn_in_days` runs
@@ -470,7 +516,39 @@ PERTURBATIONS = [
 #: economy stream, so its trajectories differ from every earlier preset
 #: through the RNG as well as through the mechanism. Giving the arrival test
 #: its own stream would remove that coupling.
-DRAW_SCHEDULE_MOVERS = frozenset({"vix_jump_intensity", "macro_burn_in_days"})
+#:
+#: `phase_target_range_draw` is the third, and the reason is written out
+#: because this set is where an inconvenience would hide if anyone let it.
+#:
+#: At 0.0 the dial takes NO draw. The site at `daily.rs:310` sits inside
+#: `if inputs.phase_target_range_draw != 0.0`, so every preset written
+#: before the dial is bit-identical to itself and all three known-answer
+#: digests reproduce unmoved on this branch. Nothing is exempted for the
+#: shipped default; the exemption covers the dial turned ON.
+#:
+#: Above 0.0 the draw IS the mechanism. The dial draws a phase's growth
+#: target from the range the phase table already declares, so it needs a
+#: number, and a version that drew nothing would not have drawn anything.
+#: That is the same shape as `macro_burn_in_days` above, where the count is
+#: the mechanism rather than a side effect of it.
+#:
+#: What was REFUSED, so a later reader can see the alternative was weighed.
+#: `daily.rs:287` already takes a uniform on every phase-change day in every
+#: phase and discards it for four phases in five, and reusing it would have
+#: kept the schedule identical. It was refused because the sign is not
+#: neutral: as drawn, a larger uniform gives a deeper entry shock and a
+#: SHALLOWER target, so the two oppose and damp the spread this dial exists
+#: to create, while `1.0 - u` aligns and amplifies them. Choosing between
+#: those on the strength of which one satisfies this test would be choosing
+#: a mechanism to make a test pass. It remains open on modelling grounds.
+#:
+#: The displacement is measured rather than assumed harmless: a
+#: displacement-only null, the dial off with the stream advanced by two
+#: draws at the same point, is run beside the treated arm so the reported
+#: effect is separated from the position shift.
+DRAW_SCHEDULE_MOVERS = frozenset({
+    "vix_jump_intensity", "macro_burn_in_days", "phase_target_range_draw",
+})
 
 
 def test_the_perturbation_table_covers_the_whole_settable_surface():
