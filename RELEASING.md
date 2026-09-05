@@ -31,11 +31,11 @@ implied.
 | `pyproject.toml` | the wheel, the sdist, PyPI |
 | `rust/Cargo.toml` | the crate, crates.io |
 | `CITATION.cff` | anyone citing a result |
-| `tradefloor-docs: docs/reproducing-a-run.md` | the worked example that prints it |
+| `tradefloor-docs: pyproject.toml` (mirrored) | the version badge and the JSON-LD on every rendered page |
 
-The fourth location moved with the docs at 0.5.0: it lives in the
-PRIVATE `simoncoombes/tradefloor-docs` repo now, along with every
-rendered page that prints the version. Bump it there, rebuild, and
+The fourth location lives in the PRIVATE `simoncoombes/tradefloor-docs`
+repo: `mirrors.py --source` copies this repository's `pyproject.toml`
+there, and the build reads the version from the copy. Mirror, rebuild and
 push that repo as part of the same release pass.
 
 `CITATION.cff` carries two fields, not one: `version:` and `date-released:`,
