@@ -694,7 +694,21 @@ impl Engine {
         let bases = self.sector_base_variances_for(&names);
         let v = crate::market::index_var::index_unconditional_variance(
             &self.params, &names, self.sector_keys.len(), &bases);
-        crate::market::index_var::vix_from_variance(self.params.vix_variance_premium, v)
+        let derived =
+            crate::market::index_var::vix_from_variance(self.params.vix_variance_premium, v);
+        // A ROSTER WITH NO INDEX HAS NO VIX. An engine built with no public
+        // names, or one whose whole roster is bankrupt, leaves an
+        // unconditional variance of nothing but the market jump, and the
+        // anchor it derives is a denominator four coupling sites divide by.
+        // The dial is the honest answer there rather than a number the
+        // roster cannot support -- and it is a FALLBACK with a condition,
+        // not a clamp: on any roster that has an index at all this branch is
+        // not taken.
+        if derived.is_finite() && derived > 0.0 {
+            derived
+        } else {
+            self.params.market_vol_vix_anchor
+        }
     }
 
     /// The roster as the variance identity reads it: previous-close cap
