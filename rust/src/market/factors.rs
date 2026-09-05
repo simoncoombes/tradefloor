@@ -501,7 +501,8 @@ pub fn calculate_live_factors(
     // reallocation: the factor's variance share was raised out of THIS
     // term's budget, so total volatility holds still. At 1.0 the multiply
     // is bit-inert.
-    let daily_sigma = mathx::sqrt(mathx::max(company.garch_variance, 0.0001));
+    let daily_sigma = mathx::sqrt(mathx::max(
+        company.garch_variance, super::index_var::IDIO_VARIANCE_FLOOR));
     let idio_scale = idio_scale_for(params, beta);
     let idiosyncratic_sigma = daily_sigma * idio_scale / mathx::sqrt(390.0);
 

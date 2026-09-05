@@ -290,6 +290,7 @@ fn check_scenario(file: &str) {
                 // The constant-sigma baseline: these tests predate the factor's
                 // variance process and pin behaviour at its baseline level.
                 market_sigma_daily: MARKET_FACTOR_SIGMA,
+                    vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
                 settle_draws: SettleDrawPolicy::FourOrZero,
                 // The depth counterfactual, off. It reaches no company field.
                 settle_depth_counterfactual: false,

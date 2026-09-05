@@ -130,6 +130,14 @@ pub struct CloseInputs {
     /// scale the clamp reference above into the regime the market is in.
     /// See §78.
     pub vix: f64,
+    /// The VIX at which that coupling reads ONE.
+    ///
+    /// `params.market_vol_vix_anchor` under every preset before pt-v19,
+    /// which is where this line read it from; under `vix_level_identity`
+    /// the engine derives it from the index's own unconditional variance
+    /// and passes that instead, so the per-name clamp reference moves with
+    /// the same reference point the factor and the jumps do.
+    pub vix_anchor: f64,
     /// How the close treats `avg_volume`. [`AvgVolumePolicy::Hold`] unless
     /// you are replaying a reference tape.
     pub avg_volume: AvgVolumePolicy,
@@ -185,7 +193,7 @@ pub fn close_day_with(
     let base_variance = if params.garch_vix_coupling == 0.0 {
         inputs.sector_base_daily_variance
     } else {
-        let ratio = inputs.vix / params.market_vol_vix_anchor;
+        let ratio = inputs.vix / inputs.vix_anchor;
         let c = params.garch_vix_coupling;
         inputs.sector_base_daily_variance * (1.0 - c + c * ratio * ratio)
     };
@@ -311,6 +319,7 @@ mod tests {
             daily_innovation: innovation,
             sector_base_daily_variance: BASE,
             vix: 15.0,
+            vix_anchor: crate::params::PT_V1.market_vol_vix_anchor,
             avg_volume: AvgVolumePolicy::Hold,
         }
     }

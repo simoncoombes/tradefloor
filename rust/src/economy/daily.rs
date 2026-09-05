@@ -131,6 +131,14 @@ pub struct DailyInputs<'a> {
     pub market_day_return_pct: f64,
     pub vix_implied_from_market: f64,
     pub vix_return_gain_up: f64,
+    /// The VIX's level comes from the index's own conditional variance
+    /// rather than from the phase table. See
+    /// `ModelParams::vix_level_identity`; 0.0 is every preset before
+    /// pt-v19 and is bit-identical.
+    pub vix_level_identity: f64,
+    /// The index's conditional daily sigma in PER CENT, for the fear
+    /// excursion's zero-mean correction. Read only under the identity.
+    pub vix_index_sigma_pct: f64,
     pub vix_return_clamp: f64,
     pub vix_target_shock_cap: f64,
     /// Upper bound on the VIX state. See `ModelParams::vix_ceiling`, which
@@ -222,6 +230,8 @@ impl<'a> Default for DailyInputs<'a> {
             market_day_return_pct: 0.0,
             vix_implied_from_market: 0.0,
             vix_return_gain_up: VIX_RETURN_GAIN_UP,
+            vix_level_identity: 0.0,
+            vix_index_sigma_pct: 0.0,
             vix_return_clamp: VIX_RETURN_CLAMP,
             vix_target_shock_cap: VIX_TARGET_SHOCK_CAP,
             inflation_reversion: INFLATION_MEAN_REVERSION,
@@ -247,6 +257,61 @@ impl<'a> Default for DailyInputs<'a> {
 /// the "reads `economy.x`, writes `newState.x`" distinction — which is
 /// load-bearing throughout, since many lines read the OLD value after a new
 /// one has been written — impossible to express faithfully.
+/// The MEAN of the VIX target's return spike over a session, given the
+/// index's own conditional sigma — the quantity `vix_target_offset` was
+/// fitted to cancel.
+///
+/// # Why an offset existed at all
+///
+/// The spike is `gain * |r|` on a down session and `-gain_up * r` on an up
+/// one. Over a zero-mean return those two do not cancel unless the gains
+/// are equal, so an ASYMMETRIC gain injects a standing positive excursion
+/// into the level — and `vix_target_offset` was a constant fitted to
+/// subtract it. That is a level constant standing in for a first moment
+/// somebody could have written down, and it is why the same dial had to be
+/// refitted every time the gain moved.
+///
+/// # The closed form
+///
+/// For `r ~ N(0, sigma^2)` and gains `g_down`, `g_up`:
+///
+/// ```text
+/// E[spike] = P(r < 0) g_down E[|r| | r < 0] - P(r >= 0) g_up E[r | r >= 0]
+///          = 0.5 (g_down - g_up) E|r|
+///          = 0.5 (g_down - g_up) sigma sqrt(2 / pi)
+/// ```
+///
+/// so it moves with the market's own volatility instead of standing still,
+/// which is the second thing a fitted constant could not do: an offset
+/// derived in a calm year is the wrong offset in a violent one.
+///
+/// # Three approximations, stated rather than absorbed
+///
+/// - **Gaussian.** The model's index carries excess kurtosis about 2.6, so
+///   `E|r|` is a per cent or two under the true one and the correction is
+///   fractionally small. It is a correction to a term that is itself a few
+///   points, so the residual is tenths of a point.
+/// - **Unclamped.** `vix_return_clamp` truncates `r` first. At the shipped
+///   15 per cent and an index sigma near 1 per cent that is a fifteen-sigma
+///   truncation and contributes nothing; a preset that clamps near the
+///   index's own sigma would need the truncated moment instead.
+/// - **Linear in `|r|`.** When the response gains an exponent `p` on the
+///   down side, `E|r|` becomes `E|r|^p = sigma^p 2^(p/2) Gamma((p+1)/2) /
+///   sqrt(pi)`, which is the same identity with the Gaussian absolute
+///   moment generalised, and this function is where it goes. At `p = 1`,
+///   `Gamma(1) = 1` and the expression below is that identity exactly.
+pub fn expected_return_spike(sigma_pct: f64, gain: f64, gain_up: f64) -> f64 {
+    // `E|r| = sigma sqrt(2/pi)` for a zero-mean Gaussian. Written as the
+    // reciprocal of `SQRT_TWO_PI` times two so it is visibly the same
+    // constant `factors.rs` uses for the tilt's first moment, which is the
+    // same integral.
+    0.5 * (gain - gain_up) * sigma_pct * (2.0 / SQRT_TWO_PI)
+}
+
+/// `sqrt(2 pi)`, as `market::factors` spells it. A literal because `sqrt`
+/// is not `const`, and the test below pins it against `mathx::sqrt`.
+const SQRT_TWO_PI: f64 = 2.5066282746310002;
+
 pub fn update_economy_daily(
     economy: &EconomyState,
     inputs: &DailyInputs,
@@ -848,11 +913,20 @@ pub fn update_economy_daily(
         CyclePhase::Trough => 22.0,
         CyclePhase::Recovery => 16.0,
     };
+    // THE LEVEL. Under the identity it is the index's own conditional
+    // variance in VIX points and the table above is not read at all: the
+    // business cycle reaches the VIX through the variance processes or not
+    // at all. At 0.0 the branch is not taken and every preset before pt-v19
+    // reproduces bit for bit. See `ModelParams::vix_level_identity`.
+    //
     // THE CLOCK THE CLUSTERING RUNS ON. Those five constants move on a
     // multi-year cycle, so volatility regimes here are years long and a
     // one-year window contains no regime change at all. At amplitude 1.0
     // this is the shipped arithmetic exactly. See §71.
-    let mut target_vix = if inputs.vix_cycle_amplitude == 1.0 {
+    let identity_level = inputs.vix_level_identity != 0.0;
+    let mut target_vix = if identity_level {
+        inputs.vix_implied_from_market
+    } else if inputs.vix_cycle_amplitude == 1.0 {
         phase_vix
     } else {
         VIX_PHASE_MEAN + inputs.vix_cycle_amplitude * (phase_vix - VIX_PHASE_MEAN)
@@ -866,7 +940,14 @@ pub fn update_economy_daily(
     // +0.15 points and the correlation between the day's return and the
     // next day's VIX change is -0.065 even with the gain at 5000 (§70). At
     // source 0.0 this branch is not taken and every preset reproduces.
-    let driving_return = if inputs.vix_return_source == 0.0 {
+    let driving_return = if identity_level {
+        // THE SESSION, always. The excursion below is made zero-mean
+        // against the session's own conditional sigma, and the same
+        // correction applied to a closing MINUTE would be twenty times the
+        // quantity it is correcting. So the identity does not read
+        // `vix_return_source`; a preset that turns it on gets the day.
+        inputs.market_day_return_pct
+    } else if inputs.vix_return_source == 0.0 {
         inputs.market_return_pct
     } else {
         let s = inputs.vix_return_source;
@@ -885,11 +966,29 @@ pub fn update_economy_daily(
         return_spike + inflation_adj + shock_adj,
     );
 
+    // THE EXCURSION'S OWN MEAN, which is what the offset was for.
+    //
+    // An asymmetric gain over a zero-mean return injects a standing
+    // positive excursion, and `vix_target_offset` was a number fitted to
+    // cancel it. Under the identity it is cancelled by its own closed form
+    // instead, computed each day from the index's conditional sigma: see
+    // `expected_return_spike`. Nothing is fitted and nothing is left over.
+    if identity_level {
+        target_vix -= expected_return_spike(
+            inputs.vix_index_sigma_pct,
+            inputs.vix_return_gain,
+            inputs.vix_return_gain_up,
+        );
+    }
+
     // Earnings-season bump. The 30.44 is a mean month length, so this is not
     // the same day-of-month the month-start blocks above use.
+    //
+    // Not read under the identity: half a point on the first half of a
+    // month is a level constant, and the level is the variance now.
     let earnings_month_vix = (((day_of_year - 1) % 365) as f64 / 30.44).floor() + 1.0;
     let day_of_month_vix = day_of_year as f64 - ((earnings_month_vix - 1.0) * 30.44).floor();
-    if day_of_month_vix <= 15.0 {
+    if !identity_level && day_of_month_vix <= 15.0 {
         target_vix += 0.5;
     }
 
@@ -905,13 +1004,15 @@ pub fn update_economy_daily(
     // on a negative zero, which is the same reason `apply_jumps` guards its
     // own total, and a dial that ships inert must leave the state it does not
     // touch bit-identical.
-    if inputs.vix_target_offset != 0.0 {
+    if !identity_level && inputs.vix_target_offset != 0.0 {
         target_vix += inputs.vix_target_offset;
     }
 
     // (§68). At weight zero this branch is not taken and every preset
     // reproduces bit for bit.
-    if inputs.vix_realised_vol_weight != 0.0 {
+    // Not read under the identity: the WHOLE target is the read-back, so
+    // there is nothing to blend it with.
+    if !identity_level && inputs.vix_realised_vol_weight != 0.0 {
         let w = inputs.vix_realised_vol_weight;
         target_vix = (1.0 - w) * target_vix + w * inputs.vix_implied_from_market;
     }
