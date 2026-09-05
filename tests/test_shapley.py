@@ -29,16 +29,30 @@ pytest.importorskip("pyarrow", reason="facts.measure reads bars through Arrow")
 shapley = pytest.importorskip("shapley",
                               reason="calibration tooling is not packaged")
 
-#: Two dials that both move the panel at four names and 32 days. The QE
-#: gain was the first choice and moved nothing at that horizon, which is a
-#: fact about the macro chain rather than a defect; a toy whose groups are
-#: inert proves the sum identity as 0 = 0.
+#: Two dials that both move the panel at four names. The QE gain was the
+#: first choice and moved nothing, which is a fact about the macro chain
+#: rather than a defect; a toy whose groups are inert proves the sum
+#: identity as 0 = 0.
 TOY_GROUPS = {
     "trim": {"market_factor_sigma": 0.007593024924589399},
     "volume": {"volume_move_response": 1.0},
 }
 TOY_SEEDS = [1, 2]
-TOY_DAYS = 32
+
+#: 252, not the 32 this ran at until 2026-09-05. `shapley.ruler` returned
+#: the 252-day bands for every horizon but 504, so a 32-day toy was grading
+#: its panel against a ruler derived from 253-bar windows, and the certified
+#: column it printed beside each row was measured at 252 days too.
+#:
+#: It has to be a horizon with a RULER, and it has to be 252 rather than 504,
+#: because the last test in this file is about the level row carrying its
+#: certified value with the band verdict withheld -- and at 504 there is no
+#: certified level value to carry, so that test would pass on the horizon
+#: instead of on the protocol it is named for. The horizon caveat is tested
+#: directly below instead, which needs no engine runs at all.
+#:
+#: It costs about fifteen seconds once, the fixture being module-scoped.
+TOY_DAYS = 252
 TOY_UNIVERSE = (4, 1)
 
 
@@ -251,8 +265,40 @@ def test_the_report_prints_the_certified_value_the_band_and_the_caveats(toy):
         assert f"\n  {name:16s}" in text
     assert "sum of shares" in text
     assert f"{len(TOY_SEEDS)} seed(s) against the 30" in text
-    assert f"{TOY_DAYS} days against the certified horizon" in text
     assert "Universe.random(4, seed=1) against the certified" in text
+    # At the certified horizon the horizon caveat must NOT fire. It is
+    # tested at the horizons where it does, below.
+    assert "days against the certified horizon" not in text
+
+
+def test_the_horizon_caveat_names_the_ruler_or_says_there_is_none():
+    """The three cases, none of which needs an engine run.
+
+    `ruler` returned `facts.REAL_MARKETS` for every horizon but 504, so at
+    32 days this tool graded a 32-day panel against 253-bar-window bands and
+    printed a caveat naming the ruler truthfully over a wrong comparison. It
+    now withholds, and the caveat says so.
+    """
+    from tradefloor import envelope
+
+    def texts(days):
+        name, _ = shapley.ruler(days)
+        return shapley.caveats(
+            seeds=list(range(30)), days=days, universe=(40, 111),
+            unmeasured=[], crn={"market": {"agree": True}},
+            ruler_name=name, values={frozenset(): {}}, names=[])
+
+    # At either horizon that HAS a ruler, no horizon caveat: the certified
+    # column is measured at that horizon too, which is what the caveat is
+    # about.
+    for days in sorted(envelope.RULERS_BY_HORIZON):
+        assert not any("certified horizon" in t or "band set" in t
+                       for t in texts(days)), days
+        assert shapley.ruler(days)[1], days
+    none = " ".join(texts(32))
+    assert "no band set has been derived at 32 days" in none
+    assert "WITHHELD" in none
+    assert str(sorted(envelope.RULERS_BY_HORIZON)) in none
 
 
 def test_the_level_row_carries_a_share_and_no_band_verdict(toy):

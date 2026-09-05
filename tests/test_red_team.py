@@ -37,9 +37,19 @@ from tradefloor import envelope  # noqa: E402
 
 pytest.importorskip("pyarrow", reason="facts.measure reads bars via Arrow")
 
-#: Small enough for a sub-second cell at a six-name roster, large enough to
-#: clear facts.measure's default min_observations=30.
-DAYS = 35
+#: The CERTIFIED horizon, because this tool's whole product is
+#: `facts.compare_to_real_markets` verdicts and those bands are derived from
+#: 253-bar windows of real data. This read 35 -- "small enough for a
+#: sub-second cell at a six-name roster, large enough to clear
+#: facts.measure's default min_observations=30" -- and the toy grid was
+#: therefore ranking 35-day panels by their distance from a 252-day ruler,
+#: which is the defect the tool exists to hunt, inside the tool's own tests.
+#: `compare_to_real_markets` refuses it now.
+#:
+#: A cell costs about two seconds at six names instead of half a second. The
+#: alternative, a toy that measures without grading, would not exercise
+#: `Finding` or the ranking at all, and those are what these tests are for.
+DAYS = 252
 
 TOOL = str(Path(__file__).resolve().parent.parent
           / "tools" / "calibration" / "red_team.py")

@@ -1289,14 +1289,28 @@ def main() -> None:
             "universe": f"Universe.random({universe_n}, seed={universe_seed})",
             "loss_real": breakdown["loss"],
             "loss_search": search_loss(panels, margin),
-            "bands_used_for_every_verdict_here": "the TRUE bands "
-                                                 "(facts.REAL_MARKETS)",
-            "bootstrap_spread": bootstrap_spread(panels),
+            # Named per axis. This read "the TRUE bands
+            # (facts.REAL_MARKETS)" on every axis including the 504-day
+            # one -- true of three of them, and an assertion of the right
+            # answer over the one where it was wrong. The bands above ARE
+            # horizon-matched; the label was left behind with the
+            # bootstrap, which is the shape of a partial fix.
+            "bands_used_for_every_verdict_here":
+                "facts.REAL_MARKETS_504" if far else "facts.REAL_MARKETS",
+            "seed_sd_used": "facts.SEED_SD_504" if far else "facts.SEED_SD",
+            # The bootstrap resamples the SAME panels and must use the SAME
+            # ruler. It called the default, so on the 504-day axis the
+            # spread that sets §8's threshold was a 252-day-ruler number
+            # sitting beside a 504-day-ruler loss, and the two were
+            # compared. `band_distance_loss` refuses that pairing now.
+            "bootstrap_spread": bootstrap_spread(panels, bands=bands,
+                                                 seed_sd=scales),
             "statistics": stats,
             "panels": panels,
         }
 
-    def bootstrap_spread(panels: list[dict], draws: int = 2000) -> float:
+    def bootstrap_spread(panels: list[dict], draws: int = 2000, *,
+                         bands=None, seed_sd=None) -> float:
         """§8's yardstick: how much L_real moves on a re-draw of the seeds.
 
         The overfitting rule prices "validation worse than training"
@@ -1314,7 +1328,8 @@ def main() -> None:
         for _ in range(draws):
             idx = boot.integers(0, len(panels), len(panels))
             losses.append(loss_mod.band_distance_loss(
-                [panels[i] for i in idx])["loss"])
+                [panels[i] for i in idx], bands=bands,
+                seed_sd=seed_sd)["loss"])
         return float(statistics.stdev(losses))
 
     axes = {}
