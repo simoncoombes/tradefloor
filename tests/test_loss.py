@@ -759,6 +759,13 @@ def test_the_level_rows_seed_sd_is_reproducible_on_its_own_protocol():
                 assert derived == pytest.approx(SEED_SD[key], rel=0.01), (
                     key, generator)
 
+    # The recorded standard errors are DERIVED here rather than compared to
+    # a literal, because a typed se is the number that goes stale when the
+    # sd beside it is re-measured.
+    n = len(LEVEL_PROTOCOL["seeds"])
+    for key, se in SEED_SD_LEVEL_PROVENANCE["thirty_seed_standard_error"].items():
+        assert se == pytest.approx(SEED_SD[key] / n ** 0.5, rel=1e-3), key
+
 
 def test_the_pooled_rows_scale_is_not_the_spread_across_seeds():
     """The two candidate scales for a pooled row are different quantities.

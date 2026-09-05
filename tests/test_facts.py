@@ -610,14 +610,26 @@ def test_the_index_drift_row_measures_what_the_graded_rows_cannot_see():
         assert 0.0 < delta < SEED_SD[key], (key, delta, SEED_SD[key])
 
 
-def test_the_index_drift_row_is_reported_and_never_graded():
-    """Reporting only, and the absence of a band is structural rather than
-    remembered.
+def test_the_index_drift_row_is_graded_as_a_level_row_and_held_red():
+    """Graded, grouped as LEVEL, and kept out of the shape count.
 
-    A first-moment band would have to be derived from a real index over a
-    matched window and that derivation does not exist here, so the row earns
-    no verdict, cannot pass, cannot fail, and `envelope` refuses it outright
-    rather than scoring it against a band nobody measured.
+    THE NAME AND THE ASSERTIONS DISAGREED until 2026-09-05. This was
+    `..._is_reported_and_never_graded`, and its docstring said the row
+    "earns no verdict, cannot pass, cannot fail" -- which was true while
+    the row sat in `REPORTING_ONLY` and stopped being true on 2026-09-03,
+    when a band derived from ^GSPC put it in `REAL_MARKETS`. The body was
+    updated then and the name and docstring were not, so the file carried
+    a test asserting the opposite of what it was called. Renamed rather
+    than reverted: the assertions are the current behaviour and the name
+    was the stale half.
+
+    What it now holds: the row is graded against a band whose provenance
+    is three URLs and a fetch date; it is in `LEVEL` and not in `SHAPE`,
+    so a certification count of fourteen shape rows never folds it in; it
+    aggregates as a thirty-seed MEAN rather than a median; and it is
+    absent from `envelope.CERTIFIED` while present in `certified()` with
+    its own group, which is how a row can be published RED without being
+    counted as a pass or hidden as a gap.
     """
     from tradefloor import envelope
     from tradefloor.facts import (REAL_MARKETS, REAL_MARKETS_PROVENANCE, REPORTING_ONLY,
@@ -653,12 +665,22 @@ def test_the_index_drift_row_is_reported_and_never_graded():
     scored = envelope.score({"index_drift_pct": year["index_drift_pct"]})
     assert scored["statistics"]["index_drift_pct"]["group"] == "level"
     assert scored["level_of"] == 1 and scored["shape_of"] == 0
-    # Not in the shape table of the certified set; its own table is empty
-    # until the thirty-seed measurement on the pinned protocol lands, and
-    # the manifest names it as unmeasured rather than giving it a number.
+    # Not in the shape table of the certified set, and PRESENT in the
+    # manifest with a value: the thirty-seed measurement on the pinned
+    # protocol landed on 2026-09-04 and `CERTIFIED_LEVEL` carries it.
+    #
+    # This read `in cert["unmeasured"] or in cert["statistics"]` while the
+    # measurement was outstanding, which is an assertion no state of the
+    # module can fail -- a row is in one or the other by construction. It
+    # is split now: the row is measured, so it is in `statistics`, and
+    # `unmeasured` is asserted not to hold it rather than left as an
+    # alternative that excuses it.
     assert "index_drift_pct" not in envelope.CERTIFIED
     cert = envelope.certified()
-    assert "index_drift_pct" in cert["unmeasured"] or "index_drift_pct" in cert["statistics"]
+    assert "index_drift_pct" in cert["statistics"]
+    assert "index_drift_pct" not in cert["unmeasured"]
+    assert cert["statistics"]["index_drift_pct"]["group"] == "level"
+    assert cert["statistics"]["index_drift_pct"]["in_band"] is False
 
     # Reported in its own section of the report, as a graded row.
     text = report(year)

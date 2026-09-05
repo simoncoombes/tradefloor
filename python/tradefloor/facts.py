@@ -1350,6 +1350,39 @@ SEED_SD_LEVEL_PROVENANCE = {
         "loss_contribution_at_pt_v16": {"bootstrap": 60.5,
                                         "across_reporting_seeds": 7.9},
     },
+    #: THE STANDARD ERROR OF A THIRTY-SEED READING, which is the figure a
+    #: reader comparing a level reading to its band actually needs, and is
+    #: not the sd. `index_drift_pct` reads 9.55716/sqrt(30) = 1.745, and
+    #: the band 2.9..11.9 is only +-2.58 of that wide on its own ruler. A
+    #: level arm that moves less than about 3.5 points has not been shown
+    #: to move at all at thirty seeds.
+    "thirty_seed_standard_error": {"index_drift_pct": 1.745},
+    #: WHAT A SEED SD IS AND IS NOT, which bounds every entry in `SEED_SD`
+    #: rather than only the rows here.
+    #:
+    #: It is WITHIN-REGIME noise. Every economy opens in
+    #: `CyclePhase::Expansion` (`rust/src/economy/state.rs`,
+    #: `create_initial_economy_state`), the model draws no seed-level
+    #: regime, and at pt-v18's `cycle_hazard_per_month` of 1.0 a
+    #: certified year reaches no trough at all -- the dial's own docstring
+    #: records 0 of 2121 rolls clamped over a certified year. So thirty
+    #: seeds are thirty draws from one regime, and the dispersion measured
+    #: across them is noise dispersion.
+    #:
+    #: A real market's year-to-year variation is not. It includes regime
+    #: changes the model does not draw, which is why a band derived from
+    #: real windows is wider than a seed sd would suggest and why the two
+    #: must not be substituted for one another. This does NOT favour
+    #: either candidate scale for the pooled row below: both are measured
+    #: on the same thirty seeds at one regime, so neither carries regime
+    #: dispersion and the choice between them turns on the estimator, not
+    #: on this.
+    "seed_sd_is_within_regime": "every economy opens in Expansion and a "
+                                "certified year reaches no trough, so a "
+                                "seed sd is a within-regime noise scale; a "
+                                "real market's year-to-year variation "
+                                "includes regime changes the model does "
+                                "not draw",
     #: Rows on this protocol that carry no `SEED_SD` entry, against the
     #: reason. Empty since 2026-09-05, and kept so the next such row has
     #: somewhere to carry its reason rather than being silently absent.
@@ -1837,12 +1870,25 @@ def _index_drift_pct(
     does. An earlier and smaller sample in the design note puts the same
     roster at 0.78 standard deviations, and the two have not been
     reconciled. The handicap was then measured directly, on 2026-09-04 at
-    thirty seeds each: pt-v18 reads +1.974 in this row's convention with
-    roster 111 held and +5.281 with the roster varying, 3.3 points, and
-    pt-v16 reads -13.643 varying, so the direct figure is about half the
-    six estimated from the sweep's slope. A level figure therefore carries
-    its protocol as part of its value, and no two level figures compare
-    unless both name theirs (`LEVEL_PROTOCOL`).
+    thirty seeds each. AT dccc3b0, which is the pin these figures are
+    current at: pt-v18 reads +3.735 in this row's convention with roster
+    111 held and +7.023 with the roster varying, 3.29 points, and pt-v16
+    reads -16.751 held against -13.643 varying, 3.11 points. So the direct
+    figure is about half the six estimated from the sweep's slope, on
+    either preset. A level figure therefore carries its protocol as part
+    of its value, and no two level figures compare unless both name theirs
+    (`LEVEL_PROTOCOL`).
+
+    A LEVEL FIGURE WITH NO PIN CANNOT BE CHECKED, which is why every
+    number above names one. This paragraph read +1.974 held and +5.281
+    varying until 2026-09-05, measured at 6326337 and correct there; the
+    five-branch merge to dccc3b0 moved pt-v18's level by +1.76 held and
+    +1.74 varying while leaving pt-v16 bit-identical to four places. The
+    control that established it re-ran the old pin and changed nothing
+    else (`wsc-control3`, and the account in the design repository's
+    `programme/default-gates.md`). pt-v16 is unmoved because the merge's
+    five branches added their dials at inert defaults; pt-v18 turns
+    several of them on.
 
     # Which horizon
 

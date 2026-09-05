@@ -137,8 +137,16 @@ CERTIFIED: dict[str, float] = {
 #: protocol rather than copied from an arm run on other seeds: seeds 101 to
 #: 130, 252 days, the roster varying with the seed, because a level that
 #: describes the MODEL cannot be measured on one draw. The same preset reads
-#: +1.9740 on a held roster, which passes nothing it does not also pass here
-#: but sits 3.3 points lower, so the protocol is part of the number.
+#: -16.7514 on a held roster (measured 2026-09-05 at dccc3b0, the same
+#: protocol and seeds), which passes nothing it does not also pass here but
+#: sits 3.11 points lower, so the protocol is part of the number.
+#:
+#: This line read "+1.9740 on a held roster ... 3.3 points lower" until
+#: 2026-09-05. Both figures are pt-v18's, not this preset's: +1.9740 was
+#: pt-v18 held at 6326337 and 3.3 was pt-v18's own protocol gap there. One
+#: sentence carrying two presets' provenance, and -13.6431 against +1.9740
+#: is 15.6 points rather than the 3.3 it claimed. See
+#: `facts._index_drift_pct` for the pin rule this is an instance of.
 CERTIFIED_LEVEL: dict[str, float] = {
     # The default preset loses 13.6 per cent a year while holding all
     # fourteen shape rows in band. That is the whole reason this row exists.
