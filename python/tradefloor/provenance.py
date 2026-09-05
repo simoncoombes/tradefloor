@@ -137,6 +137,95 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "source": "rust/src/params.rs, pt_v18, 'The one CHOSEN constant in "
                   "this era'",
     },
+    "sector_factor_sigma": {
+        # A DERIVATION EXISTS AND IT IS NOT FOR THIS VALUE. ws-b derived
+        # 0.01070690368 by inverting `excess = a + b*sigma^2` onto the real
+        # windows' median 0.164, measured residual -0.0016, form tested on a
+        # fourth point at -0.0037. pt-v16 and pt-v18 ship 0.008583053614.
+        # Those are different numbers, and a residual attaches to the value
+        # it was computed for.
+        #
+        # The design note adds a second reason not to promote it: it was
+        # derived on a model whose sector volatility does not run, so
+        # whether any value is needed is itself open.
+        "kind": "undetermined",
+        "presets": {"pt-v16": 0.008583053614, "pt-v18": 0.008583053614},
+        "what_would_determine_it": "the same inversion run against the "
+                                   "SHIPPED value, or the shipped value "
+                                   "replaced by the derived one. A residual "
+                                   "of -0.0016 is recorded for "
+                                   "0.01070690368 and says nothing about "
+                                   "0.008583053614",
+        "source": "programme/RESUME.md, ws-b's derived pair; the arm is not "
+                  "the shipped value",
+        "derivation_exists_for_another_value": 0.01070690368,
+    },
+    "garch_gamma": {
+        # No admissible derived value EXISTS, which is a stronger statement
+        # than "not yet derived" and is why this entry is worth writing.
+        # Derived from the real leverage effect the GJR asymmetry is 0.6548,
+        # which puts persistence at 1.0722 -- non-stationary, 1.28x the
+        # largest admissible value, and worse on the omega identity
+        # manifold at 1.039. Under either omega no stationary GJR asymmetry
+        # reproduces the real -0.042.
+        #
+        # So the shipped 0.18318536187800277 is a search optimum, and the
+        # thing that would derive it is currently proved not to exist.
+        "kind": "undetermined",
+        "presets": {"pt-v16": 0.18318536187800277,
+                    "pt-v18": 0.18318536187800277},
+        "what_would_determine_it": "a mechanism change that lets a "
+                                   "STATIONARY asymmetry reach the real "
+                                   "leverage effect of -0.042. Today the "
+                                   "derived value is 0.6548 at a "
+                                   "persistence of 1.0722, which "
+                                   "`ModelParams.check_stationary` refuses, "
+                                   "so no admissible derived value exists "
+                                   "and the shipped figure cannot be "
+                                   "reached by derivation",
+        "source": "programme/RESUME.md, ws-b's leverage-effect solve",
+        "no_admissible_derived_value": True,
+    },
+    "vix_return_gain_up": {
+        # THE DOCSTRING'S 2:1 IS REFUTED AND THE SHIPPED PAIR IS SYMMETRIC.
+        # The claim that the real up response is about half the down one
+        # had no series, window or estimator attached; the tape gives
+        # 2.070/2.440 = 0.848 at near-identical bucket sizes, so the up side
+        # is about 85 per cent of the down.
+        #
+        # And the pair that ships is 17.0/17.0 -- a DIAL ratio of 1.000,
+        # which every preset from pt-v9 carries. The design note's table
+        # labels 0.40 as "shipped"; 25.0/10.0 is pt-v1 through pt-v8. So the
+        # shipped dials sit on the far side of the tape figure from every
+        # candidate discussed, not between them.
+        #
+        # NOT CLAIMED: that the shipped RESPONSE ratio is 1.000. The gains
+        # feed a channel with a clamp and a target, so the dial ratio need
+        # not be the response ratio, and nobody has measured the shipped
+        # one.
+        "kind": "undetermined",
+        "presets": {"pt-v16": 17.0, "pt-v18": 17.0},
+        "what_would_determine_it": "the shipped pair's RESPONSE ratio at 2 "
+                                   "per cent, measured the way the tape's "
+                                   "0.848 was, and a value for this dial "
+                                   "that reproduces it. The tape figure "
+                                   "refutes the docstring's 0.5; it does "
+                                   "not derive 17.0, and the shipped dial "
+                                   "ratio of 1.000 has never been compared "
+                                   "with it",
+        "source": "programme/RESUME.md, ws-a's tape refutation at 98c5ac4",
+        "docstring_claim_refuted": "the real up response is about half the "
+                                   "down one; the tape says 0.848",
+    },
+    "market_vol_slow_gain": {
+        "kind": "undetermined",
+        "presets": {"pt-v16": 0.05, "pt-v18": 0.05},
+        "what_would_determine_it": "a measured slow-component gain. ws-b "
+                                   "withdrew this dial as undetermined "
+                                   "rather than deriving it; 0.05 is a "
+                                   "round number with no series behind it",
+        "source": "programme/RESUME.md, ws-b's withdrawal",
+    },
     "market_beta_down_asym": {
         # The dial's own docstring reads "0.0 -- every shipped preset -- is
         # bit-identical", and pt-v16 and pt-v18 both ship 0.025. Verified
@@ -166,6 +255,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: `market_vol_vix_anchor` at 15.98426471. A search optimum with decimal
 #: places is still a search optimum.
 #:
+#: NOT EVERY DIAL WITH A DEFECT IS IN THIS SET. `garch_omega` ships 2e-06 in
+#: every preset, so no required preset moves it off the baseline and it is
+#: out of scope here -- while the identity at `rust/src/market/garch.rs`
+#: puts the shipped value 18.4x short. A dial every preset gets equally
+#: wrong is a defect this list is not shaped to catch, because the list
+#: asks "what did we choose", not "what is right". It enters the set the
+#: moment a preset moves it.
+#:
 #: It shrinks when a workstream records a derivation and never grows without
 #: someone deciding it should. `tests/test_dial_provenance.py` asserts it as
 #: a SET in both directions, so a new dial fails until it is either given
@@ -183,7 +280,6 @@ UNPROVENANCED = (
     "endogenous_news_sigma",
     "garch_alpha",
     "garch_beta",
-    "garch_gamma",
     "garch_vix_coupling",
     "idio_sigma_scale",
     "jump_intensity_idio",
@@ -200,7 +296,6 @@ UNPROVENANCED = (
     "market_vol_alpha",
     "market_vol_beta",
     "market_vol_ceiling_multiple",
-    "market_vol_slow_gain",
     "market_vol_slow_persistence",
     "market_vol_slow_vix_damp",
     "market_vol_slow_weight",
@@ -214,7 +309,6 @@ UNPROVENANCED = (
     "oil_opec_symmetry",
     "oil_seasonality_target",
     "qe_pe_gain",
-    "sector_factor_sigma",
     "sector_loading",
     "sector_loading_beta_slope",
     "sector_vix_coupling",
@@ -224,7 +318,6 @@ UNPROVENANCED = (
     "vix_realised_vol_weight",
     "vix_return_clamp",
     "vix_return_gain",
-    "vix_return_gain_up",
     "vix_return_source",
     "vix_target_shock_cap",
     "volume_innovation_sigma",
