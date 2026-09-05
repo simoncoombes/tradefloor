@@ -250,6 +250,61 @@ pub struct ModelParams {
     pub idio_sigma_beta_exponent: f64,
     /// Order-flow impact coefficient, before the informed fraction.
     pub order_flow_coefficient: f64,
+    /// Which participation law the order-flow impact multiplier follows.
+    ///
+    /// At 0.0, the shipped law unchanged: the multiplier is
+    /// `max(0.2, min(participation, 10) * 0.15)`. At 1.0 it is
+    /// `0.15 * participation` up to the knee at ten and
+    /// `1.5 * sqrt(participation / 10)` above it.
+    ///
+    /// A BRANCH at zero rather than a blend, so every preset that predates
+    /// this dial is bit-identical instead of owing anything to an argument
+    /// about arithmetic on a signed zero.
+    ///
+    /// THE CLOCK. Participation is a tick's total order volume over the
+    /// name's average MINUTE volume, which is its average DAILY volume over
+    /// 390, the minutes in a session. That is the only rate this dial
+    /// touches and its clock is the trading day, not the calendar one. The
+    /// 365-day economy never enters here.
+    ///
+    /// WHAT IS WRONG WITH THE SHIPPED LAW: it has three regimes, not two.
+    /// The floor and the linear term meet at exactly 4/3, because 0.15
+    /// times 4/3 is 0.2, so the shipped multiplier is the linear law
+    /// clamped at BOTH ends. Its elasticity in participation is 0 below
+    /// 4/3, 1 between 4/3 and 10, and 0 again above 10. The reported defect
+    /// was the ceiling; the floor is the same defect at the other end.
+    ///
+    /// WHAT THE MEASURED LAW IS. Below the knee, linear: Cont, Kukanov and
+    /// Stoikov (Journal of Financial Econometrics 12(1) 47-88, 2014) find
+    /// price change over short intervals linear in order-flow imbalance
+    /// with slope inversely proportional to depth, which is this function's
+    /// scale exactly. Above it, one half: Toth, Lemperiere, Deremble, de
+    /// Lataillade, Kockelkoren and Bouchaud (Physical Review X 1, 021006,
+    /// 2011) give the square root for orders large against available
+    /// volume, and Almgren, Thum, Hauptmann and Li (Risk 18(7) 58-62, 2005)
+    /// measure 0.6 on the same object. The two regimes are one law rather
+    /// than two findings to reconcile: Cont et al. derive the square root
+    /// from their own linear model by a scaling argument, in their own
+    /// abstract.
+    ///
+    /// NO NEW CONSTANT, WHICH IS THE POINT. 0.15 and 10 are the numbers
+    /// already in the source. The knee does not move, the two branches
+    /// agree at 1.5 where they meet, and the band between 4/3 and 10 is
+    /// unchanged to the bit. Only the two clamped tails differ and neither
+    /// carries a coefficient anyone could tune.
+    ///
+    /// WHAT IT DOES NOT CLAIM. It does not restate the DEPTH exponent.
+    /// `calculate_live_factors` multiplies this by `liquidity_factor`,
+    /// which divides by the same per-minute volume a second time, so impact
+    /// still falls as depth squared where the cited law gives depth. That
+    /// is a separate defect, issue #182, and this dial does not touch it.
+    ///
+    /// It also changes nothing in a run that injects no order flow.
+    /// `TickInputs.order_volumes` is the empty slice at every construction
+    /// site but the two `order_flow=` paths, and at zero volume the raw
+    /// imbalance is the literal `0.0`, whose product with either multiplier
+    /// is `+0.0`.
+    pub order_flow_impact_law: f64,
     /// Permanent (information) share of order-flow impact.
     pub informed_flow_fraction: f64,
     /// How fast endogenous inflation reverts toward its 2% target each
@@ -1945,6 +2000,7 @@ impl ModelParams {
             idio_sigma_scale: factor_vol::IDIO_SIGMA_SCALE,
             idio_sigma_beta_exponent: 0.0,
             order_flow_coefficient: factors::ORDER_FLOW_COEFFICIENT,
+            order_flow_impact_law: 0.0,
             informed_flow_fraction: factors::INFORMED_FLOW_FRACTION,
             inflation_reversion: crate::economy::INFLATION_MEAN_REVERSION,
             inflation_ceiling: crate::economy::INFLATION_CEILING,
@@ -3143,6 +3199,7 @@ impl ModelParams {
             "idio_sigma_scale" => self.idio_sigma_scale,
             "idio_sigma_beta_exponent" => self.idio_sigma_beta_exponent,
             "order_flow_coefficient" => self.order_flow_coefficient,
+            "order_flow_impact_law" => self.order_flow_impact_law,
             "inflation_ceiling" => self.inflation_ceiling,
             "inflation_floor" => self.inflation_floor,
             "inflation_reversion" => self.inflation_reversion,
@@ -3300,6 +3357,7 @@ impl ModelParams {
             "idio_sigma_scale" => out.idio_sigma_scale = value,
             "idio_sigma_beta_exponent" => out.idio_sigma_beta_exponent = value,
             "order_flow_coefficient" => out.order_flow_coefficient = value,
+            "order_flow_impact_law" => out.order_flow_impact_law = value,
             "inflation_ceiling" => out.inflation_ceiling = value,
             "inflation_floor" => out.inflation_floor = value,
             "inflation_reversion" => out.inflation_reversion = value,
@@ -3581,6 +3639,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "news_peer_weight_down",
         "news_sector_weight",
         "order_flow_coefficient",
+        "order_flow_impact_law",
         "overnight_variance_ratio",
         "price_breaker_fraction",
         "price_hard_cap",

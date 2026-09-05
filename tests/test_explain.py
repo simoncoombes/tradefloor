@@ -1510,7 +1510,8 @@ EXPECTED = {
                       "news_peer_vix_coupling", "endogenous_news_intensity",
                       "endogenous_news_sigma"), ()),
     "order_flow_impact": (("order_flow_coefficient",
-                           "informed_flow_fraction"), ("avg_volume",)),
+                           "informed_flow_fraction",
+                           "order_flow_impact_law"), ("avg_volume",)),
     "short_squeeze_effect": ((), ("short_interest", "last_daily_return")),
     "random_noise": (("idio_sigma_scale", "idio_sigma_beta_exponent",
                       "sector_loading", "sector_loading_beta_slope",
@@ -1560,8 +1561,20 @@ def test_every_declared_dial_is_a_model_param_that_its_rust_reads():
     # Exact, not a floor. A floor let nine of random_noise's ten dials be
     # dropped and still pass, because the table declares more than the
     # floor asked for.
-    # 42 since the overnight move's one dial joined.
-    assert declared == 42
+    #
+    # 41 to 43 across two changes that landed on separate branches and are
+    # both here: `order_flow_impact_law` joined the EXISTING
+    # order_flow_impact mechanism, taking it to three dials and adding no
+    # mechanism, and the overnight move arrived as a NEW mechanism
+    # carrying one. So the dial count takes both and the mechanism count
+    # takes only the second, 9 to 10. Counted off the merged table rather
+    # than added up from the two branches, each of which read 42 for a
+    # different reason.
+    #
+    # An exact count means a new dial fails here until it is declared,
+    # which is the point, so the number moving with a dial is correct
+    # rather than maintenance.
+    assert declared == 43
     assert sum(1 for m in ex.MECHANISMS if m.dials) == 10
 
 

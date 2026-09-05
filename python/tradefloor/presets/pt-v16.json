@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v16",
   "fingerprint": "pt-v16",
-  "coefficient_digest": "b33f607994392efab3484d2fda527972ed0177d5bff5e9b9d084d84e2f120eb1",
+  "coefficient_digest": "7b3af86c711b01fb8240b42df709d9d89f1b1ff1f73e0221520a77feb029a7a9",
   "coefficients": {
     "book_levels": 10.0,
     "buyback_payout_share": 0.0,
@@ -98,6 +98,7 @@
     "oil_seasonality_target": 0.0,
     "oil_supply_response": 0.0,
     "order_flow_coefficient": 50.0,
+    "order_flow_impact_law": 0.0,
     "overnight_variance_ratio": 0.0,
     "phillips_curve_coeff": 0.2,
     "price_breaker_fraction": 0.25,

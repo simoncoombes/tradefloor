@@ -46,7 +46,7 @@ use crate::params::ModelParams;
 use crate::rng::Rng;
 
 use super::factors::{
-    calculate_live_factors, order_imbalance, FactorCompany, LiveFactors, NewsEvent,
+    calculate_live_factors, order_imbalance_with, FactorCompany, LiveFactors, NewsEvent,
     SharedFactors,
 };
 use super::hours::{intraday_vol, intraday_volume, MarketStatus};
@@ -806,7 +806,12 @@ pub fn simulate_market_tick(
             .find(|(t, _)| t == &company.ticker)
             .map(|(_, v)| *v)
             .unwrap_or_default();
-        let imbalance = order_imbalance(vol.buy, vol.sell, company.stock.avg_volume);
+        // `_with`, so `order_flow_impact_law` selects the participation
+        // law. At 0.0 it delegates to `order_imbalance` unchanged, and a
+        // name with no injected flow reads a default `OrderVolume` and
+        // gets `+0.0` under either law.
+        let imbalance =
+            order_imbalance_with(p, vol.buy, vol.sell, company.stock.avg_volume);
 
         // DRAW SITE: one normal, inside the factor computation.
         rng.site(crate::rng::Site::FactorIdioZ, idx as u32);

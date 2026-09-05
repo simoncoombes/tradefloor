@@ -4,6 +4,9 @@
 
 **Every `Universe.random` roster re-rolls**; pin 0.6.2.
 
+**A settable law keeps order-flow impact responding past ten times average
+minute volume**: `order_flow_impact_law`.
+
 **A new preset, pt-v18, returns five first moments the model injected and
 grows fair value with nominal output**, taking the equal-weight index from
 -16.150 per cent a year to -0.340 on a roster six points dearer than the
@@ -132,6 +135,120 @@ negative; a reversed effect would read as "too weak" rather than "too
 high". Whether the sign prior outranks the excluded window is a ruling,
 recorded as open in the table and the test that used to present the
 exclusion as the data's own finding.
+
+### The participation law in order-flow impact
+
+The shipped multiplier is `max(0.2, min(participation, 10) * 0.15)`, and
+its elasticity in participation is zero below four thirds, one between
+four thirds and ten, and zero again above ten. The floor is not an
+independent constant: 0.15 times four thirds is 0.2, so the floor and the
+line meet and the shipped law is one line clamped at both ends. So the
+defect reported as saturation above ten times is wrong on both sides of
+the band, in opposite directions.
+
+`order_flow_impact_law` at 1.0 gives `0.15 * participation` up to the knee
+and `1.5 * sqrt(participation / 10)` above it. It adds no constant: both
+numbers are the ones already in the source, the knee does not move, the
+branches agree at 1.5 where they meet, and the band between the clamps is
+unchanged to the bit. Linear at this scale is Cont, Kukanov and Stoikov
+(Journal of Financial Econometrics 12(1) 47-88, 2014); the square root is
+Toth, Lemperiere, Deremble, de Lataillade, Kockelkoren and Bouchaud
+(Physical Review X 1, 021006, 2011), and Almgren, Thum, Hauptmann and Li
+(Risk 18(7) 58-62, 2005) measure 0.6 on the same object. The crossover is
+the first paper's own claim: they derive the square root from their
+linear model by a scaling argument, in their abstract.
+
+At 1.0 the dial unclamps that law at both ends and crosses it to a square
+root at the knee. It ships at 0.0, no preset turns it on, and the three
+known-answer digests do not move. The repair changes what the library
+tells a user a trade costs rather than what the market does, because the
+order-flow channel is reachable only through injected flow.
+
+Two limits. Where the repair's range ends is a property of the name, and
+past that point a quoted cost reports where the session breaker sits.
+
+Measured on two rosters, six names on seed 3 and twelve on seed 11, thirty
+seeds each, reading the accumulated `order_flow_impact` attribution before
+the cent grid and the breaker:
+
+| band | shipped | derived | measured law | derived |
+|---|---|---|---|---|
+| below four thirds | 0.000 | 0 | 1.000 | 1 |
+| four thirds to ten | 1.000 | 1 | 1.000 | 1 |
+| above ten | 0.000 | 0 | 0.500 | 0.5 |
+
+Both rosters give those six figures to three decimals. The realised
+`cost_bps` elasticity above the knee is 0.521 on the first roster and
+0.474 on the second against the same 0.5, and inside the band it reads
+0.882 and 0.776 against 1, so the price surface compresses the shock a
+little and the shock itself is exact.
+
+What that is worth to a caller: over the same thirty seeds the median cost
+of an order four hundred times a name's average minute volume is seven
+times what it was, and at twelve hundred times it is twelve times. Below
+the knee the change runs the other way and is mostly invisible, because a
+price is on a cent grid and the median cost of the smallest orders reads
+0.00 basis points under both laws.
+
+Nothing a graded row can see. The order-flow channel is reachable only
+through `TickInputs.order_volumes`, which is the empty slice at every
+construction site but the two `order_flow=` paths, so a certified run
+accumulates exactly zero through it: 360 attribution values across thirty
+seeds, worst absolute value 0.0. Thirty seeds of five days run under both
+laws are byte-identical across 2,808,000 bytes of price, and the ten-seed
+certified panel returns all sixteen statistics identical to the bit, 14 of
+14 in band either way. None of the graded rows measures an extreme in any
+case: they are moments, autocorrelations, correlations and median
+responses, and this lives at the tail of the size distribution.
+
+Where the range ends is a property of the instrument. `price_breaker_
+fraction` holds a name inside 25 per cent of its previous close and clamps
+the PRICE, so a railed run carries the same impact vector as any other
+railed run. On the thinnest name of a six-name roster the close moves
++13.412, +24.879 and +24.358 per cent at ten, a hundred and a thousand
+times average minute volume, so the second is at the bound and the third
+is the same place; every other name on that roster is clear.
+`mispricing_cap` is not what binds, with `s` at about three per cent of
+its 0.9.
+
+A large gross flow hides a net order less than it did. Cont, Kukanov and
+Stoikov have impact depending on the net imbalance and not on the gross it
+arrived inside; the shipped law divides the whole participation term back
+out above the knee, so gross size hides a net order almost completely.
+Median cost of a fixed net order on the thinnest name, thirty seeds, as the
+gross around it grows:
+
+| gross padding | shipped | measured |
+|---|---|---|
+| none | 1345.0 | 1345.0 |
+| one times minute volume | 1107.4 | 1219.3 |
+| ten times | 435.6 | 770.9 |
+| a hundred times | 60.7 | 284.5 |
+
+So burying a net order inside a hundredfold gross flow hides it by a factor
+of 22.2 under the shipped law and 4.7 under the measured one. The square
+root halves the exponent on gross size rather than removing it, so this
+moves toward the cited law without arriving at it.
+
+`flow_impact` is the surface where this change is legible. On `analyse` the
+book caps the fill at displayed depth and identical fills mean identical
+flow, so the book can bind before the cost law does. That bound is measured
+in `tradefloor/tca.py` on its own roster, where requests of twenty and a
+hundred times average minute volume both fill the same 483 shares, and this
+change does not move it.
+
+The arm here that meant to measure that came back empty and is not evidence
+for anything. Every order it placed was refused: it asked for a hundredth
+of a 44-million-share daily volume, about 43 million dollars, against
+`analyse`'s default cash of a million at two times leverage. Its 25 of 25
+runs identical compares two runs in which nothing traded, which is a zero
+measured where the phenomenon cannot occur.
+
+Depth is a separate defect and this does not touch it. `order_imbalance`
+already returns the dimensionless quantity the cited law works in, and
+`calculate_live_factors` then divides by the same per-minute volume again,
+so impact falls as depth squared where the cited law gives depth, which
+is issue #182 and needs a decision the sources do not supply.
 
 ### The graded level row and the split of the certified set
 

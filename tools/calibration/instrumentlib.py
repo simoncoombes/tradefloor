@@ -155,6 +155,14 @@ PARAM_SPECS: dict[str, dict] = {
     # earnings share of nominal output constant, which is the reading the
     # economy supports, and above it earnings outgrow output for ever.
     "earnings_nominal_growth": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # A SWITCH, not a degree, and the box is [0, 1] only because the
+    # registry needs one. The branch is at zero and every nonzero value
+    # selects the same measured law, so this axis has two levels and a
+    # search over it reports a step rather than a gradient. Deliberate:
+    # the exponents either side of the knee are read off the cited
+    # measurements, not fitted, and a tunable exponent is the defect
+    # this dial exists to remove.
+    "order_flow_impact_law": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
     # A SHARE of demand, so [0, 1]. Above 1.0 supply outruns demand every
     # day and inventory ramps upward instead of downward, which is the
     # defect inverted.

@@ -6,6 +6,9 @@ your trading is part of why that price happened. Here both worlds are
 runnable.
 """
 
+import math
+import struct
+
 import pytest
 
 import tradefloor
@@ -18,8 +21,8 @@ TRADED = UNIVERSE[0].ticker
 # perturbs the traded name's own state (its book, its maker inventory, its
 # variance path), and identical draws map through that perturbed state to a
 # per-seed divergence of several bps either way. At this flow size the
-# deterministic push is ALSO a few bps — `order_imbalance` floors at 0.2 for
-# any realistic participation, so raising the flow does not raise the push —
+# deterministic push is ALSO a few bps -- `order_imbalance` is pinned at one
+# of its clamps, so raising the flow does not raise the push --
 # which makes single-seed sign assertions a seed lottery. They passed by luck
 # before the 2026-08 market-factor recalibration re-rolled every trajectory
 # (at the old sigma, seed 6 already read -4 bps for a buyer). The direction
@@ -123,11 +126,13 @@ def test_bigger_size_costs_more():
     #
     # Measured on a THIN name, and at sizes three orders of magnitude apart,
     # because the size channel is narrow and bounded at both ends.
-    # `order_imbalance` multiplies the buy/sell ratio by
-    # `max(0.2, min(total / avg_minute_volume, 10) * 0.15)`, so size enters
-    # only through a multiplier that floors at 0.2 and saturates at 1.5. The
-    # whole size effect is a factor of 7.5, and it is spent by ten times the
-    # name's average minute volume.
+    # Under the SHIPPED law, `order_imbalance` multiplies the buy/sell ratio
+    # by `max(0.2, min(total / avg_minute_volume, 10) * 0.15)`, so size
+    # enters only through a multiplier that floors at 0.2 and saturates at
+    # 1.5. The whole size effect is a factor of 7.5 and it is spent by ten
+    # times the name's average minute volume. That is the default and it is
+    # what this test measures; `order_flow_impact_law` replaces both clamps
+    # with the measured law and widens the band without limit.
     #
     # This read `UNIVERSE[0]` at 1e6 against 8e6 shares until the universe
     # generator was reconciled to open a drawn roster at its own fair value.
@@ -152,11 +157,17 @@ def test_bigger_size_costs_more():
 def test_order_size_stops_mattering_once_the_imbalance_multiplier_saturates():
     """The bound on the test above, asserted rather than left implicit.
 
-    Impact is about PARTICIPATION and the participation term is capped, so
-    beyond ten times a name's average minute volume the model is indifferent
-    to size: a large order and an enormous one are the same order to it.
-    Worth pinning, because a transaction-cost figure read off this surface
-    at institutional size is reading a constant.
+    Impact is about PARTICIPATION and the SHIPPED participation term is
+    capped, so beyond ten times a name's average minute volume the default
+    is indifferent to size: a large order and an enormous one are the same
+    order to it. Worth pinning, because a transaction-cost figure read off
+    this surface at institutional size is reading a constant.
+
+    A property of the default and not of the model. Issue #166 is this
+    ceiling; `order_flow_impact_law` removes it, and the test below is the
+    same three sizes under the measured law. This one stays because the
+    default stays, and it will start failing on the day a preset turns the
+    law on -- which is the notice anyone reading a cost figure needs.
     """
     thin = min(UNIVERSE, key=lambda i: i.avg_volume)
     costs = [
@@ -180,6 +191,191 @@ def test_order_size_stops_mattering_once_the_imbalance_multiplier_saturates():
         order_flow={thin.ticker: (1e5, 9.9e4)}, ticks=390
     ).cost_bps(thin.ticker)
     assert lone > 100.0 * buried, (lone, buried)
+
+
+# The three tests below are one instrument and not three, and the pair in
+# the middle is the reason. `..._shock_follows_the_square_root...` reads the
+# attribution column, which is the law's own output; `..._breaker_binds...`
+# reads the price, which is the law's output after the clamps. On the gate
+# where the wiring first worked the first passed and the second failed, and
+# THAT is what said the clamp sits between them -- neither test says it
+# alone. A later pass that merges them into one "does size cost more" test
+# would delete the bracket and leave a suite that can see a broken law but
+# not where it broke.
+SHIPPED = "pt-v16"
+
+
+def _laws():
+    return (tradefloor.ModelParams.from_preset(SHIPPED),
+            tradefloor.ModelParams.from_preset(SHIPPED, order_flow_impact_law=1.0))
+
+
+def _thin_and_its_minute():
+    """The thinnest name and the denominator `order_imbalance` divides by.
+
+    Derived from the roster rather than written as round numbers, so a size
+    expressed in multiples of it lands where it is meant to whatever the
+    generator gives this universe. The daily average over 390, floored at
+    100 shares, which is the floor this name is actually on.
+    """
+    thin = min(UNIVERSE, key=lambda i: i.avg_volume)
+    return thin, max(thin.avg_volume / 390.0, 100.0)
+
+
+def _shock(model, ticker, size, seed=42, ticks=390):
+    """A day's accumulated ``order_flow_impact`` for one name.
+
+    The law's own output. It is read before the price breaker, the cent
+    grid and the price path, none of which it passes through, so a ratio
+    taken here is the law's ratio and not a session's. Every tick carries
+    the same flow, so the day is the tick's shock times the intraday scale
+    summed, and the scale is identical under both laws.
+    """
+    engine = tradefloor.Engine(seed=seed, universe=UNIVERSE, model=model)
+    engine.open_market()
+    engine.run_session(9, 30, 3, ticks, order_flow={ticker: (size, 0.0)})
+    engine.close_market()
+    raw = engine.attribution("order_flow_impact")
+    values = struct.unpack("<%dd" % (len(raw) // 8), raw)
+    return values[[i.ticker for i in UNIVERSE].index(ticker)]
+
+
+def test_the_shipped_law_cannot_tell_three_orders_apart_and_the_measured_one_can():
+    """Issue #166 as a deterministic contrast, with no statistic in the way.
+
+    Under the shipped law the three sizes produce byte-identical runs. The
+    participation term returns the same number for all three, so every
+    price on every tick matches and they are literally the same order to
+    the model. Under `order_flow_impact_law` they are three different runs.
+
+    Asserted on the whole impact vector rather than on a cost, because a
+    cost is a price difference, prices are on a cent grid, and a
+    single-seed inequality on a noisy statistic is how the original size
+    test came to compare one million shares against eight million and
+    measure a rounding.
+    """
+    # The MOST liquid name, not the thinnest, and the reason is the test
+    # below: on the thinnest name the corrected law moves the close past the
+    # 25 per cent session breaker, the price rails, and two railed runs are
+    # byte-identical for a reason that has nothing to do with the law. The
+    # most liquid name is the one furthest from that bound, and a thousand
+    # times ITS average minute volume is still deep in the tail because
+    # participation is relative to the name.
+    liquid = max(UNIVERSE, key=lambda i: i.avg_volume)
+    minute = max(liquid.avg_volume / 390.0, 100.0)
+    off, on = _laws()
+    sizes = (10.0 * minute, 100.0 * minute, 1000.0 * minute)
+
+    def runs(model):
+        return [tradefloor.flow_impact(
+            seed=42, universe=UNIVERSE, model=model,
+            order_flow={liquid.ticker: (size, 0.0)}, ticks=390,
+        ) for size in sizes]
+
+    shipped = runs(off)
+    assert (shipped[0].impact == shipped[1].impact == shipped[2].impact), (
+        "the shipped law is supposed to be indifferent to size up here")
+
+    measured = runs(on)
+    # Checked before the inequalities, so a roster that starts railing fails
+    # with the cause named rather than looking like the law stopped working.
+    at = measured[0].tickers.index(liquid.ticker)
+    for run in measured:
+        move = abs(run.impact[at]) / run.baseline[at]
+        assert move < 0.20, (
+            "this name now moves %.1f per cent and the breaker is at 25, so "
+            "these runs may be railing rather than following the law" % (move * 100))
+
+    impacts = [run.impact for run in measured]
+    assert impacts[0] != impacts[1]
+    assert impacts[1] != impacts[2]
+    assert impacts[0] != impacts[2]
+    # The smallest sits exactly on the knee, where the two laws meet, so the
+    # change is confined above it rather than applied everywhere.
+    assert impacts[0] == shipped[0].impact
+
+
+def test_the_measured_shock_follows_the_square_root_above_the_knee():
+    """The exponent itself, through the public surface rather than derived.
+
+    This is the assertion the pinned pair should have carried. It fails if
+    the exponent above the knee is zero, which is what the `min` gave, and
+    it fails at any other exponent including a merely higher ceiling.
+
+    The multiplier above the knee is `1.5 * sqrt(participation / 10)` and a
+    day's shock is proportional to it, so a hundredfold in size is a
+    tenfold in the shock and a tenfold in size is a sqrt(10).
+
+    The 1e-14 figure behind the tolerance is an EMULATION and not a
+    measurement of this law. It was taken on a build that did not carry the
+    dial, by scaling `order_flow_coefficient`, which multiplies the same
+    product by the same factor and is therefore the same arithmetic. It
+    establishes that the shock is proportional to the multiplier; it does
+    not establish that the multiplier is right, which is what the assertion
+    below is for. The tolerance is three orders looser than the figure.
+
+    DELIBERATELY IN THE TAIL. Ten, a hundred and a thousand times the
+    name's average minute volume are not typical orders, and that is the
+    point: the shipped law is least wrong at typical size, so a test there
+    would pass under both laws and be reading the body.
+    """
+    thin, minute = _thin_and_its_minute()
+    off, on = _laws()
+    multiples = (10.0, 100.0, 1000.0)
+    shipped = [_shock(off, thin.ticker, m * minute) for m in multiples]
+    measured = [_shock(on, thin.ticker, m * minute) for m in multiples]
+
+    assert shipped[0] == shipped[1] == shipped[2], shipped
+    assert measured[0] == shipped[0], (measured[0], shipped[0])
+    assert measured[1] / measured[0] == pytest.approx(math.sqrt(10.0), rel=1e-11)
+    assert measured[2] / measured[0] == pytest.approx(10.0, rel=1e-11)
+
+
+def test_above_the_knee_the_session_breaker_binds_before_the_cost_law_does():
+    """What the repair does NOT buy, pinned rather than left to be noticed.
+
+    The corrected law keeps charging for size, and on the thinnest name it
+    charges enough that the close rails the session breaker. So `cost_bps`
+    stops following the shock well before the shock stops growing, and a
+    reader comparing costs at institutional size on a thin name still sees
+    a surface that barely responds -- for a different reason, which is
+    worth naming.
+
+    The breaker clamps the PRICE, so it takes the impact vector with it and
+    not only the cost: two railed runs are byte-identical. Measured on the
+    thinnest name, `price_breaker_fraction` is 0.25 and the close moves
+    +13.412, +24.879 and +24.358 per cent at ten, a hundred and a thousand
+    times its average minute volume, so the second is already at the bound
+    and the third is the same place. `mispricing_cap` is not what binds:
+    `s` sits at about three per cent of its 0.9 there.
+
+    Asserted as the DISAGREEMENT between the two, not as either level, so
+    it stays true whatever the breaker is set to and does not pin a
+    measured result. The shipped law reaches the same place by a different
+    route, so this is the one property the repair does not change.
+
+    Found by EMULATION before any build carried the dial: scaling
+    `order_flow_coefficient` by sqrt(10) and by 10 is the same arithmetic
+    as the multiplier growing by those factors, and it gave 1341, 2488 and
+    2436 basis points where the law predicts a factor of 3.162 at each
+    step. The third is LOWER than the second. Those three numbers are the
+    emulation's and not this law's, which is why none of them is asserted
+    here.
+    """
+    thin, minute = _thin_and_its_minute()
+    _, on = _laws()
+    multiples = (10.0, 100.0, 1000.0)
+    shock = [_shock(on, thin.ticker, m * minute) for m in multiples]
+    cost = [tradefloor.flow_impact(
+        seed=42, universe=UNIVERSE, model=on,
+        order_flow={thin.ticker: (m * minute, 0.0)}, ticks=390,
+    ).cost_bps(thin.ticker) for m in multiples]
+
+    assert shock[0] < shock[1] < shock[2], shock
+    assert not (cost[0] < cost[1] < cost[2]), (
+        "the breaker is supposed to bind here; if the cost now tracks the "
+        "shock all the way up, this bound has moved and the write-up that "
+        "says the repair is capped above the knee is stale: %r" % (cost,))
 
 
 def test_the_two_worlds_differ_only_by_the_flow():

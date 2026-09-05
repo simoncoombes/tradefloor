@@ -1,10 +1,15 @@
 """Transaction cost analysis against a market where the trader never existed.
 
 Every number asserted here was measured first. The interesting ones are the
-counter-intuitive results — a negative shortfall on a round trip, a flat
-response above the saturation point — because those are where a user would
+counter-intuitive results -- a negative shortfall on a round trip, a flat
+response above the saturation point -- because those are where a user would
 otherwise assume the library was broken, or worse, assume it was right for the
 wrong reason.
+
+The flat response is the shipped default's, not the model's: see
+``order_flow_impact_law``. On this surface it is usually the book that
+binds first anyway, because ``analyse`` fills against displayed depth and
+identical fills mean identical flow.
 """
 
 import pytest
