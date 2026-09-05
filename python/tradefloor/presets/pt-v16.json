@@ -224,6 +224,92 @@
     "sector_excess_corr": 0.15791325865750708,
     "corr_persistence_acf1": 0.28646873190483535
   },
+  "panel_level": {
+    "rows": [
+      "index_drift_pct",
+      "fear_gauge_dn1",
+      "fear_gauge_dn3"
+    ],
+    "comparison_rule": "a level or crisis figure carries its protocol as part of its value. A figure measured with the roster held is never compared with a band, with a certified value, or with a figure from the roster-varying protocol: pt-v16 reads -16.7514 on index_drift_pct with roster 111 held and -13.6431 with the roster varying, so the protocol is worth more than most of the differences a reader would draw from the numbers",
+    "roster_varying": {
+      "protocol": "facts.LEVEL_PROTOCOL: Universe.random(40, seed=<seed>), roster varying",
+      "roster_per_seed": true,
+      "graded": true,
+      "seeds": [
+        101,
+        130
+      ],
+      "n_seeds": 30,
+      "days": 252,
+      "commit": "dccc3b0",
+      "package_version": "0.6.2",
+      "model_fingerprint": "pt-v16",
+      "index_drift_pct": {
+        "value": -13.643092896551307,
+        "estimator": "mean",
+        "n_seeds": 30,
+        "band": [
+          2.9,
+          11.9
+        ],
+        "distance": 16.543092896551308,
+        "in_band": false
+      },
+      "fear_gauge_dn1": {
+        "value": 0.9499890654690217,
+        "estimator": "median",
+        "n_seeds": 30,
+        "band": [
+          0.7,
+          4.03
+        ],
+        "distance": 0.0,
+        "in_band": true
+      },
+      "fear_gauge_dn3": {
+        "value": 1.9556904785119098,
+        "estimator": "pooled",
+        "pooled_sessions": 96,
+        "reporting_seeds": 15,
+        "band": [
+          2.6,
+          9.58
+        ],
+        "distance": 0.6443095214880903,
+        "in_band": false
+      }
+    },
+    "roster_held": {
+      "protocol": "Universe.random(40, seed=111) HELD, seeds 101-130",
+      "roster_per_seed": false,
+      "graded": false,
+      "seeds": [
+        101,
+        130
+      ],
+      "n_seeds": 30,
+      "days": 252,
+      "commit": "dccc3b0",
+      "package_version": "0.6.2",
+      "model_fingerprint": "pt-v16",
+      "index_drift_pct": {
+        "value": -16.751417720869952,
+        "estimator": "mean",
+        "n_seeds": 30
+      },
+      "fear_gauge_dn1": {
+        "value": 0.9190615135217106,
+        "estimator": "median",
+        "n_seeds": 30
+      },
+      "fear_gauge_dn3": {
+        "value": 1.9063644691034973,
+        "estimator": "pooled",
+        "pooled_sessions": 120,
+        "reporting_seeds": 20
+      }
+    }
+  },
   "in_band": {
     "252": 14,
     "504": 14,

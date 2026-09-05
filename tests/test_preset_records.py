@@ -190,6 +190,59 @@ def test_the_envelope_agrees_with_the_record_for_the_preset_it_certifies():
             )
 
 
+def test_the_envelope_and_the_record_agree_on_the_level_and_crisis_rows():
+    """The binding `CERTIFIED` had and the level and crisis rows did not.
+
+    `CERTIFIED` and `MEASURED_504` are tied to the committed record by the
+    test above, so neither can be re-typed at an era boundary and drift.
+    `CERTIFIED_LEVEL` and `CERTIFIED_CRISIS` were checked only for
+    MEMBERSHIP and for red/green DIRECTION -- never for value. That is the
+    same hole as a preset with no record, one level down: three published
+    figures with nothing holding them to a measurement.
+
+    They are bound here to `panel_level.roster_varying`, which is the
+    certified protocol, and the held reading beside it is asserted UNGRADED
+    -- a level figure from the other protocol is never compared with a band
+    (`facts.LEVEL_PROTOCOL["comparison_rule"]`).
+    """
+    from tradefloor.facts import CRISIS, LEVEL, LEVEL_PROTOCOL  # noqa: PLC0415
+
+    rec = load(RECORDS / f"{envelope.PRESET}.json")
+    block = rec.get("panel_level")
+    assert block, (
+        f"{envelope.PRESET} has no panel_level block, so nothing measured "
+        "backs CERTIFIED_LEVEL or CERTIFIED_CRISIS. Write one with "
+        "tools/presets/record.py --level-only"
+    )
+    varying, held = block["roster_varying"], block["roster_held"]
+    assert varying["graded"] and varying["roster_per_seed"], varying
+    assert not held["graded"] and not held["roster_per_seed"], (
+        "the held-roster reading is marked graded; the bands belong to the "
+        "roster-varying protocol and a held figure carries no verdict"
+    )
+    assert varying["n_seeds"] == len(LEVEL_PROTOCOL["seeds"])
+    assert varying["days"] == LEVEL_PROTOCOL["days"]
+    assert block["comparison_rule"] == LEVEL_PROTOCOL["comparison_rule"]
+    assert set(block["rows"]) == set(LEVEL) | set(CRISIS)
+
+    published = dict(envelope.CERTIFIED_LEVEL, **envelope.CERTIFIED_CRISIS)
+    assert set(published) <= set(block["rows"])
+    for stat, value in published.items():
+        measured = varying[stat]["value"]
+        assert value == pytest.approx(measured, abs=10 ** -PLACES), (
+            f"envelope publishes {stat}={value} for {envelope.PRESET}, the "
+            f"record measured {measured} on the certified protocol"
+        )
+        # The held reading carries no verdict, so it cannot be mistaken for
+        # this one.
+        assert "band" not in held[stat], stat
+
+    # A measured figure names the commit it was measured at, because a level
+    # figure with no pin cannot be checked -- pt-v18's went stale exactly
+    # that way.
+    assert varying["commit"] and held["commit"], block
+
+
 def test_the_envelope_and_the_record_agree_on_the_band_count():
     rec = load(RECORDS / f"{envelope.PRESET}.json")
     assert rec["in_band"]["252"] == len(envelope.CERTIFIED)

@@ -333,6 +333,13 @@ def main() -> int:
     ap.add_argument("--mechanisms", action="store_true",
                     help="rewrite only the mechanism set of every committed "
                          "record from the build's coefficients; no panel needed")
+    ap.add_argument("--level-only", action="store_true", dest="level_only",
+                    help="add or replace ONLY the panel_level block on the "
+                         "committed records, from --level artefacts; no "
+                         "panel needed. For a level measurement that lands "
+                         "after a preset's panel, which is every one of them "
+                         "so far, and it leaves every measured block byte "
+                         "for byte as it is")
     ap.add_argument("--coefficients", action="store_true",
                     help="rewrite only the coefficient vector and its digest "
                          "on every committed record, from the build; no panel "
@@ -344,6 +351,8 @@ def main() -> int:
         return write_mechanisms()
     if args.coefficients:
         return write_coefficients()
+    if args.level_only:
+        return write_level(load_level(args.level))
 
     import tradefloor
 
@@ -456,6 +465,52 @@ def write_coefficients() -> int:
         added = sorted(set(values) - set(before))
         print(f"  wrote {path.relative_to(ROOT)}"
               + (f"  (+{', '.join(added)})" if added else ""))
+    return 0
+
+
+def write_level(level: dict[str, dict]) -> int:
+    """Set `panel_level` on the named records and touch nothing else.
+
+    A level measurement arrives on its own protocol and its own run, after
+    the preset's panel and often months after -- pt-v16's panel is from
+    0.6.0 and its level rows were measured on 2026-09-04. Demanding
+    `--panel` to record them would mean re-measuring twenty-six seed blocks
+    to write down a number that has nothing to do with them.
+
+    So this takes the level artefacts alone. Every other field is read and
+    written back unchanged, and the block is inserted after `panel_504` so
+    a record reads in the order it was measured.
+    """
+    if not level:
+        print("  --level-only needs at least one --level artefact")
+        return 1
+    written = 0
+    for name, arts in sorted(level.items()):
+        path = OUT / f"{name}.json"
+        if not path.exists():
+            print(f"  REFUSED {name}: no committed record to add a "
+                  "panel_level to; write the record first")
+            return 1
+        record = json.loads(path.read_text(encoding="utf-8"))
+        block = level_block(arts)
+        ordered = {}
+        for key, value in record.items():
+            if key == "panel_level":
+                continue  # re-inserted in its place below
+            ordered[key] = value
+            if key == "panel_504":
+                ordered["panel_level"] = block
+        if "panel_level" not in ordered:
+            ordered["panel_level"] = block
+        path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8", newline="\n")
+        varying = block["roster_varying"]
+        print(f"  wrote {path.relative_to(ROOT)}  panel_level: "
+              + ", ".join(
+                  f"{row} {varying[row]['value']:+.4f}"
+                  for row in block["rows"] if varying.get(row)))
+        written += 1
+    print(f"{written} record(s) updated")
     return 0
 
 
