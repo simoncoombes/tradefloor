@@ -30,6 +30,11 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shadow"))
 import data  # noqa: E402
 
+# The panel's band rule, from the one place that defines it. This tool once
+# carried its own copy, median-centred, while the test helper trimmed around
+# the mean; the two agreed on every fear band and disagreed elsewhere.
+from tradefloor.facts import shared_rule  # noqa: E402
+
 END = "2026-09-03"
 THRESHOLDS = {"dn1": -1.0, "dn3": -3.0, "dn5": -5.0}
 PANEL_START = "2015-07-01"
@@ -62,14 +67,6 @@ def windows_from(rows, start, count, length=252):
         out.append(rows[i:i + length])
         i += length
     return out
-
-
-def shared_rule(values):
-    """[min - s, max + s], s the sd with the most extreme window dropped."""
-    med = statistics.median(values)
-    trimmed = sorted(values, key=lambda x: abs(x - med))[:-1]
-    s = statistics.stdev(trimmed) if len(trimmed) > 1 else 0.0
-    return (min(values) - s, max(values) + s, s)
 
 
 def main():

@@ -98,6 +98,41 @@ above zero because a gap carries no volume against it. No preset carries
 the dial; the response curve is in the design repository's
 `programme/overnight-process.md`.
 
+### One band rule with a named centre
+
+REALISM-BANDS.md's rule for a window-derived band drops "the single most
+extreme window" before taking the noise scale, and never said from what.
+Two implementations answered differently: the fear and overnight band tools
+trimmed around the median of the windows, the leave-one-window-out test and
+the 505-bar tool around the mean. On every band both had produced the two
+agreed except two edges, the 252-bar `cross_sectional_corr` floor and the
+505-bar `sector_excess_corr` ceiling, and both shipped edges are the
+median's. The median is also the centre the trim's purpose needs, since a
+mean is pulled toward the member the trim is meant to drop. So
+`facts.BAND_RULE` now states the rule with its centre, `facts.trimmed_sd`,
+`shared_rule`, `round_outward` and `band_from_windows` implement it once,
+and `fear_band.py` and the test import them, with no shipped band moving.
+
+The band step is now derivable. Seven of ten shipped 252-bar bands did not
+come out of the rule applied to `REAL_MARKETS_WINDOWS`, because the rule's
+outward rounding and the design note's named literature moves lived only
+in prose. `facts.REAL_MARKETS_ADJUSTMENTS` records the three moves as data,
+each with its edge, direction and source: the volatility ceiling moved
+outward to 36, the clustering floor clamped inward to 0.02, and the
+leverage ceiling clamped inward to 0.00. A test derives every derivable
+band as the rule plus its named adjustment, refuses an adjustment that
+moves nothing or claims the wrong direction, and the six rows with no
+entry must ship the rule's band exactly.
+
+The leverage clamp's cost is stated rather than argued away. The 2020-07
+window of the reference panel reads +0.014, inside the rule's ceiling of
++0.06 and outside the clamped 0.00, so the clamp rejects one real year
+in nine. No current verdict turns on it, every certified reading being
+negative; a reversed effect would read as "too weak" rather than "too
+high". Whether the sign prior outranks the excluded window is a ruling,
+recorded as open in the table and the test that used to present the
+exclusion as the data's own finding.
+
 ### The graded level row and the split of the certified set
 
 The panel's first moment, `index_drift_pct`, was measured and reported
