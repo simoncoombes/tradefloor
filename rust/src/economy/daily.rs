@@ -1768,15 +1768,26 @@ mod vix_return_shape {
     /// `1.003/c * |r|^1.200` and the realised response back on the fit.
     /// Asserted to floating-point tolerance, because this is an identity
     /// about the code and not a measurement.
+    ///
+    /// **`c` CANCELS, and the test says so by varying it.** The first
+    /// version pinned one value, 0.03138, which was the transmission
+    /// measured on a VIX level since found to be 1.232x too low. Nothing
+    /// went wrong -- the constant cancels between the scale and the
+    /// response -- but a stale measured figure standing alone in a test
+    /// reads as though the test depended on it, and the next reader has
+    /// to derive the cancellation to find out that it does not. Three
+    /// values spanning the compressed level, the corrected one and a
+    /// number belonging to neither make the independence the assertion.
     #[test]
     fn the_derived_scale_reproduces_the_fitted_curve() {
-        const C: f64 = 0.03138;
-        let scale = 1.003 / C;
-        for &r in &[0.710, 1.211, 1.704, 2.234, 2.746, 3.360, 4.415, 6.390] {
-            let realised = C * return_spike_for(-r, scale, scale / 2.0, 1.200);
-            let want = 1.003 * mathx::pow(r, 1.200);
-            assert!((realised - want).abs() < 1e-9,
-                    "bucket {r}: realised {realised}, fit {want}");
+        for &c in &[0.03138, 0.0600, 0.25] {
+            let scale = 1.003 / c;
+            for &r in &[0.710, 1.211, 1.704, 2.234, 2.746, 3.360, 4.415, 6.390] {
+                let realised = c * return_spike_for(-r, scale, scale / 2.0, 1.200);
+                let want = 1.003 * mathx::pow(r, 1.200);
+                assert!((realised - want).abs() < 1e-9,
+                        "c {c}, bucket {r}: realised {realised}, fit {want}");
+            }
         }
     }
 
