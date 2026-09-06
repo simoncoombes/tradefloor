@@ -32,6 +32,16 @@ standing warning on the realism page:
                 against the six gate_pick screens on: trap 15, where a six-seed
                 read called pt-v10 13/14 and thirty called it 14/14 because
                 corr_persistence_acf1 has an across-seed sd of 0.28.
+
+Both 252-day cells now keep their PER-SEED panels and carry a mechanism
+certificate beside the band count (`envelope.certify`). The band count answers
+"could a real year read this" and cannot answer "is a model without the
+mechanism excluded" -- on five of the fourteen rows the band contains the
+mechanism-absent reading outright -- and the second question needs the
+per-seed readings rather than their median, so the aggregation that used to
+happen here threw away the only thing that could answer it. The two cells
+differ in which seeds they draw, so a mechanism verdict that holds on one and
+not the other is trap 15 in the second count.
   crisis_lever  annualised volatility under a held VIX 65 divided by the same
                 under a held VIX 5, on the CERTIFIED roster over 252 days at
                 thirty seeds. This is deliberately NOT scenario_response's
@@ -191,6 +201,12 @@ def main() -> None:
         lo = _median_panel(collected[("lever_lo", preset)])
         hi = _median_panel(collected[("lever_hi", preset)])
 
+        # The mechanism certificate, from the per-seed panels rather than
+        # from their median. Both 252-day cells, because the count that
+        # matters is per protocol and not per preset.
+        cert252 = envelope.certify(collected[("panel_252", preset)])
+        certhos = envelope.certify(collected[("heldout_seeds", preset)])
+
         n252, miss252 = _count_in_band(p252, facts.REAL_MARKETS)
         n504, miss504 = _count_in_band(p504, facts.REAL_MARKETS_504)
         nhou, misshou = _count_in_band(phou, facts.REAL_MARKETS)
@@ -203,16 +219,29 @@ def main() -> None:
             "in_band_504": n504, "misses_504": miss504,
             "in_band_heldout_universe": nhou, "misses_heldout_universe": misshou,
             "in_band_heldout_seeds": nhos, "misses_heldout_seeds": misshos,
+            "mechanism_252": envelope.certification_record(cert252),
+            "mechanism_heldout_seeds": envelope.certification_record(certhos),
+            # Kept so the certificate above is re-derivable from this
+            # artefact alone: a count without the readings under it is an
+            # assertion, and this is the file a committed record is built
+            # from.
+            "per_seed_252": collected[("panel_252", preset)],
+            "per_seed_heldout_seeds": collected[("heldout_seeds", preset)],
             "annualised_vol_pct": p252["annualised_vol_pct"],
             "vol_at_vix_5": lo["annualised_vol_pct"],
             "vol_at_vix_65": hi["annualised_vol_pct"],
             "crisis_lever": hi["annualised_vol_pct"] / lo["annualised_vol_pct"],
         }
         r = results[preset]
+        mc = r["mechanism_252"]["counts"]
         print(f"{preset:8s} 252:{n252:2d}/14  504:{n504:2d}/14  "
               f"hoU:{nhou:2d}/14  hoS:{nhos:2d}/14  "
               f"vol:{r['annualised_vol_pct']:5.1f}%  "
-              f"lever:{r['crisis_lever']:.2f}x", flush=True)
+              f"lever:{r['crisis_lever']:.2f}x  "
+              f"mech:{mc['mechanism_shown']:2d}/{mc['mechanism_of']}  "
+              f"centre:{mc['at_centre']:2d}/{mc['at_centre_of']}"
+              + (f"  REVERSED:{','.join(r['mechanism_252']['reversed'])}"
+                 if r["mechanism_252"]["reversed"] else ""), flush=True)
 
     out = {
         "pretium_version": tradefloor.version(),
@@ -237,6 +266,13 @@ def main() -> None:
                 f"{LEVER_LO:.0f}, certified roster, 252 days, thirty seeds"
             ),
             "real_crisis_lever": REAL_LEVER,
+            "mechanism": (
+                "facts.mechanism_verdict per row on the per-seed panels of "
+                "the cell: an exact sign test against the row's "
+                "mechanism-absent reading (facts.NULLS) at the cut the "
+                "band's own false-alarm rate gives (facts.sign_cut). Three "
+                "counts, never one: in band, mechanism shown, at real centre"
+            ),
         },
         "presets": results,
     }

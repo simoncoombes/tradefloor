@@ -17,11 +17,25 @@ band is the same defect as an unreproducible figure, one level up.
 
 ## The headline
 
-**At 252 days the default preset holds all fourteen statistics in band. At
-504 days, against bands re-derived at that window, it holds thirteen.** The
-one that misses is `volume_change_acf1`, whose two-year band is tighter than
-its one-year band. This headline read seven of fourteen at 504 days until
-the 2026-08-26 era boundary moved the default from pt-v3 to pt-v10.
+**At 252 days the default preset holds all fourteen statistics in band, and
+at 504 days, against bands re-derived at that window, all fourteen again.**
+The committed record `python/tradefloor/presets/pt-v16.json` is what says so
+and `tests/test_preset_records.py` holds `envelope.CERTIFIED` and
+`MEASURED_504` to it. This headline read "thirteen at 504, the one that
+misses is `volume_change_acf1`" until 2026-09-05: that described pt-v10 and
+pt-v11, whose miss `pt-v12`'s `volume_move_cap` closed on 2026-08-26, and it
+survived two era boundaries because nothing tested a sentence.
+
+**And fourteen of fourteen answers ONE question: could a real YEAR read
+these numbers.** It does not answer whether the mechanisms the rows are named
+for are present, and on five of the fourteen it cannot: `BAND_RULE` builds a
+prediction interval for one real year and the panel grades a thirty-seed
+median about five times more precisely than that, so the band contains the
+mechanism-absent reading on `abs_return_acf20`, `leverage_effect`,
+`corr_asymmetry`, `corr_asymmetry_lagged` and `corr_persistence_acf1`. A
+mechanism-absent null model passes three of those bands with probability
+1.000. That is what `NULLS`, `mechanism_verdict` and `envelope.certify` are
+for, and why a certificate here is THREE counts and not one.
 
 Two eras of caveats attach. First, the 2026-08 model changes (the GJR
 asymmetry term, conditional volatility on the shared market factor, that
@@ -332,7 +346,9 @@ be re-checked rather than inherited.
 
 from __future__ import annotations
 
+import functools
 import math
+import random
 import statistics
 import textwrap
 from typing import Any, Iterable, Mapping, Sequence
@@ -369,9 +385,13 @@ REAL_MARKETS = {
     "corr_asymmetry_lagged": (-0.20, 0.55),
     "sector_excess_corr": (0.11, 0.23),
     # Correlation persistence: acf1 of mean pairwise correlation over
-    # non-overlapping 21-day sub-windows. Twelve sub-windows at 252 days,
-    # and the real windows themselves scatter from -0.05 to +0.40, so this
-    # band admits everything and says so; the 504-day band is the ruler.
+    # non-overlapping 21-day sub-windows. ELEVEN sub-windows at 252 model
+    # days (`sub_window_count`; this comment read twelve, which is the BAR
+    # count), and the real windows themselves scatter from -0.05 to +0.40,
+    # so this band admits everything and says so. What certifies the row at
+    # 252 days is the mechanism gate against the estimator's own null of
+    # -0.09 (`NULLS`), not a longer window: both presets read 22 to 24 of
+    # thirty seeds on the real side there.
     "corr_persistence_acf1": (-0.19, 0.54),
     # The LEVEL row, graded from 2026-09-03. Annualised return of the
     # daily-rebalanced equal-weight portfolio, percent a year, a price
@@ -420,6 +440,16 @@ REAL_MARKETS = {
 #: figures otherwise. Literature reconciliation may move an edge OUTWARD
 #: to a retrieved, horizon-compatible value; the two INWARD clamps are
 #: named on their rows. "windows" is (min, median, max) over the nine.
+#: The sentence every row whose band cannot fail a mechanism-absent model
+#: carries, under `admits_the_null`. One fact about the band RULE rather
+#: than five observations about five rows, so it is written once.
+_BAND_ADMITS_NULL = (
+    "the band admits its own null: it contains the reading of a model "
+    "WITHOUT this mechanism, so no band verdict on this row can fail one. "
+    "What certifies the mechanism is the sign test in `NULLS` and "
+    "`mechanism_verdict`; the band answers fidelity alone. "
+)
+
 REAL_MARKETS_PROVENANCE = {
     "annualised_vol_pct": {
         "claim": "pooled across-name annualised daily vol of a 40-stock "
@@ -559,6 +589,13 @@ REAL_MARKETS_PROVENANCE = {
         "derivation": "mechanical from the windows",
         "comparability": "argued as for lag 1",
         "supersedes": None,
+        "admits_the_null": _BAND_ADMITS_NULL + (
+            "Measured: a null model's thirty-seed median passes this band "
+            "with probability 1.000, and the band's null-side edge sits 4.2 "
+            "model standard errors on the far side of zero. This row is also "
+            "the one the gate does not COUNT at 252 days "
+            "(MECHANISM_DIAGNOSTIC): the real within-year effect is inside "
+            "real year-to-year noise on the longer record."),
     },
     "cross_sectional_corr": {
         "claim": "mean pairwise correlation of daily returns across a "
@@ -624,6 +661,12 @@ REAL_MARKETS_PROVENANCE = {
                          "effect in real data; index-level and "
                          "parametric-model magnitudes do not band it",
         "supersedes": (-0.30, -0.10),
+        "admits_the_null": _BAND_ADMITS_NULL + (
+            "Here the inward clamp puts the ceiling EXACTLY on the null, so a "
+            "null model's median passes this band with probability 0.50 -- a "
+            "coin flip, measured. Under the mechanism gate the clamp decides "
+            "the fidelity wording and the gate does the excluding, which is "
+            "what the clamp's own ruling asked of it."),
     },
     "volume_change_acf1": {
         "claim": "median across names of the lag-1 autocorrelation of "
@@ -660,6 +703,13 @@ REAL_MARKETS_PROVENANCE = {
             "no literature reconciliation applied, the record carries no "
             "verified exceedance-correlation number for single stocks",
         ),
+        "admits_the_null": _BAND_ADMITS_NULL + (
+            "Measured: a null model passes this band with probability 1.000 "
+            "and the null-side edge sits 12 model standard errors beyond "
+            "zero. It is also the weakest real fact on the panel -- 2.1 "
+            "across-window standard errors over nine windows, with four of "
+            "the nine negative -- so a verdict here is worth less than the "
+            "same verdict elsewhere."),
     },
     "corr_asymmetry_lagged": {
         "claim": "as corr_asymmetry, conditioned on the previous day's "
@@ -669,11 +719,25 @@ REAL_MARKETS_PROVENANCE = {
         "sources": (
             "tradefloor-design/realism_bands_reference_panel.py, run 2026-08-25",
         ),
+        "admits_the_null": _BAND_ADMITS_NULL + (
+            "Measured: a null model passes this band with probability 1.000 "
+            "and the null-side edge sits 10 model standard errors beyond "
+            "zero. The band admits more than the null on this row: the "
+            "shipped default reads the effect BACKWARDS -- real names co-move "
+            "MORE the day after a market fall, +0.111 in eight of nine "
+            "windows, and the model reads -0.064 with 25 of 30 seeds on the "
+            "wrong side -- and (-0.20, 0.55) admits that with room. The "
+            "mechanism gate reads it REVERSED."),
     },
     "sector_excess_corr": {
         "claim": "mean same-sector pairwise correlation minus mean cross-sector, "
                  "GICS labels for the same 40 names, 252-day windows 2015-2025",
-        "windows": (0.133, 0.164, 0.200),
+        # The maximum read 0.200 until 2026-09-05, when the per-window
+        # readings joined REAL_MARKETS_WINDOWS and the nine non-crisis
+        # windows put it at 0.199462. The 0.200 was the prose's "sits
+        # between +0.10 and +0.20" carried into the triple; the band does
+        # not move, because 0.1995 + s and 0.200 + s both round up to 0.23.
+        "windows": (0.133, 0.164, 0.199),
         "crisis_window": 0.103,
         "sources": (
             "tradefloor-design/realism_bands_reference_panel.py, run 2026-08-25. "
@@ -692,6 +756,14 @@ REAL_MARKETS_PROVENANCE = {
             "same roster and estimator as facts.measure; the 252-day band is "
             "wide enough to admit every preset and is recorded as such.",
         ),
+        "admits_the_null": _BAND_ADMITS_NULL + (
+            "Measured: a null model passes this band with probability 0.92. "
+            "The null here is not zero but the ESTIMATOR's own small-sample "
+            "median, -0.09 at eleven sub-windows, and against that null both "
+            "presets are shown at 252 days on 22 to 24 of thirty seeds -- so "
+            "the row does not need a 504-day window, and the earlier "
+            "recommendation to move it there was a repair of the band's "
+            "form."),
     },
     # The level row's band is a LONG-RUN MEAN and not a window range, so
     # `windows` carries the three inputs to the centre instead of a window
@@ -802,15 +874,27 @@ REAL_MARKETS_PROVENANCE = {
 #: `tests/test_reference_windows.py` derives all nine reproducible triples
 #: from this table rather than trusting that they match.
 #:
-#: TEN ROWS OF FOURTEEN. The four correlation-structure rows -- corr_asymmetry,
-#: corr_asymmetry_lagged, sector_excess_corr and corr_persistence_acf1 -- have
-#: no per-window record here, and `abs_return_acf5`'s provenance summarises a
-#: different window set from this one, so its triple is not derivable from
-#: these values and the test excludes it by name rather than by tolerance.
+#: FOURTEEN ROWS OF FOURTEEN since 2026-09-05. The four correlation-structure
+#: rows -- corr_asymmetry, corr_asymmetry_lagged, sector_excess_corr and
+#: corr_persistence_acf1 -- had no per-window record here until the mechanism
+#: gate needed the DISPERSION of a row across real years and not only its
+#: centre: `facts.real_centre_se` cannot be derived from a min, a median and a
+#: max, and reading one off the band edges would recover an interval a
+#: rounding quantum wide and call it a number. The four rows below are the
+#: readings the same run already held, at the same ten windows, the same
+#: crisis index and the same estimators; each of their shipped bands
+#: re-derives from them by `band_from_windows` with no adjustment, which is
+#: what `tests/test_reference_windows.py` now checks for all fourteen.
+#: `abs_return_acf5`'s provenance TRIPLE still summarises a different window
+#: set from this one, so that triple is not derivable from these values and
+#: the test excludes it by name rather than by tolerance -- the row's
+#: per-window readings here are this window set's, and its centre and
+#: dispersion come from them.
 #:
 #: What this unblocks: any re-derivation of a band, a leave-one-window-out
 #: null of the panel against real data, and any method that needs the
-#: dispersion of a statistic across real years rather than its range.
+#: dispersion of a statistic across real years rather than its range -- which
+#: is what the mechanism gate's centre diagnostic needs on every row.
 REAL_MARKETS_WINDOWS = {
     "windows": (
         "2015-07..2016-07", "2016-07..2017-07", "2017-07..2018-07",
@@ -820,6 +904,14 @@ REAL_MARKETS_WINDOWS = {
     ),
     #: Index into `windows` of the one excluded from every band derivation.
     "crisis_index": 4,
+    #: The horizon these readings were measured at, in trading days. Load
+    #: bearing: `real_centre_se` is the dispersion of a row across real years
+    #: AT THIS WINDOW LENGTH, and clustering and correlation persistence both
+    #: read two to six times higher over 504 bars, so scoring a 504-day model
+    #: median against these is the wrong-ruler error `envelope.score` exists
+    #: to prevent on the band side. `centre_distance` reads this rather than
+    #: assuming a year.
+    "horizon_days": 252,
     "roster": "40 US large caps, common to all ten windows",
     "source": "tradefloor-design/REALISM-BANDS.md, the window table",
     "values": {
@@ -833,6 +925,22 @@ REAL_MARKETS_WINDOWS = {
         "volume_abs_return_corr": (0.617, 0.616, 0.584, 0.527, 0.645, 0.544, 0.513, 0.502, 0.503, 0.536),
         "leverage_effect": (-0.109, -0.020, -0.087, -0.113, -0.128, 0.014, -0.038, -0.043, -0.007, -0.042),
         "volume_change_acf1": (-0.221, -0.242, -0.255, -0.259, -0.284, -0.266, -0.238, -0.296, -0.263, -0.239),
+        # The four correlation-structure rows, added 2026-09-05 from the same
+        # measurements the triples above summarise. The first three come from
+        # tradefloor-design/real_panel_results.json (retrieved 2026-08-25, the
+        # ten windows in this table's order) and the fourth from
+        # tradefloor-design/real-corr-persistence-bands.json (retrieved
+        # 2026-08-25, `horizons.252.windows`, whose window labels and crisis
+        # flag match this table's row for row). SIX decimal places, not the
+        # two or three the rows above carry: at three, rounding the reading
+        # and then rounding again for the provenance triple disagrees with
+        # the triple in the last place on two of the four rows, and the
+        # triples are what `tests/test_reference_windows.py` derives from
+        # this table. Six re-derives all four bands and all four triples.
+        "corr_asymmetry": (0.083620, 0.111329, 0.347536, -0.154308, 0.167156, 0.130683, 0.083401, -0.005660, -0.021105, -0.026730),
+        "corr_asymmetry_lagged": (0.110982, 0.153005, 0.262461, 0.194994, 0.074015, 0.077962, -0.091566, 0.088895, 0.104868, 0.437507),
+        "sector_excess_corr": (0.151341, 0.187726, 0.145666, 0.133220, 0.103284, 0.193363, 0.199462, 0.177668, 0.151042, 0.163995),
+        "corr_persistence_acf1": (-0.030074, 0.228778, 0.345540, 0.287463, 0.374252, -0.049544, 0.122706, 0.402453, 0.197257, 0.277800),
     },
     #: Rows whose provenance triple this table does NOT reproduce, with why.
     "not_derivable": {
@@ -2165,13 +2273,27 @@ def _dependence(
             # non-overlapping 21-day windows, then the lag-1 autocorrelation
             # of that series. Real markets on the 40-name reference roster
             # read 0.388 with a half-life near fifteen days
-            # (tradefloor-design/real-corr-persistence.json, 126 windows). A
-            # model whose correlation is a lookup on today's VIX reads near
-            # zero here: the cross-section decouples the tick VIX falls.
+            # (tradefloor-design/real-corr-persistence.json, 126 windows).
             # Non-overlapping windows on purpose; overlapping ones
-            # manufacture persistence out of shared days. Twelve windows in
-            # a 252-day run is a noisy estimate per seed and is reported as a
-            # diagnostic rather than judged against a band.
+            # manufacture persistence out of shared days.
+            #
+            # ELEVEN windows in a 252-day run, not twelve: the returns above
+            # are differences of prices, so 252 bars give 251 returns and
+            # `251 // 21` whole sub-windows. `facts.sub_window_count` is that
+            # arithmetic and `facts.persistence_null` needs it, because the
+            # estimator's own null at eleven draws is -0.09 rather than zero.
+            # The comment here read "twelve" for two eras.
+            #
+            # This comment also read "a model whose correlation is a lookup
+            # on today's VIX reads near zero here: the cross-section
+            # decouples the tick VIX falls". That is REFUTED for this model:
+            # the arm with the VIX pinned at its anchor every day reads +0.15
+            # on thirty seeds, higher than the free arm's +0.13, and the
+            # paired difference across the same seeds is -0.006 with a t of
+            # -0.4 (tradefloor-design/programme/band-form-design.md 5f). So
+            # the row certifies that correlation varies WITH MEMORY and says
+            # nothing about which channel carries it; attributing it needs a
+            # constant-factor-variance arm, whose dial is not identified.
             n_windows = common // CORR_PERSISTENCE_WINDOW
             if n_windows >= 6:
                 per_window = []
@@ -2506,6 +2628,699 @@ def panel_statistics(
     return facts
 
 
+# --------------------------------------------------------------------------
+# The mechanism gate: the second half of one instrument
+# --------------------------------------------------------------------------
+
+#: How tolerant `BAND_RULE` is of a CORRECT reading, per window count.
+#:
+#: MEASURED, with its residual, because the rule's false-alarm rate is a
+#: property of the rule and not a matter of preference: draw `n` standard
+#: normal windows, build `[min - s, max + s]` with `trimmed_sd` exactly as
+#: `shared_rule` does, and ask how often a fresh draw from the same law
+#: falls outside. Nine windows -- the count every shipped 252-bar band rests
+#: on -- lets a correct reading out 6.49 per cent of the time.
+#: `band_rule_false_alarm` re-derives these live and
+#: `tests/test_mechanism_gate.py` holds the table to a re-derivation rather
+#: than to itself.
+#:
+#: This is the number the mechanism gate's cut is taken from (`sign_cut`),
+#: which is what keeps the cut from being chosen: the mechanism half of the
+#: instrument is exactly as tolerant of a correct model as the fidelity half
+#: already is. A row graded against a 504-day band is graded at THAT band's
+#: tolerance, which is two and a half times looser because five windows
+#: support it, and copying the 252 cut across would silently tighten it.
+BAND_RULE_TOLERANCE: dict[int, float] = {
+    4: 0.23998,
+    5: 0.16800,
+    7: 0.09730,
+    9: 0.06486,
+}
+
+BAND_RULE_TOLERANCE_PROVENANCE = {
+    "kind": "measured",
+    "claim": "the probability that a fresh reading from the same law falls "
+             "outside the band BAND_RULE builds from n readings of it",
+    "estimator": "facts.band_rule_false_alarm: n + 1 iid standard normal "
+                 "draws, the band from the first n by facts.shared_rule "
+                 "(unrounded, since rounding is per-row and outward), the "
+                 "verdict on the last",
+    "draws": 200_000,
+    "seed": 20260905,
+    "residual": "binomial standard error sqrt(p(1-p)/draws): 0.00055 at "
+                "nine windows, 0.00066 at seven, 0.00084 at five, 0.00095 "
+                "at four",
+    "window_counts": "nine is the non-crisis count behind every 252-bar "
+                     "band (REAL_MARKETS_WINDOWS, ten windows less the "
+                     "crisis one); five is the count behind the 504-bar "
+                     "bands and four behind the 504-bar persistence band "
+                     "(REAL_MARKETS_504)",
+    "source": "tradefloor-design/programme/band-form-design.md section 4 "
+              "and results/bandform-measured.md follow-up 7, 2026-09-05",
+    "unrounded_note": "the rate is measured on the UNROUNDED band. Outward "
+                      "rounding widens a shipped band by up to one quantum "
+                      "an edge, so a shipped band is at most this tolerant "
+                      "and the cut derived from it is at most this strict",
+}
+
+#: How many non-crisis real windows each band set rests on, which is what
+#: sets that band's own tolerance. The 504 entry is the count for thirteen
+#: of the fourteen rows; `corr_persistence_acf1` rests on four there, so a
+#: gate reads the count per row through `band_windows` rather than off this
+#: dict alone.
+BAND_WINDOWS: dict[int, int] = {252: 9, 504: 5}
+
+#: The one 504-bar band built on a different window count, and it is
+#: recorded in `REAL_MARKETS_504` beside the band itself.
+BAND_WINDOWS_EXCEPTIONS: dict[int, dict[str, int]] = {
+    504: {"corr_persistence_acf1": 4},
+}
+
+#: The sampling sd of a median over the mean's, for a large sample from a
+#: smooth law: sqrt(pi / 2). An identity, so it is written as one.
+MEDIAN_SE_FACTOR = math.sqrt(math.pi / 2)
+
+#: The mechanism-absent reading of each shape row -- what a model WITHOUT
+#: the mechanism the row is named for reads on it -- with how it was arrived
+#: at, in the three-word vocabulary this project grades a derivation by:
+#: `derived` from an identity, `measured` with a residual, or
+#: `undetermined`. A row whose null the run's own shape decides carries an
+#: `estimator` and no value, so no such number is typed here.
+#:
+#: Why a graded panel needs this at all. `BAND_RULE` builds
+#: `[min - s, max + s]` over the non-crisis real windows: a prediction
+#: interval for ONE real year, which a fresh correct year leaves 6.5 per
+#: cent of the time (`BAND_RULE_TOLERANCE`). The panel grades the MEDIAN of
+#: thirty seeds, whose sampling sd is about a quarter of one seed's, so the
+#: graded quantity is known about five times more precisely than the
+#: interval it is judged against -- and the interval was never built to
+#: exclude anything. It contains the mechanism-absent reading whenever the
+#: real effect at its weak end is within about one across-year sd of the
+#: null, and measured with each preset's own seed noise a null model's
+#: graded median passes the shipped band with probability 1.000 on
+#: `abs_return_acf20`, `corr_asymmetry` and `corr_asymmetry_lagged`, 0.92 on
+#: `corr_persistence_acf1` and 0.50 on `leverage_effect`.
+#:
+#: A band verdict answers "could a real year read this". It cannot also
+#: answer "is a model without the mechanism excluded", because one interval
+#: has one width and the two questions have different scales -- real
+#: across-year dispersion for the first, the protocol's own resolution at
+#: thirty seeds for the second. So the panel publishes THREE counts
+#: (`envelope.certify`) and this table is what the second is measured
+#: against. Source: tradefloor-design/programme/band-form-design.md,
+#: sections 2 and 3, 2026-09-05.
+NULLS: dict[str, dict[str, Any]] = {
+    "annualised_vol_pct": {
+        "value": None, "kind": "undetermined",
+        "derivation": "a level has no mechanism-absent reading: there is no "
+                      "model of this market that lacks volatility. The row "
+                      "is graded for fidelity and reported against the real "
+                      "centre, and it certifies no mechanism",
+    },
+    "excess_kurtosis": {
+        "value": 0.0, "kind": "derived",
+        "derivation": "Gaussian returns have zero excess kurtosis, so a "
+                      "model whose per-name returns are normal reads zero "
+                      "here whatever else it does",
+    },
+    "return_acf1": {
+        "value": 0.0, "kind": "derived",
+        "derivation": "independence of successive returns. This row is the "
+                      "one whose null IS the real value (-0.0055, half an "
+                      "across-window standard error from zero over nine "
+                      "windows), so the band certifies that the model is "
+                      "NOT distinguishable from independence and a sign "
+                      "test against zero would be a test for the ABSENCE "
+                      "of a mechanism, which is why the row is EQUIVALENCE "
+                      "and not MECHANISM",
+    },
+    "abs_return_acf1": {
+        "value": 0.0, "kind": "derived",
+        "derivation": "independence of |r| across days: with no variance "
+                      "memory the absolute returns are iid and every lag "
+                      "reads zero in expectation",
+    },
+    "abs_return_acf5": {
+        "value": 0.0, "kind": "derived",
+        "derivation": "as lag 1: independence of |r| across days",
+    },
+    "abs_return_acf20": {
+        "value": 0.0, "kind": "derived",
+        "derivation": "as lag 1: independence of |r| across days",
+    },
+    "cross_sectional_corr": {
+        "value": 0.0, "kind": "derived",
+        "derivation": "independence across names: with no shared factor the "
+                      "mean pairwise correlation is zero in expectation",
+    },
+    "volume_abs_return_corr": {
+        "value": 0.0, "kind": "derived",
+        "derivation": "independence of volume and |r|: with no channel from "
+                      "a move to the volume that answers it the correlation "
+                      "is zero in expectation",
+    },
+    "leverage_effect": {
+        "value": 0.0, "kind": "derived",
+        "derivation": "symmetric response. corr(r_t, |r_t+1|) is zero for "
+                      "any r_t = sigma_t z_t whose sigma reads only past "
+                      "SQUARES, because the sign of r_t then carries no "
+                      "information about |r_t+1| -- the Zumbach argument "
+                      "this module already states beside zumbach_asymmetry",
+    },
+    "volume_change_acf1": {
+        "value": None, "kind": "undetermined",
+        "derivation": "iid volume drives the change autocorrelation toward "
+                      "-0.5, but the exact value depends on the volume "
+                      "noise law and deriving it would take a simulation of "
+                      "that law. Not needed for any verdict: the row sits "
+                      "eleven frozen seed sd from -0.5, so it is graded for "
+                      "fidelity and against the real centre only",
+    },
+    "corr_asymmetry": {
+        "value": 0.0, "kind": "derived",
+        "derivation": "symmetric loading on the market factor: if names "
+                      "load on the factor the same way on down days as on "
+                      "up days, the difference of the two conditional mean "
+                      "correlations is zero in expectation",
+    },
+    "corr_asymmetry_lagged": {
+        "value": 0.0, "kind": "derived",
+        "derivation": "as corr_asymmetry, conditioned on the PREVIOUS day's "
+                      "market return instead of today's",
+    },
+    "sector_excess_corr": {
+        "value": 0.0, "kind": "derived",
+        "derivation": "no sector factor: with only a market factor the "
+                      "same-sector excess over the cross-sectional mean is "
+                      "zero in expectation",
+    },
+    "corr_persistence_acf1": {
+        "value": None, "kind": "measured", "estimator": "persistence_null",
+        "derivation": "the ESTIMATOR's own null, not zero. The row is the "
+                      "lag-1 autocorrelation of a short series of "
+                      "sub-window mean correlations, and _autocorrelation "
+                      "on N iid draws is biased below zero at small N: its "
+                      "median is about -0.094 at the eleven sub-windows a "
+                      "252-day run yields. The MEDIAN is the null a sign "
+                      "test needs, because that is the value each seed "
+                      "falls either side of with probability one half. "
+                      "Computed from the run's own sub-window count by "
+                      "`persistence_null`, never typed, because the count "
+                      "moves with the horizon: eleven at 252 model days, "
+                      "twenty-three at 504",
+    },
+}
+
+#: The three classes of shape row, and what each certifies. Listed rather
+#: than inferred, so a row added to `SHAPE` must be placed in a class on
+#: purpose; `test_facts` and `test_mechanism_gate` assert the three
+#: partition `SHAPE`.
+#:
+#: MECHANISM rows have a constructible mechanism-absent reading, so a sign
+#: test against it can fail a model that lacks the mechanism. EQUIVALENCE
+#: rows are the ones whose real value IS the null: the band certifies that
+#: the model is not distinguishable from it, and there is no mechanism to
+#: show. LEVEL_ONLY rows have no mechanism-absent reading at all.
+MECHANISM = (
+    "excess_kurtosis", "abs_return_acf1", "abs_return_acf5",
+    "abs_return_acf20", "cross_sectional_corr", "volume_abs_return_corr",
+    "leverage_effect", "corr_asymmetry", "corr_asymmetry_lagged",
+    "sector_excess_corr", "corr_persistence_acf1",
+)
+EQUIVALENCE = ("return_acf1",)
+LEVEL_ONLY = ("annualised_vol_pct", "volume_change_acf1")
+
+#: Mechanism rows whose verdict is REPORTED and NOT COUNTED at a given
+#: horizon, against the reason, so a row cannot be quietly graded where a
+#: correct model would fail it. Keyed by horizon in trading days.
+#:
+#: `abs_return_acf20` at 252 days is the case this exists for. The row is
+#: named for a long-memory fact that is not visible inside one year on the
+#: longer real record: over 34 non-crisis 252-bar windows of a 32-name
+#: 1990-2025 reference the within-year lag-20 reading is +0.005, 1.1
+#: across-window standard errors from zero, and a CORRECT model -- thirty
+#: seeds about that centre with that dispersion -- passes the sign gate 17
+#: per cent of the time. The panel's own decade reads +0.020 and would
+#: certify it, so the row's certifiability depends on which decade is taken
+#: as the truth, and that is not a certificate. At 504 days both references
+#: read +0.030 and a correct model passes at 1.00, which is where the row
+#: belongs. Two conditions travel with the move and neither is met yet: the
+#: 504 fidelity band rests on five windows rather than nine, and the 504
+#: reading is inflated by the year step until the opening is drawn from the
+#: stationary law. Until both, reported and not counted.
+MECHANISM_DIAGNOSTIC: dict[int, dict[str, str]] = {
+    252: {
+        "abs_return_acf20": (
+            "not certifiable at 252 days: the real within-year effect is "
+            "inside real year-to-year noise on the 1990-2025 reference "
+            "(median +0.005 over 34 windows, 1.1 across-window standard "
+            "errors from zero), so a correct model passes the gate 17 per "
+            "cent of the time. Re-state at 504 days, where both references "
+            "read +0.030 and a correct model passes at 1.00; diagnostic "
+            "until the 504 arm and the stationary opening exist"
+        ),
+    },
+}
+
+
+def band_rule_false_alarm(n_windows: int, *, draws: int = 200_000,
+                          seed: int = 20260905) -> tuple[float, float]:
+    """Re-derive `BAND_RULE_TOLERANCE` for `n_windows`: (rate, its se).
+
+    The band is built UNROUNDED, by `shared_rule`, because outward rounding
+    is per-row and only ever widens: a shipped band is at most this
+    tolerant, so a cut derived from this rate is at most this strict.
+    """
+    if n_windows < 2:
+        raise ValidationError(
+            f"n_windows must be at least 2 to have a band, got {n_windows}")
+    if draws < 1:
+        raise ValidationError(f"draws must be positive, got {draws}")
+    rng = random.Random(seed)
+    outside = 0
+    for _ in range(draws):
+        windows = [rng.gauss(0.0, 1.0) for _ in range(n_windows)]
+        low, high, _ = shared_rule(windows)
+        fresh = rng.gauss(0.0, 1.0)
+        if fresh < low or fresh > high:
+            outside += 1
+    rate = outside / draws
+    return rate, math.sqrt(rate * (1.0 - rate) / draws)
+
+
+def band_rule_tolerance(n_windows: int) -> float:
+    """`BAND_RULE`'s false-alarm rate at `n_windows`, measured.
+
+    Raises rather than guessing for a window count nobody has measured: the
+    cut a gate reads comes from here, and a tolerance interpolated between
+    two measurements would be a chosen constant.
+    """
+    try:
+        return BAND_RULE_TOLERANCE[n_windows]
+    except KeyError:
+        raise ValidationError(
+            f"BAND_RULE's tolerance at {n_windows} windows is not measured; "
+            f"measured counts are {sorted(BAND_RULE_TOLERANCE)}. Run "
+            f"facts.band_rule_false_alarm({n_windows}) and record it with "
+            f"its residual rather than interpolating."
+        ) from None
+
+
+def band_windows(key: str, horizon_days: int) -> int:
+    """How many non-crisis real windows `key`'s band at this horizon rests on."""
+    if horizon_days not in BAND_WINDOWS:
+        raise ValidationError(
+            f"no band set is recorded at {horizon_days} days; recorded "
+            f"horizons are {sorted(BAND_WINDOWS)}")
+    return BAND_WINDOWS_EXCEPTIONS.get(horizon_days, {}).get(
+        key, BAND_WINDOWS[horizon_days])
+
+
+def binomial_two_sided(n: int, k: int) -> float:
+    """The exact two-sided probability of a count as extreme as `k` of `n`.
+
+    Under `Bin(n, 1/2)`: twice the smaller tail, capped at one. Exact, from
+    `math.comb`, so the gate needs no normal approximation and no standard
+    error estimator anywhere.
+    """
+    if n < 1 or not 0 <= k <= n:
+        raise ValidationError(f"need 0 <= k <= n and n >= 1, got k={k}, n={n}")
+    total = 2 ** n
+    upper = sum(math.comb(n, j) for j in range(k, n + 1)) / total
+    lower = sum(math.comb(n, j) for j in range(0, k + 1)) / total
+    return min(1.0, 2.0 * min(upper, lower))
+
+
+def sign_cut(n: int, tolerance: float) -> int:
+    """The seeds-on-the-real-side count that reads SHOWN at `tolerance`.
+
+    The smallest `k` above `n / 2` whose exact two-sided binomial
+    probability is nearest `tolerance`. Nothing is chosen: `tolerance` is
+    `BAND_RULE`'s own false-alarm rate, so the mechanism half of the
+    instrument is as tolerant of a correct model as the fidelity half, and
+    the integer comes out of the binomial rather than off a table.
+    """
+    if n < 2:
+        raise ValidationError(
+            f"a sign test needs at least two readings, got {n}")
+    if not 0.0 < tolerance < 1.0:
+        raise ValidationError(
+            f"tolerance must be a probability strictly inside (0, 1), got "
+            f"{tolerance}")
+    best: tuple[float, int] | None = None
+    for k in range(n // 2 + 1, n + 1):
+        distance = abs(binomial_two_sided(n, k) - tolerance)
+        if best is None or (distance, k) < best:
+            best = (distance, k)
+    assert best is not None
+    return best[1]
+
+
+@functools.lru_cache(maxsize=None)
+def persistence_null(sub_windows: int, *, draws: int = 50_000,
+                     seed: int = 20260905) -> float:
+    """`corr_persistence_acf1`'s mechanism-absent reading at `sub_windows`.
+
+    The MEDIAN of `_autocorrelation(x, 1)` over `draws` samples of
+    `sub_windows` iid standard normals -- the estimator's own null, computed
+    by calling the estimator the panel calls rather than a re-derivation of
+    it, so a change to `_autocorrelation` moves the null with it.
+
+    The median rather than the mean, because the median is the value each
+    seed falls either side of with probability one half, which is what an
+    exact sign test's size rests on. The mean is close to `-1 / N` and the
+    two differ by about 0.004 at eleven sub-windows.
+
+    Monte Carlo, so it carries an error: the sampling sd of the median is
+    about `MEDIAN_SE_FACTOR * 0.259 / sqrt(draws)`, 0.0015 at the default
+    draws, which no per-seed reading on any arm on record sits within.
+    """
+    if sub_windows < 3:
+        raise ValidationError(
+            f"_autocorrelation needs more than lag + 1 values, got "
+            f"{sub_windows}")
+    rng = random.Random(seed)
+    return statistics.median(
+        _autocorrelation([rng.gauss(0.0, 1.0) for _ in range(sub_windows)], 1)
+        for _ in range(draws)
+    )
+
+
+def sub_window_count(horizon_days: int) -> int:
+    """How many `CORR_PERSISTENCE_WINDOW` sub-windows a run of this length has.
+
+    Eleven at 252 days, not twelve: the panel differences prices into
+    returns first, so a 252-bar run carries 251 returns and
+    `251 // 21 = 11`. The twelve in the older comment counted BARS.
+    """
+    if horizon_days < 2:
+        raise ValidationError(
+            f"horizon_days must be at least 2 to have a return, got "
+            f"{horizon_days}")
+    return (horizon_days - 1) // CORR_PERSISTENCE_WINDOW
+
+
+def null_value(key: str, *, horizon_days: int | None = None) -> float | None:
+    """`key`'s mechanism-absent reading, resolving any estimator it names."""
+    entry = NULLS.get(key)
+    if entry is None:
+        raise ValidationError(
+            f"no null recorded for {key!r}; recorded rows are "
+            f"{sorted(NULLS)}")
+    if entry.get("estimator") == "persistence_null":
+        if horizon_days is None:
+            raise ValidationError(
+                f"{key}'s null is computed from the run's own sub-window "
+                "count, so horizon_days is required")
+        return persistence_null(sub_window_count(horizon_days))
+    return entry["value"]
+
+
+def real_windows(key: str) -> tuple[float, ...] | None:
+    """`key`'s non-crisis real readings, one per window, or None if unrecorded.
+
+    Four rows have no per-window record in `REAL_MARKETS_WINDOWS` -- the two
+    conditional-correlation asymmetries, the sector excess and the
+    correlation persistence -- so anything that needs the DISPERSION of a
+    row across real years, rather than its centre, is undetermined for
+    those four in this package.
+    """
+    values = REAL_MARKETS_WINDOWS["values"].get(key)
+    if values is None:
+        return None
+    crisis = REAL_MARKETS_WINDOWS["crisis_index"]
+    return tuple(v for i, v in enumerate(values) if i != crisis)
+
+
+def real_centre(key: str) -> float | None:
+    """The median real reading for `key`: the value a correct model aims at.
+
+    From the per-window table where it exists, and from the middle of
+    `REAL_MARKETS_PROVENANCE`'s (min, median, max) triple otherwise -- the
+    same quantity, recorded to three places. A provenance entry whose
+    `windows` is not an ORDERED triple is not a triple of that kind and is
+    refused rather than read positionally: `abs_return_acf5` records eight
+    values there and `index_drift_pct` records three that are not a range.
+    """
+    windows = real_windows(key)
+    if windows is not None:
+        return statistics.median(windows)
+    recorded = REAL_MARKETS_PROVENANCE.get(key, {}).get("windows")
+    if (recorded is not None and len(recorded) == 3
+            and recorded[0] <= recorded[1] <= recorded[2]):
+        return float(recorded[1])
+    return None
+
+
+def real_centre_se(key: str) -> float | None:
+    """The standard error of `key`'s real centre, or None where undetermined.
+
+    `MEDIAN_SE_FACTOR * trimmed_sd(windows) / sqrt(len(windows))`, on the
+    same trimmed sd `BAND_RULE` prices its width in. None for the four rows
+    with no per-window record: a centre recorded to three places gives the
+    centre, not its dispersion, and inverting the band edges for it would
+    recover an interval a rounding quantum wide and call it a number.
+    """
+    windows = real_windows(key)
+    if windows is None:
+        return None
+    return MEDIAN_SE_FACTOR * trimmed_sd(windows) / math.sqrt(len(windows))
+
+
+def median_se(values: Sequence[float]) -> float:
+    """The sampling sd of the median of `values`, normal approximation.
+
+    `MEDIAN_SE_FACTOR * sd / sqrt(n)`. Reported beside the bootstrap and
+    never used as a gate: the two disagree by up to a factor of two on the
+    skewed rows, and a verdict that turns on which estimator was picked is
+    a chosen constant wearing a derivation's clothes.
+    """
+    if len(values) < 2:
+        raise ValidationError(
+            f"need at least two readings for a spread, got {len(values)}")
+    return MEDIAN_SE_FACTOR * statistics.stdev(values) / math.sqrt(len(values))
+
+
+def median_se_bootstrap(values: Sequence[float], *, draws: int = 2000,
+                        seed: int = 20260905) -> float:
+    """The sampling sd of the median of `values`, by resampling them.
+
+    `draws` defaults to the 2000 this repository's other bootstrap already
+    uses (`tools/calibration/calibrate.py`, `bootstrap_spread`). Reported,
+    never a gate, for the reason in `median_se`.
+    """
+    values = list(values)
+    if len(values) < 2:
+        raise ValidationError(
+            f"need at least two readings to resample, got {len(values)}")
+    if draws < 2:
+        raise ValidationError(f"draws must be at least 2, got {draws}")
+    rng = random.Random(seed)
+    n = len(values)
+    return statistics.stdev(
+        statistics.median(rng.choices(values, k=n)) for _ in range(draws)
+    )
+
+
+def centre_multiplier(tolerance: float) -> float:
+    """The two-sided normal multiplier with false-alarm rate `tolerance`.
+
+    1.846 at `BAND_RULE`'s nine-window tolerance. The CENTRE diagnostic's
+    threshold, so that it too is as tolerant of a correct model as the
+    fidelity band already is.
+    """
+    if not 0.0 < tolerance < 1.0:
+        raise ValidationError(
+            f"tolerance must be a probability strictly inside (0, 1), got "
+            f"{tolerance}")
+    return -statistics.NormalDist().inv_cdf(tolerance / 2.0)
+
+
+def mechanism_verdict(values: Sequence[float], key: str, *,
+                      horizon_days: int = TRADING_DAYS_PER_YEAR,
+                      bootstrap_draws: int = 2000,
+                      bootstrap_seed: int = 20260905) -> dict[str, Any]:
+    """Is a model WITHOUT `key`'s mechanism excluded by these per-seed readings?
+
+    An exact sign test of the per-seed readings against the row's
+    mechanism-absent reading, at the tolerance `BAND_RULE` itself carries.
+    `k` seeds sit on the real side of the null; SHOWN at `k >= sign_cut`,
+    REVERSED at `k <= n - sign_cut`, NOT SHOWN between. REVERSED is a
+    verdict of its own and not a shade of "not shown": a certified reversed
+    mechanism is the failure the leverage row's inward clamp exists to
+    prevent, and on that row alone.
+
+    Deliberately not a `z_0 >= multiplier` test. The two standard-error
+    estimators for a thirty-seed median disagree by up to a factor of two on
+    the skewed rows and two verdicts on the shipped default flip with the
+    choice, so the gate is the exact, distribution-free test that needs
+    neither -- it IS the order-statistic confidence interval of the median
+    excluding the null -- and both standard errors are reported beside it as
+    effect sizes. What that costs is about 64 per cent of a z-test's power
+    on a Gaussian row, which still leaves a correct model certified at 0.95
+    to 1.00 on every row certifiable at 252 days.
+
+    `counted` is False for a row this horizon reports and does not grade
+    (`MECHANISM_DIAGNOSTIC`), which is a state distinct from any verdict:
+    the row still gets one, and it does not enter the count.
+
+    At a horizon other than the one `REAL_MARKETS_WINDOWS` was measured at,
+    the only thing taken from the real side is the SIGN of the effect, which
+    is a property of the market rather than of the window: every row's real
+    median has the same sign at 252 and 504 bars on both references
+    (band-form-design 5d, follow-ups 4 and 5). The magnitudes are not used
+    here, and `centre_distance` refuses to use them across horizons.
+    """
+    if key not in MECHANISM:
+        raise ValidationError(
+            f"{key!r} certifies no mechanism, so a sign test on it would be "
+            f"a test against a null nothing derives. Mechanism rows are "
+            f"{sorted(MECHANISM)}; {key!r} is "
+            + ("EQUIVALENCE, whose real value IS its null"
+               if key in EQUIVALENCE else
+               "LEVEL_ONLY, which has no mechanism-absent reading"
+               if key in LEVEL_ONLY else "not a shape row"))
+    values = [v for v in values if v is not None]
+    if len(values) < 2:
+        raise ValidationError(
+            f"a sign test on {key} needs at least two per-seed readings, got "
+            f"{len(values)}")
+
+    null = null_value(key, horizon_days=horizon_days)
+    centre = real_centre(key)
+    if null is None or centre is None:
+        raise ValidationError(
+            f"{key}'s null or real centre is undetermined, so no real "
+            "direction can be derived for a sign test")
+    direction = 1.0 if centre >= null else -1.0
+
+    n = len(values)
+    windows = band_windows(key, horizon_days)
+    tolerance = band_rule_tolerance(windows)
+    cut = sign_cut(n, tolerance)
+    k = sum(1 for v in values if direction * (v - null) > 0)
+    if k >= cut:
+        verdict = "shown"
+    elif k <= n - cut:
+        verdict = "reversed"
+    else:
+        verdict = "not shown"
+
+    median = statistics.median(values)
+    se_normal = median_se(values)
+    se_boot = median_se_bootstrap(values, draws=bootstrap_draws,
+                                  seed=bootstrap_seed)
+    signed = direction * (median - null)
+    diagnostic = MECHANISM_DIAGNOSTIC.get(horizon_days, {}).get(key)
+    return {
+        "row": key,
+        "n": n,
+        "null": null,
+        "null_kind": NULLS[key]["kind"],
+        "direction": direction,
+        "k": k,
+        "cut": cut,
+        "tolerance": tolerance,
+        "band_windows": windows,
+        "p": binomial_two_sided(n, k),
+        "verdict": verdict,
+        "at_the_cut": k == cut or k == n - cut,
+        "median": median,
+        # Effect sizes, both estimators, never the gate.
+        "se_normal": se_normal,
+        "se_bootstrap": se_boot,
+        "z0_normal": signed / se_normal if se_normal else None,
+        "z0_bootstrap": signed / se_boot if se_boot else None,
+        "counted": diagnostic is None,
+        "diagnostic": diagnostic,
+    }
+
+
+def centre_distance(values: Sequence[float], key: str, *,
+                    horizon_days: int = TRADING_DAYS_PER_YEAR) -> dict[str, Any]:
+    """How far the graded median sits from the real centre, in both errors.
+
+    `z_r = (median - centre) / sqrt(se_m^2 + se_real^2)`, reported and never
+    a gate: the real centre is one decade of one market, `se_real` is a
+    within-decade error, and a gate on it would encode 2015-2025 as the
+    truth with a precision the reference does not have -- the 32-name
+    1990-2025 reference puts three rows one to three `se_real` away from the
+    panel's decade.
+
+    It is the quantity "aim at the real central value" names, so it belongs
+    in the report and in a calibration objective. `z_r` is None where
+    `real_centre_se` is undetermined, with the reason beside it.
+
+    UNDETERMINED at any horizon but the one `REAL_MARKETS_WINDOWS` was
+    measured at, rather than answered with the wrong ruler. The real
+    dispersion of a row across years is a property of the window length --
+    clustering at lag 20 reads +0.005 over 252 bars and +0.030 over 504 on
+    the same reference -- so a 504-day model median against these windows
+    would be the same error on the centre side that `envelope.score` refuses
+    on the band side, and it would be invisible because the answer is a
+    plausible number.
+    """
+    if key not in REAL_MARKETS:
+        raise ValidationError(
+            f"{key!r} is not a graded row; graded rows are "
+            f"{sorted(REAL_MARKETS)}")
+    values = [v for v in values if v is not None]
+    if len(values) < 2:
+        raise ValidationError(
+            f"need at least two per-seed readings for {key}, got "
+            f"{len(values)}")
+    median = statistics.median(values)
+    se_m = median_se(values)
+    table_horizon = REAL_MARKETS_WINDOWS["horizon_days"]
+    matched = horizon_days == table_horizon
+    centre = real_centre(key) if matched else None
+    se_r = real_centre_se(key) if matched else None
+    out: dict[str, Any] = {
+        "row": key,
+        "n": len(values),
+        "horizon_days": horizon_days,
+        "median": median,
+        "se_m": se_m,
+        "real_centre": centre,
+        "se_real": se_r,
+        "multiplier": centre_multiplier(
+            band_rule_tolerance(BAND_WINDOWS[table_horizon])),
+        "z_r": None,
+        "at_centre": None,
+        "undetermined": None,
+    }
+    if not matched:
+        out["undetermined"] = (
+            f"REAL_MARKETS_WINDOWS holds {table_horizon}-day readings and "
+            f"this panel is {horizon_days} days. The real dispersion of a row "
+            "across years moves with the window length, so a centre distance "
+            "taken across horizons would be the wrong-ruler error with a "
+            "plausible-looking answer. Measure the windows at this horizon "
+            "first"
+        )
+        return out
+    if centre is None:
+        out["undetermined"] = (
+            f"{key} has neither a per-window real record in "
+            "REAL_MARKETS_WINDOWS nor an ordered (min, median, max) "
+            "provenance triple, so it has no real centre in this package"
+        )
+        return out
+    if se_r is None:
+        out["undetermined"] = (
+            f"{key} has no per-window real record in REAL_MARKETS_WINDOWS, "
+            "so the dispersion of the row across real years is not in this "
+            "package and se_real cannot be derived. Its centre is recorded "
+            "to three places in REAL_MARKETS_PROVENANCE, which gives the "
+            "centre and not its error"
+        )
+        return out
+    combined = math.sqrt(se_m ** 2 + se_r ** 2)
+    out["z_r"] = (median - centre) / combined
+    out["at_centre"] = abs(out["z_r"]) < out["multiplier"]
+    return out
+
+
 def compare_to_real_markets(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Line each measured statistic up against the empirical range.
 
@@ -2655,6 +3470,16 @@ def report(facts: dict[str, Any]) -> str:
                     f"it has been derived at {facts['days']}.", 72,
                     initial_indent="  ", subsequent_indent="  ")
     lines += [
+        "",
+        "Every verdict above answers ONE question: could a real year read",
+        "this number. It does not say the mechanism the row is named for is",
+        "present, and on five rows it cannot -- the band contains the reading",
+        "of a model without the mechanism, and a mechanism-absent model",
+        "passes three of those bands every time. What answers 'is a model",
+        "WITHOUT the mechanism excluded' is a sign test of the per-seed",
+        "readings against the row's null: facts.mechanism_verdict, and",
+        "envelope.certify for the three counts together. One measurement",
+        "cannot answer it, because the question is about a distribution.",
         "",
         "Read the two sections against each other. A model can get the shape",
         "of one series right and still get every way things move together",

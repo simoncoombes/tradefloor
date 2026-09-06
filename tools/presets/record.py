@@ -114,6 +114,13 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
         "measured": measured,
         "panel_252": p["panel_252"],
         "panel_504": p["panel_504"],
+        # The mechanism certificate beside the band panel, because "14 of 14
+        # in band" answers fidelity alone: on five rows the band contains the
+        # reading of a model WITHOUT the mechanism the row is named for. See
+        # `envelope.certify`. Additive, so schema 1 stays 1 and a record
+        # written before this field existed keeps working.
+        "mechanism_252": p["mechanism_252"],
+        "mechanism_heldout_seeds": p["mechanism_heldout_seeds"],
         "in_band": {
             "252": p["in_band_252"],
             "504": p["in_band_504"],
@@ -145,6 +152,16 @@ def main() -> int:
     ap.add_argument("--mechanisms", action="store_true",
                     help="rewrite only the mechanism set of every committed "
                          "record from the build's coefficients; no panel needed")
+    ap.add_argument("--mechanism-gate", metavar="PANEL",
+                    help="write ONLY the mechanism certificate onto the "
+                         "committed records the given panel names, leaving "
+                         "every other field byte for byte as it is. For the "
+                         "case this field was added in: the certificate is a "
+                         "new measurement on a protocol whose per-seed panels "
+                         "nobody kept before, and re-deriving `panel_252` "
+                         "from a fresh run at the same time would silently "
+                         "fold in every model and roster change since the "
+                         "record was written")
     ap.add_argument("--coefficients", action="store_true",
                     help="rewrite only the coefficient vector and its digest "
                          "on every committed record, from the build; no panel "
@@ -152,6 +169,8 @@ def main() -> int:
                          "preset gains the new name at its inert default and "
                          "no measurement has changed")
     args = ap.parse_args()
+    if args.mechanism_gate:
+        return write_mechanism_gate(args.mechanism_gate)
     if args.mechanisms:
         return write_mechanisms()
     if args.coefficients:
@@ -179,7 +198,8 @@ def main() -> int:
                 # comparing it would report drift on every re-run. What has
                 # to agree is the SCIENCE.
                 for field in ("coefficient_digest", "mechanisms", "panel_252",
-                              "panel_504", "in_band", "misses", "crisis_lever"):
+                              "panel_504", "in_band", "misses", "crisis_lever",
+                              "mechanism_252", "mechanism_heldout_seeds"):
                     if have.get(field) != record[field]:
                         drift.append(f"{path.name}: {field} differs")
         else:
@@ -232,6 +252,56 @@ def write_coefficients() -> int:
         print(f"  wrote {path.relative_to(ROOT)}"
               + (f"  (+{', '.join(added)})" if added else ""))
     return 0
+
+
+def write_mechanism_gate(panel_path: str) -> int:
+    """Set the mechanism certificate on every record the panel names.
+
+    Two fields and nothing else. A preset's `panel_252` was measured on the
+    build and the roster generator of its own day, and the certificate is
+    measured today: writing both from one run would move the published band
+    figures for a reason that has nothing to do with the mechanism question,
+    which is the drift this whole file exists to stop. So the certificate
+    carries its OWN provenance -- the commit, the version and the method that
+    produced it -- and a reader can see that the two blocks were measured on
+    different builds because each says which.
+    """
+    panel = json.loads(pathlib.Path(panel_path).read_text(encoding="utf-8"))
+    measured = {
+        "tradefloor_version": panel["pretium_version"],
+        "commit": git("rev-parse", "HEAD") or None,
+        "method": panel["method"],
+    }
+    written = 0
+    for name in sorted(panel["presets"]):
+        path = OUT / f"{name}.json"
+        if not path.exists():
+            print(f"  skipped {name}: no committed record to write onto")
+            continue
+        record = json.loads(path.read_text(encoding="utf-8"))
+        p = panel["presets"][name]
+        for field in ("mechanism_252", "mechanism_heldout_seeds"):
+            block = dict(p[field])
+            block["measured"] = measured
+            record[field] = block
+        ordered = {}
+        for key, value in record.items():
+            if key in ("mechanism_252", "mechanism_heldout_seeds"):
+                continue
+            ordered[key] = value
+            if key == "panel_504":
+                ordered["mechanism_252"] = record["mechanism_252"]
+                ordered["mechanism_heldout_seeds"] = \
+                    record["mechanism_heldout_seeds"]
+        path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8", newline="\n")
+        counts = record["mechanism_252"]["counts"]
+        print(f"  wrote {path.relative_to(ROOT)}  mechanism shown "
+              f"{counts['mechanism_shown']} of {counts['mechanism_of']}"
+              + (f", REVERSED {record['mechanism_252']['reversed']}"
+                 if record["mechanism_252"]["reversed"] else ""))
+        written += 1
+    return 0 if written else 1
 
 
 def write_mechanisms() -> int:

@@ -648,6 +648,14 @@ def test_the_index_drift_row_is_reported_and_never_graded():
     assert "index_drift_pct" in LEVEL and "index_drift_pct" not in SHAPE
     assert sorted(SHAPE + LEVEL + CRISIS) == sorted(REAL_MARKETS)
     assert len(SHAPE) == 14
+    # And the shape rows are partitioned a second way, by what each one can
+    # CERTIFY: a mechanism-absent null exists for it, its real value IS its
+    # null, or it has no mechanism-absent reading at all. Asserted here beside
+    # the group split for the same reason -- a fifteenth row must be placed in
+    # both on purpose. tests/test_mechanism_gate.py is where the classes are
+    # exercised.
+    from tradefloor.facts import MECHANISM, EQUIVALENCE, LEVEL_ONLY
+    assert sorted(MECHANISM + EQUIVALENCE + LEVEL_ONLY) == sorted(SHAPE)
     prov = REAL_MARKETS_PROVENANCE["index_drift_pct"]
     assert sum("query1.finance.yahoo.com" in s for s in prov["sources"]) == 3
     assert "fetched 2026-09-03" in prov["sources"][0]
