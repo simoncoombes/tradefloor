@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v16",
   "fingerprint": "pt-v16",
-  "coefficient_digest": "00171476a373b15ac52dd265c09c2a5cb1e4fcd1296a957ebe3abbe739fbdabe",
+  "coefficient_digest": "6a855819ec7022fb290c13609fe17d76cf01d93fe3ca9ed79f217dba1f34af6e",
   "coefficients": {
     "book_levels": 10.0,
     "buyback_payout_share": 0.0,
@@ -19,6 +19,7 @@
     "crowd_momentum_gain": 0.02,
     "crowd_valuation_gain": 0.006,
     "cycle_hazard_per_month": 0.0,
+    "cycle_stationary_opening": 0.0,
     "daily_credit_floor_gain": 1.0,
     "daily_shock_cap": 0.15,
     "default_sector_anchor_pe": 18.0,

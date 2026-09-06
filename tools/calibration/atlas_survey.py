@@ -364,6 +364,15 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the cascade path's own arithmetic (garch.rs:187). A blend between is
     # meaningful, so the axis is the unit interval.
     "garch_omega_sector_scaled": (0.0, 1.0),
+    # Whether day zero is drawn from the cycle's stationary law. A SWITCH,
+    # not a share: a day-zero state is either drawn from that law or it is
+    # not, and there is no half-drawn phase, so the two admissible values
+    # are the two ends and the interior has no reading. The range is stated
+    # here rather than left to the convention box for the usual reason --
+    # the dial ships at 0.0, so a multiplicative box is the degenerate
+    # point (0.0, 0.0) -- and a survey that lands inside the interval gets
+    # the same opening as 1.0, which the dial's own tests assert.
+    "cycle_stationary_opening": (0.0, 1.0),
     # News peer transfer: weights of a peer's surprise, natural unit range.
     "news_peer_weight": (0.0, 1.0),
     "news_peer_weight_down": (0.0, 1.0),

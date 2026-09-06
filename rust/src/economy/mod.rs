@@ -40,7 +40,8 @@ pub mod state;
 
 pub use central_bank::{update_central_bank, Decision, MeetingOutcome};
 pub use cycle::{
-    check_cycle_transition, cycle_hazard_params, get_cycle_transition_probability, weibull_hazard,
+    check_cycle_transition, cycle_hazard_params, get_cycle_transition_probability,
+    mean_sojourn_days, phase_cycle, stationary_opening, stationary_phase_shares, weibull_hazard,
 };
 pub use daily::{update_economy_daily, DailyInputs};
 pub use state::*;
