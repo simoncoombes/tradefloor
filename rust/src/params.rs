@@ -1851,6 +1851,139 @@ pub struct ModelParams {
     /// second calibration constant. The VIX clamp of 10 to 80 and the
     /// factor's ceiling multiple bound the feedback.
     pub vix_realised_vol_weight: f64,
+    /// The VIX's LEVEL comes from the index's own conditional variance, not
+    /// from a table of constants. 0.0 ships and is every preset before
+    /// pt-v19, bit for bit.
+    ///
+    /// # What the level was made of
+    ///
+    /// At `vix_realised_vol_weight` 0.3 the target was
+    ///
+    /// ```text
+    /// target = 0.7 * [ phase(19 + 0.85 (p - 19))     the business cycle
+    ///                + spike(gain * |r|)             the day's return
+    ///                + 0.5 on the first half of a month
+    ///                + offset ]
+    ///        + 0.3 *   anchor * sigma_f / market_factor_sigma
+    /// ```
+    ///
+    /// so ABOUT TWO THIRDS OF THE LEVEL WAS CONSTANTS and their
+    /// cancellations — a phase table shrunk toward 19, an offset cancelling
+    /// the standing excursion an asymmetric gain injects, an earnings bump
+    /// — and the remaining third was the market factor's sigma read through
+    /// a conversion of 2105.1 VIX points per unit of daily sigma where the
+    /// identity is `100 * sqrt(252)` = 1587.5. Measured, at the arm nearest
+    /// the candidate: mean VIX 13.76 on an index realising 15.60 per cent
+    /// annualised, a ratio of 0.882 where the tape's is 1.252.
+    ///
+    /// And the referent was wrong twice over. The index is not the factor:
+    /// on the certified roster it carries 2.05x the factor's variance —
+    /// factor 55 per cent, jumps 23, sector and idiosyncratic 11, the
+    /// intraday curve 4.6, news 3 — and none of the rest reached the VIX at
+    /// any value of any dial.
+    ///
+    /// # What it is at 1.0
+    ///
+    /// ```text
+    /// target = (1 + pi) * 100 * sqrt(252 * V_t) + spike(r) - E[spike | sigma_t]
+    /// ```
+    ///
+    /// with `V_t` the engine's own one-day-ahead conditional variance of the
+    /// cap-weighted index ([`crate::market::index_var`]), computed from the
+    /// states it already holds at the close, and the excursion made
+    /// zero-mean by its own closed form rather than by a fitted offset.
+    /// `pi` is [`ModelParams::vix_variance_premium`].
+    ///
+    /// Three things follow, and they are the point of the change rather
+    /// than side effects:
+    ///
+    /// - `market_vol_vix_anchor` is DERIVED, from the same identity at the
+    ///   unconditional point, and the dial is not read at all. The forward
+    ///   map `base * (1 - c + c (VIX/anchor)^2)` and the read-back then
+    ///   agree at that point by construction — the property the old
+    ///   comment claimed ("so the loop is consistent") and the two
+    ///   constants never delivered.
+    /// - The phase table, `vix_cycle_amplitude`, `vix_target_offset`, the
+    ///   earnings bump and `vix_realised_vol_weight` are not read. The
+    ///   business cycle reaches the VIX through the variance processes or
+    ///   not at all.
+    /// - The spike reads the SESSION's return whatever `vix_return_source`
+    ///   says, because the zero-mean correction is computed against the
+    ///   session's conditional sigma and a correction sized for the day
+    ///   applied to a closing minute would be twenty times too large.
+    ///
+    /// `vix_mean_reversion`, `vix_decay_ratio`, `vix_return_gain`,
+    /// `vix_return_gain_up`, `vix_return_clamp` and `vix_target_shock_cap`
+    /// all keep their jobs: they are the fear channel, not the level. The
+    /// inflation and shock adders keep theirs too, so a scripted macro path
+    /// reaches the VIX exactly as it did, and a PINNED VIX still overrides
+    /// the state and drives variance through the forward map unchanged.
+    ///
+    /// # Stationarity, since this closes the loop
+    ///
+    /// Write `s_f` for the share of the unconditional index variance that
+    /// follows the VIX and `c` for the coupling. The factor's target is
+    /// `base (1 - c + c V_t / V_uncond)`; substituting
+    /// `V_t = s_f V_uncond v_f / base + (1 - s_f) V_uncond` gives a fixed
+    /// point at `v_f = base` EXACTLY, independent of `s_f`, and an
+    /// effective persistence of `(alpha + beta) + (1 - alpha - beta) c s_f`
+    /// — about 0.99 at the shipped coefficients. The level is held by the
+    /// variance processes' own reversion, weakened but not removed, which
+    /// is where a real index's long-run variance lives.
+    pub vix_level_identity: f64,
+    /// The variance risk premium `pi`: how far a real VIX sits ABOVE the
+    /// realised volatility of its own index. Read only while
+    /// [`ModelParams::vix_level_identity`] is non-zero.
+    ///
+    /// # Equality was the wrong identity, and this is the size of it
+    ///
+    /// MEASURED on ^GSPC and ^VIX adjusted closes, 1990-01-03 to
+    /// 2025-07-30, 8,959 aligned sessions with a return, by
+    /// `programme/scripts/vix-rv-relation.py` in the design repository.
+    /// Five estimators, because the answer depends on which one the model's
+    /// own statistic corresponds to:
+    ///
+    /// | estimator | VIX / RV |
+    /// |---|---|
+    /// | pooled over the whole span, one history | 1.076 |
+    /// | per calendar year, 35 years | median 1.252, IQR 1.128-1.398 |
+    /// | rolling 252-session windows, 415 of them | median 1.257, P10 1.049, P90 1.473 |
+    /// | against the NEXT 21 sessions' realised vol | median 1.398 |
+    /// | against the TRAILING 21 sessions | median 1.372, correlation 0.853 |
+    ///
+    /// Three of 35 calendar years read below 1.0 (2008 at 0.80, 2020 at
+    /// 0.85, 2018 at 0.98); the other 32 sit above it, and 92.5 per cent of
+    /// rolling windows do.
+    ///
+    /// **The value is 0.252 and the residual is the per-year IQR, 1.128 to
+    /// 1.398, so +/- 0.13 on `pi`.** The window estimator is the
+    /// like-for-like one: the certified panel's statistic is a per-window
+    /// relationship on a 252-session window, which is what estimators B and
+    /// C measure. The pooled 1.076 is recorded so the choice is visible; it
+    /// does not change any conclusion, because the model reads 0.88.
+    ///
+    /// # Why the default is the measured value and not zero
+    ///
+    /// Every other dial in this era ships at the value that makes it inert.
+    /// This one is not read at all while `vix_level_identity` is 0.0, so
+    /// both defaults are equally inert and the choice is about what a
+    /// preset that turns the identity on gets without saying anything.
+    /// Zero would be the EQUALITY ruler, which the measurement above puts
+    /// at 1.42x wrong. A default that is a refuted identity is a chosen
+    /// constant; the measured one is not.
+    ///
+    /// # What could not be determined
+    ///
+    /// The premium's FORM. By VIX level the difference grows from +3.3
+    /// points below VIX 12 to +8.9 above 30 while the ratio holds at 1.44,
+    /// 1.42, 1.44, 1.37, 1.35, 1.35 from 0 to 40 and falls to 1.23 only
+    /// above 40; by realised-vol tercile of years the ratio reads 1.40,
+    /// 1.24, 1.16 from calm to violent while the difference reads +4.1,
+    /// +3.0, +4.2. Neither form is exact. The ratio is the more stable one
+    /// over the range this model lives in and is the one used; a
+    /// state-dependent premium is not supported by this measurement and is
+    /// not fitted here.
+    pub vix_variance_premium: f64,
     /// Which return the VIX reacts to: the last TICK's (0.0, shipped) or the
     /// day's (1.0), blended in between.
     ///
@@ -2233,6 +2366,12 @@ impl ModelParams {
             forced_flow_reservoir: 0.0,
             forced_flow_replenish: 0.0,
             vix_realised_vol_weight: 0.0,
+            // 0.0 is the level the constants built, bit-identical to the
+            // arithmetic that predates this dial.
+            vix_level_identity: 0.0,
+            // MEASURED, and unread while the identity above is 0.0. See
+            // the field's own note for the five estimators and the IQR.
+            vix_variance_premium: 0.252,
             vix_cycle_amplitude: 1.0,
             vix_return_source: 0.0,
             vix_return_gain: crate::economy::VIX_RETURN_GAIN,
@@ -3435,6 +3574,8 @@ impl ModelParams {
             "forced_flow_replenish" => self.forced_flow_replenish,
             "vix_cycle_amplitude" => self.vix_cycle_amplitude,
             "vix_realised_vol_weight" => self.vix_realised_vol_weight,
+            "vix_level_identity" => self.vix_level_identity,
+            "vix_variance_premium" => self.vix_variance_premium,
             "vix_return_clamp" => self.vix_return_clamp,
             "vix_return_gain" => self.vix_return_gain,
             "vix_return_gain_up" => self.vix_return_gain_up,
@@ -3597,6 +3738,8 @@ impl ModelParams {
             "forced_flow_replenish" => out.forced_flow_replenish = value,
             "vix_cycle_amplitude" => out.vix_cycle_amplitude = value,
             "vix_realised_vol_weight" => out.vix_realised_vol_weight = value,
+            "vix_level_identity" => out.vix_level_identity = value,
+            "vix_variance_premium" => out.vix_variance_premium = value,
             "vix_return_clamp" => out.vix_return_clamp = value,
             "vix_return_gain" => out.vix_return_gain = value,
             "vix_return_gain_up" => out.vix_return_gain_up = value,
@@ -3822,6 +3965,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "forced_flow_reservoir",
         "forced_flow_replenish",
         "vix_realised_vol_weight",
+        "vix_level_identity",
+        "vix_variance_premium",
         "vix_return_clamp",
         "vix_return_gain",
         "vix_return_gain_up",

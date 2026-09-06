@@ -74,6 +74,9 @@ JUMPS = Mechanism(
     state=(
         StateSpec("economy.vix", scope="engine", doc="the VIX today",
                   rust="self.economy.vix"),
+        StateSpec("vix_anchor", scope="engine",
+                  doc="the VIX at which the rate scale is one",
+                  rust="self.vix_anchor"),
         StateSpec("stock.mispricing_s", scope="company", optional=True,
                   doc="log deviation from fair value",
                   rust="company.stock.mispricing_s"),
@@ -92,7 +95,7 @@ JUMPS = Mechanism(
     body=(
         # The regime's effect on the arrival rate. The ratio is a pure
         # value; at coupling zero the branch that uses it is not taken.
-        Let("ratio", div(State("economy.vix"), Dial("market_vol_vix_anchor"))),
+        Let("ratio", div(State("economy.vix"), State("vix_anchor"))),
         Let("rate_scale", If(Bin("==", Dial("jump_vix_coupling"), Const(0.0)),
                              Const(1.0),
                              add(sub(Const(1.0), Dial("jump_vix_coupling")),

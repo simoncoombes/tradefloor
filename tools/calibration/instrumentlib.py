@@ -253,6 +253,20 @@ PARAM_SPECS: dict[str, dict] = {
     # calibration notes).
     "vix_realised_vol_weight": {"kind": "abs", "step_unit": 0.05,
                                 "hard_range": (0.0, 1.0)},
+    # The level identity is a SWITCH, not a quantity: 0.0 is the phase
+    # table and 1.0 is the index's own variance, and a search that
+    # landed on 0.4 would be running neither. The range is opened to
+    # both ends so an atlas can reach the arm, with a step that walks
+    # the whole interval in one move.
+    "vix_level_identity": {"kind": "abs", "step_unit": 1.0,
+                           "hard_range": (0.0, 1.0)},
+    # The premium is MEASURED at 0.252 with a per-year IQR of 1.128 to
+    # 1.398 on the ratio, so 0.128 to 0.398 here. The box is that IQR
+    # widened to the P10-P90 of the rolling-window estimator (1.049 to
+    # 1.473) rather than opened to anything a search finds comfortable:
+    # outside it the value is not one the tape supports.
+    "vix_variance_premium": {"kind": "abs", "step_unit": 0.02,
+                             "hard_range": (0.049, 0.473)},
     "vix_return_gain": {"kind": "log", "hard_range": (1.0, 250.0)},
     "vix_return_source": {"kind": "abs", "step_unit": 0.1,
                           "hard_range": (0.0, 1.0)},

@@ -1762,6 +1762,20 @@ impl PyEngine {
         self.inner.params().fingerprint()
     }
 
+    /// The VIX at which this engine's variance couplings read ONE.
+    ///
+    /// `model_params["market_vol_vix_anchor"]` under every preset before
+    /// pt-v19, and the value DERIVED from the index's own unconditional
+    /// variance under `vix_level_identity`. Exposed because under the
+    /// identity it is a property of the run rather than of the model: it
+    /// depends on the roster, so no coefficient dictionary can state it and
+    /// a preset record that quotes it has to say which universe it was
+    /// derived on.
+    #[getter]
+    fn vix_anchor(&self) -> f64 {
+        self.inner.vix_anchor()
+    }
+
     /// The model this engine runs, as a `ModelParams`.
     #[getter]
     fn model(&self) -> crate::python_params::PyModelParams {

@@ -254,6 +254,26 @@ pub fn update_market_variance_with(
     day_factor: f64,
     vix: f64,
 ) -> f64 {
+    update_market_variance_at(
+        params, params.market_vol_vix_anchor, current_variance, day_factor, vix)
+}
+
+/// [`update_market_variance_with`] against an EXPLICIT anchor.
+///
+/// The anchor is the VIX at which the coupled target equals the baseline
+/// variance, and under `vix_level_identity` it is DERIVED from the index's
+/// own unconditional variance rather than read from the dial -- so the
+/// engine has to be able to say which one this update reads. Every caller
+/// that is not the engine passes `params.market_vol_vix_anchor`, which is
+/// the expression that stood here, so the arithmetic is unchanged to the
+/// bit for every preset before pt-v19.
+pub fn update_market_variance_at(
+    params: &crate::params::ModelParams,
+    vix_anchor: f64,
+    current_variance: f64,
+    day_factor: f64,
+    vix: f64,
+) -> f64 {
     let base = params.market_factor_sigma * params.market_factor_sigma;
     // The reversion target: baseline variance, VIX-scaled when coupled.
     // The blend form is kept even at coupling 1.0 because the constant is
@@ -264,7 +284,7 @@ pub fn update_market_variance_with(
     // residue), and at `vix == MARKET_VOL_VIX_ANCHOR` the ratio is
     // exactly 1.0 at any coupling, so an anchor-level VIX reproduces the
     // autonomous update bit-for-bit — tests pin both.
-    let vix_ratio = vix / params.market_vol_vix_anchor;
+    let vix_ratio = vix / vix_anchor;
     let target = base
         * (1.0 - params.market_vol_vix_coupling
             + params.market_vol_vix_coupling * vix_response(params, vix_ratio));
@@ -459,6 +479,17 @@ impl MarketVarianceState {
         mathx::sqrt(self.variance)
     }
 
+    /// Today's factor VARIANCE, the state itself.
+    ///
+    /// Beside `sigma_daily` rather than derived from it: `sqrt(v)` squared
+    /// is not `v`, and the index-variance identity reads this state
+    /// alongside variances that were never square-rooted, so a round trip
+    /// through the square root would put a rounding difference on one term
+    /// of a sum and not the others.
+    pub fn variance(&self) -> f64 {
+        self.variance
+    }
+
     /// Accumulate one tick's market factor into the day's innovation.
     pub fn accumulate(&mut self, market_factor: f64) {
         self.day_factor += market_factor;
@@ -482,6 +513,19 @@ impl MarketVarianceState {
     /// calls; at [`crate::params::PT_V1`] it is the shipped update bit for
     /// bit.
     pub fn close_day_with(&mut self, params: &crate::params::ModelParams, vix: f64) {
+        self.close_day_at(params, params.market_vol_vix_anchor, vix);
+    }
+
+    /// [`Self::close_day_with`] against an EXPLICIT anchor -- what the
+    /// engine calls, so that `vix_level_identity`'s derived anchor reaches
+    /// the forward map. At `params.market_vol_vix_anchor` this is the
+    /// arithmetic that stood here, to the bit.
+    pub fn close_day_at(
+        &mut self,
+        params: &crate::params::ModelParams,
+        vix_anchor: f64,
+        vix: f64,
+    ) {
         // The fear the target reads, not necessarily today's print. Real
         // volatility follows sustained fear with inertia; a model that
         // transmits every VIX print one-for-one into the variance target
@@ -499,7 +543,7 @@ impl MarketVarianceState {
             sm
         };
         let base = params.market_factor_sigma * params.market_factor_sigma;
-        let vix_ratio = vix / params.market_vol_vix_anchor;
+        let vix_ratio = vix / vix_anchor;
         let target = base
             * (1.0 - params.market_vol_vix_coupling
                 + params.market_vol_vix_coupling * vix_response(params, vix_ratio));
@@ -511,8 +555,8 @@ impl MarketVarianceState {
         // update to the bit, and this is the only spelling that owes
         // nothing to an argument about how floats behave.
         if w == 0.0 {
-            self.variance = update_market_variance_with(
-                params, self.variance, self.day_factor, vix);
+            self.variance = update_market_variance_at(
+                params, vix_anchor, self.variance, self.day_factor, vix);
             self.fast_variance = self.variance;
             self.prev_day_factor = self.day_factor;
             self.day_factor = 0.0;

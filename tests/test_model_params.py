@@ -269,6 +269,17 @@ PERTURBATIONS = [
     # `test_the_crisis_threshold_acts_above_itself`.
     ("vix_mean_reversion", 0.30, True),
     ("vix_realised_vol_weight", 0.5, True),
+    # The LEVEL identity, and it moves the market on its own: the VIX's
+    # whole target becomes the index's conditional variance in points,
+    # which the macro chain reads every day and the market reads back
+    # through the factor's variance target the same day.
+    ("vix_level_identity", 1.0, True),
+    # The premium is a multiplier on that level and is NOT read while
+    # the identity above is 0.0, which is this probe's default. Inert
+    # for the same reason `vix_target_shock_cap` is: the branch that
+    # reads it is not taken. Shown live by
+    # `test_the_premium_moves_the_level_once_the_identity_is_on`.
+    ("vix_variance_premium", 0.5, False),
     ("vix_cycle_amplitude", 1.0, True),     # perturbed AWAY from the default, which is 0.0 since the 2026-08-26 boundary
     ("vix_return_source", 0.0, True),        # perturbed AWAY from the default, which is 1.0 since pt-v10
     ("vix_return_gain", 150.0, True),         # the channel reads the day since pt-v10, and the harness's days fall

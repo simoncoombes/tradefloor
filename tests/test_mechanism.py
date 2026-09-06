@@ -59,7 +59,13 @@ def test_the_generated_rust_keeps_the_contract():
     # source order and no reassociation: fully parenthesised, as written
     assert "(1.0 - p.jump_vix_coupling) + ((p.jump_vix_coupling * ratio) * ratio)" in text
     assert "crate::market::tick::clamp_s(&self.params, s + total)" in text
-    assert "let ratio = self.economy.vix / p.market_vol_vix_anchor;" in text
+    # THE ANCHOR IS ENGINE STATE, not a dial read. Under
+    # `vix_level_identity` it is derived from the index's own
+    # unconditional variance and `params.market_vol_vix_anchor` is not read
+    # at all, so the arrival rate has to read the value the engine ran with
+    # rather than the coefficient. The dial stays declared, because it is
+    # still where the anchor comes from at the default.
+    assert "let ratio = self.economy.vix / self.vix_anchor;" in text
     assert text.index("next_f64") < text.index("next_normal")
     assert "if let Some(acc) = self.attribution.get_mut(index)" in text
 
@@ -598,7 +604,7 @@ def test_the_intensity_accessor_is_generated_from_the_specification():
     have = emit.committed(JUMPS, "jumps.intensity_market")
     assert have is not None
     assert have == emit.accessor_body(JUMPS, "intensity_market")
-    assert "let ratio = self.economy.vix / p.market_vol_vix_anchor;" in have
+    assert "let ratio = self.economy.vix / self.vix_anchor;" in have
     assert "let rate_scale = if p.jump_vix_coupling == 0.0" in have
     assert "let intensity_market = if p.jump_vix_coupling == 0.0" in have
     # it reads state and dials and takes no draw

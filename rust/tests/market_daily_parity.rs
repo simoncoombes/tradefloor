@@ -168,6 +168,7 @@ fn replay_case(case: &Json) -> (TickCompany, String) {
             // convention: the sector table lives in the reference implementation.
             sector_base_daily_variance: bits(i["sectorBaseDailyVariance"].as_str().unwrap()),
             vix: 15.0,
+            vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
             avg_volume: AvgVolumePolicy::ReferenceEma,
         },
     );
@@ -298,6 +299,7 @@ fn walk_chain(chain: &Json, base: f64, mut visit: impl FnMut(usize, &TickCompany
                 daily_innovation: None,
                 sector_base_daily_variance: base,
                 vix: 15.0,
+                vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
                 avg_volume: AvgVolumePolicy::ReferenceEma,
             },
         );

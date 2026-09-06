@@ -52,6 +52,7 @@ pub mod factors;
 pub mod garch;
 pub mod hours;
 pub mod index_value;
+pub mod index_var;
 pub mod tick;
 
 pub use daily::{close_day, close_day_all, close_day_with, reset_daily_prices, AvgVolumePolicy, CloseInputs};
@@ -66,6 +67,8 @@ pub use hours::{
     MarketStatus, MARKET_MINUTES,
 };
 pub use index_value::{calculate_market_index, IndexConstituent, IndexValue};
+pub use index_var::{index_conditional_variance, index_unconditional_variance,
+                    intraday_variance_factor, vix_from_variance, NameVariance};
 pub use tick::{
     simulate_market_tick, NewsImpactEntry, OrderVolume, SettleDrawPolicy, TickCompany, TickInputs,
     TickOutcome, TickStock, MARKET_FACTOR_SIGMA, S_PHI_TICK,

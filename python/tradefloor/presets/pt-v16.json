@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v16",
   "fingerprint": "pt-v16",
-  "coefficient_digest": "00171476a373b15ac52dd265c09c2a5cb1e4fcd1296a957ebe3abbe739fbdabe",
+  "coefficient_digest": "6067ac72b5cee02449b5654349c31ddbd89d8b606f27841dbc2d0676eae71c95",
   "coefficients": {
     "book_levels": 10.0,
     "buyback_payout_share": 0.0,
@@ -141,6 +141,7 @@
     "vix_decay_ratio": 0.6,
     "vix_jump_intensity": 0.0,
     "vix_jump_scale": 0.0,
+    "vix_level_identity": 0.0,
     "vix_mean_reversion": 0.06,
     "vix_realised_vol_weight": 0.3,
     "vix_return_clamp": 15.0,
@@ -149,6 +150,7 @@
     "vix_return_source": 1.0,
     "vix_target_offset": 0.0,
     "vix_target_shock_cap": 45.0,
+    "vix_variance_premium": 0.252,
     "volume_idio_persistence": 0.0,
     "volume_idio_sigma": 0.0,
     "volume_idio_variance_gain": 0.0,
@@ -162,7 +164,7 @@
   },
   "mechanisms": {
     "jumps": {
-      "spec": "39073377cfbc0ef059453c7909d6e713ae5ce4a40d117c157b31040ecd9df39a",
+      "spec": "b27965bd06cd6fc3ae3199835bbd8e7007839460d3f67fba8489d6a80df79ff1",
       "stream": "jumps",
       "doses": {
         "jump_intensity_market": 0.0565753337,

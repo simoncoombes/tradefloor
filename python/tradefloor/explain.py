@@ -281,6 +281,11 @@ MECHANISMS: tuple[Mechanism, ...] = (
                ("jumps", "jump_market_z", "market"),
                ("jumps", "jump_company_u", "company"),
                ("jumps", "jump_company_z", "company")),
+        # The arrival rate reads the ANCHOR through the engine, not the
+        # dial: under `vix_level_identity` the anchor is derived from the
+        # index's own unconditional variance and the dial is not read at
+        # all, so the honest place to look for it is the derivation.
+        via=("engine::Engine::derive_vix_anchor",),
         offset=-1,
     ),
     Mechanism(
