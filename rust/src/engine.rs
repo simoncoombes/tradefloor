@@ -2252,6 +2252,7 @@ impl Engine {
                 },
                 vix_level_identity: self.params.vix_level_identity,
                 vix_return_gain_up: self.params.vix_return_gain_up,
+                vix_return_exponent: self.params.vix_return_exponent,
                 vix_return_clamp: self.params.vix_return_clamp,
                 vix_target_shock_cap: self.params.vix_target_shock_cap,
                 vix_ceiling: self.params.vix_ceiling,

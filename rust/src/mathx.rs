@@ -77,6 +77,25 @@ pub fn cos(x: f64) -> f64 {
     libm::cos(x)
 }
 
+/// The gamma function.
+///
+/// Reached from one place: the Gaussian absolute moment of order `p` in
+/// [`crate::economy::daily::expected_return_spike`], which needs
+/// `Gamma((p + 1) / 2)` to cancel a fear excursion whose down side carries
+/// an exponent. Its call site branches at `p = 1` rather than evaluating
+/// `Gamma(1)`, so nothing that predates that exponent reaches this
+/// function at all.
+///
+/// Routed through `libm` for the module's own reason and not by habit:
+/// `tgamma` is a series evaluation, so the platform libm answers differ in
+/// the last places, and a VIX level that differed by an ULP between Linux
+/// and Windows would compound through the variance loop exactly as the
+/// module docs describe for `cos`.
+#[inline]
+pub fn tgamma(x: f64) -> f64 {
+    libm::tgamma(x)
+}
+
 /// Square root.
 ///
 /// Delegates to `std` deliberately: IEEE-754 pins the result exactly, so all

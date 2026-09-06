@@ -146,6 +146,7 @@
     "vix_mean_reversion": 0.06,
     "vix_realised_vol_weight": 0.3,
     "vix_return_clamp": 15.0,
+    "vix_return_exponent": 1.0,
     "vix_return_gain": 17.0,
     "vix_return_gain_up": 17.0,
     "vix_return_source": 1.0,
