@@ -2155,6 +2155,33 @@ pub struct ModelParams {
     /// The DIRECTION is robust across every bucket; the fourth decimal is
     /// not, and shipping it would be a chosen constant wearing a
     /// measurement's clothes.
+    ///
+    /// **0.8965 IS NOT `vix_return_gain_up`'s TARGET**, and the table
+    /// above is the easiest place in this file to think it is. It is the
+    /// scale of a `p = 1.041` power fit, and no dial in this tree
+    /// implements that form. The quantity the up side's dial reproduces
+    /// is the scale of a fit with the exponent PINNED AT 1, which is what
+    /// the code runs. Refitting the same eight up buckets that way gives
+    /// **0.9278** -- residual sd 0.1425 in logs, 14.2 per cent in `dVIX`;
+    /// standard error of the mean 0.0504, so a 95 per cent interval of
+    /// 0.824 to 1.045 on seven degrees of freedom; worst bucket 38.5 per
+    /// cent; count-weighted 0.8904. The same refit on the DOWN buckets
+    /// gives 1.1872 with a worst residual of 29.6 per cent against the
+    /// power form's 9.8, which is the convexity stated in the units a
+    /// linear dial would have to work in.
+    ///
+    /// # The zero-mean correction moves with this dial
+    ///
+    /// Under [`ModelParams::vix_level_identity`] the standing excursion
+    /// an asymmetric response injects is cancelled by its own closed form
+    /// rather than by a fitted offset, and that closed form is the
+    /// response's FIRST MOMENT. A power form changes it: see
+    /// [`crate::economy::daily::expected_return_spike`], which carries
+    /// this exponent for that reason. The two dials are independent of
+    /// each other -- either ships alone -- but a tree that has one
+    /// reaching the spike and not the correction cancels the wrong
+    /// quantity, by a factor that scales as `sigma^(p - 1)` and is
+    /// therefore right at exactly one volatility.
     pub vix_return_exponent: f64,
     /// The index return is clamped to +/- this before it drives the VIX.
     ///
