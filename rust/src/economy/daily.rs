@@ -139,6 +139,9 @@ pub struct DailyInputs<'a> {
     /// The index's conditional daily sigma in PER CENT, for the fear
     /// excursion's zero-mean correction. Read only under the identity.
     pub vix_index_sigma_pct: f64,
+    /// The exponent of the return-to-fear response; 1.0 is the linear
+    /// form and is bit-identical. See `ModelParams::vix_return_exponent`.
+    pub vix_return_exponent: f64,
     pub vix_return_clamp: f64,
     pub vix_target_shock_cap: f64,
     /// Upper bound on the VIX state. See `ModelParams::vix_ceiling`, which
@@ -232,6 +235,7 @@ impl<'a> Default for DailyInputs<'a> {
             vix_return_gain_up: VIX_RETURN_GAIN_UP,
             vix_level_identity: 0.0,
             vix_index_sigma_pct: 0.0,
+            vix_return_exponent: 1.0,
             vix_return_clamp: VIX_RETURN_CLAMP,
             vix_target_shock_cap: VIX_TARGET_SHOCK_CAP,
             inflation_reversion: INFLATION_MEAN_REVERSION,
@@ -249,14 +253,6 @@ impl<'a> Default for DailyInputs<'a> {
     }
 }
 
-/// One simulated day of the macro chain.
-///
-/// The reference implementation spread-copies (`{ ...economy }`) and returns new state.
-/// This takes `&EconomyState` and returns a new one for the same reason: the
-/// observable contract is the returned value, and a `&mut` version would make
-/// the "reads `economy.x`, writes `newState.x`" distinction — which is
-/// load-bearing throughout, since many lines read the OLD value after a new
-/// one has been written — impossible to express faithfully.
 /// The MEAN of the VIX target's return spike over a session, given the
 /// index's own conditional sigma — the quantity `vix_target_offset` was
 /// fitted to cancel.
@@ -311,6 +307,64 @@ pub fn expected_return_spike(sigma_pct: f64, gain: f64, gain_up: f64) -> f64 {
 /// `sqrt(2 pi)`, as `market::factors` spells it. A literal because `sqrt`
 /// is not `const`, and the test below pins it against `mathx::sqrt`.
 const SQRT_TWO_PI: f64 = 2.5066282746310002;
+
+/// The VIX target's response to the session return, in points.
+///
+/// Extracted from the daily update so it can be pinned directly: the
+/// claim that a preset predating `vix_return_exponent` reproduces bit for
+/// bit is a property of this arithmetic and nothing else, and a test that
+/// has to drive a whole economy to reach it is testing the economy.
+///
+/// The sign convention is the one that stood: a DOWN session (a negative
+/// `current`) produces a POSITIVE spike, and an up session a negative one.
+///
+/// At `exponent == 1.0` this is the shipped expression to the bit -- the
+/// same multiply in the same operand order -- and the branch exists for
+/// that reason rather than for speed. `pow(x, 1.0)` is not guaranteed to
+/// return `x` exactly on every platform, and a preset that predates a dial
+/// must not depend on it.
+///
+/// Above 1.0 the response is CONVEX and `gain` becomes the SCALE of a
+/// power law: see [`crate::params::ModelParams::vix_return_exponent`] for
+/// the measurement it comes from, the exponent's error bar, and what the
+/// up side assumes.
+pub fn return_spike_for(current: f64, gain: f64, gain_up: f64, exponent: f64) -> f64 {
+    // THE EXPONENT IS THE DOWN SIDE'S ALONE, and that is a measurement
+    // rather than a simplification. Fitting the two sides separately on
+    // the same 8,960 sessions, same alignment, same estimator:
+    //
+    //   down   scale 1.0033   exponent 1.1996   R^2 0.9947
+    //   up     scale 0.8965   exponent 1.0410   R^2 0.9655
+    //
+    // The down side is convex; the up side is very nearly LINEAR, and at
+    // an R^2 of 0.9655 with a worst bucket missing by 35 per cent on 23
+    // sessions, 1.0410 is not distinguishable from 1.0 by this data. So
+    // the up side keeps the linear form rather than carrying a fourth
+    // decimal the fit does not support, and applying one exponent to
+    // both sides -- which is what the first version of this did -- would
+    // have made the up side wrong to buy nothing.
+    if current >= 0.0 || exponent == 1.0 {
+        // An UP session, or the linear special case, in the arithmetic
+        // that stood here: same multiply, same operand order, so every
+        // preset predating this dial reproduces to the bit.
+        if current < 0.0 {
+            -current * gain
+        } else {
+            -current * gain_up
+        }
+    } else {
+        gain * mathx::pow(-current, exponent)
+    }
+}
+
+/// One simulated day of the macro chain.
+///
+/// The reference implementation spread-copies (`{ ...economy }`) and returns new state.
+/// This takes `&EconomyState` and returns a new one for the same reason: the
+/// observable contract is the returned value, and a `&mut` version would make
+/// the "reads `economy.x`, writes `newState.x`" distinction — which is
+/// load-bearing throughout, since many lines read the OLD value after a new
+/// one has been written — impossible to express faithfully.
 
 pub fn update_economy_daily(
     economy: &EconomyState,
@@ -954,11 +1008,9 @@ pub fn update_economy_daily(
         (1.0 - s) * inputs.market_return_pct + s * inputs.market_day_return_pct
     };
     let current_mkt_ret_vix = mathx::max(-clamp_vix, mathx::min(clamp_vix, driving_return));
-    let return_spike = if current_mkt_ret_vix < 0.0 {
-        -current_mkt_ret_vix * inputs.vix_return_gain
-    } else {
-        -current_mkt_ret_vix * inputs.vix_return_gain_up
-    };
+    let return_spike = return_spike_for(
+        current_mkt_ret_vix, inputs.vix_return_gain,
+        inputs.vix_return_gain_up, inputs.vix_return_exponent);
     let inflation_adj = mathx::max(0.0, (economy.inflation_rate - 3.0) * 0.2);
     let shock_adj = shock_gdp_impact.abs() * 2.0;
     target_vix += mathx::min(
@@ -1468,5 +1520,125 @@ mod vix_level_identity {
         }).collect();
         assert!(off[0] != off[1] && off[1] != off[2],
                 "the source moves nothing even with the identity off: {off:?}");
+    }
+}
+
+#[cfg(test)]
+mod vix_return_shape {
+    use super::*;
+
+    /// Every preset that predates the dial must reproduce bit for bit, and
+    /// the claim is about THIS arithmetic, so it is asserted on bits over
+    /// a spread of returns rather than on a tolerance at one point. The
+    /// expectation is written out as the expression that stood here, not
+    /// as a number, so a change to either side is caught.
+    #[test]
+    fn a_unit_exponent_is_the_shipped_arithmetic_to_the_bit() {
+        let (gain, gain_up) = (30.0, 14.0);
+        for i in -400..=400 {
+            let r = i as f64 * 0.05;
+            let want = if r < 0.0 { -r * gain } else { -r * gain_up };
+            assert_eq!(return_spike_for(r, gain, gain_up, 1.0), want,
+                       "moved at r = {r}");
+        }
+    }
+
+    /// The sign convention the linear form set: a DOWN session frightens
+    /// the market and an UP session calms it, at every exponent.
+    #[test]
+    fn a_down_session_raises_fear_and_an_up_session_lowers_it() {
+        for &p in &[1.0, 1.132, 1.200, 1.287] {
+            assert!(return_spike_for(-2.0, 30.0, 15.0, p) > 0.0, "down at p={p}");
+            assert!(return_spike_for(2.0, 30.0, 15.0, p) < 0.0, "up at p={p}");
+            assert_eq!(return_spike_for(0.0, 30.0, 15.0, p), 0.0, "zero at p={p}");
+        }
+    }
+
+    /// THE UP SIDE IS LINEAR AT EVERY EXPONENT, because the tape says it
+    /// is: fitted separately the up side reads 1.0410 at an R squared of
+    /// 0.9655, which this data cannot distinguish from 1.0. So the
+    /// exponent must not reach it, and an up session gives the same
+    /// answer whatever the dial says.
+    #[test]
+    fn the_exponent_does_not_reach_the_up_side() {
+        for i in 0..=200 {
+            let r = i as f64 * 0.05;
+            let want = -r * 15.0;
+            for &p in &[1.0, 1.132, 1.200, 1.287, 1.8] {
+                assert_eq!(return_spike_for(r, 30.0, 15.0, p), want,
+                           "the up side moved at r={r}, p={p}");
+            }
+        }
+    }
+
+    /// CONVEXITY, which is the whole point of the dial: points of fear per
+    /// per-cent of return must RISE with the size of the move, where the
+    /// linear form holds them flat. The real curve rises from 1.00 to 1.54
+    /// across this span and a constant gain cannot.
+    #[test]
+    fn the_response_per_per_cent_rises_only_above_a_unit_exponent() {
+        let per_pct = |r: f64, p: f64| return_spike_for(-r, 30.0, 15.0, p) / r;
+        for &r in &[0.71, 1.70, 2.75, 3.36, 6.39] {
+            assert!((per_pct(r, 1.0) - 30.0).abs() < 1e-12,
+                    "the linear form is not flat at r={r}");
+        }
+        let mut last = f64::NEG_INFINITY;
+        for &r in &[0.71, 1.70, 2.75, 3.36, 6.39] {
+            let v = per_pct(r, 1.200);
+            assert!(v > last, "not rising at r={r}: {v} after {last}");
+            last = v;
+        }
+    }
+
+    /// The scale reproduces the FITTED curve, which is the only claim
+    /// this arithmetic can make.
+    ///
+    /// `dVIX = 1.003 |r|^1.200` reaches the VIX through a transmission
+    /// `c`, so a scale of `1.003 / c` puts the target's spike at
+    /// `1.003/c * |r|^1.200` and the realised response back on the fit.
+    /// Asserted to floating-point tolerance, because this is an identity
+    /// about the code and not a measurement.
+    #[test]
+    fn the_derived_scale_reproduces_the_fitted_curve() {
+        const C: f64 = 0.03138;
+        let scale = 1.003 / C;
+        for &r in &[0.710, 1.211, 1.704, 2.234, 2.746, 3.360, 4.415, 6.390] {
+            let realised = C * return_spike_for(-r, scale, scale / 2.0, 1.200);
+            let want = 1.003 * mathx::pow(r, 1.200);
+            assert!((realised - want).abs() < 1e-9,
+                    "bucket {r}: realised {realised}, fit {want}");
+        }
+    }
+
+    /// And the fit's distance from the buckets it was fitted to is a
+    /// property of the FIT, not of this code, so it is derived here rather
+    /// than pinned: the tolerance is the worst residual the eight medians
+    /// themselves produce. Written this way so that the day someone
+    /// refits the curve, this test moves with it instead of failing for a
+    /// reason that has nothing to do with the arithmetic under test.
+    #[test]
+    fn the_fit_sits_within_its_own_worst_residual_of_every_bucket() {
+        const BUCKETS: [(f64, f64); 8] = [
+            (0.710, 0.710), (1.211, 1.255), (1.704, 1.890), (2.234, 2.440),
+            (2.746, 3.040), (3.360, 4.530), (4.415, 6.040), (6.390, 9.830)];
+        let worst = BUCKETS.iter()
+            .map(|&(r, d)| (1.003 * mathx::pow(r, 1.200) / d - 1.0).abs())
+            .fold(0.0_f64, f64::max);
+        // The fit is a least-squares line through eight points and does
+        // not pass through any of them; a worst residual far above a
+        // tenth would mean the power law is the wrong family, which is
+        // the thing worth catching here.
+        assert!(worst < 0.15,
+                "the fit misses its worst bucket by {:.1} per cent, which is                  too far for a power law to be the right family",
+                100.0 * worst);
+        const C: f64 = 0.03138;
+        let scale = 1.003 / C;
+        for &(r, dvix) in BUCKETS.iter() {
+            let realised = C * return_spike_for(-r, scale, scale / 2.0, 1.200);
+            let err = (realised / dvix - 1.0).abs();
+            assert!(err <= worst + 1e-9,
+                    "bucket {r} is off by {:.1} per cent, worse than the                      fit's own worst residual of {:.1}",
+                    100.0 * err, 100.0 * worst);
+        }
     }
 }

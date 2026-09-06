@@ -2034,10 +2034,128 @@ pub struct ModelParams {
     /// to 1.79 against a real 4.0 and leaves lag-5 clustering where it was
     /// (§68). What was missing is the feedback above, not the gain.
     pub vix_return_gain: f64,
-    /// The same for an UP day. Shipped 10.0; the real response to a +2% day
-    /// is about half the size of the response to -2%, which the shipped
-    /// 2.5:1 ratio is already close to.
+    /// The same for an UP day. Shipped 10.0.
+    ///
+    /// # The "about half" this used to claim has no provenance, and is wrong
+    ///
+    /// This docstring read: "the real response to a +2% day is about half
+    /// the size of the response to -2%, which the shipped 2.5:1 ratio is
+    /// already close to." That sentence names no series, no window, no
+    /// sample size and no estimator, and it sits directly beneath
+    /// `vix_return_gain`'s claim, which names all four -- so it read as
+    /// though it inherited that provenance when it had none of its own.
+    /// It was the only statement of a real up-to-down ratio anywhere in
+    /// the tree, and a derivation was built on it.
+    ///
+    /// MEASURED, on ^GSPC and ^VIX over 8,960 aligned sessions, by
+    /// fitting each side separately and evaluating the two curves:
+    ///
+    /// | move | down response | up response | up / down |
+    /// |---|---|---|---|
+    /// | 1% | 1.003 | 0.897 | 0.89 |
+    /// | 3% | 3.73 | 2.80 | 0.75 |
+    /// | 6% | 8.58 | 5.75 | 0.67 |
+    ///
+    /// So the real ratio is 0.67 to 0.89, not 0.5, and the model's fear
+    /// asymmetry is about TWICE the real one rather than close to it.
+    ///
+    /// And the ratio is NOT CONSTANT, because the two sides have
+    /// different exponents -- 1.1996 down against 1.0410 up. **No single
+    /// value of this dial can express a ratio that varies with the size
+    /// of the move.** That is the same class of defect as the linear
+    /// response the exponent fixes: the parameter's form cannot represent
+    /// the quantity it names. Expressing it properly needs an up-side
+    /// scale set against the down-side scale at the fit level, 0.894, and
+    /// the residual variation left over is the up side's own exponent,
+    /// which this data cannot resolve.
     pub vix_return_gain_up: f64,
+    /// The EXPONENT of the return-to-fear response. 1.0 ships and is the
+    /// linear form, bit-identical to the arithmetic that stood here.
+    ///
+    /// # Why a linear gain cannot be calibrated
+    ///
+    /// The real response of implied volatility to a session return is
+    /// CONVEX, and a gain multiplies every size of move by the same
+    /// factor, so no value of `vix_return_gain` can reproduce it. Measured
+    /// on ^GSPC and ^VIX, 8,960 sessions aligned on dates both series
+    /// report, 1990-01-03 to 2025-07-31, down sessions bucketed with each
+    /// bucket represented by its OWN median rather than its label:
+    ///
+    /// | median \|r\| | median dVIX | points per 1% |
+    /// |---|---|---|
+    /// | 0.710 | 0.710 | 1.00 |
+    /// | 1.211 | 1.255 | 1.04 |
+    /// | 1.704 | 1.890 | 1.11 |
+    /// | 2.234 | 2.440 | 1.09 |
+    /// | 2.746 | 3.040 | 1.11 |
+    /// | 3.360 | 4.530 | 1.35 |
+    /// | 4.415 | 6.040 | 1.37 |
+    /// | 6.390 | 9.830 | 1.54 |
+    ///
+    /// The points-per-1% column rises monotonically from 1.00 to 1.54, so
+    /// the convexity is visible before any fit. Least squares in logs on
+    /// the eight bucket medians gives `dVIX = 1.003 * |r|^1.200` at an R
+    /// squared of 0.9947. A linear gain is the `p = 1` special case and
+    /// the tape rejects it.
+    ///
+    /// # The exponent's error bar, which it must not ship without
+    ///
+    /// Refitting those medians: residual sd 0.0671 in logs, which is 6.9
+    /// per cent in `dVIX`, worst bucket -9.8 per cent; standard error of
+    /// the exponent 0.0357, so a 95 per cent interval of **1.112 to
+    /// 1.287** on six degrees of freedom.
+    ///
+    /// A SECOND and larger uncertainty is the weighting. The fit above is
+    /// unweighted over buckets holding 22 to 994 sessions -- the shallow
+    /// buckets carry forty-five times the sessions of the deep ones -- and
+    /// weighting by count gives **1.132** instead. Neither is wrong:
+    /// unweighted asks what shape the curve has, count-weighted asks what
+    /// shape a typical session sees. The first is the right question for a
+    /// tail, so 1.200 is the value here, but the choice is a choice and
+    /// the range it spans is worth 8 per cent of the response at -3% and
+    /// 13 per cent at -6.4%.
+    ///
+    /// # What changes when this is not 1.0
+    ///
+    /// `vix_return_gain` stops being a gain and becomes the SCALE of a
+    /// power law, and its units change from VIX points per per-cent to
+    /// VIX points per per-cent to the p. The scale that reproduces the
+    /// real curve is `1.003 / c`, where `c` is the measured transmission
+    /// from a point of VIX TARGET to a point of same-day VIX.
+    ///
+    /// `vix_target_shock_cap` is a boundary condition on the spike, so it
+    /// moves with the form too: the largest spike the model can produce
+    /// becomes `scale * vix_return_clamp^p` rather than
+    /// `gain * vix_return_clamp`.
+    ///
+    /// # The up side was assumed, then measured, and the assumption lost
+    ///
+    /// The first version of this dial applied one exponent to BOTH sides
+    /// and said so as an assumption. The up side has since been fitted on
+    /// the same 8,960 sessions with the same alignment, the same
+    /// estimator and the same buckets, taking `-dVIX` on up sessions
+    /// (`programme/scripts/vix-updown-fit.py` in the design repo, and the
+    /// down fit reproduces the figures above exactly, which is what makes
+    /// the instrument trustworthy before it is used on new data):
+    ///
+    /// | side | scale | exponent | R squared | worst bucket |
+    /// |---|---|---|---|---|
+    /// | down | 1.0033 | 1.1996 | 0.9947 | 9.8% |
+    /// | up | 0.8965 | 1.0410 | 0.9655 | 35.0% |
+    ///
+    /// **The down side is convex and the up side is very nearly linear**,
+    /// so ONE exponent across both would have been wrong on the up side
+    /// to buy nothing. The exponent is therefore the down side's alone;
+    /// `return_spike_for` never reaches an up session with it and a test
+    /// pins that at every exponent.
+    ///
+    /// The up side keeps the LINEAR form rather than shipping 1.0410,
+    /// because at an R squared of 0.9655 with a worst bucket missing by
+    /// 35 per cent on 23 sessions this data cannot tell 1.0410 from 1.0.
+    /// The DIRECTION is robust across every bucket; the fourth decimal is
+    /// not, and shipping it would be a chosen constant wearing a
+    /// measurement's clothes.
+    pub vix_return_exponent: f64,
     /// The index return is clamped to +/- this before it drives the VIX.
     ///
     /// Shipped 0.03, so a -10% day and a -3% day produce identical fear. A
@@ -2376,6 +2494,9 @@ impl ModelParams {
             vix_return_source: 0.0,
             vix_return_gain: crate::economy::VIX_RETURN_GAIN,
             vix_return_gain_up: crate::economy::VIX_RETURN_GAIN_UP,
+            // 1.0 is the linear form and is bit-identical to the
+            // arithmetic that stood before this dial existed.
+            vix_return_exponent: 1.0,
             vix_return_clamp: crate::economy::VIX_RETURN_CLAMP,
             vix_target_shock_cap: crate::economy::VIX_TARGET_SHOCK_CAP,
             // Both reproduce the shipped arithmetic exactly: 80.0 is the
@@ -3579,6 +3700,7 @@ impl ModelParams {
             "vix_return_clamp" => self.vix_return_clamp,
             "vix_return_gain" => self.vix_return_gain,
             "vix_return_gain_up" => self.vix_return_gain_up,
+            "vix_return_exponent" => self.vix_return_exponent,
             "vix_return_source" => self.vix_return_source,
             "vix_target_shock_cap" => self.vix_target_shock_cap,
             "vix_ceiling" => self.vix_ceiling,
@@ -3743,6 +3865,7 @@ impl ModelParams {
             "vix_return_clamp" => out.vix_return_clamp = value,
             "vix_return_gain" => out.vix_return_gain = value,
             "vix_return_gain_up" => out.vix_return_gain_up = value,
+            "vix_return_exponent" => out.vix_return_exponent = value,
             "vix_return_source" => out.vix_return_source = value,
             "vix_target_shock_cap" => out.vix_target_shock_cap = value,
             "vix_ceiling" => out.vix_ceiling = value,
@@ -3970,6 +4093,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_return_clamp",
         "vix_return_gain",
         "vix_return_gain_up",
+        "vix_return_exponent",
         "vix_return_source",
         "vix_target_shock_cap",
         "vix_ceiling",
