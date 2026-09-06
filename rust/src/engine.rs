@@ -1612,8 +1612,11 @@ impl Engine {
                 }
                 None => 0.0,
             };
-            let daily_sigma =
-                crate::mathx::sqrt(crate::mathx::max(company.stock.garch_variance, 0.0001));
+            // The overnight path's copy of the tick's absolute floor; see
+            // `market::factors`, where the same constant is read from the
+            // same field. Two spellings of one floor must move together.
+            let daily_sigma = crate::mathx::sqrt(
+                crate::mathx::max(company.stock.garch_variance, p.idio_sigma_floor));
             let idio = daily_sigma
                 * crate::market::factors::idio_scale_for(p, beta)
                 * crate::market::factors::cap_size_multiplier_with(p, company.stock.market_cap)

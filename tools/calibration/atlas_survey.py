@@ -359,6 +359,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # VIX. Both blend weights, whole domain (§60, CRISIS-BLEND-SECTOR.md).
     "crisis_blend_source": (0.0, 1.0),
     "sector_vix_coupling": (0.0, 1.0),
+    # Ships at 0.0 and its whole content is the far end: at 1.0 omega goes
+    # onto the identity `sector_base_variance * (1 - persistence)`, which is
+    # the cascade path's own arithmetic (garch.rs:187). A blend between is
+    # meaningful, so the axis is the unit interval.
+    "garch_omega_sector_scaled": (0.0, 1.0),
     # News peer transfer: weights of a peer's surprise, natural unit range.
     "news_peer_weight": (0.0, 1.0),
     "news_peer_weight_down": (0.0, 1.0),
@@ -397,6 +402,11 @@ EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
     # out at 0.008, and §59 measured the band reached at 0.012 and overshot
     # at 0.020, so the box is the range that can see the answer.
     "sector_factor_sigma": (0.0, 0.02),
+    # The tick's absolute variance floor, in daily VARIANCE units. It ships
+    # NONZERO at 1e-4, so the convention box is multiplicative and cannot
+    # reach 0.0 -- and 0.0, which removes the floor, is the value the dial
+    # exists for. Stated explicitly for that reason.
+    "idio_sigma_floor": (0.0, 4.0e-4),
     # The crisis market-factor gain (§97). Shipped 0.5, and the [1/4x, 4x]
     # convention box would top out at 2.0 anyway; stated explicitly because
     # the interesting region is ABOVE the shipped value, not around it.

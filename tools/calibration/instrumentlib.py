@@ -552,6 +552,17 @@ PARAM_SPECS: dict[str, dict] = {
                                     "hard_range": (1.0, 50.0)},
     "market_vol_floor_multiple": {"kind": "log",
                                   "hard_range": (0.001, 1.0)},
+    # The two floor dials (programme/idio-vol-floor.md). Both must be able
+    # to reach the END of their range, not a multiple of the shipped value:
+    # the whole content of each is what happens at one endpoint, so a
+    # convention box around the ship would explore everything except the
+    # answer.
+    "garch_omega_sector_scaled": {"kind": "abs", "step_unit": 0.1,
+                                  "hard_range": (0.0, 1.0)},
+    # In daily VARIANCE units. 0.0 removes the floor, which is the point of
+    # the dial; the top is 4x the shipped 1e-4, the convention multiple.
+    "idio_sigma_floor": {"kind": "abs", "step_unit": 2.5e-5,
+                         "hard_range": (0.0, 4.0e-4)},
 }
 
 #: §3.9's searched set — the identifiability filter the SVD tests.

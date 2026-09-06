@@ -524,6 +524,45 @@ pub struct ModelParams {
     pub garch_vix_coupling: f64,
     /// Floor as a multiple of the sector's long-run variance.
     pub garch_floor_multiple: f64,
+    /// Scale `garch_omega` by the SECTOR's base variance instead of using
+    /// one constant for every sector. 0.0 is the shipped constant, read by
+    /// branch, and every preset before this dial is bit-identical.
+    ///
+    /// The identity, which is the cascade path's arithmetic verbatim
+    /// ([`crate::market::garch::update_garch_cascade`]):
+    ///
+    /// ```text
+    /// omega_i = sector_base_variance * (1 - alpha - beta_i - gamma/2)
+    /// ```
+    ///
+    /// which is exactly the omega that makes the recursion's unconditional
+    /// variance `omega / (1 - persistence)` EQUAL the sector's own base
+    /// variance. No number is chosen: every term is already a parameter or
+    /// the sector table's own `daily_sigma` squared.
+    ///
+    /// Why it is needed. At the shipped constant of 2e-6 the recursion's
+    /// unconditional level is about 1.2e-5 for EVERY sector, against clamp
+    /// floors running 1.6e-5 to 1.56e-4, so the level is global while the
+    /// band around it is per sector. The sector table's 3.1x spread in
+    /// `daily_sigma` then reaches the price as roughly 1.4x, and per-name
+    /// volatility carries no sector ordering at all against a real corpus
+    /// ordered from staples 17.0 per cent to technology 29.4.
+    pub garch_omega_sector_scaled: f64,
+    /// The absolute floor under a name's daily sigma in the tick and in the
+    /// overnight path, in DAILY VARIANCE units. Ships at 1e-4, which is the
+    /// constant both sites carried inline, so every existing preset is
+    /// bit-identical; 0.0 removes it.
+    ///
+    /// It was written as a dead-stock guard -- a zero variance would freeze
+    /// a price -- and against a recursion whose own level is about 6.3e-5
+    /// it is instead the binding constraint on 61 to 90 per cent of
+    /// name-days in nine of the twelve sectors. The guard's job is already
+    /// done, and done PER SECTOR rather than absolutely, by the
+    /// `[0.25, 5.0] x sector_base_variance` clamp in
+    /// [`crate::market::garch::update_garch_variance_for`], which cannot
+    /// return zero for a positive base. A preset that sets this to 0.0
+    /// therefore has one fewer constant in it, not one more.
+    pub idio_sigma_floor: f64,
 
     // ── Market-factor variance process (market/factor_vol.rs) ───────────
     /// The market factor's own GARCH reaction term: how sharply
@@ -2122,6 +2161,8 @@ impl ModelParams {
             garch_ceiling_multiple: garch::CEILING_MULTIPLE,
             garch_vix_coupling: 0.0,
             garch_floor_multiple: garch::FLOOR_MULTIPLE,
+            garch_omega_sector_scaled: 0.0,
+            idio_sigma_floor: 0.0001,
             market_vol_alpha: factor_vol::MARKET_VOL_ALPHA,
             market_vol_beta: factor_vol::MARKET_VOL_BETA,
             market_vol_gamma: 0.0,
@@ -3323,6 +3364,8 @@ impl ModelParams {
             "garch_ceiling_multiple" => self.garch_ceiling_multiple,
             "garch_vix_coupling" => self.garch_vix_coupling,
             "garch_floor_multiple" => self.garch_floor_multiple,
+            "garch_omega_sector_scaled" => self.garch_omega_sector_scaled,
+            "idio_sigma_floor" => self.idio_sigma_floor,
             "market_vol_alpha" => self.market_vol_alpha,
             "market_vol_beta" => self.market_vol_beta,
             "market_vol_gamma" => self.market_vol_gamma,
@@ -3483,6 +3526,8 @@ impl ModelParams {
             "garch_ceiling_multiple" => out.garch_ceiling_multiple = value,
             "garch_vix_coupling" => out.garch_vix_coupling = value,
             "garch_floor_multiple" => out.garch_floor_multiple = value,
+            "garch_omega_sector_scaled" => out.garch_omega_sector_scaled = value,
+            "idio_sigma_floor" => out.idio_sigma_floor = value,
             "market_vol_alpha" => out.market_vol_alpha = value,
             "market_vol_beta" => out.market_vol_beta = value,
             "market_vol_gamma" => out.market_vol_gamma = value,
@@ -3676,6 +3721,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "crisis_blend_gain",
         "crisis_blend_ramp",
         "crisis_blend_source",
+        "garch_omega_sector_scaled",
+        "idio_sigma_floor",
         "crisis_blend_variance_damp",
         "crisis_vix_threshold",
         "crowd_lean_cap",
