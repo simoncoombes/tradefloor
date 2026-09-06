@@ -626,8 +626,9 @@ impl Engine {
     /// before touching the economy or the generator, so construction is
     /// what it always was and no arithmetic changes. That is what makes
     /// bit-identity a property of the control flow rather than of
-    /// floating-point luck -- and it is asserted anyway, over 800 daily
-    /// returns on thirty seeds, by
+    /// floating-point luck -- and it is asserted anyway, over 9,000 daily
+    /// returns on thirty seeds, against a digest taken from a build of the
+    /// commit this branch was cut from, by
     /// `tests/test_stationary_opening.py`.
     ///
     /// The uniforms come from the ECONOMY substream, the stream
