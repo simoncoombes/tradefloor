@@ -44,6 +44,58 @@ replays from the state the day started in.
 
 <!-- release-note-ends -->
 
+### The horizon picks the ruler
+
+A band table and a noise scale are each derived AT a horizon, and a panel
+is measured at one. Pairing a 504-day measurement with the 252-day bands
+had been done four times over in the calibration path, and nothing could
+catch it, because the horizon lived in the caller: `facts.measure` records
+`days` and nothing read it.
+
+`tools/calibration/evaluate_axes.py` scored all four of its axes with the
+default `band_distance_loss`, which is `facts.REAL_MARKETS` and
+`facts.SEED_SD`, both derived at 252 days. Its `holdout_horizon` axis runs
+504. So the one axis whose purpose is to vary the horizon was graded on the
+horizon it varies away from, its band room divided by the other horizon's
+noise scale, and the artefact labelled the result "the TRUE bands". That
+verdict is half of `generalises`, which `calibrate.py`, `emit_preset.py`
+and `report_tables.py` read. `examples/07-research-workflow.py` measured 60
+days and handed the panel to `compare_to_real_markets`, whose bands come
+from 253-bar windows.
+
+`facts` now carries the horizons that HAVE a ruler and the two tables that
+make each one up, and five functions that let a scoring call ask what
+horizon its panel came from and what horizon its ruler was derived at. A
+disagreement raises. A horizon with no band set is refused BY NAME, because
+a nearer band set is not an approximation: the 252-day and 504-day tables
+differ on twelve of fourteen rows and their noise scales differ by factors
+from 0.80 to 3.23. `envelope.BANDS_504` registers itself, since `facts`
+cannot name it and a table the checker cannot identify is one it cannot
+refuse.
+
+**What breaks.** `compare_to_real_markets` and `report` read
+`facts["days"]`, so a panel measured at a horizon with no bands raises
+where it used to return verdicts, and one that records no horizon raises
+rather than being assumed to be 252. `envelope.score` looks its horizon up
+instead of testing `horizon_days > 252`, so 756 and 1,008 are refused
+rather than given the 504-day bands. `band_distance_loss` checks the panels
+it is given against the tables it is handed, its own defaults included.
+`shapley.ruler` withholds every band verdict at a horizon with no ruler,
+the way that tool already withholds a row certified on another protocol.
+Each verdict row carries `horizon_days` and `ruler`, and `report` names the
+band set in its header.
+
+Five test sites and one shipped example measured at 60, 120 or 180 days and
+graded against the 252-day bands; each moves to a horizon that has a ruler.
+The suite was making the mistake it exists to catch.
+
+**Not written here: the release-note line above the marker.** That section
+stands at 248 words of 250 and the sentence this change needs is about
+twenty-five, so it cannot go in without trimming five other branches'
+announcements. The line to add, when the budget gives: *A panel is graded
+against the ruler for its own horizon, and one with no band set is refused:
+a 60-day `compare_to_real_markets` now raises.*
+
 ### The overnight process
 
 Nothing moved a price between sessions. The price after `open_market` was
