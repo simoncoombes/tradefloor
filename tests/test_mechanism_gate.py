@@ -568,6 +568,19 @@ def test_the_certificate_publishes_three_counts_and_names_the_reversed_row():
     with pytest.raises(ValidationError):
         envelope.certify(panels[:1])
 
+    # A panel whose seeds do not scatter has no standard error and so no
+    # effect size, and the report must still print: the GATE counts sides and
+    # needs no estimator, so a dash in the z_0 column is not a missing
+    # verdict. Constructed, because a division by zero in a report is how a
+    # count that was computed correctly fails to reach anybody.
+    flat = [{row: real_centre(row) for row in SHAPE} for _ in range(SEEDS)]
+    flat_result = envelope.certify(flat)
+    for row, m in flat_result["mechanism"].items():
+        assert m["se_normal"] == 0.0 and m["z0_normal"] is None, row
+        assert m["verdict"] == "shown", row
+    text = envelope.certification_report(flat_result)
+    assert "excess_kurtosis" in text
+
 
 def test_a_null_model_is_fourteen_of_fourteen_in_band_and_certifies_nothing():
     """The finding as one assertion.

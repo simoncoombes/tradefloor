@@ -1224,10 +1224,17 @@ def certification_report(result: Mapping[str, Any]) -> str:
             marks.append("diagnostic, not counted")
         if not band.get("in_band", True):
             marks.append("OUT OF BAND")
+        def effect(value: float | None) -> str:
+            # None where the seeds do not scatter at all, which makes the
+            # standard error zero and the ratio undefined. The GATE still has
+            # an answer there -- it counts sides and needs no estimator --
+            # so a dash in an effect-size column is not a missing verdict.
+            return f"{value:>+8.2f}" if value is not None else f"{'--':>8s}"
+
         lines.append(
             f"{row:24s} {m['median']:>10.4f} {m['null']:>9.4f} "
             f"{m['k']:>3d}/{m['n']:<3d} {m['p']:>7.3f}  "
-            f"{m['z0_normal']:>+8.2f} {m['z0_bootstrap']:>+8.2f}  "
+            f"{effect(m['z0_normal'])} {effect(m['z0_bootstrap'])}  "
             + (f"{z_r:>+6.2f}" if z_r is not None else f"{'--':>6s}")
             + "  " + ", ".join(marks))
     for row, c in result["centre"].items():
