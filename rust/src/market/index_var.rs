@@ -60,16 +60,6 @@
 use crate::mathx;
 use crate::params::ModelParams;
 
-/// The floor the tick puts under a name's GARCH variance before taking its
-/// square root, `factors.rs`'s `max(company.garch_variance, 0.0001)`.
-///
-/// Named here and used there, because the identity has to read the sigma
-/// the tick actually draws with rather than the state behind it. On the
-/// certified roster the floor BINDS for nearly every name — the GARCH's own
-/// resting level sits under it — so a variance computed off the raw state
-/// would understate the per-name block by a factor of two and nothing would
-/// say so.
-pub const IDIO_VARIANCE_FLOOR: f64 = 0.0001;
 
 /// One session's worth of the market's tick grid, which is what the
 /// intraday curve is averaged over.
@@ -122,7 +112,7 @@ pub fn intraday_variance_factor() -> f64 {
 /// The three factors are `factors.rs`'s own, called rather than restated,
 /// so a change to either of them moves this identity with it.
 fn idio_sigma_daily(p: &ModelParams, name: &NameVariance) -> f64 {
-    let daily_sigma = mathx::sqrt(mathx::max(name.garch_variance, IDIO_VARIANCE_FLOOR));
+    let daily_sigma = mathx::sqrt(mathx::max(name.garch_variance, p.idio_sigma_floor));
     daily_sigma
         * crate::market::factors::idio_scale_for(p, name.beta)
         * crate::market::factors::cap_size_multiplier_with(p, name.market_cap)
