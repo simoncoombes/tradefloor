@@ -412,6 +412,26 @@ PERTURBATIONS = [
     # draws BY running the economy, so the count is the mechanism rather
     # than a side effect of it.
     ("macro_burn_in_days", 30.0, True),
+    # Drawing the day-zero cycle phase AND its age from the cycle's own
+    # stationary law. It moves the market on the probe through two channels
+    # at once, and both are the mechanism rather than a side effect.
+    #
+    # The phase: pt-v16 carries `vix_cycle_amplitude` at 0.85, so the VIX's
+    # target on day one is `19 + 0.85 * (phase_target - 19)` and a drawn
+    # phase that is not an expansion moves it immediately -- which is the
+    # whole channel settle1 found, the couplings turning a warmer VIX into
+    # variance from the first tick.
+    #
+    # The draws: two uniforms from the ECONOMY substream, which displaces
+    # every later economy draw. `phase_target_range_draw`'s entry above
+    # measures what a displacement of exactly this size does on this probe
+    # -- the VIX carries it at the end of day one and the prices by day two
+    # -- so this dial is in DRAW_SCHEDULE_MOVERS below for the same reason
+    # `macro_burn_in_days` is.
+    #
+    # 1.0 rather than a fraction: the dial is a SWITCH, and every non-zero
+    # value runs the same construction.
+    ("cycle_stationary_opening", 1.0, True),
     # The share of earnings returned as net buybacks. It reaches the
     # valuation on the first tick that has a day behind it, and the probe's
     # first tick is day 0, where the elapsed time is zero and the factor is
@@ -548,6 +568,7 @@ PERTURBATIONS = [
 #: effect is separated from the position shift.
 DRAW_SCHEDULE_MOVERS = frozenset({
     "vix_jump_intensity", "macro_burn_in_days", "phase_target_range_draw",
+    "cycle_stationary_opening",
 })
 
 

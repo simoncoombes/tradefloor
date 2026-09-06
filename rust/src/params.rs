@@ -1005,6 +1005,100 @@ pub struct ModelParams {
     /// draw count, and it does so by running the economy rather than as a
     /// side effect.
     pub macro_burn_in_days: f64,
+    /// Draw the day-zero cycle phase AND its age from the cycle's own
+    /// stationary law. 0.0 -- every preset before pt-v19 -- draws nothing
+    /// and leaves construction exactly as it was.
+    ///
+    /// # The cohort this exists to remove
+    ///
+    /// Every run opens in EXPANSION at phase age ZERO, and every preset
+    /// before pt-v18 never moves that. pt-v18's `macro_burn_in_days`
+    /// advances the economy 755 days but HOLDS the phase and RESETS its
+    /// clock, so it restores the same point. An expansion has a 180-day
+    /// minimum and then a steep Weibull exit, so thirty seeds leave their
+    /// first one at nearly the same age and move through the first cycle in
+    /// near-synchrony: year two is a synchronised recession (contraction
+    /// share 0.51 on pt-v1, pt-v16 and a pinned-VIX arm alike), year three a
+    /// synchronised recovery. The VIX's phase table carries the synchrony
+    /// into every name through the couplings; measured index sd on pt-v16
+    /// runs 1.105, 1.514, 1.291, 1.243 by year and the mean VIX 18.5, 23.4,
+    /// 17.9, 20.8.
+    ///
+    /// It is a COHORT EFFECT, and no choice of certification window fixes a
+    /// cohort. It also does not damp on the fast clock: the yearly mix is
+    /// still 0.20 to 0.33 of a total-variation unit from stationary in years
+    /// five to twelve, because the fixed minimum durations make the cycle's
+    /// length nearly deterministic. A run that opens at rest has nothing to
+    /// converge to, on any clock.
+    ///
+    /// # The law, which is an identity
+    ///
+    /// [`stationary_opening`] carries the algebra and the engine line each
+    /// term is read from. In brief, with `p_i(d)` the hazard-only daily
+    /// transition probability at a phase age of `d` days:
+    ///
+    /// ```text
+    /// S_i(d)  = prod_{t=1}^{d-1} (1 - p_i(t))
+    /// E[T_i]  = sum_{d>=1} S_i(d)
+    /// pi_i    = E[T_i] / sum_j E[T_j]        the phase
+    /// P(K=k)  = S_i(k+1) / E[T_i]            its age, in rolls already survived
+    /// ```
+    ///
+    /// The second line is the renewal identity for the backward recurrence
+    /// time. **The age is the half most easily got wrong**: drawing the
+    /// phase and setting the age to zero starts a smaller cohort at the same
+    /// point, because 73 per cent of stationary expansions are younger than
+    /// the 180-day minimum at pt-v16's clock, with a median age of 123 days.
+    ///
+    /// Nothing here is a matter of degree. The only inputs are
+    /// `cycle_hazard_params`, `phase_characteristics().min_months` and
+    /// `cycle_hazard_per_month`, all already in the engine.
+    ///
+    /// # A SWITCH, not a gain
+    ///
+    /// A BRANCH at 0.0, so every preset that predates the dial is
+    /// bit-identical rather than owing anything to an argument about
+    /// arithmetic. Every non-zero value is the same construction: there is
+    /// no meaningful interpolation between a point mass and a law, and
+    /// inventing one would be a chosen constant wearing a gain's clothes.
+    /// `order_flow_impact_law` is the same shape for the same reason.
+    ///
+    /// # What runs at 1.0
+    ///
+    /// The phase and its age are drawn, then `macro_burn_in_days` of economy
+    /// runs FREE -- the phase not held, its clock not reset -- so the fields
+    /// relax to the values consistent with the phase path they have just
+    /// lived through, and the condition ladder acts on the mix while they
+    /// do. That is how the ladder is handled: the identity is the hazard
+    /// alone, and the free run is where the state-dependence enters.
+    ///
+    /// So on a preset with `macro_burn_in_days` at 0.0 -- pt-v16 included --
+    /// the draw runs and NO relaxation follows, and the fields open at their
+    /// constructor values under a possibly-contractionary phase. That is the
+    /// literal composition of the two dials and it is deliberate: the
+    /// measured attribution says the phase mix does the work and the fields
+    /// barely do (pt-v18's burn-in applied to pt-v16 leaves year two a
+    /// synchronised recession, contraction share 0.51, and the first pair
+    /// still grows at z 2.04).
+    ///
+    /// # What it costs
+    ///
+    /// Two uniforms from the ECONOMY substream -- the stream the burn-in
+    /// already consumes, so the market's day-zero draws sit where they sat
+    /// -- and one pass of the survival recursion per phase plus one for the
+    /// drawn phase. About 78,000 multiplies at pt-v18's clock and 2,700 at
+    /// pt-v16's, once, against the 755 macro days pt-v18 already pays.
+    /// Nothing per session. Like `macro_burn_in_days` it moves the economy
+    /// substream's draw count, and for the same reason.
+    ///
+    /// # What it overrides
+    ///
+    /// The phase and age a caller passed in `EconomyState`. At 1.0 the
+    /// day-zero cycle state is drawn rather than supplied, which is the
+    /// point of it; a caller who needs a specific phase leaves this at 0.0.
+    ///
+    /// [`stationary_opening`]: crate::economy::stationary_opening
+    pub cycle_stationary_opening: f64,
     /// The share of earnings a company returns as net buybacks. 0.0 --
     /// every preset before pt-v18 -- is bit-identical.
     ///
@@ -2142,6 +2236,7 @@ impl ModelParams {
             phase_target_range_draw: 0.0,
             neutral_discount_rate: crate::fair_value::NEUTRAL_DISCOUNT_RATE,
             macro_burn_in_days: 0.0,
+            cycle_stationary_opening: 0.0,
             buyback_payout_share: 0.0,
             jump_mean_compensated: 0.0,
             cascade_symmetry: 0.0,
@@ -3343,6 +3438,7 @@ impl ModelParams {
             "phase_target_range_draw" => self.phase_target_range_draw,
             "neutral_discount_rate" => self.neutral_discount_rate,
             "macro_burn_in_days" => self.macro_burn_in_days,
+            "cycle_stationary_opening" => self.cycle_stationary_opening,
             "buyback_payout_share" => self.buyback_payout_share,
             "jump_mean_compensated" => self.jump_mean_compensated,
             "cascade_symmetry" => self.cascade_symmetry,
@@ -3503,6 +3599,7 @@ impl ModelParams {
             "phase_target_range_draw" => out.phase_target_range_draw = value,
             "neutral_discount_rate" => out.neutral_discount_rate = value,
             "macro_burn_in_days" => out.macro_burn_in_days = value,
+            "cycle_stationary_opening" => out.cycle_stationary_opening = value,
             "buyback_payout_share" => out.buyback_payout_share = value,
             "jump_mean_compensated" => out.jump_mean_compensated = value,
             "cascade_symmetry" => out.cascade_symmetry = value,
@@ -3733,6 +3830,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "trough_growth_floor",
         "phase_target_range_draw",
         "neutral_discount_rate",
+        "cycle_stationary_opening",
         "macro_burn_in_days",
         "buyback_payout_share",
         "oil_supply_response",

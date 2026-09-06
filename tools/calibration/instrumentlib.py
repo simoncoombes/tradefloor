@@ -180,6 +180,13 @@ PARAM_SPECS: dict[str, dict] = {
     # the phase clock keeps, and past 1.0 the cycle runs slower than its own
     # scale states.
     "cycle_hazard_per_month": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # A SWITCH and not a gain: 0.0 is the opening every preset before pt-v19
+    # has, and every non-zero value is the same drawn opening. `step_unit`
+    # 1.0 on a hard range of (0, 1) is the shape `order_flow_impact_law`
+    # already uses for a two-valued dial, so a search can propose the two
+    # states and nothing between them.
+    "cycle_stationary_opening": {"kind": "abs", "step_unit": 1.0,
+                                 "hard_range": (0.0, 1.0)},
     "trough_growth_floor": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "phase_target_range_draw": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # The yield at which the target multiple sits on its sector anchor. A

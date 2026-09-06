@@ -57,8 +57,8 @@
 
 use crate::economy::{
     Decision,
-    check_cycle_transition, update_central_bank, update_economy_daily, CentralBankState,
-    DailyInputs, EconomicShock, EconomyState,
+    check_cycle_transition, stationary_opening, update_central_bank, update_economy_daily,
+    CentralBankState, DailyInputs, EconomicShock, EconomyState,
 };
 use crate::market::{
     close_day_with, get_market_status, intraday_fraction, reset_daily_prices,
@@ -615,8 +615,88 @@ impl Engine {
             day_marks: Vec::new(),
             params,
         };
-        engine.burn_in_economy();
+        engine.open_economy();
         engine
+    }
+
+    /// Put the economy where day zero finds it.
+    ///
+    /// A BRANCH at `cycle_stationary_opening` 0.0, which is every preset
+    /// before pt-v19: [`Engine::burn_in_economy`] runs exactly as it always
+    /// has, nothing extra is drawn, and construction is bit-identical. At
+    /// any non-zero value the cycle's day-zero state is DRAWN from its own
+    /// stationary law and the economy then relaxes under it.
+    ///
+    /// Why the two are alternatives rather than a sequence: the burn-in
+    /// holds the phase and resets its clock, which is exactly the point mass
+    /// the drawn opening exists to replace. Running both would draw a state
+    /// and then throw it away.
+    fn open_economy(&mut self) {
+        if self.params.cycle_stationary_opening == 0.0 {
+            self.burn_in_economy();
+            return;
+        }
+        self.draw_stationary_cycle_state();
+        self.relax_economy();
+    }
+
+    /// Draw the day-zero phase and its age from the cycle's stationary law.
+    ///
+    /// Two uniforms from the ECONOMY substream — the stream the burn-in
+    /// already consumes — so the market's day-zero draws sit where they sat,
+    /// and the count is declared the way the burn-in's is. The law and the
+    /// renewal identity behind the age are
+    /// [`crate::economy::stationary_opening`]; the phase and age this writes
+    /// OVERRIDE whatever the caller passed in `EconomyState`, which is what
+    /// drawing a day-zero state means.
+    fn draw_stationary_cycle_state(&mut self) {
+        self.economy_rng.site(Site::EconomyCycle, 0);
+        let u_phase = self.economy_rng.next_f64();
+        let u_age = self.economy_rng.next_f64();
+        self.draws.economy += 2;
+        let (phase, months) =
+            stationary_opening(self.params.cycle_hazard_per_month, u_phase, u_age);
+        self.economy.cycle_phase = phase;
+        self.economy.months_in_current_phase = months;
+    }
+
+    /// Relax the macro fields under the DRAWN phase, before day zero.
+    ///
+    /// [`Engine::burn_in_economy`] with the phase FREE and its clock NOT
+    /// reset. The chain is already in its stationary law, which a free run
+    /// preserves by definition, so the only work left is for unemployment,
+    /// inflation and the yields to reach the values consistent with the
+    /// phase path they have just lived through — under a drawn contraction,
+    /// a contraction's corner rather than an expansion's, which is the
+    /// point. The condition ladder acts on the mix while this runs, and that
+    /// is how the ladder is handled: the drawn law is the hazard alone.
+    ///
+    /// Holding the phase here instead, as the burn-in does, would drive
+    /// unemployment and the policy rate far past any state a 755-day
+    /// contraction reaches, and the fields would open inconsistent with the
+    /// mix they came from.
+    ///
+    /// The length is `macro_burn_in_days`, so a preset with that at 0.0 —
+    /// pt-v16 included — draws its opening and relaxes nothing. See
+    /// `ModelParams::cycle_stationary_opening` for why that composition is
+    /// deliberate rather than an oversight.
+    ///
+    /// `nominal_output_base` is re-read at the end for the reason
+    /// [`Engine::burn_in_economy`] gives: `gdp` and `cpi` compound on every
+    /// one of these days. At zero days nothing has compounded and the
+    /// re-read returns the value the constructor already computed.
+    fn relax_economy(&mut self) {
+        let days = self.params.macro_burn_in_days as i64;
+        for day in 1..=days {
+            self.advance_day(&DayAdvanceRequest {
+                volatility: 1.0,
+                active_shocks: &[],
+                market_return_pct: 0.0,
+                game_day: day,
+                timestamp: day * 24 * 60,
+            });
+        }
+        self.nominal_output_base = self.economy.gdp * self.economy.cpi;
     }
 
     /// Advance the economy alone to the state its own dynamics reach,
