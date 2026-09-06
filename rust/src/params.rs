@@ -1119,18 +1119,38 @@ pub struct ModelParams {
     ///
     /// A day-zero state is either drawn from the stationary law or it is
     /// not; there is no half-drawn phase. Every non-zero value therefore
-    /// gives the same opening, which is asserted rather than left to be
-    /// discovered (`stationary_opening_dial` in `engine.rs`). The two
-    /// admissible values are 0.0 and 1.0.
+    /// gives the same opening, which is asserted rather than left for a
+    /// search to find as a flat direction:
+    /// `test_every_non_zero_value_gives_the_same_opening` in
+    /// `tests/test_stationary_opening.py`. The two admissible values are
+    /// 0.0 and 1.0.
     ///
     /// # What it costs
     ///
     /// Two uniforms from the economy substream at construction, so the
     /// market's day-zero draws sit where they sat, plus about 2,500 to
     /// 67,000 multiplies once -- the identity's walk, whose length is the
-    /// clock's, not the run's. Nothing per session. It moves the economy
-    /// substream's draw count by exactly two when it is on, as
-    /// `macro_burn_in_days` already moves it and declares.
+    /// clock's, not the run's. Nothing per session.
+    ///
+    /// # It moves the draw schedule in TWO places, not one
+    ///
+    /// The two construction uniforms, as `macro_burn_in_days` already
+    /// moves it and declares. And then, for the WHOLE RUN:
+    /// `check_cycle_transition` returns before drawing while a phase is
+    /// younger than its minimum duration, so a run opening at age zero
+    /// rolls no exit for its first 180 days while one opening past the
+    /// minimum rolls one every day. The count there is the mechanism -- a
+    /// phase past its minimum is a phase whose exit is being rolled -- and
+    /// it is not a construction cost.
+    ///
+    /// The three-day perturbation probe cannot see either, and reads the
+    /// count IDENTICAL at its own seed: the phase-change block in
+    /// `economy/daily.rs` takes a uniform on both of the two days it fires
+    /// and a drawn age past two days skips both, cancelling the two
+    /// construction draws exactly. Measured over six seeds at 1, 2, 3, 5,
+    /// 10 and 30 days the difference runs 0, +1, +2, +4 and +30, which is
+    /// why `DRAW_SCHEDULE_MOVERS` carries this dial for the mechanism
+    /// rather than on the probe's evidence.
     pub cycle_stationary_opening: f64,
     /// The share of earnings a company returns as net buybacks. 0.0 --
     /// every preset before pt-v18 -- is bit-identical.
