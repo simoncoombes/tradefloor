@@ -40,6 +40,7 @@ import tradefloor
 from tradefloor import envelope
 from tradefloor.facts import (
     BAND_RULE_TOLERANCE,
+    REAL_MARKETS_WINDOWS,
     BAND_WINDOWS,
     CORR_PERSISTENCE_WINDOW,
     EQUIVALENCE,
@@ -503,6 +504,21 @@ def test_the_centre_distance_is_determined_on_every_shape_row():
     assert "REAL_MARKETS_WINDOWS" in level["undetermined"]
     with pytest.raises(ValidationError):
         centre_distance([1.0, 2.0], "not_a_row")
+
+    # THE WRONG-RULER REFUSAL, constructed. The real windows are 252-bar
+    # readings, and a row's dispersion across real years moves with the
+    # window length -- clustering at lag 20 reads six times higher over 504
+    # bars. So a 504-day panel gets no centre distance rather than a
+    # plausible-looking one, and `certify` at that horizon says so on every
+    # row instead of publishing a count.
+    row = "abs_return_acf20"
+    values = panel_about(row, real_centre(row), spread(row), seed=11)
+    far = centre_distance(values, row, horizon_days=504)
+    assert far["z_r"] is None and far["at_centre"] is None
+    assert "wrong-ruler" in far["undetermined"]
+    near = centre_distance(values, row, horizon_days=252)
+    assert near["z_r"] is not None
+    assert REAL_MARKETS_WINDOWS["horizon_days"] == 252
 
 
 # --------------------------------------------------------------------------

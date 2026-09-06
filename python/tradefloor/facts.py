@@ -904,6 +904,14 @@ REAL_MARKETS_WINDOWS = {
     ),
     #: Index into `windows` of the one excluded from every band derivation.
     "crisis_index": 4,
+    #: The horizon these readings were measured at, in trading days. Load
+    #: bearing: `real_centre_se` is the dispersion of a row across real years
+    #: AT THIS WINDOW LENGTH, and clustering and correlation persistence both
+    #: read two to six times higher over 504 bars, so scoring a 504-day model
+    #: median against these is the wrong-ruler error `envelope.score` exists
+    #: to prevent on the band side. `centre_distance` reads this rather than
+    #: assuming a year.
+    "horizon_days": 252,
     "roster": "40 US large caps, common to all ten windows",
     "source": "tradefloor-design/REALISM-BANDS.md, the window table",
     "values": {
@@ -2883,6 +2891,13 @@ def mechanism_verdict(values: Sequence[float], key: str, *,
     `counted` is False for a row this horizon reports and does not grade
     (`MECHANISM_DIAGNOSTIC`), which is a state distinct from any verdict:
     the row still gets one, and it does not enter the count.
+
+    At a horizon other than the one `REAL_MARKETS_WINDOWS` was measured at,
+    the only thing taken from the real side is the SIGN of the effect, which
+    is a property of the market rather than of the window: every row's real
+    median has the same sign at 252 and 504 bars on both references
+    (band-form-design 5d, follow-ups 4 and 5). The magnitudes are not used
+    here, and `centre_distance` refuses to use them across horizons.
     """
     if key not in MECHANISM:
         raise ValidationError(
@@ -2949,7 +2964,8 @@ def mechanism_verdict(values: Sequence[float], key: str, *,
     }
 
 
-def centre_distance(values: Sequence[float], key: str) -> dict[str, Any]:
+def centre_distance(values: Sequence[float], key: str, *,
+                    horizon_days: int = TRADING_DAYS_PER_YEAR) -> dict[str, Any]:
     """How far the graded median sits from the real centre, in both errors.
 
     `z_r = (median - centre) / sqrt(se_m^2 + se_real^2)`, reported and never
@@ -2962,6 +2978,15 @@ def centre_distance(values: Sequence[float], key: str) -> dict[str, Any]:
     It is the quantity "aim at the real central value" names, so it belongs
     in the report and in a calibration objective. `z_r` is None where
     `real_centre_se` is undetermined, with the reason beside it.
+
+    UNDETERMINED at any horizon but the one `REAL_MARKETS_WINDOWS` was
+    measured at, rather than answered with the wrong ruler. The real
+    dispersion of a row across years is a property of the window length --
+    clustering at lag 20 reads +0.005 over 252 bars and +0.030 over 504 on
+    the same reference -- so a 504-day model median against these windows
+    would be the same error on the centre side that `envelope.score` refuses
+    on the band side, and it would be invisible because the answer is a
+    plausible number.
     """
     if key not in REAL_MARKETS:
         raise ValidationError(
@@ -2974,20 +2999,34 @@ def centre_distance(values: Sequence[float], key: str) -> dict[str, Any]:
             f"{len(values)}")
     median = statistics.median(values)
     se_m = median_se(values)
-    centre = real_centre(key)
-    se_r = real_centre_se(key)
+    table_horizon = REAL_MARKETS_WINDOWS["horizon_days"]
+    matched = horizon_days == table_horizon
+    centre = real_centre(key) if matched else None
+    se_r = real_centre_se(key) if matched else None
     out: dict[str, Any] = {
         "row": key,
         "n": len(values),
+        "horizon_days": horizon_days,
         "median": median,
         "se_m": se_m,
         "real_centre": centre,
         "se_real": se_r,
-        "multiplier": centre_multiplier(band_rule_tolerance(BAND_WINDOWS[252])),
+        "multiplier": centre_multiplier(
+            band_rule_tolerance(BAND_WINDOWS[table_horizon])),
         "z_r": None,
         "at_centre": None,
         "undetermined": None,
     }
+    if not matched:
+        out["undetermined"] = (
+            f"REAL_MARKETS_WINDOWS holds {table_horizon}-day readings and "
+            f"this panel is {horizon_days} days. The real dispersion of a row "
+            "across years moves with the window length, so a centre distance "
+            "taken across horizons would be the wrong-ruler error with a "
+            "plausible-looking answer. Measure the windows at this horizon "
+            "first"
+        )
+        return out
     if centre is None:
         out["undetermined"] = (
             f"{key} has neither a per-window real record in "

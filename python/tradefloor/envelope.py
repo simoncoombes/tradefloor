@@ -1101,7 +1101,8 @@ def certify(panels: Sequence[Mapping[str, float]], *,
         if row in _facts.MECHANISM:
             mechanism[row] = _facts.mechanism_verdict(
                 values, row, horizon_days=horizon_days)
-        centre[row] = _facts.centre_distance(values, row)
+        centre[row] = _facts.centre_distance(values, row,
+                                             horizon_days=horizon_days)
 
     counted = {r: v for r, v in mechanism.items() if v["counted"]}
     shown = sorted(r for r, v in counted.items() if v["verdict"] == "shown")
