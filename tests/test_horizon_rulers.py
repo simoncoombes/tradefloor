@@ -289,9 +289,22 @@ def test_envelope_score_refuses_a_horizon_with_no_band_set():
         "facts.REAL_MARKETS"
 
 
-def test_shapley_ruler_refuses_a_horizon_with_no_band_set():
+def test_shapley_ruler_withholds_at_a_horizon_with_no_band_set():
     """It returned `facts.REAL_MARKETS` for any horizon other than exactly
     504, with a name that truthfully said so over a wrong comparison.
+
+    This asserted `SystemExit` at an unregistered horizon and the module
+    withholds instead, which is the better contract and the one its single
+    caller is written against: `decompose` computes `withheld` as every key
+    absent from `bands`, so an empty band set withholds every verdict, names
+    them all in its output, and leaves the decomposition -- what this tool
+    is for -- intact. A raise would instead refuse a legitimate run, the
+    1,008-day settling study among them. Refusing to GRADE is the fix;
+    refusing to RUN was never the requirement.
+
+    So the test now asserts the withholding contract rather than a raise,
+    and asserts it where the silence would do harm: that nothing is graded
+    and nothing is dropped unnamed.
     """
     pytest.importorskip("instrumentlib",
                         reason="calibration tooling is not packaged")
@@ -299,8 +312,17 @@ def test_shapley_ruler_refuses_a_horizon_with_no_band_set():
 
     assert shapley.ruler(252)[0] == "facts.REAL_MARKETS"
     assert shapley.ruler(504)[0] == "envelope.BANDS_504"
-    with pytest.raises(SystemExit):
-        shapley.ruler(756)
+
+    name, bands = shapley.ruler(756)
+    assert name is None, name
+    assert bands == {}, bands
+
+    # The contract that matters is the caller's: an empty band set must
+    # withhold every row and name it, never grade one against another
+    # horizon's bands and never drop one silently.
+    measured = ["annualised_vol_pct", "excess_kurtosis", "leverage_effect"]
+    withheld = [key for key in measured if key not in bands]
+    assert withheld == measured
 
 
 def test_every_registered_horizon_has_both_tables():
