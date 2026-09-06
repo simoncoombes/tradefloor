@@ -1872,6 +1872,16 @@ mod fear_response_shape {
     /// across all of it — 1.000 points per per cent at -0.7, 1.538 at
     /// -6.4.
     ///
+    /// THE DEFECT WAS MOVED, NOT FIXED, and the tree says so in its own
+    /// words without anyone having joined them up.
+    /// [`crate::params::ModelParams::vix_return_clamp`] documents the first
+    /// era exactly: "Shipped 0.03, so a -10% day and a -3% day produce
+    /// identical fear. A crash is exactly where that assumption is worst."
+    /// pt-v9 raised that clamp from 0.03 to 15 -- and set a cap of 45
+    /// against a gain of 17, which reinstates identical fear from 2.647 per
+    /// cent up. The binding constraint moved by a factor of 88 and stopped
+    /// being documented; it never went away.
+    ///
     /// Each entry is a declared DEFECT, not a permission. The list is
     /// exhaustive in both directions and the binding dial is recomputed
     /// rather than trusted, so the table cannot rot either way.
