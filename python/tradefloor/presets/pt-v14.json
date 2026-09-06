@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v14",
   "fingerprint": "pt-v14",
-  "coefficient_digest": "0df8575ddbb89bcfa2827a70ac7a7b84285066c25f7249adcf36b4ee9d651574",
+  "coefficient_digest": "39d3d884a1ef3990cae9d8207725811b718b9cb29535afcbcd1c799e410cc868",
   "coefficients": {
     "book_levels": 10.0,
     "buyback_payout_share": 0.0,

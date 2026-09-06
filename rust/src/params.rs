@@ -4560,6 +4560,13 @@ mod tests {
         }
     }
 
+    /// NEVER RAN UNTIL 2026-09-06. It sat between two `#[test]` functions
+    /// without one of its own, so cargo compiled it, warned that it was
+    /// dead code among two other long-standing warnings, and no suite ever
+    /// called it. A test whose subject moved reports green; a test that is
+    /// never invoked reports nothing at all, and the difference is
+    /// invisible in a passing run.
+    #[test]
     fn the_shipped_half_life_keeps_the_recorded_bits_and_a_new_one_recomputes() {
         let same = PT_V1.with_override("mispricing_half_life_days", 60.0).unwrap();
         assert_eq!(same.mispricing_phi.to_bits(), 0x3FEF_A1E8_27A1_B38C);
