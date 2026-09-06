@@ -281,7 +281,7 @@ impl<'a> Default for DailyInputs<'a> {
 /// which is the second thing a fitted constant could not do: an offset
 /// derived in a calm year is the wrong offset in a violent one.
 ///
-/// # Three approximations, stated rather than absorbed
+/// # The approximations, stated rather than absorbed
 ///
 /// - **Gaussian.** The model's index carries excess kurtosis about 2.6, so
 ///   `E|r|` is a per cent or two under the true one and the correction is
@@ -291,17 +291,61 @@ impl<'a> Default for DailyInputs<'a> {
 ///   15 per cent and an index sigma near 1 per cent that is a fifteen-sigma
 ///   truncation and contributes nothing; a preset that clamps near the
 ///   index's own sigma would need the truncated moment instead.
-/// - **Linear in `|r|`.** When the response gains an exponent `p` on the
-///   down side, `E|r|` becomes `E|r|^p = sigma^p 2^(p/2) Gamma((p+1)/2) /
-///   sqrt(pi)`, which is the same identity with the Gaussian absolute
-///   moment generalised, and this function is where it goes. At `p = 1`,
-///   `Gamma(1) = 1` and the expression below is that identity exactly.
-pub fn expected_return_spike(sigma_pct: f64, gain: f64, gain_up: f64) -> f64 {
-    // `E|r| = sigma sqrt(2/pi)` for a zero-mean Gaussian. Written as the
-    // reciprocal of `SQRT_TWO_PI` times two so it is visibly the same
-    // constant `factors.rs` uses for the tilt's first moment, which is the
-    // same integral.
-    0.5 * (gain - gain_up) * sigma_pct * (2.0 / SQRT_TWO_PI)
+/// - **The moment's order.** The exponent below is carried in closed form
+///   rather than approximated, but it is the GAUSSIAN absolute moment, so
+///   the first bullet's caveat applies to it with more force: a moment of
+///   order `p > 1` weights the tail harder than the mean does, and the
+///   index's excess kurtosis is therefore understated by more here than at
+///   `p = 1`. The residual is still a fraction of a term worth a few
+///   points, and it is one-signed: the correction is too SMALL, so the
+///   level it leaves is fractionally too high.
+///
+/// # The exponent, carried rather than assumed away
+///
+/// The two halves of the excursion no longer share a moment. With the
+/// response `scale |r|^p` on the down side and `g_up |r|` on the up side —
+/// which is what [`return_spike_for`] does, the exponent being the down
+/// side's alone — the identity is
+///
+/// ```text
+/// E[spike] = 0.5 scale E|r|^p - 0.5 g_up E|r|
+///
+/// E|r|^p   = sigma^p 2^(p/2) Gamma((p + 1) / 2) / sqrt(pi)
+/// ```
+///
+/// the Gaussian absolute moment of order `p`. At `p = 1` that is
+/// `sigma sqrt(2/pi)` exactly, because `Gamma(1) = 1`, and the two halves
+/// collapse back to `0.5 (g_down - g_up) E|r|`.
+///
+/// **This is the term that makes the two fixes compose.** The identity's
+/// whole claim is that the excursion is cancelled by its own closed form
+/// and nothing is left over. Under a power form a correction computed as
+/// if the response were linear cancels the wrong quantity, and the error
+/// is not constant: it GROWS with the index's own sigma, because
+/// `E|r|^p / E|r|` scales as `sigma^(p-1)`. A level correction that is
+/// right in a calm year and wrong in a violent one is the defect the
+/// fitted offset had, reintroduced by the back door.
+pub fn expected_return_spike(sigma_pct: f64, gain: f64, gain_up: f64, exponent: f64) -> f64 {
+    if exponent == 1.0 {
+        // `E|r| = sigma sqrt(2/pi)` for a zero-mean Gaussian. Written as
+        // the reciprocal of `SQRT_TWO_PI` times two so it is visibly the
+        // same constant `factors.rs` uses for the tilt's first moment,
+        // which is the same integral.
+        //
+        // The branch is explicit rather than evaluated, for the reason
+        // `return_spike_for` gives: neither `pow(x, 1.0)` nor `Gamma(1.0)`
+        // is guaranteed to return its exact value on every platform, and a
+        // preset that predates the exponent must reproduce to the bit.
+        // This is the expression that stood here, in the same operand
+        // order.
+        return 0.5 * (gain - gain_up) * sigma_pct * (2.0 / SQRT_TWO_PI);
+    }
+    let e_abs = sigma_pct * (2.0 / SQRT_TWO_PI);
+    let e_pow = mathx::pow(sigma_pct, exponent)
+        * mathx::pow(2.0, 0.5 * exponent)
+        * mathx::tgamma(0.5 * (exponent + 1.0))
+        / mathx::sqrt(core::f64::consts::PI);
+    0.5 * (gain * e_pow - gain_up * e_abs)
 }
 
 /// `sqrt(2 pi)`, as `market::factors` spells it. A literal because `sqrt`
@@ -1030,6 +1074,7 @@ pub fn update_economy_daily(
             inputs.vix_index_sigma_pct,
             inputs.vix_return_gain,
             inputs.vix_return_gain_up,
+            inputs.vix_return_exponent,
         );
     }
 
@@ -1461,7 +1506,7 @@ mod vix_level_identity {
     fn a_symmetric_response_needs_no_correction() {
         for i in 0..=200 {
             let sigma = i as f64 * 0.05;
-            assert_eq!(expected_return_spike(sigma, 17.0, 17.0), 0.0,
+            assert_eq!(expected_return_spike(sigma, 17.0, 17.0, 1.0), 0.0,
                        "a symmetric response was corrected at sigma {sigma}");
         }
     }
@@ -1476,7 +1521,7 @@ mod vix_level_identity {
         for &sigma in &[0.25, 0.8, 1.04, 2.5, 9.0] {
             for &(g, gu) in &[(30.0, 14.0), (17.0, 5.0), (1.0, 0.0)] {
                 let want = 0.5 * (g - gu) * sigma * mathx::sqrt(two_over_pi);
-                let have = expected_return_spike(sigma, g, gu);
+                let have = expected_return_spike(sigma, g, gu, 1.0);
                 assert!((have - want).abs() < 1e-12,
                         "sigma {sigma}, gains {g}/{gu}: {have} vs {want}");
             }
@@ -1488,10 +1533,135 @@ mod vix_level_identity {
     /// calm year is the wrong offset in a violent one.
     #[test]
     fn the_correction_scales_with_the_index_sigma() {
-        let a = expected_return_spike(1.0, 30.0, 14.0);
-        let b = expected_return_spike(2.0, 30.0, 14.0);
+        let a = expected_return_spike(1.0, 30.0, 14.0, 1.0);
+        let b = expected_return_spike(2.0, 30.0, 14.0, 1.0);
         assert!((b - 2.0 * a).abs() < 1e-12, "{b} is not twice {a}");
         assert!(a > 0.0, "an asymmetric down-heavy response has a positive mean");
+    }
+
+    /// A UNIT EXPONENT IS THE LINEAR CORRECTION TO THE BIT.
+    ///
+    /// The generalised branch would reproduce it to about an ULP, and an
+    /// ULP is exactly what this crate does not accept: the VIX feeds the
+    /// factor's variance, which feeds prices, so a last-place difference
+    /// becomes a different market inside a year. The equality is asserted
+    /// on bits over a spread of sigmas and gain pairs, against the
+    /// expression rather than against a number.
+    #[test]
+    fn a_unit_exponent_is_the_linear_correction_to_the_bit() {
+        for i in 0..=200 {
+            let sigma = i as f64 * 0.05;
+            for &(g, gu) in &[(30.0, 14.0), (17.0, 5.0), (22.3, 11.15), (1.0, 0.0)] {
+                let want = 0.5 * (g - gu) * sigma * (2.0 / SQRT_TWO_PI);
+                assert_eq!(expected_return_spike(sigma, g, gu, 1.0), want,
+                           "sigma {sigma}, gains {g}/{gu}");
+            }
+        }
+    }
+
+    /// THE MOMENT IS THE GAUSSIAN ABSOLUTE MOMENT, checked where the
+    /// answer needs no gamma function.
+    ///
+    /// `E|r|^p = sigma^p 2^(p/2) Gamma((p+1)/2) / sqrt(pi)` is what the
+    /// code evaluates, so asserting it against itself would prove nothing.
+    /// At `p = 2` and `p = 3` the moment has an elementary closed form —
+    /// `sigma^2` and `2 sigma^3 sqrt(2/pi)` — reached without `tgamma` at
+    /// all, so a wrong gamma, a wrong power of two or a swapped half is
+    /// caught rather than reproduced.
+    #[test]
+    fn the_power_moment_matches_its_elementary_cases() {
+        let root_two_over_pi = 2.0 / SQRT_TWO_PI;
+        for &sigma in &[0.25, 0.8, 1.04, 2.5, 9.0] {
+            for &(g, gu) in &[(30.0, 14.0), (22.3, 11.15)] {
+                let e_abs = sigma * root_two_over_pi;
+                for &(p, e_pow) in &[
+                    (2.0, sigma * sigma),
+                    (3.0, 2.0 * sigma * sigma * sigma * root_two_over_pi),
+                ] {
+                    let want = 0.5 * (g * e_pow - gu * e_abs);
+                    let have = expected_return_spike(sigma, g, gu, p);
+                    assert!((have - want).abs() <= 1e-9 * want.abs().max(1.0),
+                            "sigma {sigma}, p {p}, gains {g}/{gu}: {have} vs {want}");
+                }
+            }
+        }
+    }
+
+    /// AND IT IS THE MEAN OF THE THING IT CORRECTS, at the shipped
+    /// exponent, where no elementary form exists.
+    ///
+    /// The two cases above pin the moment; this pins the WHOLE identity —
+    /// the half-split, the sign convention and the exponent living on the
+    /// down side alone — by integrating `return_spike_for` itself against
+    /// a Gaussian density. Simpson's rule on +/- 12 sigma with 24,001
+    /// points, which is a different computation from the closed form in
+    /// every respect except the answer.
+    ///
+    /// A residual of 1e-6 relative is far inside the identity's own
+    /// approximations, and far outside what a missing factor of two or a
+    /// moment taken on the wrong side would give.
+    #[test]
+    fn the_closed_form_is_the_integral_of_the_response() {
+        let n = 24_000usize;
+        for &sigma in &[0.6, 1.04, 2.5] {
+            for &(p, g, gu) in &[(1.2, 22.3, 11.15), (1.132, 30.0, 14.0), (1.0, 30.0, 14.0)] {
+                let (lo, hi) = (-12.0 * sigma, 12.0 * sigma);
+                let h = (hi - lo) / n as f64;
+                let f = |r: f64| {
+                    let d = mathx::exp(-0.5 * (r / sigma) * (r / sigma))
+                        / (sigma * SQRT_TWO_PI);
+                    return_spike_for(r, g, gu, p) * d
+                };
+                let mut acc = f(lo) + f(hi);
+                for i in 1..n {
+                    let r = lo + i as f64 * h;
+                    acc += f(r) * if i % 2 == 1 { 4.0 } else { 2.0 };
+                }
+                let quad = acc * h / 3.0;
+                let closed = expected_return_spike(sigma, g, gu, p);
+                assert!((quad - closed).abs() <= 1e-6 * closed.abs().max(1.0),
+                        "sigma {sigma}, p {p}: quadrature {quad} vs closed {closed}");
+            }
+        }
+    }
+
+    /// A LINEAR CORRECTION UNDER A POWER FORM IS WRONG BY A FACTOR THAT
+    /// MOVES WITH THE MARKET, and it is wrong in both directions.
+    ///
+    /// This is why the exponent had to reach this function rather than
+    /// only [`return_spike_for`]. The down half carries `E|r|^p` and the
+    /// up half `E|r|`, so the ratio of the right correction to the linear
+    /// one grows as `sigma^(p - 1)` and crosses 1.0 at a single
+    /// volatility — near sigma 0.91 at `p = 1.2`. A correction computed as
+    /// if the response were linear therefore over-corrects a calm market
+    /// and under-corrects a violent one, which is precisely the defect the
+    /// fitted `vix_target_offset` had. The identity exists to remove that
+    /// defect, not to relocate it behind a closed form.
+    ///
+    /// Asserted as monotonicity plus a sign change rather than as
+    /// "the error grows with sigma", which is false: the error is smallest
+    /// AT the crossing and grows away from it in both directions.
+    #[test]
+    fn a_linear_correction_under_a_power_form_is_wrong_by_a_moving_factor() {
+        let (p, g, gu) = (1.2, 22.3, 11.15);
+        let ratio = |sigma: f64| {
+            expected_return_spike(sigma, g, gu, p) / expected_return_spike(sigma, g, gu, 1.0)
+        };
+        let mut last = f64::NEG_INFINITY;
+        for &sigma in &[0.25, 0.5, 0.91, 2.0, 4.0, 9.0] {
+            let r = ratio(sigma);
+            assert!(r > last, "the ratio did not rise at sigma {sigma}: {r} vs {last}");
+            last = r;
+        }
+        assert!(ratio(0.25) < 1.0,
+                "the linear correction did not over-correct a calm market: {}",
+                ratio(0.25));
+        assert!(ratio(9.0) > 1.0,
+                "the linear correction did not under-correct a violent one: {}",
+                ratio(9.0));
+        assert!(ratio(9.0) / ratio(0.25) > 1.5,
+                "a 36-fold volatility moved the correction by less than half: {}",
+                ratio(9.0) / ratio(0.25));
     }
 
     /// THE SPIKE READS THE SESSION UNDER THE IDENTITY, whatever
