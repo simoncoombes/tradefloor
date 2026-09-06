@@ -19,6 +19,7 @@
     "crowd_momentum_gain": 0.02,
     "crowd_valuation_gain": 0.006,
     "cycle_hazard_per_month": 0.0,
+    "cycle_stationary_opening": 0.0,
     "daily_credit_floor_gain": 1.0,
     "daily_shock_cap": 0.15,
     "default_sector_anchor_pe": 18.0,

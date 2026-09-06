@@ -573,6 +573,12 @@ PARAM_SPECS: dict[str, dict] = {
     # answer.
     "garch_omega_sector_scaled": {"kind": "abs", "step_unit": 0.1,
                                   "hard_range": (0.0, 1.0)},
+    # The stationary day-zero opening (programme/stationary-opening-design.md).
+    # A switch: 0.0 and 1.0 are the only values that mean anything, so the
+    # step is the whole interval and a search either takes the mechanism or
+    # leaves it.
+    "cycle_stationary_opening": {"kind": "abs", "step_unit": 1.0,
+                                 "hard_range": (0.0, 1.0)},
     # In daily VARIANCE units. 0.0 removes the floor, which is the point of
     # the dial; the top is 4x the shipped 1e-4, the convention multiple.
     "idio_sigma_floor": {"kind": "abs", "step_unit": 2.5e-5,

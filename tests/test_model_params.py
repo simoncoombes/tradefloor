@@ -425,6 +425,25 @@ PERTURBATIONS = [
     # draws BY running the economy, so the count is the mechanism rather
     # than a side effect of it.
     ("macro_burn_in_days", 30.0, True),
+    # Whether day zero's cycle phase and its age are DRAWN from the
+    # cycle's stationary law instead of being the same point on every run.
+    # It moves the market on the probe: the drawn phase reaches the VIX
+    # through the phase table on day one and the couplings turn that into
+    # variance, and the two construction draws displace the economy
+    # substream besides. Perturbed to 1.0, the only other admissible
+    # value -- see the dial's own note on why the interior has no reading,
+    # and `test_stationary_opening.py`, which asserts that every non-zero
+    # value gives the same run.
+    #
+    # It also moves `draws_consumed`, which is why it is in
+    # DRAW_SCHEDULE_MOVERS below -- and the probe is the wrong instrument
+    # for that: at seed 42 over three days the count reads IDENTICAL,
+    # because the two construction draws are cancelled exactly by the
+    # phase-change block at `daily.rs:285`, which a drawn age past two
+    # days skips on both of the days it would fire. Measured over six
+    # seeds at 1, 2, 3, 5, 10 and 30 days the difference runs 0, +1, +2,
+    # +4 and +30, so the zero here is a coincidence of one cell.
+    ("cycle_stationary_opening", 1.0, True),
     # The share of earnings returned as net buybacks. It reaches the
     # valuation on the first tick that has a day behind it, and the probe's
     # first tick is day 0, where the elapsed time is zero and the factor is
@@ -559,8 +578,30 @@ PERTURBATIONS = [
 #: displacement-only null, the dial off with the stream advanced by two
 #: draws at the same point, is run beside the treated arm so the reported
 #: effect is separated from the position shift.
+#: `cycle_stationary_opening` is the fourth, and it moves the schedule in
+#: TWO places, both of which are the mechanism.
+#:
+#: At 0.0 it takes no draw at all: `Engine::draw_stationary_opening`
+#: returns before touching the generator, so every preset written before
+#: the dial is bit-identical to itself and the committed known-answer
+#: digests reproduce unmoved. Nothing is exempted for the shipped default.
+#:
+#: Above 0.0 the two uniforms ARE the draw -- a phase and an age drawn from
+#: a distribution need two numbers, and a version that drew nothing would
+#: not have drawn anything. Same shape as the two above.
+#:
+#: The second place is not a construction draw and is worth writing out.
+#: `check_cycle_transition` returns BEFORE drawing while a phase is younger
+#: than its minimum duration, so a run opening at age zero rolls no exit
+#: for its first 180 days, and one opening at a drawn age past the minimum
+#: rolls one every day. The count therefore differs for the whole run and
+#: not only at construction -- and it differs because the phase's exit is
+#: being rolled, which is the thing this dial exists to make true on day
+#: one. Measured: +1 a day on a seed whose drawn expansion opens at 228
+#: days, nothing on seeds whose drawn phase opens below its minimum.
 DRAW_SCHEDULE_MOVERS = frozenset({
     "vix_jump_intensity", "macro_burn_in_days", "phase_target_range_draw",
+    "cycle_stationary_opening",
 })
 
 

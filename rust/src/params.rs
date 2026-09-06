@@ -1044,6 +1044,114 @@ pub struct ModelParams {
     /// draw count, and it does so by running the economy rather than as a
     /// side effect.
     pub macro_burn_in_days: f64,
+    /// Draw the day-zero cycle phase AND its age from the cycle's own
+    /// stationary law, instead of opening every run at the same point.
+    /// 0.0 -- every preset before pt-v19 -- draws nothing and leaves
+    /// construction as it was, to the bit.
+    ///
+    /// # A cohort, not a transient
+    ///
+    /// Every run opens in EXPANSION at phase age ZERO. A phase has a
+    /// minimum duration before a transition can roll (`economy/state.rs`,
+    /// `phase_characteristics`: 6, 2, 4, 2, 4 months) and then a Weibull
+    /// hazard (`economy/cycle.rs`), and at this era's clock the exit after
+    /// the minimum is steep, so thirty seeds leave their first expansion
+    /// at nearly the same age and move through the first cycle in step.
+    /// Year two is a synchronised recession -- contraction share 0.51 on
+    /// pt-v1, pt-v16 and a pinned-VIX arm alike, so it is a property of
+    /// the construction and not of a preset -- and the macro fields travel
+    /// with it: unemployment 2.8, 5.8, 7.0, 4.9 by year on pt-v16, the
+    /// recession probability 0.13, 0.54, 0.14, 0.37.
+    ///
+    /// It does not damp on a horizon anyone runs. The fixed minimums make
+    /// the cycle's length nearly deterministic, so the yearly mix is still
+    /// 0.20 to 0.33 of a total-variation unit from stationary in years
+    /// five to twelve at this clock. `macro_burn_in_days` does not fix it
+    /// either, and was never meant to: it HOLDS the phase and RESETS its
+    /// clock, so it restores the same point after settling the fields.
+    ///
+    /// # The identity it draws from
+    ///
+    /// The cycle is a cyclic semi-Markov chain, so for phase `i` at age
+    /// `a` days ([`crate::economy::stationary_opening`]):
+    ///
+    /// ```text
+    /// S_i(d)  = prod_{t=1}^{d-1} (1 - p_i(t))   P(the sojourn survives d - 1 checks)
+    /// E[T_i]  = sum_{d>=1} S_i(d)               the mean sojourn, in days
+    /// pi_i    = E[T_i] / sum_j E[T_j]           the share of days in phase i
+    /// f_i(a)  = S_i(a + 1) / E[T_i]             the age within phase i
+    /// P(i, a) = S_i(a + 1) / sum_j E[T_j]       the joint law
+    /// ```
+    ///
+    /// with `p_i` the probability `check_cycle_transition` compares against
+    /// its uniform, read on the hazard alone. Nothing is chosen: every term
+    /// is the engine's own -- `cycle_hazard_params`, `min_months`, the
+    /// hazard's cap of 0.8, the clamp at 0.3 and
+    /// [`ModelParams::cycle_hazard_per_month`] -- and the walk stops where
+    /// the remaining tail cannot move an f64 sum of it.
+    ///
+    /// **The AGE is not optional.** `f_i` is the renewal identity for the
+    /// backward recurrence time, and it is the part a build would skip.
+    /// Drawing the phase and setting the age to zero would start a smaller
+    /// cohort at the same point: at this clock 73 per cent of stationary
+    /// expansions are younger than the 180-day minimum a fresh one has to
+    /// clear, with a median age of 123 days against a mean sojourn of 246.
+    ///
+    /// # The fields, and the ladder
+    ///
+    /// `adjust_transition_probability` adds to the hazard from the macro
+    /// state, so the TRUE stationary law depends on the fields, which
+    /// depend on the phase path. There is no closed form. The draw above
+    /// is the hazard-only law; the fields are then relaxed by
+    /// `macro_burn_in_days` days of the ordinary daily step with the phase
+    /// NOT held and its clock NOT reset -- the chain is already in its
+    /// stationary law, which a free run preserves by definition, while
+    /// unemployment, inflation and the yields relax to the values
+    /// consistent with the phase path they have just lived through, and the
+    /// ladder acts on the mix during that run. That is how the ladder is
+    /// handled: by construction rather than by algebra.
+    ///
+    /// So this dial and `macro_burn_in_days` are two halves of one
+    /// opening, and a preset that sets this without the other opens a
+    /// drawn contraction on an expansion's fields.
+    ///
+    /// # Why it is a SWITCH and the interior has no reading
+    ///
+    /// A day-zero state is either drawn from the stationary law or it is
+    /// not; there is no half-drawn phase. Every non-zero value therefore
+    /// gives the same opening, which is asserted rather than left for a
+    /// search to find as a flat direction:
+    /// `test_every_non_zero_value_gives_the_same_opening` in
+    /// `tests/test_stationary_opening.py`. The two admissible values are
+    /// 0.0 and 1.0.
+    ///
+    /// # What it costs
+    ///
+    /// Two uniforms from the economy substream at construction, so the
+    /// market's day-zero draws sit where they sat, plus about 2,500 to
+    /// 67,000 multiplies once -- the identity's walk, whose length is the
+    /// clock's, not the run's. Nothing per session.
+    ///
+    /// # It moves the draw schedule in TWO places, not one
+    ///
+    /// The two construction uniforms, as `macro_burn_in_days` already
+    /// moves it and declares. And then, for the WHOLE RUN:
+    /// `check_cycle_transition` returns before drawing while a phase is
+    /// younger than its minimum duration, so a run opening at age zero
+    /// rolls no exit for its first 180 days while one opening past the
+    /// minimum rolls one every day. The count there is the mechanism -- a
+    /// phase past its minimum is a phase whose exit is being rolled -- and
+    /// it is not a construction cost.
+    ///
+    /// The three-day perturbation probe cannot see either, and reads the
+    /// count IDENTICAL at its own seed: the phase-change block in
+    /// `economy/daily.rs` takes a uniform on both of the two days it fires
+    /// and a drawn age past two days skips both, cancelling the two
+    /// construction draws exactly. Measured over six seeds at 1, 2, 3, 5,
+    /// 10 and 30 days the difference runs 0, +1, +2, +4 and +30, which is
+    /// why `DRAW_SCHEDULE_MOVERS` carries this dial for the mechanism
+    /// rather than on the probe's evidence.
+    pub cycle_stationary_opening: f64,
     /// The share of earnings a company returns as net buybacks. 0.0 --
     /// every preset before pt-v18 -- is bit-identical.
     ///
@@ -2316,6 +2424,7 @@ impl ModelParams {
             phase_target_range_draw: 0.0,
             neutral_discount_rate: crate::fair_value::NEUTRAL_DISCOUNT_RATE,
             macro_burn_in_days: 0.0,
+            cycle_stationary_opening: 0.0,
             buyback_payout_share: 0.0,
             jump_mean_compensated: 0.0,
             cascade_symmetry: 0.0,
@@ -3525,6 +3634,7 @@ impl ModelParams {
             "phase_target_range_draw" => self.phase_target_range_draw,
             "neutral_discount_rate" => self.neutral_discount_rate,
             "macro_burn_in_days" => self.macro_burn_in_days,
+            "cycle_stationary_opening" => self.cycle_stationary_opening,
             "buyback_payout_share" => self.buyback_payout_share,
             "jump_mean_compensated" => self.jump_mean_compensated,
             "cascade_symmetry" => self.cascade_symmetry,
@@ -3689,6 +3799,7 @@ impl ModelParams {
             "phase_target_range_draw" => out.phase_target_range_draw = value,
             "neutral_discount_rate" => out.neutral_discount_rate = value,
             "macro_burn_in_days" => out.macro_burn_in_days = value,
+            "cycle_stationary_opening" => out.cycle_stationary_opening = value,
             "buyback_payout_share" => out.buyback_payout_share = value,
             "jump_mean_compensated" => out.jump_mean_compensated = value,
             "cascade_symmetry" => out.cascade_symmetry = value,
@@ -3924,6 +4035,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "phase_target_range_draw",
         "neutral_discount_rate",
         "macro_burn_in_days",
+        "cycle_stationary_opening",
         "buyback_payout_share",
         "oil_supply_response",
         "market_vol_vix_coupling",

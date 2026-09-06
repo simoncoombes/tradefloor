@@ -803,6 +803,59 @@ impl Engine {
         )
     }
 
+    /// Draw the day-zero cycle phase and its age from the cycle's own
+    /// stationary law, and say whether it drew.
+    ///
+    /// A BRANCH at 0.0, which is every preset before pt-v19: it returns
+    /// before touching the economy or the generator, so construction is
+    /// what it always was and no arithmetic changes. That is what makes
+    /// bit-identity a property of the control flow rather than of
+    /// floating-point luck -- and it is asserted anyway, over 9,000 daily
+    /// returns on thirty seeds, against a digest taken from a build of the
+    /// commit this branch was cut from, by
+    /// `tests/test_stationary_opening.py`.
+    ///
+    /// The uniforms come from the ECONOMY substream, the stream
+    /// [`Engine::burn_in_economy`] already consumes, so the market's
+    /// day-zero draws sit exactly where they sat and only this domain's
+    /// sequence moves. Two draws, counted through the same `Counting`
+    /// wrapper the daily step uses, so `draws_consumed` records them.
+    ///
+    /// They are recorded at [`Site::EconomyCycle`], which is the site they
+    /// belong to: what is being drawn is the cycle's own transition law,
+    /// read as a distribution instead of rolled forward one day at a time.
+    /// No new site is declared, so the draw-schedule registry in
+    /// `python/tradefloor/noise.py` is unchanged.
+    ///
+    /// See [`ModelParams::cycle_stationary_opening`] for the identity, why
+    /// the AGE is the part that cannot be skipped, and why the field
+    /// relaxation is `macro_burn_in_days`' half of the same opening.
+    fn draw_stationary_opening(&mut self) -> bool {
+        if self.params.cycle_stationary_opening == 0.0 {
+            return false;
+        }
+        let mut rng = std::mem::replace(&mut self.economy_rng, GameRng::new(0, MAIN_STREAM));
+        let mut counting = Counting {
+            inner: &mut rng,
+            count: 0,
+        };
+        counting.site(Site::EconomyCycle, 0);
+        let u_phase = counting.next_f64();
+        let u_age = counting.next_f64();
+        let consumed = counting.count;
+        self.economy_rng = rng;
+        self.draws.economy += consumed;
+
+        let (phase, months) = crate::economy::stationary_opening(
+            self.params.cycle_hazard_per_month,
+            u_phase,
+            u_age,
+        );
+        self.economy.cycle_phase = phase;
+        self.economy.months_in_current_phase = months;
+        true
+    }
+
     /// Advance the economy alone to the state its own dynamics reach,
     /// before day zero.
     ///
@@ -839,6 +892,24 @@ impl Engine {
     /// age would open a random distance into an expansion, which is a
     /// different certified year and a choice rather than a correction.
     ///
+    /// # Both of those stop, and only when the opening is DRAWN
+    ///
+    /// Holding the phase and resetting the clock restore the same point
+    /// this burn-in started from, which is the defect
+    /// [`ModelParams::cycle_stationary_opening`] exists for: the fields
+    /// settle and the cohort survives. When that dial has drawn the phase
+    /// and its age, the burn-in runs FREE -- the phase is not held and the
+    /// clock is not reset -- because the chain is already in its
+    /// stationary law, which a free run preserves by definition, and what
+    /// is left to do is relax the fields under the phase path the run has
+    /// just lived through. Holding a drawn contraction for 755 days
+    /// instead would drive unemployment and the policy rate far past any
+    /// state a contraction reaches, and the fields would open inconsistent
+    /// with the mix.
+    ///
+    /// At the shipped default the dial draws nothing and every line here
+    /// is the line that stood before it.
+    ///
     /// # The growth term's base
     ///
     /// `gdp` and `cpi` compound on every one of these days, so the base of
@@ -847,6 +918,11 @@ impl Engine {
     /// above its earnings, which is a level jump nobody asked for and
     /// which the ratio was never meant to carry.
     fn burn_in_economy(&mut self) {
+        // The day-zero phase and its age first, so what follows relaxes
+        // the fields under the phase the run will OPEN in. Inert at the
+        // default, where it returns without drawing and every line below
+        // is the line that stood here.
+        let drawn = self.draw_stationary_opening();
         if self.params.macro_burn_in_days <= 0.0 {
             return;
         }
@@ -861,12 +937,14 @@ impl Engine {
                 game_day: day,
                 timestamp: day * 24 * 60,
             });
-            if self.economy.cycle_phase != phase {
+            if !drawn && self.economy.cycle_phase != phase {
                 self.economy.cycle_phase = phase;
                 self.economy.months_in_current_phase = months_before + 1.0 / 30.0;
             }
         }
-        self.economy.months_in_current_phase = 0.0;
+        if !drawn {
+            self.economy.months_in_current_phase = 0.0;
+        }
         self.nominal_output_base = self.economy.gdp * self.economy.cpi;
     }
 
