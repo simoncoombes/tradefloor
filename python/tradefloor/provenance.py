@@ -58,6 +58,31 @@ asserted as a SET in both directions, so a dial cannot be added without a
 decision and provenance cannot be written without the list shrinking. The
 list is the actual state of the shipped preset, and until 2026-09-05 nobody
 had written it down.
+
+# The hole a frozen baseline leaves, and `POST_BASELINE`
+
+`pt-v1` is frozen and bit-reproducing, so a dial added to `ModelParams`
+afterwards carries in `pt-v1` **whatever default its own author gave it**.
+"Differs from `pt-v1`" then cannot see that value at all, however chosen it
+is. The first version of this module said so about `garch_omega`: 2e-06 in
+every preset, 18.4x short of its own identity, and out of scope because
+nobody moved it.
+
+That was a footnote while the dials it hid were old. It is not one now.
+`vix_variance_premium` ships 0.252 in `pt-v1` because the dial did not exist
+when `pt-v1` was written; the number is this era's measurement, and the
+audit was blind to it. `POST_BASELINE` names such dials and puts them in
+scope at the value each required preset actually ships, so an entry still
+goes stale the moment one of them moves.
+
+**It is not yet the complete set**, and it says so rather than reading as
+one. It covers the dials the pt-v19 charter's ledger names. The complete
+set is derivable -- the dial names in `ModelParams` that do not appear in
+`rust/src/params.rs` at the last release, `git show f47c149:` -- and on
+2026-09-06 that was thirty-four names, twenty-four of them unmoved by any
+required preset and thirteen of those the sector table's own per-sector
+sigmas. Enumerating them is a decision about scope, not bookkeeping, so it
+is left to whoever takes it.
 """
 
 from __future__ import annotations
@@ -92,6 +117,43 @@ REQUIRED_FIELDS = {
 #: an exponent shipped without an error bar is a chosen constant with more
 #: decimal places.
 MEASURED_ERROR_FIELDS = ("residual", "standard_error")
+
+#: Dials in scope that no required preset moves, because the BASELINE
+#: PREDATES THEM. See the module note: `pt-v1` is frozen, so the value it
+#: carries for a dial added later is that dial author's default and not a
+#: choice `pt-v1` made, and the difference-from-baseline rule is blind to it.
+#:
+#: Each entry says why the dial is here. Membership is asserted in
+#: `tests/test_dial_provenance.py`: every name is a real dial, and a name a
+#: required preset DOES move is refused, because that dial is already in
+#: scope under the rule above and listing it here as well would hide that
+#: somebody chose it.
+#:
+#: PARTIAL, ON PURPOSE, and the module note says how to derive the whole
+#: set. These five are the dials `programme/PT-V19-CHARTER.md` section 3.1
+#: names in its ledger that the difference-from-baseline rule cannot reach.
+POST_BASELINE = {
+    "vix_level_identity":
+        "added 2026-09-05 for the VIX level identity; pt-v19 sets it to 1.0 "
+        "(charter 3.1) and every shipped preset leaves it at 0.0",
+    "cycle_stationary_opening":
+        "added 2026-09-05 for the stationary opening; pt-v19 sets it to 1.0 "
+        "(charter 3.1, ruling R2) and every shipped preset leaves it at 0.0",
+    "vix_variance_premium":
+        "the measured variance risk premium. Read only while "
+        "`vix_level_identity` is non-zero, so no preset has had to move it "
+        "-- and 0.252 is a measurement, which is exactly the kind of number "
+        "that must not be invisible because it arrived as a default",
+    "vix_return_exponent":
+        "the power form's exponent, shipped inert at 1.0 under ruling R4 "
+        "while the tape reads 1.200. A dial whose shipped value is not the "
+        "measured one is the case this module exists for",
+    "idio_sigma_floor":
+        "the per-name sigma floor, which replaced an inline literal at the "
+        "value the literal carried. Ships at 1e-4 in every preset and binds "
+        "on 61 to 90 per cent of name-days in nine of twelve sectors, so it "
+        "is a live constraint that no preset has ever chosen",
+}
 
 #: The provenance of each shipped dial value.
 #:
@@ -226,6 +288,102 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                    "round number with no series behind it",
         "source": "programme/RESUME.md, ws-b's withdrawal",
     },
+    "vix_variance_premium": {
+        # The one MEASURED entry in the table, and the schema was built
+        # around what it has to carry: a source, a date, a script, and an
+        # error bar. The estimator is a choice and it is named, because
+        # this quantity reads 1.076 pooled over one history and 1.252 per
+        # calendar year, and the panel's own statistic is a per-window one.
+        "kind": "measured",
+        "presets": {"pt-v16": 0.252, "pt-v18": 0.252},
+        "source": "^GSPC and ^VIX adjusted closes, 1990-01-03 to "
+                  "2025-07-30, 8,959 aligned sessions with a return; "
+                  "per-calendar-year estimator over 35 years",
+        "date": "2026-09-05",
+        "script": "programme/scripts/vix-rv-relation.py (design repo)",
+        "residual": "the per-year IQR, 1.128 to 1.398 on the ratio, so "
+                    "+/- 0.13 on pi. The rolling-252-session estimator "
+                    "reads median 1.257, P10 1.049, P90 1.473",
+        "estimator": "per calendar year, median of 35. Stated because the "
+                     "pooled single-history figure is 1.076 and the "
+                     "per-window one is 1.252, and the per-window "
+                     "estimator is the like-for-like one for a certified "
+                     "panel whose statistic runs on a 252-session window",
+        "note": "equality is REFUTED rather than merely unsupported: 32 of "
+                "35 calendar years and 92.5 per cent of rolling windows "
+                "read above 1.0. The dial is not read at all while "
+                "vix_level_identity is 0.0, so this value ships inert in "
+                "every preset here -- and a default that is a refuted "
+                "identity would be a chosen constant, which is why the "
+                "measured value is the default and zero is not",
+        "source_docstring": "rust/src/params.rs, "
+                            "ModelParams::vix_variance_premium",
+    },
+    "vix_return_exponent": {
+        # A MEASUREMENT EXISTS AND IT IS NOT OF THIS VALUE. The tape's down
+        # side fits dVIX = 1.003 |r|^1.1996, R squared 0.9947 over eight
+        # bucket medians on 8,960 sessions, standard error 0.0357 -- a 95
+        # per cent interval of 1.112 to 1.287, and 1.132 count-weighted.
+        # The shipped value is 1.0.
+        #
+        # 1.0 is the exponent at which the power form reduces to the linear
+        # one, so the dial is inert and every preset before it is
+        # bit-identical. That is a fact about the code and it is recorded
+        # here; it is NOT a derivation of 1.0 as the right exponent, and
+        # calling it one is precisely the move this module refuses. A
+        # residual attaches to the value it was computed for, and 0.0357
+        # was computed for 1.1996.
+        "kind": "undetermined",
+        "presets": {"pt-v16": 1.0, "pt-v18": 1.0},
+        "what_would_determine_it": "the question asked on an arm whose "
+                                   "index sd is near the tape's, which no "
+                                   "arm in wsa16 or wsa17 was, with the "
+                                   "shape residual read beside the "
+                                   "per-bucket columns "
+                                   "(PT-V19-CHARTER.md 2.4). wsa17 could "
+                                   "not resolve it: its verdict rests on "
+                                   "one bucket holding 336 of 7,560 model "
+                                   "sessions against 22 of 8,959 real "
+                                   "ones, and dropping that bucket leaves "
+                                   "six thousandths of a log unit between "
+                                   "the two",
+        "source": "programme/joint-solve-scope.md, the exponent fit; "
+                  "programme/scripts/vix-updown-fit.py (design repo)",
+        "derivation_exists_for_another_value": 1.1996,
+        "inert_at_shipped_value": True,
+        "ruling": "R4 -- ruled out of pt-v19 until 2.4 is measured "
+                  "properly, and the ruling stands",
+    },
+    "macro_burn_in_days": {
+        # THE SOURCE CLAIMS A MEASUREMENT AND SHIPS NO ERROR BAR. The
+        # docstring reads "The length is measured -- 755 is the day the
+        # last field enters one stationary standard deviation of its mean
+        # and stays there", with unemployment at 119 days, inflation 419
+        # and the ten-year 705. No script, no date, and no dispersion: the
+        # day a field enters a band is a random variable, and one path's
+        # value for it is one draw.
+        #
+        # Under this schema that is not a measurement, and the refusal is
+        # the point. Charter 3.2 reaches the same place from the other
+        # side: 755.0 is pt-v18's and is inherited, and ruling R2 fixes
+        # that both halves of the opening ship together without fixing the
+        # length.
+        "kind": "undetermined",
+        "presets": {"pt-v18": 755.0},
+        "what_would_determine_it": "the burn-in table re-run across the "
+                                   "certified seed cohort, reporting the "
+                                   "dispersion of the day each field "
+                                   "enters and stays inside one stationary "
+                                   "sd, and re-run on the STATIONARY "
+                                   "OPENING rather than on pt-v18's "
+                                   "expansion-at-age-zero start, since "
+                                   "that is what pt-v19 ships and it moves "
+                                   "the quantity being waited for",
+        "source": "rust/src/params.rs, ModelParams::macro_burn_in_days, "
+                  "section 'The length is measured'; "
+                  "programme/PT-V19-CHARTER.md 3.2",
+        "source_claims_a_measurement_without_an_error_bar": True,
+    },
     "market_beta_down_asym": {
         # The dial's own docstring reads "0.0 -- every shipped preset -- is
         # bit-identical", and pt-v16 and pt-v18 both ship 0.025. Verified
@@ -246,9 +404,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
 }
 
-#: Dials a required preset moves off the baseline that carry NO entry.
+#: Dials in scope that carry NO entry.
 #:
-#: This list is the finding. Sixty-one of the sixty-four choices in the
+#: This list is the finding. Fifty-nine of the sixty-nine dials in the
 #: shipped and candidate presets have no recorded derivation, and several
 #: carry eight significant figures with no error bar anywhere --
 #: `crisis_blend_gain` at 0.8275881, `crisis_vix_threshold` at 30.88325108,
@@ -256,12 +414,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: places is still a search optimum.
 #:
 #: NOT EVERY DIAL WITH A DEFECT IS IN THIS SET. `garch_omega` ships 2e-06 in
-#: every preset, so no required preset moves it off the baseline and it is
-#: out of scope here -- while the identity at `rust/src/market/garch.rs`
-#: puts the shipped value 18.4x short. A dial every preset gets equally
-#: wrong is a defect this list is not shaped to catch, because the list
-#: asks "what did we choose", not "what is right". It enters the set the
-#: moment a preset moves it.
+#: every preset and is not named in `POST_BASELINE`, so it is out of scope
+#: here -- while the identity at `rust/src/market/garch.rs` puts the shipped
+#: value 18.4x short. A dial every preset gets equally wrong is a defect the
+#: difference rule is not shaped to catch, because that rule asks "what did
+#: we choose", not "what is right". It enters the set the moment a preset
+#: moves it, or the moment somebody declares it post-baseline.
 #:
 #: It shrinks when a workstream records a derivation and never grows without
 #: someone deciding it should. `tests/test_dial_provenance.py` asserts it as
@@ -274,6 +432,7 @@ UNPROVENANCED = (
     "crisis_blend_source",
     "crisis_vix_threshold",
     "cycle_hazard_per_month",
+    "cycle_stationary_opening",
     "daily_credit_floor_gain",
     "earnings_nominal_growth",
     "endogenous_news_intensity",
@@ -281,6 +440,7 @@ UNPROVENANCED = (
     "garch_alpha",
     "garch_beta",
     "garch_vix_coupling",
+    "idio_sigma_floor",
     "idio_sigma_scale",
     "jump_intensity_idio",
     "jump_intensity_market",
@@ -290,7 +450,6 @@ UNPROVENANCED = (
     "jump_sigma_idio",
     "jump_sigma_market",
     "jump_vix_coupling",
-    "macro_burn_in_days",
     "market_beta_down_asym_recentre",
     "market_factor_sigma",
     "market_vol_alpha",
@@ -314,6 +473,7 @@ UNPROVENANCED = (
     "sector_vix_coupling",
     "vix_cycle_amplitude",
     "vix_decay_ratio",
+    "vix_level_identity",
     "vix_mean_reversion",
     "vix_realised_vol_weight",
     "vix_return_clamp",
@@ -333,11 +493,14 @@ def _dict(name: str) -> dict[str, float]:
     return {k: v for k, v in values.items() if k != "name"}
 
 
-def required_dials() -> dict[str, dict[str, float]]:
-    """Every dial a required preset moves off the baseline, and to what.
+def moved_dials() -> dict[str, dict[str, float]]:
+    """Every dial a required preset sets to something other than the baseline.
 
-    Keyed by dial, then by preset, so a dial two presets set differently
-    shows both values and an entry has to justify each.
+    The difference rule on its own. Kept separate from `required_dials`
+    because the distinction is the finding: a dial in here is a choice
+    somebody took against `BASELINE`, and a dial that is in scope only
+    through `POST_BASELINE` is one the baseline could not express a choice
+    about.
     """
     base = _dict(BASELINE)
     out: dict[str, dict[str, float]] = {}
@@ -345,6 +508,28 @@ def required_dials() -> dict[str, dict[str, float]]:
         for key, value in _dict(preset).items():
             if key in base and value != base[key]:
                 out.setdefault(key, {})[preset] = value
+    return out
+
+
+def required_dials() -> dict[str, dict[str, float]]:
+    """Every dial in scope, and what each required preset ships for it.
+
+    Two rules, and the second is there because the first cannot see past a
+    frozen baseline: a dial a required preset MOVES off `BASELINE`, and a
+    dial named in `POST_BASELINE`, recorded at the value each preset ships
+    whether or not it differs.
+
+    Keyed by dial, then by preset, so a dial two presets set differently
+    shows both values and an entry has to justify each. A `POST_BASELINE`
+    dial is recorded the same way, so an entry for it goes stale on the same
+    rule the moment a preset moves it.
+    """
+    out = moved_dials()
+    for preset in REQUIRED_PRESETS:
+        values = _dict(preset)
+        for key in POST_BASELINE:
+            if key in values:
+                out.setdefault(key, {})[preset] = values[key]
     return out
 
 
@@ -405,10 +590,26 @@ def audit() -> dict[str, Any]:
     `stale_unprovenanced` are names listed there that no longer need one;
     `invalid` are entries that fail the schema; `mismatched` are entries
     whose recorded value is not what the preset ships, which is exactly how
-    a record goes stale when a dial moves under it.
+    a record goes stale when a dial moves under it; `post_baseline` are
+    faults in the declared list itself.
     """
+    base = _dict(BASELINE)
+    moved = moved_dials()
     required = required_dials()
     covered = set(DIAL_PROVENANCE) | set(UNPROVENANCED)
+
+    post_baseline: list[str] = []
+    for dial in sorted(POST_BASELINE):
+        if dial not in base:
+            post_baseline.append(
+                f"{dial}: named in POST_BASELINE and is not a dial of "
+                f"{BASELINE}")
+        elif dial in moved:
+            post_baseline.append(
+                f"{dial}: named in POST_BASELINE, and "
+                f"{', '.join(sorted(moved[dial]))} moves it off {BASELINE}. "
+                "It is already in scope under the difference rule, and "
+                "declaring it here as well hides that somebody chose it")
 
     invalid: list[str] = []
     for dial, entry in sorted(DIAL_PROVENANCE.items()):
@@ -418,8 +619,9 @@ def audit() -> dict[str, Any]:
     for dial, entry in sorted(DIAL_PROVENANCE.items()):
         if dial not in required:
             mismatched.append(
-                f"{dial}: has provenance but no required preset moves it off "
-                f"{BASELINE}"
+                f"{dial}: has provenance but is not in scope -- no required "
+                f"preset moves it off {BASELINE}, and it is not named in "
+                "POST_BASELINE"
             )
             continue
         for preset, value in (entry.get("presets") or {}).items():
@@ -435,6 +637,9 @@ def audit() -> dict[str, Any]:
 
     return {
         "required": sorted(required),
+        "moved": sorted(moved),
+        "post_baseline_in_scope": sorted(set(required) - set(moved)),
+        "post_baseline": post_baseline,
         "provenanced": sorted(DIAL_PROVENANCE),
         "missing": sorted(set(required) - covered),
         "unprovenanced": sorted(set(required) & set(UNPROVENANCED)),
@@ -453,14 +658,18 @@ def report() -> str:
     """The audit as a table, for a human deciding what to derive next."""
     a = audit()
     lines = [
-        f"{len(a['required'])} dials moved off {BASELINE} by "
+        f"{len(a['required'])} dials in scope for "
         f"{', '.join(REQUIRED_PRESETS)}",
+        f"  {len(a['moved'])} moved off {BASELINE}",
+        f"  {len(a['post_baseline_in_scope'])} in scope because "
+        f"{BASELINE} predates them",
         f"  {len(a['provenanced'])} with provenance "
         + ", ".join(f"{k} {len(v)}" for k, v in a["by_kind"].items()),
         f"  {len(a['unprovenanced'])} declared unprovenanced",
         f"  {len(a['missing'])} with neither",
     ]
-    for label in ("missing", "invalid", "mismatched", "stale_unprovenanced"):
+    for label in ("missing", "invalid", "mismatched", "stale_unprovenanced",
+                  "post_baseline"):
         for item in a[label]:
             lines.append(f"  {label.upper()}: {item}")
     return "\n".join(lines)
@@ -471,9 +680,9 @@ def check() -> None:
     a = audit()
     faults = (
         [f"no provenance and not declared unprovenanced: {d}" for d in a["missing"]]
-        + a["invalid"] + a["mismatched"]
-        + [f"declared unprovenanced but not moved by any required preset: {d}"
-           for d in a["stale_unprovenanced"]]
+        + a["invalid"] + a["mismatched"] + a["post_baseline"]
+        + [f"declared unprovenanced but not in scope for any required "
+           f"preset: {d}" for d in a["stale_unprovenanced"]]
     )
     if faults:
         raise ValidationError(

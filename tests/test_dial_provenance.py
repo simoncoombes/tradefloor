@@ -27,9 +27,9 @@ def test_every_choice_is_either_derived_measured_or_declared_unknown():
 
     A new dial fails until someone either records where its value came from
     or adds it to `UNPROVENANCED` on purpose, and provenance cannot be
-    written without the list shrinking. Sixty-one of sixty-four choices in
-    the shipped and candidate presets have no recorded derivation today;
-    that number is the finding, and this is what stops it growing quietly.
+    written without the list shrinking. Fifty-nine of the sixty-nine dials
+    in scope have no recorded derivation today; that number is the finding,
+    and this is what stops it growing quietly.
     """
     a = pv.audit()
     assert not a["missing"], (
@@ -59,6 +59,88 @@ def test_an_entry_that_goes_stale_when_its_dial_moves_is_caught():
     with_moved = dict(pv.DIAL_PROVENANCE, **{dial: moved})
     a = _audit_with(with_moved, pv.UNPROVENANCED)
     assert any("ships" in m for m in a["mismatched"]), a["mismatched"]
+
+
+def test_post_baseline_names_dials_the_difference_rule_cannot_reach():
+    """The declared list is real, and it is not doing the other rule's job.
+
+    Every name is a dial of the baseline, and none of them is one a
+    required preset moves -- a dial that IS moved is in scope already, and
+    listing it here as well would hide that somebody chose it. Both halves
+    are asserted to FIRE below, because a membership rule nothing can
+    violate is not a rule.
+    """
+    base = tradefloor.ModelParams.from_preset(pv.BASELINE).to_dict()
+    moved = pv.moved_dials()
+    for dial, why in pv.POST_BASELINE.items():
+        assert dial in base, f"{dial} is not a dial of {pv.BASELINE}"
+        assert dial not in moved, (
+            f"{dial} is moved off the baseline by "
+            f"{sorted(moved[dial])} and does not need declaring")
+        assert why and isinstance(why, str), dial
+
+    assert not pv.audit()["post_baseline"]
+
+    # It fires on a name that is not a dial at all.
+    a = _audit_with_post_baseline({"no_such_dial": "invented"})
+    assert any("is not a dial" in f for f in a["post_baseline"]), a
+
+    # And on a dial the difference rule already covers. `vix_return_gain`
+    # is 25.0 at pt-v1 and 17.0 in both required presets.
+    a = _audit_with_post_baseline({"vix_return_gain": "already a choice"})
+    assert any("moves it off" in f for f in a["post_baseline"]), a
+
+
+def test_a_dial_added_after_the_baseline_is_in_scope_at_what_it_ships():
+    """The hole `POST_BASELINE` exists for, on the dial that opened it.
+
+    `vix_variance_premium` is 0.252 in `pt-v1`, `pt-v16` and `pt-v18`
+    alike, because the dial did not exist when `pt-v1` was frozen and the
+    baseline therefore carries this era's own measurement. The
+    difference-from-baseline rule cannot see such a value however chosen it
+    is; the scope rule that replaces it records what each preset SHIPS, so
+    the staleness binding still works.
+    """
+    dial = "vix_variance_premium"
+    values = {p: tradefloor.ModelParams.from_preset(p).to_dict()[dial]
+              for p in (pv.BASELINE,) + tuple(pv.REQUIRED_PRESETS)}
+    assert len(set(values.values())) == 1, values
+
+    assert dial not in pv.moved_dials()
+    required = pv.required_dials()
+    assert dial in required
+    for preset in pv.REQUIRED_PRESETS:
+        assert required[dial][preset] == values[preset]
+
+    # And it still goes stale when the dial moves under the entry, which is
+    # the whole point of recording the value rather than only the name.
+    moved = dict(pv.DIAL_PROVENANCE[dial],
+                 presets={p: v + 0.1 for p, v in required[dial].items()})
+    a = _audit_with(dict(pv.DIAL_PROVENANCE, **{dial: moved}),
+                    pv.UNPROVENANCED)
+    assert any(dial in m and "ships" in m for m in a["mismatched"]), a
+
+
+def test_the_measured_entry_carries_its_error_bar_and_names_its_estimator():
+    """The one `measured` entry, held to the rule the kind exists for.
+
+    A source and a date are not a measurement. This one carries the per-year
+    IQR as its residual, and it names the estimator, because the same tape
+    reads 1.076 pooled over one history and 1.252 per calendar year and the
+    two have been read side by side before.
+    """
+    measured = pv.audit()["by_kind"]["measured"]
+    assert measured, "the schema's measured branch is exercised by no entry"
+    for dial in measured:
+        entry = pv.DIAL_PROVENANCE[dial]
+        assert not pv.validate_entry(dial, entry)
+        assert any(entry.get(f) for f in pv.MEASURED_ERROR_FIELDS), dial
+        assert entry.get("estimator"), (
+            f"{dial} is measured and does not say by which estimator. Two "
+            "correct readings of one quantity were read as one number for "
+            "months, which is why this is asserted and not merely advised")
+        shipped = pv.required_dials()[dial]
+        assert entry["presets"] == shipped, (dial, entry["presets"], shipped)
 
 
 def test_a_measured_value_without_an_error_bar_is_refused():
@@ -134,6 +216,17 @@ def test_the_report_names_every_dial_it_counts():
     assert pv.BASELINE in text
     for preset in pv.REQUIRED_PRESETS:
         assert preset in text
+
+
+def _audit_with_post_baseline(mapping):
+    """`audit()` over a substituted POST_BASELINE, for the fires-when-it-should
+    half of the membership rule."""
+    real = pv.POST_BASELINE
+    pv.POST_BASELINE = mapping
+    try:
+        return pv.audit()
+    finally:
+        pv.POST_BASELINE = real
 
 
 def _audit_with(table, unprovenanced):
