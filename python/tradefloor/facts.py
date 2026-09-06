@@ -1057,39 +1057,103 @@ REAL_MARKETS_504 = {
 
 #: The across-seed noise scale at 504 days, the companion to `SEED_SD`.
 #:
-#: Measured because it could not be assumed: the scales differ from the
-#: 252-day ones by factors from 0.80 to 3.23. Excess kurtosis is 3.2x
-#: noisier at 504 days, so an objective reusing `SEED_SD` there would have
-#: over-penalised it threefold while under-penalising volatility.
+#: Measured because it could not be assumed: on the same preset, roster and
+#: seeds the 504-day scales run from 0.46 of the 252-day ones
+#: (`volume_abs_return_corr`) to 0.86 (`corr_asymmetry_lagged`). EVERY row
+#: falls, which is what an estimator does on a longer window, so an
+#: objective reusing `SEED_SD` at 504 days under-penalises every row.
+#:
+#: RE-MEASURED 2026-09-06. The table shipped until then was pt-v3 on roster
+#: fingerprint 5d8de78b, which the generator reconciliation retired, while
+#: its numerators were pt-v16 and pt-v18 on the roster that ships. Nothing
+#: bound it: `tests/test_facts.py` asserted only that its persistence entry
+#: is the largest correlation-type scale. It is the denominator of every
+#: 504-day `room_sd`, of the 504 arm of `loss.dual_horizon_loss`, of
+#: `calibrate.py --dual-horizon`, of `section8_check.py` and of
+#: `atlas_survey.py`, so a stale one restates all of them.
+#:
+#: The old table said kurtosis was 3.21x NOISIER at 504 days, and that ratio
+#: was the stated reason this table exists. On one preset, one roster and one
+#: seed set it reads 0.62x: less noisy, not more. The 3.21 compared pt-v3 on
+#: a retired roster with pt-v1 on the live one, and the direction it reported
+#: was the difference between them rather than the horizon.
+#:
+#: The consequence is the largest in the table. Every 504-day `room_sd` this
+#: project has published divided by a denominator up to 5.2x too large
+#: (kurtosis, 3.78 against 0.73), so a statistic reported as sitting 0.6 seed
+#: sd inside its 504-day band sits over three. The band VERDICTS are
+#: unaffected -- a scale moves no band -- and the 504 arm of
+#: `loss.dual_horizon_loss` is affected as the square, so kurtosis
+#: contributed about 27x less to that objective than it should have.
 SEED_SD_504 = {
-    "annualised_vol_pct": 5.143322,
-    "excess_kurtosis": 3.781635,
-    "return_acf1": 0.059668,
-    "abs_return_acf1": 0.119851,
-    "abs_return_acf5": 0.09079536,
-    "abs_return_acf20": 0.05491287,
-    "cross_sectional_corr": 0.09997682,
-    "volume_abs_return_corr": 0.04210395,
-    "leverage_effect": 0.08338545,
-    "volume_change_acf1": 0.01183045,
-    # 2026-08-25, pt-v3, same protocol, sample sd across the thirty seeds;
-    # the run reproduced MEASURED_504's cross_sectional_corr 0.4057 to four
-    # places.
-    "corr_asymmetry": 0.14982,
-    "corr_asymmetry_lagged": 0.13171,
-    "sector_excess_corr": 0.00539,
-    # 2026-08-25, pt-v3, same protocol; twenty-four points per seed.
-    "corr_persistence_acf1": 0.1972443,
+    "annualised_vol_pct": 4.779408306,
+    "excess_kurtosis": 0.7265305516,
+    "return_acf1": 0.04042526606,
+    "abs_return_acf1": 0.05930312554,
+    "abs_return_acf5": 0.04497743519,
+    "abs_return_acf20": 0.03579083816,
+    "cross_sectional_corr": 0.06981599524,
+    "volume_abs_return_corr": 0.01899405944,
+    "leverage_effect": 0.05607850586,
+    "volume_change_acf1": 0.008456262085,
+    "corr_asymmetry": 0.1349171341,
+    "corr_asymmetry_lagged": 0.09982258299,
+    "sector_excess_corr": 0.004748081416,
+    "corr_persistence_acf1": 0.1983588686,
 }
 
 #: Where SEED_SD_504 came from.
 SEED_SD_504_PROVENANCE = {
-    "source": "facts.measure() on Universe.random(40, seed=111), 504 days, "
-              "seeds 101-130, sample sd across seeds",
-    "date": "2026-08-23",
-    "model_fingerprint": "pt-v3",
-    "bands": "tradefloor-design/bands-504-noncrisis.json, five non-crisis "
-             "505-bar windows of the same 40-name reference roster",
+    "source": "facts.measure() at pt-v1 on the committed forty-name panel "
+              "roster, 504 days, seeds 101-130, sample sd across seeds. The "
+              "252-day companion's protocol with the horizon changed and "
+              "nothing else, so the two tables are a same-source pair for "
+              "the first time",
+    "date": "2026-09-06",
+    "model_fingerprint": "pt-v1",
+    "universe_fingerprint": "9be68b9bc37e79785765df2f395a9348"
+                            "650a4e9293507680532293fdf78808dd",
+    "days": 504,
+    "seeds": tuple(range(101, 131)),
+    "estimator": "sample standard deviation (n - 1) across seeds",
+    "script": "programme/scripts/hruler-seedsd504.py in the design "
+              "repository, run on the box hruler1",
+    "measured_at_commit": "2bfb2dbf56b2444f25cc78cd2961bcf152e1cd5b",
+    # The error bar. An identity for a normal sample and the leading term
+    # generally: the relative standard error of a sample sd on n draws is
+    # 1 / sqrt(2(n - 1)), which is 13.1 per cent at thirty seeds. Every
+    # entry above carries it. A scale shipped without one is a chosen
+    # constant with more decimal places.
+    "relative_standard_error": 0.13130643285972254,
+    "relative_standard_error_identity": "1 / sqrt(2 * (n - 1)), n = 30",
+    # The instrument. The same script measured the same seeds at 252 days
+    # and reproduced the committed `SEED_SD` to 4.5e-06 relative, worst row.
+    # A harness whose 252-day arm cannot reproduce the shipped table has
+    # not earned the right to replace the 504-day one, and without this
+    # check a harness defect would look exactly like a horizon effect.
+    "instrument_check": "the same run's 252-day arm reproduces facts.SEED_SD "
+                        "to 4.5e-06 relative on its worst row",
+    "roster_note": "the roster is read from tests/fixtures/"
+                   "panel-roster-40.json rather than drawn by "
+                   "Universe.random, so this table no longer moves when the "
+                   "generator does. That is exactly what happened to the "
+                   "table this replaces",
+    "pinned_by": "tests/test_loss.py re-measures two of the thirty seeds "
+                 "live at 504 days and re-derives the sd from the committed "
+                 "per-seed table",
+    "bands": "facts.REAL_MARKETS_504, from tradefloor-design/"
+             "bands-504-noncrisis.json and bands-504-conditional-corr.json, "
+             "five non-crisis 505-bar windows of the same forty-name "
+             "reference roster; unchanged by this measurement",
+    "supersedes": {
+        "date": "2026-08-23",
+        "model_fingerprint": "pt-v3",
+        "universe": "Universe.random(40, seed=111) on the generator before "
+                    "the 2026-09-03 reconciliation, roster fingerprint "
+                    "5d8de78b",
+        "why": "two eras of preset and a retired roster, bound by nothing "
+               "but a max-ordering assert",
+    },
 }
 
 #: Where SEED_SD's values come from, carried as data so any consumer -- the
@@ -1148,10 +1212,12 @@ SEED_SD_PROVENANCE = {
                           "on Windows differs by up to 8.4e-15 relative on "
                           "excess kurtosis while all three known-answer "
                           "digests match.",
-    "companion_not_re_measured": "SEED_SD_504 and the envelope module's "
-                                 "measured tables were taken on the "
-                                 "superseded roster and have not been "
-                                 "re-measured on this one.",
+    "companion_not_re_measured": "the envelope module's measured tables "
+                                 "were taken on the superseded roster and "
+                                 "have not been re-measured on this one. "
+                                 "SEED_SD_504 was, on 2026-09-06, by the "
+                                 "protocol above with the horizon changed "
+                                 "and nothing else.",
 }
 
 #: The provenance of the `SEED_SD` entries measured on `LEVEL_PROTOCOL`
