@@ -67,8 +67,9 @@ pub use hours::{
     MarketStatus, MARKET_MINUTES,
 };
 pub use index_value::{calculate_market_index, IndexConstituent, IndexValue};
-pub use index_var::{index_conditional_variance, index_unconditional_variance,
-                    intraday_variance_factor, vix_from_variance, NameVariance};
+pub use index_var::{index_conditional_variance, index_conditional_variance_terms,
+                    index_unconditional_variance, intraday_variance_factor,
+                    vix_from_variance, IndexVarianceTerms, NameVariance};
 pub use tick::{
     simulate_market_tick, NewsImpactEntry, OrderVolume, SettleDrawPolicy, TickCompany, TickInputs,
     TickOutcome, TickStock, MARKET_FACTOR_SIGMA, S_PHI_TICK,
