@@ -417,6 +417,58 @@ REAL_MARKETS = {
     # Bands from ^VIX against ^GSPC, 1990 to 2026, in `REAL_MARKETS_PROVENANCE`.
     "fear_gauge_dn1": (0.70, 4.03),
     "fear_gauge_dn3": (2.60, 9.58),
+    # The index TAIL row, graded from 2026-09-06: the share of sessions, in
+    # percent, whose cap-weighted index return is at or below -3 percent --
+    # the count of the sessions the two rows above condition on. Until this
+    # row existed, everything the project knew about the index tail was
+    # ungraded, and a model could reach the real count with a third more
+    # volatility and a nearly Gaussian tail without any row saying so.
+    #
+    # The band is the LEVEL row's form and not the shape rows'. This row
+    # grades a mean over the certification seeds, so the question is
+    # "is the model's ensemble rate consistent with the real long-run rate,
+    # given how well the tape knows it" -- centre plus or minus the
+    # multiplier times the centre's own standard error -- not "could one
+    # real year read this", which is what `BAND_RULE` answers and which on
+    # these windows gives [-1.18, 14.27]: a floor below zero and a ceiling
+    # that admits 2008 every year.
+    #
+    #   centre 1.2132 percent, 107 hits in 8,820 sessions over 35
+    #   non-overlapping 252-return windows of ^GSPC, the sessions
+    #   1990-07-24 to 2025-07-31 under the anchor rule INDEX_TAIL_WINDOWS
+    #   states; across-window sd 2.3613, so the standard error of the mean
+    #   is 0.3991 (moving-block bootstrap 0.393 at block length one, 0.410
+    #   at two, 0.412 at three; lag-1 autocorrelation of the counts +0.06,
+    #   so adjacent years do not share their crashes at this window length);
+    #   multiplier 1.846 = centre_multiplier(band_rule_tolerance(9)), the
+    #   panel's own measured tolerance rather than a convention; raw band
+    #   [0.4763, 1.9500], rounded outward to the shipped edges. In the
+    #   centre's own units that is 0.39x to 1.62x.
+    #
+    # The ceiling is the one edge where the rounding RULE decides the
+    # printed number rather than the third decimal: the raw high is
+    # 1.950042, four parts in a hundred thousand above 1.95, so
+    # `round_outward` gives 1.96 where rounding to nearest would give 1.95.
+    # Outward is the rule this panel applies to every band and the one the
+    # row is derived under, because rounding a band edge inward makes the
+    # band stricter than the tolerance it claims.
+    #
+    # RESIDUAL: one window, 2008-06..2009-06, carries 33 of the 107 hits.
+    # Without it the centre falls to 0.864 and the standard error to 0.199,
+    # which is a different quantity -- the non-2008 crash rate -- and a
+    # model that never produces a 2008 would pass it. The band says
+    # "the unconditional crash rate, 2008 included, known to about a third
+    # of itself at one standard error", and that is the true state of
+    # thirty-five years of evidence rather than a tighter number the tape
+    # does not have. It is why the row cannot fail a thin tail: 0.688
+    # percent is 1.3 tape standard errors below the centre, and no seed
+    # count shrinks the tape's error. `index_excess_kurtosis` reads the
+    # thin side and is REPORTING_ONLY.
+    #
+    # Derivable with tools/calibration/tail_band.py; the window table is
+    # INDEX_TAIL_WINDOWS below and tests/test_reference_windows.py
+    # re-derives these two edges from it.
+    "index_tail_dn3_pct": (0.47, 1.96),
 }
 
 #: Where each band comes from, carried as data so a reader can ask the
@@ -857,7 +909,183 @@ REAL_MARKETS_PROVENANCE = {
             "three in 2,520 model sessions across ten seeds",
         ),
     },
+    "index_tail_dn3_pct": {
+        "claim": "the share of sessions, in percent, with a ^GSPC unadjusted "
+                 "close-to-close return at or below -3 percent. Centre: the "
+                 "mean over 35 non-overlapping 252-return windows, the "
+                 "sessions 1990-07-24 to 2025-07-31, of each window's rate, 1.2132 "
+                 "percent, which is 107 hits in 8,820 sessions because the "
+                 "windows are of equal length. Band: centre +/- "
+                 "centre_multiplier(band_rule_tolerance(9)) = 1.846 times "
+                 "the across-window standard error 2.3613 / sqrt(35) = "
+                 "0.3991, each edge rounded outward. NOT the shared rule: "
+                 "the row grades a MEAN over the certification seeds, so its "
+                 "question is whether the model's ensemble rate is "
+                 "consistent with the real long-run rate given how well the "
+                 "tape knows it, and [min - s, max + s] answers a different "
+                 "one",
+        "windows": (0.000, 0.397, 13.095),
+        # NO window is excluded. The 2008-06..2009-06 window carries 33 of
+        # the 107 hits and it is the sensitivity rather than a crisis
+        # reading to be set aside: dropping it moves the centre to 0.864 and
+        # the standard error to 0.199, which is the NON-2008 rate, a
+        # different quantity that a model incapable of a 2008 would pass.
+        # `fear_gauge_dn3`'s band excludes no window either, for the related
+        # reason that a calm year holds no such session at all.
+        "crisis_window": None,
+        "sensitivity": "2008-07-22..2009-07-21 holds 33 of the 107 hits, "
+                       "13.095 percent of its own sessions. It is IN the "
+                       "centre and in the scale; without it the centre is "
+                       "0.864 and the standard error 0.199, band [0.49, "
+                       "1.24], which is the non-2008 crash rate and is shown "
+                       "rather than adopted. The scale is therefore one "
+                       "window's, and the band says so",
+        "sources": (
+            "tools/calibration/tail_band.py, run 2026-09-06 on the cache "
+            "tools/shadow/data.py writes; ^GSPC 1990-01-02 to 2025-07-31, "
+            "8,961 closes and 8,960 returns, fetched 2026-09-05T17:16:06Z "
+            "from https://query1.finance.yahoo.com/v8/finance/chart/^GSPC"
+            "?period1=631152000&period2=1754006400&interval=1d&events=split; "
+            "the UNADJUSTED close, because an index pays no dividend and the "
+            "model's session return carries none either",
+            "the window table is INDEX_TAIL_WINDOWS in this module, from the "
+            "same run, and tests/test_reference_windows.py re-derives the "
+            "centre, the standard error and both band edges from it",
+            "over the whole 8,960-return series the count is the same 107 at "
+            "a rate of 1.1942 percent, and 93 sessions read at or above +3 "
+            "percent (1.0379); the three real rates in use across the "
+            "programme -- 107/9,236, 107/8,960 and this row's 107/8,820 -- "
+            "span 4.7 percent, which is why a tail figure is stated as a "
+            "percentage of sessions against this band and not as a multiple "
+            "of an unnamed real rate",
+            "tradefloor-design/programme/tail-rows-design.md, the design "
+            "note: the estimator ruling, the window table with each window's "
+            "sd, excess kurtosis and NBER overlap, and the four band forms "
+            "that were considered and not adopted",
+        ),
+    },
 }
+
+#: The tape's own index tail, window by window, as data.
+#:
+#: `REAL_MARKETS_WINDOWS` is a different corpus -- forty US large caps over
+#: one decade, read PER NAME -- and this row's real side is a cap-weighted
+#: INDEX over thirty-five years, so it cannot live there and does not. The
+#: two tables are read through the same three functions (`real_windows`,
+#: `real_centre`, `real_centre_se`), which branch on which corpus holds the
+#: row.
+#:
+#: `(start, end, hits, sessions)` per window, oldest first, and `start` and
+#: `end` are the first and last SESSION the window counts, not the bars
+#: either side of it.
+#:
+#: THE ANCHOR RULE, stated because a band whose anchoring is implicit is not
+#: reproducible and this one decides a band edge. The windows are
+#: non-overlapping blocks of consecutive RETURNS, anchored at the LATEST
+#: return and walking back; the remainder at the start of the series is
+#: dropped, and it is derived from the series length rather than chosen --
+#: 8,960 returns less 35 blocks of 252 is 140. Two consequences, both load
+#: bearing:
+#:
+#: the anchor is the tape's last bar, the one fixed point that does not move
+#: when the cache is refetched, where anchoring at the first bar would
+#: silently discard the most recent data and shift every window each time
+#: the series grew;
+#:
+#: and the blocks are contiguous in RETURN space, so no session falls
+#: between two of them. Blocking the BARS instead -- 253-bar blocks giving
+#: 252 returns each -- drops one seam return at every boundary, 34 of them
+#: here, and those seams are sessions the tape holds. The two constructions
+#: agree on 107 hits in 8,820 sessions and on the centre, and differ in the
+#: across-window sd, 2.3613 under this rule against 2.3711 bar-blocked,
+#: because the hits fall into different windows.
+#:
+#: BOTH horizons, because a per-session rate has to be the same number at
+#: both and this is where that is checked rather than asserted: 252 gives
+#: [0.4733, 1.9530] and 504 gives [0.4798, 1.9945], the same band within a
+#: twentieth of its own width. `envelope.BANDS_504` therefore carries the
+#: 252-day band for this row with that as its argument.
+INDEX_TAIL_WINDOWS: dict[str, Any] = {
+    "series": "^GSPC",
+    "column": "unadjusted close",
+    "threshold_pct": -3.0,
+    "source": "tools/calibration/tail_band.py, 2026-09-06",
+    #: `(start, end, hits, sessions)`, keyed on the window's return count.
+    "windows": {
+        252: (
+            ("1990-07-24", "1991-07-22", 1, 252),
+            ("1991-07-23", "1992-07-20", 1, 252),
+            ("1992-07-21", "1993-07-19", 0, 252),
+            ("1993-07-20", "1994-07-18", 0, 252),
+            ("1994-07-19", "1995-07-17", 0, 252),
+            ("1995-07-18", "1996-07-15", 1, 252),
+            ("1996-07-16", "1997-07-14", 0, 252),
+            ("1997-07-15", "1998-07-14", 1, 252),
+            ("1998-07-15", "1999-07-14", 5, 252),
+            ("1999-07-15", "2000-07-12", 3, 252),
+            ("2000-07-13", "2001-07-12", 3, 252),
+            ("2001-07-13", "2002-07-18", 3, 252),
+            ("2002-07-19", "2003-07-18", 7, 252),
+            ("2003-07-21", "2004-07-20", 0, 252),
+            ("2004-07-21", "2005-07-19", 0, 252),
+            ("2005-07-20", "2006-07-19", 0, 252),
+            ("2006-07-20", "2007-07-20", 1, 252),
+            ("2007-07-23", "2008-07-21", 2, 252),
+            ("2008-07-22", "2009-07-21", 33, 252),
+            ("2009-07-22", "2010-07-21", 5, 252),
+            ("2010-07-22", "2011-07-20", 0, 252),
+            ("2011-07-21", "2012-07-19", 6, 252),
+            ("2012-07-20", "2013-07-23", 0, 252),
+            ("2013-07-24", "2014-07-23", 0, 252),
+            ("2014-07-24", "2015-07-23", 0, 252),
+            ("2015-07-24", "2016-07-22", 3, 252),
+            ("2016-07-25", "2017-07-24", 0, 252),
+            ("2017-07-25", "2018-07-24", 2, 252),
+            ("2018-07-25", "2019-07-25", 3, 252),
+            ("2019-07-26", "2020-07-24", 14, 252),
+            ("2020-07-27", "2021-07-26", 2, 252),
+            ("2021-07-27", "2022-07-26", 6, 252),
+            ("2022-07-27", "2023-07-27", 2, 252),
+            ("2023-07-28", "2024-07-29", 0, 252),
+            ("2024-07-30", "2025-07-31", 3, 252),
+        ),
+        504: (
+            ("1991-07-23", "1993-07-19", 1, 504),
+            ("1993-07-20", "1995-07-17", 0, 504),
+            ("1995-07-18", "1997-07-14", 1, 504),
+            ("1997-07-15", "1999-07-14", 6, 504),
+            ("1999-07-15", "2001-07-12", 6, 504),
+            ("2001-07-13", "2003-07-18", 10, 504),
+            ("2003-07-21", "2005-07-19", 0, 504),
+            ("2005-07-20", "2007-07-20", 1, 504),
+            ("2007-07-23", "2009-07-21", 35, 504),
+            ("2009-07-22", "2011-07-20", 5, 504),
+            ("2011-07-21", "2013-07-23", 6, 504),
+            ("2013-07-24", "2015-07-23", 0, 504),
+            ("2015-07-24", "2017-07-24", 3, 504),
+            ("2017-07-25", "2019-07-25", 5, 504),
+            ("2019-07-26", "2021-07-26", 16, 504),
+            ("2021-07-27", "2023-07-27", 8, 504),
+            ("2023-07-28", "2025-07-31", 3, 504),
+        ),
+    },
+    #: Which graded row this table is the real side of. One row today; the
+    #: up-tail companion reads the same series and is REPORTING_ONLY, so it
+    #: takes no band from here.
+    "rows": ("index_tail_dn3_pct",),
+}
+
+
+def index_tail_rates(horizon_days: int) -> tuple[float, ...]:
+    """Each real window's rate at `horizon_days`, in percent of sessions."""
+    windows = INDEX_TAIL_WINDOWS["windows"].get(int(horizon_days))
+    if windows is None:
+        raise ValidationError(
+            f"the index tail table holds no {horizon_days}-return windows; "
+            f"measured horizons are {sorted(INDEX_TAIL_WINDOWS['windows'])}. "
+            "Run tools/calibration/tail_band.py at that horizon and record "
+            "the windows rather than rescaling a rate from another one")
+    return tuple(100.0 * hits / sessions for _, _, hits, sessions in windows)
 
 #: The reference panel's per-window readings, as data.
 #:
@@ -1361,6 +1589,21 @@ SEED_SD_LEVEL_PROVENANCE = {
                           "value exists to take a standard deviation of; its "
                           "graded value stands on the pooled session count "
                           "reported beside it",
+        "index_tail_dn3_pct": "a per-seed value exists, so an sd could be "
+                              "taken, and it is not frozen here. The row's "
+                              "seed dispersion is a property of the "
+                              "certified model's MIXTURE -- how many seeds "
+                              "hold no session at -3 percent at all -- and "
+                              "at pt-v1 that mixture does not exist: every "
+                              "run opens in expansion at phase age zero, so "
+                              "an sd taken there is the opening's and not "
+                              "the model's. It is measured on the "
+                              "certification run instead, where envelope."
+                              "certify reports it beside the rate as se_m "
+                              "with the share of seeds at zero, the share at "
+                              "five or more hits and the maximum. Nothing "
+                              "divides by it: the band's width is the tape's "
+                              "own standard error and does not read this",
         "fear_gauge_dn1": "the table freezes its scale at pt-v1, where the "
                           "return channel cannot answer a session: "
                           "vix_return_source is 0.0 there, so the gauge reads "
@@ -1614,7 +1857,13 @@ SHAPE = (
     "corr_persistence_acf1",
 )
 LEVEL = ("index_drift_pct",)
-CRISIS = ("fear_gauge_dn1", "fear_gauge_dn3")
+#: The index tail row is CRISIS and not LEVEL: it counts the sessions the
+#: two fear rows condition on, so the three are read together, and the
+#: report already holds the group red until the model earns it. LEVEL would
+#: fit the arithmetic -- a rate is a first moment -- and was not chosen
+#: because the level row's protocol note and its `SEED_SD` treatment are
+#: specific to the drift.
+CRISIS = ("fear_gauge_dn1", "fear_gauge_dn3", "index_tail_dn3_pct")
 
 #: How a row is read across seeds. The shape rows are medians over the
 #: certification seeds, which is what every recorded panel and band was
@@ -1630,7 +1879,28 @@ CRISIS = ("fear_gauge_dn1", "fear_gauge_dn3")
 #: pooled row's per-run panel carries the samples under `<row>_samples` and
 #: their count under `<row>_sessions`, and the graded value is the median
 #: of the pooled samples with the pooled count reported beside it.
-AGGREGATE = {"index_drift_pct": "mean", "fear_gauge_dn3": "pooled"}
+#: A POOLED_RATE row is a THIRD kind and is named as one, because "pooled"
+#: was already two things in this module and a rate is neither of them: the
+#: graded value is `100 * sum(hits) / sum(sessions)` over the certification
+#: runs, a ratio of two sums rather than a median of a concatenated sample.
+#: Its per-run panel carries `<row>_hits` and `<row>_sessions`. At equal run
+#: lengths the ratio IS the mean of the per-run rates, which is what
+#: `aggregate_value` returns for it and what the band's width was set
+#: against; the two differ only on panels of unequal length, and
+#: `tests/test_facts.py` pins both halves of that.
+#:
+#: Why a COUNT row is never a median across seeds. Per seed the value is
+#: `k / 251` with `k` a small integer, and on the tape thirteen of
+#: thirty-five real 252-return windows hold no session at or below -3
+#: percent at all: the median real window reads 0.397 percent against a real
+#: mean of 1.213. A median over thirty such seeds moves only when a seed
+#: crosses an integer near the middle, and is unchanged by any seed above it
+#: going from two hits to thirty-three, so it is nearly blind to the
+#: quantity its row names. One run read both ways differed by 3.2x, which is
+#: the finding this kind exists to close
+#: (tradefloor-design/programme/results/tail-estimator.md).
+AGGREGATE = {"index_drift_pct": "mean", "fear_gauge_dn3": "pooled",
+             "index_tail_dn3_pct": "pooled_rate"}
 
 #: Which seed the certification varies, per group. The shape rows vary the
 #: market seed on one roster, `Universe.random(40, seed=111)`, held fixed,
@@ -1664,16 +1934,44 @@ LEVEL_PROTOCOL = {
     "seeds": tuple(range(101, 131)),
     "roster": "Universe.random(40, seed=<seed>)",
     "estimator": "mean across seeds for the level row; the crisis rows by "
-                 "AGGREGATE, the median across seeds or the pooled median",
+                 "AGGREGATE, which is the median across seeds for "
+                 "fear_gauge_dn1, the median of the pooled samples for "
+                 "fear_gauge_dn3, and the pooled RATE -- the hits over every "
+                 "seed divided by the sessions over every seed -- for "
+                 "index_tail_dn3_pct",
     "days": 252,
 }
 
 
 def aggregate_value(key: str, values: Sequence[float]) -> float:
-    """One graded value for `key` from its per-seed readings."""
-    if AGGREGATE.get(key, "median") == "mean":
+    """One graded value for `key` from its per-seed readings.
+
+    A `pooled_rate` row reads the MEAN here, which is the pooled rate
+    exactly when every run contributed the same number of sessions --
+    the certification protocol's case. `aggregate_panels` divides the two
+    sums instead and needs no such condition, so a consumer holding the
+    per-seed counts should use that; this function has only the rates.
+    """
+    if AGGREGATE.get(key, "median") in ("mean", "pooled_rate"):
         return statistics.fmean(values)
     return statistics.median(values)
+
+
+def pooled_rate_counts(key: str) -> tuple[str, str]:
+    """The two per-run panel keys a `pooled_rate` row's graded value sums.
+
+    The convention, in one place: a rate row is named `<row>_pct` and its
+    counts `<row>_hits` and `<row>_sessions`. Stated as a function rather
+    than as three string literals in three consumers, and refused for a row
+    not named that way, so a rate row added without its counts fails here
+    instead of being silently medianed somewhere else.
+    """
+    if not key.endswith("_pct"):
+        raise ValidationError(
+            f"a pooled_rate row is named <row>_pct and carries <row>_hits "
+            f"and <row>_sessions beside it; {key!r} is not")
+    stem = key[:-len("_pct")]
+    return stem + "_hits", stem + "_sessions"
 
 
 def aggregate_panels(panels: Sequence[Mapping[str, Any]],
@@ -1689,6 +1987,19 @@ def aggregate_panels(panels: Sequence[Mapping[str, Any]],
             pooled = [x for p in panels for x in (p.get(key + "_samples") or ())]
             if pooled:
                 out[key] = statistics.median(pooled)
+            continue
+        if AGGREGATE.get(key) == "pooled_rate":
+            # The ratio of two sums, never the median of a list of rates.
+            # A panel carrying the rate but not its two counts is not enough
+            # to pool, so the row is OMITTED rather than aggregated by a
+            # different estimator under the same name.
+            hit_key, session_key = pooled_rate_counts(key)
+            hits = [p.get(hit_key) for p in panels]
+            sessions = [p.get(session_key) for p in panels]
+            if (all(h is not None for h in hits)
+                    and all(n is not None for n in sessions)
+                    and sum(sessions)):
+                out[key] = 100.0 * sum(hits) / sum(sessions)
             continue
         present = [p[key] for p in panels if p.get(key) is not None]
         if present:
@@ -1728,6 +2039,30 @@ REPORTING_ONLY: dict[str, str] = {
         "saturation can be read as a ratio against it; the real up side "
         "stays flat where the down side falls"
     ),
+    "index_excess_kurtosis": (
+        "no band, and it is the SCALE-FREE companion to index_tail_dn3_pct: "
+        "the count row can be reached by a model with a third more "
+        "volatility and no fat tail at all, and this row is what separates "
+        "the two. The tape reads a median of 1.456 over the same 35 windows, "
+        "with a standard error of the median of 0.428, 33 of 35 above zero "
+        "and 23 above 1.0. Three band forms and none of them certifies "
+        "anything: the shared rule gives [-2.24, 17.89], because a real year "
+        "(2003-07..2004-07) read -0.06 and the fidelity form therefore "
+        "admits a Gaussian index; the mechanism form's null is zero and is "
+        "excluded by any variance process, so it says nothing about "
+        "thinness; and the centre form is never a gate, for the reason "
+        "centre_distance's docstring gives. Printed with its distance from "
+        "1.456 beside the count row, so the count is never read alone"
+    ),
+    "index_tail_up3_pct": (
+        "no band: the up side of the count, reported so the down side is "
+        "never read as an asymmetry when it is a volatility reading. The "
+        "tape holds 93 sessions at or above +3 percent in 8,960 (1.038 "
+        "percent) against 107 below -3 (1.194), a down-to-up ratio of 1.15; "
+        "the model's excess, where it has one, has been nearly symmetric, "
+        "1.64-1.87x down against 1.60-1.77x up, and a down-only row would "
+        "hide that"
+    ),
 }
 
 #: Row labels for `report`. The dict order of REAL_MARKETS above is the print
@@ -1752,6 +2087,9 @@ LABELS = {
     "fear_gauge_dn3": "VIX move, day <= -3%",
     "fear_gauge_dn5": "VIX move, day <= -5%",
     "fear_gauge_up1": "VIX move, day >= +1%",
+    "index_tail_dn3_pct": "sessions <= -3%, %",
+    "index_tail_up3_pct": "sessions >= +3%, %",
+    "index_excess_kurtosis": "index excess kurtosis",
 }
 
 
@@ -2471,6 +2809,50 @@ def measure(
 #: The session-return thresholds of the fear rows, percent.
 FEAR_BUCKETS = {"fear_gauge_dn1": -1.0, "fear_gauge_dn3": -3.0, "fear_gauge_dn5": -5.0}
 
+#: The threshold of the index tail rows, percent. The same bucket the fear
+#: rows condition on, so the count row and the response rows are counting and
+#: answering the same sessions.
+INDEX_TAIL_THRESHOLD = 3.0
+
+
+def _index_session_returns(
+    bars: Any,
+    universe: Sequence[Instrument],
+) -> list[tuple[int, float]]:
+    """The cap-weighted index session returns of a recorded run, percent.
+
+    One `(day, return)` per pair of consecutive recorded days, the level
+    being the roster's shares outstanding times the close, which is the
+    series `fear_statistics` buckets and the series the index tail rows
+    count. Factored out of `fear_statistics` so that the rows conditioned
+    on a session and the rows COUNTING those sessions cannot drift into two
+    definitions of "a session at -3 percent": they read the same list.
+
+    It is the CAP-WEIGHTED CLOSE form, this library's own, and not the
+    snapshot form the programme harnesses use (price against
+    `previous_close`, weighted by market cap). The two agree to a
+    correlation of +0.9998 over 2,520 sessions and differ where a jump
+    lands between the last tick and the close, so a programme figure and a
+    panel figure can differ in the third decimal and a note comparing them
+    has to say which form each is.
+    """
+    try:
+        import pyarrow as pa
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError(
+            "_index_session_returns reads Arrow tables and needs pyarrow. "
+            "Install it with: pip install tradefloor[arrow]") from exc
+    b = pa.table(bars).to_pydict()
+    shares = [float(inst.shares_outstanding) for inst in universe]
+    level: dict[int, float] = {}
+    for day, ident, close in zip(b["day"], b["instrument_id"], b["close"]):
+        if close is None:
+            continue
+        level[int(day)] = level.get(int(day), 0.0) + float(close) * shares[int(ident)]
+    days = sorted(level)
+    return [(day, (level[day] / level[prev] - 1.0) * 100.0)
+            for prev, day in zip(days, days[1:]) if level[prev] > 0.0]
+
 
 def fear_statistics(
     bars: Any,
@@ -2507,6 +2889,21 @@ def fear_statistics(
     and whose graded value is pooled across runs (`AGGREGATE`); each with
     `_sessions` beside it and, for the pooled row, `_samples`;
     `fear_gauge_dn5` and `fear_gauge_up1` as reported diagnostics.
+
+    And the INDEX TAIL rows, which count the sessions the rows above
+    condition on rather than answering them: `index_tail_dn3_pct`, the
+    share of sessions at or below -3 percent, graded as a POOLED RATE over
+    the certification seeds with `index_tail_dn3_hits` and
+    `index_tail_dn3_sessions` beside it; `index_tail_up3_pct` with its own
+    hit count, and `index_excess_kurtosis`, both reported and not graded
+    (`REPORTING_ONLY`). They are computed here, from the same index level,
+    because a count row measured somewhere else would be a second
+    definition of the session a fear row already buckets.
+
+    The tail counts every session return and the fear rows score one fewer:
+    the last recorded session has no gauge answer, by the alignment above.
+    So `index_tail_dn3_hits >= fear_gauge_dn3_sessions` on every run with a
+    difference of at most one, which `tests/test_facts.py` asserts.
     """
     try:
         import pyarrow as pa
@@ -2514,21 +2911,13 @@ def fear_statistics(
         raise ImportError(
             "fear_statistics reads Arrow tables and needs pyarrow. Install "
             "it with: pip install tradefloor[arrow]") from exc
-    b = pa.table(bars).to_pydict()
     m = pa.table(macro).to_pydict()
-    shares = [float(inst.shares_outstanding) for inst in universe]
-    level: dict[int, float] = {}
-    for day, ident, close in zip(b["day"], b["instrument_id"], b["close"]):
-        if close is None:
-            continue
-        level[int(day)] = level.get(int(day), 0.0) + float(close) * shares[int(ident)]
+    index = _index_session_returns(bars, universe)
     gauge = {int(day): float(v) for day, v in zip(m["day"], m["vix"]) if v is not None}
-    days = sorted(level)
     pairs: list[tuple[float, float]] = []
-    for prev, day in zip(days, days[1:]):
-        if day + 1 not in gauge or day not in gauge or level[prev] <= 0.0:
+    for day, ret in index:
+        if day + 1 not in gauge or day not in gauge:
             continue
-        ret = (level[day] / level[prev] - 1.0) * 100.0
         pairs.append((ret, gauge[day + 1] - gauge[day]))
     out: dict[str, Any] = {"fear_sessions_scored": len(pairs)}
     for key, threshold in FEAR_BUCKETS.items():
@@ -2540,7 +2929,54 @@ def fear_statistics(
     up = [c for r, c in pairs if r >= 1.0]
     out["fear_gauge_up1"] = statistics.median(up) if up else None
     out["fear_gauge_up1_sessions"] = len(up)
+    out.update(index_tail_statistics(index))
     return out
+
+
+def index_tail_statistics(
+    index: Sequence[tuple[int, float]],
+) -> dict[str, Any]:
+    """The index tail rows from the index session returns of one run.
+
+    Separated from `fear_statistics` so a test can feed it a series and read
+    the rows without running a market, and so the arithmetic of the graded
+    row is one short function rather than three lines inside a longer one.
+
+    `index_tail_dn3_pct` is `100 * hits / sessions` on ONE run, which is not
+    the graded value: the graded value pools the counts over every
+    certification seed (`AGGREGATE`, `aggregate_panels`). The per-run rate
+    is carried anyway because a mixture is a property of the seeds and the
+    certificate reports the share of seeds at zero beside the rate.
+    """
+    returns = [r for _, r in index]
+    n = len(returns)
+    out: dict[str, Any] = {}
+    for key, hit in (("index_tail_dn3", lambda r: r <= -INDEX_TAIL_THRESHOLD),
+                     ("index_tail_up3", lambda r: r >= INDEX_TAIL_THRESHOLD)):
+        hits = sum(1 for r in returns if hit(r))
+        out[key + "_hits"] = hits
+        out[key + "_sessions"] = n
+        out[key + "_pct"] = 100.0 * hits / n if n else None
+    out["index_excess_kurtosis"] = _excess_kurtosis(returns)
+    return out
+
+
+def _excess_kurtosis(values: Sequence[float]) -> float | None:
+    """The population fourth standardised moment less three, or None.
+
+    `panel_statistics`'s form, on the index's own return series rather than
+    on the pooled per-name one. None where the series is too short to
+    standardise or does not move at all: zero is a real reading of a
+    Gaussian series and would be a false pass on an empty one.
+    """
+    if len(values) < 2:
+        return None
+    mean = statistics.fmean(values)
+    sd = statistics.pstdev(values)
+    if sd == 0:
+        return None
+    standard = [(x - mean) / sd for x in values]
+    return sum(x ** 4 for x in standard) / len(standard) - 3.0
 
 
 def panel_statistics(
@@ -3036,7 +3472,9 @@ def null_value(key: str, *, horizon_days: int | None = None) -> float | None:
     return entry["value"]
 
 
-def real_windows(key: str) -> tuple[float, ...] | None:
+def real_windows(key: str, *,
+                 horizon_days: int = TRADING_DAYS_PER_YEAR
+                 ) -> tuple[float, ...] | None:
     """`key`'s non-crisis real readings, one per window, or None if unrecorded.
 
     Four rows have no per-window record in `REAL_MARKETS_WINDOWS` -- the two
@@ -3044,7 +3482,19 @@ def real_windows(key: str) -> tuple[float, ...] | None:
     correlation persistence -- so anything that needs the DISPERSION of a
     row across real years, rather than its centre, is undetermined for
     those four in this package.
+
+    Two corpora, not one. `INDEX_TAIL_WINDOWS` holds the index tail row's
+    real side: a cap-weighted INDEX over thirty-five years, where
+    `REAL_MARKETS_WINDOWS` holds per-NAME readings over one decade of forty
+    large caps. The tail row is measured at both certified horizons there
+    and its windows are read at the one asked for; every other row exists at
+    the one horizon its table was measured at, and `centre_distance` refuses
+    the rest rather than rescaling them.
     """
+    if key in INDEX_TAIL_WINDOWS["rows"]:
+        if int(horizon_days) not in INDEX_TAIL_WINDOWS["windows"]:
+            return None
+        return index_tail_rates(horizon_days)
     values = REAL_MARKETS_WINDOWS["values"].get(key)
     if values is None:
         return None
@@ -3052,8 +3502,16 @@ def real_windows(key: str) -> tuple[float, ...] | None:
     return tuple(v for i, v in enumerate(values) if i != crisis)
 
 
-def real_centre(key: str) -> float | None:
-    """The median real reading for `key`: the value a correct model aims at.
+def real_centre(key: str, *,
+                horizon_days: int = TRADING_DAYS_PER_YEAR) -> float | None:
+    """The real reading for `key` a correct model aims at, by the row's estimator.
+
+    The MEDIAN over the windows for a row graded as a median, which is every
+    row but one, and the MEAN for a row graded as a mean or a pooled rate --
+    the estimator has to follow the quantity on the real side too, or the
+    band's centre and the value graded against it are two different
+    statistics. On the index tail row the two differ by 3.1x, 1.213 against
+    0.397, for the reason `AGGREGATE` gives.
 
     From the per-window table where it exists, and from the middle of
     `REAL_MARKETS_PROVENANCE`'s (min, median, max) triple otherwise -- the
@@ -3062,9 +3520,20 @@ def real_centre(key: str) -> float | None:
     refused rather than read positionally: `abs_return_acf5` records eight
     values there and `index_drift_pct` records three that are not a range.
     """
-    windows = real_windows(key)
+    windows = real_windows(key, horizon_days=horizon_days)
     if windows is not None:
+        if AGGREGATE.get(key) in ("mean", "pooled_rate"):
+            return statistics.fmean(windows)
         return statistics.median(windows)
+    # The fallback is a MEDIAN -- that is what the middle of the triple is --
+    # so it answers for a row graded as a median and for no other. Returning
+    # it for a mean row would hand back a different statistic under the same
+    # name, and on the index tail row the two differ by a factor of three
+    # (0.397 against 1.213). It is also the horizon guard: a row whose
+    # windows are absent AT THIS HORIZON must not be answered from a triple
+    # summarising another one.
+    if AGGREGATE.get(key) in ("mean", "pooled_rate"):
+        return None
     recorded = REAL_MARKETS_PROVENANCE.get(key, {}).get("windows")
     if (recorded is not None and len(recorded) == 3
             and recorded[0] <= recorded[1] <= recorded[2]):
@@ -3072,18 +3541,30 @@ def real_centre(key: str) -> float | None:
     return None
 
 
-def real_centre_se(key: str) -> float | None:
+def real_centre_se(key: str, *,
+                   horizon_days: int = TRADING_DAYS_PER_YEAR) -> float | None:
     """The standard error of `key`'s real centre, or None where undetermined.
 
-    `MEDIAN_SE_FACTOR * trimmed_sd(windows) / sqrt(len(windows))`, on the
-    same trimmed sd `BAND_RULE` prices its width in. None for the four rows
-    with no per-window record: a centre recorded to three places gives the
-    centre, not its dispersion, and inverting the band edges for it would
-    recover an interval a rounding quantum wide and call it a number.
+    `MEDIAN_SE_FACTOR * trimmed_sd(windows) / sqrt(len(windows))` for a row
+    whose centre is a median, on the same trimmed sd `BAND_RULE` prices its
+    width in. For a row whose centre is a MEAN it is the ordinary
+    `sd / sqrt(n)`: no median factor, because the estimator is not a median,
+    and no trim, because a centre that counts the extreme window and a scale
+    that pretends it is not in the draw are inconsistent. On the index tail
+    row that is the difference between 0.3991 and 0.2452, and the larger one
+    is the honest number -- one window of thirty-five carries a third of the
+    events.
+
+    None for the four rows with no per-window record: a centre recorded to
+    three places gives the centre, not its dispersion, and inverting the
+    band edges for it would recover an interval a rounding quantum wide and
+    call it a number.
     """
-    windows = real_windows(key)
+    windows = real_windows(key, horizon_days=horizon_days)
     if windows is None:
         return None
+    if AGGREGATE.get(key) in ("mean", "pooled_rate"):
+        return statistics.stdev(windows) / math.sqrt(len(windows))
     return MEDIAN_SE_FACTOR * trimmed_sd(windows) / math.sqrt(len(windows))
 
 
@@ -3258,7 +3739,17 @@ def centre_distance(values: Sequence[float], key: str, *,
     the same reference -- so a 504-day model median against these windows
     would be the same error on the centre side that `envelope.score` refuses
     on the band side, and it would be invisible because the answer is a
-    plausible number.
+    plausible number. The ONE exception is a row whose real side is measured
+    at both horizons, which today is `index_tail_dn3_pct` alone: it reads
+    the 35-window table at 252 and the 17-window table at 504, and the
+    refusal stands for every other row at every other horizon.
+
+    THE ESTIMATOR FOLLOWS THE ROW. `median` and `se_m` above are a median
+    and its normal-approximation standard error for a row graded as a
+    median. For the pooled-rate row they are the MEAN of the per-seed rates
+    and `sd / sqrt(n)`, because a median of a zero-inflated count is not an
+    estimator of its frequency; the field keeps its name so a serialised
+    certificate has one shape, and `estimator` says which quantity it holds.
     """
     if key not in REAL_MARKETS:
         raise ValidationError(
@@ -3269,16 +3760,24 @@ def centre_distance(values: Sequence[float], key: str, *,
         raise ValidationError(
             f"need at least two per-seed readings for {key}, got "
             f"{len(values)}")
-    median = statistics.median(values)
-    se_m = median_se(values)
+    rate_row = AGGREGATE.get(key) == "pooled_rate"
+    if rate_row:
+        median = statistics.fmean(values)
+        se_m = statistics.stdev(values) / math.sqrt(len(values))
+    else:
+        median = statistics.median(values)
+        se_m = median_se(values)
     table_horizon = REAL_MARKETS_WINDOWS["horizon_days"]
-    matched = horizon_days == table_horizon
-    centre = real_centre(key) if matched else None
-    se_r = real_centre_se(key) if matched else None
+    own_table = key in INDEX_TAIL_WINDOWS["rows"]
+    matched = (int(horizon_days) in INDEX_TAIL_WINDOWS["windows"] if own_table
+               else horizon_days == table_horizon)
+    centre = real_centre(key, horizon_days=horizon_days) if matched else None
+    se_r = real_centre_se(key, horizon_days=horizon_days) if matched else None
     out: dict[str, Any] = {
         "row": key,
         "n": len(values),
         "horizon_days": horizon_days,
+        "estimator": "mean" if rate_row else "median",
         "median": median,
         "se_m": se_m,
         "real_centre": centre,
@@ -3291,12 +3790,15 @@ def centre_distance(values: Sequence[float], key: str, *,
     }
     if not matched:
         out["undetermined"] = (
-            f"REAL_MARKETS_WINDOWS holds {table_horizon}-day readings and "
-            f"this panel is {horizon_days} days. The real dispersion of a row "
-            "across years moves with the window length, so a centre distance "
-            "taken across horizons would be the wrong-ruler error with a "
-            "plausible-looking answer. Measure the windows at this horizon "
-            "first"
+            (f"INDEX_TAIL_WINDOWS holds "
+             f"{sorted(INDEX_TAIL_WINDOWS['windows'])}-return windows"
+             if own_table else
+             f"REAL_MARKETS_WINDOWS holds {table_horizon}-day readings")
+            + f" and this panel is {horizon_days} days. The real dispersion "
+            "of a row across years moves with the window length, so a centre "
+            "distance taken across horizons would be the wrong-ruler error "
+            "with a plausible-looking answer. Measure the windows at this "
+            "horizon first"
         )
         return out
     if centre is None:
@@ -3441,7 +3943,12 @@ def report(facts: dict[str, Any]) -> str:
     lines += ["", "level: the first moment, held red until it is right"]
     lines += [row(key) for key in LEVEL]
     if CRISIS:
-        lines += ["", "crisis: the fear gauge on a large down day"]
+        # Not "the fear gauge on a large down day" any more: the group holds
+        # the COUNT of those days as well as the gauge's answer to them, and
+        # a heading that names only the response would mislabel the row that
+        # counts. The two questions are different and the group asks both.
+        lines += ["", "crisis: how often a large down day, and the fear "
+                      "gauge's answer to one"]
         lines += [row(key) for key in CRISIS]
 
     # The ungraded rows, derived from the ruler in use rather than listed, so

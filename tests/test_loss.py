@@ -222,10 +222,15 @@ def test_the_loss_covers_nine_statistics_and_reports_fifteen():
     # row here meant to leave: it joins the live targets when SEED_SD
     # carries its seed sd on the pinned protocol, so that a search charges
     # for the level it moves. Until then it is reported and not summed.
+    # `index_tail_dn3_pct` is structural and, unlike the level row, is meant
+    # to STAY structural: its band is the tape's own uncertainty on a
+    # thirty-five-year crash rate, so a band distance is flat at zero across
+    # everything a search would try and the only thing an objective term
+    # could contribute is noise at the edges.
     assert set(STRUCTURAL) == {
         "volume_change_acf1", "corr_asymmetry", "corr_asymmetry_lagged",
         "sector_excess_corr", "corr_persistence_acf1", "index_drift_pct",
-        "fear_gauge_dn1", "fear_gauge_dn3",
+        "fear_gauge_dn1", "fear_gauge_dn3", "index_tail_dn3_pct",
     }
     assert set(LIVE_TARGETS) | set(CONSTRAINTS) | set(STRUCTURAL) == set(
         REAL_MARKETS

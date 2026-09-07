@@ -613,9 +613,18 @@ def paired_rows() -> list[str]:
     """The graded rows a per-seed pairing can carry: every row but the pooled.
 
     `facts.SHAPE`, `facts.LEVEL` and the `facts.CRISIS` rows read per seed.
-    A pooled row (`facts.AGGREGATE`) is graded over the sessions of every
+    A `pooled` row (`facts.AGGREGATE`) is graded over the SESSIONS of every
     seed together and has no per-seed value to pair, so a share of it
     would be a difference of two numbers that are not the graded ones.
+
+    A `pooled_rate` row is not that case and is carried here. It does have a
+    per-seed value -- the seed's own hits over its own sessions -- and the
+    arms this tool pairs run for the same number of days, where the pooled
+    rate IS the mean of those per-seed rates. What a share of it costs is
+    stated rather than hidden: the per-seed value is a small integer over
+    251, so the paired difference of two arms is a difference of two coarse
+    counts and its spread across seeds is wide. The share is the honest
+    quantity; it is simply a noisy one.
     """
     from tradefloor import facts
 
@@ -624,7 +633,12 @@ def paired_rows() -> list[str]:
 
 
 def pooled_rows() -> list[str]:
-    """The graded rows read over pooled sessions, which carry no share."""
+    """The graded rows read over pooled SAMPLES, which carry no share.
+
+    The `pooled` kind only. A `pooled_rate` row pools two COUNTS rather
+    than a sample list and keeps a per-seed value, so it is in
+    `paired_rows` instead.
+    """
     from tradefloor import facts
 
     return [key for key in facts.SHAPE + facts.LEVEL + facts.CRISIS

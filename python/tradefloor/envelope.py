@@ -54,6 +54,7 @@ these numbers:
 
 from __future__ import annotations
 
+import math
 import statistics
 import textwrap
 from dataclasses import dataclass, field
@@ -163,6 +164,27 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # cent row is below its floor of 2.60, pooled over 96 sessions.
     "fear_gauge_dn1": 0.9500,
     "fear_gauge_dn3": 1.9557,
+    # The index tail row, measured 2026-09-06 on the same protocol and the
+    # same thirty seeds: 96 sessions at or below -3 per cent in 7,530, a
+    # pooled rate of 1.2749 per cent against a band of 0.47 to 1.96 and a
+    # tape centre of 1.213. It is IN band, by 0.685 on a run standard error
+    # of 0.531, and it is not held red -- which is the row doing its job
+    # rather than the row failing to: the default's certified YEAR reaches
+    # the real crash rate. What the same preset does in year two is 2.500
+    # per cent, HIGH, on the same seeds and the same run, and that is the
+    # oscillation this row was added to make visible.
+    #
+    # The three counts beside it, which the rate cannot see: 15 of 30 seeds
+    # hold no such session (the tape's 35 windows hold 13), 5 of 30 hold
+    # five or more (the tape 7), and the worst seed holds 32 (the tape 33).
+    # So the mixture is roughly the tape's with too much mass at zero, and
+    # two seeds carry a 2008 apiece.
+    #
+    # GRADED AND NOT COUNTED at this preset: `cycle_stationary_opening` is
+    # 0.0, so every seed opens in expansion at phase age zero and this is
+    # year one of a non-stationary opening. `envelope.tail_block` carries
+    # that as data beside the verdict.
+    "index_tail_dn3_pct": 1.2749,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -179,6 +201,21 @@ BANDS_504: dict[str, tuple[float, float]] = {
     # twice the sessions against the same real distribution.
     "fear_gauge_dn1": (0.70, 4.03),
     "fear_gauge_dn3": (2.60, 9.58),
+    # The index tail row's band is a per-SESSION rate, so a longer window
+    # measures the same quantity with more sessions rather than a different
+    # one, and the 252-day band grades both horizons. That is a derivation
+    # and not a reuse: the same construction and the same anchor rule on
+    # seventeen non-overlapping 504-return windows of the same series give a
+    # centre of 1.2372 (106 hits in 8,568), an across-window sd of 1.6916, a
+    # standard error of 0.4103 and a raw band of [0.4797, 1.9946], which
+    # rounds outward to [0.47, 2.00] -- the same band within a twentieth of
+    # its own width.
+    # `facts.INDEX_TAIL_WINDOWS` carries both window sets and
+    # `tests/test_reference_windows.py` re-derives both bands from them.
+    # What the longer horizon does change is the MODEL's own resolution,
+    # which improves by about a third, and `certify` reports that as `se_m`
+    # beside the verdict.
+    "index_tail_dn3_pct": (0.47, 1.96),
     "annualised_vol_pct": (16.0, 34.0),
     "excess_kurtosis": (7.1, 22.0),
     "return_acf1": (-0.03, 0.04),
@@ -1083,8 +1120,125 @@ def score(panel: Mapping[str, float], *,
     }
 
 
+#: The row `tail_block` reads, and the only `pooled_rate` row there is.
+TAIL_ROW = "index_tail_dn3_pct"
+
+
+def tail_block(panels: Sequence[Mapping[str, Any]], *,
+               horizon_days: int = CERTIFIED_HORIZON_DAYS,
+               stationary_opening: bool | None = None) -> dict[str, Any] | None:
+    """The index tail row's certificate line, from the per-seed panels.
+
+    None when the panels do not carry the row's counts, which is what a
+    panel measured before the row existed looks like; the certificate then
+    says nothing about the tail rather than reporting a rate it cannot
+    compute.
+
+    THREE COUNTS, NEVER ONE. The graded value is a pooled rate and a rate
+    cannot see its own mixture: thirty seeds at three hits each and a
+    mixture of zeros and a crash year have the same mean. So the block
+    carries the share of seeds with no hit, the share with five or more and
+    the largest single count, beside the tape's own 13 of 35, 7 of 35 and
+    33. Those three are REPORTED and not gated, because the tape's are three
+    integers with no useful error bar.
+
+    AT THE EDGE. The band's half-width is the TAPE's standard error, which
+    is the narrowest it can honestly be; the run has an error of its own,
+    `se_m`, and at thirty seeds it is about the same size. A verdict whose
+    margin to the nearer band edge is under one `se_m` is therefore a
+    verdict this run cannot resolve, and it is flagged rather than reported
+    as a clean pass or a clean failure -- the treatment `mechanism_verdict`
+    gives a sign count sitting on its cut.
+
+    `stationary_opening` is the run's own answer to whether every seed
+    opened at phase age zero. On the current opening year one is
+    all-expansion on every seed and year two a synchronised contraction, so
+    a rate measured there reads the OPENING and not the model; passed False,
+    the block is graded, printed and NOT counted, with the reason carried as
+    data. Passed None it says the opening was not stated, which is not the
+    same as saying it was stationary.
+    """
+    from . import facts as _facts
+
+    # Refused rather than answered with the wrong ruler, the same way `score`
+    # refuses a horizon with no band set: the row's real windows exist at two
+    # lengths and a rate read against the other one's counts is a number that
+    # looks plausible and means nothing.
+    if (horizon_days not in RULERS_BY_HORIZON
+            or int(horizon_days) not in _facts.INDEX_TAIL_WINDOWS["windows"]):
+        raise ValidationError(
+            f"the index tail row has no real windows at {horizon_days} days; "
+            f"measured horizons are "
+            f"{sorted(_facts.INDEX_TAIL_WINDOWS['windows'])}. Run "
+            "tools/calibration/tail_band.py at that horizon and record them")
+
+    hit_key, session_key = _facts.pooled_rate_counts(TAIL_ROW)
+    hits = [p.get(hit_key) for p in panels]
+    sessions = [p.get(session_key) for p in panels]
+    if any(h is None for h in hits) or not sum(n or 0 for n in sessions):
+        return None
+
+    bands, _, _ = RULERS_BY_HORIZON[horizon_days]
+    low, high = bands[TAIL_ROW]
+    rate = 100.0 * sum(hits) / sum(sessions)
+    rates = [100.0 * h / n for h, n in zip(hits, sessions) if n]
+    se_m = (statistics.stdev(rates) / math.sqrt(len(rates))
+            if len(rates) > 1 else None)
+    centre = _facts.real_centre(TAIL_ROW, horizon_days=horizon_days)
+    se_real = _facts.real_centre_se(TAIL_ROW, horizon_days=horizon_days)
+    margin = min(rate - low, high - rate)
+    tape = _facts.INDEX_TAIL_WINDOWS["windows"][int(horizon_days)]
+    tape_counts = [k for _, _, k, _ in tape]
+    return {
+        "row": TAIL_ROW,
+        "horizon_days": horizon_days,
+        "seeds": len(rates),
+        "hits": sum(hits),
+        "sessions": sum(sessions),
+        "rate": rate,
+        "band": [low, high],
+        "in_band": low <= rate <= high,
+        "verdict": ("in" if low <= rate <= high
+                    else "HIGH" if rate > high else "LOW"),
+        "margin": margin,  # signed: positive inside the band, negative outside
+        "se_m": se_m,
+        "real_centre": centre,
+        "se_real": se_real,
+        "z_r": ((rate - centre) / math.sqrt(se_m ** 2 + se_real ** 2)
+                if se_m is not None and se_real else None),
+        # Within one run standard error of the nearer edge, on EITHER side:
+        # the run cannot resolve this verdict. `margin` is signed, positive
+        # inside the band and negative outside it, so the flag takes its
+        # magnitude -- a reading far outside is resolved, not at the edge.
+        "at_the_edge": se_m is not None and abs(margin) < se_m,
+        "zero_share": sum(1 for h in hits if h == 0) / len(hits),
+        "five_or_more_share": sum(1 for h in hits if h >= 5) / len(hits),
+        "max_hits": max(hits),
+        "tape": {
+            "windows": len(tape_counts),
+            "zero_share": sum(1 for k in tape_counts if k == 0) / len(tape_counts),
+            "five_or_more_share": sum(1 for k in tape_counts if k >= 5) / len(tape_counts),
+            "max_hits": max(tape_counts),
+        },
+        "counted": stationary_opening,
+        "not_counted": (
+            None if stationary_opening else
+            "year one of a non-stationary opening: every seed opens in "
+            "expansion at phase age zero, so the ensemble rate reads the "
+            "opening and not the model -- 0.57x to 0.97x of the centre in "
+            "year one and 2.06x to 2.19x in year two on the same preset and "
+            "the same seeds. Graded and printed, not counted, until the run "
+            "carries a stationary opening"
+            if stationary_opening is False else
+            "the run did not state whether its opening is stationary, and "
+            "an unstated opening is not a stationary one: pass "
+            "stationary_opening to count this row"),
+    }
+
+
 def certify(panels: Sequence[Mapping[str, float]], *,
-             horizon_days: int = CERTIFIED_HORIZON_DAYS) -> dict[str, Any]:
+             horizon_days: int = CERTIFIED_HORIZON_DAYS,
+             stationary_opening: bool | None = None) -> dict[str, Any]:
     """The certificate, as THREE counts, from the per-seed panels themselves.
 
     `score` grades one aggregated panel against the bands and answers one
@@ -1163,6 +1317,12 @@ def certify(panels: Sequence[Mapping[str, float]], *,
         "fidelity": fidelity,
         "mechanism": mechanism,
         "centre": centre,
+        # The index tail row, which is neither a shape row nor a mechanism
+        # row: it counts events rather than reading a shape, so it has its
+        # own line and its own three counts. None on panels that do not
+        # carry it.
+        "tail": tail_block(panels, horizon_days=horizon_days,
+                           stationary_opening=stationary_opening),
         "counts": {
             "in_band": fidelity["shape_in_band"],
             "in_band_of": fidelity["shape_of"],
@@ -1231,6 +1391,9 @@ def certification_record(result: Mapping[str, Any]) -> dict[str, Any]:
                   "undetermined": c["undetermined"]}
             for row, c in result["centre"].items()
         },
+        # Kept whole: every field is JSON-safe and the three counts are the
+        # part a reader cannot recompute from the rate.
+        "tail": result.get("tail"),
     }
 
 
@@ -1292,6 +1455,41 @@ def certification_report(result: Mapping[str, Any]) -> str:
             f"{'--':>8s} {'--':>8s}  "
             + (f"{z_r:>+6.2f}" if z_r is not None else f"{'--':>6s}")
             + "  " + kind)
+    tail = result.get("tail")
+    if tail:
+        marks = [tail["verdict"]]
+        if tail["at_the_edge"]:
+            marks.append("AT THE EDGE")
+        if not tail["counted"]:
+            marks.append("graded, not counted")
+        lines += [
+            "",
+            f"{tail['row']:24s} {tail['rate']:>10.4f} "
+            f"{'--':>9s} {'--':>7s} {'--':>7s}  "
+            f"{'--':>8s} {'--':>8s}  "
+            + (f"{tail['z_r']:>+6.2f}" if tail["z_r"] is not None
+               else f"{'--':>6s}")
+            + "  " + ", ".join(marks),
+            f"  {tail['hits']} hits in {tail['sessions']} sessions over "
+            f"{tail['seeds']} seeds, pooled; band "
+            f"{tail['band'][0]:.2f} to {tail['band'][1]:.2f}, centre "
+            f"{tail['real_centre']:.3f} (se {tail['se_real']:.3f}); "
+            + (f"run se {tail['se_m']:.3f}, " if tail["se_m"] is not None
+               else "")
+            + f"margin to the nearer edge {tail['margin']:+.3f}",
+            # The mixture, which the rate cannot see. Printed beside the
+            # tape's own three so a reader can tell "the right rate" from
+            # "the right rate for the right reason".
+            f"  seeds at zero {tail['zero_share']:.2f} (tape "
+            f"{tail['tape']['zero_share']:.2f}), at five or more "
+            f"{tail['five_or_more_share']:.2f} (tape "
+            f"{tail['tape']['five_or_more_share']:.2f}), most in one seed "
+            f"{tail['max_hits']} (tape {tail['tape']['max_hits']}); "
+            "reported, not gated",
+        ]
+        if tail["not_counted"]:
+            lines += textwrap.wrap(tail["not_counted"], 76,
+                                   initial_indent="  ", subsequent_indent="  ")
     if result["reversed"]:
         lines += [
             "",
