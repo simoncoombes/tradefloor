@@ -581,3 +581,116 @@ def test_the_welch_combination_and_the_fingerprint():
     assert df == pytest.approx(10.0, rel=1e-12)
     se, df = loss._welch(1.0, 4.0, 1e-6, 1e9)
     assert df == pytest.approx(4.0, rel=1e-3)
+
+
+# --------------------------------------------------------------------------
+# R6: two horizons, never one number
+# --------------------------------------------------------------------------
+
+
+def test_the_two_horizons_are_never_combined():
+    """REFUSES: a single score that has chosen a weight between the horizons.
+
+    THIS IS THE ARTEFACT: one number standing for a panel measured at two
+    window lengths. It is refused whichever way it would be formed -- a
+    weighted sum, an average, or the certified horizon alone with the other
+    reduced to a gate -- because the row that decides it moves and the tape
+    does not. `volume_abs_return_corr` reads 0.5158 at 252 and 0.5945 at 504
+    on the shipped default while the tape reads 0.536 and 0.5345, so the
+    same row is below its centre at one horizon and four standard errors
+    above it at the other.
+
+    Constructed: one panel per horizon, each at its own horizon's centres
+    except for a single row moved at 504 only. The 504 score moves, the 252
+    score does not, and there is no key in the result that moved with both.
+    """
+    centres = {h: {row: rule_row(row, horizon_days=h)["centre"] for row in SHAPE}
+               for h in loss.SCORED_HORIZONS}
+    at_centre = loss.dual_scoring_rule(
+        {h: constant_panels(centres[h]) for h in centres}, rows=SHAPE)
+
+    assert "S" not in at_centre, (
+        "a combined score is exactly what R6 refuses")
+    assert at_centre["combined"] is None
+    assert "R6" in at_centre["why_no_combined"]
+    assert set(at_centre["scored_horizons"]) == set(loss.SCORED_HORIZONS)
+    for horizon in loss.SCORED_HORIZONS:
+        assert at_centre[f"S_{horizon}"] == pytest.approx(0.0, abs=1e-12)
+    # The two tapes are different tapes, and the fingerprint says so.
+    assert (at_centre["rule_fingerprint"][252]
+            != at_centre["rule_fingerprint"][504])
+
+    moved = {h: dict(centres[h]) for h in centres}
+    row = "volume_abs_return_corr"
+    moved[504][row] += 4.0 * rule_row(row, horizon_days=504)["se"]
+    one_horizon = loss.dual_scoring_rule(
+        {h: constant_panels(moved[h]) for h in moved}, rows=SHAPE)
+    assert one_horizon["S_252"] == pytest.approx(0.0, abs=1e-12)
+    assert one_horizon["S_504"] > 0
+    assert one_horizon["S_504"] == pytest.approx(
+        one_horizon["horizons"][504]["rows"][row]["term"], rel=1e-12)
+
+
+def test_a_candidate_that_wins_one_horizon_does_not_beat_the_incumbent():
+    """REFUSES: a ranking that lets a 504 gain buy a 252 regression.
+
+    That trade is what a weighted sum takes and what a certified-horizon
+    score cannot see. Under R6 it is INCOMPARABLE: neither vector dominates
+    and both stay on the frontier, which is the cost of the ruling stated as
+    a test rather than as a sentence.
+
+    Three constructions against one definition: better at both (dominates),
+    better at one and worse at the other (does not), and better at one by
+    less than that horizon's own tolerance (does not, because a difference
+    inside the noise is not a difference).
+    """
+    tolerance = {h: loss.horizon_cut(h) * 1.0 for h in loss.SCORED_HORIZONS}
+    incumbent = {252: 30.0, 504: 30.0}
+
+    better_at_both = {252: 20.0, 504: 20.0}
+    assert loss.dominates(better_at_both, incumbent, tolerance=tolerance)
+
+    trades = {252: 20.0, 504: 40.0}
+    assert not loss.dominates(trades, incumbent, tolerance=tolerance)
+    assert not loss.dominates(incumbent, trades, tolerance=tolerance)
+
+    inside_the_noise = {252: 30.0 - tolerance[252] / 2, 504: 30.0}
+    assert not loss.dominates(inside_the_noise, incumbent, tolerance=tolerance)
+
+    # The cut is the panel's own at each horizon, and it is not the same one:
+    # nine real windows at 252 and five at 504.
+    assert loss.horizon_cut(252) > loss.horizon_cut(504)
+    assert loss.horizon_cut(252) == pytest.approx(
+        facts.centre_multiplier(facts.band_rule_tolerance(9)), rel=1e-12)
+    assert loss.horizon_cut(504) == pytest.approx(
+        facts.centre_multiplier(facts.band_rule_tolerance(5)), rel=1e-12)
+
+    with pytest.raises(ValidationError):
+        loss.dominates({252: 1.0}, {504: 1.0}, tolerance=tolerance)
+
+
+def test_the_corpus_path_needs_a_model_error_at_every_horizon_it_scores():
+    """REFUSES: one horizon's across-block spread used as the other's.
+
+    The spread of a block median across blocks is a property of the window
+    length exactly as the tape's dispersion is -- at 504 days
+    `abs_return_acf5` reads 0.01463 against 0.00857 at 252, a factor of 1.7
+    on the same corpus. So `dual_scoring_rule_from_medians` refuses to score
+    a horizon it was given no model error for, by name, rather than reaching
+    for the other's.
+    """
+    medians = {h: {row: rule_row(row, horizon_days=h)["centre"] for row in SHAPE}
+               for h in loss.SCORED_HORIZONS}
+    se = {h: {row: 0.01 for row in SHAPE} for h in loss.SCORED_HORIZONS}
+
+    out = loss.dual_scoring_rule_from_medians(
+        medians, se_model_by_horizon=se, df_model=1433, rows=SHAPE)
+    assert out["S_252"] == pytest.approx(0.0, abs=1e-12)
+    assert out["S_504"] == pytest.approx(0.0, abs=1e-12)
+    assert "S" not in out
+
+    with pytest.raises(ValidationError) as exc:
+        loss.dual_scoring_rule_from_medians(
+            medians, se_model_by_horizon={504: se[504]}, df_model=1433,
+            rows=SHAPE)
+    assert "252" in str(exc.value)

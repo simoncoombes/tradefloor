@@ -4113,6 +4113,33 @@ def rule_row(key: str, *, horizon_days: int = TRADING_DAYS_PER_YEAR,
     is missing and a `missing` tuple naming it, which is how
     `scoring_rule` builds its `blind` list with a reason rather than by
     reading an exception's message.
+
+    R7, THE ERROR BARS, ruled by Simon on 2026-09-06 and recorded in
+    `tradefloor-design/programme/RULINGS-2026-09-06.md`: `se` is the
+    WITHIN-DECADE standard error of the 2015-2025 reference panel, and the
+    measured disagreement between that decade and the 32-name 1990-2025
+    reference -- one to three `se` on three rows, recorded in
+    `centre_distance`'s docstring -- is NOT folded into it. Widening `se`
+    by that gap would make the objective honest about the decade at the
+    cost of discrimination on exactly the rows where it bites. So a fit to
+    this centre is a fit to the decade, and that is now a decision rather
+    than a default: the limit is stated here because this is where the
+    number enters.
+
+    EVERY VALUE IS DERIVED FROM THE WINDOWS, and no stored summary is read
+    from any file. `centre`, `se` and `df` come from `real_centre`,
+    `real_centre_se` and `real_centre_df`, which read the window tables and
+    `trimmed_sd` -- the median-centred trim `BAND_RULE` names. The design
+    repository's `bands-504-noncrisis.json` carries a `trimmed_sd` field
+    per row that was written on 2026-08-22 and never regenerated after the
+    trim centre was named on 2026-09-04, so its values are the superseded
+    mean-centred ones; on `return_acf1` the two drop different windows and
+    the standard error differs by 2.6 per cent. Reading such a field would
+    take the old answer from a file whose own tool has since been fixed,
+    which is why nothing here reads one. The three rows with no window
+    table read `centre`, `centre_se` and `centre_df` from
+    `REAL_MARKETS_PROVENANCE`, where the record IS the measurement and is
+    labelled as such.
     """
     windows = real_windows(key, horizon_days=horizon_days)
     prov = REAL_MARKETS_PROVENANCE.get(key, {})

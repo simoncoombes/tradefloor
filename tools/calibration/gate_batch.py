@@ -55,7 +55,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "python"))
 
 import gate_pick  # noqa: E402
-from tradefloor import envelope, facts  # noqa: E402
+from tradefloor import envelope, facts, loss  # noqa: E402
 
 #: The real range for crisis co-movement, from the `scenario-magnitude` gap's
 #: own text: "crisis co-movement reads 0.696 against a real 0.664 to 0.727".
@@ -295,6 +295,41 @@ def main() -> int:
             if acc[label].get(kind):
                 print(gate_pick.summarise(kind, acc[label][kind]), flush=True)
         v = verdict(acc[label])
+        # The scoring rule, at BOTH horizons and combined at neither. R6
+        # (Simon, 2026-09-06): a gate that printed one number would be
+        # choosing a weight between the two, and `volume_abs_return_corr`
+        # is the row that makes that choice consequential -- 0.96 combined
+        # standard errors below its tape centre at 252 days and z +4.38 at
+        # 504, where it carries 47 per cent of pt-v16's whole score. The
+        # model's row moves between the horizons and the tape's does not.
+        # It costs a maximum: two candidates can each win a horizon, and
+        # then neither beats the other and both stay on the frontier.
+        panels_by_horizon = {days: acc[label][kind]
+                             for kind, days in (("p252", 252), ("p504", 504))
+                             if acc[label].get(kind)}
+        if panels_by_horizon:
+            rule = loss.dual_scoring_rule(panels_by_horizon)
+            v["scoring_rule"] = {
+                "scored_horizons": list(rule["scored_horizons"]),
+                "rule_fingerprint": rule["rule_fingerprint"],
+                "why_no_combined": rule["why_no_combined"],
+                **{f"S_{h}": rule[f"S_{h}"] for h in rule["scored_horizons"]},
+                **{f"S_gauss_{h}": rule[f"S_gauss_{h}"]
+                   for h in rule["scored_horizons"]},
+                "rows": {h: {k: {kk: r[kk] for kk in
+                                 ("T", "centre", "se_real", "se_model", "df",
+                                  "z", "term", "in_band", "band_position")}
+                             for k, r in rule["horizons"][h]["rows"].items()}
+                         for h in rule["scored_horizons"]},
+                "blind": {h: rule["horizons"][h]["blind"]
+                          for h in rule["scored_horizons"]},
+            }
+            parts = "   ".join(
+                f"S_{h} {rule[f'S_{h}']:.2f}" for h in rule["scored_horizons"])
+            blind = sorted(set().union(*(set(rule["horizons"][h]["blind"])
+                                         for h in rule["scored_horizons"])))
+            print(f"  scoring rule: {parts}   (never summed; blind on "
+                  f"{', '.join(blind) or 'nothing'})", flush=True)
         # Crisis co-movement is SCORED here, not merely printed. It carries a
         # stated real range in the scenario-magnitude gap, 0.664 to 0.727, it
         # is the statistic that rejected four gate batches of jump work, and

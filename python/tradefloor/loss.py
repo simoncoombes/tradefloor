@@ -81,12 +81,13 @@ import warnings
 from typing import Any, Mapping, Sequence
 
 from ._core import ValidationError
-from .facts import (AGGREGATE, CRISIS, LEVEL, REAL_MARKETS, REAL_MARKETS_504,
-                    REAL_MARKETS_PROVENANCE, RULERS_BY_HORIZON, SEED_SD,
-                    SEED_SD_504, SEED_SD_PROVENANCE, SHAPE, aggregate_panels,
-                    band_distance, check_ruler_horizon, horizon_of_panels,
-                    median_se, median_se_bootstrap, pooled_rate_counts,
-                    rule_row)
+from .facts import (AGGREGATE, BAND_WINDOWS, CRISIS, LEVEL, REAL_MARKETS,
+                    REAL_MARKETS_504, REAL_MARKETS_PROVENANCE,
+                    RULERS_BY_HORIZON, SEED_SD, SEED_SD_504,
+                    SEED_SD_PROVENANCE, SHAPE, aggregate_panels,
+                    band_distance, band_rule_tolerance, centre_multiplier,
+                    check_ruler_horizon, horizon_of_panels, median_se,
+                    median_se_bootstrap, pooled_rate_counts, rule_row)
 
 #: The statistics the calibration search is trying to move into band. This
 #: is the ONE tuple to edit when a model change makes a structural statistic
@@ -871,3 +872,158 @@ def scoring_rule_from_medians(medians: Mapping[str, float], *,
         "horizon_days": int(horizon_days),
         "rule_fingerprint": rule_fingerprint(table),
     }
+
+
+# --------------------------------------------------------------------------
+# R6: score both years separately, report both, combine neither
+#
+# Simon, 2026-09-06, `programme/RULINGS-2026-09-06.md` R6. This is not either
+# of the two options the design note put up. It is NOT the certified horizon
+# with the other as a feasibility gate, and it is NOT the two summed under a
+# `weight_504` that `dual_horizon_loss` already declines to call a
+# derivation. It is: score both, report both, combine neither.
+#
+# WHY, in one row. `volume_abs_return_corr` sits 0.96 combined standard
+# errors BELOW its tape centre at 252 days and at z = +4.38 at 504, where it
+# carries 47 per cent of pt-v16's whole score. The model's row moves between
+# the horizons and the tape's does not: 0.536 against 0.5345. Any single
+# number hides that, whichever way it is formed -- a weighted sum by
+# averaging it away, a certified-horizon-only score by never looking.
+#
+# WHAT IT COSTS, stated because it is not free. There is no maximum any
+# more, only a frontier: two candidates can each be better on one horizon
+# and neither dominates. `beats` becomes dominance and a generation has a
+# non-dominated SET rather than a winner. `atlas.Survey.pareto` makes the
+# same argument and this uses its definition of dominance -- no other row at
+# least as good on every objective and strictly better on one -- rather than
+# a second one.
+#
+# WHAT IT REFUSES. `dual_scoring_rule` returns no key holding a combined
+# score, and `tests/test_scoring_rule.py` asserts that by name. A caller
+# that wants one number does not get one from here.
+#
+# R7, the companion ruling, is stated where it applies: `se_R` is the
+# WITHIN-DECADE standard error of the 2015-2025 panel, and the measured
+# disagreement between that decade and the 1990-2025 reference -- one to
+# three `se_R` on three rows -- is NOT folded into it. That is now a
+# decision rather than a default, so `rule_row`'s docstring carries it.
+# --------------------------------------------------------------------------
+
+#: The horizons a score is reported at. Both of them, every time.
+SCORED_HORIZONS: tuple[int, ...] = (252, 504)
+
+
+def _dual(results: Mapping[int, Mapping[str, Any]]) -> dict[str, Any]:
+    """The two horizons' results side by side, with nothing summed across them.
+
+    The shape is deliberately awkward for a caller that wants a scalar: the
+    per-horizon results sit under `horizons`, `S_252` and `S_504` are
+    conveniences for reading, and there is no `S`. `combined` records why,
+    in the output, so a reader of a serialised score does not have to know
+    the ruling to understand the shape.
+    """
+    out: dict[str, Any] = {
+        "horizons": dict(results),
+        "scored_horizons": tuple(sorted(results)),
+        "combined": None,
+        "why_no_combined":
+            "R6 (Simon, 2026-09-06): the two horizons are scored, reported "
+            "and never combined. volume_abs_return_corr sits 0.96 se below "
+            "its tape centre at 252 and at z +4.38 at 504; a single number "
+            "hides that whichever way it is formed. Rank on the pair -- "
+            "dominance, not a maximum.",
+        "rule_fingerprint": {h: r["rule_fingerprint"] for h, r in results.items()},
+    }
+    for horizon, result in results.items():
+        out[f"S_{horizon}"] = result["S"]
+        out[f"S_gauss_{horizon}"] = result["S_gauss"]
+        out[f"blind_{horizon}"] = result["blind"]
+    return out
+
+
+def dual_scoring_rule(panels_by_horizon: Mapping[int, Sequence[Mapping[str, Any]]],
+                      *, rows: Sequence[str] | None = None,
+                      bootstrap_draws: int = 2000,
+                      bootstrap_seed: int = 20260905) -> dict[str, Any]:
+    """`S` at every horizon in `panels_by_horizon`, side by side, uncombined.
+
+    `panels_by_horizon` maps a horizon to that horizon's per-seed panels --
+    `{252: [...], 504: [...]}` is what a gate run produces. Each horizon is
+    scored against ITS OWN tape table, because the tape's centre and its
+    error are both properties of the window length: `abs_return_acf20` reads
+    0.020 over 252 bars and 0.029 over 504 on the same reference.
+
+    Raises rather than guessing when a horizon has no panels, and refuses a
+    horizon the library has no window table for, through `rule_row`.
+    """
+    if not panels_by_horizon:
+        raise ValidationError(
+            "the rule scores both horizons and was given panels for neither; "
+            f"pass a mapping like {{252: [...], 504: [...]}}")
+    return _dual({int(h): scoring_rule(
+        panels, horizon_days=int(h), rows=rows,
+        bootstrap_draws=bootstrap_draws, bootstrap_seed=bootstrap_seed)
+        for h, panels in panels_by_horizon.items()})
+
+
+def dual_scoring_rule_from_medians(
+        medians_by_horizon: Mapping[int, Mapping[str, float]], *,
+        se_model_by_horizon: Mapping[int, Mapping[str, float]],
+        df_model: float,
+        rows: Sequence[str] | None = None) -> dict[str, Any]:
+    """The corpus path at both horizons, from a record's stored medians.
+
+    `se_model_by_horizon` is per horizon and required for the same reason
+    `se_model` is: the across-block spread of a block median is a property
+    of the window length as much as the tape's is, and at 504 days it runs
+    from 0.46x to 6.04x the frozen table depending on the row.
+    """
+    missing = sorted(set(medians_by_horizon) - set(se_model_by_horizon))
+    if missing:
+        raise ValidationError(
+            f"no model error was supplied at {missing} days; the rule never "
+            "reads another horizon's, because the across-block spread of a "
+            "block median is a property of the window length")
+    return _dual({int(h): scoring_rule_from_medians(
+        medians, horizon_days=int(h),
+        se_model=se_model_by_horizon[h], df_model=df_model, rows=rows)
+        for h, medians in medians_by_horizon.items()})
+
+
+def dominates(candidate: Mapping[int, float], incumbent: Mapping[int, float],
+              *, tolerance: Mapping[int, float]) -> bool:
+    """Is `candidate` better at one horizon and no worse at any, beyond noise?
+
+    `atlas.Survey.pareto`'s definition, on a minimised score: no worse on
+    every horizon and strictly better on at least one. The tolerance is what
+    makes it usable on measurements rather than on exact numbers -- a
+    difference inside it is not a difference -- and it is the panel's own
+    per-horizon figure, `centre_multiplier(band_rule_tolerance(...))` times
+    the paired standard error, rather than a cutoff chosen here.
+
+    Two candidates that each win a horizon dominate each other nowhere and
+    both stay on the frontier. That is the cost R6 accepts, and it is a
+    property of the model rather than of this function.
+    """
+    keys = sorted(set(candidate) & set(incumbent))
+    if not keys:
+        raise ValidationError(
+            "dominance needs at least one horizon both were scored at; "
+            f"candidate has {sorted(candidate)} and incumbent "
+            f"{sorted(incumbent)}")
+    no_worse = all(candidate[h] <= incumbent[h] + tolerance.get(h, 0.0)
+                   for h in keys)
+    better = any(candidate[h] < incumbent[h] - tolerance.get(h, 0.0)
+                 for h in keys)
+    return no_worse and better
+
+
+def horizon_cut(horizon_days: int) -> float:
+    """The panel's own tolerance at this horizon, as a multiplier on an se.
+
+    `centre_multiplier(band_rule_tolerance(band_windows))`: 1.846 at 252
+    days on nine windows and 1.378 at 504 on five, the same construction the
+    index tail band took its multiplier from. Nothing is chosen; the number
+    falls out of how many real windows the horizon's band rests on.
+    """
+    return centre_multiplier(band_rule_tolerance(BAND_WINDOWS[int(horizon_days)]))
