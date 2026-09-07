@@ -1776,6 +1776,78 @@ impl PyEngine {
         self.inner.vix_anchor()
     }
 
+    /// The index variance the LAST VIX update read, term by term, or
+    /// `None` if no day has advanced under `vix_level_identity`.
+    ///
+    /// Keys: `factor`, `sector`, `idio` (the three noise blocks BEFORE the
+    /// intraday curve), `market_jump`, `idio_jump`, `news`, `k` (the
+    /// curve's second moment, which multiplies the first three and not the
+    /// last three), `total` (the variance itself, in fraction squared per
+    /// session) and `implied` (that variance as a VIX, through
+    /// `(1 + premium) * 100 * sqrt(252 * total)`).
+    ///
+    /// THE NUMBER THE UPDATE READ, not a recomputation. The identity's
+    /// instantaneous terms — the sector draw's sigma and the jump arrival
+    /// rate — are read at the VIX the close saw, `VIX_{t-1}`, and the
+    /// update then moves the VIX. A getter that evaluated the identity
+    /// afresh would read those two terms at `VIX_t` and disagree with the
+    /// update by a day's VIX move, which is exactly the size of the
+    /// quantity a loop measurement is trying to see.
+    ///
+    /// `None` rather than zeroes when the identity is off: there the
+    /// read-back is not computed at all, and a dictionary of zeroes would
+    /// read as a market with no variance rather than as a run with no
+    /// read-back.
+    ///
+    /// This is a diagnostic and it is not carried in `state_snapshot`, so
+    /// it moves no state hash. A fork carries it — a fork is a copy, and
+    /// its last VIX update really was the parent's — but `restore_state`
+    /// does not: a restored engine keeps its own last reading, `None` if
+    /// it had advanced no day, until its own next day advances.
+    fn index_variance_terms<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Option<Bound<'py, PyDict>>> {
+        let terms = match self.inner.last_index_variance() {
+            Some(t) => t,
+            None => return Ok(None),
+        };
+        let out = PyDict::new_bound(py);
+        out.set_item("factor", terms.factor_raw)?;
+        out.set_item("sector", terms.sector_raw)?;
+        out.set_item("idio", terms.idio_raw)?;
+        out.set_item("market_jump", terms.market_jump)?;
+        out.set_item("idio_jump", terms.idio_jump)?;
+        out.set_item("news", terms.news)?;
+        out.set_item("k", terms.k)?;
+        let total = terms.total();
+        out.set_item("total", total)?;
+        out.set_item(
+            "implied",
+            crate::market::index_var::vix_from_variance(
+                self.inner.params().vix_variance_premium,
+                total,
+            ),
+        )?;
+        Ok(Some(out))
+    }
+
+    /// The variance targets the last close reverted toward, as
+    /// `(fast, slow)`, or `None` before any close.
+    ///
+    /// `slow` is `None` when the preset has no slow component
+    /// (`market_vol_slow_weight == 0.0` — pt-v1 through pt-v3 and the
+    /// default `PT_V1`), because `factor_vol.rs::close_day_at` returns
+    /// before a slow target is computed on that branch. On such a preset
+    /// the first element is THE target, not a "fast" one.
+    ///
+    /// The two `None`s mean different things: the outer is "no close
+    /// yet", the inner is "no slow component". A fork carries the
+    /// reading, a restore does not.
+    fn market_variance_target(&self) -> Option<(f64, Option<f64>)> {
+        self.inner.market_variance_target()
+    }
+
     /// The model this engine runs, as a `ModelParams`.
     #[getter]
     fn model(&self) -> crate::python_params::PyModelParams {
