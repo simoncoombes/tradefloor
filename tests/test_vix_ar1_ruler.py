@@ -313,6 +313,45 @@ def test_the_debias_is_applied_at_the_window_length():
         facts.debias_ar1(0.9, 1)
 
 
+def test_the_anchor_is_a_rule_and_the_front_one_is_shipped():
+    """At 504 the ANCHOR moves the ruler more than the noise does.
+
+    Measured on the tape: the end-anchored cut reads 0.950772 against the
+    shipped 0.959348, a move of 0.0086 against a bootstrap standard error of
+    0.0061. So a 504-day ruler quoted without its anchoring rule is not
+    reproducible, and section 1.3 moves the certified horizon to 504.
+
+    That makes the anchor part of the derivation rather than an
+    implementation detail, so it is asserted here rather than only recorded:
+    `blocks` front-anchors, the end-anchored cut is a DIFFERENT cut, and the
+    provenance states the rule in words. The tape-gated test below pins the
+    shipped windows to the front cut of the real series; this one binds the
+    rule where there is no tape, which is CI.
+    """
+    # A tape whose two cuts genuinely disagree, so the assertion below is
+    # about which cut ships and not about a distinction with no difference.
+    tape = mean_reverting(250, seed=900) + mean_reverting(250, seed=901,
+                                                          phi=0.55)
+    front = ruler.blocks(tape, 120)
+    end = ruler.blocks(tape, 120, anchor="end")
+    assert len(front) == len(end) == 4          # 500 // 120, tail dropped
+    assert front[0] == tape[:120]               # anchored at the first bar
+    assert front[-1] == tape[360:480]           # and 20 bars are dropped
+    assert end[-1] == tape[380:]                # the other cut ends flush
+    assert front != end
+
+    front_ruler = facts.median_level_ar1(front, length=120)
+    end_ruler = facts.median_level_ar1(end, length=120)
+    assert abs(front_ruler - end_ruler) > 1e-6, (
+        "this fixture was built so the two cuts disagree; if they no longer "
+        "do, the assertion above proves nothing and the fixture needs "
+        "rebuilding rather than the tolerance loosening")
+
+    # And the rule is stated where a reader of the ruler will find it.
+    assert "front-anchored" in facts.REAL_VIX_AR1_PROVENANCE["window"]
+    assert "anchoring" in facts.REAL_VIX_AR1_PROVENANCE["residual"]
+
+
 def test_the_recorded_windows_reproduce_from_the_tape():
     """The tool's cut against what `facts` records, when the tape is present.
 
