@@ -78,7 +78,8 @@ from typing import Any, Mapping, Sequence
 from ._core import ValidationError
 from .facts import (AGGREGATE, REAL_MARKETS, REAL_MARKETS_504, SEED_SD,
                     SEED_SD_504, SEED_SD_PROVENANCE, aggregate_panels,
-                    band_distance, check_ruler_horizon, horizon_of_panels)
+                    band_distance, check_ruler_horizon, horizon_of_panels,
+                    pooled_rate_counts)
 
 #: The statistics the calibration search is trying to move into band. This
 #: is the ONE tuple to edit when a model change makes a structural statistic
@@ -148,6 +149,16 @@ CONSTRAINTS = (
 #: the objective every recorded calibration score was measured under, at
 #: the default preset by 16.5 points against a scale of 9.6, and that is
 #: a decision about the search rather than about the row.
+#:
+#: The index tail row `index_tail_dn3_pct` is structural and is meant to
+#: STAY here, which makes it the second exception. Its band is the tape's
+#: own uncertainty -- thirty-five years, one of which holds a third of the
+#: events -- so it is [0.47, 1.96] on a centre of 1.21, and a band distance
+#: is flat at zero across everything a search would try. An objective term
+#: that is flat over the whole feasible region contributes nothing but
+#: noise at the edges, which is the edge-finding failure the panel's own
+#: history is full of. The row exists to GRADE the answer, not to be solved
+#: against.
 STRUCTURAL = tuple(
     key for key in REAL_MARKETS
     if key not in LIVE_TARGETS and key not in CONSTRAINTS
@@ -288,6 +299,12 @@ def band_distance_loss(
             # empty or not; it is missing only where the panel never
             # measured it.
             values = [p.get(key + "_samples") for p in panels]
+        elif AGGREGATE.get(key) == "pooled_rate":
+            # And a pooled-RATE row is present on a panel that carries its
+            # hit count, zero or not. Reading its `_pct` instead would call
+            # a seed with no session at -3 percent unmeasured, when zero of
+            # 251 is a reading and a third of real years read it.
+            values = [p.get(pooled_rate_counts(key)[0]) for p in panels]
         else:
             values = [p.get(key) for p in panels]
         present = [v for v in values if v is not None]
@@ -312,8 +329,9 @@ def band_distance_loss(
             continue
 
         # Each row by its own estimator: a median for the shape rows, a
-        # thirty-seed mean for a level row, a pooled median for a crisis row
-        # (`facts.AGGREGATE`).
+        # thirty-seed mean for a level row, and for the crisis rows a pooled
+        # median or a pooled RATE, the hits over every seed divided by the
+        # sessions over every seed (`facts.AGGREGATE`).
         measured = graded[key]
         distance = band_distance(measured, low, high)
         sd = scales.get(key)

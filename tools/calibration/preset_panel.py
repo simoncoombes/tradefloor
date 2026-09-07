@@ -78,6 +78,43 @@ HELDOUT_SEEDS = tuple(range(1, 31))
 #: a fifteenth statistic joins this table by being added to the envelope.
 PANEL = tuple(envelope.CERTIFIED)
 
+#: WHY THIS TOOL EMITS NO INDEX TAIL FIGURE, deliberately and by ruling.
+#:
+#: `index_tail_dn3_pct` is certified on `facts.LEVEL_PROTOCOL`, where the
+#: ROSTER varies with the seed, because a crash rate is a property of the
+#: roster's concentration as much as of the model. This tool runs the held
+#: roster, `Universe.random(40, seed=111)`. The two protocols read
+#: measurably different numbers on the same preset: pt-v16 reads 1.2749
+#: percent with the roster varying against 1.124 held, a gap of 13.4
+#: percent.
+#:
+#: So a tail figure measured here would be a held-roster number sitting in
+#: a preset record under the same row name as the varying-roster number in
+#: `envelope.CERTIFIED_CRISIS`, and somebody would compare them. Annotating
+#: it would not prevent that: this project's three worst ruler errors were
+#: all labelled somewhere and compared anyway -- the real VIX AR1 documented
+#: as a whole-span estimate and scored against 252-day windows,
+#: `crisisprobe-frontier`'s band declaring itself CHOSEN in its own source
+#: and still producing a charter verdict, and `REAL_TAIL3 = 107/9236`
+#: carrying its provenance in `facts.py` while eight scripts divided GSPC
+#: hits by a VIX session count.
+#:
+#: ABSENT WITH A REASON is the honest state. The per-seed panels therefore
+#: do not carry the row's counts, `envelope.certify` finds nothing to build
+#: a tail block from, and `certification_record` carries `tail: None`. This
+#: string travels in the artefact's `method` so a reader of a record learns
+#: why the field is empty and what would fill it.
+TAIL_NOT_MEASURED = (
+    "index_tail_dn3_pct is NOT measured by this tool. It is certified on "
+    "facts.LEVEL_PROTOCOL, where the roster varies with the seed, and this "
+    "tool holds Universe.random(40, seed=111); the two protocols differ by "
+    "13.4 percent on the shipped preset (1.2749 varying against 1.124 "
+    "held). A held-roster figure under this row's name would be compared "
+    "with the certified one, so none is emitted. What would fill it: a "
+    "level-protocol arm in this tool, which is a box job and a Phase 1 "
+    "follow-on rather than part of the row's own branch."
+)
+
 #: The crisis lever's two endpoints, and the real-market figure it is read
 #: against (17.2% annualised below VIX 12 against 106.1% above VIX 45, from
 #: `real_vix_lever.py`; the ratio is 6.16).
@@ -204,8 +241,18 @@ def main() -> None:
         # The mechanism certificate, from the per-seed panels rather than
         # from their median. Both 252-day cells, because the count that
         # matters is per protocol and not per preset.
-        cert252 = envelope.certify(collected[("panel_252", preset)])
-        certhos = envelope.certify(collected[("heldout_seeds", preset)])
+        # Whether every run of this preset opens at phase age zero, read off
+        # the preset rather than assumed. It decides nothing here today,
+        # because these panels carry no tail counts and the tail block comes
+        # back None (`TAIL_NOT_MEASURED`); it is passed so that the day this
+        # tool grows a level-protocol arm, the block it produces is counted
+        # or not counted on the run's own opening rather than on a default.
+        stationary = bool(tradefloor.ModelParams.from_preset(preset)
+                          .to_dict().get("cycle_stationary_opening", 0.0))
+        cert252 = envelope.certify(collected[("panel_252", preset)],
+                                   stationary_opening=stationary)
+        certhos = envelope.certify(collected[("heldout_seeds", preset)],
+                                   stationary_opening=stationary)
 
         n252, miss252 = _count_in_band(p252, facts.REAL_MARKETS)
         n504, miss504 = _count_in_band(p504, facts.REAL_MARKETS_504)
@@ -261,6 +308,7 @@ def main() -> None:
             "heldout_seeds": f"{heldout[0]}-{heldout[-1]} ({len(heldout)})",
             "bands_252": "facts.REAL_MARKETS",
             "bands_504": "facts.REAL_MARKETS_504",
+            "index_tail_not_measured": TAIL_NOT_MEASURED,
             "crisis_lever": (
                 f"annualised vol at held VIX {LEVER_HI:.0f} over held VIX "
                 f"{LEVER_LO:.0f}, certified roster, 252 days, thirty seeds"

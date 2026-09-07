@@ -374,6 +374,34 @@ pub struct Engine {
     /// depends on the roster and the parameters, and both are fixed when
     /// the engine is built.
     vix_anchor: f64,
+    /// The index variance the LAST VIX update read, term by term.
+    ///
+    /// `None` until an `advance_day_with` has run under
+    /// [`ModelParams::vix_level_identity`], and `None` for ever under
+    /// every preset that leaves the identity off — because there the
+    /// read-back is not computed at all and a zero here would be a
+    /// variance of nothing rather than an absence.
+    ///
+    /// A REMEMBERED VALUE AND NOT A GETTER, and the difference is a day.
+    /// `advance_day_with` computes this from post-close states at
+    /// `VIX_{t-1}` — the sector sigma and the jump rate are read at the
+    /// VIX the close saw — and then updates the VIX. Anything that
+    /// recomputed the identity afterwards would read the instantaneous
+    /// terms at `VIX_t` and hand back a variance no VIX update ever saw.
+    ///
+    /// Pure diagnostic: nothing in the engine reads it, and it is
+    /// deliberately NOT in `state_snapshot`, so it moves no state hash and
+    /// no digest. A FORK carries it, because a fork is a `Clone` and its
+    /// last VIX update really was the parent's. `restore_state` does not,
+    /// because the snapshot does not hold it: a restored engine keeps
+    /// whatever reading it had of its own — `None` if it had advanced no
+    /// day — until its own next day advances. That is the price of
+    /// staying out of the hash, and it is stated rather than hidden.
+    last_index_variance: Option<crate::market::index_var::IndexVarianceTerms>,
+    /// The variance targets the last close reverted toward, `(fast, slow)`.
+    /// Diagnostic only, like `last_index_variance`, and kept OUT of
+    /// `state_snapshot` and the state hash for the same reason.
+    last_market_targets: Option<(f64, Option<f64>)>,
 }
 
 impl Engine {
@@ -632,6 +660,9 @@ impl Engine {
             // value so that a path which somehow skipped the derivation
             // would divide by zero rather than run on a plausible number.
             vix_anchor: 0.0,
+            // No day has closed, so no VIX update has read a variance.
+            last_index_variance: None,
+            last_market_targets: None,
         };
         engine.vix_anchor = engine.derive_vix_anchor();
         engine.burn_in_economy();
@@ -781,7 +812,9 @@ impl Engine {
     /// an implied volatility prices. The VIX-driven quantities (the sector
     /// draw's sigma, the jump arrival rate) are read at the close's VIX,
     /// which is the information the close has.
-    fn index_conditional_variance_now(&self) -> f64 {
+    fn index_conditional_variance_terms_now(
+        &self,
+    ) -> crate::market::index_var::IndexVarianceTerms {
         let names = self.index_variance_names();
         let sector_sigma = crate::market::tick::sector_sigma_at(
             &self.params, &self.economy, self.vix_anchor);
@@ -792,7 +825,7 @@ impl Engine {
             (1.0 - self.params.jump_vix_coupling)
                 + ((self.params.jump_vix_coupling * ratio) * ratio)
         };
-        crate::market::index_var::index_conditional_variance(
+        crate::market::index_var::index_conditional_variance_terms(
             &self.params,
             &names,
             self.sector_keys.len(),
@@ -801,6 +834,35 @@ impl Engine {
             rate_scale,
             crate::market::index_var::intraday_variance_factor(),
         )
+    }
+
+    /// The terms of the index variance the last VIX update read, or `None`
+    /// if no day has advanced under the identity. See
+    /// [`Engine::last_index_variance`] for why it is remembered rather
+    /// than recomputed.
+    pub fn last_index_variance(
+        &self,
+    ) -> Option<crate::market::index_var::IndexVarianceTerms> {
+        self.last_index_variance
+    }
+
+    /// The variance targets the last close reverted toward: `(fast, slow)`.
+    ///
+    /// `None` before any close. The SLOW element is `None` whenever the
+    /// preset has no slow component (`market_vol_slow_weight == 0.0`,
+    /// which pt-v1 through pt-v3 and `PT_V1` all ship) — on that branch
+    /// `factor_vol.rs` returns before a slow target is ever computed, so
+    /// there is none to report. On such a preset the FIRST element is THE
+    /// target, not a "fast" one.
+    ///
+    /// So a `None` in the outer option and a `None` in the inner one mean
+    /// different things: no close yet, versus no slow component. A fork
+    /// carries the reading (`Engine` derives `Clone`); a restore does not,
+    /// because the snapshot has no such key — which is what keeps this out
+    /// of the state hash — so a restored engine keeps its own last reading
+    /// until its next day.
+    pub fn market_variance_target(&self) -> Option<(f64, Option<f64>)> {
+        self.last_market_targets
     }
 
     /// Draw the day-zero cycle phase and its age from the cycle's own
@@ -1969,7 +2031,8 @@ impl Engine {
         // above and with the same zero-draw discipline. The VIX read here
         // is the day's TRADING value — the macro chain has not advanced
         // yet, exactly as the per-name updates see the day they closed.
-        self.market_vol.close_day_at(&self.params, self.vix_anchor, self.economy.vix);
+        self.last_market_targets =
+            Some(self.market_vol.close_day_at(&self.params, self.vix_anchor, self.economy.vix));
         // The forced-flow reservoir drains on stress days and rebuilds in
         // calm. Updated only while the mechanism is live: at gain 0 or
         // reservoir 0 the state stays exactly 0.0 and nothing changes.
@@ -2193,10 +2256,22 @@ impl Engine {
         // excursion's zero-mean correction are two readings of the same
         // variance, and computing it twice would be one loop over the
         // roster too many and one more place for the two to disagree.
+        //
+        // The terms are KEPT as well as summed. `total()` is the same
+        // operations in the same order as the expression that stood here,
+        // so the read-back is the number it always was; what is new is
+        // that a measurement can afterwards ask which term of `V_t` the
+        // update read, at the VIX it read them at. Off the identity
+        // neither the sum nor the terms are computed and the field stays
+        // at the `None` it was built with -- `params` is fixed for the
+        // engine's life, so that branch has nothing to clear -- and
+        // nothing here changes WHEN anything is computed.
         let index_variance = if self.params.vix_level_identity == 0.0 {
             0.0
         } else {
-            self.index_conditional_variance_now()
+            let terms = self.index_conditional_variance_terms_now();
+            self.last_index_variance = Some(terms);
+            terms.total()
         };
 
         rng.site(Site::EconomyDaily, 0);

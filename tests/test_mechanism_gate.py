@@ -609,3 +609,213 @@ def test_a_null_model_is_fourteen_of_fourteen_in_band_and_certifies_nothing():
         "corr_persistence_acf1",
     }
     assert result["counts"]["mechanism_shown"] == 0, result["shown"]
+
+
+# --------------------------------------------------------------------------
+# The index tail row: a count the shape rows cannot see
+#
+# The row exists because the panel had seventeen certified rows and not one
+# read the index tail, so a model could reach the real count with a third
+# more volatility and a nearly Gaussian tail, or miss it entirely, and every
+# row stayed green. These tests show the two rows independent in both
+# directions and the tail row FAILING a model the per-name kurtosis row
+# passes.
+# --------------------------------------------------------------------------
+
+TAIL_ROW = "index_tail_dn3_pct"
+
+
+def tail_panels(hits, sessions=251, shape_at_centre=True):
+    """`SEEDS` panels whose shape rows sit at their band centres.
+
+    `hits` is either one count for every seed or a list of per-seed counts,
+    so a test can set the RATE and the MIXTURE separately: the pooled rate
+    cannot see the difference and the certificate reports both.
+    """
+    counts = list(hits) if isinstance(hits, (list, tuple)) else [hits] * SEEDS
+    assert len(counts) == SEEDS
+    panels = []
+    for i, k in enumerate(counts):
+        panel = {}
+        if shape_at_centre:
+            for row in SHAPE:
+                low, high = REAL_MARKETS[row]
+                panel[row] = (low + high) / 2.0 + 1e-9 * i
+        panel["index_tail_dn3_hits"] = k
+        panel["index_tail_dn3_sessions"] = sessions
+        panel[TAIL_ROW] = 100.0 * k / sessions
+        panels.append(panel)
+    return panels
+
+
+def test_the_tail_row_fails_where_every_shape_row_passes():
+    """Fourteen of fourteen in band, and the index tail out.
+
+    Six hits in 251 sessions on every seed is 2.39 per cent, above a ceiling
+    of 1.96; three hits is 1.20 per cent, inside. Nothing else about the
+    panels changes between the two, so the verdict is the row's and not a
+    side effect of the fixture.
+    """
+    from tradefloor.facts import aggregate_panels
+
+    fat = envelope.certify(tail_panels(6))
+    assert fat["fidelity"]["shape_in_band"] == fat["fidelity"]["shape_of"] == 14
+    assert fat["tail"]["verdict"] == "HIGH"
+    assert not fat["tail"]["in_band"]
+    assert fat["tail"]["rate"] == pytest.approx(
+        aggregate_panels(tail_panels(6), keys=[TAIL_ROW])[TAIL_ROW])
+
+    ok = envelope.certify(tail_panels(3))
+    assert ok["fidelity"]["shape_in_band"] == 14
+    assert ok["tail"]["verdict"] == "in"
+
+    # And `score` reads the same verdict off the graded panel, so the row is
+    # not a certificate-only field.
+    graded = aggregate_panels(tail_panels(6), keys=[TAIL_ROW])
+    assert not envelope.score(graded)["statistics"][TAIL_ROW]["in_band"]
+    assert envelope.score(graded)["statistics"][TAIL_ROW]["group"] == "crisis"
+
+
+def test_the_tail_row_and_the_per_name_kurtosis_row_are_independent():
+    """The converse, so the pair is shown independent in both directions.
+
+    Per-name kurtosis at 1.0 is below its floor of 1.6 while the tail sits
+    at 1.20 per cent, inside its band: one row out, the other in, on the
+    same panels. With the test above, neither row implies the other and the
+    count row is not a second reading of the shape row.
+    """
+    panels = tail_panels(3)
+    for panel in panels:
+        panel["excess_kurtosis"] = 1.0
+    result = envelope.certify(panels)
+    assert not result["fidelity"]["statistics"]["excess_kurtosis"]["in_band"]
+    assert result["tail"]["verdict"] == "in"
+    assert result["fidelity"]["shape_in_band"] == 13
+
+
+def test_the_recorded_models_the_row_refuses_are_ones_the_kurtosis_row_passes():
+    """The acceptance case of charter 1.2, on readings already recorded.
+
+    Two models, each measured on thirty seeds, each with a per-name
+    `excess_kurtosis` INSIDE its band and an index tail the new row refuses.
+    The readings are inputs here, named with where they came from; what is
+    asserted is a property of the two shipped BANDS, so this fails if either
+    band is widened to admit these models and not if a measurement moves.
+    """
+    tail_low, tail_high = REAL_MARKETS[TAIL_ROW]
+    kurt_low, kurt_high = REAL_MARKETS["excess_kurtosis"]
+    recorded = [
+        # pt-v16, year two of the 1,008-day settle1 run: the same seeds and
+        # the same preset as the year that certifies (settle1.md, with the
+        # per-name kurtosis from open3-504.md and settle2-panel-years.md).
+        ("pt-v16 year two", 2.500, (7.42, 8.08)),
+        # pt-v1 on a plain 252-day run, open3's `v1held_ctl`.
+        ("pt-v1 at 252 days", 3.012, (3.24,)),
+    ]
+    for name, tail, kurtoses in recorded:
+        assert tail > tail_high, name
+        for kurtosis in kurtoses:
+            assert kurt_low <= kurtosis <= kurt_high, (name, kurtosis)
+
+    # And the thin side, stated as the limit it is: pt-v18 year one reads
+    # 0.688 per cent and the row does NOT refuse it, at any seed count,
+    # because the band half-width is the TAPE's standard error and no number
+    # of model seeds shrinks that.
+    assert tail_low <= 0.688 <= tail_high
+    centre = real_centre(TAIL_ROW)
+    se_real = real_centre_se(TAIL_ROW)
+    multiplier = centre_multiplier(band_rule_tolerance(9))
+    assert (centre - 0.688) / se_real < multiplier
+    assert centre - multiplier * se_real == pytest.approx(tail_low, abs=0.01)
+
+
+def test_the_pooled_rate_cannot_see_its_mixture_so_three_counts_are_reported():
+    """The same rate from two different models of the world.
+
+    Thirty seeds at two hits each, and twenty-two zeros beside eight seeds
+    carrying seven or eight, pool to the same rate. The graded value is
+    identical; the three counts beside it are not, and the tape's own three
+    are printed with them so a reader can tell the right rate from the right
+    rate for the right reason.
+    """
+    flat = tail_panels([2] * SEEDS)
+    lumpy = tail_panels([0] * 22 + [7, 7, 7, 8, 8, 8, 7, 8])
+    a = envelope.certify(flat)["tail"]
+    b = envelope.certify(lumpy)["tail"]
+    assert a["rate"] == pytest.approx(b["rate"])
+    assert a["verdict"] == b["verdict"]
+    assert a["zero_share"] == 0.0 and b["zero_share"] == pytest.approx(22 / 30)
+    assert a["max_hits"] == 2 and b["max_hits"] == 8
+    assert a["five_or_more_share"] == 0.0
+    # The tape's three, carried beside them: 13 of 35 windows at zero, 7 at
+    # five or more, 33 in the worst one.
+    assert a["tape"]["zero_share"] == pytest.approx(13 / 35)
+    assert a["tape"]["five_or_more_share"] == pytest.approx(7 / 35)
+    assert a["tape"]["max_hits"] == 33
+    # The lumpy panel is the one that looks like the tape, and neither is
+    # gated on it: both verdicts are the rate's.
+    assert abs(b["zero_share"] - b["tape"]["zero_share"]) < \
+        abs(a["zero_share"] - a["tape"]["zero_share"])
+
+
+def test_a_verdict_inside_one_run_standard_error_of_an_edge_says_so():
+    """AT THE EDGE, the treatment a sign count sitting on its cut gets.
+
+    The band half-width is the tape's own standard error and the run has one
+    of its own; a margin smaller than the run's error is a verdict this run
+    cannot resolve, whichever side it fell.
+    """
+    # Five hits on every seed is 1.99 per cent, just above the 1.96 ceiling,
+    # and the seeds do not scatter at all, so the run's error is zero and
+    # the verdict IS resolved.
+    tight = envelope.certify(tail_panels(5))["tail"]
+    assert tight["verdict"] == "HIGH" and tight["se_m"] == 0
+    assert not tight["at_the_edge"]
+    # The same rate from a scattered mixture cannot be.
+    scattered = envelope.certify(tail_panels([0] * 15 + [10] * 15))["tail"]
+    assert scattered["rate"] == pytest.approx(tight["rate"])
+    assert scattered["verdict"] == "HIGH"
+    assert scattered["at_the_edge"]
+
+
+def test_the_tail_row_is_graded_and_not_counted_on_a_non_stationary_opening():
+    """R3's condition, carried as data rather than as a note in a file.
+
+    On the current opening every seed starts in expansion at phase age zero,
+    so year one is all-expansion and year two a synchronised contraction on
+    the same preset and the same seeds. A rate measured there reads the
+    opening. The row is still graded and still printed, which is the
+    treatment `abs_return_acf20` gets at 252 days, and the reason travels
+    with the verdict.
+    """
+    panels = tail_panels(3)
+    unstated = envelope.certify(panels)["tail"]
+    assert unstated["counted"] is None
+    assert "did not state" in unstated["not_counted"]
+
+    moving = envelope.certify(panels, stationary_opening=False)["tail"]
+    assert moving["counted"] is False
+    assert "non-stationary opening" in moving["not_counted"]
+    assert moving["verdict"] == "in"
+
+    settled = envelope.certify(panels, stationary_opening=True)["tail"]
+    assert settled["counted"] is True
+    assert settled["not_counted"] is None
+
+    text = envelope.certification_report(
+        envelope.certify(panels, stationary_opening=False))
+    assert TAIL_ROW in text and "graded, not counted" in text
+    assert "seeds at zero" in text
+
+
+def test_a_panel_without_the_counts_gets_no_tail_block_rather_than_a_guess():
+    """A panel measured before the row existed says nothing about the tail."""
+    panels = tail_panels(3)
+    for panel in panels:
+        del panel["index_tail_dn3_hits"]
+        del panel["index_tail_dn3_sessions"]
+    result = envelope.certify(panels)
+    assert result["tail"] is None
+    assert envelope.certification_record(result)["tail"] is None
+    # And the certificate still renders.
+    assert "certification:" in envelope.certification_report(result)

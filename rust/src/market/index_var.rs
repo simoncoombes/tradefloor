@@ -153,6 +153,60 @@ fn jump_intensities(p: &ModelParams, rate_scale: f64) -> (f64, f64) {
     }
 }
 
+/// The six pieces [`index_conditional_variance`] sums, kept apart.
+///
+/// The `_raw` three are the PRE-`K` sums: the intraday curve multiplies
+/// the noise block and not the jumps, which the test named
+/// `the_intraday_curve_does_not_reach_the_jumps` pins, so a struct that
+/// stored them already scaled would have thrown away the only distinction
+/// between the two halves of the identity. `k` travels with them for the same reason: the total is
+/// not reconstructible from the terms without it.
+///
+/// Fraction squared per session throughout, except `k`, which is
+/// dimensionless.
+///
+/// This type exists so a measurement can read WHICH term of `V_t` a VIX
+/// move went into — the loop closes through the factor, the sector and
+/// the jump rate at three different couplings, and the sum alone cannot
+/// say which. Nothing in the engine reads it back.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct IndexVarianceTerms {
+    /// `beta_w^2 * v_f`, the market factor's block before `K`.
+    pub factor_raw: f64,
+    /// `sum_s (sum_{i in s} w_i L_i)^2 sigma_s^2`, before `K`.
+    pub sector_raw: f64,
+    /// `sum_i w_i^2 idio_i^2`, before `K`.
+    pub idio_raw: f64,
+    /// The intraday curve's second moment, [`intraday_variance_factor`].
+    pub k: f64,
+    /// `lambda_m (mu^2 + sigma_m^2) - (lambda_m mu)^2`.
+    pub market_jump: f64,
+    /// `sum_i w_i^2 lambda_i sigma_J^2`.
+    pub idio_jump: f64,
+    /// `nu sigma_news^2 sum_i w_i^2`.
+    pub news: f64,
+}
+
+impl IndexVarianceTerms {
+    /// The index's conditional variance: what
+    /// [`index_conditional_variance`] returns.
+    ///
+    /// THE SAME OPERATIONS IN THE SAME ORDER as the expression this
+    /// replaced, which is a stronger claim than equality and the only one
+    /// worth making here. Floating-point addition does not associate, so
+    /// `k * (a + b + c) + d + e + f` regrouped anywhere is a different
+    /// number in the last place — and the last place is not nothing: this
+    /// variance is the VIX, the VIX is the factor's target, and a run
+    /// diverges from a run that differs by an ULP. Asserted on bits by
+    /// `the_terms_sum_to_the_variance_they_were_split_from`.
+    pub fn total(&self) -> f64 {
+        self.k * (self.factor_raw + self.sector_raw + self.idio_raw)
+            + self.market_jump
+            + self.idio_jump
+            + self.news
+    }
+}
+
 /// The cap-weighted index's one-day-ahead conditional variance, in
 /// fraction² per session.
 ///
@@ -192,6 +246,32 @@ pub fn index_conditional_variance(
     jump_rate_scale: f64,
     k: f64,
 ) -> f64 {
+    index_conditional_variance_terms(
+        p, names, sector_count, factor_variance, sector_sigma, jump_rate_scale, k)
+        .total()
+}
+
+/// [`index_conditional_variance`] with the terms kept rather than summed.
+///
+/// Same arithmetic, same order, same arguments; the only difference is
+/// that the six pieces the sum is built from survive it, so a measurement
+/// can ask which term of `V_t` moved rather than only that `V_t` did.
+/// [`IndexVarianceTerms::total`] is the sum, and
+/// [`index_conditional_variance`] is now this function followed by that
+/// one — so the two cannot disagree, and the test beside this module
+/// asserts the equality ON BITS rather than to a tolerance.
+///
+/// Nothing here is computed that the summing form did not compute. This is
+/// a read-only instrument: it adds no draw, no state and no term.
+pub fn index_conditional_variance_terms(
+    p: &ModelParams,
+    names: &[NameVariance],
+    sector_count: usize,
+    factor_variance: f64,
+    sector_sigma: f64,
+    jump_rate_scale: f64,
+    k: f64,
+) -> IndexVarianceTerms {
     let mut beta_w = 0.0;
     let mut weight_sq = 0.0;
     let mut idio_var = 0.0;
@@ -211,7 +291,7 @@ pub fn index_conditional_variance(
         sector_var += loaded * loaded * sector_sigma * sector_sigma;
     }
 
-    let noise = k * (beta_w * beta_w * factor_variance + sector_var + idio_var);
+    let factor_raw = beta_w * beta_w * factor_variance;
 
     let (lambda_m, lambda_i) = jump_intensities(p, jump_rate_scale);
     let mu = p.jump_mean_market;
@@ -223,7 +303,15 @@ pub fn index_conditional_variance(
         * p.endogenous_news_sigma
         * p.endogenous_news_sigma;
 
-    noise + market_jump + idio_jump + news
+    IndexVarianceTerms {
+        factor_raw,
+        sector_raw: sector_var,
+        idio_raw: idio_var,
+        k,
+        market_jump,
+        idio_jump,
+        news,
+    }
 }
 
 /// How many passes the resting-variance contraction below takes.
@@ -496,6 +584,227 @@ mod tests {
         for (i, v) in settled.iter().enumerate() {
             assert!(*v < 0.000225, "name {i} rests at {v}, at or above its seed");
         }
+    }
+
+    /// A ROSTER WITH A NAME OUTSIDE THE SECTOR TABLE, which is the branch
+    /// `sector < sector_count` guards. Kept beside `roster` so the spread
+    /// below covers the accumulator's skip as well as its sum.
+    fn roster_with_a_stray_sector() -> Vec<NameVariance> {
+        let mut names = roster();
+        names[3].sector = 99;
+        names[5].market_cap = 4.0e11;
+        names[6].garch_variance = 0.0009;
+        names
+    }
+
+    /// THE EXPRESSION THAT STOOD IN `index_conditional_variance` BEFORE
+    /// THE TERMS WERE KEPT, written out here so the equality has two
+    /// independent sides.
+    ///
+    /// Asserting `index_conditional_variance` against
+    /// `index_conditional_variance_terms(..).total()` would prove nothing
+    /// at all -- the first is now DEFINED as the second. The claim worth
+    /// asserting is that `total()` is the ORIGINAL sum in the ORIGINAL
+    /// grouping, and that needs the original written down.
+    ///
+    /// Copied deliberately rather than factored out: a shared helper would
+    /// move with the code it is supposed to be checking.
+    fn the_sum_as_it_was_written(
+        p: &ModelParams,
+        names: &[NameVariance],
+        sector_count: usize,
+        factor_variance: f64,
+        sector_sigma: f64,
+        jump_rate_scale: f64,
+        k: f64,
+    ) -> f64 {
+        let mut beta_w = 0.0;
+        let mut weight_sq = 0.0;
+        let mut idio_var = 0.0;
+        let mut sector_loaded = vec![0.0; sector_count];
+        for name in names {
+            beta_w += name.weight * name.beta;
+            weight_sq += name.weight * name.weight;
+            let idio = idio_sigma_daily(p, name);
+            idio_var += name.weight * name.weight * idio * idio;
+            if name.sector < sector_count {
+                sector_loaded[name.sector] +=
+                    name.weight * crate::market::factors::sector_loading_for(p, name.beta);
+            }
+        }
+        let mut sector_var = 0.0;
+        for loaded in sector_loaded.iter() {
+            sector_var += loaded * loaded * sector_sigma * sector_sigma;
+        }
+
+        let noise = k * (beta_w * beta_w * factor_variance + sector_var + idio_var);
+
+        let (lambda_m, lambda_i) = jump_intensities(p, jump_rate_scale);
+        let mu = p.jump_mean_market;
+        let sig = p.jump_sigma_market;
+        let market_jump = lambda_m * (mu * mu + sig * sig) - (lambda_m * mu) * (lambda_m * mu);
+        let idio_jump = weight_sq * lambda_i * p.jump_sigma_idio * p.jump_sigma_idio;
+
+        let news = weight_sq * p.endogenous_news_intensity
+            * p.endogenous_news_sigma
+            * p.endogenous_news_sigma;
+
+        noise + market_jump + idio_jump + news
+    }
+
+    /// The parameter vectors the spread below runs, each reaching a branch
+    /// the others do not: the shipped preset, `jump_intensities`' own
+    /// zero-coupling branch, the news term switched on, and the jumps
+    /// switched off.
+    fn parameter_spread() -> Vec<(&'static str, ModelParams)> {
+        let mut uncoupled = PT_V18;
+        uncoupled.jump_vix_coupling = 0.0;
+        let mut noisy = PT_V18;
+        noisy.endogenous_news_intensity = 0.35;
+        noisy.endogenous_news_sigma = 0.031;
+        noisy.jump_intensity_idio = 0.0;
+        let mut no_jumps = PT_V18;
+        no_jumps.jump_intensity_market = 0.0;
+        no_jumps.jump_intensity_idio = 0.0;
+        vec![
+            ("pt-v18", PT_V18),
+            ("uncoupled jumps", uncoupled),
+            ("news on", noisy),
+            ("no jumps", no_jumps),
+        ]
+    }
+
+    /// KEEPING THE TERMS DOES NOT MOVE THE SUM, ON BITS.
+    ///
+    /// Floating-point addition does not associate, so a regrouping of
+    /// `k * (a + b + c) + d + e + f` is a different number in the last
+    /// place -- and a last place is not nothing here. Under
+    /// `vix_level_identity` this variance IS the VIX, the VIX is the
+    /// factor's target and the jump arrival rate, and a run that differs
+    /// by an ULP is a different market inside a year. So the assertion is
+    /// `assert_eq!` over a spread of every argument, against the
+    /// expression that stood in the function rather than against a
+    /// number, in the form `economy/daily.rs` asserts `return_spike_for`
+    /// and `expected_return_spike` in.
+    #[test]
+    fn the_terms_sum_to_the_variance_they_were_split_from() {
+        let k_curve = intraday_variance_factor();
+        for (label, p) in parameter_spread() {
+            for names in [roster(), roster_with_a_stray_sector()] {
+                for &sector_count in &[3usize, 5] {
+                    for i in 0..=12 {
+                        let factor_variance = 1.0e-6 + i as f64 * 8.3e-5;
+                        for j in 0..=6 {
+                            let sector_sigma = j as f64 * 0.0061;
+                            for &scale in &[0.0, 0.25, 1.0, 1.7, 4.9, 27.5] {
+                                for &k in &[1.0, k_curve, 2.25] {
+                                    let want = the_sum_as_it_was_written(
+                                        &p, &names, sector_count, factor_variance,
+                                        sector_sigma, scale, k);
+                                    let terms = index_conditional_variance_terms(
+                                        &p, &names, sector_count, factor_variance,
+                                        sector_sigma, scale, k);
+                                    assert_eq!(
+                                        terms.total(), want,
+                                        "{label}: sectors {sector_count}, v_f \
+                                         {factor_variance}, sigma_s {sector_sigma}, \
+                                         scale {scale}, k {k}");
+                                    assert_eq!(
+                                        index_conditional_variance(
+                                            &p, &names, sector_count, factor_variance,
+                                            sector_sigma, scale, k),
+                                        want,
+                                        "{label}: the summing form moved");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// AND EACH TERM IS THE BLOCK ITS NAME CLAIMS.
+    ///
+    /// The test above cannot see a mislabelling: a struct that put the
+    /// sector block in `idio_raw` and the idiosyncratic block in
+    /// `sector_raw` sums to the same variance and passes it. Since the
+    /// point of the split is to say WHICH term of `V_t` a VIX move went
+    /// into, the labels ARE the instrument and they are asserted
+    /// separately -- each against its own closed form, and then by moving
+    /// one dial at a time and requiring that exactly one field responds.
+    #[test]
+    fn each_term_carries_the_block_its_name_says() {
+        let k = intraday_variance_factor();
+        let p = PT_V18;
+        let names = roster_with_a_stray_sector();
+        let (v_f, sigma_s, scale) = (0.00021, 0.0093, 1.6);
+        let terms = index_conditional_variance_terms(
+            &p, &names, 3, v_f, sigma_s, scale, k);
+
+        let beta_w: f64 = names.iter().map(|n| n.weight * n.beta).sum();
+        assert_eq!(terms.factor_raw, beta_w * beta_w * v_f, "factor_raw");
+
+        let mut loaded = vec![0.0; 3];
+        for n in names.iter() {
+            if n.sector < 3 {
+                loaded[n.sector] +=
+                    n.weight * crate::market::factors::sector_loading_for(&p, n.beta);
+            }
+        }
+        let mut sector_var = 0.0;
+        for l in loaded.iter() {
+            sector_var += l * l * sigma_s * sigma_s;
+        }
+        assert_eq!(terms.sector_raw, sector_var, "sector_raw");
+
+        let mut idio_var = 0.0;
+        for n in names.iter() {
+            let s = idio_sigma_daily(&p, n);
+            idio_var += n.weight * n.weight * s * s;
+        }
+        assert_eq!(terms.idio_raw, idio_var, "idio_raw");
+
+        assert_eq!(terms.k, k, "k is the argument, not a recomputation");
+
+        let (lm, li) = jump_intensities(&p, scale);
+        let (mu, sg) = (p.jump_mean_market, p.jump_sigma_market);
+        assert_eq!(terms.market_jump,
+                   lm * (mu * mu + sg * sg) - (lm * mu) * (lm * mu), "market_jump");
+        let weight_sq: f64 = names.iter().map(|n| n.weight * n.weight).sum();
+        assert_eq!(terms.idio_jump,
+                   weight_sq * li * p.jump_sigma_idio * p.jump_sigma_idio, "idio_jump");
+        assert_eq!(terms.news,
+                   weight_sq * p.endogenous_news_intensity
+                       * p.endogenous_news_sigma * p.endogenous_news_sigma, "news");
+
+        // One dial at a time, and exactly one field may respond. This is
+        // what catches a swap between two blocks whose closed forms were
+        // copied from the same place.
+        let no_sector = index_conditional_variance_terms(
+            &p, &names, 3, v_f, 0.0, scale, k);
+        assert_eq!(no_sector.sector_raw, 0.0,
+                   "the sector block did not follow its sigma");
+        assert_eq!(no_sector.idio_raw, terms.idio_raw,
+                   "the sector sigma reached idio_raw");
+        assert_eq!(no_sector.factor_raw, terms.factor_raw,
+                   "the sector sigma reached factor_raw");
+
+        let mut quiet = p.clone();
+        quiet.endogenous_news_intensity = 0.0;
+        let no_news = index_conditional_variance_terms(
+            &quiet, &names, 3, v_f, sigma_s, scale, k);
+        assert_eq!(no_news.news, 0.0,
+                   "the news block did not follow its intensity");
+        assert_eq!(no_news.idio_jump, terms.idio_jump,
+                   "the news intensity reached idio_jump");
+
+        let no_factor = index_conditional_variance_terms(
+            &p, &names, 3, 0.0, sigma_s, scale, k);
+        assert_eq!(no_factor.factor_raw, 0.0,
+                   "the factor block did not follow its variance");
+        assert_eq!(no_factor.sector_raw, terms.sector_raw,
+                   "the factor variance reached sector_raw");
     }
 
     /// The identity converts a variance to VIX points through
