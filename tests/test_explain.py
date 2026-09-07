@@ -257,7 +257,7 @@ def test_a_check_costs_one_day_run_per_distinct_overlay():
         result = e.explain(e.tickers[0], 1)
         assert result.check() == []
         assert len(result._runs) == 15 + 4, size
-        assert len(result._walk) == (55 + 8 if HAS_PRINTS else 53 + 8), size
+        assert len(result._walk) == WALK_NODES, size
         assert len(ex._addresses(result.root)) == 2736 + 3, size
 
 
@@ -888,6 +888,16 @@ def test_a_roster_edit_inside_the_day_is_refused_by_name():
 # --------------------------------------------------------------------------
 
 HAS_PRINTS = hasattr(tf.Engine, "prints")
+#: Nodes in a checked explanation tree, on one constant so the two tests
+#: that assert it cannot disagree again.
+#:
+#: They did. `ee05ee3` moved the count when the eighth stream landed and
+#: updated the walk assertion to `55 + 8` while leaving the MCP tool's at
+#: 55, and the pair sat contradicting each other on `dev` -- invisible,
+#: because the MCP test `importorskip`s an optional extra, so every local
+#: run and every measurement box SKIPPED it, and the pushes to `dev` ran no
+#: CI. The first pull request to run CI on this lineage found it.
+WALK_NODES = (55 + 8) if HAS_PRINTS else (53 + 8)
 needs_prints = pytest.mark.skipif(
     not HAS_PRINTS, reason="Engine.prints() is not on this build")
 
@@ -1841,7 +1851,9 @@ def test_the_mcp_tool_returns_a_checked_tree():
     out = mcp.explain(universe_size=8, day=1)
     assert out["ok"] is True
     assert out["checked"]["misses"] == []
-    assert out["checked"]["nodes"] == (55 if HAS_PRINTS else 53)
+    # The SAME quantity as the walk assertion above, from the same
+    # constant. Restating it is how the two came to disagree by eight.
+    assert out["checked"]["nodes"] == WALK_NODES
     shown = [c["name"] for c in out["tree"]["children"]]
     assert shown == list(ex.CONTRIBUTIONS)
     total = math.fsum(c["value"] for c in out["tree"]["children"])

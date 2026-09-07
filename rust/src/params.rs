@@ -1044,6 +1044,114 @@ pub struct ModelParams {
     /// draw count, and it does so by running the economy rather than as a
     /// side effect.
     pub macro_burn_in_days: f64,
+    /// Draw the day-zero cycle phase AND its age from the cycle's own
+    /// stationary law, instead of opening every run at the same point.
+    /// 0.0 -- every preset before pt-v19 -- draws nothing and leaves
+    /// construction as it was, to the bit.
+    ///
+    /// # A cohort, not a transient
+    ///
+    /// Every run opens in EXPANSION at phase age ZERO. A phase has a
+    /// minimum duration before a transition can roll (`economy/state.rs`,
+    /// `phase_characteristics`: 6, 2, 4, 2, 4 months) and then a Weibull
+    /// hazard (`economy/cycle.rs`), and at this era's clock the exit after
+    /// the minimum is steep, so thirty seeds leave their first expansion
+    /// at nearly the same age and move through the first cycle in step.
+    /// Year two is a synchronised recession -- contraction share 0.51 on
+    /// pt-v1, pt-v16 and a pinned-VIX arm alike, so it is a property of
+    /// the construction and not of a preset -- and the macro fields travel
+    /// with it: unemployment 2.8, 5.8, 7.0, 4.9 by year on pt-v16, the
+    /// recession probability 0.13, 0.54, 0.14, 0.37.
+    ///
+    /// It does not damp on a horizon anyone runs. The fixed minimums make
+    /// the cycle's length nearly deterministic, so the yearly mix is still
+    /// 0.20 to 0.33 of a total-variation unit from stationary in years
+    /// five to twelve at this clock. `macro_burn_in_days` does not fix it
+    /// either, and was never meant to: it HOLDS the phase and RESETS its
+    /// clock, so it restores the same point after settling the fields.
+    ///
+    /// # The identity it draws from
+    ///
+    /// The cycle is a cyclic semi-Markov chain, so for phase `i` at age
+    /// `a` days ([`crate::economy::stationary_opening`]):
+    ///
+    /// ```text
+    /// S_i(d)  = prod_{t=1}^{d-1} (1 - p_i(t))   P(the sojourn survives d - 1 checks)
+    /// E[T_i]  = sum_{d>=1} S_i(d)               the mean sojourn, in days
+    /// pi_i    = E[T_i] / sum_j E[T_j]           the share of days in phase i
+    /// f_i(a)  = S_i(a + 1) / E[T_i]             the age within phase i
+    /// P(i, a) = S_i(a + 1) / sum_j E[T_j]       the joint law
+    /// ```
+    ///
+    /// with `p_i` the probability `check_cycle_transition` compares against
+    /// its uniform, read on the hazard alone. Nothing is chosen: every term
+    /// is the engine's own -- `cycle_hazard_params`, `min_months`, the
+    /// hazard's cap of 0.8, the clamp at 0.3 and
+    /// [`ModelParams::cycle_hazard_per_month`] -- and the walk stops where
+    /// the remaining tail cannot move an f64 sum of it.
+    ///
+    /// **The AGE is not optional.** `f_i` is the renewal identity for the
+    /// backward recurrence time, and it is the part a build would skip.
+    /// Drawing the phase and setting the age to zero would start a smaller
+    /// cohort at the same point: at this clock 73 per cent of stationary
+    /// expansions are younger than the 180-day minimum a fresh one has to
+    /// clear, with a median age of 123 days against a mean sojourn of 246.
+    ///
+    /// # The fields, and the ladder
+    ///
+    /// `adjust_transition_probability` adds to the hazard from the macro
+    /// state, so the TRUE stationary law depends on the fields, which
+    /// depend on the phase path. There is no closed form. The draw above
+    /// is the hazard-only law; the fields are then relaxed by
+    /// `macro_burn_in_days` days of the ordinary daily step with the phase
+    /// NOT held and its clock NOT reset -- the chain is already in its
+    /// stationary law, which a free run preserves by definition, while
+    /// unemployment, inflation and the yields relax to the values
+    /// consistent with the phase path they have just lived through, and the
+    /// ladder acts on the mix during that run. That is how the ladder is
+    /// handled: by construction rather than by algebra.
+    ///
+    /// So this dial and `macro_burn_in_days` are two halves of one
+    /// opening, and a preset that sets this without the other opens a
+    /// drawn contraction on an expansion's fields.
+    ///
+    /// # Why it is a SWITCH and the interior has no reading
+    ///
+    /// A day-zero state is either drawn from the stationary law or it is
+    /// not; there is no half-drawn phase. Every non-zero value therefore
+    /// gives the same opening, which is asserted rather than left for a
+    /// search to find as a flat direction:
+    /// `test_every_non_zero_value_gives_the_same_opening` in
+    /// `tests/test_stationary_opening.py`. The two admissible values are
+    /// 0.0 and 1.0.
+    ///
+    /// # What it costs
+    ///
+    /// Two uniforms from the economy substream at construction, so the
+    /// market's day-zero draws sit where they sat, plus about 2,500 to
+    /// 67,000 multiplies once -- the identity's walk, whose length is the
+    /// clock's, not the run's. Nothing per session.
+    ///
+    /// # It moves the draw schedule in TWO places, not one
+    ///
+    /// The two construction uniforms, as `macro_burn_in_days` already
+    /// moves it and declares. And then, for the WHOLE RUN:
+    /// `check_cycle_transition` returns before drawing while a phase is
+    /// younger than its minimum duration, so a run opening at age zero
+    /// rolls no exit for its first 180 days while one opening past the
+    /// minimum rolls one every day. The count there is the mechanism -- a
+    /// phase past its minimum is a phase whose exit is being rolled -- and
+    /// it is not a construction cost.
+    ///
+    /// The three-day perturbation probe cannot see either, and reads the
+    /// count IDENTICAL at its own seed: the phase-change block in
+    /// `economy/daily.rs` takes a uniform on both of the two days it fires
+    /// and a drawn age past two days skips both, cancelling the two
+    /// construction draws exactly. Measured over six seeds at 1, 2, 3, 5,
+    /// 10 and 30 days the difference runs 0, +1, +2, +4 and +30, which is
+    /// why `DRAW_SCHEDULE_MOVERS` carries this dial for the mechanism
+    /// rather than on the probe's evidence.
+    pub cycle_stationary_opening: f64,
     /// The share of earnings a company returns as net buybacks. 0.0 --
     /// every preset before pt-v18 -- is bit-identical.
     ///
@@ -1851,6 +1959,139 @@ pub struct ModelParams {
     /// second calibration constant. The VIX clamp of 10 to 80 and the
     /// factor's ceiling multiple bound the feedback.
     pub vix_realised_vol_weight: f64,
+    /// The VIX's LEVEL comes from the index's own conditional variance, not
+    /// from a table of constants. 0.0 ships and is every preset before
+    /// pt-v19, bit for bit.
+    ///
+    /// # What the level was made of
+    ///
+    /// At `vix_realised_vol_weight` 0.3 the target was
+    ///
+    /// ```text
+    /// target = 0.7 * [ phase(19 + 0.85 (p - 19))     the business cycle
+    ///                + spike(gain * |r|)             the day's return
+    ///                + 0.5 on the first half of a month
+    ///                + offset ]
+    ///        + 0.3 *   anchor * sigma_f / market_factor_sigma
+    /// ```
+    ///
+    /// so ABOUT TWO THIRDS OF THE LEVEL WAS CONSTANTS and their
+    /// cancellations — a phase table shrunk toward 19, an offset cancelling
+    /// the standing excursion an asymmetric gain injects, an earnings bump
+    /// — and the remaining third was the market factor's sigma read through
+    /// a conversion of 2105.1 VIX points per unit of daily sigma where the
+    /// identity is `100 * sqrt(252)` = 1587.5. Measured, at the arm nearest
+    /// the candidate: mean VIX 13.76 on an index realising 15.60 per cent
+    /// annualised, a ratio of 0.882 where the tape's is 1.252.
+    ///
+    /// And the referent was wrong twice over. The index is not the factor:
+    /// on the certified roster it carries 2.05x the factor's variance —
+    /// factor 55 per cent, jumps 23, sector and idiosyncratic 11, the
+    /// intraday curve 4.6, news 3 — and none of the rest reached the VIX at
+    /// any value of any dial.
+    ///
+    /// # What it is at 1.0
+    ///
+    /// ```text
+    /// target = (1 + pi) * 100 * sqrt(252 * V_t) + spike(r) - E[spike | sigma_t]
+    /// ```
+    ///
+    /// with `V_t` the engine's own one-day-ahead conditional variance of the
+    /// cap-weighted index ([`crate::market::index_var`]), computed from the
+    /// states it already holds at the close, and the excursion made
+    /// zero-mean by its own closed form rather than by a fitted offset.
+    /// `pi` is [`ModelParams::vix_variance_premium`].
+    ///
+    /// Three things follow, and they are the point of the change rather
+    /// than side effects:
+    ///
+    /// - `market_vol_vix_anchor` is DERIVED, from the same identity at the
+    ///   unconditional point, and the dial is not read at all. The forward
+    ///   map `base * (1 - c + c (VIX/anchor)^2)` and the read-back then
+    ///   agree at that point by construction — the property the old
+    ///   comment claimed ("so the loop is consistent") and the two
+    ///   constants never delivered.
+    /// - The phase table, `vix_cycle_amplitude`, `vix_target_offset`, the
+    ///   earnings bump and `vix_realised_vol_weight` are not read. The
+    ///   business cycle reaches the VIX through the variance processes or
+    ///   not at all.
+    /// - The spike reads the SESSION's return whatever `vix_return_source`
+    ///   says, because the zero-mean correction is computed against the
+    ///   session's conditional sigma and a correction sized for the day
+    ///   applied to a closing minute would be twenty times too large.
+    ///
+    /// `vix_mean_reversion`, `vix_decay_ratio`, `vix_return_gain`,
+    /// `vix_return_gain_up`, `vix_return_clamp` and `vix_target_shock_cap`
+    /// all keep their jobs: they are the fear channel, not the level. The
+    /// inflation and shock adders keep theirs too, so a scripted macro path
+    /// reaches the VIX exactly as it did, and a PINNED VIX still overrides
+    /// the state and drives variance through the forward map unchanged.
+    ///
+    /// # Stationarity, since this closes the loop
+    ///
+    /// Write `s_f` for the share of the unconditional index variance that
+    /// follows the VIX and `c` for the coupling. The factor's target is
+    /// `base (1 - c + c V_t / V_uncond)`; substituting
+    /// `V_t = s_f V_uncond v_f / base + (1 - s_f) V_uncond` gives a fixed
+    /// point at `v_f = base` EXACTLY, independent of `s_f`, and an
+    /// effective persistence of `(alpha + beta) + (1 - alpha - beta) c s_f`
+    /// — about 0.99 at the shipped coefficients. The level is held by the
+    /// variance processes' own reversion, weakened but not removed, which
+    /// is where a real index's long-run variance lives.
+    pub vix_level_identity: f64,
+    /// The variance risk premium `pi`: how far a real VIX sits ABOVE the
+    /// realised volatility of its own index. Read only while
+    /// [`ModelParams::vix_level_identity`] is non-zero.
+    ///
+    /// # Equality was the wrong identity, and this is the size of it
+    ///
+    /// MEASURED on ^GSPC and ^VIX adjusted closes, 1990-01-03 to
+    /// 2025-07-30, 8,959 aligned sessions with a return, by
+    /// `programme/scripts/vix-rv-relation.py` in the design repository.
+    /// Five estimators, because the answer depends on which one the model's
+    /// own statistic corresponds to:
+    ///
+    /// | estimator | VIX / RV |
+    /// |---|---|
+    /// | pooled over the whole span, one history | 1.076 |
+    /// | per calendar year, 35 years | median 1.252, IQR 1.128-1.398 |
+    /// | rolling 252-session windows, 415 of them | median 1.257, P10 1.049, P90 1.473 |
+    /// | against the NEXT 21 sessions' realised vol | median 1.398 |
+    /// | against the TRAILING 21 sessions | median 1.372, correlation 0.853 |
+    ///
+    /// Three of 35 calendar years read below 1.0 (2008 at 0.80, 2020 at
+    /// 0.85, 2018 at 0.98); the other 32 sit above it, and 92.5 per cent of
+    /// rolling windows do.
+    ///
+    /// **The value is 0.252 and the residual is the per-year IQR, 1.128 to
+    /// 1.398, so +/- 0.13 on `pi`.** The window estimator is the
+    /// like-for-like one: the certified panel's statistic is a per-window
+    /// relationship on a 252-session window, which is what estimators B and
+    /// C measure. The pooled 1.076 is recorded so the choice is visible; it
+    /// does not change any conclusion, because the model reads 0.88.
+    ///
+    /// # Why the default is the measured value and not zero
+    ///
+    /// Every other dial in this era ships at the value that makes it inert.
+    /// This one is not read at all while `vix_level_identity` is 0.0, so
+    /// both defaults are equally inert and the choice is about what a
+    /// preset that turns the identity on gets without saying anything.
+    /// Zero would be the EQUALITY ruler, which the measurement above puts
+    /// at 1.42x wrong. A default that is a refuted identity is a chosen
+    /// constant; the measured one is not.
+    ///
+    /// # What could not be determined
+    ///
+    /// The premium's FORM. By VIX level the difference grows from +3.3
+    /// points below VIX 12 to +8.9 above 30 while the ratio holds at 1.44,
+    /// 1.42, 1.44, 1.37, 1.35, 1.35 from 0 to 40 and falls to 1.23 only
+    /// above 40; by realised-vol tercile of years the ratio reads 1.40,
+    /// 1.24, 1.16 from calm to violent while the difference reads +4.1,
+    /// +3.0, +4.2. Neither form is exact. The ratio is the more stable one
+    /// over the range this model lives in and is the one used; a
+    /// state-dependent premium is not supported by this measurement and is
+    /// not fitted here.
+    pub vix_variance_premium: f64,
     /// Which return the VIX reacts to: the last TICK's (0.0, shipped) or the
     /// day's (1.0), blended in between.
     ///
@@ -1901,10 +2142,155 @@ pub struct ModelParams {
     /// to 1.79 against a real 4.0 and leaves lag-5 clustering where it was
     /// (§68). What was missing is the feedback above, not the gain.
     pub vix_return_gain: f64,
-    /// The same for an UP day. Shipped 10.0; the real response to a +2% day
-    /// is about half the size of the response to -2%, which the shipped
-    /// 2.5:1 ratio is already close to.
+    /// The same for an UP day. Shipped 10.0.
+    ///
+    /// # The "about half" this used to claim has no provenance, and is wrong
+    ///
+    /// This docstring read: "the real response to a +2% day is about half
+    /// the size of the response to -2%, which the shipped 2.5:1 ratio is
+    /// already close to." That sentence names no series, no window, no
+    /// sample size and no estimator, and it sits directly beneath
+    /// `vix_return_gain`'s claim, which names all four -- so it read as
+    /// though it inherited that provenance when it had none of its own.
+    /// It was the only statement of a real up-to-down ratio anywhere in
+    /// the tree, and a derivation was built on it.
+    ///
+    /// MEASURED, on ^GSPC and ^VIX over 8,960 aligned sessions, by
+    /// fitting each side separately and evaluating the two curves:
+    ///
+    /// | move | down response | up response | up / down |
+    /// |---|---|---|---|
+    /// | 1% | 1.003 | 0.897 | 0.89 |
+    /// | 3% | 3.73 | 2.80 | 0.75 |
+    /// | 6% | 8.58 | 5.75 | 0.67 |
+    ///
+    /// So the real ratio is 0.67 to 0.89, not 0.5, and the model's fear
+    /// asymmetry is about TWICE the real one rather than close to it.
+    ///
+    /// And the ratio is NOT CONSTANT, because the two sides have
+    /// different exponents -- 1.1996 down against 1.0410 up. **No single
+    /// value of this dial can express a ratio that varies with the size
+    /// of the move.** That is the same class of defect as the linear
+    /// response the exponent fixes: the parameter's form cannot represent
+    /// the quantity it names. Expressing it properly needs an up-side
+    /// scale set against the down-side scale at the fit level, 0.894, and
+    /// the residual variation left over is the up side's own exponent,
+    /// which this data cannot resolve.
     pub vix_return_gain_up: f64,
+    /// The EXPONENT of the return-to-fear response. 1.0 ships and is the
+    /// linear form, bit-identical to the arithmetic that stood here.
+    ///
+    /// # Why a linear gain cannot be calibrated
+    ///
+    /// The real response of implied volatility to a session return is
+    /// CONVEX, and a gain multiplies every size of move by the same
+    /// factor, so no value of `vix_return_gain` can reproduce it. Measured
+    /// on ^GSPC and ^VIX, 8,960 sessions aligned on dates both series
+    /// report, 1990-01-03 to 2025-07-31, down sessions bucketed with each
+    /// bucket represented by its OWN median rather than its label:
+    ///
+    /// | median \|r\| | median dVIX | points per 1% |
+    /// |---|---|---|
+    /// | 0.710 | 0.710 | 1.00 |
+    /// | 1.211 | 1.255 | 1.04 |
+    /// | 1.704 | 1.890 | 1.11 |
+    /// | 2.234 | 2.440 | 1.09 |
+    /// | 2.746 | 3.040 | 1.11 |
+    /// | 3.360 | 4.530 | 1.35 |
+    /// | 4.415 | 6.040 | 1.37 |
+    /// | 6.390 | 9.830 | 1.54 |
+    ///
+    /// The points-per-1% column rises monotonically from 1.00 to 1.54, so
+    /// the convexity is visible before any fit. Least squares in logs on
+    /// the eight bucket medians gives `dVIX = 1.003 * |r|^1.200` at an R
+    /// squared of 0.9947. A linear gain is the `p = 1` special case and
+    /// the tape rejects it.
+    ///
+    /// # The exponent's error bar, which it must not ship without
+    ///
+    /// Refitting those medians: residual sd 0.0671 in logs, which is 6.9
+    /// per cent in `dVIX`, worst bucket -9.8 per cent; standard error of
+    /// the exponent 0.0357, so a 95 per cent interval of **1.112 to
+    /// 1.287** on six degrees of freedom.
+    ///
+    /// A SECOND and larger uncertainty is the weighting. The fit above is
+    /// unweighted over buckets holding 22 to 994 sessions -- the shallow
+    /// buckets carry forty-five times the sessions of the deep ones -- and
+    /// weighting by count gives **1.132** instead. Neither is wrong:
+    /// unweighted asks what shape the curve has, count-weighted asks what
+    /// shape a typical session sees. The first is the right question for a
+    /// tail, so 1.200 is the value here, but the choice is a choice and
+    /// the range it spans is worth 8 per cent of the response at -3% and
+    /// 13 per cent at -6.4%.
+    ///
+    /// # What changes when this is not 1.0
+    ///
+    /// `vix_return_gain` stops being a gain and becomes the SCALE of a
+    /// power law, and its units change from VIX points per per-cent to
+    /// VIX points per per-cent to the p. The scale that reproduces the
+    /// real curve is `1.003 / c`, where `c` is the measured transmission
+    /// from a point of VIX TARGET to a point of same-day VIX.
+    ///
+    /// `vix_target_shock_cap` is a boundary condition on the spike, so it
+    /// moves with the form too: the largest spike the model can produce
+    /// becomes `scale * vix_return_clamp^p` rather than
+    /// `gain * vix_return_clamp`.
+    ///
+    /// # The up side was assumed, then measured, and the assumption lost
+    ///
+    /// The first version of this dial applied one exponent to BOTH sides
+    /// and said so as an assumption. The up side has since been fitted on
+    /// the same 8,960 sessions with the same alignment, the same
+    /// estimator and the same buckets, taking `-dVIX` on up sessions
+    /// (`programme/scripts/vix-updown-fit.py` in the design repo, and the
+    /// down fit reproduces the figures above exactly, which is what makes
+    /// the instrument trustworthy before it is used on new data):
+    ///
+    /// | side | scale | exponent | R squared | worst bucket |
+    /// |---|---|---|---|---|
+    /// | down | 1.0033 | 1.1996 | 0.9947 | 9.8% |
+    /// | up | 0.8965 | 1.0410 | 0.9655 | 35.0% |
+    ///
+    /// **The down side is convex and the up side is very nearly linear**,
+    /// so ONE exponent across both would have been wrong on the up side
+    /// to buy nothing. The exponent is therefore the down side's alone;
+    /// `return_spike_for` never reaches an up session with it and a test
+    /// pins that at every exponent.
+    ///
+    /// The up side keeps the LINEAR form rather than shipping 1.0410,
+    /// because at an R squared of 0.9655 with a worst bucket missing by
+    /// 35 per cent on 23 sessions this data cannot tell 1.0410 from 1.0.
+    /// The DIRECTION is robust across every bucket; the fourth decimal is
+    /// not, and shipping it would be a chosen constant wearing a
+    /// measurement's clothes.
+    ///
+    /// **0.8965 IS NOT `vix_return_gain_up`'s TARGET**, and the table
+    /// above is the easiest place in this file to think it is. It is the
+    /// scale of a `p = 1.041` power fit, and no dial in this tree
+    /// implements that form. The quantity the up side's dial reproduces
+    /// is the scale of a fit with the exponent PINNED AT 1, which is what
+    /// the code runs. Refitting the same eight up buckets that way gives
+    /// **0.9278** -- residual sd 0.1425 in logs, 14.2 per cent in `dVIX`;
+    /// standard error of the mean 0.0504, so a 95 per cent interval of
+    /// 0.824 to 1.045 on seven degrees of freedom; worst bucket 38.5 per
+    /// cent; count-weighted 0.8904. The same refit on the DOWN buckets
+    /// gives 1.1872 with a worst residual of 29.6 per cent against the
+    /// power form's 9.8, which is the convexity stated in the units a
+    /// linear dial would have to work in.
+    ///
+    /// # The zero-mean correction moves with this dial
+    ///
+    /// Under [`ModelParams::vix_level_identity`] the standing excursion
+    /// an asymmetric response injects is cancelled by its own closed form
+    /// rather than by a fitted offset, and that closed form is the
+    /// response's FIRST MOMENT. A power form changes it: see
+    /// [`crate::economy::daily::expected_return_spike`], which carries
+    /// this exponent for that reason. The two dials are independent of
+    /// each other -- either ships alone -- but a tree that has one
+    /// reaching the spike and not the correction cancels the wrong
+    /// quantity, by a factor that scales as `sigma^(p - 1)` and is
+    /// therefore right at exactly one volatility.
+    pub vix_return_exponent: f64,
     /// The index return is clamped to +/- this before it drives the VIX.
     ///
     /// Shipped 0.03, so a -10% day and a -3% day produce identical fear. A
@@ -2183,6 +2569,7 @@ impl ModelParams {
             phase_target_range_draw: 0.0,
             neutral_discount_rate: crate::fair_value::NEUTRAL_DISCOUNT_RATE,
             macro_burn_in_days: 0.0,
+            cycle_stationary_opening: 0.0,
             buyback_payout_share: 0.0,
             jump_mean_compensated: 0.0,
             cascade_symmetry: 0.0,
@@ -2233,10 +2620,19 @@ impl ModelParams {
             forced_flow_reservoir: 0.0,
             forced_flow_replenish: 0.0,
             vix_realised_vol_weight: 0.0,
+            // 0.0 is the level the constants built, bit-identical to the
+            // arithmetic that predates this dial.
+            vix_level_identity: 0.0,
+            // MEASURED, and unread while the identity above is 0.0. See
+            // the field's own note for the five estimators and the IQR.
+            vix_variance_premium: 0.252,
             vix_cycle_amplitude: 1.0,
             vix_return_source: 0.0,
             vix_return_gain: crate::economy::VIX_RETURN_GAIN,
             vix_return_gain_up: crate::economy::VIX_RETURN_GAIN_UP,
+            // 1.0 is the linear form and is bit-identical to the
+            // arithmetic that stood before this dial existed.
+            vix_return_exponent: 1.0,
             vix_return_clamp: crate::economy::VIX_RETURN_CLAMP,
             vix_target_shock_cap: crate::economy::VIX_TARGET_SHOCK_CAP,
             // Both reproduce the shipped arithmetic exactly: 80.0 is the
@@ -3386,6 +3782,7 @@ impl ModelParams {
             "phase_target_range_draw" => self.phase_target_range_draw,
             "neutral_discount_rate" => self.neutral_discount_rate,
             "macro_burn_in_days" => self.macro_burn_in_days,
+            "cycle_stationary_opening" => self.cycle_stationary_opening,
             "buyback_payout_share" => self.buyback_payout_share,
             "jump_mean_compensated" => self.jump_mean_compensated,
             "cascade_symmetry" => self.cascade_symmetry,
@@ -3435,9 +3832,12 @@ impl ModelParams {
             "forced_flow_replenish" => self.forced_flow_replenish,
             "vix_cycle_amplitude" => self.vix_cycle_amplitude,
             "vix_realised_vol_weight" => self.vix_realised_vol_weight,
+            "vix_level_identity" => self.vix_level_identity,
+            "vix_variance_premium" => self.vix_variance_premium,
             "vix_return_clamp" => self.vix_return_clamp,
             "vix_return_gain" => self.vix_return_gain,
             "vix_return_gain_up" => self.vix_return_gain_up,
+            "vix_return_exponent" => self.vix_return_exponent,
             "vix_return_source" => self.vix_return_source,
             "vix_target_shock_cap" => self.vix_target_shock_cap,
             "vix_ceiling" => self.vix_ceiling,
@@ -3548,6 +3948,7 @@ impl ModelParams {
             "phase_target_range_draw" => out.phase_target_range_draw = value,
             "neutral_discount_rate" => out.neutral_discount_rate = value,
             "macro_burn_in_days" => out.macro_burn_in_days = value,
+            "cycle_stationary_opening" => out.cycle_stationary_opening = value,
             "buyback_payout_share" => out.buyback_payout_share = value,
             "jump_mean_compensated" => out.jump_mean_compensated = value,
             "cascade_symmetry" => out.cascade_symmetry = value,
@@ -3597,9 +3998,12 @@ impl ModelParams {
             "forced_flow_replenish" => out.forced_flow_replenish = value,
             "vix_cycle_amplitude" => out.vix_cycle_amplitude = value,
             "vix_realised_vol_weight" => out.vix_realised_vol_weight = value,
+            "vix_level_identity" => out.vix_level_identity = value,
+            "vix_variance_premium" => out.vix_variance_premium = value,
             "vix_return_clamp" => out.vix_return_clamp = value,
             "vix_return_gain" => out.vix_return_gain = value,
             "vix_return_gain_up" => out.vix_return_gain_up = value,
+            "vix_return_exponent" => out.vix_return_exponent = value,
             "vix_return_source" => out.vix_return_source = value,
             "vix_target_shock_cap" => out.vix_target_shock_cap = value,
             "vix_ceiling" => out.vix_ceiling = value,
@@ -3781,6 +4185,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "phase_target_range_draw",
         "neutral_discount_rate",
         "macro_burn_in_days",
+        "cycle_stationary_opening",
         "buyback_payout_share",
         "oil_supply_response",
         "market_vol_vix_coupling",
@@ -3822,9 +4227,12 @@ pub fn settable_names() -> Vec<&'static str> {
         "forced_flow_reservoir",
         "forced_flow_replenish",
         "vix_realised_vol_weight",
+        "vix_level_identity",
+        "vix_variance_premium",
         "vix_return_clamp",
         "vix_return_gain",
         "vix_return_gain_up",
+        "vix_return_exponent",
         "vix_return_source",
         "vix_target_shock_cap",
         "vix_ceiling",
@@ -4152,6 +4560,13 @@ mod tests {
         }
     }
 
+    /// NEVER RAN UNTIL 2026-09-06. It sat between two `#[test]` functions
+    /// without one of its own, so cargo compiled it, warned that it was
+    /// dead code among two other long-standing warnings, and no suite ever
+    /// called it. A test whose subject moved reports green; a test that is
+    /// never invoked reports nothing at all, and the difference is
+    /// invisible in a passing run.
+    #[test]
     fn the_shipped_half_life_keeps_the_recorded_bits_and_a_new_one_recomputes() {
         let same = PT_V1.with_override("mispricing_half_life_days", 60.0).unwrap();
         assert_eq!(same.mispricing_phi.to_bits(), 0x3FEF_A1E8_27A1_B38C);

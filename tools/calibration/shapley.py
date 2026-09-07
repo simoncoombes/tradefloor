@@ -814,12 +814,28 @@ def spread(seed_shares: dict[str, dict[str, dict[int, float]]],
 
 
 def ruler(days: int) -> tuple[str, dict[str, tuple[float, float]]]:
-    """The bands a horizon is scored against, and their name."""
-    from tradefloor import envelope, facts
+    """The bands a horizon is scored against, and their name.
 
-    if days == 2 * envelope.CERTIFIED_HORIZON_DAYS:
-        return "envelope.BANDS_504", dict(envelope.BANDS_504)
-    return "facts.REAL_MARKETS", dict(facts.REAL_MARKETS)
+    `(None, {})` at a horizon with no band set, so the caller WITHHOLDS its
+    band verdicts rather than grading against another horizon's. This read
+    `if days == 504: ... return facts.REAL_MARKETS`, so every other horizon
+    -- the 32 the toy grid runs, 60, 180, 756, the 1,008 the settling study
+    runs -- got the 252-day bands under a name that truthfully said so while
+    the comparison itself was wrong.
+
+    Withholding rather than raising, because this module already withholds:
+    a row certified on the level protocol carries its band as a LOCATION
+    with no verdict, since the protocols differ. A horizon with no ruler is
+    the same refusal one level up, and the decomposition -- which is what
+    this tool is for -- is unaffected by it.
+    """
+    from tradefloor import envelope
+
+    row = envelope.RULERS_BY_HORIZON.get(days)
+    if row is None:
+        return None, {}
+    bands, _, name = row
+    return name, dict(bands)
 
 
 def certified_column(days: int, stats: list[str]) -> dict:
@@ -849,6 +865,17 @@ def certified_column(days: int, stats: list[str]) -> dict:
         source, horizon = "envelope.CERTIFIED", envelope.CERTIFIED_HORIZON_DAYS
     values: dict[str, float | None] = {}
     protocol: dict[str, str] = {}
+    # A horizon with no ruler has no certified column either: `CERTIFIED` is
+    # measured at 252 days and `MEASURED_504` at 504, and neither describes a
+    # 32-day or 756-day run. Marking the protocol here is what withholds the
+    # band verdict downstream, through the machinery that already withholds a
+    # row measured on another protocol.
+    if horizon not in envelope.RULERS_BY_HORIZON:
+        return {"preset": envelope.PRESET, "source": None,
+                "horizon_days": horizon,
+                "values": {key: None for key in stats},
+                "protocol": {key: "no ruler at this horizon" for key in stats},
+                "level_protocol": facts.LEVEL_PROTOCOL["roster"]}
     for key in stats:
         if key in facts.SHAPE:
             table = envelope.MEASURED_504 if far else envelope.CERTIFIED
@@ -888,7 +915,18 @@ def caveats(*, seeds: list[int], days: int, universe: tuple[int, int],
             "the evidence for each share, and the medians are medians of "
             f"{len(seeds)}")
     column = certified_column(days, [])
-    if days != column["horizon_days"]:
+    if ruler_name is None:
+        # The strongest caveat this tool can carry, so it is stated first
+        # among the horizon ones: the decomposition stands and NO band
+        # verdict does.
+        out.append(
+            f"no band set has been derived at {days} days, so every band "
+            f"verdict and the certified column are WITHHELD; the horizons "
+            f"with a ruler are "
+            f"{sorted(envelope.RULERS_BY_HORIZON)}. The shares below are "
+            f"unaffected -- they are differences between this run's own "
+            f"subsets")
+    elif days != column["horizon_days"]:
         out.append(
             f"{days} days against the certified horizon of "
             f"{envelope.CERTIFIED_HORIZON_DAYS}; band verdicts use "
@@ -978,7 +1016,8 @@ def summarise(rows_by_subset: dict[frozenset[str], list[dict]],
     # roster varying and this tool holds one, so their verdicts are
     # withheld and their band is carried as a location.
     withheld = [key for key in measured
-                if certified["protocol"][key] != "held"]
+                if certified["protocol"][key] != "held"
+                or key not in bands]
     comparable = {key: bands[key] for key in measured if key not in withheld}
     moves = band_moves(values, names, comparable)
     for name in names:
@@ -1026,7 +1065,10 @@ def summarise(rows_by_subset: dict[frozenset[str], list[dict]],
         "change": {key: values[everything][key] - values[frozenset()][key]
                    for key in measured},
         "ruler": ruler_name,
-        "bands": {key: list(bands[key]) for key in measured},
+        # None where the horizon has no ruler, rather than another
+        # horizon's band printed as though it graded this run.
+        "bands": {key: (list(bands[key]) if key in bands else None)
+                  for key in measured},
         "certified": certified,
         "band_moves": moves,
         "crn": crn,
@@ -1109,8 +1151,12 @@ def report(summary: dict, *, provenance: dict | None = None,
     for key in summary["statistics"]:
         base_value = summary["values"][none][key]
         target_value = summary["values"][everything][key]
-        lo, hi = summary["bands"][key]
-        if key in withheld:
+        band = summary["bands"][key]
+        lo, hi = band if band else (None, None)
+        if band is None:
+            verdict = (f"verdict withheld: no band set has been derived at "
+                       f"{summary['days']} days")
+        elif key in withheld:
             verdict = ("verdict withheld: certified on the level protocol, "
                        "this run holds one roster")
         else:
@@ -1126,8 +1172,9 @@ def report(summary: dict, *, provenance: dict | None = None,
             "",
             f"{facts.LABELS.get(key, key):22s} base {base_value:9.4f}   "
             f"target {target_value:9.4f}   certified "
-            f"{cert_text}   band {lo:.2f} to {hi:.2f}   "
-            f"{verdict}",
+            f"{cert_text}   band "
+            + (f"{lo:.2f} to {hi:.2f}" if band else "none at this horizon")
+            + f"   {verdict}",
             header,
         ]
         for name in names:

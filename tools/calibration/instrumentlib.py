@@ -253,12 +253,35 @@ PARAM_SPECS: dict[str, dict] = {
     # calibration notes).
     "vix_realised_vol_weight": {"kind": "abs", "step_unit": 0.05,
                                 "hard_range": (0.0, 1.0)},
+    # The level identity is a SWITCH, not a quantity: 0.0 is the phase
+    # table and 1.0 is the index's own variance, and a search that
+    # landed on 0.4 would be running neither. The range is opened to
+    # both ends so an atlas can reach the arm, with a step that walks
+    # the whole interval in one move.
+    "vix_level_identity": {"kind": "abs", "step_unit": 1.0,
+                           "hard_range": (0.0, 1.0)},
+    # The premium is MEASURED at 0.252 with a per-year IQR of 1.128 to
+    # 1.398 on the ratio, so 0.128 to 0.398 here. The box is that IQR
+    # widened to the P10-P90 of the rolling-window estimator (1.049 to
+    # 1.473) rather than opened to anything a search finds comfortable:
+    # outside it the value is not one the tape supports.
+    "vix_variance_premium": {"kind": "abs", "step_unit": 0.02,
+                             "hard_range": (0.049, 0.473)},
     "vix_return_gain": {"kind": "log", "hard_range": (1.0, 250.0)},
     "vix_return_source": {"kind": "abs", "step_unit": 0.1,
                           "hard_range": (0.0, 1.0)},
     "vix_cycle_amplitude": {"kind": "abs", "step_unit": 0.1,
                             "hard_range": (0.0, 2.0)},
     "vix_return_gain_up": {"kind": "log", "hard_range": (1.0, 250.0)},
+    # The exponent is a SHAPE and its plausible span is narrow: the tape
+    # puts it at 1.200 with a 95 per cent interval of 1.112 to 1.287 and a
+    # count-weighted reading of 1.132. The hard range is opened to 1.0
+    # (the linear form, so a search can always return to what shipped) and
+    # to 2.0, well past anything the measurement supports, so the bound is
+    # a guard rather than a prior. `abs` and not `log`, because the
+    # interesting span is a few hundredths wide.
+    "vix_return_exponent": {"kind": "abs", "step_unit": 0.02,
+                            "hard_range": (1.0, 2.0)},
     # The crisis-fear pair, added with the dials themselves so no search
     # reaches them before a box exists.
     #
@@ -559,6 +582,12 @@ PARAM_SPECS: dict[str, dict] = {
     # answer.
     "garch_omega_sector_scaled": {"kind": "abs", "step_unit": 0.1,
                                   "hard_range": (0.0, 1.0)},
+    # The stationary day-zero opening (programme/stationary-opening-design.md).
+    # A switch: 0.0 and 1.0 are the only values that mean anything, so the
+    # step is the whole interval and a search either takes the mechanism or
+    # leaves it.
+    "cycle_stationary_opening": {"kind": "abs", "step_unit": 1.0,
+                                 "hard_range": (0.0, 1.0)},
     # In daily VARIANCE units. 0.0 removes the floor, which is the point of
     # the dial; the top is 4x the shipped 1e-4, the convention multiple.
     "idio_sigma_floor": {"kind": "abs", "step_unit": 2.5e-5,

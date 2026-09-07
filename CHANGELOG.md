@@ -44,6 +44,107 @@ replays from the state the day started in.
 
 <!-- release-note-ends -->
 
+### The horizon picks the ruler
+
+A band table and a noise scale are each derived AT a horizon, and a panel
+is measured at one. Pairing a 504-day measurement with the 252-day bands
+had been done four times over in the calibration path, and nothing could
+catch it, because the horizon lived in the caller: `facts.measure` records
+`days` and nothing read it.
+
+`tools/calibration/evaluate_axes.py` scored all four of its axes with the
+default `band_distance_loss`, which is `facts.REAL_MARKETS` and
+`facts.SEED_SD`, both derived at 252 days. Its `holdout_horizon` axis runs
+504. So the one axis whose purpose is to vary the horizon was graded on the
+horizon it varies away from, its band room divided by the other horizon's
+noise scale, and the artefact labelled the result "the TRUE bands". That
+verdict is half of `generalises`, which `calibrate.py`, `emit_preset.py`
+and `report_tables.py` read. `examples/07-research-workflow.py` measured 60
+days and handed the panel to `compare_to_real_markets`, whose bands come
+from 253-bar windows.
+
+`facts` now carries the horizons that HAVE a ruler and the two tables that
+make each one up, and five functions that let a scoring call ask what
+horizon its panel came from and what horizon its ruler was derived at. A
+disagreement raises. A horizon with no band set is refused BY NAME, because
+a nearer band set is not an approximation: the 252-day and 504-day tables
+differ on twelve of fourteen rows and their noise scales differ by factors
+from 0.80 to 3.23. `envelope.BANDS_504` registers itself, since `facts`
+cannot name it and a table the checker cannot identify is one it cannot
+refuse.
+
+**What breaks.** `compare_to_real_markets` and `report` read
+`facts["days"]`, so a panel measured at a horizon with no bands raises
+where it used to return verdicts, and one that records no horizon raises
+rather than being assumed to be 252. `envelope.score` looks its horizon up
+instead of testing `horizon_days > 252`, so 756 and 1,008 are refused
+rather than given the 504-day bands. `band_distance_loss` checks the panels
+it is given against the tables it is handed, its own defaults included.
+`shapley.ruler` withholds every band verdict at a horizon with no ruler,
+the way that tool already withholds a row certified on another protocol.
+Each verdict row carries `horizon_days` and `ruler`, and `report` names the
+band set in its header.
+
+Five test sites and one shipped example measured at 60, 120 or 180 days and
+graded against the 252-day bands; each moves to a horizon that has a ruler.
+The suite was making the mistake it exists to catch.
+
+**Not written here: the release-note line above the marker.** That section
+stands at 248 words of 250 and the sentence this change needs is about
+twenty-five, so it cannot go in without trimming five other branches'
+announcements. The line to add, when the budget gives: *A panel is graded
+against the ruler for its own horizon, and one with no band set is refused:
+a 60-day `compare_to_real_markets` now raises.*
+
+### Three counts where one band answered two questions
+
+No release-note headline: the `Unreleased` note stands at 248 words against
+a budget of 250, so there is no room for one until the section is re-cut.
+
+`facts.BAND_RULE` builds `[min - s, max + s]` over nine real windows: a
+prediction interval for ONE real year, which a fresh correct year leaves 6.49
+per cent of the time. The panel grades the MEDIAN of thirty seeds, whose
+sampling sd is about a quarter of one seed's, so the graded quantity is known
+about five times more precisely than the interval judging it, and the
+interval was never built to exclude anything. On five of the fourteen shape
+rows it contains the mechanism-absent reading outright, and measured with the
+shipped preset's own seed noise a null model's graded median passes the band
+with probability 1.000 on `abs_return_acf20`, `corr_asymmetry` and
+`corr_asymmetry_lagged`, 0.92 on `corr_persistence_acf1`, and 0.50 on
+`leverage_effect`, whose inward clamp sits exactly on its null. Fourteen of
+fourteen in band was true and answered a question nobody was asking.
+
+`facts.NULLS` records each row's mechanism-absent reading with its
+derivation, and `MECHANISM`, `EQUIVALENCE` and `LEVEL_ONLY` partition `SHAPE`
+by what a row can certify at all. `facts.mechanism_verdict` runs an exact
+sign test of the per-seed readings against that null: SHOWN at
+`facts.sign_cut(n, tolerance)` seeds on the real side, REVERSED at `n - cut`
+or fewer, NOT SHOWN between. `envelope.certify` takes the per-seed panels the
+certification run already produces and returns in band, mechanism shown and
+at real centre, naming any row that is in band AND reversed.
+
+Nothing in it is chosen. The nulls are identities; the cut is the binomial's
+nearest to `BAND_RULE`'s own measured false-alarm rate, so the mechanism half
+of the instrument is exactly as tolerant of a correct model as the fidelity
+half; and `corr_persistence_acf1`'s null is the estimator's own small-sample
+median, computed from the run's sub-window count rather than typed. It is
+deliberately not a `z >= 1.85` test: the two standard-error estimators for a
+thirty-seed median disagree by up to a factor of two on the skewed rows, and
+two verdicts on the shipped default flip with the choice. Both are reported
+as effect sizes and neither is the gate.
+
+`abs_return_acf20` is reported and NOT counted at 252 days: the real
+within-year effect is inside real year-to-year noise on the 1990-2025
+reference, where a correct model would pass 17 per cent of the time. It
+belongs at 504 days, where both references read +0.030, once that arm exists.
+
+`REAL_MARKETS_WINDOWS` gains the four correlation-structure rows it lacked,
+from the measurements its own summary triples came from, because the centre
+diagnostic needs a row's dispersion across real years and a min, a median and
+a max do not carry one. Every one of their bands re-derives from the readings
+with no adjustment. `sector_excess_corr`'s recorded maximum moves from 0.200
+to the windows' own 0.199, leaving its band where it was.
+
 ### The overnight process
 
 Nothing moved a price between sessions. The price after `open_market` was

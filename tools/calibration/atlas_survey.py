@@ -226,6 +226,16 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # So the box is the closed unit interval and its top is where the unit is
     # right rather than where a search stopped.
     "cycle_hazard_per_month": (0.0, 1.0),
+    # THE LEVEL IDENTITY, and it is two LEVELS rather than a range: 0.0 is
+    # the phase table plus the offset plus the factor read back through a
+    # conversion 1.326x the identity's, and 1.0 is the index's own
+    # conditional variance in VIX points. A vector that landed on 0.4 would
+    # be running neither -- the target would be four tenths of a variance
+    # and six tenths of a table, which is not a model anybody proposed. The
+    # unit interval is the registry's shape, as it is for
+    # order_flow_impact_law above, not a claim that a half means half a
+    # mechanism.
+    "vix_level_identity": (0.0, 1.0),
     "trough_growth_floor": (0.0, 1.0),
     "phase_target_range_draw": (0.0, 1.0),
     # Days the economy is advanced alone before day zero. 0.0 is
@@ -364,6 +374,15 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the cascade path's own arithmetic (garch.rs:187). A blend between is
     # meaningful, so the axis is the unit interval.
     "garch_omega_sector_scaled": (0.0, 1.0),
+    # Whether day zero is drawn from the cycle's stationary law. A SWITCH,
+    # not a share: a day-zero state is either drawn from that law or it is
+    # not, and there is no half-drawn phase, so the two admissible values
+    # are the two ends and the interior has no reading. The range is stated
+    # here rather than left to the convention box for the usual reason --
+    # the dial ships at 0.0, so a multiplicative box is the degenerate
+    # point (0.0, 0.0) -- and a survey that lands inside the interval gets
+    # the same opening as 1.0, which the dial's own tests assert.
+    "cycle_stationary_opening": (0.0, 1.0),
     # News peer transfer: weights of a peer's surprise, natural unit range.
     "news_peer_weight": (0.0, 1.0),
     "news_peer_weight_down": (0.0, 1.0),

@@ -289,8 +289,13 @@ def test_score_reads_a_panel_against_its_own_horizon():
     panel["excess_kurtosis"] = 5.23
     near = env.score(panel, horizon_days=252)
     far = env.score(panel, horizon_days=504)
-    assert near["ruler"] == "REAL_MARKETS"
-    assert far["ruler"] == "REAL_MARKETS_504"
+    # Module-qualified, and naming the table `score` actually grades with.
+    # This read `"REAL_MARKETS_504"` at 504 days while the table in use was
+    # `envelope.BANDS_504`, which has three more rows -- a label asserting a
+    # provenance the code did not have, which is the shape of every finding
+    # the horizon-ruler branch repaired.
+    assert near["ruler"] == "facts.REAL_MARKETS"
+    assert far["ruler"] == "envelope.BANDS_504"
     assert near["statistics"]["excess_kurtosis"]["in_band"]
     assert not far["statistics"]["excess_kurtosis"]["in_band"], (
         "5.23 is inside the 252-day kurtosis band and outside the tighter "

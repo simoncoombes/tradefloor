@@ -131,6 +131,17 @@ pub struct DailyInputs<'a> {
     pub market_day_return_pct: f64,
     pub vix_implied_from_market: f64,
     pub vix_return_gain_up: f64,
+    /// The VIX's level comes from the index's own conditional variance
+    /// rather than from the phase table. See
+    /// `ModelParams::vix_level_identity`; 0.0 is every preset before
+    /// pt-v19 and is bit-identical.
+    pub vix_level_identity: f64,
+    /// The index's conditional daily sigma in PER CENT, for the fear
+    /// excursion's zero-mean correction. Read only under the identity.
+    pub vix_index_sigma_pct: f64,
+    /// The exponent of the return-to-fear response; 1.0 is the linear
+    /// form and is bit-identical. See `ModelParams::vix_return_exponent`.
+    pub vix_return_exponent: f64,
     pub vix_return_clamp: f64,
     pub vix_target_shock_cap: f64,
     /// Upper bound on the VIX state. See `ModelParams::vix_ceiling`, which
@@ -222,6 +233,9 @@ impl<'a> Default for DailyInputs<'a> {
             market_day_return_pct: 0.0,
             vix_implied_from_market: 0.0,
             vix_return_gain_up: VIX_RETURN_GAIN_UP,
+            vix_level_identity: 0.0,
+            vix_index_sigma_pct: 0.0,
+            vix_return_exponent: 1.0,
             vix_return_clamp: VIX_RETURN_CLAMP,
             vix_target_shock_cap: VIX_TARGET_SHOCK_CAP,
             inflation_reversion: INFLATION_MEAN_REVERSION,
@@ -239,6 +253,154 @@ impl<'a> Default for DailyInputs<'a> {
     }
 }
 
+/// The MEAN of the VIX target's return spike over a session, given the
+/// index's own conditional sigma — the quantity `vix_target_offset` was
+/// fitted to cancel.
+///
+/// # Why an offset existed at all
+///
+/// The spike is `gain * |r|` on a down session and `-gain_up * r` on an up
+/// one. Over a zero-mean return those two do not cancel unless the gains
+/// are equal, so an ASYMMETRIC gain injects a standing positive excursion
+/// into the level — and `vix_target_offset` was a constant fitted to
+/// subtract it. That is a level constant standing in for a first moment
+/// somebody could have written down, and it is why the same dial had to be
+/// refitted every time the gain moved.
+///
+/// # The closed form
+///
+/// For `r ~ N(0, sigma^2)` and gains `g_down`, `g_up`:
+///
+/// ```text
+/// E[spike] = P(r < 0) g_down E[|r| | r < 0] - P(r >= 0) g_up E[r | r >= 0]
+///          = 0.5 (g_down - g_up) E|r|
+///          = 0.5 (g_down - g_up) sigma sqrt(2 / pi)
+/// ```
+///
+/// so it moves with the market's own volatility instead of standing still,
+/// which is the second thing a fitted constant could not do: an offset
+/// derived in a calm year is the wrong offset in a violent one.
+///
+/// # The approximations, stated rather than absorbed
+///
+/// - **Gaussian.** The model's index carries excess kurtosis about 2.6, so
+///   `E|r|` is a per cent or two under the true one and the correction is
+///   fractionally small. It is a correction to a term that is itself a few
+///   points, so the residual is tenths of a point.
+/// - **Unclamped.** `vix_return_clamp` truncates `r` first. At the shipped
+///   15 per cent and an index sigma near 1 per cent that is a fifteen-sigma
+///   truncation and contributes nothing; a preset that clamps near the
+///   index's own sigma would need the truncated moment instead.
+/// - **The moment's order.** The exponent below is carried in closed form
+///   rather than approximated, but it is the GAUSSIAN absolute moment, so
+///   the first bullet's caveat applies to it with more force: a moment of
+///   order `p > 1` weights the tail harder than the mean does, and the
+///   index's excess kurtosis is therefore understated by more here than at
+///   `p = 1`. The residual is still a fraction of a term worth a few
+///   points, and it is one-signed: the correction is too SMALL, so the
+///   level it leaves is fractionally too high.
+///
+/// # The exponent, carried rather than assumed away
+///
+/// The two halves of the excursion no longer share a moment. With the
+/// response `scale |r|^p` on the down side and `g_up |r|` on the up side —
+/// which is what [`return_spike_for`] does, the exponent being the down
+/// side's alone — the identity is
+///
+/// ```text
+/// E[spike] = 0.5 scale E|r|^p - 0.5 g_up E|r|
+///
+/// E|r|^p   = sigma^p 2^(p/2) Gamma((p + 1) / 2) / sqrt(pi)
+/// ```
+///
+/// the Gaussian absolute moment of order `p`. At `p = 1` that is
+/// `sigma sqrt(2/pi)` exactly, because `Gamma(1) = 1`, and the two halves
+/// collapse back to `0.5 (g_down - g_up) E|r|`.
+///
+/// **This is the term that makes the two fixes compose.** The identity's
+/// whole claim is that the excursion is cancelled by its own closed form
+/// and nothing is left over. Under a power form a correction computed as
+/// if the response were linear cancels the wrong quantity, and the error
+/// is not constant: it GROWS with the index's own sigma, because
+/// `E|r|^p / E|r|` scales as `sigma^(p-1)`. A level correction that is
+/// right in a calm year and wrong in a violent one is the defect the
+/// fitted offset had, reintroduced by the back door.
+pub fn expected_return_spike(sigma_pct: f64, gain: f64, gain_up: f64, exponent: f64) -> f64 {
+    if exponent == 1.0 {
+        // `E|r| = sigma sqrt(2/pi)` for a zero-mean Gaussian. Written as
+        // the reciprocal of `SQRT_TWO_PI` times two so it is visibly the
+        // same constant `factors.rs` uses for the tilt's first moment,
+        // which is the same integral.
+        //
+        // The branch is explicit rather than evaluated, for the reason
+        // `return_spike_for` gives: neither `pow(x, 1.0)` nor `Gamma(1.0)`
+        // is guaranteed to return its exact value on every platform, and a
+        // preset that predates the exponent must reproduce to the bit.
+        // This is the expression that stood here, in the same operand
+        // order.
+        return 0.5 * (gain - gain_up) * sigma_pct * (2.0 / SQRT_TWO_PI);
+    }
+    let e_abs = sigma_pct * (2.0 / SQRT_TWO_PI);
+    let e_pow = mathx::pow(sigma_pct, exponent)
+        * mathx::pow(2.0, 0.5 * exponent)
+        * mathx::tgamma(0.5 * (exponent + 1.0))
+        / mathx::sqrt(core::f64::consts::PI);
+    0.5 * (gain * e_pow - gain_up * e_abs)
+}
+
+/// `sqrt(2 pi)`, as `market::factors` spells it. A literal because `sqrt`
+/// is not `const`, and the test below pins it against `mathx::sqrt`.
+const SQRT_TWO_PI: f64 = 2.5066282746310002;
+
+/// The VIX target's response to the session return, in points.
+///
+/// Extracted from the daily update so it can be pinned directly: the
+/// claim that a preset predating `vix_return_exponent` reproduces bit for
+/// bit is a property of this arithmetic and nothing else, and a test that
+/// has to drive a whole economy to reach it is testing the economy.
+///
+/// The sign convention is the one that stood: a DOWN session (a negative
+/// `current`) produces a POSITIVE spike, and an up session a negative one.
+///
+/// At `exponent == 1.0` this is the shipped expression to the bit -- the
+/// same multiply in the same operand order -- and the branch exists for
+/// that reason rather than for speed. `pow(x, 1.0)` is not guaranteed to
+/// return `x` exactly on every platform, and a preset that predates a dial
+/// must not depend on it.
+///
+/// Above 1.0 the response is CONVEX and `gain` becomes the SCALE of a
+/// power law: see [`crate::params::ModelParams::vix_return_exponent`] for
+/// the measurement it comes from, the exponent's error bar, and what the
+/// up side assumes.
+pub fn return_spike_for(current: f64, gain: f64, gain_up: f64, exponent: f64) -> f64 {
+    // THE EXPONENT IS THE DOWN SIDE'S ALONE, and that is a measurement
+    // rather than a simplification. Fitting the two sides separately on
+    // the same 8,960 sessions, same alignment, same estimator:
+    //
+    //   down   scale 1.0033   exponent 1.1996   R^2 0.9947
+    //   up     scale 0.8965   exponent 1.0410   R^2 0.9655
+    //
+    // The down side is convex; the up side is very nearly LINEAR, and at
+    // an R^2 of 0.9655 with a worst bucket missing by 35 per cent on 23
+    // sessions, 1.0410 is not distinguishable from 1.0 by this data. So
+    // the up side keeps the linear form rather than carrying a fourth
+    // decimal the fit does not support, and applying one exponent to
+    // both sides -- which is what the first version of this did -- would
+    // have made the up side wrong to buy nothing.
+    if current >= 0.0 || exponent == 1.0 {
+        // An UP session, or the linear special case, in the arithmetic
+        // that stood here: same multiply, same operand order, so every
+        // preset predating this dial reproduces to the bit.
+        if current < 0.0 {
+            -current * gain
+        } else {
+            -current * gain_up
+        }
+    } else {
+        gain * mathx::pow(-current, exponent)
+    }
+}
+
 /// One simulated day of the macro chain.
 ///
 /// The reference implementation spread-copies (`{ ...economy }`) and returns new state.
@@ -247,6 +409,7 @@ impl<'a> Default for DailyInputs<'a> {
 /// the "reads `economy.x`, writes `newState.x`" distinction — which is
 /// load-bearing throughout, since many lines read the OLD value after a new
 /// one has been written — impossible to express faithfully.
+
 pub fn update_economy_daily(
     economy: &EconomyState,
     inputs: &DailyInputs,
@@ -848,11 +1011,20 @@ pub fn update_economy_daily(
         CyclePhase::Trough => 22.0,
         CyclePhase::Recovery => 16.0,
     };
+    // THE LEVEL. Under the identity it is the index's own conditional
+    // variance in VIX points and the table above is not read at all: the
+    // business cycle reaches the VIX through the variance processes or not
+    // at all. At 0.0 the branch is not taken and every preset before pt-v19
+    // reproduces bit for bit. See `ModelParams::vix_level_identity`.
+    //
     // THE CLOCK THE CLUSTERING RUNS ON. Those five constants move on a
     // multi-year cycle, so volatility regimes here are years long and a
     // one-year window contains no regime change at all. At amplitude 1.0
     // this is the shipped arithmetic exactly. See §71.
-    let mut target_vix = if inputs.vix_cycle_amplitude == 1.0 {
+    let identity_level = inputs.vix_level_identity != 0.0;
+    let mut target_vix = if identity_level {
+        inputs.vix_implied_from_market
+    } else if inputs.vix_cycle_amplitude == 1.0 {
         phase_vix
     } else {
         VIX_PHASE_MEAN + inputs.vix_cycle_amplitude * (phase_vix - VIX_PHASE_MEAN)
@@ -866,18 +1038,23 @@ pub fn update_economy_daily(
     // +0.15 points and the correlation between the day's return and the
     // next day's VIX change is -0.065 even with the gain at 5000 (§70). At
     // source 0.0 this branch is not taken and every preset reproduces.
-    let driving_return = if inputs.vix_return_source == 0.0 {
+    let driving_return = if identity_level {
+        // THE SESSION, always. The excursion below is made zero-mean
+        // against the session's own conditional sigma, and the same
+        // correction applied to a closing MINUTE would be twenty times the
+        // quantity it is correcting. So the identity does not read
+        // `vix_return_source`; a preset that turns it on gets the day.
+        inputs.market_day_return_pct
+    } else if inputs.vix_return_source == 0.0 {
         inputs.market_return_pct
     } else {
         let s = inputs.vix_return_source;
         (1.0 - s) * inputs.market_return_pct + s * inputs.market_day_return_pct
     };
     let current_mkt_ret_vix = mathx::max(-clamp_vix, mathx::min(clamp_vix, driving_return));
-    let return_spike = if current_mkt_ret_vix < 0.0 {
-        -current_mkt_ret_vix * inputs.vix_return_gain
-    } else {
-        -current_mkt_ret_vix * inputs.vix_return_gain_up
-    };
+    let return_spike = return_spike_for(
+        current_mkt_ret_vix, inputs.vix_return_gain,
+        inputs.vix_return_gain_up, inputs.vix_return_exponent);
     let inflation_adj = mathx::max(0.0, (economy.inflation_rate - 3.0) * 0.2);
     let shock_adj = shock_gdp_impact.abs() * 2.0;
     target_vix += mathx::min(
@@ -885,11 +1062,30 @@ pub fn update_economy_daily(
         return_spike + inflation_adj + shock_adj,
     );
 
+    // THE EXCURSION'S OWN MEAN, which is what the offset was for.
+    //
+    // An asymmetric gain over a zero-mean return injects a standing
+    // positive excursion, and `vix_target_offset` was a number fitted to
+    // cancel it. Under the identity it is cancelled by its own closed form
+    // instead, computed each day from the index's conditional sigma: see
+    // `expected_return_spike`. Nothing is fitted and nothing is left over.
+    if identity_level {
+        target_vix -= expected_return_spike(
+            inputs.vix_index_sigma_pct,
+            inputs.vix_return_gain,
+            inputs.vix_return_gain_up,
+            inputs.vix_return_exponent,
+        );
+    }
+
     // Earnings-season bump. The 30.44 is a mean month length, so this is not
     // the same day-of-month the month-start blocks above use.
+    //
+    // Not read under the identity: half a point on the first half of a
+    // month is a level constant, and the level is the variance now.
     let earnings_month_vix = (((day_of_year - 1) % 365) as f64 / 30.44).floor() + 1.0;
     let day_of_month_vix = day_of_year as f64 - ((earnings_month_vix - 1.0) * 30.44).floor();
-    if day_of_month_vix <= 15.0 {
+    if !identity_level && day_of_month_vix <= 15.0 {
         target_vix += 0.5;
     }
 
@@ -905,13 +1101,15 @@ pub fn update_economy_daily(
     // on a negative zero, which is the same reason `apply_jumps` guards its
     // own total, and a dial that ships inert must leave the state it does not
     // touch bit-identical.
-    if inputs.vix_target_offset != 0.0 {
+    if !identity_level && inputs.vix_target_offset != 0.0 {
         target_vix += inputs.vix_target_offset;
     }
 
     // (§68). At weight zero this branch is not taken and every preset
     // reproduces bit for bit.
-    if inputs.vix_realised_vol_weight != 0.0 {
+    // Not read under the identity: the WHOLE target is the read-back, so
+    // there is nothing to blend it with.
+    if !identity_level && inputs.vix_realised_vol_weight != 0.0 {
         let w = inputs.vix_realised_vol_weight;
         target_vix = (1.0 - w) * target_vix + w * inputs.vix_implied_from_market;
     }
@@ -1151,5 +1349,688 @@ mod phase_table_dials {
     fn a_full_draw_reads_the_stored_target() {
         let c = phase_characteristics(CyclePhase::Contraction);
         assert_eq!(phase_growth_target(-2.75, c.gdp_growth_range, 1.0), -2.75);
+    }
+}
+
+#[cfg(test)]
+mod vix_level_identity {
+    use super::*;
+    use crate::economy::state::{create_initial_economy_state, InitialEconomyOptions};
+
+    /// A draw-free RNG, so two calls that differ only in a dial can be
+    /// compared BIT FOR BIT rather than to a tolerance. Copied from
+    /// `economy::invariants`, which uses it for the same reason.
+    struct Silent(f64);
+    impl crate::rng::Rng for Silent {
+        fn next_f64(&mut self) -> f64 {
+            self.0
+        }
+        fn next_normal(&mut self) -> f64 {
+            0.0
+        }
+    }
+
+    fn economy() -> EconomyState {
+        create_initial_economy_state(&InitialEconomyOptions::default())
+    }
+
+    /// The arm the design note registers on, as `DailyInputs`. The gains are
+    /// ASYMMETRIC, which is the whole reason an offset existed.
+    fn arm(identity: f64) -> DailyInputs<'static> {
+        DailyInputs {
+            vix_level_identity: identity,
+            vix_index_sigma_pct: 1.04,
+            vix_implied_from_market: 20.7,
+            vix_realised_vol_weight: 0.3,
+            vix_cycle_amplitude: 0.85,
+            vix_mean_reversion: 0.06,
+            vix_decay_ratio: 0.6,
+            vix_return_gain: 30.0,
+            vix_return_gain_up: 14.0,
+            vix_return_source: 1.0,
+            vix_target_offset: -9.16,
+            vix_target_shock_cap: 150.0,
+            // pt-v18's own, and it matters here: the DEFAULT is 0.03, at
+            // which every return in this module clamps to the same value
+            // and two arms that should differ do not. A test that had left
+            // it at the default reported the return source as inert with
+            // the identity off, which is the harness clamping, not the
+            // model.
+            vix_return_clamp: 15.0,
+            market_day_return_pct: -1.7,
+            market_return_pct: -0.02,
+            game_day: 40,
+            ..Default::default()
+        }
+    }
+
+    fn vix_after(inputs: &DailyInputs) -> f64 {
+        update_economy_daily(&economy(), inputs, &mut Silent(0.5)).vix
+    }
+
+    /// THE NEW INPUT IS UNREAD AT THE DEFAULT, asserted on bits over a
+    /// spread rather than at one point.
+    ///
+    /// `vix_index_sigma_pct` is the index's conditional sigma, and the only
+    /// thing that reads it is the excursion's zero-mean correction. If the
+    /// branch guarding that correction were ever wrong -- an `||` for an
+    /// `&&`, a dial compared against the wrong constant -- every preset
+    /// before pt-v19 would move, and it would move by a fraction of a point
+    /// a day, which is exactly the size nothing notices.
+    #[test]
+    fn the_index_sigma_is_not_read_while_the_identity_is_off() {
+        let want = vix_after(&arm(0.0));
+        for i in 0..=800 {
+            let mut inputs = arm(0.0);
+            inputs.vix_index_sigma_pct = i as f64 * 0.05;
+            assert_eq!(vix_after(&inputs), want, "moved at sigma = {}",
+                       i as f64 * 0.05);
+        }
+    }
+
+    /// And the mirror: at the identity it is read, monotonically, because
+    /// the correction it sizes is subtracted from the target.
+    #[test]
+    fn the_index_sigma_is_read_once_the_identity_is_on() {
+        let mut last = f64::INFINITY;
+        for i in 1..=20 {
+            let mut inputs = arm(1.0);
+            inputs.vix_index_sigma_pct = i as f64 * 0.25;
+            let v = vix_after(&inputs);
+            assert!(v < last, "not falling at sigma {}: {v} after {last}",
+                    i as f64 * 0.25);
+            last = v;
+        }
+    }
+
+    /// THE EARNINGS BUMP, which is a literal in the code and not a dial, so
+    /// it cannot be shown retired by moving a value.
+    ///
+    /// Shown by its consequence instead: half a point on the first half of
+    /// a month is a level constant, and under the identity the level is the
+    /// variance. Two days that differ only in where they fall in the month
+    /// must give the same VIX, and with the identity off they must not.
+    #[test]
+    fn the_earnings_bump_is_not_read_under_the_identity() {
+        let (early, late) = (5, 20);
+        let mut a = arm(1.0);
+        a.game_day = early;
+        let mut b = arm(1.0);
+        b.game_day = late;
+        assert_eq!(vix_after(&a), vix_after(&b),
+                   "the month's half still moves the VIX under the identity");
+
+        let mut a = arm(0.0);
+        a.game_day = early;
+        let mut b = arm(0.0);
+        b.game_day = late;
+        assert_ne!(vix_after(&a), vix_after(&b),
+                   "the bump moves nothing even with the identity off; the harness is not reaching the code");
+    }
+
+    /// THE PHASE TABLE, the same way: five constants in the code, not a
+    /// dial. Under the identity the business cycle reaches the VIX through
+    /// the variance processes or not at all, so every phase must give the
+    /// same VIX from the same variance.
+    #[test]
+    fn the_phase_table_is_not_read_under_the_identity() {
+        let phases = [CyclePhase::Expansion, CyclePhase::Peak,
+                      CyclePhase::Contraction, CyclePhase::Trough,
+                      CyclePhase::Recovery];
+        let of = |identity: f64, phase: CyclePhase| {
+            let mut e = economy();
+            e.cycle_phase = phase;
+            update_economy_daily(&e, &arm(identity), &mut Silent(0.5)).vix
+        };
+        let want = of(1.0, CyclePhase::Expansion);
+        for p in phases {
+            assert_eq!(of(1.0, p), want, "{p:?} moved the VIX under the identity");
+        }
+        // The mirror: with it off the table is the level, so every phase
+        // gives a different one.
+        let mut seen: Vec<f64> = phases.iter().map(|p| of(0.0, *p)).collect();
+        seen.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        seen.dedup();
+        assert_eq!(seen.len(), phases.len(),
+                   "the phase table moves nothing even with the identity off");
+    }
+
+    /// THE ZERO-MEAN CORRECTION IS ZERO WHEN THERE IS NOTHING TO CORRECT.
+    ///
+    /// The excursion exists because an ASYMMETRIC gain over a zero-mean
+    /// return does not cancel. At equal gains it does, and the correction
+    /// must be exactly 0.0 -- not nearly, because a preset with symmetric
+    /// gains must not acquire a standing bias from a term that is supposed
+    /// to be about the asymmetry.
+    #[test]
+    fn a_symmetric_response_needs_no_correction() {
+        for i in 0..=200 {
+            let sigma = i as f64 * 0.05;
+            assert_eq!(expected_return_spike(sigma, 17.0, 17.0, 1.0), 0.0,
+                       "a symmetric response was corrected at sigma {sigma}");
+        }
+    }
+
+    /// And it is the Gaussian absolute moment, which is the identity it
+    /// claims to be. Asserted against `sigma sqrt(2/pi)` computed the other
+    /// way, so the constant in the code cannot drift from the integral it
+    /// stands for.
+    #[test]
+    fn the_correction_is_the_gaussian_absolute_moment() {
+        let two_over_pi = 2.0 / core::f64::consts::PI;
+        for &sigma in &[0.25, 0.8, 1.04, 2.5, 9.0] {
+            for &(g, gu) in &[(30.0, 14.0), (17.0, 5.0), (1.0, 0.0)] {
+                let want = 0.5 * (g - gu) * sigma * mathx::sqrt(two_over_pi);
+                let have = expected_return_spike(sigma, g, gu, 1.0);
+                assert!((have - want).abs() < 1e-12,
+                        "sigma {sigma}, gains {g}/{gu}: {have} vs {want}");
+            }
+        }
+    }
+
+    /// The correction MOVES WITH THE MARKET's volatility, which is the
+    /// second thing a fitted offset could not do: an offset derived in a
+    /// calm year is the wrong offset in a violent one.
+    #[test]
+    fn the_correction_scales_with_the_index_sigma() {
+        let a = expected_return_spike(1.0, 30.0, 14.0, 1.0);
+        let b = expected_return_spike(2.0, 30.0, 14.0, 1.0);
+        assert!((b - 2.0 * a).abs() < 1e-12, "{b} is not twice {a}");
+        assert!(a > 0.0, "an asymmetric down-heavy response has a positive mean");
+    }
+
+    /// A UNIT EXPONENT IS THE LINEAR CORRECTION TO THE BIT.
+    ///
+    /// The generalised branch would reproduce it to about an ULP, and an
+    /// ULP is exactly what this crate does not accept: the VIX feeds the
+    /// factor's variance, which feeds prices, so a last-place difference
+    /// becomes a different market inside a year. The equality is asserted
+    /// on bits over a spread of sigmas and gain pairs, against the
+    /// expression rather than against a number.
+    #[test]
+    fn a_unit_exponent_is_the_linear_correction_to_the_bit() {
+        for i in 0..=200 {
+            let sigma = i as f64 * 0.05;
+            for &(g, gu) in &[(30.0, 14.0), (17.0, 5.0), (22.3, 11.15), (1.0, 0.0)] {
+                let want = 0.5 * (g - gu) * sigma * (2.0 / SQRT_TWO_PI);
+                assert_eq!(expected_return_spike(sigma, g, gu, 1.0), want,
+                           "sigma {sigma}, gains {g}/{gu}");
+            }
+        }
+    }
+
+    /// THE MOMENT IS THE GAUSSIAN ABSOLUTE MOMENT, checked where the
+    /// answer needs no gamma function.
+    ///
+    /// `E|r|^p = sigma^p 2^(p/2) Gamma((p+1)/2) / sqrt(pi)` is what the
+    /// code evaluates, so asserting it against itself would prove nothing.
+    /// At `p = 2` and `p = 3` the moment has an elementary closed form —
+    /// `sigma^2` and `2 sigma^3 sqrt(2/pi)` — reached without `tgamma` at
+    /// all, so a wrong gamma, a wrong power of two or a swapped half is
+    /// caught rather than reproduced.
+    #[test]
+    fn the_power_moment_matches_its_elementary_cases() {
+        let root_two_over_pi = 2.0 / SQRT_TWO_PI;
+        for &sigma in &[0.25, 0.8, 1.04, 2.5, 9.0] {
+            for &(g, gu) in &[(30.0, 14.0), (22.3, 11.15)] {
+                let e_abs = sigma * root_two_over_pi;
+                for &(p, e_pow) in &[
+                    (2.0, sigma * sigma),
+                    (3.0, 2.0 * sigma * sigma * sigma * root_two_over_pi),
+                ] {
+                    let want = 0.5 * (g * e_pow - gu * e_abs);
+                    let have = expected_return_spike(sigma, g, gu, p);
+                    assert!((have - want).abs() <= 1e-9 * want.abs().max(1.0),
+                            "sigma {sigma}, p {p}, gains {g}/{gu}: {have} vs {want}");
+                }
+            }
+        }
+    }
+
+    /// AND IT IS THE MEAN OF THE THING IT CORRECTS, at the shipped
+    /// exponent, where no elementary form exists.
+    ///
+    /// The two cases above pin the moment; this pins the WHOLE identity —
+    /// the half-split, the sign convention and the exponent living on the
+    /// down side alone — by integrating `return_spike_for` itself against
+    /// a Gaussian density. Simpson's rule on +/- 12 sigma with 24,001
+    /// points, which is a different computation from the closed form in
+    /// every respect except the answer.
+    ///
+    /// A residual of 1e-6 relative is far inside the identity's own
+    /// approximations, and far outside what a missing factor of two or a
+    /// moment taken on the wrong side would give.
+    #[test]
+    fn the_closed_form_is_the_integral_of_the_response() {
+        let n = 24_000usize;
+        for &sigma in &[0.6, 1.04, 2.5] {
+            for &(p, g, gu) in &[(1.2, 22.3, 11.15), (1.132, 30.0, 14.0), (1.0, 30.0, 14.0)] {
+                let (lo, hi) = (-12.0 * sigma, 12.0 * sigma);
+                let h = (hi - lo) / n as f64;
+                let f = |r: f64| {
+                    let d = mathx::exp(-0.5 * (r / sigma) * (r / sigma))
+                        / (sigma * SQRT_TWO_PI);
+                    return_spike_for(r, g, gu, p) * d
+                };
+                let mut acc = f(lo) + f(hi);
+                for i in 1..n {
+                    let r = lo + i as f64 * h;
+                    acc += f(r) * if i % 2 == 1 { 4.0 } else { 2.0 };
+                }
+                let quad = acc * h / 3.0;
+                let closed = expected_return_spike(sigma, g, gu, p);
+                assert!((quad - closed).abs() <= 1e-6 * closed.abs().max(1.0),
+                        "sigma {sigma}, p {p}: quadrature {quad} vs closed {closed}");
+            }
+        }
+    }
+
+    /// A LINEAR CORRECTION UNDER A POWER FORM IS WRONG BY A FACTOR THAT
+    /// MOVES WITH THE MARKET, and it is wrong in both directions.
+    ///
+    /// This is why the exponent had to reach this function rather than
+    /// only [`return_spike_for`]. The down half carries `E|r|^p` and the
+    /// up half `E|r|`, so the ratio of the right correction to the linear
+    /// one grows as `sigma^(p - 1)` and crosses 1.0 at a single
+    /// volatility — near sigma 0.91 at `p = 1.2`. A correction computed as
+    /// if the response were linear therefore over-corrects a calm market
+    /// and under-corrects a violent one, which is precisely the defect the
+    /// fitted `vix_target_offset` had. The identity exists to remove that
+    /// defect, not to relocate it behind a closed form.
+    ///
+    /// Asserted as monotonicity plus a sign change rather than as
+    /// "the error grows with sigma", which is false: the error is smallest
+    /// AT the crossing and grows away from it in both directions.
+    #[test]
+    fn a_linear_correction_under_a_power_form_is_wrong_by_a_moving_factor() {
+        let (p, g, gu) = (1.2, 22.3, 11.15);
+        let ratio = |sigma: f64| {
+            expected_return_spike(sigma, g, gu, p) / expected_return_spike(sigma, g, gu, 1.0)
+        };
+        let mut last = f64::NEG_INFINITY;
+        for &sigma in &[0.25, 0.5, 0.91, 2.0, 4.0, 9.0] {
+            let r = ratio(sigma);
+            assert!(r > last, "the ratio did not rise at sigma {sigma}: {r} vs {last}");
+            last = r;
+        }
+        assert!(ratio(0.25) < 1.0,
+                "the linear correction did not over-correct a calm market: {}",
+                ratio(0.25));
+        assert!(ratio(9.0) > 1.0,
+                "the linear correction did not under-correct a violent one: {}",
+                ratio(9.0));
+        assert!(ratio(9.0) / ratio(0.25) > 1.5,
+                "a 36-fold volatility moved the correction by less than half: {}",
+                ratio(9.0) / ratio(0.25));
+    }
+
+    /// THE SPIKE READS THE SESSION UNDER THE IDENTITY, whatever
+    /// `vix_return_source` says, because the correction is sized for a
+    /// session and applying it to a closing MINUTE would be twenty times
+    /// the quantity it corrects.
+    #[test]
+    fn the_identity_reads_the_session_return_at_every_source() {
+        let want = {
+            let mut i = arm(1.0);
+            i.vix_return_source = 1.0;
+            vix_after(&i)
+        };
+        for &s in &[0.0, 0.25, 0.5, 0.75, 1.0] {
+            let mut i = arm(1.0);
+            i.vix_return_source = s;
+            assert_eq!(vix_after(&i), want, "the source moved the VIX at {s}");
+        }
+        // The mirror: with the identity off the source blends the two
+        // returns and they differ here, so every value gives a different
+        // answer.
+        let off: Vec<f64> = [0.0f64, 0.5, 1.0].iter().map(|&s| {
+            let mut i = arm(0.0);
+            i.vix_return_source = s;
+            vix_after(&i)
+        }).collect();
+        assert!(off[0] != off[1] && off[1] != off[2],
+                "the source moves nothing even with the identity off: {off:?}");
+    }
+}
+
+#[cfg(test)]
+mod vix_return_shape {
+    use super::*;
+
+    /// Every preset that predates the dial must reproduce bit for bit, and
+    /// the claim is about THIS arithmetic, so it is asserted on bits over
+    /// a spread of returns rather than on a tolerance at one point. The
+    /// expectation is written out as the expression that stood here, not
+    /// as a number, so a change to either side is caught.
+    #[test]
+    fn a_unit_exponent_is_the_shipped_arithmetic_to_the_bit() {
+        let (gain, gain_up) = (30.0, 14.0);
+        for i in -400..=400 {
+            let r = i as f64 * 0.05;
+            let want = if r < 0.0 { -r * gain } else { -r * gain_up };
+            assert_eq!(return_spike_for(r, gain, gain_up, 1.0), want,
+                       "moved at r = {r}");
+        }
+    }
+
+    /// The sign convention the linear form set: a DOWN session frightens
+    /// the market and an UP session calms it, at every exponent.
+    #[test]
+    fn a_down_session_raises_fear_and_an_up_session_lowers_it() {
+        for &p in &[1.0, 1.132, 1.200, 1.287] {
+            assert!(return_spike_for(-2.0, 30.0, 15.0, p) > 0.0, "down at p={p}");
+            assert!(return_spike_for(2.0, 30.0, 15.0, p) < 0.0, "up at p={p}");
+            assert_eq!(return_spike_for(0.0, 30.0, 15.0, p), 0.0, "zero at p={p}");
+        }
+    }
+
+    /// THE UP SIDE IS LINEAR AT EVERY EXPONENT, because the tape says it
+    /// is: fitted separately the up side reads 1.0410 at an R squared of
+    /// 0.9655, which this data cannot distinguish from 1.0. So the
+    /// exponent must not reach it, and an up session gives the same
+    /// answer whatever the dial says.
+    #[test]
+    fn the_exponent_does_not_reach_the_up_side() {
+        for i in 0..=200 {
+            let r = i as f64 * 0.05;
+            let want = -r * 15.0;
+            for &p in &[1.0, 1.132, 1.200, 1.287, 1.8] {
+                assert_eq!(return_spike_for(r, 30.0, 15.0, p), want,
+                           "the up side moved at r={r}, p={p}");
+            }
+        }
+    }
+
+    /// CONVEXITY, which is the whole point of the dial: points of fear per
+    /// per-cent of return must RISE with the size of the move, where the
+    /// linear form holds them flat. The real curve rises from 1.00 to 1.54
+    /// across this span and a constant gain cannot.
+    #[test]
+    fn the_response_per_per_cent_rises_only_above_a_unit_exponent() {
+        let per_pct = |r: f64, p: f64| return_spike_for(-r, 30.0, 15.0, p) / r;
+        for &r in &[0.71, 1.70, 2.75, 3.36, 6.39] {
+            assert!((per_pct(r, 1.0) - 30.0).abs() < 1e-12,
+                    "the linear form is not flat at r={r}");
+        }
+        let mut last = f64::NEG_INFINITY;
+        for &r in &[0.71, 1.70, 2.75, 3.36, 6.39] {
+            let v = per_pct(r, 1.200);
+            assert!(v > last, "not rising at r={r}: {v} after {last}");
+            last = v;
+        }
+    }
+
+    /// The scale reproduces the FITTED curve, which is the only claim
+    /// this arithmetic can make.
+    ///
+    /// `dVIX = 1.003 |r|^1.200` reaches the VIX through a transmission
+    /// `c`, so a scale of `1.003 / c` puts the target's spike at
+    /// `1.003/c * |r|^1.200` and the realised response back on the fit.
+    /// Asserted to floating-point tolerance, because this is an identity
+    /// about the code and not a measurement.
+    ///
+    /// **`c` CANCELS, and the test says so by varying it.** The first
+    /// version pinned one value, 0.03138, which was the transmission
+    /// measured on a VIX level since found to be 1.232x too low. Nothing
+    /// went wrong -- the constant cancels between the scale and the
+    /// response -- but a stale measured figure standing alone in a test
+    /// reads as though the test depended on it, and the next reader has
+    /// to derive the cancellation to find out that it does not. Three
+    /// values spanning the compressed level, the corrected one and a
+    /// number belonging to neither make the independence the assertion.
+    #[test]
+    fn the_derived_scale_reproduces_the_fitted_curve() {
+        for &c in &[0.03138, 0.0600, 0.25] {
+            let scale = 1.003 / c;
+            for &r in &[0.710, 1.211, 1.704, 2.234, 2.746, 3.360, 4.415, 6.390] {
+                let realised = c * return_spike_for(-r, scale, scale / 2.0, 1.200);
+                let want = 1.003 * mathx::pow(r, 1.200);
+                assert!((realised - want).abs() < 1e-9,
+                        "c {c}, bucket {r}: realised {realised}, fit {want}");
+            }
+        }
+    }
+
+    /// And the fit's distance from the buckets it was fitted to is a
+    /// property of the FIT, not of this code, so it is derived here rather
+    /// than pinned: the tolerance is the worst residual the eight medians
+    /// themselves produce. Written this way so that the day someone
+    /// refits the curve, this test moves with it instead of failing for a
+    /// reason that has nothing to do with the arithmetic under test.
+    #[test]
+    fn the_fit_sits_within_its_own_worst_residual_of_every_bucket() {
+        const BUCKETS: [(f64, f64); 8] = [
+            (0.710, 0.710), (1.211, 1.255), (1.704, 1.890), (2.234, 2.440),
+            (2.746, 3.040), (3.360, 4.530), (4.415, 6.040), (6.390, 9.830)];
+        let worst = BUCKETS.iter()
+            .map(|&(r, d)| (1.003 * mathx::pow(r, 1.200) / d - 1.0).abs())
+            .fold(0.0_f64, f64::max);
+        // The fit is a least-squares line through eight points and does
+        // not pass through any of them; a worst residual far above a
+        // tenth would mean the power law is the wrong family, which is
+        // the thing worth catching here.
+        assert!(worst < 0.15,
+                "the fit misses its worst bucket by {:.1} per cent, which is                  too far for a power law to be the right family",
+                100.0 * worst);
+        const C: f64 = 0.03138;
+        let scale = 1.003 / C;
+        for &(r, dvix) in BUCKETS.iter() {
+            let realised = C * return_spike_for(-r, scale, scale / 2.0, 1.200);
+            let err = (realised / dvix - 1.0).abs();
+            assert!(err <= worst + 1e-9,
+                    "bucket {r} is off by {:.1} per cent, worse than the                      fit's own worst residual of {:.1}",
+                    100.0 * err, 100.0 * worst);
+        }
+    }
+}
+
+/// THE FEAR RESPONSE MUST KEEP RISING, and for nine shipped presets it
+/// does not.
+///
+/// The defect this module makes permanent was measured on 2026-09-06
+/// (`programme/results/wsa17-result.md` in the design repository).
+/// `vix_target_shock_cap` is documented as a boundary condition, but at
+/// pt-v16 — [`crate::params::DEFAULT_PRESET_NAME`] — it is 45.0 against a
+/// `vix_return_gain` of 17.0, so it BINDS at 2.647 per cent of session
+/// return. Above that the target cannot rise any further, and the model's
+/// measured response per one per cent peaks at 0.989 and falls away to
+/// 0.470 at a -7.1 per cent session, against a tape that rises
+/// monotonically from 1.000 to 1.538. The certified default's crash
+/// response is 0.32x of the real one, and a constant does it.
+///
+/// **A cap that binds inside the graded range is not a boundary
+/// condition. It is a SHAPE parameter**, and it was an undeclared one:
+/// the era's standing finding that the model is flat where the tape rises
+/// was measured on pt-v18 arms carrying a fear vector whose cap of 150 or
+/// 450 does not bind, while every shipped preset had it bound at 2.647.
+///
+/// So this asserts no value. It asserts the PROPERTY — the response rises
+/// — and requires any preset that breaks it to say where. That turns a
+/// silent shape change into a declared one, and it is the only form of
+/// the test that can pass today and still fail the day somebody
+/// reintroduces the defect.
+#[cfg(test)]
+mod fear_response_shape {
+    use super::*;
+    use crate::params::ModelParams;
+
+    /// The deepest `|r|` at which the tape supplies a conditional median
+    /// to be wrong against: the median of its own `past -5 per cent`
+    /// bucket, 22 sessions of ^GSPC 1990-2025. Measured rather than
+    /// chosen, and past it the property is not asserted, because past it
+    /// there is no real number to compare with.
+    const GRADED_ABS_R: f64 = 6.390;
+
+    /// EVERY SHIPPED PRESET, and the return at which its fear response
+    /// stops rising. There is no third column of presets that behave.
+    ///
+    /// Two dials do it, in two eras. The first eight clamp the driving
+    /// return to 0.03 per cent, so their fear channel is spent before a
+    /// session is a tenth of a typical one. The last nine cap the spike at
+    /// 45 against a gain of 17 and stop at 2.647 per cent. Both are deep
+    /// inside the range the tape grades, and the tape's own response rises
+    /// across all of it — 1.000 points per per cent at -0.7, 1.538 at
+    /// -6.4.
+    ///
+    /// THE DEFECT WAS MOVED, NOT FIXED, and the tree says so in its own
+    /// words without anyone having joined them up.
+    /// [`crate::params::ModelParams::vix_return_clamp`] documents the first
+    /// era exactly: "Shipped 0.03, so a -10% day and a -3% day produce
+    /// identical fear. A crash is exactly where that assumption is worst."
+    /// pt-v9 raised that clamp from 0.03 to 15 -- and set a cap of 45
+    /// against a gain of 17, which reinstates identical fear from 2.647 per
+    /// cent up. The binding constraint moved by a factor of 88 and stopped
+    /// being documented; it never went away.
+    ///
+    /// Each entry is a declared DEFECT, not a permission. The list is
+    /// exhaustive in both directions and the binding dial is recomputed
+    /// rather than trusted, so the table cannot rot either way.
+    const FLATTENS_AT: &[(&str, f64, Binder)] = &[
+        ("pt-v1", 0.030, Binder::Clamp),
+        ("pt-v2", 0.030, Binder::Clamp),
+        ("pt-v3", 0.030, Binder::Clamp),
+        ("pt-v4", 0.030, Binder::Clamp),
+        ("pt-v5", 0.030, Binder::Clamp),
+        ("pt-v6", 0.030, Binder::Clamp),
+        ("pt-v7", 0.030, Binder::Clamp),
+        ("pt-v8", 0.030, Binder::Clamp),
+        ("pt-v9", 2.647, Binder::Cap),
+        ("pt-v10", 2.647, Binder::Cap),
+        ("pt-v11", 2.647, Binder::Cap),
+        ("pt-v12", 2.647, Binder::Cap),
+        ("pt-v13", 2.647, Binder::Cap),
+        ("pt-v14", 2.647, Binder::Cap),
+        ("pt-v15", 2.647, Binder::Cap),
+        ("pt-v16", 2.647, Binder::Cap),
+        ("pt-v18", 2.647, Binder::Cap),
+    ];
+
+    /// Which dial ends the rise. Named rather than inferred at the call
+    /// site, because "the response goes flat" is one symptom of two quite
+    /// different defects, and a fix for one does nothing for the other.
+    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+    enum Binder {
+        /// `vix_return_clamp` truncates the driving return itself.
+        Clamp,
+        /// `vix_target_shock_cap` truncates the spike it produces.
+        Cap,
+    }
+
+    /// The target's response to a DOWN session of size `r`, in VIX points,
+    /// with the inflation and shock adders at zero so this is the fear
+    /// channel alone. Clamp, then spike, then cap — the order
+    /// `update_economy_daily` applies them in.
+    fn response(p: &ModelParams, r: f64) -> f64 {
+        let clamped = mathx::max(-p.vix_return_clamp, mathx::min(p.vix_return_clamp, -r));
+        let spike = return_spike_for(
+            clamped,
+            p.vix_return_gain,
+            p.vix_return_gain_up,
+            p.vix_return_exponent,
+        );
+        mathx::min(p.vix_target_shock_cap, spike)
+    }
+
+    /// The smallest `r` in the graded range at which the response stops
+    /// rising, or `None` if it never does. Swept at 0.0001 per cent, so a
+    /// binding point anywhere in the range is located to three decimals.
+    fn flattens_at(p: &ModelParams) -> Option<f64> {
+        let steps = 63_900usize;
+        let mut prev = response(p, 0.0);
+        for i in 1..=steps {
+            let r = GRADED_ABS_R * i as f64 / steps as f64;
+            let now = response(p, r);
+            if now <= prev {
+                return Some(r);
+            }
+            prev = now;
+        }
+        None
+    }
+
+    /// Which dial binds first, from the dials alone. Derived here and
+    /// compared against the table, so the table records a reading of the
+    /// preset rather than a memory of one.
+    fn binder_of(p: &ModelParams) -> Binder {
+        let from_cap = mathx::pow(
+            p.vix_target_shock_cap / p.vix_return_gain,
+            1.0 / p.vix_return_exponent,
+        );
+        if p.vix_return_clamp <= from_cap {
+            Binder::Clamp
+        } else {
+            Binder::Cap
+        }
+    }
+
+    #[test]
+    fn every_preset_declares_where_its_fear_response_stops_rising() {
+        let mut wrong: Vec<String> = Vec::new();
+        for name in ModelParams::preset_names() {
+            let p = ModelParams::preset(name).expect("a name from preset_names resolves");
+            let declared = FLATTENS_AT.iter().find(|(n, _, _)| n == name);
+            match (flattens_at(&p), declared) {
+                (Some(at), Some((_, want, want_binder))) => {
+                    if (at - want).abs() >= 0.002 {
+                        wrong.push(format!(
+                            "{name} stops rising at {at:.3} per cent, not the declared \
+                             {want:.3}. Read why the number moved before editing the table."
+                        ));
+                    }
+                    let binder = binder_of(&p);
+                    if binder != *want_binder {
+                        wrong.push(format!(
+                            "{name} is declared bound by {want_binder:?} but its dials say \
+                             {binder:?}. Those are different defects."
+                        ));
+                    }
+                }
+                (Some(at), None) => wrong.push(format!(
+                    "{name} stops rising at {at:.3} per cent and declares nothing. A \
+                     response that goes flat inside the range the tape grades is a SHAPE \
+                     change, not a boundary condition, and it must be declared."
+                )),
+                (None, Some(_)) => wrong.push(format!(
+                    "{name} is declared in FLATTENS_AT but its response rises the whole \
+                     way. Remove it: a table that grants permission nobody needs will one \
+                     day grant it to a preset that does."
+                )),
+                // Nothing to say: it rises across the graded range, which
+                // is what a fear channel is for. No shipped preset reaches
+                // this arm today, and that is the finding.
+                (None, None) => {}
+            }
+        }
+        assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+    }
+
+    /// The default is one of the nine, and that is the finding.
+    ///
+    /// Pinned on its own so it cannot be lost inside a list: the day the
+    /// SHIPPED DEFAULT stops flattening its own fear response this test
+    /// fails, and somebody has fixed the mechanism rather than edited a
+    /// table.
+    #[test]
+    fn the_shipped_default_flattens_its_own_fear_response() {
+        let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+            .expect("the default preset resolves");
+        let at = flattens_at(&p).expect(
+            "the default's fear response no longer flattens inside the graded range. If \
+             that is deliberate, this test and FLATTENS_AT both need updating, and the \
+             down tail needs re-measuring, because the cap was holding it.",
+        );
+        assert!(
+            at < 3.0,
+            "the default flattens at {at:.3} per cent, which is not where it did"
+        );
+        assert_eq!(binder_of(&p), Binder::Cap, "the default is bound by its cap");
+        // FLAT, not merely non-rising: past the binding return the target
+        // takes the same spike from a -2.7 per cent session and a -6.4 per
+        // cent one. That equality is the defect stated as arithmetic.
+        assert_eq!(
+            response(&p, at),
+            response(&p, GRADED_ABS_R),
+            "the response past the binding return is no longer constant"
+        );
     }
 }

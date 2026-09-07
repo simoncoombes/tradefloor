@@ -270,10 +270,20 @@ pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days
 /// exactly 1.0 at any coupling. The draw count is unchanged, so the tape
 /// is too. Shared by the tick and the overnight move.
 pub fn sector_sigma_for(p: &ModelParams, economy: &EconomyState) -> f64 {
+    sector_sigma_at(p, economy, p.market_vol_vix_anchor)
+}
+
+/// [`sector_sigma_for`] against an EXPLICIT anchor, for the same reason
+/// `factor_vol::update_market_variance_at` takes one: under
+/// `vix_level_identity` the anchor is derived from the index's own
+/// unconditional variance rather than read from the dial. At
+/// `p.market_vol_vix_anchor` this is the arithmetic that stood here, to the
+/// bit.
+pub fn sector_sigma_at(p: &ModelParams, economy: &EconomyState, vix_anchor: f64) -> f64 {
     if p.sector_vix_coupling == 0.0 {
         p.sector_factor_sigma
     } else {
-        let ratio = economy.vix / p.market_vol_vix_anchor;
+        let ratio = economy.vix / vix_anchor;
         p.sector_factor_sigma
             * mathx::sqrt(1.0 - p.sector_vix_coupling + p.sector_vix_coupling * (ratio * ratio))
     }
@@ -467,6 +477,15 @@ pub struct TickInputs<'a> {
     /// constant sigma. A caller building `TickInputs` directly and wanting
     /// the old constant-sigma behaviour passes the constant.
     pub market_sigma_daily: f64,
+    /// The VIX at which every variance coupling reads ONE.
+    ///
+    /// `params.market_vol_vix_anchor` under every preset before pt-v19,
+    /// which is what `sector_sigma_for` reads it from; under
+    /// `vix_level_identity` the engine DERIVES it from the index's own
+    /// unconditional variance and passes that instead. Carried rather
+    /// than recomputed for the same reason `market_sigma_daily` is: the
+    /// draw must read the reference the engine actually ran with.
+    pub vix_anchor: f64,
     /// The universe's remembered stress, in VIX points above the crisis
     /// threshold, carried from previous days. Zero under every preset
     /// before pt-v4 and under any preset with the memory disabled, which
@@ -753,7 +772,7 @@ pub fn simulate_market_tick(
 
     // The sector draw's sigma is `sector_sigma_for`, shared with the
     // overnight move; the arithmetic is the one that stood here.
-    let sector_sigma = sector_sigma_for(p, economy);
+    let sector_sigma = sector_sigma_at(p, economy, inputs.vix_anchor);
     let mut sector_factors = Vec::with_capacity(inputs.sector_keys.len());
     for (sector_index, sector) in inputs.sector_keys.iter().enumerate() {
         rng.site(crate::rng::Site::SectorZ, sector_index as u32);

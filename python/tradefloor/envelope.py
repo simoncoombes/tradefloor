@@ -55,11 +55,14 @@ these numbers:
 from __future__ import annotations
 
 import statistics
+import textwrap
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
 from ._core import ValidationError
-from .facts import REAL_MARKETS, SEED_SD, SEED_SD_504, band_distance
+from . import facts as _facts
+from .facts import (CERTIFIED_HORIZON_DAYS, REAL_MARKETS, SEED_SD,
+                    SEED_SD_504, band_distance)
 
 #: The preset these measurements describe.
 PRESET = "pt-v16"
@@ -80,7 +83,10 @@ PRESET = "pt-v16"
 #: This comment read "three statistics that are in band here leave it by 504
 #: days" until 2026-08-27, which described pt-v3. `check` refuses to certify
 #: beyond this horizon.
-CERTIFIED_HORIZON_DAYS = 252
+#:
+#: Imported from `facts` rather than restated, so the horizon the bands were
+#: derived at and the horizon the envelope certifies cannot drift apart: they
+#: are one number, and `facts.RULERS_BY_HORIZON` is keyed on it.
 
 #: Measured at the certified horizon: 30 seeds, 40 instruments, 252 days.
 #: ALL FOURTEEN in band, at a band-distance loss of 0.0000, and all fourteen
@@ -187,6 +193,31 @@ BANDS_504: dict[str, tuple[float, float]] = {
     "corr_asymmetry_lagged": (-0.10, 0.47),
     "sector_excess_corr": (0.11, 0.22),
     "corr_persistence_acf1": (0.19, 0.49),
+}
+
+# So `facts.check_ruler_horizon` can identify this table when it arrives as an
+# argument. `facts` cannot name it -- `envelope` imports `facts`, not the
+# other way -- and a table the checker cannot identify is a table it cannot
+# refuse.
+_facts.register_ruler_table(BANDS_504, 504, "envelope.BANDS_504")
+
+#: The seventeen-row ruler per horizon, which is what `score` grades with.
+#: `facts.RULERS_BY_HORIZON` holds the fourteen shape rows at 504;
+#: `BANDS_504` adds the level and crisis rows carrying their 252-day bands,
+#: with the argument for each stated inline above. Keyed on the horizon and
+#: looked up rather than chosen by `horizon_days > 252`, which is what let a
+#: 756-day or 1,008-day panel be scored against the 504-day bands without
+#: anything saying so.
+#:
+#: The names are module-qualified and they name the table this function
+#: ACTUALLY grades with. `score` reported `"REAL_MARKETS_504"` at 504 days
+#: while scoring against `BANDS_504`, which is a different table with three
+#: more rows -- a small thing, and the same shape as every finding this
+#: branch is repairing: a label asserting a provenance the code did not have.
+RULERS_BY_HORIZON: dict[int, tuple[dict[str, tuple[float, float]],
+                                   dict[str, float], str]] = {
+    CERTIFIED_HORIZON_DAYS: (REAL_MARKETS, SEED_SD, "facts.REAL_MARKETS"),
+    504: (BANDS_504, SEED_SD_504, "envelope.BANDS_504"),
 }
 
 #: The same panel at 504 days. ALL FOURTEEN in band against `BANDS_504`,
@@ -979,18 +1010,32 @@ def score(panel: Mapping[str, float], *,
     are held red at the default preset on purpose and a total that folds
     them in reads fourteen of seventeen where fourteen of fourteen is the
     fact. Nothing here answers "is the panel green" without a group.
+
+    A HORIZON WITH NO RULER IS REFUSED. This used to read `far = horizon_days
+    > CERTIFIED_HORIZON_DAYS`, so a 756-day panel -- and the 1,008-day runs
+    the settling study makes -- scored against the 504-day bands with nothing
+    saying so, and 253 scored against the 252-day ones. The lookup below has
+    two keys and refuses everything else by name, because a band set derived
+    at one window is not an approximate ruler for another window: it is a
+    ruler for a different quantity.
     """
     if horizon_days < 1:
         raise ValidationError(
             f"horizon_days must be positive, got {horizon_days}")
+    if horizon_days not in RULERS_BY_HORIZON:
+        raise ValidationError(
+            f"no band set has been derived at {horizon_days} days; the "
+            f"horizons with a ruler are {sorted(RULERS_BY_HORIZON)}. A "
+            f"nearer band set is not an approximation -- the 252-day and "
+            f"504-day tables differ on twelve of fourteen rows and their "
+            f"noise scales differ by factors from 0.80 to 3.23 -- so this "
+            f"refuses rather than picking one.")
     # `loss.STRUCTURAL` names the statistics excluded from the objective by
     # design; imported here rather than at module scope because `loss`
     # imports this module's facts and a top-level import would cycle.
     from .loss import STRUCTURAL
 
-    far = horizon_days > CERTIFIED_HORIZON_DAYS
-    bands = BANDS_504 if far else REAL_MARKETS
-    noise = SEED_SD_504 if far else SEED_SD
+    bands, noise, ruler_name = RULERS_BY_HORIZON[horizon_days]
 
     unknown = sorted(set(panel) - set(REAL_MARKETS))
     if unknown:
@@ -1025,7 +1070,7 @@ def score(panel: Mapping[str, float], *,
                                "level" if name in LEVEL else "crisis")
     return {
         "horizon_days": horizon_days,
-        "ruler": "REAL_MARKETS_504" if far else "REAL_MARKETS",
+        "ruler": ruler_name,
         "statistics": rows,
         "in_band": sum(1 for r in rows.values() if r["in_band"]),
         "of": len(rows),
@@ -1036,6 +1081,242 @@ def score(panel: Mapping[str, float], *,
         "level_in_band": level_in, "level_of": level_of,
         "crisis_in_band": crisis_in, "crisis_of": crisis_of,
     }
+
+
+def certify(panels: Sequence[Mapping[str, float]], *,
+             horizon_days: int = CERTIFIED_HORIZON_DAYS) -> dict[str, Any]:
+    """The certificate, as THREE counts, from the per-seed panels themselves.
+
+    `score` grades one aggregated panel against the bands and answers one
+    question: could a real year read this. `certify` takes the per-seed
+    panels the certification run already produces and answers three, because
+    one band cannot answer more than one.
+
+      in band          a of 14   FIDELITY. `score`, unchanged, clamps
+                                 included. "Could a real year read this."
+      mechanism shown  b of N    MECHANISM. An exact sign test of the
+                                 per-seed readings against each row's
+                                 mechanism-absent reading. "Is a model
+                                 without the mechanism excluded."
+      at real centre   c of 14   CENTRE. `z_r` against the real median,
+                                 diagnostic, never a gate.
+
+    Why the second count has to exist. `facts.BAND_RULE` builds a prediction
+    interval for ONE real year and the panel grades a thirty-seed median,
+    whose sampling sd is about a quarter of one seed's. The band is
+    therefore about five times wider than the resolution of the thing it
+    judges, and it contains the mechanism-absent reading on five of the
+    fourteen rows -- measured with the shipped preset's own seed noise, a
+    null model's graded median passes the band with probability 1.000 on
+    three of them. Fourteen of fourteen in band is a true statement about
+    fidelity and says nothing at all about whether the mechanisms are
+    there. See `facts.NULLS`.
+
+    `N` is the mechanism rows this horizon GRADES: a row named in
+    `facts.MECHANISM_DIAGNOSTIC` for the horizon still gets a verdict, is
+    printed, and is not counted, because a correct model would fail it here
+    and a count that included it would grade the reference rather than the
+    model.
+
+    REVERSED is reported separately from NOT SHOWN and by name. A model with
+    the sign of a real effect backwards is a different failure from one whose
+    effect is too small to see, and the fidelity band cannot tell them apart.
+    """
+    from . import facts as _facts
+
+    panels = [dict(p) for p in panels]
+    if len(panels) < 2:
+        raise ValidationError(
+            f"a certificate needs at least two per-seed panels; a sign test "
+            f"on one seed has no power. Got {len(panels)}")
+
+    graded = _facts.aggregate_panels(panels, keys=_facts.SHAPE)
+    fidelity = score(graded, horizon_days=horizon_days)
+
+    def readings(row: str) -> list[float]:
+        return [p[row] for p in panels if p.get(row) is not None]
+
+    mechanism: dict[str, Any] = {}
+    centre: dict[str, Any] = {}
+    for row in _facts.SHAPE:
+        values = readings(row)
+        if len(values) < 2:
+            continue
+        if row in _facts.MECHANISM:
+            mechanism[row] = _facts.mechanism_verdict(
+                values, row, horizon_days=horizon_days)
+        centre[row] = _facts.centre_distance(values, row,
+                                             horizon_days=horizon_days)
+
+    counted = {r: v for r, v in mechanism.items() if v["counted"]}
+    shown = sorted(r for r, v in counted.items() if v["verdict"] == "shown")
+    not_shown = sorted(r for r, v in counted.items() if v["verdict"] == "not shown")
+    backwards = sorted(r for r, v in counted.items() if v["verdict"] == "reversed")
+    at_the_cut = sorted(r for r, v in counted.items() if v["at_the_cut"])
+    determined = {r: v for r, v in centre.items() if v["z_r"] is not None}
+    at_centre = sorted(r for r, v in determined.items() if v["at_centre"])
+
+    return {
+        "horizon_days": horizon_days,
+        "seeds": len(panels),
+        "graded": graded,
+        "fidelity": fidelity,
+        "mechanism": mechanism,
+        "centre": centre,
+        "counts": {
+            "in_band": fidelity["shape_in_band"],
+            "in_band_of": fidelity["shape_of"],
+            "mechanism_shown": len(shown),
+            "mechanism_of": len(counted),
+            "at_centre": len(at_centre),
+            "at_centre_of": len(determined),
+        },
+        "shown": shown,
+        "not_shown": not_shown,
+        "reversed": backwards,
+        "at_the_cut": at_the_cut,
+        "diagnostic": sorted(r for r, v in mechanism.items() if not v["counted"]),
+        "off_centre": sorted(r for r, v in determined.items()
+                             if not v["at_centre"]),
+        "centre_undetermined": sorted(r for r, v in centre.items()
+                                      if v["z_r"] is None),
+        # A row can be in band and reversed at once, which is the whole
+        # finding; naming those rows is cheaper than expecting a reader to
+        # intersect two lists.
+        "in_band_and_reversed": sorted(
+            r for r in backwards
+            if fidelity["statistics"].get(r, {}).get("in_band")),
+    }
+
+
+def certification_record(result: Mapping[str, Any]) -> dict[str, Any]:
+    """`certify`'s answer, trimmed to what a committed record should carry.
+
+    JSON-safe, and it drops the fidelity block because a preset record
+    already carries `panel_252` and `in_band` beside this. What it keeps per
+    row is the sign test itself -- the count, the cut, the null and the
+    verdict -- plus both effect sizes, so a reader can see how far from the
+    cut a verdict sat without re-running anything.
+
+    Defined here rather than in the tool that writes records, so the tool and
+    `envelope.CERTIFIED_MECHANISM` cannot drift into two shapes.
+    """
+    return {
+        "horizon_days": result["horizon_days"],
+        "seeds": result["seeds"],
+        "counts": dict(result["counts"]),
+        "shown": list(result["shown"]),
+        "not_shown": list(result["not_shown"]),
+        "reversed": list(result["reversed"]),
+        "at_the_cut": list(result["at_the_cut"]),
+        "diagnostic": list(result["diagnostic"]),
+        "in_band_and_reversed": list(result["in_band_and_reversed"]),
+        "rows": {
+            row: {
+                "k": m["k"], "n": m["n"], "cut": m["cut"],
+                "null": m["null"], "median": m["median"],
+                "p": m["p"], "verdict": m["verdict"],
+                "at_the_cut": m["at_the_cut"], "counted": m["counted"],
+                "z0_normal": m["z0_normal"],
+                "z0_bootstrap": m["z0_bootstrap"],
+                "tolerance": m["tolerance"],
+                "band_windows": m["band_windows"],
+            }
+            for row, m in result["mechanism"].items()
+        },
+        "centre": {
+            row: {"z_r": c["z_r"], "median": c["median"],
+                  "real_centre": c["real_centre"], "se_m": c["se_m"],
+                  "se_real": c["se_real"], "at_centre": c["at_centre"],
+                  "undetermined": c["undetermined"]}
+            for row, c in result["centre"].items()
+        },
+    }
+
+
+def certification_report(result: Mapping[str, Any]) -> str:
+    """`certify`'s three counts as text, each saying what it answers.
+
+    The sentences are not decoration. "Fourteen of fourteen in band" has
+    been read as "this model reproduces real markets" for three eras, and
+    it is a statement about whether a real YEAR could read these numbers.
+    """
+    counts = result["counts"]
+    lines = [
+        f"certification: {result['seeds']} seeds, {result['horizon_days']} days",
+        "",
+        f"  in band          {counts['in_band']:2d} of {counts['in_band_of']}"
+        "   fidelity: could a real year read this",
+        f"  mechanism shown  {counts['mechanism_shown']:2d} of "
+        f"{counts['mechanism_of']}"
+        "   is a model WITHOUT the mechanism excluded",
+        f"  at real centre   {counts['at_centre']:2d} of "
+        f"{counts['at_centre_of']}"
+        "   diagnostic, never a gate",
+        "",
+        f"{'row':24s} {'median':>10s} {'null':>9s} {'k':>7s} {'p':>7s}  "
+        f"{'z_0 norm':>8s} {'z_0 boot':>8s}  {'z_R':>6s}  verdict",
+    ]
+    for row, m in result["mechanism"].items():
+        c = result["centre"].get(row, {})
+        z_r = c.get("z_r")
+        band = result["fidelity"]["statistics"].get(row, {})
+        marks = [m["verdict"]]
+        if m["at_the_cut"]:
+            marks.append("AT THE CUT")
+        if not m["counted"]:
+            marks.append("diagnostic, not counted")
+        if not band.get("in_band", True):
+            marks.append("OUT OF BAND")
+        def effect(value: float | None) -> str:
+            # None where the seeds do not scatter at all, which makes the
+            # standard error zero and the ratio undefined. The GATE still has
+            # an answer there -- it counts sides and needs no estimator --
+            # so a dash in an effect-size column is not a missing verdict.
+            return f"{value:>+8.2f}" if value is not None else f"{'--':>8s}"
+
+        lines.append(
+            f"{row:24s} {m['median']:>10.4f} {m['null']:>9.4f} "
+            f"{m['k']:>3d}/{m['n']:<3d} {m['p']:>7.3f}  "
+            f"{effect(m['z0_normal'])} {effect(m['z0_bootstrap'])}  "
+            + (f"{z_r:>+6.2f}" if z_r is not None else f"{'--':>6s}")
+            + "  " + ", ".join(marks))
+    for row, c in result["centre"].items():
+        if row in result["mechanism"]:
+            continue
+        z_r = c["z_r"]
+        kind = ("equivalence: its real value IS its null"
+                if row in ("return_acf1",) else "level-only: no mechanism null")
+        lines.append(
+            f"{row:24s} {c['median']:>10.4f} {'--':>9s} {'--':>7s} {'--':>7s}  "
+            f"{'--':>8s} {'--':>8s}  "
+            + (f"{z_r:>+6.2f}" if z_r is not None else f"{'--':>6s}")
+            + "  " + kind)
+    if result["reversed"]:
+        lines += [
+            "",
+            "REVERSED, which the band cannot see: "
+            + ", ".join(result["reversed"]),
+        ]
+        if result["in_band_and_reversed"]:
+            lines.append(
+                "  and in band while reversed: "
+                + ", ".join(result["in_band_and_reversed"])
+                + " -- the model has the sign of a real effect backwards and "
+                "the fidelity count reads it as a pass")
+    if result["at_the_cut"]:
+        lines += ["", "at the cut, so undetermined at this seed count: "
+                  + ", ".join(result["at_the_cut"])]
+    if result["diagnostic"]:
+        lines += ["", "reported and NOT counted at this horizon:"]
+        for row in result["diagnostic"]:
+            lines += textwrap.wrap(
+                f"{row}: {result['mechanism'][row]['diagnostic']}", 76,
+                initial_indent="  ", subsequent_indent="  ")
+    if result["centre_undetermined"]:
+        lines += ["", "no centre distance: "
+                  + ", ".join(result["centre_undetermined"])]
+    return "\n".join(lines)
 
 
 def regressions(panel: Mapping[str, float], *,

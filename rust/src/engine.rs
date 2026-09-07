@@ -360,6 +360,20 @@ pub struct Engine {
     /// built with [`Engine::with_params`]; immutable for the engine's life,
     /// which is what lets its fingerprint be quoted for the whole run.
     params: ModelParams,
+    /// The VIX at which every variance coupling reads ONE — the factor's
+    /// forward map, the sector draw's sigma, the per-name GARCH clamp
+    /// reference and the jump arrival rate.
+    ///
+    /// `params.market_vol_vix_anchor` under every preset before pt-v19, so
+    /// every one of those four sites reads exactly the value it read
+    /// before. Under [`ModelParams::vix_level_identity`] it is DERIVED at
+    /// construction from the index's own unconditional variance
+    /// ([`Engine::derive_vix_anchor`]) and the dial is not read at all.
+    ///
+    /// A field rather than a call, because it is a constant of the run: it
+    /// depends on the roster and the parameters, and both are fixed when
+    /// the engine is built.
+    vix_anchor: f64,
 }
 
 impl Engine {
@@ -614,9 +628,232 @@ impl Engine {
             current_day: 0,
             day_marks: Vec::new(),
             params,
+            // Replaced immediately below. Zero rather than the dial's own
+            // value so that a path which somehow skipped the derivation
+            // would divide by zero rather than run on a plausible number.
+            vix_anchor: 0.0,
         };
+        engine.vix_anchor = engine.derive_vix_anchor();
         engine.burn_in_economy();
         engine
+    }
+
+    /// The VIX at which every variance coupling reads one.
+    ///
+    /// # At `vix_level_identity` 0.0 — the dial's value, unchanged
+    ///
+    /// A branch, not arithmetic. Every preset before pt-v19 reads exactly
+    /// `params.market_vol_vix_anchor` at all four coupling sites, which is
+    /// the expression each of them carried, so the whole change is
+    /// bit-inert there.
+    ///
+    /// # At 1.0 — derived, and the dial is not read
+    ///
+    /// `market_vol_vix_anchor`'s own definition is "the VIX level at which
+    /// a coupled target equals the baseline variance"
+    /// (`market::factor_vol`). Under the identity a VIX IS a variance —
+    /// `VIX = (1 + pi) * 100 * sqrt(252 * V)` — so that definition has an
+    /// answer rather than a value:
+    ///
+    /// ```text
+    /// anchor = (1 + pi) * 100 * sqrt(252 * V_uncond(roster, params))
+    /// ```
+    ///
+    /// and the forward map `base * (1 - c + c (VIX / anchor)^2)` and the
+    /// read-back then agree at the unconditional point BY CONSTRUCTION.
+    /// That is the property `vix_implied_from_market` has always claimed in
+    /// its comment ("so the loop is consistent") and the two constants
+    /// never delivered: at the shipped pair the factor at its baseline is
+    /// 12.05 per cent annualised against an anchor of 15.98.
+    ///
+    /// # Why it is roster-dependent, and why that is right
+    ///
+    /// A VIX prices its OWN index. A forty-name index with 5.3 effective
+    /// names carries a larger idiosyncratic block than a five-hundred-name
+    /// one, and the level a real VIX would take on it is genuinely
+    /// different. So the anchor stops being a coefficient of the model and
+    /// becomes a function of the model AND the universe — which means a
+    /// preset record that quotes it must say which roster it was derived
+    /// on.
+    ///
+    /// # The evaluation point needs no anchor, which is what makes it
+    /// non-circular
+    ///
+    /// At `vix == anchor` every coupling's ratio is exactly 1.0 and every
+    /// coupled quantity collapses to its own baseline: the factor's target
+    /// is `base` (`1 - c + c * 1`), `sector_sigma_for` returns
+    /// `sector_factor_sigma`, the per-name clamp reference is the sector's
+    /// base variance and `apply_jumps`' rate scale is one. So
+    /// `index_unconditional_variance` evaluates the identity at a point
+    /// defined without reference to the number being derived.
+    fn derive_vix_anchor(&self) -> f64 {
+        if self.params.vix_level_identity == 0.0 {
+            return self.params.market_vol_vix_anchor;
+        }
+        let names = self.index_variance_names();
+        let bases = self.sector_base_variances_for(&names);
+        let v = crate::market::index_var::index_unconditional_variance(
+            &self.params, &names, self.sector_keys.len(), &bases);
+        let derived =
+            crate::market::index_var::vix_from_variance(self.params.vix_variance_premium, v);
+        // A ROSTER WITH NO INDEX HAS NO VIX. An engine built with no public
+        // names, or one whose whole roster is bankrupt, leaves an
+        // unconditional variance of nothing but the market jump, and the
+        // anchor it derives is a denominator four coupling sites divide by.
+        // The dial is the honest answer there rather than a number the
+        // roster cannot support -- and it is a FALLBACK with a condition,
+        // not a clamp: on any roster that has an index at all this branch is
+        // not taken.
+        if derived.is_finite() && derived > 0.0 {
+            derived
+        } else {
+            self.params.market_vol_vix_anchor
+        }
+    }
+
+    /// The roster as the variance identity reads it: previous-close cap
+    /// weights, betas, sector slots, GARCH states and caps.
+    ///
+    /// The weights are built from `market_cap`, which is the same quantity
+    /// `advance_day_with` builds the day's index return from, so the
+    /// variance and the return it is the variance OF are weighted the same
+    /// way. Bankrupt and unlisted names are skipped by both.
+    fn index_variance_names(&self) -> Vec<crate::market::index_var::NameVariance> {
+        let mut total = 0.0;
+        for c in self.companies.iter() {
+            if c.is_public && !c.is_bankrupt && c.stock.market_cap > 0.0 {
+                total += c.stock.market_cap;
+            }
+        }
+        if !(total > 0.0) {
+            return Vec::new();
+        }
+        let mut out = Vec::with_capacity(self.companies.len());
+        for c in self.companies.iter() {
+            if !c.is_public || c.is_bankrupt || c.stock.market_cap <= 0.0 {
+                continue;
+            }
+            out.push(crate::market::index_var::NameVariance {
+                weight: c.stock.market_cap / total,
+                beta: c.stock.beta.unwrap_or(1.0),
+                sector: self
+                    .sector_keys
+                    .iter()
+                    .position(|k| *k == c.sector)
+                    .unwrap_or(usize::MAX),
+                garch_variance: c.stock.garch_variance,
+                market_cap: c.stock.market_cap,
+            });
+        }
+        out
+    }
+
+    /// The sector base variances of the names the identity kept, in the
+    /// same order — the clamp reference each of their GARCH processes
+    /// reverts between.
+    ///
+    /// `sector_base_variances()` is per COMPANY SLOT and includes the
+    /// bankrupt and unlisted names `index_variance_names` drops, so the two
+    /// lists are not the same length and pairing them by index would
+    /// silently mis-assign a floor to a name. Built by walking the roster
+    /// under the same filter instead.
+    fn sector_base_variances_for(
+        &self,
+        names: &[crate::market::index_var::NameVariance],
+    ) -> Vec<f64> {
+        let all = self.sector_base_variances();
+        let mut out = Vec::with_capacity(names.len());
+        for (i, c) in self.companies.iter().enumerate() {
+            if !c.is_public || c.is_bankrupt || c.stock.market_cap <= 0.0 {
+                continue;
+            }
+            out.push(all.get(i).copied().unwrap_or(c.stock.garch_variance));
+        }
+        out
+    }
+
+    /// The index's one-day-ahead conditional variance, from the states the
+    /// engine holds at the close.
+    ///
+    /// Called after `close_market` has advanced the factor's variance, the
+    /// per-name GARCH states and the jumps, so every state it reads is
+    /// TOMORROW's — which is what a one-day-ahead variance means and what
+    /// an implied volatility prices. The VIX-driven quantities (the sector
+    /// draw's sigma, the jump arrival rate) are read at the close's VIX,
+    /// which is the information the close has.
+    fn index_conditional_variance_now(&self) -> f64 {
+        let names = self.index_variance_names();
+        let sector_sigma = crate::market::tick::sector_sigma_at(
+            &self.params, &self.economy, self.vix_anchor);
+        let ratio = self.economy.vix / self.vix_anchor;
+        let rate_scale = if self.params.jump_vix_coupling == 0.0 {
+            1.0
+        } else {
+            (1.0 - self.params.jump_vix_coupling)
+                + ((self.params.jump_vix_coupling * ratio) * ratio)
+        };
+        crate::market::index_var::index_conditional_variance(
+            &self.params,
+            &names,
+            self.sector_keys.len(),
+            self.market_vol.variance(),
+            sector_sigma,
+            rate_scale,
+            crate::market::index_var::intraday_variance_factor(),
+        )
+    }
+
+    /// Draw the day-zero cycle phase and its age from the cycle's own
+    /// stationary law, and say whether it drew.
+    ///
+    /// A BRANCH at 0.0, which is every preset before pt-v19: it returns
+    /// before touching the economy or the generator, so construction is
+    /// what it always was and no arithmetic changes. That is what makes
+    /// bit-identity a property of the control flow rather than of
+    /// floating-point luck -- and it is asserted anyway, over 9,000 daily
+    /// returns on thirty seeds, against a digest taken from a build of the
+    /// commit this branch was cut from, by
+    /// `tests/test_stationary_opening.py`.
+    ///
+    /// The uniforms come from the ECONOMY substream, the stream
+    /// [`Engine::burn_in_economy`] already consumes, so the market's
+    /// day-zero draws sit exactly where they sat and only this domain's
+    /// sequence moves. Two draws, counted through the same `Counting`
+    /// wrapper the daily step uses, so `draws_consumed` records them.
+    ///
+    /// They are recorded at [`Site::EconomyCycle`], which is the site they
+    /// belong to: what is being drawn is the cycle's own transition law,
+    /// read as a distribution instead of rolled forward one day at a time.
+    /// No new site is declared, so the draw-schedule registry in
+    /// `python/tradefloor/noise.py` is unchanged.
+    ///
+    /// See [`ModelParams::cycle_stationary_opening`] for the identity, why
+    /// the AGE is the part that cannot be skipped, and why the field
+    /// relaxation is `macro_burn_in_days`' half of the same opening.
+    fn draw_stationary_opening(&mut self) -> bool {
+        if self.params.cycle_stationary_opening == 0.0 {
+            return false;
+        }
+        let mut rng = std::mem::replace(&mut self.economy_rng, GameRng::new(0, MAIN_STREAM));
+        let mut counting = Counting {
+            inner: &mut rng,
+            count: 0,
+        };
+        counting.site(Site::EconomyCycle, 0);
+        let u_phase = counting.next_f64();
+        let u_age = counting.next_f64();
+        let consumed = counting.count;
+        self.economy_rng = rng;
+        self.draws.economy += consumed;
+
+        let (phase, months) = crate::economy::stationary_opening(
+            self.params.cycle_hazard_per_month,
+            u_phase,
+            u_age,
+        );
+        self.economy.cycle_phase = phase;
+        self.economy.months_in_current_phase = months;
+        true
     }
 
     /// Advance the economy alone to the state its own dynamics reach,
@@ -655,6 +892,24 @@ impl Engine {
     /// age would open a random distance into an expansion, which is a
     /// different certified year and a choice rather than a correction.
     ///
+    /// # Both of those stop, and only when the opening is DRAWN
+    ///
+    /// Holding the phase and resetting the clock restore the same point
+    /// this burn-in started from, which is the defect
+    /// [`ModelParams::cycle_stationary_opening`] exists for: the fields
+    /// settle and the cohort survives. When that dial has drawn the phase
+    /// and its age, the burn-in runs FREE -- the phase is not held and the
+    /// clock is not reset -- because the chain is already in its
+    /// stationary law, which a free run preserves by definition, and what
+    /// is left to do is relax the fields under the phase path the run has
+    /// just lived through. Holding a drawn contraction for 755 days
+    /// instead would drive unemployment and the policy rate far past any
+    /// state a contraction reaches, and the fields would open inconsistent
+    /// with the mix.
+    ///
+    /// At the shipped default the dial draws nothing and every line here
+    /// is the line that stood before it.
+    ///
     /// # The growth term's base
     ///
     /// `gdp` and `cpi` compound on every one of these days, so the base of
@@ -663,6 +918,11 @@ impl Engine {
     /// above its earnings, which is a level jump nobody asked for and
     /// which the ratio was never meant to carry.
     fn burn_in_economy(&mut self) {
+        // The day-zero phase and its age first, so what follows relaxes
+        // the fields under the phase the run will OPEN in. Inert at the
+        // default, where it returns without drawing and every line below
+        // is the line that stood here.
+        let drawn = self.draw_stationary_opening();
         if self.params.macro_burn_in_days <= 0.0 {
             return;
         }
@@ -677,12 +937,14 @@ impl Engine {
                 game_day: day,
                 timestamp: day * 24 * 60,
             });
-            if self.economy.cycle_phase != phase {
+            if !drawn && self.economy.cycle_phase != phase {
                 self.economy.cycle_phase = phase;
                 self.economy.months_in_current_phase = months_before + 1.0 / 30.0;
             }
         }
-        self.economy.months_in_current_phase = 0.0;
+        if !drawn {
+            self.economy.months_in_current_phase = 0.0;
+        }
         self.nominal_output_base = self.economy.gdp * self.economy.cpi;
     }
 
@@ -691,6 +953,15 @@ impl Engine {
     /// whole run rather than the moment someone asked.
     pub fn params(&self) -> &ModelParams {
         &self.params
+    }
+
+    /// The VIX at which every variance coupling reads one. See the field.
+    ///
+    /// Read-only and fixed for the engine's life, like `params`: it is
+    /// derived once from the roster and the coefficients, so quoting it
+    /// describes the whole run.
+    pub fn vix_anchor(&self) -> f64 {
+        self.vix_anchor
     }
 
     // ── Draw delegation ───────────────────────────────────────────────────
@@ -824,7 +1095,7 @@ impl Engine {
         // mechanism:jumps.intensity_market begin -- generated by tools/mechanism/emit.py from
         // tools/mechanism/mechanisms/jumps.py; do not edit by hand.
         let p = &self.params;
-        let ratio = self.economy.vix / p.market_vol_vix_anchor;
+        let ratio = self.economy.vix / self.vix_anchor;
         let rate_scale = if p.jump_vix_coupling == 0.0 { 1.0 } else { (1.0 - p.jump_vix_coupling) + ((p.jump_vix_coupling * ratio) * ratio) };
         let intensity_market = if p.jump_vix_coupling == 0.0 { p.jump_intensity_market } else { p.jump_intensity_market * rate_scale };
         intensity_market
@@ -1082,6 +1353,7 @@ impl Engine {
                 order_volumes: request.order_volumes,
                 sector_keys: &self.sector_keys,
                 market_sigma_daily,
+                vix_anchor: self.vix_anchor,
                 settle_draws,
                 settle_depth_counterfactual: self.settle_depth_counterfactual,
                 nominal_output_base: self.nominal_output_base,
@@ -1588,7 +1860,8 @@ impl Engine {
         let p = &self.params;
         let scale = crate::mathx::sqrt(ratio);
         let market_sigma_daily = self.market_vol.sigma_daily();
-        let sector_sigma = crate::market::tick::sector_sigma_for(p, &self.economy);
+        let sector_sigma =
+            crate::market::tick::sector_sigma_at(p, &self.economy, self.vix_anchor);
         let econ_view = crate::fair_value::EconomyValuationInputs {
             corporate_bond_yield: Some(self.economy.corporate_bond_yield),
             federal_funds_rate: self.economy.federal_funds_rate,
@@ -1686,6 +1959,7 @@ impl Engine {
                     daily_innovation: request.daily_innovations[i],
                     sector_base_daily_variance: request.sector_base_variances[i],
                     vix: self.economy.vix,
+                    vix_anchor: self.vix_anchor,
                     avg_volume: request.avg_volume,
                 },
             );
@@ -1695,7 +1969,7 @@ impl Engine {
         // above and with the same zero-draw discipline. The VIX read here
         // is the day's TRADING value — the macro chain has not advanced
         // yet, exactly as the per-name updates see the day they closed.
-        self.market_vol.close_day_with(&self.params, self.economy.vix);
+        self.market_vol.close_day_at(&self.params, self.vix_anchor, self.economy.vix);
         // The forced-flow reservoir drains on stress days and rebuilds in
         // calm. Updated only while the mechanism is live: at gain 0 or
         // reservoir 0 the state stays exactly 0.0 and nothing changes.
@@ -1758,10 +2032,10 @@ impl Engine {
     #[rustfmt::skip]
     fn apply_jumps(&mut self) {
         // mechanism:jumps begin -- generated by tools/mechanism/emit.py from
-        // tools/mechanism/mechanisms/jumps.py (spec 39073377cfbc); do not edit by hand.
+        // tools/mechanism/mechanisms/jumps.py (spec b27965bd06cd); do not edit by hand.
         // Draws: 1 uniform, 1 normal, 1 uniform per company, 1 normal per company on the jumps stream, unconditionally.
         let p = &self.params;
-        let ratio = self.economy.vix / p.market_vol_vix_anchor;
+        let ratio = self.economy.vix / self.vix_anchor;
         let rate_scale = if p.jump_vix_coupling == 0.0 { 1.0 } else { (1.0 - p.jump_vix_coupling) + ((p.jump_vix_coupling * ratio) * ratio) };
         let intensity_market = if p.jump_vix_coupling == 0.0 { p.jump_intensity_market } else { p.jump_intensity_market * rate_scale };
         let intensity_idio = if p.jump_vix_coupling == 0.0 { p.jump_intensity_idio } else { p.jump_intensity_idio * rate_scale };
@@ -1898,7 +2172,9 @@ impl Engine {
         // non-zero, so the shipped path is untouched. `previous_close` is
         // set at the OPEN (market/daily.rs), so this is open to close, and
         // `apply_jumps` has already run, so the jumps are in `price`.
-        let market_day_return_pct = if self.params.vix_return_source == 0.0 {
+        let market_day_return_pct = if self.params.vix_return_source == 0.0
+            && self.params.vix_level_identity == 0.0
+        {
             0.0
         } else {
             let (mut acc, mut mcap) = (0.0, 0.0);
@@ -1911,6 +2187,16 @@ impl Engine {
                 mcap += c.stock.market_cap;
             }
             if mcap > 0.0 { acc / mcap } else { 0.0 }
+        };
+
+        // ONCE, and only under the identity: the read-back and the fear
+        // excursion's zero-mean correction are two readings of the same
+        // variance, and computing it twice would be one loop over the
+        // roster too many and one more place for the two to disagree.
+        let index_variance = if self.params.vix_level_identity == 0.0 {
+            0.0
+        } else {
+            self.index_conditional_variance_now()
         };
 
         rng.site(Site::EconomyDaily, 0);
@@ -1926,17 +2212,47 @@ impl Engine {
                 vix_return_source: self.params.vix_return_source,
                 vix_cycle_amplitude: self.params.vix_cycle_amplitude,
                 market_day_return_pct,
-                // The factor's sigma read back through the forward
-                // coupling's own anchor, so the loop is consistent: the
-                // forward map sends VIX to variance through
-                // `(vix / anchor)^2`, and this is its inverse.
-                vix_implied_from_market: if self.params.vix_realised_vol_weight == 0.0 {
+                // WHAT THE MARKET'S OWN VOLATILITY IS WORTH IN VIX POINTS,
+                // and it was wrong twice.
+                //
+                // The expression below the branch is the shipped one: the
+                // market FACTOR's conditional sigma, scaled so a factor at
+                // its base sigma reads back as the anchor. That is
+                // `anchor / market_factor_sigma` = 2105.1 points per unit
+                // of daily sigma where the identity -- one point is one per
+                // cent annualised -- is `100 * sqrt(252)` = 1587.5; and its
+                // referent is the factor, where the quantity a VIX prices
+                // is the INDEX's. On the certified roster the index carries
+                // 2.05x the factor's variance and none of the remainder
+                // ever reached the VIX.
+                //
+                // At `vix_level_identity` the read-back is the identity
+                // itself on the index's own conditional variance. See
+                // `ModelParams::vix_level_identity` and
+                // `market::index_var`.
+                vix_implied_from_market: if self.params.vix_level_identity != 0.0 {
+                    crate::market::index_var::vix_from_variance(
+                        self.params.vix_variance_premium,
+                        index_variance,
+                    )
+                } else if self.params.vix_realised_vol_weight == 0.0 {
                     0.0
                 } else {
                     self.params.market_vol_vix_anchor * self.market_vol.sigma_daily()
                         / self.params.market_factor_sigma
                 },
+                // The index's conditional daily sigma in PER CENT, which is
+                // the units `market_day_return_pct` is in and therefore the
+                // units the zero-mean fear correction needs. Zero, and
+                // unread, unless the identity is on.
+                vix_index_sigma_pct: if self.params.vix_level_identity == 0.0 {
+                    0.0
+                } else {
+                    100.0 * crate::mathx::sqrt(index_variance)
+                },
+                vix_level_identity: self.params.vix_level_identity,
                 vix_return_gain_up: self.params.vix_return_gain_up,
+                vix_return_exponent: self.params.vix_return_exponent,
                 vix_return_clamp: self.params.vix_return_clamp,
                 vix_target_shock_cap: self.params.vix_target_shock_cap,
                 vix_ceiling: self.params.vix_ceiling,

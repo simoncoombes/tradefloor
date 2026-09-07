@@ -128,6 +128,7 @@ fn tick(c: TickCompany, uniform: f64, volatility: f64) -> (Run, TickCompany, Tic
             order_volumes: &[],
             sector_keys: &sectors(),
             market_sigma_daily: MARKET_FACTOR_SIGMA,
+                    vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
             settle_draws: SettleDrawPolicy::FourAlways,
             settle_depth_counterfactual: true,
             // The run's opening nominal output. The growth term is
@@ -342,6 +343,7 @@ fn the_arm_reports_nothing_on_the_replay_path() {
             order_volumes: &[],
             sector_keys: &sectors(),
             market_sigma_daily: MARKET_FACTOR_SIGMA,
+                    vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
             settle_draws: SettleDrawPolicy::FourOrZero,
             settle_depth_counterfactual: true,
             // The run's opening nominal output. The growth term is

@@ -201,8 +201,17 @@ def test_volatility_is_in_band_so_raw_percentages_mean_something_now():
     # above: seed 3 at 180 days read 36.1% against a band ending at 36.0 the
     # day pt-v12 became the default, while its thirty-seed 252-day median is
     # 32.8%. A band check on one short run is a coin toss near the edge.
+    #
+    # AT 252 DAYS, not the 180 this ran until 2026-09-05. The band it checks
+    # against was derived from 253-bar real windows, and 180 days is a
+    # different quantity: `compare_to_real_markets` now refuses the pairing,
+    # which is how this line came to be read at all. The six-seed median is
+    # what the test is about and the horizon is not the thing being varied,
+    # so it costs about a minute and buys a check that means what it says.
     import statistics
-    runs = [measure(seed=s, universe=UNIVERSE, days=180) for s in (1, 2, 3, 4, 5, 6)]
+    runs = [measure(seed=s, universe=UNIVERSE,
+                    days=tradefloor.facts.CERTIFIED_HORIZON_DAYS)
+            for s in (1, 2, 3, 4, 5, 6)]
     median = statistics.median(f["annualised_vol_pct"] for f in runs)
     verdict = compare_to_real_markets(
         {**runs[2], "annualised_vol_pct": median})["annualised_vol_pct"]
@@ -334,7 +343,10 @@ def test_a_weak_leverage_effect_would_read_as_weak_not_as_too_high():
     band contains it), so the trap is pinned on a synthetic panel -- the
     wording rule has to survive the statistic being healthy.
     """
-    facts = measure(seed=3, universe=UNIVERSE, days=180)
+    # At the certified horizon, because the verdict below is a band
+    # comparison and the band is a 252-day ruler.
+    facts = measure(seed=3, universe=UNIVERSE,
+                    days=tradefloor.facts.CERTIFIED_HORIZON_DAYS)
     weakened = dict(facts)
     weakened["leverage_effect"] = +0.05
     verdict = compare_to_real_markets(weakened)["leverage_effect"]
@@ -422,7 +434,8 @@ def test_a_statistic_that_cannot_be_measured_is_absent_rather_than_zero():
     # One instrument has no pairwise correlation. Zero would be a lie of
     # exactly the shape the module warns about elsewhere: it is a real
     # reading, and here it would land close to what the model actually scores.
-    facts = measure(seed=2, universe=tradefloor.Universe.random(1, seed=9), days=60)
+    facts = measure(seed=2, universe=tradefloor.Universe.random(1, seed=9),
+                    days=tradefloor.facts.CERTIFIED_HORIZON_DAYS)
     assert facts["cross_sectional_corr"] is None
     assert "cross_sectional_corr" not in compare_to_real_markets(facts)
     assert "n/a" in report(facts)
@@ -478,7 +491,8 @@ def test_the_report_names_the_mismatches_rather_than_scoring_them():
     # A single "realism score" would average a property the model reproduces
     # well against one it gets frankly wrong, and knowing WHICH is the whole
     # value of the exercise.
-    text = report(measure(seed=3, universe=UNIVERSE, days=180))
+    text = report(measure(seed=3, universe=UNIVERSE,
+                          days=tradefloor.facts.CERTIFIED_HORIZON_DAYS))
     # The claim is that a miss is NAMED and a match is named beside it, not
     # that this seed misses on a particular side. It read TOO HIGH until the
     # universe generator was reconciled to open a drawn roster at its own
@@ -634,6 +648,14 @@ def test_the_index_drift_row_is_reported_and_never_graded():
     assert "index_drift_pct" in LEVEL and "index_drift_pct" not in SHAPE
     assert sorted(SHAPE + LEVEL + CRISIS) == sorted(REAL_MARKETS)
     assert len(SHAPE) == 14
+    # And the shape rows are partitioned a second way, by what each one can
+    # CERTIFY: a mechanism-absent null exists for it, its real value IS its
+    # null, or it has no mechanism-absent reading at all. Asserted here beside
+    # the group split for the same reason -- a fifteenth row must be placed in
+    # both on purpose. tests/test_mechanism_gate.py is where the classes are
+    # exercised.
+    from tradefloor.facts import MECHANISM, EQUIVALENCE, LEVEL_ONLY
+    assert sorted(MECHANISM + EQUIVALENCE + LEVEL_ONLY) == sorted(SHAPE)
     prov = REAL_MARKETS_PROVENANCE["index_drift_pct"]
     assert sum("query1.finance.yahoo.com" in s for s in prov["sources"]) == 3
     assert "fetched 2026-09-03" in prov["sources"][0]

@@ -78,7 +78,7 @@ from typing import Any, Mapping, Sequence
 from ._core import ValidationError
 from .facts import (AGGREGATE, REAL_MARKETS, REAL_MARKETS_504, SEED_SD,
                     SEED_SD_504, SEED_SD_PROVENANCE, aggregate_panels,
-                    band_distance)
+                    band_distance, check_ruler_horizon, horizon_of_panels)
 
 #: The statistics the calibration search is trying to move into band. This
 #: is the ONE tuple to edit when a model change makes a structural statistic
@@ -259,6 +259,19 @@ def band_distance_loss(
         REAL_MARKETS if bands is None else bands
     )
 
+    # And "avoidable" was not enough: `evaluate_axes.py` ran a 504-day axis
+    # through the default bands and the default scales for weeks, labelled
+    # them "the TRUE bands", and published a `generalises` verdict from the
+    # result. The panels say what horizon they were measured at -- `measure`
+    # records `days` -- so the pairing is CHECKED here rather than left to
+    # the caller. A panel that records no horizon, and a table nobody
+    # registered, are unknown rather than wrong and pass unchecked; the
+    # defaults are checked, because the defaults are what the mistake used.
+    horizon = check_ruler_horizon(
+        panel_days=horizon_of_panels(panels, what="the panels given to "
+                                                  "band_distance_loss"),
+        bands=table, seed_sd=scales, what="band_distance_loss")
+
     rows: dict[str, dict[str, Any]] = {}
     total = 0.0
     used: dict[str, float] = {}
@@ -327,6 +340,8 @@ def band_distance_loss(
             "contribution": contribution,
         }
 
+    from .facts import horizon_of_table
+
     return {
         "loss": total,
         "weighting": "diagonal",
@@ -334,6 +349,12 @@ def band_distance_loss(
         "seed_sd": used,
         "seed_sd_provenance": provenance,
         "panels": len(panels),
+        # Which ruler this loss was taken with, and at what horizon, so a
+        # serialised certificate carries the answer instead of leaving a
+        # reader to infer it from the tool that wrote the file. `None` where
+        # the tables are the caller's own and no horizon could be attached.
+        "horizon_days": horizon,
+        "bands": horizon_of_table(table)[1],
     }
 
 
