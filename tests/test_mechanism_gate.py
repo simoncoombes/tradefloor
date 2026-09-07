@@ -505,20 +505,34 @@ def test_the_centre_distance_is_determined_on_every_shape_row():
     with pytest.raises(ValidationError):
         centre_distance([1.0, 2.0], "not_a_row")
 
-    # THE WRONG-RULER REFUSAL, constructed. The real windows are 252-bar
-    # readings, and a row's dispersion across real years moves with the
-    # window length -- clustering at lag 20 reads six times higher over 504
-    # bars. So a 504-day panel gets no centre distance rather than a
-    # plausible-looking one, and `certify` at that horizon says so on every
-    # row instead of publishing a count.
+    # THE WRONG-RULER REFUSAL, constructed. The real windows are measured at
+    # a window length, and a row's dispersion across real years moves with
+    # it -- clustering at lag 20 reads six times higher over 504 bars. So a
+    # panel at a horizon with no window table gets no centre distance rather
+    # than a plausible-looking one, and `certify` there says so on every row
+    # instead of publishing a count.
+    #
+    # 504 is no longer such a horizon: `REAL_MARKETS_WINDOWS_504` landed with
+    # the scoring rule, so the diagnostic is answered AT the window length
+    # graded, which is what the refusal was protecting. The refusal itself is
+    # unchanged and is constructed here at 756, where no table exists.
     row = "abs_return_acf20"
     values = panel_about(row, real_centre(row), spread(row), seed=11)
-    far = centre_distance(values, row, horizon_days=504)
+    far = centre_distance(values, row, horizon_days=756)
     assert far["z_r"] is None and far["at_centre"] is None
     assert "wrong-ruler" in far["undetermined"]
     near = centre_distance(values, row, horizon_days=252)
     assert near["z_r"] is not None
     assert REAL_MARKETS_WINDOWS["horizon_days"] == 252
+
+    # And at 504 the diagnostic is answered against the 504-bar windows and
+    # at the 504-bar band's own tolerance, not the 252-bar one: five windows
+    # rather than nine, so the multiplier falls from 1.846 to 1.378.
+    at_504 = centre_distance(values, row, horizon_days=504)
+    assert at_504["z_r"] is not None
+    assert at_504["undetermined"] is None
+    assert at_504["multiplier"] < near["multiplier"]
+    assert at_504["real_centre"] != near["real_centre"]
 
 
 # --------------------------------------------------------------------------

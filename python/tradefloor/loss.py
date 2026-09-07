@@ -72,14 +72,21 @@ called, or should ever grow into, a `realism_score`.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import math
+import random
 import statistics
+import warnings
 from typing import Any, Mapping, Sequence
 
 from ._core import ValidationError
-from .facts import (AGGREGATE, REAL_MARKETS, REAL_MARKETS_504, SEED_SD,
-                    SEED_SD_504, SEED_SD_PROVENANCE, aggregate_panels,
+from .facts import (AGGREGATE, CRISIS, LEVEL, REAL_MARKETS, REAL_MARKETS_504,
+                    REAL_MARKETS_PROVENANCE, RULERS_BY_HORIZON, SEED_SD,
+                    SEED_SD_504, SEED_SD_PROVENANCE, SHAPE, aggregate_panels,
                     band_distance, check_ruler_horizon, horizon_of_panels,
-                    pooled_rate_counts)
+                    median_se, median_se_bootstrap, pooled_rate_counts,
+                    rule_row)
 
 #: The statistics the calibration search is trying to move into band. This
 #: is the ONE tuple to edit when a model change makes a structural statistic
@@ -446,4 +453,421 @@ def dual_horizon_loss(
         "weight_504": weight_504,
         "horizon_252": near,
         "horizon_504": far,
+    }
+
+
+# --------------------------------------------------------------------------
+# The scoring rule: a residual objective with curvature everywhere
+#
+# `band_distance_loss` above is flat inside the band, and the pass count in
+# the calibration searchers is flat inside it too: 1,139 of the 1,648
+# candidate-block records this project has ever measured read fourteen of
+# fourteen in band and tie. A search cannot tell dead centre from one part in
+# a thousand inside an edge, so it stops at the first admissible point it
+# reaches, which is the mechanical account of twenty-two shipped dials
+# sitting on band edges.
+#
+# The rule replaces the COUNT and leaves the band alone. Per certified row,
+#
+#     z_i = (T_i - c_i) / sqrt(se_R,i^2 + se_M,i^2)
+#     S   = sum_i (nu_i + 1) * ln(1 + z_i^2 / nu_i)          minimised
+#
+# `T_i` is the row's graded statistic on the candidate's own seeds, by the
+# row's own estimator (`facts.AGGREGATE`); `c_i` is the tape centre by the
+# SAME estimator at the SAME window length (`facts.rule_row`); `se_R,i` is
+# the tape's standard error of that centre; `se_M,i` is the candidate's own
+# sampling error at its seed count; and `nu_i` is the Welch-Satterthwaite
+# combination of the two. Each term is twice the negative log-density of a
+# Student-t with `nu_i` degrees of freedom, up to a constant.
+#
+# WHY THE t AND NOT A PLAIN SUM OF SQUARES. Near the centre they are the
+# same: `d^2 l / dz^2` at zero is `2 (nu + 1) / nu`, at least the square's 2,
+# so the surface a search close to the optimum feels is at least as steep.
+# Far out the square's influence is unbounded and the t's is not, and that
+# is the difference that matters here: under a quadratic, a row the model
+# CANNOT reach is bought down at the expense of every row it can, and the
+# optimiser reports the best available compensation. At the corpus's own
+# degrees of freedom -- one row at z = 6 with nu = 5, three at the centre
+# with nu = 8 -- moving the far row to 4 and the three to 1.5 SAVES 13.25
+# under the square and COSTS 2.7 under the rule, so the miss stays visible
+# at its own |z| instead of being smeared across the panel.
+# `tests/test_scoring_rule.py` builds that case and asserts the two signs.
+#
+# WHY THE TAPE'S STANDARD ERROR AND NOT ITS ACROSS-WINDOW SD. The band is a
+# prediction interval for one real year and prices that at
+# `BAND_RULE_TOLERANCE`. The graded quantity is a thirty-seed median. An
+# objective scaled by the across-year sd asks "could a real year read this",
+# which the band already answers; the objective asks "is the model's central
+# value the tape's", and the scale of that question is the error of the
+# tape's centre.
+#
+# WHY THE CANDIDATE'S OWN SEED ERROR AND NOT `SEED_SD`. Those tables are
+# pt-v1's noise, frozen on purpose as the denominator of every published
+# room figure. Measured against the vectors a search actually visits, the
+# 504-day table is off by 0.46 to 6.04: it understates `sector_excess_corr`
+# six-fold and overstates `leverage_effect` two-fold, because the table is a
+# property of pt-v1 and the noise is a property of the vector. An objective
+# dividing by pt-v1's number weights the six-fold row thirty-six times too
+# heavily. So `scoring_rule_from_medians` takes `se_model` and `df_model` as
+# REQUIRED arguments with no default, and warns if a frozen table is handed
+# to it anyway.
+#
+# WHAT IT IS NOT. It is not a certificate: the band remains the
+# certification gate and `BAND_RULE_TOLERANCE` remains the gate's
+# false-alarm rate. The objective ranks, the band certifies, and neither is
+# traded for the other. No band edge enters `S`; the rule reads `c` and
+# `se` and never `lo` or `hi`, and the band position is printed beside every
+# row as a diagnostic and never summed.
+# --------------------------------------------------------------------------
+
+#: The estimator of the model term, per aggregation kind, as data rather than
+#: as three branches: a median row's normal-approximation median error, a
+#: mean or rate row's ordinary `sd / sqrt(n)`, and a pooled row's seed
+#: bootstrap. The NORMAL APPROXIMATION and not the bootstrap for a median,
+#: deliberately: the library reports both and they disagree by up to two-fold
+#: on the skewed rows, an objective needs exactly one, and the property that
+#: decides it is smoothness in the dials. A bootstrap se of a thirty-seed
+#: median jumps as seeds reorder; the normal approximation moves with the
+#: values. The bootstrap rides along as `se_model_bootstrap` for the reader,
+#: and `facts.mechanism_verdict`'s sign test remains the mechanism gate.
+MODEL_SE_ESTIMATOR = {
+    "median": "facts.median_se, the normal approximation "
+              "MEDIAN_SE_FACTOR * sd / sqrt(n)",
+    "mean": "sd / sqrt(n) of the per-seed values",
+    "pooled_rate": "sd / sqrt(n) of the per-seed rates",
+    "pooled": "a seed bootstrap of the pooled median: resample the SEEDS "
+              "with replacement, re-pool their session samples, take the "
+              "median, and report the sd across draws",
+}
+
+
+def rule_table(horizon_days: int,
+               rows: Sequence[str] | None = None) -> dict[str, dict[str, Any]]:
+    """The tape side of every row at this horizon, blind rows included.
+
+    One `facts.rule_row(..., require=False)` per row, so a row with no
+    centre, no error or no degrees of freedom comes back carrying its
+    `missing` tuple rather than raising here: the objective has to be able
+    to say WHICH rows it is blind on, and an exception cannot be summed
+    over.
+    """
+    if rows is None:
+        rows = tuple(SHAPE) + tuple(LEVEL) + tuple(CRISIS)
+    return {key: rule_row(key, horizon_days=horizon_days, require=False)
+            for key in rows}
+
+
+def rule_fingerprint(table: Mapping[str, Mapping[str, Any]]) -> str:
+    """A digest of every centre, error and df a score was taken against.
+
+    A score is only comparable with another taken against the same tape, and
+    the tape moves: the 504-bar windows landed after the corpus was measured,
+    `fear_gauge_dn3`'s error is not derived yet, and the level row's centre
+    was re-derived in September. So every result carries the fingerprint of
+    the table it used, and two scores with different fingerprints are two
+    numbers rather than a comparison.
+    """
+    payload = json.dumps(
+        [[key, t.get("centre"), t.get("se"), t.get("df"), t.get("estimator")]
+         for key, t in sorted(table.items())],
+        sort_keys=True, default=float)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _welch(se_real: float, df_real: float,
+           se_model: float, df_model: float) -> tuple[float, float]:
+    """The combined error and its Welch-Satterthwaite degrees of freedom."""
+    se = math.sqrt(se_real ** 2 + se_model ** 2)
+    denom = (se_real ** 4 / df_real) + (se_model ** 4 / df_model)
+    return se, (se ** 4 / denom if denom > 0 else math.inf)
+
+
+def rule_term(z: float, df: float) -> float:
+    """`(nu + 1) * ln(1 + z^2 / nu)`, twice a Student-t's negative log-density.
+
+    An identity, so it is written as one and takes no constant. At large
+    `nu` it is `z^2`; at small `nu` it grows as a logarithm, which is the
+    bounded influence the whole form exists for.
+    """
+    if df <= 0:
+        raise ValidationError(
+            f"a t term needs positive degrees of freedom, got {df}")
+    if math.isinf(df):
+        return z * z
+    return (df + 1.0) * math.log1p(z * z / df)
+
+
+def _band_of(key: str, horizon_days: int) -> tuple[float, float] | None:
+    """The row's band at this horizon, for the diagnostic and never for `S`.
+
+    `envelope` owns the seventeen-row table at 504 -- the fourteen shape
+    bands plus the level and crisis rows carrying their 252-day bands, each
+    argued in that module -- so it is imported HERE rather than at module
+    scope: `envelope` reads `loss.STRUCTURAL` inside one of its own
+    functions, and a module-level import in both directions is a cycle
+    waiting for whichever is loaded first.
+    """
+    from . import envelope
+    table = envelope.RULERS_BY_HORIZON.get(int(horizon_days))
+    if table is None:
+        return None
+    band = table[0].get(key)
+    return None if band is None else (float(band[0]), float(band[1]))
+
+
+def _seed_bootstrap_pooled_median(panels: Sequence[Mapping[str, Any]],
+                                  key: str, *, draws: int,
+                                  seed: int) -> float | None:
+    """The sd of the pooled median under resampling the SEEDS, not the sessions.
+
+    The seed is the unit of replication: a run contributes however many
+    sessions its own draw produced, and resampling sessions would price the
+    error of a median over one long series rather than over thirty runs.
+    """
+    per_seed = [tuple(p.get(key + "_samples") or ()) for p in panels]
+    per_seed = [s for s in per_seed if s]
+    if len(per_seed) < 2:
+        return None
+    rng = random.Random(seed)
+    n = len(per_seed)
+    medians = []
+    for _ in range(draws):
+        pooled: list[float] = []
+        for _ in range(n):
+            pooled.extend(rng.choice(per_seed))
+        if pooled:
+            medians.append(statistics.median(pooled))
+    if len(medians) < 2:
+        return None
+    return statistics.stdev(medians)
+
+
+def _blind_reason(key: str, tape: Mapping[str, Any]) -> str:
+    """Why a row with an incomplete tape side is out of the sum, in its words."""
+    return (f"the tape side of {key} is missing "
+            f"{', '.join(tape['missing'])}: "
+            + (REAL_MARKETS_PROVENANCE.get(key, {}).get("centre_se_pending")
+               or f"derive it and record it beside {key!r}; the rule never "
+                  "substitutes a neighbour's"))
+
+
+def scoring_rule(panels: Sequence[Mapping[str, Any]], *,
+                 horizon_days: int,
+                 rows: Sequence[str] | None = None,
+                 bootstrap_draws: int = 2000,
+                 bootstrap_seed: int = 20260905) -> dict[str, Any]:
+    """`S` over the certified rows, from the candidate's own per-seed panels.
+
+    `panels` is one `facts.measure` result per seed, which is what every
+    gate run already produces; the model term is taken from those seeds and
+    not from a frozen table, so it is the candidate's own.
+
+    Returns `{"S", "S_gauss", "rows", "blind", "n_seeds", "horizon_days",
+    "rule_fingerprint"}`. `S_gauss` is `sum z^2`, reported beside `S` and
+    never searched on: it is the quadratic whose unbounded influence buys an
+    unreachable row down at every other row's expense.
+
+    A ROW THE TAPE CANNOT SCORE IS LISTED, NEVER SUBSTITUTED. `blind` maps
+    the row to the reason, `S` sums the rest, and no neighbour's centre or
+    error is read for it -- `SEED_SD_LEVEL_PROVENANCE` already rules that for
+    the seed scale and the rule inherits it for both terms. A score printed
+    without its blind list is not a score: it is a sum over an unnamed subset
+    presented as a sum over the panel.
+    """
+    panels = list(panels)
+    if len(panels) < 2:
+        raise ValidationError(
+            f"the model term is the spread across seeds, so the rule needs "
+            f"at least two per-seed panels, got {len(panels)}")
+    table = rule_table(horizon_days, rows)
+    graded = aggregate_panels(panels, keys=list(table))
+    noise = RULERS_BY_HORIZON.get(int(horizon_days), {}).get("seed_sd", {})
+
+    out_rows: dict[str, Any] = {}
+    blind: dict[str, str] = {}
+    total = gauss = 0.0
+    for key, tape in table.items():
+        kind = AGGREGATE.get(key, "median")
+        values = [p[key] for p in panels if p.get(key) is not None]
+        se_m: float | None = None
+        se_m_boot: float | None = None
+        df_m: float | None = None
+        if kind == "pooled":
+            se_m = _seed_bootstrap_pooled_median(
+                panels, key, draws=bootstrap_draws, seed=bootstrap_seed)
+            df_m = None if se_m is None else len(panels) - 1
+        elif len(values) >= 2:
+            if kind == "median":
+                se_m = median_se(values)
+                se_m_boot = median_se_bootstrap(
+                    values, draws=bootstrap_draws, seed=bootstrap_seed)
+            else:
+                se_m = statistics.stdev(values) / math.sqrt(len(values))
+            df_m = len(values) - 1
+        band = _band_of(key, horizon_days)
+        measured = graded.get(key)
+        row: dict[str, Any] = {
+            "row": key,
+            "T": measured,
+            "centre": tape.get("centre"),
+            "se_real": tape.get("se"),
+            "df_real": tape.get("df"),
+            "se_model": se_m,
+            "se_model_bootstrap": se_m_boot,
+            "df_model": df_m,
+            "estimator": tape.get("estimator"),
+            "model_estimator": MODEL_SE_ESTIMATOR[kind],
+            "source": tape.get("source"),
+            "band": band,
+            "in_band": (None if band is None or measured is None
+                        else band_distance(measured, *band) == 0),
+            # The band POSITION, printed and never summed. The half-width is
+            # 2.6 to 6.2 combined standard errors across the rows, set by the
+            # band rule's rounding and range, so summing it would weight rows
+            # against each other by an accident of the band's geometry --
+            # which is the geometry the objective exists to stop reading.
+            "band_position": (None if band is None or measured is None
+                              or band[1] == band[0]
+                              else (measured - band[0]) / (band[1] - band[0])),
+            "room_sd": (None if band is None or measured is None
+                        or not noise.get(key) else
+                        min(measured - band[0], band[1] - measured)
+                        / noise[key]),
+            "se": None, "z": None, "df": None, "term": None,
+        }
+        why = None
+        if measured is None:
+            why = (f"{key} is not in these panels, so the rule has no "
+                   "graded value for it")
+        elif tape.get("missing"):
+            why = _blind_reason(key, tape)
+        elif se_m is None or df_m is None:
+            why = (f"the model term of {key} needs at least two per-seed "
+                   f"readings and these panels carry {len(values)}"
+                   + ("; a pooled row needs its per-seed session samples"
+                      if kind == "pooled" else ""))
+        if why is not None:
+            blind[key] = why
+            out_rows[key] = row
+            continue
+        se, df = _welch(tape["se"], tape["df"], se_m, df_m)
+        z = (measured - tape["centre"]) / se
+        row["se"] = se
+        row["z"] = z
+        row["df"] = df
+        row["term"] = rule_term(z, df)
+        total += row["term"]
+        gauss += z * z
+        out_rows[key] = row
+
+    return {
+        "S": total,
+        "S_gauss": gauss,
+        "rows": out_rows,
+        "blind": blind,
+        "scored": sorted(k for k in out_rows if k not in blind),
+        "n_seeds": len(panels),
+        "horizon_days": int(horizon_days),
+        "rule_fingerprint": rule_fingerprint(table),
+    }
+
+
+def scoring_rule_from_medians(medians: Mapping[str, float], *,
+                              horizon_days: int,
+                              se_model: Mapping[str, float],
+                              df_model: float,
+                              rows: Sequence[str] | None = None
+                              ) -> dict[str, Any]:
+    """`S` from a record that kept only the aggregated panel, not its seeds.
+
+    The corpus path. `corpus/gates/**` stores one median per row per
+    candidate-block and no per-seed values, so the model term cannot be the
+    candidate's own and has to come from somewhere the caller names:
+    `se_model` and `df_model` are REQUIRED keyword arguments with NO
+    DEFAULT, and that is the guard. What it refuses is a call that lets the
+    frozen `facts.SEED_SD` tables become the model term by omission -- the
+    one substitution the design note measures as wrong by a factor of 0.46
+    to 6.04 against the vectors a search actually visits.
+
+    Passing a frozen table EXPLICITLY is allowed and warns, because there
+    are readers of the old records for whom pt-v1's scale is the only number
+    there is; the warning names it so the reading is not mistaken for the
+    candidate's own noise.
+    """
+    frozen = (("facts.SEED_SD", SEED_SD), ("facts.SEED_SD_504", SEED_SD_504))
+    for name, tbl in frozen:
+        shared = set(se_model) & set(tbl)
+        if shared and all(se_model[k] == tbl[k] for k in shared):
+            warnings.warn(
+                f"{name} was passed as the scoring rule's model error. It is "
+                "pt-v1's across-seed noise, frozen on purpose as the "
+                "denominator of every published room figure, and it is NOT "
+                "the candidate's: measured against the vectors the corpus "
+                "actually holds it runs from 0.46x to 6.04x the truth, so a "
+                "row it understates six-fold is weighted thirty-six times "
+                "too heavily. Use the candidate's own per-seed spread where "
+                "the record has one.",
+                RuntimeWarning, stacklevel=2)
+            break
+    table = rule_table(horizon_days, rows)
+    noise = RULERS_BY_HORIZON.get(int(horizon_days), {}).get("seed_sd", {})
+    out_rows: dict[str, Any] = {}
+    blind: dict[str, str] = {}
+    total = gauss = 0.0
+    for key, tape in table.items():
+        measured = medians.get(key)
+        band = _band_of(key, horizon_days)
+        se_m = se_model.get(key)
+        row: dict[str, Any] = {
+            "row": key,
+            "T": measured,
+            "centre": tape.get("centre"),
+            "se_real": tape.get("se"),
+            "df_real": tape.get("df"),
+            "se_model": se_m,
+            "df_model": df_model,
+            "estimator": tape.get("estimator"),
+            "source": tape.get("source"),
+            "band": band,
+            "in_band": (None if band is None or measured is None
+                        else band_distance(measured, *band) == 0),
+            "band_position": (None if band is None or measured is None
+                              or band[1] == band[0]
+                              else (measured - band[0]) / (band[1] - band[0])),
+            "room_sd": (None if band is None or measured is None
+                        or not noise.get(key) else
+                        min(measured - band[0], band[1] - measured)
+                        / noise[key]),
+            "se": None, "z": None, "df": None, "term": None,
+        }
+        why = None
+        if measured is None:
+            why = f"{key} is not in this record's medians"
+        elif tape.get("missing"):
+            why = _blind_reason(key, tape)
+        elif se_m is None:
+            why = (f"no model error was supplied for {key}, and the rule "
+                   "never reads a neighbour's")
+        if why is not None:
+            blind[key] = why
+            out_rows[key] = row
+            continue
+        se, df = _welch(tape["se"], tape["df"], se_m, df_model)
+        z = (measured - tape["centre"]) / se
+        row["se"] = se
+        row["z"] = z
+        row["df"] = df
+        row["term"] = rule_term(z, df)
+        total += row["term"]
+        gauss += z * z
+        out_rows[key] = row
+    return {
+        "S": total,
+        "S_gauss": gauss,
+        "rows": out_rows,
+        "blind": blind,
+        "scored": sorted(k for k in out_rows if k not in blind),
+        "n_seeds": None,
+        "horizon_days": int(horizon_days),
+        "rule_fingerprint": rule_fingerprint(table),
     }
