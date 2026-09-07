@@ -11,6 +11,9 @@ FIRES rather than being satisfied by construction.
 
 from __future__ import annotations
 
+import pathlib
+import re
+
 import pytest
 
 import tradefloor
@@ -27,7 +30,7 @@ def test_every_choice_is_either_derived_measured_or_declared_unknown():
 
     A new dial fails until someone either records where its value came from
     or adds it to `UNPROVENANCED` on purpose, and provenance cannot be
-    written without the list shrinking. Eighty-four of the ninety-four dials
+    written without the list shrinking. Eighty-five of the ninety-five dials
     in scope have no recorded derivation today; that number is the finding,
     and this is what stops it growing quietly.
     """
@@ -121,6 +124,87 @@ def test_a_dial_in_two_buckets_is_refused():
         pv.OUT_OF_SCOPE = real
 
 
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+
+#: Dials whose setter writes a field other than their own, so the value
+#: reaches the engine under a different name. Pinned, not discovered at
+#: import: a parser that silently found nothing would make the test below
+#: pass by returning an empty set, which is the shape of a broken instrument.
+DERIVED_PARTNERS = {
+    "mispricing_half_life_days": {"mispricing_phi", "s_phi_tick"},
+    "price_breaker_fraction": {"breaker_up", "breaker_down"},
+}
+
+
+def _setter_arms():
+    """Every by-name setter arm in `params.rs`, and the fields it assigns.
+
+    Read from the Rust source because the derived fields are not in
+    `to_dict()` -- `breaker_up` and `breaker_down` are invisible from
+    Python, which is part of why the dial looked dead.
+    """
+    lines = (ROOT / "rust" / "src" / "params.rs").read_text(
+        encoding="utf-8").split("\n")
+    starts = [i for i, l in enumerate(lines)
+              if re.search(r'^\s*"[a-z0-9_]+" => (out\.|\{)', l)]
+    assert starts, "no setter arms parsed; the instrument is broken"
+    region = lines[min(starts):max(starts) + 40]
+
+    arms, i = {}, 0
+    while i < len(region):
+        m = re.match(r'\s*"([a-z0-9_]+)" => (.*)$', region[i])
+        if not m:
+            i += 1
+            continue
+        dial, rest = m.group(1), m.group(2)
+        body = [rest]
+        if rest.strip().startswith("{"):
+            depth = rest.count("{") - rest.count("}")
+            j = i + 1
+            while j < len(region) and depth > 0:
+                body.append(region[j])
+                depth += region[j].count("{") - region[j].count("}")
+                j += 1
+            i = j
+        else:
+            i += 1
+        arms[dial] = set(re.findall(r"out\.([a-z0-9_]+)\s*=", "\n".join(body)))
+    return arms
+
+
+def test_a_dial_that_reaches_the_engine_under_another_name_is_never_out_of_scope():
+    """The mistake this test exists for was made here, and it was mine.
+
+    `price_breaker_fraction` was recorded as never read, because nothing
+    outside `params.rs` mentions it. Its setter derives `breaker_up` and
+    `breaker_down`, the engine reads those, and
+    `the_breaker_band_is_derived_once_at_construction` pins it. Searching
+    the consumer for a dial's own name is the wrong instrument for a dial
+    with a derived partner, and a negative result from the wrong instrument
+    is not evidence.
+
+    So a dial with a derived partner may not be declared out of scope at
+    all: whatever is true of it cannot have been established that way.
+    """
+    arms = _setter_arms()
+    assert len(arms) == len(set(pv.settable_dials())), (
+        f"parsed {len(arms)} setter arms for "
+        f"{len(set(pv.settable_dials()))} settable dials; the parser has "
+        "drifted and would under-report derived partners")
+
+    found = {d: extra for d, a in arms.items() if (extra := a - {d})}
+    assert found == DERIVED_PARTNERS, (
+        "the set of dials writing a field other than their own has changed. "
+        "Each one needs its out-of-scope status re-decided, because its "
+        f"value reaches the engine under another name: {found}")
+
+    for dial in DERIVED_PARTNERS:
+        assert dial not in pv.OUT_OF_SCOPE, (
+            f"{dial} writes {sorted(DERIVED_PARTNERS[dial])} and cannot be "
+            "declared out of scope on evidence about where its own name "
+            "appears")
+
+
 def test_out_of_scope_claims_inertness_and_never_ignorance():
     """`OUT_OF_SCOPE` may say "this cannot be a choice", never "we did not look".
 
@@ -132,7 +216,8 @@ def test_out_of_scope_claims_inertness_and_never_ignorance():
     Enforced on the text, because the text is the claim: every reason names
     a gate, a partner dial, or the fact that nothing reads the dial.
     """
-    grounds = ("inert", "unread", "never read")
+    # "never read" is deliberately NOT here: see the test above.
+    grounds = ("inert", "unread")
     for dial, why in pv.OUT_OF_SCOPE.items():
         assert why and isinstance(why, str), dial
         assert any(g in why for g in grounds), (

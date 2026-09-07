@@ -119,11 +119,28 @@ question, and this module does not pretend to ask it.
 # What `OUT_OF_SCOPE` may and may not mean
 
 It means **this dial cannot be a choice that needs justifying** -- it is
-inert at the shipped value, or unread because a partner dial gates it, or
-not read at all. Each entry names the gate, because "the docstring says it
-is bit-identical" is the kind of evidence this module exists to distrust:
+inert at the shipped value, or unread because a partner dial gates it. Each
+entry names the gate, because "the docstring says it is bit-identical" is
+the kind of evidence this module exists to distrust:
 `market_beta_down_asym`'s docstring says 0.0 is what every preset ships and
 both required presets ship 0.025.
+
+**"Never read" is not an available reason, and the reason it is not is a
+mistake made here.** `price_breaker_fraction` was classified dead because
+nothing outside `params.rs` mentions it. It is not dead: its setter derives
+`breaker_up` and `breaker_down` from it (`params.rs:4022`), the engine reads
+those, and `the_breaker_band_is_derived_once_at_construction` pins the
+behaviour. **A dial can reach the engine under another name**, so searching
+for its own name in the consumer measures the wrong thing, and a negative
+result from the wrong instrument is not evidence.
+
+Two routes were then audited across all 129 settable dials rather than
+argued about. Setter arms that write a field other than their own: exactly
+**two**, `mispricing_half_life_days` and `price_breaker_fraction`, and
+`tests/test_dial_provenance.py` pins that pair and refuses to let either be
+declared out of scope. Dials copied into a differently named field at a
+struct literal: **none**. So every other out-of-scope reason rests on a
+gate that was read, not on a name that was searched for.
 
 It does **not** mean "nobody has looked". A dial that is LIVE at its
 shipped value and that no preset moves is a chosen constant, and it belongs
@@ -294,6 +311,14 @@ POST_BASELINE = {
         "at the values they already had",
     "volume_move_noise":
         "0.2, promoted with it",
+    "price_breaker_fraction":
+        "0.25, the circuit-breaker half-band. LIVE, and it was briefly "
+        "recorded here as dead: nothing outside params.rs names it, but "
+        "the setter derives `breaker_up` and `breaker_down` from it "
+        "(params.rs:4022) and the engine reads those, which "
+        "`the_breaker_band_is_derived_once_at_construction` pins. The "
+        "shipped value is the module constant "
+        "`tick::PRICE_BREAKER_FRACTION` and no preset moves it",
 }
 
 #: Settable dials that cannot be a choice needing justification, and why.
@@ -366,14 +391,6 @@ OUT_OF_SCOPE = {
     "phase_target_range_draw":
         "inert at 0.0: economy/daily.rs:479 branches on `!= 0.0` and takes "
         "the range's midpoint",
-    "price_breaker_fraction":
-        "NEVER READ. Nothing outside params.rs reads this field; the "
-        "breaker uses `breaker_up` and `breaker_down`, which are computed "
-        "from the module constant `tick::PRICE_BREAKER_FRACTION` at "
-        "construction and are NOT recomputed when this dial is set. So it "
-        "is settable and inert, which is a defect in the dial rather than "
-        "a property of the model -- recorded here rather than quietly "
-        "classified",
     "qe_pe_stock_gain":
         "inert at 0.0: it multiplies `ln(qe_assets_ratio)` into the target "
         "P/E, so zero contributes nothing",
@@ -381,19 +398,30 @@ OUT_OF_SCOPE = {
         "inert at 0.0: engine.rs:440 multiplies the phase intensity by "
         "this, so the business cycle reaches the market not at all",
     "size_effect_smoothness":
-        "inert at 0.0: market/factors.rs:294 returns the step value by an "
+        "inert at 0.0: market/factors.rs:295 returns the step value by an "
         "early return, so the power law is never evaluated",
     "size_effect_exponent":
-        "unread while `size_effect_smoothness` is 0.0 -- the early return "
-        "above it happens first. The 0.15 is a fitted number that the "
-        "shipped configuration never reaches",
+        "unread at the shipped `size_effect_smoothness` of 0.0. The guard "
+        "is market/factors.rs:294-297 -- `let s = "
+        "params.size_effect_smoothness; if s == 0.0 { return stepped; }` "
+        "-- and the dial's only read, market/factors.rs:307, sits after "
+        "that early return. The 0.15 is a fitted number the shipped "
+        "configuration never evaluates",
     "spread_size_smoothness":
-        "inert at 0.0: microstructure.rs:207 takes the stepped spread "
-        "when this is `== 0.0`",
+        "inert at 0.0: microstructure.rs:207 takes the stepped spread on "
+        "`size_smoothness == 0.0`, reached from the params through "
+        "market/tick.rs:1201",
     "spread_size_exponent":
-        "unread while `spread_size_smoothness` is 0.0 (microstructure.rs:"
-        "207). The 0.455 is a fitted number the shipped configuration "
-        "never reaches",
+        "unread at the shipped `spread_size_smoothness` of 0.0. Both dials "
+        "DO reach the settlement path -- market/tick.rs:1201-1202 passes "
+        "them from the params -- and the guard is microstructure.rs:207, "
+        "`if size_smoothness == 0.0 || mcap_billions <= 0.0 { stepped }`, "
+        "so the else branch holding this exponent is never evaluated. The "
+        "0.455 is a fitted number the shipped configuration never reaches. "
+        "Noted separately: engine.rs:2789's `book_for` hardcodes 0.0 and "
+        "the module constant instead of reading the params, so a preset "
+        "that smoothed the curve would get an unsmoothed inspection book; "
+        "at the shipped 0.0 the two agree exactly",
     "trough_growth_floor":
         "inert at 0.0: economy/daily.rs:481 leaves the trough range at the "
         "shipped (-1.0, 0.5)",
@@ -673,7 +701,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 
 #: Dials in scope that carry NO entry.
 #:
-#: This list is the finding. Eighty-four of the ninety-four dials in scope
+#: This list is the finding. Eighty-five of the ninety-five dials in scope
 #: have no recorded derivation, and several
 #: carry eight significant figures with no error bar anywhere --
 #: `crisis_blend_gain` at 0.8275881, `crisis_vix_threshold` at 30.88325108,
@@ -754,6 +782,7 @@ UNPROVENANCED = (
     "oil_opec_symmetry",
     "oil_seasonality_target",
     "order_flow_coefficient",
+    "price_breaker_fraction",
     "price_hard_cap",
     "qe_pe_gain",
     "sector_loading",
