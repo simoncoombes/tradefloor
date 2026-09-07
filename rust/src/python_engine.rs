@@ -1832,6 +1832,22 @@ impl PyEngine {
         Ok(Some(out))
     }
 
+    /// The variance targets the last close reverted toward, as
+    /// `(fast, slow)`, or `None` before any close.
+    ///
+    /// `slow` is `None` when the preset has no slow component
+    /// (`market_vol_slow_weight == 0.0` — pt-v1 through pt-v3 and the
+    /// default `PT_V1`), because `factor_vol.rs::close_day_at` returns
+    /// before a slow target is computed on that branch. On such a preset
+    /// the first element is THE target, not a "fast" one.
+    ///
+    /// The two `None`s mean different things: the outer is "no close
+    /// yet", the inner is "no slow component". A fork carries the
+    /// reading, a restore does not.
+    fn market_variance_target(&self) -> Option<(f64, Option<f64>)> {
+        self.inner.market_variance_target()
+    }
+
     /// The model this engine runs, as a `ModelParams`.
     #[getter]
     fn model(&self) -> crate::python_params::PyModelParams {

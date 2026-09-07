@@ -505,27 +505,51 @@ impl MarketVarianceState {
     /// Close-of-day update. Consumes the accumulated innovation exactly
     /// once; a second close before any tick sees a zero innovation, which
     /// is the same quiet-day decay the per-name GARCH exhibits.
-    pub fn close_day(&mut self, vix: f64) {
-        self.close_day_with(&crate::params::PT_V1, vix);
+    pub fn close_day(&mut self, vix: f64) -> (f64, Option<f64>) {
+        self.close_day_with(&crate::params::PT_V1, vix)
     }
 
     /// [`Self::close_day`] under explicit model parameters. What the engine
     /// calls; at [`crate::params::PT_V1`] it is the shipped update bit for
     /// bit.
-    pub fn close_day_with(&mut self, params: &crate::params::ModelParams, vix: f64) {
-        self.close_day_at(params, params.market_vol_vix_anchor, vix);
+    pub fn close_day_with(
+        &mut self, params: &crate::params::ModelParams, vix: f64,
+    ) -> (f64, Option<f64>) {
+        self.close_day_at(params, params.market_vol_vix_anchor, vix)
     }
 
     /// [`Self::close_day_with`] against an EXPLICIT anchor -- what the
     /// engine calls, so that `vix_level_identity`'s derived anchor reaches
     /// the forward map. At `params.market_vol_vix_anchor` this is the
     /// arithmetic that stood here, to the bit.
+    /// Returns the variance TARGETS this close reverted toward:
+    /// `(fast, slow)`, with `slow` absent when there is no slow component.
+    ///
+    /// Returned rather than stored, so nothing is added to
+    /// [`MarketVarianceState`] — no new field, no change to `snapshot`,
+    /// `restore`, `PartialEq` or the state hash. The engine keeps the pair
+    /// if it wants it; see [`crate::engine::Engine::market_variance_target`].
+    ///
+    /// **The slow target is `None` at `market_vol_slow_weight == 0.0`, and
+    /// that is not a convenience.** The fast target is computed
+    /// unconditionally below, before the early return, so it exists on
+    /// both paths. The slow one is computed only after that return, so on
+    /// the single-component branch there is no slow target in existence to
+    /// report. Returning `(target, target)` there would rest on every
+    /// `slow_weight` 0.0 preset also shipping `slow_vix_damp` 0.0 — true
+    /// of today's presets, not an invariant, and a future preset would
+    /// break it silently while the name still claimed a reading from the
+    /// close.
+    ///
+    /// On a single-component preset the first element is THE target, not a
+    /// "fast" one: `fast` only means something when there is a slow
+    /// component to be fast relative to.
     pub fn close_day_at(
         &mut self,
         params: &crate::params::ModelParams,
         vix_anchor: f64,
         vix: f64,
-    ) {
+    ) -> (f64, Option<f64>) {
         // The fear the target reads, not necessarily today's print. Real
         // volatility follows sustained fear with inertia; a model that
         // transmits every VIX print one-for-one into the variance target
@@ -560,7 +584,8 @@ impl MarketVarianceState {
             self.fast_variance = self.variance;
             self.prev_day_factor = self.day_factor;
             self.day_factor = 0.0;
-            return;
+            // No slow component exists on this branch. See the docstring.
+            return (target, None);
         }
 
         let fast = clamp_variance(
@@ -605,6 +630,7 @@ impl MarketVarianceState {
         self.variance = clamp_variance(params, (1.0 - w) * fast + w * slow);
         self.prev_day_factor = self.day_factor;
         self.day_factor = 0.0;
+        (target, Some(slow_target))
     }
 
     /// The state numbers, for checkpoints: `(variance, day_factor,
@@ -1011,5 +1037,52 @@ mod gjr_tests {
             (gap - 0.5 * g * (d * d - t)).abs() < 1e-18,
             "gap {gap} must be (gamma/2)(d^2 - t)"
         );
+    }
+}
+
+#[cfg(test)]
+mod close_day_targets {
+    use super::*;
+    use crate::params::ModelParams;
+
+    /// THE FIRST ELEMENT MEANS THE SAME THING ON BOTH BRANCHES.
+    ///
+    /// `close_day_at` returns `(fast, slow)` and its docstring claims that
+    /// on a single-component preset the first element is THE target rather
+    /// than a "fast" one — which is only honest if the branch does not
+    /// change the value. Asserted on bits: same dials, same state, same
+    /// VIX, `market_vol_slow_weight` the only difference.
+    #[test]
+    fn the_first_target_does_not_depend_on_whether_a_slow_component_exists() {
+        for &damp in &[0.0, 0.5] {
+            for &vix in &[12.0, 19.5, 34.0] {
+                let mut none = ModelParams::pt_v1();
+                none.market_vol_slow_weight = 0.0;
+                none.market_vol_slow_vix_damp = damp;
+                let mut some = none.clone();
+                some.market_vol_slow_weight = 0.35;
+
+                let a = MarketVarianceState::new_with(&none)
+                    .close_day_at(&none, none.market_vol_vix_anchor, vix);
+                let b = MarketVarianceState::new_with(&some)
+                    .close_day_at(&some, some.market_vol_vix_anchor, vix);
+                assert_eq!(a.0.to_bits(), b.0.to_bits(),
+                           "the fast target moved with the slow weight at                             damp {damp}, vix {vix}");
+            }
+        }
+    }
+
+    /// The slow target is absent exactly when there is no slow component,
+    /// and present exactly when there is. Not "usually".
+    #[test]
+    fn the_slow_target_is_present_exactly_when_the_component_is() {
+        for &w in &[0.0, 0.35] {
+            let mut p = ModelParams::pt_v1();
+            p.market_vol_slow_weight = w;
+            let got = MarketVarianceState::new_with(&p)
+                .close_day_at(&p, p.market_vol_vix_anchor, 20.0);
+            assert_eq!(got.1.is_some(), w != 0.0,
+                       "slow weight {w} reported slow target {:?}", got.1);
+        }
     }
 }

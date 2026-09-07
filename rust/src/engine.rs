@@ -398,6 +398,10 @@ pub struct Engine {
     /// day — until its own next day advances. That is the price of
     /// staying out of the hash, and it is stated rather than hidden.
     last_index_variance: Option<crate::market::index_var::IndexVarianceTerms>,
+    /// The variance targets the last close reverted toward, `(fast, slow)`.
+    /// Diagnostic only, like `last_index_variance`, and kept OUT of
+    /// `state_snapshot` and the state hash for the same reason.
+    last_market_targets: Option<(f64, Option<f64>)>,
 }
 
 impl Engine {
@@ -658,6 +662,7 @@ impl Engine {
             vix_anchor: 0.0,
             // No day has closed, so no VIX update has read a variance.
             last_index_variance: None,
+            last_market_targets: None,
         };
         engine.vix_anchor = engine.derive_vix_anchor();
         engine.burn_in_economy();
@@ -839,6 +844,25 @@ impl Engine {
         &self,
     ) -> Option<crate::market::index_var::IndexVarianceTerms> {
         self.last_index_variance
+    }
+
+    /// The variance targets the last close reverted toward: `(fast, slow)`.
+    ///
+    /// `None` before any close. The SLOW element is `None` whenever the
+    /// preset has no slow component (`market_vol_slow_weight == 0.0`,
+    /// which pt-v1 through pt-v3 and `PT_V1` all ship) — on that branch
+    /// `factor_vol.rs` returns before a slow target is ever computed, so
+    /// there is none to report. On such a preset the FIRST element is THE
+    /// target, not a "fast" one.
+    ///
+    /// So a `None` in the outer option and a `None` in the inner one mean
+    /// different things: no close yet, versus no slow component. A fork
+    /// carries the reading (`Engine` derives `Clone`); a restore does not,
+    /// because the snapshot has no such key — which is what keeps this out
+    /// of the state hash — so a restored engine keeps its own last reading
+    /// until its next day.
+    pub fn market_variance_target(&self) -> Option<(f64, Option<f64>)> {
+        self.last_market_targets
     }
 
     /// Draw the day-zero cycle phase and its age from the cycle's own
@@ -2007,7 +2031,8 @@ impl Engine {
         // above and with the same zero-draw discipline. The VIX read here
         // is the day's TRADING value — the macro chain has not advanced
         // yet, exactly as the per-name updates see the day they closed.
-        self.market_vol.close_day_at(&self.params, self.vix_anchor, self.economy.vix);
+        self.last_market_targets =
+            Some(self.market_vol.close_day_at(&self.params, self.vix_anchor, self.economy.vix));
         // The forced-flow reservoir drains on stress days and rebuilds in
         // calm. Updated only while the mechanism is live: at gain 0 or
         // reservoir 0 the state stays exactly 0.0 and nothing changes.
