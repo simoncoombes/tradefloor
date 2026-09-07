@@ -88,29 +88,49 @@ computation was written.
 required preset actually ships, so an entry still goes stale the moment one
 of them moves.
 
-# What still falls through, stated so nobody has to rediscover it
+# The partition, which is what actually closes the crack
 
-**`POST_BASELINE` is not exhaustive and NOTHING HERE MAKES IT SO.** It
-covers the dials the pt-v19 charter's ledger names. A dial added to
-`ModelParams` tomorrow, at a default no required preset moves, enters
-neither scope and no test in this repository fails. That is the same crack,
-still open, one dial narrower.
+An entry table and a declared list still leave the question "what is in
+scope" answered by a computation, and a computation can quietly stop
+covering things. So the settable surface is asserted as a PARTITION:
+**every settable dial is in exactly one of `moved_dials()`,
+`POST_BASELINE`, or `OUT_OF_SCOPE`**, and a dial in none of them fails the
+suite. A dial added tomorrow lands in none. That is the deliverable; the
+classifications are what it costs.
 
-The complete set is derivable -- the dial names in `ModelParams` that do not
-appear in `rust/src/params.rs` at the last release, `git show f47c149:` --
-and on 2026-09-06 that was thirty-four names, twenty-four of them unmoved by
-any required preset and thirteen of those the sector table's own per-sector
-sigmas. `ModelParams` carries 158 dials; 64 are moved off `pt-v1` and five
-are declared here, so 89 are in no scope at all.
+# Which surface, and why `settable()` and not `to_dict()`
 
-**The check that would close it, and it is deliberately not written here:**
-assert the 158 as a PARTITION -- every dial either moved off the baseline,
-or named in `POST_BASELINE`, or named in a committed out-of-scope list with
-a reason -- so a new dial fails the suite until somebody classifies it. That
-needs no git and no history, only that nothing is unaccounted for. It also
-requires 89 first-time classifications, which is a decision about scope
-rather than bookkeeping, so it is left to whoever takes it rather than taken
-here by default.
+`ModelParams.to_dict()` returns 158 names and `ModelParams.settable()`
+returns 129. **The partition is over the 129**, because the question is
+"what did somebody choose" and the other 29 cannot be chosen: fifteen are
+module constants exposed read-only through the by-name getter
+(`inflation_target`, `phillips_curve_coeff`, `fiscal_multiplier` and so
+on), twelve are the sector table's per-sector sigmas read through a
+`strip_prefix` branch, and two -- `mispricing_phi` and `s_phi_tick` -- are
+struct fields DERIVED from `mispricing_half_life_days` whose setter refuses
+them by name. Every dial already in scope is inside the 129, so nothing was
+lost by choosing it.
+
+Those 29 are not thereby blessed. Fifteen of them are hardcoded numbers
+somebody picked, and "no preset can move it" is a statement about the API,
+not about the number. They are a different surface with a different
+question, and this module does not pretend to ask it.
+
+# What `OUT_OF_SCOPE` may and may not mean
+
+It means **this dial cannot be a choice that needs justifying** -- it is
+inert at the shipped value, or unread because a partner dial gates it, or
+not read at all. Each entry names the gate, because "the docstring says it
+is bit-identical" is the kind of evidence this module exists to distrust:
+`market_beta_down_asym`'s docstring says 0.0 is what every preset ships and
+both required presets ship 0.025.
+
+It does **not** mean "nobody has looked". A dial that is LIVE at its
+shipped value and that no preset moves is a chosen constant, and it belongs
+in `POST_BASELINE` with no entry -- which is to say in `UNPROVENANCED`,
+whose whole purpose is to record an admitted gap. Filing a live constant
+under out-of-scope would hide it, and hiding it is the failure this
+partition was built to end.
 """
 
 from __future__ import annotations
@@ -181,6 +201,225 @@ POST_BASELINE = {
         "value the literal carried. Ships at 1e-4 in every preset and binds "
         "on 61 to 90 per cent of name-days in nine of twelve sectors, so it "
         "is a live constraint that no preset has ever chosen",
+
+    # ---- live at the shipped value and moved by no preset -------------
+    # Everything below entered scope with the partition. Each one is READ
+    # on the shipped path -- the read site is named -- and sits at a value
+    # `pt-v1` carries because the dial did not exist when `pt-v1` was
+    # written. That is a chosen constant by the charter's definition, so it
+    # is in scope and it is in `UNPROVENANCED` until somebody derives or
+    # measures it. None of them is being called wrong here; they are being
+    # called unaccounted for, which they are.
+    "garch_omega":
+        "THE ONE WITH A MEASURED CONSEQUENCE. 2e-06 in every preset, read "
+        "at rust/src/market/garch.rs:348. At pt-v16's persistence 0.836415 "
+        "the steady-state idiosyncratic variance is 1.2226e-05, sigma "
+        "0.00350, against `idio_sigma_floor`'s variance 1e-4, sigma "
+        "0.01000 -- so the floor sits 8.2x ABOVE the process fixed point "
+        "and the tick draws with the FLOOR for every sector, which is why "
+        "the sector table's 0.008 to 0.025 spread does not reach the "
+        "running model. Charter 2.6. Its partner "
+        "`garch_omega_sector_scaled` ships 0.0 and is inert by branch, so "
+        "the identity that would derive this value is not on the shipped "
+        "path",
+    "crash_amplifier_slope":
+        "0.2, read at market/factors.rs:552 whenever the shock clears the "
+        "threshold",
+    "crash_amplifier_threshold":
+        "2.0 baseline sigmas, the branch condition at market/factors.rs:551",
+    "crisis_blend_ramp":
+        "1.4, the divisor of the crisis spike at market/tick.rs:768",
+    "crowd_lean_cap":
+        "0.02, the clamp on the crowd's daily shock at mispricing.rs:178. "
+        "Its own docstring calls it a guard; it is a guard with a number",
+    "crowd_momentum_gain":
+        "0.02, read at mispricing.rs:177",
+    "crowd_valuation_gain":
+        "0.006, read at mispricing.rs:177",
+    "garch_ceiling_multiple":
+        "5.0, the per-name variance ceiling at market/garch.rs:190. Its "
+        "docstring says it was searched under bounds and measured as "
+        "BINDING on clustering, so it is not a dormant guard",
+    "garch_floor_multiple":
+        "0.25, the per-name variance floor at market/garch.rs:191",
+    "inflation_ceiling":
+        "6.0 per cent, the clamp at economy/daily.rs:641. Its docstring "
+        "records the series sitting ON this clamp once the reversion is "
+        "loosened, against a real 9.0 in June 2022",
+    "inflation_floor":
+        "-1.0 per cent, the clamp at economy/daily.rs:640",
+    "inflation_reversion":
+        "0.55 of the gap per month, read at economy/daily.rs:577. The "
+        "docstring records it as the hard-coded value promoted to a dial "
+        "and names the miss it produces: monthly acf1 0.936 against a real "
+        "0.978",
+    "informed_flow_fraction":
+        "0.35, the permanent share of order-flow impact at "
+        "market/factors.rs:422",
+    "market_vol_floor_multiple":
+        "0.05, the market factor's variance floor at "
+        "market/factor_vol.rs:363",
+    "market_vol_vix_exponent":
+        "2.0, and the branch at market/factor_vol.rs:375 takes the literal "
+        "square at exactly this value. The square is a modelling choice, "
+        "not an inert default -- the docstring records round 100 measuring "
+        "it too convex through mid-VIX",
+    "mispricing_cap":
+        "0.9, the bound on |s| at market/tick.rs:1338",
+    "mispricing_half_life_days":
+        "60.0 trading days, and the one settable knob for the decay: it "
+        "recomputes `mispricing_phi` and `s_phi_tick`, which the setter "
+        "refuses directly",
+    "news_market_weight":
+        "0.3, read at market/factors.rs:408",
+    "news_sector_weight":
+        "0.5, read at market/factors.rs:406",
+    "order_flow_coefficient":
+        "50.0, the impact coefficient before the informed fraction at "
+        "market/factors.rs:421",
+    "price_hard_cap":
+        "50000.0, applied at market/tick.rs:1054",
+    "usd_crisis_vix_threshold":
+        "25.5, the safe-haven gate at economy/daily.rs:983. A SEPARATE "
+        "dial from `crisis_vix_threshold`, which the required presets move "
+        "to 30.88325108, so the two gates have silently diverged",
+    "vix_ceiling":
+        "80.0, applied at economy/daily.rs:1145 -- and its own docstring "
+        "says 'A CHOSEN constant and not a derived one, declared here so a "
+        "reader can disagree with it'. A dial that admits this in prose "
+        "and is invisible to the audit is the exact pairing this partition "
+        "exists to stop",
+    "volume_move_floor":
+        "0.6, one of four tick-engine literals promoted to dials in 0.3.0 "
+        "at the values they already had",
+    "volume_move_noise":
+        "0.2, promoted with it",
+}
+
+#: Settable dials that cannot be a choice needing justification, and why.
+#:
+#: NOT "nobody has looked" -- that is what `UNPROVENANCED` is for. An entry
+#: here claims the dial is INERT at the value every preset ships, or unread
+#: because a partner gates it, or not read at all, and it names the gate so
+#: the claim can be checked. Every reason below was read off the engine
+#: rather than off the dial's own docstring, because a docstring is exactly
+#: the evidence this module distrusts.
+#:
+#: A dial whose gate is another dial is only inert while that partner sits
+#: where it sits. Move the partner and this entry becomes false -- which is
+#: why each one names the partner rather than saying "inert".
+OUT_OF_SCOPE = {
+    "crisis_blend_variance_damp":
+        "inert at 0.0: market/factors.rs:473 branches on `== 0.0`",
+    "fair_value_book_floor":
+        "inert at 0.0: the book floor is not applied to profitable "
+        "companies, and the valuation is the reference implementation's",
+    "forced_flow_gain":
+        "inert at 0.0: market/tick.rs:962 branches on `!= 0.0`, so the "
+        "whole forced-flow segment is absent",
+    "forced_flow_beta_exponent":
+        "unread while `forced_flow_gain` is 0.0; and inert at 0.0 in its "
+        "own right (market/tick.rs:968)",
+    "forced_flow_replenish":
+        "unread while `forced_flow_gain` is 0.0 (engine.rs:1976 requires "
+        "gain != 0 and reservoir > 0)",
+    "forced_flow_reservoir":
+        "unread while `forced_flow_gain` is 0.0, and 0.0 itself fails the "
+        "`> 0.0` condition at engine.rs:1976",
+    "forced_flow_threshold":
+        "unread while `forced_flow_gain` is 0.0; the 40.0 is the VIX level "
+        "the absent segment would wake at",
+    "garch_beta_dispersion":
+        "inert at 0.0: market/garch.rs:252 spreads persistence by this "
+        "width, and a width of zero leaves every name on the common beta",
+    "garch_cascade_components":
+        "inert at 0.0: economy/daily.rs:204 takes the cascade path only at "
+        "`>= 1.0`, so the single-component GJR recursion runs",
+    "garch_cascade_ratio":
+        "unread while `garch_cascade_components` is 0.0 -- its only read "
+        "site, market/garch.rs:180, is inside the cascade",
+    "garch_cascade_weight":
+        "unread while `garch_cascade_components` is 0.0 -- its only read "
+        "site, market/garch.rs:199, is inside the cascade",
+    "garch_omega_sector_scaled":
+        "inert at 0.0: market/garch.rs:347 branches on `== 0.0` and takes "
+        "the constant `garch_omega`. See `garch_omega`'s entry -- this "
+        "being inert is why that value is not derived on the shipped path",
+    "idio_sigma_beta_exponent":
+        "inert at 0.0: market/factors.rs:98 branches on `== 0.0`",
+    "market_beta_down_asym_lag":
+        "inert at 0.0: market/factors.rs:450 branches on `== 0.0`",
+    "market_vol_gamma":
+        "inert at 0.0: the GJR term at market/factor_vol.rs:395 loads "
+        "`gamma` on the squared shock and omega compensates by `gamma/2`, "
+        "so zero is the symmetric update exactly",
+    "market_vol_vix_smooth":
+        "inert at 0.0: market/factor_vol.rs:536 branches on `== 0.0` and "
+        "reads the raw print",
+    "order_flow_impact_law":
+        "inert at 0.0: market/factors.rs:773 branches on `== 0.0` and "
+        "takes the shipped law",
+    "overnight_variance_ratio":
+        "inert at 0.0: the overnight move is this ratio of a session's "
+        "variance (engine.rs:1856), and nothing moved a price between "
+        "sessions before the dial existed",
+    "phase_target_range_draw":
+        "inert at 0.0: economy/daily.rs:479 branches on `!= 0.0` and takes "
+        "the range's midpoint",
+    "price_breaker_fraction":
+        "NEVER READ. Nothing outside params.rs reads this field; the "
+        "breaker uses `breaker_up` and `breaker_down`, which are computed "
+        "from the module constant `tick::PRICE_BREAKER_FRACTION` at "
+        "construction and are NOT recomputed when this dial is set. So it "
+        "is settable and inert, which is a defect in the dial rather than "
+        "a property of the model -- recorded here rather than quietly "
+        "classified",
+    "qe_pe_stock_gain":
+        "inert at 0.0: it multiplies `ln(qe_assets_ratio)` into the target "
+        "P/E, so zero contributes nothing",
+    "regime_stress_points":
+        "inert at 0.0: engine.rs:440 multiplies the phase intensity by "
+        "this, so the business cycle reaches the market not at all",
+    "size_effect_smoothness":
+        "inert at 0.0: market/factors.rs:294 returns the step value by an "
+        "early return, so the power law is never evaluated",
+    "size_effect_exponent":
+        "unread while `size_effect_smoothness` is 0.0 -- the early return "
+        "above it happens first. The 0.15 is a fitted number that the "
+        "shipped configuration never reaches",
+    "spread_size_smoothness":
+        "inert at 0.0: microstructure.rs:207 takes the stepped spread "
+        "when this is `== 0.0`",
+    "spread_size_exponent":
+        "unread while `spread_size_smoothness` is 0.0 (microstructure.rs:"
+        "207). The 0.455 is a fitted number the shipped configuration "
+        "never reaches",
+    "trough_growth_floor":
+        "inert at 0.0: economy/daily.rs:481 leaves the trough range at the "
+        "shipped (-1.0, 0.5)",
+    "universe_stress_weight":
+        "inert at 0.0: market/tick.rs:760 branches on `== 0.0` and the "
+        "blend reads today's VIX alone",
+    "universe_stress_decay":
+        "unread while `universe_stress_weight` is 0.0, and 0.0 itself "
+        "multiplies the remembered stress to nothing (engine.rs:443)",
+    "vix_jump_intensity":
+        "inert at 0.0: economy/daily.rs:1128 branches on `!= 0.0`, so no "
+        "exogenous fear event is ever drawn",
+    "vix_jump_scale":
+        "unread while `vix_jump_intensity` is 0.0, and 0.0 itself scales "
+        "any jump to nothing (economy/daily.rs:1132)",
+    "vix_target_offset":
+        "inert at 0.0: a constant added to the VIX target, and the level "
+        "identity retires it outright",
+    "volume_idio_persistence":
+        "inert at 0.0: the per-name volume state has no memory and no "
+        "innovation, so the common multiplier is the whole of it",
+    "volume_idio_sigma":
+        "unread while `volume_idio_persistence` is 0.0",
+    "volume_idio_variance_gain":
+        "inert at 0.0: volume follows the market factor's variance and "
+        "nothing of the name's own",
 }
 
 #: The provenance of each shipped dial value.
@@ -434,8 +673,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 
 #: Dials in scope that carry NO entry.
 #:
-#: This list is the finding. Fifty-nine of the sixty-nine dials in the
-#: shipped and candidate presets have no recorded derivation, and several
+#: This list is the finding. Eighty-four of the ninety-four dials in scope
+#: have no recorded derivation, and several
 #: carry eight significant figures with no error bar anywhere --
 #: `crisis_blend_gain` at 0.8275881, `crisis_vix_threshold` at 30.88325108,
 #: `market_vol_vix_anchor` at 15.98426471. A search optimum with decimal
@@ -455,10 +694,16 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: provenance or added here on purpose.
 UNPROVENANCED = (
     "cascade_symmetry",
+    "crash_amplifier_slope",
+    "crash_amplifier_threshold",
     "crisis_blend_cap",
     "crisis_blend_gain",
+    "crisis_blend_ramp",
     "crisis_blend_source",
     "crisis_vix_threshold",
+    "crowd_lean_cap",
+    "crowd_momentum_gain",
+    "crowd_valuation_gain",
     "cycle_hazard_per_month",
     "cycle_stationary_opening",
     "daily_credit_floor_gain",
@@ -467,9 +712,16 @@ UNPROVENANCED = (
     "endogenous_news_sigma",
     "garch_alpha",
     "garch_beta",
+    "garch_ceiling_multiple",
+    "garch_floor_multiple",
+    "garch_omega",
     "garch_vix_coupling",
     "idio_sigma_floor",
     "idio_sigma_scale",
+    "inflation_ceiling",
+    "inflation_floor",
+    "inflation_reversion",
+    "informed_flow_fraction",
     "jump_intensity_idio",
     "jump_intensity_market",
     "jump_mean_compensated",
@@ -483,22 +735,32 @@ UNPROVENANCED = (
     "market_vol_alpha",
     "market_vol_beta",
     "market_vol_ceiling_multiple",
+    "market_vol_floor_multiple",
     "market_vol_slow_persistence",
     "market_vol_slow_vix_damp",
     "market_vol_slow_weight",
     "market_vol_vix_anchor",
     "market_vol_vix_coupling",
+    "market_vol_vix_exponent",
+    "mispricing_cap",
+    "mispricing_half_life_days",
     "momentum_theta",
     "neutral_discount_rate",
+    "news_market_weight",
     "news_peer_vix_coupling",
     "news_peer_weight",
     "news_peer_weight_down",
+    "news_sector_weight",
     "oil_opec_symmetry",
     "oil_seasonality_target",
+    "order_flow_coefficient",
+    "price_hard_cap",
     "qe_pe_gain",
     "sector_loading",
     "sector_loading_beta_slope",
     "sector_vix_coupling",
+    "usd_crisis_vix_threshold",
+    "vix_ceiling",
     "vix_cycle_amplitude",
     "vix_decay_ratio",
     "vix_level_identity",
@@ -510,10 +772,23 @@ UNPROVENANCED = (
     "vix_target_shock_cap",
     "volume_innovation_sigma",
     "volume_move_cap",
+    "volume_move_floor",
+    "volume_move_noise",
     "volume_move_response",
     "volume_persistence",
     "volume_variance_gain",
 )
+
+
+def settable_dials() -> tuple[str, ...]:
+    """The surface the partition is over: what a preset can actually set.
+
+    `ModelParams.settable()`, not `to_dict()`. The module note says why the
+    two differ and why this is the right one; it is a function rather than a
+    constant so a test can substitute a surface with one more name on it and
+    check that the unclassified dial fails.
+    """
+    return tuple(ModelParams.settable())
 
 
 def _dict(name: str) -> dict[str, float]:
@@ -559,6 +834,58 @@ def required_dials() -> dict[str, dict[str, float]]:
             if key in values:
                 out.setdefault(key, {})[preset] = values[key]
     return out
+
+
+def partition() -> dict[str, Any]:
+    """Every settable dial, in exactly one bucket, with the leftovers named.
+
+    `unclassified` is the one that matters. A dial added to `ModelParams`
+    lands in no bucket, appears here, and fails `check()` until somebody
+    decides which bucket it belongs in and writes the reason down. That is
+    the whole point: the scope stops being a computation that can silently
+    stop covering things.
+
+    `overlapping` catches the other direction. A dial declared out of scope
+    that a preset then moves would otherwise be counted twice and read as
+    settled in one place while being a live choice in the other.
+    """
+    surface = set(settable_dials())
+    moved = set(moved_dials())
+    buckets = {
+        "moved": moved,
+        "post_baseline": set(POST_BASELINE),
+        "out_of_scope": set(OUT_OF_SCOPE),
+    }
+
+    faults: list[str] = []
+    for label, names in buckets.items():
+        for dial in sorted(names - surface):
+            faults.append(
+                f"{dial}: declared in {label.upper()} and is not a settable "
+                "dial of this build")
+
+    overlapping: list[str] = []
+    labels = list(buckets)
+    for i, left in enumerate(labels):
+        for right in labels[i + 1:]:
+            for dial in sorted(buckets[left] & buckets[right]):
+                overlapping.append(
+                    f"{dial}: in both {left.upper()} and {right.upper()}; a "
+                    "dial belongs to exactly one, and a live choice filed "
+                    "as out of scope is the failure this partition ends")
+
+    claimed = set().union(*buckets.values())
+    unclassified = sorted(surface - claimed)
+
+    return {
+        "surface": len(surface),
+        "moved": sorted(buckets["moved"] & surface),
+        "post_baseline": sorted(buckets["post_baseline"]),
+        "out_of_scope": sorted(buckets["out_of_scope"]),
+        "unclassified": unclassified,
+        "overlapping": overlapping,
+        "faults": faults,
+    }
 
 
 def validate_entry(dial: str, entry: Any) -> list[str]:
@@ -619,7 +946,9 @@ def audit() -> dict[str, Any]:
     `invalid` are entries that fail the schema; `mismatched` are entries
     whose recorded value is not what the preset ships, which is exactly how
     a record goes stale when a dial moves under it; `post_baseline` are
-    faults in the declared list itself.
+    faults in the declared list itself; `unclassified` are settable dials
+    in no bucket of the partition at all, which is what a newly added dial
+    looks like before anyone has decided about it.
     """
     base = _dict(BASELINE)
     moved = moved_dials()
@@ -638,6 +967,10 @@ def audit() -> dict[str, Any]:
                 f"{', '.join(sorted(moved[dial]))} moves it off {BASELINE}. "
                 "It is already in scope under the difference rule, and "
                 "declaring it here as well hides that somebody chose it")
+
+    part = partition()
+    post_baseline.extend(part["faults"])
+    post_baseline.extend(part["overlapping"])
 
     invalid: list[str] = []
     for dial, entry in sorted(DIAL_PROVENANCE.items()):
@@ -668,6 +1001,9 @@ def audit() -> dict[str, Any]:
         "moved": sorted(moved),
         "post_baseline_in_scope": sorted(set(required) - set(moved)),
         "post_baseline": post_baseline,
+        "unclassified": part["unclassified"],
+        "out_of_scope": part["out_of_scope"],
+        "surface": part["surface"],
         "provenanced": sorted(DIAL_PROVENANCE),
         "missing": sorted(set(required) - covered),
         "unprovenanced": sorted(set(required) & set(UNPROVENANCED)),
@@ -686,6 +1022,9 @@ def report() -> str:
     """The audit as a table, for a human deciding what to derive next."""
     a = audit()
     lines = [
+        f"{a['surface']} settable dials, partitioned",
+        f"  {len(a['out_of_scope'])} out of scope, each with its reason",
+        f"  {len(a['unclassified'])} unclassified",
         f"{len(a['required'])} dials in scope for "
         f"{', '.join(REQUIRED_PRESETS)}",
         f"  {len(a['moved'])} moved off {BASELINE}",
@@ -697,7 +1036,7 @@ def report() -> str:
         f"  {len(a['missing'])} with neither",
     ]
     for label in ("missing", "invalid", "mismatched", "stale_unprovenanced",
-                  "post_baseline"):
+                  "post_baseline", "unclassified"):
         for item in a[label]:
             lines.append(f"  {label.upper()}: {item}")
     return "\n".join(lines)
@@ -709,6 +1048,9 @@ def check() -> None:
     faults = (
         [f"no provenance and not declared unprovenanced: {d}" for d in a["missing"]]
         + a["invalid"] + a["mismatched"] + a["post_baseline"]
+        + [f"settable and in no bucket of the partition -- decide whether it "
+           f"is a choice needing provenance or record why it is not: {d}"
+           for d in a["unclassified"]]
         + [f"declared unprovenanced but not in scope for any required "
            f"preset: {d}" for d in a["stale_unprovenanced"]]
     )

@@ -27,7 +27,7 @@ def test_every_choice_is_either_derived_measured_or_declared_unknown():
 
     A new dial fails until someone either records where its value came from
     or adds it to `UNPROVENANCED` on purpose, and provenance cannot be
-    written without the list shrinking. Fifty-nine of the sixty-nine dials
+    written without the list shrinking. Eighty-four of the ninety-four dials
     in scope have no recorded derivation today; that number is the finding,
     and this is what stops it growing quietly.
     """
@@ -59,6 +59,86 @@ def test_an_entry_that_goes_stale_when_its_dial_moves_is_caught():
     with_moved = dict(pv.DIAL_PROVENANCE, **{dial: moved})
     a = _audit_with(with_moved, pv.UNPROVENANCED)
     assert any("ships" in m for m in a["mismatched"]), a["mismatched"]
+
+
+def test_the_settable_surface_is_a_partition():
+    """Every settable dial in exactly one bucket, and none left over.
+
+    This is the test the whole module was missing. Scope used to be a
+    COMPUTATION -- "differs from pt-v1" -- and a computation can quietly
+    stop covering things: on 2026-09-06 it had stopped covering a tape
+    measurement, an exponent whose shipped value is not the measured one,
+    and a live per-name floor, and every test here passed. A partition
+    cannot do that, because the leftovers are named.
+    """
+    part = pv.partition()
+    assert part["surface"] == len(set(pv.settable_dials()))
+    assert not part["faults"], part["faults"]
+    assert not part["overlapping"], part["overlapping"]
+    assert not part["unclassified"], (
+        "settable dials in no bucket -- classify them rather than letting "
+        f"the audit not ask about them: {part['unclassified']}")
+
+    counted = (len(part["moved"]) + len(part["post_baseline"])
+               + len(part["out_of_scope"]))
+    assert counted == part["surface"], (counted, part["surface"])
+
+
+def test_a_dial_added_tomorrow_fails_until_somebody_classifies_it():
+    """The property the partition exists for, made to fire.
+
+    A new dial lands in no bucket. It has to FAIL, not be absorbed, or the
+    partition is a description of today rather than a guard on tomorrow.
+    """
+    real = pv.settable_dials
+    pv.settable_dials = lambda: tuple(real()) + ("a_dial_nobody_classified",)
+    try:
+        part = pv.partition()
+        assert part["unclassified"] == ["a_dial_nobody_classified"], part
+        with pytest.raises(tradefloor.ValidationError,
+                           match="no bucket of the partition"):
+            pv.check()
+    finally:
+        pv.settable_dials = real
+
+
+def test_a_dial_in_two_buckets_is_refused():
+    """The other direction, and it is the one that would hide a choice.
+
+    A dial filed out of scope that a preset then moves would read as
+    settled in one place and be a live choice in the other. `vix_return_gain`
+    is moved by both required presets, so declaring it out of scope has to
+    be refused.
+    """
+    real = pv.OUT_OF_SCOPE
+    pv.OUT_OF_SCOPE = dict(real, vix_return_gain="filed away")
+    try:
+        assert any("in both MOVED and OUT_OF_SCOPE" in f
+                   for f in pv.partition()["overlapping"]), pv.partition()
+        with pytest.raises(tradefloor.ValidationError, match="in both"):
+            pv.check()
+    finally:
+        pv.OUT_OF_SCOPE = real
+
+
+def test_out_of_scope_claims_inertness_and_never_ignorance():
+    """`OUT_OF_SCOPE` may say "this cannot be a choice", never "we did not look".
+
+    The distinction is the module's whole point one level up. A dial that is
+    LIVE at its shipped value and moved by nobody is a chosen constant and
+    belongs in `POST_BASELINE` with no entry -- which is `UNPROVENANCED`,
+    the state that records an admitted gap. Filing it here would hide it.
+
+    Enforced on the text, because the text is the claim: every reason names
+    a gate, a partner dial, or the fact that nothing reads the dial.
+    """
+    grounds = ("inert", "unread", "never read")
+    for dial, why in pv.OUT_OF_SCOPE.items():
+        assert why and isinstance(why, str), dial
+        assert any(g in why for g in grounds), (
+            f"{dial}: an out-of-scope reason claims the dial cannot be a "
+            f"choice, and this one does not say so: {why!r}")
+        assert "nobody has looked" not in why, dial
 
 
 def test_post_baseline_names_dials_the_difference_rule_cannot_reach():
