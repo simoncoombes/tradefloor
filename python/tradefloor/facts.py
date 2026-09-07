@@ -1383,6 +1383,265 @@ SEED_SD_LEVEL_PROVENANCE = {
 }
 
 # --------------------------------------------------------------------------
+# The VIX's persistence, and the ruler a run of a given length is graded by
+#
+# One estimator, one window, one debias, and all three named wherever the
+# number appears. The row this section exists for -- the model's
+# `vix_ar1_debiased` -- is a PER-RUN reading: one seed's daily VIX levels
+# over the run, the lag-one autocorrelation about that run's own mean, the
+# median across seeds, then the first-order small-sample correction at the
+# run's length. The figure it was compared against for months, 0.976, is the
+# WHOLE-SPAN autocorrelation of ^VIX -- one series of 8,960 bars, and it
+# checks at 0.9772.
+#
+# Those are two different quantities and the model's is the smaller one. The
+# same estimator on the same tape, cut into 252-session windows, reads a
+# median of 0.9151 raw, and debiased at the run length it lands about 0.047
+# BELOW the whole-span figure. So the gap runs the other way from the way it
+# was read: every identity arm of the level fix is more persistent than the
+# real VIX rather than short of it, and `id-v18-d100`'s 0.9763 "MET" was a
+# comparison between two estimators.
+#
+# RULED (`programme/PT-V19-CHARTER.md` section 1.5, 2026-09-06): the ruler is
+# the WINDOWED, DEBIASED figure, derived from the tape by the same estimator
+# the model uses, at the same window length as the horizon being graded. Not
+# the whole-span number. A run of `CERTIFIED_HORIZON_DAYS` sessions is the
+# model's natural unit and the panel certifies at that length; re-estimating
+# the model whole-span would mean concatenating seeds, which are different
+# market paths and not one series.
+#
+# And so it is horizon-parameterised, like every other ruler here rather than
+# by a second convention: it is registered in `RULERS_BY_HORIZON` below and
+# `real_vix_ar1` REFUSES a horizon nobody derived it at, instead of handing
+# back the 252-day figure for a 504-day run. That is this same defect one
+# length further out, and section 1.3 moves the certified horizon to 504.
+
+
+def level_ar1(series: Sequence[float]) -> float:
+    """Lag-one autocorrelation of a LEVEL series about its own mean.
+
+    `_autocorrelation` at lag one, CALLED rather than reimplemented. A
+    second lag-one autocorrelation in this module would be two functions
+    that agree numerically today, which is the whole of the defect this
+    section repairs; `tests/test_vix_ar1_ruler.py` asserts that the tape's
+    ruler and the model's row both resolve this one object, and constructs
+    an exactly-agreeing twin to show the assertion rejects it.
+
+    A series with no lag-one pair, or a constant one, is REFUSED rather
+    than reported as 0.0, which is what `_autocorrelation` returns for
+    both. A constant VIX is not a VIX with no persistence, and a
+    fabricated zero inside a median across runs moves that median without
+    announcing itself.
+    """
+    values = [float(v) for v in series]
+    if len(values) < 3:
+        raise ValidationError(
+            f"a lag-one autocorrelation needs at least three observations, "
+            f"got {len(values)}")
+    mean = statistics.fmean(values)
+    if sum((v - mean) ** 2 for v in values) == 0.0:
+        raise ValidationError(
+            "a constant series has no lag-one autocorrelation, and 0.0 -- "
+            "which `_autocorrelation` returns for one -- would enter a "
+            "median across runs as a reading rather than as the absence of "
+            "one")
+    return _autocorrelation(values, 1)
+
+
+def debias_ar1(rho: float, n: int) -> float:
+    """`rho + (1 + 3 rho) / n`: the Marriott-Pope / Kendall first correction.
+
+    A lag-one autocorrelation estimated about the sample's OWN mean is
+    biased DOWN by about `(1 + 3 rho) / n`. At n = 252 and rho near 0.93
+    that is 0.015 -- the same size as the distance between the model and
+    the tape -- so leaving it out would read a correct model as too fast.
+
+    Both sides of the comparison carry it, which is the point of putting it
+    here: the correction cancels only if the ruler and the row apply the
+    same one at the same n, and the ruler's n is the window length while
+    the row's is the run length, which is why they are the same number.
+    """
+    if n < 3:
+        raise ValidationError(
+            f"the debias divides by the length the reading was taken over, "
+            f"which must be at least 3, got {n}")
+    return float(rho) + (1.0 + 3.0 * float(rho)) / int(n)
+
+
+def median_ar1_debiased(readings: Iterable[float], *, n: int) -> float:
+    """The median of several raw lag-one readings, debiased at their length.
+
+    The aggregation the model's row already used -- median first, then the
+    correction on the median -- kept in that order because the correction
+    is monotone in rho and the rows on the record were computed this way.
+    """
+    values = [float(r) for r in readings]
+    if not values:
+        raise ValidationError(
+            "no lag-one readings to take a median of; a ruler derived from "
+            "nothing is the failure this refusal exists for")
+    return debias_ar1(statistics.median(values), n)
+
+
+def median_level_ar1(runs: Iterable[Sequence[float]], *, length: int) -> float:
+    """`level_ar1` of every run, the median across them, debiased at `length`.
+
+    THE function. The tape's ruler is this applied to non-overlapping
+    `length`-session blocks of ^VIX closes; the model's row is this applied
+    to one `length`-day VIX level series per seed. Same function, different
+    data, which is the property the estimator has to have and did not: the
+    number the model was graded against was computed by different code over
+    a different span.
+
+    A run of any other length is REFUSED. The debias divides by a length,
+    and a 504-day model row read through the 252-day ruler is this
+    section's defect at the next horizon, reached by the same route, which
+    is that nothing checked.
+    """
+    series = [list(run) for run in runs]
+    if not series:
+        raise ValidationError(
+            "no runs to take a median lag-one autocorrelation over")
+    wrong = sorted({len(run) for run in series} - {int(length)})
+    if wrong:
+        raise ValidationError(
+            f"every run must be {length} observations long, which is the "
+            f"length the debias divides by and the horizon the ruler is "
+            f"derived at; got runs of {wrong}. Grade a run at its own "
+            f"horizon (`facts.real_vix_ar1`) rather than through this one.")
+    return median_ar1_debiased([level_ar1(run) for run in series],
+                               n=int(length))
+
+
+def vix_levels(macro: Any) -> list[float]:
+    """The daily VIX level series of a recorded run, from its macro table.
+
+    `Engine.macro_table()`'s `vix` column in day order -- the series every
+    harness reporting a VIX AR1 has been rebuilding for itself out of
+    `state_snapshot()["economy"]["vix"]`, one seed at a time. One reader, so
+    the MODEL side of the comparison is as fixed as the estimator is.
+    """
+    try:
+        import pyarrow as pa
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError(
+            "vix_levels reads Arrow tables and needs pyarrow. Install it "
+            "with: pip install tradefloor[arrow]") from exc
+    table = pa.table(macro).to_pydict()
+    rows = [(int(day), v) for day, v in zip(table["day"], table["vix"])
+            if v is not None]
+    return [float(v) for _, v in sorted(rows)]
+
+
+#: The tape's own raw lag-one readings, per window, per horizon: what
+#: `tools/calibration/vix_ar1_ruler.py` cuts out of ^VIX, recorded here so
+#: the ruler below is a DERIVATION rather than a literal.
+#:
+#: ^VIX daily closes, 1990-01-02..2025-07-30, 8,960 bars, through
+#: `tools/shadow/data.py` (vendor data, not committed, so the tool
+#: re-derives and this module records). Cut front-anchored into consecutive
+#: non-overlapping blocks of `days` closes with the incomplete tail dropped:
+#: 35 blocks to 2025-01-06 at 252, 17 to 2024-01-04 at 504. Non-overlapping
+#: because the model's runs are independent paths and overlapping windows
+#: would share bars; front-anchored because the tape's own start is the one
+#: anchor nobody chooses, and the end-anchored cut is reported beside it as
+#: the residual.
+REAL_VIX_AR1_WINDOWS: dict[int, tuple[float, ...]] = {
+    252: (
+        0.932986, 0.936984, 0.932669, 0.831825, 0.891625, 0.807711,
+        0.863434, 0.950051, 0.963172, 0.883080, 0.912968, 0.944540,
+        0.968119, 0.980974, 0.902529, 0.875963, 0.919307, 0.950860,
+        0.974381, 0.967820, 0.923876, 0.951197, 0.892371, 0.811283,
+        0.898589, 0.915077, 0.936773, 0.801044, 0.904585, 0.840256,
+        0.954118, 0.823957, 0.903528, 0.941548, 0.848448,
+    ),
+    504: (
+        0.952398, 0.941728, 0.899211, 0.960833, 0.951699, 0.942366,
+        0.976975, 0.934406, 0.959890, 0.974375, 0.945409, 0.918508,
+        0.920164, 0.952086, 0.902994, 0.957686, 0.967174,
+    ),
+}
+
+#: The ruler: the tape's windowed, debiased VIX AR1, per horizon.
+#:
+#: DERIVED at import from the readings above, by the same two functions the
+#: model's row goes through, so there is nowhere to write the number down and
+#: no way for it to drift from the readings it comes from. The value is not
+#: quoted here either, and `tests/test_vix_ar1_ruler.py` asserts it appears
+#: nowhere in this file: a ruler with a literal beside its derivation has two
+#: spellings, and the one a reader copies is the stale one. Print it with
+#: `tools/calibration/vix_ar1_ruler.py`.
+REAL_VIX_AR1: dict[int, float] = {
+    days: median_ar1_debiased(raws, n=days)
+    for days, raws in REAL_VIX_AR1_WINDOWS.items()
+}
+
+REAL_VIX_AR1_PROVENANCE = {
+    "kind": "derived",
+    "claim": "the lag-one autocorrelation a correct model's VIX level "
+             "series would read over a run of `days` sessions, on the "
+             "estimator and at the length the model's own row uses",
+    "series": "^VIX daily close, 1990-01-02..2025-07-30, 8,960 bars, via "
+              "tools/shadow/data.py (Yahoo v8 chart API; vendor data is "
+              "not committed, so the tool re-derives and this module "
+              "records the windows)",
+    "estimator": "facts.median_level_ar1: facts.level_ar1 -- which is "
+                 "facts._autocorrelation at lag one, about each window's "
+                 "own mean -- per window, the median across windows, then "
+                 "facts.debias_ar1",
+    "window": "consecutive non-overlapping blocks of `days` closes, "
+              "front-anchored at the tape's first bar, the incomplete tail "
+              "dropped: 35 windows at 252 (to 2025-01-06, 140 bars "
+              "dropped), 17 at 504 (to 2024-01-04, 392 dropped)",
+    "debias": "rho + (1 + 3 rho) / days, Marriott-Pope / Kendall first "
+              "order, at the WINDOW length, which is the run length the "
+              "model's row debiases at",
+    "residual": "at 252, 35 windows, raw median 0.915077, sd across "
+                "windows 0.0513, bootstrap se of the median 0.0120 "
+                "(20,000 resamples, seed 20260906); the end-anchored cut "
+                "reads 0.930052, moving the ruler by 0.000113. At 504, 17 "
+                "windows, raw median 0.951699, sd 0.0230, bootstrap se of "
+                "the median 0.0061, and the end-anchored cut reads "
+                "0.950772 -- the anchoring choice moves the 504 ruler by "
+                "0.0086, MORE than its own sampling error, because "
+                "seventeen windows place 2008 differently. The 504 figure "
+                "carries that residual and the 252 figure does not",
+    "not_the_ruler": "the whole-span reading of the same series is 0.9772 "
+                     "raw and 0.9777 debiased, 0.047 above this one. It is "
+                     "`REAL_AR1 = 0.976` in the design repository's "
+                     "programme scripts, correctly documented as "
+                     "whole-span there and compared against 252-day model "
+                     "rows anyway",
+    "source": "tradefloor-design/programme/PT-V19-CHARTER.md section 1.5, "
+              "ruled 2026-09-06; derived by "
+              "tools/calibration/vix_ar1_ruler.py",
+}
+
+
+def real_vix_ar1(days: Any, *, what: str = "this measurement") -> float:
+    """The windowed, debiased VIX AR1 a `days`-session run is graded against.
+
+    Raises for a horizon the ruler was not derived at, on the argument
+    `rulers_for_horizon` raises on: handing back the 252-day figure for a
+    504-day run compares a reading against a number computed over a
+    different length, which is the defect this ruler exists to end rather
+    than to relocate. The tape's readings at 252 and 504 differ by 0.029,
+    so the substitution is not a small one.
+    """
+    try:
+        return REAL_VIX_AR1[int(days)]
+    except (KeyError, TypeError, ValueError):
+        raise ValidationError(
+            f"the VIX AR1 ruler has not been derived at {days!r} days, so "
+            f"{what} cannot be graded against it. The horizons with one "
+            f"are {sorted(REAL_VIX_AR1)}. Cut the tape at {days!r} with "
+            f"tools/calibration/vix_ar1_ruler.py and record its windows in "
+            f"REAL_VIX_AR1_WINDOWS, rather than reading the ruler for "
+            f"another length."
+        ) from None
+
+
+# --------------------------------------------------------------------------
 # Which ruler belongs to which horizon
 #
 # A band table and a noise scale are each derived AT a horizon, and a panel is
@@ -1403,13 +1662,16 @@ SEED_SD_LEVEL_PROVENANCE = {
 #: default. `envelope.CERTIFIED_HORIZON_DAYS` is this value.
 CERTIFIED_HORIZON_DAYS = 252
 
-#: The horizons that HAVE a ruler, and the two tables that make each one up.
+#: The horizons that HAVE a ruler, and what makes each one up.
 #:
 #: A scoring call looks a horizon up here instead of choosing a table, so a
 #: horizon with no band set is refused BY NAME rather than falling through to
-#: the 252-day set. Adding a horizon means deriving BOTH tables at it: bands
-#: without a noise scale cannot report how far inside a band a statistic sits,
-#: and a noise scale without bands grades nothing.
+#: the 252-day set. Adding a horizon means deriving ALL THREE parts at it:
+#: bands without a noise scale cannot report how far inside a band a statistic
+#: sits, a noise scale without bands grades nothing, and `vix_ar1` is here
+#: because a persistence ruler that does not move with the horizon is how a
+#: 252-day model row came to be graded against a whole-span tape figure
+#: (`REAL_VIX_AR1` above).
 #:
 #: No 60-day, 180-day or 756-day entry exists because no band set has been
 #: derived at those horizons. `realism_bands_horizon.py` in the design
@@ -1422,12 +1684,16 @@ RULERS_BY_HORIZON: dict[int, dict[str, Any]] = {
         "bands_name": "facts.REAL_MARKETS",
         "seed_sd": SEED_SD,
         "seed_sd_name": "facts.SEED_SD",
+        "vix_ar1": REAL_VIX_AR1[CERTIFIED_HORIZON_DAYS],
+        "vix_ar1_name": "facts.REAL_VIX_AR1[252]",
     },
     504: {
         "bands": REAL_MARKETS_504,
         "bands_name": "facts.REAL_MARKETS_504",
         "seed_sd": SEED_SD_504,
         "seed_sd_name": "facts.SEED_SD_504",
+        "vix_ar1": REAL_VIX_AR1[504],
+        "vix_ar1_name": "facts.REAL_VIX_AR1[504]",
     },
 }
 

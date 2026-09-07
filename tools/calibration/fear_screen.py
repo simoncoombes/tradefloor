@@ -7,7 +7,25 @@ in brackets): rv21-VIX tracking +0.868 [+0.60,+0.92], spike asymmetry
 [0.004,0.263], same-day corr -0.813 [-0.84,-0.78] (already real at
 shipped; guarded, not chased). Panel guard: 4-seed p252 medians per
 cell, because the u63 lesson says a livelier VIX breaks the calibrated
-panel and the breakage size decides the re-levelling budget."""
+panel and the breakage size decides the re-levelling budget.
+
+THE AR(1) TARGET ABOVE IS NOT THIS SCRIPT'S RULER, and saying so is the
+whole of PT-V19-CHARTER section 1.5. 0.976 is the WHOLE-SPAN lag-one
+autocorrelation of ^VIX -- one series of 8,960 bars -- and `ar1` here is
+a reading over 1,259 sessions, one run at a time, the median across
+seeds. The same estimator on the same tape reads 0.9299 at a 252-session
+window and 0.9593 at 504 (derived 2026-09-06; `facts.REAL_VIX_AR1` is the
+live pair), so the length matters by far more than the sampling error,
+and no ruler has been derived at 1,259.
+
+What this script now reports, named: `ar1` is `facts.level_ar1` per seed
+-- the lag-one autocorrelation about that run's own mean, raw --
+`ar1_days` is the length it was taken over, and `ar1_debiased` in the
+summary is `facts.median_ar1_debiased`, the median across seeds with the
+Marriott-Pope / Kendall correction `rho + (1 + 3 rho) / n` at that
+length. It went through a private Pearson correlation of two shifted
+slices, undebiased, until 2026-09-06. Derive a ruler to compare it
+against with `tools/calibration/vix_ar1_ruler.py --window 1259`."""
 import argparse, json, math, statistics, sys
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -122,7 +140,10 @@ def fear_one(job):
             "vix_median": statistics.median(vl),
             "spike_asym": (statistics.mean(dv[i] for i in up)
                            / -statistics.mean(dv[i] for i in dn)) if dn and up else float("nan"),
-            "ar1": corr(vl[1:], vl[:-1])}
+            # RAW, and the median across seeds comes first: the debias is
+            # applied to the median in `main`, which is the order the
+            # programme's own rows use and the order `facts` implements.
+            "ar1": pt.facts.level_ar1(vl), "ar1_days": len(vl)}
 
 
 def panel_one(job):
@@ -171,8 +192,14 @@ def main():
         pr = [r for r in rows if r["kind"] == "panel" and r["label"] == l]
         summary[l] = {"overrides": CELLS[l]}
         for k in ("same_day_corr", "rv21_vix_corr", "p_vix_gt_30",
-                  "vix_median", "spike_asym", "ar1"):
+                  "vix_median", "spike_asym", "ar1", "ar1_days"):
             summary[l][k] = statistics.median(r[k] for r in fr)
+        # The comparable figure, with its window attached. Against the
+        # 0.976 in this module's docstring it is not comparable at all --
+        # see the paragraph there.
+        import tradefloor as pt
+        summary[l]["ar1_debiased"] = pt.facts.median_ar1_debiased(
+            [r["ar1"] for r in fr], n=int(summary[l]["ar1_days"]))
         for k in pr[0]:
             if k not in ("kind", "label", "seed"):
                 summary[l]["panel_" + k] = statistics.median(r[k] for r in pr)
