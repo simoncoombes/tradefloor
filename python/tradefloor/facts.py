@@ -835,6 +835,24 @@ REAL_MARKETS_PROVENANCE = {
                  "+/- max(2 se, the model's resolution at thirty seeds, 2.37)",
         "windows": (7.75, -0.38, -0.85),
         "crisis_window": None,
+        # The tape side of the scoring rule for this row, which has no
+        # per-window table because its quantity is a long-run MEAN and not a
+        # year's reading. `centre` and `centre_se` are the claim's own 7.37
+        # and 2.25; `centre_components` is what they were combined from, so
+        # both re-derive here rather than standing as two typed numbers, and
+        # `centre_df` is the Welch-Satterthwaite combination of those
+        # components: se^4 / (1.87^4 / 74 + 1.24^4 / 21) = 91. The same
+        # centre and error grade a 504-day reading, for the reason
+        # `envelope.BANDS_504` gives: a long-run mean's uncertainty is the
+        # centre's, not the window's.
+        "centre": 7.37,
+        "centre_se": 2.25,
+        "centre_df": 91,
+        "centre_components": ((7.75, 1.87, 75), (-0.38, 1.24, 22)),
+        "centre_estimator": "the mean of 75 calendar-year S&P 500 price "
+                            "log returns plus the mean of 22 calendar-year "
+                            "equal-weight premia, each with its own standard "
+                            "error, combined in quadrature",
         "sources": (
             "tools/calibration/index_band.py, run 2026-09-03 on the cache "
             "tools/shadow/data.py writes; ^GSPC 1950-01-03 to 2026-09-02, "
@@ -871,6 +889,24 @@ REAL_MARKETS_PROVENANCE = {
                  "across-window sd with the most extreme window dropped",
         "windows": (1.34, 2.66, 3.39),
         "crisis_window": 3.08,
+        # The tape side of the scoring rule. The model's row is a per-seed
+        # median across a run's sessions aggregated as the median over
+        # seeds, so the like-for-like tape centre is the MEDIAN of the nine
+        # non-crisis 252-window medians, which is the middle of the triple
+        # above, 2.66. The error is the panel's own form on the recorded
+        # across-window trimmed sd, MEDIAN_SE_FACTOR * 0.64 / sqrt(9), and
+        # `centre_df` is 9 - 2: the trim drops one window and the sd spends
+        # one. The nine window VALUES are not in this package -- they are
+        # `fear_band.py`'s output and were never committed -- so the error
+        # here re-derives from a summary and not from the readings, which is
+        # the one place on this row where a record stands in for a
+        # measurement.
+        "centre_se": 0.2673736826273067,
+        "centre_df": 7,
+        "trimmed_sd": 0.64,
+        "n_windows": 9,
+        "centre_estimator": "the median of the nine non-crisis 252-session "
+                            "window medians",
         "sources": (
             "tools/calibration/fear_band.py, run 2026-09-04 on the cache "
             "tools/shadow/data.py writes; ^VIX 1990-01-02 to 2026-09-02, 9,236 "
@@ -893,6 +929,36 @@ REAL_MARKETS_PROVENANCE = {
                  "1990 that holds at least five such sessions, ten windows",
         "windows": (3.70, 5.30, 8.48),
         "crisis_window": 7.12,
+        # THE CENTRE IS THE POOLED MEDIAN, +5.73, and not the 5.30 in the
+        # triple above. The model's row is POOLED over every seed's sessions
+        # (`AGGREGATE`), so the like-for-like tape quantity is the median of
+        # the 107 real sessions since 1990 -- which the `sources` entry
+        # below already records -- and 5.30 is the median of the ten WINDOW
+        # medians the band was built from. Two estimators of two quantities;
+        # scoring the pooled model row against 5.30 is the wrong-ruler error
+        # on this row, and it is the reason the centre is written here as a
+        # field rather than left to be read positionally out of the triple.
+        "centre": 5.73,
+        # 10 - 1: a window-block bootstrap over the ten windows spends one.
+        "centre_df": 9,
+        "n_windows": 10,
+        "centre_estimator": "the median of the 107 real sessions at or below "
+                            "-3 per cent since 1990, pooled",
+        # NO `centre_se`, and the objective refuses the row by name until
+        # there is one. The error of a pooled median is a window-block
+        # bootstrap over those ten windows; it has never been run, and no
+        # neighbour's error stands in for it (`SEED_SD_LEVEL_PROVENANCE`
+        # rules that for the seed scale and the rule inherits it for both
+        # terms). Until it lands, `rule_row` raises and `scoring_rule` lists
+        # the row under `blind` with this sentence as the reason.
+        "centre_se_pending":
+            "fear_gauge_dn3's tape error is a window-block bootstrap of the "
+            "pooled median over the ten windows since 1990 that hold at "
+            "least five sessions at or below -3 per cent, 2,000 draws at "
+            "seed 20260905, which tools/calibration/fear_band.py can run "
+            "offline from the cached tape in seconds. It has not been run, "
+            "so the row has a centre and no scale and the objective is "
+            "blind on it and says so.",
         "sources": (
             "tools/calibration/fear_band.py, run 2026-09-04, the same two "
             "series; ten windows since 1990 with at least five sessions at -3 "
@@ -925,6 +991,14 @@ REAL_MARKETS_PROVENANCE = {
                  "tape knows it, and [min - s, max + s] answers a different "
                  "one",
         "windows": (0.000, 0.397, 13.095),
+        # Recorded at 252 and DERIVED at every horizon: the row's windows
+        # exist at both, so `real_centre_df` reads them rather than this
+        # field, which would be right at 252 (35 windows, one spent on the
+        # mean) and wrong at 504 (17 windows give 16).
+        # `tests/test_scoring_rule.py` asserts the two agree at 252.
+        "centre_df": 34,
+        "centre_estimator": "the mean of the 35 non-overlapping 252-return "
+                            "window rates, with sd / sqrt(35) as its error",
         # NO window is excluded. The 2008-06..2009-06 window carries 33 of
         # the 107 hits and it is the sensitivity rather than a crisis
         # reading to be set aside: dropping it moves the centre to 0.864 and
@@ -1177,6 +1251,104 @@ REAL_MARKETS_WINDOWS = {
     },
 }
 
+#: The same panel at a 505-BAR window, one row per reference window, as data.
+#:
+#: `REAL_MARKETS_WINDOWS` is the 252-bar table and this is its 504-bar twin:
+#: the same forty US large caps, the same estimators, six consecutive
+#: 505-bar windows (504 daily log returns each) covering 2013-07 to 2025-07,
+#: promoted from the design repository's
+#: `realism-bands-504-reference-panel.json` (retrieved 2026-08-29). Until it
+#: existed the library carried 504-bar BANDS with no windows underneath
+#: them, so `real_centre_se` -- the dispersion of a row across real years at
+#: the window length it is graded at -- was undetermined at 504 on every
+#: row, and `centre_distance` refused the horizon for want of one.
+#:
+#: THIRTEEN rows, not fourteen: `corr_persistence_acf1` is measured on its
+#: own sub-window construction and carries its own table,
+#: `REAL_PERSISTENCE_WINDOWS_504`, for the same reason it carries its own
+#: entry in `BAND_WINDOWS_EXCEPTIONS`.
+#:
+#: SIX decimal places, from the same argument the four correlation rows in
+#: `REAL_MARKETS_WINDOWS` carry: the bands are re-derived from this table by
+#: `tests/test_reference_windows.py`, and a table rounded shorter than the
+#: band's own quantum cannot re-derive an edge that sits near one.
+#:
+#: `crisis_index` is 3, the 2019-07-23..2021-07-22 window that holds the
+#: COVID crash, excluded from every band derivation and from every centre
+#: exactly as index 4 is at 252 days. The window is kept in the table
+#: rather than deleted, so the exclusion is a property of the reader and
+#: visible to it.
+REAL_MARKETS_WINDOWS_504 = {
+    "windows": (
+        "2013-07-16..2015-07-16", "2015-07-17..2017-07-18",
+        "2017-07-19..2019-07-22", "2019-07-23..2021-07-22",
+        "2021-07-23..2023-07-26", "2023-07-27..2025-07-31",
+    ),
+    #: Index into `windows` of the one excluded from every band derivation.
+    "crisis_index": 3,
+    "horizon_days": 504,
+    "roster": "40 US large caps, common to all six windows",
+    "source": "tradefloor-design/realism-bands-504-reference-panel.json, "
+              "the six panels; Yahoo Finance v8 daily bars, retrieved "
+              "2026-08-29",
+    "values": {
+        "annualised_vol_pct": (19.216427, 22.353833, 23.738032, 37.725517, 29.963137, 26.826592),
+        "excess_kurtosis": (18.756861, 13.213448, 9.570653, 13.275513, 11.656521, 15.210755),
+        "return_acf1": (-0.007142, 0.019115, 0.003875, -0.185553, 0.013391, -0.011487),
+        "abs_return_acf1": (0.086844, 0.185348, 0.151582, 0.365624, 0.075641, 0.107090),
+        "abs_return_acf5": (0.037661, 0.081906, 0.051818, 0.296852, 0.042329, 0.058708),
+        "abs_return_acf20": (-0.001156, 0.052856, 0.053149, 0.127220, 0.028624, 0.020961),
+        "cross_sectional_corr": (0.356987, 0.387843, 0.351402, 0.527947, 0.352781, 0.247227),
+        "volume_abs_return_corr": (0.534510, 0.622733, 0.548402, 0.606696, 0.500665, 0.530010),
+        "leverage_effect": (-0.018603, -0.083786, -0.092402, -0.088098, -0.039799, -0.025019),
+        "volume_change_acf1": (-0.249799, -0.227681, -0.256171, -0.270115, -0.270525, -0.249609),
+        "corr_asymmetry": (0.024013, 0.094736, 0.040630, 0.156259, 0.050145, -0.010517),
+        "corr_asymmetry_lagged": (0.025554, 0.120831, 0.249207, 0.034493, 0.010205, 0.359768),
+        "sector_excess_corr": (0.131241, 0.165127, 0.139761, 0.129726, 0.190655, 0.161457),
+    },
+}
+
+#: `corr_persistence_acf1`'s own 504-bar windows, because its construction is
+#: its own.
+#:
+#: The row is the lag-1 autocorrelation of the mean pairwise correlation over
+#: non-overlapping 21-day SUB-windows, so a 505-bar window holds 24 of them
+#: and the row's evidence base is not the panel's. The design repository
+#: measured it separately (`real-corr-persistence-bands.json`, retrieved
+#: 2026-08-25) over five 504-bar windows rather than six -- its series starts
+#: one window later -- and FOUR of them are non-crisis, which is why
+#: `BAND_WINDOWS_EXCEPTIONS` already records a four-window band for this row
+#: at this horizon. Reading it out of `REAL_MARKETS_WINDOWS_504` would take a
+#: dispersion across six windows of a quantity measured on five.
+REAL_PERSISTENCE_WINDOWS_504 = {
+    "windows": (
+        "2015-07-17..2017-07-18", "2017-07-19..2019-07-22",
+        "2019-07-23..2021-07-22", "2021-07-23..2023-07-26",
+        "2023-07-27..2025-07-31",
+    ),
+    "crisis_index": 2,
+    "horizon_days": 504,
+    "roster": "the 40 US large caps of real-corr-persistence-bands.json",
+    "source": "tradefloor-design/real-corr-persistence-bands.json, "
+              "horizons.504.windows; retrieved 2026-08-25",
+    "sub_window": 21,
+    "values": {
+        "corr_persistence_acf1": (0.248393, 0.428851, 0.360519, 0.356755, 0.265590),
+    },
+}
+
+#: The horizons at which the shape panel has a per-window real record.
+#:
+#: `real_windows` and everything downstream of it REFUSE any other horizon by
+#: name rather than answering from the 252-bar table, which is what they did
+#: before this tuple existed: `real_windows("abs_return_acf20", horizon_days=756)`
+#: returned the 252-bar readings, and the row reads six times higher over 504
+#: bars than over 252. The refusal is the wrong-ruler guard moved from
+#: `centre_distance`, which could only apply it to itself, into the function
+#: that holds the windows.
+WINDOW_HORIZONS: tuple[int, ...] = (252, 504)
+
+
 #: The band rule every window-derived band on this panel is built with, as
 #: code rather than as a sentence three tools and a test each paraphrased.
 #: REALISM-BANDS.md states it: over the non-crisis windows, s is the sample sd
@@ -1285,6 +1457,19 @@ REAL_MARKETS_ADJUSTMENTS: dict[str, dict[str, tuple[float, str, str]]] = {
                  "window at +0.014, excluded"),
     },
 }
+
+
+#: Where a shipped 504-bar band departs from `band_from_windows` on its
+#: non-crisis windows, and why. EMPTY, and that is the finding rather than an
+#: omission: `REAL_MARKETS_504`'s own note records that the literature
+#: reconciliation applied to `REAL_MARKETS` "needs a retrieved,
+#: horizon-compatible source per statistic and is a human judgement that has
+#: not been made at this horizon", so every 504-bar edge is the mechanical
+#: rule's and nothing else. The table exists so the derivation test has one
+#: shape at both horizons and so the first 504-bar adjustment has to be
+#: written down here with its reason rather than appearing as a band the
+#: rule cannot reproduce.
+REAL_MARKETS_ADJUSTMENTS_504: dict[str, dict[str, tuple[float, str, str]]] = {}
 
 
 #: The across-seed standard deviation of each statistic at the shipped
@@ -3743,28 +3928,50 @@ def real_windows(key: str, *,
                  ) -> tuple[float, ...] | None:
     """`key`'s non-crisis real readings, one per window, or None if unrecorded.
 
-    Four rows have no per-window record in `REAL_MARKETS_WINDOWS` -- the two
-    conditional-correlation asymmetries, the sector excess and the
-    correlation persistence -- so anything that needs the DISPERSION of a
-    row across real years, rather than its centre, is undetermined for
-    those four in this package.
+    Every one of the fourteen shape rows has one, at both certified
+    horizons. The four correlation-structure rows joined the 252-bar table
+    on 2026-09-05 and the 504-bar tables landed with the scoring rule; the
+    sentence this docstring used to carry, that four rows have no record,
+    was stale from the first of those and is the reason it is written here
+    as a claim a test re-derives rather than as prose.
 
     Two corpora, not one. `INDEX_TAIL_WINDOWS` holds the index tail row's
     real side: a cap-weighted INDEX over thirty-five years, where
     `REAL_MARKETS_WINDOWS` holds per-NAME readings over one decade of forty
     large caps. The tail row is measured at both certified horizons there
-    and its windows are read at the one asked for; every other row exists at
-    the one horizon its table was measured at, and `centre_distance` refuses
-    the rest rather than rescaling them.
+    and its windows are read at the one asked for.
+
+    THE HORIZON IS REFUSED BY NAME, not ignored. The shape panel has a
+    per-window record at the two horizons in `WINDOW_HORIZONS`, 252 from
+    `REAL_MARKETS_WINDOWS` and 504 from `REAL_MARKETS_WINDOWS_504` (with
+    `corr_persistence_acf1` reading its own `REAL_PERSISTENCE_WINDOWS_504`,
+    for the reason that table gives). Any other horizon raises rather than
+    handing back the 252-bar readings under a longer window's name, which
+    is what this function did before the 504 table existed: clustering at
+    lag 20 reads +0.005 over 252 bars and +0.030 over 504 on the same
+    reference, so the answer would have been wrong and plausible at once.
     """
     if key in INDEX_TAIL_WINDOWS["rows"]:
         if int(horizon_days) not in INDEX_TAIL_WINDOWS["windows"]:
             return None
         return index_tail_rates(horizon_days)
-    values = REAL_MARKETS_WINDOWS["values"].get(key)
+    if int(horizon_days) not in WINDOW_HORIZONS:
+        raise ValidationError(
+            f"no per-window real record for {key!r} at {horizon_days} days; "
+            f"the shape panel's windows are recorded at "
+            f"{sorted(WINDOW_HORIZONS)} days, and a row's dispersion across "
+            "real years is a property of the window length, so it is refused "
+            "here rather than answered from another horizon's table")
+    if int(horizon_days) == TRADING_DAYS_PER_YEAR:
+        table = REAL_MARKETS_WINDOWS
+    elif key in REAL_PERSISTENCE_WINDOWS_504["values"]:
+        table = REAL_PERSISTENCE_WINDOWS_504
+    else:
+        table = REAL_MARKETS_WINDOWS_504
+    values = table["values"].get(key)
     if values is None:
         return None
-    crisis = REAL_MARKETS_WINDOWS["crisis_index"]
+    crisis = table["crisis_index"]
     return tuple(v for i, v in enumerate(values) if i != crisis)
 
 
@@ -3821,10 +4028,15 @@ def real_centre_se(key: str, *,
     is the honest number -- one window of thirty-five carries a third of the
     events.
 
-    None for the four rows with no per-window record: a centre recorded to
-    three places gives the centre, not its dispersion, and inverting the
-    band edges for it would recover an interval a rounding quantum wide and
-    call it a number.
+    None for a row with no per-window record, which since the 504-bar
+    windows landed is the level row and the two fear rows and no shape row
+    at either certified horizon: a centre recorded to three places gives
+    the centre, not its dispersion, and inverting the band edges for it
+    would recover an interval a rounding quantum wide and call it a number.
+    Those three carry a `centre_se` in `REAL_MARKETS_PROVENANCE` where one
+    has been derived, and `rule_row` -- not this function -- is what reads
+    it: this is the WINDOW dispersion, and a recorded error is a different
+    provenance under the same name.
     """
     windows = real_windows(key, horizon_days=horizon_days)
     if windows is None:
@@ -3832,6 +4044,154 @@ def real_centre_se(key: str, *,
     if AGGREGATE.get(key) in ("mean", "pooled_rate"):
         return statistics.stdev(windows) / math.sqrt(len(windows))
     return MEDIAN_SE_FACTOR * trimmed_sd(windows) / math.sqrt(len(windows))
+
+
+def real_centre_df(key: str, *,
+                   horizon_days: int = TRADING_DAYS_PER_YEAR) -> int | None:
+    """The degrees of freedom of `key`'s real centre, or None where unrecorded.
+
+    For a row with a per-window record it is derived from the windows and
+    nothing is chosen: `n - 2` where the centre is a median and its scale a
+    TRIMMED sd, because the trim drops one window and the sd spends one;
+    `n - 1` where the centre is a mean or a pooled rate, whose scale is the
+    plain sd and spends one. The two are the estimators `real_centre` and
+    `real_centre_se` actually use, read off the same `AGGREGATE` entry, so
+    the count cannot drift from the scale it belongs to.
+
+    For the three rows with no window table -- the level row and the two
+    fear rows -- it is `centre_df` in `REAL_MARKETS_PROVENANCE`, recorded
+    beside the one-line derivation that produced it. The index tail row
+    records one too and does NOT read it here: its windows exist at both
+    horizons, so a fixed 34 would be right at 252 and wrong at 504, where
+    seventeen windows give 16. `tests/test_scoring_rule.py` asserts the
+    recorded 34 equals the derived one at 252, which is what keeps the
+    record honest without letting it answer for a horizon it was not
+    measured at.
+    """
+    windows = real_windows(key, horizon_days=horizon_days)
+    if windows is not None:
+        if AGGREGATE.get(key) in ("mean", "pooled_rate"):
+            return len(windows) - 1
+        return len(windows) - 2
+    recorded = REAL_MARKETS_PROVENANCE.get(key, {}).get("centre_df")
+    return None if recorded is None else int(recorded)
+
+
+def rule_row(key: str, *, horizon_days: int = TRADING_DAYS_PER_YEAR,
+             require: bool = True) -> dict[str, Any]:
+    """The TAPE side of the scoring rule for one row: centre, error, and df.
+
+    `{"row", "horizon_days", "centre", "se", "df", "estimator", "source"}`.
+    The objective in `tradefloor.loss.scoring_rule` reads exactly this and
+    nothing else about real markets, so what the rule aims at is one
+    function with one contract rather than four call sites each deciding
+    which table to open.
+
+    THE ESTIMATOR FOLLOWS THE ROW, which is the rule the note this
+    implements calls the AR1 ruler's: the same estimator the model's row is
+    graded by, applied to the tape at the same window length as the horizon
+    graded. A median row takes the median of the non-crisis windows at that
+    horizon with `real_centre_se`'s trimmed-sd error; a mean or pooled-rate
+    row takes the mean and the plain `sd / sqrt(n)`; and a row with no
+    window table takes the centre, error and df recorded in
+    `REAL_MARKETS_PROVENANCE`, whose `centre_estimator` names the quantity.
+    A centre by a different estimator than the row it grades is the error
+    that read a pooled model median against a median of window medians for
+    months.
+
+    THIS IS THE GUARD, and what it refuses is a row whose tape side is not
+    all three of a centre, a standard error and a degrees of freedom.
+    Today that is exactly one row, `fear_gauge_dn3`: its centre is on the
+    record as the pooled tape median, +5.73 over the 107 sessions since
+    1990, and its standard error is a window-block bootstrap of that median
+    that has never been run, so the row has a number and no scale. The
+    refusal names the row and which of the three is missing, because a
+    scoring rule that silently dropped it would publish a sum over sixteen
+    rows under the name of a sum over seventeen.
+
+    `require=False` returns the same dict with `None` in place of whatever
+    is missing and a `missing` tuple naming it, which is how
+    `scoring_rule` builds its `blind` list with a reason rather than by
+    reading an exception's message.
+
+    R7, THE ERROR BARS, ruled by Simon on 2026-09-06 and recorded in
+    `tradefloor-design/programme/RULINGS-2026-09-06.md`: `se` is the
+    WITHIN-DECADE standard error of the 2015-2025 reference panel, and the
+    measured disagreement between that decade and the 32-name 1990-2025
+    reference -- one to three `se` on three rows, recorded in
+    `centre_distance`'s docstring -- is NOT folded into it. Widening `se`
+    by that gap would make the objective honest about the decade at the
+    cost of discrimination on exactly the rows where it bites. So a fit to
+    this centre is a fit to the decade, and that is now a decision rather
+    than a default: the limit is stated here because this is where the
+    number enters.
+
+    EVERY VALUE IS DERIVED FROM THE WINDOWS, and no stored summary is read
+    from any file. `centre`, `se` and `df` come from `real_centre`,
+    `real_centre_se` and `real_centre_df`, which read the window tables and
+    `trimmed_sd` -- the median-centred trim `BAND_RULE` names. The design
+    repository's `bands-504-noncrisis.json` carries a `trimmed_sd` field
+    per row that was written on 2026-08-22 and never regenerated after the
+    trim centre was named on 2026-09-04, so its values are the superseded
+    mean-centred ones; on `return_acf1` the two drop different windows and
+    the standard error differs by 2.6 per cent. Reading such a field would
+    take the old answer from a file whose own tool has since been fixed,
+    which is why nothing here reads one. The three rows with no window
+    table read `centre`, `centre_se` and `centre_df` from
+    `REAL_MARKETS_PROVENANCE`, where the record IS the measurement and is
+    labelled as such.
+    """
+    windows = real_windows(key, horizon_days=horizon_days)
+    prov = REAL_MARKETS_PROVENANCE.get(key, {})
+    if windows is not None:
+        rate = AGGREGATE.get(key) in ("mean", "pooled_rate")
+        out: dict[str, Any] = {
+            "row": key,
+            "horizon_days": int(horizon_days),
+            "centre": real_centre(key, horizon_days=horizon_days),
+            "se": real_centre_se(key, horizon_days=horizon_days),
+            "df": real_centre_df(key, horizon_days=horizon_days),
+            "estimator": (
+                f"{'mean' if rate else 'median'} of the {len(windows)} "
+                f"non-crisis {int(horizon_days)}-day windows, with "
+                f"{'sd' if rate else 'MEDIAN_SE_FACTOR * trimmed_sd'}"
+                f" / sqrt({len(windows)}) as its error"),
+            "source": ("facts.INDEX_TAIL_WINDOWS"
+                       if key in INDEX_TAIL_WINDOWS["rows"] else
+                       "facts.REAL_MARKETS_WINDOWS"
+                       if int(horizon_days) == TRADING_DAYS_PER_YEAR else
+                       "facts.REAL_PERSISTENCE_WINDOWS_504"
+                       if key in REAL_PERSISTENCE_WINDOWS_504["values"] else
+                       "facts.REAL_MARKETS_WINDOWS_504"),
+        }
+    else:
+        if key not in REAL_MARKETS:
+            raise ValidationError(
+                f"{key!r} is not a graded row; graded rows are "
+                f"{sorted(REAL_MARKETS)}")
+        out = {
+            "row": key,
+            "horizon_days": int(horizon_days),
+            "centre": prov.get("centre", real_centre(
+                key, horizon_days=horizon_days)),
+            "se": prov.get("centre_se"),
+            "df": real_centre_df(key, horizon_days=horizon_days),
+            "estimator": prov.get("centre_estimator",
+                                  "recorded in REAL_MARKETS_PROVENANCE"),
+            "source": f"facts.REAL_MARKETS_PROVENANCE[{key!r}]",
+        }
+    missing = tuple(f for f in ("centre", "se", "df") if out[f] is None)
+    out["missing"] = missing
+    if missing and require:
+        raise ValidationError(
+            f"the scoring rule has no tape side for {key!r} at "
+            f"{int(horizon_days)} days: {', '.join(missing)} "
+            f"{'is' if len(missing) == 1 else 'are'} not on the record. "
+            + (prov.get("centre_se_pending", "")
+               or f"Derive it and record it beside {key!r} in "
+                  "REAL_MARKETS_PROVENANCE, or in the window table for its "
+                  "horizon; the rule never substitutes a neighbour's."))
+    return out
 
 
 def median_se(values: Sequence[float]) -> float:
@@ -3998,17 +4358,28 @@ def centre_distance(values: Sequence[float], key: str, *,
     in the report and in a calibration objective. `z_r` is None where
     `real_centre_se` is undetermined, with the reason beside it.
 
-    UNDETERMINED at any horizon but the one `REAL_MARKETS_WINDOWS` was
-    measured at, rather than answered with the wrong ruler. The real
-    dispersion of a row across years is a property of the window length --
-    clustering at lag 20 reads +0.005 over 252 bars and +0.030 over 504 on
-    the same reference -- so a 504-day model median against these windows
-    would be the same error on the centre side that `envelope.score` refuses
-    on the band side, and it would be invisible because the answer is a
-    plausible number. The ONE exception is a row whose real side is measured
-    at both horizons, which today is `index_tail_dn3_pct` alone: it reads
-    the 35-window table at 252 and the 17-window table at 504, and the
-    refusal stands for every other row at every other horizon.
+    UNDETERMINED at any horizon with no per-window record, rather than
+    answered with the wrong ruler. The real dispersion of a row across years
+    is a property of the window length -- clustering at lag 20 reads +0.005
+    over 252 bars and +0.030 over 504 on the same reference -- so a 504-day
+    model median against the 252-bar windows would be the same error on the
+    centre side that `envelope.score` refuses on the band side, and it would
+    be invisible because the answer is a plausible number. Since the 504-bar
+    windows landed (`REAL_MARKETS_WINDOWS_504`) the refusal no longer falls
+    on 504: the horizon has a table of its own, so the diagnostic is
+    answered AT the window length graded, which is the whole of what the
+    refusal was protecting. `index_tail_dn3_pct` reads its own 35-window
+    table at 252 and its 17-window table at 504, and every horizon in
+    neither corpus is still refused by name.
+
+    THE MULTIPLIER FOLLOWS THE HORIZON TOO. `band_windows(key,
+    horizon_days)` gives the window count the row's band at that horizon
+    rests on -- nine at 252, five at 504, four for `corr_persistence_acf1`
+    at 504 -- and the threshold is `centre_multiplier` of that count's own
+    `band_rule_tolerance`: 1.846, 1.378 and 1.175. Reading a 504-day panel
+    against the 252-day tolerance would hold a five-window band to a
+    nine-window band's false-alarm rate, which is the same wrong-ruler shape
+    one level down.
 
     THE ESTIMATOR FOLLOWS THE ROW. `median` and `se_m` above are a median
     and its normal-approximation standard error for a row graded as a
@@ -4036,7 +4407,7 @@ def centre_distance(values: Sequence[float], key: str, *,
     table_horizon = REAL_MARKETS_WINDOWS["horizon_days"]
     own_table = key in INDEX_TAIL_WINDOWS["rows"]
     matched = (int(horizon_days) in INDEX_TAIL_WINDOWS["windows"] if own_table
-               else horizon_days == table_horizon)
+               else int(horizon_days) in WINDOW_HORIZONS)
     centre = real_centre(key, horizon_days=horizon_days) if matched else None
     se_r = real_centre_se(key, horizon_days=horizon_days) if matched else None
     out: dict[str, Any] = {
@@ -4048,8 +4419,10 @@ def centre_distance(values: Sequence[float], key: str, *,
         "se_m": se_m,
         "real_centre": centre,
         "se_real": se_r,
-        "multiplier": centre_multiplier(
-            band_rule_tolerance(BAND_WINDOWS[table_horizon])),
+        "multiplier": centre_multiplier(band_rule_tolerance(
+            band_windows(key, int(horizon_days))
+            if int(horizon_days) in BAND_WINDOWS
+            else BAND_WINDOWS[table_horizon])),
         "z_r": None,
         "at_centre": None,
         "undetermined": None,
@@ -4059,7 +4432,8 @@ def centre_distance(values: Sequence[float], key: str, *,
             (f"INDEX_TAIL_WINDOWS holds "
              f"{sorted(INDEX_TAIL_WINDOWS['windows'])}-return windows"
              if own_table else
-             f"REAL_MARKETS_WINDOWS holds {table_horizon}-day readings")
+             f"the shape panel's windows are recorded at "
+             f"{sorted(WINDOW_HORIZONS)} days")
             + f" and this panel is {horizon_days} days. The real dispersion "
             "of a row across years moves with the window length, so a centre "
             "distance taken across horizons would be the wrong-ruler error "
