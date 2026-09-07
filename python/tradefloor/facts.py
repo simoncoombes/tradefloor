@@ -1999,6 +1999,40 @@ REAL_VIX_AR1_WINDOWS: dict[int, tuple[float, ...]] = {
 #: nowhere in this file: a ruler with a literal beside its derivation has two
 #: spellings, and the one a reader copies is the stale one. Print it with
 #: `tools/calibration/vix_ar1_ruler.py`.
+def persistence_statistics(macro: Any, *, days: int) -> dict[str, Any]:
+    """The VIX's own persistence, as `measure` reports it: one row.
+
+    THE THIRD PART, beside `panel_statistics` and `fear_statistics`, and it
+    exists as a function for the reason `test_noise_attribution` asserts:
+    everything `measure` reports comes from a part that can be called and
+    checked on its own, so a key appearing in a panel and in none of the
+    parts is a failure by name. Computing this inline in `measure` would
+    have made it the one row with no independent caller.
+
+    ONE RUN, so this is `level_ar1` debiased at the run length and NOT
+    `median_level_ar1`, which is the median ACROSS runs. A harness taking
+    the median of these across seeds lands on the same number, because
+    `debias_ar1` is affine and increasing -- which is what lets a per-run
+    row answer for a ruler defined across runs.
+
+    `level_ar1` REFUSES a series with no lag-one pair and a constant one,
+    and neither is a VIX with no persistence. The row is then reported
+    ABSENT with its reason under `vix_ar1_debiased_blind` rather than
+    defaulted: the scoring rule already reports a row missing from a record
+    as blind, and a fabricated 0.0 inside a median across seeds would move
+    it without announcing itself.
+    """
+    try:
+        return {VIX_AR1_ROW: debias_ar1(level_ar1(vix_levels(macro)), days)}
+    except ValidationError as exc:
+        return {VIX_AR1_ROW + "_blind": str(exc)}
+
+
+#: The MODEL row this ruler grades, spelled once. `facts.measure` emits it
+#: and `real_windows` answers for it; a second spelling is how the ruler and
+#: the row came to be two different quantities in the first place.
+VIX_AR1_ROW = "vix_ar1_debiased"
+
 REAL_VIX_AR1: dict[int, float] = {
     days: median_ar1_debiased(raws, n=days)
     for days, raws in REAL_VIX_AR1_WINDOWS.items()
@@ -2315,6 +2349,25 @@ LEVEL = ("index_drift_pct",)
 #: because the level row's protocol note and its `SEED_SD` treatment are
 #: specific to the drift.
 CRISIS = ("fear_gauge_dn1", "fear_gauge_dn3", "index_tail_dn3_pct")
+#: SCORED BUT NOT BANDED, and the only group that is.
+#:
+#: `SHAPE + LEVEL + CRISIS` is an exact partition of `REAL_MARKETS` -- the
+#: banded rows, which `envelope.certify` reads -- and `test_facts` asserts
+#: it. This group sits outside that partition on purpose: section 1.5 ruled
+#: on the RULER for the VIX's persistence and not on a band for it, and a
+#: band is a separate derivation nobody has done. So the row enters the
+#: scoring rule, where a centre and an error are all it needs, and does NOT
+#: enter certification, where it would need a width no one has derived.
+#:
+#: Why it has to enter something. The ruler was delivered, recorded in
+#: `RULERS_BY_HORIZON`, and READ BY NOTHING: not `envelope.CERTIFIED`, not
+#: `loss.rule_table`, not `measure`. With the row absent, raising
+#: `vix_mean_reversion` improved `S` by 12 to 31 points while taking this
+#: statistic from within one standard error of its ruler to five and more --
+#: an objective that priced one end of a dial and not the other. That is
+#: section 1.3's defect exactly: the row that could not fail was the row
+#: that was not there.
+PERSISTENCE = (VIX_AR1_ROW,)
 
 #: How a row is read across seeds. The shape rows are medians over the
 #: certification seeds, which is what every recorded panel and band was
@@ -3254,6 +3307,25 @@ def measure(
     facts.update(panel_statistics(bars, universe,
                                   min_observations=min_observations))
     facts.update(fear_statistics(engine.bars(grain="day"), engine.macro_table(), universe))
+
+    # The VIX's own persistence. Section 1.5's ruler was derived, recorded in
+    # RULERS_BY_HORIZON and read by nothing: every harness that wanted this
+    # row rebuilt the series for itself, which is what `vix_levels` was
+    # written to end. The series is already recorded above -- `record(day)`
+    # once per session -- so the row costs one lag-one autocorrelation and
+    # no extra simulation.
+    #
+    # ONE RUN, so this is `level_ar1` debiased at the run length and NOT
+    # `median_level_ar1`, which is the median ACROSS runs. A harness takes
+    # the median of these across seeds and lands on the same number, because
+    # `debias_ar1` is affine and increasing.
+    #
+    # `level_ar1` REFUSES a series with no lag-one pair and a constant one,
+    # and neither is a VIX with no persistence. The row is then OMITTED with
+    # its reason rather than defaulted: the scoring rule already reports a
+    # row missing from a record as blind, and a fabricated 0.0 inside a
+    # median across seeds would move it without announcing itself.
+    facts.update(persistence_statistics(engine.macro_table(), days=days))
     return facts
 
 
@@ -3955,6 +4027,25 @@ def real_windows(key: str, *,
         if int(horizon_days) not in INDEX_TAIL_WINDOWS["windows"]:
             return None
         return index_tail_rates(horizon_days)
+    if key == VIX_AR1_ROW:
+        # DEBIASED, one per window, because the MODEL's row is debiased and
+        # section 1.5's whole finding was a debiased reading graded against
+        # a raw one. `debias_ar1` is affine and increasing, so the median of
+        # these IS `REAL_VIX_AR1[horizon_days]` to the last bit -- asserted
+        # in `tests/test_vix_ar1_ruler.py` -- and the ruler cannot drift away
+        # from the rule by being computed twice.
+        #
+        # The error is then this module's own median estimator,
+        # MEDIAN_SE_FACTOR * trimmed_sd / sqrt(n), the same one the fourteen
+        # shape rows use, and NOT the 0.0120 bootstrap figure
+        # REAL_VIX_AR1_PROVENANCE records: two rows summed in one `S` whose
+        # errors come from different estimators are not comparable terms.
+        # The two disagree by 13 per cent at 252 (0.010420 against 0.0120)
+        # and 2.6 at 504, so this is a choice and it is recorded here.
+        raws = REAL_VIX_AR1_WINDOWS.get(int(horizon_days))
+        if raws is None:
+            return None
+        return tuple(debias_ar1(r, int(horizon_days)) for r in raws)
     if int(horizon_days) not in WINDOW_HORIZONS:
         raise ValidationError(
             f"no per-window real record for {key!r} at {horizon_days} days; "
@@ -4152,11 +4243,24 @@ def rule_row(key: str, *, horizon_days: int = TRADING_DAYS_PER_YEAR,
             "se": real_centre_se(key, horizon_days=horizon_days),
             "df": real_centre_df(key, horizon_days=horizon_days),
             "estimator": (
+                # The VIX row's windows are consecutive blocks of the whole
+                # tape with no crisis exclusion, so calling them non-crisis
+                # would describe a filter that was never applied. They are
+                # also debiased before the median, which is the property
+                # section 1.5 is about, so the string says so.
+                f"median of the {len(windows)} {int(horizon_days)}-day "
+                f"windows, each debiased by facts.debias_ar1 at "
+                f"{int(horizon_days)} before the median, with "
+                f"MEDIAN_SE_FACTOR * trimmed_sd / sqrt({len(windows)}) as "
+                f"its error"
+                if key == VIX_AR1_ROW else
                 f"{'mean' if rate else 'median'} of the {len(windows)} "
                 f"non-crisis {int(horizon_days)}-day windows, with "
                 f"{'sd' if rate else 'MEDIAN_SE_FACTOR * trimmed_sd'}"
                 f" / sqrt({len(windows)}) as its error"),
-            "source": ("facts.INDEX_TAIL_WINDOWS"
+            "source": ("facts.REAL_VIX_AR1_WINDOWS"
+                       if key == VIX_AR1_ROW else
+                       "facts.INDEX_TAIL_WINDOWS"
                        if key in INDEX_TAIL_WINDOWS["rows"] else
                        "facts.REAL_MARKETS_WINDOWS"
                        if int(horizon_days) == TRADING_DAYS_PER_YEAR else
