@@ -30,9 +30,9 @@ def test_every_choice_is_either_derived_measured_or_declared_unknown():
 
     A new dial fails until someone either records where its value came from
     or adds it to `UNPROVENANCED` on purpose, and provenance cannot be
-    written without the list shrinking. Eighty-five of the ninety-five dials
-    in scope have no recorded derivation today; that number is the finding,
-    and this is what stops it growing quietly.
+    written without the list shrinking. Seventy-seven of the ninety-five
+    dials in scope have no recorded derivation today; that number is the
+    finding, and this is what stops it growing quietly.
     """
     a = pv.audit()
     assert not a["missing"], (

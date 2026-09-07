@@ -452,9 +452,10 @@ OUT_OF_SCOPE = {
 
 #: The provenance of each shipped dial value.
 #:
-#: SEEDED, NOT FILLED IN. Three entries, one of each kind, all read off the
-#: code rather than invented, so the schema is exercised by real data. The
-#: other sixty-one dials are in `UNPROVENANCED` and belong to the
+#: PARTIAL, AND THE REST IS DECLARED. Eighteen entries, every one read off
+#: the code or off the doc comment that already carried the derivation,
+#: rather than invented, so the schema is exercised by real data. The
+#: other seventy-seven dials are in `UNPROVENANCED` and belong to the
 #: workstreams that own them. Filling them in from here would be inventing
 #: derivations, which is the failure this module exists to prevent.
 DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
@@ -697,11 +698,467 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "source": "rust/src/params.rs, ModelParams::market_beta_down_asym",
         "docstring_disagrees_with_shipped_value": True,
     },
+
+    # ---- the eight dials pt-v18 moves whose derivations were already
+    # written, in `params.rs`'s doc comments, and were nowhere the audit
+    # could see them. Transcribed 2026-09-07, one entry each, kind decided
+    # off what the source actually establishes rather than off how long it
+    # is: seven give an identity and its terms, and `cascade_symmetry`'s
+    # own docstring declines the derivation in a section headed "What is
+    # NOT derived here". Where a source is precise it is quoted; where a
+    # derivation has an exception, the exception is in the entry, because
+    # an entry that records only the identity overstates it.
+    "market_beta_down_asym_recentre": {
+        "kind": "derived",
+        "presets": {"pt-v18": 1.0},
+        "identity": "`E[f 1{f<0}] = -s / sqrt(2 pi)` for `f ~ N(0, s^2)`. "
+                    "Scaling one side of a zero-mean draw moves its mean, so "
+                    "the tilt adds `a * beta * -s / sqrt(2 pi)` to every name "
+                    "every tick, and at 1.0 the whole of it is returned as "
+                    "`this * a * beta * s / sqrt(2 pi)`. Every quantity in "
+                    "the form is known exactly where it is applied, so the "
+                    "correction is arithmetic and not an estimate",
+        "terms": {
+            "s": "the CONDITIONAL per-tick sigma the factor was actually "
+                 "drawn with, `shared.market_sigma_tick`, rather than "
+                 "`market_factor_sigma` (market/factors.rs:574-583). That is "
+                 "what makes the correction proof against the variance "
+                 "process, the VIX coupling and a scenario that pins VIX: a "
+                 "hotter tick injects more and gives back more, in the same "
+                 "ratio",
+            "a": "`market_beta_down_asym`, the tilt being corrected. The "
+                 "correction is gated on BOTH dials being nonzero, so a "
+                 "preset that sets this without the tilt is bit-identical",
+            "beta": "per name, because this is not a correction but the "
+                    "algebra of the line being corrected -- the injection "
+                    "into name `i` IS `beta_i` times the form. Using 1.0 "
+                    "would leave a residual proportional to `beta_i - 1`, a "
+                    "cross-sectional bias as well as a mean one",
+            "sqrt(2 pi)": "`SQRT_TWO_PI`, the constant of the half-normal "
+                          "first moment; nothing here is fitted",
+        },
+        "source": "rust/src/params.rs, "
+                  "ModelParams::market_beta_down_asym_recentre, sections "
+                  "'Why the tilt injects a first moment at all' and 'What is "
+                  "given back, exactly'; applied at "
+                  "rust/src/market/factors.rs:574-583",
+        "not_given_back": "THE CRASH AMPLIFIER, and an entry that omits this "
+                          "overstates the derivation. The amplifier "
+                          "multiplies the market channel above a threshold in "
+                          "baseline sigmas and it is exactly the tail the "
+                          "tilt scales, so the true injected mean is the form "
+                          "above times `E[f 1{f<0} A] / E[f 1{f<0}]`. That "
+                          "ratio has NO closed form; it was measured at 1.00 "
+                          "to 1.38 across conditional sigmas and sits near "
+                          "1.01 at the sigmas that occur. Correcting it would "
+                          "need either a new bit-pinned transcendental or a "
+                          "fitted constant, so the residual is left rather "
+                          "than approximated: known, signed, and about one "
+                          "per cent of the term. The offset is applied AFTER "
+                          "the amplifier for the same reason -- added before "
+                          "it, the offset would itself be amplified and "
+                          "deliver the form times `E[A]`",
+        "note": "the mean it returns was nobody's choice: it is the "
+                "by-product of a correlation mechanism, and it cost the "
+                "equal-weight index 7.9 percentage points a year at pt-v16. "
+                "The volatility path's -1.670 acts THROUGH it rather than "
+                "beside it, because a hotter conditional sigma injects "
+                "proportionally more",
+    },
+    "oil_opec_symmetry": {
+        "kind": "derived",
+        "presets": {"pt-v18": 1.0},
+        "identity": "at 1.0 both branches of the OPEC rule use one "
+                    "probability and one magnitude range, so the expected "
+                    "impact is equal and opposite either side of the 80 "
+                    "target and zero on net. The shipped pair does not "
+                    "mirror: 0.6 at 3-to-6 below the target against 0.5 at "
+                    "2-to-5 above it, an expected +2.700 against -1.750, so "
+                    "the cut is 1.54 times the increase and the rule pushes "
+                    "the oil price up",
+        "terms": {
+            "0.55": "the mean of the rule's own two probabilities, 0.6 and "
+                    "0.5 (economy/daily.rs:860-864)",
+            "2.5 to 5.5": "the mean of its own two magnitude ranges, 3-to-6 "
+                          "and 2-to-5; the width of 3.0 is the one both "
+                          "branches already carry, so no number is invented",
+            "1.0": "the unique share at which the two branches coincide. "
+                   "Below it the direction is only partly removed; the dial "
+                   "is a share of the gap between the branches, not a level",
+        },
+        "source": "rust/src/params.rs, ModelParams::oil_opec_symmetry, "
+                  "sections 'The asymmetry nobody chose' and 'Symmetrised "
+                  "rather than picked'; the branch is "
+                  "economy/daily.rs:860-864",
+        "size_is_not_preserved_exactly": "the source calls this 'the unique "
+                                         "symmetric rule which preserves the "
+                                         "total intervention the rule "
+                                         "performs', and that clause is off "
+                                         "by 1.1 per cent. Averaging the "
+                                         "probability and the magnitude "
+                                         "SEPARATELY drops their cross term: "
+                                         "0.6*4.5 + 0.5*3.5 is 4.450 before "
+                                         "and 2*(0.55*4.0) is 4.400 after, so "
+                                         "a symmetric rule preserving the "
+                                         "total exactly would need "
+                                         "`p*M = 2.225` and this one does "
+                                         "not. What IS exact is the "
+                                         "direction, which is what the dial "
+                                         "is for; the conservation clause is "
+                                         "approximate and is recorded here as "
+                                         "approximate",
+        "note": "worth about +0.95 of oil price per firing, and the rule "
+                "fires every 90 days, so this is a small term. It is "
+                "corrected because it is wrong rather than because it is "
+                "large",
+    },
+    "oil_seasonality_target": {
+        "kind": "derived",
+        "presets": {"pt-v18": 1.0},
+        "identity": "the amplitude is SPLIT, `1 + g*a` on the reversion "
+                    "target against `1 + (1-g)*a` on the price level, so the "
+                    "total is conserved at every `g` and the level carries "
+                    "none of the shape at exactly `g = 1.0`. A shape applied "
+                    "to a LEVEL compounds, because the daily factors "
+                    "multiply: their product is 5.119 over the 252 game-days "
+                    "a certified year passes and 0.921 over a full 365, the "
+                    "shape being near neutral over its own period while the "
+                    "horizon slices it asymmetrically -- 162 days of the up "
+                    "leg against 90 of the down",
+        "terms": {
+            "a = 0.03": "the amplitude the term already carries. This dial "
+                        "is a share of it, so what changes is WHERE a shape "
+                        "acts rather than how large it is",
+            "g = 1.0": "the value at which the level's factor `1 + (1-g)*a` "
+                       "is 1 exactly (economy/daily.rs:895-900). Past 1.0 "
+                       "the level would carry the shape inverted, so the "
+                       "endpoint is not a matter of degree",
+        },
+        "source": "rust/src/params.rs, ModelParams::oil_seasonality_target, "
+                  "sections 'A shape applied to a level compounds' and 'The "
+                  "target rather than the level, at the same amplitude'",
+        "what_is_not_achieved": "neutrality over the window. The source's "
+                                "requirement is that 'a seasonal shape has to "
+                                "be neutral over the WINDOW as well as over "
+                                "its own period', and on the target the shape "
+                                "still integrates to +0.672 per cent of oil "
+                                "over a certified year. So 1.0 is derived as "
+                                "the value that takes the shape OFF THE "
+                                "LEVEL, which is exact, and not as the value "
+                                "that makes it neutral, which it approaches "
+                                "-- +0.672 per cent against a level-side "
+                                "product of 5.119",
+        "note": "the defect is not the shape's size. Summing the term's own "
+                "contribution to each day's change over year one gives "
+                "+365.80 of oil price against a net change of +72.10, so it "
+                "pushed about five times harder than the price moved: oil "
+                "had no fixed point under it and sat on its 150.0 clamp from "
+                "day 180 on every seed, with the inflation term, the meeting "
+                "rule and the discount rate following it there",
+    },
+    "cycle_hazard_per_month": {
+        "kind": "derived",
+        "presets": {"pt-v18": 1.0},
+        "identity": "`weibull_hazard` returns `(shape/scale) * "
+                    "pow(months/scale, shape-1)` and every scale in "
+                    "`cycle_hazard_params` is in MONTHS -- 36 for an "
+                    "expansion, 6 for a peak, 12 for a contraction -- so its "
+                    "value is a rate per month, while it was compared "
+                    "against a uniform once a day. "
+                    "`months_in_current_phase` advances by exactly `1/30` a "
+                    "day, so the month this engine keeps is 30 days and the "
+                    "conversion is the monthly rate over 30. At 1.0 `per_day` "
+                    "computes `monthly * (30 - 29)/30`, which is "
+                    "`monthly / 30` to the last bit",
+        "terms": {
+            "30": "read off the engine's own clock and not chosen: "
+                  "`months_in_current_phase` advances by `1.0/30.0` a day at "
+                  "economy/daily.rs:1231, and `per_day` is "
+                  "economy/cycle.rs:55-61",
+            "the placement": "the conversion is applied LAST, after "
+                             "`adjust_transition_probability` and after the "
+                             "clamp, because every operand before it is a "
+                             "rate per month: the hazard's own cap of 0.8, "
+                             "the ladder's additions of 0.1 and 0.15, and the "
+                             "clamp at 0.3. Converting earlier would leave "
+                             "the ladder as a daily probability against a "
+                             "base hazard near 0.0004 a day, so an inverted "
+                             "curve would raise the transition rate by 250 "
+                             "times where it now triples it. The 9.7 years "
+                             "assumes this placement; dividing before the "
+                             "clamp gives 9.59, the difference sitting "
+                             "entirely in the two short phases",
+        },
+        "source": "rust/src/params.rs, ModelParams::cycle_hazard_per_month, "
+                  "sections 'A rate per month drawn once a day' and 'The "
+                  "whole ladder is in months'; the conversion is `per_day` at "
+                  "rust/src/economy/cycle.rs:55-61",
+        "the_conversion_is_linear_in_the_rate": "both readings treat the "
+                                                "monthly figure as a "
+                                                "PROBABILITY -- it is "
+                                                "compared against a uniform "
+                                                "directly and clamped at 0.3 "
+                                                "-- and dividing by 30 is the "
+                                                "exact conversion of a RATE, "
+                                                "not of a probability. "
+                                                "`1 - (1-p)^(1/30)` reads "
+                                                "0.002812 against this "
+                                                "reading's 0.0027 at an "
+                                                "expansion's 0.081, and "
+                                                "0.011819 against 0.01 at the "
+                                                "clamp: 4.0 and 15.4 per cent "
+                                                "high. That bears on neither "
+                                                "clock, which is what this "
+                                                "dial decides, and it is "
+                                                "recorded because the "
+                                                "identity above says 'to the "
+                                                "last bit' about the "
+                                                "arithmetic and not about the "
+                                                "statistics",
+        "note": "read once a day the cycle ran about thirty times too fast: a "
+                "full cycle in 2.6 trading years against 9.7 read per month, "
+                "and a 252-day run opening at the start of an expansion left "
+                "it 63 per cent of the time against 3. Both figures are the "
+                "hazard alone, and the ladder is scaled with the base because "
+                "the conversion is applied after it, so the ratio of thirty "
+                "is unaffected",
+    },
+    "jump_mean_compensated": {
+        "kind": "derived",
+        "presets": {"pt-v18": 1.0},
+        "identity": "a jump arriving with probability `lambda` and mean `m` "
+                    "contributes `lambda * m` to the expected return every "
+                    "day whether it fires or not. Subtracting `lambda * m` is "
+                    "the standard compensated-Poisson construction: it makes "
+                    "the jump term a martingale, and because the compensator "
+                    "is a DETERMINISTIC offset it moves the first moment and "
+                    "leaves every central moment untouched. The skew and the "
+                    "fat tail survive exactly, at the mean the calibration "
+                    "chose, and the drift goes to zero -- so the mean does "
+                    "not move at all: what was wrong was the missing "
+                    "compensator and not the value",
+        "terms": {
+            "lambda": "the CONDITIONAL intensity, already scaled by the VIX "
+                      "coupling, so the compensator tracks the arrival rate: "
+                      "`jump_mean_compensated * (intensity_market * "
+                      "jump_mean_market)` at rust/src/engine.rs:2110. The "
+                      "investigation measured the realised drift at 1.084 "
+                      "times the day-zero closed form, so a compensator on "
+                      "the day-zero rate would have left that 8 per cent "
+                      "behind",
+            "m": "`jump_mean_market`, unmoved. It is negative so that crashes "
+                 "are larger than rallies, which is a real property of index "
+                 "returns and a legitimate thing to want",
+        },
+        "source": "rust/src/params.rs, ModelParams::jump_mean_compensated, "
+                  "sections 'The mean is there for skew, and it also buys a "
+                  "drift' and 'Compensated rather than re-derived'",
+        "no_smaller_mean_exists": "the obvious repair -- solve for a mean "
+                                  "that buys the skew without the drift -- is "
+                                  "refused rather than skipped: for a "
+                                  "compound Poisson jump the drift and the "
+                                  "skew are both LINEAR in the mean, so "
+                                  "trading one against the other is a matter "
+                                  "of degree and any answer would be a fitted "
+                                  "constant",
+        "note": "the drift was never chosen; it was never visible. "
+                "`jump_mean_market` was set once in the pt-v4 era by a search "
+                "whose objective could not read a first moment and inherited "
+                "unchanged through eleven presets, at -0.11769 per name per "
+                "year at pt-v16's day-zero intensity and 2.6 percentage "
+                "points of annual index level",
+    },
+    "earnings_nominal_growth": {
+        "kind": "derived",
+        "presets": {"pt-v18": 1.0},
+        "identity": "price is `fair_value * exp(s)` with `s` a stationary "
+                    "AR(2) around zero and `eps` fixed when an instrument is "
+                    "built, so the only time variation in fair value is the "
+                    "discount rate and the expected log change of the index "
+                    "is ZERO in a stationary economy and negative in one "
+                    "whose yields rise. At 1.0 `eps` and "
+                    "`book_value_per_share` are multiplied by "
+                    "`1 + this * (N_t/N_0 - 1)` with `N = gdp * cpi`, which "
+                    "holds the earnings share of nominal output CONSTANT. "
+                    "That is the only value read off the process rather than "
+                    "chosen: below 1.0 the share falls every year and above "
+                    "1.0 it rises for ever, both assertions about a quantity "
+                    "this model does not carry",
+        "terms": {
+            "N_t / N_0": "nominal output against its value when the engine "
+                         "was built (market/tick.rs:318-327). The multiplier "
+                         "is 1.0 on day 0 by construction, so the opening "
+                         "valuation, and the lazy initial `s` taken from it, "
+                         "are unchanged",
+            "both fields": "`eps` AND `book_value_per_share`, because the "
+                           "valuation is then homogeneous of degree one in "
+                           "nominal terms on both of its paths -- a "
+                           "profitable company through `eps * target_pe` and "
+                           "a loss-making one through "
+                           "`book * LOSS_MAKING_PRICE_TO_BOOK`. Scaling only "
+                           "earnings would make a loss-maker's fair value "
+                           "fall in real terms every year",
+            "the clock": "the economy compounds `gdp` by `gdp_growth/100/365` "
+                         "and `cpi` by `inflation_rate/100/365` on every day "
+                         "it advances, and it advances once per market day, "
+                         "so a certified year of 252 sessions delivers "
+                         "`252/365` of every annual rate. Measured on "
+                         "`Universe.random(40, seed=111)` over 252 days at "
+                         "pt-v18, seeds 1 to 6: a median of +4.353 per cent "
+                         "per trading year against mean growth 3.353 and mean "
+                         "inflation 2.931, and `(3.353 + 2.931) * 252/365` is "
+                         "4.339, which is the clock stated as a number",
+        },
+        "source": "rust/src/params.rs, ModelParams::earnings_nominal_growth, "
+                  "sections 'Why the model has no expected return without "
+                  "this', 'What it scales, exactly', 'The clock, which is the "
+                  "part that is easy to get wrong' and 'What it does NOT "
+                  "claim'",
+        "why_not_a_drift_in_s": "a premium placed in `s` gives a LEVEL and "
+                                "not growth. Under a constant drift `c` per "
+                                "step the stationary mean solves "
+                                "`m = phi*m + c`, so what is injected is "
+                                "`c/(1-phi)`, reached on the 60-day half-life "
+                                "and followed by no growth at all. Simulated "
+                                "at 3, 6 and 9 per cent a year it gave levels "
+                                "of +0.010, +0.021 and +0.031 with "
+                                "third-year growth of ZERO. An expected "
+                                "return has to enter fair value",
+        "what_it_does_not_claim": "a real price index earns 3 to 4 points a "
+                                  "year ABOVE nominal output growth, through "
+                                  "buybacks and the drift of the earnings "
+                                  "share. The model has nothing to derive "
+                                  "that from, so this term does not attempt "
+                                  "it and the gap is reported rather than "
+                                  "closed. The +4.353 is also a property of "
+                                  "the opening expansion rather than of the "
+                                  "model: on the same roster, seed 1, over "
+                                  "1008 days the run leaves expansion and "
+                                  "ends in a trough, and nominal output "
+                                  "reaches 1.0685, which is 1.67 per cent a "
+                                  "year",
+    },
+    "neutral_discount_rate": {
+        "kind": "derived",
+        "presets": {"pt-v18": 0.0482},
+        "identity": "`compute_target_pe` compresses the multiple by "
+                    "`(discount - neutral) * RATE_PE_SENSITIVITY * duration` "
+                    "(fair_value.rs:189), so a name is valued exactly on its "
+                    "sector anchor when the discount rate equals this dial. "
+                    "The value that zeroes the day-zero term is therefore the "
+                    "corporate yield the economy RESTS at under the arm that "
+                    "ships with it, read off the process rather than chosen",
+        "terms": {
+            "0.0482": "the corner the dynamics reach. pt-v18 also ships "
+                      "`macro_burn_in_days` at 755, so the year opens at the "
+                      "corner rather than at the opening state's 0.0456, and "
+                      "the dial is set to whichever of the two the arm "
+                      "actually opens at",
+            "0.04": "what it replaces -- the module constant "
+                    "`fair_value::NEUTRAL_DISCOUNT_RATE`, carried by every "
+                    "preset before pt-v18. The economy opens at 4.56 per cent "
+                    "and settles at 4.82 and never visits 4.00, which is why "
+                    "every profitable name opened about one per cent below "
+                    "the price the generator drew for it",
+            "the generator": "untouched, and it has to be: the multiple this "
+                             "anchors is the same sector anchor the generator "
+                             "draws its multiples around, so the two stay "
+                             "consistent under any neutral rate and a roster "
+                             "opens at fair value exactly when the engine's "
+                             "discount rate equals this",
+        },
+        "source": "rust/src/params.rs, ModelParams::neutral_discount_rate, "
+                  "sections 'A neutral point the economy never visits' and "
+                  "'Read off the economy rather than chosen'",
+        "the_identity_is_exact_and_the_term_is_not": "0.0482 is read off the "
+                                                     "burn-in table, which is "
+                                                     "the same source "
+                                                     "`macro_burn_in_days` is "
+                                                     "filed as undetermined "
+                                                     "for: it records ONE "
+                                                     "path and no dispersion. "
+                                                     "The level a field rests "
+                                                     "at is a random variable "
+                                                     "as much as the day it "
+                                                     "gets there is, so what "
+                                                     "would close this is the "
+                                                     "corner yield re-read "
+                                                     "across the certified "
+                                                     "seed cohort with its "
+                                                     "spread beside it. The "
+                                                     "identity does not "
+                                                     "depend on the answer; "
+                                                     "the shipped digit does",
+        "note": "the defect it repairs is +0.0107 of day-zero mispricing at "
+                "the opening and +0.014 at the corner, unwound over the year "
+                "on a 60-day half-life. At the second sweep's measured "
+                "-94.872 index points per unit of opening level that is 1.0 "
+                "to 1.3 points of the first year, on every seed, and nothing "
+                "in a stationary year. PROMOTED rather than renamed: the name "
+                "was already on the carried read-only surface, and `to_pairs` "
+                "merges that surface with the settable one and sorts, so "
+                "moving it leaves every preset's pairs, fingerprint and "
+                "coefficient digest untouched wherever the value has not "
+                "moved",
+    },
+    "cascade_symmetry": {
+        # THE SOURCE DECLINES THE DERIVATION, in a section headed "What is
+        # NOT derived here, and is worth saying". It names the tilt, the
+        # jump and the oil supply term as the ones that have a stationarity
+        # condition or a closed form and puts this one on the other side of
+        # that line. The mean-of-the-pair construction is a rule for picking
+        # the numbers under the dial, not a value read off the process, and
+        # the docstring says so in as many words. Recording it as derived
+        # because the neighbouring entries are would be exactly the
+        # inherited authority this module exists to refuse.
+        "kind": "undetermined",
+        "presets": {"pt-v18": 1.0},
+        "what_would_determine_it": "the ladder's expected contribution "
+                                   "measured at 1.0 over the returns this "
+                                   "engine actually produces. The drift "
+                                   "argument runs over 'a symmetric "
+                                   "distribution of daily returns', and this "
+                                   "model deliberately does not have one -- "
+                                   "`jump_mean_market` is negative so that "
+                                   "crashes are larger than rallies -- so "
+                                   "what an odd-symmetric ladder contributes "
+                                   "HERE is a measurement nobody has taken. "
+                                   "Behind that sits the open question the "
+                                   "source leaves open: whether the "
+                                   "ladders' bare literals should be "
+                                   "parameters at all, since nothing "
+                                   "recorded a reason for "
+                                   "the difference between the two ladders "
+                                   "and nothing could reach them",
+        "declared_not_derived_in_source": True,
+        "source": "rust/src/params.rs, ModelParams::cascade_symmetry, section "
+                  "'What is NOT derived here, and is worth saying'; the "
+                  "ladders are at rust/src/market/factors.rs:617-627",
+        "what_the_rule_does_achieve": "the mean construction is exact here, "
+                                      "unlike the OPEC rule it copies. "
+                                      "Threshold 0.025 and tiers 0.007, "
+                                      "0.0045, 0.0025 and 0.0005 give 0.0145 "
+                                      "a side, against a shipped 0.017 down "
+                                      "(four tiers, gate 0.02) and 0.012 up "
+                                      "(three tiers, gate 0.03), so the "
+                                      "pair's total intervention is 0.029 "
+                                      "before and after and neither side is "
+                                      "chosen. The GATES are deliberately "
+                                      "left alone -- a stop-loss sits under "
+                                      "every long, a buy-stop needs shorts to "
+                                      "exist, so the upside keeps its "
+                                      "`short_interest_ratio > 0.1` condition "
+                                      "-- and that is finance rather than an "
+                                      "accident. None of it derives 1.0; it "
+                                      "conserves a size and removes a "
+                                      "direction whose correct value nobody "
+                                      "has measured",
+    },
 }
 
 #: Dials in scope that carry NO entry.
 #:
-#: This list is the finding. Eighty-five of the ninety-five dials in scope
+#: This list is the finding. Seventy-seven of the ninety-five dials in scope
 #: have no recorded derivation, and several
 #: carry eight significant figures with no error bar anywhere --
 #: `crisis_blend_gain` at 0.8275881, `crisis_vix_threshold` at 30.88325108,
@@ -721,7 +1178,6 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: a SET in both directions, so a new dial fails until it is either given
 #: provenance or added here on purpose.
 UNPROVENANCED = (
-    "cascade_symmetry",
     "crash_amplifier_slope",
     "crash_amplifier_threshold",
     "crisis_blend_cap",
@@ -732,10 +1188,8 @@ UNPROVENANCED = (
     "crowd_lean_cap",
     "crowd_momentum_gain",
     "crowd_valuation_gain",
-    "cycle_hazard_per_month",
     "cycle_stationary_opening",
     "daily_credit_floor_gain",
-    "earnings_nominal_growth",
     "endogenous_news_intensity",
     "endogenous_news_sigma",
     "garch_alpha",
@@ -752,13 +1206,11 @@ UNPROVENANCED = (
     "informed_flow_fraction",
     "jump_intensity_idio",
     "jump_intensity_market",
-    "jump_mean_compensated",
     "jump_mean_market",
     "jump_momentum_share",
     "jump_sigma_idio",
     "jump_sigma_market",
     "jump_vix_coupling",
-    "market_beta_down_asym_recentre",
     "market_factor_sigma",
     "market_vol_alpha",
     "market_vol_beta",
@@ -773,14 +1225,11 @@ UNPROVENANCED = (
     "mispricing_cap",
     "mispricing_half_life_days",
     "momentum_theta",
-    "neutral_discount_rate",
     "news_market_weight",
     "news_peer_vix_coupling",
     "news_peer_weight",
     "news_peer_weight_down",
     "news_sector_weight",
-    "oil_opec_symmetry",
-    "oil_seasonality_target",
     "order_flow_coefficient",
     "price_breaker_fraction",
     "price_hard_cap",
