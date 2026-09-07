@@ -71,18 +71,46 @@ nobody moved it.
 That was a footnote while the dials it hid were old. It is not one now.
 `vix_variance_premium` ships 0.252 in `pt-v1` because the dial did not exist
 when `pt-v1` was written; the number is this era's measurement, and the
-audit was blind to it. `POST_BASELINE` names such dials and puts them in
-scope at the value each required preset actually ships, so an entry still
-goes stale the moment one of them moves.
+audit was blind to it.
 
-**It is not yet the complete set**, and it says so rather than reading as
-one. It covers the dials the pt-v19 charter's ledger names. The complete
-set is derivable -- the dial names in `ModelParams` that do not appear in
-`rust/src/params.rs` at the last release, `git show f47c149:` -- and on
-2026-09-06 that was thirty-four names, twenty-four of them unmoved by any
-required preset and thirteen of those the sector table's own per-sector
-sigmas. Enumerating them is a decision about scope, not bookkeeping, so it
-is left to whoever takes it.
+**Name the failure for what it is: a guard reporting green because its
+subject moved out of its scope.** Every test here passed on 2026-09-06 with
+a tape measurement, an exponent whose shipped value is not the measured one,
+and a live per-name floor all outside the question being asked -- and the
+suite could not have said so, because the completeness assertion is over
+`required_dials()` and `required_dials()` was the thing that had shrunk. A
+green run meant "everything in scope is accounted for", and scope was
+silently the wrong set. The lesson generalises past this module: when a
+scope is computed rather than declared, ask what has left it since the
+computation was written.
+
+`POST_BASELINE` names such dials and puts them in scope at the value each
+required preset actually ships, so an entry still goes stale the moment one
+of them moves.
+
+# What still falls through, stated so nobody has to rediscover it
+
+**`POST_BASELINE` is not exhaustive and NOTHING HERE MAKES IT SO.** It
+covers the dials the pt-v19 charter's ledger names. A dial added to
+`ModelParams` tomorrow, at a default no required preset moves, enters
+neither scope and no test in this repository fails. That is the same crack,
+still open, one dial narrower.
+
+The complete set is derivable -- the dial names in `ModelParams` that do not
+appear in `rust/src/params.rs` at the last release, `git show f47c149:` --
+and on 2026-09-06 that was thirty-four names, twenty-four of them unmoved by
+any required preset and thirteen of those the sector table's own per-sector
+sigmas. `ModelParams` carries 158 dials; 64 are moved off `pt-v1` and five
+are declared here, so 89 are in no scope at all.
+
+**The check that would close it, and it is deliberately not written here:**
+assert the 158 as a PARTITION -- every dial either moved off the baseline,
+or named in `POST_BASELINE`, or named in a committed out-of-scope list with
+a reason -- so a new dial fails the suite until somebody classifies it. That
+needs no git and no history, only that nothing is unaccounted for. It also
+requires 89 first-time classifications, which is a decision about scope
+rather than bookkeeping, so it is left to whoever takes it rather than taken
+here by default.
 """
 
 from __future__ import annotations
