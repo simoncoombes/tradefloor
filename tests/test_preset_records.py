@@ -109,3 +109,130 @@ def test_the_envelope_and_the_record_agree_on_the_band_count():
         "the certified preset misses a band at the certified horizon, which "
         f"is a bigger fact than a stale number: {rec['misses']['252']}"
     )
+
+
+# --------------------------------------------------------------------------
+# The index tail row, through the record
+#
+# The row is a POOLED RATE: its graded value is two counts summed over the
+# seeds, so a per-seed panel that keeps only the fourteen shape rows cannot
+# produce it. These bind the path from what `preset_panel.py` keeps, through
+# `envelope.certification_record`, to the field `record.py` writes -- so the
+# row cannot be dropped at any of the three seams without a failure.
+# --------------------------------------------------------------------------
+
+
+def test_the_held_roster_tool_emits_no_index_tail_figure_and_says_why():
+    """The omission is asserted, not merely observed.
+
+    `index_tail_dn3_pct` is certified on `facts.LEVEL_PROTOCOL`, where the
+    roster varies with the seed; `preset_panel.py` holds roster 111. The two
+    read 1.2749 and 1.124 per cent on the shipped preset, a 13.4 per cent
+    gap, so a held-roster figure carried in a preset record under this row's
+    name would be compared with the certified one.
+
+    Annotating it would not prevent that. Every ruler error this project has
+    made was labelled somewhere and compared anyway: the real VIX AR1 is
+    documented as a whole-span estimate and was scored against 252-day
+    windows; `crisisprobe-frontier`'s tail band declares itself CHOSEN in
+    its own source and still produced a charter verdict; `REAL_TAIL3 =
+    107/9236` carries its provenance in `facts.py` while eight scripts
+    divided GSPC hits by a VIX session count.
+
+    So the held-roster path emits NOTHING for this row, and this test fails
+    if it ever starts to. Absent with a stated reason is honest; a
+    wrong-protocol number with a footnote is not.
+    """
+    import sys
+
+    sys.path.insert(0, str(RECORDS.parent.parent.parent
+                           / "tools" / "calibration"))
+    preset_panel = pytest.importorskip("preset_panel")
+    from tradefloor.facts import pooled_rate_counts
+
+    counts = set(pooled_rate_counts(envelope.TAIL_ROW))
+    kept = set(preset_panel.PANEL)
+    assert envelope.TAIL_ROW not in kept
+    assert not (counts & kept), (
+        "the held-roster panels carry the tail row's counts, so "
+        "envelope.certify will build a tail block from the wrong protocol")
+    assert sorted(preset_panel.PANEL) == sorted(envelope.CERTIFIED)
+
+    # And the reason travels in the artefact, naming both the mismatch and
+    # what would fill the field.
+    reason = preset_panel.TAIL_NOT_MEASURED
+    assert envelope.TAIL_ROW in reason
+    assert "LEVEL_PROTOCOL" in reason and "seed=111" in reason
+    assert "level-protocol arm" in reason
+
+
+def test_certify_finds_no_tail_block_on_held_roster_panels():
+    """The omission, end to end: the tool's own panel shape yields None.
+
+    Asserted on panels built the way `preset_panel._job` builds them --
+    trimmed to `PANEL` -- so this fails if the trim ever widens to include
+    the counts, which is the only way a held-roster tail figure could reach
+    a record.
+    """
+    from tradefloor.facts import REAL_MARKETS
+
+    import sys
+
+    sys.path.insert(0, str(RECORDS.parent.parent.parent
+                           / "tools" / "calibration"))
+    preset_panel = pytest.importorskip("preset_panel")
+
+    full = {k: (lo + hi) / 2.0 for k, (lo, hi) in REAL_MARKETS.items()}
+    full["index_tail_dn3_hits"] = 3
+    full["index_tail_dn3_sessions"] = 251
+    trimmed = [{k: full[k] for k in preset_panel.PANEL} for _ in range(4)]
+    result = envelope.certify(trimmed)
+    assert result["tail"] is None
+    assert envelope.certification_record(result)["tail"] is None
+
+
+def test_a_certification_record_carries_the_tail_block_when_the_panels_do():
+    """The second seam, on panels shaped the way the tool now keeps them."""
+    from tradefloor.facts import REAL_MARKETS
+
+    panels = []
+    for i in range(4):
+        panel = {k: (lo + hi) / 2.0 for k, (lo, hi) in REAL_MARKETS.items()}
+        panel["fear_gauge_dn3_samples"] = [panel["fear_gauge_dn3"]]
+        panel["index_tail_dn3_hits"] = i
+        panel["index_tail_dn3_sessions"] = 251
+        panel["index_tail_dn3_pct"] = 100.0 * i / 251
+        panels.append(panel)
+    record = envelope.certification_record(
+        envelope.certify(panels, stationary_opening=False))
+    tail = record["tail"]
+    assert tail["row"] == envelope.TAIL_ROW
+    assert tail["hits"] == 0 + 1 + 2 + 3 and tail["sessions"] == 4 * 251
+    assert tail["rate"] == pytest.approx(100.0 * 6 / 1004)
+    assert tail["counted"] is False
+    # JSON-safe, because this is what gets written to a record file.
+    assert json.loads(json.dumps(tail)) == tail
+
+
+@pytest.mark.parametrize("path", records(), ids=lambda p: p.stem)
+def test_no_committed_record_carries_a_tail_figure(path):
+    """The third seam, asserted rather than skipped.
+
+    A record is written from `preset_panel.py`, which runs the held roster,
+    and the row is certified on the varying one. So no record carries a tail
+    figure and none should: this fails if one appears, which is the point.
+    It was a conditional skip until the ruling, and a skip cannot fail --
+    it would have gone quiet on exactly the regression it was written for.
+
+    When `preset_panel.py` grows a level-protocol arm, this test is what has
+    to be edited to admit the field, which puts the decision in front of
+    whoever makes the change.
+    """
+    rec = load(path)
+    tail = rec.get("mechanism_252", {}).get("tail")
+    assert tail is None, (
+        f"{path.name} carries a tail figure. It was measured on the held "
+        "roster and the row is certified on facts.LEVEL_PROTOCOL, which "
+        "reads 13.4 per cent higher on the shipped preset; a reader will "
+        "compare it with envelope.CERTIFIED_CRISIS. See "
+        "preset_panel.TAIL_NOT_MEASURED")

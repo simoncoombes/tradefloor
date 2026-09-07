@@ -59,6 +59,17 @@ def panel_at(days: int, **overrides) -> dict:
         out[key] = (low + high) / 2.0
     if "fear_gauge_dn3" in out:
         out["fear_gauge_dn3_samples"] = [out["fear_gauge_dn3"]]
+    if "index_tail_dn3_pct" in out:
+        # A pooled-RATE row is aggregated from its two counts, so a panel
+        # carrying only the rate leaves the row unmeasured and every
+        # assertion about it passes for the wrong reason. The counts are
+        # built to give back the mid-band rate the fixture set.
+        sessions = days - 1
+        out["index_tail_dn3_hits"] = round(
+            out["index_tail_dn3_pct"] * sessions / 100.0)
+        out["index_tail_dn3_sessions"] = sessions
+        out["index_tail_dn3_pct"] = (
+            100.0 * out["index_tail_dn3_hits"] / sessions)
     out.update(overrides)
     return out
 

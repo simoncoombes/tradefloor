@@ -776,7 +776,8 @@ def test_the_fear_rows_answer_the_session_they_are_paired_with():
 def test_the_fear_rows_are_graded_in_the_crisis_group_and_pooled_where_thin():
     from tradefloor.facts import (REAL_MARKETS, CRISIS, AGGREGATE, aggregate_panels,
                                   pooled_sessions, REPORTING_ONLY, LABELS)
-    assert set(CRISIS) == {"fear_gauge_dn1", "fear_gauge_dn3"}
+    assert set(CRISIS) == {"fear_gauge_dn1", "fear_gauge_dn3",
+                           "index_tail_dn3_pct"}
     assert all(k in REAL_MARKETS for k in CRISIS)
     assert AGGREGATE["fear_gauge_dn3"] == "pooled"
     panels = [{"fear_gauge_dn3": None, "fear_gauge_dn3_samples": [], "fear_gauge_dn1": 1.0},
@@ -788,6 +789,117 @@ def test_the_fear_rows_are_graded_in_the_crisis_group_and_pooled_where_thin():
     assert agg["fear_gauge_dn1"] == 1.0
     for key in ("fear_gauge_dn5", "fear_gauge_up1"):
         assert key in REPORTING_ONLY and key in LABELS and key not in REAL_MARKETS
+
+
+def test_the_index_tail_row_counts_the_sessions_the_fear_rows_condition_on():
+    """The instrument, on a real run: the count and the response agree.
+
+    The fear rows pair a session with the gauge's answer to it, and the
+    last recorded session has no answer, so the tail COUNT is at or one
+    above the fear row's session count on every run. If the two ever
+    disagree by more than that, one of them is bucketing a different
+    series -- which is the failure factoring `_index_session_returns` out
+    of `fear_statistics` exists to make impossible.
+    """
+    from tradefloor.facts import fear_statistics, index_tail_statistics
+
+    days = 120
+    engine = tradefloor.Engine(seed=7, universe=UNIVERSE)
+    for day in range(days):
+        engine.open_market()
+        engine.run_session(9, 30, 3, 390)
+        engine.record(day)
+        engine.close_market()
+    rows = fear_statistics(engine.bars(grain="day"), engine.macro_table(),
+                           UNIVERSE)
+
+    # Every session return is counted; the gauge scores one fewer.
+    assert rows["index_tail_dn3_sessions"] == days - 1
+    assert rows["fear_sessions_scored"] == days - 2
+    delta = rows["index_tail_dn3_hits"] - rows["fear_gauge_dn3_sessions"]
+    assert 0 <= delta <= 1, (rows["index_tail_dn3_hits"],
+                            rows["fear_gauge_dn3_sessions"])
+    assert rows["index_tail_dn3_pct"] == pytest.approx(
+        100.0 * rows["index_tail_dn3_hits"] / rows["index_tail_dn3_sessions"])
+
+    # And the arithmetic, on a series with no market under it, so a
+    # threshold moved by a sign or an inclusive comparison turned strict
+    # fails here rather than in a run nobody re-reads.
+    series = [(d, r) for d, r in enumerate(
+        [-3.0, -2.999, 3.0, 2.999, 0.0, -10.0])]
+    tail = index_tail_statistics(series)
+    assert tail["index_tail_dn3_hits"] == 2      # -3.0 is AT the threshold
+    assert tail["index_tail_up3_hits"] == 1
+    assert tail["index_tail_dn3_sessions"] == 6
+    assert tail["index_tail_dn3_pct"] == pytest.approx(100.0 * 2 / 6)
+
+
+def test_the_index_tail_row_is_pooled_as_a_rate_and_never_medianed():
+    """The third aggregate kind, and why it is not the other two.
+
+    `AGGREGATE` had "mean" and "pooled" and the tail row is neither: it is
+    a ratio of two sums. The test that matters is the one that separates
+    the pooled rate from a median over seeds, because the record carries
+    one run read both ways differing by 3.2x.
+    """
+    from tradefloor.facts import (AGGREGATE, CRISIS, REAL_MARKETS,
+                                  aggregate_panels, aggregate_value,
+                                  pooled_rate_counts)
+    import statistics as st
+
+    row = "index_tail_dn3_pct"
+    assert AGGREGATE[row] == "pooled_rate"
+    assert row in CRISIS and row in REAL_MARKETS
+    assert pooled_rate_counts(row) == ("index_tail_dn3_hits",
+                                       "index_tail_dn3_sessions")
+    with pytest.raises(tradefloor.ValidationError):
+        pooled_rate_counts("excess_kurtosis")
+
+    # Five seeds, three of them with no session at -3 percent at all --
+    # the shape the tape itself has, where 13 of 35 real years hold none.
+    hits = [0, 0, 0, 2, 8]
+    panels = [{"index_tail_dn3_hits": h, "index_tail_dn3_sessions": 251,
+               row: 100.0 * h / 251} for h in hits]
+    graded = aggregate_panels(panels, keys=[row])[row]
+    assert graded == pytest.approx(100.0 * sum(hits) / (5 * 251))
+    # The median over seeds reads ZERO on the same five seeds. That is the
+    # whole reason for the kind: the two estimators are not close.
+    assert st.median(p[row] for p in panels) == 0.0
+    assert graded > 0.7
+
+    # At equal run lengths the pooled rate IS the mean of the rates, which
+    # is what `aggregate_value` returns when it has only the rates...
+    assert aggregate_value(row, [p[row] for p in panels]) == pytest.approx(graded)
+    # ...and at UNEQUAL lengths they part company, so a consumer holding
+    # the counts uses `aggregate_panels` and one holding only the rates
+    # says which it used.
+    uneven = [{"index_tail_dn3_hits": 0, "index_tail_dn3_sessions": 100,
+               row: 0.0},
+              {"index_tail_dn3_hits": 8, "index_tail_dn3_sessions": 900,
+               row: 100.0 * 8 / 900}]
+    pooled = aggregate_panels(uneven, keys=[row])[row]
+    assert pooled == pytest.approx(100.0 * 8 / 1000)
+    assert aggregate_value(row, [p[row] for p in uneven]) == pytest.approx(
+        100.0 * 8 / 900 / 2)
+    assert pooled != pytest.approx(
+        aggregate_value(row, [p[row] for p in uneven]))
+
+    # A panel carrying the rate but not the counts cannot be pooled, and is
+    # omitted rather than aggregated by a different estimator under the
+    # same name.
+    assert row not in aggregate_panels([{row: 1.0}, {row: 2.0}], keys=[row])
+
+
+def test_the_index_tail_companions_are_reported_and_say_why_they_have_no_band():
+    from tradefloor.facts import LABELS, REAL_MARKETS, REPORTING_ONLY
+
+    for key in ("index_excess_kurtosis", "index_tail_up3_pct"):
+        assert key in REPORTING_ONLY and key in LABELS
+        assert key not in REAL_MARKETS
+    # The scale-free companion carries the tape numbers a reader needs to
+    # place a value, since it has no band to place it against.
+    reason = REPORTING_ONLY["index_excess_kurtosis"]
+    assert "1.456" in reason and "0.428" in reason
 
 
 def test_the_index_drift_row_is_the_daily_rebalanced_portfolio():

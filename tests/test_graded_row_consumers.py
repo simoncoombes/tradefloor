@@ -37,6 +37,14 @@ def _panels(count: int = 4) -> list[dict]:
         panel["days"] = 252
         panel["skew"] = -0.1 * i
         panel["fear_gauge_dn1_sessions"] = 12
+        # The index tail row is a pooled RATE and is aggregated from these
+        # two counts, not from the rate above. Seed zero holds none, which
+        # is the shape a third of real years have and the shape that broke
+        # the three tools this file exists for.
+        panel["index_tail_dn3_hits"] = 0 if i == 0 else i + 1
+        panel["index_tail_dn3_sessions"] = 251
+        panel["index_tail_dn3_pct"] = (
+            100.0 * panel["index_tail_dn3_hits"] / 251)
         if i == 0:
             panel["fear_gauge_dn3"] = None
             panel["fear_gauge_dn3_samples"] = []
