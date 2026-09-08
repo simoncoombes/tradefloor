@@ -121,8 +121,16 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # buy_and_hold -1.103%. Momentum and mean-reversion swapped for the
     # sixth time, 0.518 points apart, which is the widest that pair has been
     # at a swap. The bottom pair held and the oracle has still never moved.
-    assert ranked == ["oracle", "mean_reversion", "momentum",
-                      "random", "buy_and_hold"]
+    #
+    # Re-measured again at the 0.7.0 boundary that made pt-v18 the default:
+    # oracle +7.185%, momentum +1.736%, mean_reversion +1.680%,
+    # buy_and_hold -0.123%, random -0.848%. Momentum and mean-reversion
+    # swapped for the SEVENTH time, 0.056 points apart -- the narrowest
+    # margin at any swap so far, and the clearest reading yet of why this
+    # comment keeps warning about that pair. The bottom pair swapped too.
+    # The oracle has still never moved.
+    assert ranked == ["oracle", "momentum", "mean_reversion",
+                      "buy_and_hold", "random"]
 
 
 def test_random_trading_is_close_to_flat_over_a_short_run(scores):

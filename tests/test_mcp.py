@@ -611,8 +611,20 @@ def test_describe_simulator_serves_the_envelopes_verdicts_by_group():
     assert set(SHAPE) <= served_in
     assert d["certified"]["groups"]["shape"] == list(SHAPE)
     assert all(k in LEVEL + CRISIS for k in served_in - set(SHAPE))
-    # The row that exists to be red at the default preset is served red.
-    assert "index_drift_pct" in served_out
+    # The level and crisis rows are served with their OWN verdicts, which is
+    # the property that matters and the one that survives an era boundary.
+    # This read `assert "index_drift_pct" in served_out` and pinned the
+    # verdict rather than the wiring: it was red at every default through
+    # pt-v16 and is green at pt-v18, and a test that pins today's verdict
+    # fails on the release that improves the model. What must hold is that
+    # each row is served under the verdict the envelope computes for it.
+    for row in LEVEL + CRISIS:
+        if row not in cert["statistics"]:
+            continue                       # unmeasured; asserted just below
+        expected = served_in if cert["statistics"][row]["in_band"] else served_out
+        assert row in expected, (
+            f"{row} is served under the wrong verdict: the envelope reads "
+            f"in_band={cert['statistics'][row]['in_band']}")
     assert set(d["certified"]["statistics_unmeasured"]) == set(cert["unmeasured"])
     assert d["structural_limitations"]
     assert "atlas" in d["not_exposed_here"]

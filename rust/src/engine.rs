@@ -583,19 +583,32 @@ impl Engine {
     /// default written as a bare `PT_V1` at two call sites, where moving an
     /// era means finding both.
     ///
-    /// Since 0.6.0 this is [`PT_V16`], the first preset to hold the complete
-    /// card at the deepest standard this programme runs: over twenty-six
-    /// seed blocks at one hundred seeds each, thirteen of them never touched
-    /// by any search, it holds the 504-day full house on 26, keeps crisis
-    /// co-movement and the crisis lever in range on 26 each, and leaves no
-    /// out-of-band row anywhere.
+    /// Since 0.7.0 this is [`PT_V18`], the first default to hold every
+    /// certified row rather than the shape rows alone. It holds all fourteen
+    /// shape rows at 252 and 504 days and on both held-out axes, as pt-v16
+    /// did; what is new is the other four. The index level returns +5.80 per
+    /// cent a year against a band of 2.90 to 11.90, where pt-v16 lost 13.64
+    /// and was held red for three eras, and the -3 per cent fear row reads
+    /// 3.25 against a floor of 2.60, where pt-v16 read 1.96 and was below
+    /// it. Nine of the ten graded mechanisms are shown against pt-v16's
+    /// eight.
+    ///
+    /// It reads FURTHER from real on one row: the crisis lever is 6.53x
+    /// against real markets' 6.16x, where pt-v16 read 6.23x.
+    ///
+    /// This constant and [`crate::params::DEFAULT_PRESET_NAME`] are the two
+    /// things that decide the default, and a test at the bottom of
+    /// `params.rs` asserts they agree. Moving one alone changes what the
+    /// library REPORTS while every engine keeps running the other, which is
+    /// the substitution that shipped once already: `model_preset()` answered
+    /// "pt-v1" for runs executing pt-v3.
     ///
     /// Every earlier preset stays selectable and bit-reproducing, so
     /// anything recorded under one replays exactly by naming it.
     ///
-    /// [`PT_V16`]: crate::params::PT_V16
+    /// [`PT_V18`]: crate::params::PT_V18
     pub const fn default_model() -> crate::params::ModelParams {
-        crate::params::PT_V16
+        crate::params::PT_V18
     }
 
     /// [`Engine::new`] under an explicit model preset (the runtime seam,
@@ -609,6 +622,42 @@ impl Engine {
         central_bank: CentralBankState,
         sector_keys: Vec<String>,
         params: ModelParams,
+    ) -> Self {
+        Self::with_params_from_opening(seed, companies, economy, central_bank,
+                                       sector_keys, params, true)
+    }
+
+    /// [`Engine::with_params`], saying whether the opening is the model's to
+    /// settle or the caller's to keep.
+    ///
+    /// `settle_opening` is true for `with_params` and every path that takes
+    /// the DEFAULT macro state, which is what `macro_burn_in_days` exists to
+    /// fix: every run otherwise opens in expansion at phase age zero with the
+    /// constructor's own field values, and the burn-in relaxes those into
+    /// something a run can start from.
+    ///
+    /// It is FALSE when the caller supplied a macro state, because then the
+    /// opening is a statement rather than an artefact. Measured at 0.7.0,
+    /// when the default gained the dial: an engine asked for a VIX of 45.0
+    /// and a policy rate of 5 per cent opened at 21.55 and 0.00 -- the
+    /// burn-in had relaxed the request away over 755 days, and
+    /// `Macro`'s own round-trip contract, that a value read back can be
+    /// written straight in, was silently false.
+    ///
+    /// Settling and then restoring the named fields was considered and
+    /// refused: the variance state the burn-in leaves behind tracks the VIX
+    /// path it actually ran, so writing a crisis VIX back on top of it
+    /// produces an engine whose volatility state and VIX disagree. Skipping
+    /// is what a caller naming an opening asked for, and it is what every
+    /// preset before pt-v18 did.
+    pub fn with_params_from_opening(
+        seed: u32,
+        companies: Vec<TickCompany>,
+        economy: EconomyState,
+        central_bank: CentralBankState,
+        sector_keys: Vec<String>,
+        params: ModelParams,
+        settle_opening: bool,
     ) -> Self {
         let companies_len = companies.len();
         // Read before the economy moves into the struct, and never
@@ -665,7 +714,9 @@ impl Engine {
             last_market_targets: None,
         };
         engine.vix_anchor = engine.derive_vix_anchor();
-        engine.burn_in_economy();
+        if settle_opening {
+            engine.burn_in_economy();
+        }
         engine
     }
 
@@ -3225,7 +3276,29 @@ impl Engine {
     /// A string is length-prefixed, `u32` big-endian then UTF-8, so "AB"
     /// followed by "C" cannot hash as "A" followed by "BC". A bool is one
     /// byte. An `Option` is a presence byte and then the value when present.
+    /// `pending_jump` and `pending_overnight` are the day's boundary moves
+    /// waiting for the tape row that carries them. They live on the Python
+    /// wrapper rather than here, because they are recording state, and they
+    /// are passed IN rather than left out: a snapshot carries them, and
+    /// `manifest.state_hash` -- the twin this must agree with byte for byte
+    /// -- refuses a snapshot holding a field it does not hash. Two states
+    /// alike in every column and holding different pending jumps write
+    /// different tapes tomorrow, so calling them equal would overclaim.
+    ///
+    /// Empty slices for a caller that has none, which is every core-only
+    /// caller and every test below.
     pub fn state_hash(&self, day_count: u32, market_open: bool) -> [u8; 32] {
+        self.state_hash_with_pending(day_count, market_open, &[], &[])
+    }
+
+    /// [`Engine::state_hash`], carrying the wrapper's pending tape state.
+    pub fn state_hash_with_pending(
+        &self,
+        day_count: u32,
+        market_open: bool,
+        pending_jump: &[f64],
+        pending_overnight: &[f64],
+    ) -> [u8; 32] {
         use sha2::{Digest, Sha256};
 
         let n = self.companies.len();
@@ -3298,6 +3371,16 @@ impl Engine {
         }
         hash_f64(&mut buf, self.universe_stress);
         hash_f64(&mut buf, self.forced_flow_spent);
+        // LENGTH-PREFIXED, because these two are EMPTY between the tape row
+        // that consumes them and the close that fills them again, where
+        // every per-slot array above always follows the roster. An empty
+        // buffer and a roster-length one of zeros are different states.
+        for pending in [pending_jump, pending_overnight] {
+            hash_u32(&mut buf, pending.len() as u32);
+            for value in pending {
+                hash_f64(&mut buf, *value);
+            }
+        }
         // The growth term's base, in snapshot order. A constant of the run
         // rather than state that advances, and covered for the reason
         // every other field here is: two engines that agree on today's
@@ -3952,6 +4035,12 @@ mod tests {
     fn a_closed_market_costs_nothing() {
         let mut e = engine(7);
         let before_prices = e.prices();
+        // The DELTA, not the lifetime total. A default preset with a macro
+        // burn-in draws during construction -- pt-v18 runs 755 days of it --
+        // and this test is about what the operation costs, not about what
+        // building an engine costs. Asserting the total made the claim
+        // depend on a dial in a different subsystem.
+        let before_draws = e.draws_consumed();
         let out = e.tick(&TickRequest {
             time: GameTime {
                 hour: 11,
@@ -3965,7 +4054,7 @@ mod tests {
             out.draws_consumed, 0,
             "a closed market must not advance the stream"
         );
-        assert_eq!(e.draws_consumed(), 0);
+        assert_eq!(e.draws_consumed() - before_draws, 0);
         assert_eq!(e.prices(), before_prices);
     }
 
@@ -4140,11 +4229,17 @@ mod tests {
         // World B: no chain — the evolved values are pinned directly, as a
         // replay of a recorded macro series would.
         let mut pinned = engine(2026);
+        // The DELTA, not the lifetime total. A default preset with a macro
+        // burn-in draws during construction -- pt-v18 runs 755 days of it --
+        // and this test is about what the operation costs, not about what
+        // building an engine costs. Asserting the total made the claim
+        // depend on a dial in a different subsystem.
+        let before_economy = pinned.draws_by_stream().economy;
         *pinned.economy_mut() = evolved;
         day(&mut pinned);
 
         assert_eq!(
-            pinned.draws_by_stream().economy,
+            pinned.draws_by_stream().economy - before_economy,
             0,
             "the pinned world must not run the macro chain"
         );
@@ -4166,12 +4261,18 @@ mod tests {
     #[test]
     fn the_cumulative_draw_count_includes_embedder_draws() {
         let mut e = engine(5);
+        // The DELTA, not the lifetime total. A default preset with a macro
+        // burn-in draws during construction -- pt-v18 runs 755 days of it --
+        // and this test is about what the operation costs, not about what
+        // building an engine costs. Asserting the total made the claim
+        // depend on a dial in a different subsystem.
+        let before = e.draws_consumed();
         e.draw_uniform();
         e.draw_normal();
-        assert_eq!(e.draws_consumed(), 2);
+        assert_eq!(e.draws_consumed() - before, 2);
         e.open_market();
         let out = e.tick(&request(10, 0));
-        assert_eq!(e.draws_consumed(), 2 + out.draws_consumed);
+        assert_eq!(e.draws_consumed() - before, 2 + out.draws_consumed);
     }
 
     #[test]
@@ -4493,11 +4594,17 @@ mod tests {
         let innovations = vec![None; 3];
         let variances = vec![0.000225; 3];
         let mut e = engine(13);
+        // The DELTA, not the lifetime total. A default preset with a macro
+        // burn-in draws during construction -- pt-v18 runs 755 days of it --
+        // and this test is about what the operation costs, not about what
+        // building an engine costs. Asserting the total made the claim
+        // depend on a dial in a different subsystem.
+        let before = e.draws_consumed();
         let mut buf = SessionBuffer::new();
         let out = e.run_session(&session(10, &innovations, &variances), &mut buf);
         // 10 open ticks at 1 + 3 sectors + 2 and 4 per company.
         assert_eq!(out.draws_consumed, 10 * (1 + 3 + 2 * 3 + 4 * 3));
-        assert_eq!(e.draws_consumed(), out.draws_consumed);
+        assert_eq!(e.draws_consumed() - before, out.draws_consumed);
     }
 
     #[test]

@@ -1764,9 +1764,10 @@ SEED_SD_LEVEL_PROVENANCE = {
     "pinned_by": "tests/test_loss.py re-measures two of the thirty seeds "
                  "live on the level protocol and re-derives the sd from the "
                  "committed per-seed table those panels must match",
-    "same_run_at_the_default": "pt-v16 on the same protocol and seeds reads "
-                               "an sd of 7.0888, the figure beside "
-                               "envelope.CERTIFIED_LEVEL; the entry above "
+    "same_run_at_the_default": "pt-v18 on the same protocol and seeds reads "
+                               "an sd of 6.4767, the figure beside "
+                               "envelope.CERTIFIED_LEVEL; pt-v16 read 7.0888 "
+                               "there on the same run, and the entry above "
                                "is at pt-v1 because the table freezes its "
                                "denominators there",
     "unmeasured": {
@@ -2344,7 +2345,7 @@ SHAPE = (
 LEVEL = ("index_drift_pct",)
 #: The index tail row is CRISIS and not LEVEL: it counts the sessions the
 #: two fear rows condition on, so the three are read together, and the
-#: report already holds the group red until the model earns it. LEVEL would
+#: report already gives the group its own verdict. LEVEL would
 #: fit the arithmetic -- a rate is a first moment -- and was not chosen
 #: because the level row's protocol note and its `SEED_SD` treatment are
 #: specific to the drift.

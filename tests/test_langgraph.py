@@ -1330,8 +1330,14 @@ NOTEBOOK = REPO / "examples" / "integrations" / "langgraph" / "rate_shock.ipynb"
 #: OpenAI, LangSmith personal, and LangSmith service. `AdapterInfo` has
 #: nowhere to put one by construction, but a fixture is committed once and
 #: read forever, so this is checked rather than trusted.
-SECRET_PREFIXES = ("sk-ant-", "sk-proj-", "sk-", "lsv2_pt_", "lsv2_sk_",
-                   "pylf_v1_", "api_key", "Authorization", "Bearer ")
+#: PREFIXES AND HEADER NAMES, not bare fragments. `sk-` on its own is not a
+#: credential prefix, it is two letters and a hyphen: it matched "risk-off"
+#: in a re-recorded rationale, exactly as it matched "risk-adjusted" in the
+#: callable fixture's mandate and was removed there for the same reason. A
+#: check that fires on the model's prose is a check nobody can leave on.
+SECRET_PREFIXES = ("sk-ant-", "sk-proj-", "lsv2_pt_", "lsv2_sk_",
+                   "pylf_v1_", "api_key", "api-key", "Authorization",
+                   "Bearer ", "anthropic-version")
 
 
 def experiment_module():

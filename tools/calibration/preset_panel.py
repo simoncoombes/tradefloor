@@ -122,6 +122,16 @@ LEVER_LO, LEVER_HI = 5.0, 65.0
 REAL_LEVER = 6.16
 
 
+def _commit() -> str | None:
+    """The checkout this measurement ran in, or None outside a checkout."""
+    import subprocess
+    try:
+        return subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
+                              text=True, check=True).stdout.strip() or None
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
 def presets() -> list[str]:
     """Every shipped preset, READ from the engine rather than probed for.
 
@@ -294,6 +304,13 @@ def main() -> None:
 
     out = {
         "pretium_version": tradefloor.version(),
+        # The commit that MEASURED this, read here rather than stamped by
+        # whoever writes a record from it later. `record.py` used to take
+        # `git rev-parse HEAD` in its own working directory, which is the
+        # measuring checkout only when the record is written on the box --
+        # write one anywhere else and the record names a commit that did not
+        # produce it.
+        "commit": _commit(),
         # The ENGINE's default, not the envelope's claim about it. This field
         # read `envelope.PRESET` until 0.6.0, so at an era boundary, which is
         # exactly when this tool runs, the artefact labelled itself with the

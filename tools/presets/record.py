@@ -41,7 +41,7 @@ SCHEMA = 1
 #: holding an old result actually asks.
 DEFAULT_SINCE = {
     "pt-v3": "0.1.0", "pt-v10": "0.2.0", "pt-v12": "0.3.0",
-    "pt-v14": "0.4.0", "pt-v16": "0.6.0",
+    "pt-v14": "0.4.0", "pt-v16": "0.6.0", "pt-v18": "0.7.0",
 }
 
 
@@ -98,7 +98,10 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
         # the build that produced it cannot be re-derived, which is the whole
         # reason `RunManifest` exists for runs.
         "tradefloor_version": panel["pretium_version"],
-        "commit": git("rev-parse", "HEAD") or None,
+        # The panel's own commit first. `git rev-parse HEAD` here names the
+        # checkout writing the file, which is the measuring one only when the
+        # record is written on the box that measured it.
+        "commit": panel.get("commit") or git("rev-parse", "HEAD") or None,
         "workers": panel.get("workers"),
         "wall_seconds": round(panel.get("wall_s", 0.0), 1),
         "method": panel["method"],
@@ -162,6 +165,16 @@ def main() -> int:
                          "from a fresh run at the same time would silently "
                          "fold in every model and roster change since the "
                          "record was written")
+    ap.add_argument("--level-rows", metavar="ROWS",
+                    help="write ONLY the LEVEL_PROTOCOL block onto the record "
+                         "the given ptv18-envelope-rows.py artefact names. "
+                         "envelope.CERTIFIED_LEVEL and CERTIFIED_CRISIS are "
+                         "certified on a protocol no panel measures, so they "
+                         "reach a record through here or not at all")
+    ap.add_argument("--default-since", action="store_true",
+                    help="rewrite only `default_since` on every committed "
+                         "record from the DEFAULT_SINCE table; no panel "
+                         "needed. For the release that moves the default")
     ap.add_argument("--coefficients", action="store_true",
                     help="rewrite only the coefficient vector and its digest "
                          "on every committed record, from the build; no panel "
@@ -171,6 +184,10 @@ def main() -> int:
     args = ap.parse_args()
     if args.mechanism_gate:
         return write_mechanism_gate(args.mechanism_gate)
+    if args.level_rows:
+        return write_level_protocol(args.level_rows)
+    if args.default_since:
+        return write_default_since()
     if args.mechanisms:
         return write_mechanisms()
     if args.coefficients:
@@ -302,6 +319,107 @@ def write_mechanism_gate(panel_path: str) -> int:
                  if record["mechanism_252"]["reversed"] else ""))
         written += 1
     return 0 if written else 1
+
+
+def write_level_protocol(rows_path: str) -> int:
+    """Set the LEVEL_PROTOCOL block on the record the measurement names.
+
+    The panel this file is otherwise built from holds `Universe.random(40,
+    seed=111)` and measures the fourteen SHAPE rows. `envelope.CERTIFIED_LEVEL`
+    and `CERTIFIED_CRISIS` are certified on `facts.LEVEL_PROTOCOL`, where the
+    roster varies with the seed, so no panel can produce them and nothing
+    bound them to a record. That is how `envelope.DECAY_252` came to describe
+    pt-v14 under a pt-v16 default while its neighbours moved: a published
+    constant with nothing to compare it against goes stale in silence, and
+    the module's own docstring promises it describes the shipped preset.
+
+    Its own provenance, like the mechanism certificate's, because it is a
+    different run on a different protocol and a reader must be able to see
+    that rather than infer it.
+
+    REFUSES on a measurement whose control did not reproduce. The control arm
+    exists to separate a moved model from a moved instrument, and a block
+    written over a failed control is a published number nobody can compare.
+    The refusal belongs here, at the write, rather than at the measurement:
+    the readings are worth keeping either way, and it is publishing them that
+    the verdict has to gate.
+    """
+    doc = json.loads(pathlib.Path(rows_path).read_text(encoding="utf-8"))
+    name = doc["target"]
+    path = OUT / f"{name}.json"
+    if not path.exists():
+        print(f"REFUSED: no committed record at {path} to write the "
+              f"level block onto; write the panel record first",
+              file=sys.stderr)
+        return 1
+    if not doc.get("control_reproduced"):
+        print(f"REFUSED: the control {doc['control']} did not reproduce "
+              f"the constants this build publishes for it "
+              f"({', '.join(doc.get('control_moved_rows') or [])}), so "
+              f"{name}'s readings are not on the ruler they replace",
+              file=sys.stderr)
+        return 1
+
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["level_protocol"] = {
+        "certified_level": doc["certified_level"],
+        "certified_crisis": doc["certified_crisis"],
+        "certification": doc["certification_record"],
+        "control": {
+            "preset": doc["control"],
+            "reproduced": True,
+            "values": doc["control_values"],
+            "published": doc["published_values"],
+        },
+        "measured": {
+            "tradefloor_version": doc.get("package_version"),
+            "commit": doc.get("commit"),
+            "protocol": doc.get("protocol"),
+            "seeds": doc.get("seeds"),
+            "days": doc.get("days"),
+        },
+    }
+    ordered = {}
+    for key, value in record.items():
+        if key == "level_protocol":
+            continue
+        ordered[key] = value
+        if key == "mechanism_heldout_seeds":
+            ordered["level_protocol"] = record["level_protocol"]
+    if "level_protocol" not in ordered:      # a record written before that field
+        ordered["level_protocol"] = record["level_protocol"]
+    path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8", newline="\n")
+    rows = dict(doc["certified_level"])
+    rows.update(doc["certified_crisis"])
+    print(f"  wrote {path.relative_to(ROOT)}  level_protocol: "
+          + ", ".join(f"{k}={v:.4f}" for k, v in rows.items()))
+    return 0
+
+
+def write_default_since() -> int:
+    """Set `default_since` on every committed record, from the table above.
+
+    Not a measurement: it says which release made a preset the default, which
+    is a fact about the project and lives in `DEFAULT_SINCE`. It gets its own
+    mode because the alternative at an era boundary is re-running a 96-core
+    panel to change one string, or editing seventeen JSON files by hand --
+    and hand-editing a generated record is how `envelope.DECAY_252` came to
+    describe a preset nobody was running.
+    """
+    written = 0
+    for path in sorted(OUT.glob("*.json")):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        was = record.get("default_since")
+        record["default_since"] = DEFAULT_SINCE.get(record["preset"])
+        if was != record["default_since"]:
+            print(f"  {path.name}: default_since {was!r} -> "
+                  f"{record['default_since']!r}")
+            written += 1
+        path.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8", newline="\n")
+    print(f"  {written} record(s) changed")
+    return 0
 
 
 def write_mechanisms() -> int:

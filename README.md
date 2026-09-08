@@ -139,10 +139,16 @@ lists every target and what it actually reaches.
 
 ## Realism
 
-`tf.facts.measure()` scores fourteen statistics against real-market bands. The
-default preset, `pt-v16`, holds all fourteen at one year and at two years on
-each of twenty-six seed blocks, thirteen of which no search ever touched, with
-no out-of-band row anywhere.
+`tf.facts.measure()` scores fourteen shape statistics against real-market
+bands, and four more on a protocol that varies the roster with the seed. The
+default preset, `pt-v18`, holds all fourteen at one year and at two years, on
+the certification roster and on a held-out one, at thirty seeds each -- and it
+is the first default to hold the other four as well: the index level returns
++5.8 per cent a year inside a band of 2.9 to 11.9, where `pt-v16` lost 13.6
+and was reported red for three releases.
+
+One row reads further from real than before: the crisis lever is 6.53x
+against real markets' 6.16x, where `pt-v16` read 6.23x.
 
 Five of the fourteen were calibration targets, and the bands both tuned the
 model and graded it. So this is a stated envelope, not a test against market
@@ -173,7 +179,7 @@ Each release builds five targets, runs one fixed simulation in each, and
 compares digests. A disagreement stops the release. The crate ships its own
 `exp`, `log`, `sin` and `cos`, so the platform libm cannot change a result.
 
-`pt-v16` became the default at 0.6.0, taking it from `pt-v14`. Naming your
+`pt-v18` became the default at 0.7.0, taking it from `pt-v16`. Naming your
 preset explicitly makes a run replay exactly, and every preset from `pt-v1` on
 is still selectable.
 

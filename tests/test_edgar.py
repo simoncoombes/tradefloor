@@ -135,12 +135,47 @@ def test_prices_start_at_fair_value():
     harvests mispricing sees nothing until shocks accumulate.
     """
     instruments = to_instruments(snapshot(), **MACRO)
+    # Under the SAME model the loader priced with. The loader takes the
+    # shipped default's `neutral_discount_rate`, and an expectation computed
+    # at `fair_value`'s own default would be checking that the loader used
+    # the constant rather than that it used the model -- which is the defect
+    # this argument exists to prevent, not the property under test.
+    neutral = tradefloor.ModelParams.from_preset().to_dict()[
+        "neutral_discount_rate"]
     for inst, row in zip(instruments, ROWS):
         expected = tradefloor.fair_value(
             eps=row["eps"], sector=row["sector"],
             revenue_growth=row["revenue_growth"],
-            book_value_per_share=row["book_value_per_share"], **MACRO)
+            book_value_per_share=row["book_value_per_share"],
+            neutral_discount_rate=neutral, **MACRO)
         assert inst.initial_price == expected.fair_value
+
+
+def test_the_loader_prices_under_the_model_it_is_given():
+    """The macro must match the engine's and so must the MODEL.
+
+    `neutral_discount_rate` is the rate at which a multiple sits on its
+    sector anchor. It is 0.04 in every preset through pt-v16 and 0.0482 in
+    pt-v18, so a loader holding `fair_value`'s default would price a
+    universe the default engine then values differently. Measured at the
+    0.7.0 boundary: a matched-macro run opened at |s| 0.0169 instead of
+    0.0005, and the gap to a MISMATCHED rate regime fell from 201x to 4.9x.
+    """
+    for preset in ("pt-v16", "pt-v18"):
+        neutral = tradefloor.ModelParams.from_preset(preset).to_dict()[
+            "neutral_discount_rate"]
+        instruments = to_instruments(snapshot(), model=preset, **MACRO)
+        for inst, row in zip(instruments, ROWS):
+            expected = tradefloor.fair_value(
+                eps=row["eps"], sector=row["sector"],
+                revenue_growth=row["revenue_growth"],
+                book_value_per_share=row["book_value_per_share"],
+                neutral_discount_rate=neutral, **MACRO)
+            assert inst.initial_price == expected.fair_value, (preset, inst.ticker)
+    # And the two really do differ, so the loop above is not comparing a
+    # constant with itself.
+    assert ([i.initial_price for i in to_instruments(snapshot(), model="pt-v16", **MACRO)]
+            != [i.initial_price for i in to_instruments(snapshot(), model="pt-v18", **MACRO)])
 
 
 def test_a_loss_maker_is_priced_off_book():

@@ -1128,6 +1128,16 @@ impl PyEngine {
             ));
         }
         let params = model_params_from(model)?;
+        // WHETHER THE OPENING IS THE MODEL'S TO SETTLE. `macro_burn_in_days`
+        // exists to relax the CONSTRUCTOR'S default macro, which otherwise
+        // opens every run in expansion at phase age zero. A caller who
+        // passes `macro_state` has named an opening instead, and settling it
+        // for 755 days discards what they asked for -- measured at 0.7.0, an
+        // engine asked for a VIX of 45.0 and a policy rate of 5 per cent
+        // opened at 21.55 and 0.00. This is the only place that knows the
+        // difference: by the time the core has an `EconomyState`, a supplied
+        // macro and the default one look the same.
+        let settle_opening = macro_state.is_none();
         let economy = economy_from(macro_state)?;
         let companies: Vec<TickCompany> = universe
             .iter()
@@ -1137,13 +1147,14 @@ impl PyEngine {
         let tickers = universe.iter().map(|i| i.ticker.clone()).collect();
 
         Ok(Self {
-            inner: Engine::with_params(
+            inner: Engine::with_params_from_opening(
                 seed,
                 companies,
                 economy,
                 create_initial_central_bank_state(0),
                 crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
                 params,
+                settle_opening,
             ),
             buffer: SessionBuffer::new(),
             pending_jump: Vec::new(),
@@ -1378,6 +1389,19 @@ impl PyEngine {
             // exist to forbid.
             self.day_count += 1;
             self.inner.advance_macro_day(i64::from(self.day_count));
+            // AND THE DAY'S JUMP ONTO THE TAPE, which `close_market` does
+            // and this path did not. Same argument as the line above, one
+            // field further on: a day closed this way applied its jump to
+            // the market and never wrote it to the record, so the truth
+            // table for a `close_at_end` run was missing a column the
+            // explicit close carried.
+            //
+            // Invisible until 0.7.0. The jump slot is zero unless a jump
+            // fired, and pt-v18 switches on `jump_mean_compensated`, whose
+            // compensator lands every day; the state hash learned the
+            // pending fields in the same release and the two spellings then
+            // hashed apart, which is how this surfaced.
+            self.record_day_jump();
         }
         Ok(self.buffer.ticks_written)
     }
@@ -2604,7 +2628,9 @@ impl PyEngine {
     /// `tradefloor.manifest.state_hash(engine.state_snapshot())` computes
     /// the same digest in Python, and a test holds the two equal.
     fn state_hash(&self) -> String {
-        let bytes = self.inner.state_hash(self.day_count, self.market_open);
+        let bytes = self.inner.state_hash_with_pending(
+            self.day_count, self.market_open,
+            &self.pending_jump, &self.pending_overnight);
         let mut hex = String::with_capacity(64);
         for byte in bytes {
             hex.push_str(&format!("{byte:02x}"));
@@ -2756,6 +2782,26 @@ impl PyEngine {
         // this and nothing called it. Carried now, while it is free.
         out.set_item("universe_stress", self.inner.universe_stress())?;
         out.set_item("volume_idio", f64_bytes(py, self.inner.volume_idio()))?;
+        // THE DAY'S JUMP AND OVERNIGHT MOVE, WAITING FOR A TAPE ROW.
+        //
+        // Both are applied at a day boundary, so no tick of that day can
+        // carry them; they are written onto the FIRST TICK OF THE NEXT DAY,
+        // which is where a reader reconstructing the day finds them. Between
+        // the close that produced them and that row they are pending, and a
+        // snapshot taken in that window used to drop them -- so a resumed
+        // run's tape was missing the jump on its first recorded row while the
+        // continuous run's carried it.
+        //
+        // Invisible until 0.7.0: the jump slot is zero unless a jump fired,
+        // and pt-v18 switches on `jump_mean_compensated`, whose compensator
+        // is deterministic and lands EVERY day. `test_a_resumed_run_carries_
+        // its_whole_record` found it at day 2, tick 0.
+        //
+        // RECORDING state, not market state. Restoring them changes what the
+        // tape says and no price, which is why the drift guard in
+        // `test_forking.py` names them rather than seeing them move a market.
+        out.set_item("pending_jump", f64_bytes(py, &self.pending_jump))?;
+        out.set_item("pending_overnight", f64_bytes(py, &self.pending_overnight))?;
         // The day's endogenous news, generated once in `open_market` and read
         // by every tick of that day. Per-DAY state, not a per-tick input, and
         // omitting it made a mid-day restore run the rest of the day with the
@@ -3036,6 +3082,20 @@ impl PyEngine {
         }
         if let Some(raw) = snapshot.get_item("universe_stress")? {
             self.inner.set_universe_stress(raw.extract::<f64>()?);
+        }
+        for (key, slot) in [("pending_jump", 0usize), ("pending_overnight", 1usize)] {
+            if let Some(raw) = snapshot.get_item(key)? {
+                let bytes: &[u8] = raw.extract()?;
+                let values: Vec<f64> = bytes
+                    .chunks_exact(8)
+                    .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                    .collect();
+                if slot == 0 {
+                    self.pending_jump = values;
+                } else {
+                    self.pending_overnight = values;
+                }
+            }
         }
         if let Some(raw) = snapshot.get_item("volume_idio")? {
             let bytes: &[u8] = raw.extract()?;

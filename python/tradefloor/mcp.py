@@ -637,9 +637,9 @@ def describe_simulator() -> dict[str, Any]:
             "statistics_in_band": in_band,
             "statistics_out_of_band": out_band,
             # The split: a green panel certifies the shape rows; the level
-            # and crisis rows are reported red until the model earns them,
-            # and one whose certified value is not yet measured is named
-            # here rather than counted either way.
+            # and crisis rows are reported with their own verdicts, and one
+            # whose certified value is not yet measured is named here rather
+            # than counted either way.
             "groups": cert["groups"],
             "statistics_unmeasured": unmeasured,
             "detail": [_statistic_line(n) for n in REAL_MARKETS],

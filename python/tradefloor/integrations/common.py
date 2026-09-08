@@ -1140,7 +1140,22 @@ class Transcript:
         same file. Recordings get committed, diffed and hashed, and text
         mode would answer all three differently per machine.
         """
+        import datetime
         import pathlib
+        # WHEN, stamped here because here is where a recording becomes an
+        # artefact. Every committed fixture carries `recorded_utc` and
+        # `test_callable.py` asserts it, and nothing set it: the field
+        # reached the first fixtures by hand and every recording made since
+        # has been written without it, so the check passed only for as long
+        # as nobody re-recorded. A recording that cannot say when it was made
+        # is one nobody can place against the model that produced it.
+        #
+        # Set only if absent, so re-saving a loaded transcript keeps the time
+        # it was RECORDED rather than the time it was last written.
+        self.meta.setdefault(
+            "recorded_utc",
+            datetime.datetime.now(datetime.timezone.utc)
+            .replace(microsecond=0).isoformat())
         target = pathlib.Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(self.to_json().encode("utf-8"))

@@ -51,6 +51,16 @@ def market_state(engine):
                   "market_cap", "mispricing_s", "garch_variance"):
         out[field] = struct.unpack("<%dd" % n, engine.column(field))
     out["draws"] = engine.draws_consumed
+    # PER STREAM, because the total mixes two claims. The market stream is
+    # what a preset member may never displace; the economy stream is where a
+    # macro dial's own mechanism lives, and a dial that changes the macro
+    # path changes which state-dependent macro draw sites fire. Asserting
+    # the total made those one number, which was harmless while the default
+    # ran no macro at construction and became wrong at 0.7.0, when
+    # `macro_burn_in_days` put 755 days of macro in front of every run.
+    by_stream = dict(engine.draws_by_stream())
+    out["draws_market"] = by_stream["market"]
+    out["draws_economy"] = by_stream["economy"]
     return out
 
 
@@ -135,7 +145,31 @@ PERTURBATIONS = [
     # the economy moves fair value. Three sessions do not get there, which is
     # also why nothing in the suite caught the 0.4.2 regression this dial
     # exists to prevent. It is exercised directly in economy/invariants.rs.
-    ("usd_crisis_vix_threshold", 15.0, False),
+    # ---- THE BURN-IN MOVED THE PROBE'S STARTING LINE ------------------
+    #
+    # Nine entries below read `False` until 0.7.0 and read `True` now, and
+    # not one of their reasons was wrong. Every one said some version of
+    # "INERT over a probe this short": the OPEC rule fires every 90 days and
+    # the probe runs three; oil sits in a dead zone until it leaves it; an
+    # expansion's minimum duration is six months; the dollar reaches equities
+    # only through three links of the macro chain; the first meeting is day
+    # 45. All still true of the MECHANISM.
+    #
+    # What changed is where the probe starts. pt-v18 ships
+    # `macro_burn_in_days` at 755, and `Engine::with_params` runs those days
+    # before the caller's first, so three sessions from CONSTRUCTION are now
+    # three sessions from day 755. Oil has left the dead zone, OPEC has
+    # decided eight times, the cycle has run through phases and the bank has
+    # met. The gates these notes describe are all behind the probe.
+    #
+    # They are flipped rather than the burn-in being switched off here,
+    # because `True` is the true answer for the SHIPPED model: a user who
+    # perturbs one of these on the default and runs three days does see the
+    # market move. The old reasons are kept, marked, because the mechanism
+    # they describe is the reason each one was ever inert -- and it is what
+    # would make it inert again under a preset with no burn-in.
+    # -------------------------------------------------------------------
+    ("usd_crisis_vix_threshold", 15.0, True),  # was False; the burn-in reaches it (see above)
     # The daily credit spread floor (#48). It only bites once the 10y treasury
     # has drifted far enough under the stale corporate yield to breach the 0.8
     # floor, which takes about 120 days on the deterministic channel. Three
@@ -227,13 +261,13 @@ PERTURBATIONS = [
     # `test_jumps_move_prices_when_intensity_is_on`.
     ("jump_intensity_market", 1.0, True),   # live since pt-v10 turned this mechanism on
     ("jump_intensity_idio", 1.0, True),   # live since pt-v10 turned this mechanism on
-    ("jump_mean_market", -0.05, False),        # needs an occurrence
+    ("jump_mean_market", -0.05, True),  # was False; the burn-in reaches it (see above)        # needs an occurrence
     ("jump_sigma_market", 0.05, False),        # needs an occurrence
     ("jump_sigma_idio", 0.05, False),          # needs an occurrence
     # Whether herding continues a jump. Inert for the same reason as the
     # sizes above and one more: at the default preset no jump ever fires, so
     # there is nothing for the share to withhold from the momentum term.
-    ("jump_momentum_share", 1.0, False),     # perturbed away from the default (0.0 since pt-v6); needs a jump inside the three sessions, which is a 7% chance a day
+    ("jump_momentum_share", 1.0, True),  # was False; the burn-in reaches it (see above)     # perturbed away from the default (0.0 since pt-v6); needs a jump inside the three sessions, which is a 7% chance a day
     # A spread across names, applied at the day close. It DOES move the
     # trajectory on its own: unlike the jump parameters it needs no
     # occurrence, only a roster with more than one market cap in it.
@@ -294,9 +328,9 @@ PERTURBATIONS = [
     ("vix_target_shock_cap", 40.0, False),   # binds only past a 12-point excursion
     ("inflation_ceiling", 10.0, False),       # binds only when inflation reaches 6%
     ("inflation_floor", -3.0, False),         # binds only when inflation reaches -1%
-    ("inflation_reversion", 0.15, False),      # monthly; reaches prices via the bond yield at the first meeting (day 45)
+    ("inflation_reversion", 0.15, True),  # was False; the burn-in reaches it (see above)      # monthly; reaches prices via the bond yield at the first meeting (day 45)
     ("crisis_vix_threshold", 18.0, False),     # needs VIX above the gate
-    ("jump_vix_coupling", 1.0, False),
+    ("jump_vix_coupling", 1.0, True),  # was False; the burn-in reaches it (see above)
     ("crisis_blend_gain", 2.0, False),
     # Was inert with reason "sigma ships at 0.0, so alone this generates
     # zero-impact news". True since pt-v11 put sigma at 0.03 and pt-v12 made
@@ -350,12 +384,12 @@ PERTURBATIONS = [
     # separate the two arms by well under one unit: both are still deep in
     # the dead zone and the prices are identical. The dial bites around day
     # 120, when the unanswered-demand arm reaches the floor.
-    ("oil_supply_response", 0.5, False),
+    ("oil_supply_response", 0.5, True),  # was False; the burn-in reaches it (see above)
     # How much of the OPEC rule's direction is removed. INERT over a probe
     # this short for a plainer reason than its neighbour: the rule fires
     # only every 90 days and the probe runs three, so the branch is never
     # reached and no draw it would change is taken.
-    ("oil_opec_symmetry", 0.5, False),
+    ("oil_opec_symmetry", 0.5, True),  # was False; the burn-in reaches it (see above)
     # WHERE oil's seasonal shape acts. It moves the oil price on the first
     # day, and INERT on the market all the same, because oil reaches a price
     # only through the inflation term at daily.rs, which is a dead zone
@@ -363,7 +397,7 @@ PERTURBATIONS = [
     # arms to about 73 on day one, so both sit inside the dead zone, the
     # discount rate never hears about it and the valuation never moves. Over
     # 252 days oil leaves that zone in both directions and the dial bites.
-    ("oil_seasonality_target", 0.5, False),
+    ("oil_seasonality_target", 0.5, True),  # was False; the burn-in reaches it (see above)
     # The clock the cycle hazard is read on. INERT over a probe this short
     # for a reason the mechanism states rather than one the value hides: the
     # engine opens at zero months in phase and an expansion's minimum
@@ -383,7 +417,7 @@ PERTURBATIONS = [
     # the clock advances 1/30 a day, so it fires on days 0 and 1 and
     # never again. `draws_consumed` runs +1 after one day and +2 from
     # the second and stays there, which is the whole of the exemption
-    # this dial takes in DRAW_SCHEDULE_MOVERS below.
+    # this dial takes in ECONOMY_STREAM_MOVERS below.
     #
     # WHICH channel moves the market is separable without a new
     # instrument, because 0.5 and 1.0 take the SAME draw at the same
@@ -427,7 +461,7 @@ PERTURBATIONS = [
     # Days the economy is advanced alone before day zero. It moves the
     # market on the first tick, because every name is valued against an
     # economy that has travelled. It also moves `draws_consumed`, which is
-    # why it is in DRAW_SCHEDULE_MOVERS below: a burn-in consumes economy
+    # why it is in ECONOMY_STREAM_MOVERS below: a burn-in consumes economy
     # draws BY running the economy, so the count is the mechanism rather
     # than a side effect of it.
     ("macro_burn_in_days", 30.0, True),
@@ -442,7 +476,7 @@ PERTURBATIONS = [
     # value gives the same run.
     #
     # It also moves `draws_consumed`, which is why it is in
-    # DRAW_SCHEDULE_MOVERS below -- and the probe is the wrong instrument
+    # ECONOMY_STREAM_MOVERS below -- and the probe is the wrong instrument
     # for that: at seed 42 over three days the count reads IDENTICAL,
     # because the two construction draws are cancelled exactly by the
     # phase-change block at `daily.rs:285`, which a drawn age past two
@@ -499,9 +533,9 @@ PERTURBATIONS = [
     # How much of a VIX jump survives into the next day. A PAIR with
     # `vix_jump_intensity`: with the intensity at its shipped 0.0 there is no
     # jump to decay, so the ratio has nothing to act on.
-    ("vix_decay_ratio", 0.3, False),
+    ("vix_decay_ratio", 0.3, True),  # was False; the burn-in reaches it (see above)
     # The jump arrival rate. Non-zero means the mechanism draws, which is why
-    # it is in DRAW_SCHEDULE_MOVERS below.
+    # it is in ECONOMY_STREAM_MOVERS below.
     ("vix_jump_intensity", 0.5, True),
     # The size of a jump once one arrives. The other half of the pair: with
     # the intensity at 0.0 there is no arrival to scale.
@@ -521,7 +555,7 @@ PERTURBATIONS = [
     # day, so unlike its neighbours it needs no partner and no branch: at
     # 0.5 it moves seven columns and 2.028e-3 of a price at the widest name.
     # Neither dial takes a draw, so `draws_consumed` is unmoved for both and
-    # neither belongs in DRAW_SCHEDULE_MOVERS below.
+    # neither belongs in ECONOMY_STREAM_MOVERS below.
     ("vix_target_offset", 0.5, True),
     # -- forced flow ---------------------------------------------------------
     # Gated twice, which is why all five read inert here. `forced_flow_gain`
@@ -605,9 +639,36 @@ PERTURBATIONS = [
 #: being rolled, which is the thing this dial exists to make true on day
 #: one. Measured: +1 a day on a seed whose drawn expansion opens at 228
 #: days, nothing on seeds whose drawn phase opens below its minimum.
-DRAW_SCHEDULE_MOVERS = frozenset({
+#: WHICH DIALS REACH THE ECONOMY STREAM, measured across the whole settable
+#: surface at 0.7.0 rather than listed from memory. Not an exemption: the
+#: market stream is asserted unmoved for every one of these too, and the
+#: sweep that produced this list found NO dial that moves it.
+#:
+#: The four above -- `vix_jump_intensity`, `macro_burn_in_days`,
+#: `phase_target_range_draw`, `cycle_stationary_opening` -- are here because
+#: their draw IS their mechanism, which the notes above set out at length.
+#:
+#: `inflation_reversion` is the fifth and it arrived with the 0.7.0 default.
+#: `macro_burn_in_days` at 755 puts 755 days of macro in front of every run,
+#: and the macro chain has STATE-DEPENDENT draw sites: `update_central_bank`
+#: draws at each meeting, the OPEC arm draws on a decision day. A dial that
+#: changes the macro path therefore changes which of those fire, and the
+#: count follows -- here by ONE draw over the probe. On pt-v16 it moved
+#: nothing, because a run reached none of those sites in three sessions.
+#:
+#: That is the mechanism and not a leak. The market stream is where a paired
+#: comparison needs its alignment and it is untouched -- measured across the
+#: whole settable surface on this probe, and NO dial moves it -- while a
+#: macro dial that did not change which macro draw sites fire would be a
+#: macro dial that does nothing.
+#:
+#: This list is PROBE-SPECIFIC and derived with `run_market` rather than
+#: reasoned about: three sessions on this roster. A longer probe reaches
+#: more sites and would find more dials here, which is why the assertion
+#: below names the site rather than asserting a count.
+ECONOMY_STREAM_MOVERS = frozenset({
     "vix_jump_intensity", "macro_burn_in_days", "phase_target_range_draw",
-    "cycle_stationary_opening",
+    "cycle_stationary_opening", "inflation_reversion",
 })
 
 
@@ -642,10 +703,25 @@ def test_each_settable_parameter_moves_the_market_or_names_why_not(
     assert custom.fingerprint.startswith("custom-")
     perturbed = market_state(run_market(custom))
 
-    if name not in DRAW_SCHEDULE_MOVERS:
-        assert perturbed["draws"] == base["draws"], \
-            f"{name} moved the draw schedule"
-    moved = any(perturbed[k] != base[k] for k in perturbed if k != "draws")
+    # THE MARKET STREAM, for every parameter and with no exemptions. This is
+    # the claim the CRN apparatus rests on, and measured across the whole
+    # settable surface at 0.7.0 not one dial moves it -- including the four
+    # that used to be exempted here, whose draws all land in the economy
+    # stream. The exemption existed because the assertion was on the TOTAL;
+    # on the stream that matters, nothing needs exempting.
+    assert perturbed["draws_market"] == base["draws_market"], (
+        f"{name} moved the MARKET draw schedule, which no preset member may")
+    # The economy stream is DECLARED rather than exempted, and checked in
+    # both directions, so a dial that starts or stops displacing the macro
+    # path is a decision rather than a drift.
+    moved_economy = perturbed["draws_economy"] != base["draws_economy"]
+    assert moved_economy == (name in ECONOMY_STREAM_MOVERS), (
+        f"{name}: economy stream moved={moved_economy}, declared="
+        f"{name in ECONOMY_STREAM_MOVERS}. A dial reaches this stream by "
+        "changing which state-dependent macro draw site fires; add it with "
+        "the site it reaches, or find out why it stopped.")
+    moved = any(perturbed[k] != base[k] for k in perturbed
+                if k not in ("draws", "draws_market", "draws_economy"))
     assert moved == moves, (
         f"{name}={value}: expected moved={moves}, got {moved} — either a "
         "parameter is not wired through, or an inert reason above is stale"
@@ -666,8 +742,10 @@ def test_the_slow_variance_component_acts_when_its_three_parts_agree():
     optimiser could walk through.
     """
     base = market_state(run_market())
+    # From the DEFAULT, so this measures the slow component and not the
+    # distance to pt-v3 as well. See the note on CUSTOM below.
     both = tradefloor.ModelParams.from_preset(
-        "pt-v3", market_vol_slow_gain=0.1, market_vol_slow_weight=0.5)
+        market_vol_slow_gain=0.1, market_vol_slow_weight=0.5)
     assert both.fingerprint.startswith("custom-")
     moved = market_state(run_market(both))
     assert moved["draws"] == base["draws"], "the slow component moved the draw schedule"
@@ -991,7 +1069,8 @@ def test_the_conditionally_inert_parameters_act_under_their_conditions():
                         ("informed_flow_fraction", 0.5),
                         ("news_sector_weight", 0.6),
                         ("news_market_weight", 0.4)]:
-        custom = tradefloor.ModelParams.from_preset("pt-v1", **{name: value})
+        # From the DEFAULT, for the reason the note on CUSTOM gives.
+        custom = tradefloor.ModelParams.from_preset(**{name: value})
         moved = run_with_inputs(custom)
         assert moved["draws"] == base["draws"], name
         assert moved != base, f"{name} did not act even under its inputs"
@@ -1191,7 +1270,14 @@ def test_replay_accepts_the_model_and_reproduces_the_custom_run():
 #: One perturbation, shared by the whole section. market_factor_sigma is
 #: the loudest single lever (it scales the shared component of every
 #: return), so any runner that quietly dropped the model fails fast.
-CUSTOM = tradefloor.ModelParams.from_preset("pt-v1", market_factor_sigma=0.03)
+#: Perturbed from the DEFAULT, not from pt-v1. The CRN guard below compares
+#: this against a default run, and building it from a named preset compares
+#: a preset change and a parameter change at once -- the mistake the note on
+#: `test_each_settable_parameter_moves_the_market_or_names_why_not` sets out.
+#: It was invisible until 0.7.0, when the default gained a construction
+#: burn-in that pt-v1 does not run and the two arms' draw counts parted by
+#: exactly the burn-in.
+CUSTOM = tradefloor.ModelParams.from_preset(market_factor_sigma=0.03)
 
 SMALL = tradefloor.Universe.random(6, seed=2)
 

@@ -81,6 +81,26 @@ from tradefloor.integrations.pydantic_ai import PydanticAIAdapter
 SEED = 4242
 DAYS = 5
 
+#: HOW LONG THE OFFLINE RULE RUNS, which is not how long the recorded model
+#: run does. `mean_reversion` reads `return_5d` and acts on a five-day move
+#: past two per cent, so on a five-day run it gets one usable reading. That
+#: was enough on the market pt-v16 produced and is not on pt-v18's, whose
+#: worst five-day fall over this roster and seed is 1.85 per cent -- under
+#: the rule's own trigger, so it holds every day, trades nothing and
+#: demonstrates nothing. Measured across horizons at the 0.7.0 boundary:
+#: 5 days 0 trades, 8 days 2, 10 days 4, 20 days 17 with two market
+#: refusals.
+#:
+#: Ten, because it gives the five-day rule five usable days instead of one
+#: and stays inside the funding limit. The RULE is untouched: lowering its
+#: threshold until this market tripped it would be fitting a demonstration
+#: to a market, and the threshold is the thing being demonstrated.
+#:
+#: The recorded model runs stay at `DAYS`. A language model reads the
+#: observation rather than waiting for a window, and both recordings trade
+#: on five days.
+OFFLINE_DAYS = 10
+
 #: The book the agent runs. Large enough that its orders are a real fraction
 #: of daily volume, so execution costs something, and small enough that the
 #: funding cap actually binds: at 2x leverage this is $20M of buying power
@@ -413,10 +433,10 @@ def main() -> dict:
                            every=DECISION_EVERY)
 
     scores = tf.evaluate({"pydantic_ai": pm}, seed=SEED, universe=universe(),
-                         days=DAYS, cash=CASH)
+                         days=OFFLINE_DAYS, cash=CASH)
     card = scores["pydantic_ai"]
 
-    print(f"seed {SEED}, {DAYS} days, {len(ROSTER)} instruments")
+    print(f"seed {SEED}, {OFFLINE_DAYS} days, {len(ROSTER)} instruments")
     print(f"framework          {pm.info.reference()}")
     print(f"decisions          {len(pm.record)}")
     print(f"trades             {card.trades}")
@@ -438,7 +458,7 @@ def main() -> dict:
     # `rejected == 0` is the one worth keeping honest. It is easy to satisfy
     # by trading nothing, and easy to fail by sizing against the
     # participation cap alone, which is what four independent agents did.
-    assert len(pm.record) == DAYS, pm.record
+    assert len(pm.record) == OFFLINE_DAYS, pm.record
     assert not card.errors, card.errors
     assert card.rejected == 0, card.rejected
     assert card.trades > 0, "a run that never traded proves nothing"

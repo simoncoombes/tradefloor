@@ -66,18 +66,19 @@ from .facts import (CERTIFIED_HORIZON_DAYS, REAL_MARKETS, SEED_SD,
                     SEED_SD_504, band_distance)
 
 #: The preset these measurements describe.
-PRESET = "pt-v16"
+PRESET = "pt-v18"
 
 #: The measurement horizon the envelope certifies, in trading days.
 #: Not a soft preference, though the reason is no longer a band count: since
 #: pt-v12 all fourteen are in band at 504 days as well (`MEASURED_504`), and
-#: pt-v16 holds them there with more room again. What holds the horizon here is
-#: that `CERTIFIED` was MEASURED here, on thirty seeds and two held-out axes.
+#: every default since has held them there with more room again. What holds
+#: the horizon here is that `CERTIFIED` was MEASURED here, on thirty seeds
+#: and two held-out axes.
 #:
 #: The old reason -- that the thinnest 504-day row cleared its ceiling by
 #: only 0.11 -- no longer applies: `annualised_vol_pct` read 33.89 under
-#: pt-v12, 30.24 under pt-v14, and 28.12 under pt-v16, against the same
-#: 34.0 ceiling throughout. The
+#: pt-v12, 30.24 under pt-v14, 28.12 under pt-v16 and 25.40 under pt-v18,
+#: against the same 34.0 ceiling throughout. The
 #: horizon stays 252 because that is where the certification was measured,
 #: not because 504 is fragile.
 #:
@@ -117,74 +118,103 @@ PRESET = "pt-v16"
 #: The SHAPE rows only. The level and crisis rows are held in
 #: `CERTIFIED_LEVEL` and `CERTIFIED_CRISIS`, because the two kinds are
 #: certified separately: a green panel means the fourteen shape rows are in
-#: band, and the level and crisis rows are reported red beside them until
-#: the model earns them. A row the default preset fails is never widened to
-#: pass and never folded into this count.
+#: band, and the level and crisis rows are reported beside them with their
+#: own verdicts. Those verdicts were red at every default through pt-v16 and
+#: are green at pt-v18; the split is a statement about PROTOCOL, not about
+#: failure, and it stays whichever way the verdicts read. A row the default
+#: preset fails is never widened to pass and never folded into this count.
 CERTIFIED: dict[str, float] = {
-    "annualised_vol_pct": 24.2377,
-    "excess_kurtosis": 9.7510,
-    "return_acf1": -0.0044,
-    "abs_return_acf1": 0.0413,
-    "abs_return_acf5": 0.0139,
-    "abs_return_acf20": 0.0030,
-    "cross_sectional_corr": 0.2825,
-    "volume_abs_return_corr": 0.5158,
-    "leverage_effect": -0.0141,
-    "volume_change_acf1": -0.2798,
-    "corr_asymmetry": 0.0175,
-    "corr_asymmetry_lagged": -0.0015,
-    "sector_excess_corr": 0.1604,
-    "corr_persistence_acf1": 0.1724,
+    "annualised_vol_pct": 24.6973,
+    "excess_kurtosis": 9.1013,
+    "return_acf1": 0.0022,
+    "abs_return_acf1": 0.0529,
+    "abs_return_acf5": 0.0270,
+    "abs_return_acf20": 0.0079,
+    "cross_sectional_corr": 0.3400,
+    "volume_abs_return_corr": 0.5187,
+    "leverage_effect": -0.0362,
+    "volume_change_acf1": -0.2799,
+    "corr_asymmetry": 0.0168,
+    "corr_asymmetry_lagged": 0.1024,
+    "sector_excess_corr": 0.1387,
+    "corr_persistence_acf1": 0.2220,
 }
 
 #: The LEVEL rows the default preset reads at the certified horizon,
-#: measured as a thirty-seed mean on the certification roster and seeds
-#: (`facts.AGGREGATE`), and held RED. Measured on 2026-09-04 on the pinned
-#: protocol rather than copied from an arm run on other seeds: seeds 101 to
-#: 130, 252 days, the roster varying with the seed, because a level that
-#: describes the MODEL cannot be measured on one draw. The same preset reads
-#: +1.9740 on a held roster, which passes nothing it does not also pass here
-#: but sits 3.3 points lower, so the protocol is part of the number.
+#: measured as a thirty-seed mean on `facts.LEVEL_PROTOCOL` -- seeds 101 to
+#: 130, 252 days, the roster varying WITH the seed, because a level that
+#: describes the MODEL cannot be measured on one draw (`facts.AGGREGATE`).
+#:
+#: Measured 2026-09-08 for the 0.7.0 boundary, on the box run
+#: `ptv18level2`, at the pin that puts the burn-in's macro calendars back on
+#: the caller's clock. The run before it (`ptv18level1`) measured a pt-v18
+#: whose central bank and OPEC arm were inert across this whole window.
+#:
+#: The outgoing default was measured on the same build, the same protocol
+#: and the same seeds in the same run, and reproduced the four constants
+#: this module published for it to all four printed places, so these
+#: readings replace those on one ruler rather than beside another.
+#: `python/tradefloor/presets/pt-v18.json` carries both under
+#: `level_protocol`, and `tests/test_preset_records.py` binds this table to
+#: it -- the binding `DECAY_252` below still does not have.
+#:
+#: The protocol is part of the number and not a detail of it: pt-v16 read
+#: -13.6431 with the roster varying against +1.9740 with it held, a gap of
+#: 15.6 points on one preset, because a drawn roster opens away from fair
+#: value by a draw worth several points of first-year drift.
 CERTIFIED_LEVEL: dict[str, float] = {
-    # The default preset loses 13.6 per cent a year while holding all
-    # fourteen shape rows in band. That is the whole reason this row exists.
-    "index_drift_pct": -13.6431,
+    # The default preset RETURNS 5.80 per cent a year, inside a band of 2.90
+    # to 11.90 at band position 0.32, on a thirty-seed standard error of
+    # 1.18 -- so 2.45 standard errors above the floor rather than merely on
+    # the right side of it. pt-v16 read -13.6431 and was held red here for
+    # three eras; this row exists because of that, and pt-v18 is the first
+    # default to hold it.
+    "index_drift_pct": 5.7957,
 }
 
-#: The CRISIS rows, reserved for the fear gauge, measured on the same run
-#: and protocol as the level row (`facts.LEVEL_PROTOCOL`).
+#: The CRISIS rows, reserved for the fear gauge and the index tail, measured
+#: on the same run and protocol as the level row (`facts.LEVEL_PROTOCOL`).
+#:
+#: All three are IN BAND at this default. They are still reported apart from
+#: the fourteen shape rows, because they are certified on a different
+#: protocol and a green shape panel says nothing about them -- not because
+#: they are failing. `check` computes each verdict rather than asserting it;
+#: it asserted "held red" here until 0.7.0, which was true of every default
+#: through pt-v16 and would have been a false statement the day one held.
 CERTIFIED_CRISIS: dict[str, float] = {
-    # The -1 per cent row sits INSIDE its band at 0.70 to 4.03, by a quarter
-    # of a point on a band whose trimmed across-window sd is 0.64, so the
-    # pass is well within one standard deviation of the floor. It is a pass
-    # and it is not evidence that the small-session response is right: the
-    # row earns its place as the control that makes the -3 per cent row's
-    # failure mean something, since a single row at -1 per cent would have
-    # scored a saturating channel as passing for three eras. The -3 per
-    # cent row is below its floor of 2.60, pooled over 96 sessions.
-    "fear_gauge_dn1": 0.9500,
-    "fear_gauge_dn3": 1.9557,
-    # The index tail row, measured 2026-09-06 on the same protocol and the
-    # same thirty seeds: 96 sessions at or below -3 per cent in 7,530, a
-    # pooled rate of 1.2749 per cent against a band of 0.47 to 1.96 and a
-    # tape centre of 1.213. It is IN band, by 0.685 on a run standard error
-    # of 0.531, and it is not held red -- which is the row doing its job
-    # rather than the row failing to: the default's certified YEAR reaches
-    # the real crash rate. What the same preset does in year two is 2.500
-    # per cent, HIGH, on the same seeds and the same run, and that is the
-    # oscillation this row was added to make visible.
+    # The -1 per cent row reads 1.5834 in a band of 0.70 to 4.03, at band
+    # position 0.27. pt-v16 read 0.9500 at position 0.09 -- inside, and six
+    # standard errors below centre, which is the reading that made a count
+    # of rows-in-band an insufficient answer. This is further from the floor
+    # and still below centre, and it is a pass rather than evidence that the
+    # small-session response is right.
     #
-    # The three counts beside it, which the rate cannot see: 15 of 30 seeds
-    # hold no such session (the tape's 35 windows hold 13), 5 of 30 hold
-    # five or more (the tape 7), and the worst seed holds 32 (the tape 33).
-    # So the mixture is roughly the tape's with too much mass at zero, and
-    # two seeds carry a 2008 apiece.
+    # The -3 per cent row reads 3.2473 against a floor of 2.60, pooled over
+    # 119 sessions, at band position 0.09. pt-v16 read 1.9557 and was BELOW
+    # that floor. So this row moves from out of band to in, close to the
+    # edge: the saturating channel the fear cap creates is not fixed here,
+    # it is far enough off the floor to grade.
+    "fear_gauge_dn1": 1.5834,
+    "fear_gauge_dn3": 3.2473,
+    # The index tail row on the same thirty seeds: 119 sessions at or below
+    # -3 per cent in 7,530, a pooled rate of 1.5803 per cent against a band
+    # of 0.47 to 1.96 and a tape centre of 1.213. IN band, at band position
+    # 0.75 -- nearer its CEILING than pt-v16's 1.2749 was. More crash
+    # sessions is the direction the era wanted and this row is the one that
+    # says when there are too many, so read the position and not the verdict.
+    #
+    # The three counts beside it, which the rate cannot see: 11 of 30 seeds
+    # hold no such session (the tape's 35 windows hold 13; pt-v16 held 15),
+    # 5 of 30 hold five or more (the tape 7, pt-v16 5), and the worst seed
+    # holds 39 (the tape 33, pt-v16 32). The mixture is closer to the tape's
+    # than pt-v16's at the zero end and heavier at the far end.
     #
     # GRADED AND NOT COUNTED at this preset: `cycle_stationary_opening` is
     # 0.0, so every seed opens in expansion at phase age zero and this is
     # year one of a non-stationary opening. `envelope.tail_block` carries
-    # that as data beside the verdict.
-    "index_tail_dn3_pct": 1.2749,
+    # that as data beside the verdict. What this preset does in year two has
+    # not been measured; pt-v16's 2.500 per cent is pt-v16's.
+    "index_tail_dn3_pct": 1.5803,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -267,38 +297,50 @@ RULERS_BY_HORIZON: dict[int, tuple[dict[str, tuple[float, float]],
 #: row was `annualised_vol_pct` at 33.89 against a ceiling of 34.0 -- 0.11 of
 #: room on a statistic whose seed spread is far wider, so the count was
 #: genuine but would have flipped on a change that barely moved the model.
-#: pt-v16 reads 28.12 there, 5.88 of room, having widened it again at
-#: the 0.6.0 boundary.
+#: pt-v18 reads 25.40 there, 8.60 of room, having widened it at each of the
+#: 0.6.0 and 0.7.0 boundaries.
 #:
 #: The count is still MEASURED rather than certified: the certified horizon
 #: is 252 because that is where `CERTIFIED` was measured.
 MEASURED_504: dict[str, float] = {
-    "annualised_vol_pct": 28.1221,
-    "excess_kurtosis": 9.4598,
-    "return_acf1": 0.0114,
-    "abs_return_acf1": 0.1037,
-    "abs_return_acf5": 0.0643,
-    "abs_return_acf20": 0.0217,
-    "cross_sectional_corr": 0.3524,
-    "volume_abs_return_corr": 0.5942,
-    "leverage_effect": -0.0274,
-    "volume_change_acf1": -0.2567,
-    "corr_asymmetry": -0.0065,
-    "corr_asymmetry_lagged": -0.0232,
-    "sector_excess_corr": 0.1579,
-    "corr_persistence_acf1": 0.2865,
+    "annualised_vol_pct": 25.4021,
+    "excess_kurtosis": 10.4101,
+    "return_acf1": 0.0018,
+    "abs_return_acf1": 0.0940,
+    "abs_return_acf5": 0.0435,
+    "abs_return_acf20": 0.0126,
+    "cross_sectional_corr": 0.3631,
+    "volume_abs_return_corr": 0.5705,
+    "leverage_effect": -0.0482,
+    "volume_change_acf1": -0.2644,
+    "corr_asymmetry": 0.0384,
+    "corr_asymmetry_lagged": 0.0843,
+    "sector_excess_corr": 0.1308,
+    "corr_persistence_acf1": 0.3113,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
 #: The model crosses below real around lag 8 and goes NEGATIVE by lag 30,
 #: where real markets stay weakly positive out to lag 60.
 #:
-#: MEASURED UNDER pt-v14, and not yet re-measured for pt-v16. Every other
-#: constant in this module moved to the new default at 0.6.0; this curve, the
-#: slope below and the `decay-shape` gap that quotes them did not, because
-#: re-deriving them is a multi-lag measurement rather than a panel read. A
-#: single seed at lag twenty reads +0.0221 under pt-v16 against -0.0071 under
-#: pt-v14, so the shape has narrowed and the numbers here understate it.
+#: MEASURED UNDER pt-v14, and re-measured for neither pt-v16 nor pt-v18.
+#: Every other constant in this module moved to the new default at 0.6.0 and
+#: again at 0.7.0; this curve, the slope below and the `decay-shape` gap that
+#: quotes them did not, because re-deriving them is a ten-lag measurement and
+#: the certification panel carries three of those lags. A single seed at lag
+#: twenty reads +0.0221 under pt-v16 against -0.0071 under pt-v14, so the
+#: shape has narrowed and the numbers here understate it.
+#:
+#: This is now TWO defaults stale and it is stated rather than fixed, which
+#: is a decision and not an oversight. What would fix it: a ten-lag |return|
+#: autocorrelation run on `facts.LEVEL_PROTOCOL` at thirty seeds, which is a
+#: box job. What must NOT fix it: `atlas_survey.decay_slope` fits the same
+#: quantity through lags 1, 5 and 20, all three of which sit in `CERTIFIED`
+#: above -- so a slope for the shipped default is one line away, and it is a
+#: THREE-POINT estimator where `DECAY_SLOPE` is a ten-point one. Substituting
+#: it would put two estimators under one name, which is the error this
+#: project has made three times and documents in `facts.REAL_TAIL3`,
+#: `crisisprobe-frontier` and the VIX AR1 row.
 DECAY_252: dict[int, float] = {
     1: 0.1413, 2: 0.1063, 3: 0.0897, 5: 0.0496, 8: 0.0371,
     12: 0.0173, 20: 0.0082, 30: -0.0052, 45: -0.0120, 60: -0.0142,
@@ -366,15 +408,15 @@ GAPS: tuple[Gap, ...] = (
         summary="the certified horizon is 252 days",
         detail=(
             "Against bands re-derived at the matching window, the shipped "
-            "pt-v16 holds ALL FOURTEEN at 504 days, as pt-v14 and pt-v12 did "
-            "before it. pt-v12 was the first to manage it: pt-v3 held 7 "
-            "there and pt-v10 held 13.\n\n"
+            "pt-v18 holds ALL FOURTEEN at 504 days, as pt-v16, pt-v14 and "
+            "pt-v12 did before it. pt-v12 was the first to manage it: pt-v3 "
+            "held 7 there and pt-v10 held 13.\n\n"
             "So why is the horizon still 252? Two reasons, and the band "
             "count is neither. First, headroom -- though this reason has "
             "weakened: under pt-v12 annualised_vol_pct read 33.89 against a "
             "band ending at 34.0, only 0.11 of room on a statistic whose "
-            "seed spread is many times that. pt-v16 reads 28.12 there, "
-            "which is 5.88 of room, so the fourteenth row is no longer "
+            "seed spread is many times that. pt-v18 reads 25.40 there, "
+            "which is 8.60 of room, so the fourteenth row is no longer "
             "thin. Second and now decisive on its own, "
             "CERTIFIED is what this module certifies and it is measured at "
             "252 days on thirty seeds. The 504-day table is measured, not "
@@ -475,15 +517,18 @@ GAPS: tuple[Gap, ...] = (
             "The expected size of a scenario\'s response is calibrated; "
             "the dispersion around it is not. That is the gap now.\n\n"
             "The steady-state lever -- how much more violent a sustained "
-            "crisis is than a calm market -- reads 6.23x on pt-v16 against "
+            "crisis is than a calm market -- reads 6.53x on pt-v18 against "
             "real markets\' 6.16x, measured from a held VIX 5 to a held VIX "
             "65 on the certified 40-name roster over 252 days at thirty "
-            "seeds. pt-v14 read 6.18x there, pt-v10 5.05x, and the default "
-            "before it 3.07x. "
+            "seeds. pt-v16 read 6.23x there, pt-v14 6.18x, pt-v10 5.05x, "
+            "and the default before it 3.07x. "
             "This gap opened by saying the VIX shock response was materially "
-            "weaker than the previous preset\'s; on pt-v16 it is stronger "
-            "than any preset before it and within two percent of real, so "
-            "that sentence is WITHDRAWN.\n\n"
+            "weaker than the previous preset\'s; every preset since pt-v11 "
+            "has been stronger than the one before it, so that sentence is "
+            "WITHDRAWN. What replaces it is an OVERSHOOT rather than a "
+            "shortfall: pt-v18 sits 5.9 per cent above real where pt-v16 sat "
+            "1.1 per cent above, so the lever is the one row on this panel "
+            "the new default reads FURTHER from real than the old one.\n\n"
             "'Direction is right' is measured rather than asserted. Driving "
             "the real 2020-21 macro path through the model and correlating "
             "daily returns against each driver, over 504 sessions, against "
@@ -924,8 +969,12 @@ def check(
                 f"lag 30 where real markets stay positive to lag 60"
             ))
         elif name not in CERTIFIED:
-            # A level or crisis row: graded, and held red at the shipped
-            # preset until the model earns it, or not yet measured there.
+            # A level or crisis row. The verdict is COMPUTED, for the reason
+            # the two counts above are: this arm read the band and then said
+            # "held red" without comparing against it. That was true of every
+            # default through pt-v16 and false the moment one held the row,
+            # and a warning asserting a verdict it did not read is the same
+            # defect as a count written down.
             value = CERTIFIED_LEVEL.get(name, CERTIFIED_CRISIS.get(name))
             if value is None:
                 warnings.append(
@@ -933,10 +982,21 @@ def check(
                     f"measured on the pinned protocol yet")
             else:
                 lo, hi = REAL_MARKETS[name]
-                warnings.append(
-                    f"{name} is held red at the certified horizon "
-                    f"({value:.4f} against {(lo, hi)}); a result leaning on "
-                    f"it leans on a row the shipped preset does not hold")
+                if band_distance(value, lo, hi) == 0:
+                    warnings.append(
+                        f"{name} is in band at the certified horizon "
+                        f"({value:.4f} in {(lo, hi)}, at band position "
+                        f"{(value - lo) / (hi - lo):.2f}) -- it is reported "
+                        f"apart from the shape rows because it is certified "
+                        f"on facts.LEVEL_PROTOCOL, where the roster varies "
+                        f"with the seed, and a pass close to an edge is a "
+                        f"pass and not a demonstration that the row is right")
+                else:
+                    warnings.append(
+                        f"{name} is held red at the certified horizon "
+                        f"({value:.4f} against {(lo, hi)}); a result leaning "
+                        f"on it leans on a row the shipped preset does not "
+                        f"hold")
         elif horizon_days <= CERTIFIED_HORIZON_DAYS:
             lo, hi = REAL_MARKETS[name]
             if band_distance(CERTIFIED[name], lo, hi) == 0:
@@ -1585,9 +1645,9 @@ def certified() -> dict[str, Any]:
 
     The statistics carry their group. The shape rows are what a green panel
     certifies; the level and crisis rows are reported with their own
-    verdicts and are red until the model earns them, and a level or crisis
-    row whose certified value has not been measured yet is listed under
-    ``unmeasured`` rather than given a number.
+    verdicts, computed here from the band rather than assumed, and a level
+    or crisis row whose certified value has not been measured yet is listed
+    under ``unmeasured`` rather than given a number.
     """
     from .facts import SHAPE, LEVEL, CRISIS
     statistics: dict[str, Any] = {}

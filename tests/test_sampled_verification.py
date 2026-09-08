@@ -179,7 +179,16 @@ def _mutations(label, value):
     hash computes from the roster, so a read that stopped short raises rather
     than hashing less, and two slots are the cheap second opinion.
     """
-    if isinstance(value, bytes):
+    if isinstance(value, bytes) and not value:
+        # An EMPTY transport buffer, which `pending_jump` and
+        # `pending_overnight` are between the tape row that consumes them
+        # and the close that fills them again. Every other buffer here
+        # follows the roster and always has slots, so this walk had never
+        # met one. It perturbs to a buffer holding one value, because that
+        # is the difference the hash's length prefix exists to see: an empty
+        # buffer and a one-slot buffer are different states.
+        yield f"{label}[]", struct.pack("<d", 1.0)
+    elif isinstance(value, bytes):
         yield f"{label}[0]", _slot(value, 0)
         last = len(value) // 8 - 1
         if last > 0:
