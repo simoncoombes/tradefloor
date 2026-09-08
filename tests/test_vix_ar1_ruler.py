@@ -374,3 +374,126 @@ def test_the_recorded_windows_reproduce_from_the_tape():
         assert facts.median_level_ar1(ruler.blocks(levels, days),
                                       length=days) == pytest.approx(
             facts.real_vix_ar1(days), abs=5e-7)
+
+
+# --------------------------------------------------------------------------
+# The row on the rule
+#
+# The ruler above was delivered, registered in `RULERS_BY_HORIZON`, and read
+# by NOTHING -- not `envelope.CERTIFIED`, not `loss.rule_table`, not
+# `measure`. These assert the wiring, and they assert it as derivations for
+# the same reason the rest of this file does: a tape refetch that moves the
+# ruler must fail honestly rather than fail here.
+
+
+def test_the_rules_centre_is_the_ruler_itself():
+    """`rule_row`'s centre IS `REAL_VIX_AR1`, not a second computation of it.
+
+    The rule reads the windows and takes a median; the ruler debiases a
+    median of the same windows. `debias_ar1` is affine and increasing, so
+    median-then-debias and debias-then-median are the same number -- and
+    that is what lets the row be derived twice without drifting. Asserted
+    exactly, because "close" is how the whole-span figure survived.
+    """
+    from tradefloor import loss
+    for horizon in sorted(facts.REAL_VIX_AR1):
+        row = facts.rule_row(facts.VIX_AR1_ROW, horizon_days=horizon)
+        assert row["centre"] == facts.REAL_VIX_AR1[horizon]
+        assert row["missing"] == ()
+        assert row["source"] == "facts.REAL_VIX_AR1_WINDOWS"
+        assert facts.VIX_AR1_ROW in loss.rule_table(horizon, None)
+
+
+def test_the_windows_the_rule_reads_are_debiased():
+    """`real_windows` hands the rule DEBIASED readings.
+
+    This is section 1.5's defect in the one place it could come back: the
+    model's row is debiased, so a raw window table routed into the rule
+    would grade a debiased reading against a raw centre and be wrong by
+    about 0.015 -- the same size as the distance being measured.
+    """
+    for horizon, raws in facts.REAL_VIX_AR1_WINDOWS.items():
+        got = facts.real_windows(facts.VIX_AR1_ROW, horizon_days=horizon)
+        assert got == tuple(facts.debias_ar1(r, horizon) for r in raws)
+        assert got != tuple(raws)
+
+
+def test_the_rules_error_is_this_modules_median_estimator():
+    """The error is derived from these windows, not read from provenance.
+
+    `REAL_VIX_AR1_PROVENANCE` records a bootstrap standard error of the
+    median. It is not what the rule uses: every other median row on the
+    rule carries `MEDIAN_SE_FACTOR * trimmed_sd / sqrt(n)`, and two rows
+    summed into one `S` whose errors come from different estimators are not
+    comparable terms. The two disagree by about 13 per cent at 252, so this
+    is a choice and it is pinned.
+    """
+    for horizon in sorted(facts.REAL_VIX_AR1):
+        windows = facts.real_windows(facts.VIX_AR1_ROW, horizon_days=horizon)
+        row = facts.rule_row(facts.VIX_AR1_ROW, horizon_days=horizon)
+        assert row["se"] == (facts.MEDIAN_SE_FACTOR
+                             * facts.trimmed_sd(windows)
+                             / math.sqrt(len(windows)))
+        assert row["df"] == len(windows) - 2
+
+
+def test_the_row_is_scored_and_deliberately_not_banded():
+    """On the rule, off the certification panel, and that is the ruling.
+
+    Section 1.5 ruled on the RULER and not on a band; a band is a separate
+    derivation nobody has done. So `PERSISTENCE` sits outside the
+    `SHAPE + LEVEL + CRISIS` partition of `REAL_MARKETS` on purpose, and
+    this asserts both halves -- that it IS scored and that it is NOT
+    certified -- so neither can be changed by accident.
+    """
+    from tradefloor import envelope, loss
+    assert facts.PERSISTENCE == (facts.VIX_AR1_ROW,)
+    assert facts.VIX_AR1_ROW not in facts.REAL_MARKETS
+    assert facts.VIX_AR1_ROW not in envelope.CERTIFIED
+    assert sorted(facts.SHAPE + facts.LEVEL + facts.CRISIS) == \
+        sorted(facts.REAL_MARKETS)
+    for horizon in sorted(facts.REAL_VIX_AR1):
+        assert facts.VIX_AR1_ROW in loss.rule_table(horizon, None)
+
+
+def test_measure_emits_the_row_through_the_same_functions():
+    """The model's side is `vix_levels` -> `level_ar1` -> `debias_ar1`.
+
+    Not a fourth spelling of a lag-one autocorrelation. The check runs the
+    engine once, reads the row `measure` reported, and rebuilds it from the
+    recorded macro table through the three public objects.
+    """
+    universe = pt.Universe.random(12, seed=111)
+    panel = facts.measure(seed=101, universe=universe, days=252,
+                          model="pt-v18", min_observations=5)
+    assert facts.VIX_AR1_ROW in panel, panel.get(
+        facts.VIX_AR1_ROW + "_blind", "row absent with no reason recorded")
+    engine = pt.Engine(seed=101, universe=list(universe), model="pt-v18")
+    for day in range(252):
+        engine.open_market()
+        engine.run_session(9, 30, 3, 390)
+        engine.record(day)
+        engine.close_market()
+    rebuilt = facts.debias_ar1(
+        facts.level_ar1(facts.vix_levels(engine.macro_table())), 252)
+    assert panel[facts.VIX_AR1_ROW] == rebuilt
+
+
+def test_the_row_actually_moves_the_score():
+    """A row on the table that no `S` reflects would be wiring and not a rule.
+
+    Scoring the same medians with and without the row must differ, and the
+    row must not come back blind: `scoring_rule_from_medians` reports a row
+    it has no model error for as blind rather than raising, so a silently
+    dropped row would otherwise look exactly like a scored one.
+    """
+    from tradefloor import loss
+    medians = {facts.VIX_AR1_ROW: 0.87, "annualised_vol_pct": 24.0}
+    se = {facts.VIX_AR1_ROW: 0.004, "annualised_vol_pct": 0.5}
+    with_row = loss.scoring_rule_from_medians(
+        medians, se_model=se, df_model=7.0, horizon_days=252)
+    without = loss.scoring_rule_from_medians(
+        {"annualised_vol_pct": 24.0}, se_model={"annualised_vol_pct": 0.5},
+        df_model=7.0, horizon_days=252)
+    assert facts.VIX_AR1_ROW not in with_row["blind"]
+    assert with_row["S"] > without["S"]

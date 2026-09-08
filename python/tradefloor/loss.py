@@ -81,7 +81,8 @@ import warnings
 from typing import Any, Mapping, Sequence
 
 from ._core import ValidationError
-from .facts import (AGGREGATE, BAND_WINDOWS, CRISIS, LEVEL, REAL_MARKETS,
+from .facts import (AGGREGATE, BAND_WINDOWS, CRISIS, LEVEL, PERSISTENCE,
+                    REAL_MARKETS,
                     REAL_MARKETS_504, REAL_MARKETS_PROVENANCE,
                     RULERS_BY_HORIZON, SEED_SD, SEED_SD_504,
                     SEED_SD_PROVENANCE, SHAPE, aggregate_panels,
@@ -553,7 +554,7 @@ def rule_table(horizon_days: int,
     over.
     """
     if rows is None:
-        rows = tuple(SHAPE) + tuple(LEVEL) + tuple(CRISIS)
+        rows = tuple(SHAPE) + tuple(LEVEL) + tuple(CRISIS) + tuple(PERSISTENCE)
     return {key: rule_row(key, horizon_days=horizon_days, require=False)
             for key in rows}
 

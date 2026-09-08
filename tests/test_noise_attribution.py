@@ -161,8 +161,14 @@ def test_facts_panel_statistics_is_what_measure_reports():
     Rebuilt from the parts on the same engine rather than held to a fixed
     key set: the fear rows read the macro table, which `panel_statistics`
     never sees, so they and their session diagnostics come from
-    `fear_statistics`, and a key `measure` reports that none of the three
-    parts produced fails here by name.
+    `fear_statistics`, the VIX's persistence from `persistence_statistics`,
+    and a key `measure` reports that none of the four parts produced fails
+    here by name.
+
+    THE POINT IS THAT `measure` INVENTS NOTHING. A row computed inline
+    there would be the one row with no independent caller and no
+    independent check, so this assertion is what forced the VIX
+    persistence row out of the middle of `measure` and into a part.
     """
     universe = tf.Universe.random(4, seed=7)
     measured = facts.measure(seed=3, universe=universe, days=40)
@@ -177,11 +183,15 @@ def test_facts_panel_statistics_is_what_measure_reports():
                                  engine.macro_table(), universe)
     identity = {"seed": 3, "universe_fingerprint": facts.fingerprint_of(universe),
                 "model_fingerprint": engine.model_fingerprint, "days": 40}
+    persistence = facts.persistence_statistics(engine.macro_table(), days=40)
     assert set(stats) <= set(measured)
     assert all(measured[k] == v for k, v in stats.items())
     assert set(stats).isdisjoint(fear)
     assert all(measured[k] == v for k, v in fear.items())
-    assert measured == {**identity, **stats, **fear}
+    assert set(persistence).isdisjoint(stats)
+    assert set(persistence).isdisjoint(fear)
+    assert all(measured[k] == v for k, v in persistence.items())
+    assert measured == {**identity, **stats, **fear, **persistence}
     # The graded rows outside the shape set are the fear part's, and the
     # noise module's statistic target reads the panel part alone, so a
     # crisis row is refused there by name rather than read as absent.
