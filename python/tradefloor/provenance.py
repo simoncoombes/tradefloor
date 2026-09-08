@@ -372,8 +372,6 @@ OUT_OF_SCOPE = {
         "being inert is why that value is not derived on the shipped path",
     "idio_sigma_beta_exponent":
         "inert at 0.0: market/factors.rs:98 branches on `== 0.0`",
-    "market_beta_down_asym_lag":
-        "inert at 0.0: market/factors.rs:450 branches on `== 0.0`",
     "market_vol_gamma":
         "inert at 0.0: the GJR term at market/factor_vol.rs:395 loads "
         "`gamma` on the squared shock and omega compensates by `gamma/2`, "
@@ -708,6 +706,71 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # NOT derived here". Where a source is precise it is quoted; where a
     # derivation has an exception, the exception is in the entry, because
     # an entry that records only the identity overstates it.
+    "market_beta_down_asym_lag": {
+        "kind": "measured",
+        "presets": {"pt-v18": 0.375},
+        "source": "the certified panel plus index drift, the fear gauge and "
+                  "the VIX's own persistence, scored by `loss.rule_table` at "
+                  "nineteen rows, on thirty seeds over roster 40 @ seed 111 "
+                  "at both certified horizons. One dial moved on pt-v18 and "
+                  "nothing else",
+        "date": "2026-09-07",
+        "script": "programme/scripts/armboth.py via ptv19dials-jobs.sh "
+                  "(design repo), arm B; registered at 053f3bf before the "
+                  "run and recorded at 3175a4c",
+        "residual": "the argmin of a SEVEN-POINT GRID -- 0, 0.25, 0.375, "
+                    "0.5, 0.625, 0.75, 1.0 -- so the value is located to the "
+                    "grid and not below it. Its neighbours read S_252 47.74 "
+                    "and 46.59 against 46.25 here, and S_504 37.44 and 40.09 "
+                    "against 36.05, so the surface is flat to about a point "
+                    "of S across +/- 0.125 and nothing finer was measured",
+        "estimator": "median across thirty seeds per row, the model error "
+                     "each row's own across-seed spread, `df_model` 29",
+        "note": "BOTH horizons pick this point, so unlike `vix_mean_reversion` "
+                "beside it there is no frontier and no ruling. Full on is "
+                "worse than off at 504 (82.52 against 49.72). An eight-seed "
+                "screen read the argmin as 0.5 and a ten-mechanism survey "
+                "marginal read it as monotone toward 1.0; both were wrong, in "
+                "opposite directions, which is why this entry cites a "
+                "thirty-seed one-dial arm and not either of them",
+    },
+    "vix_mean_reversion": {
+        "kind": "measured",
+        "presets": {"pt-v16": 0.06, "pt-v18": 0.10},
+        "source": "the same nineteen-row objective and the same thirty-seed "
+                  "arm, with `market_beta_down_asym_lag` pinned at 0.375",
+        "date": "2026-09-07",
+        "script": "programme/scripts/armboth.py via ptv19armd-jobs.sh "
+                  "(design repo), arm D; registered at 92463f9 before the "
+                  "run and recorded at 3175a4c",
+        "residual": "THE OBJECTIVE DOES NOT PICK THIS VALUE. Three points "
+                    "are non-dominated on the pair (`S_252`, `S_504`): 0.10 "
+                    "at 28.69/29.78, 0.12 at 25.65/32.84 and 0.15 at "
+                    "23.87/42.79. The spread across that frontier is 4.8 "
+                    "points at 252 and 13.0 at 504, and it is a partial "
+                    "order rather than an error bar",
+        "estimator": "median across thirty seeds per row, the model error "
+                     "each row's own across-seed spread, `df_model` 29",
+        "chosen_from_a_frontier": "RULED by Simon on 2026-09-07 under R10, "
+                                  "R6 having forbidden a combined number "
+                                  "that would pick one of the three and hide "
+                                  "the rest. A different ruling would have "
+                                  "been equally consistent with the "
+                                  "measurement, and this field exists so no "
+                                  "reader mistakes the value for one the "
+                                  "objective determined",
+        "note": "what the ruling was made on: 0.10 is the only one of the "
+                "three holding `vix_ar1_debiased` inside two standard errors "
+                "of its ruler at both horizons (+0.7 and -2.0, against -2.7 "
+                "and -6.8 at 0.15), and the only one where the two horizons "
+                "score alike rather than one being bought at the other's "
+                "expense. The shipped 0.06 is DOMINATED -- 0.12 beats it at "
+                "both horizons -- so it was not going to stay whatever the "
+                "ruling. Before the persistence row joined the rule the "
+                "eighteen-row objective wanted 0.15 at 252 and 0.20 at 504; "
+                "adding the row did not close that disagreement, it reversed "
+                "which end was which",
+    },
     "market_beta_down_asym_recentre": {
         "kind": "derived",
         "presets": {"pt-v18": 1.0},

@@ -3673,6 +3673,60 @@ impl ModelParams {
         // The year-level outcome under that clock is registered and being
         // measured rather than assumed here.
         p.earnings_nominal_growth = 1.0;
+        // THE LAGGED DOWNSIDE WIRE, at the best of a seven-point sweep.
+        //
+        // The dial's own docstring gives the motivation -- real down-moves
+        // continue and the contemporaneous wire alone cannot express it --
+        // and this is the first preset to switch it on. 0.375 is the
+        // argmin of `S` over 0, 0.25, 0.375, 0.5, 0.625, 0.75, 1.0 at
+        // THIRTY seeds, and BOTH horizons agree on it: 57.55 to 46.25 at
+        // 252 and 49.72 to 36.05 at 504. Nothing was ruled; the two
+        // horizons picked the same point.
+        //
+        // It is not a fear-channel dial and the measurement says so. Across
+        // that whole sweep the fear gauge moves 0.936 to 1.115 and the
+        // VIX's own persistence moves 0.0333 to 0.0274 -- a nineteenth of
+        // what `vix_mean_reversion` does to the same row -- so it earns its
+        // score on other rows entirely, which is why the two compose.
+        //
+        // Full on is WORSE THAN OFF at 504 (82.52 against 49.72). An
+        // eight-seed screen read the optimum as 0.5 and a survey marginal
+        // over ten mechanisms read it as monotone toward 1.0; both were
+        // wrong, in opposite directions, and thirty seeds on one dial is
+        // what settled it.
+        p.market_beta_down_asym_lag = 0.375;
+        // VIX MEAN REVERSION: A RULING ON A PARTIAL ORDER, NOT A DERIVATION.
+        //
+        // Said plainly because the distinction is this era's: 0.375 above
+        // is where two horizons agreed, and 0.10 here is where they did
+        // not. On the same thirty-seed sweep, at the lag above, three
+        // values are non-dominated on (`S_252`, `S_504`):
+        //
+        //     0.10 -> 28.69 / 29.78     0.12 -> 25.65 / 32.84
+        //     0.15 -> 23.87 / 42.79
+        //
+        // R6 forbids a combined number that would pick one of these and
+        // hide the rest, and R10 makes the choice among them Simon's.
+        // RULED 0.10 on 2026-09-07. It is a decision, and a different
+        // ruling would have been equally consistent with the measurement.
+        //
+        // What the ruling was made on. The scoring rule gained the VIX's
+        // own persistence row this day (`facts.PERSISTENCE`), and 0.10 is
+        // the only one of the three holding that row inside two standard
+        // errors of its ruler at BOTH horizons: +0.7 and -2.0, against
+        // -2.7 and -6.8 at 0.15. It is also the only point where the two
+        // horizons score alike rather than one being bought at the other's
+        // expense, which nothing in the objective asked for.
+        //
+        // The shipped 0.06 is DOMINATED -- 0.12 beats it at both horizons
+        // -- so whatever the ruling, it was not going to stay.
+        //
+        // Registered before the run in the design repository at `053f3bf`
+        // and measured at `3175a4c`; the eighteen-row objective that
+        // preceded the persistence row wanted 0.15 at 252 and 0.20 at 504,
+        // and adding the row did not close that disagreement, it reversed
+        // which end was which.
+        p.vix_mean_reversion = 0.10;
         p
     }
 
