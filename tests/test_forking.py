@@ -1172,6 +1172,18 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "the substitutions installed by tradefloor.noise. This scenario "
         "installs none, so there is nothing to drop; test_noise.py restores "
         "a snapshot with one installed and asserts the continuation keeps it.",
+    "pending_jump":
+        "the day's jump, waiting for the tape row that carries it. Applied "
+        "at a day boundary, so no tick of that day can hold it, and written "
+        "onto the FIRST TICK OF THE NEXT DAY. Dropping it changes what the "
+        "TAPE says and no price, and this guard compares trajectories. "
+        "tests/test_shadow_solver.py::test_a_resumed_run_carries_its_whole_"
+        "record is the test that does see it: with this absent from the "
+        "snapshot, a resumed run's record was missing the jump on its first "
+        "recorded row while the continuous run's carried it.",
+    "pending_overnight":
+        "the overnight move, waiting for the same row and for the same "
+        "reason as pending_jump.",
     "model_fingerprint":
         "not state. It is the guard that refuses a snapshot restored onto an "
         "engine running other coefficients, which has its own test; dropping "

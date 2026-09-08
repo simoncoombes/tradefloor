@@ -2767,6 +2767,26 @@ impl PyEngine {
         // this and nothing called it. Carried now, while it is free.
         out.set_item("universe_stress", self.inner.universe_stress())?;
         out.set_item("volume_idio", f64_bytes(py, self.inner.volume_idio()))?;
+        // THE DAY'S JUMP AND OVERNIGHT MOVE, WAITING FOR A TAPE ROW.
+        //
+        // Both are applied at a day boundary, so no tick of that day can
+        // carry them; they are written onto the FIRST TICK OF THE NEXT DAY,
+        // which is where a reader reconstructing the day finds them. Between
+        // the close that produced them and that row they are pending, and a
+        // snapshot taken in that window used to drop them -- so a resumed
+        // run's tape was missing the jump on its first recorded row while the
+        // continuous run's carried it.
+        //
+        // Invisible until 0.7.0: the jump slot is zero unless a jump fired,
+        // and pt-v18 switches on `jump_mean_compensated`, whose compensator
+        // is deterministic and lands EVERY day. `test_a_resumed_run_carries_
+        // its_whole_record` found it at day 2, tick 0.
+        //
+        // RECORDING state, not market state. Restoring them changes what the
+        // tape says and no price, which is why the drift guard in
+        // `test_forking.py` names them rather than seeing them move a market.
+        out.set_item("pending_jump", f64_bytes(py, &self.pending_jump))?;
+        out.set_item("pending_overnight", f64_bytes(py, &self.pending_overnight))?;
         // The day's endogenous news, generated once in `open_market` and read
         // by every tick of that day. Per-DAY state, not a per-tick input, and
         // omitting it made a mid-day restore run the rest of the day with the
@@ -3047,6 +3067,20 @@ impl PyEngine {
         }
         if let Some(raw) = snapshot.get_item("universe_stress")? {
             self.inner.set_universe_stress(raw.extract::<f64>()?);
+        }
+        for (key, slot) in [("pending_jump", 0usize), ("pending_overnight", 1usize)] {
+            if let Some(raw) = snapshot.get_item(key)? {
+                let bytes: &[u8] = raw.extract()?;
+                let values: Vec<f64> = bytes
+                    .chunks_exact(8)
+                    .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                    .collect();
+                if slot == 0 {
+                    self.pending_jump = values;
+                } else {
+                    self.pending_overnight = values;
+                }
+            }
         }
         if let Some(raw) = snapshot.get_item("volume_idio")? {
             let bytes: &[u8] = raw.extract()?;

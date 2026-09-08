@@ -372,17 +372,32 @@ def test_the_jacobian_refresh_is_reached(short_days):
     runs: a solve with refresh off takes fewer forward evaluations than
     one that retakes the Jacobian every few steps.
     """
-    engine = tf.Engine(seed=11, universe=UNIVERSE)
-    fwd = shadow.Forward(engine, 0, len(UNIVERSE))
-    x_true = np.random.default_rng(9).normal(size=fwd.layout.size)
-    r_obs = fwd.returns(x_true, fwd.jump_patches(None, {}))
-    counts = {}
-    for refresh in (0, shadow.SOLVER["refresh"]):
-        fwd.evals = 0
-        shadow.solve(fwd, r_obs, fwd.jump_patches(None, {}),
-                     np.zeros(fwd.layout.size), sigma=1e-3, refresh=refresh)
-        counts[refresh] = fwd.evals
-    assert counts[shadow.SOLVER["refresh"]] > counts[0]
+    # OVER SEVERAL SEEDS, because a single one can converge inside the
+    # refresh interval and then the branch never runs -- the test passes on
+    # a comparison of two identical numbers and states nothing. Seed 11 did
+    # exactly that at 0.7.0: 28 evaluations either way. Requiring one strict
+    # separation across the set says the branch ran somewhere, and requiring
+    # no seed to come out FASTER with refresh on says what it costs.
+    separated = []
+    for seed in (11, 21, 13):
+        engine = tf.Engine(seed=seed, universe=UNIVERSE)
+        fwd = shadow.Forward(engine, 0, len(UNIVERSE))
+        x_true = np.random.default_rng(9).normal(size=fwd.layout.size)
+        r_obs = fwd.returns(x_true, fwd.jump_patches(None, {}))
+        counts = {}
+        for refresh in (0, shadow.SOLVER["refresh"]):
+            fwd.evals = 0
+            shadow.solve(fwd, r_obs, fwd.jump_patches(None, {}),
+                         np.zeros(fwd.layout.size), sigma=1e-3, refresh=refresh)
+            counts[refresh] = fwd.evals
+        assert counts[shadow.SOLVER["refresh"]] >= counts[0], (
+            f"seed {seed}: retaking the Jacobian cost FEWER evaluations "
+            f"({counts}), which the interval cannot do")
+        if counts[shadow.SOLVER["refresh"]] > counts[0]:
+            separated.append((seed, counts))
+    assert separated, (
+        "no seed took enough steps to reach the refresh interval, so the "
+        "branch never ran and this test compared identical numbers")
 
 
 # -- the prior at the ends of the interval ------------------------------------
@@ -640,14 +655,24 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     # 12.46, until the universe generator was reconciled to open a drawn
     # roster at its own fair value. The roster here is generated, so that
     # re-dealt the day and the reused Jacobian started paying for the
-    # indicator on it: the retry stopped being what found it. The fix is
-    # unchanged and still guarded, on a day that still needs it. Of 378
-    # combinations swept, four were decisive, so a day where the reused
-    # Jacobian is good enough is now much the commoner case.
+    # indicator on it: the retry stopped being what found it.
+    #
+    # Re-swept again at the 0.7.0 boundary that made pt-v18 the default,
+    # which re-dealt it a second time -- the plain trial reached 10.15
+    # against a no-jump 29.80 and would have found it alone. Ninety-eight
+    # combinations swept, ten advance counts by seven planted normals, and
+    # exactly ONE was decisive: the same ten-day advance with the normal
+    # back at -2.27, where the reused Jacobian leaves the trial at 31.15
+    # against a no-jump 22.97 and a Jacobian of its own reaches 8.43.
+    #
+    # The fix is unchanged and still guarded, on a day that still needs it.
+    # One in ninety-eight says a day where the reused Jacobian is good
+    # enough is now the overwhelmingly commoner case, which is a fact about
+    # the model rather than about the retry.
     rng = np.random.default_rng(7)
     for i in range(10):
         _planted_day(11 + i, None, rng)
-    fwd, r_obs = _planted_day(21, -3.10, rng)
+    fwd, r_obs = _planted_day(21, -2.27, rng)
     found = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
     assert found["jump_market"] is not None
     assert found["jump_market"] < 0.0
