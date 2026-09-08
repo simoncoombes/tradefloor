@@ -29,11 +29,25 @@ The split matters because they decay differently, and every serious execution
 model is built on the distinction. Elsewhere it is fitted from data with
 heroic assumptions. Here both worlds are runnable and the split is measured.
 
-Be aware of the bounds before sizing an experiment. The information
-channel's imbalance term is clamped per tick: below about 1.33x the
-instrument's average minute volume a floor applies and the term is flat,
-above 10x it is capped and flat again, and between them it scales. Both
-constants live in ``order_imbalance`` in ``rust/src/market/factors.rs``. In
+Be aware of the bounds before sizing an experiment. Under the shipped
+default the information channel's imbalance term is clamped per tick:
+below about 1.33x the instrument's average minute volume a floor applies
+and the term is flat, above 10x it is capped and flat again, and between
+them it scales. Both constants live in ``order_imbalance`` in
+``rust/src/market/factors.rs``. Setting ``order_flow_impact_law`` to 1.0
+replaces both clamps with the measured law -- linear in participation
+below the knee, square root above it -- so the term never goes flat. The
+band between the clamps is identical either way.
+
+There is a second bound past it and it is not in the cost law. The session
+breaker holds a name inside ``price_breaker_fraction`` of its previous
+close, 25 per cent by default, and it clamps the PRICE, so a railed run
+carries the same impact vector as any other railed run. Where that bites is
+a property of the instrument: on a thin name it can be between ten and a
+hundred times average minute volume, and on a liquid one past a thousand. A
+cost read at extreme size on a thin name is therefore a breaker reading
+rather than a law reading. Check the close against the bound before
+quoting one. In
 practice an ``analyse`` run hits a harder bound first: the book caps the
 fill at the displayed depth, and identical fills mean identical flow and
 identical numbers. Measured on this build, with ``analyse`` and a single

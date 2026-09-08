@@ -180,6 +180,56 @@ def test_macro_reads_back_in_the_units_it_was_written_in():
     assert e.macro_state.inflation_rate == pytest.approx(0.031)
 
 
+def test_a_supplied_opening_survives_construction():
+    """The macro you passed is the macro you get.
+
+    `macro_burn_in_days` exists to relax the CONSTRUCTOR'S default macro,
+    which otherwise opens every run in expansion at phase age zero. pt-v18
+    ships it at 755 and the burn-in ran on a supplied opening too, so an
+    engine asked for a VIX of 45.0 and a policy rate of 5 per cent opened at
+    21.55 and 0.00 -- three releases' worth of scenario studies would have
+    started somewhere other than where they asked to.
+
+    Asserted across every shipped preset, so a preset that switches the
+    burn-in on later cannot reintroduce it.
+    """
+    crisis = tradefloor.Macro(vix=45.0, federal_funds_rate=0.05,
+                              inflation_rate=0.06, cycle="contraction")
+    for name in tradefloor.preset_names():
+        e = tradefloor.Engine(seed=1, universe=tradefloor.Universe.random(3, seed=1),
+                              macro_state=crisis, model=name)
+        got = e.macro_state
+        assert got.vix == pytest.approx(45.0), name
+        assert got.federal_funds_rate == pytest.approx(0.05), name
+        assert got.inflation_rate == pytest.approx(0.06), name
+        assert got.cycle == "contraction", name
+
+
+def test_a_batch_opens_where_a_single_engine_does():
+    """`EngineBatch([s])` and `Engine(s)` are the same market.
+
+    The rule that decides whether an opening is settled lives at the Python
+    boundary, and it is written twice -- once here, once in the batch. A
+    batch that settled an opening the single engine kept would be a silently
+    different market, which is the drift `economy_from`'s own comment names.
+    """
+    universe = tradefloor.Universe.random(3, seed=1)
+    crisis = tradefloor.Macro(vix=45.0, federal_funds_rate=0.05)
+    for macro in (None, crisis):
+        kwargs = {} if macro is None else {"macro_state": macro}
+        single = tradefloor.Engine(seed=7, universe=universe, **kwargs)
+        batch = tradefloor.EngineBatch(seeds=[7], universe=universe, **kwargs)
+        single.open_market()
+        batch.open_market()
+        single.run_session(9, 30, 3, 30)
+        batch.run_session(9, 30, 3, 30)
+        # Both return raw f64 bytes; the batch's are (seeds, names) and the
+        # single engine's are one row, so one seed makes them the same bytes.
+        assert batch.prices() == single.prices(), (
+            "the batch and the single engine opened on different markets"
+            + ("" if macro is None else " under a supplied macro state"))
+
+
 def test_pinning_is_narrow():
     # "Narrow write surface, generous read surface": pinning the policy rate
     # must not also freeze inflation.

@@ -1,0 +1,394 @@
+{
+  "replications": 4,
+  "arms": {
+    "control": {},
+    "+200bps": {
+      "federal_funds_rate": 0.06,
+      "corporate_bond_yield": 0.075
+    },
+    "vix": {
+      "vix": 45.0
+    },
+    "cycle": {
+      "cycle": "contraction"
+    },
+    "crisis": {
+      "federal_funds_rate": 0.06,
+      "corporate_bond_yield": 0.075,
+      "vix": 45.0,
+      "cycle": "contraction"
+    }
+  },
+  "per_arm": {
+    "control": {
+      "mean_of_means": 0.775911215319144,
+      "stdev_of_means": 0.05417342895214307,
+      "min": 0.6827025278256853,
+      "max": 0.8152416226395308
+    },
+    "+200bps": {
+      "mean_of_means": 0.7540094331084932,
+      "stdev_of_means": 0.07657813178681115,
+      "min": 0.6574083314111319,
+      "max": 0.8715764766124434
+    },
+    "vix": {
+      "mean_of_means": 0.6690163550376552,
+      "stdev_of_means": 0.11364262767727235,
+      "min": 0.5580383646407776,
+      "max": 0.851808114249273
+    },
+    "cycle": {
+      "mean_of_means": 0.6780879468581944,
+      "stdev_of_means": 0.08830363164368514,
+      "min": 0.5535188239111885,
+      "max": 0.7718527212789168
+    },
+    "crisis": {
+      "mean_of_means": 0.6121629040455294,
+      "stdev_of_means": 0.04353335306954089,
+      "min": 0.561267642834463,
+      "max": 0.6620541292732693
+    }
+  },
+  "against_control": {
+    "+200bps": {
+      "gap": 0.021901782210650755,
+      "spread": 0.07657813178681115,
+      "ratio": 0.2860057003169519,
+      "lower_in": 3
+    },
+    "vix": {
+      "gap": 0.10689486028148876,
+      "spread": 0.11364262767727235,
+      "ratio": 0.9406229199931366,
+      "lower_in": 3
+    },
+    "cycle": {
+      "gap": 0.09782326846094958,
+      "spread": 0.08830363164368514,
+      "ratio": 1.1078057225967468,
+      "lower_in": 4
+    },
+    "crisis": {
+      "gap": 0.16374831127361456,
+      "spread": 0.05417342895214307,
+      "ratio": 3.022668390038042,
+      "lower_in": 4
+    }
+  },
+  "rows": [
+    {
+      "index": 1,
+      "transcript": "run-01.json",
+      "mean_exposure": {
+        "control": 0.8079916935722847,
+        "+200bps": 0.7370738214081853,
+        "vix": 0.6740425685932085,
+        "cycle": 0.7718527212789168,
+        "crisis": 0.5773050202746484
+      },
+      "risk_language": {
+        "control": 15,
+        "+200bps": 12,
+        "vix": 20,
+        "cycle": 20,
+        "crisis": 20
+      },
+      "decisions": 20,
+      "ordering_strict": 0,
+      "ordering_days": 20,
+      "ordering_failures": [
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "holds_on_means": false,
+      "agent_change": {
+        "control": -0.046415072669688695,
+        "+200bps": -0.02208396542324209,
+        "vix": -0.1480260141205212,
+        "cycle": -0.052425751469605264,
+        "crisis": -0.32783350634404285
+      },
+      "decision_counts": {
+        "control": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "+200bps": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "vix": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "cycle": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "crisis": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        }
+      },
+      "refusals": 0
+    },
+    {
+      "index": 2,
+      "transcript": "run-02.json",
+      "mean_exposure": {
+        "control": 0.6827025278256853,
+        "+200bps": 0.6574083314111319,
+        "vix": 0.5921763726673617,
+        "cycle": 0.5535188239111885,
+        "crisis": 0.561267642834463
+      },
+      "risk_language": {
+        "control": 14,
+        "+200bps": 12,
+        "vix": 20,
+        "cycle": 20,
+        "crisis": 20
+      },
+      "decisions": 20,
+      "ordering_strict": 4,
+      "ordering_days": 20,
+      "ordering_failures": [
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        29,
+        30,
+        31,
+        32,
+        33,
+        36,
+        37,
+        38
+      ],
+      "holds_on_means": false,
+      "agent_change": {
+        "control": 0.08714067755130339,
+        "+200bps": 0.0480419702637116,
+        "vix": -0.06679831777339651,
+        "cycle": -0.12503767315194775,
+        "crisis": -0.2072027461302608
+      },
+      "decision_counts": {
+        "control": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "+200bps": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "vix": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "cycle": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "crisis": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        }
+      },
+      "refusals": 0
+    },
+    {
+      "index": 3,
+      "transcript": "run-03.json",
+      "mean_exposure": {
+        "control": 0.8152416226395308,
+        "+200bps": 0.8715764766124434,
+        "vix": 0.5580383646407776,
+        "cycle": 0.6368934242749879,
+        "crisis": 0.6480248237997368
+      },
+      "risk_language": {
+        "control": 15,
+        "+200bps": 12,
+        "vix": 18,
+        "cycle": 20,
+        "crisis": 20
+      },
+      "decisions": 20,
+      "ordering_strict": 0,
+      "ordering_days": 20,
+      "ordering_failures": [
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "holds_on_means": false,
+      "agent_change": {
+        "control": 0.039455097719041876,
+        "+200bps": 0.08834987560115304,
+        "vix": -0.3532639892247049,
+        "cycle": -0.19924328116275392,
+        "crisis": -0.18940433823844904
+      },
+      "decision_counts": {
+        "control": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "+200bps": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "vix": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "cycle": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "crisis": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        }
+      },
+      "refusals": 0
+    },
+    {
+      "index": 4,
+      "transcript": "run-04.json",
+      "mean_exposure": {
+        "control": 0.7977090172390752,
+        "+200bps": 0.7499791030022124,
+        "vix": 0.851808114249273,
+        "cycle": 0.7500868179676845,
+        "crisis": 0.6620541292732693
+      },
+      "risk_language": {
+        "control": 14,
+        "+200bps": 14,
+        "vix": 16,
+        "cycle": 20,
+        "crisis": 19
+      },
+      "decisions": 20,
+      "ordering_strict": 0,
+      "ordering_days": 20,
+      "ordering_failures": [
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "holds_on_means": false,
+      "agent_change": {
+        "control": -0.05229482204259017,
+        "+200bps": -0.07720912778412592,
+        "vix": 0.022637594899863944,
+        "cycle": -0.057928566009537885,
+        "crisis": -0.18542625894155196
+      },
+      "decision_counts": {
+        "control": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "+200bps": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "vix": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "cycle": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        },
+        "crisis": {
+          "scheduled": 20,
+          "valid": 20,
+          "refused": 0
+        }
+      },
+      "refusals": 0
+    }
+  ]
+}

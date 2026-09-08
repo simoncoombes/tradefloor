@@ -1,0 +1,453 @@
+"""Draw surgery in World (noise, phase 2).
+
+Each claim the surgery methods make, stated as a test: unfiring a jump
+moves nothing before its day and no draw count; a window on one stream
+leaves every other stream's log bit-identical and is the documented
+derivation; a transplant reproduces the source at its addresses and
+nothing outside them; the check after a surgery's day names a schedule
+that moved.
+"""
+
+import pytest
+
+import tradefloor as tf
+from tradefloor import noise
+from tradefloor.counterfactual import World, agree, compare
+
+SEED = 42
+UNIVERSE = tf.Universe.random(10, seed=99)
+STEPS, TICKS = 2, 20
+# The market jump fires on every day: an intensity of one with the VIX
+# coupling off, so the comparison `u < 1.0` holds for every uniform the
+# stream can draw and only the surgery's 1.0 escapes it.
+JUMPY = tf.ModelParams.from_preset("pt-v16", jump_intensity_market=1.0,
+                                   jump_vix_coupling=0.0)
+
+
+class Buyer:
+    """Buys a fixed lot of the first name on the first step of every day."""
+
+    def act(self, obs):
+        if obs.step % obs.steps_per_day == 0:
+            return {obs.tickers[0]: 50}
+        return {}
+
+
+def world(model=None):
+    return World(seed=SEED, universe=UNIVERSE, agent=Buyer(),
+                 steps_per_day=STEPS, ticks_per_step=TICKS, model=model)
+
+
+def logs(w, streams, first, last):
+    return {s: [tuple(e) for e in w.draws(s, first, last)] for s in streams}
+
+
+def trace_all(*worlds, first, last):
+    for w in worlds:
+        for s in noise.STREAMS:
+            w.trace_draws(s, first, last)
+
+
+# -- unfire ------------------------------------------------------------------
+
+def test_unfiring_a_jump_moves_nothing_before_its_day():
+    root = world(model=JUMPY).run(3)
+    control, unfired = root.fork("control", "unfired")
+    agreement = agree(control, unfired)
+    assert agreement.identical
+    unfired.unfire(4)
+    control.run(4)
+    unfired.run(4)
+
+    assert (unfired.engine.draws_by_stream()
+            == control.engine.draws_by_stream())
+    assert unfired.engine.stream_positions() == control.engine.stream_positions()
+    rows = list(zip(control.trace, unfired.trace))
+    assert all(a["prices"] == b["prices"] for a, b in rows if a["day"] <= 4)
+    assert any(a["prices"] != b["prices"] for a, b in rows if a["day"] > 4)
+    market = [e for e in unfired.draws("jumps", 4, 4)
+              if e.site == "jump_market_u"]
+    assert [e.value for e in market] == [noise.NO_FIRE]
+    assert unfired.surgeries == [{
+        "kind": "unfire", "day": 4, "step": 4 * STEPS, "stream": "jumps",
+        "address": tuple(market[0].address), "value": noise.NO_FIRE,
+        # the record says whether the jump it defeats could have fired,
+        # and whether the surgery can stop it; this preset fires on every
+        # day and one is the highest intensity the surgery can stop
+        "intensity": 1.0, "fires": True, "stoppable": True}]
+
+    report = compare(control, unfired, agreement=agreement)
+    assert report.divergence.intervention_day == 4
+    assert report.divergence.intervention_step == 4 * STEPS
+    assert report.divergence.prices == 5 * STEPS
+    assert report.as_dict()["fork_agreement"]["identical"]
+
+
+def test_unfire_refuses_a_day_that_has_run():
+    w = world().run(2)
+    with pytest.raises(tf.ValidationError, match="has run"):
+        w.unfire(1)
+    with pytest.raises(tf.ValidationError, match="market open"):
+        w.engine.open_market()
+        w.unfire(3)
+
+
+# -- window ------------------------------------------------------------------
+
+def test_a_window_surgery_leaves_every_other_stream_bit_identical():
+    root = world().run(2)
+    control, windowed, again, other = root.fork(
+        "control", "windowed", "again", "other")
+    trace_all(control, windowed, again, other, first=2, last=4)
+    windowed.window("news", (3, 4), surgery_seed=7)
+    again.window("news", (3, 4), surgery_seed=7)
+    other.window("news", (3, 4), surgery_seed=8)
+    for w in (control, windowed, again, other):
+        w.run(3)
+
+    others = [s for s in noise.STREAMS if s != "news"]
+    assert logs(windowed, others, 2, 4) == logs(control, others, 2, 4)
+    assert logs(windowed, ["news"], 2, 2) == logs(control, ["news"], 2, 2)
+    assert logs(windowed, ["news"], 3, 4) != logs(control, ["news"], 3, 4)
+    assert logs(again, ["news"], 3, 4) == logs(windowed, ["news"], 3, 4)
+    assert logs(other, ["news"], 3, 4) != logs(windowed, ["news"], 3, 4)
+    # the same addresses as the control: the schedule did not move
+    entries = windowed.draws("news", 3, 4)
+    assert ([e.address for e in entries]
+            == [e.address for e in control.draws("news", 3, 4)])
+    # the values are the documented derivation, in address order
+    expected = tf.Engine.surgery_draws(
+        SEED, "news", 7, [e.address.kind for e in entries])
+    assert [e.value for e in entries] == expected
+    assert windowed.surgeries == [{
+        "kind": "window", "day": 3, "step": 3 * STEPS, "stream": "news",
+        "days": (3, 4), "surgery_seed": 7, "draws": len(entries)}]
+    assert (windowed.engine.draws_by_stream()
+            == control.engine.draws_by_stream())
+
+
+def test_a_window_on_the_market_stream_covers_every_tick():
+    root = world().run(1)
+    control, windowed = root.fork("control", "windowed")
+    trace_all(control, windowed, first=1, last=2)
+    windowed.window("market", 2, surgery_seed=1)
+    control.run(2)
+    windowed.run(2)
+    n, sectors = len(UNIVERSE), root.engine.day_marks()[0]["sectors"]
+    per_tick = 1 + sectors + n + n + 4 * n
+    assert windowed.surgeries[0]["draws"] == per_tick * STEPS * TICKS
+    assert logs(windowed, ["market"], 1, 1) == logs(control, ["market"], 1, 1)
+    a = windowed.draws("market", 2, 2)
+    b = control.draws("market", 2, 2)
+    assert [(e.address, e.site, e.tag) for e in a] == [
+        (e.address, e.site, e.tag) for e in b]
+    assert all(x.value != y.value for x, y in zip(a, b))
+    others = [s for s in noise.STREAMS if s != "market"]
+    assert logs(windowed, others, 1, 2) == logs(control, others, 1, 2)
+
+
+def test_the_surgery_derivation_is_a_function_of_its_three_seeds():
+    kinds = ["uniform", "normal", "normal", "uniform"] * 4
+    a = tf.Engine.surgery_draws(42, "jumps", 7, kinds)
+    assert a == tf.Engine.surgery_draws(42, "jumps", 7, kinds)
+    assert a != tf.Engine.surgery_draws(42, "jumps", 8, kinds)
+    assert a != tf.Engine.surgery_draws(42, "market", 7, kinds)
+    assert a != tf.Engine.surgery_draws(43, "jumps", 7, kinds)
+    assert all(0.0 <= u < 1.0 for u, k in zip(a, kinds) if k == "uniform")
+    with pytest.raises(ValueError):
+        tf.Engine.surgery_draws(42, "weather", 7, kinds)
+    with pytest.raises(ValueError):
+        noise.surgery_patches(42, "jumps", 7,
+                              [noise.DrawAddress("market", "uniform", 0)])
+
+
+# -- transplant --------------------------------------------------------------
+
+def test_a_transplant_reproduces_the_source_exactly_and_nothing_outside():
+    root = world().run(2)
+    control, source, target = root.fork("control", "source", "target")
+    trace_all(control, source, target, first=2, last=5)
+    source.window("jumps", (3, 4), surgery_seed=3)
+    source.run(4)
+    target.transplant(source, "jumps", (3, 4))
+    control.run(4)
+    target.run(4)
+
+    assert logs(target, ["jumps"], 3, 4) == logs(source, ["jumps"], 3, 4)
+    assert logs(target, ["jumps"], 3, 4) != logs(control, ["jumps"], 3, 4)
+    assert logs(target, ["jumps"], 2, 2) == logs(control, ["jumps"], 2, 2)
+    assert logs(target, ["jumps"], 5, 5) == logs(control, ["jumps"], 5, 5)
+    others = [s for s in noise.STREAMS if s != "jumps"]
+    assert logs(target, others, 2, 5) == logs(control, others, 2, 5)
+    # the same draws everywhere makes the same world
+    assert target.trace == source.trace
+    assert target.digest() == source.digest()
+    assert target.surgeries == [{
+        "kind": "transplant", "day": 3, "step": 3 * STEPS,
+        "stream": "jumps", "days": (3, 4), "source": "source",
+        "source_seed": SEED, "draws": len(source.draws("jumps", 3, 4))}]
+
+
+def test_a_transplant_needs_a_traced_source():
+    root = world().run(1)
+    source, target = root.fork("source", "target")
+    source.run(2)
+    with pytest.raises(tf.ValidationError, match="Trace the source"):
+        target.transplant(source, "jumps", (1, 2))
+
+
+def test_a_transplant_refuses_a_roster_of_another_size():
+    small = World(seed=SEED, universe=tf.Universe.random(4, seed=1),
+                  agent=Buyer(), steps_per_day=STEPS, ticks_per_step=TICKS)
+    small.trace_draws("jumps", 0, 0).run(1)
+    target = world()
+    with pytest.raises(tf.ValidationError, match="instruments"):
+        target.transplant(small, "jumps", 0)
+
+
+# -- point -------------------------------------------------------------------
+
+def test_point_replaces_one_future_draw_and_refuses_a_drawn_one():
+    w = world().run(1)
+    with pytest.raises(tf.ValidationError, match="has been drawn"):
+        w.point(("market", "uniform", 0), 0.5)
+    ahead = w.engine.stream_positions()["jumps"][0]
+    w.point(("jumps", "uniform", ahead), 0.25)
+    assert w.surgeries == [{
+        "kind": "point", "day": 1, "step": STEPS, "stream": "jumps",
+        "address": ("jumps", "uniform", ahead), "value": 0.25}]
+    w.trace_draws("jumps", 1, 1).run(1)
+    hit = [e for e in w.draws("jumps", 1, 1)
+           if e.address == noise.DrawAddress("jumps", "uniform", ahead)]
+    assert [(e.value, e.site) for e in hit] == [(0.25, "jump_market_u")]
+
+
+# -- the check after the day -------------------------------------------------
+
+def test_the_check_after_the_day_names_a_moved_schedule():
+    w = world().run(1)
+    w.unfire(2)
+    spec = UNIVERSE[0]
+    w.engine.list_instrument(tf.Instrument(
+        "ZZZZ", spec.sector, initial_price=spec.initial_price,
+        shares_outstanding=spec.shares_outstanding, eps=spec.eps,
+        book_value_per_share=spec.book_value_per_share,
+        revenue_growth=spec.revenue_growth, avg_volume=spec.avg_volume,
+        beta=spec.beta, short_interest=spec.short_interest))
+    with pytest.raises(tf.ValidationError, match="did not land"):
+        w.run(2)
+
+
+# -- forks and agreement -----------------------------------------------------
+
+def test_a_fork_carries_the_surgery_and_agree_reports_it_as_engine_state():
+    root = world().run(1)
+    a, b = root.fork("a", "b")
+    assert agree(a, b).identical
+    b.unfire(2)
+    report = agree(a, b)
+    assert not report.identical
+    assert report.differences == ["whole engine state"]
+    child, = b.fork("child")
+    assert child.surgeries == b.surgeries
+    assert child.engine.draw_patches() == b.engine.draw_patches()
+    child.run(2)
+    b.run(2)
+    assert child.trace == b.trace
+
+
+# -- the check after the day -------------------------------------------------
+
+QUIET = tf.ModelParams.from_preset("pt-v16", jump_intensity_market=0.0,
+                                   jump_vix_coupling=0.0)
+
+
+def test_the_check_after_the_day_names_the_site_it_landed_on():
+    """A schedule that moved puts the aimed address on another site.
+
+    The jumps stream takes one uniform for the market and one per active
+    company, so a delisting between the surgery and its day shortens every
+    later day and slides the address onto a company's draw. Without this
+    branch the surgery reports success while patching a company's jump.
+    """
+    w = world(JUMPY).run(1)
+    w.unfire(2)
+    w.engine.delist(0)
+    with pytest.raises(tf.ValidationError) as caught:
+        w.run(2)
+    message = str(caught.value)
+    assert "landed on jump_company_u" in message
+    assert "rather than jump_market_u" in message
+    assert "company 0" in message
+
+
+def test_the_check_after_the_day_names_the_value_it_delivered():
+    """A second patch at the same address wins, and the check says so.
+
+    The address is drawn on the day it was aimed at, at the site it was
+    aimed at, and still delivers a value the surgery did not install.
+    Without this branch that overlay passes as the installed one.
+    """
+    w = world(JUMPY).run(1)
+    w.unfire(2)
+    w.engine.patch_draws([(*w.surgeries[0]["address"], 0.5)])
+    with pytest.raises(tf.ValidationError) as caught:
+        w.run(2)
+    message = str(caught.value)
+    assert "delivered 0.5 rather than 1.0" in message
+    assert "the overlay in place is not the one installed" in message
+
+
+# -- a surgery that cannot do anything ---------------------------------------
+
+def test_unfire_records_that_a_zero_intensity_jump_cannot_fire():
+    """An unfired arm identical to its control used to say nothing about
+    why. At an intensity of zero the jump cannot fire, so the record says
+    the surgery is a no-op rather than leaving the reader to guess."""
+    base = world(QUIET).run(3)
+    control, shock = base.fork("control", "unfired")
+    shock.unfire(3)
+    record = shock.surgeries[0]
+    assert record["intensity"] == 0.0
+    assert record["fires"] is False
+    assert record["stoppable"] is True
+    control.run(2)
+    shock.run(2)
+    # and the arms agree, which is what the record predicted
+    assert compare(control, shock).divergence.prices is None
+
+
+def test_unfire_records_that_a_certain_jump_fires():
+    """The other outcome. An intensity of one fires on every day, because
+    every uniform the stream can draw is below it."""
+    base = world(JUMPY).run(3)
+    control, shock = base.fork("control", "unfired")
+    shock.unfire(3)
+    record = shock.surgeries[0]
+    assert record["intensity"] == 1.0
+    assert record["fires"] is True
+    assert record["stoppable"] is True
+    control.run(2)
+    shock.run(2)
+    assert compare(control, shock).divergence.prices is not None
+
+
+def _fired_on(model, day, *, universe=UNIVERSE):
+    """Whether the market jump of `day` fired, without asking the model.
+
+    The reviewer's oracle: suppress that day's market jump uniform in a
+    fork and see whether prices move two days later, since the jump lands
+    at the close and surfaces at the next open. Uses no intensity and no
+    formula, so it is an independent answer.
+    """
+    base = World(seed=SEED, universe=universe, agent=Buyer(),
+                 steps_per_day=STEPS, ticks_per_step=TICKS,
+                 model=model).run(day)
+    control, suppressed = base.fork("control", "suppressed")
+    suppressed.unfire(day)
+    control.run(2)
+    suppressed.run(2)
+    return compare(control, suppressed).divergence.prices is not None
+
+
+def test_the_intensity_is_the_threshold_the_jump_fires_on():
+    """The engine answers, and the answer is the threshold it uses.
+
+    Held together by behaviour rather than by reading the source: a market
+    uniform patched just under the reported intensity fires and one just
+    over it does not, so an accessor that drifted from `apply_jumps` would
+    fail here.
+    """
+    w = world().run(1)
+    intensity = w.engine.market_jump_intensity()
+    assert 0.0 < intensity < 1.0
+    for offset, expect_move in ((-1e-9, True), (+1e-9, False)):
+        probe = world().run(1)
+        address = probe._jump_address(1)
+        control, patched = probe.fork("control", "patched")
+        noise.patch_draws(patched.engine, [
+            noise.Patch(address, intensity + offset)])
+        noise.patch_draws(control.engine, [
+            noise.Patch(address, noise.NO_FIRE)])
+        control.run(3)
+        patched.run(3)
+        moved = compare(control, patched).divergence.prices is not None
+        assert moved is expect_move, (offset, intensity)
+
+
+def test_fires_agrees_with_whether_the_jump_fired():
+    """`fires` against the oracle, at four intensities.
+
+    Zero cannot fire and one fires on every day, which is what the record
+    claims outright. Between them the draw decides it and the record says
+    None rather than guessing.
+    """
+    seen = {}
+    for intensity in (0.0, 0.25, 0.5, 1.0):
+        model = tf.ModelParams.from_preset(
+            "pt-v16", jump_intensity_market=intensity,
+            jump_vix_coupling=0.0)
+        w = world(model).run(1)
+        assert w.engine.market_jump_intensity() == intensity
+        w.unfire(1)
+        record = w.surgeries[0]
+        fired = _fired_on(model, 1)
+        seen[intensity] = (record["fires"], fired)
+        if record["fires"] is not None:
+            assert record["fires"] is fired, intensity
+    assert seen[0.0] == (False, False)
+    assert seen[1.0] == (True, True)
+    # and the two in between are not claimed either way
+    assert seen[0.25][0] is None and seen[0.5][0] is None
+
+
+def test_an_intensity_above_one_cannot_be_stopped_and_says_so():
+    """The value installed is 1.0 and the engine fires on `u < intensity`,
+    so above one the surgery's own value is under the threshold: the jump
+    fires in both arms and the arm comes back identical to its control."""
+    model = tf.ModelParams.from_preset("pt-v16",
+                                       jump_intensity_market=1.5,
+                                       jump_vix_coupling=0.0)
+    base = world(model).run(1)
+    control, unfired = base.fork("control", "unfired")
+    unfired.unfire(1)
+    record = unfired.surgeries[0]
+    assert record["intensity"] == 1.5
+    assert record["fires"] is True
+    assert record["stoppable"] is False
+    control.run(3)
+    unfired.run(3)
+    assert compare(control, unfired).divergence.prices is None
+    # at one and below the surgery bites
+    stoppable = tf.ModelParams.from_preset("pt-v16",
+                                           jump_intensity_market=1.0,
+                                           jump_vix_coupling=0.0)
+    base = world(stoppable).run(1)
+    control, unfired = base.fork("control", "unfired")
+    unfired.unfire(1)
+    assert unfired.surgeries[0]["stoppable"] is True
+    control.run(3)
+    unfired.run(3)
+    assert compare(control, unfired).divergence.prices is not None
+
+
+# -- the day a surgery may name ----------------------------------------------
+
+def test_a_surgery_refuses_a_day_that_has_run():
+    """A draw already taken cannot be replaced, so a window starts today
+    or later."""
+    w = world().run(3)
+    with pytest.raises(tf.ValidationError) as caught:
+        w.window("jumps", 1, surgery_seed=1)
+    assert "day 1 has run" in str(caught.value)
+    assert "this world is on day 3" in str(caught.value)
+    # today is allowed
+    assert w.window("jumps", 3, surgery_seed=1) is w
+
+
+def test_a_day_pair_that_runs_backwards_is_refused():
+    w = world().run(3)
+    with pytest.raises(tf.ValidationError) as caught:
+        w.window("jumps", (4, 2), surgery_seed=1)
+    assert "days runs backwards: (4, 2)" in str(caught.value)
+    assert w.window("jumps", (4, 5), surgery_seed=1) is w

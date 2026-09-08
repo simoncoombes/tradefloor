@@ -511,7 +511,26 @@ impl PyEngine {
         self.day_buffer
             .anchor
             .extend_from_slice(&self.buffer.anchor[..n]);
-        for k in 0..8 {
+        self.day_buffer
+            .shock
+            .extend_from_slice(&self.buffer.shock[..n]);
+        self.day_buffer
+            .absorbed
+            .extend_from_slice(&self.buffer.absorbed[..n]);
+        self.day_buffer
+            .clamp
+            .extend_from_slice(&self.buffer.clamp[..n]);
+        // Appended only when the session actually carried the arm, so a day
+        // that ran without it holds an EMPTY pair rather than a padded one.
+        if !self.buffer.unbounded_print.is_empty() {
+            self.day_buffer
+                .unbounded_print
+                .extend_from_slice(&self.buffer.unbounded_print[..n]);
+            self.day_buffer
+                .liquidity_share
+                .extend_from_slice(&self.buffer.liquidity_share[..n]);
+        }
+        for k in 0..crate::market::factors::S_COMPONENT_KEYS.len() {
             self.day_buffer.components[k]
                 .extend_from_slice(&self.buffer.components[k][..n]);
         }
@@ -520,15 +539,30 @@ impl PyEngine {
         // first tick of the next day: `s` there already includes it. Zeroed
         // here and filled from the pending value on that first row, so the
         // columns sum to the change in `s` tick by tick (§74).
-        let before = self.day_buffer.components[8].len();
-        self.day_buffer.components[8].resize(self.day_buffer.components[0].len(), 0.0);
+        let before = self.day_buffer.components[crate::market::factors::JUMP_SLOT].len();
+        self.day_buffer.components[crate::market::factors::JUMP_SLOT].resize(self.day_buffer.components[0].len(), 0.0);
         if !self.pending_jump.is_empty() {
             for (i, v) in self.pending_jump.iter().enumerate() {
-                if let Some(slot) = self.day_buffer.components[8].get_mut(before + i) {
+                if let Some(slot) = self.day_buffer.components[crate::market::factors::JUMP_SLOT].get_mut(before + i) {
                     *slot += v;
                 }
             }
             self.pending_jump.clear();
+        }
+        // The tenth series is the overnight move. It happens at the open,
+        // before any tick, and the row where its effect is observed is the
+        // first tick of the same day: `s` there already includes it. Zeroed
+        // here and filled from the pending value on that first row, as the
+        // jump is, so the columns sum to the change in `s` tick by tick.
+        let before = self.day_buffer.components[crate::market::factors::OVERNIGHT_SLOT].len();
+        self.day_buffer.components[crate::market::factors::OVERNIGHT_SLOT].resize(self.day_buffer.components[0].len(), 0.0);
+        if !self.pending_overnight.is_empty() {
+            for (i, v) in self.pending_overnight.iter().enumerate() {
+                if let Some(slot) = self.day_buffer.components[crate::market::factors::OVERNIGHT_SLOT].get_mut(before + i) {
+                    *slot += v;
+                }
+            }
+            self.pending_overnight.clear();
         }
     }
 
@@ -539,7 +573,7 @@ impl PyEngine {
     /// carry it. The engine accumulates it in attribution slot 7; this puts it
     /// on the tape where a reader reconstructing the day will find it.
     fn record_day_jump(&mut self) {
-        let jumps: Vec<f64> = self.inner.attribution().iter().map(|row| row[8]).collect();
+        let jumps: Vec<f64> = self.inner.attribution().iter().map(|row| row[crate::market::factors::JUMP_SLOT]).collect();
         if jumps.iter().any(|v| *v != 0.0) {
             self.pending_jump = jumps;
         }
@@ -703,7 +737,19 @@ struct DayBuffer {
     mispricing: Vec<f64>,
     fundamental: Vec<f64>,
     anchor: Vec<f64>,
-    components: [Vec<f64>; 9],
+    components: [Vec<f64>; crate::market::factors::COMPONENT_COUNT],
+    shock: Vec<f64>,
+    absorbed: Vec<f64>,
+    clamp: Vec<f64>,
+    /// Empty on a day whose sessions ran without the depth counterfactual.
+    ///
+    /// A session that ran with it appends; one that did not appends nothing.
+    /// A day whose sessions disagree therefore ends SHORT, and `prints`
+    /// reports that day without the two columns rather than serving a column
+    /// that stops part way through it. `settle_depth_counterfactual` is
+    /// documented as a setting to choose before a run for this reason.
+    unbounded_print: Vec<f64>,
+    liquidity_share: Vec<f64>,
 }
 
 impl DayBuffer {
@@ -714,6 +760,11 @@ impl DayBuffer {
         self.mispricing.clear();
         self.fundamental.clear();
         self.anchor.clear();
+        self.shock.clear();
+        self.absorbed.clear();
+        self.clamp.clear();
+        self.unbounded_print.clear();
+        self.liquidity_share.clear();
         for column in self.components.iter_mut() {
             column.clear();
         }
@@ -725,6 +776,112 @@ impl DayBuffer {
 /// `Clone` is what [`PyEngine::fork`] is made of, and it is derived rather
 /// than written so that a field added here is carried into a fork without
 /// anyone remembering to carry it. See the note on [`Engine`].
+fn stream_name(id: u32) -> &'static str {
+    match id {
+        crate::rng::stream::MARKET => "market",
+        crate::rng::stream::ECONOMY => "economy",
+        crate::rng::stream::EXTERNAL => "external",
+        crate::rng::stream::JUMPS => "jumps",
+        crate::rng::stream::VOLUME => "volume",
+        crate::rng::stream::NEWS => "news",
+        crate::rng::stream::VOLUME_IDIO => "volume_idio",
+        crate::rng::stream::OVERNIGHT => "overnight",
+        _ => "unknown",
+    }
+}
+
+fn stream_id(name: &str) -> PyResult<u32> {
+    Ok(match name {
+        "market" => crate::rng::stream::MARKET,
+        "economy" => crate::rng::stream::ECONOMY,
+        "external" => crate::rng::stream::EXTERNAL,
+        "jumps" => crate::rng::stream::JUMPS,
+        "volume" => crate::rng::stream::VOLUME,
+        "news" => crate::rng::stream::NEWS,
+        "volume_idio" => crate::rng::stream::VOLUME_IDIO,
+        "overnight" => crate::rng::stream::OVERNIGHT,
+        other => {
+            return Err(ValidationError::new_err(format!(
+                "unknown stream {other:?}; one of market, economy, external, jumps, volume, news, volume_idio, overnight"
+            )))
+        }
+    })
+}
+
+/// Which sector a name belongs to, on the roster `engine` holds.
+///
+/// The KEY rather than its position, so the Python side derives the
+/// sector factor's tag from `tradefloor.sectors()` instead of taking a
+/// number this function worked out. Not two sources: that wrapper reads
+/// the same array, and an engine refuses an unknown sector at
+/// construction, so the two cannot disagree. What it buys is that the
+/// tag becomes recomputable from published values, so a check can derive
+/// it independently of the code under it rather than reading back an
+/// integer this function produced. Resolved against whichever engine is
+/// asked, because a kept copy's roster and the live one differ after a
+/// delisting.
+///
+/// Empty where the name is not on that engine's roster, which the caller
+/// refuses before it reaches the tag.
+fn sector_of(engine: &PyEngine, ticker: &str) -> String {
+    engine
+        .tickers
+        .iter()
+        .position(|t| t == ticker)
+        .and_then(|i| engine.inner.companies().get(i).map(|c| c.sector.clone()))
+        .unwrap_or_default()
+}
+
+fn draw_kind(name: &str) -> PyResult<crate::rng::DrawKind> {
+    Ok(match name {
+        "uniform" => crate::rng::DrawKind::Uniform,
+        "normal" => crate::rng::DrawKind::Normal,
+        other => {
+            return Err(ValidationError::new_err(format!(
+                "unknown draw kind {other:?}; uniform or normal"
+            )))
+        }
+    })
+}
+
+/// One kept day: the engine as it stood before that day opened, and where
+/// that day's inputs begin in the run log.
+///
+/// `Box` because the copy is a `PyEngine` and a `PyEngine` holds the store,
+/// so the type is recursive. The copy's own store is empty, which is what
+/// makes the recursion one level deep however many days are kept.
+#[derive(Clone)]
+struct KeptOpen {
+    engine: Box<PyEngine>,
+    log_start: usize,
+}
+
+/// The days `explain` can reach, and the copies it reaches them through.
+///
+/// Bookkeeping, off until [`PyEngine::keep_explanations`] asks for it, and
+/// outside [`PyEngine::state_snapshot`] and [`PyEngine::state_hash`]: a copy
+/// taken here is read and never run, so an engine with a window open produces
+/// the same market as one without. The known-answer digest is the same digest
+/// with the window open, which `tests/test_explain.py` states.
+///
+/// The cost is one engine copy per kept day, without the recorded tape, so a
+/// window is asked for over the days a caller means to explain rather than
+/// over a whole run.
+#[derive(Clone, Default)]
+struct Explanations {
+    window: Option<(i64, i64)>,
+    opens: std::collections::BTreeMap<i64, KeptOpen>,
+}
+
+impl Explanations {
+    fn wants(&self, day: i64) -> bool {
+        match self.window {
+            Some((from, to)) => from <= day && day <= to,
+            None => false,
+        }
+    }
+}
+
 #[pyclass(name = "Engine", module = "tradefloor._core")]
 #[derive(Clone)]
 pub struct PyEngine {
@@ -733,6 +890,9 @@ pub struct PyEngine {
     /// The jump the last close applied to `s`, waiting for the row where its
     /// effect is observed: the FIRST tick of the next day (§74).
     pending_jump: Vec<f64>,
+    /// The overnight move the last open applied to `s`, waiting for the
+    /// row where its effect is observed: the first tick of the same day.
+    pending_overnight: Vec<f64>,
     tickers: Vec<String>,
     /// Recorded per-day batches.
     ///
@@ -785,6 +945,161 @@ pub struct PyEngine {
     /// and recording them would create a second source of truth that could
     /// disagree with the first.
     log: Vec<crate::python_log::LogEntry>,
+    /// What `explain` reaches a day through. Recording only: nothing here is
+    /// read by the tick, the snapshot or the hash.
+    explanations: Explanations,
+}
+
+/// The day stamp, kept off the Python surface.
+///
+/// `open_market_on` is how `open_market` and `run_days` agree on the day
+/// a mark and the day's news draws carry, and it is not something a caller
+/// reaches for: a caller that wants its own numbering has `set_day`. Held
+/// in a plain `impl` rather than `#[pymethods]` for that reason, since
+/// every method of a `#[pymethods]` block becomes a binding and every
+/// binding has to be declared in the stub.
+impl PyEngine {
+    /// Roll the day's opening marks, numbering the day `day`.
+    ///
+    /// The day is stamped BEFORE `inner.open_market()`, and the order is the
+    /// whole of it. That call pushes the day mark and takes the day's
+    /// endogenous news draws, so both carry whatever number was stamped when
+    /// it ran. `run_days` used to open first and re-stamp afterwards, which
+    /// left one run carrying two numbers: `run_days(3, first_day=100)` logged
+    /// the market, economy, jumps, volume and per-name volume streams on days
+    /// 100, 101 and 102, the news stream on 0, 1 and 2, and `day_marks()` on
+    /// 0, 1 and 2, so `market_day_layout(100)` found nothing while
+    /// `market_day_layout(0)` returned a mark for a day the log called 100.
+    /// Two `run_days(2)` calls in a row reached the same split without any
+    /// `first_day` at all.
+    fn open_market_on(&mut self, day: i64) {
+        // The explanation copy is taken before anything about the day has
+        // happened, so a fork of it runs the day from its own open under the
+        // inputs the log records from here on. Taken with the store moved
+        // out, because cloning `self` with the store in place would copy
+        // every day already kept, once per day kept.
+        if self.explanations.wants(day) {
+            let held = std::mem::take(&mut self.explanations);
+            let mut copy = self.clone();
+            self.explanations = held;
+            // The tape is a consequence, and a copy of a year of it per kept
+            // day is what makes this unaffordable. A replay records the one
+            // day it runs, which is the day being explained.
+            copy.recorded.clear();
+            copy.recorded_macro.clear();
+            copy.recorded_book.clear();
+            copy.day_buffer.clear();
+            // And the draw log, which is the size of the tape. Without
+            // this a copy carried every entry logged before its day, so
+            // N kept days held N squared over two days of log and a
+            // thirty-day window at forty names cost 1.6 GB. The copy is
+            // never asked what it recorded: the tree reads the source
+            // engine's log, and the copy is only forked and replayed.
+            copy.inner.clear_draw_log_records();
+            let log_start = self.log.len();
+            self.explanations.opens.insert(
+                day,
+                KeptOpen {
+                    engine: Box::new(copy),
+                    log_start,
+                },
+            );
+        }
+        self.log.push(crate::python_log::LogEntry::OpenMarket);
+        // A new day's tape starts here. Without this, a run that never closed
+        // would grow one unbounded "day".
+        self.day_buffer.clear();
+        self.market_open = true;
+        // The day a draw carries in the draw log is the day whose open it
+        // follows, so the jumps, volume and macro draws taken at a close
+        // belong to the day they close rather than to the one after.
+        self.inner.set_current_day(day);
+        self.inner.open_market();
+        // The overnight move the open applied to `s`, for the tape: booked
+        // onto the day's first row, where its effect is observed, as the
+        // close's jump is booked onto the next day's (§74).
+        let nights: Vec<f64> = self.inner.overnight_moves().to_vec();
+        if nights.iter().any(|v| *v != 0.0) {
+            self.pending_overnight = nights;
+        }
+    }
+
+    /// The roster operations between the previous day's open and this one.
+    ///
+    /// Walks back from `log_start` to the open before it and reports every
+    /// `list_instrument` and `delist` in that gap, as `(operation, what)`.
+    /// A roster operation there moves the slots the previous day's tape is
+    /// keyed by, so a level read from it at today's slot is another
+    /// company's. The log is what KNOWS: comparing the two days' tape
+    /// widths misses a listing paired with a delisting, and comparing the
+    /// two days' rosters needs the day before to have been kept.
+    fn roster_ops_before(&self, log_start: usize) -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        // Spelled as a comparison rather than `.min`, because the parity
+        // scan keeps `.min` and `.max` inside `mathx` even on integers.
+        let end = if log_start > self.log.len() {
+            self.log.len()
+        } else {
+            log_start
+        };
+        let start = self.log[..end]
+            .iter()
+            .rposition(|e| matches!(e, crate::python_log::LogEntry::OpenMarket))
+            .unwrap_or(0);
+        for entry in &self.log[start..end] {
+            match entry {
+                crate::python_log::LogEntry::ListInstrument { ticker, .. } => {
+                    out.push(("list_instrument".to_string(), ticker.clone()))
+                }
+                crate::python_log::LogEntry::Delist { index } => {
+                    out.push(("delist".to_string(), index.to_string()))
+                }
+                _ => {}
+            }
+        }
+        out
+    }
+
+    /// The log entries of the day whose open sits at `log_start`.
+    ///
+    /// From that open to the close that ends the day, inclusive, plus any
+    /// `record` that follows the close. A day ends at an explicit
+    /// `close_market` or at a session that carried `close_at_end`, which
+    /// are the two spellings of one close, and a day that never closed
+    /// runs to the end of the log.
+    ///
+    /// The trailing records are here because a caller who closes through
+    /// the session records AFTER the close, and stopping at the close
+    /// dropped that entry out of the day. What the entry carries is the
+    /// label the day's rows have on the tape, so losing it left the
+    /// explanation reading the tape at the day the store keyed the open
+    /// by, which is a different day's rows whenever the two disagree.
+    fn day_inputs(&self, py: Python<'_>, log_start: usize) -> PyResult<Vec<PyObject>> {
+        let mut out = Vec::new();
+        let mut closed = false;
+        for entry in self.log.iter().skip(log_start) {
+            if closed {
+                match entry {
+                    crate::python_log::LogEntry::Record { .. } => {
+                        out.push(entry.to_py(py)?);
+                        continue;
+                    }
+                    _ => break,
+                }
+            }
+            out.push(entry.to_py(py)?);
+            match entry {
+                crate::python_log::LogEntry::CloseMarket => closed = true,
+                crate::python_log::LogEntry::RunSession { close_at_end, .. }
+                    if *close_at_end =>
+                {
+                    closed = true
+                }
+                _ => {}
+            }
+        }
+        Ok(out)
+    }
 }
 
 #[pymethods]
@@ -813,6 +1128,16 @@ impl PyEngine {
             ));
         }
         let params = model_params_from(model)?;
+        // WHETHER THE OPENING IS THE MODEL'S TO SETTLE. `macro_burn_in_days`
+        // exists to relax the CONSTRUCTOR'S default macro, which otherwise
+        // opens every run in expansion at phase age zero. A caller who
+        // passes `macro_state` has named an opening instead, and settling it
+        // for 755 days discards what they asked for -- measured at 0.7.0, an
+        // engine asked for a VIX of 45.0 and a policy rate of 5 per cent
+        // opened at 21.55 and 0.00. This is the only place that knows the
+        // difference: by the time the core has an `EconomyState`, a supplied
+        // macro and the default one look the same.
+        let settle_opening = macro_state.is_none();
         let economy = economy_from(macro_state)?;
         let companies: Vec<TickCompany> = universe
             .iter()
@@ -822,16 +1147,18 @@ impl PyEngine {
         let tickers = universe.iter().map(|i| i.ticker.clone()).collect();
 
         Ok(Self {
-            inner: Engine::with_params(
+            inner: Engine::with_params_from_opening(
                 seed,
                 companies,
                 economy,
                 create_initial_central_bank_state(0),
                 crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
                 params,
+                settle_opening,
             ),
             buffer: SessionBuffer::new(),
             pending_jump: Vec::new(),
+            pending_overnight: Vec::new(),
             day_buffer: DayBuffer::default(),
             market_open: false,
             day_count: 0,
@@ -840,17 +1167,16 @@ impl PyEngine {
             recorded_macro: Vec::new(),
             recorded_book: Vec::new(),
             log: Vec::new(),
+            explanations: Explanations::default(),
         })
     }
 
     /// Roll the day's opening marks. Call once before the session's ticks.
+    ///
+    /// Numbers the day from the engine's own counter. `run_days` numbers it
+    /// from `first_day` instead, through [`Self::open_market_on`].
     fn open_market(&mut self) {
-        self.log.push(crate::python_log::LogEntry::OpenMarket);
-        // A new day's tape starts here. Without this, a run that never closed
-        // would grow one unbounded "day".
-        self.day_buffer.clear();
-        self.market_open = true;
-        self.inner.open_market();
+        self.open_market_on(i64::from(self.day_count));
     }
 
     /// Advance one game-minute.
@@ -1063,6 +1389,19 @@ impl PyEngine {
             // exist to forbid.
             self.day_count += 1;
             self.inner.advance_macro_day(i64::from(self.day_count));
+            // AND THE DAY'S JUMP ONTO THE TAPE, which `close_market` does
+            // and this path did not. Same argument as the line above, one
+            // field further on: a day closed this way applied its jump to
+            // the market and never wrote it to the record, so the truth
+            // table for a `close_at_end` run was missing a column the
+            // explicit close carried.
+            //
+            // Invisible until 0.7.0. The jump slot is zero unless a jump
+            // fired, and pt-v18 switches on `jump_mean_compensated`, whose
+            // compensator lands every day; the state hash learned the
+            // pending fields in the same release and the two spellings then
+            // hashed apart, which is how this surfaced.
+            self.record_day_jump();
         }
         Ok(self.buffer.ticks_written)
     }
@@ -1080,10 +1419,17 @@ impl PyEngine {
     /// over `run_session` loses well under one per cent. Use this because it
     /// reads better and records for you, not because a loop would be slow.
     ///
+    /// `ledger` is an optional `tradefloor.DayLedger`, which is handed the
+    /// state hash after every close and, when it keeps them, the state
+    /// itself. It is a callback rather than a return value because a run of
+    /// 252 days holds 252 leaves and the caller usually wants them beside a
+    /// `RunManifest` rather than in a list this method built.
+    ///
     /// Returns the number of days run.
     #[pyo3(signature = (
         days, *, hour = 9, minute = 30, day_of_week = 3,
-        ticks_per_day = 390, volatility = 1.0, record = true, first_day = 0
+        ticks_per_day = 390, volatility = 1.0, record = true,
+        first_day = None, ledger = None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn run_days(
@@ -1096,7 +1442,8 @@ impl PyEngine {
         ticks_per_day: usize,
         volatility: f64,
         record: bool,
-        first_day: u32,
+        first_day: Option<u32>,
+        ledger: Option<Py<PyAny>>,
     ) -> PyResult<usize> {
         if days == 0 {
             return Err(ValidationError::new_err("days must be greater than zero"));
@@ -1104,8 +1451,28 @@ impl PyEngine {
         if ticks_per_day == 0 {
             return Err(ValidationError::new_err("ticks_per_day must be greater than zero"));
         }
+        // Defaults to the engine's own counter, not to zero. Numbering from
+        // zero on every call gave a second run the day numbers of the first:
+        // two `run_days(2)` calls on one engine put four simulated days on
+        // two numbers, so `draw_log("jumps", 0, 0)` returned two days of
+        // draws and `day_marks()` read 0, 1, 0, 1. The counter is what the
+        // record and the day marks already advanced on, so following it is
+        // what makes the second call continue the first. A caller that
+        // wants to restart the numbering passes `first_day=0`.
+        let first_day = first_day.unwrap_or(self.day_count);
+        // Asked once rather than per day: whether the ledger wants the
+        // predecessor states decides how much a later verification costs, and
+        // it cannot change halfway through a run.
+        let keeps_snapshots: bool = match &ledger {
+            Some(l) => l.bind(py).getattr("keeps_snapshots")?.extract()?,
+            None => false,
+        };
         for offset in 0..days {
-            self.open_market();
+            // `first_day` is the day number the record and the truth table
+            // carry, so the day mark, the news draws and every stream's log
+            // carry it too. Passed INTO the open rather than stamped after
+            // it, for the reason `open_market_on` gives.
+            self.open_market_on((first_day + offset as u32) as i64);
             self.run_session(py, hour, minute, day_of_week, ticks_per_day, volatility,
                              false, None, None, None)?;
             // Record BEFORE the close: the close advances the macro chain
@@ -1115,6 +1482,18 @@ impl PyEngine {
                 self.record(first_day + offset as u32)?;
             }
             self.close_market();
+            // The leaf is taken AFTER the close, so a run that never called
+            // `record` still ledgers, and the state a leaf commits to is the
+            // one the next day starts from.
+            if let Some(l) = &ledger {
+                let leaf = self.state_hash();
+                let snapshot = if keeps_snapshots {
+                    Some(self.state_snapshot(py)?)
+                } else {
+                    None
+                };
+                l.bind(py).call_method1("_close", (leaf, snapshot))?;
+            }
         }
         Ok(days)
     }
@@ -1407,6 +1786,92 @@ impl PyEngine {
         self.inner.params().fingerprint()
     }
 
+    /// The VIX at which this engine's variance couplings read ONE.
+    ///
+    /// `model_params["market_vol_vix_anchor"]` under every preset before
+    /// pt-v19, and the value DERIVED from the index's own unconditional
+    /// variance under `vix_level_identity`. Exposed because under the
+    /// identity it is a property of the run rather than of the model: it
+    /// depends on the roster, so no coefficient dictionary can state it and
+    /// a preset record that quotes it has to say which universe it was
+    /// derived on.
+    #[getter]
+    fn vix_anchor(&self) -> f64 {
+        self.inner.vix_anchor()
+    }
+
+    /// The index variance the LAST VIX update read, term by term, or
+    /// `None` if no day has advanced under `vix_level_identity`.
+    ///
+    /// Keys: `factor`, `sector`, `idio` (the three noise blocks BEFORE the
+    /// intraday curve), `market_jump`, `idio_jump`, `news`, `k` (the
+    /// curve's second moment, which multiplies the first three and not the
+    /// last three), `total` (the variance itself, in fraction squared per
+    /// session) and `implied` (that variance as a VIX, through
+    /// `(1 + premium) * 100 * sqrt(252 * total)`).
+    ///
+    /// THE NUMBER THE UPDATE READ, not a recomputation. The identity's
+    /// instantaneous terms — the sector draw's sigma and the jump arrival
+    /// rate — are read at the VIX the close saw, `VIX_{t-1}`, and the
+    /// update then moves the VIX. A getter that evaluated the identity
+    /// afresh would read those two terms at `VIX_t` and disagree with the
+    /// update by a day's VIX move, which is exactly the size of the
+    /// quantity a loop measurement is trying to see.
+    ///
+    /// `None` rather than zeroes when the identity is off: there the
+    /// read-back is not computed at all, and a dictionary of zeroes would
+    /// read as a market with no variance rather than as a run with no
+    /// read-back.
+    ///
+    /// This is a diagnostic and it is not carried in `state_snapshot`, so
+    /// it moves no state hash. A fork carries it — a fork is a copy, and
+    /// its last VIX update really was the parent's — but `restore_state`
+    /// does not: a restored engine keeps its own last reading, `None` if
+    /// it had advanced no day, until its own next day advances.
+    fn index_variance_terms<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Option<Bound<'py, PyDict>>> {
+        let terms = match self.inner.last_index_variance() {
+            Some(t) => t,
+            None => return Ok(None),
+        };
+        let out = PyDict::new_bound(py);
+        out.set_item("factor", terms.factor_raw)?;
+        out.set_item("sector", terms.sector_raw)?;
+        out.set_item("idio", terms.idio_raw)?;
+        out.set_item("market_jump", terms.market_jump)?;
+        out.set_item("idio_jump", terms.idio_jump)?;
+        out.set_item("news", terms.news)?;
+        out.set_item("k", terms.k)?;
+        let total = terms.total();
+        out.set_item("total", total)?;
+        out.set_item(
+            "implied",
+            crate::market::index_var::vix_from_variance(
+                self.inner.params().vix_variance_premium,
+                total,
+            ),
+        )?;
+        Ok(Some(out))
+    }
+
+    /// The variance targets the last close reverted toward, as
+    /// `(fast, slow)`, or `None` before any close.
+    ///
+    /// `slow` is `None` when the preset has no slow component
+    /// (`market_vol_slow_weight == 0.0` — pt-v1 through pt-v3 and the
+    /// default `PT_V1`), because `factor_vol.rs::close_day_at` returns
+    /// before a slow target is computed on that branch. On such a preset
+    /// the first element is THE target, not a "fast" one.
+    ///
+    /// The two `None`s mean different things: the outer is "no close
+    /// yet", the inner is "no slow component". A fork carries the
+    /// reading, a restore does not.
+    fn market_variance_target(&self) -> Option<(f64, Option<f64>)> {
+        self.inner.market_variance_target()
+    }
+
     /// The model this engine runs, as a `ModelParams`.
     #[getter]
     fn model(&self) -> crate::python_params::PyModelParams {
@@ -1442,6 +1907,273 @@ impl PyEngine {
         out.set_item("economy", draws.economy)?;
         out.set_item("external", draws.external)?;
         Ok(out)
+    }
+
+    // ── Draw surgery (phase 2) ────────────────────────────────────────────
+
+    /// The draws a surgery generator delivers, in the order of `kinds`.
+    ///
+    /// A fresh generator per the surgery derivation contract in `rng.rs`
+    /// (`GameRng::surgery`), read once. `kinds` is "uniform" or "normal"
+    /// per draw, in the order of the addresses the caller is about to
+    /// replace, and the result is the value for each. Nothing on any
+    /// engine is read or moved; the root seed is an argument because the
+    /// derivation is a function of it, the stream and the surgery seed,
+    /// and of nothing else.
+    #[staticmethod]
+    fn surgery_draws(
+        seed: u32,
+        stream: &str,
+        surgery_seed: u32,
+        kinds: Vec<String>,
+    ) -> PyResult<Vec<f64>> {
+        let id = stream_id(stream)?;
+        let mut rng = crate::rng::GameRng::surgery(seed, id, surgery_seed);
+        let mut out = Vec::with_capacity(kinds.len());
+        for kind in &kinds {
+            out.push(match draw_kind(kind)? {
+                crate::rng::DrawKind::Uniform => rng.next_f64(),
+                crate::rng::DrawKind::Normal => rng.next_normal(),
+            });
+        }
+        Ok(out)
+    }
+
+    // ── Draw addressing (phase 1) ─────────────────────────────────────────
+
+    /// The market jump's effective daily intensity at this engine's dials
+    /// and its current VIX: the threshold `apply_jumps` compares its
+    /// market uniform against. Takes no draw and changes nothing.
+    ///
+    /// A surgery that stops the jump installs 1.0, so it can only stop one
+    /// where this is at most 1.0; above that every uniform the stream can
+    /// draw is already under the threshold.
+    fn market_jump_intensity(&self) -> f64 {
+        self.inner.market_jump_intensity()
+    }
+
+    /// The day the draws taken from now on carry in the draw log and the
+    /// day marks. `open_market` stamps the engine's own day counter and
+    /// `run_days` stamps `first_day`, each at the open it labels, so this is
+    /// for a caller that drives the core between an open and a close and
+    /// wants the draws numbered its own way, or an embedder taking draws
+    /// through `draw_uniform` on a closed market.
+    ///
+    /// Stamped between an open and the close that follows it, this moves the
+    /// number the rest of that day's draws carry and leaves the day mark on
+    /// the number the open stamped.
+    ///
+    /// It moves the VALUATION too, under a preset that sets
+    /// `buyback_payout_share`, because the buyback factor reads this number
+    /// as its elapsed time. So a stamp taken to label draws reprices every
+    /// name from the next tick. Nothing in this repository calls it.
+    fn set_day(&mut self, day: i64) {
+        self.inner.set_current_day(day);
+    }
+
+    /// `(uniforms, normals)` taken so far on each stream, keyed by stream
+    /// name: the address the next draw of each kind would take.
+    fn stream_positions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let out = PyDict::new_bound(py);
+        for (id, (u, n)) in self.inner.stream_positions().iter().enumerate() {
+            out.set_item(stream_name(id as u32), (*u, *n))?;
+        }
+        Ok(out)
+    }
+
+    /// Install substitutions: `(stream, kind, index, value)` tuples, the
+    /// stream and kind by name. The generators still advance at every
+    /// address; only the value the consumer receives changes.
+    fn patch_draws(&mut self, patches: Vec<(String, String, u64, f64)>) -> PyResult<()> {
+        for (stream, kind, index, value) in patches {
+            let id = stream_id(&stream)?;
+            let kind = draw_kind(&kind)?;
+            self.inner.patch_draw(id, kind, index, value);
+        }
+        Ok(())
+    }
+
+    /// The installed overlay, as `(stream, kind, index, value)` tuples.
+    fn draw_patches(&self) -> Vec<(String, String, u64, f64)> {
+        let mut out = Vec::new();
+        for id in 0..crate::rng::stream::COUNT as u32 {
+            if let Some(o) = self.inner.draw_overlay(id) {
+                for ((kind, index), value) in &o.table {
+                    out.push((stream_name(id).to_string(), kind.name().to_string(), *index, *value));
+                }
+            }
+        }
+        out
+    }
+
+    /// Record every draw `stream` takes on days `from_day..=to_day`.
+    fn trace_draws(&mut self, stream: String, from_day: i64, to_day: i64) -> PyResult<()> {
+        self.inner.enable_draw_log(stream_id(&stream)?, from_day, to_day);
+        Ok(())
+    }
+
+    /// The recorded draws of `stream` on days `from_day..=to_day`, as
+    /// `((stream, kind, index), value, day, site, tag)` tuples in the order
+    /// they were taken.
+    fn draw_log(&self, stream: String, from_day: i64, to_day: i64)
+        -> PyResult<Vec<((String, String, u64), f64, i64, String, u32)>> {
+        let id = stream_id(&stream)?;
+        Ok(self
+            .inner
+            .draw_log(id)
+            .iter()
+            .filter(|r| from_day <= r.day && r.day <= to_day)
+            .map(|r| ((stream.clone(), r.kind.name().to_string(), r.index), r.value, r.day, r.site.name().to_string(), r.tag))
+            .collect())
+    }
+
+    /// One dict per opened day: `day`, `positions` (stream name to
+    /// `(uniforms, normals)` at the open), `active`, `sectors`, `ticks`.
+    fn day_marks<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        let mut out = Vec::new();
+        for m in self.inner.day_marks() {
+            let d = PyDict::new_bound(py);
+            d.set_item("day", m.day)?;
+            let pos = PyDict::new_bound(py);
+            for (id, (u, n)) in m.positions.iter().enumerate() {
+                pos.set_item(stream_name(id as u32), (*u, *n))?;
+            }
+            d.set_item("positions", pos)?;
+            d.set_item("active", m.active.clone())?;
+            d.set_item("sectors", m.sectors)?;
+            d.set_item("ticks", m.ticks)?;
+            out.push(d);
+        }
+        Ok(out)
+    }
+
+    /// Where each active company's market-stream normals sit on `day`:
+    /// `(company, first, stride, ticks)`, the normal at tick `t` being
+    /// `first + t * stride`. `None` if the day was never opened.
+    fn market_day_layout(&self, day: i64) -> Option<Vec<(u32, u64, u64, u32)>> {
+        self.inner
+            .market_day_layout(day)
+            .map(|v| v.iter().map(|l| (l.company, l.first, l.stride, l.ticks)).collect())
+    }
+
+    /// Keep what [`Self::explain`] needs for days `from_day` to `to_day`.
+    ///
+    /// Two records, both read-only. Every stream's draw log is turned on over
+    /// the window, starting one day early because the jump a day's `truth`
+    /// table carries was drawn at the close before it. And the engine is
+    /// copied at each of those days' opens, so a day can be run again from
+    /// the state it ran from the first time, under the inputs the run log
+    /// holds for it.
+    ///
+    /// Neither moves a trajectory. The log records what a consumer received
+    /// and the copy is never run by the engine that holds it, so a market
+    /// with a window open is the market it would have been without one and
+    /// `tests/known_answer.py` reports the shipped digest either way.
+    ///
+    /// Both `run_days` and `World.run` open through one path, so both fill
+    /// this. The cost is one engine copy per kept day, taken without the
+    /// recorded tape and without the draw log, so ask for the days you
+    /// mean to explain rather than for a whole run.
+    ///
+    /// What that costs, on `Universe.random(40, seed=111)` at `pt-v16`
+    /// over thirty days with `record=True`, as the PROCESS peak working
+    /// set rather than a Python-side allocation figure, since the store
+    /// is Rust memory: 436 to 457 MB with a thirty-day window against 89
+    /// to 92 MB with none, two readers on one machine. Recorded, because
+    /// `Engine.explain` reads the day off `truth()` and a window is only
+    /// useful on a run that recorded. A fork carries what the parent
+    /// kept, so `World.fork` and every counterfactual arm pay it again
+    /// per arm: `fork(1)` takes 0.011 s at a five-day window, 0.046 s at
+    /// twenty and 0.136 s at sixty. A fork collects no new opens of its
+    /// own past the window it inherited.
+    ///
+    /// The draw log is cleared on the copy because the copy is never
+    /// asked what it recorded: the tree reads the SOURCE engine's log,
+    /// and the copy is only forked and replayed. Carried, it made the
+    /// store quadratic in the window, since copy k held k days of a log
+    /// that is the size of the tape; the same thirty-day window cost
+    /// 1.6 GB and a single fork at sixty days took 24.8 seconds. Found
+    /// by the P1 reviewer on 2026-09-02.
+    fn keep_explanations(&mut self, from_day: i64, to_day: i64) -> PyResult<()> {
+        if to_day < from_day {
+            return Err(ValidationError::new_err(format!(
+                "keep_explanations takes a window, and day {to_day} is \
+                 before day {from_day}"
+            )));
+        }
+        self.explanations.window = Some((from_day, to_day));
+        for id in 0..crate::rng::stream::COUNT as u32 {
+            self.inner.enable_draw_log(id, from_day - 1, to_day);
+        }
+        Ok(())
+    }
+
+    /// One name's day, from its move down to the draws that seeded it.
+    ///
+    /// Returns a `tradefloor.explain.Explanation`. The tree, the replays and
+    /// the caveats are built in `python/tradefloor/explain.py`; this hands
+    /// that module the engine, the window and the day's own inputs, which is
+    /// the bookkeeping a binding owns.
+    ///
+    /// Raises when `day` was not kept, naming the days that were. The store
+    /// is opt-in, so a caller who has not asked for it is told what to ask
+    /// for rather than handed a tree with no leaves.
+    fn explain(slf: &Bound<'_, Self>, ticker: &str, day: i64) -> PyResult<PyObject> {
+        let py = slf.py();
+        let (sector, window, kept, opened, inputs, before, ops) = {
+            let me = slf.borrow();
+            let window = me.explanations.window;
+            let kept: Vec<i64> = me.explanations.opens.keys().copied().collect();
+            // The roster the day BEFORE opened on, where that day was
+            // kept too. Comparing the two rosters is exact where the
+            // widths are not: a listing and a delisting in one day leave
+            // the width alone and move every slot between them.
+            let before: Option<Vec<String>> = me
+                .explanations
+                .opens
+                .get(&(day - 1))
+                .map(|k| k.engine.tickers.clone());
+            match me.explanations.opens.get(&day) {
+                Some(k) => {
+                    let entries = me.day_inputs(py, k.log_start)?;
+                    let ops = me.roster_ops_before(k.log_start);
+                    // Against the COPY's roster, not this engine's. A
+                    // delisting shifts every slot below it, so a name
+                    // resolved against the roster as it is now addresses
+                    // a different company in a day kept before the
+                    // change, and the sector tag with it.
+                    let sector = sector_of(&k.engine, ticker);
+                    (
+                        sector,
+                        window,
+                        kept,
+                        Some((*k.engine).clone()),
+                        Some(entries),
+                        before,
+                        ops,
+                    )
+                }
+                None => (
+                    sector_of(&me, ticker),
+                    window,
+                    kept,
+                    None,
+                    None,
+                    before,
+                    Vec::new(),
+                ),
+            }
+        };
+        let module = py.import_bound("tradefloor.explain")?;
+        Ok(module
+            .call_method1(
+                "_explain",
+                (
+                    slf, ticker, day, sector, window, kept, opened, inputs,
+                    before, ops,
+                ),
+            )?
+            .unbind())
     }
 
     #[getter]
@@ -1861,6 +2593,51 @@ impl PyEngine {
         Ok((0..count).map(|_| self.clone()).collect())
     }
 
+    /// This market's state as one 64-character hex digest: the ledger leaf.
+    ///
+    /// Covers every field [`PyEngine::state_snapshot`] carries, in one fixed
+    /// order, on the canonical-f64 rule `manifest._f64` and
+    /// `tests/known_answer.py` share. `crate::engine::Engine::state_hash`
+    /// documents the encoding and why the generator states are hashed as
+    /// `u64` bit patterns rather than as floats.
+    ///
+    /// Two engines whose hashes agree hold the same market state to the bit,
+    /// including the macro chain and the generator positions that
+    /// `market_digest` leaves out. Two engines that reached that state by
+    /// different routes hash the same: this is a hash of state, and the
+    /// order log, the recorded tape and the pending daily jump are outside
+    /// it, exactly as they are outside the snapshot.
+    ///
+    /// One difference is worth knowing before two runs are compared.
+    /// `run_session` with `close_at_end` leaves this binding's session flag
+    /// set where `close_market` clears it, so the two spellings of one close
+    /// hash apart on a market that is otherwise identical to the bit. The
+    /// flag is state rather than bookkeeping: it decides whether the next
+    /// session re-opens the day and re-anchors `previous_close`. A recorded
+    /// run still verifies against itself either way, because a replay runs
+    /// the spelling its own log holds.
+    ///
+    /// Each per-slot array is hashed at the width the engine holds for it.
+    /// That is the invariant, whatever the roster does.
+    ///
+    /// Every per-slot array follows the roster, `volume_idio` included
+    /// since the resize that landed with this one, so the width this walks
+    /// after a listing or a delisting is the roster's and the Python twin
+    /// accepts the same snapshot.
+    ///
+    /// `tradefloor.manifest.state_hash(engine.state_snapshot())` computes
+    /// the same digest in Python, and a test holds the two equal.
+    fn state_hash(&self) -> String {
+        let bytes = self.inner.state_hash_with_pending(
+            self.day_count, self.market_open,
+            &self.pending_jump, &self.pending_overnight);
+        let mut hex = String::with_capacity(64);
+        for byte in bytes {
+            hex.push_str(&format!("{byte:02x}"));
+        }
+        hex
+    }
+
     /// Every column plus the generator position, as one dict.
     ///
     /// A market's complete state, in constant time. The alternative already
@@ -1910,14 +2687,32 @@ impl PyEngine {
         // round-trip exactly rather than closely. Nine numbers rather than a
         // nested structure so a pre-split snapshot (three numbers) is
         // unmistakable at a glance and on restore.
-        let mut rng_out = Vec::with_capacity(15);
+        let mut rng_out = Vec::with_capacity(3 * crate::rng::stream::COUNT);
         for s in [rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
-                  rng.news, rng.volume_idio] {
+                  rng.news, rng.volume_idio, rng.overnight] {
             rng_out.push(f64::from_bits(s.state));
             rng_out.push(f64::from_bits(s.increment));
             rng_out.push(s.spare.unwrap_or(f64::NAN));
         }
         out.set_item("rng", rng_out)?;
+        // Draw addressing (phase 1): the counts that give every draw its
+        // address, and the overlay, both additive. A snapshot from before
+        // this key restores with counts of zero and no overlay.
+        let positions = self.inner.stream_positions();
+        let counts: Vec<f64> = positions
+            .iter()
+            .flat_map(|(u, n)| [*u as f64, *n as f64])
+            .collect();
+        out.set_item("draw_counts", counts)?;
+        let mut overlay: Vec<(u32, u8, u64, f64)> = Vec::new();
+        for id in 0..crate::rng::stream::COUNT as u32 {
+            if let Some(o) = self.inner.draw_overlay(id) {
+                for ((kind, index), value) in &o.table {
+                    overlay.push((id, *kind as u8, *index, *value));
+                }
+            }
+        }
+        out.set_item("draw_overlay", overlay)?;
         out.set_item("tickers", self.inner.ids().to_vec())?;
         // The model the frozen market was priced under. `restore_state`
         // refuses a mismatch: a snapshot restored onto an engine running
@@ -1931,13 +2726,13 @@ impl PyEngine {
         // re-opens the day and re-anchors `previous_close`.
         // Two widths now: the engine's attribution carries the daily jump in
         // an eighth slot, the tick's own decomposition does not (§74).
-        let flat9 = |rows: &[[f64; 9]]| -> Vec<f64> {
+        let flat10 = |rows: &[[f64; crate::market::factors::COMPONENT_COUNT]]| -> Vec<f64> {
             rows.iter().flat_map(|r| r.iter().copied()).collect()
         };
         let flat = |rows: &[[f64; 8]]| -> Vec<f64> {
             rows.iter().flat_map(|r| r.iter().copied()).collect()
         };
-        out.set_item("attribution", f64_bytes(py, &flat9(self.inner.attribution())))?;
+        out.set_item("attribution", f64_bytes(py, &flat10(self.inner.attribution())))?;
         out.set_item(
             "tick_components",
             f64_bytes(py, &flat(self.inner.tick_components())),
@@ -1965,6 +2760,16 @@ impl PyEngine {
         // a snapshot without it restores to 0.0, which is bit-exact for
         // every run recorded while the reservoir dial shipped 0.0.
         out.set_item("forced_flow_spent", self.inner.forced_flow_spent())?;
+        // Nominal output when the run opened, the base of the growth
+        // term's ratio. A constant of the run rather than advancing state,
+        // and carried for the reason the two above are: an engine restored
+        // without it would rebase its valuation on the restore day and
+        // grow from there, which is a plausible market and not the one the
+        // snapshot describes. A snapshot written before this key
+        // leaves the engine on the base it was built with, and such a
+        // snapshot comes from a build where the growth term did not exist,
+        // so it names a preset carrying the dial at 0.0.
+        out.set_item("nominal_output_base", self.inner.nominal_output_base())?;
         // The common log-volume state. Same reason as the variance above, and
         // the same failure: omitted, a fork re-opens at volume 1.0 mid-regime
         // and diverges through the book (§74).
@@ -1977,6 +2782,26 @@ impl PyEngine {
         // this and nothing called it. Carried now, while it is free.
         out.set_item("universe_stress", self.inner.universe_stress())?;
         out.set_item("volume_idio", f64_bytes(py, self.inner.volume_idio()))?;
+        // THE DAY'S JUMP AND OVERNIGHT MOVE, WAITING FOR A TAPE ROW.
+        //
+        // Both are applied at a day boundary, so no tick of that day can
+        // carry them; they are written onto the FIRST TICK OF THE NEXT DAY,
+        // which is where a reader reconstructing the day finds them. Between
+        // the close that produced them and that row they are pending, and a
+        // snapshot taken in that window used to drop them -- so a resumed
+        // run's tape was missing the jump on its first recorded row while the
+        // continuous run's carried it.
+        //
+        // Invisible until 0.7.0: the jump slot is zero unless a jump fired,
+        // and pt-v18 switches on `jump_mean_compensated`, whose compensator
+        // is deterministic and lands EVERY day. `test_a_resumed_run_carries_
+        // its_whole_record` found it at day 2, tick 0.
+        //
+        // RECORDING state, not market state. Restoring them changes what the
+        // tape says and no price, which is why the drift guard in
+        // `test_forking.py` names them rather than seeing them move a market.
+        out.set_item("pending_jump", f64_bytes(py, &self.pending_jump))?;
+        out.set_item("pending_overnight", f64_bytes(py, &self.pending_overnight))?;
         // The day's endogenous news, generated once in `open_market` and read
         // by every tick of that day. Per-DAY state, not a per-tick input, and
         // omitting it made a mid-day restore run the rest of the day with the
@@ -2022,7 +2847,7 @@ impl PyEngine {
             previous_day_market_return, rolling_market_return_30d,
             market_pe, qe_pe_boost,
             fiscal_stimulus, government_debt_to_gdp,
-            months_in_current_phase, recession_probability,
+            months_in_current_phase, phase_gdp_target, recession_probability,
         );
         econ.set_item("gdp_trend", economy.gdp_trend.to_vec())?;
         econ.set_item("cycle_phase", economy.cycle_phase.as_str())?;
@@ -2135,13 +2960,32 @@ impl PyEngine {
         // does not carry -- see the bindings below. That is what lets a
         // checkpoint written before a mechanism existed replay exactly as it
         // did then, rather than against a zeroed generator wearing its seed.
-        if !matches!(rng.len(), 9 | 12 | 15 | 18 | 21) {
+        if rng.len() < 9 || rng.len() % 3 != 0 || rng.len() > 3 * crate::rng::stream::COUNT {
             return Err(ValidationError::new_err(format!(
                 "rng must be 9 numbers (market, economy, external), 12 \
-                 (plus jumps), 15 (plus volume), 18 (plus news) or 21 \
-                 (plus per-name volume), as \
+                 (plus jumps), 15 (plus volume), 18 (plus news), 21 \
+                 (plus per-name volume) or 24 (plus overnight), as \
                  (state, increment, spare) triples, got {}",
                 rng.len()
+            )));
+        }
+        let mut counts: Vec<f64> = match snapshot.get_item("draw_counts")? {
+            Some(v) => v.extract()?,
+            None => vec![0.0; 2 * crate::rng::stream::COUNT],
+        };
+        // Fourteen numbers predate the overnight stream. That stream keeps
+        // the position this engine holds, as its generator does below, so a
+        // snapshot from before the stream restores exactly as it did then.
+        if counts.len() == 2 * (crate::rng::stream::COUNT - 1) {
+            let (uniforms, normals) = self.inner.stream_positions()[crate::rng::stream::COUNT - 1];
+            counts.push(uniforms as f64);
+            counts.push(normals as f64);
+        }
+        if counts.len() != 2 * crate::rng::stream::COUNT {
+            return Err(ValidationError::new_err(format!(
+                "draw_counts must be {} numbers, two per stream, got {}",
+                2 * crate::rng::stream::COUNT,
+                counts.len()
             )));
         }
         let stream = |at: usize| crate::rng::RngState {
@@ -2152,6 +2996,8 @@ impl PyEngine {
             } else {
                 Some(rng[at + 2])
             },
+            uniforms: counts[(at / 3) * 2] as u64,
+            normals: counts[(at / 3) * 2 + 1] as u64,
         };
         // A nine-number snapshot predates the jump stream. Its jump position
         // is whatever this engine derived from its seed, and keeping that is
@@ -2168,6 +3014,7 @@ impl PyEngine {
         let volume = if rng.len() >= 15 { stream(12) } else { current.volume };
         let news = if rng.len() >= 18 { stream(15) } else { current.news };
         let volume_idio = if rng.len() >= 21 { stream(18) } else { current.volume_idio };
+        let overnight = if rng.len() >= 3 * crate::rng::stream::COUNT { stream(3 * (crate::rng::stream::COUNT - 1)) } else { current.overnight };
         self.inner.set_rng_state(crate::engine::EngineRngState {
             market: stream(0),
             economy: stream(3),
@@ -2176,7 +3023,26 @@ impl PyEngine {
             volume,
             news,
             volume_idio,
+            overnight,
         });
+        if let Some(raw) = snapshot.get_item("draw_overlay")? {
+            let entries: Vec<(u32, u8, u64, f64)> = raw.extract()?;
+            for id in 0..crate::rng::stream::COUNT as u32 {
+                self.inner.set_draw_overlay(id, None);
+            }
+            for (id, kind, index, value) in entries {
+                let kind = match kind {
+                    0 => crate::rng::DrawKind::Uniform,
+                    1 => crate::rng::DrawKind::Normal,
+                    other => {
+                        return Err(ValidationError::new_err(format!(
+                            "draw_overlay kind must be 0 (uniform) or 1 (normal), got {other}"
+                        )))
+                    }
+                };
+                self.inner.patch_draw(id, kind, index, value);
+            }
+        }
 
         // The per-day accumulators. Absent from a snapshot written before
         // these were carried, so they are optional and default to "a day that
@@ -2216,6 +3082,20 @@ impl PyEngine {
         }
         if let Some(raw) = snapshot.get_item("universe_stress")? {
             self.inner.set_universe_stress(raw.extract::<f64>()?);
+        }
+        for (key, slot) in [("pending_jump", 0usize), ("pending_overnight", 1usize)] {
+            if let Some(raw) = snapshot.get_item(key)? {
+                let bytes: &[u8] = raw.extract()?;
+                let values: Vec<f64> = bytes
+                    .chunks_exact(8)
+                    .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                    .collect();
+                if slot == 0 {
+                    self.pending_jump = values;
+                } else {
+                    self.pending_overnight = values;
+                }
+            }
         }
         if let Some(raw) = snapshot.get_item("volume_idio")? {
             let bytes: &[u8] = raw.extract()?;
@@ -2260,6 +3140,11 @@ impl PyEngine {
         // snapshot, whose runs all carried 0.0.
         if let Some(raw) = snapshot.get_item("forced_flow_spent")? {
             self.inner.set_forced_flow_spent(raw.extract()?);
+        }
+        // Restore the growth term's base. Absent means a snapshot from a
+        // build without the term, whose preset carries the dial at 0.0.
+        if let Some(raw) = snapshot.get_item("nominal_output_base")? {
+            self.inner.set_nominal_output_base(raw.extract()?);
         }
         if let Some(raw) = snapshot.get_item("market_variance")? {
             let vals: Vec<f64> = raw.extract()?;
@@ -2325,7 +3210,7 @@ impl PyEngine {
                 previous_day_market_return, rolling_market_return_30d,
                 market_pe, qe_pe_boost,
                 fiscal_stimulus, government_debt_to_gdp,
-                months_in_current_phase, recession_probability,
+                months_in_current_phase, phase_gdp_target, recession_probability,
             );
             if let Some(v) = d.get_item("gdp_trend")? {
                 let trend: Vec<f64> = v.extract()?;
@@ -2378,9 +3263,27 @@ impl PyEngine {
                     })?;
             }
         }
+        // The marks name the days THIS engine opened, and a restore replaces
+        // the run. Kept across one, they named days the restored engine had
+        // not run: two days, then a three-day snapshot, then two more
+        // reported marks for 0, 1, 3 and 4.
+        self.inner.clear_day_marks();
         if let Some(v) = snapshot.get_item("day_count")? {
             self.day_count = v.extract()?;
         }
+        // The core's own day, pushed rather than left where construction put
+        // it. `open_market` sets it from `day_count` at every open, so the
+        // two agree at every point a snapshot can be taken; a restore that
+        // stops before the next open is the one path where they part.
+        //
+        // That path used to reach nothing. It reaches the valuation now,
+        // because the buyback factor is `exp(yield * elapsed / 252)` and
+        // elapsed is this number, so a market restored MID-DAY priced its
+        // next tick as though the run had just begun. The forking guard
+        // caught it as a divergence in every column, which is what it is
+        // for: something the engine carries drove the market and was not
+        // restored with it.
+        self.inner.set_current_day(i64::from(self.day_count));
         Ok(())
     }
 
@@ -2405,10 +3308,19 @@ impl PyEngine {
             instruments: self.day_buffer.companies,
             prices: self.day_buffer.prices.clone(),
             volumes: self.day_buffer.volumes.clone(),
+            // The session's open, the engine's mark from `open_market`,
+            // which the close leaves alone, so a record taken on either
+            // side of it reads the same value.
+            opens: self.inner.column(PriceField::Open),
             mispricing: self.day_buffer.mispricing.clone(),
             fundamental: self.day_buffer.fundamental.clone(),
             anchor: self.day_buffer.anchor.clone(),
             components: std::array::from_fn(|k| self.day_buffer.components[k].clone()),
+            shock: self.day_buffer.shock.clone(),
+            absorbed: self.day_buffer.absorbed.clone(),
+            clamp: self.day_buffer.clamp.clone(),
+            unbounded_print: self.day_buffer.unbounded_print.clone(),
+            liquidity_share: self.day_buffer.liquidity_share.clone(),
         });
         let e = self.inner.economy();
         self.recorded_macro.push(crate::python_arrow::MacroRow {
@@ -2477,6 +3389,7 @@ impl PyEngine {
                 instruments: self.buffer.companies,
                 prices: self.written(&self.buffer.prices).to_vec(),
                 volumes: self.written(&self.buffer.volumes).to_vec(),
+                opens: self.inner.column(PriceField::Open),
                 // bars() reads neither, and cloning the ground-truth
                 // buffers to build a table that discards them would be pure
                 // copying. truth() has its own path below.
@@ -2484,6 +3397,11 @@ impl PyEngine {
                 fundamental: Vec::new(),
                 anchor: Vec::new(),
                 components: std::array::from_fn(|_| Vec::new()),
+                shock: Vec::new(),
+                absorbed: Vec::new(),
+                clamp: Vec::new(),
+                unbounded_print: Vec::new(),
+                liquidity_share: Vec::new(),
             }]
         } else {
             self.select_recorded(day)?
@@ -2581,7 +3499,7 @@ impl PyEngine {
                 // writes. On this un-recorded path the day has not closed, so
                 // there is no jump yet and the column is zeros (§74).
                 &std::array::from_fn(|k| {
-                    if k < 8 {
+                    if k < crate::market::factors::S_COMPONENT_KEYS.len() {
                         self.written(&self.buffer.components[k]).to_vec()
                     } else {
                         vec![0.0; self.written(&self.buffer.components[0]).len()]
@@ -2611,6 +3529,171 @@ impl PyEngine {
         Ok(crate::python_arrow::PyArrowStream::new(
             "truth",
             crate::python_arrow::truth_schema(),
+            batches,
+        ))
+    }
+
+    /// Settle every open tick a second time against unbounded depth.
+    ///
+    /// Off by default. With it on, `prints()` carries `unbounded_print` and
+    /// `liquidity_share`: what the same tick would have printed against every
+    /// resting level, under the same four uniforms and from the same book
+    /// state, and how much of the print's move that difference accounts for.
+    ///
+    /// The market does not change. The second settlement runs on its own
+    /// book, takes no draw, and its fills reach no company field, so the
+    /// known-answer digest is the same digest with the arm on. What it costs
+    /// is roughly one settlement per active company per open tick, which is
+    /// the largest single item in a tick.
+    ///
+    /// Set it before the FIRST session of a day. A day whose sessions
+    /// disagree records fewer counterfactual values than it has rows, and
+    /// `prints()` drops both columns for that whole day rather than serving
+    /// one with a gap in it. The table's schema caveat names that case, so a
+    /// caller who switched the arm mid-day is told why the columns are gone
+    /// rather than being told to do what they just did. Days that disagree
+    /// with EACH OTHER are a different matter and raise.
+    ///
+    /// The run log does not carry it, because the log carries INPUTS and this
+    /// is not one: no draw, no price and no company field depends on it. A
+    /// replay therefore rebuilds the same market and the same `shock` and
+    /// `absorbed` columns, and rebuilds the arm only if it is asked for
+    /// again.
+    #[pyo3(signature = (on = true))]
+    fn settle_depth_counterfactual(&mut self, on: bool) {
+        self.inner.set_settle_depth_counterfactual(on);
+    }
+
+    /// The `prints` table: how each print was arrived at.
+    ///
+    /// `truth` says what moved fair value. This says what happened between
+    /// fair value and the tape: `shock` is the log distance from the last
+    /// print to the model price, `absorbed` is the log distance from the
+    /// model price to the print, and the two sum to the print's own log move.
+    ///
+    ///   `prints()`        every recorded day, one batch each
+    ///   `prints(day=N)`   that day alone
+    ///
+    /// `absorbed` is measured to the PRINTED price, so it carries the second
+    /// circuit breaker as well as the book. `clamp` is the breaker's own
+    /// part of it, and `absorbed - clamp` is the book's.
+    ///
+    /// Read them apart. On every clamped print measured, the book and the
+    /// breaker pull opposite ways, and on roughly three fifths of them they
+    /// cancel to the last bit, so `absorbed` alone reads exactly zero on a
+    /// name the breaker had just moved 513 basis points -- the same value it
+    /// takes on a tick that never settled. `clamp` is what tells those two
+    /// rows apart.
+    ///
+    /// `unbounded_print` and `liquidity_share` are present only when
+    /// `settle_depth_counterfactual(True)` was set before the run, and the
+    /// schema metadata says which case the table is. Asking for several days
+    /// that disagree raises rather than dropping the columns, because a table
+    /// whose meaning changes half way down is worse than an error.
+    ///
+    /// `liquidity_share` is NEGATIVE on most rows that carry one, because
+    /// the depth bound truncates a walk rather than adding to it: an order
+    /// that exhausts a shallow book stops there, while against every resting
+    /// level it keeps filling and prints further out. The unbounded move is
+    /// `1 - liquidity_share` times the printed move.
+    #[pyo3(signature = (*, day = None))]
+    fn prints(&self, day: Option<u32>) -> PyResult<crate::python_arrow::PyArrowStream> {
+        use crate::python_arrow::DepthColumns;
+        // Which of the three shapes a set of buffers is in. A column the
+        // length of the table is the arm; an empty one is no arm; anything
+        // between is a day whose sessions disagreed, and that day is served
+        // WITHOUT the columns rather than with a gap in them.
+        let state = |len: usize, rows: usize| {
+            if len == 0 || rows == 0 {
+                DepthColumns::Absent
+            } else if len >= rows {
+                DepthColumns::Present
+            } else {
+                DepthColumns::PartialDay
+            }
+        };
+        let ran = |s: DepthColumns| match s {
+            DepthColumns::Present => "with",
+            DepthColumns::Absent => "without",
+            DepthColumns::PartialDay => "part way through",
+        };
+
+        let (batches, depth) = if self.recorded.is_empty() {
+            let ticks = self.buffer.ticks_written;
+            let instruments = self.buffer.companies;
+            let depth = state(
+                self.written(&self.buffer.unbounded_print).len(),
+                ticks * instruments,
+            );
+            (
+                vec![crate::python_arrow::prints_batch(
+                    // Nothing is recorded, so there is no day to select and
+                    // the argument is the label on the rows, as it is on the
+                    // same path in `bars` and `truth`.
+                    day.unwrap_or(0),
+                    ticks,
+                    instruments,
+                    self.written(&self.buffer.prices),
+                    self.written(&self.buffer.anchor),
+                    self.written(&self.buffer.shock),
+                    self.written(&self.buffer.absorbed),
+                    self.written(&self.buffer.clamp),
+                    self.written(&self.buffer.unbounded_print),
+                    self.written(&self.buffer.liquidity_share),
+                    depth,
+                )
+                .map_err(crate::python_arrow::arrow_err)?],
+                depth,
+            )
+        } else {
+            let selected = self.select_recorded(day)?;
+            // Decided across the whole selection, and a disagreement between
+            // DAYS is reported rather than resolved. A run that switched the
+            // arm on half way through has two kinds of day in it, and picking
+            // either one for the schema mislabels the other. A disagreement
+            // WITHIN one day is a different thing: `PartialDay` is a shape,
+            // and the caveat on it names the case.
+            let rows = |d: &crate::python_arrow::RecordedDay| d.ticks * d.instruments;
+            let depth = selected
+                .first()
+                .map(|d| state(d.unbounded_print.len(), rows(d)))
+                .unwrap_or(DepthColumns::Absent);
+            for d in &selected {
+                let has = state(d.unbounded_print.len(), rows(d));
+                if has != depth {
+                    return Err(ValidationError::new_err(format!(
+                        "day {} ran {} the depth counterfactual and the rest ran {} it. \
+                         Ask for one day at a time, or re-run with one setting.",
+                        d.day,
+                        ran(has),
+                        ran(depth),
+                    )));
+                }
+            }
+            let mut out = Vec::with_capacity(selected.len());
+            for d in &selected {
+                out.push(
+                    crate::python_arrow::prints_batch(
+                        d.day,
+                        d.ticks,
+                        d.instruments,
+                        &d.prices,
+                        &d.anchor,
+                        &d.shock,
+                        &d.absorbed,
+                        &d.clamp,
+                        &d.unbounded_print,
+                        &d.liquidity_share,
+                        depth,
+                    )
+                    .map_err(crate::python_arrow::arrow_err)?,
+                );
+            }
+            (out, depth)
+        };
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "prints",
+            crate::python_arrow::prints_schema(depth),
             batches,
         ))
     }
@@ -2942,7 +4025,7 @@ impl PyNewsImpact {
 /// An alias rather than a second list. Declared twice, the two orderings would
 /// eventually disagree and every column would still look plausible -- the
 /// `truth` schema is generated from the same constant for the same reason.
-pub const FACTOR_NAMES: [&str; 9] = [
+pub const FACTOR_NAMES: [&str; crate::market::factors::COMPONENT_COUNT] = [
     crate::market::factors::S_COMPONENT_KEYS[0],
     crate::market::factors::S_COMPONENT_KEYS[1],
     crate::market::factors::S_COMPONENT_KEYS[2],
@@ -2952,6 +4035,7 @@ pub const FACTOR_NAMES: [&str; 9] = [
     crate::market::factors::S_COMPONENT_KEYS[6],
     crate::market::factors::S_COMPONENT_KEYS[7],
     crate::market::factors::JUMP_COMPONENT_KEY,
+    crate::market::factors::OVERNIGHT_COMPONENT_KEY,
 ];
 
 /// Every field `column()` accepts, in one place.

@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import statistics as st
 import sys
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -48,6 +47,58 @@ def one(job):
                                                                seed=UNIVERSE_SEED),
                         days=days, model=m)
     return days, seed, dict(row)
+
+
+def tables(acc: dict[int, list[dict]]) -> tuple[dict[int, dict[str, float]],
+                                                list[str]]:
+    """The drift curve and the indicative band count, from per-seed panels.
+
+    `acc` maps a horizon to its `facts.measure` panels, one per seed. Each
+    graded row is read by its own estimator through `facts.aggregate_panels`:
+    the median for a shape row, the mean for the level row, the pooled
+    median for the pooled fear row, and a row absent from every panel at a
+    horizon is printed as n/a rather than medianed over None.
+
+    The band count is of the SHAPE rows, which is what a gate reads; the
+    level and crisis rows are printed beside it with their own verdicts and
+    never added to it, because the shipped preset holds them red on purpose
+    and a total that folded them in would read fourteen of seventeen where
+    fourteen of fourteen is the fact.
+    """
+    med = {d: facts.aggregate_panels(acc[d]) for d in HORIZONS}
+    lines = [
+        f"\n{'statistic':26}" + "".join(f"{d:>10}" for d in HORIZONS)
+        + "   drift 504->2520",
+    ]
+    for k in sorted(facts.REAL_MARKETS):
+        far, near = med[2520].get(k), med[504].get(k)
+        drift = ("n/a" if far is None or near is None or near == 0
+                 else f"{(far - near) / abs(near):+.1%}")
+        cells = "".join(f"{med[d][k]:10.4f}" if k in med[d] else f"{'n/a':>10}"
+                        for d in HORIZONS)
+        lines.append(f"{k:26}" + cells + f"   {drift:>16}")
+
+    # Graded against the 504 bands, which is the WRONG ruler at 2520 and is
+    # labelled as such. Printed because a reader will ask, and because a
+    # statistic leaving a band it was inside at 504 is the signal worth
+    # having even when the band is not horizon-matched.
+    lines.append("\nAgainst BANDS_504 (not horizon-matched -- indicative only):")
+
+    def in_band(d: int, k: str) -> bool:
+        return (k in med[d]
+                and envelope.BANDS_504[k][0] <= med[d][k] <= envelope.BANDS_504[k][1])
+
+    for d in HORIZONS:
+        out = [k for k in facts.SHAPE if not in_band(d, k)]
+        others = ", ".join(
+            f"{k} {'in' if in_band(d, k) else 'OUT' if k in med[d] else 'n/a'}"
+            for k in facts.LEVEL + facts.CRISIS)
+        lines.append(
+            f"  {d:5}d: {len(facts.SHAPE) - len(out)}/{len(facts.SHAPE)} "
+            "shape rows in band"
+            + (f", out: {', '.join(sorted(out))}" if out else "")
+            + f"; level and crisis rows beside the count: {others}")
+    return med, lines
 
 
 def main() -> int:
@@ -89,29 +140,9 @@ def main() -> int:
                 acc[d].append(row)
         print(f"  {days}d: {len(acc[days])}/{len(seeds)} done", flush=True)
 
-    med = {d: {k: st.median([r[k] for r in acc[d]]) for k in facts.REAL_MARKETS}
-           for d in HORIZONS}
-
-    print(f"\n{'statistic':26}" + "".join(f"{d:>10}" for d in HORIZONS)
-          + "   drift 504->2520", flush=True)
-    for k in sorted(facts.REAL_MARKETS):
-        far, near = med[2520][k], med[504][k]
-        drift = "n/a" if near == 0 else f"{(far - near) / abs(near):+.1%}"
-        print(f"{k:26}" + "".join(f"{med[d][k]:10.4f}" for d in HORIZONS)
-              + f"   {drift:>16}", flush=True)
-
-    # Graded against the 504 bands, which is the WRONG ruler at 2520 and is
-    # labelled as such. Printed because a reader will ask, and because a
-    # statistic leaving a band it was inside at 504 is the signal worth
-    # having even when the band is not horizon-matched.
-    print("\nAgainst BANDS_504 (not horizon-matched -- indicative only):",
-          flush=True)
-    for d in HORIZONS:
-        out = [k for k in facts.REAL_MARKETS
-               if not (envelope.BANDS_504[k][0] <= med[d][k]
-                       <= envelope.BANDS_504[k][1])]
-        print(f"  {d:5}d: {14 - len(out)}/14 in band"
-              + (f", out: {', '.join(sorted(out))}" if out else ""), flush=True)
+    med, lines = tables(acc)
+    for line in lines:
+        print(line, flush=True)
 
     if args.out:
         Path(args.out).write_text(json.dumps(

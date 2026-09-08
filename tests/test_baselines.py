@@ -113,8 +113,24 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # them. Under pt-v14 the same seed read oracle +4.874%, mean_reversion
     # +1.801%, momentum +1.449%, buy_and_hold -0.588%, random -0.988%. The
     # oracle has still never moved.
+    #
+    # Re-measured again when the universe generator was reconciled to open a
+    # drawn roster at its own fair value, which re-drew every generated
+    # name's earnings and book value and so every trajectory: oracle
+    # +7.132%, mean_reversion +2.450%, momentum +1.932%, random -0.735%,
+    # buy_and_hold -1.103%. Momentum and mean-reversion swapped for the
+    # sixth time, 0.518 points apart, which is the widest that pair has been
+    # at a swap. The bottom pair held and the oracle has still never moved.
+    #
+    # Re-measured again at the 0.7.0 boundary that made pt-v18 the default:
+    # oracle +7.185%, momentum +1.736%, mean_reversion +1.680%,
+    # buy_and_hold -0.123%, random -0.848%. Momentum and mean-reversion
+    # swapped for the SEVENTH time, 0.056 points apart -- the narrowest
+    # margin at any swap so far, and the clearest reading yet of why this
+    # comment keeps warning about that pair. The bottom pair swapped too.
+    # The oracle has still never moved.
     assert ranked == ["oracle", "momentum", "mean_reversion",
-                      "random", "buy_and_hold"]
+                      "buy_and_hold", "random"]
 
 
 def test_random_trading_is_close_to_flat_over_a_short_run(scores):

@@ -412,11 +412,67 @@ def one(job):
         f = facts.measure(seed=seed, universe=pt.Universe.random(60, seed=909), days=252, model=m)
     else:
         raise ValueError(kind)
-    return kind, {k: f.get(k) for k in list(facts.REAL_MARKETS)}
+    return kind, panel_row(f)
+
+
+#: The kinds whose rows are `facts.measure` panels, and therefore aggregate by
+#: `facts.AGGREGATE` rather than by a plain median. `driven` is the one that
+#: is not: its keys are ratios of its own, with no band and no estimator here.
+PANEL_KINDS = ("p252", "p504", "vix5", "vix45", "vix65",
+               "ho_seeds", "ho_universe")
+
+
+def panel_row(f: dict) -> dict:
+    """One seed's panel: every graded row, and the counts a pooled row needs.
+
+    The value alone is not enough for two of the eighteen rows and never was.
+    `fear_gauge_dn3` is graded as the median of the sessions POOLED across
+    seeds, so its per-seed value is None on the third of runs that hold no
+    such session and the graded value cannot be rebuilt from the values;
+    `index_tail_dn3_pct` is graded as a ratio of two sums, so the per-seed
+    rates do not carry it either. Both need their companion keys, and the
+    scoring rule needs them again for the seed bootstrap that prices the
+    pooled row's own error.
+
+    This is what makes a record re-scorable. Every figure the corpus under
+    `corpus/gates/` can support today is computed from block MEDIANS, because
+    that is all those records kept: no per-seed values, so no candidate's own
+    seed error, and three of the seventeen rows blind in every record. The
+    keys here are the ones that stop being true of the next record.
+    """
+    row = {k: f.get(k) for k in facts.REAL_MARKETS}
+    for key in facts.REAL_MARKETS:
+        kind = facts.AGGREGATE.get(key)
+        if kind == "pooled":
+            row[key + "_samples"] = list(f.get(key + "_samples") or ())
+            row[key + "_sessions"] = f.get(key + "_sessions")
+        elif kind == "pooled_rate":
+            hits, sessions = facts.pooled_rate_counts(key)
+            row[hits] = f.get(hits)
+            row[sessions] = f.get(sessions)
+    return row
+
+
+def graded_panel(rows: list[dict]) -> dict:
+    """The graded panel from per-seed rows, each row by its own estimator.
+
+    `facts.aggregate_panels`, and not a median over every key: the level row
+    is a MEAN across seeds, `fear_gauge_dn3` is the median of the pooled
+    samples and `index_tail_dn3_pct` is the hits over every seed divided by
+    the sessions over every seed. Taking a plain median of all three -- which
+    this tool did while `facts.REAL_MARKETS` held only the fourteen shape
+    rows and no other kind existed -- reads a different statistic under each
+    of their names, and on the tail row the two differ by 3.1x.
+    """
+    return facts.aggregate_panels(rows)
 
 
 def summarise(kind: str, rows: list[dict]) -> str:
-    med = {k: st.median([r[k] for r in rows if r.get(k) is not None]) for k in rows[0]}
+    if kind in PANEL_KINDS:
+        med = graded_panel(rows)
+    else:
+        med = {k: facts.aggregate_value(k, [r[k] for r in rows if r.get(k) is not None])
+               for k in rows[0] if any(r.get(k) is not None for r in rows)}
     if kind == "driven":
         return (f"  driven 2020-21 ({len(rows)} seeds): return sd "
                 f"{med['ret_sd']:.4f} vs real AAPL {med['real_ret_sd']:.4f} "
@@ -430,10 +486,13 @@ def summarise(kind: str, rows: list[dict]) -> str:
                 f"xs {med['cross_sectional_corr']:.3f} kurt {med['excess_kurtosis']:.2f} "
                 f"vol {med['annualised_vol_pct']:.1f}")
     days = 504 if kind == "p504" else 252
-    sc = envelope.score(med, horizon_days=days)["statistics"]
-    out = [k for k, v in sc.items() if not v.get("in_band", True)]
-    n = len(facts.REAL_MARKETS)
-    return (f"  {kind:12s} {days}d ({len(rows)} seeds): {n - len(out)}/{n} in band; vol "
+    scored = envelope.score(med, horizon_days=days)
+    sc = scored["statistics"]
+    out = [k for k, v in sc.items() if not v.get("in_band", True) and k in facts.SHAPE]
+    level = [f"{k} {med[k]:+.2f}" for k in facts.LEVEL if k in med]
+    n = len(facts.SHAPE)
+    return (f"  {kind:12s} {days}d ({len(rows)} seeds): {n - len(out)}/{n} shape in band; "
+            f"level {', '.join(level) or 'n/a'}; vol "
             f"{med['annualised_vol_pct']:.1f} kurt {med['excess_kurtosis']:.2f} xs "
             f"{med['cross_sectional_corr']:.3f} sector_ex {med['sector_excess_corr']:+.4f} "
             f"persist {med['corr_persistence_acf1']:+.3f} acf1/5/20 {med['abs_return_acf1']:.3f}/"

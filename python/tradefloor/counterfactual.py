@@ -47,6 +47,30 @@ Every test forked on a day boundary, so nothing caught it. This module cannot
 reach that state: :meth:`World.run` takes whole days, and :meth:`World.fork`
 refuses an open market.
 
+## Draw surgery
+
+An intervention changes a macro field. A surgery changes a draw: the
+random number one consumer received, at one address, with every other
+draw of every stream left where it was (`tradefloor.noise` states the
+address contract). Four are offered on a world, each recorded in
+``surgeries`` beside the interventions:
+
+- :meth:`World.point` replaces one draw.
+- :meth:`World.unfire` stops the market jump of one day from firing.
+- :meth:`World.window` re-randomises one stream over a range of days
+  under a generator derived from the seed, the stream and a surgery
+  seed by a documented contract.
+- :meth:`World.transplant` copies another world's draws of one stream
+  over a range of days into this one, address for address.
+
+A surgery arm forks from the same state as its control, so :func:`agree`
+is taken at the fork before the surgery and :func:`compare` reads the
+gap after it, exactly as for an intervention. A surgery aimed at a day
+is checked after that day runs: the draw log must show the patched
+address drawn on that day, at the site it was aimed at, and a schedule
+that moved in between raises rather than reporting a surgery that
+landed somewhere else.
+
 ## The agent is the subject, not the apparatus
 
 Everything here takes the agent as a parameter and touches nothing about it
@@ -66,6 +90,58 @@ Two optional hooks, neither required:
 - ``fork()`` returns an independent copy of the agent. Without it a fork falls
   back to :func:`copy.deepcopy`, which is right for a policy holding plain
   Python state and wrong for one holding a socket, a session or a file handle.
+
+## Several agents in one world
+
+A world takes ``agents={"a": agent_a, "b": agent_b}`` in place of ``agent=``,
+and then holds one :class:`~tradefloor.Portfolio` per label against one
+engine, which `portfolio.py` was written to allow. Within a step every agent
+sees the same prices and the same book, each over its own portfolio; they are
+asked in label order, they execute in label order against the shared book,
+and every portfolio's pending flow is merged per ticker and reaches the
+market as the one ``order_flow`` argument of the one session. Agents see each
+other's impact and never each other's orders, and :meth:`Scenario.apply` runs
+once a day for the whole cohort.
+
+## Agents do not take each other's liquidity within a step
+
+:meth:`Portfolio.execute` prices a fill through ``book.sweep_cost``, which
+walks the levels to compute an average and removes nothing from the book. So
+two agents buying the same name on the same step meet the same ladder and
+fill at the same price, and the ladder after both of them is the ladder
+before either. Measured on this build, on ``Universe.random(8, seed=99)``
+at seed 42, two agents each buying 10,000 shares of the first name at step
+0: both fill at 83.96118999999999 against a first ask level of 9,762 shares
+at 83.96 that neither of them moved, and the sweep walks past that level to
+a worst price of 84.01, so the equality is a claim about a ladder that did
+not move rather than two fills at the top of the book.
+``test_externality.py`` pins it.
+
+The cohort's whole footprint reaches the market once, as the merged
+``order_flow`` of that step's session, so an agent meets another's trading
+from the next step on and never inside the step it happened. Order priority
+within a step is a queue this engine does not run, and a cohort does not
+introduce one.
+
+Label order therefore decides three things and no price: the order agents are
+asked, the order their flows are summed into the merged mapping, and the
+order :attr:`World.rejected` is written. It is sorted order, so the same
+labels give the same market whatever order the mapping was built in. A dict
+literal's own order would make the market a property of how the caller typed
+it, and with three or more agents on one ticker the summation order is a
+float-associativity question rather than a cosmetic one.
+
+The single-agent form is a one-element cohort under its old names.
+:attr:`World.agent` and :attr:`World.portfolio` read that one element and
+raise on a cohort; :attr:`World.agents` and :attr:`World.portfolios` are the
+per-label collections. A single-agent trace row is the row it always was. A
+cohort row carries the shared fields and an ``agents`` map of the per-agent
+ones, and :func:`agree` grows one row per label rather than one row for a
+collection nobody can read back.
+
+:meth:`World.without` is the removal :mod:`tradefloor.externality` measures:
+a fork in which one agent sends no orders from the fork day on, its positions
+left where they were and still marked to that arm's market.
 
 ## What this deliberately does not do
 
@@ -96,6 +172,8 @@ from .harness import Observation, session_clock
 from .manifest import RunManifest, market_digest
 from .portfolio import Portfolio
 from .interventions import Intervention
+from . import noise as _noise
+from .render import Renderer, check_renderer
 from .scenario import Scenario
 from .universe_util import fingerprint_of
 
@@ -104,6 +182,11 @@ from .universe_util import fingerprint_of
 #: and a row is meant to be readable.
 MACRO_FIELDS = ("federal_funds_rate", "corporate_bond_yield", "vix",
                 "inflation_rate", "cycle")
+
+#: The label the single-agent form holds its one agent under. Empty, because
+#: a world built with `agent=` was never given a label for it and inventing
+#: one would put a name in a trace row that the caller never wrote.
+SOLO = ""
 
 
 def _f64(buf: bytes) -> list[float]:
@@ -136,6 +219,42 @@ def _refusal_types() -> tuple[type[BaseException], type[BaseException]]:
     return _REFUSAL_TYPES
 
 
+def _cohort(agent: Any, agents: dict[str, Any] | None
+            ) -> tuple[bool, dict[str, Any]]:
+    """The agents a world was built with, as one mapping, in label order.
+
+    Sorted rather than in the order the mapping was written. Label order is
+    the order agents are asked in and the order they execute in, so it is a
+    property of the market; taking it from a dict literal would make the
+    market a property of how the caller typed the call, and two callers
+    naming the same cohort would get two markets.
+    """
+    if (agent is None) == (agents is None):
+        raise ValidationError(
+            "a World takes agent= or agents=, and exactly one of them. "
+            "agent=MyAgent() is one trader with one portfolio; "
+            "agents={'a': A(), 'b': B()} is a cohort in one market, each "
+            "with its own portfolio and its own leverage limit.")
+    if agents is None:
+        return True, {SOLO: agent}
+    if not isinstance(agents, dict):
+        raise ValidationError(
+            f"agents= takes a mapping of label to agent, got "
+            f"{type(agents).__name__}. The label names the agent in the "
+            f"trace, in agree() and in an externality matrix.")
+    if not agents:
+        raise ValidationError(
+            "agents={} builds a world with nobody in it. Name at least one "
+            "agent, or use agent= for the single-agent form.")
+    for key in agents:
+        if not isinstance(key, str) or not key:
+            raise ValidationError(
+                f"agent labels are non-empty strings, got {key!r}. The "
+                f"empty label is the single-agent form's own, so a cohort "
+                f"cannot take it.")
+    return False, {key: agents[key] for key in sorted(agents)}
+
+
 class World:
     """A market, an agent trading it, and the macro path they run under.
 
@@ -162,20 +281,30 @@ class World:
     that step, and carries on; see :meth:`_ask`. Either way the count is in
     the trace and in :meth:`summary` under ``unusable_responses``, kept
     apart from the market-side ``refused`` so a comparison cannot add them.
+
+    ``agents`` is the cohort form, ``{label: agent}``, and exactly one of it
+    and ``agent`` is given. Each label gets its own portfolio against this
+    one engine, on the terms the module docstring sets out. ``cash`` and
+    ``max_leverage`` are per agent, so a three-agent cohort starts with
+    three times the capital of a one-agent world and each of the three is
+    capped on its own book.
     """
 
     __slots__ = ("label", "seed", "universe", "macro", "model", "cash",
                  "max_leverage", "steps_per_day", "ticks_per_step", "start",
-                 "engine", "portfolio", "agent", "trace", "pins",
+                 "engine", "_portfolios", "_agents", "_single", "_frozen",
+                 "trace", "pins",
                  "interventions", "applied", "rejected", "fork_step",
-                 "on_refusal", "_day", "_step", "_adv", "_ran")
+                 "on_refusal", "surgeries", "_expected", "_day", "_step",
+                 "_adv", "_ran")
 
     def __init__(
         self,
         *,
         seed: int,
         universe: Sequence[Instrument],
-        agent: Any,
+        agent: Any = None,
+        agents: dict[str, Any] | None = None,
         pins: dict[str, Any] | None = None,
         macro: Macro | None = None,
         cash: float = 1_000_000.0,
@@ -193,6 +322,8 @@ class World:
         if on_refusal not in ("raise", "skip"):
             raise ValidationError(
                 f"on_refusal must be 'raise' or 'skip', got {on_refusal!r}")
+        self._single, self._agents = _cohort(agent, agents)
+        self._frozen: frozenset[str] = frozenset()
         self.label = label
         self.seed = int(seed)
         self.universe = list(universe)
@@ -216,10 +347,24 @@ class World:
         # above, which is this module's own one-field-at-a-time record.
         self.applied: list[Intervention] = []
         self._ran: Scenario | None = None
-        self.agent = agent
+        #: Every draw surgery made on this world, in order: the kind, the
+        #: day it aims at, the stream and what was installed. Beside
+        #: `interventions` rather than in it, because a surgery is not a
+        #: macro field and a scenario cannot carry one.
+        self.surgeries: list[dict[str, Any]] = []
+        # Surgeries still to be checked, by the day they aim at: after
+        # that day runs, `_verify_surgery` reads the draw log and confirms
+        # each patch landed where it was aimed.
+        self._expected: dict[int, list[tuple]] = {}
         self.engine = Engine(seed=self.seed, universe=self.universe,
                              macro_state=macro, model=model)
-        self.portfolio = Portfolio(cash=self.cash, max_leverage=max_leverage)
+        # One book per label, against the one engine above. `cash` and
+        # `max_leverage` are per agent: a cohort is several traders in one
+        # market, and pooling their capital would make each one's limit a
+        # function of how many others happened to be in the room.
+        self._portfolios: dict[str, Portfolio] = {
+            key: Portfolio(cash=self.cash, max_leverage=max_leverage)
+            for key in self._agents}
         self.trace: list[dict[str, Any]] = []
         self.rejected: list[str] = []
         # The step this world was forked at, or None for a root. It is
@@ -240,6 +385,96 @@ class World:
         #: clip that exists to keep an order realistic was sized against a
         #: market that no longer existed.
         self._adv = [instrument.avg_volume for instrument in self.universe]
+
+    # -- who is in this world ---------------------------------------------
+
+    @property
+    def is_cohort(self) -> bool:
+        """True when this world was built with ``agents=``."""
+        return not self._single
+
+    @property
+    def agents(self) -> dict[str, Any]:
+        """Every agent here, keyed by label, in the order they are asked in.
+
+        A world built with ``agent=`` returns that one agent under the empty
+        label, because the single-agent form is a one-element cohort. The
+        mapping is a copy and the agents in it are the live ones.
+        """
+        return dict(self._agents)
+
+    @property
+    def portfolios(self) -> dict[str, Portfolio]:
+        """Every portfolio here, keyed by the label of the agent it belongs
+        to. A copy of the mapping, holding the live portfolios."""
+        return dict(self._portfolios)
+
+    @property
+    def frozen(self) -> tuple[str, ...]:
+        """The labels that send no orders, from :meth:`without`.
+
+        A frozen agent is asked nothing and executes nothing. It keeps the
+        positions it held when it was frozen and they go on being marked to
+        this world's market, so its net worth still moves.
+        """
+        return tuple(label for label in self._agents
+                     if label in self._frozen)
+
+    @property
+    def agent(self) -> Any:
+        """The one agent, on a world built with ``agent=``."""
+        return self._agents[self._solo("agent")]
+
+    @agent.setter
+    def agent(self, value: Any) -> None:
+        self._agents[self._solo("agent")] = value
+
+    @property
+    def portfolio(self) -> Portfolio:
+        """The one portfolio, on a world built with ``agent=``."""
+        return self._portfolios[self._solo("portfolio")]
+
+    @portfolio.setter
+    def portfolio(self, value: Portfolio) -> None:
+        self._portfolios[self._solo("portfolio")] = value
+
+    def _solo(self, field: str) -> str:
+        """The single-agent label, or a message naming the cohort's labels."""
+        if self._single:
+            return SOLO
+        plural = {"agent": "agents", "portfolio": "portfolios"}[field]
+        first = next(iter(self._agents))
+        raise ValidationError(
+            f"this world holds {len(self._agents)} agents "
+            f"({', '.join(self._agents)}), so .{field} names none of them. "
+            f"Read .{plural}[label], as in "
+            f"world.{plural}[{first!r}].")
+
+    def _label_for(self, agent: str | None, what: str) -> str:
+        """The label a per-agent call is about, or why the call is ambiguous.
+
+        `summary` and `compare` each report one agent's numbers. On a cohort
+        the caller says which, because a table headed with one agent's P&L
+        and filled with another's is the failure this refuses to have.
+        """
+        if agent is None:
+            if self._single:
+                return SOLO
+            first = next(iter(self._agents))
+            raise ValidationError(
+                f"{what}() reports one agent's numbers and this world holds "
+                f"{len(self._agents)} ({', '.join(self._agents)}). Name the "
+                f"one it is about: {what}(agent={first!r}).")
+        if self._single:
+            raise ValidationError(
+                f"{what}(agent={agent!r}) names a label and this world holds "
+                f"one agent built with agent=, which carries no label. Drop "
+                f"agent=, or build the world with agents={{{agent!r}: ...}}.")
+        if agent not in self._agents:
+            raise ValidationError(
+                f"no agent is labelled {agent!r} here; this world holds "
+                f"{', '.join(self._agents)}.")
+        return agent
 
     # -- identity ---------------------------------------------------------
 
@@ -292,18 +527,33 @@ class World:
 
     # -- running ----------------------------------------------------------
 
-    def run(self, days: int = 1) -> "World":
+    def run(self, days: int = 1, *, record: bool = False,
+            ledger: Any = None) -> "World":
         """Advance ``days`` whole days, agent trading, and record every step.
 
         Whole days only. A world stopped mid-day could not be forked safely,
         and offering a half-day advance would mean offering the fork that goes
         with it. See the module docstring.
 
+        ``record`` also records each day on the engine before its close,
+        the way :func:`tradefloor.facts.measure` does, so ``engine.bars``
+        and ``engine.truth`` carry the run and
+        :func:`tradefloor.facts.panel_statistics` can read it. Off by default:
+        a record is an entry in the order log, and a world that recorded
+        would checkpoint and replay differently from one that did not.
+        Nothing about the market moves either way.
+
         The loop is the one :func:`tradefloor.evaluate` runs, deliberately:
         the same clock, the same order of observe-execute-settle, and the
         same feedback of the agent's own flow into the next session. A
         counterfactual run that stepped the market differently from the
         library's own evaluation would be measuring a second engine.
+
+        ``ledger`` is an optional :class:`tradefloor.DayLedger`, handed the
+        state hash after every close. It is an argument here rather than a
+        field on the world, because :meth:`fork` produces two worlds and one
+        ledger shared between them would interleave the arms into a single
+        list of leaves that describes neither.
         """
         if days < 0:
             raise ValidationError(f"days cannot be negative, got {days}")
@@ -333,65 +583,152 @@ class World:
 
             for _ in range(self.steps_per_day):
                 prices = _f64(self.engine.prices())
-                obs = Observation(self._step, day, tickers, prices,
-                                  self.portfolio, self.engine, self._adv,
-                                  self.steps_per_day)
-                self.portfolio.stamp(
-                    day, self._step,
-                    (self._step % self.steps_per_day) * self.ticks_per_step)
+                tick = ((self._step % self.steps_per_day)
+                        * self.ticks_per_step)
+                # Every agent is shown the same cross-section and the same
+                # book, each over its own portfolio, and all of them are
+                # asked before any of them executes. That is what makes a
+                # cohort simultaneous within a step: they see each other's
+                # impact from the sessions already run and never each
+                # other's orders from this one.
+                observed: dict[str, Observation] = {}
+                for label, portfolio in self._portfolios.items():
+                    observed[label] = Observation(
+                        self._step, day, tickers, prices, portfolio,
+                        self.engine, self._adv, self.steps_per_day)
+                    portfolio.stamp(day, self._step, tick)
 
-                orders, unusable = self._ask(obs)
-                # No decision on a refused step. The adapter's last
-                # decision is still the one BEFORE this step, and reading
-                # it here would put a decision the agent did not take into
-                # the row that records it not taking one -- and `compare`
-                # finds the divergence step by comparing exactly this
-                # field.
-                decision = None if unusable else self._decision()
-                fills, refused = self._execute(orders, tickers)
+                asked = {label: self._ask_agent(label, obs)
+                         for label, obs in observed.items()}
+                # Execution in label order, against the one book. The order
+                # fixes which agent's rejection is written first and nothing
+                # about price: `sweep_cost` reads the ladder and removes
+                # nothing, so both agents meet the same levels and fill at
+                # the same price. See the module docstring.
+                done = {label: self._execute(asked[label][0], tickers, label)
+                        for label in self._agents}
 
                 self.engine.run_session(
                     *session_clock((hour, minute, day_of_week),
                                    self._step % self.steps_per_day,
                                    self.ticks_per_step),
                     self.ticks_per_step,
-                    order_flow=self.portfolio.pending_flow())
-                self.portfolio.clear_flow()
+                    order_flow=self._merged_flow())
+                for portfolio in self._portfolios.values():
+                    portfolio.clear_flow()
 
-                self.trace.append({
-                    "step": self._step,
-                    "day": day,
-                    "step_of_day": self._step % self.steps_per_day,
-                    "macro": macro,
-                    "decision": decision,
-                    "orders": {t: q for t, q in orders.items() if q},
-                    "fills": fills,
-                    "refused": refused,
-                    # Market-side above, agent-side here, and they are two
-                    # different failures: `refused` is an order this market
-                    # would not take, `unusable` is output that was never an
-                    # order. One column covering both would read an agent
-                    # that cannot format an answer as an illiquid market.
-                    "unusable": unusable,
-                    # End of step: what this step's session produced. The
-                    # orders above are what opened it. Both in one row, so a
-                    # divergence can be attributed to a decision or to the
-                    # market that answered it.
-                    "prices": _f64(self.engine.prices()),
-                    "cash": self.portfolio.cash,
-                    "net_worth": self.portfolio.net_worth(self.engine),
-                    "exposure": self.portfolio.leverage(self.engine),
-                    "positions": {t: p.quantity
-                                  for t, p in sorted(
-                                      self.portfolio.positions.items())},
-                })
+                self.trace.append(self._row(day, macro, asked, done))
                 self._step += 1
 
+            if record:
+                self.engine.record(day)
             self.engine.close_market()
+            self._verify_surgery(day)
+            if ledger is not None:
+                ledger.close(self.engine)
             self._day += 1
         return self
 
-    def _ask(self, obs: "Observation") -> tuple[dict[str, float], str | None]:
+    def _row(self, day: int, macro: dict[str, Any], asked: dict, done: dict
+             ) -> dict[str, Any]:
+        """One trace row, in whichever of the two shapes this world has.
+
+        A single-agent row carries the per-agent fields at the top level, in
+        the order and under the names it has always used, because those rows
+        are pinned. A cohort row carries the shared fields and an `agents`
+        map keyed by label, since there is no single decision, order set or
+        net worth for a step in which three agents traded.
+        """
+        # End of step: what this step's session produced. The orders below
+        # are what opened it. Both in one row, so a divergence can be
+        # attributed to a decision or to the market that answered it.
+        prices = _f64(self.engine.prices())
+        row: dict[str, Any] = {
+            "step": self._step,
+            "day": day,
+            "step_of_day": self._step % self.steps_per_day,
+            "macro": macro,
+        }
+        if not self._single:
+            row["prices"] = prices
+            row["agents"] = {label: self._fields(label, asked, done)
+                             for label in self._agents}
+            return row
+        fields = self._fields(SOLO, asked, done)
+        for name in ("decision", "orders", "fills", "refused", "unusable"):
+            row[name] = fields[name]
+        row["prices"] = prices
+        for name in ("cash", "net_worth", "exposure", "positions"):
+            row[name] = fields[name]
+        return row
+
+    def _fields(self, label: str, asked: dict, done: dict) -> dict[str, Any]:
+        """One agent's half of a trace row."""
+        orders, unusable, decision = asked[label]
+        fills, refused = done[label]
+        portfolio = self._portfolios[label]
+        return {
+            "decision": decision,
+            "orders": {t: q for t, q in orders.items() if q},
+            "fills": fills,
+            "refused": refused,
+            # Market-side above, agent-side here, and they are two
+            # different failures: `refused` is an order this market would
+            # not take, `unusable` is output that was never an order. One
+            # column covering both would read an agent that cannot format
+            # an answer as an illiquid market.
+            "unusable": unusable,
+            "cash": portfolio.cash,
+            "net_worth": portfolio.net_worth(self.engine),
+            "exposure": portfolio.leverage(self.engine),
+            "positions": {t: p.quantity
+                          for t, p in sorted(portfolio.positions.items())},
+        }
+
+    def _merged_flow(self) -> dict[str, tuple[float, float]]:
+        """Every portfolio's pending flow, summed per ticker.
+
+        One `order_flow` argument reaches the session, so a cohort's
+        footprint is what the market sees rather than one agent's. The sum
+        runs in label order, which fixes the order the floats are added in.
+
+        A one-portfolio world passes its own mapping straight through, so
+        the bytes the engine is handed are the bytes it was handed before
+        this method existed.
+        """
+        if len(self._portfolios) == 1:
+            return next(iter(self._portfolios.values())).pending_flow()
+        merged: dict[str, tuple[float, float]] = {}
+        for label in self._agents:
+            for ticker, (buy, sell) in (
+                    self._portfolios[label].pending_flow().items()):
+                have = merged.get(ticker)
+                merged[ticker] = ((buy, sell) if have is None
+                                  else (have[0] + buy, have[1] + sell))
+        return merged
+
+    def _ask_agent(self, label: str, obs: "Observation"
+                   ) -> tuple[dict[str, float], str | None, Any]:
+        """One agent's orders, its refusal if it gave one, and its decision.
+
+        A frozen agent is not called at all. `without` freezes it to remove
+        it from the market, and calling `act` and discarding the answer
+        would still spend whatever the call costs and still advance
+        whatever state the agent keeps.
+        """
+        if label in self._frozen:
+            return {}, None, None
+        agent = self._agents[label]
+        orders, unusable = self._ask(agent, obs)
+        # No decision on a refused step. The adapter's last decision is
+        # still the one BEFORE this step, and reading it here would put a
+        # decision the agent did not take into the row that records it not
+        # taking one -- and `compare` finds the divergence step by
+        # comparing exactly this field.
+        return orders, unusable, (None if unusable else self._decision(agent))
+
+    def _ask(self, agent: Any,
+             obs: "Observation") -> tuple[dict[str, float], str | None]:
         """The agent's orders for this step, and its refusal if it gave one.
 
         Under ``on_refusal="raise"`` -- the default, and what this module
@@ -427,22 +764,22 @@ class World:
         refusals each, and produced an empty series.
         """
         if self.on_refusal == "raise":
-            return self.agent.act(obs) or {}, None
+            return agent.act(obs) or {}, None
         refusal, miss = _refusal_types()
         try:
-            return self.agent.act(obs) or {}, None
+            return agent.act(obs) or {}, None
         except miss:
             raise
         except refusal as exc:
             return {}, f"{type(exc).__name__}: {exc}"
 
-    def _decision(self) -> Any:
+    def _decision(self, agent: Any) -> Any:
         """Whatever the agent chose to publish about its last decision."""
-        hook = getattr(self.agent, "decision", None)
+        hook = getattr(agent, "decision", None)
         return hook() if callable(hook) else None
 
-    def _execute(self, orders: dict[str, float],
-                 tickers: Sequence[str]) -> tuple[list[dict], list[str]]:
+    def _execute(self, orders: dict[str, float], tickers: Sequence[str],
+                 label: str = SOLO) -> tuple[list[dict], list[str]]:
         """Send the agent's orders, recording each fill against its arrival mid.
 
         The mid is read BEFORE the sweep, which makes the recorded
@@ -456,16 +793,22 @@ class World:
         """
         fills: list[dict] = []
         refused: list[str] = []
+        portfolio = self._portfolios[label]
+        # The world-level list names the agent on a cohort and reads as it
+        # always did on a single-agent world, where there is one agent for
+        # a label to point at.
+        where = f"step {self._step}" if self._single \
+            else f"step {self._step} {label}"
         for ticker, quantity in orders.items():
             if not quantity:
                 continue
             book = self.engine.book(ticker)
             mid = book.mid_price
             try:
-                fill = self.portfolio.execute(self.engine, ticker, quantity)
+                fill = portfolio.execute(self.engine, ticker, quantity)
             except (OrderError, ValidationError) as exc:
                 refused.append(f"{ticker}: {exc}")
-                self.rejected.append(f"step {self._step} {ticker}: {exc}")
+                self.rejected.append(f"{where} {ticker}: {exc}")
                 continue
             fills.append({
                 "ticker": fill["ticker"],
@@ -630,6 +973,9 @@ class World:
         copies correctly either way; one holding a client, a socket or a file
         handle needs to say what a copy of it means, and the hook is where it
         says so.
+
+        A cohort forks whole: every agent and every portfolio is copied,
+        under the labels they had, and the arms carry the same frozen set.
         """
         if len(labels) < 1:
             raise ValidationError("fork needs at least one label")
@@ -643,8 +989,12 @@ class World:
                          seed=self.seed, macro=self.macro)
         out: list[World] = []
         for label, engine in zip(labels, engines):
+            copies = {key: self._fork_agent(agent)
+                      for key, agent in self._agents.items()}
             child = World(seed=self.seed, universe=self.universe,
-                          agent=self._fork_agent(), pins=self.pins,
+                          agent=copies[SOLO] if self._single else None,
+                          agents=None if self._single else copies,
+                          pins=self.pins,
                           macro=self.macro, cash=self.cash,
                           max_leverage=self.max_leverage,
                           steps_per_day=self.steps_per_day,
@@ -657,7 +1007,9 @@ class World:
                           # column would be the only one anybody read.
                           on_refusal=self.on_refusal)
             child.engine = engine
-            child.portfolio = copy.deepcopy(self.portfolio)
+            child._portfolios = {key: copy.deepcopy(book)
+                                 for key, book in self._portfolios.items()}
+            child._frozen = self._frozen
             child.trace = copy.deepcopy(self.trace)
             child.rejected = list(self.rejected)
             child.interventions = copy.deepcopy(self.interventions)
@@ -665,15 +1017,51 @@ class World:
             # copied and its contents shared safely. Each arm may then
             # `apply` a scenario of its own on top.
             child.applied = list(self.applied)
+            # The engine copy carries the overlay; the record and the
+            # checks still owed travel with it.
+            child.surgeries = copy.deepcopy(self.surgeries)
+            child._expected = copy.deepcopy(self._expected)
             child._day = self._day
             child._step = self._step
             child.fork_step = self._step
             out.append(child)
         return out
 
-    def _fork_agent(self) -> Any:
-        hook = getattr(self.agent, "fork", None)
-        return hook() if callable(hook) else copy.deepcopy(self.agent)
+    def _fork_agent(self, agent: Any) -> Any:
+        hook = getattr(agent, "fork", None)
+        return hook() if callable(hook) else copy.deepcopy(agent)
+
+    def without(self, label: str) -> "World":
+        """A fork in which ``label`` sends no orders from this day on.
+
+        The removal an externality matrix measures. The named agent is asked
+        nothing and executes nothing in the arm this returns; it keeps the
+        positions it held at the fork and they go on being marked to the
+        arm's own market, so its net worth still moves with prices it no
+        longer influences.
+
+        Removal is inaction from the fork day on rather than a world the
+        agent never traded in. The shared history stands in both arms, which
+        is what makes them comparable at all: a world where the agent had
+        never existed would differ from day zero and there would be no fork
+        to measure from.
+        """
+        if self._single:
+            raise ValidationError(
+                "without() takes one agent out of a cohort and this world "
+                "holds one agent built with agent=. Build it with "
+                "agents={label: agent} to have a cohort to remove from.")
+        if label not in self._agents:
+            raise ValidationError(
+                f"no agent is labelled {label!r} here; this world holds "
+                f"{', '.join(self._agents)}.")
+        (child,) = self.fork(f"without {label}")
+        child._frozen = self._frozen | {label}
+        return child
+
+    def remove(self, label: str) -> "World":
+        """Alias of :meth:`without`."""
+        return self.without(label)
 
     def _refuse_open_market(self, what: str) -> None:
         """Refuse to fork or checkpoint a world whose day is half-finished.
@@ -693,6 +1081,323 @@ class World:
                 "accumulators, and a fork taken there restores a market that "
                 "looks correct and diverges from its parent tomorrow. Close "
                 "the day first.")
+
+    # -- draw surgery -----------------------------------------------------
+
+    def trace_draws(self, stream: str, from_day: int, to_day: int) -> "World":
+        """Record what ``stream`` delivers on days ``from_day..to_day``.
+
+        Opt-in, because the market stream takes several hundred draws per
+        tick at a hundred names and a log of a whole run is the size of the
+        tape. Read it back with :meth:`draws`. A transplant reads the
+        SOURCE world's log, so a source is traced before it runs the days
+        to be copied. Named as the engine method it wraps; ``trace`` is the
+        world's step record.
+        """
+        self.engine.trace_draws(stream, int(from_day), int(to_day))
+        return self
+
+    def draws(self, stream: str, from_day: int,
+              to_day: int) -> list[_noise.LoggedDraw]:
+        """The draws ``stream`` delivered on those days, where traced."""
+        return _noise.draw_log(self.engine, stream, int(from_day),
+                               int(to_day))
+
+    def point(self, address: Any, value: float) -> "World":
+        """Replace one draw: what the consumer at ``address`` receives.
+
+        The generator still advances at that address, so every other draw
+        of every stream is where it was. The address must lie ahead of the
+        stream's position; a draw already taken cannot be replaced, and
+        asking is refused rather than the patch being kept for nothing.
+
+        A point surgery names an address, not a day, so it does not get
+        the check after its day that the other surgeries do. Use
+        :meth:`unfire`, :meth:`window` or :meth:`transplant` when the day
+        is the point.
+        """
+        self._refuse_open_market("point")
+        address = _noise.DrawAddress(*address).check()
+        self._refuse_passed(address)
+        _noise.patch_draws(self.engine, [_noise.Patch(address, float(value))])
+        self.surgeries.append({
+            "kind": "point", "day": self._day, "step": self._step,
+            "stream": address.stream, "address": tuple(address),
+            "value": float(value)})
+        return self
+
+    def unfire(self, day: int) -> "World":
+        """Stop the market jump of ``day`` from firing, and nothing else.
+
+        # The comparison, and the value
+
+        ``Engine::apply_jumps`` runs at the close of every day. It takes
+        one uniform ``u`` on the jumps stream, then one normal, and the
+        market jump fires when ``u < intensity``, where ``intensity`` is
+        ``jump_intensity_market`` scaled by the VIX coupling. ``u`` lies
+        in ``[0, 1)``. The value installed is ``1.0``: never below an
+        intensity of at most one, which is what a daily probability is.
+        The normal is still drawn, so the company jumps that follow, and
+        every later day, are exactly where they were. That is what makes
+        the unfired arm a control for the jump: ``draws_by_stream`` is
+        identical and every price up to and including the close of
+        ``day`` is identical, because the jump lands at that close and is
+        first seen at the next open.
+
+        What it cannot do: stop an intensity above one. A market whose
+        daily intensity exceeds one fires every day by construction, and
+        ``1.0`` is below it too. No shipped preset sets one.
+
+        # The address
+
+        The jumps stream takes one uniform for the market and one per
+        ACTIVE company each day, the market's first, so the market uniform
+        of ``day`` sits at the stream's current uniform position plus that
+        many per day until then. The count moves with the active set, and
+        both directions were measured: a ten-name roster took 11 uniforms
+        and 11 normals on a day, and 10 of each on the day after
+        ``delist(0)``. A listing moves it the same way.
+
+        So the arithmetic assumes the active set does not change between
+        the surgery and the day, and the check after ``day`` runs is what
+        holds that assumption to account: the draw log must show the
+        patched address at the market jump site on that day, with the value
+        that was installed, and a schedule that moved raises rather than
+        reporting a surgery that landed on a company.
+
+        # Whether the jump would have fired
+
+        The record carries ``intensity``, which the ENGINE reports for
+        its own dials and its current VIX, and ``fires``. An
+        intensity of zero makes ``u < intensity`` false for every ``u`` in
+        ``[0, 1)``, so the jump cannot fire and ``fires`` is ``False``: the
+        surgery is a no-op and the record says so, rather than leaving an
+        unfired arm that is identical to its control and silent about why.
+        An intensity of one or more fires on every day, so ``fires`` is
+        ``True``. Between the two the draw decides it, ``fires`` is
+        ``None``, and the control arm is what shows it.
+
+        ``intensity`` is read when ``unfire`` is called. Where the VIX
+        coupling is on it moves with the VIX, so for a day that has not run
+        it is the intensity of today rather than of ``day``, and only the
+        zero case is exact for both, since a zero intensity stays zero
+        whatever the VIX does.
+
+        # What it cannot stop, and says
+
+        ``stoppable`` is false above an intensity of one. The value
+        installed is ``1.0`` and the engine fires on ``u < intensity``, so
+        at an intensity above one the installed value is itself under the
+        threshold: the jump fires in the surgery's arm as well and the arm
+        comes back identical to its control. Reported rather than left as
+        a record saying ``fires`` with nothing to show for it. No shipped
+        preset sets an intensity above one.
+        """
+        self._refuse_open_market("unfire")
+        day = int(day)
+        if day < self._day:
+            raise ValidationError(
+                f"day {day} has run; this world is on day {self._day}. A "
+                "draw already taken cannot be replaced, so unfire names a "
+                "day from today on.")
+        address = self._jump_address(day)
+        _noise.patch_draws(self.engine,
+                           [_noise.Patch(address, _noise.NO_FIRE)])
+        self.engine.trace_draws("jumps", day, day)
+        self._expect(day, address, _noise.NO_FIRE, "jump_market_u")
+        # Asked of the engine, not restated here. A Python copy of the
+        # scaling diverged from the engine on a zero anchor, and the test
+        # that guarded it wrote the formula a third time and compared two
+        # Python copies.
+        intensity = float(self.engine.market_jump_intensity())
+        fires: bool | None
+        if intensity <= 0.0:
+            fires = False
+        elif intensity >= 1.0:
+            fires = True
+        else:
+            fires = None
+        # The value installed is 1.0 and the engine fires on `u < intensity`,
+        # so above an intensity of one the installed value is itself under
+        # the threshold and the jump fires in the surgery's arm too.
+        stoppable = intensity <= 1.0
+        self.surgeries.append({
+            "kind": "unfire", "day": day, "step": day * self.steps_per_day,
+            "stream": "jumps", "address": tuple(address),
+            "value": _noise.NO_FIRE,
+            "intensity": intensity, "fires": fires,
+            "stoppable": stoppable})
+        return self
+
+    def window(self, stream: str, days: Any, surgery_seed: int) -> "World":
+        """Re-randomise ``stream`` over ``days`` under a surgery generator.
+
+        ``days`` is ``(first, last)`` inclusive, or one day. Every draw the
+        stream takes on those days is replaced by the next draw of a
+        generator derived from this world's seed, the stream and
+        ``surgery_seed`` per the surgery derivation contract in
+        ``rust/src/rng.rs`` (``GameRng::surgery``), which a golden test
+        pins. The same ``surgery_seed`` on the same world reproduces the
+        window; a different one is a different window; every other stream
+        delivers exactly what it did.
+
+        # How the addresses are found
+
+        The engine is forked and the fork runs the days to ``last`` with
+        the stream traced and nothing else: no agent orders and no macro
+        pins. The market, news, jumps and volume streams take a number of
+        draws per day fixed by the roster and the tick count, so their
+        addresses on those days are the fork's. The economy chain's count
+        depends on its own state, so a window on it can be aimed a draw
+        wide by the surgery itself; the check after each day of the
+        window confirms every patched address was drawn on the day it was
+        aimed at, and raises if the schedule moved.
+
+        The fork costs one run of the days to ``last`` and, for the market
+        stream, a log the size of the tape over the window.
+        """
+        self._refuse_open_market("window")
+        first, last = _days(days)
+        self._refuse_past(first, "window")
+        stream = _noise.DrawAddress(stream, "uniform", 0).check().stream
+        probe, = self.engine.fork(1)
+        probe.trace_draws(stream, first, last)
+        hour, minute, day_of_week = self.start
+        probe.run_days(last - self._day + 1, hour=hour, minute=minute,
+                       day_of_week=day_of_week,
+                       ticks_per_day=self.steps_per_day * self.ticks_per_step,
+                       volatility=1.0, record=False, first_day=self._day)
+        logged = _noise.draw_log(probe, stream, first, last)
+        if not logged:
+            raise ValidationError(
+                f"{stream} takes no draws on days {first}..{last}, so there "
+                "is nothing to re-randomise.")
+        patches = _noise.surgery_patches(
+            self.seed, stream, surgery_seed, [e.address for e in logged])
+        _noise.patch_draws(self.engine, patches)
+        self.engine.trace_draws(stream, first, last)
+        for entry, item in zip(logged, patches):
+            self._expect(entry.day, item.address, item.value, None)
+        self.surgeries.append({
+            "kind": "window", "day": first,
+            "step": first * self.steps_per_day, "stream": stream,
+            "days": (first, last), "surgery_seed": int(surgery_seed),
+            "draws": len(patches)})
+        return self
+
+    def transplant(self, source: "World", stream: str, days: Any) -> "World":
+        """Copy ``source``'s draws of ``stream`` on ``days`` into this world.
+
+        Address for address: what ``source`` received at each address the
+        stream took on those days, this world receives at the same
+        address. The source must have been traced on those days before it
+        ran them (:meth:`trace_draws`); an untraced source has no record to copy
+        and the call says so rather than running it again.
+
+        The addresses are the source's. On a world with the same roster
+        and tick count they name the same draws of the same days, and the
+        check after each day confirms it. A source with a different roster
+        size is refused up front: its schedule puts the same address on a
+        different day, which is a different experiment. Two worlds of
+        different seeds may transplant between them; the address then
+        names a position in the schedule rather than a draw of the same
+        generator, and the record carries the source's seed and label.
+        """
+        self._refuse_open_market("transplant")
+        first, last = _days(days)
+        self._refuse_past(first, "transplant")
+        if len(source.universe) != len(self.universe):
+            raise ValidationError(
+                f"{source.label or 'the source'} lists "
+                f"{len(source.universe)} instruments and this world "
+                f"{len(self.universe)}, so the same address falls on "
+                "different days in the two schedules.")
+        logged = source.draws(stream, first, last)
+        if not logged:
+            raise ValidationError(
+                f"{source.label or 'the source'} has no draw log for "
+                f"{stream} on days {first}..{last}. Trace the source before "
+                f"it runs those days: source.trace_draws({stream!r}, {first}, "
+                f"{last}).")
+        patches = [_noise.Patch(e.address, e.value) for e in logged]
+        for item in patches:
+            self._refuse_passed(item.address)
+        _noise.patch_draws(self.engine, patches)
+        self.engine.trace_draws(stream, first, last)
+        for entry in logged:
+            self._expect(entry.day, entry.address, entry.value, None)
+        self.surgeries.append({
+            "kind": "transplant", "day": first,
+            "step": first * self.steps_per_day, "stream": stream,
+            "days": (first, last), "source": source.label,
+            "source_seed": source.seed, "draws": len(patches)})
+        return self
+
+    def _jump_address(self, day: int) -> _noise.DrawAddress:
+        uniforms, _ = self.engine.stream_positions()["jumps"]
+        per_day = 1 + len(self.engine.tickers)
+        return _noise.DrawAddress("jumps", "uniform",
+                                  uniforms + (day - self._day) * per_day)
+
+    def _refuse_past(self, first: int, what: str) -> None:
+        if first < self._day:
+            raise ValidationError(
+                f"day {first} has run; this world is on day {self._day}. A "
+                f"draw already taken cannot be replaced, so a {what} starts "
+                "today or later.")
+
+    def _refuse_passed(self, address: _noise.DrawAddress) -> None:
+        uniforms, normals = self.engine.stream_positions()[address.stream]
+        position = uniforms if address.kind == "uniform" else normals
+        if address.index < position:
+            raise ValidationError(
+                f"{address.stream} {address.kind} {address.index} has been "
+                f"drawn; the stream is at {position}. A draw already taken "
+                "cannot be replaced.")
+
+    def _expect(self, day: int, address: _noise.DrawAddress, value: float,
+                site: str | None) -> None:
+        self._expected.setdefault(int(day), []).append((address, value, site))
+
+    def _verify_surgery(self, day: int) -> None:
+        """Confirm every surgery aimed at ``day`` landed where it was aimed.
+
+        Read from the draw log after the day ran. A patch is keyed by an
+        address, and an address is a count, so anything that changes how
+        many draws a day takes between the surgery and the day moves
+        where the patch lands. The log says where it did land, and a
+        surgery that landed elsewhere is an error here rather than a
+        result somewhere else.
+        """
+        expected = self._expected.pop(day, None)
+        if not expected:
+            return
+        logs: dict[str, dict] = {}
+        for address, value, site in expected:
+            if address.stream not in logs:
+                logs[address.stream] = {
+                    e.address: e for e in self.draws(address.stream, day, day)}
+            entry = logs[address.stream].get(address)
+            where = (f"{address.stream} {address.kind} {address.index} on "
+                     f"day {day}")
+            if entry is None:
+                raise ValidationError(
+                    f"the surgery aimed at {where} did not land: that address "
+                    f"was not drawn on day {day}. The schedule moved between "
+                    "the surgery and the day, which a listing does; the "
+                    "patch is still installed and lands wherever the "
+                    "address is drawn.")
+            if site is not None and entry.site != site:
+                raise ValidationError(
+                    f"the surgery aimed at {where} landed on {entry.site} "
+                    f"(company {entry.tag}) rather than {site}. The schedule "
+                    "moved between the surgery and the day, which a listing "
+                    "does.")
+            if entry.value != value:
+                raise ValidationError(
+                    f"the surgery aimed at {where} delivered {entry.value!r} "
+                    f"rather than {value!r}: the overlay in place is not the "
+                    "one installed.")
 
     # -- reporting --------------------------------------------------------
 
@@ -739,10 +1444,14 @@ class World:
                        universe=self.universe, macro=self.macro,
                        model=self.model)
 
-    def net_worth(self) -> float:
-        return self.portfolio.net_worth(self.engine)
+    def net_worth(self, *, agent: str | None = None) -> float:
+        """One agent's cash plus marked positions. ``agent`` names which on
+        a cohort and is left out on a single-agent world."""
+        return self._portfolios[
+            self._label_for(agent, "net_worth")].net_worth(self.engine)
 
-    def summary(self, *, since: int | None = None) -> dict[str, Any]:
+    def summary(self, *, since: int | None = None,
+                agent: str | None = None) -> dict[str, Any]:
         """The numbers a comparison quotes for one arm.
 
         Behaviour first, P&L last, in the order the module argues they should
@@ -758,22 +1467,31 @@ class World:
         measured from the starting capital, because neither is a windowed
         quantity. ``pnl_since`` is the windowed one, and for a forked arm it
         is the number the experiment is actually about.
+
+        ``agent`` names which agent on a cohort, where every number here
+        belongs to one of them, and is left out on a single-agent world. A
+        cohort summary carries the label back under ``agent``.
         """
+        label = self._label_for(agent, "summary")
+        portfolio = self._portfolios[label]
         start = self.fork_step if since is None else since
         start = 0 if start is None else max(0, min(start, len(self.trace)))
-        window = self.trace[start:]
+        window = [_fields_of(row, label) for row in self.trace[start:]]
         fills = [f for row in window for f in row["fills"]]
         turnover = sum(abs(f["notional"]) for f in fills)
         cost = _execution_cost(fills)
 
-        base = self.trace[start - 1]["net_worth"] if start > 0 else self.cash
+        base = (_fields_of(self.trace[start - 1], label)["net_worth"]
+                if start > 0 else self.cash)
         peak, drawdown = base, 0.0
         for row in window:
             peak = max(peak, row["net_worth"])
             if peak > 0:
                 drawdown = max(drawdown, (peak - row["net_worth"]) / peak)
 
-        return {
+        last = _fields_of(self.trace[-1], label) if self.trace else None
+        worth = portfolio.net_worth(self.engine)
+        out = {
             "label": self.label,
             "days": self._day,
             "steps": self._step,
@@ -789,26 +1507,61 @@ class World:
             "execution_cost": cost,
             "execution_cost_bps": (cost / turnover * 10_000
                                    if turnover else 0.0),
-            "exposure": self.trace[-1]["exposure"] if self.trace else 0.0,
-            "cash": self.portfolio.cash,
-            "positions": (dict(self.trace[-1]["positions"])
-                          if self.trace else {}),
-            "final_net_worth": self.net_worth(),
+            "exposure": last["exposure"] if last else 0.0,
+            "cash": portfolio.cash,
+            "positions": dict(last["positions"]) if last else {},
+            "final_net_worth": worth,
             "value_at_start": base,
-            "pnl": self.net_worth() - self.cash,
-            "return_pct": (self.net_worth() - self.cash) / self.cash * 100.0,
-            "pnl_since": self.net_worth() - base,
-            "return_since_pct": ((self.net_worth() - base) / base * 100.0
+            "pnl": worth - self.cash,
+            "return_pct": (worth - self.cash) / self.cash * 100.0,
+            "pnl_since": worth - base,
+            "return_since_pct": ((worth - base) / base * 100.0
                                  if base else 0.0),
             "max_drawdown_pct": drawdown * 100.0,
             "market_digest": self.digest(),
             "model_fingerprint": self.engine.model_fingerprint,
             "interventions": copy.deepcopy(self.interventions),
         }
+        if not self._single:
+            # Only on a cohort. A single-agent summary keeps the keys it
+            # has always had, and those are pinned.
+            out["agent"] = label
+            out["frozen"] = label in self._frozen
+        return out
 
     def __repr__(self) -> str:
+        who = ("" if self._single
+               else f", agents={', '.join(self._agents)}")
         return (f"World({self.label!r}, seed={self.seed}, day={self._day}, "
-                f"step={self._step}, {len(self.universe)} instruments)")
+                f"step={self._step}, {len(self.universe)} instruments"
+                f"{who})")
+
+
+def _fields_of(row: dict[str, Any], label: str) -> dict[str, Any]:
+    """The per-agent half of a trace row, whichever shape the row has.
+
+    A single-agent row carries those fields at the top level and a cohort
+    row carries them under ``agents[label]``. Every reader goes through
+    here, so the shape is known in one place rather than at each of the
+    seven sites that read a row.
+    """
+    agents = row.get("agents")
+    return row if agents is None else agents[label]
+
+
+def _days(days: Any) -> tuple[int, int]:
+    """``(first, last)`` inclusive from one day or a pair."""
+    if isinstance(days, int):
+        return days, days
+    try:
+        first, last = (int(d) for d in days)
+    except (TypeError, ValueError):
+        raise ValidationError(
+            f"days is one day or a (first, last) pair, got {days!r}")
+    if last < first:
+        raise ValidationError(
+            f"days runs backwards: ({first}, {last})")
+    return first, last
 
 
 def _execution_cost(fills: Sequence[dict]) -> float:
@@ -903,12 +1656,20 @@ def agree(a: World, b: World) -> Agreement:
     not come back identical the experiment has no control, and every number
     downstream of it is describing two different markets.
 
-    Nine checks, every one read back off the two objects. The engine state
+    Nine checks between two single-agent worlds, and seven plus two per
+    label between two cohorts, every one of them read back off the two
+    objects. The engine state
     snapshot subsumes several of the others on its own -- it carries every
     column, the generator position, the per-day accumulators, the macro chain
     and the central bank -- but they are listed beside it rather than folded
     into it, because a reader checking that a portfolio survived a fork should
     not have to know that a dict of eighteen columns implies it.
+
+    A draw surgery is engine state. The snapshot carries the overlay a
+    surgery installs, so after one the ``whole engine state`` row reads
+    DIFFERENT while ``generator state`` reads identical: the generators
+    are where they were, and what a consumer will receive is not. Take the
+    agreement at the fork, before the surgery, as for an intervention.
 
     What is NOT here, and why. ``draws_consumed`` and ``order_log`` are both
     zero and empty on a freshly branched engine -- :func:`tradefloor.branch`
@@ -916,13 +1677,19 @@ def agree(a: World, b: World) -> Agreement:
     nor the log is part of that state. Comparing them across two branches
     would pass every time, on nothing. The generator POSITION is a real check
     and it is here, inside the snapshot's ``rng``.
+
+    Between two cohorts the portfolio and agent rows become one row per
+    label, named ``portfolio[label]`` and ``agent state[label]``, so a check
+    count grows with the cohort and a difference names the agent it belongs
+    to. A label present in one world and absent from the other is a
+    difference rather than a skipped row.
     """
     prices_a, prices_b = a.engine.prices(), b.engine.prices()
     snap_a, snap_b = a.engine.state_snapshot(), b.engine.state_snapshot()
     bits_a, bits_b = _bits(snap_a), _bits(snap_b)
     book_a, book_b = _books(a.engine), _books(b.engine)
-    port_a, port_b = _portfolio_state(a.portfolio), _portfolio_state(b.portfolio)
-    agent_a, agent_b = _agent_state(a.agent), _agent_state(b.agent)
+    solo = a._single and b._single
+    labels = sorted(set(a._agents) | set(b._agents))
 
     checks = [
         ("market columns", bits_a["columns"] == bits_b["columns"],
@@ -939,15 +1706,41 @@ def agree(a: World, b: World) -> Agreement:
                    if k in ("federal_funds_rate", "corporate_bond_yield"))),
         ("whole engine state", bits_a == bits_b,
          f"{len(snap_a)} fields, day {snap_a['day_count']}"),
-        ("portfolio", port_a == port_b,
-         f"${port_a['cash']:,.0f} cash, "
-         f"{len(port_a['positions'])} positions"),
-        ("agent state", _bits(agent_a) == _bits(agent_b),
-         "no state() hook" if agent_a is None
-         else f"{len(agent_a)} fields"),
-        ("shared history", a.trace == b.trace, f"{len(a.trace)} steps"),
     ]
+    for label in labels:
+        name = "portfolio" if solo else f"portfolio[{label}]"
+        missing = _missing(a, b, label)
+        if missing:
+            checks.append((name, False, missing))
+            continue
+        port_a = _portfolio_state(a._portfolios[label])
+        port_b = _portfolio_state(b._portfolios[label])
+        checks.append((name, port_a == port_b,
+                       f"${port_a['cash']:,.0f} cash, "
+                       f"{len(port_a['positions'])} positions"))
+    for label in labels:
+        name = "agent state" if solo else f"agent state[{label}]"
+        missing = _missing(a, b, label)
+        if missing:
+            checks.append((name, False, missing))
+            continue
+        agent_a = _agent_state(a._agents[label])
+        agent_b = _agent_state(b._agents[label])
+        checks.append((name, _bits(agent_a) == _bits(agent_b),
+                       "no state() hook" if agent_a is None
+                       else f"{len(agent_a)} fields"))
+    checks.append(
+        ("shared history", a.trace == b.trace, f"{len(a.trace)} steps"))
     return Agreement(checks)
+
+
+def _missing(a: World, b: World, label: str) -> str:
+    """Which of two worlds lacks an agent, as a detail line, or empty."""
+    absent = [world.label or "the other world"
+              for world in (a, b) if label not in world._agents]
+    if not absent:
+        return ""
+    return f"no agent {label!r} in {' and '.join(absent)}"
 
 
 def _books(engine: Engine) -> dict[str, list]:
@@ -1031,6 +1824,18 @@ class Divergence:
                 f"prices={self.prices})")
 
 
+def _column_name(summary: dict[str, Any], fallback: str) -> str:
+    """The heading one arm's column takes.
+
+    The arm's label, and on a cohort the agent's label after it, because two
+    arms of a cohort experiment differ in the world AND in which of several
+    traders the column belongs to.
+    """
+    label = summary.get("label") or fallback
+    agent = summary.get("agent")
+    return f"{label}:{agent}" if agent else label
+
+
 class Comparison:
     """Two arms of one experiment, side by side."""
 
@@ -1079,8 +1884,8 @@ class Comparison:
     )
 
     def render(self, width: int = 24) -> str:
-        left = self.control.get("label", "control")
-        right = self.treatment.get("label", "treatment")
+        left = _column_name(self.control, "control")
+        right = _column_name(self.treatment, "treatment")
         lines = [f"  {'':<{width}} {left:>16} {right:>16}",
                  "  " + "-" * (width + 34)]
         for label, key, fmt in self.ROWS:
@@ -1099,7 +1904,8 @@ class Comparison:
 
 
 def compare(control: World, treatment: World,
-            *, agreement: Agreement | None = None) -> Comparison:
+            *, agreement: Agreement | None = None,
+            agent: str | None = None) -> Comparison:
     """Put two forked worlds side by side and find where they came apart.
 
     ``agreement`` is the :class:`Agreement` taken at the fork, carried through
@@ -1107,12 +1913,20 @@ def compare(control: World, treatment: World,
     identical. Optional, because a comparison is still computable without it
     -- but a published one without it is asking to be believed rather than
     checked.
+
+    ``agent`` names the agent the comparison is about, and a cohort world
+    requires it: two columns of behaviour and P&L belong to one trader, and a
+    cohort has several. The shared rows, macro and prices, come from the
+    world either way; decisions, orders and net worth come from that agent.
+    Both arms are read under the same label, so the arms must hold it.
     """
     if control.steps_per_day != treatment.steps_per_day:
         raise ValidationError(
             f"arms ran at {control.steps_per_day} and "
             f"{treatment.steps_per_day} steps per day, so their traces do not "
             "line up step for step and no divergence step is meaningful.")
+    label_a = control._label_for(agent, "compare")
+    label_b = treatment._label_for(agent, "compare")
 
     a, b = control.trace, treatment.trace
     # When the arm was driven by `intervene`, the first entry carries both
@@ -1126,26 +1940,35 @@ def compare(control: World, treatment: World,
         earliest = min(item.at for item in treatment.applied)
         intervention = {"day": earliest,
                         "step": earliest * treatment.steps_per_day}
+    # A surgery arm: the earliest day a surgery aims at is the day the
+    # treatment departs from the control, so it is what the divergence
+    # table quotes.
+    if intervention is None and treatment.surgeries:
+        earliest = min(item["day"] for item in treatment.surgeries)
+        intervention = {"day": earliest,
+                        "step": earliest * treatment.steps_per_day}
 
-    def first(field: str) -> int | None:
+    def first(field: str, shared: bool = False) -> int | None:
         for row_a, row_b in zip(a, b):
-            if row_a[field] != row_b[field]:
+            left = row_a if shared else _fields_of(row_a, label_a)
+            right = row_b if shared else _fields_of(row_b, label_b)
+            if left[field] != right[field]:
                 return int(row_a["step"])
         return None
 
     return Comparison(
-        control=control.summary(),
-        treatment=treatment.summary(since=control.fork_step),
+        control=control.summary(agent=agent),
+        treatment=treatment.summary(since=control.fork_step, agent=agent),
         agreement=agreement,
         divergence=Divergence(
             intervention_step=None if intervention is None
             else intervention["step"],
             intervention_day=None if intervention is None
             else intervention["day"],
-            macro=first("macro"),
+            macro=first("macro", shared=True),
             decision=first("decision"),
             orders=first("orders"),
-            prices=first("prices"),
+            prices=first("prices", shared=True),
             portfolio=first("net_worth"),
             steps_per_day=control.steps_per_day,
         ),
@@ -1528,3 +2351,540 @@ def resample(control: World, treatment: World, *, at: int | None = None,
     return Resample(at=at, n=n, control=left, treatment=right, noise=noise,
                     separation=separation, identical_inputs=not differing,
                     differing_lines=differing, intervened_fields=touched)
+
+
+# ---------------------------------------------------------------------------
+# Observation invariance: the same world, shown differently
+# ---------------------------------------------------------------------------
+
+
+class Invariance:
+    """How much a decision changed because the market changed, against how
+    much it changed because the market was described differently.
+
+    :func:`invariance` forks one world once per renderer, runs each fork
+    the same number of days under the same agent, and reports two things
+    side by side: :attr:`presentation`, the first step at which any two
+    renderers' arms came apart, and :attr:`floor`, the same agent's own
+    noise on one renderer's identical, repeated input. A presentation
+    effect smaller than the floor is not a finding; it is the agent
+    answering the same question twice, the way :func:`resample` already
+    reads a between-arm gap against a within-arm one.
+
+    It cannot say a difference is a defect. An agent may read basis points
+    more reliably than dollars, or a compact table better than nine lines a
+    name. :attr:`presentation` says where two renderings first diverged and
+    what diverged -- the decision, the orders, the resulting prices, the
+    portfolio -- not which renderer was right. :meth:`agreement_rate` and
+    :meth:`most_agreed` say which renderer's decisions the others matched
+    most often, which is as close to "right" as this function gets.
+    """
+
+    __slots__ = ("renderers", "days", "decisions", "presentation", "floor",
+                "unrecorded", "stopped_early", "days_compared")
+
+    def __init__(self, *, renderers: Sequence[str], days: int,
+                decisions: dict[str, list], presentation: list[Comparison],
+                floor: "Resample | None",
+                unrecorded: Sequence[str] = (),
+                stopped_early: dict[str, int] | None = None,
+                days_compared: dict[tuple[str, str], int] | None = None,
+                ) -> None:
+        #: The renderer keys :func:`invariance` was called with, in the
+        #: order given. `presentation`'s pairs and `decisions`' keys both
+        #: name renderers from this list, minus whichever are in
+        #: :attr:`unrecorded`.
+        self.renderers = list(renderers)
+        self.days = days
+        #: Per renderer key, the agent's STANDING decision at every
+        #: post-fork step -- one entry a step, not one a day. Between two
+        #: actual decision points this repeats the last one, the same
+        #: way `World.run`'s own trace does (`_decision` returns whatever
+        #: the agent last published, not `None`, until it decides
+        #: again); `None` marks only a REFUSED step. The shared pre-fork
+        #: history is left out: every arm ran it identically by
+        #: construction, so it says nothing about presentation. A
+        #: renderer in :attr:`unrecorded` has no entry here; a renderer
+        #: in :attr:`stopped_early` has a TRUNCATED one, covering only
+        #: the days it actually completed.
+        self.decisions = decisions
+        #: One :class:`Comparison` per pair of MEASURED renderers (both
+        #: outside :attr:`unrecorded`), control and treatment ordered as
+        #: they appear in :attr:`renderers`. Its :attr:`~Comparison.divergence`
+        #: is a :class:`Divergence` whose `intervention_step` and
+        #: `intervention_day` are always `None` here -- nothing was
+        #: intervened on, only shown differently -- and whose `decision`,
+        #: `orders`, `prices` and `portfolio` are the steps this
+        #: experiment is about.
+        self.presentation = list(presentation)
+        #: :func:`resample` between two forks of the SAME renderer
+        #: (`renderers[0]`), or `None` when `invariance` was called with
+        #: `floor=False`, or when `renderers[0]` itself could not replay.
+        #: Its `identical_inputs` is always True: nothing was intervened
+        #: on here either, and the whole point is a between-arm gap
+        #: measured on one unchanging question.
+        self.floor = floor
+        #: Renderer keys :func:`invariance` could not measure: against a
+        #: replaying agent, a renderer whose text does not match what was
+        #: recorded raises a
+        #: :class:`~tradefloor.integrations.common.DecisionError` at its
+        #: first post-fork decision -- :class:`~tradefloor.integrations.common.ReplayMiss`
+        #: on the three adapters built on the shared base, and FinRobot's
+        #: own :class:`~tradefloor.integrations.finrobot.DecisionError` on
+        #: FinRobot, which carries no `ReplayMiss` of its own and raises
+        #: the same class for a genuine replay miss and for a malformed
+        #: recorded response -- and that renderer is reported here rather
+        #: than taking the whole call down. ONLY a renderer that completed
+        #: ZERO post-fork days lands here; one that got partway is in
+        #: :attr:`stopped_early` instead, with what it DID measure kept
+        #: rather than thrown away. Typically every renderer but the one
+        #: the recording was made under. Empty against a live agent,
+        #: which answers any renderer's text.
+        self.unrecorded = list(unrecorded)
+        #: Renderer keys that completed at least one post-fork day but
+        #: not all `days` of them, mapped to the STEP whose decision
+        #: never arrived. Most often this means `days` asked for more
+        #: than a replayed transcript covers for that renderer -- the
+        #: renderer that matches the recording typically gets this far
+        #: rather than landing in :attr:`unrecorded`, which is why the
+        #: two are kept apart: an arm that genuinely ran most of the
+        #: experiment is a different thing from one that never started,
+        #: and :attr:`decisions` keeps what a stopped-early arm measured
+        #: rather than discarding it.
+        self.stopped_early = dict(stopped_early or {})
+        #: `(control key, treatment key) -> days both arms of that pair
+        #: actually completed`, for every pair in :attr:`presentation`.
+        #: Equal to :attr:`days` unless one side is in
+        #: :attr:`stopped_early`, in which case it is that side's
+        #: shorter count: :func:`compare` diffs two traces with `zip`,
+        #: which silently stops at the shorter one, so a pair's
+        #: :class:`Divergence` reading "never" is a claim about however
+        #: many days this dict says, not necessarily :attr:`days`.
+        self.days_compared = dict(days_compared or {})
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "renderers": list(self.renderers),
+            "days": self.days,
+            "decisions": copy.deepcopy(self.decisions),
+            "presentation": [c.as_dict() for c in self.presentation],
+            "floor": None if self.floor is None else self.floor.as_dict(),
+            "unrecorded": list(self.unrecorded),
+            "stopped_early": dict(self.stopped_early),
+            # A list of rows, not a dict with a tuple key: tuple keys do
+            # not survive `json.dumps`, and `as_dict()` is meant to.
+            "days_compared": [
+                {"renderer_a": a, "renderer_b": b, "days": n}
+                for (a, b), n in self.days_compared.items()
+            ],
+        }
+
+    def agreement_rate(self) -> dict[str, float]:
+        """For each measured renderer, the mean fraction of post-fork
+        steps at which its decision equalled each OTHER measured
+        renderer's, over every renderer it shares a step with.
+
+        Compared by equality on the same dictionary :func:`compare` diffs
+        on -- the actions and the rationale, published by
+        :meth:`~tradefloor.integrations.common.FrameworkAdapter.decision`
+        -- at matching positions in :attr:`decisions`, which are aligned
+        because every measured arm ran the same number of days from the
+        same fork. Since :attr:`decisions` holds the agent's STANDING
+        decision at every STEP, not one entry a day, an agent asked once
+        a day (the default cadence) has each real decision counted
+        `steps_per_day` times over -- consistent across renderers, since
+        every measured arm runs the same cadence, but a rate near the
+        agent's own repeat-length is not automatically a strong
+        agreement; read it against how often the agent actually decides.
+        Empty when fewer than two renderers were measured.
+        """
+        keys = [k for k in self.renderers if k in self.decisions]
+        totals: dict[str, list[float]] = {k: [] for k in keys}
+        for i in range(len(keys)):
+            for j in range(i + 1, len(keys)):
+                a, b = keys[i], keys[j]
+                da, db = self.decisions[a], self.decisions[b]
+                n = min(len(da), len(db))
+                if n == 0:
+                    continue
+                matched = sum(1 for x, y in zip(da[:n], db[:n]) if x == y)
+                rate = matched / n
+                totals[a].append(rate)
+                totals[b].append(rate)
+        return {k: (sum(v) / len(v) if v else 0.0) for k, v in totals.items()}
+
+    def most_agreed(self) -> str | None:
+        """The renderer key with the STRICTLY highest :meth:`agreement_rate`,
+        or `None` when fewer than two renderers were measured, or when two
+        or more renderers tie for the highest rate.
+
+        A tie is not a finding, and reporting one of the tied renderers as
+        the winner -- which a naive `max` would, by whichever happened to
+        come first in :attr:`renderers` -- would print a result this
+        function has no basis for: this package's whole premise is that it
+        cannot say which renderer is right, and a "winner" drawn from list
+        order is exactly the claim it must not make. Two renderers that
+        fully agree with each other tie at `1.0` and this returns `None`
+        for them, correctly -- there is nothing to prefer between two
+        renderings the agent read identically.
+        """
+        rates = self.agreement_rate()
+        if len(rates) < 2:
+            return None
+        best = max(rates.values())
+        winners = [key for key, rate in rates.items() if rate == best]
+        return winners[0] if len(winners) == 1 else None
+
+    def table(self) -> Any:
+        """One row per pair of renderers, where their arms first came
+        apart, as a :class:`pyarrow.Table`.
+
+        Columns: `renderer_a`, `renderer_b`, `fork_agreed` (whether
+        :func:`agree` found the two arms identical at the fork, before
+        either renderer had rendered a step), `days_compared` (from
+        :attr:`days_compared` -- how many days this ROW actually covers,
+        which is :attr:`days` unless one side is in
+        :attr:`stopped_early`), and the first post-fork step at which
+        `decision`, `orders`, `prices` and `portfolio` diverged, `None`
+        where they never did over `days_compared` days -- NOT necessarily
+        :attr:`days`, and a reader comparing rows across a table where
+        `days_compared` varies is comparing spans of different length.
+
+        Lazily imports `pyarrow`, a TEST and TOOLING dependency the library
+        itself does not carry; see `tests/test_arrow.py`.
+        """
+        try:
+            import pyarrow as pa
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError(
+                "Invariance.table() needs pyarrow. Install it with: "
+                "pip install pyarrow"
+            ) from exc
+
+        rows = []
+        for comparison in self.presentation:
+            d = comparison.divergence
+            left = comparison.control.get("label", "")
+            right = comparison.treatment.get("label", "")
+            rows.append({
+                "renderer_a": left,
+                "renderer_b": right,
+                "fork_agreed": (None if comparison.agreement is None
+                               else comparison.agreement.identical),
+                "days_compared": self.days_compared.get(
+                    (left, right), self.days),
+                "decision_diverges_at": d.decision,
+                "orders_diverge_at": d.orders,
+                "prices_diverge_at": d.prices,
+                "portfolio_diverges_at": d.portfolio,
+            })
+        if not rows:
+            # Unreachable through `invariance()`, which refuses fewer than
+            # two renderers and so always produces at least one pair; only
+            # a caller constructing `Invariance` by hand with an empty
+            # `presentation` can reach this. `pa.table([])` cannot infer a
+            # schema from nothing, so the columns are named explicitly
+            # rather than left for the caller to discover by failing.
+            schema = pa.schema([
+                ("renderer_a", pa.string()), ("renderer_b", pa.string()),
+                ("fork_agreed", pa.bool_()),
+                ("days_compared", pa.int64()),
+                ("decision_diverges_at", pa.int64()),
+                ("orders_diverge_at", pa.int64()),
+                ("prices_diverge_at", pa.int64()),
+                ("portfolio_diverges_at", pa.int64()),
+            ])
+            return pa.table(
+                {name: [] for name in schema.names}, schema=schema)
+        return pa.Table.from_pylist(rows)
+
+    def render(self) -> str:
+        out = [f"  invariance over {self.days} days asked for, "
+              f"{len(self.renderers)} renderers: "
+              + ", ".join(self.renderers)]
+        if self.unrecorded:
+            out.append(f"  unrecorded (no reply for this text in the "
+                       f"transcript): {', '.join(self.unrecorded)}")
+        if self.stopped_early:
+            # States what is known -- the step -- and not why: the
+            # renderer's text may never have matched a recording, or a
+            # LIVE call may have raised partway through, and this
+            # function cannot always tell which (see `invariance`'s own
+            # docstring on FinRobot's exception hierarchy).
+            stopped = ", ".join(f"{key!r} at step {step}" for key, step
+                                in self.stopped_early.items())
+            out.append(f"  stopped early (no further reply after this "
+                       f"step; decisions kept up to it): {stopped}")
+        out.append("")
+        for comparison in self.presentation:
+            left = comparison.control.get("label", "control")
+            right = comparison.treatment.get("label", "treatment")
+            d = comparison.divergence
+            agreed = ("agreed at the fork" if (comparison.agreement is None
+                      or comparison.agreement.identical)
+                      else "DID NOT AGREE at the fork")
+            out.append(f"  {left} vs {right}, {agreed}")
+            covered = self.days_compared.get((left, right), self.days)
+            if covered < self.days:
+                out.append(f"  compared over {covered} of {self.days} "
+                           "days asked for -- one side stopped early; "
+                           "every row below reads over that shorter span")
+            out.append(d.render())
+            out.append("")
+        most = self.most_agreed()
+        if most is not None:
+            rate = self.agreement_rate()[most]
+            out.append(f"  the agent agreed with {most!r} most often "
+                       f"({rate:.0%} of steps, averaged over the other "
+                       "measured renderers)")
+        if self.floor is not None:
+            out.append(f"  the agent's own noise floor, {self.floor.n} "
+                       f"calls each on {self.renderers[0]!r} and an "
+                       "identical clone of it:")
+            out.append(self.floor.render())
+        return "\n".join(out)
+
+    def __repr__(self) -> str:
+        return (f"Invariance({len(self.renderers)} renderers, "
+                f"{len(self.presentation)} pairs, "
+                f"unrecorded={len(self.unrecorded)}, "
+                f"stopped_early={len(self.stopped_early)}, "
+                f"floor={'measured' if self.floor is not None else None})")
+
+
+def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
+               floor: bool = True) -> Invariance:
+    """Fork `world` once per renderer, run each `days` days, and report how
+    much the agent's decisions moved.
+
+    ```python
+    from tradefloor.render import TextRenderer, JSONRenderer
+
+    report = invariance(
+        world, [TextRenderer(units="usd"), TextRenderer(units="bps"),
+               JSONRenderer()],
+        days=10)
+    print(report.render())
+    ```
+
+    Each renderer gets its own fork of `world`, taken in one call to
+    :meth:`World.fork` so every arm shares identical pre-fork state, and
+    its own copy of `world.agent` with `renderer` replaced -- everything
+    else about the agent (its framework, its instructions, its cadence)
+    stays what `world` was already running. `world.agent` must carry a
+    `renderer` attribute, which every adapter under
+    `tradefloor.integrations` does; a plain policy with no rendering step
+    has nothing for this function to vary.
+
+    On a `LangGraphAdapter` built with its own `input_builder=` (not the
+    default), the swap changes nothing a live graph actually receives:
+    a caller's own builder does not read `self.renderer`, only the
+    adapter's DEFAULT one does. This function does not detect that case
+    and will run every arm anyway, quietly measuring nothing -- the
+    graph sees the same input on every arm, so every comparison finds no
+    presentation effect, which looks identical to a real one. Pass a
+    `LangGraphAdapter` at its default `input_builder` to this function,
+    or vary the renderer some other way (a custom `input_builder` reading
+    `self.renderer` itself) if the graph needs its own.
+
+    `floor`, true by default, forks one more arm under `renderers[0]` --
+    the first renderer, taken as the reference -- and calls
+    :func:`resample` between it and the `renderers[0]` arm above, asking
+    the agent's own first post-fork decision again several times. Both
+    arms saw identical input, so the resulting gap is the agent's own
+    noise and nothing else, which is what :attr:`Invariance.floor`
+    measures a presentation effect against. Set it false to skip the extra
+    fork and the extra calls.
+
+    Against a replaying agent, a renderer whose text does not match what
+    the transcript was recorded under raises a
+    :class:`~tradefloor.integrations.common.DecisionError` at its first
+    post-fork decision. This function catches that PER ARM: the renderer
+    is reported in :attr:`Invariance.unrecorded` rather than the whole
+    call failing, which is what lets a single recorded transcript still
+    answer "what would a different rendering have looked like" even
+    though only one rendering was ever actually asked. A live framework
+    failure is a different kind of failure and is not caught here; it
+    propagates. A malformed recorded response would, ideally, be a third
+    kind and also propagate -- three of the four adapters raise
+    :class:`~tradefloor.integrations.common.ReplayMiss`, a distinct
+    subclass, for exactly this reason, and a narrower catch would leave
+    it alone. FinRobot does not: it raises the same
+    :class:`~tradefloor.integrations.finrobot.DecisionError` for a
+    replay miss and for a response that failed to parse, so on FinRobot
+    the two are indistinguishable from here and this function reports
+    both as unrecorded rather than reaching into one adapter's exception
+    hierarchy by name to tell them apart. In practice this is the
+    narrower, likelier case: every shipped fixture is checked elsewhere
+    for exactly this (`tests/test_integrations.py`'s
+    `test_a_committed_recording_is_valid_without_its_framework`).
+
+    This depends on the exception reaching this function at all. `World`
+    built with `on_refusal="skip"` -- not the default -- swallows a
+    generic `DecisionError` as a refused step rather than raising it, and
+    re-raises only `ReplayMiss` specifically. A FinRobot fork under a
+    `world` configured that way will not report a non-matching renderer
+    as unrecorded; it will report a run full of refusals instead. Forks
+    inherit `on_refusal` from `world`, unchanged.
+
+    Raises :class:`~tradefloor._core.ValidationError` on fewer than two
+    renderers, on two renderers sharing a :meth:`~.Renderer.key`, on an
+    object without both `render` and `key`, or on an agent with no
+    `renderer` attribute, all at the call, before anything runs.
+    """
+    if len(renderers) < 2:
+        raise ValidationError(
+            f"invariance needs at least 2 renderers to compare, got "
+            f"{len(renderers)}. One renderer has nothing to be invariant "
+            "against.")
+    if not hasattr(world.agent, "renderer"):
+        raise ValidationError(
+            f"{type(world.agent).__name__} has no `renderer` attribute, so "
+            "there is nothing for invariance() to vary between forks. "
+            "FinRobotAdapter, LangGraphAdapter, PydanticAIAdapter and "
+            "OpenAIAgentsAdapter all carry one; a hand-written policy or "
+            "CallableAgentAdapter renders nothing and is not a subject for "
+            "this experiment.")
+    for i, renderer in enumerate(renderers):
+        check_renderer(renderer, where=f"renderers[{i}]")
+
+    keys = [r.key() for r in renderers]
+    if len(set(keys)) != len(keys):
+        raise ValidationError(
+            f"renderers must have distinct keys, got {keys}. invariance "
+            "reports one column per renderer, and two sharing a key would "
+            "be reported, and forked, as one.")
+
+    # `DecisionError`, not the narrower `ReplayMiss`: FinRobot raises its
+    # own `DecisionError` for a replay miss, with no `ReplayMiss`
+    # subclass of its own -- see the docstring above -- so catching only
+    # `ReplayMiss` would let a non-matching renderer take the whole call
+    # down on FinRobot specifically while working as documented on the
+    # other three adapters. Imported here rather than at module level
+    # for the same reason `resample._ask_again` does: `integrations` is
+    # reached explicitly, never pulled in by `import tradefloor` alone.
+    from .integrations.common import DecisionError
+
+    labels = list(keys)
+    if floor:
+        floor_label = f"{keys[0]} (floor)"
+        while floor_label in labels:
+            floor_label += " (floor)"
+        labels = labels + [floor_label]
+
+    forks = world.fork(*labels)
+    renderer_forks = forks[:len(keys)]
+
+    # Every pairwise agreement, taken BEFORE the renderer swap below: at
+    # this point every fork still carries the SAME renderer `world.agent`
+    # did, so this is proof the shared start was identical, not a report
+    # on the very difference this function exists to measure. Taken
+    # after the swap, `agree()`'s agent-state check would see the
+    # renderer itself as the divergence on any adapter whose `state()`
+    # publishes it (FinRobotAdapter does), and report every pair as a
+    # failed fork on that adapter alone -- a comparison artefact, not a
+    # finding.
+    agreements = {}
+    for i in range(len(renderer_forks)):
+        for j in range(i + 1, len(renderer_forks)):
+            agreements[(i, j)] = agree(renderer_forks[i], renderer_forks[j])
+    floor_agreement = (agree(forks[0], forks[-1]) if floor else None)
+    # `Resample` carries no `agreement` slot of its own -- `resample()`
+    # takes two already-forked worlds and has never needed one, because it
+    # is normally called on arms whose fork already had a `Comparison` to
+    # attach to. Here the check is worth making anyway, since a floor
+    # resting on a fork that was not actually identical would understate
+    # itself, but the finding belongs in the error a caller would see, not
+    # in a field bolted onto a type this package does not own.
+    if floor and not floor_agreement.identical:
+        raise ValidationError(
+            f"the two forks built for the noise floor disagree at the "
+            f"fork: {floor_agreement.differences}. This should not happen "
+            "-- World.fork() is meant to guarantee an identical start -- "
+            "and a floor measured past it would not be pure agent noise.")
+
+    for fork_world, renderer in zip(forks, renderers):
+        fork_world.agent.renderer = renderer
+    if floor:
+        forks[-1].agent.renderer = renderers[0]
+
+    def _run(fork_world: "World") -> int:
+        """Days of `fork_world` actually completed before a
+        `DecisionError`, if any.
+
+        A day at a time -- proven equal to one `fork_world.run(days=days)`
+        call for a fork that never fails, see `tests/test_render.py`'s
+        day-by-day equivalence check -- rather than the whole span in one
+        call, so a failure partway through leaves the days that DID
+        succeed in the trace instead of discarding them. `days` more than
+        a transcript covers used to report the reference renderer itself
+        as unrecorded, having genuinely replayed most of the run; now it
+        reports exactly how far it got.
+        """
+        completed = 0
+        for _ in range(days):
+            try:
+                fork_world.run(days=1)
+            except DecisionError:
+                return completed
+            completed += 1
+        return completed
+
+    completed = [_run(fork_world) for fork_world in renderer_forks]
+    unrecorded = [key for key, n in zip(keys, completed) if n == 0]
+    # A step, not a day: `fork_world.step` is exactly the step whose
+    # decision never arrived, because `World.run` raises before
+    # advancing `_step` past the step that failed.
+    stopped_early = {
+        key: fork_world.step
+        for key, fork_world, n in zip(keys, renderer_forks, completed)
+        if 0 < n < days
+    }
+
+    decisions = {
+        key: [row["decision"]
+             for row in fork_world.trace[fork_world.fork_step:]]
+        for key, fork_world, n in zip(keys, renderer_forks, completed)
+        if n > 0
+    }
+
+    presentation = []
+    # Keyed by (control label, treatment label) -- exactly
+    # `comparison.control["label"]`, `comparison.treatment["label"]` for
+    # the matching `Comparison`, since `World.fork` used the renderer
+    # keys as labels -- so `render()` and `table()` can look this up
+    # from the `Comparison` alone, with nothing extra to keep paired up.
+    days_compared: dict[tuple[str, str], int] = {}
+    for i in range(len(renderer_forks)):
+        if completed[i] == 0:
+            continue
+        for j in range(i + 1, len(renderer_forks)):
+            if completed[j] == 0:
+                continue
+            a, b = renderer_forks[i], renderer_forks[j]
+            presentation.append(compare(a, b, agreement=agreements[(i, j)]))
+            # `compare()` diffs two traces with `zip()`, which silently
+            # stops at the shorter one -- correct for what it measures,
+            # but a pair where one arm stopped early is compared over
+            # FEWER days than `days`, and nothing about a "never
+            # diverged" row says so without this.
+            days_compared[(keys[i], keys[j])] = min(completed[i], completed[j])
+
+    floor_result = None
+    if floor:
+        # Attempted unconditionally: the floor's own fork is an
+        # independent replay of `renderers[0]`'s text, and while it is
+        # deterministic to reach the same outcome as `completed[0]` --
+        # same seed, same renderer, same market -- checking it rather
+        # than inferring it costs one more replay attempt and nothing
+        # else. `resample` only needs the FIRST post-fork decision, so
+        # one completed day is enough on both sides even if either later
+        # stops early.
+        floor_completed = _run(forks[-1])
+        if completed[0] > 0 and floor_completed > 0:
+            floor_result = resample(forks[0], forks[-1])
+
+    return Invariance(renderers=keys, days=days, decisions=decisions,
+                      presentation=presentation, floor=floor_result,
+                      stopped_early=stopped_early, unrecorded=unrecorded,
+                      days_compared=days_compared)

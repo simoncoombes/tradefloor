@@ -51,6 +51,16 @@ def market_state(engine):
                   "market_cap", "mispricing_s", "garch_variance"):
         out[field] = struct.unpack("<%dd" % n, engine.column(field))
     out["draws"] = engine.draws_consumed
+    # PER STREAM, because the total mixes two claims. The market stream is
+    # what a preset member may never displace; the economy stream is where a
+    # macro dial's own mechanism lives, and a dial that changes the macro
+    # path changes which state-dependent macro draw sites fire. Asserting
+    # the total made those one number, which was harmless while the default
+    # ran no macro at construction and became wrong at 0.7.0, when
+    # `macro_burn_in_days` put 755 days of macro in front of every run.
+    by_stream = dict(engine.draws_by_stream())
+    out["draws_market"] = by_stream["market"]
+    out["draws_economy"] = by_stream["economy"]
     return out
 
 
@@ -98,6 +108,12 @@ PERTURBATIONS = [
     ("sector_factor_sigma", 0.004, True),
     ("idio_sigma_scale", 1.0, True),
     ("order_flow_coefficient", 80.0, False),   # needs order flow; none sent
+    # Same reason, and it is the whole reason the known-answer digests do
+    # not move: this dial is reachable only through `TickInputs`
+    # `.order_volumes`, which is the empty slice at every construction
+    # site but the two `order_flow=` paths. At zero volume the raw
+    # imbalance is the literal 0.0 under both laws.
+    ("order_flow_impact_law", 1.0, False),     # needs order flow; none sent
     ("informed_flow_fraction", 0.5, False),    # needs order flow; none sent
     ("news_sector_weight", 0.6, False),        # needs news; none sent
     ("news_market_weight", 0.4, False),        # needs news; none sent
@@ -129,7 +145,31 @@ PERTURBATIONS = [
     # the economy moves fair value. Three sessions do not get there, which is
     # also why nothing in the suite caught the 0.4.2 regression this dial
     # exists to prevent. It is exercised directly in economy/invariants.rs.
-    ("usd_crisis_vix_threshold", 15.0, False),
+    # ---- THE BURN-IN MOVED THE PROBE'S STARTING LINE ------------------
+    #
+    # Nine entries below read `False` until 0.7.0 and read `True` now, and
+    # not one of their reasons was wrong. Every one said some version of
+    # "INERT over a probe this short": the OPEC rule fires every 90 days and
+    # the probe runs three; oil sits in a dead zone until it leaves it; an
+    # expansion's minimum duration is six months; the dollar reaches equities
+    # only through three links of the macro chain; the first meeting is day
+    # 45. All still true of the MECHANISM.
+    #
+    # What changed is where the probe starts. pt-v18 ships
+    # `macro_burn_in_days` at 755, and `Engine::with_params` runs those days
+    # before the caller's first, so three sessions from CONSTRUCTION are now
+    # three sessions from day 755. Oil has left the dead zone, OPEC has
+    # decided eight times, the cycle has run through phases and the bank has
+    # met. The gates these notes describe are all behind the probe.
+    #
+    # They are flipped rather than the burn-in being switched off here,
+    # because `True` is the true answer for the SHIPPED model: a user who
+    # perturbs one of these on the default and runs three days does see the
+    # market move. The old reasons are kept, marked, because the mechanism
+    # they describe is the reason each one was ever inert -- and it is what
+    # would make it inert again under a preset with no burn-in.
+    # -------------------------------------------------------------------
+    ("usd_crisis_vix_threshold", 15.0, True),  # was False; the burn-in reaches it (see above)
     # The daily credit spread floor (#48). It only bites once the 10y treasury
     # has drifted far enough under the stale corporate yield to breach the 0.8
     # floor, which takes about 120 days on the deterministic channel. Three
@@ -154,6 +194,8 @@ PERTURBATIONS = [
     ("garch_vix_coupling", 0.8, False),    # scales the clamp reference by (vix/anchor)^2, and the harness runs at the anchor, where that is exactly 1.0 at any coupling
     ("garch_ceiling_multiple", 0.9, False),   # measured not to bind under pt-v10 at 0.9, 1.05, 2.0 or 20.0: the trimmed idio scale keeps per-name variance under the clamp's reference
     ("garch_floor_multiple", 0.99, True),
+    ("garch_omega_sector_scaled", 1.0, True),
+    ("idio_sigma_floor", 0.0, True),
     ("market_vol_alpha", 0.2, True),
     ("market_vol_beta", 0.7, True),
     # The market factor's GJR leverage. Ships at 0.0 on every preset, so
@@ -219,13 +261,13 @@ PERTURBATIONS = [
     # `test_jumps_move_prices_when_intensity_is_on`.
     ("jump_intensity_market", 1.0, True),   # live since pt-v10 turned this mechanism on
     ("jump_intensity_idio", 1.0, True),   # live since pt-v10 turned this mechanism on
-    ("jump_mean_market", -0.05, False),        # needs an occurrence
+    ("jump_mean_market", -0.05, True),  # was False; the burn-in reaches it (see above)        # needs an occurrence
     ("jump_sigma_market", 0.05, False),        # needs an occurrence
     ("jump_sigma_idio", 0.05, False),          # needs an occurrence
     # Whether herding continues a jump. Inert for the same reason as the
     # sizes above and one more: at the default preset no jump ever fires, so
     # there is nothing for the share to withhold from the momentum term.
-    ("jump_momentum_share", 1.0, False),     # perturbed away from the default (0.0 since pt-v6); needs a jump inside the three sessions, which is a 7% chance a day
+    ("jump_momentum_share", 1.0, True),  # was False; the burn-in reaches it (see above)     # perturbed away from the default (0.0 since pt-v6); needs a jump inside the three sessions, which is a 7% chance a day
     # A spread across names, applied at the day close. It DOES move the
     # trajectory on its own: unlike the jump parameters it needs no
     # occurrence, only a roster with more than one market cap in it.
@@ -261,17 +303,34 @@ PERTURBATIONS = [
     # `test_the_crisis_threshold_acts_above_itself`.
     ("vix_mean_reversion", 0.30, True),
     ("vix_realised_vol_weight", 0.5, True),
+    # The LEVEL identity, and it moves the market on its own: the VIX's
+    # whole target becomes the index's conditional variance in points,
+    # which the macro chain reads every day and the market reads back
+    # through the factor's variance target the same day.
+    ("vix_level_identity", 1.0, True),
+    # The premium is a multiplier on that level and is NOT read while
+    # the identity above is 0.0, which is this probe's default. Inert
+    # for the same reason `vix_target_shock_cap` is: the branch that
+    # reads it is not taken. Shown live by
+    # `test_the_premium_moves_the_level_once_the_identity_is_on`.
+    ("vix_variance_premium", 0.5, False),
     ("vix_cycle_amplitude", 1.0, True),     # perturbed AWAY from the default, which is 0.0 since the 2026-08-26 boundary
     ("vix_return_source", 0.0, True),        # perturbed AWAY from the default, which is 1.0 since pt-v10
     ("vix_return_gain", 150.0, True),         # the channel reads the day since pt-v10, and the harness's days fall
     ("vix_return_gain_up", 60.0, False),     # needs an UP day; under this default the channel reads the DAY and the harness's three sessions fall
+    # The exponent bends the response the gain scales. It moves the market
+    # for the same reason the gain does -- the channel reads the day and
+    # the harness's three sessions fall -- and it is perturbed AWAY from
+    # the linear 1.0, which is the one value at which the branch is
+    # bit-identical to the arithmetic that predates the dial.
+    ("vix_return_exponent", 1.4, True),
     ("vix_return_clamp", 0.12, True),
     ("vix_target_shock_cap", 40.0, False),   # binds only past a 12-point excursion
     ("inflation_ceiling", 10.0, False),       # binds only when inflation reaches 6%
     ("inflation_floor", -3.0, False),         # binds only when inflation reaches -1%
-    ("inflation_reversion", 0.15, False),      # monthly; reaches prices via the bond yield at the first meeting (day 45)
+    ("inflation_reversion", 0.15, True),  # was False; the burn-in reaches it (see above)      # monthly; reaches prices via the bond yield at the first meeting (day 45)
     ("crisis_vix_threshold", 18.0, False),     # needs VIX above the gate
-    ("jump_vix_coupling", 1.0, False),
+    ("jump_vix_coupling", 1.0, True),  # was False; the burn-in reaches it (see above)
     ("crisis_blend_gain", 2.0, False),
     # Was inert with reason "sigma ships at 0.0, so alone this generates
     # zero-impact news". True since pt-v11 put sigma at 0.03 and pt-v12 made
@@ -306,6 +365,159 @@ PERTURBATIONS = [
     # The lagged twin, on the session AFTER a down day. Ships at 0.0 and the
     # probe runs three days, which is enough to carry one across.
     ("market_beta_down_asym_lag", 0.05, True),
+    # Gives back the first moment the contemporaneous tilt injects. It is
+    # gated on that tilt being nonzero, and pt-v16 ships it at 0.025, so
+    # the probe's market moves. On a preset with the tilt at 0.0 this dial
+    # is inert by construction, which its own unit test states.
+    #
+    # 0.5 and not 1.0: pt-v18 IS the default plus this dial at 1.0, so
+    # that perturbation reproduces a named preset and the vector stops
+    # fingerprinting as `custom-`. Any entry here that lands exactly on a
+    # named preset breaks the assertion below for a reason that has
+    # nothing to do with the parameter.
+    ("market_beta_down_asym_recentre", 0.5, True),
+    # How much of oil demand supply answers. INERT over a probe this short,
+    # and the reason is the mechanism rather than a wiring gap. Inventory
+    # opens at 50 and the oil price feels it only outside the 40-to-60 dead
+    # zone, where the pressure term is exactly zero. Demand draws inventory
+    # down by about 0.45 a day, so half of that is 0.22 a day and three days
+    # separate the two arms by well under one unit: both are still deep in
+    # the dead zone and the prices are identical. The dial bites around day
+    # 120, when the unanswered-demand arm reaches the floor.
+    ("oil_supply_response", 0.5, True),  # was False; the burn-in reaches it (see above)
+    # How much of the OPEC rule's direction is removed. INERT over a probe
+    # this short for a plainer reason than its neighbour: the rule fires
+    # only every 90 days and the probe runs three, so the branch is never
+    # reached and no draw it would change is taken.
+    ("oil_opec_symmetry", 0.5, True),  # was False; the burn-in reaches it (see above)
+    # WHERE oil's seasonal shape acts. It moves the oil price on the first
+    # day, and INERT on the market all the same, because oil reaches a price
+    # only through the inflation term at daily.rs, which is a dead zone
+    # between 50 and 80. Oil opens at 75 and the seasonal down leg takes both
+    # arms to about 73 on day one, so both sit inside the dead zone, the
+    # discount rate never hears about it and the valuation never moves. Over
+    # 252 days oil leaves that zone in both directions and the dial bites.
+    ("oil_seasonality_target", 0.5, True),  # was False; the burn-in reaches it (see above)
+    # The clock the cycle hazard is read on. INERT over a probe this short
+    # for a reason the mechanism states rather than one the value hides: the
+    # engine opens at zero months in phase and an expansion's minimum
+    # duration is six months, so check_cycle_transition returns before it
+    # draws until day 180 and the probe runs three. Over 252 days it bites,
+    # and what separates the arms is the count of seeds that leave expansion.
+    ("cycle_hazard_per_month", 0.5, False),
+    # The floor waits on a phase the probe never reaches: it moves only the
+    # trough's growth range, and a certified year reaches no trough at all,
+    # let alone three days from an opening expansion.
+    ("trough_growth_floor", 0.5, False),
+    # MOVES the market on the probe, and the entry is a DECOMPOSITION
+    # rather than a verdict, because three readings of it were wrong
+    # before this one.
+    #
+    # The block is gated on `months_in_current_phase < 1/30 + 0.001` and
+    # the clock advances 1/30 a day, so it fires on days 0 and 1 and
+    # never again. `draws_consumed` runs +1 after one day and +2 from
+    # the second and stays there, which is the whole of the exemption
+    # this dial takes in ECONOMY_STREAM_MOVERS below.
+    #
+    # WHICH channel moves the market is separable without a new
+    # instrument, because 0.5 and 1.0 take the SAME draw at the same
+    # stream position and differ only in the coefficient. Measured at 1,
+    # 2, 3, 5, 10 and 20 days: 0.5 and 1.0 are BIT-IDENTICAL in every
+    # column at every horizon, while both differ from 0.0 by the same
+    # amount -- nothing on day one, then 2.1e-3 of a price at the widest
+    # name on days two and three, and 1.5e-3 still at twenty.
+    #
+    # So the probe's move is the draw's displacement of the ECONOMY
+    # substream, and the coefficient reaches no market column at all
+    # inside twenty sessions. Day 0 is `day % DAYS_PER_MONTH == 0` and
+    # `% DAYS_PER_QUARTER == 0` both, so the drawn target IS read and
+    # the economy does differ between those two arms; the market does
+    # not hear it. Sequence, measured on the same runs: the VIX carries
+    # the displacement at the end of day one (14.8477 against 15.1255,
+    # and 15.1255 for both perturbed arms) before any price column has
+    # moved.
+    #
+    # That sharpens drift-vix's rule rather than refuting it -- a
+    # displaced draw moves a probe in proportion to how directly its
+    # consumer reaches the observable, and how soon. It also resolves
+    # the registered prediction in both directions: the market moves,
+    # in two sessions rather than twenty, and the valuation path the
+    # COEFFICIENT takes shows nothing across the whole span. Whether it
+    # bites over a certified year is what `phasenull` was launched to
+    # measure, and this does not answer it.
+    #
+    # The `False` that stood here was never exercised. Until the
+    # exemption below landed, this test failed on the draw-count
+    # assertion first and stopped, so the `moves` verdict was argued
+    # and never run.
+    ("phase_target_range_draw", 0.5, True),
+    # The yield at which the target multiple sits on its sector anchor.
+    # 0.05 rather than either shipped value: 0.04 is the default this probe
+    # perturbs and 0.0456 is pt-v18's, and an entry landing on a named
+    # preset's value would fingerprint as that preset. It moves the market
+    # on the first tick, because every name's fair value is recomputed from
+    # it before a single price is formed.
+    ("neutral_discount_rate", 0.05, True),
+    # Days the economy is advanced alone before day zero. It moves the
+    # market on the first tick, because every name is valued against an
+    # economy that has travelled. It also moves `draws_consumed`, which is
+    # why it is in ECONOMY_STREAM_MOVERS below: a burn-in consumes economy
+    # draws BY running the economy, so the count is the mechanism rather
+    # than a side effect of it.
+    ("macro_burn_in_days", 30.0, True),
+    # Whether day zero's cycle phase and its age are DRAWN from the
+    # cycle's stationary law instead of being the same point on every run.
+    # It moves the market on the probe: the drawn phase reaches the VIX
+    # through the phase table on day one and the couplings turn that into
+    # variance, and the two construction draws displace the economy
+    # substream besides. Perturbed to 1.0, the only other admissible
+    # value -- see the dial's own note on why the interior has no reading,
+    # and `test_stationary_opening.py`, which asserts that every non-zero
+    # value gives the same run.
+    #
+    # It also moves `draws_consumed`, which is why it is in
+    # ECONOMY_STREAM_MOVERS below -- and the probe is the wrong instrument
+    # for that: at seed 42 over three days the count reads IDENTICAL,
+    # because the two construction draws are cancelled exactly by the
+    # phase-change block at `daily.rs:285`, which a drawn age past two
+    # days skips on both of the days it would fire. Measured over six
+    # seeds at 1, 2, 3, 5, 10 and 30 days the difference runs 0, +1, +2,
+    # +4 and +30, so the zero here is a coincidence of one cell.
+    ("cycle_stationary_opening", 1.0, True),
+    # The share of earnings returned as net buybacks. It reaches the
+    # valuation on the first tick that has a day behind it, and the probe's
+    # first tick is day 0, where the elapsed time is zero and the factor is
+    # exactly 1.0. Over the probe's three days it bites on the second and
+    # third, so the market moves.
+    ("buyback_payout_share", 0.5, True),
+    # The overnight move's variance as a fraction of a session's. It moves
+    # the market from the second day's open: a name has no `s` before its
+    # first tick, so the first session opens where it always did, and every
+    # open after it carries a gap.
+    ("overnight_variance_ratio", 0.5, True),
+    # How much of the jump's drift is given back. The compensator is
+    # subtracted every day whether or not a jump fires, so unlike its two
+    # neighbours it bites on the first close.
+    ("jump_mean_compensated", 0.5, True),
+    # How far the two stop ladders are matched. INERT over a probe this
+    # short, and the mechanism says why. Both ladders read the PREVIOUS
+    # completed day's return and neither fires until a name has moved more
+    # than two or three per cent in a day. Three days of a calm market
+    # produce no such day, so no branch is reached and nothing this dial
+    # touches is evaluated. Over 252 days it bites: the thirty-seed sweep
+    # separates the arms.
+    ("cascade_symmetry", 0.5, False),
+    # How much of nominal output growth the valuation's earnings carry. It
+    # reads a level the economy compounds daily, so it moves the market as
+    # soon as one day has closed rather than waiting on a branch: over the
+    # probe's three days the ratio reaches about 1.00025 and the perturbed
+    # arm values every name a fraction above the base one.
+    #
+    # 0.5 rather than 1.0 for the reason the recentre entry above gives, and
+    # because a share is the reading this dial has: 1.0 holds the earnings
+    # share of nominal output constant and every value below it lets that
+    # share fall.
+    ("earnings_nominal_growth", 0.5, True),
     # The exponent on the VIX ratio in the market variance target. The
     # endogenous VIX leaves its anchor on day one, so the ratio is never
     # exactly 1.0 and any exponent but the shipped one moves the target.
@@ -321,13 +533,30 @@ PERTURBATIONS = [
     # How much of a VIX jump survives into the next day. A PAIR with
     # `vix_jump_intensity`: with the intensity at its shipped 0.0 there is no
     # jump to decay, so the ratio has nothing to act on.
-    ("vix_decay_ratio", 0.3, False),
+    ("vix_decay_ratio", 0.3, True),  # was False; the burn-in reaches it (see above)
     # The jump arrival rate. Non-zero means the mechanism draws, which is why
-    # it is in DRAW_SCHEDULE_MOVERS below.
+    # it is in ECONOMY_STREAM_MOVERS below.
     ("vix_jump_intensity", 0.5, True),
     # The size of a jump once one arrives. The other half of the pair: with
     # the intensity at 0.0 there is no arrival to scale.
     ("vix_jump_scale", 1.0, False),
+    # An upper bound on the VIX state, shipped at 80.0. INERT at 40.0 for a
+    # reason the probe's own range gives rather than a dead wire: the VIX
+    # reads 14.8477, 15.0094 and 15.0644 over the three days, so a bound at
+    # 40 is never approached and the clamp is never evaluated. Measured on
+    # this build, and the counter-measurement is what makes the verdict a
+    # statement about the probe: at a bound of 14.0 the same three days move
+    # nine columns and 4.819e-3 of a price at the widest name, and at 10.0
+    # they move nine columns and 2.410e-3. The dial is wired; the probe is
+    # calm.
+    ("vix_ceiling", 40.0, False),
+    # A constant added to the VIX target, shipped at 0.0. It reaches the VIX
+    # the same day and the VIX feeds the market factor's variance the same
+    # day, so unlike its neighbours it needs no partner and no branch: at
+    # 0.5 it moves seven columns and 2.028e-3 of a price at the widest name.
+    # Neither dial takes a draw, so `draws_consumed` is unmoved for both and
+    # neither belongs in ECONOMY_STREAM_MOVERS below.
+    ("vix_target_offset", 0.5, True),
     # -- forced flow ---------------------------------------------------------
     # Gated twice, which is why all five read inert here. `forced_flow_gain`
     # ships at 0.0, so the mechanism is off; and `forced_flow_threshold`
@@ -345,10 +574,13 @@ PERTURBATIONS = [
 
 
 #: Parameters whose perturbation legitimately changes the draw SCHEDULE, so
-#: the §5.2 guard below skips them. Only the VIX jump qualifies: its arrival
-#: test draws from the shared `economy` stream once a day whenever the
-#: intensity is non-zero, so turning it on consumes three extra draws over
-#: the probe's three days whether or not a jump ever fires.
+#: the §5.2 guard below skips them. Three qualify. The VIX jump's arrival test
+#: draws from the shared `economy` stream once a day whenever the intensity
+#: is non-zero, so turning it on consumes three extra draws over the probe's
+#: three days whether or not a jump ever fires. `macro_burn_in_days` runs
+#: the economy for that many days before day zero, so it consumes a
+#: burn-in's worth of economy draws; there the count IS the mechanism, and a
+#: version that drew nothing would not have advanced anything.
 #:
 #: This is not a violation today, because every shipped preset carries
 #: `vix_jump_intensity` at 0.0 and therefore draws nothing extra. It is a
@@ -356,7 +588,88 @@ PERTURBATIONS = [
 #: economy stream, so its trajectories differ from every earlier preset
 #: through the RNG as well as through the mechanism. Giving the arrival test
 #: its own stream would remove that coupling.
-DRAW_SCHEDULE_MOVERS = frozenset({"vix_jump_intensity"})
+#:
+#: `phase_target_range_draw` is the third, and the reason is written out
+#: because this set is where an inconvenience would hide if anyone let it.
+#:
+#: At 0.0 the dial takes NO draw. The site at `daily.rs:310` sits inside
+#: `if inputs.phase_target_range_draw != 0.0`, so every preset written
+#: before the dial is bit-identical to itself and all three known-answer
+#: digests reproduce unmoved on this branch. Nothing is exempted for the
+#: shipped default; the exemption covers the dial turned ON.
+#:
+#: Above 0.0 the draw IS the mechanism. The dial draws a phase's growth
+#: target from the range the phase table already declares, so it needs a
+#: number, and a version that drew nothing would not have drawn anything.
+#: That is the same shape as `macro_burn_in_days` above, where the count is
+#: the mechanism rather than a side effect of it.
+#:
+#: What was REFUSED, so a later reader can see the alternative was weighed.
+#: `daily.rs:287` already takes a uniform on every phase-change day in every
+#: phase and discards it for four phases in five, and reusing it would have
+#: kept the schedule identical. It was refused because the sign is not
+#: neutral: as drawn, a larger uniform gives a deeper entry shock and a
+#: SHALLOWER target, so the two oppose and damp the spread this dial exists
+#: to create, while `1.0 - u` aligns and amplifies them. Choosing between
+#: those on the strength of which one satisfies this test would be choosing
+#: a mechanism to make a test pass. It remains open on modelling grounds.
+#:
+#: The displacement is measured rather than assumed harmless: a
+#: displacement-only null, the dial off with the stream advanced by two
+#: draws at the same point, is run beside the treated arm so the reported
+#: effect is separated from the position shift.
+#: `cycle_stationary_opening` is the fourth, and it moves the schedule in
+#: TWO places, both of which are the mechanism.
+#:
+#: At 0.0 it takes no draw at all: `Engine::draw_stationary_opening`
+#: returns before touching the generator, so every preset written before
+#: the dial is bit-identical to itself and the committed known-answer
+#: digests reproduce unmoved. Nothing is exempted for the shipped default.
+#:
+#: Above 0.0 the two uniforms ARE the draw -- a phase and an age drawn from
+#: a distribution need two numbers, and a version that drew nothing would
+#: not have drawn anything. Same shape as the two above.
+#:
+#: The second place is not a construction draw and is worth writing out.
+#: `check_cycle_transition` returns BEFORE drawing while a phase is younger
+#: than its minimum duration, so a run opening at age zero rolls no exit
+#: for its first 180 days, and one opening at a drawn age past the minimum
+#: rolls one every day. The count therefore differs for the whole run and
+#: not only at construction -- and it differs because the phase's exit is
+#: being rolled, which is the thing this dial exists to make true on day
+#: one. Measured: +1 a day on a seed whose drawn expansion opens at 228
+#: days, nothing on seeds whose drawn phase opens below its minimum.
+#: WHICH DIALS REACH THE ECONOMY STREAM, measured across the whole settable
+#: surface at 0.7.0 rather than listed from memory. Not an exemption: the
+#: market stream is asserted unmoved for every one of these too, and the
+#: sweep that produced this list found NO dial that moves it.
+#:
+#: The four above -- `vix_jump_intensity`, `macro_burn_in_days`,
+#: `phase_target_range_draw`, `cycle_stationary_opening` -- are here because
+#: their draw IS their mechanism, which the notes above set out at length.
+#:
+#: `inflation_reversion` is the fifth and it arrived with the 0.7.0 default.
+#: `macro_burn_in_days` at 755 puts 755 days of macro in front of every run,
+#: and the macro chain has STATE-DEPENDENT draw sites: `update_central_bank`
+#: draws at each meeting, the OPEC arm draws on a decision day. A dial that
+#: changes the macro path therefore changes which of those fire, and the
+#: count follows -- here by ONE draw over the probe. On pt-v16 it moved
+#: nothing, because a run reached none of those sites in three sessions.
+#:
+#: That is the mechanism and not a leak. The market stream is where a paired
+#: comparison needs its alignment and it is untouched -- measured across the
+#: whole settable surface on this probe, and NO dial moves it -- while a
+#: macro dial that did not change which macro draw sites fire would be a
+#: macro dial that does nothing.
+#:
+#: This list is PROBE-SPECIFIC and derived with `run_market` rather than
+#: reasoned about: three sessions on this roster. A longer probe reaches
+#: more sites and would find more dials here, which is why the assertion
+#: below names the site rather than asserting a count.
+ECONOMY_STREAM_MOVERS = frozenset({
+    "vix_jump_intensity", "macro_burn_in_days", "phase_target_range_draw",
+    "cycle_stationary_opening", "inflation_reversion",
+})
 
 
 def test_the_perturbation_table_covers_the_whole_settable_surface():
@@ -390,10 +703,25 @@ def test_each_settable_parameter_moves_the_market_or_names_why_not(
     assert custom.fingerprint.startswith("custom-")
     perturbed = market_state(run_market(custom))
 
-    if name not in DRAW_SCHEDULE_MOVERS:
-        assert perturbed["draws"] == base["draws"], \
-            f"{name} moved the draw schedule"
-    moved = any(perturbed[k] != base[k] for k in perturbed if k != "draws")
+    # THE MARKET STREAM, for every parameter and with no exemptions. This is
+    # the claim the CRN apparatus rests on, and measured across the whole
+    # settable surface at 0.7.0 not one dial moves it -- including the four
+    # that used to be exempted here, whose draws all land in the economy
+    # stream. The exemption existed because the assertion was on the TOTAL;
+    # on the stream that matters, nothing needs exempting.
+    assert perturbed["draws_market"] == base["draws_market"], (
+        f"{name} moved the MARKET draw schedule, which no preset member may")
+    # The economy stream is DECLARED rather than exempted, and checked in
+    # both directions, so a dial that starts or stops displacing the macro
+    # path is a decision rather than a drift.
+    moved_economy = perturbed["draws_economy"] != base["draws_economy"]
+    assert moved_economy == (name in ECONOMY_STREAM_MOVERS), (
+        f"{name}: economy stream moved={moved_economy}, declared="
+        f"{name in ECONOMY_STREAM_MOVERS}. A dial reaches this stream by "
+        "changing which state-dependent macro draw site fires; add it with "
+        "the site it reaches, or find out why it stopped.")
+    moved = any(perturbed[k] != base[k] for k in perturbed
+                if k not in ("draws", "draws_market", "draws_economy"))
     assert moved == moves, (
         f"{name}={value}: expected moved={moves}, got {moved} — either a "
         "parameter is not wired through, or an inert reason above is stale"
@@ -414,8 +742,10 @@ def test_the_slow_variance_component_acts_when_its_three_parts_agree():
     optimiser could walk through.
     """
     base = market_state(run_market())
+    # From the DEFAULT, so this measures the slow component and not the
+    # distance to pt-v3 as well. See the note on CUSTOM below.
     both = tradefloor.ModelParams.from_preset(
-        "pt-v3", market_vol_slow_gain=0.1, market_vol_slow_weight=0.5)
+        market_vol_slow_gain=0.1, market_vol_slow_weight=0.5)
     assert both.fingerprint.startswith("custom-")
     moved = market_state(run_market(both))
     assert moved["draws"] == base["draws"], "the slow component moved the draw schedule"
@@ -739,7 +1069,8 @@ def test_the_conditionally_inert_parameters_act_under_their_conditions():
                         ("informed_flow_fraction", 0.5),
                         ("news_sector_weight", 0.6),
                         ("news_market_weight", 0.4)]:
-        custom = tradefloor.ModelParams.from_preset("pt-v1", **{name: value})
+        # From the DEFAULT, for the reason the note on CUSTOM gives.
+        custom = tradefloor.ModelParams.from_preset(**{name: value})
         moved = run_with_inputs(custom)
         assert moved["draws"] == base["draws"], name
         assert moved != base, f"{name} did not act even under its inputs"
@@ -939,7 +1270,14 @@ def test_replay_accepts_the_model_and_reproduces_the_custom_run():
 #: One perturbation, shared by the whole section. market_factor_sigma is
 #: the loudest single lever (it scales the shared component of every
 #: return), so any runner that quietly dropped the model fails fast.
-CUSTOM = tradefloor.ModelParams.from_preset("pt-v1", market_factor_sigma=0.03)
+#: Perturbed from the DEFAULT, not from pt-v1. The CRN guard below compares
+#: this against a default run, and building it from a named preset compares
+#: a preset change and a parameter change at once -- the mistake the note on
+#: `test_each_settable_parameter_moves_the_market_or_names_why_not` sets out.
+#: It was invisible until 0.7.0, when the default gained a construction
+#: burn-in that pt-v1 does not run and the two arms' draw counts parted by
+#: exactly the burn-in.
+CUSTOM = tradefloor.ModelParams.from_preset(market_factor_sigma=0.03)
 
 SMALL = tradefloor.Universe.random(6, seed=2)
 

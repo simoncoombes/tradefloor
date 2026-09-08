@@ -204,8 +204,15 @@ pub fn quote_ladder(params: &LadderParams) -> (Vec<LadderLevel>, Vec<LadderLevel
     // `Math.max(1, levels)`, then a `<` comparison per iteration. NaN makes
     // the comparison false immediately, giving zero levels — a `for` over an
     // integer range could not express that. An infinite `levels` loops
-    // forever, exactly as the original does; it is unreachable and left
-    // faithful rather than guarded.
+    // forever, exactly as the original does, and it is left faithful rather
+    // than guarded here.
+    //
+    // That used to be unreachable. It no longer is: the depth counterfactual
+    // passes `f64::INFINITY` as `SettleOptions::depth_multiplier` on every
+    // open tick, and the only thing between that and this loop is the
+    // `min(BOOK_LEVELS, ...)` in `microstructure::settle_price_through_book`.
+    // Removing that cap does not fail a test, it aborts the process on a 34
+    // GB allocation, so the cap carries an assertion beside it now.
     let n = mathx::max(1.0, params.levels);
 
     let mut i = 0i64;

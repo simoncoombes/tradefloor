@@ -159,7 +159,8 @@ def test_pending_flow_is_what_the_market_should_feel():
 def test_flow_fed_back_actually_moves_the_market():
     # Traded on AAB, not the usual TICKER (AAA), and the reason is worth
     # keeping: AAA is a 44M-share-a-day mega-cap, information impact
-    # saturates at 10x the average minute volume, and its saturated ceiling
+    # saturates at 10x the average minute volume under the shipped default
+    # (`order_flow_impact_law` removes that ceiling), and its saturated ceiling
     # works out to about one cent over this session -- which the cent grid
     # then hides or shows depending on where the seed's noise lands. It
     # showed until the stream-split re-deal and hides after, but the

@@ -33,11 +33,22 @@ from . import facts
 from . import loss
 from .checkpoint import Checkpoint, branch
 from . import counterfactual
-from .counterfactual import (Agreement, Comparison, Divergence, Resample,
-                             World, agree, compare, resample)
+from . import noise
+from .counterfactual import (Agreement, Comparison, Divergence, Invariance,
+                             Resample, World, agree, compare, invariance,
+                             resample)
+from . import externality
+from .externality import Externality, externalities
+from . import render
+from .render import JSONRenderer, Renderer, TextRenderer
 from .sweep import sweep
+from . import boundary
+from .boundary import BoundaryMap, Flip, flip, map_boundaries
+
+from . import explain
+from .explain import Explanation, Node
 from . import manifest
-from .manifest import RunManifest
+from .manifest import DayLedger, RunManifest, Verification
 from . import spec
 from .spec import SPEC_VERSION, StrategySpec
 from .scenario import Scenario, run_scenario
@@ -50,6 +61,11 @@ from . import yaml_subset
 from .tca import Execution
 from .baselines import capture_ratio, reference_agents
 from .ranking import AgentRecord, Ranking, rank
+from . import fingerprint
+from .fingerprint import (
+    BATTERY_VERSION, Battery, Cell, Fingerprint, FingerprintComparison,
+    battery, commit, reveal, sealed_battery,
+)
 from ._core import (  # noqa: F401
     ArrowStream,
     Engine,
@@ -78,6 +94,7 @@ from ._core import (  # noqa: F401
     impulse_response,
     market_status,
     model_preset,
+    preset_names,
     sector_daily_sigma,
     sectors,
     stationary_sigma,
@@ -102,14 +119,23 @@ __all__ = [
     "spec", "StrategySpec", "SPEC_VERSION",
     "Scenario", "run_scenario", "facts", "loss", "Checkpoint", "branch", "sweep",
     "counterfactual", "World", "agree", "compare", "resample",
+    "noise",
+    "externality", "Externality", "externalities",
     "Agreement", "Comparison", "Resample",
     "Divergence",
+    "boundary", "flip", "map_boundaries", "Flip", "BoundaryMap",
+    "invariance", "Invariance", "render", "Renderer", "TextRenderer",
+    "JSONRenderer",
+    "explain", "Explanation", "Node",
     "Intervention", "Firing", "ScenarioValidationError", "interventions",
     "TARGETS", "UNSUPPORTED_TARGETS", "yaml_subset",
-    "manifest", "RunManifest",
+    "manifest", "RunManifest", "DayLedger", "Verification",
+    "fingerprint", "BATTERY_VERSION", "Battery", "Cell", "Fingerprint",
+    "FingerprintComparison", "battery", "commit", "reveal", "sealed_battery",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
-    "market_status", "model_preset", "run_many", "sector_daily_sigma", "sectors",
+    "market_status", "model_preset", "preset_names", "run_many",
+    "sector_daily_sigma", "sectors",
     "stationary_sigma", "step_mispricing_daily", "version",
     "__version__",
 ]

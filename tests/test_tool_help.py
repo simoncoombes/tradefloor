@@ -25,13 +25,18 @@ import sys
 
 import pytest
 
-TOOLS = pathlib.Path(__file__).resolve().parent.parent / "tools" / "calibration"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+#: Every directory under `tools/` holding scripts a reader runs. The glob
+#: covered `calibration` alone, so `tools/shadow/shadow.py --help` worked
+#: and nothing kept it working.
+TOOL_DIRS = (ROOT / "tools" / "calibration", ROOT / "tools" / "shadow")
 
 
 def _entry_points() -> list[pathlib.Path]:
     """Tool scripts that parse arguments, so have a help to print."""
     out = []
-    for path in sorted(TOOLS.glob("*.py")):
+    paths = sorted(p for d in TOOL_DIRS if d.is_dir() for p in d.glob("*.py"))
+    for path in paths:
         if path.name.startswith("_"):
             continue
         text = path.read_text(encoding="utf-8")

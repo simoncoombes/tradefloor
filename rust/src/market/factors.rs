@@ -48,6 +48,76 @@ use crate::mathx;
 /// preset that carries jumps (§74).
 pub const JUMP_COMPONENT_KEY: &str = "jump";
 
+/// The overnight move's slot in the ENGINE's attribution, after the jump.
+/// `Engine::apply_overnight` moves `mispricing_s` at the open, before any
+/// tick, so a decomposition without it would not reconstruct the first
+/// tick of a day on any preset that carries the overnight process.
+pub const OVERNIGHT_COMPONENT_KEY: &str = "overnight";
+
+/// The jump's and the overnight move's slots in the engine's attribution,
+/// after the tick's components, and the width of an attribution row. Every
+/// array of components is sized from `COMPONENT_COUNT` rather than written
+/// out, for the reason `rng::stream::COUNT` gives.
+pub const JUMP_SLOT: usize = S_COMPONENT_KEYS.len();
+pub const OVERNIGHT_SLOT: usize = JUMP_SLOT + 1;
+pub const COMPONENT_COUNT: usize = OVERNIGHT_SLOT + 1;
+
+/// A name's loading on its sector factor, from its beta (§108).
+///
+/// At slope zero the branch is not taken and the loading is exactly
+/// `sector_loading`, so a preset that sets neither is bit-identical. Shared
+/// by the tick and the overnight move so the two compose a name the same
+/// way; the tick's arithmetic is this function's, operation for operation.
+pub fn sector_loading_for(params: &crate::params::ModelParams, beta: f64) -> f64 {
+    if params.sector_loading_beta_slope == 0.0 {
+        params.sector_loading
+    } else {
+        // Tied to beta rather than to a new draw: a name that moves more
+        // with the market plausibly moves more with its industry too, and
+        // reusing an existing per-name attribute costs no RNG stream and
+        // cannot shift the draw schedule.
+        let b = beta;
+        params.sector_loading * (1.0 + params.sector_loading_beta_slope * (b - 1.0))
+    }
+}
+
+/// A name's idiosyncratic scale, from its beta.
+///
+/// The idiosyncratic scale was one number for every name in the roster:
+/// cap size varies a name's noise through `cap_mult` and GARCH varies it
+/// through the name's own conditional variance, but the SCALE itself did
+/// not vary at all. Real rosters disperse well past that -- interquartile
+/// volatility ratio 1.273..1.486 over ten reference windows against
+/// pt-v12's 1.205 -- and no dial that moves every name together closes a
+/// dispersion gap.
+///
+/// At exponent zero the branch is not taken and the scale is exactly
+/// `idio_sigma_scale`, so a preset that leaves it unset is bit-identical.
+/// Shared by the tick and the overnight move, as `sector_loading_for` is.
+pub fn idio_scale_for(params: &crate::params::ModelParams, beta: f64) -> f64 {
+    if params.idio_sigma_beta_exponent == 0.0 {
+        params.idio_sigma_scale
+    } else if beta <= 0.0 {
+        // A non-positive beta has no exposure to raise to a power, and
+        // `pow` of a negative base with a fractional exponent is NaN. The
+        // homogeneous scale is the honest answer, following
+        // `cap_size_multiplier_with`'s treatment of a non-positive cap.
+        params.idio_sigma_scale
+    } else {
+        // Same choice as `sector_loading_beta_slope`: tied to beta, which
+        // the universe already carries, so it costs no RNG stream and
+        // cannot move the draw schedule.
+        //
+        // Bounded for the same reason the size effect is: a power law is
+        // unbounded as its base leaves the ordinary range, and a degenerate
+        // beta must not be able to silence a name or let one dominate the
+        // roster's whole variance budget.
+        let (lo, hi) = IDIO_BETA_BOUNDS;
+        params.idio_sigma_scale
+            * mathx::clamp(mathx::pow(beta, params.idio_sigma_beta_exponent), lo, hi)
+    }
+}
+
 pub const S_COMPONENT_KEYS: [&str; 8] = [
     "reversion",
     "momentum",
@@ -116,6 +186,14 @@ pub struct SharedFactors {
     /// Yesterday's session closed with a down market factor. Read only by
     /// the lagged transmission wire (`market_beta_down_asym_lag`).
     pub prev_day_down: bool,
+    /// The CONDITIONAL per-tick sigma `market_factor` was drawn with, which
+    /// is `market_sigma_daily / sqrt(390)` and not
+    /// `params.market_factor_sigma`. Carried rather than recomputed
+    /// because the two differ by the whole of the factor's variance
+    /// process, and the one quantity that can recentre the downside tilt
+    /// exactly is the sigma the draw actually used. Read only by
+    /// `market_beta_down_asym_recentre`.
+    pub market_sigma_tick: f64,
 }
 
 impl SharedFactors {
@@ -412,18 +490,10 @@ pub fn calculate_live_factors(
     // systematic loading the model did not let vary, where its exposure to
     // the MARKET varies by beta two lines above.
     //
-    // At slope zero the branch is not taken and the loading is exactly
-    // `sector_loading`, so a preset that sets neither is bit-identical.
-    let sector_loading = if params.sector_loading_beta_slope == 0.0 {
-        params.sector_loading
-    } else {
-        // Tied to beta rather than to a new draw: a name that moves more
-        // with the market plausibly moves more with its industry too, and
-        // reusing an existing per-name attribute costs no RNG stream and
-        // cannot shift the draw schedule.
-        let b = beta;
-        params.sector_loading * (1.0 + params.sector_loading_beta_slope * (b - 1.0))
-    };
+    // The loading and the scale are `sector_loading_for` and
+    // `idio_scale_for`, shared with the overnight move so the two compose
+    // a name the same way; each is the arithmetic that stood here.
+    let sector_loading = sector_loading_for(params, beta);
     let sector_component = sector_loading * shared.sector(&company.sector);
 
     // `garchVariance` is in DAILY units; the tick needs per-tick sigma.
@@ -431,38 +501,20 @@ pub fn calculate_live_factors(
     // reallocation: the factor's variance share was raised out of THIS
     // term's budget, so total volatility holds still. At 1.0 the multiply
     // is bit-inert.
-    let daily_sigma = mathx::sqrt(mathx::max(company.garch_variance, 0.0001));
-    // The idiosyncratic scale was one number for every name in the roster:
-    // cap size varies a name's noise through `cap_mult` and GARCH varies it
-    // through the name's own conditional variance, but the SCALE itself did
-    // not vary at all. Real rosters disperse well past that -- interquartile
-    // volatility ratio 1.273..1.486 over ten reference windows against
-    // pt-v12's 1.205 -- and no dial that moves every name together closes a
-    // dispersion gap.
-    //
-    // At exponent zero the branch is not taken and the scale is exactly
-    // `idio_sigma_scale`, so a preset that leaves it unset is bit-identical.
-    let idio_scale = if params.idio_sigma_beta_exponent == 0.0 {
-        params.idio_sigma_scale
-    } else if beta <= 0.0 {
-        // A non-positive beta has no exposure to raise to a power, and
-        // `pow` of a negative base with a fractional exponent is NaN. The
-        // homogeneous scale is the honest answer, following
-        // `cap_size_multiplier_with`'s treatment of a non-positive cap.
-        params.idio_sigma_scale
-    } else {
-        // Same choice as `sector_loading_beta_slope`: tied to beta, which
-        // the universe already carries, so it costs no RNG stream and
-        // cannot move the draw schedule.
-        //
-        // Bounded for the same reason the size effect is: a power law is
-        // unbounded as its base leaves the ordinary range, and a degenerate
-        // beta must not be able to silence a name or let one dominate the
-        // roster's whole variance budget.
-        let (lo, hi) = IDIO_BETA_BOUNDS;
-        params.idio_sigma_scale
-            * mathx::clamp(mathx::pow(beta, params.idio_sigma_beta_exponent), lo, hi)
-    };
+    // THE ABSOLUTE FLOOR, and why it is a parameter now. This 1e-4 was a
+    // dead-stock guard: "a zero variance would make sigma zero and the
+    // price would stop moving entirely". Against a recursion whose own
+    // level is about 6.3e-5 it is not a guard, it is the law -- it binds on
+    // 61 to 90 per cent of name-days in nine of the twelve sectors, and it
+    // is what makes a utility and a bank carry the same idiosyncratic
+    // sigma. The job it was written for is already done, per sector rather
+    // than absolutely, by the `[0.25, 5.0] x sector_base_variance` clamp in
+    // `garch::update_garch_variance_for`, which cannot return zero for a
+    // positive base. So this REMOVES a constant rather than adding one:
+    // shipping at 1e-4 leaves every existing preset bit-identical, and a
+    // preset that sets it to 0.0 has one fewer number in it.
+    let daily_sigma = mathx::sqrt(mathx::max(company.garch_variance, params.idio_sigma_floor));
+    let idio_scale = idio_scale_for(params, beta);
     let idiosyncratic_sigma = daily_sigma * idio_scale / mathx::sqrt(390.0);
 
     // DRAW SITE — here, before `crash_amplifier` is computed. The order is
@@ -502,7 +554,36 @@ pub fn calculate_live_factors(
         1.0
     };
 
-    let random_noise = market_component * crash_amplifier + sector_component + idiosyncratic_noise;
+    // Give back the first moment the downside tilt injects, AFTER the
+    // amplifier. `market_beta_down_asym` scales one side of a zero-mean
+    // draw, which moves its mean, and a mean here is a drift: for
+    // `f ~ N(0, s^2)`, `E[f 1{f<0}] = -s / sqrt(2 pi)`, so the tilt adds
+    // `a * beta * -s / sqrt(2 pi)` to every name every tick whether the
+    // market is calm or not.
+    //
+    // `s` is the CONDITIONAL sigma of this tick's draw, so the correction
+    // tracks the variance process instead of assuming the baseline. AFTER
+    // the amplifier because an offset added before it would be amplified
+    // too, delivering the form times `E[A]` rather than the form. What
+    // that leaves is the amplifier's own effect on the tilt, which has no
+    // closed form and is about one per cent; see the parameter's doc.
+    //
+    // A branch, and gated on BOTH dials being nonzero, so every preset
+    // that predates this parameter is bit-identical and so is any preset
+    // that sets it without the tilt it corrects.
+    let tilt_recentre = if params.market_beta_down_asym_recentre == 0.0
+        || params.market_beta_down_asym == 0.0
+    {
+        0.0
+    } else {
+        params.market_beta_down_asym_recentre
+            * params.market_beta_down_asym
+            * beta
+            * shared.market_sigma_tick
+            / SQRT_TWO_PI
+    };
+    let random_noise =
+        market_component * crash_amplifier + tilt_recentre + sector_component + idiosyncratic_noise;
 
     // ── Forced flow ───────────────────────────────────────────────────────
     // Squeezes and stop cascades react to a move that ALREADY happened —
@@ -520,17 +601,41 @@ pub fn calculate_live_factors(
         short_squeeze_effect = mathx::min(0.02, short_squeeze_effect);
     }
 
+    // The two stop ladders, and how far they are matched. At symmetry 0.0
+    // each side keeps its own literals and the arithmetic below is the
+    // shipped arithmetic. At 1.0 both use the mean of the pair: threshold
+    // 0.025, tiers 0.007, 0.0045, 0.0025 and 0.0005. That chooses neither
+    // side and preserves the pair's total intervention exactly, 0.029
+    // before and after.
+    //
+    // The GATES are untouched either way. A stop-loss sits under every
+    // long, so the downside carries no condition beyond its threshold; a
+    // buy-stop needs shorts to exist, so the upside keeps its short
+    // interest gate. Those are finance rather than an accident.
+    let (down_gate, down_a, down_b, down_c, down_d,
+         up_gate, up_a, up_b, up_c, up_d) =
+        if params.cascade_symmetry == 0.0 {
+            (0.02, 0.008, 0.005, 0.003, 0.001,
+             0.03, 0.006, 0.004, 0.002, 0.000)
+        } else {
+            let g = params.cascade_symmetry;
+            (0.02 + 0.005 * g, 0.008 - 0.001 * g, 0.005 - 0.0005 * g,
+             0.003 - 0.0005 * g, 0.001 - 0.0005 * g,
+             0.03 - 0.005 * g, 0.006 + 0.001 * g, 0.004 + 0.0005 * g,
+             0.002 + 0.0005 * g, 0.000 + 0.0005 * g)
+        };
+
     // Downside stop cascade — denser stops at the -3/-5/-7% levels.
-    if daily_return < -0.02 {
+    if daily_return < -down_gate {
         let drop = daily_return.abs();
         let stop_cascade = if drop > 0.07 {
-            0.008
+            down_a
         } else if drop > 0.05 {
-            0.005
+            down_b
         } else if drop > 0.03 {
-            0.003
+            down_c
         } else {
-            0.001
+            down_d
         };
         short_squeeze_effect -= stop_cascade;
     }
@@ -538,13 +643,20 @@ pub fn calculate_live_factors(
     // Upside cascade — short sellers' buy-stops trigger on rallies. Note this
     // is NOT exclusive with the squeeze block above: a heavily-shorted name up
     // 8% gets both, which is the point.
-    if daily_return > 0.03 && short_interest_ratio > 0.1 {
+    //
+    // The fourth tier is 0.0 at symmetry 0.0, where the shipped ladder has
+    // only three and this branch is the band between the gate and 3 per
+    // cent that the shipped rule never reaches, since its gate IS 3 per
+    // cent. It becomes reachable and non-zero together.
+    if daily_return > up_gate && short_interest_ratio > 0.1 {
         let buy_cascade = if daily_return > 0.07 {
-            0.006
+            up_a
         } else if daily_return > 0.05 {
-            0.004
+            up_b
+        } else if daily_return > 0.03 {
+            up_c
         } else {
-            0.002
+            up_d
         };
         short_squeeze_effect += buy_cascade;
     }
@@ -564,6 +676,22 @@ fn truthy(value: Option<f64>) -> f64 {
         _ => 0.0,
     }
 }
+
+/// `sqrt(2 pi)`, the denominator of a standard normal's half-moment:
+/// `E[f 1{f<0}] = -sigma / sqrt(2 pi)`.
+///
+/// A literal because `sqrt` is not a const function, and safe as a literal
+/// because IEEE-754 specifies `sqrt` exactly, so there is one right answer
+/// on every target and `the_half_moment_denominator_is_sqrt_two_pi` asserts
+/// this is it, bit for bit, against the language's own `PI`. That test is
+/// the reason this is not a second source of truth: a mistyped digit fails
+/// it rather than shipping a slightly wrong recentring.
+///
+/// Note what this deliberately is NOT: `erf`. Recentring needs only the
+/// half-moment of a normal, which is elementary. The normal TAIL would
+/// need `erf`, `mathx` exposes none, and adding one would be a new
+/// bit-pinned transcendental with its own known-answer obligation.
+const SQRT_TWO_PI: f64 = 2.5066282746310002;
 
 /// Order imbalance from a tick's pending orders, from the reference
 /// implementation.
@@ -592,6 +720,81 @@ fn truthy_or(value: f64, fallback: f64) -> f64 {
     } else {
         fallback
     }
+}
+
+/// The participation at which the shipped multiplier stops responding, and
+/// the slope it responds with below that. Both are read back out of
+/// `order_imbalance` itself by `the_law_constants_are_the_shipped_ones`, so
+/// they cannot drift away from the literals that function still uses.
+const PARTICIPATION_KNEE: f64 = 10.0;
+const PARTICIPATION_SLOPE: f64 = 0.15;
+
+/// The measured participation multiplier: linear below the knee, square
+/// root above it.
+///
+/// Continuous at the knee by construction and not by arrangement -- both
+/// branches evaluate to `PARTICIPATION_SLOPE * PARTICIPATION_KNEE` there,
+/// because `sqrt(1)` is exactly 1.0 in IEEE-754.
+///
+/// The linear branch reaches down to zero on its own, which is why there is
+/// no floor here. The shipped 0.2 was the linear law clamped at precisely
+/// the point it crosses 0.2, since `PARTICIPATION_SLOPE * 4.0 / 3.0` is
+/// that value; removing the clamp continues the same line rather than
+/// introducing a different one.
+fn participation_multiplier(participation: f64) -> f64 {
+    if participation <= PARTICIPATION_KNEE {
+        PARTICIPATION_SLOPE * participation
+    } else {
+        PARTICIPATION_SLOPE
+            * PARTICIPATION_KNEE
+            * mathx::sqrt(participation / PARTICIPATION_KNEE)
+    }
+}
+
+/// `order_imbalance` under `order_flow_impact_law`.
+///
+/// At 0.0 this IS `order_imbalance`, by branch rather than by arithmetic,
+/// so every preset that predates the dial is bit-identical. At 1.0 the
+/// participation multiplier follows the measured law instead of the clamped
+/// one. `ModelParams::order_flow_impact_law` carries the sources, the
+/// clock, and what the change does not claim. It does NOT restate the
+/// depth exponent; that is issue #182.
+///
+/// `order_imbalance` keeps its signature and its behaviour because it is
+/// public API, re-exported through `market::mod`. This is the
+/// `cap_size_multiplier` / `cap_size_multiplier_with` pattern already in
+/// this file.
+pub fn order_imbalance_with(
+    params: &crate::params::ModelParams,
+    buy_vol: f64,
+    sell_vol: f64,
+    avg_volume: f64,
+) -> f64 {
+    if params.order_flow_impact_law == 0.0 {
+        return order_imbalance(buy_vol, sell_vol, avg_volume);
+    }
+    let total_vol = buy_vol + sell_vol;
+    // Written as the negation so a NaN total takes this branch too, which is
+    // what `order_imbalance`'s `if total_vol > 0.0` does. Returning the same
+    // literal keeps the sign of the zero identical on both laws, and that is
+    // what makes a run with no injected flow bit-identical rather than
+    // merely equal.
+    //
+    // A NOTE FOR WHOEVER REVISES THE LAW BELOW. The shipped call site
+    // multiplies a raw imbalance by the multiplier, and with no injected
+    // flow that raw imbalance is a literal zero. Zero times a FINITE
+    // multiplier is zero; zero times an infinity is NaN, and a NaN reaching
+    // a price is a moved trajectory and a moved known-answer digest. So a
+    // participation term must stay finite at zero participation even though
+    // this early return means it is not evaluated there today. Putting a
+    // division or a logarithm in `participation_multiplier` breaks that,
+    // and `the_multiplier_is_finite_at_zero_participation` is what says so.
+    if !(total_vol > 0.0) {
+        return 0.0;
+    }
+    let avg_minute_vol = mathx::max(truthy_or(avg_volume, 1_000_000.0) / 390.0, 100.0);
+    let raw_imbalance = (buy_vol - sell_vol) / total_vol;
+    raw_imbalance * participation_multiplier(total_vol / avg_minute_vol)
 }
 
 #[cfg(test)]
@@ -630,6 +833,8 @@ mod tests {
             sector_factors: vec![("technology".into(), 0.0)],
             crisis_spike: 0.0,
             prev_day_down: false,
+            market_sigma_tick: crate::params::PT_V1.market_factor_sigma
+                / crate::mathx::sqrt(390.0),
         }
     }
 
@@ -640,6 +845,18 @@ mod tests {
         s: &SharedFactors,
     ) -> LiveFactors {
         calculate_live_factors(c, news, imbalance, 1.0, s, &crate::params::PT_V1, &mut Fixed(0.0))
+    }
+
+    /// `factors` under explicit parameters, for the dials whose whole
+    /// question is what a preset sets them to.
+    fn factors_with(
+        p: &crate::params::ModelParams,
+        c: &FactorCompany,
+        news: &[NewsEvent],
+        imbalance: f64,
+        s: &SharedFactors,
+    ) -> LiveFactors {
+        calculate_live_factors(c, news, imbalance, 1.0, s, p, &mut Fixed(0.0))
     }
 
     #[test]
@@ -847,6 +1064,109 @@ mod tests {
     }
 
     #[test]
+    fn the_half_moment_denominator_is_sqrt_two_pi() {
+        // SQRT_TWO_PI is a literal because `sqrt` is not const. This is
+        // what stops it being a second source of truth: it must equal the
+        // language's own PI put through the same `sqrt` the rest of this
+        // crate uses, to the bit.
+        assert_eq!(SQRT_TWO_PI, mathx::sqrt(2.0 * std::f64::consts::PI));
+    }
+
+    #[test]
+    fn recentring_returns_the_mean_the_downside_tilt_injects() {
+        // The claim, measured rather than argued: with the tilt on, the
+        // market channel's mean over a symmetric factor is negative, and
+        // with the recentring on it is zero. Averaged over a symmetric
+        // grid of factor draws, which is what makes the two arms
+        // comparable without an RNG.
+        let mut params = crate::params::PT_V16;
+        assert_ne!(params.market_beta_down_asym, 0.0, "the tilt must be on");
+        let sigma_tick = params.market_factor_sigma / mathx::sqrt(390.0);
+
+        // A symmetric grid, WEIGHTED BY THE NORMAL DENSITY. The weight is
+        // the whole point: the correction gives back `E[f 1{f<0}]` for a
+        // NORMAL factor, which is `-sigma / sqrt(2 pi)`. Averaging over a
+        // uniform grid instead measures `E[f 1{f<0}]` for a uniform one,
+        // which on [-4, 4] sigmas is -1.0 sigma against the normal's
+        // -0.399, so a correct correction would look 60 per cent short.
+        // This test asserted exactly that and failed the code for it.
+        let grid: Vec<f64> = (1..=400)
+            .map(|k| k as f64 * 0.01)
+            .flat_map(|z| [z, -z])
+            .collect();
+
+        let mean_of = |p: &crate::params::ModelParams| -> f64 {
+            let company = company();
+            let mut total = 0.0;
+            let mut weight_sum = 0.0;
+            for z in &grid {
+                let w = mathx::exp(-z * z / 2.0);
+                let s = SharedFactors {
+                    market_factor: z * sigma_tick,
+                    sector_factors: vec![("technology".into(), 0.0)],
+                    crisis_spike: 0.0,
+                    prev_day_down: false,
+                    market_sigma_tick: sigma_tick,
+                };
+                total += w * factors_with(p, &company, &[], 0.0, &s).random_noise;
+                weight_sum += w;
+            }
+            total / weight_sum
+        };
+
+        let injected = mean_of(&params);
+        assert!(
+            injected < 0.0,
+            "the tilt should inject a NEGATIVE mean, got {injected}"
+        );
+
+        params.market_beta_down_asym_recentre = 1.0;
+        let corrected = mean_of(&params);
+
+        // What remains is the crash amplifier's own effect on the tilt,
+        // which this deliberately does not correct. It is a small
+        // fraction of the term, and it is the ONLY thing left.
+        let residual = corrected / injected;
+        assert!(
+            residual.abs() < 0.05,
+            "recentring left {residual} of the injected mean, expected \
+             only the amplifier's few per cent"
+        );
+        // And it did not overshoot into a positive drift.
+        assert!(corrected <= 0.0, "recentring overshot to {corrected}");
+    }
+
+    #[test]
+    fn recentring_is_inert_without_the_tilt_it_corrects() {
+        // Gated on BOTH dials. A preset that sets the recentring without
+        // the tilt has nothing to give back and must be bit-identical, or
+        // the dial would inject the drift it exists to remove.
+        let company = company();
+        let s = shared();
+        let mut params = crate::params::PT_V16;
+        params.market_beta_down_asym = 0.0;
+        let without = factors_with(&params, &company, &[], 0.0, &s).random_noise;
+        params.market_beta_down_asym_recentre = 1.0;
+        let with = factors_with(&params, &company, &[], 0.0, &s).random_noise;
+        assert_eq!(without, with);
+    }
+
+    #[test]
+    fn every_preset_before_pt_v18_is_bit_identical_under_the_new_dial() {
+        // The parameter ships at 0.0 and the branch is at zero, so adding
+        // it moved no trajectory. Asserted against the presets rather than
+        // argued from the branch.
+        for name in crate::params::ModelParams::preset_names() {
+            let p = crate::params::ModelParams::preset(name).expect("named");
+            if *name == "pt-v18" {
+                assert_eq!(p.market_beta_down_asym_recentre, 1.0, "{name}");
+                continue;
+            }
+            assert_eq!(p.market_beta_down_asym_recentre, 0.0, "{name}");
+        }
+    }
+
+    #[test]
     fn order_flow_carries_only_the_informed_fraction() {
         // The structural claim behind INFORMED_FLOW_FRACTION: the book now
         // charges the mechanical part, so the factor must not.
@@ -895,6 +1215,274 @@ mod tests {
             order_imbalance(1000.0, 0.0, 0.0),
             order_imbalance(1000.0, 0.0, 1_000_000.0)
         );
+    }
+
+    // -- The participation law ---------------------------------------------
+
+    fn law_on() -> crate::params::ModelParams {
+        crate::params::PT_V16
+            .with_override("order_flow_impact_law", 1.0)
+            .unwrap()
+    }
+
+    /// The multiplier alone, at participation `phi`.
+    ///
+    /// A pure one-sided buy, so the raw imbalance is exactly 1.0 and what
+    /// comes back is the participation term by itself. 390,000 shares a day
+    /// is 1,000 a minute, well clear of the 100-share floor, so `phi`
+    /// thousand shares of buying IS a participation of `phi`.
+    fn multiplier(p: &crate::params::ModelParams, phi: f64) -> f64 {
+        order_imbalance_with(p, phi * 1000.0, 0.0, 390_000.0)
+    }
+
+    /// `d log m / d log phi`, measured across one octave.
+    ///
+    /// A power law returns its own exponent. Anything else returns the
+    /// average slope over the octave, which is what makes this readable on
+    /// a clamped function too: a clamp reads zero.
+    fn exponent(p: &crate::params::ModelParams, phi: f64) -> f64 {
+        mathx::log(multiplier(p, 2.0 * phi) / multiplier(p, phi)) / mathx::log(2.0)
+    }
+
+    #[test]
+    fn the_shipped_law_stops_responding_at_both_ends_and_not_just_the_top() {
+        // Issue #166 reports the ceiling. The floor is the same defect at
+        // the other end, and it is measured here rather than read off the
+        // source because the two clamps are written differently -- one is a
+        // `min` inside the product, the other a `max` around it -- and only
+        // the elasticity shows they do the same thing.
+        let off = crate::params::PT_V16;
+        assert_eq!(
+            off.order_flow_impact_law, 0.0,
+            "the shipped law must remain the default"
+        );
+        for (phi, expected, what) in [
+            (0.1, 0.0, "below the floor, size has stopped mattering"),
+            (2.0, 1.0, "in the band, size maps straight through"),
+            (20.0, 0.0, "above the ceiling, size has stopped mattering again"),
+        ] {
+            let k = exponent(&off, phi);
+            assert!((k - expected).abs() < 1e-12, "phi {phi}: {k}, {what}");
+        }
+        // And WHERE the ends are, not only that they exist. Mutation
+        // testing found this: with the elasticities alone, a ceiling moved
+        // from ten to twenty still reads 0 at the point sampled above it,
+        // because that point moved inside the new band. The multiplier is
+        // already at its ceiling at exactly ten, and still rising just
+        // below, so a ceiling anywhere else fails one of these two.
+        assert_eq!(multiplier(&off, PARTICIPATION_KNEE), multiplier(&off, 1e9));
+        assert!(multiplier(&off, 9.0) < multiplier(&off, PARTICIPATION_KNEE));
+    }
+
+    #[test]
+    fn the_law_constants_are_read_back_out_of_the_shipped_function() {
+        // `PARTICIPATION_SLOPE` and `PARTICIPATION_KNEE` are named here but
+        // `order_imbalance` still uses its own literals, so the two could
+        // drift apart. Recovered rather than compared against a number
+        // written twice: the slope from two points inside the band, the
+        // ceiling from a participation far outside it, and the knee as
+        // their ratio.
+        let off = crate::params::PT_V16;
+        let slope = (multiplier(&off, 8.0) - multiplier(&off, 4.0)) / 4.0;
+        assert!((slope - PARTICIPATION_SLOPE).abs() < 1e-15, "slope {slope}");
+        let knee = multiplier(&off, 1e9) / slope;
+        assert!((knee - PARTICIPATION_KNEE).abs() < 1e-9, "knee {knee}");
+        // The floor is not an independent constant either: it is what the
+        // same line reaches at four thirds.
+        let floor_crossing = multiplier(&off, 1e-9) / slope;
+        assert!(
+            (floor_crossing - 4.0 / 3.0).abs() < 1e-9,
+            "floor crossing {floor_crossing}"
+        );
+    }
+
+    #[test]
+    fn the_measured_law_leaves_the_band_between_the_clamps_untouched() {
+        // The whole claim of the fix, stated as an equality: the shipped
+        // law is already right where neither clamp binds, so the change is
+        // confined to the two tails. Bit for bit, not approximately.
+        let off = crate::params::PT_V16;
+        let on = law_on();
+        for phi in [1.4, 2.0, 5.0, 9.0, 9.999] {
+            assert_eq!(multiplier(&off, phi), multiplier(&on, phi), "phi {phi}");
+        }
+        // Outside it they differ in OPPOSITE directions, which is the part
+        // the issue's framing as saturation misses. The floor made small
+        // orders too expensive; the ceiling made large ones too cheap.
+        assert!(multiplier(&on, 0.1) < multiplier(&off, 0.1));
+        assert!(multiplier(&on, 100.0) > multiplier(&off, 100.0));
+    }
+
+    #[test]
+    fn the_measured_law_keeps_responding_above_the_knee() {
+        // The test the shipped pair should have been. It fails if the
+        // exponent above the knee is zero, which is what the `min` gave,
+        // and it fails just as loudly at any other clamp, because a higher
+        // ceiling is still a ceiling.
+        //
+        // One half is not chosen here. Toth et al. (Physical Review X 1,
+        // 021006, 2011) measure it for orders large against available
+        // volume; the citation and the reason the two regimes are one law
+        // sit on `ModelParams::order_flow_impact_law`.
+        let on = law_on();
+        for phi in [11.0, 50.0, 1_000.0, 100_000.0] {
+            let k = exponent(&on, phi);
+            assert!((k - 0.5).abs() < 1e-12, "phi {phi} gave exponent {k}");
+        }
+        // Unbounded, so no two sizes are ever the same order to the model.
+        // A hundredfold larger order costs ten times more, at any size.
+        let ratio = multiplier(&on, 1e6) / multiplier(&on, 1e4);
+        assert!((ratio - 10.0).abs() < 1e-9, "{ratio}");
+    }
+
+    #[test]
+    fn the_measured_law_is_linear_below_the_knee_all_the_way_down() {
+        // Cont, Kukanov and Stoikov (Journal of Financial Econometrics
+        // 12(1), 2014) give exponent one at this scale, and the shipped
+        // floor gives zero below four thirds. Asserted across four decades,
+        // so a floor reintroduced anywhere in that range fails here.
+        let on = law_on();
+        for phi in [1e-4, 1e-3, 1e-2, 0.1, 0.5, 1.0, 4.0] {
+            let k = exponent(&on, phi);
+            assert!((k - 1.0).abs() < 1e-12, "phi {phi} gave exponent {k}");
+        }
+    }
+
+    #[test]
+    fn the_multiplier_is_finite_at_zero_participation() {
+        // Not reachable through `order_imbalance_with` today, which returns
+        // early on zero volume. This guards the law itself, because the
+        // early return is not what the digests rest on: the call site
+        // multiplies a literal zero by whatever comes back, and zero times
+        // an infinity is NaN. A division or a logarithm added to the law
+        // fails here rather than in a trajectory nobody re-runs.
+        let m = participation_multiplier(0.0);
+        assert!(m.is_finite(), "{m}");
+        let product = 0.0 * m;
+        assert_eq!(product, 0.0);
+        assert!(product.is_sign_positive(), "{product}");
+    }
+
+    #[test]
+    fn the_two_branches_meet_at_the_knee() {
+        // Continuous by construction and not by arrangement: `sqrt(1)` is
+        // exactly 1.0, so the square-root branch evaluates to the linear
+        // branch's value at the crossover with no constant matched by hand.
+        assert_eq!(
+            participation_multiplier(PARTICIPATION_KNEE),
+            PARTICIPATION_SLOPE * PARTICIPATION_KNEE
+        );
+        let above = participation_multiplier(PARTICIPATION_KNEE * (1.0 + 1e-12));
+        let below = participation_multiplier(PARTICIPATION_KNEE * (1.0 - 1e-12));
+        assert!((above - below).abs() < 1e-9, "{above} vs {below}");
+    }
+
+    #[test]
+    fn the_measured_law_never_stops_responding_to_size() {
+        // Monotone strictly increasing across nine decades of
+        // participation. The shipped law fails this at both ends, and the
+        // second assertion keeps this test honest by requiring that it
+        // does -- otherwise a change that flattened BOTH laws would leave
+        // the first assertion passing on a function that never moves.
+        let on = law_on();
+        let off = crate::params::PT_V16;
+        let mut phi = 1e-4;
+        let mut ties_off = 0;
+        while phi < 1e5 {
+            let next = phi * 2.0;
+            assert!(
+                multiplier(&on, next) > multiplier(&on, phi),
+                "measured law flat between {phi} and {next}"
+            );
+            if multiplier(&off, next) == multiplier(&off, phi) {
+                ties_off += 1;
+            }
+            phi = next;
+        }
+        assert!(
+            ties_off > 0,
+            "the shipped law is supposed to be the one that goes flat"
+        );
+    }
+
+    #[test]
+    fn every_shipped_preset_runs_the_shipped_law() {
+        // The dial ships at 0.0 everywhere, so adding it moved no
+        // trajectory. Asserted against the presets themselves rather than
+        // argued from the branch, and it will fail the day a preset turns
+        // the law on -- which is the day the change stops being free.
+        for name in crate::params::ModelParams::preset_names() {
+            let p = crate::params::ModelParams::preset(name).expect("named");
+            assert_eq!(p.order_flow_impact_law, 0.0, "{name}");
+        }
+    }
+
+    #[test]
+    fn the_dial_at_zero_is_the_shipped_function_bit_for_bit() {
+        let off = crate::params::PT_V16;
+        for (b, s, av) in [
+            (10_000.0, 0.0, 50_000.0),
+            (0.0, 10_000.0, 50_000.0),
+            (1e6, 1e6, 1e6),
+            (0.0, 0.0, 1e6),
+            (1000.0, 0.0, 0.0),
+            (3.0, 7.0, 1e9),
+            (1e9, 1.0, 1e6),
+        ] {
+            assert_eq!(
+                order_imbalance_with(&off, b, s, av),
+                order_imbalance(b, s, av),
+                "{b} {s} {av}"
+            );
+        }
+    }
+
+    #[test]
+    fn no_injected_flow_is_bit_identical_under_either_law() {
+        // Why the known-answer digests do not move. Every
+        // `TickInputs.order_volumes` outside the two `order_flow=` paths is
+        // the empty slice, so the tick reads a default `OrderVolume` and
+        // calls this with two zeros.
+        //
+        // The SIGN is the assertion, not the value. A `-0.0` reaching an
+        // accumulator is the one way a term that is arithmetically nothing
+        // can still move a trajectory, and the two laws arrive at zero by
+        // different routes -- one multiplies by a floor of 0.2, the other
+        // by a slope of 0.0.
+        let on = law_on();
+        let off = crate::params::PT_V16;
+        for (label, p) in [("measured", &on), ("shipped", &off)] {
+            let out = order_imbalance_with(p, 0.0, 0.0, 1e6);
+            assert_eq!(out, 0.0, "{label}");
+            assert!(out.is_sign_positive(), "{label} returned {out}");
+        }
+    }
+
+    #[test]
+    fn the_measured_law_keeps_the_direction_and_neutrality_of_the_shipped_one() {
+        // The properties the two shipped unit tests above assert, re-checked
+        // under the new law. Neither of them fails under it, because both
+        // are about direction and neutrality rather than about the clamps --
+        // but that is a fact worth a test rather than a claim in a report.
+        let on = law_on();
+        let thin = order_imbalance_with(&on, 10_000.0, 0.0, 50_000.0);
+        let liquid = order_imbalance_with(&on, 10_000.0, 0.0, 500e6);
+        assert!(thin > liquid, "{thin} vs {liquid}");
+        assert_eq!(order_imbalance_with(&on, 1e6, 1e6, 1e6), 0.0);
+        assert_eq!(order_imbalance_with(&on, 0.0, 0.0, 1e6), 0.0);
+        assert_eq!(
+            order_imbalance_with(&on, 1000.0, 0.0, 0.0),
+            order_imbalance_with(&on, 1000.0, 0.0, 1_000_000.0)
+        );
+        // Selling is the mirror of buying at every size, under a law that
+        // now has two branches to get that wrong in.
+        for phi in [0.5, 5.0, 500.0] {
+            assert_eq!(
+                order_imbalance_with(&on, 0.0, phi * 1000.0, 390_000.0),
+                -order_imbalance_with(&on, phi * 1000.0, 0.0, 390_000.0),
+                "phi {phi}"
+            );
+        }
     }
 
     // ── Forced flow ───────────────────────────────────────────────────────
@@ -1117,11 +1705,41 @@ mod tests {
     #[test]
     fn the_garch_variance_floor_stops_a_dead_stock_freezing() {
         // A zero variance would make sigma zero and the price would stop
-        // moving entirely; the 0.0001 floor prevents that.
+        // moving entirely; `idio_sigma_floor` prevents that, and ships at
+        // the 1e-4 this test was written against.
         let mut c = company();
         c.garch_variance = 0.0;
         let mut rng = Fixed(1.0);
         let out = calculate_live_factors(&c, &[], 0.0, 1.0, &shared(), &crate::params::PT_V1, &mut rng).random_noise;
         assert!(out > 0.0, "noise collapsed to {out}");
+    }
+
+    /// The floor is READ FROM THE FIELD, not from a constant beside it.
+    ///
+    /// Both this site and the overnight path in `engine.rs` spelled the
+    /// same 1e-4 inline, and a floor spelled twice is a floor that moves
+    /// once. This asserts the tick's copy follows the field; the overnight
+    /// copy has its own assertion in `engine.rs`.
+    #[test]
+    fn the_idio_sigma_floor_is_the_parameter_and_not_a_constant() {
+        let mut c = company();
+        // Well under the shipped 1e-4, so the floor decides at the default
+        // and the recursion's own value decides once the floor is removed.
+        c.garch_variance = 1.0e-6;
+        let base = crate::params::PT_V1;
+        let mut lifted = crate::params::PT_V1;
+        lifted.idio_sigma_floor = 0.0;
+        let mut r1 = Fixed(1.0);
+        let mut r2 = Fixed(1.0);
+        let floored = calculate_live_factors(&c, &[], 0.0, 1.0, &shared(), &base, &mut r1).random_noise;
+        let free = calculate_live_factors(&c, &[], 0.0, 1.0, &shared(), &lifted, &mut r2).random_noise;
+        // sqrt(1e-4) against sqrt(1e-6) is a factor of ten in sigma, and
+        // the noise is linear in sigma, so the ratio is the evidence.
+        assert!(free < floored, "removing the floor did not lower the noise: {free} vs {floored}");
+        let ratio = floored / free;
+        assert!(
+            (ratio - 10.0).abs() < 1e-9,
+            "expected the floor to be exactly the parameter, ratio {ratio}"
+        );
     }
 }

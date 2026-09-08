@@ -1349,17 +1349,31 @@ def test_the_committed_recording_replays_end_to_end():
     assert len(agent.record) == example.DAYS, (
         f"{example.DAYS - len(agent.record)} recorded decisions did not "
         "replay; a missing key is absorbed by evaluate() rather than raised")
-    assert card.trades == 3, card.trades
-    assert card.pnl == pytest.approx(20370.0), card.pnl
-    assert card.turnover == pytest.approx(1676790.0), card.turnover
+    # RE-RECORDED at the 0.7.0 boundary that made pt-v18 the default. A
+    # recording is keyed by a digest of the exact observation the model was
+    # sent, and every price in that observation moved, so the committed
+    # transcript could not replay at all and a fresh live run was the only
+    # way back. These are that run: 7 trades against the old 3, and the
+    # values stay PINNED rather than bounded for the reason the docstring
+    # gives -- a corrupted digest drops decisions quietly and only exact
+    # numbers catch it.
+    assert card.trades == 7, card.trades
+    assert card.pnl == pytest.approx(33475.0), card.pnl
+    assert card.turnover == pytest.approx(2657865.0), card.turnover
 
-    # The recording carries one genuine market refusal -- the day-1 leverage
-    # overshoot the notebook is built around. Pinned so that a replay
-    # failure, which lands in the same list, cannot hide inside it.
-    assert card.rejected == 1, card.errors
-    assert card.errors == [
-        "step 6: trade would take leverage to 2.19x, above the 2.00x limit"
-    ], card.errors
+    # AND THE REFUSAL IS GONE, which is a fact about the new run and not a
+    # bug. The old recording carried one genuine market refusal -- a day-1
+    # leverage overshoot to 2.19x -- and the notebook's mandate table quotes
+    # it as the committed arm's result. gpt-5.2 sized inside the limits on
+    # this market, so the recording has nothing to refuse.
+    #
+    # Pinned at zero deliberately: a replay failure lands in this same list,
+    # so asserting the list is EMPTY still catches one. What is lost is the
+    # notebook's worked example of a refusal, and the honest fix for that is
+    # a re-recorded mandate table rather than fishing for a run that
+    # overshoots.
+    assert card.rejected == 0, card.errors
+    assert card.errors == [], card.errors
 
 
 @needs_fixture

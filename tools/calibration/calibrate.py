@@ -713,8 +713,7 @@ class Evaluator:
         # rank candidates. At margin 0 they are equal, which the caller
         # asserts once at the baseline rather than trusting.
         breakdown = band_distance_loss(panels)
-        medians = {key: statistics.median(p[key] for p in panels)
-                   for key in panels[0]}
+        medians = panel_medians(panels)
         margined = search_loss(panels, self.margin,
                                self.room_target, self.room_weight)
         far_margined = None
@@ -794,6 +793,28 @@ def panel_rows(row: dict) -> list[str]:
             f" d={stat['distance']:.4f}"
             + (f"  {scaled:.3f} sd" if scaled is not None else ""))
     return lines
+
+
+def panel_medians(panels: list[dict]) -> dict[str, float]:
+    """One value per statistic from per-seed panels, by each row's estimator.
+
+    The graded rows come through `facts.aggregate_panels`, which reads a
+    level row as a mean, a pooled row over its samples, and omits a row
+    absent from every panel; the supplementary rows are medians over the
+    panels that carry them as numbers. A panel also carries identity
+    fields, session counts and sample lists, none of which is a statistic,
+    and a median over every key of the first panel was how this raised
+    TypeError on the first run after the pooled fear row joined the panel.
+    """
+    from tradefloor import facts
+
+    out = facts.aggregate_panels(panels)
+    for key in lib.SUPPLEMENTARY_STATS:
+        values = [p.get(key) for p in panels]
+        numeric = [v for v in values if isinstance(v, (int, float))]
+        if numeric:
+            out[key] = statistics.median(numeric)
+    return out
 
 
 def main() -> None:
@@ -970,9 +991,12 @@ def main() -> None:
     # ── Stage 0: the baseline, on both seed tiers ────────────────────────
     base_search = ev.batch([{}], search_seeds, "baseline")[0]
     base_train = ev.batch([{}], train_seeds, "baseline")[0]
+    # A graded row absent from every panel of a tier (the pooled fear row
+    # on a tier with no session at -3 percent) has no median to offset.
     subset_offsets = {
         key: base_search["medians"][key] - base_train["medians"][key]
         for key in facts.REAL_MARKETS
+        if key in base_search["medians"] and key in base_train["medians"]
     }
     say(f"pt-v1 L_real: {base_train['loss_real']:.4f} on {len(train_seeds)} "
         f"train seeds, {base_search['loss_real']:.4f} on the "
@@ -1265,14 +1289,28 @@ def main() -> None:
             "universe": f"Universe.random({universe_n}, seed={universe_seed})",
             "loss_real": breakdown["loss"],
             "loss_search": search_loss(panels, margin),
-            "bands_used_for_every_verdict_here": "the TRUE bands "
-                                                 "(facts.REAL_MARKETS)",
-            "bootstrap_spread": bootstrap_spread(panels),
+            # Named per axis. This read "the TRUE bands
+            # (facts.REAL_MARKETS)" on every axis including the 504-day
+            # one -- true of three of them, and an assertion of the right
+            # answer over the one where it was wrong. The bands above ARE
+            # horizon-matched; the label was left behind with the
+            # bootstrap, which is the shape of a partial fix.
+            "bands_used_for_every_verdict_here":
+                "facts.REAL_MARKETS_504" if far else "facts.REAL_MARKETS",
+            "seed_sd_used": "facts.SEED_SD_504" if far else "facts.SEED_SD",
+            # The bootstrap resamples the SAME panels and must use the SAME
+            # ruler. It called the default, so on the 504-day axis the
+            # spread that sets §8's threshold was a 252-day-ruler number
+            # sitting beside a 504-day-ruler loss, and the two were
+            # compared. `band_distance_loss` refuses that pairing now.
+            "bootstrap_spread": bootstrap_spread(panels, bands=bands,
+                                                 seed_sd=scales),
             "statistics": stats,
             "panels": panels,
         }
 
-    def bootstrap_spread(panels: list[dict], draws: int = 2000) -> float:
+    def bootstrap_spread(panels: list[dict], draws: int = 2000, *,
+                         bands=None, seed_sd=None) -> float:
         """§8's yardstick: how much L_real moves on a re-draw of the seeds.
 
         The overfitting rule prices "validation worse than training"
@@ -1290,7 +1328,8 @@ def main() -> None:
         for _ in range(draws):
             idx = boot.integers(0, len(panels), len(panels))
             losses.append(loss_mod.band_distance_loss(
-                [panels[i] for i in idx])["loss"])
+                [panels[i] for i in idx], bands=bands,
+                seed_sd=seed_sd)["loss"])
         return float(statistics.stdev(losses))
 
     axes = {}

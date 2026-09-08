@@ -59,13 +59,23 @@ def compare(cert: dict, keys: list[str]) -> None:
     """
     names = list(cert["vectors"])
     for axis, label in AXES:
+        first_axis = cert["vectors"][names[0]]["axes"][axis]
+        ruler = first_axis.get("bands_used_for_every_verdict_here", "")
         print(f"\n**{label}** — L_real " + ", ".join(
             f"{n} {cert['vectors'][n]['axes'][axis]['loss_real']:.4f}"
-            for n in names) + "\n")
+            for n in names)
+            + (f", graded against `{ruler}`" if ruler else "") + "\n")
         print("| statistic | band | role | "
               + " | ".join(f"{n} | room" for n in names) + " |")
         print("|---|---|---|" + "---|---|" * len(names))
-        for key in keys:
+        # An axis grades the rows ITS ruler holds, which is not the same set
+        # at every horizon: the 504-day bands cover the fourteen shape rows
+        # and not the level or crisis ones. A row this axis did not grade is
+        # listed under the table as ungraded rather than dropped without
+        # comment or filled in from the other horizon's band.
+        graded = first_axis["statistics"]
+        ungraded = [k for k in keys if k not in graded]
+        for key in [k for k in keys if k in graded]:
             first = cert["vectors"][names[0]]["axes"][axis]["statistics"][key]
             band = f"{first['band'][0]:g} to {first['band'][1]:g}"
             places = 1 if key == "annualised_vol_pct" else (
@@ -78,6 +88,10 @@ def compare(cert: dict, keys: list[str]) -> None:
                              f"{room(stat)} sd")
             print(f"| {key} | {band} | {first['role']} | "
                   + " | ".join(cells) + " |")
+        if ungraded:
+            print(f"\nNot graded on this axis, no band derived at "
+                  f"{first_axis.get('ruler_horizon_days', '?')} days: "
+                  + ", ".join(f"`{k}`" for k in ungraded))
 
     print("\n### The two variance persistences, against the 252-day window\n")
     print("| vector | factor persistence | half-life | GJR persistence "

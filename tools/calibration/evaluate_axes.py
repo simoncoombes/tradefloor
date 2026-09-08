@@ -21,6 +21,14 @@ three held-out ones — and the JSON carries the same per-statistic rows,
 per-seed panels and provenance a `calibrate.py` certificate does, so the
 two are readable side by side.
 
+EVERY AXIS IS GRADED ON THE RULER FOR ITS OWN HORIZON. That was not true
+until 2026-09-05: the 504-day axis was scored by the default
+`band_distance_loss`, which is the 252-day bands and the 252-day noise
+scale, and the artefact labelled the result "the TRUE bands". The one axis
+whose purpose is to vary the horizon was measuring at one horizon and
+grading at the other, and its verdict is half of `generalises`. See
+`ruler_for` below.
+
     .venv/bin/python tools/calibration/evaluate_axes.py \
         --certificate results/calibrate-pt-v2-2026-08-22.json \
         --variant "name=key:value,key:value" \
@@ -55,6 +63,31 @@ AXES = {
     "holdout_horizon": (lib.TRAIN_SEEDS, lib.PANEL_UNIVERSE_N,
                         lib.PANEL_UNIVERSE_SEED, 504),
 }
+
+
+def ruler_for(days: int):
+    """The bands and the noise scale derived at this axis's own horizon.
+
+    THE FIX THIS FILE EXISTED WITHOUT. Every axis was scored by
+    `band_distance_loss(panels)` on the defaults -- `facts.REAL_MARKETS` and
+    `facts.SEED_SD`, both derived at 252 days -- and `room_sd` divided by
+    `facts.SEED_SD` explicitly, and the artefact labelled the result "the
+    TRUE bands". So `holdout_horizon`, the one axis whose entire purpose is
+    to vary the horizon and nothing else, was graded on the horizon it was
+    varying away from, and its verdict fed `generalises`, which
+    `calibrate.py`, `emit_preset.py` and `report_tables.py` read.
+
+    `section8_check.py:106-113` fixed exactly this for its own horizon axes
+    and its comment names it "§32's error"; this file was left. The lookup
+    below is `facts.rulers_for_horizon`, which refuses a horizon with no band
+    set rather than falling back, so an axis added at 756 or 1,008 days fails
+    at the ruler rather than quietly scoring on the 252-day one.
+    """
+    import tradefloor.facts as facts
+
+    bands, seed_sd = facts.rulers_for_horizon(
+        days, what=f"the {days}-day axis")
+    return bands, seed_sd, facts.RULERS_BY_HORIZON[days]["bands_name"]
 
 
 def parse_variant(text: str, base: dict[str, float]) -> tuple[str, dict]:
@@ -154,15 +187,21 @@ def main() -> None:
             panel_runs += len(jobs)
             crn = lib.crn_streams(rows)
             panels = [r["panel"] for r in rows]
-            breakdown = loss_mod.band_distance_loss(panels)
+            bands, seed_sd, ruler_name = ruler_for(days)
+            breakdown = loss_mod.band_distance_loss(
+                panels, bands=bands, seed_sd=seed_sd)
             # How far inside its band each statistic sits, in its own seed
             # noise. The band loss is flat inside the band and cannot see
             # this; it is what decides whether a statistic survives a
             # change of seeds, universe or horizon, so a tool whose whole
             # job is comparing named vectors across those axes reports it.
+            # In THIS axis's noise scale: `facts.SEED_SD` was hard-coded
+            # here, so every 504-day room reading was divided by the
+            # 252-day denominator, which differs by factors from 0.80 to
+            # 3.23 across rows.
             for key, srow in breakdown["statistics"].items():
                 lo, hi = srow["band"]
-                sd = facts.SEED_SD.get(key)
+                sd = seed_sd.get(key)
                 m = srow["measured"]
                 srow["room_sd"] = (None if m is None or not sd
                                    else min(m - lo, hi - m) / sd)
@@ -172,15 +211,22 @@ def main() -> None:
                 spread = statistics.stdev([
                     loss_mod.band_distance_loss(
                         [panels[i] for i in
-                         boot.integers(0, len(panels), len(panels))])["loss"]
+                         boot.integers(0, len(panels), len(panels))],
+                        bands=bands, seed_sd=seed_sd)["loss"]
                     for _ in range(2000)])
             row["axes"][axis] = {
                 "seeds": list(seeds), "days": days,
                 "universe": f"Universe.random({universe_n}, "
                             f"seed={universe_seed})",
                 "loss_real": breakdown["loss"],
-                "bands_used_for_every_verdict_here": "the TRUE bands "
-                                                     "(facts.REAL_MARKETS)",
+                # Named per axis, because it differs per axis. This field
+                # read "the TRUE bands (facts.REAL_MARKETS)" on every axis
+                # including the 504-day one, which is how the wrong ruler
+                # survived: the artefact asserted the right answer.
+                "bands_used_for_every_verdict_here": ruler_name,
+                "ruler_horizon_days": days,
+                "seed_sd_used": ("facts.SEED_SD" if days == 252
+                                 else "facts.SEED_SD_504"),
                 "bootstrap_spread": spread,
                 "statistics": breakdown["statistics"],
                 "crn_guard": {"asserted_stream": lib.CRN_STREAM,
@@ -197,6 +243,13 @@ def main() -> None:
     # and out of band on any validation axis. Scale-free, unlike the
     # 2x-bootstrap-spread clause, which a training loss near zero makes
     # almost impossible to satisfy.
+    #
+    # Each side is now graded on its own horizon's ruler, so a flip on
+    # `holdout_horizon` means what the axis is named for: in band at 252
+    # days against the 252-day bands, out of band at 504 against the
+    # 504-day ones. Before the fix above it meant "the 504-day reading of
+    # this row fell outside the 252-day band", which is a statement about
+    # two rulers and cannot be attributed to the horizon at all.
     for name, row in results.items():
         train = row["axes"]["train_seeds"]["statistics"]
         flips = []
@@ -233,11 +286,37 @@ def main() -> None:
             "structural_excluded": list(loss_mod.STRUCTURAL),
         },
         "method": {
+            # The ruler is recorded PER AXIS. One `bands` block for the whole
+            # file described the 252-day set and stood over a 504-day axis
+            # graded (then, wrongly; now, correctly) against a different one,
+            # so a reader checking the artefact's own provenance was told the
+            # thing that was not true.
             "axes": {k: {"seeds": list(v[0]), "universe_n": v[1],
-                         "universe_seed": v[2], "days": v[3]}
+                         "universe_seed": v[2], "days": v[3],
+                         "bands": ruler_for(v[3])[2],
+                         "seed_sd": ("facts.SEED_SD" if v[3] == 252
+                                     else "facts.SEED_SD_504")}
                      for k, v in AXES.items()},
+            "bands_by_horizon": {
+                str(days): {k: list(v) for k, v in
+                            facts.RULERS_BY_HORIZON[days]["bands"].items()}
+                for days in sorted({v[3] for v in AXES.values()})},
+            "seed_sd_by_horizon": {
+                str(days): dict(facts.RULERS_BY_HORIZON[days]["seed_sd"])
+                for days in sorted({v[3] for v in AXES.values()})},
+            # Kept under the old names, and they mean what they always
+            # described: the CERTIFIED-horizon tables, which are the ruler
+            # for three of the four axes and the row order every reader of
+            # this file uses. What changed is that they no longer stand for
+            # the fourth axis; `axes[*]["bands"]` names each axis's own.
             "bands": {k: list(v) for k, v in facts.REAL_MARKETS.items()},
             "seed_sd": dict(facts.SEED_SD),
+            "bands_note": (
+                f"the {facts.CERTIFIED_HORIZON_DAYS}-day tables. Read "
+                f"axes[*].bands for the ruler each axis was actually graded "
+                f"with; the 504-day set holds the fourteen shape rows only, "
+                f"so the level and crisis rows are ungraded on that axis "
+                f"rather than graded against a 252-day band."),
             "workers": args.workers,
         },
         "vectors": results,

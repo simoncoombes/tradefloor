@@ -320,7 +320,49 @@ pub fn update_garch_variance_for(
     last_daily_return: f64,
     sector_base_variance: f64,
 ) -> f64 {
-    let mut new_var = params.garch_omega
+    // THE LONG-RUN LEVEL, and the one inconsistency this dial removes.
+    //
+    // `garch_omega` is ONE constant for every sector, so this recursion's
+    // unconditional variance -- `omega / (1 - alpha - beta - gamma/2)` --
+    // is the same for a utility as for a technology name, while the clamp
+    // band built around it two statements below is a multiple of the
+    // SECTOR's own variance. The level is global and the band is per
+    // sector, so the sector table's 3.1x spread in `daily_sigma` reaches
+    // the price as about 1.4x.
+    //
+    // The cascade spelling of this same process does not have the problem.
+    // [`update_garch_cascade`] builds `omega_i = sector_base_variance *
+    // (1 - pers_i)`, which is the identity that makes each component's
+    // unconditional level EQUAL its sector's base. That is also what this
+    // module's own doc claims the single-component path does: "the process
+    // mean-reverts toward its sector rather than toward a single global
+    // level". It does not; it is HELD near its sector by the clamps.
+    //
+    // So this is one process spelled two ways, and this dial removes the
+    // difference rather than introducing a rule. At 0.0 the shipped
+    // constant is read BY BRANCH and every preset before the dial is
+    // bit-identical; at 1.0 the cascade's identity is evaluated exactly,
+    // not approached through a blend, because `a + w * (b - a)` at `w = 1`
+    // is not bit-equal to `b`.
+    let omega = if params.garch_omega_sector_scaled == 0.0 {
+        params.garch_omega
+    } else {
+        // `1 - persistence` is clamped at zero. A persistence at or above
+        // one would otherwise make the identity NEGATIVE, and a negative
+        // omega is a different process, not a smaller one. Dial vectors
+        // reaching persistence above 1.0 are not hypothetical: a
+        // `garch_gamma` of 0.55 on the shipped alpha and beta reaches
+        // 1.0198 and is held finite only by the ceiling below.
+        let persistence = params.garch_alpha + garch_beta + params.garch_gamma / 2.0;
+        let identity = sector_base_variance * mathx::max(0.0, 1.0 - persistence);
+        if params.garch_omega_sector_scaled == 1.0 {
+            identity
+        } else {
+            (1.0 - params.garch_omega_sector_scaled) * params.garch_omega
+                + params.garch_omega_sector_scaled * identity
+        }
+    };
+    let mut new_var = omega
         + params.garch_alpha * last_daily_return * last_daily_return
         + garch_beta * current_variance;
     // The GJR asymmetry: a negative return feeds through with weight
@@ -365,6 +407,77 @@ mod tests {
     /// pt-v1 0.9900 (69d), pt-v2 0.9551 (15d), pt-v3 through pt-v12 0.8364
     /// (3.9d). The memory was lost in the pt-v2 to pt-v3 calibration and has
     /// been frozen across ten presets since.
+    /// At 0.0 the sector scaling is bit-identical, by branch.
+    ///
+    /// The point of the branch is that every preset predating the dial owes
+    /// nothing to an argument about how a zero-weight multiply rounds, so
+    /// the assertion is on BITS and not on a tolerance.
+    #[test]
+    fn the_omega_scaling_is_bit_identical_at_zero() {
+        let base = ModelParams::pt_v16();
+        assert_eq!(base.garch_omega_sector_scaled, 0.0, "the dial must ship off");
+        for r in [-0.03_f64, -0.005, 0.0, 0.004, 0.02] {
+            for v in [BASE * 0.3, BASE, BASE * 2.0] {
+                let with = update_garch_variance_for(&base, base.garch_beta, v, r, BASE);
+                let mut off = ModelParams::pt_v16();
+                off.garch_omega_sector_scaled = 0.0;
+                let without = update_garch_variance_for(&off, off.garch_beta, v, r, BASE);
+                assert_eq!(with.to_bits(), without.to_bits());
+            }
+        }
+    }
+
+    /// At 1.0 the recursion's unconditional variance IS the sector's base.
+    ///
+    /// This is the identity the dial exists to impose, so it is asserted as
+    /// an identity rather than against a recorded number: iterate the
+    /// recursion with a return of exactly zero, which strips the alpha and
+    /// gamma terms and leaves `V' = omega + beta V`, whose fixed point is
+    /// `omega / (1 - beta)`. Under the scaling `omega` is
+    /// `base * (1 - alpha - beta - gamma/2)`, so the fixed point lands on
+    /// `base` only when alpha and gamma are zero -- which is why the test
+    /// sets them to zero rather than working around them. With them
+    /// non-zero the shock terms supply the rest of the persistence budget,
+    /// and that is measured on the box, not here.
+    #[test]
+    fn the_omega_scaling_puts_the_unconditional_level_on_the_sector_base() {
+        let mut p = ModelParams::pt_v16();
+        p.garch_omega_sector_scaled = 1.0;
+        p.garch_alpha = 0.0;
+        p.garch_gamma = 0.0;
+        p.garch_beta = 0.85;
+        // Start away from the fixed point in both directions and let it
+        // converge; the clamp band is [0.25, 5] x base and the target is
+        // base itself, so the band never intervenes.
+        for start in [BASE * 0.3, BASE * 4.0] {
+            let mut v = start;
+            for _ in 0..400 {
+                v = update_garch_variance_for(&p, p.garch_beta, v, 0.0, BASE);
+            }
+            assert!(
+                (v / BASE - 1.0).abs() < 1e-9,
+                "unconditional variance {v} is not the sector base {BASE} (from {start})"
+            );
+        }
+    }
+
+    /// The scaled omega is never negative, however the dials are set.
+    ///
+    /// `1 - persistence` goes negative above a persistence of one, and a
+    /// negative omega is a different process rather than a smaller one. A
+    /// `garch_gamma` of 0.55 on the shipped alpha and beta reaches 1.0198,
+    /// so this is a reachable state and not a hypothetical.
+    #[test]
+    fn a_non_stationary_persistence_cannot_make_omega_negative() {
+        let mut p = ModelParams::pt_v16();
+        p.garch_omega_sector_scaled = 1.0;
+        p.garch_gamma = 0.55;
+        let persistence = p.garch_alpha + p.garch_beta + p.garch_gamma / 2.0;
+        assert!(persistence > 1.0, "this test needs a divergent persistence, got {persistence}");
+        let out = update_garch_variance_for(&p, p.garch_beta, BASE, 0.0, BASE);
+        assert!(out > 0.0, "variance went non-positive: {out}");
+    }
+
     #[test]
     fn every_shipped_preset_has_a_stationary_variance_process() {
         for name in ModelParams::preset_names() {

@@ -152,7 +152,35 @@ import tradefloor
 # twenty-six measured blocks with no out-of-band row anywhere. Windows
 # x86_64 and Linux aarch64 produced this digest independently before it was
 # committed, which is the cross-platform half of the claim.
-KAT_VERSION = 13
+#
+# 2026-09-08: the pt-v16 to pt-v18 era boundary, at 0.7.0. Every seeded run
+# changes, so the digest must. pt-v18 switches on eight mechanisms pt-v16
+# ships inert -- most of them at 1.0, which is the whole of the correction
+# rather than a tuned fraction -- and it is the first default to hold every
+# certified row: the index level returns +5.80 per cent a year inside a band
+# of 2.90 to 11.90 where pt-v16 lost 13.64, and the -3 per cent fear row
+# reads 3.25 above a floor of 2.60 where pt-v16 read 1.96 below it.
+#
+# TWO constants decide the default and this boundary moved both:
+# `params::DEFAULT_PRESET_NAME` and `Engine::default_model`. Moving the name
+# alone leaves every engine running the old preset while the library reports
+# the new one, and this file cannot see that -- the simulation digest did not
+# budge when only the name moved. `params.rs` has the test that does.
+#
+# `metadataSha256` does NOT move here. `model_preset()` reports the
+# mispricing and crowd coefficients and pt-v16 and pt-v18 carry identical
+# values for all of them, so what the library says about itself is unchanged
+# while what it simulates is not. That is the split working: the two digests
+# were separated in 0.4.x precisely so a boundary could move one without
+# asserting the other.
+#
+# The digest moved a SECOND time before 0.7.0 shipped, and katVersion does
+# not move again for it: the boundary is one era, not two. This file's
+# engine section passes an explicit `Macro`, and `macro_burn_in_days` was
+# relaxing a supplied opening away over 755 days -- an engine asked for a
+# VIX of 45.0 and a policy rate of 5 per cent opened at 21.55 and 0.00.
+# A supplied opening is now kept, so this section starts where it says.
+KAT_VERSION = 14
 
 SEED = 20260820
 DAYS = 250

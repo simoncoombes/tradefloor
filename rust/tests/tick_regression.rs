@@ -168,7 +168,19 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
             // schedule, which must not depend on the factor's conditional
             // sigma at all.
             market_sigma_daily: MARKET_FACTOR_SIGMA,
+                    vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
             settle_draws: SettleDrawPolicy::FourAlways,
+            // The depth counterfactual, off. It reaches no company field.
+            settle_depth_counterfactual: false,
+                // The run's opening nominal output. The growth term is
+                // off on every preset these tests pin, so it is read
+                // nowhere; this tick's own value is what a single-tick
+                // caller opens at.
+                nominal_output_base: economy.gdp * economy.cpi,
+                // Trading days closed. The buyback factor is off on
+                // every preset these tests pin, so it is read
+                // nowhere; 0 is what a single-tick caller opens at.
+                elapsed_days: 0,
                 params: &tradefloor::params::PT_V1,
         },
         &mut rng,

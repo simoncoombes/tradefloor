@@ -244,7 +244,11 @@ fn the_bounded_series_stay_bounded_under_sustained_stress() {
                 },
                 &mut Extreme(sign),
             );
-            e = check_cycle_transition(&e, &mut Extreme(if sign > 0.0 { 0.0 } else { 0.99 }));
+            e = check_cycle_transition(
+                &e,
+                &mut Extreme(if sign > 0.0 { 0.0 } else { 0.99 }),
+                0.0,
+            );
             let out = update_central_bank(&cb, &e, day * 24 * 60, &mut Extreme(sign));
             cb = out.central_bank;
             e = out.economy;
@@ -308,11 +312,11 @@ fn a_phase_cannot_end_before_its_minimum_duration() {
         let mut e = economy();
         e.cycle_phase = phase;
         e.months_in_current_phase = phase_characteristics(phase).min_months - 0.001;
-        let (p, _) = get_cycle_transition_probability(&e);
+        let (p, _) = get_cycle_transition_probability(&e, 0.0);
         assert_eq!(p, 0.0, "{phase:?} offered a transition before its minimum");
         // A generator that always fires must still not move it.
         assert_eq!(
-            check_cycle_transition(&e, &mut Silent(0.0)).cycle_phase,
+            check_cycle_transition(&e, &mut Silent(0.0), 0.0).cycle_phase,
             phase
         );
     }
@@ -335,10 +339,24 @@ fn the_daily_transition_hazard_is_capped_at_thirty_percent() {
         e.treasury_yield_2y = 9.0;
         e.treasury_yield_10y = 1.0;
         e.market_pe = Some(60.0);
-        let (p, _) = get_cycle_transition_probability(&e);
+        let (p, _) = get_cycle_transition_probability(&e, 0.0);
         assert!(
             (0.0..=0.3).contains(&p),
             "{phase:?} hazard {p} escaped [0, 0.3]"
+        );
+        // Read per month the same cap bounds a MONTHLY rate, so the daily
+        // probability it admits is thirty times smaller. Asserted at the
+        // bound rather than at 0.3, which every value under the monthly
+        // reading would satisfy whether or not the conversion happened.
+        let (per_month, _) = get_cycle_transition_probability(&e, 1.0);
+        assert!(
+            (0.0..=0.01).contains(&per_month),
+            "{phase:?} hazard {per_month} escaped [0, 0.01] read per month"
+        );
+        assert_eq!(
+            per_month,
+            p / 30.0,
+            "{phase:?} read per month is not the monthly rate over 30"
         );
     }
 }

@@ -54,33 +54,41 @@ these numbers:
 
 from __future__ import annotations
 
+import math
 import statistics
+import textwrap
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
 from ._core import ValidationError
-from .facts import REAL_MARKETS, SEED_SD, SEED_SD_504, band_distance
+from . import facts as _facts
+from .facts import (CERTIFIED_HORIZON_DAYS, REAL_MARKETS, SEED_SD,
+                    SEED_SD_504, band_distance)
 
 #: The preset these measurements describe.
-PRESET = "pt-v16"
+PRESET = "pt-v18"
 
 #: The measurement horizon the envelope certifies, in trading days.
 #: Not a soft preference, though the reason is no longer a band count: since
 #: pt-v12 all fourteen are in band at 504 days as well (`MEASURED_504`), and
-#: pt-v16 holds them there with more room again. What holds the horizon here is
-#: that `CERTIFIED` was MEASURED here, on thirty seeds and two held-out axes.
+#: every default since has held them there with more room again. What holds
+#: the horizon here is that `CERTIFIED` was MEASURED here, on thirty seeds
+#: and two held-out axes.
 #:
 #: The old reason -- that the thinnest 504-day row cleared its ceiling by
 #: only 0.11 -- no longer applies: `annualised_vol_pct` read 33.89 under
-#: pt-v12, 30.24 under pt-v14, and 28.12 under pt-v16, against the same
-#: 34.0 ceiling throughout. The
+#: pt-v12, 30.24 under pt-v14, 28.12 under pt-v16 and 25.40 under pt-v18,
+#: against the same 34.0 ceiling throughout. The
 #: horizon stays 252 because that is where the certification was measured,
 #: not because 504 is fragile.
 #:
 #: This comment read "three statistics that are in band here leave it by 504
 #: days" until 2026-08-27, which described pt-v3. `check` refuses to certify
 #: beyond this horizon.
-CERTIFIED_HORIZON_DAYS = 252
+#:
+#: Imported from `facts` rather than restated, so the horizon the bands were
+#: derived at and the horizon the envelope certifies cannot drift apart: they
+#: are one number, and `facts.RULERS_BY_HORIZON` is keyed on it.
 
 #: Measured at the certified horizon: 30 seeds, 40 instruments, 252 days.
 #: ALL FOURTEEN in band, at a band-distance loss of 0.0000, and all fourteen
@@ -107,21 +115,106 @@ CERTIFIED_HORIZON_DAYS = 252
 #: different draw rather than a different market -- `GAPS`
 #: "roster-concentration" measures what changes when the roster's SHAPE
 #: changes, and it changes the count.
+#: The SHAPE rows only. The level and crisis rows are held in
+#: `CERTIFIED_LEVEL` and `CERTIFIED_CRISIS`, because the two kinds are
+#: certified separately: a green panel means the fourteen shape rows are in
+#: band, and the level and crisis rows are reported beside them with their
+#: own verdicts. Those verdicts were red at every default through pt-v16 and
+#: are green at pt-v18; the split is a statement about PROTOCOL, not about
+#: failure, and it stays whichever way the verdicts read. A row the default
+#: preset fails is never widened to pass and never folded into this count.
 CERTIFIED: dict[str, float] = {
-    "annualised_vol_pct": 24.2377,
-    "excess_kurtosis": 9.7510,
-    "return_acf1": -0.0044,
-    "abs_return_acf1": 0.0413,
-    "abs_return_acf5": 0.0139,
-    "abs_return_acf20": 0.0030,
-    "cross_sectional_corr": 0.2825,
-    "volume_abs_return_corr": 0.5158,
-    "leverage_effect": -0.0141,
-    "volume_change_acf1": -0.2798,
-    "corr_asymmetry": 0.0175,
-    "corr_asymmetry_lagged": -0.0015,
-    "sector_excess_corr": 0.1604,
-    "corr_persistence_acf1": 0.1724,
+    "annualised_vol_pct": 24.6973,
+    "excess_kurtosis": 9.1013,
+    "return_acf1": 0.0022,
+    "abs_return_acf1": 0.0529,
+    "abs_return_acf5": 0.0270,
+    "abs_return_acf20": 0.0079,
+    "cross_sectional_corr": 0.3400,
+    "volume_abs_return_corr": 0.5187,
+    "leverage_effect": -0.0362,
+    "volume_change_acf1": -0.2799,
+    "corr_asymmetry": 0.0168,
+    "corr_asymmetry_lagged": 0.1024,
+    "sector_excess_corr": 0.1387,
+    "corr_persistence_acf1": 0.2220,
+}
+
+#: The LEVEL rows the default preset reads at the certified horizon,
+#: measured as a thirty-seed mean on `facts.LEVEL_PROTOCOL` -- seeds 101 to
+#: 130, 252 days, the roster varying WITH the seed, because a level that
+#: describes the MODEL cannot be measured on one draw (`facts.AGGREGATE`).
+#:
+#: Measured 2026-09-08 for the 0.7.0 boundary, on the box run
+#: `ptv18level2`, at the pin that puts the burn-in's macro calendars back on
+#: the caller's clock. The run before it (`ptv18level1`) measured a pt-v18
+#: whose central bank and OPEC arm were inert across this whole window.
+#:
+#: The outgoing default was measured on the same build, the same protocol
+#: and the same seeds in the same run, and reproduced the four constants
+#: this module published for it to all four printed places, so these
+#: readings replace those on one ruler rather than beside another.
+#: `python/tradefloor/presets/pt-v18.json` carries both under
+#: `level_protocol`, and `tests/test_preset_records.py` binds this table to
+#: it -- the binding `DECAY_252` below still does not have.
+#:
+#: The protocol is part of the number and not a detail of it: pt-v16 read
+#: -13.6431 with the roster varying against +1.9740 with it held, a gap of
+#: 15.6 points on one preset, because a drawn roster opens away from fair
+#: value by a draw worth several points of first-year drift.
+CERTIFIED_LEVEL: dict[str, float] = {
+    # The default preset RETURNS 5.80 per cent a year, inside a band of 2.90
+    # to 11.90 at band position 0.32, on a thirty-seed standard error of
+    # 1.18 -- so 2.45 standard errors above the floor rather than merely on
+    # the right side of it. pt-v16 read -13.6431 and was held red here for
+    # three eras; this row exists because of that, and pt-v18 is the first
+    # default to hold it.
+    "index_drift_pct": 5.7957,
+}
+
+#: The CRISIS rows, reserved for the fear gauge and the index tail, measured
+#: on the same run and protocol as the level row (`facts.LEVEL_PROTOCOL`).
+#:
+#: All three are IN BAND at this default. They are still reported apart from
+#: the fourteen shape rows, because they are certified on a different
+#: protocol and a green shape panel says nothing about them -- not because
+#: they are failing. `check` computes each verdict rather than asserting it;
+#: it asserted "held red" here until 0.7.0, which was true of every default
+#: through pt-v16 and would have been a false statement the day one held.
+CERTIFIED_CRISIS: dict[str, float] = {
+    # The -1 per cent row reads 1.5834 in a band of 0.70 to 4.03, at band
+    # position 0.27. pt-v16 read 0.9500 at position 0.09 -- inside, and six
+    # standard errors below centre, which is the reading that made a count
+    # of rows-in-band an insufficient answer. This is further from the floor
+    # and still below centre, and it is a pass rather than evidence that the
+    # small-session response is right.
+    #
+    # The -3 per cent row reads 3.2473 against a floor of 2.60, pooled over
+    # 119 sessions, at band position 0.09. pt-v16 read 1.9557 and was BELOW
+    # that floor. So this row moves from out of band to in, close to the
+    # edge: the saturating channel the fear cap creates is not fixed here,
+    # it is far enough off the floor to grade.
+    "fear_gauge_dn1": 1.5834,
+    "fear_gauge_dn3": 3.2473,
+    # The index tail row on the same thirty seeds: 119 sessions at or below
+    # -3 per cent in 7,530, a pooled rate of 1.5803 per cent against a band
+    # of 0.47 to 1.96 and a tape centre of 1.213. IN band, at band position
+    # 0.75 -- nearer its CEILING than pt-v16's 1.2749 was. More crash
+    # sessions is the direction the era wanted and this row is the one that
+    # says when there are too many, so read the position and not the verdict.
+    #
+    # The three counts beside it, which the rate cannot see: 11 of 30 seeds
+    # hold no such session (the tape's 35 windows hold 13; pt-v16 held 15),
+    # 5 of 30 hold five or more (the tape 7, pt-v16 5), and the worst seed
+    # holds 39 (the tape 33, pt-v16 32). The mixture is closer to the tape's
+    # than pt-v16's at the zero end and heavier at the far end.
+    #
+    # GRADED AND NOT COUNTED at this preset: `cycle_stationary_opening` is
+    # 0.0, so every seed opens in expansion at phase age zero and this is
+    # year one of a non-stationary opening. `envelope.tail_block` carries
+    # that as data beside the verdict. What this preset does in year two has
+    # not been measured; pt-v16's 2.500 per cent is pt-v16's.
+    "index_tail_dn3_pct": 1.5803,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -129,6 +222,30 @@ CERTIFIED: dict[str, float] = {
 #: the 252-day bands is the wrong ruler, and it flatters the model on
 #: kurtosis while being harsher elsewhere -- these are mostly TIGHTER.
 BANDS_504: dict[str, tuple[float, float]] = {
+    # The level band is an annualised long-run mean whose width is the
+    # centre's own uncertainty, so the same band grades a 504-day reading;
+    # the model's resolution at 504 days is finer, and the centre's is not.
+    "index_drift_pct": (2.9, 11.9),
+    # The fear rows' bands are per-session statistics whose real-side
+    # derivation is per 252-session window, and a 504-day reading pools
+    # twice the sessions against the same real distribution.
+    "fear_gauge_dn1": (0.70, 4.03),
+    "fear_gauge_dn3": (2.60, 9.58),
+    # The index tail row's band is a per-SESSION rate, so a longer window
+    # measures the same quantity with more sessions rather than a different
+    # one, and the 252-day band grades both horizons. That is a derivation
+    # and not a reuse: the same construction and the same anchor rule on
+    # seventeen non-overlapping 504-return windows of the same series give a
+    # centre of 1.2372 (106 hits in 8,568), an across-window sd of 1.6916, a
+    # standard error of 0.4103 and a raw band of [0.4797, 1.9946], which
+    # rounds outward to [0.47, 2.00] -- the same band within a twentieth of
+    # its own width.
+    # `facts.INDEX_TAIL_WINDOWS` carries both window sets and
+    # `tests/test_reference_windows.py` re-derives both bands from them.
+    # What the longer horizon does change is the MODEL's own resolution,
+    # which improves by about a third, and `certify` reports that as `se_m`
+    # beside the verdict.
+    "index_tail_dn3_pct": (0.47, 1.96),
     "annualised_vol_pct": (16.0, 34.0),
     "excess_kurtosis": (7.1, 22.0),
     "return_acf1": (-0.03, 0.04),
@@ -145,6 +262,31 @@ BANDS_504: dict[str, tuple[float, float]] = {
     "corr_persistence_acf1": (0.19, 0.49),
 }
 
+# So `facts.check_ruler_horizon` can identify this table when it arrives as an
+# argument. `facts` cannot name it -- `envelope` imports `facts`, not the
+# other way -- and a table the checker cannot identify is a table it cannot
+# refuse.
+_facts.register_ruler_table(BANDS_504, 504, "envelope.BANDS_504")
+
+#: The seventeen-row ruler per horizon, which is what `score` grades with.
+#: `facts.RULERS_BY_HORIZON` holds the fourteen shape rows at 504;
+#: `BANDS_504` adds the level and crisis rows carrying their 252-day bands,
+#: with the argument for each stated inline above. Keyed on the horizon and
+#: looked up rather than chosen by `horizon_days > 252`, which is what let a
+#: 756-day or 1,008-day panel be scored against the 504-day bands without
+#: anything saying so.
+#:
+#: The names are module-qualified and they name the table this function
+#: ACTUALLY grades with. `score` reported `"REAL_MARKETS_504"` at 504 days
+#: while scoring against `BANDS_504`, which is a different table with three
+#: more rows -- a small thing, and the same shape as every finding this
+#: branch is repairing: a label asserting a provenance the code did not have.
+RULERS_BY_HORIZON: dict[int, tuple[dict[str, tuple[float, float]],
+                                   dict[str, float], str]] = {
+    CERTIFIED_HORIZON_DAYS: (REAL_MARKETS, SEED_SD, "facts.REAL_MARKETS"),
+    504: (BANDS_504, SEED_SD_504, "envelope.BANDS_504"),
+}
+
 #: The same panel at 504 days. ALL FOURTEEN in band against `BANDS_504`,
 #: which pt-v12 was the first preset to manage. This comment read "five of
 #: ten" until 2026-08-26 (pt-v3, against the ten-statistic panel of the
@@ -155,38 +297,50 @@ BANDS_504: dict[str, tuple[float, float]] = {
 #: row was `annualised_vol_pct` at 33.89 against a ceiling of 34.0 -- 0.11 of
 #: room on a statistic whose seed spread is far wider, so the count was
 #: genuine but would have flipped on a change that barely moved the model.
-#: pt-v16 reads 28.12 there, 5.88 of room, having widened it again at
-#: the 0.6.0 boundary.
+#: pt-v18 reads 25.40 there, 8.60 of room, having widened it at each of the
+#: 0.6.0 and 0.7.0 boundaries.
 #:
 #: The count is still MEASURED rather than certified: the certified horizon
 #: is 252 because that is where `CERTIFIED` was measured.
 MEASURED_504: dict[str, float] = {
-    "annualised_vol_pct": 28.1221,
-    "excess_kurtosis": 9.4598,
-    "return_acf1": 0.0114,
-    "abs_return_acf1": 0.1037,
-    "abs_return_acf5": 0.0643,
-    "abs_return_acf20": 0.0217,
-    "cross_sectional_corr": 0.3524,
-    "volume_abs_return_corr": 0.5942,
-    "leverage_effect": -0.0274,
-    "volume_change_acf1": -0.2567,
-    "corr_asymmetry": -0.0065,
-    "corr_asymmetry_lagged": -0.0232,
-    "sector_excess_corr": 0.1579,
-    "corr_persistence_acf1": 0.2865,
+    "annualised_vol_pct": 25.4021,
+    "excess_kurtosis": 10.4101,
+    "return_acf1": 0.0018,
+    "abs_return_acf1": 0.0940,
+    "abs_return_acf5": 0.0435,
+    "abs_return_acf20": 0.0126,
+    "cross_sectional_corr": 0.3631,
+    "volume_abs_return_corr": 0.5705,
+    "leverage_effect": -0.0482,
+    "volume_change_acf1": -0.2644,
+    "corr_asymmetry": 0.0384,
+    "corr_asymmetry_lagged": 0.0843,
+    "sector_excess_corr": 0.1308,
+    "corr_persistence_acf1": 0.3113,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
 #: The model crosses below real around lag 8 and goes NEGATIVE by lag 30,
 #: where real markets stay weakly positive out to lag 60.
 #:
-#: MEASURED UNDER pt-v14, and not yet re-measured for pt-v16. Every other
-#: constant in this module moved to the new default at 0.6.0; this curve, the
-#: slope below and the `decay-shape` gap that quotes them did not, because
-#: re-deriving them is a multi-lag measurement rather than a panel read. A
-#: single seed at lag twenty reads +0.0221 under pt-v16 against -0.0071 under
-#: pt-v14, so the shape has narrowed and the numbers here understate it.
+#: MEASURED UNDER pt-v14, and re-measured for neither pt-v16 nor pt-v18.
+#: Every other constant in this module moved to the new default at 0.6.0 and
+#: again at 0.7.0; this curve, the slope below and the `decay-shape` gap that
+#: quotes them did not, because re-deriving them is a ten-lag measurement and
+#: the certification panel carries three of those lags. A single seed at lag
+#: twenty reads +0.0221 under pt-v16 against -0.0071 under pt-v14, so the
+#: shape has narrowed and the numbers here understate it.
+#:
+#: This is now TWO defaults stale and it is stated rather than fixed, which
+#: is a decision and not an oversight. What would fix it: a ten-lag |return|
+#: autocorrelation run on `facts.LEVEL_PROTOCOL` at thirty seeds, which is a
+#: box job. What must NOT fix it: `atlas_survey.decay_slope` fits the same
+#: quantity through lags 1, 5 and 20, all three of which sit in `CERTIFIED`
+#: above -- so a slope for the shipped default is one line away, and it is a
+#: THREE-POINT estimator where `DECAY_SLOPE` is a ten-point one. Substituting
+#: it would put two estimators under one name, which is the error this
+#: project has made three times and documents in `facts.REAL_TAIL3`,
+#: `crisisprobe-frontier` and the VIX AR1 row.
 DECAY_252: dict[int, float] = {
     1: 0.1413, 2: 0.1063, 3: 0.0897, 5: 0.0496, 8: 0.0371,
     12: 0.0173, 20: 0.0082, 30: -0.0052, 45: -0.0120, 60: -0.0142,
@@ -254,15 +408,15 @@ GAPS: tuple[Gap, ...] = (
         summary="the certified horizon is 252 days",
         detail=(
             "Against bands re-derived at the matching window, the shipped "
-            "pt-v16 holds ALL FOURTEEN at 504 days, as pt-v14 and pt-v12 did "
-            "before it. pt-v12 was the first to manage it: pt-v3 held 7 "
-            "there and pt-v10 held 13.\n\n"
+            "pt-v18 holds ALL FOURTEEN at 504 days, as pt-v16, pt-v14 and "
+            "pt-v12 did before it. pt-v12 was the first to manage it: pt-v3 "
+            "held 7 there and pt-v10 held 13.\n\n"
             "So why is the horizon still 252? Two reasons, and the band "
             "count is neither. First, headroom -- though this reason has "
             "weakened: under pt-v12 annualised_vol_pct read 33.89 against a "
             "band ending at 34.0, only 0.11 of room on a statistic whose "
-            "seed spread is many times that. pt-v16 reads 28.12 there, "
-            "which is 5.88 of room, so the fourteenth row is no longer "
+            "seed spread is many times that. pt-v18 reads 25.40 there, "
+            "which is 8.60 of room, so the fourteenth row is no longer "
             "thin. Second and now decisive on its own, "
             "CERTIFIED is what this module certifies and it is measured at "
             "252 days on thirty seeds. The 504-day table is measured, not "
@@ -363,15 +517,18 @@ GAPS: tuple[Gap, ...] = (
             "The expected size of a scenario\'s response is calibrated; "
             "the dispersion around it is not. That is the gap now.\n\n"
             "The steady-state lever -- how much more violent a sustained "
-            "crisis is than a calm market -- reads 6.23x on pt-v16 against "
+            "crisis is than a calm market -- reads 6.53x on pt-v18 against "
             "real markets\' 6.16x, measured from a held VIX 5 to a held VIX "
             "65 on the certified 40-name roster over 252 days at thirty "
-            "seeds. pt-v14 read 6.18x there, pt-v10 5.05x, and the default "
-            "before it 3.07x. "
+            "seeds. pt-v16 read 6.23x there, pt-v14 6.18x, pt-v10 5.05x, "
+            "and the default before it 3.07x. "
             "This gap opened by saying the VIX shock response was materially "
-            "weaker than the previous preset\'s; on pt-v16 it is stronger "
-            "than any preset before it and within two percent of real, so "
-            "that sentence is WITHDRAWN.\n\n"
+            "weaker than the previous preset\'s; every preset since pt-v11 "
+            "has been stronger than the one before it, so that sentence is "
+            "WITHDRAWN. What replaces it is an OVERSHOOT rather than a "
+            "shortfall: pt-v18 sits 5.9 per cent above real where pt-v16 sat "
+            "1.1 per cent above, so the lever is the one row on this panel "
+            "the new default reads FURTHER from real than the old one.\n\n"
             "'Direction is right' is measured rather than asserted. Driving "
             "the real 2020-21 macro path through the model and correlating "
             "daily returns against each driver, over 504 sessions, against "
@@ -811,7 +968,36 @@ def check(
                 f"markets' {REAL_DECAY_SLOPE}, and the curve is negative by "
                 f"lag 30 where real markets stay positive to lag 60"
             ))
-        elif CERTIFIED.get(name) is not None and horizon_days <= CERTIFIED_HORIZON_DAYS:
+        elif name not in CERTIFIED:
+            # A level or crisis row. The verdict is COMPUTED, for the reason
+            # the two counts above are: this arm read the band and then said
+            # "held red" without comparing against it. That was true of every
+            # default through pt-v16 and false the moment one held the row,
+            # and a warning asserting a verdict it did not read is the same
+            # defect as a count written down.
+            value = CERTIFIED_LEVEL.get(name, CERTIFIED_CRISIS.get(name))
+            if value is None:
+                warnings.append(
+                    f"{name} is graded and its certified value has not been "
+                    f"measured on the pinned protocol yet")
+            else:
+                lo, hi = REAL_MARKETS[name]
+                if band_distance(value, lo, hi) == 0:
+                    warnings.append(
+                        f"{name} is in band at the certified horizon "
+                        f"({value:.4f} in {(lo, hi)}, at band position "
+                        f"{(value - lo) / (hi - lo):.2f}) -- it is reported "
+                        f"apart from the shape rows because it is certified "
+                        f"on facts.LEVEL_PROTOCOL, where the roster varies "
+                        f"with the seed, and a pass close to an edge is a "
+                        f"pass and not a demonstration that the row is right")
+                else:
+                    warnings.append(
+                        f"{name} is held red at the certified horizon "
+                        f"({value:.4f} against {(lo, hi)}); a result leaning "
+                        f"on it leans on a row the shipped preset does not "
+                        f"hold")
+        elif horizon_days <= CERTIFIED_HORIZON_DAYS:
             lo, hi = REAL_MARKETS[name]
             if band_distance(CERTIFIED[name], lo, hi) == 0:
                 warnings.append(
@@ -914,18 +1100,39 @@ def score(panel: Mapping[str, float], *,
     horizon's own seed noise, signed so negative means out. A statistic
     barely inside is one seed away from not being, and the band loss cannot
     see the difference.
+
+    The counts are split by group. `in_band` and `of` total every row
+    scored and are kept for readers that predate the split; a gate asks
+    `shape_in_band` against `shape_of`, because the level and crisis rows
+    are held red at the default preset on purpose and a total that folds
+    them in reads fourteen of seventeen where fourteen of fourteen is the
+    fact. Nothing here answers "is the panel green" without a group.
+
+    A HORIZON WITH NO RULER IS REFUSED. This used to read `far = horizon_days
+    > CERTIFIED_HORIZON_DAYS`, so a 756-day panel -- and the 1,008-day runs
+    the settling study makes -- scored against the 504-day bands with nothing
+    saying so, and 253 scored against the 252-day ones. The lookup below has
+    two keys and refuses everything else by name, because a band set derived
+    at one window is not an approximate ruler for another window: it is a
+    ruler for a different quantity.
     """
     if horizon_days < 1:
         raise ValidationError(
             f"horizon_days must be positive, got {horizon_days}")
+    if horizon_days not in RULERS_BY_HORIZON:
+        raise ValidationError(
+            f"no band set has been derived at {horizon_days} days; the "
+            f"horizons with a ruler are {sorted(RULERS_BY_HORIZON)}. A "
+            f"nearer band set is not an approximation -- the 252-day and "
+            f"504-day tables differ on twelve of fourteen rows and their "
+            f"noise scales differ by factors from 0.80 to 3.23 -- so this "
+            f"refuses rather than picking one.")
     # `loss.STRUCTURAL` names the statistics excluded from the objective by
     # design; imported here rather than at module scope because `loss`
     # imports this module's facts and a top-level import would cycle.
     from .loss import STRUCTURAL
 
-    far = horizon_days > CERTIFIED_HORIZON_DAYS
-    bands = BANDS_504 if far else REAL_MARKETS
-    noise = SEED_SD_504 if far else SEED_SD
+    bands, noise, ruler_name = RULERS_BY_HORIZON[horizon_days]
 
     unknown = sorted(set(panel) - set(REAL_MARKETS))
     if unknown:
@@ -946,13 +1153,428 @@ def score(panel: Mapping[str, float], *,
                         else min(measured - low, high - measured) / sd),
             "structural": name in STRUCTURAL,
         }
+    from .facts import SHAPE, LEVEL, CRISIS
+
+    def count(group):
+        names = [n for n in rows if n in group]
+        return sum(1 for n in names if rows[n]["in_band"]), len(names)
+
+    shape_in, shape_of = count(SHAPE)
+    level_in, level_of = count(LEVEL)
+    crisis_in, crisis_of = count(CRISIS)
+    for name in rows:
+        rows[name]["group"] = ("shape" if name in SHAPE else
+                               "level" if name in LEVEL else "crisis")
     return {
         "horizon_days": horizon_days,
-        "ruler": "REAL_MARKETS_504" if far else "REAL_MARKETS",
+        "ruler": ruler_name,
         "statistics": rows,
         "in_band": sum(1 for r in rows.values() if r["in_band"]),
         "of": len(rows),
+        # The split. A gate reads `shape_in_band` against `shape_of`; the
+        # level and crisis counts are reported beside it and never added
+        # to it.
+        "shape_in_band": shape_in, "shape_of": shape_of,
+        "level_in_band": level_in, "level_of": level_of,
+        "crisis_in_band": crisis_in, "crisis_of": crisis_of,
     }
+
+
+#: The row `tail_block` reads, and the only `pooled_rate` row there is.
+TAIL_ROW = "index_tail_dn3_pct"
+
+
+def tail_block(panels: Sequence[Mapping[str, Any]], *,
+               horizon_days: int = CERTIFIED_HORIZON_DAYS,
+               stationary_opening: bool | None = None) -> dict[str, Any] | None:
+    """The index tail row's certificate line, from the per-seed panels.
+
+    None when the panels do not carry the row's counts, which is what a
+    panel measured before the row existed looks like; the certificate then
+    says nothing about the tail rather than reporting a rate it cannot
+    compute.
+
+    THREE COUNTS, NEVER ONE. The graded value is a pooled rate and a rate
+    cannot see its own mixture: thirty seeds at three hits each and a
+    mixture of zeros and a crash year have the same mean. So the block
+    carries the share of seeds with no hit, the share with five or more and
+    the largest single count, beside the tape's own 13 of 35, 7 of 35 and
+    33. Those three are REPORTED and not gated, because the tape's are three
+    integers with no useful error bar.
+
+    AT THE EDGE. The band's half-width is the TAPE's standard error, which
+    is the narrowest it can honestly be; the run has an error of its own,
+    `se_m`, and at thirty seeds it is about the same size. A verdict whose
+    margin to the nearer band edge is under one `se_m` is therefore a
+    verdict this run cannot resolve, and it is flagged rather than reported
+    as a clean pass or a clean failure -- the treatment `mechanism_verdict`
+    gives a sign count sitting on its cut.
+
+    `stationary_opening` is the run's own answer to whether every seed
+    opened at phase age zero. On the current opening year one is
+    all-expansion on every seed and year two a synchronised contraction, so
+    a rate measured there reads the OPENING and not the model; passed False,
+    the block is graded, printed and NOT counted, with the reason carried as
+    data. Passed None it says the opening was not stated, which is not the
+    same as saying it was stationary.
+    """
+    from . import facts as _facts
+
+    # Refused rather than answered with the wrong ruler, the same way `score`
+    # refuses a horizon with no band set: the row's real windows exist at two
+    # lengths and a rate read against the other one's counts is a number that
+    # looks plausible and means nothing.
+    if (horizon_days not in RULERS_BY_HORIZON
+            or int(horizon_days) not in _facts.INDEX_TAIL_WINDOWS["windows"]):
+        raise ValidationError(
+            f"the index tail row has no real windows at {horizon_days} days; "
+            f"measured horizons are "
+            f"{sorted(_facts.INDEX_TAIL_WINDOWS['windows'])}. Run "
+            "tools/calibration/tail_band.py at that horizon and record them")
+
+    hit_key, session_key = _facts.pooled_rate_counts(TAIL_ROW)
+    hits = [p.get(hit_key) for p in panels]
+    sessions = [p.get(session_key) for p in panels]
+    if any(h is None for h in hits) or not sum(n or 0 for n in sessions):
+        return None
+
+    bands, _, _ = RULERS_BY_HORIZON[horizon_days]
+    low, high = bands[TAIL_ROW]
+    rate = 100.0 * sum(hits) / sum(sessions)
+    rates = [100.0 * h / n for h, n in zip(hits, sessions) if n]
+    se_m = (statistics.stdev(rates) / math.sqrt(len(rates))
+            if len(rates) > 1 else None)
+    centre = _facts.real_centre(TAIL_ROW, horizon_days=horizon_days)
+    se_real = _facts.real_centre_se(TAIL_ROW, horizon_days=horizon_days)
+    margin = min(rate - low, high - rate)
+    tape = _facts.INDEX_TAIL_WINDOWS["windows"][int(horizon_days)]
+    tape_counts = [k for _, _, k, _ in tape]
+    return {
+        "row": TAIL_ROW,
+        "horizon_days": horizon_days,
+        "seeds": len(rates),
+        "hits": sum(hits),
+        "sessions": sum(sessions),
+        "rate": rate,
+        "band": [low, high],
+        "in_band": low <= rate <= high,
+        "verdict": ("in" if low <= rate <= high
+                    else "HIGH" if rate > high else "LOW"),
+        "margin": margin,  # signed: positive inside the band, negative outside
+        "se_m": se_m,
+        "real_centre": centre,
+        "se_real": se_real,
+        "z_r": ((rate - centre) / math.sqrt(se_m ** 2 + se_real ** 2)
+                if se_m is not None and se_real else None),
+        # Within one run standard error of the nearer edge, on EITHER side:
+        # the run cannot resolve this verdict. `margin` is signed, positive
+        # inside the band and negative outside it, so the flag takes its
+        # magnitude -- a reading far outside is resolved, not at the edge.
+        "at_the_edge": se_m is not None and abs(margin) < se_m,
+        "zero_share": sum(1 for h in hits if h == 0) / len(hits),
+        "five_or_more_share": sum(1 for h in hits if h >= 5) / len(hits),
+        "max_hits": max(hits),
+        "tape": {
+            "windows": len(tape_counts),
+            "zero_share": sum(1 for k in tape_counts if k == 0) / len(tape_counts),
+            "five_or_more_share": sum(1 for k in tape_counts if k >= 5) / len(tape_counts),
+            "max_hits": max(tape_counts),
+        },
+        "counted": stationary_opening,
+        "not_counted": (
+            None if stationary_opening else
+            "year one of a non-stationary opening: every seed opens in "
+            "expansion at phase age zero, so the ensemble rate reads the "
+            "opening and not the model -- 0.57x to 0.97x of the centre in "
+            "year one and 2.06x to 2.19x in year two on the same preset and "
+            "the same seeds. Graded and printed, not counted, until the run "
+            "carries a stationary opening"
+            if stationary_opening is False else
+            "the run did not state whether its opening is stationary, and "
+            "an unstated opening is not a stationary one: pass "
+            "stationary_opening to count this row"),
+    }
+
+
+def certify(panels: Sequence[Mapping[str, float]], *,
+             horizon_days: int = CERTIFIED_HORIZON_DAYS,
+             stationary_opening: bool | None = None) -> dict[str, Any]:
+    """The certificate, as THREE counts, from the per-seed panels themselves.
+
+    `score` grades one aggregated panel against the bands and answers one
+    question: could a real year read this. `certify` takes the per-seed
+    panels the certification run already produces and answers three, because
+    one band cannot answer more than one.
+
+      in band          a of 14   FIDELITY. `score`, unchanged, clamps
+                                 included. "Could a real year read this."
+      mechanism shown  b of N    MECHANISM. An exact sign test of the
+                                 per-seed readings against each row's
+                                 mechanism-absent reading. "Is a model
+                                 without the mechanism excluded."
+      at real centre   c of 14   CENTRE. `z_r` against the real median,
+                                 diagnostic, never a gate.
+
+    Why the second count has to exist. `facts.BAND_RULE` builds a prediction
+    interval for ONE real year and the panel grades a thirty-seed median,
+    whose sampling sd is about a quarter of one seed's. The band is
+    therefore about five times wider than the resolution of the thing it
+    judges, and it contains the mechanism-absent reading on five of the
+    fourteen rows -- measured with the shipped preset's own seed noise, a
+    null model's graded median passes the band with probability 1.000 on
+    three of them. Fourteen of fourteen in band is a true statement about
+    fidelity and says nothing at all about whether the mechanisms are
+    there. See `facts.NULLS`.
+
+    `N` is the mechanism rows this horizon GRADES: a row named in
+    `facts.MECHANISM_DIAGNOSTIC` for the horizon still gets a verdict, is
+    printed, and is not counted, because a correct model would fail it here
+    and a count that included it would grade the reference rather than the
+    model.
+
+    REVERSED is reported separately from NOT SHOWN and by name. A model with
+    the sign of a real effect backwards is a different failure from one whose
+    effect is too small to see, and the fidelity band cannot tell them apart.
+    """
+    from . import facts as _facts
+
+    panels = [dict(p) for p in panels]
+    if len(panels) < 2:
+        raise ValidationError(
+            f"a certificate needs at least two per-seed panels; a sign test "
+            f"on one seed has no power. Got {len(panels)}")
+
+    graded = _facts.aggregate_panels(panels, keys=_facts.SHAPE)
+    fidelity = score(graded, horizon_days=horizon_days)
+
+    def readings(row: str) -> list[float]:
+        return [p[row] for p in panels if p.get(row) is not None]
+
+    mechanism: dict[str, Any] = {}
+    centre: dict[str, Any] = {}
+    for row in _facts.SHAPE:
+        values = readings(row)
+        if len(values) < 2:
+            continue
+        if row in _facts.MECHANISM:
+            mechanism[row] = _facts.mechanism_verdict(
+                values, row, horizon_days=horizon_days)
+        centre[row] = _facts.centre_distance(values, row,
+                                             horizon_days=horizon_days)
+
+    counted = {r: v for r, v in mechanism.items() if v["counted"]}
+    shown = sorted(r for r, v in counted.items() if v["verdict"] == "shown")
+    not_shown = sorted(r for r, v in counted.items() if v["verdict"] == "not shown")
+    backwards = sorted(r for r, v in counted.items() if v["verdict"] == "reversed")
+    at_the_cut = sorted(r for r, v in counted.items() if v["at_the_cut"])
+    determined = {r: v for r, v in centre.items() if v["z_r"] is not None}
+    at_centre = sorted(r for r, v in determined.items() if v["at_centre"])
+
+    return {
+        "horizon_days": horizon_days,
+        "seeds": len(panels),
+        "graded": graded,
+        "fidelity": fidelity,
+        "mechanism": mechanism,
+        "centre": centre,
+        # The index tail row, which is neither a shape row nor a mechanism
+        # row: it counts events rather than reading a shape, so it has its
+        # own line and its own three counts. None on panels that do not
+        # carry it.
+        "tail": tail_block(panels, horizon_days=horizon_days,
+                           stationary_opening=stationary_opening),
+        "counts": {
+            "in_band": fidelity["shape_in_band"],
+            "in_band_of": fidelity["shape_of"],
+            "mechanism_shown": len(shown),
+            "mechanism_of": len(counted),
+            "at_centre": len(at_centre),
+            "at_centre_of": len(determined),
+        },
+        "shown": shown,
+        "not_shown": not_shown,
+        "reversed": backwards,
+        "at_the_cut": at_the_cut,
+        "diagnostic": sorted(r for r, v in mechanism.items() if not v["counted"]),
+        "off_centre": sorted(r for r, v in determined.items()
+                             if not v["at_centre"]),
+        "centre_undetermined": sorted(r for r, v in centre.items()
+                                      if v["z_r"] is None),
+        # A row can be in band and reversed at once, which is the whole
+        # finding; naming those rows is cheaper than expecting a reader to
+        # intersect two lists.
+        "in_band_and_reversed": sorted(
+            r for r in backwards
+            if fidelity["statistics"].get(r, {}).get("in_band")),
+    }
+
+
+def certification_record(result: Mapping[str, Any]) -> dict[str, Any]:
+    """`certify`'s answer, trimmed to what a committed record should carry.
+
+    JSON-safe, and it drops the fidelity block because a preset record
+    already carries `panel_252` and `in_band` beside this. What it keeps per
+    row is the sign test itself -- the count, the cut, the null and the
+    verdict -- plus both effect sizes, so a reader can see how far from the
+    cut a verdict sat without re-running anything.
+
+    Defined here rather than in the tool that writes records, so the tool and
+    `envelope.CERTIFIED_MECHANISM` cannot drift into two shapes.
+    """
+    return {
+        "horizon_days": result["horizon_days"],
+        "seeds": result["seeds"],
+        "counts": dict(result["counts"]),
+        "shown": list(result["shown"]),
+        "not_shown": list(result["not_shown"]),
+        "reversed": list(result["reversed"]),
+        "at_the_cut": list(result["at_the_cut"]),
+        "diagnostic": list(result["diagnostic"]),
+        "in_band_and_reversed": list(result["in_band_and_reversed"]),
+        "rows": {
+            row: {
+                "k": m["k"], "n": m["n"], "cut": m["cut"],
+                "null": m["null"], "median": m["median"],
+                "p": m["p"], "verdict": m["verdict"],
+                "at_the_cut": m["at_the_cut"], "counted": m["counted"],
+                "z0_normal": m["z0_normal"],
+                "z0_bootstrap": m["z0_bootstrap"],
+                "tolerance": m["tolerance"],
+                "band_windows": m["band_windows"],
+            }
+            for row, m in result["mechanism"].items()
+        },
+        "centre": {
+            row: {"z_r": c["z_r"], "median": c["median"],
+                  "real_centre": c["real_centre"], "se_m": c["se_m"],
+                  "se_real": c["se_real"], "at_centre": c["at_centre"],
+                  "undetermined": c["undetermined"]}
+            for row, c in result["centre"].items()
+        },
+        # Kept whole: every field is JSON-safe and the three counts are the
+        # part a reader cannot recompute from the rate.
+        "tail": result.get("tail"),
+    }
+
+
+def certification_report(result: Mapping[str, Any]) -> str:
+    """`certify`'s three counts as text, each saying what it answers.
+
+    The sentences are not decoration. "Fourteen of fourteen in band" has
+    been read as "this model reproduces real markets" for three eras, and
+    it is a statement about whether a real YEAR could read these numbers.
+    """
+    counts = result["counts"]
+    lines = [
+        f"certification: {result['seeds']} seeds, {result['horizon_days']} days",
+        "",
+        f"  in band          {counts['in_band']:2d} of {counts['in_band_of']}"
+        "   fidelity: could a real year read this",
+        f"  mechanism shown  {counts['mechanism_shown']:2d} of "
+        f"{counts['mechanism_of']}"
+        "   is a model WITHOUT the mechanism excluded",
+        f"  at real centre   {counts['at_centre']:2d} of "
+        f"{counts['at_centre_of']}"
+        "   diagnostic, never a gate",
+        "",
+        f"{'row':24s} {'median':>10s} {'null':>9s} {'k':>7s} {'p':>7s}  "
+        f"{'z_0 norm':>8s} {'z_0 boot':>8s}  {'z_R':>6s}  verdict",
+    ]
+    for row, m in result["mechanism"].items():
+        c = result["centre"].get(row, {})
+        z_r = c.get("z_r")
+        band = result["fidelity"]["statistics"].get(row, {})
+        marks = [m["verdict"]]
+        if m["at_the_cut"]:
+            marks.append("AT THE CUT")
+        if not m["counted"]:
+            marks.append("diagnostic, not counted")
+        if not band.get("in_band", True):
+            marks.append("OUT OF BAND")
+        def effect(value: float | None) -> str:
+            # None where the seeds do not scatter at all, which makes the
+            # standard error zero and the ratio undefined. The GATE still has
+            # an answer there -- it counts sides and needs no estimator --
+            # so a dash in an effect-size column is not a missing verdict.
+            return f"{value:>+8.2f}" if value is not None else f"{'--':>8s}"
+
+        lines.append(
+            f"{row:24s} {m['median']:>10.4f} {m['null']:>9.4f} "
+            f"{m['k']:>3d}/{m['n']:<3d} {m['p']:>7.3f}  "
+            f"{effect(m['z0_normal'])} {effect(m['z0_bootstrap'])}  "
+            + (f"{z_r:>+6.2f}" if z_r is not None else f"{'--':>6s}")
+            + "  " + ", ".join(marks))
+    for row, c in result["centre"].items():
+        if row in result["mechanism"]:
+            continue
+        z_r = c["z_r"]
+        kind = ("equivalence: its real value IS its null"
+                if row in ("return_acf1",) else "level-only: no mechanism null")
+        lines.append(
+            f"{row:24s} {c['median']:>10.4f} {'--':>9s} {'--':>7s} {'--':>7s}  "
+            f"{'--':>8s} {'--':>8s}  "
+            + (f"{z_r:>+6.2f}" if z_r is not None else f"{'--':>6s}")
+            + "  " + kind)
+    tail = result.get("tail")
+    if tail:
+        marks = [tail["verdict"]]
+        if tail["at_the_edge"]:
+            marks.append("AT THE EDGE")
+        if not tail["counted"]:
+            marks.append("graded, not counted")
+        lines += [
+            "",
+            f"{tail['row']:24s} {tail['rate']:>10.4f} "
+            f"{'--':>9s} {'--':>7s} {'--':>7s}  "
+            f"{'--':>8s} {'--':>8s}  "
+            + (f"{tail['z_r']:>+6.2f}" if tail["z_r"] is not None
+               else f"{'--':>6s}")
+            + "  " + ", ".join(marks),
+            f"  {tail['hits']} hits in {tail['sessions']} sessions over "
+            f"{tail['seeds']} seeds, pooled; band "
+            f"{tail['band'][0]:.2f} to {tail['band'][1]:.2f}, centre "
+            f"{tail['real_centre']:.3f} (se {tail['se_real']:.3f}); "
+            + (f"run se {tail['se_m']:.3f}, " if tail["se_m"] is not None
+               else "")
+            + f"margin to the nearer edge {tail['margin']:+.3f}",
+            # The mixture, which the rate cannot see. Printed beside the
+            # tape's own three so a reader can tell "the right rate" from
+            # "the right rate for the right reason".
+            f"  seeds at zero {tail['zero_share']:.2f} (tape "
+            f"{tail['tape']['zero_share']:.2f}), at five or more "
+            f"{tail['five_or_more_share']:.2f} (tape "
+            f"{tail['tape']['five_or_more_share']:.2f}), most in one seed "
+            f"{tail['max_hits']} (tape {tail['tape']['max_hits']}); "
+            "reported, not gated",
+        ]
+        if tail["not_counted"]:
+            lines += textwrap.wrap(tail["not_counted"], 76,
+                                   initial_indent="  ", subsequent_indent="  ")
+    if result["reversed"]:
+        lines += [
+            "",
+            "REVERSED, which the band cannot see: "
+            + ", ".join(result["reversed"]),
+        ]
+        if result["in_band_and_reversed"]:
+            lines.append(
+                "  and in band while reversed: "
+                + ", ".join(result["in_band_and_reversed"])
+                + " -- the model has the sign of a real effect backwards and "
+                "the fidelity count reads it as a pass")
+    if result["at_the_cut"]:
+        lines += ["", "at the cut, so undetermined at this seed count: "
+                  + ", ".join(result["at_the_cut"])]
+    if result["diagnostic"]:
+        lines += ["", "reported and NOT counted at this horizon:"]
+        for row in result["diagnostic"]:
+            lines += textwrap.wrap(
+                f"{row}: {result['mechanism'][row]['diagnostic']}", 76,
+                initial_indent="  ", subsequent_indent="  ")
+    if result["centre_undetermined"]:
+        lines += ["", "no centre distance: "
+                  + ", ".join(result["centre_undetermined"])]
+    return "\n".join(lines)
 
 
 def regressions(panel: Mapping[str, float], *,
@@ -1009,24 +1631,42 @@ def regressions(panel: Mapping[str, float], *,
         # one that always did the work: a row the shipped preset does not
         # hold in band cannot be lost by a candidate.
         low, high = REAL_MARKETS[name]
+        # A level or crisis row is held red at the shipped preset, so it has
+        # nothing to lose here; it is absent from `CERTIFIED` and skipped.
+        if name not in CERTIFIED:
+            continue
         if band_distance(CERTIFIED[name], low, high) == 0 and not row["in_band"]:
             lost.append(name)
     return sorted(lost)
 
 
 def certified() -> dict[str, Any]:
-    """The envelope as a plain mapping, for serialising into a manifest."""
-    return {
-        "preset": PRESET,
-        "certified_horizon_days": CERTIFIED_HORIZON_DAYS,
-        "statistics": {
-            k: {
+    """The envelope as a plain mapping, for serialising into a manifest.
+
+    The statistics carry their group. The shape rows are what a green panel
+    certifies; the level and crisis rows are reported with their own
+    verdicts, computed here from the band rather than assumed, and a level
+    or crisis row whose certified value has not been measured yet is listed
+    under ``unmeasured`` rather than given a number.
+    """
+    from .facts import SHAPE, LEVEL, CRISIS
+    statistics: dict[str, Any] = {}
+    for table, group in ((CERTIFIED, "shape"), (CERTIFIED_LEVEL, "level"),
+                         (CERTIFIED_CRISIS, "crisis")):
+        for k, v in table.items():
+            statistics[k] = {
                 "measured": v,
                 "band": list(REAL_MARKETS[k]),
                 "in_band": band_distance(v, *REAL_MARKETS[k]) == 0,
+                "group": group,
             }
-            for k, v in CERTIFIED.items()
-        },
+    unmeasured = [k for k in LEVEL + CRISIS if k not in statistics]
+    return {
+        "preset": PRESET,
+        "certified_horizon_days": CERTIFIED_HORIZON_DAYS,
+        "statistics": statistics,
+        "groups": {"shape": list(SHAPE), "level": list(LEVEL), "crisis": list(CRISIS)},
+        "unmeasured": unmeasured,
         "gaps": [
             {
                 "id": g.id,

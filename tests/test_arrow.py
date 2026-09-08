@@ -360,11 +360,59 @@ def test_downsampled_bars_reconcile_with_the_ticks_they_came_from():
     volumes = [v for v, i, d in zip(tick["volume"], tick["instrument_id"], tick["day"])
                if i == 0 and d == 0]
 
-    assert daily["open"][0] == closes[0]
+    # The open is the session's open and not the first print; the test
+    # below holds it to the engine's own mark. Close, high and low are the
+    # ticks', with the open inside the range as the print the day opened on.
     assert daily["close"][0] == closes[-1]
-    assert daily["high"][0] == max(closes)
-    assert daily["low"][0] == min(closes)
+    assert daily["high"][0] == max(closes + [daily["open"][0]])
+    assert daily["low"][0] == min(closes + [daily["open"][0]])
     assert daily["volume"][0] == pytest.approx(sum(volumes))
+
+
+def test_the_day_bar_opens_at_the_session_open_not_the_first_print():
+    """Issue #179. `prices` holds the print AFTER each tick, so a bar whose
+    open is its first element opens one tick into the session. The day bar
+    now carries the engine's own `open` mark, taken at `open_market` before
+    any tick. On the engine as it stands that mark IS the previous close on
+    every name-night, because nothing moves a price between sessions, so an
+    overnight return read off these bars is exactly zero, which is the
+    correct reading of a model with no overnight process; the first print
+    differs from it on most name-days and was being read as a gap."""
+    u = tradefloor.Universe.random(4, seed=5)
+    e = tradefloor.Engine(seed=2026, universe=u)
+    opens = []
+    for day in range(3):
+        e.open_market()
+        opens.append(arr(e.column("open")))
+        e.run_session(9, 30, 3, 390)
+        e.close_market()
+        e.record(day)
+    daily = pa.table(e.bars(grain="day")).to_pydict()
+    tick = pa.table(e.bars()).to_pydict()
+    bar_open = {(d, i): o for d, i, o in
+                zip(daily["day"], daily["instrument_id"], daily["open"])}
+    bar_close = {(d, i): c for d, i, c in
+                 zip(daily["day"], daily["instrument_id"], daily["close"])}
+    first_print = {(d, i): c for d, t, i, c in
+                   zip(tick["day"], tick["tick"], tick["instrument_id"], tick["close"])
+                   if t == 0}
+    for d in range(3):
+        for i in range(4):
+            assert bar_open[(d, i)] == opens[d][i], (d, i)
+            if d > 0:
+                assert bar_open[(d, i)] == bar_close[(d - 1, i)], (d, i)
+    assert sum(1 for k in bar_open if bar_open[k] != first_print[k]) > 0
+    # The first intraday bar of a day opens at the session open too; a
+    # later bar opens at its first print, the exchange convention.
+    minute = pa.table(e.bars(minutes=15)).to_pydict()
+    rows = {(d, b, i): o for d, b, i, o in zip(minute["day"], minute["bar"],
+                                                minute["instrument_id"], minute["open"])}
+    prints = {(d, t, i): c for d, t, i, c in
+              zip(tick["day"], tick["tick"], tick["instrument_id"], tick["close"])}
+    for d in range(3):
+        for i in range(4):
+            assert rows[(d, 0, i)] == opens[d][i]
+            assert rows[(d, 1, i)] == prints[(d, 15, i)]
 
 
 def test_high_is_at_or_above_low_everywhere():

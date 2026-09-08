@@ -55,7 +55,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "python"))
 
 import gate_pick  # noqa: E402
-from tradefloor import envelope, facts  # noqa: E402
+from tradefloor import envelope, facts, loss  # noqa: E402
 
 #: The real range for crisis co-movement, from the `scenario-magnitude` gap's
 #: own text: "crisis co-movement reads 0.696 against a real 0.664 to 0.727".
@@ -142,17 +142,34 @@ def load(path: str) -> list[dict]:
 
 
 def verdict(rows_by_kind: dict[str, list]) -> dict:
-    """The numbers a ranking needs, beside the human-readable block."""
+    """The numbers a ranking needs, beside the human-readable block.
+
+    THE RECORD CARRIES ITS SEEDS NOW, and that is the point of this pass.
+    Every record `corpus/gates/**` holds keeps one median per row per block
+    and nothing else, so a re-score of that corpus cannot take the
+    candidate's own across-seed error -- it has to pool one across the whole
+    corpus and apply it to every vector, and the corpus itself measures that
+    substitution as wrong by 0.46x to 6.04x depending on the row. FOUR of
+    the eighteen graded rows -- the level row, both fear rows and the index
+    tail row -- are blind in every one of those records for the same reason,
+    and the search that built them never saw those rows either. Measured on
+    the committed corpus: 1,648 records, fourteen rows scored on each.
+    `per_seed` is what stops the next campaign being read that way:
+    the per-seed panel for every kind, every row, with the pooled rows'
+    session samples and hit counts beside them.
+    """
     out = {}
     for kind in KINDS:
         rows = rows_by_kind.get(kind)
         if not rows:
             continue
-        med = {k: st.median([r[k] for r in rows if r.get(k) is not None])
-               for k in rows[0]}
         if kind == "driven":
-            out["driven"] = med
+            out["driven"] = {k: st.median([r[k] for r in rows
+                                           if r.get(k) is not None])
+                             for k in rows[0]}
             continue
+        # Each row by its own estimator, not a median over all of them.
+        med = gate_pick.graded_panel(rows)
         if kind in ("vix5", "vix45", "vix65"):
             out[kind] = {k: med[k] for k in (
                 "sector_excess_corr", "cross_sectional_corr",
@@ -162,6 +179,11 @@ def verdict(rows_by_kind: dict[str, list]) -> dict:
         sc = envelope.score(med, horizon_days=days)
         out[kind] = {
             "in_band": sc["in_band"], "of": sc["of"],
+                # The split: a gate reads the shape count; the level and
+                # crisis rows are held red and never added to it.
+                "shape_in_band": sc.get("shape_in_band"), "shape_of": sc.get("shape_of"),
+                "level_in_band": sc.get("level_in_band"), "level_of": sc.get("level_of"),
+                "crisis_in_band": sc.get("crisis_in_band"), "crisis_of": sc.get("crisis_of"),
             "out": [k for k, v in sc["statistics"].items()
                     if not v.get("in_band", True)],
             "median": med,
@@ -273,6 +295,41 @@ def main() -> int:
             if acc[label].get(kind):
                 print(gate_pick.summarise(kind, acc[label][kind]), flush=True)
         v = verdict(acc[label])
+        # The scoring rule, at BOTH horizons and combined at neither. R6
+        # (Simon, 2026-09-06): a gate that printed one number would be
+        # choosing a weight between the two, and `volume_abs_return_corr`
+        # is the row that makes that choice consequential -- 0.96 combined
+        # standard errors below its tape centre at 252 days and z +4.38 at
+        # 504, where it carries 47 per cent of pt-v16's whole score. The
+        # model's row moves between the horizons and the tape's does not.
+        # It costs a maximum: two candidates can each win a horizon, and
+        # then neither beats the other and both stay on the frontier.
+        panels_by_horizon = {days: acc[label][kind]
+                             for kind, days in (("p252", 252), ("p504", 504))
+                             if acc[label].get(kind)}
+        if panels_by_horizon:
+            rule = loss.dual_scoring_rule(panels_by_horizon)
+            v["scoring_rule"] = {
+                "scored_horizons": list(rule["scored_horizons"]),
+                "rule_fingerprint": rule["rule_fingerprint"],
+                "why_no_combined": rule["why_no_combined"],
+                **{f"S_{h}": rule[f"S_{h}"] for h in rule["scored_horizons"]},
+                **{f"S_gauss_{h}": rule[f"S_gauss_{h}"]
+                   for h in rule["scored_horizons"]},
+                "rows": {h: {k: {kk: r[kk] for kk in
+                                 ("T", "centre", "se_real", "se_model", "df",
+                                  "z", "term", "in_band", "band_position")}
+                             for k, r in rule["horizons"][h]["rows"].items()}
+                         for h in rule["scored_horizons"]},
+                "blind": {h: rule["horizons"][h]["blind"]
+                          for h in rule["scored_horizons"]},
+            }
+            parts = "   ".join(
+                f"S_{h} {rule[f'S_{h}']:.2f}" for h in rule["scored_horizons"])
+            blind = sorted(set().union(*(set(rule["horizons"][h]["blind"])
+                                         for h in rule["scored_horizons"])))
+            print(f"  scoring rule: {parts}   (never summed; blind on "
+                  f"{', '.join(blind) or 'nothing'})", flush=True)
         # Crisis co-movement is SCORED here, not merely printed. It carries a
         # stated real range in the scenario-magnitude gap, 0.664 to 0.727, it
         # is the statistic that rejected four gate batches of jump work, and
@@ -305,6 +362,16 @@ def main() -> int:
         results[label] = {
             "base": c["base"], "overrides": c["overrides"],
             "fingerprint": gate_pick.model(c["base"], c["overrides"]).fingerprint,
+            # The seeds this record stands on, and the per-seed panels
+            # themselves. A record without them can be scored on a corpus
+            # average and never on its own noise, and two records measured
+            # on blocks of different size cannot be compared at all -- the
+            # existing corpus states thirty by this tool's default and does
+            # not carry the number, so the claim is unverifiable there.
+            "seeds": list(train),
+            "held_out_seeds": list(gate_pick.HELDOUT),
+            "per_seed": {kind: acc[label][kind] for kind in KINDS
+                         if acc[label].get(kind)},
             **v,
         }
 

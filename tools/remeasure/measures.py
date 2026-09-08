@@ -89,7 +89,7 @@ def g_determinism(ctx: Ctx) -> dict:
     custom = pt.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
     custom_fp = pt.Engine(seed=42, universe=_u(6, 7), model=custom).model_fingerprint
 
-    from tradefloor.facts import MARGINAL, REAL_MARKETS
+    from tradefloor.facts import SHAPE, MARGINAL, REAL_MARKETS
     return {
         "kat_digest": digest,
         "kat_digest_elided": f"{digest[:8]}...{digest[-7:]}",
@@ -102,7 +102,7 @@ def g_determinism(ctx: Ctx) -> dict:
         "fp_len": len(u.fingerprint),
         "fp_reversal_differs": u.fingerprint != reversed_u.fingerprint,
         "facts_marginal": len(MARGINAL),
-        "facts_dependence": len(REAL_MARKETS) - len(MARGINAL),
+        "facts_dependence": len(SHAPE) - len(MARGINAL),
         "oracle_default_top_k": Oracle().top_k,
         "custom_model_fp": custom_fp,
         "preset_lacks_market_sigma": "market_factor_sigma" not in preset,

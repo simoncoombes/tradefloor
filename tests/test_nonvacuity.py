@@ -144,8 +144,13 @@ def test_every_truth_component_can_be_non_zero():
         engine.record(day)
 
     table = pa.table(engine.truth()).to_pydict()
+    # `overnight` is structurally zero at every shipped preset, since the
+    # dial that moves it ships at 0.0; it is reachable, and the test that
+    # proves it turns the dial on (tests/test_overnight.py, the tape test),
+    # the same arrangement `circuit_breaker` has.
     dead = [name for name in tradefloor.Engine.FACTORS
-            if name != "circuit_breaker" and all(v == 0.0 for v in table[name])]
+            if name not in ("circuit_breaker", "overnight")
+            and all(v == 0.0 for v in table[name])]
     assert dead == [], dead
     # And momentum specifically is zero on day one and non-zero on day two,
     # which is the shape of "not yet" rather than "never".
@@ -315,8 +320,11 @@ def test_the_stylised_facts_are_not_all_within_range():
     # If every statistic matched, `compare_to_real_markets` would be doing no
     # work and the module's honesty would be untested. Two are known
     # mismatches; that must stay visible.
+    # At the certified horizon: 120 days has no band set, and grading it
+    # against the 252-day bands is the error this suite now refuses.
     facts = tradefloor.facts.measure(
-        seed=3, universe=tradefloor.Universe.random(40, seed=111), days=120)
+        seed=3, universe=tradefloor.Universe.random(40, seed=111),
+        days=tradefloor.facts.CERTIFIED_HORIZON_DAYS)
     verdicts = tradefloor.facts.compare_to_real_markets(facts)
     assert any(not v["matches"] for v in verdicts.values())
     assert any(v["matches"] for v in verdicts.values())

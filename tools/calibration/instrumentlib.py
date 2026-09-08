@@ -145,6 +145,72 @@ PARAM_SPECS: dict[str, dict] = {
     "market_vol_vix_exponent": {"kind": "abs", "step_unit": 0.05, "hard_range": (1.0, 4.0)},
     "market_beta_down_asym": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
     "market_beta_down_asym_lag": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
+    # A SHARE of the injected first moment, so its range is [0, 1] and
+    # not an open coefficient: above 1.0 it would inject an upward
+    # drift of its own, which is the defect inverted rather than a
+    # richer model.
+    "market_beta_down_asym_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # The SHARE of nominal output growth the valuation's earnings carry.
+    # A share, so [0, 1] rather than an open coefficient: 1.0 holds the
+    # earnings share of nominal output constant, which is the reading the
+    # economy supports, and above it earnings outgrow output for ever.
+    "earnings_nominal_growth": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # A SWITCH, not a degree, and the box is [0, 1] only because the
+    # registry needs one. The branch is at zero and every nonzero value
+    # selects the same measured law, so this axis has two levels and a
+    # search over it reports a step rather than a gradient. Deliberate:
+    # the exponents either side of the knee are read off the cited
+    # measurements, not fitted, and a tunable exponent is the defect
+    # this dial exists to remove.
+    "order_flow_impact_law": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    # A SHARE of demand, so [0, 1]. Above 1.0 supply outruns demand every
+    # day and inventory ramps upward instead of downward, which is the
+    # defect inverted.
+    "oil_supply_response": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # A SHARE of the asymmetry removed, so [0, 1]. Past 1.0 the branches
+    # cross and the rule pushes the other way.
+    "oil_opec_symmetry": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # WHERE the seasonal shape acts, as a SHARE of its own amplitude, so
+    # [0, 1]. 0.0 puts all of it on the price level, where it compounds,
+    # and 1.0 all of it on the reversion target. Past 1.0 the level carries
+    # a negative amplitude, which is the shape inverted.
+    "oil_seasonality_target": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # A SHARE of the hazard's unit correction, so [0, 1]. 0.0 draws a rate
+    # whose scale is in months once a day, 1.0 reads it on the 30-day month
+    # the phase clock keeps, and past 1.0 the cycle runs slower than its own
+    # scale states.
+    "cycle_hazard_per_month": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "trough_growth_floor": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "phase_target_range_draw": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # The yield at which the target multiple sits on its sector anchor. A
+    # LOG box like the other rate-like dials, and no explicit hard range,
+    # because it ships at 0.04 rather than at zero and the calibration
+    # convention's own [1/4x, 4x] gives 0.01 to 0.16. Both ends are outside
+    # anything the economy reaches, so the box is wide rather than chosen.
+    "neutral_discount_rate": {"kind": "log"},
+    # Days the economy is advanced alone before day zero. A COUNT, so an
+    # absolute box, and its top is the horizon the burn-in that measured it
+    # ran to: the transient table reaches 1095 days and the last field the
+    # valuation reads enters its band at 755.
+    "macro_burn_in_days": {"kind": "abs", "step_unit": 30.0,
+                           "hard_range": (0.0, 1095.0)},
+    # A SHARE of earnings, so [0, 1]. Past 1.0 a company returns more than
+    # it earns every year, which is a claim about leverage this model does
+    # not carry.
+    "buyback_payout_share": {"kind": "abs", "step_unit": 0.05,
+                             "hard_range": (0.0, 1.0)},
+    # The overnight move's variance as a fraction of a session's. A RATIO
+    # of variances, so an absolute box from zero; 1.0 is a night as large
+    # as a session, and the real share of 0.23 to 0.43 sits well below it
+    # even with the jump realised at the open.
+    "overnight_variance_ratio": {"kind": "abs", "step_unit": 0.05,
+                                 "hard_range": (0.0, 2.0)},
+    # A SHARE of the jump drift returned, so [0, 1]. 1.0 is the
+    # martingale and past it the compensator overshoots.
+    "jump_mean_compensated": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # A SHARE of the ladders' asymmetry removed, so [0, 1]. Past 1.0 they
+    # cross and the upside ladder becomes the larger of the two.
+    "cascade_symmetry": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "market_vol_vix_smooth": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 60.0)},
     "qe_pe_stock_gain": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 20.0)},
     "universe_stress_weight": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 2.0)},
@@ -187,12 +253,54 @@ PARAM_SPECS: dict[str, dict] = {
     # calibration notes).
     "vix_realised_vol_weight": {"kind": "abs", "step_unit": 0.05,
                                 "hard_range": (0.0, 1.0)},
+    # The level identity is a SWITCH, not a quantity: 0.0 is the phase
+    # table and 1.0 is the index's own variance, and a search that
+    # landed on 0.4 would be running neither. The range is opened to
+    # both ends so an atlas can reach the arm, with a step that walks
+    # the whole interval in one move.
+    "vix_level_identity": {"kind": "abs", "step_unit": 1.0,
+                           "hard_range": (0.0, 1.0)},
+    # The premium is MEASURED at 0.252 with a per-year IQR of 1.128 to
+    # 1.398 on the ratio, so 0.128 to 0.398 here. The box is that IQR
+    # widened to the P10-P90 of the rolling-window estimator (1.049 to
+    # 1.473) rather than opened to anything a search finds comfortable:
+    # outside it the value is not one the tape supports.
+    "vix_variance_premium": {"kind": "abs", "step_unit": 0.02,
+                             "hard_range": (0.049, 0.473)},
     "vix_return_gain": {"kind": "log", "hard_range": (1.0, 250.0)},
     "vix_return_source": {"kind": "abs", "step_unit": 0.1,
                           "hard_range": (0.0, 1.0)},
     "vix_cycle_amplitude": {"kind": "abs", "step_unit": 0.1,
                             "hard_range": (0.0, 2.0)},
     "vix_return_gain_up": {"kind": "log", "hard_range": (1.0, 250.0)},
+    # The exponent is a SHAPE and its plausible span is narrow: the tape
+    # puts it at 1.200 with a 95 per cent interval of 1.112 to 1.287 and a
+    # count-weighted reading of 1.132. The hard range is opened to 1.0
+    # (the linear form, so a search can always return to what shipped) and
+    # to 2.0, well past anything the measurement supports, so the bound is
+    # a guard rather than a prior. `abs` and not `log`, because the
+    # interesting span is a few hundredths wide.
+    "vix_return_exponent": {"kind": "abs", "step_unit": 0.02,
+                            "hard_range": (1.0, 2.0)},
+    # The crisis-fear pair, added with the dials themselves so no search
+    # reaches them before a box exists.
+    #
+    # The ceiling's box is drawn around the two levels its own docstring
+    # names rather than around the shipped 80.0: the real index closed at
+    # 82.69 on 2020-03-16, and the derived response peaks at 93.0 driven
+    # over that year with the ceiling off. A box from 60 to 100 holds both,
+    # so a search can reach values that truncate the 2020 peak and values
+    # that are inert on that tape, and the difference between them is
+    # something it can measure rather than something the box decided.
+    "vix_ceiling": {"kind": "abs", "step_unit": 1.0, "hard_range": (60.0, 100.0)},
+    # Ships at 0.0, so the multiplicative default cannot serve it and the
+    # range has to be explicit. It cancels a standing POSITIVE excursion an
+    # asymmetric return gain puts on the target, so the useful side is
+    # negative; the box is symmetric because the sign of the asymmetry is
+    # not a constant of the model. On the 2020 tape the bias is 10.5 points
+    # of excursion and 7.34 of level, so +-12 clears both with headroom.
+    "vix_target_offset": {"kind": "abs", "step_unit": 0.5,
+                          "hard_range": (-12.0, 12.0)},
     # The clamp's units follow `vix_return_source`: a FRACTION when the
     # channel reads the closing tick (shipped 0.03) and PERCENTAGE POINTS
     # when it reads the day (pt-v9 uses 15.0). One box has to hold both, so
@@ -467,6 +575,23 @@ PARAM_SPECS: dict[str, dict] = {
                                     "hard_range": (1.0, 50.0)},
     "market_vol_floor_multiple": {"kind": "log",
                                   "hard_range": (0.001, 1.0)},
+    # The two floor dials (programme/idio-vol-floor.md). Both must be able
+    # to reach the END of their range, not a multiple of the shipped value:
+    # the whole content of each is what happens at one endpoint, so a
+    # convention box around the ship would explore everything except the
+    # answer.
+    "garch_omega_sector_scaled": {"kind": "abs", "step_unit": 0.1,
+                                  "hard_range": (0.0, 1.0)},
+    # The stationary day-zero opening (programme/stationary-opening-design.md).
+    # A switch: 0.0 and 1.0 are the only values that mean anything, so the
+    # step is the whole interval and a search either takes the mechanism or
+    # leaves it.
+    "cycle_stationary_opening": {"kind": "abs", "step_unit": 1.0,
+                                 "hard_range": (0.0, 1.0)},
+    # In daily VARIANCE units. 0.0 removes the floor, which is the point of
+    # the dial; the top is 4x the shipped 1e-4, the convention multiple.
+    "idio_sigma_floor": {"kind": "abs", "step_unit": 2.5e-5,
+                         "hard_range": (0.0, 4.0e-4)},
 }
 
 #: §3.9's searched set — the identifiability filter the SVD tests.

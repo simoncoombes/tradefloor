@@ -1162,6 +1162,28 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: is a field the guard below is not guarding, and the difference between
 #: those two cases is the whole value of the check.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "draw_counts":
+        "the address counters behind tradefloor.noise. A generator restored "
+        "without them continues from counts of zero, so a patch written "
+        "against the source lands elsewhere or nowhere; with no overlay "
+        "installed nothing reads them, and the trajectory is the same. "
+        "test_noise.py pins both halves.",
+    "draw_overlay":
+        "the substitutions installed by tradefloor.noise. This scenario "
+        "installs none, so there is nothing to drop; test_noise.py restores "
+        "a snapshot with one installed and asserts the continuation keeps it.",
+    "pending_jump":
+        "the day's jump, waiting for the tape row that carries it. Applied "
+        "at a day boundary, so no tick of that day can hold it, and written "
+        "onto the FIRST TICK OF THE NEXT DAY. Dropping it changes what the "
+        "TAPE says and no price, and this guard compares trajectories. "
+        "tests/test_shadow_solver.py::test_a_resumed_run_carries_its_whole_"
+        "record is the test that does see it: with this absent from the "
+        "snapshot, a resumed run's record was missing the jump on its first "
+        "recorded row while the continuous run's carried it.",
+    "pending_overnight":
+        "the overnight move, waiting for the same row and for the same "
+        "reason as pending_jump.",
     "model_fingerprint":
         "not state. It is the guard that refuses a snapshot restored onto an "
         "engine running other coefficients, which has its own test; dropping "
@@ -1178,6 +1200,13 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "it needs a market whose VIX was high and is now held low. This "
         "scenario keeps the VIX in crisis throughout, which makes "
         "every OTHER dial live.",
+    "nominal_output_base":
+        "the run's opening gdp times cpi, read once at construction. Both "
+        "engines here are built from the same macro state, and Macro cannot "
+        "set either level, so their bases are the same number and dropping "
+        "the key restores to it. What reaches this field is a snapshot whose "
+        "economy carries output away from the restoring engine's own, which "
+        "test_earnings_nominal_growth.py restores and then prices against.",
     "central_bank":
         "the meeting calendar runs off day_count, which IS restored, so both "
         "engines schedule the same meetings. A difference needs a run that "

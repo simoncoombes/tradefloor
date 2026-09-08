@@ -1,0 +1,199 @@
+{
+  "n": 8,
+  "step": 120,
+  "stats": {
+    "control": {
+      "calls": 8,
+      "refusals": 0,
+      "distinct": 4,
+      "mean_net": 0.625,
+      "stdev_net": 0.6959705453537527,
+      "mean_gross": 69000.0,
+      "stdev_gross": 5590.169943749474,
+      "prompt_lines": 372,
+      "differing_lines": 0
+    },
+    "crisis": {
+      "calls": 8,
+      "refusals": 0,
+      "distinct": 5,
+      "mean_net": -0.125,
+      "stdev_net": 0.5994789404140899,
+      "mean_gross": 38125.0,
+      "stdev_gross": 15909.411522743385,
+      "prompt_lines": 372,
+      "differing_lines": 72
+    }
+  },
+  "runs": {
+    "control": [
+      {
+        "orders": {
+          "IBM": -19000.0,
+          "FANG": -10000.0,
+          "AMD": 20000.0,
+          "INCY": 5000.0,
+          "TMUS": 10000.0
+        },
+        "net": 1,
+        "gross": 64000.0
+      },
+      {
+        "orders": {
+          "IBM": -19000.0,
+          "FANG": -10000.0,
+          "AMD": 20000.0,
+          "INCY": 10000.0,
+          "TMUS": 15000.0
+        },
+        "net": 1,
+        "gross": 74000.0
+      },
+      {
+        "orders": {
+          "IBM": -19000.0,
+          "FANG": -10000.0,
+          "AMD": 20000.0,
+          "INCY": 5000.0,
+          "TMUS": 10000.0
+        },
+        "net": 1,
+        "gross": 64000.0
+      },
+      {
+        "orders": {
+          "IBM": -19000.0,
+          "FANG": -10000.0,
+          "AMD": 20000.0,
+          "INCY": 10000.0,
+          "TMUS": 15000.0
+        },
+        "net": 1,
+        "gross": 74000.0
+      },
+      {
+        "orders": {
+          "IBM": -19000.0,
+          "FANG": -10000.0,
+          "AMD": 20000.0,
+          "INCY": 5000.0,
+          "TMUS": 10000.0
+        },
+        "net": 1,
+        "gross": 64000.0
+      },
+      {
+        "orders": {
+          "IBM": -19000.0,
+          "FANG": -10000.0,
+          "AMD": 30000.0,
+          "INCY": 10000.0
+        },
+        "net": 0,
+        "gross": 69000.0
+      },
+      {
+        "orders": {
+          "IBM": -19000.0,
+          "FANG": -10000.0,
+          "AMD": 20000.0,
+          "INCY": 5000.0,
+          "TMUS": 10000.0
+        },
+        "net": 1,
+        "gross": 64000.0
+      },
+      {
+        "orders": {
+          "IBM": -19000.0,
+          "FANG": -10000.0,
+          "AMD": -20000.0,
+          "INCY": 10000.0,
+          "TMUS": 20000.0
+        },
+        "net": -1,
+        "gross": 79000.0
+      }
+    ],
+    "crisis": [
+      {
+        "orders": {
+          "IBM": -10000.0,
+          "AKAM": -7000.0,
+          "AMD": -20000.0,
+          "TMUS": 10000.0,
+          "INCY": 5000.0
+        },
+        "net": -1,
+        "gross": 52000.0
+      },
+      {
+        "orders": {
+          "IBM": -10000.0,
+          "INCY": -10000.0,
+          "AMD": 15000.0,
+          "TMUS": 10000.0
+        },
+        "net": 0,
+        "gross": 45000.0
+      },
+      {
+        "orders": {
+          "IBM": -5000.0,
+          "SLB": 40000.0,
+          "FANG": 5000.0
+        },
+        "net": 1,
+        "gross": 50000.0
+      },
+      {
+        "orders": {
+          "IBM": -10000.0,
+          "INCY": -10000.0,
+          "AMD": 15000.0,
+          "TMUS": 10000.0
+        },
+        "net": 0,
+        "gross": 45000.0
+      },
+      {
+        "orders": {
+          "IBM": -3000.0,
+          "SLB": 15000.0
+        },
+        "net": 0,
+        "gross": 18000.0
+      },
+      {
+        "orders": {
+          "IBM": -10000.0,
+          "INCY": -10000.0,
+          "AMD": 15000.0,
+          "TMUS": 10000.0
+        },
+        "net": 0,
+        "gross": 45000.0
+      },
+      {
+        "orders": {
+          "IBM": -10000.0,
+          "INCY": -10000.0,
+          "AMD": 15000.0,
+          "TMUS": 10000.0
+        },
+        "net": 0,
+        "gross": 45000.0
+      },
+      {
+        "orders": {
+          "IBM": -5000.0
+        },
+        "net": -1,
+        "gross": 5000.0
+      }
+    ]
+  },
+  "recorded_by": "run.py --live --record",
+  "model": "claude-sonnet-4-5-20250929",
+  "temperature": 0.0
+}

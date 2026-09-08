@@ -1,0 +1,101 @@
+# liquidity_crisis, rebased to fire at the fork.
+#
+# This is the scenario that ships with Tradefloor. Every shock, every value
+# and the one assumption are unchanged, and the packaged file is the source
+# of truth for what a funding event does here:
+#
+#     python/tradefloor/scenarios/liquidity_crisis.yml
+#     sha256:a8eb4bbc679fdfac243930456768fb941da14efd7ab653bac373ffded3531a98
+#
+# ONE FIELD DIFFERS. The packaged file fires `at: 50`, and every packaged
+# scenario does, because they are written for a single market with fifty
+# days of warmup before the event. `World.apply` rebases `at` by the day it
+# is applied on, so handing the packaged file to an arm forked on day 20
+# fires it on day 70 -- fifty days after the fork.
+#
+# That is the wrong experiment for this question. Fifty post-fork days
+# before the shock means fifty days in which the two arms drift apart on
+# nothing but the agent answering the same question two ways, and the
+# crisis then lands on two markets that are no longer comparable. The
+# question here is what the agent does when the market changes UNDER it,
+# from a fork where both arms are identical to the bit.
+#
+# So `at: 0`: the funding event begins on the first day after the fork and
+# runs for twenty-five, which covers the whole twenty-day branch window.
+# Nothing else is touched. This file carries its own fingerprint, so a
+# reader can tell the two apart and check either.
+#
+# ---------------------------------------------------------------------
+# What follows is the packaged file, verbatim except for `at` and `name`.
+# ---------------------------------------------------------------------
+
+# Example experimental assumptions. This scenario is not a forecast, and not
+# a claim about how a real market would respond to a real liquidity event.
+#
+# The scenario this simulator is best placed to run, because it is the one
+# where a good decision and a good outcome come apart. Nothing here moves
+# fair value much. What moves is the BOOK: `market.liquidity` scales the
+# avg_volume column the market maker quotes off, so every ladder level thins,
+# a marketable order walks further up it, and the same trade the agent would
+# have made anyway costs more.
+#
+# Measured two ways, because only one of them is unambiguous.
+#
+# THE MECHANISM. `Universe.random(20, seed=101)`, five seeds, book read after
+# twenty days: quoted depth scales exactly with the multiplier, 175,060
+# shares to 70,019 at x0.40, and the cost of sweeping 50,000 shares rises
+# from 6.08 bps to 8.57 bps, and to 14.59 bps at x0.10. Below x0.4 a
+# 200,000-share order cannot be filled from quoted depth at all. The quoted
+# SPREAD does not move -- spread here is a function of VIX and of the name's
+# size tier, not of avg_volume -- which is why this scenario moves VIX too.
+#
+# WHAT IT COSTS AN AGENT. That depends on the agent, and one run cannot size
+# it. Over sixteen PAIRED seeds of a momentum top-5 strategy across thirty
+# days, x0.40 raised the median notional-weighted impact by 33 bps, but did
+# so in only ten of the sixteen; at x0.10 it was twelve of sixteen. Take the
+# direction, not the magnitude, and run your own seeds.
+#
+# Measured on PRICES over the same universe, the depth shock moved the
+# median instrument 0.00%. That is the point rather than a disappointment:
+# an execution shock is invisible in a price series and expensive in a fill,
+# and an evaluation that reads only the price series will score an agent as
+# though it traded for free.
+
+version: 1
+
+scenario:
+  name: liquidity_crisis_at_fork
+
+  description: >
+    A funding event: quoted depth collapses to 40% and volatility doubles for
+    twenty-five days, and then both end. Volatility is released back to the
+    endogenous chain, which mean-reverts it; depth is written back, because
+    nothing in the engine writes that column at all. Example experimental
+    assumptions, not a forecast.
+
+  shocks:
+
+    - target: market.liquidity
+      operation: multiply
+      value: 0.40
+      at: 0
+      duration: 25
+
+    - target: macro.vix
+      operation: multiply
+      value: 2.0
+      at: 0
+      duration: 25
+
+  transmission:
+
+    # An assumption, and one worth stating rather than burying: a funding
+    # event that halves depth is assumed to widen credit by 50 basis points
+    # as well. Nothing in this simulator derives that number. It is here so
+    # the scenario prices a credit channel alongside the execution one, and
+    # so that a reader can change it.
+    - target: macro.corporate_yield
+      operation: add
+      value: 0.005
+      at: 0
+      duration: 25

@@ -38,13 +38,15 @@
 use crate::economy::EconomyState;
 use crate::fair_value::{compute_fair_value_with, CompanyValuationInputs, EconomyValuationInputs};
 use crate::mathx;
-use crate::microstructure::{settle_price_through_book, CompanyMicrostructure, SettleOptions};
+use crate::microstructure::{
+    decompose, settle_price_through_book, CompanyMicrostructure, SettleOptions,
+};
 use crate::mispricing::crowd_lean_with;
 use crate::params::ModelParams;
 use crate::rng::Rng;
 
 use super::factors::{
-    calculate_live_factors, order_imbalance, FactorCompany, LiveFactors, NewsEvent,
+    calculate_live_factors, order_imbalance_with, FactorCompany, LiveFactors, NewsEvent,
     SharedFactors,
 };
 use super::hours::{intraday_vol, intraday_volume, MarketStatus};
@@ -198,8 +200,160 @@ pub struct TickCompany {
     pub revenue_growth: Option<f64>,
 }
 
+/// Trading days in a year, the clock a market rate is quoted on.
+///
+/// Separate from the economy's 365 by intent. A buyback yield is earnings
+/// over a TRADED price, so it is an annual rate on the market's own
+/// calendar, and an `economy_days_per_year` that unified the macro clocks
+/// would leave this alone.
+pub const MARKET_DAYS_PER_YEAR: f64 = 252.0;
+
+/// The per-share factor a buyback yield has produced by `elapsed_days`.
+///
+/// A company returning a share of its earnings as net buybacks retires
+/// stock, so earnings and book per share grow faster than the company does,
+/// by the buyback yield `b = payout_share * eps / price`. That yield is
+/// earnings over price, so the mechanism pays more when the multiple is low
+/// and less when it is high, which is the behaviour a real buyback
+/// programme has and a flat premium does not.
+///
+/// # What is exact and what is not
+///
+/// The share count obeys `dS/S = -payout * eps(u)/P(u) du`, so the exact
+/// factor is the exponential of the payout share times the INTEGRAL of the
+/// earnings yield. This evaluates the yield at today's price and holds it
+/// over the elapsed time, which is the form the design states and needs no
+/// per-name accumulator. Measured against the integral on real price paths
+/// at pt-v18: over 252 days on 200 name-seeds the difference is +0.026
+/// points of annual index return at the median and +0.009 at the mean, and
+/// over 1008 days on 120 name-seeds it is -0.015 and -0.068. The multiple
+/// mean-reverts, so today's yield estimates the period's average yield at
+/// both horizons. The worst single name is 1.39 points over four years and
+/// the index averages forty of them with errors on both sides.
+///
+/// The yield reads the earnings the growth term has already restated, and
+/// not the earnings this factor itself restates. Solving for the
+/// self-consistent yield is a Lambert W with no bit-pinned implementation
+/// here, and the term it omits is second order: at 1.85 per cent over a
+/// year it understates the yield by 0.03 of a point, against a market
+/// price in the denominator that rises with the same buybacks and pushes
+/// the other way.
+///
+/// # The clamp on a loss-maker
+///
+/// A negative earnings yield would grow the share count, which is dilution
+/// rather than buyback, and a company cannot return earnings it does not
+/// have. So a loss-maker neither retires nor issues. That clamp does not
+/// carry the hazard this era keeps finding in one-sided terms: `eps` is
+/// fixed for a name at construction, so it selects a fixed share of the
+/// roster once rather than branching on a zero-mean quantity every day. On
+/// `Universe.random(40, seed=111)` it is 3 names of 40.
+pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days: i64) -> f64 {
+    if p.buyback_payout_share == 0.0 {
+        return 1.0;
+    }
+    let eps = match eps {
+        Some(e) if e > 0.0 && e.is_finite() => e,
+        _ => return 1.0,
+    };
+    if !(price > 0.0) || !price.is_finite() || elapsed_days <= 0 {
+        return 1.0;
+    }
+    let b = p.buyback_payout_share * eps / price;
+    mathx::exp(b * elapsed_days as f64 / MARKET_DAYS_PER_YEAR)
+}
+
+/// The sector draw's DAILY sigma, which follows VIX when coupled, on the
+/// market factor's own target shape: variance scales with (VIX / anchor)^2,
+/// so sigma scales with its square root. A branch at zero keeps every
+/// preset before the coupling bit-identical; at the anchor the ratio is
+/// exactly 1.0 at any coupling. The draw count is unchanged, so the tape
+/// is too. Shared by the tick and the overnight move.
+pub fn sector_sigma_for(p: &ModelParams, economy: &EconomyState) -> f64 {
+    sector_sigma_at(p, economy, p.market_vol_vix_anchor)
+}
+
+/// [`sector_sigma_for`] against an EXPLICIT anchor, for the same reason
+/// `factor_vol::update_market_variance_at` takes one: under
+/// `vix_level_identity` the anchor is derived from the index's own
+/// unconditional variance rather than read from the dial. At
+/// `p.market_vol_vix_anchor` this is the arithmetic that stood here, to the
+/// bit.
+pub fn sector_sigma_at(p: &ModelParams, economy: &EconomyState, vix_anchor: f64) -> f64 {
+    if p.sector_vix_coupling == 0.0 {
+        p.sector_factor_sigma
+    } else {
+        let ratio = economy.vix / vix_anchor;
+        p.sector_factor_sigma
+            * mathx::sqrt(1.0 - p.sector_vix_coupling + p.sector_vix_coupling * (ratio * ratio))
+    }
+}
+
+/// The factor the valuation's fundamentals are restated by, from the
+/// economy's own integrated nominal output.
+///
+/// `1.0` whenever `earnings_nominal_growth` is 0.0, through a BRANCH rather
+/// than through arithmetic that happens to be neutral, so every preset
+/// before pt-v18 reaches `compute_fair_value` with the fundamentals it was
+/// built with and reproduces bit for bit.
+///
+/// # The quantity
+///
+/// `N = gdp * cpi`, nominal output, which the economy compounds daily at
+/// `gdp_growth / 100 / 365` and `inflation_rate / 100 / 365` in
+/// [`crate::economy::daily`]. `base` is `N` when the engine was built, so
+/// the ratio is exactly 1.0 on day 0 and the opening valuation is
+/// unchanged. The economy advances once per market day and the market
+/// annualises by 252, so a certified year carries `252 / 365` of both
+/// annual rates.
+///
+/// # The guard
+///
+/// A base that is not finite and positive gives 1.0. `gdp` and `cpi` are
+/// levels the economy never takes to zero, so this reaches nothing the
+/// engine builds; it is here because a caller may construct
+/// [`TickInputs`] directly, and a NaN entering the valuation would freeze
+/// every book downstream with no indication of where it came from.
+pub fn nominal_scale(p: &ModelParams, economy: &EconomyState, base: f64) -> f64 {
+    if p.earnings_nominal_growth == 0.0 {
+        return 1.0;
+    }
+    if !(base > 0.0) || !base.is_finite() {
+        return 1.0;
+    }
+    let ratio = economy.gdp * economy.cpi / base;
+    // Linear in the dial, so a share of the term is a share of the level
+    // the term adds, which is the shape every other dial in this era has.
+    1.0 + p.earnings_nominal_growth * (ratio - 1.0)
+}
+
+/// Valuation inputs with the fundamentals restated in the price level and
+/// output the economy has reached.
+///
+/// `scale` is `1 + earnings_nominal_growth * (N_t / N_0 - 1)`, from
+/// [`nominal_scale`]. Both fundamentals move together, so the valuation
+/// stays homogeneous of degree one in nominal terms on the earnings path
+/// and on the book path alike, and a loss-maker valued at
+/// `book * LOSS_MAKING_PRICE_TO_BOOK` grows with the same output a
+/// profitable company does. The sector anchor is a multiple and the
+/// revenue growth is a rate, so both are already nominal-neutral and
+/// neither moves.
+pub fn scale_valuation(
+    company: CompanyValuationInputs,
+    scale: f64,
+) -> CompanyValuationInputs {
+    CompanyValuationInputs {
+        sector_avg_pe: company.sector_avg_pe,
+        eps: company.eps.map(|v| v * scale),
+        book_value_per_share: company.book_value_per_share.map(|v| v * scale),
+        revenue_growth: company.revenue_growth,
+    }
+}
+
 impl TickCompany {
-    fn valuation(&self) -> CompanyValuationInputs {
+    /// The valuation inputs as the tick reads them; `pub(crate)` so the
+    /// overnight move prices the open from the same figures.
+    pub(crate) fn valuation(&self) -> CompanyValuationInputs {
         CompanyValuationInputs {
             sector_avg_pe: self.sector_avg_pe,
             eps: self.eps,
@@ -323,6 +477,15 @@ pub struct TickInputs<'a> {
     /// constant sigma. A caller building `TickInputs` directly and wanting
     /// the old constant-sigma behaviour passes the constant.
     pub market_sigma_daily: f64,
+    /// The VIX at which every variance coupling reads ONE.
+    ///
+    /// `params.market_vol_vix_anchor` under every preset before pt-v19,
+    /// which is what `sector_sigma_for` reads it from; under
+    /// `vix_level_identity` the engine DERIVES it from the index's own
+    /// unconditional variance and passes that instead. Carried rather
+    /// than recomputed for the same reason `market_sigma_daily` is: the
+    /// draw must read the reference the engine actually ran with.
+    pub vix_anchor: f64,
     /// The universe's remembered stress, in VIX points above the crisis
     /// threshold, carried from previous days. Zero under every preset
     /// before pt-v4 and under any preset with the memory disabled, which
@@ -337,6 +500,33 @@ pub struct TickInputs<'a> {
     /// See [`SettleDrawPolicy`]. `FourAlways` unless replaying a recorded
     /// reference stream.
     pub settle_draws: SettleDrawPolicy,
+    /// Settle each open tick a second time against unbounded depth, and
+    /// report what the difference was.
+    ///
+    /// Off by default and inert to the market: the second settlement runs on
+    /// its own book, its result reaches no company field, and it takes no
+    /// draw. It is served the four uniforms the real settlement was served,
+    /// rewound, so it requires [`SettleDrawPolicy::FourAlways`] and is
+    /// skipped under `FourOrZero`, where the settlement draws from the
+    /// caller's recorded source and there is no buffer to rewind.
+    pub settle_depth_counterfactual: bool,
+    /// Nominal output when the run opened: `gdp * cpi` at construction.
+    ///
+    /// Read only by [`nominal_scale`], and only when
+    /// `earnings_nominal_growth` is nonzero, which is pt-v18 and no preset
+    /// before it. A caller building `TickInputs` directly passes the
+    /// opening `economy.gdp * economy.cpi` of the run it is simulating; a
+    /// single-tick caller passes this tick's own, which makes the ratio
+    /// 1.0 and the valuation the one every earlier preset computes.
+    pub nominal_output_base: f64,
+    /// Trading days this run has closed, which is the buyback factor's
+    /// clock.
+    ///
+    /// Read only by [`buyback_scale`], and only when
+    /// `buyback_payout_share` is nonzero, which is pt-v18 and no preset
+    /// before it. A single-tick caller passes 0, which makes the factor
+    /// 1.0 and the valuation the one every earlier preset computes.
+    pub elapsed_days: i64,
     /// The model coefficients (the runtime seam, CALIBRATION.md §5). The
     /// engine passes its own; a caller building `TickInputs` directly
     /// passes [`crate::params::PT_V1`] for the shipped model, which is
@@ -379,6 +569,68 @@ pub struct TickOutcome {
     /// carry and cannot be recovered afterwards.
     pub factors: Vec<LiveFactors>,
     pub shared_factors: SharedFactors,
+    /// The shock that arrived, per active company, in log units.
+    ///
+    /// `log(fair_value / the last print)`: the distance the price model put
+    /// between the tape and this tick's anchor, before the book covered any
+    /// of it. Phase 4 reports it whether or not the market is open, because
+    /// a closed tick still moves fair value and prints the model price.
+    pub shock: Vec<f64>,
+    /// The depth that absorbed it, per active company, in log units.
+    ///
+    /// `log(the print / fair_value)`, against the print the tape carries --
+    /// so it includes the second circuit breaker, which lands between the
+    /// book's last trade and what is published. `shock + absorbed` is the
+    /// print's log move away from the last print.
+    pub absorbed: Vec<f64>,
+    /// How far the second circuit breaker moved the print, per active
+    /// company, in log units.
+    ///
+    /// `log(the print / what the book settled)`, so zero on every tick the
+    /// breaker left alone. `absorbed - clamp` is the book's own share of the
+    /// distance from the model price to the tape.
+    ///
+    /// Separate because the two cancel. On every clamped row measured the
+    /// book and the breaker pull opposite ways, and on roughly three fifths
+    /// of them they cancel to the last bit, so `absorbed` reads exactly zero
+    /// on a name the breaker had just moved 513 basis points -- the same
+    /// value it takes on a tick that never settled at all.
+    pub clamp: Vec<f64>,
+    /// What the same tick would have printed against unbounded depth, per
+    /// active company.
+    ///
+    /// Empty unless [`TickInputs::settle_depth_counterfactual`] was set and
+    /// the schedule was [`SettleDrawPolicy::FourAlways`]. Same draws, same
+    /// book state, same breaker; the only difference is how many resting
+    /// levels a slice could walk.
+    pub unbounded_print: Vec<f64>,
+    /// Liquidity's share of the print's move, per active company.
+    ///
+    /// `log(print / unbounded_print) / log(print / the last print)`: how far
+    /// the depth bound moved the print, as a multiple of the move the print
+    /// actually made. Zero when the two prints coincide, which covers every
+    /// tick that did not settle, and NaN when the print did not move and the
+    /// deeper book would have moved it. Empty alongside `unbounded_print`.
+    ///
+    /// # It is normally NEGATIVE, and it is not a percentage
+    ///
+    /// The bound TRUNCATES a walk. A market order that exhausts a shallow
+    /// book stops there; against every resting level it keeps filling and
+    /// prints further from where it started. So the real print sits between
+    /// the last print and the unbounded print, the numerator opposes the
+    /// denominator, and the share comes out below zero. Measured on
+    /// `Universe.random(12, seed=111)` at seed 42 over three days of pt-v16:
+    /// 1,351 rows negative against 72 positive, of 1,436 where the bound
+    /// moved the print at all. It read 1,409 against 100 of 1,516 on the
+    /// roster the universe generator produced before it was reconciled to
+    /// open at fair value, which re-drew the roster and so the market.
+    ///
+    /// Read it through the identity it satisfies: the unbounded book's move
+    /// away from the last print is `1 - share` times the printed move. A
+    /// share of -1 means the deeper book would have moved the price twice as
+    /// far. Nothing bounds it by one, so a small printed move against a large
+    /// truncation gives a large ratio.
+    pub liquidity_share: Vec<f64>,
 }
 
 /// Run one simulated market minute.
@@ -448,7 +700,16 @@ pub fn simulate_market_tick(
                 sector_factors: Vec::new(),
                 crisis_spike: 0.0,
                 prev_day_down: false,
+                // No tick ran, so no draw had a sigma. Zero rather than
+                // the constant: a reader of a closed market's factors
+                // should not find a plausible sigma there.
+                market_sigma_tick: 0.0,
             },
+            shock: Vec::new(),
+            absorbed: Vec::new(),
+            clamp: Vec::new(),
+            unbounded_print: Vec::new(),
+            liquidity_share: Vec::new(),
         };
     }
 
@@ -464,6 +725,7 @@ pub fn simulate_market_tick(
     // variance process, not the constant; when the caller passes the
     // baseline (`MARKET_FACTOR_SIGMA`) this line is bit-identical to the
     // constant-sigma era's spelling, association included.
+    rng.site(crate::rng::Site::MarketFactorZ, 0);
     let market_factor = rng.next_normal() * inputs.market_sigma_daily * tick_scale;
 
     // Crisis correlation: above the crisis threshold, sector factors blend
@@ -508,20 +770,12 @@ pub fn simulate_market_tick(
         0.0
     };
 
-    // The sector draw's sigma follows VIX when coupled, on the market
-    // factor's own target shape: variance scales with (VIX / anchor)^2, so
-    // sigma scales with its square root. A branch at zero keeps every preset
-    // before this parameter bit-identical; at the anchor the ratio is exactly
-    // 1.0 at any coupling. The draw count is unchanged, so the tape is too.
-    let sector_sigma = if p.sector_vix_coupling == 0.0 {
-        p.sector_factor_sigma
-    } else {
-        let ratio = economy.vix / p.market_vol_vix_anchor;
-        p.sector_factor_sigma
-            * mathx::sqrt(1.0 - p.sector_vix_coupling + p.sector_vix_coupling * (ratio * ratio))
-    };
+    // The sector draw's sigma is `sector_sigma_for`, shared with the
+    // overnight move; the arithmetic is the one that stood here.
+    let sector_sigma = sector_sigma_at(p, economy, inputs.vix_anchor);
     let mut sector_factors = Vec::with_capacity(inputs.sector_keys.len());
-    for sector in inputs.sector_keys {
+    for (sector_index, sector) in inputs.sector_keys.iter().enumerate() {
+        rng.site(crate::rng::Site::SectorZ, sector_index as u32);
         let idiosyncratic = rng.next_normal() * sector_sigma * tick_scale;
         // Where the blend takes from. At source 0.0 the sector draw is
         // attenuated and the market factor injected through this slot, the
@@ -542,6 +796,10 @@ pub fn simulate_market_tick(
         sector_factors,
         crisis_spike: vix_correlation_spike,
         prev_day_down: inputs.prev_day_down,
+        // The same expression the draw above multiplied the normal by, so
+        // the recentring reads the sigma that was actually used rather
+        // than one recomputed from the constant.
+        market_sigma_tick: inputs.market_sigma_daily * tick_scale,
     };
 
     let intraday_vol_mult = intraday_vol(inputs.intraday_t);
@@ -567,9 +825,15 @@ pub fn simulate_market_tick(
             .find(|(t, _)| t == &company.ticker)
             .map(|(_, v)| *v)
             .unwrap_or_default();
-        let imbalance = order_imbalance(vol.buy, vol.sell, company.stock.avg_volume);
+        // `_with`, so `order_flow_impact_law` selects the participation
+        // law. At 0.0 it delegates to `order_imbalance` unchanged, and a
+        // name with no injected flow reads a default `OrderVolume` and
+        // gets `+0.0` under either law.
+        let imbalance =
+            order_imbalance_with(p, vol.buy, vol.sell, company.stock.avg_volume);
 
         // DRAW SITE: one normal, inside the factor computation.
+        rng.site(crate::rng::Site::FactorIdioZ, idx as u32);
         let factors = calculate_live_factors(
             &company.factor_view(),
             inputs.news,
@@ -620,6 +884,7 @@ pub fn simulate_market_tick(
         // DRAW SITE: one uniform, STASHED. It is consumed in phase 3, and
         // drawing it there instead would give the same count on a different
         // stream.
+        rng.site(crate::rng::Site::StashU, idx as u32);
         all_randoms.push(rng.next_f64());
     }
 
@@ -646,11 +911,34 @@ pub fn simulate_market_tick(
     let mut s_components = vec![[0.0f64; 8]; active_count];
     let mut crowd_leans = vec![0.0; active_count];
 
+    // The fundamentals restated in the economy's current price level and
+    // output, once for the whole tick because it is a macro quantity.
+    // Exactly 1.0 under every preset before pt-v18, by the branch in
+    // `nominal_scale`, and 1.0 on day 0 under pt-v18 as well.
+    let nominal = nominal_scale(p, economy, inputs.nominal_output_base);
+
     for i in 0..active_count {
         let idx = active_indices[i];
+        // A BRANCH rather than a multiply by 1.0. The two agree on every
+        // finite value, and the branch is what the preset contract rests
+        // on rather than on an argument about how floats behave.
+        let grown = if nominal == 1.0 {
+            companies[idx].valuation()
+        } else {
+            scale_valuation(companies[idx].valuation(), nominal)
+        };
+        // Per NAME, unlike the growth term above: the yield is this
+        // company's own earnings over its own price. A BRANCH at 1.0 for
+        // the same reason as the one above.
+        let buyback = buyback_scale(p, grown.eps, current_prices[i], inputs.elapsed_days);
+        let valuation = if buyback == 1.0 {
+            grown
+        } else {
+            scale_valuation(grown, buyback)
+        };
         let breakdown = compute_fair_value_with(
-            &companies[idx].valuation(), &econ_view, p.fair_value_book_floor,
-            p.qe_pe_gain, p.qe_pe_stock_gain);
+            &valuation, &econ_view, p.fair_value_book_floor,
+            p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate);
         let fv = breakdown.fair_value;
 
         // Lazy init: adopt the current premium/discount as the starting `s`,
@@ -846,10 +1134,46 @@ pub fn simulate_market_tick(
     }
 
     // ── Phase 4: settlement ───────────────────────────────────────────────
+    //
+    // The decomposition columns are filled here rather than derived
+    // afterwards, because `shock` is measured against the LAST print and a
+    // consumer reading a finished table has already lost it at the first tick
+    // of a day.
+    let mut shock_col = vec![0.0; active_count];
+    let mut absorbed_col = vec![0.0; active_count];
+    let mut clamp_col = vec![0.0; active_count];
+    // The counterfactual arm needs the buffered uniforms, which exist only on
+    // the engine's own generated schedule. Under `FourOrZero` the settlement
+    // draws lazily from the caller's recorded stream and a second settlement
+    // would take draws off it, so the arm does not run and its columns stay
+    // empty rather than being filled with the real print twice.
+    let depth_arm = inputs.settle_depth_counterfactual
+        && inputs.settle_draws == SettleDrawPolicy::FourAlways;
+    let mut unbounded_col = if depth_arm { vec![0.0; active_count] } else { Vec::new() };
+    let mut share_col = if depth_arm { vec![0.0; active_count] } else { Vec::new() };
+
     for i in 0..active_count {
         let idx = active_indices[i];
         let fair_value = new_prices[i];
         let volume = volumes[i].floor();
+        // The tape's last print, read before this tick overwrites it at the
+        // foot of the loop. `micro` below is built from the same field.
+        let last_print = companies[idx].stock.price;
+        // The breaker's band for this company, hoisted so the counterfactual
+        // print is clamped by the same bounds as the real one. Comparing a
+        // clamped print against an unclamped one would book the breaker to
+        // liquidity.
+        let print_max = previous_closes[i] * p.breaker_up;
+        let print_min = mathx::max(previous_closes[i] * p.breaker_down, 0.01);
+        let breaker = |price: f64| {
+            if price > print_max || price < print_min {
+                mathx::max(print_min, mathx::min(print_max, price))
+            } else {
+                price
+            }
+        };
+        // NaN until the arm runs, and never read unless it does.
+        let mut unbounded_price = f64::NAN;
 
         let mut new_price = fair_value;
         if open {
@@ -860,6 +1184,7 @@ pub fn simulate_market_tick(
             // which guard fired. Under `FourOrZero` the settle draws
             // lazily from the shared source, four or zero, matching what a
             // recorded reference stream actually holds.
+            rng.site(crate::rng::Site::SettleU, idx as u32);
             let mut predrawn = match inputs.settle_draws {
                 SettleDrawPolicy::FourAlways => Some(PredrawnUniforms::new([
                     rng.next_f64(),
@@ -878,6 +1203,9 @@ pub fn simulate_market_tick(
                 vix: economy.vix,
                 difficulty: None,
                 flow_lean: Some(crowd_leans[i]),
+                // The shipped bound. `settle_price_through_book` returns it
+                // untouched at 1.0, so this line moves no trajectory.
+                depth_multiplier: 1.0,
             };
             let settled = match predrawn.as_mut() {
                 Some(buffer) => {
@@ -887,13 +1215,53 @@ pub fn simulate_market_tick(
             };
             new_price = settled.price;
 
+            // The depth counterfactual: this tick again, from the same state,
+            // against every level the maker quotes.
+            //
+            // It runs HERE, between the settlement and the maker-inventory
+            // carry below, for two reasons. The book it quotes against is
+            // built from `micro`, which was taken before the settlement, so
+            // the arm sees the state the real settlement saw rather than the
+            // state it left. And it takes NO draw: the buffer is rewound and
+            // serves the same four uniforms a second time, which is why the
+            // stream position after this block is what it was without it.
+            if depth_arm {
+                if let Some(buffer) = predrawn.as_mut() {
+                    buffer.rewind();
+                    // A second build rather than a clone of the real book,
+                    // and the two are the same thing here: `build_live_book`
+                    // is a pure function of the company and the options, and
+                    // the only option that differs is the depth multiplier.
+                    // The arm's book IS the first one with more levels.
+                    let deep = settle_price_through_book(
+                        &micro,
+                        fair_value,
+                        volume,
+                        &SettleOptions {
+                            depth_multiplier: f64::INFINITY,
+                            ..options
+                        },
+                        buffer,
+                    );
+                    // The maker inventory this returns is DISCARDED, along
+                    // with everything else about it except the price. An arm
+                    // that fed its fills back would be a second market, and
+                    // the next tick would no longer be the one that actually
+                    // ran.
+                    unbounded_price = breaker(deep.price);
+                }
+            }
+
             // Breaker #2 — the PRINT. See the module header for why this one
             // is the load-bearing clamp.
-            let print_max = previous_closes[i] * p.breaker_up;
-            let print_min = mathx::max(previous_closes[i] * p.breaker_down, 0.01);
-            if new_price > print_max || new_price < print_min {
-                new_price = mathx::max(print_min, mathx::min(print_max, new_price));
-            }
+            //
+            // The settled price is kept so the clamp can be reported apart
+            // from the book. They pull opposite ways on every clamped row
+            // and cancel exactly on most of them, so one column carrying
+            // both says a halted name absorbed nothing.
+            let settled_price = new_price;
+            new_price = breaker(new_price);
+            clamp_col[i] = mathx::log(new_price / settled_price);
 
             // Carry maker inventory forward. This is what makes impact
             // PERSIST: a large buy leaves the maker short, so it keeps quoting
@@ -904,6 +1272,39 @@ pub fn simulate_market_tick(
                         + settled.maker_inventory_delta,
                 );
             }
+        }
+
+        // The decomposition, against the print the tape carries. `absorbed`
+        // therefore holds the breaker as well as the book, which is the
+        // honest reading of "what stood between the model price and the
+        // print" -- on a halted name the breaker IS what absorbed the shock.
+        let (shock, absorbed) = decompose(last_print, fair_value, new_price);
+        shock_col[i] = shock;
+        absorbed_col[i] = absorbed;
+        if depth_arm {
+            // A tick that never settled leaves the arm unrun, and the honest
+            // reading of that is that unbounded depth would have printed the
+            // same price. `mathx::log` of a ratio of one is zero, so the
+            // share below is zero without a special case.
+            let unbounded = if unbounded_price.is_nan() { new_price } else { unbounded_price };
+            unbounded_col[i] = unbounded;
+            let moved = mathx::log(new_price / last_print);
+            share_col[i] = if unbounded == new_price {
+                // The two prints coincide, so liquidity's share is zero
+                // whatever the move was -- including a move of zero, where
+                // the ratio below would be 0/0.
+                0.0
+            } else if moved == 0.0 {
+                // The print did not move and the deeper book would have
+                // moved it. There is no move to apportion, so the share is
+                // undefined and says so. Dividing anyway gives an infinity
+                // that survives into every mean taken over the column;
+                // measured at 7 rows in 14,040 on a three-day run of twelve
+                // names, so it is rare and it is real.
+                f64::NAN
+            } else {
+                mathx::log(new_price / unbounded) / moved
+            };
         }
 
         let stock = &mut companies[idx].stock;
@@ -923,6 +1324,11 @@ pub fn simulate_market_tick(
         volumes,
         factors: all_factors,
         shared_factors: shared,
+        shock: shock_col,
+        absorbed: absorbed_col,
+        clamp: clamp_col,
+        unbounded_print: unbounded_col,
+        liquidity_share: share_col,
     }
 }
 
@@ -950,6 +1356,17 @@ struct PredrawnUniforms {
 impl PredrawnUniforms {
     fn new(draws: [f64; 4]) -> Self {
         Self { draws, at: 0 }
+    }
+
+    /// Serve the same four uniforms again, from the start.
+    ///
+    /// This is what makes the depth counterfactual free: the second
+    /// settlement is fed the numbers the first one was fed, so the shared
+    /// stream is not touched and the tick's draw count is what it was. The
+    /// buffer is per-company and per-tick, so a rewind cannot reach any
+    /// settlement but the one it belongs to.
+    fn rewind(&mut self) {
+        self.at = 0;
     }
 }
 
@@ -1066,4 +1483,93 @@ mod tests {
         }
     }
 
+    /// The economy the scale is read off, at a stated nominal output.
+    fn economy_at(gdp: f64, cpi: f64) -> EconomyState {
+        let mut e = crate::economy::create_initial_economy_state(
+            &crate::economy::InitialEconomyOptions::default());
+        e.gdp = gdp;
+        e.cpi = cpi;
+        e
+    }
+
+    fn with_dial(value: f64) -> crate::params::ModelParams {
+        let mut p = crate::params::PT_V16;
+        p.earnings_nominal_growth = value;
+        p
+    }
+
+    #[test]
+    fn the_scale_is_one_wherever_the_dial_is_off() {
+        // The branch, not the arithmetic: an output ten times the base
+        // still returns a literal 1.0, so no preset before pt-v18 reaches
+        // a multiply at all.
+        let p = with_dial(0.0);
+        for (gdp, cpi) in [(25000.0, 100.0), (250000.0, 100.0),
+                           (25000.0, 1000.0), (0.0, 100.0)] {
+            let e = economy_at(gdp, cpi);
+            assert_eq!(nominal_scale(&p, &e, 2_500_000.0), 1.0);
+        }
+    }
+
+    #[test]
+    fn the_scale_is_the_output_ratio_when_the_dial_is_full() {
+        let p = with_dial(1.0);
+        let base = 2_500_000.0;
+        assert_eq!(nominal_scale(&p, &economy_at(25000.0, 100.0), base), 1.0);
+        assert_eq!(nominal_scale(&p, &economy_at(50000.0, 100.0), base), 2.0);
+        assert_eq!(nominal_scale(&p, &economy_at(25000.0, 200.0), base), 2.0);
+        // Down as well as up, which is what a contraction reaches and what
+        // a flat premium could not do.
+        assert_eq!(nominal_scale(&p, &economy_at(20000.0, 100.0), base), 0.8);
+    }
+
+    #[test]
+    fn a_share_of_the_dial_is_a_share_of_the_level() {
+        // Linear in the dial, so half the dial adds half of what the whole
+        // of it adds. Stated on the level rather than on the log, which is
+        // the shape every other dial in this era has.
+        let base = 2_500_000.0;
+        let e = economy_at(50000.0, 100.0);
+        assert_eq!(nominal_scale(&with_dial(0.5), &e, base), 1.5);
+        assert_eq!(nominal_scale(&with_dial(0.25), &e, base), 1.25);
+    }
+
+    #[test]
+    fn a_base_that_is_not_a_positive_number_gives_one() {
+        // Nothing the engine builds reaches this, because `gdp` and `cpi`
+        // are levels the economy never takes to zero. A caller building
+        // `TickInputs` by hand can, and a NaN entering the valuation would
+        // freeze every book downstream with nothing to say where it came
+        // from.
+        let p = with_dial(1.0);
+        let e = economy_at(25000.0, 100.0);
+        for base in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert_eq!(nominal_scale(&p, &e, base), 1.0);
+        }
+    }
+
+    #[test]
+    fn the_scaled_valuation_moves_both_fundamentals_and_nothing_else() {
+        let company = CompanyValuationInputs {
+            sector_avg_pe: Some(18.0),
+            eps: Some(4.0),
+            book_value_per_share: Some(20.0),
+            revenue_growth: Some(0.05),
+        };
+        let scaled = scale_valuation(company, 1.25);
+        assert_eq!(scaled.eps, Some(5.0));
+        assert_eq!(scaled.book_value_per_share, Some(25.0));
+        // A rate and a multiple, both already nominal-neutral.
+        assert_eq!(scaled.revenue_growth, Some(0.05));
+        assert_eq!(scaled.sector_avg_pe, Some(18.0));
+        // An absent fundamental stays absent rather than becoming zero,
+        // which is the difference between a company the valuation prices
+        // off book and one it prices at nothing.
+        let empty = scale_valuation(CompanyValuationInputs {
+            sector_avg_pe: None, eps: None,
+            book_value_per_share: None, revenue_growth: None,
+        }, 1.25);
+        assert_eq!(empty.eps, None);
+        assert_eq!(empty.book_value_per_share, None);
+    }
 }

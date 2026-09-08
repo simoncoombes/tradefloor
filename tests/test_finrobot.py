@@ -259,7 +259,7 @@ def test_the_adapters_constructor_keywords_are_the_ones_callers_wrote():
     assert set(parameters) == {
         "mode", "transcript", "recorder", "prior", "llm_config",
         "fundamentals", "objective", "mandate", "agent_config", "every",
-        "max_participation", "panel", "arm", "info"}
+        "max_participation", "panel", "renderer", "arm", "info"}
     assert all(p.kind is inspect.Parameter.KEYWORD_ONLY
                for p in parameters.values()), (
         "a positional argument here breaks FinRobotAdapter.fork, which "
@@ -1062,6 +1062,17 @@ def test_every_recorded_meta_field_still_has_somewhere_to_live():
     housed = dict(published)
     housed.update(published.get("generation") or {})
     housed.update(published.get("extra") or {})
+    # And what the TRANSCRIPT stamps, which is not the adapter's to provide:
+    # `recorded_utc` is when the recording was written and `provenance()` is
+    # built before the first call, so it cannot know it. Derived by saving an
+    # empty transcript rather than listed, so a field added there cannot make
+    # this fail for a reason that has nothing to do with FinRobot.
+    import tempfile
+    from tradefloor.integrations import common as _ci
+    stamped = _ci.Transcript()
+    scratch = pathlib.Path(tempfile.mkdtemp()) / "empty.json"
+    stamped.save(scratch)
+    housed.update(json.loads(scratch.read_text(encoding="utf-8"))["meta"])
 
     homeless = sorted(k for k in meta if k not in housed)
     assert not homeless, (
@@ -1350,9 +1361,13 @@ def test_importing_the_adapter_still_needs_no_framework_after_the_rebase():
             # Relative imports are first-party Tradefloor and always fine.
             if node.level == 0:
                 imported.add(node.module.split(".")[0])
+    # Standard library only, at ANY scope: `ast.walk` sees a function-local
+    # import too, which is why `pathlib` is here -- `Transcript.save` imports
+    # it inside the method. `datetime` joined it when `save` began stamping
+    # `recorded_utc`.
     allowed = {"copy", "hashlib", "importlib", "json", "re", "statistics",
                "typing", "asyncio", "inspect", "concurrent", "pathlib",
-               "__future__"}
+               "datetime", "__future__"}
     assert imported <= allowed, (
         f"common.py imports {sorted(imported - allowed)} at module scope. "
         "finrobot.py imports common at module scope, so anything common "

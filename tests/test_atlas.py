@@ -930,9 +930,20 @@ def test_collect_builds_the_survey_from_streamed_rows_mid_flight(tmp_path):
              "error": "MemoryError: 88 workers", "error_kind": "infrastructure"}]
     for days in drv.HORIZONS:
         for s in drv.SCREEN_SEEDS:
+            # The pooled fear row as a real panel carries it: None with no
+            # samples on a seed that held no session at -3 percent, a value
+            # with its samples elsewhere. A median over the per-seed values
+            # raised TypeError on the None; the pooled median is 3.0 here.
+            seed_panel = dict(panel)
+            if s == drv.SCREEN_SEEDS[0]:
+                seed_panel["fear_gauge_dn3"] = None
+                seed_panel["fear_gauge_dn3_samples"] = []
+            else:
+                seed_panel["fear_gauge_dn3"] = 3.0
+                seed_panel["fear_gauge_dn3_samples"] = [2.0, 3.0, 4.0]
             rows.append({"id": f"0:panel{days}:{s}", "index": 0,
                          "kind": "panel", "days": days, "seed": s,
-                         "panel": dict(panel),
+                         "panel": seed_panel,
                          "draws_by_stream": {"market": 1000}})
     for vix in drv.sr.HELD_VIX:
         for s in drv.SCREEN_SEEDS:
@@ -957,6 +968,9 @@ def test_collect_builds_the_survey_from_streamed_rows_mid_flight(tmp_path):
     for key in ("loss", "loss_252", "loss_504",
                 "shock_ratio_median", "vol_lever", "corr_blend"):
         assert key in measured["outputs"], key
+    assert measured["outputs"]["fear_gauge_dn3_252"] == pytest.approx(3.0)
+    assert measured["outputs"]["index_drift_pct_252"] == pytest.approx(
+        panel["index_drift_pct"])
     assert measured["outputs"]["shock_ratio_median"] == pytest.approx(1.1)
     assert measured["outputs"]["vol_lever"] == pytest.approx(
         (1.0 + 65 / 20.0) / (1.0 + 5 / 20.0))

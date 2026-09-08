@@ -61,6 +61,10 @@ CALLS = {
     "run_stress_scenario": {"scenario": "liquidity_crisis", "days": 2,
                             "universe_size": 8},
     "explain_price_move": {"universe_size": 8, "day": 1, "top_n": 2},
+    # A small roster and one day, because this tool replays the day once
+    # per distinct draw set to check its own tree and a tool call answers
+    # inside a conversation.
+    "explain": {"universe_size": 8, "day": 1, "depth": 2},
     "start_job": {"tool": "evaluate_strategies",
                   "arguments": {"strategies": {"m": MOMENTUM}, "days": 1,
                                 "universe_size": 8}},

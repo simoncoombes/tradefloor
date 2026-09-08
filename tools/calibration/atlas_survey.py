@@ -125,7 +125,7 @@ from calibrate import calibration_box     # noqa: E402
 
 import tradefloor                            # noqa: E402
 from tradefloor import atlas                 # noqa: E402
-from tradefloor.facts import REAL_MARKETS    # noqa: E402
+from tradefloor.facts import REAL_MARKETS, aggregate_panels  # noqa: E402
 
 #: Measured by `facts.measure`, judged by nothing yet, recorded per horizon
 #: as `<stat>_<days>` beside the thirteen. See CALIBRATION-FOLLOWUPS.md §64.
@@ -167,6 +167,104 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the box the way ramp=50 does above: strong-to-implausible.
     "market_beta_down_asym": (0.0, 0.1),
     "market_beta_down_asym_lag": (0.0, 0.1),
+    # A constant added to the VIX target, in points. Not a share, so its box
+    # is drawn from the bias it exists to cancel rather than from the unit
+    # interval: an asymmetric return gain leaves a standing POSITIVE
+    # excursion on the target, worth 10.5 points of excursion and 7.34 of
+    # level on the 2020 tape against a measured overshoot of 6.38. The
+    # useful side is therefore negative and the top of the box is where the
+    # correction is well past exact. -12 to +12 holds both figures with
+    # headroom and keeps the sign symmetric, because which way the
+    # asymmetry runs is a property of the run rather than of the model.
+    "vix_target_offset": (-12.0, 12.0),
+    # The SHARE of the first moment the contemporaneous wire injects that
+    # is given back. Bounded by its own meaning rather than by a
+    # convention: 0.0 is the wire as pt-v16 ships it, 1.0 returns the whole
+    # of what it injects, and past 1.0 the dial would inject an upward
+    # drift of its own, which is the defect inverted rather than a wider
+    # search. So the box is the closed unit interval, and unlike the
+    # entries around it there is no strong-to-implausible top to choose:
+    # the top is where the correction is exact.
+    "market_beta_down_asym_recentre": (0.0, 1.0),
+    # The SHARE of nominal output growth the valuation carries. Bounded by
+    # its own meaning, as its neighbour above is: 0.0 is a valuation whose
+    # earnings never move, 1.0 holds the earnings share of nominal output
+    # constant, and past 1.0 earnings outgrow the economy every year, which
+    # is an assertion about a quantity this model does not carry. So the box
+    # is the closed unit interval and the top is where the claim stops.
+    "earnings_nominal_growth": (0.0, 1.0),
+    # Two levels rather than a range: 0.0 is the shipped clamped
+    # multiplier and anything above it is the measured law, whose
+    # exponents come from the literature rather than from a search. The
+    # unit interval is the registry's shape, not a claim that 0.5 means
+    # half a law.
+    "order_flow_impact_law": (0.0, 1.0),
+    # The share of oil demand supply answers on the daily step. Bounded by
+    # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
+    # the value that makes the inventory random walk driftless, and past 1.0
+    # supply would exceed demand every day and inventory would ramp the
+    # other way. So the box is the closed unit interval and its top is
+    # where the process is stationary.
+    "oil_supply_response": (0.0, 1.0),
+    # How much of the OPEC rule's direction is removed. A share again:
+    # 0.0 is the rule as written, 1.0 is the symmetric form that keeps its
+    # total intervention, and past 1.0 the two branches would cross and the
+    # rule would push oil DOWN on net, which is the asymmetry inverted.
+    "oil_opec_symmetry": (0.0, 1.0),
+    # Where oil's seasonal shape acts, as a share of its own amplitude.
+    # Bounded by meaning again: 0.0 puts the whole shape on the price
+    # level, where the daily factors compound to 5.119 over a certified
+    # year, 1.0 puts the whole of it on the reversion target, where it
+    # integrates to +0.672 per cent, and past 1.0 the level would carry
+    # the shape inverted. So the box is the closed unit interval and its
+    # top is where the shape stops compounding.
+    "oil_seasonality_target": (0.0, 1.0),
+    # The clock the cycle hazard is read on. 0.0 draws a rate whose scale is
+    # in months once a day, which makes a full cycle 2.6 trading years; 1.0
+    # reads it on the 30-day month the phase clock already keeps, which makes
+    # it 9.7; and past 1.0 the cycle would run slower than the scale states.
+    # So the box is the closed unit interval and its top is where the unit is
+    # right rather than where a search stopped.
+    "cycle_hazard_per_month": (0.0, 1.0),
+    # THE LEVEL IDENTITY, and it is two LEVELS rather than a range: 0.0 is
+    # the phase table plus the offset plus the factor read back through a
+    # conversion 1.326x the identity's, and 1.0 is the index's own
+    # conditional variance in VIX points. A vector that landed on 0.4 would
+    # be running neither -- the target would be four tenths of a variance
+    # and six tenths of a table, which is not a model anybody proposed. The
+    # unit interval is the registry's shape, as it is for
+    # order_flow_impact_law above, not a claim that a half means half a
+    # mechanism.
+    "vix_level_identity": (0.0, 1.0),
+    "trough_growth_floor": (0.0, 1.0),
+    "phase_target_range_draw": (0.0, 1.0),
+    # Days the economy is advanced alone before day zero. 0.0 is
+    # construction as every earlier preset does it, 755 is the day the last
+    # field the valuation reads enters its stationary band, and 1095 is the
+    # horizon the burn-in that measured both ran to. Past that the box would
+    # describe a transient nobody has measured.
+    "macro_burn_in_days": (0.0, 1095.0),
+    # The share of earnings returned as net buybacks. 0.0 is a model with
+    # no share retirement, a third is the US large-cap filing record this
+    # era declares, and 1.0 returns the whole of earnings every year. Past
+    # that a company returns more than it earns, which is a claim about
+    # leverage this model does not carry, so the box is the closed unit
+    # interval and its top is where the earnings run out.
+    "buyback_payout_share": (0.0, 1.0),
+    # The overnight move's variance as a fraction of a session's. 0.0 is no
+    # overnight process, which is every earlier preset; 1.0 is a night as
+    # large as a session, above anything the real panel reads; past it the
+    # night would carry more than the day, which no window has shown.
+    "overnight_variance_ratio": (0.0, 1.0),
+    # How much of the jump's own drift is given back. 0.0 is the
+    # uncompensated process, 1.0 is the martingale, and past 1.0 the
+    # compensator exceeds the drift and the jump pushes the other way.
+    "jump_mean_compensated": (0.0, 1.0),
+    # How far the two stop ladders are matched. 0.0 is the shipped pair,
+    # 1.0 is the mirror at the mean of the two, and past 1.0 the ladders
+    # cross and the upside becomes the larger one, which is the asymmetry
+    # inverted rather than a wider search.
+    "cascade_symmetry": (0.0, 1.0),
     # EMA days on the VIX the market variance target reads (round 99).
     # Measured dead at 3 and 10 along the driven window; 20 trading days
     # is a month of smoothing, past which the fear response is no longer
@@ -271,6 +369,20 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # VIX. Both blend weights, whole domain (§60, CRISIS-BLEND-SECTOR.md).
     "crisis_blend_source": (0.0, 1.0),
     "sector_vix_coupling": (0.0, 1.0),
+    # Ships at 0.0 and its whole content is the far end: at 1.0 omega goes
+    # onto the identity `sector_base_variance * (1 - persistence)`, which is
+    # the cascade path's own arithmetic (garch.rs:187). A blend between is
+    # meaningful, so the axis is the unit interval.
+    "garch_omega_sector_scaled": (0.0, 1.0),
+    # Whether day zero is drawn from the cycle's stationary law. A SWITCH,
+    # not a share: a day-zero state is either drawn from that law or it is
+    # not, and there is no half-drawn phase, so the two admissible values
+    # are the two ends and the interior has no reading. The range is stated
+    # here rather than left to the convention box for the usual reason --
+    # the dial ships at 0.0, so a multiplicative box is the degenerate
+    # point (0.0, 0.0) -- and a survey that lands inside the interval gets
+    # the same opening as 1.0, which the dial's own tests assert.
+    "cycle_stationary_opening": (0.0, 1.0),
     # News peer transfer: weights of a peer's surprise, natural unit range.
     "news_peer_weight": (0.0, 1.0),
     "news_peer_weight_down": (0.0, 1.0),
@@ -309,6 +421,11 @@ EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
     # out at 0.008, and §59 measured the band reached at 0.012 and overshot
     # at 0.020, so the box is the range that can see the answer.
     "sector_factor_sigma": (0.0, 0.02),
+    # The tick's absolute variance floor, in daily VARIANCE units. It ships
+    # NONZERO at 1e-4, so the convention box is multiplicative and cannot
+    # reach 0.0 -- and 0.0, which removes the floor, is the value the dial
+    # exists for. Stated explicitly for that reason.
+    "idio_sigma_floor": (0.0, 4.0e-4),
     # The crisis market-factor gain (§97). Shipped 0.5, and the [1/4x, 4x]
     # convention box would top out at 2.0 anyway; stated explicitly because
     # the interesting region is ABOVE the shipped value, not around it.
@@ -1078,9 +1195,13 @@ def cmd_collect(args) -> int:
         panels = {days: [rows[f"{index}:panel{days}:{s}"]["panel"]
                          for s in seeds] for days in meta["horizons"]}
         for days, batch in panels.items():
-            for stat in REAL_MARKETS:
-                outputs[f"{stat}_{days}"] = statistics.median(
-                    p[stat] for p in batch)
+            # The graded rows by their own estimators: a level row as a
+            # mean, a pooled row over the samples of every seed, and a row
+            # absent from every panel omitted rather than medianed over
+            # None, which is how a batch with no session at -3 percent on
+            # one seed stopped the collect.
+            for stat, value in aggregate_panels(batch).items():
+                outputs[f"{stat}_{days}"] = value
             # Diagnostics: measured, unbanded, recorded so the map can see
             # them. Correlation persistence (§64) is the first.
             for stat in DIAGNOSTIC_STATS:

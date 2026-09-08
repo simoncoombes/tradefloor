@@ -35,6 +35,7 @@ COMPONENTS = [
     "random_noise",
     "circuit_breaker",
     "jump",
+    "overnight",
 ]
 
 LEVELS = ["mispricing_s", "fundamental_value", "anchor_price"]
@@ -330,30 +331,56 @@ def test_attribution_equals_the_tape_for_every_factor():
 
     universe = tradefloor.Universe.random(4, seed=5)
     engine = tradefloor.Engine(seed=1, universe=universe)
-    engine.open_market()
-    for step in range(4):
-        hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
-        engine.run_session(hour, minute, 3, 60)
-    engine.close_market()
-    engine.record(0)
+
+    def run_a_day(day):
+        engine.open_market()
+        for step in range(4):
+            hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
+            engine.run_session(hour, minute, 3, 60)
+        engine.close_market()
+        engine.record(day)
+        return {f: _f64(engine.attribution(f))[0]
+                for f in tradefloor.Engine.FACTORS}
+
+    # TWO days, because the jump is a day-level move and the tape carries it
+    # on the FIRST TICK OF THE NEXT DAY -- `record_day_jump` says so, and so
+    # does `explain`'s window, which opens a day early "because the jump a
+    # day's truth table carries was drawn at the close before it".
+    #
+    # One day could therefore never compare the jump: the attribution held
+    # it and the tape had nowhere to put it yet. It passed for three eras
+    # anyway, because no jump fired in this window and both sides read zero.
+    # pt-v18 switches on `jump_mean_compensated`, whose compensator is
+    # deterministic and lands EVERY day, so the vacuous pass became a
+    # failure and the hole showed. Verified on the shipped default: day 1's
+    # tape jump is day 0's attribution to the last bit.
+    first = run_a_day(0)
+    second = run_a_day(1)
 
     truth = pa.table(engine.truth())
     rows = truth.filter(pc.equal(truth.column("instrument_id"), 0))
+    day_two = rows.filter(pc.equal(rows.column("day"), 1))
     checked = 0
     for factor in tradefloor.Engine.FACTORS:
         if factor not in truth.column_names:
             continue
-        recorded = _f64(engine.attribution(factor))[0]
-        tape = sum(v for v in rows.column(factor).to_pylist() if v is not None)
+        # The jump is compared across the boundary it actually crosses.
+        recorded = first[factor] if factor == "jump" else second[factor]
+        tape = sum(v for v in day_two.column(factor).to_pylist()
+                   if v is not None)
         assert recorded == pytest.approx(tape, abs=1e-15), (
             f"{factor}: attribution {recorded:+.6e} against a tape sum of "
             f"{tape:+.6e}"
         )
         checked += 1
-    assert checked == 9, f"only {checked} factors compared"
+    assert checked == 10, f"only {checked} factors compared"
     # And at least one of them must be non-zero, or this compared zeros.
-    assert any(_f64(engine.attribution(f))[0] != 0.0
+    assert any(second[f] != 0.0
                for f in tradefloor.Engine.FACTORS if f in truth.column_names)
+    # The jump specifically, so the arm this test could not reach before is
+    # not silently back to comparing zeros.
+    assert first["jump"] != 0.0, (
+        "no jump reached the tape, so the day-boundary arm proved nothing")
 
 
 def test_a_single_session_day_is_unaffected():

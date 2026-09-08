@@ -32,6 +32,16 @@ standing warning on the realism page:
                 against the six gate_pick screens on: trap 15, where a six-seed
                 read called pt-v10 13/14 and thirty called it 14/14 because
                 corr_persistence_acf1 has an across-seed sd of 0.28.
+
+Both 252-day cells now keep their PER-SEED panels and carry a mechanism
+certificate beside the band count (`envelope.certify`). The band count answers
+"could a real year read this" and cannot answer "is a model without the
+mechanism excluded" -- on five of the fourteen rows the band contains the
+mechanism-absent reading outright -- and the second question needs the
+per-seed readings rather than their median, so the aggregation that used to
+happen here threw away the only thing that could answer it. The two cells
+differ in which seeds they draw, so a mechanism verdict that holds on one and
+not the other is trap 15 in the second count.
   crisis_lever  annualised volatility under a held VIX 65 divided by the same
                 under a held VIX 5, on the CERTIFIED roster over 252 days at
                 thirty seeds. This is deliberately NOT scenario_response's
@@ -68,6 +78,43 @@ HELDOUT_SEEDS = tuple(range(1, 31))
 #: a fifteenth statistic joins this table by being added to the envelope.
 PANEL = tuple(envelope.CERTIFIED)
 
+#: WHY THIS TOOL EMITS NO INDEX TAIL FIGURE, deliberately and by ruling.
+#:
+#: `index_tail_dn3_pct` is certified on `facts.LEVEL_PROTOCOL`, where the
+#: ROSTER varies with the seed, because a crash rate is a property of the
+#: roster's concentration as much as of the model. This tool runs the held
+#: roster, `Universe.random(40, seed=111)`. The two protocols read
+#: measurably different numbers on the same preset: pt-v16 reads 1.2749
+#: percent with the roster varying against 1.124 held, a gap of 13.4
+#: percent.
+#:
+#: So a tail figure measured here would be a held-roster number sitting in
+#: a preset record under the same row name as the varying-roster number in
+#: `envelope.CERTIFIED_CRISIS`, and somebody would compare them. Annotating
+#: it would not prevent that: this project's three worst ruler errors were
+#: all labelled somewhere and compared anyway -- the real VIX AR1 documented
+#: as a whole-span estimate and scored against 252-day windows,
+#: `crisisprobe-frontier`'s band declaring itself CHOSEN in its own source
+#: and still producing a charter verdict, and `REAL_TAIL3 = 107/9236`
+#: carrying its provenance in `facts.py` while eight scripts divided GSPC
+#: hits by a VIX session count.
+#:
+#: ABSENT WITH A REASON is the honest state. The per-seed panels therefore
+#: do not carry the row's counts, `envelope.certify` finds nothing to build
+#: a tail block from, and `certification_record` carries `tail: None`. This
+#: string travels in the artefact's `method` so a reader of a record learns
+#: why the field is empty and what would fill it.
+TAIL_NOT_MEASURED = (
+    "index_tail_dn3_pct is NOT measured by this tool. It is certified on "
+    "facts.LEVEL_PROTOCOL, where the roster varies with the seed, and this "
+    "tool holds Universe.random(40, seed=111); the two protocols differ by "
+    "13.4 percent on the shipped preset (1.2749 varying against 1.124 "
+    "held). A held-roster figure under this row's name would be compared "
+    "with the certified one, so none is emitted. What would fill it: a "
+    "level-protocol arm in this tool, which is a box job and a Phase 1 "
+    "follow-on rather than part of the row's own branch."
+)
+
 #: The crisis lever's two endpoints, and the real-market figure it is read
 #: against (17.2% annualised below VIX 12 against 106.1% above VIX 45, from
 #: `real_vix_lever.py`; the ratio is 6.16).
@@ -75,19 +122,31 @@ LEVER_LO, LEVER_HI = 5.0, 65.0
 REAL_LEVER = 6.16
 
 
+def _commit() -> str | None:
+    """The checkout this measurement ran in, or None outside a checkout."""
+    import subprocess
+    try:
+        return subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
+                              text=True, check=True).stdout.strip() or None
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
 def presets() -> list[str]:
-    """Every selectable preset, discovered rather than hardcoded."""
-    out = []
-    for i in range(1, 200):
-        name = f"pt-v{i}"
-        try:
-            tradefloor.model_preset(name)
-        except Exception:
-            if out:
-                break
-            continue
-        out.append(name)
-    return out
+    """Every shipped preset, READ from the engine rather than probed for.
+
+    This used to probe `pt-v1`, `pt-v2`, ... and stop at the first name that
+    did not resolve. `pt-v17` does not exist -- the recomposition era
+    reserves the number -- so the probe stopped at sixteen on a build that
+    ships seventeen, and a commissioned run measured every preset EXCEPT
+    `pt-v18`, the one it was commissioned for. It cost a box and it printed
+    nothing wrong on the way: "16 presets, 2880 measurements" is what a
+    correct run of a sixteen-preset build looks like.
+
+    A guessed list fails quietly and a read list cannot, so this reads the
+    same list the engine's own error messages are built from.
+    """
+    return list(tradefloor.preset_names())
 
 
 def _roster(n: int, seed: int):
@@ -120,7 +179,10 @@ def _job(spec):
 
 
 def _median_panel(rows: list[dict]) -> dict:
-    return {k: statistics.median([r[k] for r in rows]) for k in PANEL}
+    # Each row by its own estimator: medians for the shape rows and a mean
+    # for the level row, which is what the band's width was set against.
+    return {k: facts.aggregate_value(k, [r[k] for r in rows if r.get(k) is not None])
+            for k in PANEL if any(r.get(k) is not None for r in rows)}
 
 
 def _count_in_band(panel: dict, bands: dict) -> tuple[int, list[str]]:
@@ -188,6 +250,22 @@ def main() -> None:
         lo = _median_panel(collected[("lever_lo", preset)])
         hi = _median_panel(collected[("lever_hi", preset)])
 
+        # The mechanism certificate, from the per-seed panels rather than
+        # from their median. Both 252-day cells, because the count that
+        # matters is per protocol and not per preset.
+        # Whether every run of this preset opens at phase age zero, read off
+        # the preset rather than assumed. It decides nothing here today,
+        # because these panels carry no tail counts and the tail block comes
+        # back None (`TAIL_NOT_MEASURED`); it is passed so that the day this
+        # tool grows a level-protocol arm, the block it produces is counted
+        # or not counted on the run's own opening rather than on a default.
+        stationary = bool(tradefloor.ModelParams.from_preset(preset)
+                          .to_dict().get("cycle_stationary_opening", 0.0))
+        cert252 = envelope.certify(collected[("panel_252", preset)],
+                                   stationary_opening=stationary)
+        certhos = envelope.certify(collected[("heldout_seeds", preset)],
+                                   stationary_opening=stationary)
+
         n252, miss252 = _count_in_band(p252, facts.REAL_MARKETS)
         n504, miss504 = _count_in_band(p504, facts.REAL_MARKETS_504)
         nhou, misshou = _count_in_band(phou, facts.REAL_MARKETS)
@@ -200,19 +278,39 @@ def main() -> None:
             "in_band_504": n504, "misses_504": miss504,
             "in_band_heldout_universe": nhou, "misses_heldout_universe": misshou,
             "in_band_heldout_seeds": nhos, "misses_heldout_seeds": misshos,
+            "mechanism_252": envelope.certification_record(cert252),
+            "mechanism_heldout_seeds": envelope.certification_record(certhos),
+            # Kept so the certificate above is re-derivable from this
+            # artefact alone: a count without the readings under it is an
+            # assertion, and this is the file a committed record is built
+            # from.
+            "per_seed_252": collected[("panel_252", preset)],
+            "per_seed_heldout_seeds": collected[("heldout_seeds", preset)],
             "annualised_vol_pct": p252["annualised_vol_pct"],
             "vol_at_vix_5": lo["annualised_vol_pct"],
             "vol_at_vix_65": hi["annualised_vol_pct"],
             "crisis_lever": hi["annualised_vol_pct"] / lo["annualised_vol_pct"],
         }
         r = results[preset]
+        mc = r["mechanism_252"]["counts"]
         print(f"{preset:8s} 252:{n252:2d}/14  504:{n504:2d}/14  "
               f"hoU:{nhou:2d}/14  hoS:{nhos:2d}/14  "
               f"vol:{r['annualised_vol_pct']:5.1f}%  "
-              f"lever:{r['crisis_lever']:.2f}x", flush=True)
+              f"lever:{r['crisis_lever']:.2f}x  "
+              f"mech:{mc['mechanism_shown']:2d}/{mc['mechanism_of']}  "
+              f"centre:{mc['at_centre']:2d}/{mc['at_centre_of']}"
+              + (f"  REVERSED:{','.join(r['mechanism_252']['reversed'])}"
+                 if r["mechanism_252"]["reversed"] else ""), flush=True)
 
     out = {
         "pretium_version": tradefloor.version(),
+        # The commit that MEASURED this, read here rather than stamped by
+        # whoever writes a record from it later. `record.py` used to take
+        # `git rev-parse HEAD` in its own working directory, which is the
+        # measuring checkout only when the record is written on the box --
+        # write one anywhere else and the record names a commit that did not
+        # produce it.
+        "commit": _commit(),
         # The ENGINE's default, not the envelope's claim about it. This field
         # read `envelope.PRESET` until 0.6.0, so at an era boundary, which is
         # exactly when this tool runs, the artefact labelled itself with the
@@ -229,11 +327,19 @@ def main() -> None:
             "heldout_seeds": f"{heldout[0]}-{heldout[-1]} ({len(heldout)})",
             "bands_252": "facts.REAL_MARKETS",
             "bands_504": "facts.REAL_MARKETS_504",
+            "index_tail_not_measured": TAIL_NOT_MEASURED,
             "crisis_lever": (
                 f"annualised vol at held VIX {LEVER_HI:.0f} over held VIX "
                 f"{LEVER_LO:.0f}, certified roster, 252 days, thirty seeds"
             ),
             "real_crisis_lever": REAL_LEVER,
+            "mechanism": (
+                "facts.mechanism_verdict per row on the per-seed panels of "
+                "the cell: an exact sign test against the row's "
+                "mechanism-absent reading (facts.NULLS) at the cut the "
+                "band's own false-alarm rate gives (facts.sign_cut). Three "
+                "counts, never one: in band, mechanism shown, at real centre"
+            ),
         },
         "presets": results,
     }

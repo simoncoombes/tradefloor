@@ -39,6 +39,7 @@ def replay(
     macro: Macro | None = None,
     model: str | ModelParams | None = None,
     until: int | None = None,
+    ledger: Any = None,
 ) -> Engine:
     """Re-execute a recorded log and return the resulting engine.
 
@@ -62,11 +63,36 @@ def replay(
     produce a plausible market that is not the recorded one, so
     :class:`tradefloor.RunManifest` carries the full coefficient dictionary
     and passes it back through here.
+
+    ``ledger`` is an optional :class:`tradefloor.DayLedger`, filled at every
+    close boundary the log crosses, so a replayed run can be committed to the
+    same way the original was.
     """
     engine = Engine(seed=seed, universe=universe, macro_state=macro,
                     model=model)
     entries = list(log)[: until if until is not None else len(log)]
+    apply_log(engine, entries, ledger=ledger)
+    return engine
 
+
+def apply_log(
+    engine: Engine,
+    entries: Sequence[dict[str, Any]],
+    *,
+    ledger: Any = None,
+) -> Engine:
+    """Execute recorded entries against an engine that already exists.
+
+    :func:`replay` builds the engine and calls this; a caller that has one
+    already -- a verifier replaying a single day onto a restored state -- calls
+    it directly. Splitting the two is what stops a sampled verification
+    reimplementing the operation table, where a missed entry would replay a
+    day the log does not describe and report the difference as tampering.
+
+    Appends to the engine's own order log, as every operation here does, so
+    an engine that started from a snapshot ends holding the entries it was
+    given rather than the history it was restored from.
+    """
     for i, entry in enumerate(entries):
         op = entry.get("op")
         if op not in _OPS:
@@ -79,6 +105,8 @@ def replay(
             engine.open_market()
         elif op == "close_market":
             engine.close_market()
+            if ledger is not None:
+                ledger.close(engine)
         elif op == "record":
             engine.record(entry["day"])
         elif op == "draw_uniform":
@@ -119,6 +147,11 @@ def replay(
                 news=_news(entry),
                 order_flow=_flow(entry),
             )
+            # The second spelling of a close. A ledger that knew only
+            # `close_market` would leave a session-closed run with no leaves
+            # and read as one long day.
+            if ledger is not None and entry["close_at_end"]:
+                ledger.close(engine)
 
     return engine
 
