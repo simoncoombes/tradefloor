@@ -2482,7 +2482,7 @@ pub const PT_V18: ModelParams = ModelParams::pt_v18();
 /// bottom of this file asserts it resolves to the engine's default
 /// bit-for-bit. A future era that moves the default and forgets this
 /// constant fails the suite instead of mislabelling every manifest.
-pub const DEFAULT_PRESET_NAME: &str = "pt-v16";
+pub const DEFAULT_PRESET_NAME: &str = "pt-v18";
 
 /// Every coefficient `pt-v3` moved, with the exact bits the converged
 /// certificate recorded.
@@ -4480,7 +4480,8 @@ mod tests {
         assert_eq!(crate::params::PT_V14.fingerprint(), "pt-v14");
         assert_eq!(crate::params::PT_V15.fingerprint(), "pt-v15");
         assert_eq!(crate::params::PT_V16.fingerprint(), "pt-v16");
-        assert_eq!(DEFAULT_PRESET_NAME, "pt-v16");
+        assert_eq!(crate::params::PT_V18.fingerprint(), "pt-v18");
+        assert_eq!(DEFAULT_PRESET_NAME, "pt-v18");
     }
 
     #[test]

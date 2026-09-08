@@ -102,6 +102,58 @@ def test_the_envelope_agrees_with_the_record_for_the_preset_it_certifies():
             )
 
 
+def test_the_envelope_agrees_with_the_record_on_the_level_and_crisis_rows():
+    """The other two published blocks, bound the same way.
+
+    `CERTIFIED_LEVEL` and `CERTIFIED_CRISIS` are certified on
+    `facts.LEVEL_PROTOCOL`, where the roster varies with the seed. The preset
+    panel holds roster 111, so no panel can produce them and nothing bound
+    them to anything -- which is how `envelope.DECAY_252` came to describe
+    pt-v14 under a pt-v16 default with only a comment to say so.
+
+    `record.py --level-rows` writes them into the record from a measurement
+    that carries its own control arm, and this is the binding. A record
+    without the block fails here rather than being skipped: an absent block
+    is exactly the state this test exists to make visible.
+    """
+    rec = load(RECORDS / f"{envelope.PRESET}.json")
+    block = rec.get("level_protocol")
+    assert block is not None, (
+        f"{envelope.PRESET}.json carries no level_protocol block, so nothing "
+        f"measured backs envelope.CERTIFIED_LEVEL and CERTIFIED_CRISIS. "
+        f"Write one with `record.py --level-rows`."
+    )
+    assert block["control"]["reproduced"], (
+        "the level measurement's control arm did not reproduce, so the "
+        "published rows are not on the ruler they replaced")
+
+    for field, published in (("certified_level", envelope.CERTIFIED_LEVEL),
+                             ("certified_crisis", envelope.CERTIFIED_CRISIS)):
+        measured = block[field]
+        assert set(measured) == set(published), (
+            f"{field} and the envelope disagree on WHICH rows the block holds")
+        for stat, value in published.items():
+            assert value == pytest.approx(measured[stat], abs=10 ** -PLACES), (
+                f"envelope publishes {stat}={value} for {envelope.PRESET}, "
+                f"the record measured {measured[stat]}")
+
+
+def test_every_level_and_crisis_row_the_envelope_publishes_is_graded():
+    """Nothing in these two blocks is published without a band to read it.
+
+    A row here with no entry in `facts.REAL_MARKETS` would be a number in the
+    certified envelope that cannot pass or fail, which `REPORTING_ONLY`
+    exists to keep out.
+    """
+    from tradefloor.facts import REAL_MARKETS
+
+    for table in (envelope.CERTIFIED_LEVEL, envelope.CERTIFIED_CRISIS):
+        for stat in table:
+            assert stat in REAL_MARKETS, (
+                f"{stat} is published in the certified envelope and has no "
+                f"band, so it earns no verdict")
+
+
 def test_the_envelope_and_the_record_agree_on_the_band_count():
     rec = load(RECORDS / f"{envelope.PRESET}.json")
     assert rec["in_band"]["252"] == len(envelope.CERTIFIED)

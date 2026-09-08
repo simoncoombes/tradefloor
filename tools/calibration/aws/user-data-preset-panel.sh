@@ -11,16 +11,18 @@ exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
 BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/preset-panel-060
-# The release branch: this run measures the panel for the preset 0.6.0 makes
-# the default, and `envelope.py` on that branch is what the numbers land in.
-BRANCH=release/0.6.0
+# The release branch: this run measures the panel for the preset the release
+# makes the default, and `envelope.py` on that branch is what the numbers land
+# in.
+BRANCH=release/0.7.0
 # 94, not 96. Two cores left for the streamer and the OS; a pool sized to
 # the full core count starves its own parent and the progress line stops.
 WORKERS=94
-# pt-v14 is measured beside pt-v16 on purpose. The envelope needs the new
-# default, and the changelog needs the outgoing one to state the move
-# honestly: without both, a reader whose numbers changed has no comparison.
-PRESETS=pt-v14,pt-v16
+# The outgoing default is measured beside the incoming one on purpose. The
+# envelope needs the new default, and the changelog needs the old one to state
+# the move honestly: without both, a reader whose numbers changed has no
+# comparison.
+PRESETS=pt-v16,pt-v18
 
 dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
 
@@ -92,7 +94,7 @@ python -c "
 import tradefloor as tf, sys
 name = tf.model_preset()['name']
 print('DEFAULT PRESET', name, 'VERSION', tf.version())
-sys.exit(0 if name == 'pt-v16' else 'expected pt-v16 as the default')
+sys.exit(0 if name == 'pt-v18' else 'expected pt-v18 as the default')
 "
 
 # The tool has to exist on the branch we cloned. Trap 16: a run once died on
