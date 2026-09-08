@@ -139,6 +139,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(crowd_adjusted_root_moduli, m)?)?;
     m.add_function(wrap_pyfunction!(impulse_response, m)?)?;
     m.add_function(wrap_pyfunction!(model_preset, m)?)?;
+    m.add_function(wrap_pyfunction!(preset_names, m)?)?;
     m.add_class::<PyMispricingState>()?;
     m.add_class::<PyFairValue>()?;
     m.add_class::<crate::python_book::PyOrderBook>()?;
@@ -578,4 +579,26 @@ fn model_preset(py: Python<'_>, name: Option<&str>) -> PyResult<PyObject> {
     d.set_item("crowd_momentum_gain", preset.crowd_momentum_gain)?;
     d.set_item("crowd_lean_cap", preset.crowd_lean_cap)?;
     Ok(d.into())
+}
+
+/// The shipped preset names, in the order the engine lists them.
+///
+/// The engine has always known this list -- `preset_names()` backs every
+/// "unknown model preset" message and the WASM surface exports it -- and
+/// Python could not read it, so every Python consumer that wanted the set
+/// had to guess at it. `tools/calibration/preset_panel.py` guessed by
+/// probing `pt-v1`, `pt-v2`, ... and stopping at the first name that did
+/// not resolve, which measured sixteen presets on a build that ships
+/// SEVENTEEN: `pt-v17` is reserved by the recomposition era, so the probe
+/// stopped one short of `pt-v18` and the panel silently omitted the preset
+/// the run existed to measure.
+///
+/// A guessed list fails quietly and a read list cannot. Returns the names,
+/// not the coefficients; `model_preset(name)` reads one.
+#[pyfunction]
+fn preset_names() -> Vec<String> {
+    crate::params::ModelParams::preset_names()
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect()
 }

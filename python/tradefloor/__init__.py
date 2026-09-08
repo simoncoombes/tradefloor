@@ -94,6 +94,7 @@ from ._core import (  # noqa: F401
     impulse_response,
     market_status,
     model_preset,
+    preset_names,
     sector_daily_sigma,
     sectors,
     stationary_sigma,
@@ -133,7 +134,8 @@ __all__ = [
     "FingerprintComparison", "battery", "commit", "reveal", "sealed_battery",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
-    "market_status", "model_preset", "run_many", "sector_daily_sigma", "sectors",
+    "market_status", "model_preset", "preset_names", "run_many",
+    "sector_daily_sigma", "sectors",
     "stationary_sigma", "step_mispricing_daily", "version",
     "__version__",
 ]

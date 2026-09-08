@@ -4591,6 +4591,35 @@ mod tests {
         assert_eq!(crate::params::PT_V16.fingerprint(), "pt-v16");
     }
 
+    /// `preset_names` is a hand-written list beside a match that resolves
+    /// names, and nothing compared the two. A preset added to the match and
+    /// not to the list is invisible in the worst possible way: it resolves,
+    /// so it runs; it is absent from the list, so `fingerprint` never
+    /// recognises it and every consumer that reads the list -- the WASM
+    /// surface, the Python binding, `preset_panel.py` -- silently omits it.
+    ///
+    /// The match cannot be enumerated, so this probes it: every `pt-vN` the
+    /// match resolves must be in the list. It walks past gaps rather than
+    /// stopping at them, which is the mistake that made this test worth
+    /// writing -- `preset_panel.py` stopped at the reserved pt-v17 and
+    /// measured every preset except pt-v18.
+    #[test]
+    fn the_listed_names_are_every_name_the_match_resolves() {
+        let listed: Vec<String> =
+            ModelParams::preset_names().iter().map(|s| (*s).to_string()).collect();
+        let mut resolved = Vec::new();
+        for i in 1..100 {
+            let name = format!("pt-v{i}");
+            if ModelParams::preset(&name).is_some() {
+                resolved.push(name);
+            }
+        }
+        assert_eq!(
+            resolved, listed,
+            "the match resolves {resolved:?} and preset_names lists              {listed:?}; a preset in one and not the other runs under a name              no consumer of the list can see"
+        );
+    }
+
     #[test]
     fn every_preset_runs_the_half_life_it_reports() {
         // The gap this closes. `with_override` recomputes `mispricing_phi`
