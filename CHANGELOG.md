@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.1
+
+**Three passages describing the state hash and the snapshot are corrected.**
+`Engine::state_hash` and `PyEngine::state_snapshot` each said the pending
+daily jump sat outside them. 0.7.0 moved it inside both, where the snapshot
+carries it and the digest covers it, and the text stayed as it was. This
+release changes documentation only, and every published digest holds.
+
+**Two parameter comments named a preset that does not ship.**
+`cycle_stationary_opening` and `vix_level_identity` described their zero
+default as the value every preset before pt-v19 carries. There is no
+pt-v19, and every shipped preset carries that zero.
+
+<!-- release-note-ends -->
+
 ## 0.7.0
 
 **The default preset moves to pt-v18.** Every seeded trajectory changes, so

@@ -2605,8 +2605,8 @@ impl PyEngine {
     /// including the macro chain and the generator positions that
     /// `market_digest` leaves out. Two engines that reached that state by
     /// different routes hash the same: this is a hash of state, and the
-    /// order log, the recorded tape and the pending daily jump are outside
-    /// it, exactly as they are outside the snapshot.
+    /// order log and the recorded tape are outside it, exactly as they
+    /// are outside the snapshot.
     ///
     /// One difference is worth knowing before two runs are compared.
     /// `run_session` with `close_at_end` leaves this binding's session flag
@@ -2652,7 +2652,7 @@ impl PyEngine {
     ///
     /// # What it does NOT carry
     ///
-    /// Everything here drives the market. Three things that do not are left
+    /// Everything here drives the market. Two things that do not are left
     /// out deliberately, and each of them makes a restored engine differ from
     /// the one it copied in a way no price will show:
     ///
@@ -2663,10 +2663,8 @@ impl PyEngine {
     /// - **The day's recorded tape.** `record` accumulates the day's ticks;
     ///   a restore starts that accumulation empty, so a day half-recorded
     ///   before the snapshot comes back half as long.
-    /// - **The pending daily jump**, which is the previous close's jump
-    ///   waiting for the first row of the next day's tape (§74).
     ///
-    /// All three are recording and history rather than market state, which is
+    /// Both are recording and history rather than market state, which is
     /// the line this method draws. [`PyEngine::fork`] carries them, because it
     /// copies the engine rather than rebuilding one, and it is what
     /// `tradefloor.branch` uses.
