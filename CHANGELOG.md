@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+**Atlas refuses to survey a switch as a range**: `atlas.SWITCH_DIALS` names
+the dials the engine reads as `== 0.0` or not, `Axis.factor` gives an axis
+discrete levels, and `atlas.plan_factorial` crosses factors completely, so
+a mechanism composition is measured at every setting of every other
+mechanism rather than at random ones.
+
 ## 0.7.1
 
 **Three passages describing the state hash and the snapshot are corrected.**

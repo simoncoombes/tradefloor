@@ -979,3 +979,126 @@ def test_collect_builds_the_survey_from_streamed_rows_mid_flight(tmp_path):
     assert survey.meta["errors_by_kind"] == {"model": 1}
     assert survey.meta["crn_market_deviation_count"] == 0
     assert (outdir / "atlas-report.txt").exists()
+
+
+# -- factors and switches ----------------------------------------------------
+
+def test_a_factor_axis_plans_only_its_levels_and_stratifies_them():
+    """A factor is sampled like a range -- one stratum per level -- so a
+    plan over a factor and two ranges is still one Latin hypercube, with
+    the factor's levels drawn equally often rather than at random."""
+    axes = [Axis.factor("f", (0.0, 0.5, 1.0)), Axis("x", 0.0, 1.0)]
+    rows = atlas.plan(axes, 90, seed=3)
+    seen = [r["f"] for r in rows]
+    assert set(seen) == {0.0, 0.5, 1.0}
+    assert [seen.count(v) for v in (0.0, 0.5, 1.0)] == [30, 30, 30]
+    axis = axes[0]
+    assert axis.at(0.0) == 0.0 and axis.at(0.999) == 1.0
+    assert axis.unit(0.5) == pytest.approx(0.5)
+    with pytest.raises(tradefloor.ValidationError):
+        axis.unit(0.25)   # not a level: not from this plan, not binned
+
+
+def test_a_factor_refuses_a_constant_a_repeat_and_a_log_geometry():
+    with pytest.raises(tradefloor.ValidationError):
+        Axis.factor("f", (1.0,))
+    with pytest.raises(tradefloor.ValidationError):
+        Axis.factor("f", (0.0, 0.0, 1.0))
+    with pytest.raises(tradefloor.ValidationError):
+        Axis("f", 0.5, 1.0, log=True, levels=(0.5, 1.0))
+    with pytest.raises(tradefloor.ValidationError):
+        Axis("f", 0.0, 2.0, levels=(0.0, 1.0))  # low/high are not the ends
+
+
+def test_a_switch_dial_refuses_a_range_and_takes_a_two_level_factor():
+    """The defect this guards: a [0, 1] range over a switch sampled ON at
+    every point of a 3,000-point survey, which then reported the switch as
+    moving nothing. The refusal names the source line that makes it a
+    switch, and `axes_for` cannot route around it either."""
+    for name in atlas.SWITCH_DIALS:
+        with pytest.raises(tradefloor.ValidationError, match="SWITCH"):
+            Axis(name, 0.0, 1.0)
+        with pytest.raises(tradefloor.ValidationError):
+            Axis.factor(name, (0.0, 0.5))   # 0.5 IS 1.0 to the engine
+        axis = Axis.factor(name, (0.0, 1.0))
+        assert axis.levels == (0.0, 1.0)
+        # `axes_for` turns the conventional [0, 1] box into the factor --
+        # the calibration driver has written that box for both switches
+        # since they existed -- and refuses any other range.
+        (built,) = atlas.axes_for([name], preset="pt-v18",
+                                  ranges={name: (0.0, 1.0)})
+        assert built == axis
+        with pytest.raises(tradefloor.ValidationError):
+            atlas.axes_for([name], preset="pt-v18", ranges={name: (0.0, 0.5)})
+
+
+@pytest.mark.parametrize("name", sorted(atlas.SWITCH_DIALS))
+def test_the_switch_registry_agrees_with_the_engine(name):
+    """Each registered switch is checked by MEASUREMENT: a fractional
+    setting must reproduce 1.0 bit for bit and differ from 0.0. If the
+    engine ever starts reading the magnitude, this fails and the registry
+    has to move with it -- the table cannot drift from the code."""
+    from tradefloor.facts import measure
+
+    universe = tradefloor.Universe.random(4, seed=9)
+    base = tradefloor.ModelParams.from_preset("pt-v18").to_dict()
+    assert base[name] == 0.0, f"{name} is expected to ship off"
+
+    def panel(value):
+        d = dict(base)
+        d[name] = value
+        p = measure(seed=3, universe=universe, days=60,
+                    model=tradefloor.ModelParams.from_dict(d))
+        return json.dumps({k: v for k, v in p.items()
+                           if isinstance(v, (int, float))}, sort_keys=True)
+
+    assert panel(0.37) == panel(1.0), f"{name} reads its magnitude"
+    assert panel(0.0) != panel(1.0), f"{name} does nothing at all"
+
+
+def test_plan_factorial_crosses_every_level_once_and_refuses_a_range():
+    axes = [Axis.factor("a", (0.0, 1.0)), Axis.factor("b", (0.0, 1.0)),
+            Axis.factor("c", (0.0, 0.375, 1.0))]
+    rows = atlas.plan_factorial(axes)
+    assert len(rows) == 12
+    assert len({tuple(sorted(r.items())) for r in rows}) == 12
+    assert rows[0] == {"a": 0.0, "b": 0.0, "c": 0.0}
+    assert rows[-1] == {"a": 1.0, "b": 1.0, "c": 1.0}
+    assert rows == atlas.plan_factorial(axes)   # no seed, no randomness
+    with pytest.raises(tradefloor.ValidationError):
+        atlas.plan_factorial(axes + [Axis("x", 0.0, 1.0)])
+    with pytest.raises(tradefloor.ValidationError):
+        atlas.plan_factorial([])
+    with pytest.raises(tradefloor.ValidationError):
+        atlas.plan_factorial([axes[0], Axis.factor("a", (0.0, 1.0))])
+
+
+def test_a_factor_profiles_by_level_whatever_bins_were_asked_for():
+    """Three levels into twelve bins would leave nine empty bins voting
+    'thin'; into two would merge settings measured separately. The
+    profile of a factor has one bin per level and says which."""
+    axes = [Axis.factor("f", (0.0, 0.5, 1.0)), Axis("x", 0.0, 1.0)]
+    result = atlas.survey(axes, lambda v: {"y": v["f"] + 0.01 * v["x"]},
+                          90, seed=5)
+    prof = result.profile("f", "y", bins=12)
+    assert prof["levels"] == [0.0, 0.5, 1.0]
+    assert [b["n"] for b in prof["bins"]] == [30, 30, 30]
+    assert [b["level"] for b in prof["bins"]] == [0.0, 0.5, 1.0]
+    for b in prof["bins"]:
+        assert b["low"] == b["high"] == b["level"]
+        assert b["level"] <= b["median"] <= b["level"] + 0.01
+    # And a factor's rank correlation reads like any other axis's -- a
+    # little under a range's, because thirty tied ranks per level.
+    rho = result.sensitivity("y")["correlations"]
+    assert rho["f"] > 0.9
+
+
+def test_a_survey_with_a_factor_round_trips_through_save_and_load(tmp_path):
+    axes = [Axis.factor("f", (0.0, 1.0)), Axis("s", 0.1, 10.0, log=True)]
+    result = atlas.survey(axes, lambda v: {"y": v["f"] * v["s"]}, 24, seed=1)
+    path = result.save(str(tmp_path / "s.json"))
+    back = Survey.load(path)
+    assert back.axes == result.axes
+    assert back.axes[0].levels == (0.0, 1.0)
+    assert back.provenance()["axes"]["f"]["levels"] == [0.0, 1.0]
+    assert back.profile("f", "y", bins=12)["levels"] == [0.0, 1.0]

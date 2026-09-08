@@ -83,6 +83,19 @@ describe; they do not certify.
   `tools/calibration/instrumentlib.feasibility_violation`, not in the
   type). `plan` exists so a caller can check the vectors before spending
   anything, and a `measure` that raises is recorded rather than fatal.
+
+# A switch is not a range, and the module now refuses to pretend it is
+
+Two of the model's mechanism dials are read by the engine as `== 0.0` or
+not: every nonzero value is the same law. A survey that put a [0, 1]
+range over them measured the mechanism ON at all 3,000 of its points --
+a Latin hypercube never draws exactly zero -- and reported both as moving
+nothing, because nothing varied. `SWITCH_DIALS` names them with the source
+line that makes them switches, `Axis` refuses a range over one and takes
+`Axis.factor(name, (0.0, 1.0))` instead, and `plan_factorial` crosses
+factors completely, which is the design a composition question needs and
+a hypercube cannot provide. The registry is checked against the engine by
+measurement in the test suite, so it cannot quietly drift.
 """
 
 from __future__ import annotations
@@ -107,6 +120,27 @@ DEFAULT_BOX = (0.25, 4.0)
 
 #: Default sampling seed, so an undirected survey is still reproducible.
 DEFAULT_SEED = 20260824
+
+#: Dials the engine reads as a SWITCH: every value other than zero selects
+#: the same law as 1.0, because the Rust side branches on `== 0.0` and
+#: never reads the magnitude. A continuous axis over one of these samples
+#: "on" at EVERY point -- a Latin hypercube over [0, 1] never draws zero --
+#: so a 3,000-point survey that meant to compare the mechanism off and on
+#: measured it on 3,000 times and off never. That happened
+#: (`mech-survey-result.md`, 2026-09-07): two of ten axes were switches, and
+#: the survey reported both as moving nothing. `Axis` refuses a range over
+#: any name here and asks for `Axis.factor(name, (0.0, 1.0))` instead; the
+#: test suite checks each entry against the engine by measurement, so this
+#: table cannot drift from the code it describes without a test failing.
+SWITCH_DIALS: dict[str, str] = {
+    "vix_level_identity": (
+        "economy/daily.rs reads `inputs.vix_level_identity != 0.0`; "
+        "engine.rs branches on `== 0.0` in derive_vix_anchor and the "
+        "variance forward map"),
+    "cycle_stationary_opening": (
+        "engine.rs draw_stationary_opening returns without drawing at "
+        "`== 0.0` and draws the same opening at every other value"),
+}
 
 
 def latin_hypercube(n: int, dims: int, seed: int) -> list[list[float]]:
@@ -140,7 +174,19 @@ def latin_hypercube(n: int, dims: int, seed: int) -> list[list[float]]:
 
 @dataclass(frozen=True)
 class Axis:
-    """One parameter and the range the survey moves it over."""
+    """One parameter and the range -- or the discrete LEVELS -- it moves over.
+
+    A continuous axis is a range, sampled linearly or in log. A FACTOR
+    axis (`Axis.factor`) is a fixed tuple of levels: a switch's off and on,
+    a mechanism's shipped value and its identity value, a handful of
+    candidate settings. The unit interval is split into equal strata, one
+    per level, so `plan` stratifies a factor exactly as it does a range and
+    `profile` bins by level. `plan_factorial` crosses factors completely,
+    which is what a mechanism composition question needs and a hypercube
+    cannot give: a hypercube over ten mechanisms sees every pair term at
+    random settings of the other eight; a factorial sees each at both
+    settings of every other.
+    """
 
     name: str
     low: float
@@ -150,6 +196,25 @@ class Axis:
     #: point in the top decade. `profile` bins in the same geometry, so a
     #: log axis gets near-uniform bin counts instead of a crowded first bin.
     log: bool = False
+    #: The discrete levels of a factor axis, ascending; None for a range.
+    #: Build one with `Axis.factor`, which sets `low`/`high` to the
+    #: outermost levels so every range-shaped consumer still reads it.
+    levels: tuple[float, ...] | None = None
+
+    @classmethod
+    def factor(cls, name: str, levels: Sequence[float]) -> "Axis":
+        """A discrete axis over exactly these values, in ascending order."""
+        vals = tuple(float(v) for v in levels)
+        if len(vals) < 2:
+            raise ValidationError(
+                f"{name!r}: a factor needs at least two levels, got {vals}; "
+                "one level is a constant, and a constant is the base preset")
+        if any(not math.isfinite(v) for v in vals):
+            raise ValidationError(f"{name!r}: levels must be finite, got {vals}")
+        if len(set(vals)) != len(vals):
+            raise ValidationError(f"{name!r}: levels repeat: {vals}")
+        vals = tuple(sorted(vals))
+        return cls(name, vals[0], vals[-1], False, vals)
 
     def __post_init__(self) -> None:
         if not (math.isfinite(self.low) and math.isfinite(self.high)):
@@ -163,16 +228,55 @@ class Axis:
                 f"{self.name!r}: a log axis needs a positive low, got "
                 f"{self.low}; zero is infinitely far away in log space"
             )
+        if self.levels is not None:
+            if self.log:
+                raise ValidationError(
+                    f"{self.name!r}: a factor has levels, not a geometry; "
+                    "log applies to ranges only")
+            if (self.low, self.high) != (self.levels[0], self.levels[-1]):
+                raise ValidationError(
+                    f"{self.name!r}: low/high {(self.low, self.high)} must be "
+                    f"the outermost levels {self.levels}; use Axis.factor")
+        if self.name in SWITCH_DIALS:
+            if self.levels is None:
+                raise ValidationError(
+                    f"{self.name!r} is a SWITCH ({SWITCH_DIALS[self.name]}): "
+                    "every nonzero value selects the same law, and a range "
+                    "over it would sample 'on' at every point and 'off' at "
+                    "none. Use Axis.factor(name, (0.0, 1.0))."
+                )
+            if set(self.levels) - {0.0, 1.0}:
+                raise ValidationError(
+                    f"{self.name!r} is a switch; levels other than 0.0 and "
+                    f"1.0 ({self.levels}) would all measure the same law "
+                    "and read as a difference that is not there")
 
     def at(self, unit: float) -> float:
         """The parameter value at position `unit` in [0, 1]."""
+        if self.levels is not None:
+            k = len(self.levels)
+            return self.levels[min(max(int(unit * k), 0), k - 1)]
         if self.log:
             return math.exp(math.log(self.low)
                             + unit * (math.log(self.high) - math.log(self.low)))
         return self.low + unit * (self.high - self.low)
 
     def unit(self, value: float) -> float:
-        """`at` inverted: where a value sits in [0, 1]. Used for binning."""
+        """`at` inverted: where a value sits in [0, 1]. Used for binning.
+
+        On a factor axis the answer is the centre of the level's stratum,
+        and a value that is not one of the levels is refused: it cannot
+        have come from this axis's plan, and binning it to the nearest
+        level would move a measurement to a setting it was not taken at.
+        """
+        if self.levels is not None:
+            k = len(self.levels)
+            for i, level in enumerate(self.levels):
+                if math.isclose(value, level, rel_tol=1e-12, abs_tol=1e-12):
+                    return (i + 0.5) / k
+            raise ValidationError(
+                f"{self.name!r}: {value!r} is not one of the levels "
+                f"{self.levels}")
         if self.log:
             return ((math.log(value) - math.log(self.low))
                     / (math.log(self.high) - math.log(self.low)))
@@ -230,6 +334,20 @@ def axes_for(names: Iterable[str], preset: str = "pt-v3",
         value = getattr(shipped, name, None)
         if value is None:
             raise ValidationError(f"{name!r} is not a parameter of {preset}")
+        if name in SWITCH_DIALS:
+            # A switch has two settings, whatever box the caller wrote.
+            # [0, 1] is accepted as "off and on" and becomes the factor;
+            # anything else is a range the engine cannot honour.
+            if name in ranges and tuple(ranges[name]) != (0.0, 1.0):
+                raise ValidationError(
+                    f"{name!r} is a switch ({SWITCH_DIALS[name]}) and has no "
+                    f"range; {tuple(ranges[name])} would measure one law "
+                    "under many names. Give it (0.0, 1.0) or leave it out.")
+            if name in logset:
+                raise ValidationError(f"{name!r} is a switch; log applies "
+                                      "to ranges only")
+            out.append(Axis.factor(name, (0.0, 1.0)))
+            continue
         if name in ranges:
             lo, hi = ranges[name]
             if not (lo <= value <= hi):
@@ -267,6 +385,38 @@ def plan(axes: Sequence[Axis], samples: int, seed: int = DEFAULT_SEED
             "to read a sensitivity from")
     unit = latin_hypercube(samples, len(axes), seed)
     return [{a.name: a.at(u[i]) for i, a in enumerate(axes)} for u in unit]
+
+
+def plan_factorial(axes: Sequence[Axis]) -> list[dict[str, float]]:
+    """Every combination of every factor's levels, once each. Pure.
+
+    The design for a COMPOSITION question -- do these mechanisms compose,
+    and which pairs do not -- because it measures each factor at every
+    setting of every other, so a pair term is read directly rather than
+    inferred through the other axes' noise. Refuses a range axis: a range
+    has no levels to cross, and mixing the two would silently turn the
+    factorial into a hypercube on the ranged dimensions. Survey a range
+    with `plan`, or give it levels if a handful of settings is the
+    question.
+
+    Rows come out in lexicographic level order, the last factor varying
+    fastest, so a plan is reproducible from the axes alone and needs no
+    seed.
+    """
+    import itertools
+
+    ranged = [a.name for a in axes if a.levels is None]
+    if ranged:
+        raise ValidationError(
+            f"a factorial crosses levels and {ranged} have none; give them "
+            "levels with Axis.factor, or survey them with plan")
+    names = [a.name for a in axes]
+    if len(set(names)) != len(names):
+        raise ValidationError(f"duplicated axes: {names}")
+    if not axes:
+        raise ValidationError("a factorial over no factors is the base preset")
+    return [dict(zip(names, combo))
+            for combo in itertools.product(*(a.levels for a in axes))]
 
 
 @dataclass
@@ -355,7 +505,8 @@ class Survey:
             "measured": len(self.rows) - len(self.errors()),
             "errors": len(self.errors()),
             "outputs": self.outputs(),
-            "axes": {a.name: {"low": a.low, "high": a.high, "log": a.log}
+            "axes": {a.name: {"low": a.low, "high": a.high, "log": a.log,
+                              "levels": list(a.levels) if a.levels else None}
                      for a in self.axes},
             "meta": dict(self.meta),
         }
@@ -506,6 +657,12 @@ class Survey:
         axis = self.axis(param)
         if bins < 2:
             raise ValidationError(f"bins must be at least 2, got {bins}")
+        if axis.levels is not None:
+            # A factor has as many bins as levels, whatever was asked for:
+            # binning three levels into twelve would leave nine empty bins
+            # voting "thin", and binning them into two would merge settings
+            # that were measured separately.
+            bins = len(axis.levels)
         vals, counts = self._usable(output, where)
         if len(vals) < 3 * bins:
             raise ValidationError(
@@ -529,14 +686,22 @@ class Survey:
         for i, bucket in enumerate(buckets):
             ordered = sorted(bucket)
             rows.append({
-                "low": axis.at(i / bins),
-                "high": axis.at((i + 1) / bins),
+                # A level's bin IS the level: the stratum edges of a
+                # factor are bookkeeping, not values anything was run at.
+                "low": axis.at((i + 0.5) / bins) if axis.levels
+                else axis.at(i / bins),
+                "high": axis.at((i + 0.5) / bins) if axis.levels
+                else axis.at((i + 1) / bins),
                 "n": len(ordered),
                 "median": statistics.median(ordered) if ordered else None,
                 "p10": _percentile(ordered, 0.10) if ordered else None,
                 "p90": _percentile(ordered, 0.90) if ordered else None,
             })
+        if axis.levels is not None:
+            for level, row in zip(axis.levels, rows):
+                row["level"] = level
         return {"param": param, "output": output, "log": axis.log,
+                "levels": list(axis.levels) if axis.levels else None,
                 "bins": rows, "rows_outside_range": outside,
                 "where": dict(where) if where else None,
                 **counts}
@@ -979,7 +1144,9 @@ class Survey:
     def to_dict(self) -> dict[str, Any]:
         return {
             "axes": [{"name": a.name, "low": a.low, "high": a.high,
-                      "log": a.log} for a in self.axes],
+                      "log": a.log,
+                      "levels": list(a.levels) if a.levels else None}
+                     for a in self.axes],
             "rows": self.rows,
             "meta": self.meta,
         }
@@ -1012,8 +1179,12 @@ class Survey:
     def load(cls, path: str) -> "Survey":
         with open(path, encoding="utf-8") as handle:
             doc = json.load(handle)
+        # Surveys saved before factors existed carry no "levels" key and
+        # load as ranges, which is what they were.
         return cls(
-            axes=[Axis(**a) for a in doc["axes"]],
+            axes=[Axis(a["name"], a["low"], a["high"], a.get("log", False),
+                       tuple(a["levels"]) if a.get("levels") else None)
+                  for a in doc["axes"]],
             rows=doc["rows"], meta=doc.get("meta", {}),
         )
 

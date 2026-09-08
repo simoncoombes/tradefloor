@@ -905,7 +905,10 @@ def read_rows(path: Path) -> list[dict]:
 
 
 def plan_fingerprint(axes, samples: int, plan_seed: int) -> str:
-    doc = {"axes": [[a.name, a.low, a.high, a.log] for a in axes],
+    # A factor's levels are part of the plan; a range's entry is unchanged
+    # so every fingerprint written before factors existed still verifies.
+    doc = {"axes": [[a.name, a.low, a.high, a.log]
+                    + ([list(a.levels)] if a.levels else []) for a in axes],
            "samples": samples, "plan_seed": plan_seed,
            "base_preset": BASE_PRESET, "only": list(ONLY) if ONLY else None,
            "seeds": list(SCREEN_SEEDS), "horizons": list(HORIZONS),
@@ -929,7 +932,9 @@ def build_meta(axes, samples: int, plan_seed: int, fingerprint: str) -> dict:
         "seeds": list(SCREEN_SEEDS),
         "horizons": list(HORIZONS),
         "axes": [{"name": a.name, "low": a.low, "high": a.high,
-                  "log": a.log} for a in axes],
+                  "log": a.log,
+                  "levels": list(a.levels) if a.levels else None}
+                 for a in axes],
         "panel_universe": f"Universe.random({lib.PANEL_UNIVERSE_N}, "
                           f"seed={lib.PANEL_UNIVERSE_SEED})",
         "gate_universe": f"Universe.random({sr.UNIVERSE_N}, "
@@ -1133,7 +1138,13 @@ def cmd_run(args) -> int:
 def cmd_collect(args) -> int:
     outdir = Path(args.out)
     meta = json.loads((outdir / "meta.json").read_text())
-    axes = [atlas.Axis(**a) for a in meta["axes"]]
+    # A switch written as a range by a pre-factor meta reloads as a range
+    # and is refused by `Axis` itself, which is right: that survey's plan
+    # sampled the switch ON at every point and cannot be resumed as if it
+    # had not.
+    axes = [atlas.Axis(a["name"], a["low"], a["high"], a.get("log", False),
+                       tuple(a["levels"]) if a.get("levels") else None)
+            for a in meta["axes"]]
     vectors = atlas.plan(axes, meta["samples"], meta["plan_seed"])
     if plan_fingerprint(axes, meta["samples"], meta["plan_seed"]) \
             != meta["plan_fingerprint"]:
