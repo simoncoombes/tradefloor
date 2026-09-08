@@ -221,6 +221,17 @@ _SNAPSHOT_KEYS = (
     # draws next, so two states alike in every column but one patched draw
     # are not the same state.
     "draw_counts", "draw_overlay",
+    # The day's jump and overnight move, waiting for the tape row that
+    # carries them. They are applied at a day boundary and written onto the
+    # FIRST TICK OF THE NEXT DAY, so between the close and that row they are
+    # pending state -- and a snapshot that dropped them let a resumed run's
+    # record lose a day's jump while the continuous run's kept it.
+    #
+    # Hashed for the same reason the overlay above is: they decide what the
+    # NEXT day's tape says, so two states alike in every column and holding
+    # different pending jumps are not the same state. A verification that
+    # called them equal would be overclaiming.
+    "pending_jump", "pending_overnight",
 )
 
 #: The generator sequence :func:`verify` draws its sample of days from.
@@ -486,6 +497,20 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _f64(buf, value)
     _f64(buf, snapshot["universe_stress"])
     _f64(buf, snapshot["forced_flow_spent"])
+    # LENGTH-PREFIXED, because these two are empty between the tape row that
+    # consumes them and the close that fills them again -- unlike every
+    # per-slot array above, which always follows the roster. An empty buffer
+    # and a roster-length one of zeros are different states and hash apart.
+    for name in ("pending_jump", "pending_overnight"):
+        raw = snapshot[name]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field {name!r} carries {len(raw)} bytes, which is "
+                "not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, name)
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
     # Nominal output when the run opened, the base of the growth term's
     # ratio. A constant of the run, hashed for the reason the fields around
     # it are: two engines alike in every column and holding different bases
@@ -683,7 +708,8 @@ LEDGER_SCHEMA = 1
 #: ``tick_fundamental`` or in the ``rng`` array is a value, and JSON's own
 #: float syntax would round-trip it as some other NaN.
 _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
-                   "tick_anchor", "volume_idio")
+                   "tick_anchor", "volume_idio",
+                   "pending_jump", "pending_overnight")
 
 
 #: The characters a leaf may be built from. A state hash is lowercase hex,

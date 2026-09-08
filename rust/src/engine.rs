@@ -3276,7 +3276,29 @@ impl Engine {
     /// A string is length-prefixed, `u32` big-endian then UTF-8, so "AB"
     /// followed by "C" cannot hash as "A" followed by "BC". A bool is one
     /// byte. An `Option` is a presence byte and then the value when present.
+    /// `pending_jump` and `pending_overnight` are the day's boundary moves
+    /// waiting for the tape row that carries them. They live on the Python
+    /// wrapper rather than here, because they are recording state, and they
+    /// are passed IN rather than left out: a snapshot carries them, and
+    /// `manifest.state_hash` -- the twin this must agree with byte for byte
+    /// -- refuses a snapshot holding a field it does not hash. Two states
+    /// alike in every column and holding different pending jumps write
+    /// different tapes tomorrow, so calling them equal would overclaim.
+    ///
+    /// Empty slices for a caller that has none, which is every core-only
+    /// caller and every test below.
     pub fn state_hash(&self, day_count: u32, market_open: bool) -> [u8; 32] {
+        self.state_hash_with_pending(day_count, market_open, &[], &[])
+    }
+
+    /// [`Engine::state_hash`], carrying the wrapper's pending tape state.
+    pub fn state_hash_with_pending(
+        &self,
+        day_count: u32,
+        market_open: bool,
+        pending_jump: &[f64],
+        pending_overnight: &[f64],
+    ) -> [u8; 32] {
         use sha2::{Digest, Sha256};
 
         let n = self.companies.len();
@@ -3349,6 +3371,16 @@ impl Engine {
         }
         hash_f64(&mut buf, self.universe_stress);
         hash_f64(&mut buf, self.forced_flow_spent);
+        // LENGTH-PREFIXED, because these two are EMPTY between the tape row
+        // that consumes them and the close that fills them again, where
+        // every per-slot array above always follows the roster. An empty
+        // buffer and a roster-length one of zeros are different states.
+        for pending in [pending_jump, pending_overnight] {
+            hash_u32(&mut buf, pending.len() as u32);
+            for value in pending {
+                hash_f64(&mut buf, *value);
+            }
+        }
         // The growth term's base, in snapshot order. A constant of the run
         // rather than state that advances, and covered for the reason
         // every other field here is: two engines that agree on today's

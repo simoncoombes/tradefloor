@@ -1389,6 +1389,19 @@ impl PyEngine {
             // exist to forbid.
             self.day_count += 1;
             self.inner.advance_macro_day(i64::from(self.day_count));
+            // AND THE DAY'S JUMP ONTO THE TAPE, which `close_market` does
+            // and this path did not. Same argument as the line above, one
+            // field further on: a day closed this way applied its jump to
+            // the market and never wrote it to the record, so the truth
+            // table for a `close_at_end` run was missing a column the
+            // explicit close carried.
+            //
+            // Invisible until 0.7.0. The jump slot is zero unless a jump
+            // fired, and pt-v18 switches on `jump_mean_compensated`, whose
+            // compensator lands every day; the state hash learned the
+            // pending fields in the same release and the two spellings then
+            // hashed apart, which is how this surfaced.
+            self.record_day_jump();
         }
         Ok(self.buffer.ticks_written)
     }
@@ -2615,7 +2628,9 @@ impl PyEngine {
     /// `tradefloor.manifest.state_hash(engine.state_snapshot())` computes
     /// the same digest in Python, and a test holds the two equal.
     fn state_hash(&self) -> String {
-        let bytes = self.inner.state_hash(self.day_count, self.market_open);
+        let bytes = self.inner.state_hash_with_pending(
+            self.day_count, self.market_open,
+            &self.pending_jump, &self.pending_overnight);
         let mut hex = String::with_capacity(64);
         for byte in bytes {
             hex.push_str(&format!("{byte:02x}"));
