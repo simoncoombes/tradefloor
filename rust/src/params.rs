@@ -1046,7 +1046,7 @@ pub struct ModelParams {
     pub macro_burn_in_days: f64,
     /// Draw the day-zero cycle phase AND its age from the cycle's own
     /// stationary law, instead of opening every run at the same point.
-    /// 0.0 -- every preset before pt-v19 -- draws nothing and leaves
+    /// 0.0, which every shipped preset carries, draws nothing and leaves
     /// construction as it was, to the bit.
     ///
     /// # A cohort, not a transient
@@ -1960,8 +1960,8 @@ pub struct ModelParams {
     /// factor's ceiling multiple bound the feedback.
     pub vix_realised_vol_weight: f64,
     /// The VIX's LEVEL comes from the index's own conditional variance, not
-    /// from a table of constants. 0.0 ships and is every preset before
-    /// pt-v19, bit for bit.
+    /// from a table of constants. 0.0 ships and is every shipped preset,
+    /// bit for bit.
     ///
     /// # What the level was made of
     ///
