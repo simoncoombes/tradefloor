@@ -1,14 +1,36 @@
 # Changelog
 
-## Unreleased
+## 0.7.0
+
+**The default preset moves to pt-v18.** Every seeded trajectory changes, so
+a run that did not name a preset will not replay against earlier versions.
+Naming a preset still replays exactly, and every preset from pt-v1 on stays
+selectable.
+
+**It is the first default to hold every certified row.** The fourteen shape
+rows are in band at one year and two, on the certification roster and a
+held-out one. So are the four rows certified on the level protocol, which
+no default had held before: the index level returns +5.80 per cent a year
+against a band of 2.90 to 11.90, where pt-v16 lost 13.64, and the -3 per
+cent fear row reads 3.25 against a floor of 2.60, where pt-v16 read 1.96.
+Nine of the ten graded mechanisms are shown, against pt-v16's eight.
+
+**One row reads further from real.** The crisis lever is 6.53x against real
+markets' 6.16x, where pt-v16 read 6.23x.
+
+**Every shipped preset now has a record**, measured on one ruler in one run:
+`python/tradefloor/presets/pt-v1.json` through `pt-v18.json`. The site's
+table quoted each preset's count from the panel current when it shipped, so
+its rows compared rulers rather than presets.
 
 **Every `Universe.random` roster re-rolls**; pin 0.6.2.
 
 **A settable law keeps order-flow impact responding past ten times average
 minute volume**: `order_flow_impact_law`.
 
-**A new preset, pt-v18, returns five first moments the model injected and
-grows fair value with nominal output.** The default is unchanged.
+**pt-v18 returns five first moments the model injected and grows fair value
+with nominal output**, and gains a lagged downside wire and slower VIX mean
+reversion. It is the new default, above.
 
 **The index drift and two fear rows are graded**, and the certified set
 splits into shape, level and crisis.
