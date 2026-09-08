@@ -173,6 +173,13 @@ import tradefloor
 # while what it simulates is not. That is the split working: the two digests
 # were separated in 0.4.x precisely so a boundary could move one without
 # asserting the other.
+#
+# The digest moved a SECOND time before 0.7.0 shipped, and katVersion does
+# not move again for it: the boundary is one era, not two. This file's
+# engine section passes an explicit `Macro`, and `macro_burn_in_days` was
+# relaxing a supplied opening away over 755 days -- an engine asked for a
+# VIX of 45.0 and a policy rate of 5 per cent opened at 21.55 and 0.00.
+# A supplied opening is now kept, so this section starts where it says.
 KAT_VERSION = 14
 
 SEED = 20260820

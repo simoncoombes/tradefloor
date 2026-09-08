@@ -51,9 +51,40 @@ DAYS = 30
 #: as `known_answer.json`'s digest and for the same purpose -- and unlike
 #: that one it spans thirty seeds rather than one.
 #:
-#: If this fails, something on this branch moved the shipped default. That
-#: is the whole claim, so re-stamping it is not a fix.
+#: The preset it describes is `BASE_PANEL_PRESET` below, not "the default".
+#:
+#: If this fails, something moved pt-v16. That is the whole claim, so
+#: re-stamping it is not a fix.
+#:
+#: IT NAMES ITS PRESET since 0.7.0. It was recorded as "the shipped default"
+#: and compared against whatever the default happened to be, so the release
+#: that moved the default to pt-v18 broke it for the one reason that is not
+#: a defect. Naming pt-v16 -- the default at `b3658be`, where this was
+#: recorded -- keeps the identity exactly and makes it survive every later
+#: boundary. Verified at 0.7.0: pt-v16 reproduces this digest over all 9,000
+#: returns after the default moved, the burn-in's calendars were fixed and a
+#: supplied opening stopped being relaxed.
 BASE_PANEL_DIGEST = "fbe62e965aa47a36fd8dd1cf610dd86d804ce94b9bb1ae465db75c1a4fb5e757"
+
+#: The preset the digest above records: the default at `b3658be`.
+BASE_PANEL_PRESET = "pt-v16"
+
+#: THE TWO DIALS THIS FILE'S TABLES WERE DERIVED UNDER, held so every test
+#: measures `cycle_stationary_opening` rather than the default around it.
+#: Both were 0.0 in every preset through pt-v16 and both move at pt-v18, so
+#: they were invisible until the default did.
+#:
+#: `macro_burn_in_days` runs AFTER the opening is drawn and relaxes it: 755
+#: days of macro between the draw and the reading, which is what the age
+#: tables would then be measuring.
+#:
+#: `cycle_hazard_per_month` is the clock the stationary law itself is read
+#: on, so it does not perturb the identity -- it REPLACES it.
+#: `IDENTITY_SHARES` and `IDENTITY_AGES` below are the law at 0.0, and at
+#: 1.0 the expansion median is 435 days against their 123. The
+#: slower-clock test asks for 1.0 explicitly and compares the two, which is
+#: the check that the clock is load-bearing at all.
+IDENTITY_CLOCK = {"macro_burn_in_days": 0.0, "cycle_hazard_per_month": 0.0}
 
 
 def panel_digest(model=None, seeds=SEEDS, days=DAYS):
@@ -91,14 +122,28 @@ def opening(model=None, seed=1):
 
 
 def drawn(**overrides):
-    return tradefloor.ModelParams.from_preset(
-        cycle_stationary_opening=1.0, **overrides)
+    kwargs = dict(IDENTITY_CLOCK)
+    kwargs.update(cycle_stationary_opening=1.0)
+    kwargs.update(overrides)          # an explicit burn-in wins, deliberately
+    return tradefloor.ModelParams.from_preset(**kwargs)
+
+
+def undrawn(**overrides):
+    """The opening dial OFF and no burn-in: the point the drawn form moves.
+
+    The baseline every test in this file compares against. It was the bare
+    default until 0.7.0, when the default gained a burn-in that runs after
+    the opening is drawn -- so the bare default stopped being the point.
+    """
+    kwargs = dict(IDENTITY_CLOCK)
+    kwargs.update(overrides)
+    return tradefloor.ModelParams.from_preset(**kwargs)
 
 
 # -- inert at the default ---------------------------------------------------
 
-def test_the_default_opening_is_the_base_build_to_the_bit():
-    assert panel_digest() == BASE_PANEL_DIGEST
+def test_the_recorded_preset_is_the_base_build_to_the_bit():
+    assert panel_digest(model=BASE_PANEL_PRESET) == BASE_PANEL_DIGEST
 
 
 def test_the_digest_moves_when_the_opening_is_drawn():
@@ -119,7 +164,7 @@ def test_the_default_takes_no_draw_and_leaves_the_opening_where_it_was():
     generator was not touched, on any seed.
     """
     for seed in SEEDS:
-        phase, age, draws = opening(seed=seed)
+        phase, age, draws = opening(undrawn(), seed=seed)
         assert (phase, age, draws) == ("expansion", 0.0, 0), seed
 
 
@@ -134,7 +179,7 @@ def test_every_non_zero_value_gives_the_same_opening(value):
     discover as a flat direction.
     """
     want = panel_digest(drawn(), seeds=range(1, 6), days=5)
-    model = tradefloor.ModelParams.from_preset(cycle_stationary_opening=value)
+    model = undrawn(cycle_stationary_opening=value)
     assert panel_digest(model, seeds=range(1, 6), days=5) == want
 
 

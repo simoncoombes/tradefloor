@@ -108,6 +108,11 @@ impl PyEngineBatch {
         }
 
         let params = crate::python_engine::model_params_from(model)?;
+        // The same rule as `PyEngine::new`, and for the reason
+        // `economy_from`'s own comment gives: a batch that settled an opening
+        // the single engine kept would make `EngineBatch([s])` and
+        // `Engine(s)` different markets, silently.
+        let settle_opening = macro_state.is_none();
         let economy = crate::python_engine::economy_from(macro_state)?;
         let companies: Vec<TickCompany> = universe
             .iter()
@@ -120,13 +125,14 @@ impl PyEngineBatch {
         let engines = seeds
             .iter()
             .map(|seed| {
-                Engine::with_params(
+                Engine::with_params_from_opening(
                     *seed,
                     companies.clone(),
                     economy.clone(),
                     create_initial_central_bank_state(0),
                     sector_keys.clone(),
                     params.clone(),
+                    settle_opening,
                 )
             })
             .collect::<Vec<_>>();

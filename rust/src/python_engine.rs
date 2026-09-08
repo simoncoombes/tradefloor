@@ -1128,6 +1128,16 @@ impl PyEngine {
             ));
         }
         let params = model_params_from(model)?;
+        // WHETHER THE OPENING IS THE MODEL'S TO SETTLE. `macro_burn_in_days`
+        // exists to relax the CONSTRUCTOR'S default macro, which otherwise
+        // opens every run in expansion at phase age zero. A caller who
+        // passes `macro_state` has named an opening instead, and settling it
+        // for 755 days discards what they asked for -- measured at 0.7.0, an
+        // engine asked for a VIX of 45.0 and a policy rate of 5 per cent
+        // opened at 21.55 and 0.00. This is the only place that knows the
+        // difference: by the time the core has an `EconomyState`, a supplied
+        // macro and the default one look the same.
+        let settle_opening = macro_state.is_none();
         let economy = economy_from(macro_state)?;
         let companies: Vec<TickCompany> = universe
             .iter()
@@ -1137,13 +1147,14 @@ impl PyEngine {
         let tickers = universe.iter().map(|i| i.ticker.clone()).collect();
 
         Ok(Self {
-            inner: Engine::with_params(
+            inner: Engine::with_params_from_opening(
                 seed,
                 companies,
                 economy,
                 create_initial_central_bank_state(0),
                 crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
                 params,
+                settle_opening,
             ),
             buffer: SessionBuffer::new(),
             pending_jump: Vec::new(),

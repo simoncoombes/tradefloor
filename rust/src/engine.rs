@@ -623,6 +623,42 @@ impl Engine {
         sector_keys: Vec<String>,
         params: ModelParams,
     ) -> Self {
+        Self::with_params_from_opening(seed, companies, economy, central_bank,
+                                       sector_keys, params, true)
+    }
+
+    /// [`Engine::with_params`], saying whether the opening is the model's to
+    /// settle or the caller's to keep.
+    ///
+    /// `settle_opening` is true for `with_params` and every path that takes
+    /// the DEFAULT macro state, which is what `macro_burn_in_days` exists to
+    /// fix: every run otherwise opens in expansion at phase age zero with the
+    /// constructor's own field values, and the burn-in relaxes those into
+    /// something a run can start from.
+    ///
+    /// It is FALSE when the caller supplied a macro state, because then the
+    /// opening is a statement rather than an artefact. Measured at 0.7.0,
+    /// when the default gained the dial: an engine asked for a VIX of 45.0
+    /// and a policy rate of 5 per cent opened at 21.55 and 0.00 -- the
+    /// burn-in had relaxed the request away over 755 days, and
+    /// `Macro`'s own round-trip contract, that a value read back can be
+    /// written straight in, was silently false.
+    ///
+    /// Settling and then restoring the named fields was considered and
+    /// refused: the variance state the burn-in leaves behind tracks the VIX
+    /// path it actually ran, so writing a crisis VIX back on top of it
+    /// produces an engine whose volatility state and VIX disagree. Skipping
+    /// is what a caller naming an opening asked for, and it is what every
+    /// preset before pt-v18 did.
+    pub fn with_params_from_opening(
+        seed: u32,
+        companies: Vec<TickCompany>,
+        economy: EconomyState,
+        central_bank: CentralBankState,
+        sector_keys: Vec<String>,
+        params: ModelParams,
+        settle_opening: bool,
+    ) -> Self {
         let companies_len = companies.len();
         // Read before the economy moves into the struct, and never
         // recomputed: this is where the run's nominal output starts.
@@ -678,7 +714,9 @@ impl Engine {
             last_market_targets: None,
         };
         engine.vix_anchor = engine.derive_vix_anchor();
-        engine.burn_in_economy();
+        if settle_opening {
+            engine.burn_in_economy();
+        }
         engine
     }
 
