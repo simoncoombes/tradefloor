@@ -1007,6 +1007,45 @@ impl Engine {
         if !drawn {
             self.economy.months_in_current_phase = 0.0;
         }
+        // PUT THE CALENDARS BACK ON THE CALLER'S AXIS.
+        //
+        // The loop above ran on the caller's own day numbering, 1..=days
+        // with `timestamp: day * 24 * 60`, so every clock the macro chain
+        // keeps as an ABSOLUTE time came out of it `days` in the caller's
+        // FUTURE. The run then starts at day 1 (`day_count` is 0 at
+        // construction and the first close makes it 1), and each of those
+        // clocks is read as a difference against the current day:
+        // `update_central_bank` refuses a meeting while
+        // `current_timestamp < next_meeting_date`, and the OPEC arm fires on
+        // `day - oil_last_opec_day >= OIL_OPEC_INTERVAL`.
+        //
+        // Measured on `pt-v18` before this, against `pt-v16`: the first
+        // central-bank meeting moved from day 45 to day 781 and the first
+        // OPEC decision from day 90 to day 810, so 13 meetings landed in
+        // 1,400 days where pt-v16 held 29 -- and the certified 252-day
+        // horizon contained no monetary policy and no OPEC decision at all.
+        // Two macro subsystems, inert for the whole window every published
+        // figure is measured on.
+        //
+        // This is the same restoration the phase lines above perform and it
+        // was missing: this function's contract, in `macro_burn_in_days`'
+        // own docstring, is that it "HOLDS the phase and RESETS its clock,
+        // so it restores the same point after settling the fields". The
+        // cycle's two fields were restored and these three were not.
+        //
+        // SHIFTED, not reset. The burn-in's whole purpose is that the fields
+        // arrive settled, and the meeting cadence is one of them: an opening
+        // that settles into an inflation crisis carries the 21-30 day
+        // cadence `update_central_bank` sets there, where resetting to the
+        // construction value would hand day 1 a calm calendar under crisis
+        // fields. Every consumer reads a DIFFERENCE, so translating the
+        // origin preserves each interval exactly. It is what running the
+        // burn-in on days `-days..=0` would have produced, without moving
+        // the burn-in's own trajectory to get there.
+        let elapsed_minutes = days * 24 * 60;
+        self.central_bank.next_meeting_date -= elapsed_minutes;
+        self.central_bank.last_meeting_date -= elapsed_minutes;
+        self.economy.oil_last_opec_day -= days;
         self.nominal_output_base = self.economy.gdp * self.economy.cpi;
     }
 
@@ -4629,6 +4668,61 @@ mod tests {
         assert_eq!(public, vec![false, true, false]);
         assert!(e.set_status(&[true; 2], &[true; 3]).is_err());
         assert!(e.set_status(&[true; 3], &[true; 4]).is_err());
+    }
+
+    #[test]
+    fn no_preset_opens_with_its_macro_calendars_in_the_future() {
+        // The defect this guards, measured on pt-v18 before the fix: the
+        // 755-day burn-in ran on the caller's own day numbering, so it left
+        // `next_meeting_date` at day 781 and `oil_last_opec_day` at day 720.
+        // A run starts at day 1, both are read as differences against the
+        // current day, and so the first central-bank meeting fell on day 781
+        // against pt-v16's day 45 and the first OPEC decision on day 810
+        // against day 90. The certified 252-day horizon held neither.
+        //
+        // Asserted as BEHAVIOUR over the certified horizon rather than as
+        // clock values, because the clock values are an implementation of
+        // this and the horizon is the claim. Every shipped preset, so a
+        // preset that switches the burn-in on later cannot reintroduce it.
+        for name in crate::params::ModelParams::preset_names() {
+            let params = crate::params::ModelParams::preset(name)
+                .expect("a listed preset resolves");
+            let mut e = Engine::with_params(
+                3,
+                vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+                create_initial_economy_state(&InitialEconomyOptions::default()),
+                create_initial_central_bank_state(0),
+                sectors(),
+                params,
+            );
+            assert!(
+                e.economy().oil_last_opec_day <= 0,
+                "{name}: the run opens with its last OPEC decision on day {},                  which is in the future of a run that starts at day 1",
+                e.economy().oil_last_opec_day
+            );
+            let mut meetings = 0;
+            let mut opec_days = Vec::new();
+            let mut last_opec = e.economy().oil_last_opec_day;
+            // The certified horizon, 252 days (`envelope.CERTIFIED_HORIZON_DAYS`).
+            for day in 1..=252i64 {
+                let out = e.advance_macro_day(day);
+                if out.meeting_held {
+                    meetings += 1;
+                }
+                if e.economy().oil_last_opec_day != last_opec {
+                    last_opec = e.economy().oil_last_opec_day;
+                    opec_days.push(day);
+                }
+            }
+            assert!(
+                meetings > 0,
+                "{name}: no central-bank meeting in the certified 252 days, so \n                 monetary policy is inert across the whole window every \n                 published figure is measured on"
+            );
+            assert!(
+                !opec_days.is_empty(),
+                "{name}: no OPEC decision in the certified 252 days"
+            );
+        }
     }
 
     #[test]
