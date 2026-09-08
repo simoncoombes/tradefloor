@@ -3246,8 +3246,8 @@ impl Engine {
     /// # What it cannot say
     ///
     /// It is a hash of STATE, so it says nothing about history: the order
-    /// log, the recorded tape and the pending daily jump are outside it,
-    /// exactly as they are outside `state_snapshot`. Two engines that reached
+    /// log and the recorded tape are outside it, exactly as they are
+    /// outside `state_snapshot`. Two engines that reached
     /// the same state by different routes hash the same, which is what makes
     /// a replayed day checkable against a recorded one at all.
     ///
