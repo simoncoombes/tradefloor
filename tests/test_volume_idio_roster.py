@@ -404,16 +404,19 @@ def test_every_shipped_preset_holds_the_states_at_zero_across_a_roster_change():
     per-name multiplier is exactly 1.0 for a slot holding 0.0 and for a slot
     that is not there.
     """
-    checked = 0
-    for i in range(1, 100):
-        try:
-            model = tf.ModelParams.from_preset(f"pt-v{i}").to_dict()
-        except tf.ValidationError:
-            break
-        assert model["volume_idio_sigma"] == 0.0, f"pt-v{i}"
-        assert model["volume_idio_persistence"] == 0.0, f"pt-v{i}"
-        checked += 1
-    assert checked >= 16, "the preset list is shorter than the shipped one"
+    # Read the list, do not walk it. This loop counted up from pt-v1 and
+    # broke at the first name that did not resolve, which is pt-v17 -- the
+    # recomposition era reserves the number -- so it checked sixteen presets
+    # on a build that ships seventeen and never saw pt-v18. The guard below
+    # was written to catch exactly that and could not: sixteen is not
+    # shorter than the shipped list, it IS the shipped list minus the one
+    # the walk could not reach.
+    names = tf.preset_names()
+    assert len(names) >= 17, "the preset list is shorter than the shipped one"
+    for name in names:
+        model = tf.ModelParams.from_preset(name).to_dict()
+        assert model["volume_idio_sigma"] == 0.0, name
+        assert model["volume_idio_persistence"] == 0.0, name
 
     e = mutating_run()
     assert widths(e) == (8, 8)

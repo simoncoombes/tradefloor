@@ -236,3 +236,47 @@ def test_no_committed_record_carries_a_tail_figure(path):
         "reads 13.4 per cent higher on the shipped preset; a reader will "
         "compare it with envelope.CERTIFIED_CRISIS. See "
         "preset_panel.TAIL_NOT_MEASURED")
+
+
+# --------------------------------------------------------------------------
+# The panel measures every shipped preset
+#
+# `preset_panel.py` is the run that gives a preset its record, and it costs a
+# 96-core box. It used to discover the preset list by counting up from pt-v1
+# and stopping at the first name that did not resolve. `pt-v17` does not
+# exist, so the walk stopped at sixteen on a build shipping seventeen and a
+# commissioned run measured every preset EXCEPT `pt-v18` -- the one it was
+# commissioned for -- and said nothing on the way, because "16 presets, 2880
+# measurements" is what a correct run of a sixteen-preset build looks like.
+#
+# The guard belongs here rather than in the tool: the tool's own preflight
+# runs on the box, twenty minutes and one wheel build after the launch.
+# --------------------------------------------------------------------------
+
+
+def test_the_panel_measures_every_shipped_preset():
+    import sys
+
+    sys.path.insert(0, str(RECORDS.parent.parent.parent
+                           / "tools" / "calibration"))
+    preset_panel = pytest.importorskip("preset_panel")
+
+    shipped = list(tradefloor.preset_names())
+    assert preset_panel.presets() == shipped, (
+        "the panel would measure a different set from the one the build "
+        "ships, so a preset could be missing from the run that gives it a "
+        "record"
+    )
+    # And the difference is live rather than incidental: walk the numbering
+    # the way the tool used to and, where the shipped list has a gap, the
+    # walk is SHORT. Stated as a condition and not as a fact about pt-v17,
+    # so shipping that number makes this fall away instead of failing.
+    walked = []
+    for i in range(1, len(shipped) + 2):
+        name = f"pt-v{i}"
+        if name not in shipped:
+            break
+        walked.append(name)
+    if walked != shipped:
+        assert preset_panel.presets() != walked, (
+            "the numbering has a gap and the tool still stops at it")

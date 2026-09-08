@@ -123,18 +123,20 @@ REAL_LEVER = 6.16
 
 
 def presets() -> list[str]:
-    """Every selectable preset, discovered rather than hardcoded."""
-    out = []
-    for i in range(1, 200):
-        name = f"pt-v{i}"
-        try:
-            tradefloor.model_preset(name)
-        except Exception:
-            if out:
-                break
-            continue
-        out.append(name)
-    return out
+    """Every shipped preset, READ from the engine rather than probed for.
+
+    This used to probe `pt-v1`, `pt-v2`, ... and stop at the first name that
+    did not resolve. `pt-v17` does not exist -- the recomposition era
+    reserves the number -- so the probe stopped at sixteen on a build that
+    ships seventeen, and a commissioned run measured every preset EXCEPT
+    `pt-v18`, the one it was commissioned for. It cost a box and it printed
+    nothing wrong on the way: "16 presets, 2880 measurements" is what a
+    correct run of a sixteen-preset build looks like.
+
+    A guessed list fails quietly and a read list cannot, so this reads the
+    same list the engine's own error messages are built from.
+    """
+    return list(tradefloor.preset_names())
 
 
 def _roster(n: int, seed: int):

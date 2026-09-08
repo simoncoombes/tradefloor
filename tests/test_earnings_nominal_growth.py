@@ -50,6 +50,18 @@ SHIPPED_PRESETS = (
 )
 
 
+def test_the_written_list_is_the_shipped_list():
+    """The decision this file wanted to force, actually forced.
+
+    Writing the names out only forces a decision if something compares them
+    with the engine's. Nothing did, so the tuple above was free to fall
+    behind `preset_names()` in silence -- the failure `preset_panel.presets()`
+    made expensive when it walked the numbering, stopped at the pt-v17 gap
+    and measured every preset except the one its run existed for.
+    """
+    assert SHIPPED_PRESETS == tuple(tf.preset_names())
+
+
 def _universe(n: int = ROSTER):
     return list(tf.Universe.random(n, seed=UNIVERSE_SEED))
 
