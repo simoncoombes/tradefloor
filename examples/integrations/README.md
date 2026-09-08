@@ -60,10 +60,22 @@ two adapters:
 
 | example | trades | return | impact |
 |---|---|---|---|
-| [`callable/five_days.py`](callable/five_days.py) | 3 | +0.51% | +3.96 bps |
-| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 3 | +0.51% | +3.96 bps |
-| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 3 | +2.32% | +11.70 bps |
-| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 2 | +0.73% | -5.67 bps |
+| [`callable/five_days.py`](callable/five_days.py) | 4 | +1.49% | -1.48 bps |
+| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 4 | +1.49% | -1.48 bps |
+| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 4 | +6.35% | +0.93 bps |
+| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 1 | +0.68% | +8.90 bps |
+
+Re-measured at 0.7.0, where the default preset moved to pt-v18 and every
+price in these markets moved with it. The three offline examples also run
+ten days rather than five now: they share one mean-reversion rule that acts
+on a five-day move past two per cent, and on a five-day run it gets a single
+usable reading -- which was enough on pt-v16's market and is not on this
+one, whose worst five-day fall over this roster is 1.85 per cent. Ten days
+gives the rule five readings instead of one. The rule is untouched, because
+lowering its trigger until this market tripped it would be fitting the
+demonstration to the market, and the trigger is the thing being
+demonstrated. The two recorded MODEL runs still use five days: a language
+model reads the observation rather than waiting for a window.
 
 Comparing two frameworks means holding the market fixed, which is what the
 shared contract checks in `tests/test_integrations.py` do.

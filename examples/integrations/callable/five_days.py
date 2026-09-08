@@ -42,6 +42,26 @@ from tradefloor.integrations.common import require
 SEED = 4242
 DAYS = 5
 
+#: HOW LONG THE OFFLINE RULE RUNS, which is not how long the recorded model
+#: run does. `mean_reversion` reads `return_5d` and acts on a five-day move
+#: past two per cent, so on a five-day run it gets one usable reading. That
+#: was enough on the market pt-v16 produced and is not on pt-v18's, whose
+#: worst five-day fall over this roster and seed is 1.85 per cent -- under
+#: the rule's own trigger, so it holds every day, trades nothing and
+#: demonstrates nothing. Measured across horizons at the 0.7.0 boundary:
+#: 5 days 0 trades, 8 days 2, 10 days 4, 20 days 17 with two market
+#: refusals.
+#:
+#: Ten, because it gives the five-day rule five usable days instead of one
+#: and stays inside the funding limit. The RULE is untouched: lowering its
+#: threshold until this market tripped it would be fitting a demonstration
+#: to a market, and the threshold is the thing being demonstrated.
+#:
+#: The recorded model runs stay at `DAYS`. A language model reads the
+#: observation rather than waiting for a window, and both recordings trade
+#: on five days.
+OFFLINE_DAYS = 10
+
 #: The model the live half of the notebook calls, the key variable it
 #: needs, and the output-token budget per decision. Replay -- the committed
 #: default -- needs none of them.
@@ -223,10 +243,10 @@ def mean_reversion(payload: dict) -> dict:
 def main() -> dict:
     agent = callable_agent(mean_reversion)
     scores = tf.evaluate({"mean_reversion": agent},
-                         seed=SEED, universe=universe(), days=DAYS)
+                         seed=SEED, universe=universe(), days=OFFLINE_DAYS)
     card = scores["mean_reversion"]
 
-    print(f"seed {SEED}, {DAYS} days, {len(ROSTER)} instruments")
+    print(f"seed {SEED}, {OFFLINE_DAYS} days, {len(ROSTER)} instruments")
     print(f"decisions          {len(agent.record)}")
     print(f"trades             {card.trades}")
     print(f"turnover           {card.turnover:,.0f}")
@@ -242,7 +262,7 @@ def main() -> dict:
     # consulted once per day, nothing it sent was refused by the market, and
     # every error column is empty. A demo that can rot silently is a demo
     # that teaches whatever it has rotted into.
-    assert len(agent.record) == DAYS, agent.record
+    assert len(agent.record) == OFFLINE_DAYS, agent.record
     assert not card.errors, card.errors
     assert card.rejected == 0, card.rejected
 

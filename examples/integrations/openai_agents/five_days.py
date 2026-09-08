@@ -81,6 +81,26 @@ from tradefloor.integrations.openai_agents import (OpenAIAgentsAdapter,
 SEED = 4242
 DAYS = 5
 
+#: HOW LONG THE OFFLINE RULE RUNS, which is not how long the recorded model
+#: run does. `mean_reversion` reads `return_5d` and acts on a five-day move
+#: past two per cent, so on a five-day run it gets one usable reading. That
+#: was enough on the market pt-v16 produced and is not on pt-v18's, whose
+#: worst five-day fall over this roster and seed is 1.85 per cent -- under
+#: the rule's own trigger, so it holds every day, trades nothing and
+#: demonstrates nothing. Measured across horizons at the 0.7.0 boundary:
+#: 5 days 0 trades, 8 days 2, 10 days 4, 20 days 17 with two market
+#: refusals.
+#:
+#: Ten, because it gives the five-day rule five usable days instead of one
+#: and stays inside the funding limit. The RULE is untouched: lowering its
+#: threshold until this market tripped it would be fitting a demonstration
+#: to a market, and the threshold is the thing being demonstrated.
+#:
+#: The recorded model runs stay at `DAYS`. A language model reads the
+#: observation rather than waiting for a window, and both recordings trade
+#: on five days.
+OFFLINE_DAYS = 10
+
 #: The model a live run calls, the key variable it needs, and the per-decision
 #: turn budget. Replay -- the committed default -- needs none of them.
 #:
@@ -282,10 +302,10 @@ def main() -> dict:
                                arm="live")
     transcript.meta.update(live.provenance())
     scores = tf.evaluate({"pm": live}, seed=SEED, universe=universe(),
-                         days=DAYS)
+                         days=OFFLINE_DAYS)
     card = scores["pm"]
 
-    print(f"seed {SEED}, {DAYS} days, {len(ROSTER)} instruments")
+    print(f"seed {SEED}, {OFFLINE_DAYS} days, {len(ROSTER)} instruments")
     print(f"framework          {live.info.framework} "
           f"{live.info.framework_version}")
     print(f"decisions          {len(live.record)}")
@@ -303,7 +323,7 @@ def main() -> dict:
     replayed = OpenAIAgentsAdapter(mode="replay", transcript=transcript,
                                    arm="replay")
     again = tf.evaluate({"pm": replayed}, seed=SEED, universe=universe(),
-                        days=DAYS)
+                        days=OFFLINE_DAYS)
     print(f"replayed           {len(transcript)} interactions, no SDK needed")
 
     # The structural gates, asserted rather than eyeballed: the agent was
@@ -311,7 +331,7 @@ def main() -> dict:
     # every error column is empty, and the replay reproduced the run rather
     # than quietly diverging from it. A demo that can rot silently is a demo
     # that teaches whatever it has rotted into.
-    assert len(live.record) == DAYS, live.record
+    assert len(live.record) == OFFLINE_DAYS, live.record
     assert not card.errors, card.errors
     assert card.rejected == 0, card.rejected
     assert [e["decision"] for e in replayed.record] == \
