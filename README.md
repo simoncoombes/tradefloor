@@ -142,7 +142,7 @@ lists every target and what it actually reaches.
 `tf.facts.measure()` scores fourteen shape statistics against real-market
 bands, and four more on a protocol that varies the roster with the seed. The
 default preset, `pt-v18`, holds all fourteen at one year and at two years, on
-the certification roster and on a held-out one, at thirty seeds each — and it
+the certification roster and on a held-out one, at thirty seeds each -- and it
 is the first default to hold the other four as well: the index level returns
 +5.8 per cent a year inside a band of 2.9 to 11.9, where `pt-v16` lost 13.6
 and was reported red for three releases.

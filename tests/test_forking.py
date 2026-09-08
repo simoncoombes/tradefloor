@@ -1001,7 +1001,29 @@ def _nothing_dormant():
     assert dormant, "no dial ships at zero; this model is not testing anything"
     dormant.update(endogenous_news_intensity=0.9,
                    universe_stress_weight=0.5,
-                   universe_stress_decay=0.9)
+                   universe_stress_decay=0.9,
+                   # AND THE OPENING BURN-IN OFF, which is the one shipped
+                   # dial that decides what market this scenario runs in
+                   # rather than which mechanism is live. `CRISIS` below is
+                   # the whole point of the fixture -- a VIX above the
+                   # forced-flow threshold and the stress ratchet -- and
+                   # `macro_burn_in_days` runs 755 days of macro relaxation
+                   # between the constructor and the caller's first day, so
+                   # the engine opens CALM whatever macro state is passed
+                   # in. Measured at the 0.7.0 boundary, where the default
+                   # gained the dial: an engine asked for vix 45.0 and a
+                   # policy rate of 5 per cent opened at 21.55 and 0.00, and
+                   # `forced_flow_spent` never left 0.0, so dropping it from
+                   # a snapshot changed nothing and the guard below stopped
+                   # guarding it.
+                   #
+                   # Off HERE rather than in the fixture's macro, because
+                   # the model is what this file varies and a burn-in is a
+                   # property of the opening rather than of any snapshot
+                   # field. It is 0.0 under every preset through pt-v16, so
+                   # this restores what the scenario tested before the dial
+                   # reached the default and changes nothing else.
+                   macro_burn_in_days=0.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

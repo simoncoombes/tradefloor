@@ -7,30 +7,21 @@ a run that did not name a preset will not replay against earlier versions.
 Naming a preset still replays exactly, and every preset from pt-v1 on stays
 selectable.
 
-**It is the first default to hold every certified row.** The fourteen shape
-rows are in band at one year and two, on the certification roster and a
-held-out one. So are the four rows certified on the level protocol, which
-no default had held before: the index level returns +5.80 per cent a year
-against a band of 2.90 to 11.90, where pt-v16 lost 13.64, and the -3 per
-cent fear row reads 3.25 against a floor of 2.60, where pt-v16 read 1.96.
-Nine of the ten graded mechanisms are shown, against pt-v16's eight.
+**It is the first default to hold every certified row**, the four on the
+level protocol as well as the fourteen shape rows: the index level returns
++5.80 per cent a year where pt-v16 lost 13.64. The crisis lever reads
+further from real than pt-v16's.
 
-**One row reads further from real.** The crisis lever is 6.53x against real
-markets' 6.16x, where pt-v16 read 6.23x.
-
-**Every shipped preset now has a record**, measured on one ruler in one run:
-`python/tradefloor/presets/pt-v1.json` through `pt-v18.json`. The site's
-table quoted each preset's count from the panel current when it shipped, so
-its rows compared rulers rather than presets.
+**Every shipped preset now has a record**, measured on one ruler in one run.
 
 **Every `Universe.random` roster re-rolls**; pin 0.6.2.
 
 **A settable law keeps order-flow impact responding past ten times average
 minute volume**: `order_flow_impact_law`.
 
-**pt-v18 returns five first moments the model injected and grows fair value
+**pt-v18 returns five first moments the model injected, grows fair value
 with nominal output**, and gains a lagged downside wire and slower VIX mean
-reversion. It is the new default, above.
+reversion.
 
 **The index drift and two fear rows are graded**, and the certified set
 splits into shape, level and crisis.
@@ -39,32 +30,77 @@ splits into shape, level and crisis.
 preset, and the day bar opens at the session's open.
 
 **A run can commit to the state it held at every day's end**, and a
-sampled check verifies k days for that cost.
+sampled check verifies k days.
 
 **The per-name volume states follow the roster** through any listing or
 delisting.
 
-**Every print decomposes into the shock that arrived, the depth that
-absorbed it and the breaker's share**, with an unbounded-depth
-counterfactual on request.
-
-**Every draw has an address**, a substitution table replaces one, a
-surgery installs a window, and a second `run_days` call numbers days from
-the engine's counter.
-
-**Each draw's effect on a target is measured** by a finite difference, and
-a shadow run solves a real year's closes for their draws.
+**Every print decomposes into the shock, the depth that absorbed it and
+the breaker's share**, with an unbounded-depth counterfactual.
 
 **The browser build compiles again**; 0.6.2 shipped it broken by a crate
-rename its build script did not follow.
-
-**A mechanism is a specification the engine's Rust is generated from**,
-checked for its draw effect and proven inert.
-
-**A day's move decomposes to the draws that seeded it**, and every node
-replays from the state the day started in.
+rename.
 
 <!-- release-note-ends -->
+
+### The draw surface
+
+**Every draw has an address**, a substitution table replaces one, a surgery
+installs a window, and a second `run_days` call numbers days from the
+engine's counter. **Each draw's effect on a target is measured** by a
+finite difference, and a shadow run solves a real year's closes for their
+draws. **A day's move decomposes to the draws that seeded it**, and every
+node replays from the state the day started in. **A mechanism is a
+specification the engine's Rust is generated from**, checked for its draw
+effect and proven inert.
+
+Kept here rather than in the release note because the note is budgeted as a
+whole and this release's headline is the default. Nothing below the marker
+is less true; it is less likely to be the first thing a reader needs.
+
+### The default preset moves to pt-v18
+
+The fourteen shape rows are in band at 252 and 504 days, on the
+certification roster and a held-out one, at thirty seeds each -- as
+pt-v16's were. What is new is the four rows certified on
+`facts.LEVEL_PROTOCOL`, where the roster varies with the seed:
+
+| row | band | pt-v16 | pt-v18 |
+|---|---|---|---|
+| `index_drift_pct` | 2.90-11.90 | -13.6431 OUT | +5.7957 IN |
+| `fear_gauge_dn1` | 0.70-4.03 | 0.9500 IN | 1.5834 IN |
+| `fear_gauge_dn3` | 2.60-9.58 | 1.9557 OUT | 3.2473 IN |
+| `index_tail_dn3_pct` | 0.47-1.96 | 1.2749 IN | 1.5803 IN |
+
+Two rows move from outside their bands to inside, and the level row sits
+2.45 standard errors above its floor rather than merely on the right side
+of it. Nine of the ten graded mechanisms are shown, against eight.
+
+Read the band positions, which `envelope.py` now carries beside every
+verdict: `fear_gauge_dn3` passes at position 0.09, close to its floor, and
+the index tail rises to 0.75, nearer its ceiling than pt-v16's was.
+
+**And one row reads further from real.** The steady-state crisis lever runs
+6.53x against real markets' 6.16x, where pt-v16 read 6.23x -- from 1.1 per
+cent above real to 5.9. It is the one row on the panel the new default
+reads further from real than the old one, and `envelope.GAPS` says so.
+
+`envelope.DECAY_252` and `DECAY_SLOPE` still describe pt-v14, as they have
+since 0.6.0. Two defaults stale, stated in the module rather than fixed.
+
+### Every preset on one ruler
+
+`python/tradefloor/presets/pt-v1.json` through `pt-v18.json`, from one
+`preset_panel.py` run. The documentation site quoted each preset's count
+from the panel current when it shipped, so its rows compared rulers rather
+than presets; they can be compared to each other now.
+
+Running it found the ruler had drifted. The committed pt-v16 record was
+measured at 0.6.0, and the `Universe.random` re-roll above landed after it,
+so all 28 of that record's panel values had moved. Nothing failed: the test
+that binds `envelope.py` to the record compares two artefacts written from
+the same run.
+
 
 ### The horizon picks the ruler
 

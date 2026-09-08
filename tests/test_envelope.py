@@ -42,12 +42,24 @@ def test_all_fourteen_are_in_band_at_the_certified_horizon():
     assert len(in_band) == 14, sorted(set(env.CERTIFIED) - set(in_band))
     from tradefloor.facts import LEVEL, CRISIS
     # Which of the new rows the default preset is EXPECTED to fail, named
-    # rather than assumed of all of them. The -1 per cent fear row passes at
-    # pt-v16 and was predicted to, before it was measured: one bucket cannot
-    # separate a low gain from a saturating channel, and a row at -1 per cent
-    # alone would have scored this defect as passing for three eras. That it
-    # passes is the ARGUMENT for the second bucket, not a sign the band moved.
-    EXPECTED_RED = {"index_drift_pct", "fear_gauge_dn3"}
+    # rather than assumed of all of them.
+    #
+    # EMPTY SINCE 0.7.0, and pt-v18 is the first default that empties it.
+    # It held `index_drift_pct` and `fear_gauge_dn3` through three eras --
+    # the level row at -13.6431 against a floor of 2.90, the -3 per cent
+    # fear row at 1.9557 against 2.60 -- and pt-v18 reads +5.7957 and
+    # 3.2473. The set stays and stays checked in BOTH directions rather
+    # than being deleted with the rows: a row that goes red again fails
+    # here, which is the point, and so does a row named here that quietly
+    # starts passing.
+    #
+    # The reason the second fear bucket exists is unchanged by its passing.
+    # The -1 per cent row passed at pt-v16 too, and was predicted to before
+    # it was measured: one bucket cannot separate a low gain from a
+    # saturating channel, and a row at -1 per cent alone would have scored
+    # that defect as passing for three eras. Both buckets passing is not a
+    # reason to drop one.
+    EXPECTED_RED = set()
     for k, v in list(env.CERTIFIED_LEVEL.items()) + list(env.CERTIFIED_CRISIS.items()):
         assert k in LEVEL + CRISIS
         red = band_distance(v, *REAL_MARKETS[k]) != 0
