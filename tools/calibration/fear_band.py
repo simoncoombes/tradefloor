@@ -20,10 +20,36 @@ how often they fill:
   the same rule, and the pooled median over the whole series is reported
   beside it, against the +6.03 the engine's own docstring cites from FRED.
 
+And the -3 percent row's TAPE ERROR, which `facts.REAL_MARKETS_PROVENANCE`
+records as `centre_se` and which this tool is the named route to. The
+scoring rule's centre for the row is the pooled median over every session
+since 1990 at or below -3 percent (107 of them), and its error is a
+window-block bootstrap of that median: the 252-session windows are the
+blocks, as many are drawn with replacement as there are blocks, their
+qualifying sessions are pooled, the median taken, 2,000 draws at seed
+20260905 (the repository's bootstrap convention). Two block definitions
+are run and both printed:
+
+- ALL windows since 1990 holding at least one qualifying session -- the
+  form on the record. Its blocks hold every one of the centre's 107
+  sessions, so the bootstrap resamples the centre's own sample and its
+  mean sits within a fifth of an sd of the centre.
+- the ten windows holding at least five, the BAND's blocks. Those hold 92
+  of the 107 and centre the bootstrap 0.40 below the recorded centre: an
+  estimator of a slightly different quantity, which is the wrong-ruler
+  pattern the row's own provenance forbids. Printed beside the other so
+  the choice stays visible, and not recorded.
+
+Until 2026-09-09 the provenance said this tool could run that bootstrap
+and it could not: `main()` computed bands and pooled medians and nothing
+else. The row was blind in every score for four days on the strength of a
+sentence that pointed at code that did not exist.
+
 Usage:  python tools/calibration/fear_band.py
 """
 import math
 import os
+import random
 import statistics
 import sys
 
@@ -40,6 +66,16 @@ THRESHOLDS = {"dn1": -1.0, "dn3": -3.0, "dn5": -5.0}
 PANEL_START = "2015-07-01"
 PANEL_WINDOWS = 10
 COVID_WINDOW_HOLDS = "2020-03-16"
+#: The repository's bootstrap convention (`tools/calibration/calibrate.py`,
+#: `loss.scoring_rule`): 2,000 draws at seed 20260905.
+BOOTSTRAP_DRAWS = 2000
+BOOTSTRAP_SEED = 20260905
+#: The band's block condition for the -3 row: a window carries a median of
+#: its own only with at least this many qualifying sessions. The bootstrap
+#: of the POOLED median needs no such floor, and the recorded error uses
+#: none (`DN3_ERROR_MIN_SESSIONS`).
+DN3_BAND_MIN_SESSIONS = 5
+DN3_ERROR_MIN_SESSIONS = 1
 
 
 def series():
@@ -67,6 +103,69 @@ def windows_from(rows, start, count, length=252):
         out.append(rows[i:i + length])
         i += length
     return out
+
+
+def dn3_blocks(rows, threshold=-3.0, min_sessions=DN3_ERROR_MIN_SESSIONS,
+               length=252):
+    """The consecutive `length`-session windows since 1990, each reduced to
+    the VIX changes on its sessions at or below `threshold`, keeping the
+    windows with at least `min_sessions` of them. `[(start_date, changes)]`
+    in tape order; the trailing partial window is dropped by `windows_from`.
+    """
+    out = []
+    for w in windows_from(rows, rows[0][0], 10_000, length):
+        changes = [c for _, r, c in w if r <= threshold]
+        if len(changes) >= min_sessions:
+            out.append((w[0][0], changes))
+    return out
+
+
+def block_bootstrap(blocks, draws=BOOTSTRAP_DRAWS, seed=BOOTSTRAP_SEED):
+    """The bootstrap distribution of the pooled median under resampling BLOCKS.
+
+    `blocks` is a list of session lists. Each draw picks `len(blocks)` of
+    them with replacement, pools their sessions and takes the median; the
+    returned list holds one median per draw, so its sd is the error and its
+    mean says where the estimator centres against the recorded centre. The
+    block, not the session, is the unit of replication: sessions at -3 per
+    cent arrive in clusters (2008, 2020) and a session bootstrap would price
+    the error of a median over independent days that the tape does not
+    have.
+    """
+    rng = random.Random(seed)
+    k = len(blocks)
+    medians = []
+    for _ in range(draws):
+        pooled = []
+        for _ in range(k):
+            pooled.extend(rng.choice(blocks))
+        medians.append(statistics.median(pooled))
+    return medians
+
+
+def dn3_error(rows, min_sessions=DN3_ERROR_MIN_SESSIONS,
+              draws=BOOTSTRAP_DRAWS, seed=BOOTSTRAP_SEED):
+    """`fear_gauge_dn3`'s tape error by the window-block bootstrap.
+
+    Returns a dict with the block count, the sessions the blocks hold, the
+    pooled median over those sessions, the bootstrap sd (the `centre_se`
+    the provenance records), its mean, its 2.5 and 97.5 percentiles, and
+    `df` = blocks - 1.
+    """
+    blocks = [changes for _, changes in dn3_blocks(rows, min_sessions=min_sessions)]
+    medians = sorted(block_bootstrap(blocks, draws, seed))
+    return {
+        "blocks": len(blocks),
+        "sessions": sum(len(b) for b in blocks),
+        "pooled_median": statistics.median([c for b in blocks for c in b]),
+        "se": statistics.stdev(medians),
+        "mean": statistics.fmean(medians),
+        "p2_5": medians[int(0.025 * len(medians))],
+        "p97_5": medians[int(0.975 * len(medians))],
+        "df": len(blocks) - 1,
+        "draws": draws,
+        "seed": seed,
+    }
 
 
 def main():
@@ -118,6 +217,19 @@ def main():
     for d, m, n in meds:
         print("  from %s: median %+.2f over %d" % (d, m, n))
     print("  min %+.2f max %+.2f trimmed sd %.2f -> band (%+.2f, %+.2f)" % (min(vals), max(vals), s, lo, hi))
+    print()
+    # the -3 row's TAPE ERROR: the window-block bootstrap of the pooled median
+    med3, n3 = bucket_median(rows, -3.0)
+    print("dn3 tape error, window-block bootstrap of the pooled median (%+.4f over %d sessions), %d draws, seed %d:"
+          % (med3, n3, BOOTSTRAP_DRAWS, BOOTSTRAP_SEED))
+    for label, floor in (("RECORDED: every 252-session window holding >= %d qualifying session" % DN3_ERROR_MIN_SESSIONS, DN3_ERROR_MIN_SESSIONS),
+                         ("for comparison: the band's %d windows holding >= %d" % (len(meds), DN3_BAND_MIN_SESSIONS), DN3_BAND_MIN_SESSIONS)):
+        e = dn3_error(rows, min_sessions=floor)
+        print("  %s:" % label)
+        print("    %d blocks holding %d of the %d sessions, pooled median over them %+.4f"
+              % (e["blocks"], e["sessions"], n3, e["pooled_median"]))
+        print("    se %.4f  df %d  bootstrap mean %+.4f (%+.2f from the centre)  P2.5 %+.3f  P97.5 %+.3f"
+              % (e["se"], e["df"], e["mean"], e["mean"] - med3, e["p2_5"], e["p97_5"]))
     print()
     print("the engine's own citation for the -3 row: +6.03, FRED VIXCLS against SP500, 2,511 common days to 2026-08 (rust/src/economy/state.rs)")
 

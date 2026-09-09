@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+**The scoring rule scores `fear_gauge_dn3`.** The row's tape side had a
+centre, the pooled median +5.73 over the 107 sessions since 1990 at or
+below -3 per cent, and no error, so `facts.rule_row` refused it by name and
+every `loss.scoring_rule` result since the rule shipped was a sum over
+eighteen of its nineteen rows, listed under `blind`. The error is now on the
+record: a window-block bootstrap of the pooled median over the twenty
+252-session windows since 1990 that hold at least one such session, all 107
+sessions held, 2,000 draws at seed 20260905, sd 0.6539 on 19 degrees of
+freedom, with the bootstrap centred 0.13 below the recorded centre. The
+band's ten windows as blocks would have given 0.588 on 9 but hold 92 of the
+107 and centre 0.40 below; the provenance records that as the stated limit
+and does not use it. `tools/calibration/fear_band.py` now runs the bootstrap
+it had claimed to since 2026-09-05, and `loss.rule_fingerprint` moves at
+both horizons: a score taken before this change is not comparable with one
+taken after it.
+
+<!-- release-note-ends -->
+
 ## 0.7.1
 
 **Three passages describing the state hash and the snapshot are corrected.**

@@ -939,27 +939,52 @@ REAL_MARKETS_PROVENANCE = {
         # on this row, and it is the reason the centre is written here as a
         # field rather than left to be read positionally out of the triple.
         "centre": 5.73,
-        # 10 - 1: a window-block bootstrap over the ten windows spends one.
-        "centre_df": 9,
+        # THE ERROR IS A WINDOW-BLOCK BOOTSTRAP OF THAT POOLED MEDIAN, and
+        # the blocks are EVERY 252-session window since 1990 holding at
+        # least one session at or below -3 per cent: twenty of them, holding
+        # all 107 of the centre's sessions. Twenty drawn with replacement,
+        # their sessions pooled, the median taken, 2,000 draws at seed
+        # 20260905 (`tools/calibration/fear_band.py`, `dn3_error`), sd
+        # 0.6539, and the bootstrap centres at +5.60, 0.13 below the
+        # recorded centre -- a fifth of its own sd. Seeds 20260906-8 give
+        # 0.642, 0.643, 0.646; 10,000 draws give 0.6533.
+        #
+        # NOT the ten windows the band was built from. That was the form
+        # first written here, and it was run (2026-09-08, `programme/
+        # results/objective-blind-spots.md` section 3.1): sd 0.588 on nine
+        # degrees of freedom, but its ten blocks hold 92 of the 107 sessions
+        # and it centres at +5.33, 0.40 below the centre -- two thirds of
+        # its own sd. The five-session floor is the BAND's condition, so a
+        # window can carry a median of its own; the pooled median needs no
+        # floor, and an error estimated on a different sample from the
+        # centre's is the wrong-ruler pattern this entry's own comment
+        # above forbids, in miniature. The all-window form resamples the
+        # centre's own sample; ruled by Simon on 2026-09-09.
+        "centre_se": 0.6539,
+        # 20 - 1: the block bootstrap over twenty windows spends one. NOT
+        # `n_windows` - 1: `n_windows` is the BAND's ten, and the error's
+        # blocks are a different, larger set.
+        "centre_df": 19,
+        "centre_blocks": 20,
         "n_windows": 10,
         "centre_estimator": "the median of the 107 real sessions at or below "
-                            "-3 per cent since 1990, pooled",
-        # NO `centre_se`, and the objective refuses the row by name until
-        # there is one. The error of a pooled median is a window-block
-        # bootstrap over those ten windows; it has never been run, and no
-        # neighbour's error stands in for it (`SEED_SD_LEVEL_PROVENANCE`
-        # rules that for the seed scale and the rule inherits it for both
-        # terms). Until it lands, `rule_row` raises and `scoring_rule` lists
-        # the row under `blind` with this sentence as the reason.
-        "centre_se_pending":
-            "fear_gauge_dn3's tape error is a window-block bootstrap of the "
-            "pooled median over the ten windows since 1990 that hold at "
-            "least five sessions at or below -3 per cent, 2,000 draws at "
-            "seed 20260905, which tools/calibration/fear_band.py can run "
-            "offline from the cached tape in seconds. It has not been run, "
-            "so the row has a centre and no scale and the objective is "
-            "blind on it and says so.",
+                            "-3 per cent since 1990, pooled, with the sd of "
+                            "a window-block bootstrap of that median over "
+                            "the twenty 252-session windows holding at "
+                            "least one such session as its error",
         "sources": (
+            "tools/calibration/fear_band.py, run 2026-09-09 on the same two "
+            "series (^VIX fetched 2026-09-04T02:47:57Z, ^GSPC "
+            "2026-09-03T22:11:12Z, 9,234 common sessions 1990-01-03 to "
+            "2026-09-02): centre_se 0.6539 is the sd of the pooled median "
+            "under a window-block bootstrap, twenty blocks (every "
+            "252-session window since 1990 holding at least one session at "
+            "or below -3 per cent, together holding all 107), 2,000 draws "
+            "at seed 20260905, bootstrap mean +5.60 against the centre "
+            "+5.73, 2.5-97.5 percentiles +4.56 to +6.98, centre_df 19. The "
+            "band's ten windows as blocks would give 0.588 on df 9 but hold "
+            "92 of the 107 sessions and centre at +5.33; recorded here as "
+            "the stated limit and not used",
             "tools/calibration/fear_band.py, run 2026-09-04, the same two "
             "series; ten windows since 1990 with at least five sessions at -3 "
             "or worse read 3.70 to 8.48 with a trimmed sd of 1.10; the 2020 "
@@ -4192,14 +4217,20 @@ def rule_row(key: str, *, horizon_days: int = TRADING_DAYS_PER_YEAR,
     months.
 
     THIS IS THE GUARD, and what it refuses is a row whose tape side is not
-    all three of a centre, a standard error and a degrees of freedom.
-    Today that is exactly one row, `fear_gauge_dn3`: its centre is on the
+    all three of a centre, a standard error and a degrees of freedom. On
+    the shipped table it refuses nothing at either horizon: the last row
+    without a scale was `fear_gauge_dn3`, whose centre had been on the
     record as the pooled tape median, +5.73 over the 107 sessions since
-    1990, and its standard error is a window-block bootstrap of that median
-    that has never been run, so the row has a number and no scale. The
+    1990, with no error beside it until the window-block bootstrap ran
+    (2026-09-09, `REAL_MARKETS_PROVENANCE["fear_gauge_dn3"]["centre_se"]`,
+    0.6539 on 19 degrees of freedom) -- four days in which every score
+    taken was a sum over eighteen of nineteen rows and said so. What
+    would trip the guard again is a row added to `REAL_MARKETS` with a
+    centre and no window table and no recorded `centre_se` or
+    `centre_df`, or a window table too short to carry a trimmed sd. The
     refusal names the row and which of the three is missing, because a
-    scoring rule that silently dropped it would publish a sum over sixteen
-    rows under the name of a sum over seventeen.
+    scoring rule that silently dropped it would publish a sum over
+    eighteen rows under the name of a sum over nineteen.
 
     `require=False` returns the same dict with `None` in place of whatever
     is missing and a `missing` tuple naming it, which is how

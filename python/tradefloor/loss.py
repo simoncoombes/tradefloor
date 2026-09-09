@@ -564,10 +564,12 @@ def rule_fingerprint(table: Mapping[str, Mapping[str, Any]]) -> str:
 
     A score is only comparable with another taken against the same tape, and
     the tape moves: the 504-bar windows landed after the corpus was measured,
-    `fear_gauge_dn3`'s error is not derived yet, and the level row's centre
-    was re-derived in September. So every result carries the fingerprint of
-    the table it used, and two scores with different fingerprints are two
-    numbers rather than a comparison.
+    the level row's centre was re-derived in September, and
+    `fear_gauge_dn3`'s error landed on 2026-09-09 and moved the fingerprint
+    at both horizons -- every score taken before it is an eighteen-row sum
+    and every score after it a nineteen-row one. So every result carries the
+    fingerprint of the table it used, and two scores with different
+    fingerprints are two numbers rather than a comparison.
     """
     payload = json.dumps(
         [[key, t.get("centre"), t.get("se"), t.get("df"), t.get("estimator")]

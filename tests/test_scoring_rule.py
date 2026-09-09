@@ -250,34 +250,67 @@ def test_a_blind_row_is_listed_and_never_substituted(monkeypatch):
     assert moved["rule_fingerprint"] != out["rule_fingerprint"]
 
 
-def test_the_pooled_fear_row_is_refused_by_name_until_its_bootstrap_lands():
-    """REFUSES: a seventeen-row score published over sixteen rows.
+def test_the_pooled_fear_row_is_scored_now_that_its_bootstrap_has_landed():
+    """REFUSES: a nineteen-row score published over eighteen rows.
 
-    `fear_gauge_dn3` has a centre on the record -- the pooled tape median,
-    +5.73 over the 107 sessions since 1990 -- and no error: the window-block
-    bootstrap that would give it one has never been run. `rule_row` therefore
-    raises, naming the row, naming which of the three is missing, and naming
-    what settles it. `require=False` is the same refusal as data, which is
-    what lets `scoring_rule` list the row rather than parse a message.
+    Until 2026-09-09 this test asserted the opposite: `fear_gauge_dn3` had a
+    centre on the record -- the pooled tape median, +5.73 over the 107
+    sessions since 1990 -- and no error, so `rule_row` refused it by name
+    and every score was a sum over eighteen of the nineteen rows. The
+    window-block bootstrap has now been run by the tool the record names
+    (`tools/calibration/fear_band.py`, `dn3_error`): twenty 252-session
+    windows since 1990 holding at least one qualifying session as blocks,
+    all 107 sessions held, 2,000 draws at seed 20260905, sd 0.6539 on 19
+    degrees of freedom. Un-blinded, the row is the largest single term on
+    pt-v18 at both horizons (`programme/results/dn3-error-bar.md`), so a
+    table that lost it again would silently drop about a quarter of `S`.
+
+    The number is pinned with its provenance in the style of the level and
+    -1 per cent rows below, and the guard's own behaviour is kept under
+    test by `test_a_blind_row_is_listed_and_never_substituted`, which
+    removes an error artificially.
     """
-    with pytest.raises(ValidationError) as exc:
-        rule_row("fear_gauge_dn3", horizon_days=252)
-    message = str(exc.value)
-    assert "fear_gauge_dn3" in message
-    assert "se" in message
-    assert "fear_band.py" in message
+    dn3 = REAL_MARKETS_PROVENANCE["fear_gauge_dn3"]
+    assert dn3["centre_se"] == pytest.approx(0.6539, abs=0.0005)
+    assert dn3["centre_df"] == 19
+    assert dn3["centre_blocks"] == 20
+    assert "centre_se_pending" not in dn3
+    # The stated limit travels with the number: the sources say which blocks,
+    # how many of the centre's sessions they hold, and where the bootstrap
+    # centres, and name the ten-window form as the rejected alternative.
+    sources = " ".join(dn3["sources"])
+    for phrase in ("twenty blocks", "all 107", "seed 20260905",
+                   "bootstrap mean +5.60", "92 of the 107", "0.588"):
+        assert phrase in sources, phrase
 
-    soft = rule_row("fear_gauge_dn3", horizon_days=252, require=False)
-    assert soft["missing"] == ("se",)
-    assert soft["centre"] is not None and soft["df"] is not None
-
-    # Sixteen of the eighteen graded rows have all three, at both horizons.
     for horizon in WINDOW_HORIZONS:
+        row = rule_row("fear_gauge_dn3", horizon_days=horizon)
+        assert row["missing"] == ()
+        assert row["centre"] == pytest.approx(5.73)
+        assert row["se"] == pytest.approx(dn3["centre_se"])
+        assert row["df"] == 19
+        assert "pooled" in row["estimator"]
+        assert "window-block bootstrap" in row["estimator"]
+
+        # Every graded row has all three, at both horizons: the table is
+        # blind on nothing.
         table = loss.rule_table(horizon)
-        complete = [k for k, v in table.items() if not v["missing"]]
-        assert sorted(k for k, v in table.items() if v["missing"]) == [
-            "fear_gauge_dn3"]
-        assert len(complete) == len(table) - 1
+        assert [k for k, v in table.items() if v["missing"]] == []
+        assert "fear_gauge_dn3" in table
+
+    # And the term is a real one: a candidate whose pooled median sits one
+    # tape se below the centre contributes about (nu + 1) ln(1 + 1 / nu) on
+    # a model error small against the tape's.
+    samples = [5.73 - dn3["centre_se"]] * 3
+    panels = [{"fear_gauge_dn3": samples[0], "fear_gauge_dn3_samples": samples,
+               "fear_gauge_dn3_sessions": 3} for _ in range(4)]
+    out = loss.scoring_rule(panels, horizon_days=252, rows=("fear_gauge_dn3",))
+    assert out["blind"] == {}
+    assert out["scored"] == ["fear_gauge_dn3"]
+    row = out["rows"]["fear_gauge_dn3"]
+    assert row["z"] == pytest.approx(-1.0, abs=1e-9)
+    assert row["df"] == pytest.approx(19.0, abs=1e-9)
+    assert out["S"] == pytest.approx(20.0 * math.log1p(1.0 / 19.0), rel=1e-9)
 
 
 # --------------------------------------------------------------------------
@@ -532,9 +565,12 @@ def test_the_recorded_degrees_of_freedom_are_derivations():
         rel=1e-12)
     assert dn1["centre_df"] == dn1["n_windows"] - 2
 
-    # The -3 per cent fear row: a block bootstrap over its ten windows.
+    # The -3 per cent fear row: a block bootstrap over the twenty windows
+    # holding at least one qualifying session -- NOT the band's ten
+    # (`n_windows`), which hold 92 of the centre's 107 sessions.
     dn3 = REAL_MARKETS_PROVENANCE["fear_gauge_dn3"]
-    assert dn3["centre_df"] == dn3["n_windows"] - 1
+    assert dn3["centre_df"] == dn3["centre_blocks"] - 1
+    assert dn3["centre_blocks"] != dn3["n_windows"]
 
     # The tail row: recorded at 252 and DERIVED at both, which is the point.
     # A fixed 34 would be right at one horizon and wrong at the other.
@@ -560,8 +596,8 @@ def test_the_welch_combination_and_the_fingerprint():
     """REFUSES: a score that cannot say which tape table produced it.
 
     The tape moves -- the 504-bar windows landed after the corpus was
-    measured, and `fear_gauge_dn3`'s error is still missing -- so two scores
-    are only comparable when the table behind them is the same one. The
+    measured, and `fear_gauge_dn3`'s error landed on 2026-09-09 -- so two
+    scores are only comparable when the table behind them is the same one. The
     fingerprint is that identity, and it must move when any centre, error or
     df does and not otherwise.
     """
