@@ -105,6 +105,58 @@ def test_a_dial_added_tomorrow_fails_until_somebody_classifies_it():
         pv.settable_dials = real
 
 
+def test_a_preset_that_returns_a_moved_dial_to_the_baseline_is_in_scope_for_it():
+    """Once a dial is a choice, leaving it at the baseline is a choice too.
+
+    pt-v16 moved `vix_decay_ratio` from pt-v1's 1.0 to 0.6 and pt-v19
+    returns it to 1.0 on a measurement. Under a movers-only scope rule the
+    entry recording that measurement would be refused for "claiming a
+    preset that leaves the dial at the baseline value", so the measured
+    return would be unrecordable and the dial would read as unprovenanced
+    on the one preset where it is not. This pins the rule that lets the
+    entry exist, in both directions: pt-v19 is in scope for the dial at
+    1.0, and an entry recording the WRONG value for it is still caught.
+    """
+    required = pv.required_dials()
+    base = tradefloor.ModelParams.from_preset(pv.BASELINE).to_dict()
+    assert "pt-v19" in pv.RETURNED_TO_BASELINE["vix_decay_ratio"]
+    assert required["vix_decay_ratio"]["pt-v19"] == base["vix_decay_ratio"] == 1.0
+    assert required["vix_decay_ratio"]["pt-v16"] == 0.6
+    assert "vix_decay_ratio" in pv.moved_dials()
+    assert "pt-v19" not in pv.moved_dials()["vix_decay_ratio"]
+    assert pv.DIAL_PROVENANCE["vix_decay_ratio"]["presets"]["pt-v19"] == 1.0
+
+    # The wrong value for the returning preset is still caught.
+    wrong = dict(pv.DIAL_PROVENANCE["vix_decay_ratio"],
+                 presets=dict(pv.DIAL_PROVENANCE["vix_decay_ratio"]["presets"],
+                              **{"pt-v19": 0.9}))
+    a = _audit_with(dict(pv.DIAL_PROVENANCE, vix_decay_ratio=wrong),
+                    pv.UNPROVENANCED)
+    assert any("vix_decay_ratio" in m and "ships" in m for m in a["mismatched"]), \
+        a["mismatched"]
+
+
+def test_a_return_declaration_that_is_not_a_return_is_refused():
+    """The declaration is audited, not trusted, in both directions.
+
+    Declaring a preset that MOVES the dial as "returning" it would hide a
+    move under a word; declaring a dial nobody moves would put a baseline
+    value in scope for no reason. Both fire.
+    """
+    real = pv.RETURNED_TO_BASELINE
+    try:
+        pv.RETURNED_TO_BASELINE = {"vix_decay_ratio": {"pt-v16": "not a return"}}
+        faults = pv.audit()["post_baseline"]
+        assert any("vix_decay_ratio" in f and "pt-v16 ships 0.6" in f
+                   and "hides a move" in f for f in faults), faults
+        pv.RETURNED_TO_BASELINE = {"forced_flow_gain": {"pt-v19": "nobody moves it"}}
+        faults = pv.audit()["post_baseline"]
+        assert any("forced_flow_gain" in f and "nothing to return" in f
+                   for f in faults), faults
+    finally:
+        pv.RETURNED_TO_BASELINE = real
+
+
 def test_a_dial_in_two_buckets_is_refused():
     """The other direction, and it is the one that would hide a choice.
 

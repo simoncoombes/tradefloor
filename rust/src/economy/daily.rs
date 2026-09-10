@@ -1903,6 +1903,11 @@ mod fear_response_shape {
         ("pt-v15", 2.647, Binder::Cap),
         ("pt-v16", 2.647, Binder::Cap),
         ("pt-v18", 2.647, Binder::Cap),
+        // pt-v19 inherits pt-v18's cap 45 against gain 17 and stops rising
+        // at the same 2.647 per cent: the four dials it moves are not in
+        // the fear channel's clamp or cap, and the test measured it here
+        // rather than assumed it. Charter bar B4 stays unmet by it.
+        ("pt-v19", 2.647, Binder::Cap),
     ];
 
     /// Which dial ends the rise. Named rather than inferred at the call

@@ -46,7 +46,7 @@ TICKS = 30
 SHIPPED_PRESETS = (
     "pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8",
     "pt-v9", "pt-v10", "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15",
-    "pt-v16", "pt-v18",
+    "pt-v16", "pt-v18", "pt-v19",
 )
 
 
@@ -234,13 +234,15 @@ def test_every_preset_before_pt_v18_carries_the_dial_at_zero():
     for name in SHIPPED_PRESETS:
         value = tf.ModelParams.from_preset(name).to_dict()[
             "earnings_nominal_growth"]
-        expected = 1.0 if name == "pt-v18" else 0.0
+        # pt-v18 switched it on; pt-v19 is built on pt-v18 and inherits
+        # it. Every preset before pt-v18 must read 0.0.
+        expected = 1.0 if name in ("pt-v18", "pt-v19") else 0.0
         assert value == expected, (
             f"{name} carries earnings_nominal_growth {value}")
+    # pt-v17 stays reserved and unresolvable. pt-v19 was asserted here the
+    # same way until 2026-09-10, when it was composed and shipped.
     with pytest.raises(tf.ValidationError):
         tf.ModelParams.from_preset("pt-v17")
-    with pytest.raises(tf.ValidationError):
-        tf.ModelParams.from_preset("pt-v19")
 
 
 def test_the_dial_at_zero_reproduces_the_market_bit_for_bit():

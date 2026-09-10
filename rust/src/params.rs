@@ -2467,6 +2467,12 @@ pub const PT_V16: ModelParams = ModelParams::pt_v16();
 /// pt-v16 with the first moments its mechanisms inject given back -- see
 /// [`ModelParams::pt_v18`], including why the number skips pt-v17.
 pub const PT_V18: ModelParams = ModelParams::pt_v18();
+/// pt-v18 with the VIX level identity on, the VIX's fall-rate symmetric,
+/// the sector loading raised and the per-name volume-variance channel
+/// switched on -- see [`ModelParams::pt_v19`]. REGISTERED AND SELECTABLE,
+/// NOT THE DEFAULT: `DEFAULT_PRESET_NAME` still names pt-v18, and moving
+/// it is a separate, reviewable step with its own known-answer bump.
+pub const PT_V19: ModelParams = ModelParams::pt_v19();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -3730,6 +3736,106 @@ impl ModelParams {
         p
     }
 
+    /// The four-dial candidate: pt-v18 with the VIX level identity on, the
+    /// VIX's fall-rate symmetric, the sector loading raised and the
+    /// per-name volume-variance channel switched on. Nothing else moves.
+    ///
+    /// REGISTERED AND SELECTABLE, NOT THE DEFAULT. [`PT_V18`] holds that,
+    /// and the envelope certifies whatever `DEFAULT_PRESET_NAME` names.
+    /// Moving the default changes every seeded trajectory and re-baselines
+    /// the known-answer test, so it is a separate step from composing the
+    /// preset, and this constructor landing does not move a digest.
+    ///
+    /// # Where the four values come from
+    ///
+    /// Every one is MEASURED, on the design repository's record, and the
+    /// entry for each in `python/tradefloor/provenance.py` carries the
+    /// script, the date, the seed count, the estimator and the residual.
+    /// The short form, so the constructor does not have to be trusted:
+    ///
+    /// Three of the four -- the identity, the decay ratio and the loading
+    /// -- were composed as one cell on the `sectorcomp` factorial (thirty
+    /// seeds, held roster 40 @ 111) and confirmed at ONE HUNDRED AND
+    /// TWENTY seeds against pt-v18 as the paired control (`resolve120`,
+    /// pin `3d6462a`): `S_252` 54.90 -> 32.90 and `S_504` 47.37 -> 30.05
+    /// on the nineteen-row scoring rule. The fourth,
+    /// `volume_idio_variance_gain` 0.20, was found by tracing
+    /// `volume_change_acf1` to a per-name channel every preset ships at
+    /// 0.0 (`volume-acf-result.md`) and measured on the same 120 seeds
+    /// against that three-dial cell (`iterate5`): 32.90 -> 22.69 and
+    /// 30.05 -> 26.11. The whole vector reproduces on two later boxes at
+    /// `max|delta| = 0` over every numeric field (`gainsweep`,
+    /// `crosscorr-confirm`).
+    ///
+    /// On the varying-roster certification protocol, which is the only
+    /// one that carries a band verdict, the four-dial cell reads 18 of 18
+    /// rows in band at BOTH horizons with pt-v18 reproducing its published
+    /// certification to four places in the same run (`cert4b`, 2026-09-10).
+    ///
+    /// # What was measured and left alone
+    ///
+    /// `vix_return_gain` stays at 17. The sweep on this base measured 8,
+    /// 11, 14, 17 and 20 at 120 seeds (`gainsweep`): 8 is +21.68 +/- 2.00
+    /// worse at 252, 20 is +4.04 +/- 1.38 worse at 504, 14 ties at 504 and
+    /// is +5.10 +/- 1.32 worse at 252. The frontier is 14/17/20 and 17 is
+    /// the only point on it that needs no change. A dial not moved needs
+    /// no provenance.
+    ///
+    /// # What this preset does NOT fix, and knows it
+    ///
+    /// `cross_sectional_corr` reads LOW on this base -- 2.57 + 7.79 points
+    /// of `S` across the two horizons against 0.06 + 0.42 on pt-v18 -- and
+    /// it is a floor: three dials move it 3-4 tape se with the sector row
+    /// held, and every one pays `vix_ar1_debiased`, `corr_persistence_acf1`
+    /// and `excess_kurtosis` back by as much at 120 seeds
+    /// (`crosscorr-result.md`). Two thirds of that damage is the decay
+    /// ratio's, and turning it back costs the fear rows twelve points, so
+    /// the row is a price of the regime the fear fix needs and not a
+    /// mistake in it. Bar B4 -- a fear response that RISES across the
+    /// graded range -- is unmet by this and by every preset; that is a
+    /// mechanism change (`programme/code-work-required.md` section 1), not
+    /// a dial.
+    pub const fn pt_v19() -> ModelParams {
+        let mut p = ModelParams::pt_v18();
+        // The VIX's target becomes the level the index's own conditional
+        // variance implies, so the anchor is derived (19.53 on the certified
+        // roster against the dial's 15.98) rather than chosen, and six free
+        // numbers in the fear channel stop being free. Alone on pt-v18 it
+        // makes the VIX too persistent; with the decay ratio below it is
+        // the regime in which `fear_gauge_dn3` centres (5.82 against 5.73,
+        // z +0.13 on the varying roster).
+        p.vix_level_identity = 1.0;
+        // The VIX falls at the full reversion rate, not 0.6 of it. Under
+        // the identity the 0.6 asymmetry held the mean VIX above the
+        // derived anchor and fired the crisis blend on six per cent of
+        // days; at 1.0 the mean falls under it. This is the dial that
+        // carries the fear fix -- turning it back costs `fear_gauge_dn1`
+        // nine points and `fear_gauge_dn3` twelve -- and two thirds of the
+        // `cross_sectional_corr` cost above. pt-v1 shipped 1.0; pt-v16
+        // moved it to 0.6, and this returns it on measurement.
+        p.vix_decay_ratio = 1.0;
+        // The identity and the decay ratio take `sector_excess_corr` from
+        // -3.5 to -6.7 tape se; the loading puts it back on centre
+        // (0.1641 against 0.1640 at 252). Measured 0.7-0.9 on this base:
+        // the row moves -0.0105 of cross-sectional per +0.027 of sector per
+        // 0.1 of loading, `S` is flat between 0.75 and 0.85, and 0.7 and
+        // 0.9 are 4-7 points worse.
+        p.sector_loading = 0.8;
+        // The per-name volume-variance channel, which ships at 0.0 in every
+        // earlier preset: a name's volume follows its OWN GARCH variance
+        // relative to its sector's base, not only the market factor's
+        // (`market/tick.rs`, `volume_multiplier`). It centres
+        // `volume_change_acf1` (term 8.82 -> 1.99 at 120 seeds) and, alone
+        // among that row's movers, does not pay on `volume_abs_return_corr`.
+        // 0.25 against 0.20 reads -0.12 +/- 1.28 at 252 and +1.97 +/- 1.14
+        // at 504, paired over the same 120 seeds: a plateau, and 0.20 is
+        // the lower dose on it. Its partners `volume_idio_persistence` and
+        // `volume_idio_sigma` stay at 0.0, so the per-name volume STATE is
+        // still memoryless; this is a stateless channel.
+        p.volume_idio_variance_gain = 0.20;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -3761,6 +3867,7 @@ impl ModelParams {
             "pt-v15" => Some(PT_V15),
             "pt-v16" => Some(PT_V16),
             "pt-v18" => Some(PT_V18),
+            "pt-v19" => Some(PT_V19),
             _ => None,
         }
     }
@@ -3769,7 +3876,7 @@ impl ModelParams {
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
           "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15",
-          "pt-v16", "pt-v18"]
+          "pt-v16", "pt-v18", "pt-v19"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -4481,6 +4588,10 @@ mod tests {
         assert_eq!(crate::params::PT_V15.fingerprint(), "pt-v15");
         assert_eq!(crate::params::PT_V16.fingerprint(), "pt-v16");
         assert_eq!(crate::params::PT_V18.fingerprint(), "pt-v18");
+        // pt-v19 is composed and selectable; the default has NOT moved to
+        // it. The line below is the assertion that composing a preset does
+        // not move the default by accident.
+        assert_eq!(crate::params::PT_V19.fingerprint(), "pt-v19");
         assert_eq!(DEFAULT_PRESET_NAME, "pt-v18");
     }
 

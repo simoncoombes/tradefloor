@@ -163,8 +163,9 @@ BASELINE = "pt-v1"
 
 #: The presets whose dials must carry provenance: what ships, and what is
 #: proposed to ship. A preset nobody runs is history, and history is not
-#: made better by demanding derivations for it now.
-REQUIRED_PRESETS = ("pt-v16", "pt-v18")
+#: made better by demanding derivations for it now. pt-v19 is the one
+#: proposed to ship: composed 2026-09-10, selectable, NOT the default.
+REQUIRED_PRESETS = ("pt-v16", "pt-v18", "pt-v19")
 
 KINDS = ("derived", "measured", "undetermined")
 
@@ -195,12 +196,13 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: somebody chose it.
 #:
 #: PARTIAL, ON PURPOSE, and the module note says how to derive the whole
-#: set. These five are the dials `programme/PT-V19-CHARTER.md` section 3.1
+#: set. These four are the dials `programme/PT-V19-CHARTER.md` section 3.1
 #: names in its ledger that the difference-from-baseline rule cannot reach.
+#: `vix_level_identity` was the fifth until pt-v19 moved it to 1.0 on
+#: 2026-09-10; it is in scope under the difference rule now and has its
+#: entry in `DIAL_PROVENANCE`, which is the transition this list exists
+#: to make visible rather than absorb.
 POST_BASELINE = {
-    "vix_level_identity":
-        "added 2026-09-05 for the VIX level identity; pt-v19 sets it to 1.0 "
-        "(charter 3.1) and every shipped preset leaves it at 0.0",
     "cycle_stationary_opening":
         "added 2026-09-05 for the stationary opening; pt-v19 sets it to 1.0 "
         "(charter 3.1, ruling R2) and every shipped preset leaves it at 0.0",
@@ -321,6 +323,23 @@ POST_BASELINE = {
         "`tick::PRICE_BREAKER_FRACTION` and no preset moves it",
 }
 
+#: Presets that RETURN a moved dial to the baseline value, on purpose and on
+#: a measurement. Declared, because the difference rule is blind to a
+#: return: the dial is in scope through the preset that moved it, and the
+#: preset that moved it back reads as "leaves it at the pt-v1 value" -- the
+#: one thing an entry is refused for claiming. Each name here puts that
+#: preset in scope for the dial at the baseline value, so its entry can
+#: record what was measured. `audit()` refuses a declaration whose preset
+#: does not ship the baseline for the dial, or whose dial nobody moves.
+RETURNED_TO_BASELINE = {
+    "vix_decay_ratio": {
+        "pt-v19": "pt-v16 moved it 1.0 -> 0.6 without provenance; pt-v19 "
+                  "returns it to 1.0 as one of the four dials measured at "
+                  "120 seeds against pt-v18, whose 0.6 is the paired control "
+                  "(DIAL_PROVENANCE entry)",
+    },
+}
+
 #: Settable dials that cannot be a choice needing justification, and why.
 #:
 #: NOT "nobody has looked" -- that is what `UNPROVENANCED` is for. An entry
@@ -439,27 +458,30 @@ OUT_OF_SCOPE = {
         "inert at 0.0: a constant added to the VIX target, and the level "
         "identity retires it outright",
     "volume_idio_persistence":
-        "inert at 0.0: the per-name volume state has no memory and no "
-        "innovation, so the common multiplier is the whole of it",
+        "inert at 0.0: engine.rs update_volume_idio skips the per-name "
+        "volume STATE when both it and `volume_idio_sigma` are 0.0, so the "
+        "state has no memory and no innovation. Its partner "
+        "`volume_idio_variance_gain` is a separate, stateless channel "
+        "(market/tick.rs volume_multiplier, a name's GARCH variance over "
+        "its sector's base) that pt-v19 switches on; this dial stays 0.0 "
+        "there and stays inert",
     "volume_idio_sigma":
         "unread while `volume_idio_persistence` is 0.0",
-    "volume_idio_variance_gain":
-        "inert at 0.0: volume follows the market factor's variance and "
-        "nothing of the name's own",
 }
 
 #: The provenance of each shipped dial value.
 #:
-#: PARTIAL, AND THE REST IS DECLARED. Eighteen entries, every one read off
+#: PARTIAL, AND THE REST IS DECLARED. Twenty-four entries: twenty read off
 #: the code or off the doc comment that already carried the derivation,
+#: and four (pt-v19's) read off the design repository's measured record,
 #: rather than invented, so the schema is exercised by real data. The
-#: other seventy-seven dials are in `UNPROVENANCED` and belong to the
+#: other seventy-four names are in `UNPROVENANCED` and belong to the
 #: workstreams that own them. Filling them in from here would be inventing
 #: derivations, which is the failure this module exists to prevent.
 DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "oil_supply_response": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
         "identity": "the value at which supply equals demand in expectation, "
                     "so inventory_change is the noise term alone and "
                     "inventory is driftless",
@@ -481,7 +503,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # undetermined is not a demotion of the source; it is the schema
         # refusing to call a point estimate a measurement.
         "kind": "undetermined",
-        "presets": {"pt-v18": 1.0 / 3.0},
+        "presets": {"pt-v18": 1.0 / 3.0, "pt-v19": 1.0 / 3.0},
         "what_would_determine_it": "the dispersion of net buyback yield "
                                    "across the US large-cap filing record "
                                    "the value is taken from. The point "
@@ -505,7 +527,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # derived on a model whose sector volatility does not run, so
         # whether any value is needed is itself open.
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.008583053614, "pt-v18": 0.008583053614},
+        "presets": {"pt-v16": 0.008583053614, "pt-v18": 0.008583053614, "pt-v19": 0.008583053614},
         "what_would_determine_it": "the same inversion run against the "
                                    "SHIPPED value, or the shipped value "
                                    "replaced by the derived one. A residual "
@@ -560,7 +582,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # not be the response ratio, and nobody has measured the shipped
         # one.
         "kind": "undetermined",
-        "presets": {"pt-v16": 17.0, "pt-v18": 17.0},
+        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 17.0},
         "what_would_determine_it": "the shipped pair's RESPONSE ratio at 2 "
                                    "per cent, measured the way the tape's "
                                    "0.848 was, and a value for this dial "
@@ -575,7 +597,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_vol_slow_gain": {
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.05, "pt-v18": 0.05},
+        "presets": {"pt-v16": 0.05, "pt-v18": 0.05, "pt-v19": 0.05},
         "what_would_determine_it": "a measured slow-component gain. ws-b "
                                    "withdrew this dial as undetermined "
                                    "rather than deriving it; 0.05 is a "
@@ -589,7 +611,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # this quantity reads 1.076 pooled over one history and 1.252 per
         # calendar year, and the panel's own statistic is a per-window one.
         "kind": "measured",
-        "presets": {"pt-v16": 0.252, "pt-v18": 0.252},
+        "presets": {"pt-v16": 0.252, "pt-v18": 0.252, "pt-v19": 0.252},
         "source": "^GSPC and ^VIX adjusted closes, 1990-01-03 to "
                   "2025-07-30, 8,959 aligned sessions with a return; "
                   "per-calendar-year estimator over 35 years",
@@ -628,7 +650,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # residual attaches to the value it was computed for, and 0.0357
         # was computed for 1.1996.
         "kind": "undetermined",
-        "presets": {"pt-v16": 1.0, "pt-v18": 1.0},
+        "presets": {"pt-v16": 1.0, "pt-v18": 1.0, "pt-v19": 1.0},
         "what_would_determine_it": "the question asked on an arm whose "
                                    "index sd is near the tape's, which no "
                                    "arm in wsa16 or wsa17 was, with the "
@@ -663,7 +685,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # that both halves of the opening ship together without fixing the
         # length.
         "kind": "undetermined",
-        "presets": {"pt-v18": 755.0},
+        "presets": {"pt-v18": 755.0, "pt-v19": 755.0},
         "what_would_determine_it": "the burn-in table re-run across the "
                                    "certified seed cohort, reporting the "
                                    "dispersion of the day each field "
@@ -684,7 +706,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # 2026-09-05. So the sentence that would BE the derivation is about
         # a value the default does not use.
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.025, "pt-v18": 0.025},
+        "presets": {"pt-v16": 0.025, "pt-v18": 0.025, "pt-v19": 0.025},
         "what_would_determine_it": "a daily-scale measurement of what 0.025 "
                                    "does. The recorded argument for this "
                                    "dial says a per-tick tilt is CLT-washed "
@@ -708,7 +730,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # an entry that records only the identity overstates it.
     "market_beta_down_asym_lag": {
         "kind": "measured",
-        "presets": {"pt-v18": 0.375},
+        "presets": {"pt-v18": 0.375, "pt-v19": 0.375},
         "source": "the certified panel plus index drift, the fear gauge and "
                   "the VIX's own persistence, scored by `loss.rule_table` at "
                   "nineteen rows, on thirty seeds over roster 40 @ seed 111 "
@@ -736,7 +758,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_mean_reversion": {
         "kind": "measured",
-        "presets": {"pt-v16": 0.06, "pt-v18": 0.10},
+        "presets": {"pt-v16": 0.06, "pt-v18": 0.10, "pt-v19": 0.10},
         "source": "the same nineteen-row objective and the same thirty-seed "
                   "arm, with `market_beta_down_asym_lag` pinned at 0.375",
         "date": "2026-09-07",
@@ -771,9 +793,282 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "adding the row did not close that disagreement, it reversed "
                 "which end was which",
     },
+
+    # ---- the four dials pt-v19 moves off pt-v18, composed 2026-09-10 ------
+    # All four MEASURED, on the design repository's record, and every
+    # figure below is either read from a result note that names its box or
+    # recomputed from that box's per-seed panels with the library's own
+    # nineteen-row rule at fix/dn3-error-bar (`loss.scoring_rule`, blind on
+    # nothing). Where the two routes differ -- the notes' script route puts
+    # pt-v18 at 54.90 / 47.37 and the library at 56.00 / 48.59 on the same
+    # 120 panels -- the library's figure is the one quoted and the note's
+    # is given beside it. Golf scores, lower is better; "paired" means the
+    # difference across the same seeds with a paired seed bootstrap (100
+    # resamples of the seed index, the same index for both arms).
+    #
+    # Held-roster figures carry NO band verdict; the band verdicts are the
+    # varying-roster certification's (`cert4b`), and they are stated as
+    # such.
+    "vix_level_identity": {
+        "kind": "measured",
+        "presets": {"pt-v19": 1.0},
+        "source": "the nineteen-row scoring rule over ONE HUNDRED AND TWENTY "
+                  "seeds (101-220) on roster 40 @ seed 111 at both certified "
+                  "horizons, pt-v18 as the paired control in the same run; "
+                  "composed with `vix_decay_ratio` 1.0 and `sector_loading` "
+                  "0.8 as one cell of a 2 x 2 x 3 factorial and never "
+                  "measured apart from them at 120 seeds. Band verdicts "
+                  "from the varying-roster certification protocol "
+                  "(`facts.LEVEL_PROTOCOL`, seeds 101-130, roster varying "
+                  "with the seed), where the four-dial cell reads 18 of 18 "
+                  "rows in band at BOTH horizons and pt-v18 reproduces its "
+                  "published certification to four places in the same run",
+        "date": "2026-09-09 (sectorcomp, resolve120); 2026-09-10 (cert4b)",
+        "script": "programme/scripts/resolve120-jobs.sh (design repo), arm C "
+                  "on pin 3d6462a, registered in resolve120-registration.md "
+                  "before the box; the composition chosen on "
+                  "sector-corr-result.md section 3 (run sectorcomp, thirty "
+                  "seeds); certified by cert4-jobs.sh (cert4-registration.md, "
+                  "run cert4b, i-04ce864fc91b0ab3e)",
+        "residual": "A SWITCH, so there is no error bar on the value; the "
+                    "residual is what it leaves and what it cannot be "
+                    "separated from. The three-dial cell against pt-v18, "
+                    "paired over 120 seeds: S_252 56.00 -> 32.58 (-23.42 "
+                    "+/- 2.78, t -8.4) and S_504 48.59 -> 29.37 (-19.22 +/- "
+                    "4.20, t -4.6); the notes' route reads 54.90 -> 32.90 "
+                    "and 47.37 -> 30.05. Holding on the ninety seeds "
+                    "(131-220) it was not selected on: -22.99 at 252. The "
+                    "identity's OWN share is not separable: switched back "
+                    "alone on the four-dial base at thirty seeds it costs "
+                    "S_19 23.6 -> 50.8 / 23.5 -> 69.2 (volumescreen cell 3), "
+                    "and the identity x decay interaction measures -14.7 on "
+                    "S_504 (jointsolve-i, DECISIONS 2026-09-09), so this "
+                    "dial and `vix_decay_ratio` are one regime with two "
+                    "names. What it leaves: `vix_ar1_debiased` +1.77 se "
+                    "HIGH at 252 and -2.35 se LOW at 504 on the four-dial "
+                    "base -- opposite directions, so no VIX-side dial "
+                    "centres both -- and `cross_sectional_corr` LOW by 1.1 "
+                    "/ 5.2 tape se, of which the identity alone carries "
+                    "-0.2 / -1.0 (crosscorr-result.md section 2)",
+        "estimator": "per-row medians across seeds (mean for the level row, "
+                     "the pooled median for fear_gauge_dn3, the pooled rate "
+                     "for the tail), model error the across-seed spread, "
+                     "Welch against the tape row, `df_model` 119; paired "
+                     "seed bootstrap for differences",
+        "note": "what the switch does: the VIX targets the level the index's "
+                "own conditional variance implies, so the anchor is DERIVED "
+                "(19.53 on the certified roster against the dial's 15.98) "
+                "and the mean VIX moves 16.8 -> 21.5. Alone on pt-v18 at "
+                "the shipped decay 0.6 it makes the VIX too persistent (AR1 "
+                "0.9867 against the 252 ruler 0.9299, level-fix-arms.md), "
+                "which is why it ships only with the decay ratio beside it. "
+                "In that regime `fear_gauge_dn3` centres: 5.8162 against "
+                "5.73, z_tape +0.13 on the varying roster (cert4b), from "
+                "pt-v18's 3.2473 (z -3.80). Charter bar B4 -- a fear "
+                "response that RISES across the graded range -- is NOT met "
+                "by this switch or by any dial (programme/"
+                "code-work-required.md section 1)",
+    },
+    "vix_decay_ratio": {
+        "kind": "measured",
+        "presets": {"pt-v16": 0.6, "pt-v18": 0.6, "pt-v19": 1.0},
+        "source": "the same 120-seed paired run and the same varying-roster "
+                  "certification as `vix_level_identity` above: the two were "
+                  "composed and measured together and are one regime. "
+                  "pt-v19 RETURNS the dial to the pt-v1 value "
+                  "(RETURNED_TO_BASELINE). pt-v16 moved it to 0.6 without "
+                  "provenance and pt-v18 inherited that; what the record "
+                  "says about 0.6 is that it is the paired CONTROL of this "
+                  "measurement -- the regime the fear rows read wrong in "
+                  "(fear_gauge_dn3 3.2473 against 5.73, z -3.80 on the "
+                  "varying roster) -- and, with the identity on, the "
+                  "dominated point of the two measured",
+        "date": "2026-09-09 (sectorcomp, resolve120); 2026-09-10 (cert4b, "
+                "crosscorr)",
+        "script": "programme/scripts/resolve120-jobs.sh (design repo), arm C; "
+                  "sector-corr-result.md section 3 for the composition; "
+                  "crosscorr-prior.py / crosscorr-result.md section 2 for "
+                  "the attribution of what it costs",
+        "residual": "Measured at TWO LEVELS ONLY, 0.6 and 1.0, in the 2 x 2 "
+                    "x 3 composition and at 120 seeds; nothing between them "
+                    "was measured, so the value is located to an endpoint of "
+                    "a two-point grid and not to an optimum. Switched back "
+                    "to 0.6 alone on the four-dial base at thirty seeds it "
+                    "reads S_19 23.6 -> 47.0 / 23.5 -> 63.7 (volumescreen "
+                    "cell 2); it is the dial that carries the fear fix -- "
+                    "turning it back costs `fear_gauge_dn1` nine points and "
+                    "`fear_gauge_dn3` twelve -- and it is also the dial that "
+                    "carries TWO THIRDS of the four-dial cell's "
+                    "`cross_sectional_corr` cost at 504: switched back it "
+                    "moves that row +0.0772 +/- 0.0106 at 252 and +0.1012 "
+                    "+/- 0.0120 at 504 (+2.3 / +10.5 tape se), against the "
+                    "loading's +0.7 / +2.2. That row is a floor on this "
+                    "base: three dials move it 3-4 tape se with the sector "
+                    "row held and every one pays `vix_ar1_debiased`, "
+                    "`corr_persistence_acf1` and `excess_kurtosis` back by "
+                    "as much at 120 seeds (crosscorr-result.md section 4, "
+                    "stop condition X9 triggered). At 1.0 the VIX sits at "
+                    "its floor on 3.0 per cent of days (loopgain2, arm D)",
+        "estimator": "as `vix_level_identity`",
+        "note": "mechanism: the VIX reverts at the full rate rising and at "
+                "`vix_decay_ratio` of it falling (economy/daily.rs). At 0.6 "
+                "under the identity the asymmetry held the mean VIX above "
+                "the derived anchor -- (VIX/anchor)^2 averaging 1.30 -- and "
+                "fired the crisis blend on six per cent of days; at 1.0 the "
+                "mean falls under the anchor (0.70) and the market factor's "
+                "variance runs at 0.71 of base while a name's own stays at "
+                "0.96, which is the whole of the cross-sectional cost "
+                "(sector-corr-result.md section 1, crosscorr-result.md "
+                "section 1)",
+    },
+    "sector_loading": {
+        "kind": "measured",
+        "presets": {"pt-v16": 0.58821442, "pt-v18": 0.58821442, "pt-v19": 0.8},
+        "source": "pt-v16 and pt-v18 ship 0.58821442, set by an earlier "
+                  "preset without provenance; what the record says of it is "
+                  "the sectorcomp cell in pt-v18's own regime (identity "
+                  "off, decay 0.6, thirty seeds): S_19 32.5 / 34.2 at "
+                  "0.588 against 32.9 / 31.8 at 0.7 and 43.6 / 42.5 at 0.8, "
+                  "flat between 0.588 and 0.7 and worse at 0.5 and 0.85, so "
+                  "on pt-v18 the value sits on a plateau whose floor is "
+                  "somewhere in 0.6-0.75 and was not located "
+                  "(sector-corr-result.md section 6). For pt-v19: "
+                  "`sector_excess_corr` on the nineteen-row rule: the "
+                  "identity and the decay ratio take the row from -3.5 to "
+                  "-6.7 tape se at 252 (0.1330 -> 0.1040), and the loading "
+                  "puts it back on centre. Chosen as the third level of the "
+                  "2 x 2 x 3 composition (sectorcomp, thirty seeds, held "
+                  "roster 111) and located on a five-point grid on the "
+                  "four-dial base (crosscorr screen, thirty seeds); "
+                  "confirmed at 120 seeds as part of the three-dial cell "
+                  "and on the varying roster at cert4b",
+        "date": "2026-09-09 (sectorcomp, resolve120); 2026-09-10 (crosscorr, "
+                "cert4b)",
+        "script": "programme/scripts/atlas16-jobs.sh with AXES_SET=sectorcomp "
+                  "on the factorial runner (run sectorcomp, engine pin "
+                  "d84367a on feat/atlas-factor-axes; its cells reproduce "
+                  "on release/0.7.1 @ 3d6462a to the digit, "
+                  "volume-acf-result.md section 0), cells and effects by "
+                  "factorial-cells.py (sector-corr-result.md section 3); "
+                  "crosscorr-jobs.sh and crosscorr-analyse.py "
+                  "(crosscorr-result.md section 3.3, prediction X5); "
+                  "resolve120-jobs.sh arm C",
+        "residual": "Located to +/- 0.05 on a grid of 0.7, 0.75, 0.8, 0.85, "
+                    "0.9 (thirty seeds, four-dial base): S_19 at 0.75 reads "
+                    "-1.0 / +2.3 from 0.8 and at 0.85 +0.4 / +2.3, inside "
+                    "one bootstrap sd (5-8 per cell); 0.7 and 0.9 are +4 to "
+                    "+7 worse. So the surface is FLAT across 0.75-0.85 and "
+                    "0.8 is the centre of a plateau, not a resolved optimum. "
+                    "The trade it makes is resolved: -0.0105 of "
+                    "`cross_sectional_corr` per +0.027 of "
+                    "`sector_excess_corr` per 0.1 of loading at 504 (tape se "
+                    "0.00965 and 0.01169), so it buys 2.3 tape se of the "
+                    "sector row per 1.0 of the cross-sectional row. Where "
+                    "the sector row lands: 0.1641 against centre 0.1640 at "
+                    "252 on the held roster (thirty seeds); at 120 seeds "
+                    "0.1672 (+0.0309 +/- 0.0011 over pt-v18, +3.45 tape "
+                    "se); on the varying roster 0.1792, z_tape +1.70 at 252 "
+                    "and 0.1746, +1.12 at 504 (cert4b, in band both). The "
+                    "one-dial cost it carries: switched back to 0.588 alone "
+                    "on the four-dial base the cross-sectional row gains "
+                    "+0.0216 / +0.0213 (+0.7 / +2.2 tape se) and the sector "
+                    "row loses 4.6 tape se at 504 (crosscorr-result.md "
+                    "section 2)",
+        "estimator": "as `vix_level_identity`; the sector row's tape error "
+                     "is `facts.rule_row`'s 0.008954 at 252 (median of nine "
+                     "non-crisis windows)",
+        "note": "mechanism: `L_i = sector_loading * (1 + slope * (beta_i - "
+                "1))` loads a name onto its sector factor (market/factors.rs); "
+                "`L^2 V_s / sigma^2` is the sector row and enters every "
+                "pair's denominator, which is why raising it lowers the "
+                "cross-sectional row at a fixed exchange rate. "
+                "`sector_factor_sigma` is the same curve at the same rate "
+                "(-0.0105 of row per +0.027 of sector between 0.0075 and "
+                "0.0095) and was not moved",
+    },
+    "volume_idio_variance_gain": {
+        "kind": "measured",
+        "presets": {"pt-v19": 0.20},
+        "source": "`volume_change_acf1` traced (volume-acf-result.md section "
+                  "1) to a per-name volume-variance channel every earlier "
+                  "preset ships at 0.0 -- a name's volume following its OWN "
+                  "GARCH variance over its sector's base, market/tick.rs "
+                  "`volume_multiplier` -- and this dial found to centre the "
+                  "row in a nine-dial screen (volumescreen, thirty seeds, "
+                  "three-dial base); then measured at 120 seeds at two "
+                  "levels, 0.20 (arm F) and 0.25 (arm E), against the "
+                  "three-dial cell as the paired control (iterate5); the "
+                  "four-dial vector reproduced on two later boxes at "
+                  "max|delta| = 0 over every numeric field (gainsweep g17, "
+                  "crosscorr-confirm centre) and certified on the varying "
+                  "roster (cert4b)",
+        "date": "2026-09-09 (volumescreen, iterate5); 2026-09-10 (cert4b)",
+        "script": "programme/scripts/iterate5-jobs.sh (design repo), arms "
+                  "E and F on pin 3d6462a, registered in "
+                  "iterate5-registration.md before the box "
+                  "(i-02c66532c89dbc295); the screen by volumescreen-jobs.sh "
+                  "and volumescreen-analyse.py; the paired figures below "
+                  "recomputed from the iterate5 per-seed panels with "
+                  "`loss.scoring_rule` at fix/dn3-error-bar on 2026-09-10",
+        "residual": "Two levels at 120 seeds and a five-cell ridge at "
+                    "thirty, so the value is located to a PLATEAU and not to "
+                    "an optimum: 0.25 against 0.20 reads -0.12 +/- 1.28 "
+                    "(t -0.1) at 252 and +1.97 +/- 1.14 (t +1.7) at 504; "
+                    "the thirty-seed screen read 0.3 alone at S_19 13.1 +/- "
+                    "5.4 / 17.0 +/- 8.5 against 23.6 / 23.5 at 0 (levels 0, "
+                    "0.3, 1.0, 2.0 -- 1.0 overshoots the row by 15 tape se), "
+                    "and its 4 x 3 composition with `volume_variance_gain` "
+                    "put five cells from (0.15, 0.2) to (0.3, 0.028) inside "
+                    "one sd of each other, recommending 0.2-0.3 with the "
+                    "partner left at its shipped 0.028 (volume-acf-result.md "
+                    "section 4). 0.20 is the lower of two doses the "
+                    "objective cannot tell apart. What it buys, paired over "
+                    "120 seeds "
+                    "against the three-dial cell: S_252 32.58 -> 22.53 "
+                    "(-10.05 +/- 1.34, t -7.5) and S_504 29.37 -> 25.54 "
+                    "(-3.83 +/- 1.94, t -2.0); on the ninety seeds it was "
+                    "not selected on, -11.50 at 252. The row itself: "
+                    "-0.2869 -> -0.2653 at 252 (+0.0201 +/- 0.0018, +3.11 "
+                    "tape se, centre -0.2550) and -0.2618 -> -0.2446 at 504 "
+                    "(+0.0157 +/- 0.0011, +2.86 tape se, centre -0.2498). "
+                    "What it pays: `volume_abs_return_corr` +0.0077 +/- "
+                    "0.0020 at 252 and +0.0033 +/- 0.0016 at 504 -- +0.45 "
+                    "and +0.30 of that row's tape se, inside the "
+                    "registered bar of one; nothing else moves by more "
+                    "than 0.15 tape se. THE ROSTER QUESTION, which the "
+                    "registration named as the prediction most likely to "
+                    "fail (cert4-registration.md Q4): on the VARYING roster "
+                    "the row reads -0.2701 at 252, z -1.52 on the rule "
+                    "against the registered bar of 1.5 (z_tape -2.35), and "
+                    "-0.2508 at 504, z -0.14. The letter of Q4 fails at 252 "
+                    "by 0.02 of z and holds at 504; its intent -- that the "
+                    "dial was tuned to one roster -- does not hold, because "
+                    "the paired gain over pt-v18 transfers: +0.0174 +/- "
+                    "0.0042 (+2.70 tape se) on the varying roster against "
+                    "+0.0145 (+2.25) on the held one, and the control reads "
+                    "worse on the varying roster too (z -3.79 against "
+                    "-3.9). Q5 holds: `volume_abs_return_corr` candidate "
+                    "minus control -0.15 / +0.42 tape se. The registration "
+                    "says a failed Q4 takes the dial out of the candidate; "
+                    "that is a ruling for Simon and this entry records the "
+                    "numbers it would be made on",
+        "estimator": "as `vix_level_identity`; on the varying roster the "
+                     "rule's Welch z over thirty seeds",
+        "note": "the dial is clamped: the multiplier is `clamp(1 + gain * "
+                "(garch_i / base_sector - 1), 0.25, 4.0)` per tick, and its "
+                "partners `volume_idio_persistence` and `volume_idio_sigma` "
+                "stay at 0.0, so the per-name volume STATE remains "
+                "memoryless (engine.rs update_volume_idio) and this is a "
+                "stateless channel. Every other mover of the row in the "
+                "nine-dial screen pays on `volume_abs_return_corr` by the "
+                "same mechanism (volume-acf-result.md section 3.2); this "
+                "one is the cheapest on that row at equal row effect at "
+                "every level measured, which is why it is the one that "
+                "ships",
+    },
     "market_beta_down_asym_recentre": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
         "identity": "`E[f 1{f<0}] = -s / sqrt(2 pi)` for `f ~ N(0, s^2)`. "
                     "Scaling one side of a zero-mean draw moves its mean, so "
                     "the tilt adds `a * beta * -s / sqrt(2 pi)` to every name "
@@ -830,7 +1125,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "oil_opec_symmetry": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
         "identity": "at 1.0 both branches of the OPEC rule use one "
                     "probability and one magnitude range, so the expected "
                     "impact is equal and opposite either side of the 80 "
@@ -877,7 +1172,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "oil_seasonality_target": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
         "identity": "the amplitude is SPLIT, `1 + g*a` on the reversion "
                     "target against `1 + (1-g)*a` on the price level, so the "
                     "total is conserved at every `g` and the level carries "
@@ -921,7 +1216,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "cycle_hazard_per_month": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
         "identity": "`weibull_hazard` returns `(shape/scale) * "
                     "pow(months/scale, shape-1)` and every scale in "
                     "`cycle_hazard_params` is in MONTHS -- 36 for an "
@@ -988,7 +1283,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "jump_mean_compensated": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
         "identity": "a jump arriving with probability `lambda` and mean `m` "
                     "contributes `lambda * m` to the expected return every "
                     "day whether it fires or not. Subtracting `lambda * m` is "
@@ -1033,7 +1328,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "earnings_nominal_growth": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
         "identity": "price is `fair_value * exp(s)` with `s` a stationary "
                     "AR(2) around zero and `eps` fixed when an instrument is "
                     "built, so the only time variation in fair value is the "
@@ -1103,7 +1398,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "neutral_discount_rate": {
         "kind": "derived",
-        "presets": {"pt-v18": 0.0482},
+        "presets": {"pt-v18": 0.0482, "pt-v19": 0.0482},
         "identity": "`compute_target_pe` compresses the multiple by "
                     "`(discount - neutral) * RATE_PE_SENSITIVITY * duration` "
                     "(fair_value.rs:189), so a name is valued exactly on its "
@@ -1175,7 +1470,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # because the neighbouring entries are would be exactly the
         # inherited authority this module exists to refuse.
         "kind": "undetermined",
-        "presets": {"pt-v18": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
         "what_would_determine_it": "the ladder's expected contribution "
                                    "measured at 1.0 over the returns this "
                                    "engine actually produces. The drift "
@@ -1221,8 +1516,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 
 #: Dials in scope that carry NO entry.
 #:
-#: This list is the finding. Seventy-seven of the ninety-five dials in scope
-#: have no recorded derivation, and several
+#: This list is the finding. Seventy-four names declared here against
+#: ninety-seven dials in scope (one of them, `vix_mean_reversion`, beside
+#: an entry that predates this note), and several
 #: carry eight significant figures with no error bar anywhere --
 #: `crisis_blend_gain` at 0.8275881, `crisis_vix_threshold` at 30.88325108,
 #: `market_vol_vix_anchor` at 15.98426471. A search optimum with decimal
@@ -1240,6 +1536,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: someone deciding it should. `tests/test_dial_provenance.py` asserts it as
 #: a SET in both directions, so a new dial fails until it is either given
 #: provenance or added here on purpose.
+#:
+#: Four names left on 2026-09-10 with pt-v19's entries: `vix_level_identity`,
+#: `vix_decay_ratio`, `sector_loading` and `volume_idio_variance_gain`. A
+#: `measured` entry names EVERY in-scope preset's value (asserted in
+#: `tests/test_dial_provenance.py`), so where pt-v16 and pt-v18 ship an
+#: older value for one of these -- 0.6 and 0.58821442 -- the entry says
+#: what the record measured about that value (the paired control; a
+#: plateau) rather than leaving it here.
 UNPROVENANCED = (
     "crash_amplifier_slope",
     "crash_amplifier_threshold",
@@ -1297,14 +1601,11 @@ UNPROVENANCED = (
     "price_breaker_fraction",
     "price_hard_cap",
     "qe_pe_gain",
-    "sector_loading",
     "sector_loading_beta_slope",
     "sector_vix_coupling",
     "usd_crisis_vix_threshold",
     "vix_ceiling",
     "vix_cycle_amplitude",
-    "vix_decay_ratio",
-    "vix_level_identity",
     "vix_mean_reversion",
     "vix_realised_vol_weight",
     "vix_return_clamp",
@@ -1367,6 +1668,17 @@ def required_dials() -> dict[str, dict[str, float]]:
     shows both values and an entry has to justify each. A `POST_BASELINE`
     dial is recorded the same way, so an entry for it goes stale on the same
     rule the moment a preset moves it.
+
+    And a third, DECLARED rather than computed: a preset named in
+    `RETURNED_TO_BASELINE` for a dial is in scope for that dial at the
+    baseline value it ships. The difference rule cannot see a return --
+    pt-v19 sets `vix_decay_ratio` to 1.0, which is pt-v1's value, on a
+    measurement that pt-v16's 0.6 is the dominated control of -- and
+    under the movers-only rule no entry could name pt-v19 for it without
+    being refused as claiming a preset that "leaves it at the baseline
+    value". `moved_dials` is unchanged, so the audit still reports who
+    moved what, and `audit()` refuses a declaration whose preset does not
+    in fact ship the baseline or whose dial nobody moved.
     """
     out = moved_dials()
     for preset in REQUIRED_PRESETS:
@@ -1374,6 +1686,9 @@ def required_dials() -> dict[str, dict[str, float]]:
         for key in POST_BASELINE:
             if key in values:
                 out.setdefault(key, {})[preset] = values[key]
+        for key, presets in RETURNED_TO_BASELINE.items():
+            if preset in presets and key in values and key in out:
+                out[key].setdefault(preset, values[key])
     return out
 
 
@@ -1508,6 +1823,25 @@ def audit() -> dict[str, Any]:
                 f"{', '.join(sorted(moved[dial]))} moves it off {BASELINE}. "
                 "It is already in scope under the difference rule, and "
                 "declaring it here as well hides that somebody chose it")
+
+    for dial, presets in sorted(RETURNED_TO_BASELINE.items()):
+        if dial not in moved:
+            post_baseline.append(
+                f"{dial}: named in RETURNED_TO_BASELINE and no required "
+                f"preset moves it off {BASELINE}, so there is nothing to "
+                "return from")
+            continue
+        for preset in sorted(presets):
+            if preset not in REQUIRED_PRESETS:
+                post_baseline.append(
+                    f"{dial}: RETURNED_TO_BASELINE names {preset}, which is "
+                    f"not in REQUIRED_PRESETS {list(REQUIRED_PRESETS)}")
+            elif preset in moved[dial]:
+                post_baseline.append(
+                    f"{dial}: RETURNED_TO_BASELINE names {preset}, and "
+                    f"{preset} ships {moved[dial][preset]!r}, not the "
+                    f"{BASELINE} value {base[dial]!r}. A return that is not "
+                    "a return hides a move")
 
     part = partition()
     post_baseline.extend(part["faults"])
