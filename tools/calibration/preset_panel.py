@@ -108,7 +108,7 @@ TAIL_NOT_MEASURED = (
     "index_tail_dn3_pct is NOT measured by this tool. It is certified on "
     "facts.LEVEL_PROTOCOL, where the roster varies with the seed, and this "
     "tool holds Universe.random(40, seed=111); the two protocols differ by "
-    "13.4 percent on the shipped preset (1.2749 varying against 1.124 "
+    "13.4 percent on pt-v16 (1.2749 varying against 1.124 "
     "held). A held-roster figure under this row's name would be compared "
     "with the certified one, so none is emitted. What would fill it: a "
     "level-protocol arm in this tool, which is a box job and a Phase 1 "

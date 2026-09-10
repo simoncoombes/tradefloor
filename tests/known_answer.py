@@ -180,7 +180,22 @@ import tradefloor
 # relaxing a supplied opening away over 755 days -- an engine asked for a
 # VIX of 45.0 and a policy rate of 5 per cent opened at 21.55 and 0.00.
 # A supplied opening is now kept, so this section starts where it says.
-KAT_VERSION = 14
+#
+# 2026-09-10: the pt-v18 to pt-v19 era boundary, at 0.8.0. Every seeded run
+# changes, so the digest must. pt-v19 is pt-v18 with four dials moved and
+# nothing else: the VIX level identity on (`vix_level_identity` 1.0), the
+# VIX's fall-rate symmetric (`vix_decay_ratio` 1.0), the sector loading
+# raised (`sector_loading` 0.8) and the per-name volume-variance channel
+# switched on (`volume_idio_variance_gain` 0.20). Both constants moved,
+# `params::DEFAULT_PRESET_NAME` and `Engine::default_model`, and the
+# simulation digest moved from 093f01ac... to 4931c61a... on the same
+# machine that produced the previous one.
+#
+# `metadataSha256` does NOT move here either, for the reason it did not at
+# 0.7.0: none of the four dials is among the mispricing and crowd
+# coefficients `model_preset()` reports, so what the library says about
+# itself is unchanged while what it simulates is not.
+KAT_VERSION = 15
 
 SEED = 20260820
 DAYS = 250

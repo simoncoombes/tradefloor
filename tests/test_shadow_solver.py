@@ -232,8 +232,36 @@ def test_a_planted_downward_market_jump_is_recovered(short_days):
     mean is negative, so a downward jump sits at a normal the prior can
     afford. Four planted downward jumps, six names at 40 ticks, seeds 11
     upward, sigma 1e-3: all four found, none spurious.
+
+    ASSERTED ON THE SIZE, not on the normal. `out["jump_market"]` is the
+    recovered NORMAL, and the tool's own published claim is in basis points
+    -- `jump_recovery` says "every downward jump from -85 to -208 basis
+    points recovered", and `upward_threshold` exists precisely because the
+    normal at which the size changes sign is the preset's and not a
+    constant. Until 0.8.0 this asserted `jump_market < 0.0`, which is a
+    proxy for the direction, and at pt-v19 the proxy separated from the
+    property: seed 11 recovers a normal of +0.0455 and a jump of -84.1
+    basis points. The threshold is +3.4645, so that day is 3.42 sigma from
+    inverting anything.
+
+    The proxy separated because the market aggregate absorbs the jump. The
+    docstring for the solve already concedes the day is unidentified -- more
+    unknowns than closes -- and under `vix_level_identity` the derived VIX
+    anchor on this six-name roster opens at 25.4 against pt-v18's 15.98, so
+    the day's sensitivity to the market innovation is two to three times
+    larger while the jump normal's sensitivity is the fixed
+    `jump_sigma_market`. The market innovation is therefore a cheaper
+    explanation per nat of prior and the MAP moves attribution onto it.
+    MEASURED, and worth stating plainly because it is a real degradation
+    rather than a re-baselining: the recovered share of the planted jump
+    falls from 74-91 per cent on pt-v18 to 60-76 per cent here. The
+    estimator was already biased on pt-v18 -- a planted -3.10 came back as
+    -1.38 -- and pt-v19 shrinks it further. The tool's production roster is
+    forty tickers, where the anchor inflation is far milder, so what this
+    bounds is the six-name synthetic.
     """
     rng = np.random.default_rng(7)
+    zero_at = shadow.upward_threshold(dict(tf.ModelParams.from_preset().to_dict()))
     found = 0
     spurious = 0
     for i, z in enumerate((-2.27, -1.85, -2.18, -3.10)):
@@ -241,7 +269,10 @@ def test_a_planted_downward_market_jump_is_recovered(short_days):
         out = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
         if out["jump_market"] is not None:
             found += 1
-            assert out["jump_market"] < 0.0
+            assert out["jump_market"] < zero_at, (
+                f"seed {11 + i}: recovered a normal of {out['jump_market']} "
+                f"against a sign change at {zero_at}, so the recovered jump "
+                "is UPWARD where a downward one was planted")
         spurious += len(out["jump_company"])
     assert found == 4
     assert spurious == 0
@@ -645,11 +676,11 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     own, and this is a planted day where the retry is what finds it.
     """
     # The day the retry decides, found by sweeping the advance count and the
-    # planted normal: the generator is advanced through ten days that plant
-    # nothing, and the eleventh plants a market jump of -3.10. On that day
-    # the reused Jacobian leaves the trial at 61.95 against a no-jump 41.49,
-    # so it is rejected, and a Jacobian of its own reaches 19.15 and is
-    # accepted.
+    # planted normal: the generator is advanced through days that plant
+    # nothing, and the next one plants a market jump. The first such day was
+    # a ten-day advance and a jump of -3.10, where the reused Jacobian left
+    # the trial at 61.95 against a no-jump 41.49, so it was rejected, and a
+    # Jacobian of its own reached 19.15 and was accepted.
     #
     # This was six days and a jump of -2.27, reading 28.08 against 25.48 and
     # 12.46, until the universe generator was reconciled to open a drawn
@@ -665,17 +696,38 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     # back at -2.27, where the reused Jacobian leaves the trial at 31.15
     # against a no-jump 22.97 and a Jacobian of its own reaches 8.43.
     #
+    # Re-swept again at the 0.8.0 boundary that made pt-v19 the default,
+    # which re-dealt it a third time: the ten-day advance at -2.27 now reads
+    # a plain trial of 7.11 against a no-jump 11.84, so it finds the jump
+    # alone and the premise inverted. The same grid re-swept -- ten advance
+    # counts by seven planted normals -- and the count went the OTHER way
+    # from 0.7.0: FIVE cells are decisive here against pt-v18's one. The
+    # retry guard is needed more often on this preset, not less, so the
+    # "one in ninety-eight" reading above belongs to pt-v18 and is recorded
+    # as history rather than as the current claim.
+    #
+    # The day chosen is the widest of the five: four days of advance and a
+    # planted normal of -4.00. The reused Jacobian leaves the trial at 26.43
+    # against a no-jump 11.11 -- 15.3 nats worse, so it is rejected -- and a
+    # Jacobian of its own reaches 6.53, 4.6 nats better, so it is accepted.
+    # The other four decisive cells were narrower on the plain side (1.1 to
+    # 5.0 nats), and two of them recover a normal within 0.6 of zero, which
+    # would leave the direction assertion below resting on a margin the
+    # solver can cross.
+    #
     # The fix is unchanged and still guarded, on a day that still needs it.
-    # One in ninety-eight says a day where the reused Jacobian is good
-    # enough is now the overwhelmingly commoner case, which is a fact about
-    # the model rather than about the retry.
     rng = np.random.default_rng(7)
-    for i in range(10):
+    for i in range(4):
         _planted_day(11 + i, None, rng)
-    fwd, r_obs = _planted_day(21, -2.27, rng)
+    fwd, r_obs = _planted_day(15, -4.00, rng)
     found = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
     assert found["jump_market"] is not None
-    assert found["jump_market"] < 0.0
+    # On the SIZE, for the reason the planted-jump test above gives at
+    # length: `jump_market` is the recovered normal and the direction lives
+    # in `jump_mean_market + jump_sigma_market * z`. Measured here the
+    # normal is -1.234 against a sign change at +3.4645.
+    assert found["jump_market"] < shadow.upward_threshold(
+        dict(tf.ModelParams.from_preset().to_dict()))
 
     # the same day without the retry: the trial keeps the base Jacobian
     m0 = fwd.layout.size

@@ -583,18 +583,21 @@ impl Engine {
     /// default written as a bare `PT_V1` at two call sites, where moving an
     /// era means finding both.
     ///
-    /// Since 0.7.0 this is [`PT_V18`], the first default to hold every
-    /// certified row rather than the shape rows alone. It holds all fourteen
-    /// shape rows at 252 and 504 days and on both held-out axes, as pt-v16
-    /// did; what is new is the other four. The index level returns +5.80 per
-    /// cent a year against a band of 2.90 to 11.90, where pt-v16 lost 13.64
-    /// and was held red for three eras, and the -3 per cent fear row reads
-    /// 3.25 against a floor of 2.60, where pt-v16 read 1.96 and was below
-    /// it. Nine of the ten graded mechanisms are shown against pt-v16's
-    /// eight.
+    /// Since 0.8.0 this is [`PT_V19`]: pt-v18 with four dials moved and
+    /// nothing else. It holds all fourteen shape rows at 252 and 504 days
+    /// and on both held-out axes, as pt-v18 did, and every one of the
+    /// fourteen at the real centre where pt-v18 held twelve. On the level
+    /// protocol the index level returns +6.52 per cent a year against a
+    /// band of 2.90 to 11.90 (pt-v18: +5.80), and the -3 per cent fear row
+    /// reads 5.82 against a tape centre of 5.73, where pt-v18 read 3.25
+    /// and sat a tenth of the way into its band. Nine of the ten graded
+    /// mechanisms are shown, as on pt-v18.
     ///
-    /// It reads FURTHER from real on one row: the crisis lever is 6.53x
-    /// against real markets' 6.16x, where pt-v16 read 6.23x.
+    /// It reads FURTHER from real on one row: the crisis lever is 5.28x
+    /// against real markets' 6.16x, where pt-v18 read 6.53x -- 14 per cent
+    /// under real where pt-v18 was 6 per cent over. The VIX level identity
+    /// reads the market's variance target against a derived anchor rather
+    /// than the dial's, so a held VIX 65 is a smaller multiple of it.
     ///
     /// This constant and [`crate::params::DEFAULT_PRESET_NAME`] are the two
     /// things that decide the default, and a test at the bottom of
@@ -606,9 +609,9 @@ impl Engine {
     /// Every earlier preset stays selectable and bit-reproducing, so
     /// anything recorded under one replays exactly by naming it.
     ///
-    /// [`PT_V18`]: crate::params::PT_V18
+    /// [`PT_V19`]: crate::params::PT_V19
     pub const fn default_model() -> crate::params::ModelParams {
-        crate::params::PT_V18
+        crate::params::PT_V19
     }
 
     /// [`Engine::new`] under an explicit model preset (the runtime seam,
@@ -4411,11 +4414,26 @@ mod tests {
     /// the assertions below ran over rows that could not fail them. Both
     /// counts are asserted, so a session that stops reaching a branch fails
     /// here rather than going quiet.
+    ///
+    /// The fixture NAMES pt-v18, because those counts are pt-v18's at seed
+    /// 42 and the property is arithmetic on every print rather than a fact
+    /// about the default: when the default moved to pt-v19 at 0.8.0 the same
+    /// seed produced no unmoved print at all, and the NaN branch went
+    /// unguarded -- which is exactly the failure the counts exist to raise,
+    /// and the remedy is a fixture that reaches both branches, not a weaker
+    /// assertion.
     #[test]
     fn every_print_decomposes_into_its_shock_and_its_absorption() {
         let innovations = vec![None; 3];
         let variances = vec![0.000225; 3];
-        let mut e = engine(42);
+        let mut e = Engine::with_params(
+            42,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            crate::params::PT_V18,
+        );
         e.set_settle_depth_counterfactual(true);
         let mut buf = SessionBuffer::new();
         e.run_session(&session(390, &innovations, &variances), &mut buf);

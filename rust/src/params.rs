@@ -2469,9 +2469,9 @@ pub const PT_V16: ModelParams = ModelParams::pt_v16();
 pub const PT_V18: ModelParams = ModelParams::pt_v18();
 /// pt-v18 with the VIX level identity on, the VIX's fall-rate symmetric,
 /// the sector loading raised and the per-name volume-variance channel
-/// switched on -- see [`ModelParams::pt_v19`]. REGISTERED AND SELECTABLE,
-/// NOT THE DEFAULT: `DEFAULT_PRESET_NAME` still names pt-v18, and moving
-/// it is a separate, reviewable step with its own known-answer bump.
+/// switched on -- see [`ModelParams::pt_v19`]. THE DEFAULT since 0.8.0:
+/// `DEFAULT_PRESET_NAME` names it and `Engine::default_model` returns it,
+/// and the test at the bottom of this file asserts the two agree.
 pub const PT_V19: ModelParams = ModelParams::pt_v19();
 
 /// The name of the preset an engine runs when none is named.
@@ -2488,7 +2488,7 @@ pub const PT_V19: ModelParams = ModelParams::pt_v19();
 /// bottom of this file asserts it resolves to the engine's default
 /// bit-for-bit. A future era that moves the default and forgets this
 /// constant fails the suite instead of mislabelling every manifest.
-pub const DEFAULT_PRESET_NAME: &str = "pt-v18";
+pub const DEFAULT_PRESET_NAME: &str = "pt-v19";
 
 /// Every coefficient `pt-v3` moved, with the exact bits the converged
 /// certificate recorded.
@@ -3740,11 +3740,12 @@ impl ModelParams {
     /// VIX's fall-rate symmetric, the sector loading raised and the
     /// per-name volume-variance channel switched on. Nothing else moves.
     ///
-    /// REGISTERED AND SELECTABLE, NOT THE DEFAULT. [`PT_V18`] holds that,
-    /// and the envelope certifies whatever `DEFAULT_PRESET_NAME` names.
-    /// Moving the default changes every seeded trajectory and re-baselines
-    /// the known-answer test, so it is a separate step from composing the
-    /// preset, and this constructor landing does not move a digest.
+    /// THE DEFAULT since 0.8.0, and the envelope certifies whatever
+    /// `DEFAULT_PRESET_NAME` names. It was composed, registered and
+    /// selectable one release step before it took the default, because
+    /// moving the default changes every seeded trajectory and re-baselines
+    /// the known-answer test: composing it moved no digest, and moving the
+    /// default moved the simulation digest and nothing else.
     ///
     /// # Where the four values come from
     ///
@@ -4588,11 +4589,13 @@ mod tests {
         assert_eq!(crate::params::PT_V15.fingerprint(), "pt-v15");
         assert_eq!(crate::params::PT_V16.fingerprint(), "pt-v16");
         assert_eq!(crate::params::PT_V18.fingerprint(), "pt-v18");
-        // pt-v19 is composed and selectable; the default has NOT moved to
-        // it. The line below is the assertion that composing a preset does
-        // not move the default by accident.
+        // pt-v19 took the default at 0.8.0. While it was composed and not
+        // yet the default, the line below this one asserted
+        // `DEFAULT_PRESET_NAME == "pt-v18"`, so that composing a preset
+        // could not move the default by accident; the move is deliberate
+        // now, and the assertion moved with it.
         assert_eq!(crate::params::PT_V19.fingerprint(), "pt-v19");
-        assert_eq!(DEFAULT_PRESET_NAME, "pt-v18");
+        assert_eq!(DEFAULT_PRESET_NAME, "pt-v19");
     }
 
     #[test]

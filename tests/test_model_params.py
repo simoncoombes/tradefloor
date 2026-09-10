@@ -216,7 +216,19 @@ PERTURBATIONS = [
     ("market_vol_slow_persistence", 0.99, True),    # live since pt-v15 carries the weight
     ("market_vol_slow_gain", 0.1, True),            # live since pt-v15 carries the weight
     ("market_vol_slow_weight", 0.5, True),
-    ("market_vol_vix_anchor", 22.0, True),
+    # -- the derived-anchor era (0.8.0) -------------------------------------
+    # INERT UNDER THE IDENTITY, and not read at all. This dial's whole job is
+    # to be the VIX at which every coupling's ratio is exactly 1.0, and
+    # pt-v19 DERIVES that number from the index's own unconditional variance
+    # (`engine.rs`, `derive_vix_anchor`) rather than reading it: every
+    # coupling site takes `Engine::vix_anchor`, and the dial survives only in
+    # the no-index fallback, which a live roster never reaches, and in the
+    # non-engine convenience wrappers. Measured on the probe: perturbing to
+    # 22.0 leaves the derived anchor at 20.8139, the VIX path bit-identical
+    # and not one column moved. Live again on any preset with the identity
+    # off -- it moves nine columns on pt-v18, and on pt-v19 with the identity
+    # held at 0.0.
+    ("market_vol_vix_anchor", 22.0, False),
     ("mispricing_half_life_days", 10.0, True),
     ("momentum_theta", 0.5, True),
     ("mispricing_cap", 0.001, True),
@@ -262,8 +274,21 @@ PERTURBATIONS = [
     ("jump_intensity_market", 1.0, True),   # live since pt-v10 turned this mechanism on
     ("jump_intensity_idio", 1.0, True),   # live since pt-v10 turned this mechanism on
     ("jump_mean_market", -0.05, True),  # was False; the burn-in reaches it (see above)        # needs an occurrence
-    ("jump_sigma_market", 0.05, False),        # needs an occurrence
-    ("jump_sigma_idio", 0.05, False),          # needs an occurrence
+    # The two SIZES went live at 0.8.0, and NOT through an occurrence: the
+    # probe still fires no jump, and the jump attribution over the three days
+    # is uniform across the roster and equals the compensator exactly. A jump
+    # size is a second moment of the index's conditional variance
+    # (`market/index_var.rs`: `lambda (mu^2 + sig^2) - (lambda mu)^2` for the
+    # market arm, `weight_sq lambda_i sigma^2` for the idio one), and under
+    # `vix_level_identity` that variance IS the VIX -- both the anchor derived
+    # at construction and the read-back taken each day. So the size moves the
+    # fear channel with nothing having happened. Measured: 0.05 takes the
+    # derived anchor from 20.81 to 31.47 and the VIX from 22.02 to 33.47 on
+    # the market arm, 20.81 to 20.21 and 22.02 to 21.42 on the idio one.
+    # Inert again with the identity held at 0.0, which is why "needs an
+    # occurrence" was right for every preset before pt-v19.
+    ("jump_sigma_market", 0.05, True),
+    ("jump_sigma_idio", 0.05, True),
     # Whether herding continues a jump. Inert for the same reason as the
     # sizes above and one more: at the default preset no jump ever fires, so
     # there is nothing for the share to withhold from the momentum term.
@@ -302,22 +327,77 @@ PERTURBATIONS = [
     # the gate moves nothing. Shown live by
     # `test_the_crisis_threshold_acts_above_itself`.
     ("vix_mean_reversion", 0.30, True),
-    ("vix_realised_vol_weight", 0.5, True),
+    # INERT UNDER THE IDENTITY, for the reason the identity exists. The blend
+    # this weight controls mixes the phase anchor with the realised read-back,
+    # and under `vix_level_identity` the read-back IS the whole target, so
+    # there is nothing left to blend it with: the branch in
+    # `economy/daily.rs` is guarded on `!identity_level` and is not taken, and
+    # the dial's only other read sits in the same dead `else` chain. Measured:
+    # not one column moves, and the VIX path is bit-identical. Live on any
+    # preset with the identity off.
+    ("vix_realised_vol_weight", 0.5, False),
     # The LEVEL identity, and it moves the market on its own: the VIX's
     # whole target becomes the index's conditional variance in points,
     # which the macro chain reads every day and the market reads back
     # through the factor's variance target the same day.
-    ("vix_level_identity", 1.0, True),
-    # The premium is a multiplier on that level and is NOT read while
-    # the identity above is 0.0, which is this probe's default. Inert
-    # for the same reason `vix_target_shock_cap` is: the branch that
-    # reads it is not taken. Shown live by
-    # `test_the_premium_moves_the_level_once_the_identity_is_on`.
-    ("vix_variance_premium", 0.5, False),
-    ("vix_cycle_amplitude", 1.0, True),     # perturbed AWAY from the default, which is 0.0 since the 2026-08-26 boundary
-    ("vix_return_source", 0.0, True),        # perturbed AWAY from the default, which is 1.0 since pt-v10
+    #
+    # 0.0, not 1.0: pt-v19 SHIPS this at 1.0, so perturbing TO it reproduces
+    # the default and the vector fingerprints as `pt-v19` rather than
+    # `custom-`, which fails the assertion below for a reason that has
+    # nothing to do with the parameter. It is the same class of thing the
+    # pt-v3 note in the test body below records, and the same hazard
+    # `market_beta_down_asym_recentre` carries its own warning about.
+    # The interior has no reading either: the dial is a switch,
+    # tested `!= 0.0` at all six of its read sites, so 0.5 and 2.0
+    # fingerprint as custom and then run the default's trajectory bit for
+    # bit. Turning it OFF is the only other admissible value, the way
+    # `cycle_stationary_opening` is perturbed to its only other one, and it
+    # does not land on pt-v18, which differs in three further dials.
+    # Measured: the derived anchor goes 20.8139 to 15.9843 and the VIX 22.02
+    # to 15.40, nine columns and 2.3e-1 of a price at the widest name.
+    ("vix_level_identity", 0.0, True),
+    # LIVE UNDER THE IDENTITY, and the old reason -- "the branch that reads
+    # it is not taken" -- is now the exact opposite of the truth. The premium
+    # is read at BOTH identity sites, the anchor derived at construction and
+    # the read-back taken each day, and at neither of them off it. It does
+    # NOT cancel out of the couplings' ratio, which is the reading a first
+    # draft of this entry expected: the VIX is a STATE reverting toward the
+    # target at `vix_mean_reversion` from wherever the burn-in left it, with
+    # additive noise, a premium-free zero-mean correction and a clamp, and
+    # nothing in that path is scale free. Measured on the probe: VIX/anchor
+    # is 1.070619 at the shipped 0.252 and 1.056882 at 0.5, and the anchor
+    # moves 20.81 to 24.94.
+    ("vix_variance_premium", 0.5, True),
+    # INERT UNDER THE IDENTITY: the amplitude scales the phase table around
+    # its mean, and under `vix_level_identity` the target's first branch is
+    # taken and the phase table is never read at all -- the business cycle
+    # reaches the VIX through the variance processes or not at all. Those two
+    # arms are the dial's only read sites in the crate. Perturbed AWAY from
+    # the shipped value all the same, so the entry proves the wiring the
+    # moment a preset turns the identity off.
+    ("vix_cycle_amplitude", 1.0, False),
+    # INERT UNDER THE IDENTITY, which does not read it: the zero-mean
+    # correction is sized against the SESSION's own conditional sigma, so the
+    # identity always drives on the day's return and the source's blend is
+    # never evaluated. Its other read is a guard that computes the day return
+    # when EITHER the source or the identity is on, so under the identity the
+    # day return is computed whatever the source says. Still perturbed AWAY
+    # from the default of 1.0, so it reads live the moment the identity is
+    # off.
+    ("vix_return_source", 0.0, False),
     ("vix_return_gain", 150.0, True),         # the channel reads the day since pt-v10, and the harness's days fall
-    ("vix_return_gain_up", 60.0, False),     # needs an UP day; under this default the channel reads the DAY and the harness's three sessions fall
+    # LIVE UNDER THE IDENTITY, and through the day-INDEPENDENT read rather
+    # than the up-day one. `expected_return_spike` is subtracted from the
+    # target every day under `vix_level_identity`, and at the linear exponent
+    # it is `0.5 (gain - gain_up) sigma (2/sqrt(2 pi))`: pt-v19 ships both
+    # gains at 17.0, so the correction is exactly 0.0 at the default and
+    # perturbing either half makes it non-zero on the first day of the
+    # burn-in. Measured: at 60.0 the VIX at the first close goes 22.2838 to
+    # 63.0661, and that day FALLS, so no up session is involved. The old
+    # reason is kept because it is what makes this inert off the identity:
+    # the up branch of `return_spike_for` needs an up day, and the harness's
+    # three sessions fall.
+    ("vix_return_gain_up", 60.0, True),
     # The exponent bends the response the gain scales. It moves the market
     # for the same reason the gain does -- the channel reads the day and
     # the harness's three sessions fall -- and it is perturbed AWAY from
@@ -329,14 +409,32 @@ PERTURBATIONS = [
     ("inflation_ceiling", 10.0, False),       # binds only when inflation reaches 6%
     ("inflation_floor", -3.0, False),         # binds only when inflation reaches -1%
     ("inflation_reversion", 0.15, True),  # was False; the burn-in reaches it (see above)      # monthly; reaches prices via the bond yield at the first meeting (day 45)
-    ("crisis_vix_threshold", 18.0, False),     # needs VIX above the gate
+    # LIVE at 0.8.0, and NOT because the gate moved -- because the VIX did.
+    # The derived anchor runs the probe at 21.79 to 22.28 instead of pt-v18's
+    # 15.58 to 15.73, so a gate at 18.0 is now crossed and the crisis blend
+    # fires. The reason is the probe's own range rather than the wiring, and
+    # a ladder says so: 18.0 moves nine columns and 1.21 of a price, 21.0
+    # moves 0.68, and 22.5, 25.0 and 30.0 move nothing at all. The shipped
+    # threshold is still out of the probe's reach, which is why the crisis
+    # BLEND's own dials above still read inert.
+    ("crisis_vix_threshold", 18.0, True),
     ("jump_vix_coupling", 1.0, True),  # was False; the burn-in reaches it (see above)
     ("crisis_blend_gain", 2.0, False),
     # Was inert with reason "sigma ships at 0.0, so alone this generates
     # zero-impact news". True since pt-v11 put sigma at 0.03 and pt-v12 made
     # it the default, so raising the rate now moves the market on its own.
     ("endogenous_news_intensity", 0.25, True),
-    ("endogenous_news_sigma", 0.05, False),      # the other half of the pair: no events exist to carry an impact until intensity is non-zero
+    # LIVE at 0.8.0, and the old reason is still true of the EVENT path: the
+    # probe's news uniforms deliver no event, and the `company_news`
+    # attribution is exactly 0.0 for every one of the ten names. What changed
+    # is that a news SIGMA is also a term of the index's conditional variance
+    # (`market/index_var.rs`: `weight_sq * intensity * sigma^2`), and under
+    # `vix_level_identity` that variance IS the VIX. So the dial reaches the
+    # market as a second moment without a single event occurring: 0.05 takes
+    # the derived anchor from 20.81 to 23.63 and the VIX from 22.02 to 24.80.
+    # Inert again with the identity off, which is the whole of the pairing
+    # this entry used to describe.
+    ("endogenous_news_sigma", 0.05, True),
     ("news_peer_vix_coupling", 4.0, False),      # multiplies a peer weight that is zero on every preset, and a crisis spike the harness never reaches
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
@@ -550,13 +648,19 @@ PERTURBATIONS = [
     # they move nine columns and 2.410e-3. The dial is wired; the probe is
     # calm.
     ("vix_ceiling", 40.0, False),
-    # A constant added to the VIX target, shipped at 0.0. It reaches the VIX
-    # the same day and the VIX feeds the market factor's variance the same
-    # day, so unlike its neighbours it needs no partner and no branch: at
-    # 0.5 it moves seven columns and 2.028e-3 of a price at the widest name.
-    # Neither dial takes a draw, so `draws_consumed` is unmoved for both and
-    # neither belongs in ECONOMY_STREAM_MOVERS below.
-    ("vix_target_offset", 0.5, True),
+    # A constant added to the VIX target, shipped at 0.0. INERT UNDER THE
+    # IDENTITY, and superseded by it rather than merely gated: the offset was
+    # a number FITTED to cancel the standing excursion an asymmetric gain
+    # injects over a zero-mean return, and pt-v19 subtracts that excursion's
+    # own closed form instead, sized each day off the index's conditional
+    # sigma (`economy/daily.rs`, `expected_return_spike`). The branch that
+    # adds the dial is guarded on `!identity_level` and is not taken; it is
+    # the dial's only read site. Its old measurement stands for the presets
+    # that do read it: on pt-v18 at 0.5 it moves seven columns and 2.028e-3
+    # of a price at the widest name. Neither dial takes a draw, so
+    # `draws_consumed` is unmoved for both and neither belongs in
+    # ECONOMY_STREAM_MOVERS below.
+    ("vix_target_offset", 0.5, False),
     # -- forced flow ---------------------------------------------------------
     # Gated twice, which is why all five read inert here. `forced_flow_gain`
     # ships at 0.0, so the mechanism is off; and `forced_flow_threshold`
@@ -1351,6 +1455,21 @@ def test_run_scenario_and_compare_run_the_model():
     assert result["exact"] is True
 
 
+def _direct(seed, model=None):
+    """`run_many`'s own loop, run in this process, for one seed.
+
+    Same construction and the same single session the runner performs, so its
+    `draws_consumed` is the runner's row to the draw -- asserted below rather
+    than assumed.
+    """
+    kwargs = {} if model is None else {"model": model}
+    engine = tradefloor.Engine(seed=seed, universe=SMALL, **kwargs)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 30)
+    engine.close_market()
+    return engine
+
+
 def test_run_many_runs_the_model_and_stamps_every_row():
     kwargs = dict(universe=SMALL, days=1, ticks=30, collect="summary")
     default = tradefloor.run_many([1, 2], **kwargs)
@@ -1360,8 +1479,35 @@ def test_run_many_runs_the_model_and_stamps_every_row():
     for before, after in zip(default, custom):
         assert after["model_fingerprint"] == CUSTOM.fingerprint
         assert after["prices"] != before["prices"]
-        # The CRN guard, through the runner: same seed, same schedule.
-        assert after["draws_consumed"] == before["draws_consumed"]
+
+    # The CRN guard, through the runner -- and PER STREAM, for the reason
+    # `market_state` at the top of this file gives at length. The summary row
+    # carries only the TOTAL, and the total mixes the market schedule, which
+    # no preset member may move, with the 755-day burn-in's economy draws,
+    # which a model that changes the macro path legitimately does move. Under
+    # `vix_level_identity` a variance dial IS a macro dial: CUSTOM's
+    # `market_factor_sigma` at 0.03 reaches the derived anchor through the
+    # index's unconditional variance and takes it from 20.21 to 42.56, the
+    # burn-in's VIX with it, and three more state-dependent macro draw sites
+    # therefore fire. Measured: 9098/9099 against 9101, entirely in the
+    # economy stream. This test read the total until 0.8.0 and asserted the
+    # market claim on a number that had stopped being it; `market_state` was
+    # given the same correction at 0.7.0 and the runner did not inherit it.
+    #
+    # The row has no per-stream field, so the comparison runs on engines
+    # built the way the runner builds them -- checked against the runner's
+    # own rows first, so this measures the runner rather than replacing it.
+    for seed, before, after in zip([1, 2], default, custom):
+        plain, perturbed = _direct(seed), _direct(seed, CUSTOM)
+        assert plain.draws_consumed == before["draws_consumed"], (
+            "the in-process loop stopped reproducing the runner's row, so "
+            "the stream comparison below is no longer about run_many")
+        assert perturbed.draws_consumed == after["draws_consumed"]
+        assert (dict(perturbed.draws_by_stream())["market"]
+                == dict(plain.draws_by_stream())["market"]), (
+            "the model moved the MARKET draw schedule, which no preset "
+            "member may")
+
     # The model survives the crossing into worker threads.
     threaded = tradefloor.run_many([1, 2], **kwargs, model=CUSTOM, workers=2)
     assert [r["prices"] for r in threaded] == [r["prices"] for r in custom]

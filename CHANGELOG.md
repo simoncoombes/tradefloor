@@ -18,7 +18,93 @@ it had claimed to since 2026-09-05, and `loss.rule_fingerprint` moves at
 both horizons: a score taken before this change is not comparable with one
 taken after it.
 
+**The default preset moves to pt-v19.** Every seeded trajectory changes, so
+a run that did not name a preset will not replay against earlier versions.
+Naming a preset still replays exactly, and every preset from pt-v1 on stays
+selectable.
+
+**pt-v19 holds every certified row on one ruler**, fourteen of fourteen at
+both horizons and both holdout blocks, and sits at the tape's centre on
+fourteen of fourteen mechanism rows where pt-v18 sits at twelve.
+
 <!-- release-note-ends -->
+
+**pt-v19 is pt-v18 with four dials, each measured.** `vix_level_identity`
+1.0 and `vix_decay_ratio` 1.0 make the VIX read the index's own conditional
+variance instead of the market factor's through a wrong conversion;
+`sector_loading` 0.8 pays for what that does to same-sector correlation;
+`volume_idio_variance_gain` 0.20 switches on a per-name volume-variance
+channel that had shipped at zero since it was written.
+
+**The deep fear row is the change.** `fear_gauge_dn3` reads the tape's
+centre within a tenth of a standard error, where pt-v18 sat 3.8 below it
+and passed its band at the ninth percentile.
+
+**The crisis lever falls from 6.53x to 5.28x**, which follows from the VIX
+reading a level it was not reading before.
+
+**`metadataSha256` does not move at this boundary.** pt-v19 carries
+pt-v18's mispricing and crowd coefficients, so the vector `model_preset()`
+reports is unchanged while the simulated one is not.
+
+**The fear response still flattens at 2.647 per cent of session return**,
+and no dial reaches it: `FLATTENS_AT` declares pt-v19 at the same point as
+pt-v16 and pt-v18, bound by the cap, while the tape keeps rising past it.
+The mechanism is recorded in the design repository as work the preset does
+not do.
+
+**Five dials leave the default's live surface and six join it.** Under
+`vix_level_identity` the VIX is derived from the index's conditional
+variance rather than declared, so `market_vol_vix_anchor`,
+`vix_realised_vol_weight`, `vix_cycle_amplitude`, `vix_return_source` and
+`vix_target_offset` are no longer read at all: the anchor is computed, the
+phase table is left unconsulted, the read-back has nothing to blend with,
+the identity always drives on the day's return, and the fitted offset gives
+way to the closed form it was fitted to approximate. Each is live
+again on any preset with the identity off, and every one stays settable.
+Going the other way, `jump_sigma_market`, `jump_sigma_idio` and
+`endogenous_news_sigma` now move the market with no jump and no news event
+occurring, because a size is a second moment of the variance the VIX reads;
+`vix_variance_premium` and `vix_return_gain_up` are read where they were
+not; and `crisis_vix_threshold` is reachable at values the old anchor put
+out of range. `tests/test_model_params.py` carries the traced reason for
+each, and the design repository holds the note.
+
+**The VIX anchor is now roster-dependent, and a short run opens above it.**
+pt-v18 anchored every market at 15.98 whatever it held. pt-v19 derives the
+anchor from the roster's own unconditional variance, so a forty-name market
+anchors near 18.7 to 20.2 and a six-name one near 25.4, and the VIX opens
+above the anchor and decays toward it over fifteen to twenty sessions:
+measured at seed 42, a forty-name roster opens at 19.8 and reads 13.7 by
+day ten, and a six-name roster opens at 36.4 against pt-v18's 16.6. Over
+252 and 504 days, which is where the preset was certified, that opening is
+a few per cent of the sample and the mean sits well under the anchor. Over
+five or twelve days it is the whole sample. A study on a small roster or a
+short horizon should expect a more volatile market than pt-v18 gave it,
+and three of the re-measurements in this release are that effect.
+
+**A dial that changes the index's variance now changes the macro path.**
+The derived anchor sits in front of the 755-day burn-in, and the macro
+chain draws at state-dependent sites, so such a dial moves the economy
+stream's draw count. The MARKET stream is unmoved, which is the schedule a
+preset member may never displace, and the suite now asserts that stream in
+`run_many` as well as in the parameter probe.
+
+**The integration scorecard table is re-measured** on pt-v19, and the
+rate-shock demo's attribution check is asserted on its two channels rather
+than on a still control: the agent's volatility channel is non-zero on 36
+of 179 steps under pt-v18 and pt-v19 alike, and the fork step happened to
+land in the quiet majority on one and not the other. Both arms read the
+same volatility excess at the fork, so it cancels and the difference in
+target exposure is the rate move.
+
+**Five committed agent recordings do not replay against this default** and
+are not re-recorded here: `callable`, `langgraph`, `pydantic_ai`,
+`openai_agents` and `finrobot`. A recording is keyed by a digest of the
+exact observation the model was sent, every price in it moved, and
+re-recording is a live run against a provider rather than an edit to a
+file.
+
 
 ## 0.7.1
 

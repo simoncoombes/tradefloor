@@ -41,7 +41,7 @@ SCHEMA = 1
 #: holding an old result actually asks.
 DEFAULT_SINCE = {
     "pt-v3": "0.1.0", "pt-v10": "0.2.0", "pt-v12": "0.3.0",
-    "pt-v14": "0.4.0", "pt-v16": "0.6.0", "pt-v18": "0.7.0",
+    "pt-v14": "0.4.0", "pt-v16": "0.6.0", "pt-v18": "0.7.0", "pt-v19": "0.8.0",
 }
 
 

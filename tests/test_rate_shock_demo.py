@@ -123,15 +123,52 @@ def test_the_shocked_arm_is_not_the_control(run):
 # ---------------------------------------------------------------------------
 
 def test_the_agent_cuts_risk_on_the_step_the_rate_moves(run):
+    """The attribution claim, asserted on the two channels rather than on a
+    still control.
+
+    This read `after_control == before` until 0.8.0, and that equality was a
+    COINCIDENCE rather than the property it was standing in for. The agent
+    has two ways to cut: the rate channel, which only the shocked arm sees,
+    and the volatility channel, a ratio of a 12-step window to a 60-step one
+    that both arms compute from the SAME price history up to the fork.
+    Measured over the branch on both presets: the volatility channel is
+    non-zero on 36 of the 179 steps with a full slow window -- 20 per cent,
+    and the SAME 36-of-179 on pt-v18 and on pt-v19. The fork lands on step
+    120. On pt-v18 that step fell in the quiet 80 per cent and the control
+    read exactly 0.95; on pt-v19 it falls in the busy 20 per cent and the
+    control reads 0.9416. Nothing about the agent, the demo or the
+    attribution changed -- the old assertion was resting on which side of a
+    one-in-five split one particular step happened to land.
+
+    So assert the thing that is actually load-bearing. At the fork the two
+    arms differ in the policy rate and in nothing else, so their volatility
+    channels are equal and CANCEL: the whole difference in target gross is
+    the intervention. That is a stronger statement than a still control, and
+    it holds on every preset rather than on the ones whose step 120 was
+    quiet.
+    """
     world, control, shock, _agreement = run
     fork = world.step
     before = control.trace[fork - 1]["decision"]["gross"]
-    after_control = control.trace[fork]["decision"]["gross"]
-    after_shock = shock.trace[fork]["decision"]["gross"]
+    at_control = control.trace[fork]["decision"]
+    at_shock = shock.trace[fork]["decision"]
+    after_control, after_shock = at_control["gross"], at_shock["gross"]
 
-    assert after_control == before, (
-        "the control's target moved at the fork, so the shocked arm's move "
-        "cannot be attributed to the intervention")
+    assert at_control["tightening_bps"] == 0, (
+        f"the control read {at_control['tightening_bps']}bp of tightening; "
+        "its rate was not supposed to move at all")
+    assert at_control["vol_excess"] == at_shock["vol_excess"], (
+        f"the arms read different volatility excess at the fork "
+        f"({at_control['vol_excess']} against {at_shock['vol_excess']}), so "
+        "the second channel no longer cancels and the difference in gross "
+        "cannot be attributed to the rate alone")
+    # The control may move on the shared channel, and must not move MUCH: a
+    # control that de-risked materially of its own accord would leave the
+    # comparison measuring two things even with the channel equalised.
+    assert after_control >= before * 0.98, (
+        f"the control cut gross from {before:.3f} to {after_control:.3f} "
+        "without a rate move, which is more than the volatility channel "
+        "should carry across one step")
     assert after_shock < before * 0.75, (
         f"the shocked arm cut gross exposure from {before:.3f} to "
         f"{after_shock:.3f}, which is not the material de-risking the demo "

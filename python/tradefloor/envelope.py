@@ -10,7 +10,7 @@ Two things live here, and neither is a score.
 **Per-statistic intervals** (`intervals`). Every panel statistic is reported
 with the spread it actually has across seeds, not as a bare median. A point
 estimate from a stochastic simulator invites a precision it does not have:
-`abs_return_acf20` reads +0.0096 at the shipped preset, and the across-seed
+`abs_return_acf20` reads +0.0087 at the shipped preset, and the across-seed
 range is wide enough that a single seed can read either side of zero. The
 band distance is reported in units of that spread, which is the same
 weighting `tradefloor.loss` uses -- so "how far out" is denominated in the
@@ -66,7 +66,7 @@ from .facts import (CERTIFIED_HORIZON_DAYS, REAL_MARKETS, SEED_SD,
                     SEED_SD_504, band_distance)
 
 #: The preset these measurements describe.
-PRESET = "pt-v18"
+PRESET = "pt-v19"
 
 #: The measurement horizon the envelope certifies, in trading days.
 #: Not a soft preference, though the reason is no longer a band count: since
@@ -77,8 +77,8 @@ PRESET = "pt-v18"
 #:
 #: The old reason -- that the thinnest 504-day row cleared its ceiling by
 #: only 0.11 -- no longer applies: `annualised_vol_pct` read 33.89 under
-#: pt-v12, 30.24 under pt-v14, 28.12 under pt-v16 and 25.40 under pt-v18,
-#: against the same 34.0 ceiling throughout. The
+#: pt-v12, 30.24 under pt-v14, 28.12 under pt-v16, 25.40 under pt-v18 and
+#: 23.81 under pt-v19, against the same 34.0 ceiling throughout. The
 #: horizon stays 252 because that is where the certification was measured,
 #: not because 504 is fragile.
 #:
@@ -120,24 +120,24 @@ PRESET = "pt-v18"
 #: certified separately: a green panel means the fourteen shape rows are in
 #: band, and the level and crisis rows are reported beside them with their
 #: own verdicts. Those verdicts were red at every default through pt-v16 and
-#: are green at pt-v18; the split is a statement about PROTOCOL, not about
+#: green at pt-v18 and pt-v19; the split is a statement about PROTOCOL, not about
 #: failure, and it stays whichever way the verdicts read. A row the default
 #: preset fails is never widened to pass and never folded into this count.
 CERTIFIED: dict[str, float] = {
-    "annualised_vol_pct": 24.6973,
-    "excess_kurtosis": 9.1013,
-    "return_acf1": 0.0022,
-    "abs_return_acf1": 0.0529,
-    "abs_return_acf5": 0.0270,
-    "abs_return_acf20": 0.0079,
-    "cross_sectional_corr": 0.3400,
-    "volume_abs_return_corr": 0.5187,
-    "leverage_effect": -0.0362,
-    "volume_change_acf1": -0.2799,
-    "corr_asymmetry": 0.0168,
-    "corr_asymmetry_lagged": 0.1024,
-    "sector_excess_corr": 0.1387,
-    "corr_persistence_acf1": 0.2220,
+    "annualised_vol_pct": 23.4722,
+    "excess_kurtosis": 9.3555,
+    "return_acf1": -0.0058,
+    "abs_return_acf1": 0.0625,
+    "abs_return_acf5": 0.0301,
+    "abs_return_acf20": 0.0087,
+    "cross_sectional_corr": 0.2928,
+    "volume_abs_return_corr": 0.5022,
+    "leverage_effect": -0.0451,
+    "volume_change_acf1": -0.2718,
+    "corr_asymmetry": 0.0050,
+    "corr_asymmetry_lagged": 0.0998,
+    "sector_excess_corr": 0.1635,
+    "corr_persistence_acf1": 0.2490,
 }
 
 #: The LEVEL rows the default preset reads at the certified horizon,
@@ -145,31 +145,34 @@ CERTIFIED: dict[str, float] = {
 #: 130, 252 days, the roster varying WITH the seed, because a level that
 #: describes the MODEL cannot be measured on one draw (`facts.AGGREGATE`).
 #:
-#: Measured 2026-09-08 for the 0.7.0 boundary, on the box run
-#: `ptv18level2`, at the pin that puts the burn-in's macro calendars back on
-#: the caller's clock. The run before it (`ptv18level1`) measured a pt-v18
-#: whose central bank and OPEC arm were inert across this whole window.
+#: Measured 2026-09-10 for the 0.8.0 boundary, on the box run
+#: `ptv19level`, with the preset NAMED rather than composed from overrides:
+#: the same vector had been certified as `cert-fourdial` on `cert4b` two
+#: days earlier, and the named preset reproduced every one of those
+#: readings to four places, which is the check that nothing reads a
+#: preset's name where it should read its vector.
 #:
 #: The outgoing default was measured on the same build, the same protocol
 #: and the same seeds in the same run, and reproduced the four constants
 #: this module published for it to all four printed places, so these
 #: readings replace those on one ruler rather than beside another.
-#: `python/tradefloor/presets/pt-v18.json` carries both under
+#: `python/tradefloor/presets/pt-v19.json` carries both under
 #: `level_protocol`, and `tests/test_preset_records.py` binds this table to
-#: it -- the binding `DECAY_252` below still does not have.
+#: it -- the binding `DECAY_252` below still does not have. The table
+#: itself is WRITTEN from that record by `tools/presets/envelope_tables.py`
+#: rather than typed, since 0.8.0.
 #:
 #: The protocol is part of the number and not a detail of it: pt-v16 read
 #: -13.6431 with the roster varying against +1.9740 with it held, a gap of
 #: 15.6 points on one preset, because a drawn roster opens away from fair
 #: value by a draw worth several points of first-year drift.
 CERTIFIED_LEVEL: dict[str, float] = {
-    # The default preset RETURNS 5.80 per cent a year, inside a band of 2.90
-    # to 11.90 at band position 0.32, on a thirty-seed standard error of
-    # 1.18 -- so 2.45 standard errors above the floor rather than merely on
-    # the right side of it. pt-v16 read -13.6431 and was held red here for
-    # three eras; this row exists because of that, and pt-v18 is the first
-    # default to hold it.
-    "index_drift_pct": 5.7957,
+    # The default preset RETURNS 6.52 per cent a year, inside a band of 2.90
+    # to 11.90 at band position 0.40, on a thirty-seed standard error of
+    # 1.15 -- so 3.15 standard errors above the floor. pt-v18 read 5.7957 at
+    # position 0.32; pt-v16 read -13.6431 and was held red here for three
+    # eras, and this row exists because of that.
+    "index_drift_pct": 6.5177,
 }
 
 #: The CRISIS rows, reserved for the fear gauge and the index tail, measured
@@ -182,39 +185,44 @@ CERTIFIED_LEVEL: dict[str, float] = {
 #: it asserted "held red" here until 0.7.0, which was true of every default
 #: through pt-v16 and would have been a false statement the day one held.
 CERTIFIED_CRISIS: dict[str, float] = {
-    # The -1 per cent row reads 1.5834 in a band of 0.70 to 4.03, at band
-    # position 0.27. pt-v16 read 0.9500 at position 0.09 -- inside, and six
-    # standard errors below centre, which is the reading that made a count
-    # of rows-in-band an insufficient answer. This is further from the floor
-    # and still below centre, and it is a pass rather than evidence that the
-    # small-session response is right.
+    # The -1 per cent row reads 2.4353 in a band of 0.70 to 4.03, at band
+    # position 0.52, 0.22 below a centre of 2.66. pt-v18 read 1.5834 at
+    # position 0.27 and pt-v16 0.9500 at 0.09 -- inside, and six standard
+    # errors below centre, which is the reading that made a count of
+    # rows-in-band an insufficient answer. This is the first default to read
+    # the row near its centre, and it is still a pass rather than evidence
+    # that the small-session response is right.
     #
-    # The -3 per cent row reads 3.2473 against a floor of 2.60, pooled over
-    # 119 sessions, at band position 0.09. pt-v16 read 1.9557 and was BELOW
-    # that floor. So this row moves from out of band to in, close to the
-    # edge: the saturating channel the fear cap creates is not fixed here,
-    # it is far enough off the floor to grade.
-    "fear_gauge_dn1": 1.5834,
-    "fear_gauge_dn3": 3.2473,
-    # The index tail row on the same thirty seeds: 119 sessions at or below
-    # -3 per cent in 7,530, a pooled rate of 1.5803 per cent against a band
+    # The -3 per cent row reads 5.8162, pooled over 118 sessions, at band
+    # position 0.46 -- 0.13 tape standard errors above the tape's pooled
+    # median of 5.73. pt-v18 read 3.2473 at position 0.09, close to the
+    # floor of 2.60; pt-v16 read 1.9557 and was BELOW it. The VIX level
+    # identity and the symmetric fall-rate are what moved it, and this is
+    # the row they were composed to move.
+    "fear_gauge_dn1": 2.4353,
+    "fear_gauge_dn3": 5.8162,
+    # The index tail row on the same thirty seeds: 118 sessions at or below
+    # -3 per cent in 7,530, a pooled rate of 1.5671 per cent against a band
     # of 0.47 to 1.96 and a tape centre of 1.213. IN band, at band position
-    # 0.75 -- nearer its CEILING than pt-v16's 1.2749 was. More crash
-    # sessions is the direction the era wanted and this row is the one that
-    # says when there are too many, so read the position and not the verdict.
+    # 0.74 -- where pt-v18 read 1.5803 at 0.75, so the four dials left this
+    # row where it was (paired over seeds, pt-v18 minus pt-v19 is +0.0133
+    # on a standard error of 0.1055). It is nearer its CEILING than its
+    # floor, and this row is the one that says when there are too many
+    # crash sessions, so read the position and not the verdict.
     #
-    # The three counts beside it, which the rate cannot see: 11 of 30 seeds
-    # hold no such session (the tape's 35 windows hold 13; pt-v16 held 15),
-    # 5 of 30 hold five or more (the tape 7, pt-v16 5), and the worst seed
-    # holds 39 (the tape 33, pt-v16 32). The mixture is closer to the tape's
-    # than pt-v16's at the zero end and heavier at the far end.
+    # The three counts beside it, which the rate cannot see: 14 of 30 seeds
+    # hold no such session (the tape's 35 windows hold 13; pt-v18 held 11),
+    # 3 of 30 hold five or more (the tape 7, pt-v18 5), and the worst seed
+    # holds 43 (the tape 33, pt-v18 39). More mass at zero than the tape and
+    # a heavier far end: two seeds carry a 2008 apiece.
     #
     # GRADED AND NOT COUNTED at this preset: `cycle_stationary_opening` is
     # 0.0, so every seed opens in expansion at phase age zero and this is
     # year one of a non-stationary opening. `envelope.tail_block` carries
-    # that as data beside the verdict. What this preset does in year two has
-    # not been measured; pt-v16's 2.500 per cent is pt-v16's.
-    "index_tail_dn3_pct": 1.5803,
+    # that as data beside the verdict. Year two IS measured for this preset,
+    # on the same seeds in the same run: 1.2989 per cent over 504 days,
+    # inside the same band, where pt-v16 read 2.500 and was high.
+    "index_tail_dn3_pct": 1.5671,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -297,41 +305,41 @@ RULERS_BY_HORIZON: dict[int, tuple[dict[str, tuple[float, float]],
 #: row was `annualised_vol_pct` at 33.89 against a ceiling of 34.0 -- 0.11 of
 #: room on a statistic whose seed spread is far wider, so the count was
 #: genuine but would have flipped on a change that barely moved the model.
-#: pt-v18 reads 25.40 there, 8.60 of room, having widened it at each of the
-#: 0.6.0 and 0.7.0 boundaries.
+#: pt-v19 reads 23.81 there, 10.19 of room, having widened it at each of the
+#: 0.6.0, 0.7.0 and 0.8.0 boundaries.
 #:
 #: The count is still MEASURED rather than certified: the certified horizon
 #: is 252 because that is where `CERTIFIED` was measured.
 MEASURED_504: dict[str, float] = {
-    "annualised_vol_pct": 25.4021,
-    "excess_kurtosis": 10.4101,
-    "return_acf1": 0.0018,
-    "abs_return_acf1": 0.0940,
-    "abs_return_acf5": 0.0435,
-    "abs_return_acf20": 0.0126,
-    "cross_sectional_corr": 0.3631,
-    "volume_abs_return_corr": 0.5705,
-    "leverage_effect": -0.0482,
-    "volume_change_acf1": -0.2644,
-    "corr_asymmetry": 0.0384,
-    "corr_asymmetry_lagged": 0.0843,
-    "sector_excess_corr": 0.1308,
-    "corr_persistence_acf1": 0.3113,
+    "annualised_vol_pct": 23.8123,
+    "excess_kurtosis": 10.4523,
+    "return_acf1": -0.0054,
+    "abs_return_acf1": 0.0812,
+    "abs_return_acf5": 0.0426,
+    "abs_return_acf20": 0.0123,
+    "cross_sectional_corr": 0.3008,
+    "volume_abs_return_corr": 0.5582,
+    "leverage_effect": -0.0550,
+    "volume_change_acf1": -0.2488,
+    "corr_asymmetry": 0.0261,
+    "corr_asymmetry_lagged": 0.1002,
+    "sector_excess_corr": 0.1558,
+    "corr_persistence_acf1": 0.3098,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
 #: The model crosses below real around lag 8 and goes NEGATIVE by lag 30,
 #: where real markets stay weakly positive out to lag 60.
 #:
-#: MEASURED UNDER pt-v14, and re-measured for neither pt-v16 nor pt-v18.
-#: Every other constant in this module moved to the new default at 0.6.0 and
-#: again at 0.7.0; this curve, the slope below and the `decay-shape` gap that
+#: MEASURED UNDER pt-v14, and re-measured for none of pt-v16, pt-v18 and
+#: pt-v19. Every other constant in this module moved to the new default at
+#: 0.6.0, 0.7.0 and 0.8.0; this curve, the slope below and the `decay-shape` gap that
 #: quotes them did not, because re-deriving them is a ten-lag measurement and
 #: the certification panel carries three of those lags. A single seed at lag
 #: twenty reads +0.0221 under pt-v16 against -0.0071 under pt-v14, so the
 #: shape has narrowed and the numbers here understate it.
 #:
-#: This is now TWO defaults stale and it is stated rather than fixed, which
+#: This is now THREE defaults stale and it is stated rather than fixed, which
 #: is a decision and not an oversight. What would fix it: a ten-lag |return|
 #: autocorrelation run on `facts.LEVEL_PROTOCOL` at thirty seeds, which is a
 #: box job. What must NOT fix it: `atlas_survey.decay_slope` fits the same
@@ -408,15 +416,15 @@ GAPS: tuple[Gap, ...] = (
         summary="the certified horizon is 252 days",
         detail=(
             "Against bands re-derived at the matching window, the shipped "
-            "pt-v18 holds ALL FOURTEEN at 504 days, as pt-v16, pt-v14 and "
-            "pt-v12 did before it. pt-v12 was the first to manage it: pt-v3 "
-            "held 7 there and pt-v10 held 13.\n\n"
+            "pt-v19 holds ALL FOURTEEN at 504 days, as pt-v18, pt-v16, "
+            "pt-v14 and pt-v12 did before it. pt-v12 was the first to manage "
+            "it: pt-v3 held 7 there and pt-v10 held 13.\n\n"
             "So why is the horizon still 252? Two reasons, and the band "
             "count is neither. First, headroom -- though this reason has "
             "weakened: under pt-v12 annualised_vol_pct read 33.89 against a "
             "band ending at 34.0, only 0.11 of room on a statistic whose "
-            "seed spread is many times that. pt-v18 reads 25.40 there, "
-            "which is 8.60 of room, so the fourteenth row is no longer "
+            "seed spread is many times that. pt-v19 reads 23.81 there, "
+            "which is 10.19 of room, so the fourteenth row is no longer "
             "thin. Second and now decisive on its own, "
             "CERTIFIED is what this module certifies and it is measured at "
             "252 days on thirty seeds. The 504-day table is measured, not "
@@ -517,18 +525,22 @@ GAPS: tuple[Gap, ...] = (
             "The expected size of a scenario\'s response is calibrated; "
             "the dispersion around it is not. That is the gap now.\n\n"
             "The steady-state lever -- how much more violent a sustained "
-            "crisis is than a calm market -- reads 6.53x on pt-v18 against "
+            "crisis is than a calm market -- reads 5.28x on pt-v19 against "
             "real markets\' 6.16x, measured from a held VIX 5 to a held VIX "
             "65 on the certified 40-name roster over 252 days at thirty "
-            "seeds. pt-v16 read 6.23x there, pt-v14 6.18x, pt-v10 5.05x, "
-            "and the default before it 3.07x. "
+            "seeds. pt-v18 read 6.53x there, pt-v16 6.23x, pt-v14 6.18x, "
+            "pt-v10 5.05x, and the default before it 3.07x. "
             "This gap opened by saying the VIX shock response was materially "
-            "weaker than the previous preset\'s; every preset since pt-v11 "
-            "has been stronger than the one before it, so that sentence is "
-            "WITHDRAWN. What replaces it is an OVERSHOOT rather than a "
-            "shortfall: pt-v18 sits 5.9 per cent above real where pt-v16 sat "
-            "1.1 per cent above, so the lever is the one row on this panel "
-            "the new default reads FURTHER from real than the old one.\n\n"
+            "weaker than the previous preset\'s, and that sentence was "
+            "WITHDRAWN when every preset from pt-v11 to pt-v18 read stronger "
+            "than the one before it. It is TRUE AGAIN at pt-v19, by "
+            "mechanism rather than by accident: the VIX level identity reads "
+            "the market\'s variance target against a derived anchor rather "
+            "than the dial\'s, so a held VIX 65 is a smaller multiple of it. "
+            "pt-v19 sits 14.3 per cent BELOW real where pt-v18 sat 5.9 per "
+            "cent above, so the lever is again the one row on this panel the "
+            "new default reads FURTHER from real than the old one, and this "
+            "time as a shortfall.\n\n"
             "'Direction is right' is measured rather than asserted. Driving "
             "the real 2020-21 macro path through the model and correlating "
             "daily returns against each driver, over 504 sessions, against "
@@ -942,8 +954,8 @@ def check(
             # This read "about 0.3 seed-sd above the floor" until 2026-08-27,
             # which was right for the 8.26 pt-v10 measured at 504 days and
             # wrong for the 7.75 pt-v12 reads there: the room halved and the
-            # sentence did not move. Computed since, so neither pt-v14 nor
-            # pt-v16 moving it needed an edit here.
+            # sentence did not move. Computed since, so none of pt-v14,
+            # pt-v16, pt-v18 and pt-v19 moving it needed an edit here.
             room_sd = ((MEASURED_504["excess_kurtosis"]
                         - BANDS_504["excess_kurtosis"][0])
                        / SEED_SD_504["excess_kurtosis"])
@@ -1033,8 +1045,8 @@ def check(
             "EXPECTED size is calibrated: measured as a regression gain "
             "rather than a correlation, the three driver channels run within "
             "ten percent of real AAPL (§81), and the steady-state volatility "
-            "lever from VIX 5 to VIX 65 reads 6.23x on the shipped pt-v16 "
-            "against real markets' 6.16x, where pt-v14 read 6.18x. What is "
+            "lever from VIX 5 to VIX 65 reads 5.28x on the shipped pt-v19 "
+            "against real markets' 6.16x, where pt-v18 read 6.53x. What is "
             "not calibrated is the DISPERSION around that response: over the "
             "driven 2020-21 window the model's residual sd is 1.565x real, "
             "down from 1.76x at pt-v10 and still the worst axis in the "

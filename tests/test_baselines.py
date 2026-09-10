@@ -129,7 +129,24 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # margin at any swap so far, and the clearest reading yet of why this
     # comment keeps warning about that pair. The bottom pair swapped too.
     # The oracle has still never moved.
-    assert ranked == ["oracle", "momentum", "mean_reversion",
+    #
+    # Re-measured again at the 0.8.0 boundary that made pt-v19 the default:
+    # oracle +7.148%, mean_reversion +2.305%, momentum +2.235%,
+    # buy_and_hold -0.018%, random -1.103%. Momentum and mean-reversion
+    # swapped for the EIGHTH time, 0.070 points apart, which is the second
+    # narrowest margin at any swap and lands the pair back the way pt-v12
+    # had them. The bottom pair held and the oracle has still never moved.
+    #
+    # What moved the whole board is worth naming, because it is the same
+    # mechanism behind three other re-measurements at this boundary: under
+    # `vix_level_identity` the VIX anchor is DERIVED from the roster rather
+    # than read off a dial, and a derived anchor opens above where the VIX
+    # settles. On this roster it opens at 18.66 against pt-v18's flat 15.98
+    # and decays toward it over fifteen to twenty sessions. A five-day run
+    # lives entirely inside that opening window, so every agent here is
+    # graded on a market roughly a fifth more volatile than the one the
+    # preset was certified on at 252 and 504 days.
+    assert ranked == ["oracle", "mean_reversion", "momentum",
                       "buy_and_hold", "random"]
 
 
@@ -138,14 +155,33 @@ def test_random_trading_is_close_to_flat_over_a_short_run(scores):
     # much over five days, it just pays costs. Any strategy near this number
     # is measuring its own transaction costs.
     #
-    # The bound was 0.5% before the market-factor variance process; it is
-    # 1.0% since, because a random book now carries market beta that no
+    # The bound was 0.5% before the market-factor variance process, and 1.0%
+    # from there to 0.7.0, because a random book carries market beta that no
     # longer diversifies away -- the correlated share of every name is a
-    # third of its variance, so forty coin-flip positions keep a net
-    # exposure the factor's regimes move (measured -0.61% on this seed).
-    # The floor's meaning is relative anyway: an order of magnitude under
-    # the oracle's +8.78% on the same seed and horizon.
-    assert abs(scores["random"].return_pct) < 1.0
+    # third of its variance, so forty coin-flip positions keep a net exposure
+    # the factor's regimes move.
+    #
+    # 1.25% since 0.8.0, and the cause is NOT costs. Measured across twelve
+    # seeds (1, 2, 3, 5, 7, 11, 13, 17, 42, 99, 101, 2026) at this boundary:
+    # trade count is unchanged at about 1194, impact per trade FELL from a
+    # mean 8.89 bps to 7.47, and buy-and-hold is essentially unchanged
+    # seed-for-seed, so the market's direction did not move either. What
+    # moved is the mean: -0.305% to -0.423%, with the spread of |return|
+    # going 0.386% to 0.487% and its worst seed 0.869% to 1.103%. That is
+    # variance drag on an undiversified book in a window roughly a fifth
+    # more volatile -- the same mechanism that raised this bound once
+    # before, arriving by a different route. Under `vix_level_identity` the
+    # VIX anchor is DERIVED from the roster rather than read off a dial, and
+    # a derived anchor opens above where the VIX settles: 18.66 on this
+    # roster against pt-v18's flat 15.98, decaying toward it over fifteen to
+    # twenty sessions. A five-day run sits entirely inside that window.
+    #
+    # 1.25 and not the measured 1.103: a floor asserted at its own worst
+    # observed seed is a floor that fails on the thirteenth seed anybody
+    # tries. The floor's meaning is relative anyway -- an order of magnitude
+    # under the oracle on the same seed and horizon, which the ratio below
+    # measures properly across seeds.
+    assert abs(scores["random"].return_pct) < 1.25
 
     # The RATIO is measured across seeds, not on the fixture's one.
     #
