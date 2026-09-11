@@ -213,9 +213,9 @@ from ..render import JSONRenderer, Renderer, check_renderer
 from .common import (DECISION_SCHEMA_VERSION, MAX_PARTICIPATION, AdapterInfo,
                      DecisionError, FrameworkAdapter, FrameworkError,
                      IntegrationError, Transcript, check_prior,
-                     decision_model, digest, moment_of, refuse_replay_reask,
-                     replay_response, require, run_sync,
-                     stamp_resume_counts)
+                     decision_model, digest, moment_of, preset_of,
+                     refuse_replay_reask, replay_response, require, run_sync,
+                     stamp_preset, stamp_resume_counts)
 
 #: The rules of this market, appended to whatever the agent was already
 #: instructed. It says what the agent is for and what the market can execute.
@@ -447,10 +447,13 @@ class PydanticAIAdapter(FrameworkAdapter):
         if self.mode == "replay":
             # No framework import on this path, by construction: a recorded
             # run must replay with nothing installed. The instructions were
-            # checked at construction, so nothing here can refuse except a
-            # missing recording.
+            # checked at construction, so the only refusals reachable here
+            # are a missing recording and a recording made in a different
+            # market -- the preset cannot be checked at construction,
+            # because the market does not exist until the run does.
             return replay_response(self.transcript, key,
-                                   step=obs.step, day=obs.day)
+                                   step=obs.step, day=obs.day,
+                                   preset=preset_of(obs))
 
         try:
             output = self.call_or_resume(
@@ -475,6 +478,12 @@ class PydanticAIAdapter(FrameworkAdapter):
             if "instructions_digest" not in self.recorder.meta:
                 for field, value in self.provenance().items():
                     self.recorder.meta.setdefault(field, value)
+            # WHICH MARKET, which `provenance()` cannot know: it is built
+            # before any engine exists, and the observation is the first
+            # thing in this method that has one. Without it a recording
+            # cannot say why it stops replaying when the shipped preset
+            # next moves.
+            stamp_preset(self.recorder, obs)
             self.recorder.record({
                 "arm": self.arm, "step": obs.step, "day": obs.day,
                 "digest": key, "prompt": prompt,

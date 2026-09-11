@@ -197,8 +197,9 @@ from .._core import ValidationError
 from ..render import JSONRenderer, Renderer, check_renderer
 from .common import (MAX_PARTICIPATION, AdapterInfo, DecisionError,
                      FrameworkAdapter, check_prior, decision_model, digest,
-                     moment_of, refuse_replay_reask, replay_response,
-                     require, run_sync, stamp_resume_counts)
+                     moment_of, preset_of, refuse_replay_reask,
+                     replay_response, require, run_sync, stamp_preset,
+                     stamp_resume_counts)
 
 #: The PyPI distribution that installs the framework, and the Tradefloor
 #: extra that pulls it in: ``pip install "tradefloor[openai-agents]"``.
@@ -624,7 +625,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
 
         if self.mode == "replay":
             return replay_response(self.transcript, key, step=obs.step,
-                                   day=obs.day)
+                                   day=obs.day, preset=preset_of(obs))
 
         response = self.call_or_resume(key, lambda: self._run(items, obs))
         if self.recorder is not None:
@@ -640,6 +641,12 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
             if "instructions_digest" not in self.recorder.meta:
                 for field, value in self.provenance().items():
                     self.recorder.meta.setdefault(field, value)
+            # WHICH MARKET, which `provenance()` cannot know: it is built
+            # before any engine exists, and the observation is the first
+            # thing in this method that has one. Without it a recording
+            # cannot say why it stops replaying when the shipped preset
+            # next moves.
+            stamp_preset(self.recorder, obs)
             self.recorder.record({
                 "arm": self.arm, "step": obs.step, "day": obs.day,
                 "digest": key, "prompt": items, "response": response,

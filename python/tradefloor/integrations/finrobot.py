@@ -180,6 +180,11 @@ from .common import check_prior as _check_prior  # noqa: F401 -- parity
 from .common import moment_of, refuse_replay_reask  # noqa: F401
 from .common import digest as _digest_any
 from .common import stamp_resume_counts
+#: The preset guard, shared rather than reimplemented. This adapter keeps its
+#: own replay branch -- it predates `ReplayMixin` and its miss messages name
+#: FinRobot -- but which market a recording was made in is not a FinRobot
+#: question, and a second spelling of it is a second thing to get wrong.
+from .common import preset_of, refuse_a_changed_preset, stamp_preset
 from .common import jsonable as _as_jsonable
 
 #: The macro fields FinRobot is shown. Bound to ``counterfactual.MACRO_FIELDS``
@@ -821,6 +826,13 @@ class Transcript:
     the provider and model, the generation parameters and the mandate version.
     Replaying a transcript under a different mandate produces a different
     experiment, and ``meta`` is how a reader notices.
+
+    Since 0.8.0 it also records ``model_preset``, the fingerprint of the
+    simulation preset the recording was made against, stamped on the first
+    recorded exchange by
+    :func:`~tradefloor.integrations.common.stamp_preset`. The mandate and
+    the market are the two halves of the question FinRobot was asked, and
+    ``_refuse_a_changed_mandate`` guarded only the first of them.
     """
 
     __slots__ = ("meta", "entries", "_by_digest")
@@ -1312,6 +1324,13 @@ class FinRobotAdapter:
 
     def _ask(self, prompt: str, key: str, obs: Any) -> str:
         if self.mode == "replay":
+            # The market, before the digest. A moved preset moves every price
+            # the key is computed over, so it misses EVERY entry and the
+            # message below would blame the observation mapping or the
+            # mandate for something neither of them did. Shared with the
+            # other adapters rather than restated: which market a recording
+            # was made in is not a FinRobot question.
+            refuse_a_changed_preset(self.transcript, preset_of(obs))
             # `entry_for`, not `response_for`. The latter returns None both
             # for a missing entry and for an entry whose recorded response is
             # null, and the two have opposite remedies: one means the inputs
@@ -1361,6 +1380,10 @@ class FinRobotAdapter:
             if "instructions_digest" not in self.recorder.meta:
                 for field, value in self.provenance().items():
                     self.recorder.meta.setdefault(field, value)
+            # WHICH MARKET, which `provenance()` cannot know: it is built
+            # before any engine exists, and the observation is the first
+            # thing on this path that has one.
+            stamp_preset(self.recorder, obs)
             self.recorder.record({
                 "arm": self.arm, "step": obs.step, "day": obs.day,
                 "digest": key, "prompt": prompt, "response": response,

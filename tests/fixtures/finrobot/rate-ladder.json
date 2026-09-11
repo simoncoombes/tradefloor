@@ -21,7 +21,8 @@
     "decision_schema_version": "1",
     "decision_every_steps": 6,
     "max_participation": 0.02,
-    "unparseable_responses": 1
+    "unparseable_responses": 1,
+    "model_preset": "pt-v16"
   },
   "entries": [
     {

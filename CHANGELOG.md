@@ -121,9 +121,51 @@ Each example script and each replaying test now names pt-v18, the preset
 the recordings were made under, so they reproduce across this boundary and
 every later one. The recordings themselves are unchanged, because
 re-recording is a live run against a provider rather than an edit to a
-file. A recording's `meta` block still carries no preset, so this boundary
-arrived as seventeen test failures with no field in the artefact to explain
-them.
+file. The pin decides which market a replay runs in; the `model_preset`
+field below decides whether a later mismatch is audible.
+
+**A recording names the market it was made in.** `Transcript.meta` gains
+`model_preset`: the simulation preset's fingerprint, in the vocabulary
+`Scorecard.model_fingerprint` and `Engine.model_fingerprint` already use --
+a shipped preset's name such as `pt-v18`, or `custom-XXXXXXXX` for an
+overridden vector. Every adapter stamps the running engine's own
+fingerprint on the first recorded exchange, and `Transcript.save` stamps
+the shipped default for a transcript that never met an engine.
+`replay_response` compares the recorded preset against the running one
+before it looks the digest up, and raises `ReplayMiss` on a mismatch,
+naming what was recorded, what is running, and the preset to pass to
+`World` or `evaluate`. `ReplayMiss` rather than `DecisionError`, so a run
+under `on_refusal="skip"` re-raises it instead of charging a wrong market
+to the agent and completing. Before this, a moved preset showed up only as
+every digest missing at step 0, and the seventeen failures at this
+boundary were all one cause with no field in any artefact naming it.
+`Checkpoint` has carried `model` against the same hazard since it existed.
+The seven committed fixtures gain the field, with no other byte changed.
+
+**Two of those seven were not recorded in the market they were assumed to
+be.** Five belong to the integration examples pinned at the last commit and
+are `pt-v18`, which their green replays prove. The two the liquidity-crisis
+study reads, `finrobot/rate-ladder.json` and
+`finrobot/liquidity-crisis.json`, are `pt-v16`. Three independent readings
+agree on that: the study pins `pt-v16` and was never part of the pinning
+commit; the shipped default at the commit that recorded both files was
+`pt-v16`; and both open at a VIX of 15.0000 with inflation at 0.0200, the
+constants every preset through pt-v16 declares and neither pt-v18 nor
+pt-v19 can produce on any roster. Day-zero prices are identical across
+every shipped preset on one roster, so the macro opening is what dates a
+recording. `tests/test_integrations.py` runs that measurement on every
+fixture, so the next backfill has something to check itself against.
+
+**A recording made before 0.8.0 still replays.** A transcript carrying no
+`model_preset` cannot be compared against anything, so the replay goes
+ahead and warns rather than refusing. Refusing would break every recording
+a user already holds, on upgrade, over a fact this library never asked
+anyone to record; `finrobot._refuse_a_changed_mandate` makes the same call
+for a transcript carrying neither an instructions digest nor a mandate
+version. The warning names the preset the replay is running and says that
+a step-0 miss is the symptom to expect. Adding the field by hand is a
+one-line edit to `meta`, so a recording that predates this does not have
+to be made again.
 
 
 ## 0.7.1

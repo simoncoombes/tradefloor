@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import struct
 import subprocess
 import sys
@@ -1271,6 +1272,248 @@ def test_a_recorded_null_response_is_not_diagnosed_as_missing():
         "say so")
     assert "none for this input" not in message, (
         "the missing-key diagnosis is the wrong one here")
+
+
+# -- the preset a recording was made in --------------------------------------
+
+#: The preset the five integration recordings were made under, and the one
+#: their example scripts pin. Written out here rather than read off a
+#: fixture, so a test that asserts the guard fires cannot be satisfied by a
+#: fixture that quietly changed. `FIXTURE_PRESETS` below carries the whole
+#: set, which is NOT uniform: two of the seven are pt-v16.
+#:
+#: It has to differ from the shipped default for these tests to mean
+#: anything, and it does -- the default is pt-v19. A release that made this
+#: the default again would leave the mismatch tests asserting nothing, so
+#: the one below says so out loud rather than passing quietly.
+RECORDED_PRESET = "pt-v18"
+
+
+def _world_on(preset: str) -> World:
+    """A world running a NAMED preset, so a test can move the market
+    underneath a recording the way a release does."""
+    return World(seed=7, universe=universe(), agent=callable_agent(hold),
+                 cash=1_000_000.0, model=preset,
+                 pins={"federal_funds_rate": 0.04,
+                       "corporate_bond_yield": 0.055})
+
+
+def test_saving_a_transcript_stamps_the_preset_it_was_recorded_against(
+        tmp_path):
+    """`meta` named the framework, the provider, the model and the
+    instructions, and nothing naming the MARKET. Moving the default from
+    pt-v18 to pt-v19 missed all five committed recordings at step zero and
+    no field in any of them could say why."""
+    transcript = ci.Transcript()
+    transcript.save(tmp_path / "fresh.json")
+    stamped = transcript.meta["model_preset"]
+    assert stamped == tf.ModelParams.from_preset().fingerprint, (
+        "a transcript that never met an engine records the preset a market "
+        "takes when nobody names one")
+    written = json.loads(
+        (tmp_path / "fresh.json").read_text(encoding="utf-8"))
+    assert written["meta"]["model_preset"] == stamped
+
+
+def test_re_saving_a_transcript_keeps_the_preset_it_recorded(tmp_path):
+    """The `recorded_utc` rule, for the same reason: a re-save is not a
+    re-recording, and a stamp that overwrote would relabel a pt-v18
+    recording as whatever shipped today."""
+    transcript = ci.Transcript(meta={"model_preset": RECORDED_PRESET})
+    transcript.save(tmp_path / "again.json")
+    assert transcript.meta["model_preset"] == RECORDED_PRESET
+
+
+def test_a_recording_stamps_the_engine_it_ran_on_not_the_shipped_default():
+    """The case a save-time stamp alone would get confidently wrong. Every
+    shipped integration example pins `PRESET = "pt-v18"` and re-records
+    through it, so the interesting recording is exactly the one whose market
+    is NOT the default -- and a fixture stamped "pt-v19" because that is
+    what shipped would be worse than the honest gap it replaced."""
+    assert RECORDED_PRESET != tf.ModelParams.from_preset().fingerprint, (
+        "this test is only worth running while the pin is not the default")
+    recorder = ci.Transcript()
+    agent = callable_agent(hold, mode="live", recorder=recorder, every=1)
+    world = World(seed=7, universe=universe(), agent=agent,
+                  cash=1_000_000.0, model=RECORDED_PRESET,
+                  pins={"federal_funds_rate": 0.04,
+                        "corporate_bond_yield": 0.055})
+    world.run(days=1)
+    assert len(recorder) > 0
+    assert recorder.meta["model_preset"] == RECORDED_PRESET
+
+
+def test_a_replay_under_a_different_preset_refuses_and_names_both():
+    """The seventeen failures at the pt-v19 boundary, as one message. The
+    digest covers every price in the observation and every price comes out
+    of the preset, so the lookup misses on all sixty entries and blames the
+    observation mapping -- which did not change."""
+    transcript = ci.Transcript(meta={"model_preset": RECORDED_PRESET})
+    transcript.record({"digest": "abc", "response": "the answer"})
+    obs = _observation(_world_on("pt-v19"))
+    with pytest.raises(ci.ReplayMiss) as excinfo:
+        ci.replay_response(transcript, "abc", step=0, day=0,
+                           preset=ci.preset_of(obs))
+    message = str(excinfo.value)
+    assert RECORDED_PRESET in message and "pt-v19" in message, (
+        "the message has to say what was recorded AND what is running")
+    assert "model=" in message, (
+        "and how to fix it, which is naming the recorded preset on the "
+        "World or the evaluate call")
+
+
+def test_the_preset_refusal_beats_the_missing_digest_to_the_message():
+    """Checked BEFORE the lookup. The lookup still refuses -- it is the
+    guard that cannot be forgotten, because it IS the lookup -- but a
+    reader meeting a moved market should meet the cause rather than its
+    first symptom."""
+    transcript = ci.Transcript(meta={"model_preset": RECORDED_PRESET})
+    with pytest.raises(ci.ReplayMiss) as excinfo:
+        ci.replay_response(transcript, "nothing-recorded", step=0, day=0,
+                           preset="pt-v19")
+    assert "different simulation preset" in str(excinfo.value)
+    assert "none for this input" not in str(excinfo.value)
+
+
+def test_the_preset_refusal_is_a_replay_miss_a_skipping_run_re_raises():
+    """Not a plain DecisionError. `World(on_refusal="skip")` charges a
+    DecisionError to the agent and carries on, which would turn a replay
+    against the wrong market into an agent that refused every decision,
+    completed, and published that. ReplayMiss exists for the distinction,
+    and World re-raises it."""
+    transcript = ci.Transcript(meta={"model_preset": RECORDED_PRESET})
+    with pytest.raises(ci.ReplayMiss):
+        ci.refuse_a_changed_preset(transcript, "pt-v19")
+    assert issubclass(ci.ReplayMiss, ci.DecisionError)
+
+
+def test_a_transcript_recorded_before_the_preset_field_still_replays():
+    """Absent must NOT refuse. Every recording made before 0.8.0 carries no
+    preset, and refusing them on upgrade would break working replays over a
+    fact the library never asked anyone to record -- the call
+    `finrobot._refuse_a_changed_mandate` already makes for a transcript
+    carrying neither digest nor version.
+
+    Allowed is not silent, though. An unnamed market is how a day was lost,
+    so it says so where the person running the replay can see it."""
+    legacy = ci.Transcript(meta={"framework": "x"})
+    legacy.record({"digest": "abc", "response": "the answer"})
+    with pytest.warns(UserWarning, match="does not say which simulation"):
+        assert ci.replay_response(legacy, "abc", step=0, day=0,
+                                  preset="pt-v19") == "the answer"
+
+
+def test_a_replay_that_cannot_see_an_engine_does_not_refuse():
+    """None means cannot know, never mismatch. A guard that fired on the
+    absence of evidence would refuse every unit test that drives an adapter
+    with a stand-in observation."""
+    transcript = ci.Transcript(meta={"model_preset": RECORDED_PRESET})
+    transcript.record({"digest": "abc", "response": "the answer"})
+    assert ci.preset_of(object()) is None
+    assert ci.replay_response(transcript, "abc", step=0, day=0,
+                              preset=None) == "the answer"
+
+
+def test_preset_of_reads_the_engine_the_observation_carries():
+    """One spelling of a preset in this package. A second would be a
+    fingerprint that disagrees with the manifests and the scorecards."""
+    world = _world_on(RECORDED_PRESET)
+    assert ci.preset_of(_observation(world)) == RECORDED_PRESET
+    assert (ci.preset_of(_observation(world))
+            == world.engine.model_fingerprint)
+
+
+#: The preset each committed recording was actually made in, measured
+#: rather than assumed. The day-zero macro block a recording carries is a
+#: function of the preset and of nothing else on this path -- day-zero
+#: PRICES are identical across every shipped preset, so they say nothing.
+#: Four of the five pt-v18 recordings open at vix 15.4619 with inflation
+#: 0.0282 where the two pt-v16 ones open at 15.0000 and 0.0200; the fifth,
+#: `openai_agents/five-days.json`, prints no macro block at all and is
+#: dated by its replay instead.
+#:
+#: The split was found by this change and is the reason it exists. Five of
+#: the seven belong to the integration examples pinned at `854eba5`, and
+#: the pin is what proves them: they replay green under pt-v18, which a
+#: recording made in another market could not do. The other two belong to
+#: `examples/experiments/liquidity-crisis/`, which pins `PRESET = "pt-v16"`
+#: and was never part of that pinning commit. Three readings agree on the
+#: pair: that pin, the macro opening below, and `DEFAULT_PRESET_NAME` at
+#: the commit that recorded them, which was pt-v16. Backfilling all seven
+#: at pt-v18 would have written a false provenance into two of them.
+FIXTURE_PRESETS = {
+    "callable/five-days.json": "pt-v18",
+    "finrobot/liquidity-crisis.json": "pt-v16",
+    "finrobot/rate-ladder.json": "pt-v16",
+    "finrobot/rate-shock.json": "pt-v18",
+    "langgraph/rate-shock.json": "pt-v18",
+    "openai_agents/five-days.json": "pt-v18",
+    "pydantic_ai/rate-shock.json": "pt-v18",
+}
+
+
+def test_every_committed_fixture_names_the_preset_it_was_recorded_in():
+    """The backfill, asserted per file rather than by a blanket value.
+
+    A fixture that loses the field replays only until the default next
+    moves, and a fixture that carries the WRONG one refuses a replay that
+    would have worked. The second is the worse failure, so the expected
+    value is written out per recording with the measurement behind it."""
+    root = pathlib.Path(__file__).parent / "fixtures"
+    fixtures = sorted(root.glob("*/*.json"))
+    found = {"/".join(p.relative_to(root).parts): p for p in fixtures}
+    assert set(found) == set(FIXTURE_PRESETS), (
+        "the fixture set moved; update FIXTURE_PRESETS with the preset the "
+        "new recording was made in, measured rather than assumed")
+    for name, path in found.items():
+        meta = json.loads(path.read_text(encoding="utf-8"))["meta"]
+        assert meta.get("model_preset") == FIXTURE_PRESETS[name], (
+            f"{name} names the wrong market, or none")
+
+
+def test_the_day_zero_macro_dates_each_fixture_to_the_preset_it_names():
+    """The measurement the backfill rests on, kept runnable.
+
+    Day-zero PRICES are identical across every shipped preset on a given
+    roster, so they cannot date a recording. The macro opening can. Through
+    pt-v16 the VIX and the inflation rate open at declared constants, 15.0
+    and 0.02, whatever the roster holds; pt-v18 derives both and pt-v19
+    derives the VIX from the roster's own variance, so neither can open at
+    the constant on any roster.
+
+    That is enough to date a recording without rebuilding its market: a
+    prompt opening at exactly 15.0 was recorded through pt-v16, and one
+    that does not was not. Two of the seven fixtures open at 15.0, and
+    backfilling all seven at pt-v18 would have written a false provenance
+    into both.
+    """
+    declared = (15.0, 0.02)
+    #: The named presets that open at the declared constants. Listed rather
+    #: than derived from the version number: "pt-v9" sorts after "pt-v16" as
+    #: a string, and a check that read the boundary off a comparison would
+    #: be wrong the first time a fixture from a single-digit preset joined.
+    CONSTANT_OPENING = {"pt-v16"}
+    for preset in sorted(set(FIXTURE_PRESETS.values())):
+        macro = _world_on(preset).engine.macro_state
+        opens_at_the_constant = (round(macro.vix, 4),
+                                 round(macro.inflation_rate, 4)) == declared
+        assert opens_at_the_constant == (preset in CONSTANT_OPENING), (
+            f"{preset} no longer opens where this check assumes it does")
+
+    root = pathlib.Path(__file__).parent / "fixtures"
+    checked = 0
+    for name, preset in FIXTURE_PRESETS.items():
+        prompt = json.loads((root / name).read_text(
+            encoding="utf-8"))["entries"][0].get("prompt")
+        text = prompt if isinstance(prompt, str) else json.dumps(prompt)
+        found = re.search(r'"?vix"?["\s:]+([\d.]+)', text)
+        if not found:
+            continue                       # this renderer prints no macro
+        checked += 1
+        recorded_at_the_constant = round(float(found.group(1)), 4) == 15.0
+        assert recorded_at_the_constant == (preset in CONSTANT_OPENING), (
+            f"{name} opens at a VIX the preset it names cannot produce")
+    assert checked >= 5, "the macro check found almost nothing to check"
 
 
 # -- adapter metadata --------------------------------------------------------

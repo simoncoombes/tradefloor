@@ -81,6 +81,15 @@ missing, and the replay RAISES naming the step -- keyed by (arm, step) it
 would answer the new question with a response given to the old one. Replay
 needs no framework, no network and no API key.
 
+A recording also names the MARKET it was made in. ``meta["model_preset"]``
+carries the simulation preset's fingerprint -- a shipped name like
+``"pt-v18"``, or ``custom-XXXXXXXX`` for an overridden vector, the same
+vocabulary :attr:`tradefloor.Scorecard.model_fingerprint` uses -- and
+:func:`replay_response` refuses a replay running under a different one.
+Without it, moving the default preset moved every price in every recorded
+observation, all five committed agent recordings missed at step zero, and
+the artifact had no field that could say why.
+
 This reproduces the AGENT. The market is already reproducible without it:
 :func:`tradefloor.replay.replay` rebuilds an engine from its order log, and
 nothing here duplicates that.
@@ -94,9 +103,10 @@ import importlib
 import json
 import re
 import statistics
+import warnings
 from typing import Any, Literal, Sequence
 
-from .._core import ValidationError
+from .._core import ModelParams, ValidationError
 from ..counterfactual import MACRO_FIELDS
 
 #: The macro fields an adapter may show its framework. Bound to
@@ -1083,6 +1093,20 @@ class Transcript:
     (:meth:`AdapterInfo.as_dict` is the intended shape). Replaying a
     transcript under different instructions produces a different experiment,
     and ``meta`` is how a reader notices.
+
+    It also records ``model_preset``: the fingerprint of the simulation
+    preset the recording was made against, in the vocabulary
+    :attr:`tradefloor.Engine.model_fingerprint` uses -- a shipped preset's
+    name when the market was bit-identical to it, ``custom-XXXXXXXX``
+    otherwise. The instructions and the market are the two halves of the
+    question the model was asked, and until 0.8.0 ``meta`` named only one of
+    them. :class:`~tradefloor.Checkpoint` has carried ``model`` since it
+    existed for the same reason, in its own words: a checkpoint of a
+    custom-model run that resumed under the default would replay a plausible
+    market that is not the one it froze. A transcript replayed under a moved
+    preset does the same thing one step earlier -- every key misses, because
+    every price the digest covers moved -- and the refusal a reader then
+    meets names a step number rather than the cause.
     """
 
     __slots__ = ("meta", "entries", "_by_digest")
@@ -1156,13 +1180,149 @@ class Transcript:
             "recorded_utc",
             datetime.datetime.now(datetime.timezone.utc)
             .replace(microsecond=0).isoformat())
+        # WHICH MARKET, for the same reason and with the same rule. A replay
+        # key is a digest of the exact observation the model was sent, and
+        # every price in that observation comes out of the preset -- so a
+        # recording that cannot name its preset cannot explain the one way it
+        # is guaranteed to fail. It is not a hypothetical: moving the default
+        # from pt-v18 to pt-v19 missed all five committed recordings at step
+        # zero, and no field in any of them said so.
+        #
+        # `setdefault` again, and the value is only the DEFAULT preset,
+        # because a transcript holds no engine and cannot ask one. That guess
+        # is right for a transcript that never met a market -- a fresh
+        # recorder, a hand-built fixture -- and every adapter overwrites it
+        # with the truth long before here: `stamp_preset` writes the running
+        # engine's own fingerprint on the first recorded exchange. So this is
+        # the floor, not the reading.
+        #
+        # The hazard it shares with `recorded_utc` is stated rather than
+        # solved: loading a pre-0.8.0 recording and saving it again stamps
+        # today's default onto a market it was not recorded in, exactly as
+        # that line stamps today's date onto a recording made last year. The
+        # remedy for both is the same -- do not re-save a recording you did
+        # not make -- and adding the field to a legacy fixture is a one-line
+        # edit that says what it actually ran under.
+        self.meta.setdefault("model_preset",
+                             ModelParams.from_preset().fingerprint)
         target = pathlib.Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(self.to_json().encode("utf-8"))
 
 
+def preset_of(obs: Any) -> str | None:
+    """The fingerprint of the preset ``obs``'s market is running, or None.
+
+    Read off the engine the observation carries, because that is the only
+    object in the whole replay path that knows: an adapter is constructed
+    before any market exists and is handed one observation at a time. Reading
+    it here rather than in the caller keeps the one spelling -- there is
+    exactly one way to name a preset in this package, and a second would be
+    a fingerprint that disagrees with the manifests, the scorecards and the
+    checkpoints.
+
+    None when there is no engine to ask, which happens in unit tests that
+    drive an adapter with a stand-in observation. None means "cannot know",
+    and every caller here treats it as "do not check" rather than as a
+    mismatch: a guard that fires on absence of evidence refuses the tests
+    that exist to exercise everything else.
+    """
+    fingerprint = getattr(getattr(obs, "engine", None),
+                          "model_fingerprint", None)
+    return str(fingerprint) if fingerprint else None
+
+
+def stamp_preset(recorder: "Transcript | None", obs: Any) -> None:
+    """Record which market this recording is being made in, on first write.
+
+    Called from every adapter's recorder branch, beside the provenance
+    stamp and for the identical reason: a guard that arms itself only when
+    somebody remembered to set ``meta`` is off in exactly the runs nobody
+    was careful about. :meth:`Transcript.save` also stamps the field, but
+    only with the DEFAULT preset, and the interesting recordings are the
+    ones made under a pinned non-default -- every shipped integration
+    example pins ``PRESET`` and re-records through it, so a save-time guess
+    would write "pt-v19" into a fixture recorded on pt-v18 and produce a
+    confidently wrong provenance where there had been an honest gap.
+
+    ``setdefault``, so a caller who set the field explicitly keeps it, and
+    so the value is the market of the FIRST recorded exchange. Both arms of
+    a forked experiment share one recorder and one engine, so there is no
+    second market to disagree with.
+    """
+    if recorder is None:
+        return
+    preset = preset_of(obs)
+    if preset:
+        recorder.meta.setdefault("model_preset", preset)
+
+
+def refuse_a_changed_preset(transcript: "Transcript | None",
+                            preset: str | None) -> None:
+    """Refuse a replay whose market is not the recorded one.
+
+    The mismatch this catches is the loudest failure a recording has, and
+    until 0.8.0 it was also the least legible. A replay key is a digest of
+    the exact observation the model was sent; every price in that
+    observation descends from the simulation preset; so moving the preset
+    moves every key at once and the run refuses at step zero with a message
+    about a missing digest. Measured at the pt-v19 boundary: seventeen tests
+    across five integrations, all of them one cause, and nothing in any
+    recording that could name it.
+
+    So this is checked BEFORE the lookup, not instead of it. The lookup
+    still refuses -- it is the guard that cannot be forgotten, because it is
+    the lookup -- and this runs first so that a reader meets the cause
+    rather than its first symptom. Same shape as
+    ``finrobot._refuse_a_changed_mandate``, which refuses the other half of
+    the same question.
+
+    Raises :class:`ReplayMiss` rather than a plain
+    :class:`DecisionError`, which the mandate refusal uses. That refusal
+    happens at construction, where nothing can skip it. This one happens
+    inside the run, where :class:`~tradefloor.counterfactual.World` with
+    ``on_refusal="skip"`` would charge a ``DecisionError`` to the agent and
+    carry on -- turning a replay against the wrong market into an agent that
+    refused every decision, completed, and published that. ``ReplayMiss``
+    exists for precisely that distinction and World re-raises it.
+
+    A transcript with NO ``model_preset`` is warned about and allowed
+    through. Every recording made before 0.8.0 is in that state, and
+    refusing them would break working replays on upgrade for a fact the
+    library never asked anyone to record -- the same call
+    ``_refuse_a_changed_mandate`` makes for a transcript carrying neither
+    digest nor version. Allowed is not silent, though: an unnamed market is
+    how a day was lost, so it says so once, where the person running the
+    replay can see it.
+    """
+    if transcript is None or not preset:
+        return
+    recorded = (transcript.meta or {}).get("model_preset")
+    if not recorded:
+        warnings.warn(
+            "this transcript does not say which simulation preset it was "
+            f"recorded against; the replay is running {preset}. Recordings "
+            "made before 0.8.0 carry no preset, so this cannot be checked "
+            "and the replay is going ahead -- if it refuses at step 0 with "
+            "a missing digest, a moved preset is the first thing to "
+            "suspect. Add \"model_preset\" to the transcript's meta block "
+            "to make this checkable.", stacklevel=2)
+        return
+    if str(recorded) != preset:
+        raise ReplayMiss(
+            f"this transcript was recorded against a different simulation "
+            f"preset (recorded {recorded}, running {preset}). A replay is "
+            "keyed by a digest of the exact observation the model was sent "
+            "and every price in that observation comes out of the preset, "
+            "so every recorded key would miss and the run would refuse at "
+            "step 0 naming a digest rather than this. Run the replay on "
+            f"{recorded} -- World(..., model={recorded!r}) or "
+            f"evaluate(..., model={recorded!r}) -- or re-record the run "
+            "live against the market you are running now.")
+
+
 def replay_response(transcript: Transcript, key: str, *, step: int,
-                    day: int) -> Any:
+                    day: int, preset: str | None = None) -> Any:
     """The recorded response for ``key``, or a refusal naming the step.
 
     The one lookup every replaying adapter performs, centralised so the
@@ -1183,7 +1343,16 @@ def replay_response(transcript: Transcript, key: str, *, step: int,
     the failure was written down -- and sending the user off to re-record
     the whole run would spend money to rediscover a file they already
     have.
+
+    ``preset`` is the fingerprint of the market this replay is running,
+    from :func:`preset_of`. Given one, the recorded preset is checked
+    FIRST, so the reader meets the cause -- a moved market -- rather than
+    the missing digest that is only its first symptom. See
+    :func:`refuse_a_changed_preset`. It defaults to None so that an adapter
+    written against the old signature keeps working; that adapter loses the
+    diagnosis, not the refusal.
     """
+    refuse_a_changed_preset(transcript, preset)
     entry = transcript.entry_for(key)
     if entry is None:
         raise ReplayMiss(
@@ -1964,7 +2133,8 @@ class ReplayMixin:
         self.record_exchange(prompt, key=key)
         if self.mode == "replay":
             return replay_response(self.transcript, key,
-                                   step=obs.step, day=obs.day)
+                                   step=obs.step, day=obs.day,
+                                   preset=preset_of(obs))
         # A `prior` recording is consulted first. The market is
         # deterministic, so a resumed run reaches the same prompts and the
         # same digests, and a recorded answer is still an answer to the
@@ -1979,6 +2149,7 @@ class ReplayMixin:
             # replay must return the same shape -- a JSON string
             # json.dumps'd here would replay one parse level short, against
             # a recording that looked fine when it was written.
+            stamp_preset(self.recorder, obs)
             self.recorder.record({
                 "arm": self.arm, "step": obs.step, "day": obs.day,
                 "digest": key, "prompt": prompt, "response": response,

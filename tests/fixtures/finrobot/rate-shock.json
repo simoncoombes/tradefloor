@@ -25,7 +25,8 @@
     "mandate_version": "1",
     "temperature": 0.0,
     "recorded": true,
-    "recorded_utc": "2026-09-08T13:34:43+00:00"
+    "recorded_utc": "2026-09-08T13:34:43+00:00",
+    "model_preset": "pt-v18"
   },
   "entries": [
     {

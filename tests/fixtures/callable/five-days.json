@@ -18,7 +18,8 @@
     "decision_schema_version": "1",
     "decision_every_steps": 6,
     "max_participation": 0.02,
-    "recorded_utc": "2026-09-08T13:04:48+00:00"
+    "recorded_utc": "2026-09-08T13:04:48+00:00",
+    "model_preset": "pt-v18"
   },
   "entries": [
     {

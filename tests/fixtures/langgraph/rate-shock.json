@@ -21,7 +21,8 @@
     "warmup_days": 20,
     "branch_days": 20,
     "shock_bps": 200,
-    "recorded_utc": "2026-09-08T13:15:15+00:00"
+    "recorded_utc": "2026-09-08T13:15:15+00:00",
+    "model_preset": "pt-v18"
   },
   "entries": [
     {

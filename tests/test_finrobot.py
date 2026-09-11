@@ -1364,10 +1364,11 @@ def test_importing_the_adapter_still_needs_no_framework_after_the_rebase():
     # Standard library only, at ANY scope: `ast.walk` sees a function-local
     # import too, which is why `pathlib` is here -- `Transcript.save` imports
     # it inside the method. `datetime` joined it when `save` began stamping
-    # `recorded_utc`.
+    # `recorded_utc`. `warnings` joined it when `refuse_a_changed_preset`
+    # began saying out loud that a pre-0.8.0 recording names no preset.
     allowed = {"copy", "hashlib", "importlib", "json", "re", "statistics",
                "typing", "asyncio", "inspect", "concurrent", "pathlib",
-               "datetime", "__future__"}
+               "datetime", "warnings", "__future__"}
     assert imported <= allowed, (
         f"common.py imports {sorted(imported - allowed)} at module scope. "
         "finrobot.py imports common at module scope, so anything common "
