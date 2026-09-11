@@ -63,6 +63,18 @@ from tradefloor.integrations.finrobot import (MANDATE, MANDATE_VERSION,
 #: The simulation seed. Fixed, and the whole market descends from it.
 SEED = 4242
 
+#: THE PRESET THIS STUDY RUNS ON, named here rather than inherited from
+#: whatever the shipped default happens to be. The recording under
+#: `FIXTURE` was made under pt-v18, and a replay is keyed by a digest of
+#: the exact observation the model was sent -- so a run that takes the
+#: default replays only until the default next moves, and at the pt-v19
+#: boundary every seeded price in that observation changed and the whole
+#: recording missed. Naming the preset makes the replay reproducible
+#: across every later boundary, the same way
+#: `examples/experiments/liquidity-crisis/experiment.py` names pt-v16 for
+#: its own recording. A re-recorded fixture moves this line with it.
+PRESET = "pt-v18"
+
 #: Days before the fork, and days each arm runs after it. Six decision steps a
 #: day and 65 ticks a step, which is the library's own evaluation cadence.
 WARMUP_DAYS = 20
@@ -293,7 +305,8 @@ def main(*, live: bool = False, record: bool = False,
     # -- 2. shared history ------------------------------------------------
     world = World(seed=SEED, universe=roster, agent=agent, pins=BASE_PINS,
                   cash=CASH, steps_per_day=STEPS_PER_DAY,
-                  ticks_per_step=TICKS_PER_STEP, label="shared")
+                  ticks_per_step=TICKS_PER_STEP, model=PRESET,
+                  label="shared")
     rule("Shared history")
     print(f"  Running {WARMUP_DAYS} days, FinRobot deciding once a day.")
     world.run(days=WARMUP_DAYS)

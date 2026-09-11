@@ -96,7 +96,8 @@ def test_the_recorded_run_replays_end_to_end():
     assert agent.agent is None, "a replay must need no framework object"
 
     world = World(seed=example.SEED, universe=example.universe(),
-                  agent=agent, cash=example.CASH, pins=example.PINS)
+                  agent=agent, cash=example.CASH, pins=example.PINS,
+                  model=example.PRESET)
     world.run(days=example.SHARED_DAYS)
     assert len(agent.record) == example.SHARED_DAYS
 

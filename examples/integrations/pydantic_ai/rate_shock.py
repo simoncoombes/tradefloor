@@ -81,6 +81,18 @@ from tradefloor.integrations.pydantic_ai import PydanticAIAdapter
 SEED = 4242
 DAYS = 5
 
+#: THE PRESET THE RECORDED RUN IS REPLAYED ON, named here rather than
+#: inherited from whatever the shipped default happens to be. The recording
+#: under `FIXTURE` was made under pt-v18, and a replay is keyed by a digest
+#: of the exact observation the model was sent -- so a run that takes the
+#: default replays only until the default next moves, and at the pt-v19
+#: boundary every seeded price in that observation changed and the whole
+#: recording missed. It lives with the experiment's other constants, beside
+#: the fixture it belongs to, because the notebook and the suite must
+#: replay the SAME run and two copies of one drift apart. A re-recorded
+#: fixture moves this line with it.
+PRESET = "pt-v18"
+
 #: HOW LONG THE OFFLINE RULE RUNS, which is not how long the recorded model
 #: run does. `mean_reversion` reads `return_5d` and acts on a five-day move
 #: past two per cent, so on a five-day run it gets one usable reading. That

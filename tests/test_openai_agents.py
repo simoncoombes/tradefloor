@@ -1342,9 +1342,13 @@ def test_the_committed_recording_replays_end_to_end():
 
     agent = OpenAIAgentsAdapter(mode="replay", transcript=transcript,
                                 model=exploding)
+    # `model=` means two different things a line apart: the adapter's is the
+    # framework model, `evaluate`'s is the simulation preset. The preset is
+    # NAMED rather than left to the default, because that is what makes this
+    # replay survive an era boundary -- see `example.PRESET`.
     card = tf.evaluate({"pm": agent}, seed=example.SEED,
                        universe=example.universe(),
-                       days=example.DAYS)["pm"]
+                       days=example.DAYS, model=example.PRESET)["pm"]
 
     assert len(agent.record) == example.DAYS, (
         f"{example.DAYS - len(agent.record)} recorded decisions did not "

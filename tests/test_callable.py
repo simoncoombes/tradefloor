@@ -349,7 +349,7 @@ def test_the_recorded_run_replays_end_to_end():
                            transcript=ci.Transcript.load(FIXTURE))
     card = tf.evaluate({"llm": agent}, seed=example.SEED,
                        universe=example.universe(),
-                       days=example.DAYS)["llm"]
+                       days=example.DAYS, model=example.PRESET)["llm"]
     assert len(agent.record) == example.DAYS
     assert card.trades > 0
     assert card.rejected == 0, card.errors

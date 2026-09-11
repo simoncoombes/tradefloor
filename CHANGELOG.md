@@ -98,12 +98,32 @@ land in the quiet majority on one and not the other. Both arms read the
 same volatility excess at the fork, so it cancels and the difference in
 target exposure is the rate move.
 
-**Five committed agent recordings do not replay against this default** and
-are not re-recorded here: `callable`, `langgraph`, `pydantic_ai`,
-`openai_agents` and `finrobot`. A recording is keyed by a digest of the
-exact observation the model was sent, every price in it moved, and
+**The shadow solver recovers less of a planted market jump.** On the
+six-name synthetic the recovered share falls from 74-91 per cent on pt-v18
+to 60-76 per cent here, because the derived VIX anchor opens that roster at
+25.4 against pt-v18's 15.98 and the market innovation becomes a cheaper
+explanation per nat of prior than the jump normal. The sign survives with
+3.4 sigma to spare at the seed that moves furthest, and
+`tests/test_shadow_solver.py` now asserts that sign against the preset's
+own zero crossing in place of a proxy on the recovered normal. The jump
+sizes `tools/shadow/shadow.py` publishes beside that threshold were
+measured under pt-v16 and now say so. The estimator was already biased
+before this boundary, returning -1.38 for a planted -3.10, and pt-v19
+shrinks it further. The tool's production roster is forty tickers, where
+the anchor inflation is far milder, so what this bounds is the six-name
+synthetic.
+
+**Five committed agent recordings are pinned to pt-v18 rather than
+re-recorded**: `callable`, `langgraph`, `pydantic_ai`, `openai_agents` and
+`finrobot`. A recording is keyed by a digest of the exact observation the
+model was sent, and every price in that observation moved at this boundary.
+Each example script and each replaying test now names pt-v18, the preset
+the recordings were made under, so they reproduce across this boundary and
+every later one. The recordings themselves are unchanged, because
 re-recording is a live run against a provider rather than an edit to a
-file.
+file. A recording's `meta` block still carries no preset, so this boundary
+arrived as seventeen test failures with no field in the artefact to explain
+them.
 
 
 ## 0.7.1

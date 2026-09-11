@@ -490,6 +490,15 @@ def test_jsonrenderer_refuses_a_fundamentals_value_it_cannot_encode():
 # ---------------------------------------------------------------------------
 # Every adapter's default renderer reproduces its shipped fixture
 # ---------------------------------------------------------------------------
+#
+# Every world below is built with `model=example.PRESET` -- the preset the
+# recording it replays was made under, named at the example beside the
+# fixture. A replay is keyed by a digest of the exact observation the model
+# was sent; a world that takes whatever the shipped default happens to be
+# replays only until the default next moves, and at the pt-v19 boundary
+# every seeded price in that observation changed, so these tests measured
+# the era rather than the renderer. Naming the preset makes them measure
+# the renderer again, on either side of any later boundary.
 
 
 def test_finrobot_default_renderer_replays_the_shipped_fixture():
@@ -510,7 +519,8 @@ def test_finrobot_default_renderer_replays_the_shipped_fixture():
     world = World(seed=example.SEED, universe=example.universe(),
                  agent=agent, pins=example.BASE_PINS, cash=example.CASH,
                  steps_per_day=example.STEPS_PER_DAY,
-                 ticks_per_step=example.TICKS_PER_STEP)
+                 ticks_per_step=example.TICKS_PER_STEP,
+                 model=example.PRESET)
     world.run(days=example.WARMUP_DAYS)
 
     recorded_digests = [e["digest"] for e in transcript.entries[
@@ -535,7 +545,8 @@ def test_langgraph_default_renderer_replays_the_shipped_fixture():
     assert agent.renderer.key() == "json", (
         "not the default any more; this test must exercise it")
     world = World(seed=example.SEED, universe=example.universe(),
-                 agent=agent, cash=example.CASH, pins=example.BASE_PINS)
+                 agent=agent, cash=example.CASH, pins=example.BASE_PINS,
+                 model=example.PRESET)
     world.run(days=example.WARMUP_DAYS)
 
     recorded_digests = [e["digest"] for e in transcript.entries[
@@ -556,7 +567,8 @@ def test_pydantic_ai_default_renderer_replays_the_shipped_fixture():
     assert agent.renderer.key() == "json", (
         "not the default any more; this test must exercise it")
     world = World(seed=example.SEED, universe=example.universe(),
-                 agent=agent, cash=example.CASH, pins=example.PINS)
+                 agent=agent, cash=example.CASH, pins=example.PINS,
+                 model=example.PRESET)
     world.run(days=example.SHARED_DAYS)
 
     recorded_digests = [e["digest"] for e in transcript.entries[
@@ -578,7 +590,8 @@ def test_openai_agents_default_renderer_replays_the_shipped_fixture():
     assert agent.renderer.key() == "json", (
         "not the default any more; this test must exercise it")
     card = tf.evaluate({"pm": agent}, seed=example.SEED,
-                       universe=example.universe(), days=example.DAYS)["pm"]
+                       universe=example.universe(), days=example.DAYS,
+                       model=example.PRESET)["pm"]
 
     recorded_digests = [e["digest"] for e in transcript.entries[
         :example.DAYS]]
@@ -645,7 +658,8 @@ def test_two_identical_renderers_give_identical_decisions_on_the_fixture():
         world = World(seed=example.SEED, universe=example.universe(),
                      agent=agent, pins=example.BASE_PINS, cash=example.CASH,
                      steps_per_day=example.STEPS_PER_DAY,
-                     ticks_per_step=example.TICKS_PER_STEP)
+                     ticks_per_step=example.TICKS_PER_STEP,
+                     model=example.PRESET)
         world.run(days=example.WARMUP_DAYS)
         return agent
 
@@ -733,7 +747,8 @@ def test_invariance_reports_a_non_matching_renderer_as_unrecorded():
     world = World(seed=example.SEED, universe=example.universe(),
                  agent=agent, pins=example.BASE_PINS, cash=example.CASH,
                  steps_per_day=example.STEPS_PER_DAY,
-                 ticks_per_step=example.TICKS_PER_STEP)
+                 ticks_per_step=example.TICKS_PER_STEP,
+                 model=example.PRESET)
     world.run(days=example.WARMUP_DAYS)
 
     matching = TextRenderer()
@@ -790,7 +805,8 @@ def test_invariance_asked_for_more_days_than_the_fixture_covers_stops_early():
     world = World(seed=example.SEED, universe=example.universe(),
                  agent=agent, pins=example.BASE_PINS, cash=example.CASH,
                  steps_per_day=example.STEPS_PER_DAY,
-                 ticks_per_step=example.TICKS_PER_STEP)
+                 ticks_per_step=example.TICKS_PER_STEP,
+                 model=example.PRESET)
     world.run(days=example.WARMUP_DAYS)
 
     matching = TextRenderer()

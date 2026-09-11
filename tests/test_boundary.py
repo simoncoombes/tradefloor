@@ -705,10 +705,18 @@ def _recorded_world():
         mode="replay", transcript=Recording.load(FIXTURE),
         fundamentals=study.FUNDAMENTALS, objective=study.OBJECTIVE,
         every=study.DECISION_EVERY, arm="shared")
+    # `model=study.PRESET`, not the shipped default: the recording this
+    # world replays was made under pt-v18, and a replay is keyed by a
+    # digest of the exact observation the agent was sent. A world that
+    # takes whatever the default happens to be replays only until the
+    # default next moves -- which is what the pt-v19 boundary did to every
+    # seeded price in that observation. The preset is named at the study,
+    # beside the fixture it belongs to.
     world = World(seed=study.SEED, universe=list(study.universe()),
                   agent=agent, pins=study.BASE_PINS, cash=study.CASH,
                   steps_per_day=study.STEPS_PER_DAY,
-                  ticks_per_step=study.TICKS_PER_STEP, label="shared")
+                  ticks_per_step=study.TICKS_PER_STEP,
+                  model=study.PRESET, label="shared")
     world.run(days=study.WARMUP_DAYS)
     return world, study
 

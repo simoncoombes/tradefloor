@@ -90,6 +90,18 @@ from tradefloor.integrations.langgraph import INSTRUCTIONS, LangGraphAdapter
 #: The simulation seed. Fixed, and the whole market descends from it.
 SEED = 4242
 
+#: THE PRESET THE FORKED EXPERIMENT RUNS ON, named here rather than
+#: inherited from whatever the shipped default happens to be. The recording
+#: under `FIXTURE` was made under pt-v18, and a replay is keyed by a digest
+#: of the exact observation the model was sent -- so a run that takes the
+#: default replays only until the default next moves, and at the pt-v19
+#: boundary every seeded price in that observation changed and the whole
+#: recording missed. Naming the preset makes the replay reproducible across
+#: every later boundary, the same way `examples/experiments/
+#: liquidity-crisis/experiment.py` names pt-v16 for its own recording. A
+#: re-recorded fixture moves this line with it.
+PRESET = "pt-v18"
+
 #: The flat example's length. The forked experiment uses the two below.
 DAYS = 5
 
@@ -496,7 +508,7 @@ def run_experiment(agent: LangGraphAdapter):
     leaving it to the caller.
     """
     world = World(seed=SEED, universe=universe(), agent=agent, cash=CASH,
-                  pins=BASE_PINS)
+                  pins=BASE_PINS, model=PRESET)
     world.run(days=WARMUP_DAYS)
     mark = world.checkpoint(f"before the +{SHOCK_BPS}bps shock")
 

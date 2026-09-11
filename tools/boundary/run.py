@@ -133,13 +133,19 @@ def main(argv=None) -> int:
     agent, source = build_agent(study, args)
     warmup = (study.WARMUP_DAYS if args.warmup_days is None
               else args.warmup_days)
+    # The study's own preset, named rather than inherited from the shipped
+    # default. A replay is keyed by a digest of the exact observation the
+    # agent was sent, so a map built on whatever the default happens to be
+    # would go unreachable at every probe the day the default moved -- and
+    # report that as a finding about the agent. See `study.PRESET`.
     world = tf.World(seed=study.SEED, universe=list(study.universe()),
                      agent=agent, pins=study.BASE_PINS, cash=study.CASH,
                      steps_per_day=study.STEPS_PER_DAY,
-                     ticks_per_step=study.TICKS_PER_STEP, label="shared")
+                     ticks_per_step=study.TICKS_PER_STEP,
+                     model=study.PRESET, label="shared")
     print(f"agent      {source}")
     print(f"world      seed {study.SEED}, {len(world.universe)} instruments, "
-          f"{warmup} days of shared history")
+          f"{warmup} days of shared history, preset {study.PRESET}")
     world.run(days=warmup)
 
     scenarios = (["none"] + list(tf.Scenario.available())

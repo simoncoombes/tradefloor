@@ -324,10 +324,16 @@ def test_the_recorded_finrobot_fixture_matches_its_own_transcript():
     agent = module.FinRobotAdapter(
         mode="replay", transcript=transcript, fundamentals=module.FUNDAMENTALS,
         objective=module.OBJECTIVE, every=module.DECISION_EVERY, arm="shared")
+    # `model=module.PRESET`, not the shipped default: side B has to be the
+    # same world the fixture side A reads was recorded in, and a replay is
+    # keyed by a digest of the exact observation the agent was sent. Taking
+    # the default made this test agree with itself only until the default
+    # next moved. The preset is named at the study, beside the fixture.
     world = World(seed=module.SEED, universe=list(module.universe()),
                  agent=agent, pins=module.BASE_PINS, cash=module.CASH,
                  steps_per_day=module.STEPS_PER_DAY,
-                 ticks_per_step=module.TICKS_PER_STEP, label="shared")
+                 ticks_per_step=module.TICKS_PER_STEP,
+                 model=module.PRESET, label="shared")
     world.run(days=module.WARMUP_DAYS)
     fork_step = world.step
 
