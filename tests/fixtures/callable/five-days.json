@@ -18,24 +18,24 @@
     "decision_schema_version": "1",
     "decision_every_steps": 6,
     "max_participation": 0.02,
-    "recorded_utc": "2026-09-08T13:04:48+00:00",
-    "model_preset": "pt-v18"
+    "model_preset": "pt-v19",
+    "recorded_utc": "2026-09-11T12:24:13+00:00"
   },
   "entries": [
     {
       "arm": "live",
       "step": 0,
       "day": 0,
-      "digest": "5d73e2de7f77a857",
+      "digest": "66ac136df86bacb2",
       "prompt": {
         "step": 0,
         "day": 0,
         "steps_per_day": 6,
         "macro": {
           "federal_funds_rate": 0.03,
-          "corporate_bond_yield": 0.053523476228861784,
-          "vix": 15.461852166964164,
-          "inflation_rate": 0.028221465682935133,
+          "corporate_bond_yield": 0.055364238147348734,
+          "vix": 24.736624222946865,
+          "inflation_rate": 0.028221400410657196,
           "cycle": "expansion"
         },
         "assets": [
@@ -45,8 +45,8 @@
             "return_1d": null,
             "return_5d": null,
             "volatility": null,
-            "best_bid": 139.98,
-            "best_ask": 140.02,
+            "best_bid": 139.97,
+            "best_ask": 140.03,
             "avg_daily_volume": 5000000.0,
             "max_order_shares": 100000.0,
             "position": 0.0,
@@ -100,33 +100,33 @@
           "buying_power": 2000000.0
         }
       },
-      "response": "{\"actions\": [{\"symbol\": \"TECH_A\", \"side\": \"BUY\", \"quantity\": 1500}, {\"symbol\": \"TECH_B\", \"side\": \"BUY\", \"quantity\": 1500}, {\"symbol\": \"BANK_A\", \"side\": \"BUY\", \"quantity\": 2000}, {\"symbol\": \"STAPLE_A\", \"side\": \"BUY\", \"quantity\": 2500}], \"rationale\": \"With an expansion cycle and low VIX, I establish a diversified core long book at roughly 60% of net worth (no leverage), spreading risk across growth, financial, and defensive staples while keeping ample cash to react as volatility and return data arrive.\"}"
+      "response": "{\"actions\": [{\"symbol\": \"TECH_A\", \"side\": \"BUY\", \"quantity\": 1500}, {\"symbol\": \"TECH_B\", \"side\": \"BUY\", \"quantity\": 2000}, {\"symbol\": \"BANK_A\", \"side\": \"BUY\", \"quantity\": 1500}, {\"symbol\": \"STAPLE_A\", \"side\": \"BUY\", \"quantity\": 2500}], \"rationale\": \"Expansion phase favors equity exposure, so I establish a diversified core long book (~60% of net worth, no leverage) spread across tech, financials, and defensive staples. Elevated VIX and zero return history argue for holding ample cash until volatility and trend data emerge.\"}"
     },
     {
       "arm": "live",
       "step": 6,
       "day": 1,
-      "digest": "015b504ce0fc5a82",
+      "digest": "35e839fd73014a8e",
       "prompt": {
         "step": 6,
         "day": 1,
         "steps_per_day": 6,
         "macro": {
           "federal_funds_rate": 0.03,
-          "corporate_bond_yield": 0.053523476228861784,
-          "vix": 15.235143978314987,
-          "inflation_rate": 0.028221465682935133,
+          "corporate_bond_yield": 0.055364238147348734,
+          "vix": 23.725854600901403,
+          "inflation_rate": 0.028221400410657196,
           "cycle": "expansion"
         },
         "assets": [
           {
             "symbol": "TECH_A",
-            "price": 141.95,
-            "return_1d": 0.01392857142857129,
-            "return_5d": 0.01392857142857129,
-            "volatility": 0.0060541578666476045,
-            "best_bid": 141.94,
-            "best_ask": 141.99,
+            "price": 142.92,
+            "return_1d": 0.020857142857142685,
+            "return_5d": 0.020857142857142685,
+            "volatility": 0.007828699090664625,
+            "best_bid": 142.9,
+            "best_ask": 142.96,
             "avg_daily_volume": 5000000.0,
             "max_order_shares": 100000.0,
             "position": 1500.0,
@@ -134,25 +134,105 @@
           },
           {
             "symbol": "TECH_B",
-            "price": 93.23,
-            "return_1d": -0.018631578947368332,
-            "return_5d": -0.018631578947368332,
-            "volatility": 0.005608821401727425,
-            "best_bid": 93.19,
-            "best_ask": 93.24,
+            "price": 93.48,
+            "return_1d": -0.015999999999999903,
+            "return_5d": -0.015999999999999903,
+            "volatility": 0.0060255432784367775,
+            "best_bid": 93.43,
+            "best_ask": 93.49,
+            "avg_daily_volume": 5000000.0,
+            "max_order_shares": 100000.0,
+            "position": 2000.0,
+            "fundamentals": {}
+          },
+          {
+            "symbol": "BANK_A",
+            "price": 59.51,
+            "return_1d": -0.008166666666666655,
+            "return_5d": -0.008166666666666655,
+            "volatility": 0.0038159176822113246,
+            "best_bid": 59.5,
+            "best_ask": 59.54,
             "avg_daily_volume": 5000000.0,
             "max_order_shares": 100000.0,
             "position": 1500.0,
             "fundamentals": {}
           },
           {
+            "symbol": "STAPLE_A",
+            "price": 48.37,
+            "return_1d": 0.007708333333333206,
+            "return_5d": 0.007708333333333206,
+            "volatility": 0.00957316361066081,
+            "best_bid": 48.36,
+            "best_ask": 48.39,
+            "avg_daily_volume": 5000000.0,
+            "max_order_shares": 100000.0,
+            "position": 2500.0,
+            "fundamentals": {}
+          }
+        ],
+        "portfolio": {
+          "cash": 389840.0,
+          "net_worth": 1001370.0,
+          "gross_exposure": 0.6106933501103489,
+          "max_leverage": 2.0,
+          "buying_power": 1391210.0
+        }
+      },
+      "response": "{\"actions\": [{\"symbol\": \"TECH_A\", \"side\": \"SELL\", \"quantity\": 300}, {\"symbol\": \"TECH_B\", \"side\": \"BUY\", \"quantity\": 500}, {\"symbol\": \"BANK_A\", \"side\": \"BUY\", \"quantity\": 500}], \"rationale\": \"Trimming TECH_A after its 2.1% one-day pop and adding to the pulled-back TECH_B plus low-volatility BANK_A diversifies the book and leans on mean reversion while keeping leverage well under limits with elevated VIX.\"}"
+    },
+    {
+      "arm": "live",
+      "step": 12,
+      "day": 2,
+      "digest": "7d726516b289b56a",
+      "prompt": {
+        "step": 12,
+        "day": 2,
+        "steps_per_day": 6,
+        "macro": {
+          "federal_funds_rate": 0.03,
+          "corporate_bond_yield": 0.055364238147348734,
+          "vix": 24.354951757491076,
+          "inflation_rate": 0.028221400410657196,
+          "cycle": "expansion"
+        },
+        "assets": [
+          {
+            "symbol": "TECH_A",
+            "price": 140.87,
+            "return_1d": -0.014343688776938035,
+            "return_5d": 0.006214285714285728,
+            "volatility": 0.00850632165807443,
+            "best_bid": 140.82,
+            "best_ask": 140.88,
+            "avg_daily_volume": 5000000.0,
+            "max_order_shares": 100000.0,
+            "position": 1200.0,
+            "fundamentals": {}
+          },
+          {
+            "symbol": "TECH_B",
+            "price": 94.36,
+            "return_1d": 0.009413778348309698,
+            "return_5d": -0.006736842105263152,
+            "volatility": 0.00554376197946955,
+            "best_bid": 94.33,
+            "best_ask": 94.39,
+            "avg_daily_volume": 5000000.0,
+            "max_order_shares": 100000.0,
+            "position": 2500.0,
+            "fundamentals": {}
+          },
+          {
             "symbol": "BANK_A",
-            "price": 59.54,
-            "return_1d": -0.0076666666666667105,
-            "return_5d": -0.0076666666666667105,
-            "volatility": 0.003705397319886692,
-            "best_bid": 59.53,
-            "best_ask": 59.56,
+            "price": 59.47,
+            "return_1d": -0.0006721559401781096,
+            "return_5d": -0.00883333333333336,
+            "volatility": 0.004535562808071094,
+            "best_bid": 59.44,
+            "best_ask": 59.48,
             "avg_daily_volume": 5000000.0,
             "max_order_shares": 100000.0,
             "position": 2000.0,
@@ -160,12 +240,12 @@
           },
           {
             "symbol": "STAPLE_A",
-            "price": 48.32,
-            "return_1d": 0.006666666666666599,
-            "return_5d": 0.006666666666666599,
-            "volatility": 0.007168185710744897,
-            "best_bid": 48.32,
-            "best_ask": 48.34,
+            "price": 48.54,
+            "return_1d": 0.003514575149886401,
+            "return_5d": 0.011249999999999982,
+            "volatility": 0.007537146634692758,
+            "best_bid": 48.52,
+            "best_ask": 48.55,
             "avg_daily_volume": 5000000.0,
             "max_order_shares": 100000.0,
             "position": 2500.0,
@@ -173,133 +253,53 @@
           }
         ],
         "portfolio": {
-          "cash": 407360.0,
-          "net_worth": 1000010.0,
-          "gross_exposure": 0.5926440735592644,
+          "cash": 356195.0,
+          "net_worth": 1001429.0,
+          "gross_exposure": 0.6443132763281271,
           "max_leverage": 2.0,
-          "buying_power": 1407370.0
+          "buying_power": 1357624.0
         }
       },
-      "response": "{\"actions\": [{\"symbol\": \"TECH_B\", \"side\": \"BUY\", \"quantity\": 1000}, {\"symbol\": \"BANK_A\", \"side\": \"BUY\", \"quantity\": 1000}, {\"symbol\": \"TECH_A\", \"side\": \"HOLD\", \"quantity\": 0}, {\"symbol\": \"STAPLE_A\", \"side\": \"HOLD\", \"quantity\": 0}], \"rationale\": \"Expansion regime with low VIX (15) favors modest added risk while staying unlevered: I add to the one-day laggard TECH_B for mean reversion and to low-volatility BANK_A, keeping over $250k cash as a downside buffer and gross exposure near 75%.\"}"
-    },
-    {
-      "arm": "live",
-      "step": 12,
-      "day": 2,
-      "digest": "78587f8d0c9d32a5",
-      "prompt": {
-        "step": 12,
-        "day": 2,
-        "steps_per_day": 6,
-        "macro": {
-          "federal_funds_rate": 0.03,
-          "corporate_bond_yield": 0.053523476228861784,
-          "vix": 14.947278565762609,
-          "inflation_rate": 0.028221465682935133,
-          "cycle": "expansion"
-        },
-        "assets": [
-          {
-            "symbol": "TECH_A",
-            "price": 141.72,
-            "return_1d": -0.0016202888340964838,
-            "return_5d": 0.012285714285714233,
-            "volatility": 0.0068086985743863815,
-            "best_bid": 141.7,
-            "best_ask": 141.74,
-            "avg_daily_volume": 5000000.0,
-            "max_order_shares": 100000.0,
-            "position": 1500.0,
-            "fundamentals": {}
-          },
-          {
-            "symbol": "TECH_B",
-            "price": 94.35,
-            "return_1d": 0.012013300439772445,
-            "return_5d": -0.006842105263157983,
-            "volatility": 0.00552160317531492,
-            "best_bid": 94.33,
-            "best_ask": 94.38,
-            "avg_daily_volume": 5000000.0,
-            "max_order_shares": 100000.0,
-            "position": 2500.0,
-            "fundamentals": {}
-          },
-          {
-            "symbol": "BANK_A",
-            "price": 59.67,
-            "return_1d": 0.0021834061135370675,
-            "return_5d": -0.005499999999999949,
-            "volatility": 0.004779851140110013,
-            "best_bid": 59.64,
-            "best_ask": 59.67,
-            "avg_daily_volume": 5000000.0,
-            "max_order_shares": 100000.0,
-            "position": 3000.0,
-            "fundamentals": {}
-          },
-          {
-            "symbol": "STAPLE_A",
-            "price": 48.6,
-            "return_1d": 0.005794701986755024,
-            "return_5d": 0.012499999999999956,
-            "volatility": 0.006059782380119634,
-            "best_bid": 48.59,
-            "best_ask": 48.61,
-            "avg_daily_volume": 5000000.0,
-            "max_order_shares": 100000.0,
-            "position": 2500.0,
-            "fundamentals": {}
-          }
-        ],
-        "portfolio": {
-          "cash": 254560.0,
-          "net_worth": 1003525.0,
-          "gross_exposure": 0.7463341720435465,
-          "max_leverage": 2.0,
-          "buying_power": 1258085.0
-        }
-      },
-      "response": "{\"actions\": [{\"symbol\": \"STAPLE_A\", \"side\": \"BUY\", \"quantity\": 1000}, {\"symbol\": \"TECH_A\", \"side\": \"BUY\", \"quantity\": 400}, {\"symbol\": \"TECH_B\", \"side\": \"HOLD\", \"quantity\": 0}, {\"symbol\": \"BANK_A\", \"side\": \"HOLD\", \"quantity\": 0}], \"rationale\": \"Expansion regime with low VIX supports staying invested, so I deploy part of the idle cash into the two names with positive 1-day and 5-day momentum (STAPLE_A defensive, TECH_A trend), while keeping ~13% cash and leverage well under limit for downside control.\"}"
+      "response": "{\"actions\": [{\"symbol\": \"STAPLE_A\", \"side\": \"BUY\", \"quantity\": 1000}, {\"symbol\": \"TECH_A\", \"side\": \"SELL\", \"quantity\": 300}, {\"symbol\": \"TECH_B\", \"side\": \"HOLD\", \"quantity\": 0}, {\"symbol\": \"BANK_A\", \"side\": \"HOLD\", \"quantity\": 0}], \"rationale\": \"With VIX elevated near 24, I am trimming the highest-volatility name (TECH_A, which also has negative 1-day momentum) and rotating into STAPLE_A, which shows positive 1- and 5-day momentum with defensive characteristics. Gross exposure stays well under the leverage cap with ample cash buffer.\"}"
     },
     {
       "arm": "live",
       "step": 18,
       "day": 3,
-      "digest": "c5093e7041679d47",
+      "digest": "d1f427bd600887d6",
       "prompt": {
         "step": 18,
         "day": 3,
         "steps_per_day": 6,
         "macro": {
           "federal_funds_rate": 0.03,
-          "corporate_bond_yield": 0.053523476228861784,
-          "vix": 14.03228222507177,
-          "inflation_rate": 0.028221465682935133,
+          "corporate_bond_yield": 0.055364238147348734,
+          "vix": 21.731863086547865,
+          "inflation_rate": 0.028221400410657196,
           "cycle": "expansion"
         },
         "assets": [
           {
             "symbol": "TECH_A",
-            "price": 142.72,
-            "return_1d": 0.007056167090036647,
-            "return_5d": 0.01942857142857135,
-            "volatility": 0.007215725282462176,
-            "best_bid": 142.72,
-            "best_ask": 142.76,
+            "price": 142.85,
+            "return_1d": 0.014055512174345086,
+            "return_5d": 0.02035714285714274,
+            "volatility": 0.008275004396166463,
+            "best_bid": 142.85,
+            "best_ask": 142.9,
             "avg_daily_volume": 5000000.0,
             "max_order_shares": 100000.0,
-            "position": 1900.0,
+            "position": 900.0,
             "fundamentals": {}
           },
           {
             "symbol": "TECH_B",
-            "price": 95.5,
-            "return_1d": 0.012188659247482914,
-            "return_5d": 0.0052631578947368585,
-            "volatility": 0.006333535968464784,
-            "best_bid": 95.49,
-            "best_ask": 95.54,
+            "price": 95.19,
+            "return_1d": 0.008796100042390842,
+            "return_5d": 0.0020000000000000018,
+            "volatility": 0.005965753266808859,
+            "best_bid": 95.17,
+            "best_ask": 95.23,
             "avg_daily_volume": 5000000.0,
             "max_order_shares": 100000.0,
             "position": 2500.0,
@@ -307,25 +307,25 @@
           },
           {
             "symbol": "BANK_A",
-            "price": 61.08,
-            "return_1d": 0.02362996480643531,
-            "return_5d": 0.018000000000000016,
-            "volatility": 0.006888328096167832,
-            "best_bid": 61.07,
-            "best_ask": 61.1,
+            "price": 61.16,
+            "return_1d": 0.02841768959139057,
+            "return_5d": 0.019333333333333202,
+            "volatility": 0.007050660279101575,
+            "best_bid": 61.15,
+            "best_ask": 61.19,
             "avg_daily_volume": 5000000.0,
             "max_order_shares": 100000.0,
-            "position": 3000.0,
+            "position": 2000.0,
             "fundamentals": {}
           },
           {
             "symbol": "STAPLE_A",
-            "price": 49.59,
-            "return_1d": 0.020370370370370372,
-            "return_5d": 0.03312500000000007,
-            "volatility": 0.00605272031258942,
-            "best_bid": 49.58,
-            "best_ask": 49.61,
+            "price": 49.56,
+            "return_1d": 0.021013597033374687,
+            "return_5d": 0.03249999999999997,
+            "volatility": 0.007096281988823979,
+            "best_bid": 49.55,
+            "best_ask": 49.58,
             "avg_daily_volume": 5000000.0,
             "max_order_shares": 100000.0,
             "position": 3500.0,
@@ -333,53 +333,53 @@
           }
         ],
         "portfolio": {
-          "cash": 149254.0,
-          "net_worth": 1015977.0,
-          "gross_exposure": 0.8530931310452894,
+          "cash": 349891.0,
+          "net_worth": 1012211.0,
+          "gross_exposure": 0.654329976655065,
           "max_leverage": 2.0,
-          "buying_power": 1165231.0
+          "buying_power": 1362102.0
         }
       },
-      "response": "{\"actions\": [{\"symbol\": \"TECH_A\", \"side\": \"BUY\", \"quantity\": 300}, {\"symbol\": \"STAPLE_A\", \"side\": \"BUY\", \"quantity\": 800}], \"rationale\": \"Expansion regime with low VIX and broadly positive 1d/5d momentum favors staying invested; I add modestly to a growth leader and the low-volatility staple while keeping gross exposure near 0.9x and a cash buffer to limit downside.\"}"
+      "response": "{\"actions\": [{\"symbol\": \"STAPLE_A\", \"side\": \"BUY\", \"quantity\": 1500}, {\"symbol\": \"TECH_A\", \"side\": \"BUY\", \"quantity\": 300}, {\"symbol\": \"TECH_B\", \"side\": \"HOLD\", \"quantity\": 0}, {\"symbol\": \"BANK_A\", \"side\": \"HOLD\", \"quantity\": 0}], \"rationale\": \"Broad-based positive momentum in an expansion regime justifies adding modest exposure, favoring low-volatility STAPLE_A for downside control plus a small top-up in leading TECH_A. Elevated VIX keeps me from deploying full buying power, leaving a sizable cash buffer and gross exposure under 80%.\"}"
     },
     {
       "arm": "live",
       "step": 24,
       "day": 4,
-      "digest": "4415db5a3d90d6ef",
+      "digest": "9b45efcb872bec9f",
       "prompt": {
         "step": 24,
         "day": 4,
         "steps_per_day": 6,
         "macro": {
           "federal_funds_rate": 0.03,
-          "corporate_bond_yield": 0.053523476228861784,
-          "vix": 15.955929636238379,
-          "inflation_rate": 0.028221465682935133,
+          "corporate_bond_yield": 0.055364238147348734,
+          "vix": 25.146632414019457,
+          "inflation_rate": 0.028221400410657196,
           "cycle": "expansion"
         },
         "assets": [
           {
             "symbol": "TECH_A",
-            "price": 140.94,
-            "return_1d": -0.012471973094170363,
-            "return_5d": 0.006714285714285673,
-            "volatility": 0.007876278726885181,
-            "best_bid": 140.9,
-            "best_ask": 140.95,
+            "price": 140.6,
+            "return_1d": -0.015750787539376976,
+            "return_5d": 0.004285714285714226,
+            "volatility": 0.009033854770909065,
+            "best_bid": 140.55,
+            "best_ask": 140.61,
             "avg_daily_volume": 5000000.0,
             "max_order_shares": 100000.0,
-            "position": 2200.0,
+            "position": 1200.0,
             "fundamentals": {}
           },
           {
             "symbol": "TECH_B",
-            "price": 93.76,
-            "return_1d": -0.018219895287958088,
-            "return_5d": -0.013052631578947316,
-            "volatility": 0.006285212640469525,
-            "best_bid": 93.73,
-            "best_ask": 93.78,
+            "price": 93.52,
+            "return_1d": -0.01754385964912286,
+            "return_5d": -0.015578947368421137,
+            "volatility": 0.006392100389450542,
+            "best_bid": 93.48,
+            "best_ask": 93.55,
             "avg_daily_volume": 5000000.0,
             "max_order_shares": 100000.0,
             "position": 2500.0,
@@ -387,40 +387,40 @@
           },
           {
             "symbol": "BANK_A",
-            "price": 59.01,
-            "return_1d": -0.03388998035363455,
-            "return_5d": -0.01650000000000007,
-            "volatility": 0.006902807087684213,
-            "best_bid": 58.99,
-            "best_ask": 59.03,
+            "price": 58.6,
+            "return_1d": -0.04185742315238705,
+            "return_5d": -0.023333333333333317,
+            "volatility": 0.007715804615197676,
+            "best_bid": 58.58,
+            "best_ask": 58.62,
             "avg_daily_volume": 5000000.0,
             "max_order_shares": 100000.0,
-            "position": 3000.0,
+            "position": 2000.0,
             "fundamentals": {}
           },
           {
             "symbol": "STAPLE_A",
-            "price": 49.43,
-            "return_1d": -0.003226456946965217,
-            "return_5d": 0.02979166666666666,
-            "volatility": 0.005968506122274923,
-            "best_bid": 49.41,
-            "best_ask": 49.43,
+            "price": 49.41,
+            "return_1d": -0.003026634382566673,
+            "return_5d": 0.02937499999999993,
+            "volatility": 0.006822379870837783,
+            "best_bid": 49.39,
+            "best_ask": 49.42,
             "avg_daily_volume": 5000000.0,
             "max_order_shares": 100000.0,
-            "position": 4300.0,
+            "position": 5000.0,
             "fundamentals": {}
           }
         ],
         "portfolio": {
-          "cash": 66738.0,
-          "net_worth": 1000785.0,
-          "gross_exposure": 0.9333143482366343,
+          "cash": 232651.0,
+          "net_worth": 999421.0,
+          "gross_exposure": 0.7672142170316614,
           "max_leverage": 2.0,
-          "buying_power": 1067523.0
+          "buying_power": 1232072.0
         }
       },
-      "response": "{\"actions\": [{\"symbol\": \"BANK_A\", \"side\": \"SELL\", \"quantity\": 600}, {\"symbol\": \"STAPLE_A\", \"side\": \"BUY\", \"quantity\": 700}], \"rationale\": \"Gross exposure is already near 93%, so I am rebalancing rather than adding risk: trimming BANK_A, which has the weakest 1-day and 5-day momentum with above-average volatility, and rotating into STAPLE_A, the lowest-volatility name with the only positive 5-day trend.\"}"
+      "response": "{\"actions\": [{\"symbol\": \"STAPLE_A\", \"side\": \"BUY\", \"quantity\": 2000}, {\"symbol\": \"BANK_A\", \"side\": \"SELL\", \"quantity\": 800}, {\"symbol\": \"TECH_A\", \"side\": \"HOLD\", \"quantity\": 0}, {\"symbol\": \"TECH_B\", \"side\": \"HOLD\", \"quantity\": 0}], \"rationale\": \"With VIX ~25 and a broad one-day drawdown, I am rotating toward the defensive name with the only positive 5-day momentum (STAPLE_A) and trimming BANK_A, which showed the sharpest single-day loss and the most rate/credit sensitivity. Trades stay well inside order-size and buying-power limits, keeping gross exposure modest (~0.8x).\"}"
     }
   ]
 }
