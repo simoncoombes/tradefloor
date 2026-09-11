@@ -34,27 +34,25 @@
 //! Stated rather than absorbed, because a variance that silently omits a
 //! term is the same class of defect as one that reads the wrong process:
 //!
-//! - **The downside transmission tilt, and its LAGGED wire, which is much
-//!   the larger of the two and was not on this list at all.**
-//!   `market_beta_down_asym` scales one side of a zero-mean draw, which
-//!   raises its variance by `a + a^2/2` — 2.5 per cent of the factor term
-//!   at the shipped 0.025, about 1.5 per cent of `V_t`.
-//!   `market_beta_down_asym_lag`, which pt-v18 introduced at **0.375**,
-//!   scales the whole transmission by `1 + lag` on the session after a down
-//!   day whatever the tick's own sign — so it multiplies the factor term by
-//!   `(1 + lag)^2` = **1.891** on those days, not by 1.025. `prev_day_down`
-//!   reads `prev_day_factor < 0.0` on a zero-mean accumulated sum, so it is
-//!   true on about half of all sessions.
-//!
-//!   **This is a bigger omission than either of the two B4 closed the
-//!   read-back on, and it is not closed here.** It could be: the wire is a
-//!   deterministic one-bit state the close already holds
-//!   (`factor_vol::prev_day_down`), and the tilt itself is elementary —
-//!   because `z^2 A^2` is even, `E[z^2 A^2 (1 + a 1{z<0})^2]` is
-//!   `(1 + (1 + a)^2) / 2` times [`amplifier_moments`]' own second moment,
-//!   which is the `1 + a + a^2/2` the bullet already quotes. Carrying it
-//!   would move every pt-v19 trajectory a second time, which is why it is
-//!   stated here rather than done in the same change.
+//! - **The downside transmission tilt's RECENTRING RESIDUAL**, which is the
+//!   half of the tilt that is a drift and not a variance. The tilt itself
+//!   is carried — see [`IndexVarianceTerms::tilt_raw`] — but
+//!   `market_beta_down_asym` scales one side of a zero-mean draw and so
+//!   moves its MEAN, and `market_beta_down_asym_recentre` gives back
+//!   exactly the unamplified, unlagged mean. What is left over is
+//!   `d beta_w (L N / 2 - recentre / sqrt(2 pi))` per tick, where `N` is
+//!   `E[|z| A(|z|)]` and `L` the lag multiplier: zero on an unlagged
+//!   session with the amplifier silent, and a genuine daily drift on a
+//!   lagged one. A drift is not variance, so leaving it out makes this
+//!   variance a SECOND MOMENT rather than a central one and therefore
+//!   slightly HIGH. Measured on the tick by
+//!   `the_recentring_residual_is_the_size_it_is_claimed_to_be`: on a lagged
+//!   session at pt-v19's dials it is **0.29 per cent of the market block
+//!   and 0.21 per cent of `V_t`** at the anchor, rising to 0.62 and 0.56
+//!   per cent at the factor variance the pin ladder's deepest rung runs at.
+//!   It is the one item on this list whose sign is known and whose omission
+//!   is not conservative: every other one makes `V_t` low and this one
+//!   makes it high.
 //! - **Reversion, momentum, crowd lean and the squeeze**, measured together
 //!   at 0.6 per cent of the index's variance, and the cross-covariances
 //!   between components, measured at 2.6 per cent.
@@ -64,22 +62,50 @@
 //!   mechanisms B4 closed do. It is 0.0 in every shipped preset and inert there
 //!   through `factors.rs`'s own branch; on a preset that set it, the crisis
 //!   term below prices the UNDAMPED blend and overstates the regime.
-//! - **The crash amplifier's effect on each name's GARCH rest point.**
-//!   [`resting_garch_variances`] solves the rest point from a noise variance
-//!   that carries the market factor unamplified, so the anchor's per-name
-//!   block is short wherever the tick's absolute floor does not already
-//!   bind — which on the shipped preset is nearly nowhere.
+//! - **The crash amplifier's and the tilt's effect on each name's GARCH rest
+//!   point.** [`resting_garch_variances`] solves the rest point from a noise
+//!   variance that carries the market factor unamplified and untilted, so the
+//!   anchor's per-name block is short wherever the tick's absolute floor does
+//!   not already bind — which on the shipped preset is nearly nowhere.
 //!
 //! **"Together those are worth about five per cent of `V_t`" used to stand
 //! here, and it is no longer true.** It was true of the list this one
 //! replaced, which had four items and the largest of them at 1.5 per cent.
-//! The lagged wire alone is 1.891 on the factor term on about half of all
-//! sessions, so on those sessions the residual is tens of per cent of `V_t`
-//! and not five. The figure is withdrawn rather than re-estimated: nobody
-//! has measured the new list and a number nobody measured is what this
-//! section exists to refuse. What survives unchanged is the principle —
-//! they are not quietly folded into a coefficient, and the residual is the
-//! residual.
+//! The figure is withdrawn rather than re-estimated: nobody has measured
+//! the new list and a number nobody measured is what this section exists to
+//! refuse. What survives unchanged is the principle — they are not quietly
+//! folded into a coefficient, and the residual is the residual.
+//!
+//! # The downside transmission tilt and its lagged wire
+//!
+//! **The largest omission this module ever had, and it was on the residual
+//! list above rather than in the sum.** `market_beta_down_asym` scales one
+//! side of a zero-mean draw, which raises its variance by `a + a^2/2` — 2.5
+//! per cent of the factor term at the shipped 0.025.
+//! `market_beta_down_asym_lag`, which pt-v18 introduced at **0.375**, scales
+//! the whole transmission by `1 + lag` on the session after a down day
+//! whatever the tick's own sign — so it multiplies the factor term by
+//! `(1 + lag)^2` = **1.891** on those days, not by 1.025. `prev_day_down`
+//! reads `prev_day_factor < 0.0` on a zero-mean accumulated sum, so it is
+//! true on about half of all sessions, and the read-back was short by 89
+//! per cent of the factor block on every one of them.
+//!
+//! It is carried now, and it needed no new machinery: the wire is a
+//! deterministic one-bit state the close already holds
+//! (`factor_vol::prev_day_down`, passed in rather than re-derived), and the
+//! tilt is elementary because `z^2 A^2` is EVEN — the amplifier cannot tell
+//! the two half-lines apart, so the tilt splits the loading and not the
+//! moment. See [`IndexVarianceTerms::tilt_raw`] for the derivation and
+//! [`transmission_loadings`] for the two loadings it is built from.
+//!
+//! What it costs: the read-back rises by `(1 + (1 + a)^2)/2 - 1` of the
+//! market block on a lagged session with `a = lag` — 89 per cent — and by
+//! 2.5 per cent of it on every session through the tick-sign tilt. That is
+//! a level change on the anchor as well as on the conditional read, which
+//! is why [`index_unconditional_variance`] now averages the identity over
+//! the lag bit instead of evaluating it at the unlagged branch: the bit is
+//! a fair coin on a zero-mean sum, and an anchor read at one face of it
+//! would be the mean of nothing.
 //!
 //! # The crash amplifier and the crisis blend — charter bar B4
 //!
@@ -151,6 +177,110 @@
 //! not touched, and pt-v19's certified panel does not survive this: the
 //! down-tail row `index_tail_dn3_pct` reads 5.14 per cent against a band of
 //! 0.47 to 1.96 where it read 1.5671 before.
+//!
+//! # THE STABILITY CONDITION, AND WHY IT DOES NOT BIND ON THE CRISIS DIALS
+//!
+//! The condition the crisis dials would be derived from is writable now.
+//! Under `vix_level_identity` the VIX's deterministic map is
+//! `v -> implied(v)` — the fear excursion is made zero-mean by
+//! `expected_return_spike`, and on a pinned ladder the loop's own fixed
+//! point sits within a fifth of a VIX point of the identity's — pinned at
+//! 14 with the blend off, `implied / pinned` reads 1.007 while the day's
+//! own update reads -0.015 — so that is a measurement and not an
+//! assumption. The VIX lives on `[10, vix_ceiling]`, and the top of that
+//! interval is absorbing exactly when `implied(v) >= v` near it. So:
+//!
+//! > **(S)** `implied(v) < v` for every `v` in
+//! > `(crisis_vix_threshold, vix_ceiling]`.
+//!
+//! `implied(v) / v` rises on the saturated range — `amplifier_moments`' own
+//! second moment rises with the regime ratio while every other block is at
+//! most quadratic in `v` — and the spike is saturated at the ceiling for any
+//! threshold under `vix_ceiling - ramp * cap`. **So (S) binds at the ceiling
+//! and there alone, and the binding constraint does not contain
+//! `crisis_vix_threshold` at all.** With `crisis_blend_source` 1.0 the
+//! sector leak `C` is zero, `P_2` is a quadratic in the gain, and (S) at
+//! equality is a quadratic whose positive root is closed form:
+//!
+//! ```text
+//! R [ (b L)^2 tau + b L (2 + d) cap g + cap^2 g^2 ] + Q
+//!     = vix_ceiling^2 / ((1 + premium)^2 * 100^2 * 252)
+//! ```
+//!
+//! with `R = k v_f E[z^2 A^2]`, `Q` everything the blend does not touch,
+//! `tau = (1 + (1 + d)^2) / 2` and `b L` the transmitted loading. Measured
+//! on seeds 101-103 that root is **0.1496** against the shipped 0.8276,
+//! and re-measuring the ladder at it confirms `implied(80)/80 = 0.942`.
+//!
+//! **And it does not settle anything, because the runaway is not the
+//! blend's.** With `crisis_blend_gain` set to exactly **0.0** — the blend
+//! switched off, not merely reduced — the VIX still reaches `vix_ceiling`
+//! on 81 of 7,560 seed-days over the certification protocol's thirty
+//! rosters, on three of them (110, 114 and 115); at `48cfcab`, without the
+//! tilt term, 78 on the same three. Before B4 it reached the ceiling on 0
+//! of 7,560 and no seed exceeded 60, so the runaway arrived with B4 and is
+//! not the tilt's.
+//!
+//! **Over 120 rosters it is 11 of 120 at a gain of zero, and it follows the
+//! DRAW STREAM rather than the roster.** Hold the roster at one universe
+//! and vary the market seed: 14 of 120 runs pin the VIX at its ceiling.
+//! Hold the market seed and vary the roster: **0 of 120**, and the highest
+//! VIX any of those 120 rosters reaches is 68.37. The runaway seeds are the
+//! same seeds either way. Roster properties barely separate the runs that
+//! reach the ceiling from those that do not (`beta_w` 0.983 against 0.968);
+//! the factor variance's own peak over baseline separates them sevenfold,
+//! 21.68 against 3.05. The blend is a multiplier and a large one — the
+//! shipped gain takes 11 runs of 120 to 30, and 164 ceiling days to 1,477 —
+//! and it is not the cause. Measured by `b4read1`, whose registration and
+//! result live in the design repository.
+//!
+//! The chain, measured:
+//!
+//! - the market factor's variance process makes excursions of 20 to 50
+//!   times its target lasting tens of sessions, **and they are ordinary**.
+//!   The fast component alone fails the fourth-moment condition
+//!   (`3 alpha^2 + 2 alpha beta + beta^2` = 1.1035), which was already on
+//!   the record; the SHIPPED process is a 0.65/0.35 mixture whose own
+//!   condition is the spectral radius of a 4x4 matrix and reads 0.9870,
+//!   **under one**, so the shipped factor variance has a finite fourth
+//!   moment. Its dispersion is heavy and finite — implied factor kurtosis
+//!   13 against the tape's own GARCH at 11.3 — and is the finite-sample
+//!   dispersion of any GARCH at this persistence. The excursion this
+//!   read-back turns into a ceiling-pinned VIX is the variance process
+//!   behaving like the tape, which makes the finding worse and not better;
+//! - those excursions are upstream of everything here, and the read-back
+//!   cannot reach them. Pinned at VIX 14 — the loop cut, the target held at
+//!   0.45 times base — seed 114's factor variance sits at a median 11.7
+//!   times base over eighty scored sessions on pt-v19 before B4, at
+//!   `48cfcab` and at this commit alike, the three agreeing to within one
+//!   per cent, where seed 101 reads 0.38. The residual is the derived
+//!   anchor, which differs between the builds and so moves the target;
+//! - at the deepest point of that excursion, 14.0 times base, the regime
+//!   ratio is 3.74 and the amplifier's threshold sits half a conditional
+//!   sigma out, so `amplifier_moments`' second moment is 3.48: the
+//!   amplifier term is two and a half times the factor block and this
+//!   identity reads back an implied VIX of 157 from a state the old
+//!   read-back reported as a high but bounded one. Correctly — it is
+//!   asserted against the tick.
+//!
+//! So the dial whose loop gain the read-back has newly exposed is
+//! `crash_amplifier_slope`, against `market_vol_alpha` and
+//! `market_vol_beta`; `crisis_blend_gain` sits on top of that and can make
+//! it worse but cannot make it well. A gain near 0.05 passes the certified
+//! bands at both horizons and leaves the ceiling reached on 93 of 7,560
+//! seed-days against 81 at a gain of zero, which is the shape of the
+//! problem: the bands can be satisfied while the loop stays broken, so the
+//! bands are not what decides this. The routes that would settle it, none
+//! of them a dial on this module: normalise `crash_amplifier`'s
+//! `shock_magnitude` by the CONDITIONAL sigma rather than the base one —
+//! the alternative `factors.rs` weighs and rejects, whose cost it has
+//! already measured — which makes `E[z^2 A^2]` flat in the regime and
+//! removes the superlinear term from (S) entirely; or recalibrate
+//! `market_vol_alpha` and `market_vol_beta`, which the design repository has
+//! already derived from the tape at 0.1059 and 0.8787 against the shipped
+//! 0.28035 and 0.69245, and which moves every preset from pt-v13 on; or give `crisis_blend_variance_damp` a moment so it can be used to
+//! bound the blend's own level effect, which is an incomplete-gamma
+//! integral rather than the `phi` and `Phi` the rest of this module needs.
 //!
 //! # Draws
 //!
@@ -317,6 +447,73 @@ pub fn amplifier_moments(slope: f64, threshold: f64, regime_ratio: f64) -> (f64,
     )
 }
 
+/// **The index's market loading on an up tick and on a down tick**, as the
+/// transmission tilt splits it — and the first and second moments of that
+/// split loading, which is what the variance identity needs.
+///
+/// # What the tick does
+///
+/// `factors::calculate_live_factors` builds a name's market component in
+/// three steps, and the ORDER of them is the whole content of this
+/// function:
+///
+/// ```text
+/// factor_through = beta_i * F                      the draw
+///                * (1 + d)      if F < 0           the tick-sign tilt
+///                * (1 + lag)    if prev_day_down   the lagged wire
+/// market_component = factor_through + q g p F      the crisis injection
+/// random_noise    += market_component * A(|F|)     the crash amplifier
+/// ```
+///
+/// So the tilt and the lag multiply `beta_i` and **not** the crisis
+/// injection, which is added after them; and the amplifier multiplies both,
+/// because it is applied to the sum. Cap-weighting over the roster and
+/// using `sum_i w_i = 1`, the index's market-driven tick return is
+/// `F A(|F|) * (beta_w L (1 + d 1{F<0}) + G)` with `L = 1 + lag` on a
+/// lagged session and `G = q g p`.
+///
+/// # The moments
+///
+/// The loading takes exactly two values, one per half-line, and `z^2 A(|z|)`
+/// and `z^2 A(|z|)^2` are both EVEN — the amplifier normalises by `|F|`, so
+/// it cannot tell the half-lines apart. Each half therefore carries exactly
+/// half of whichever amplifier moment it multiplies, and
+///
+/// ```text
+/// E[z^2 A^2 (loading)^2] = (up^2 + down^2) / 2  *  E[z^2 A^2]
+/// E[z^2 A   (loading)  ] = (up + down) / 2      *  E[z^2 A]
+/// ```
+///
+/// which is why this returns `((up + down)/2, (up^2 + down^2)/2)` and the
+/// identity multiplies each by the amplifier moment of the matching order.
+/// At `d = 0` both collapse to `up` and `up^2` and the tilt has cost
+/// nothing; at `lag = 0` on an unlagged session `L` is 1 and `up` is the
+/// `beta_w + G` the calm identity already had.
+///
+/// The `(1 + (1 + d)^2) / 2` the module's residual list used to quote is
+/// this function at `G = 0` and `L = 1`, and it is `1 + d + d^2/2` — the
+/// `a + a^2/2` the same bullet quoted, which is the check that the two
+/// statements of the tilt were ever the same statement.
+///
+/// # What it is NOT
+///
+/// The tilt also moves the loading's MEAN, because it scales one side of a
+/// zero-mean draw. That is a drift and not a variance, it is given back (at
+/// `L = 1`, and only there) by `market_beta_down_asym_recentre`, and the
+/// leftover is on the residual list at the top of this module with its
+/// measured size. Nothing here carries it.
+pub fn transmission_loadings(
+    beta_w: f64,
+    lag_multiplier: f64,
+    tilt: f64,
+    injection: f64,
+) -> (f64, f64) {
+    let carried = beta_w * lag_multiplier;
+    let up = carried + injection;
+    let down = carried * (1.0 + tilt) + injection;
+    ((up + down) * 0.5, (up * up + down * down) * 0.5)
+}
+
 /// The idiosyncratic sigma the TICK draws with for one name: its GARCH
 /// state through the floor, its beta-dependent scale and its size
 /// multiplier, in daily units.
@@ -443,6 +640,42 @@ pub struct IndexVarianceTerms {
     /// of the draw. No shipped preset sets it and the field is asserted to
     /// be zero at the call site rather than silently ignored.
     pub crisis_raw: f64,
+    /// **The downside transmission tilt and its lagged wire**, before `K`,
+    /// and exactly `0.0` when neither dial is live on this session.
+    ///
+    /// The tick's market loading is not `beta_w` but a two-valued random
+    /// variable — `beta_w L` on an up tick, `beta_w L (1 + d)` on a down one
+    /// — and the crisis injection is added AFTER both, so it does not
+    /// receive them. [`transmission_loadings`] returns that loading's first
+    /// and second moments `(P_1, P_2)` and the market-driven block is
+    ///
+    /// ```text
+    /// v_f [ P_2 E[z^2 A^2] + 2 C P_1 E[z^2 A] + C^2 ]
+    /// ```
+    ///
+    /// with `C` the unamplified, untilted leak through the sector slot. This
+    /// field carries what that is over and above what `factor_raw`,
+    /// `crash_raw` and `crisis_raw` already hold between them — those three
+    /// sum to the same expression at `P_1 = B`, `P_2 = B^2` — so
+    ///
+    /// ```text
+    /// tilt_raw = v_f [ (P_2 - B^2) E[z^2 A^2] + 2 C (P_1 - B) E[z^2 A] ]
+    /// ```
+    ///
+    /// and the sector attenuation is untouched, because neither wire reaches
+    /// the sector slot.
+    ///
+    /// **`lag_multiplier` is state, not a parameter.** It is `1 + lag` on a
+    /// session whose predecessor accumulated a down market factor and `1`
+    /// otherwise, read from `factor_vol::prev_day_down` — the same bit
+    /// `compute_tick` reads, passed in rather than re-derived, for the
+    /// reason `crisis_spike_for` is shared. On the shipped 0.375 that is
+    /// 1.891 on the market block, on about half of all sessions.
+    ///
+    /// A BRANCH at "neither wire live", so a preset before pt-v18 on a
+    /// session with no tilt lands on exactly `0.0` and the sum below
+    /// reproduces on bits.
+    pub tilt_raw: f64,
     /// The intraday curve's second moment, [`intraday_variance_factor`].
     pub k: f64,
     /// `lambda_m (mu^2 + sigma_m^2) - (lambda_m mu)^2`.
@@ -466,20 +699,21 @@ impl IndexVarianceTerms {
     /// diverges from a run that differs by an ULP. Asserted on bits by
     /// `the_terms_sum_to_the_variance_they_were_split_from`.
     ///
-    /// **The regime terms are appended to the noise block, not inserted
-    /// into it.** `crash_raw` and `crisis_raw` are added AFTER
-    /// `idio_raw`, so on a state where both are exactly zero — an
-    /// amplifier switched off and a VIX under the crisis threshold — the
-    /// sum is `k * (a + b + c + 0.0 + 0.0) + …`, which is bit-identical
+    /// **The regime and tilt terms are appended to the noise block, not
+    /// inserted into it.** `crash_raw`, `crisis_raw` and `tilt_raw` are
+    /// added AFTER `idio_raw`, so on a state where all three are exactly
+    /// zero — an amplifier switched off, a VIX under the crisis threshold
+    /// and neither transmission wire live — the sum is
+    /// `k * (a + b + c + 0.0 + 0.0 + 0.0) + …`, which is bit-identical
     /// to what stood here: IEEE-754 addition of `+0.0` is exact for every
     /// finite operand. That is the property
     /// `the_calm_regime_reproduces_the_sum_it_replaced` asserts, and it is
-    /// why the two new terms could be given their own fields rather than
+    /// why the three new terms could be given their own fields rather than
     /// folded into `factor_raw`.
     pub fn total(&self) -> f64 {
         self.k
             * (self.factor_raw + self.sector_raw + self.idio_raw + self.crash_raw
-                + self.crisis_raw)
+                + self.crisis_raw + self.tilt_raw)
             + self.market_jump
             + self.idio_jump
             + self.news
@@ -524,11 +758,12 @@ pub fn index_conditional_variance(
     sector_sigma: f64,
     jump_rate_scale: f64,
     crisis_spike: f64,
+    prev_day_down: bool,
     k: f64,
 ) -> f64 {
     index_conditional_variance_terms(
         p, names, sector_count, factor_variance, sector_sigma, jump_rate_scale,
-        crisis_spike, k)
+        crisis_spike, prev_day_down, k)
         .total()
 }
 
@@ -552,6 +787,7 @@ pub fn index_conditional_variance_terms(
     sector_sigma: f64,
     jump_rate_scale: f64,
     crisis_spike: f64,
+    prev_day_down: bool,
     k: f64,
 ) -> IndexVarianceTerms {
     let mut beta_w = 0.0;
@@ -598,6 +834,19 @@ pub fn index_conditional_variance_terms(
     // the sum this replaced on bits.
     let crash_raw = factor_raw * (amp_2 - 1.0);
 
+    // ── The transmission the tick runs, which is not `beta_w` ─────────────
+    //
+    // The lagged wire is a bit of STATE the close already holds, passed in
+    // rather than re-derived here, for the same reason `crisis_spike_for` is
+    // shared with the tick: the read-back and the tick must not be able to
+    // disagree about which session is which. A branch at each dial's zero,
+    // so a preset without the wire lands on exactly 1.0.
+    let lag_multiplier = if p.market_beta_down_asym_lag == 0.0 || !prev_day_down {
+        1.0
+    } else {
+        1.0 + p.market_beta_down_asym_lag
+    };
+
     // The crisis blend, at the spike the close's VIX implies. A BRANCH at
     // zero spike, so every session under `crisis_vix_threshold` — and every
     // preset read at a VIX below it — lands on exactly `0.0` rather than on
@@ -623,6 +872,26 @@ pub fn index_conditional_variance_terms(
             + (h * h - 1.0) * sector_var
     };
 
+    // ── The tilt, on top of the loading the three terms above priced ──────
+    //
+    // `b` and the leak `c` are rebuilt here rather than lifted out of the
+    // branch above, so that branch stays the arithmetic it was, bit for bit,
+    // on every state this one is inert on. A BRANCH at "neither wire live",
+    // for the same reason: at `tilt == 0.0` and `lag_multiplier == 1.0` the
+    // two loadings below are the same double and the corrections are exactly
+    // `0.0` by algebra — but a branch says so without asking the reader to
+    // check that `(x + x) / 2` is `x`.
+    let tilt_raw = if p.market_beta_down_asym == 0.0 && lag_multiplier == 1.0 {
+        0.0
+    } else {
+        let injection = p.crisis_blend_source * p.crisis_blend_gain * crisis_spike;
+        let b = beta_w + injection;
+        let c = sector_loaded_total * crisis_spike * (1.0 - p.crisis_blend_source);
+        let (p1, p2) = transmission_loadings(
+            beta_w, lag_multiplier, p.market_beta_down_asym, injection);
+        factor_variance * ((p2 - b * b) * amp_2 + 2.0 * c * (p1 - b) * amp_1)
+    };
+
     let (lambda_m, lambda_i) = jump_intensities(p, jump_rate_scale);
     let mu = p.jump_mean_market;
     let sig = p.jump_sigma_market;
@@ -639,6 +908,7 @@ pub fn index_conditional_variance_terms(
         idio_raw: idio_var,
         crash_raw,
         crisis_raw,
+        tilt_raw,
         k,
         market_jump,
         idio_jump,
@@ -747,14 +1017,33 @@ pub fn resting_garch_variances(
 /// and the amplifier is worth about four per cent of the factor block. It is
 /// part of the index's unconditional variance and belongs in the anchor.
 ///
+/// # The lagged wire at this point, which is a COIN and not a coupling
+///
+/// `market_beta_down_asym_lag` is not a VIX coupling and does not read one at
+/// the anchor: it is a bit of state, true on the session after a down market
+/// factor. `prev_day_factor` is a zero-mean accumulated sum, so the bit is a
+/// fair coin, and the index's unconditional variance is the MEAN over it —
+/// which this takes literally, evaluating the identity at both faces and
+/// averaging. `the_anchor_averages_over_the_coin_it_cannot_read` asserts the
+/// average is the average, and measures the gap: on that test's roster the
+/// two faces read 19.45 and 24.58 VIX points and the unlagged one alone is
+/// 14 per cent low. The gap is a property of the roster as well as of the
+/// dial, so the test asserts it is large rather than asserting a number.
+///
+/// Evaluating at the unlagged face instead would be the defect this whole
+/// module exists to remove, one level up: a level constant read at one face
+/// of a state that spends half its time at the other. And the average is
+/// still a point needing no anchor to evaluate, so the derivation below
+/// stays non-circular.
+///
 /// **What is still left out here**, and is now the largest named residual in
 /// this module: [`resting_garch_variances`] solves each name's GARCH rest
 /// point from `name_noise_variance`, which carries the market factor WITHOUT
-/// the amplifier. The resting level is under the tick's absolute floor for
-/// nearly every name on the shipped preset, so the omission is inert where
-/// the floor binds and understates the rest point where it does not. It is
-/// stated rather than absorbed, on the same footing as the rest of the list
-/// in the module docs.
+/// the amplifier and WITHOUT the tilt. The resting level is under the tick's
+/// absolute floor for nearly every name on the shipped preset, so the
+/// omission is inert where the floor binds and understates the rest point
+/// where it does not. It is stated rather than absorbed, on the same footing
+/// as the rest of the list in the module docs.
 pub fn index_unconditional_variance(
     p: &ModelParams,
     names: &[NameVariance],
@@ -771,8 +1060,20 @@ pub fn index_unconditional_variance(
         .enumerate()
         .map(|(i, n)| NameVariance { garch_variance: resting[i], ..*n })
         .collect();
-    index_conditional_variance(
-        p, &at_rest, sector_count, factor_variance, sector_sigma, 1.0, 0.0, k)
+    // Both faces of the coin, averaged. A BRANCH at "no lagged wire", so
+    // every preset before pt-v18 evaluates the identity exactly once and
+    // lands on the bits it always did: `0.5 * (x + x)` is `x` for every
+    // finite double, but the second evaluation is work done to learn
+    // nothing and the branch says which presets it is for.
+    if p.market_beta_down_asym_lag == 0.0 {
+        return index_conditional_variance(
+            p, &at_rest, sector_count, factor_variance, sector_sigma, 1.0, 0.0, false, k);
+    }
+    let unlagged = index_conditional_variance(
+        p, &at_rest, sector_count, factor_variance, sector_sigma, 1.0, 0.0, false, k);
+    let lagged = index_conditional_variance(
+        p, &at_rest, sector_count, factor_variance, sector_sigma, 1.0, 0.0, true, k);
+    0.5 * (unlagged + lagged)
 }
 
 /// A variance in fraction² per session, as a VIX level: the identity
@@ -848,7 +1149,7 @@ mod tests {
         p.crash_amplifier_slope = 0.0;
         let v_f = p.market_factor_sigma * p.market_factor_sigma;
         let only_factor =
-            index_conditional_variance(&p, &names, 3, v_f, 0.0, 1.0, 0.0, k);
+            index_conditional_variance(&p, &names, 3, v_f, 0.0, 1.0, 0.0, false, k);
         let beta_w: f64 = names.iter().map(|n| n.weight * n.beta).sum();
         // The idiosyncratic block is still there: subtract it explicitly
         // rather than trying to switch it off, because the tick's floor
@@ -860,14 +1161,29 @@ mod tests {
                 n.weight * n.weight * s * s
             })
             .sum();
-        let want = k * (beta_w * beta_w * v_f + idio);
+        // The TICK-SIGN tilt is live on pt-v18 whatever the lag bit says, so
+        // the factor block is not `beta_w^2 v_f` but that times the loading's
+        // own second moment. Written out here as `(1 + (1 + d)^2) / 2` rather
+        // than taken from `transmission_loadings`, so this stays a check of
+        // the identity against algebra and not against itself.
+        let d = p.market_beta_down_asym;
+        let tilt_2 = (1.0 + (1.0 + d) * (1.0 + d)) / 2.0;
+        let want = k * (beta_w * beta_w * v_f * tilt_2 + idio);
         assert!((only_factor - want).abs() < 1e-18, "{only_factor} vs {want}");
+        // And the lag is a multiplier on top of that, on the session after a
+        // down day: `(1 + lag)^2` on the whole block, 1.891 at pt-v18's
+        // 0.375. The one term in this module that reads a bit of state.
+        let lagged =
+            index_conditional_variance(&p, &names, 3, v_f, 0.0, 1.0, 0.0, true, k);
+        let l = 1.0 + p.market_beta_down_asym_lag;
+        let want_lagged = k * (beta_w * beta_w * v_f * l * l * tilt_2 + idio);
+        assert!((lagged - want_lagged).abs() < 1e-18, "{lagged} vs {want_lagged}");
 
         // News alone, on top: an exactly computable increment.
         let mut with_news = p.clone();
         with_news.endogenous_news_intensity = 0.05;
         with_news.endogenous_news_sigma = 0.02;
-        let news = index_conditional_variance(&with_news, &names, 3, v_f, 0.0, 1.0, 0.0, k)
+        let news = index_conditional_variance(&with_news, &names, 3, v_f, 0.0, 1.0, 0.0, false, k)
             - only_factor;
         let weight_sq: f64 = names.iter().map(|n| n.weight * n.weight).sum();
         assert!((news - weight_sq * 0.05 * 0.02 * 0.02).abs() < 1e-20, "news {news}");
@@ -885,8 +1201,8 @@ mod tests {
         p.sector_factor_sigma = 0.0;
         p.endogenous_news_intensity = 0.0;
         let v_f = p.market_factor_sigma * p.market_factor_sigma;
-        let at_k = index_conditional_variance(&p, &names, 3, v_f, 0.0, 1.0, 0.0, k);
-        let at_one = index_conditional_variance(&p, &names, 3, v_f, 0.0, 1.0, 0.0, 1.0);
+        let at_k = index_conditional_variance(&p, &names, 3, v_f, 0.0, 1.0, 0.0, false, k);
+        let at_one = index_conditional_variance(&p, &names, 3, v_f, 0.0, 1.0, 0.0, false, 1.0);
         // Only the noise block scaled, so the difference is (k-1) times the
         // noise block and the jump block is common to both.
         let noise_at_one = (at_k - at_one) / (k - 1.0);
@@ -1044,20 +1360,27 @@ mod tests {
     /// number, in the form `economy/daily.rs` asserts `return_spike_for`
     /// and `expected_return_spike` in.
     ///
-    /// **What B4 changed and what it did not.** `total()` now sums two more
-    /// terms inside the `k` group. Where both are exactly zero -- the
-    /// amplifier switched off and no crisis -- `a + b + c + 0.0 + 0.0` is
+    /// **What B4 and the tilt changed and what they did not.** `total()` now
+    /// sums three more terms inside the `k` group. Where all three are
+    /// exactly zero -- the amplifier switched off, no crisis, and neither
+    /// transmission wire live -- `a + b + c + 0.0 + 0.0 + 0.0` is
     /// `a + b + c` to the bit, because IEEE-754 addition of a positive zero
     /// is exact for every finite operand. So the old expression is still
     /// the answer in the regime it was the whole of, and this test says so
-    /// with the amplifier slope zeroed and the spike passed as 0.0. The
-    /// regime terms have their own tests; what this one protects is that
-    /// nothing was reassociated on the way past.
+    /// with the amplifier slope and both tilt dials zeroed and the spike
+    /// passed as 0.0. The new terms have their own tests; what this one
+    /// protects is that nothing was reassociated on the way past.
+    ///
+    /// **Both faces of the lag bit are swept**, because a preset with the
+    /// wire off must be bit-identical on a lagged session too -- that is
+    /// what makes the state this module now reads inert where the dial is.
     #[test]
     fn the_calm_regime_reproduces_the_sum_it_replaced() {
         let k_curve = intraday_variance_factor();
         for (label, mut p) in parameter_spread() {
             p.crash_amplifier_slope = 0.0;
+            p.market_beta_down_asym = 0.0;
+            p.market_beta_down_asym_lag = 0.0;
             for names in [roster(), roster_with_a_stray_sector()] {
                 for &sector_count in &[3usize, 5] {
                     for i in 0..=12 {
@@ -1066,25 +1389,28 @@ mod tests {
                             let sector_sigma = j as f64 * 0.0061;
                             for &scale in &[0.0, 0.25, 1.0, 1.7, 4.9, 27.5] {
                                 for &k in &[1.0, k_curve, 2.25] {
+                                  for &lagged in &[false, true] {
                                     let want = the_sum_as_it_was_written(
                                         &p, &names, sector_count, factor_variance,
                                         sector_sigma, scale, k);
                                     let terms = index_conditional_variance_terms(
                                         &p, &names, sector_count, factor_variance,
-                                        sector_sigma, scale, 0.0, k);
+                                        sector_sigma, scale, 0.0, lagged, k);
                                     assert_eq!(terms.crash_raw, 0.0, "{label}: amplifier off");
                                     assert_eq!(terms.crisis_raw, 0.0, "{label}: no crisis");
+                                    assert_eq!(terms.tilt_raw, 0.0, "{label}: no tilt");
                                     assert_eq!(
                                         terms.total(), want,
                                         "{label}: sectors {sector_count}, v_f \
                                          {factor_variance}, sigma_s {sector_sigma}, \
-                                         scale {scale}, k {k}");
+                                         scale {scale}, k {k}, lagged {lagged}");
                                     assert_eq!(
                                         index_conditional_variance(
                                             &p, &names, sector_count, factor_variance,
-                                            sector_sigma, scale, 0.0, k),
+                                            sector_sigma, scale, 0.0, lagged, k),
                                         want,
                                         "{label}: the summing form moved");
+                                  }
                                 }
                             }
                         }
@@ -1113,7 +1439,7 @@ mod tests {
         const SPIKE: f64 = 0.61;
         let (v_f, sigma_s, scale) = (0.00021, 0.0093, 1.6);
         let terms = index_conditional_variance_terms(
-            &p, &names, 3, v_f, sigma_s, scale, SPIKE, k);
+            &p, &names, 3, v_f, sigma_s, scale, SPIKE, false, k);
 
         let beta_w: f64 = names.iter().map(|n| n.weight * n.beta).sum();
         assert_eq!(terms.factor_raw, beta_w * beta_w * v_f, "factor_raw");
@@ -1178,7 +1504,7 @@ mod tests {
         // what catches a swap between two blocks whose closed forms were
         // copied from the same place.
         let no_sector = index_conditional_variance_terms(
-            &p, &names, 3, v_f, 0.0, scale, SPIKE, k);
+            &p, &names, 3, v_f, 0.0, scale, SPIKE, false, k);
         assert_eq!(no_sector.sector_raw, 0.0,
                    "the sector block did not follow its sigma");
         assert_eq!(no_sector.idio_raw, terms.idio_raw,
@@ -1189,14 +1515,14 @@ mod tests {
         let mut quiet = p.clone();
         quiet.endogenous_news_intensity = 0.0;
         let no_news = index_conditional_variance_terms(
-            &quiet, &names, 3, v_f, sigma_s, scale, SPIKE, k);
+            &quiet, &names, 3, v_f, sigma_s, scale, SPIKE, false, k);
         assert_eq!(no_news.news, 0.0,
                    "the news block did not follow its intensity");
         assert_eq!(no_news.idio_jump, terms.idio_jump,
                    "the news intensity reached idio_jump");
 
         let no_factor = index_conditional_variance_terms(
-            &p, &names, 3, 0.0, sigma_s, scale, SPIKE, k);
+            &p, &names, 3, 0.0, sigma_s, scale, SPIKE, false, k);
         assert_eq!(no_factor.factor_raw, 0.0,
                    "the factor block did not follow its variance");
         assert_eq!(no_factor.sector_raw, terms.sector_raw,
@@ -1209,7 +1535,7 @@ mod tests {
         let mut unamplified = p.clone();
         unamplified.crash_amplifier_slope = 0.0;
         let flat = index_conditional_variance_terms(
-            &unamplified, &names, 3, v_f, sigma_s, scale, SPIKE, k);
+            &unamplified, &names, 3, v_f, sigma_s, scale, SPIKE, false, k);
         assert_eq!(flat.crash_raw, 0.0, "the amplifier block did not follow its slope");
         assert_eq!(flat.factor_raw, terms.factor_raw, "the slope reached factor_raw");
         assert_eq!(flat.sector_raw, terms.sector_raw, "the slope reached sector_raw");
@@ -1218,7 +1544,7 @@ mod tests {
                  without it: {} against {}", flat.crisis_raw, terms.crisis_raw);
 
         let calm = index_conditional_variance_terms(
-            &p, &names, 3, v_f, sigma_s, scale, 0.0, k);
+            &p, &names, 3, v_f, sigma_s, scale, 0.0, false, k);
         assert_eq!(calm.crisis_raw, 0.0, "the blend block did not follow its spike");
         assert_eq!(calm.crash_raw, terms.crash_raw, "the spike reached crash_raw");
         assert_eq!(calm.sector_raw, terms.sector_raw, "the spike reached sector_raw");
@@ -1245,7 +1571,7 @@ mod tests {
         let names = roster();
         let (v_f, sigma_s, spike) = (0.00021, 0.0093, 0.55);
         let terms =
-            index_conditional_variance_terms(&p, &names, 3, v_f, sigma_s, 1.0, spike, k);
+            index_conditional_variance_terms(&p, &names, 3, v_f, sigma_s, 1.0, spike, false, k);
 
         let beta_w: f64 = names.iter().map(|n| n.weight * n.beta).sum();
         let l_w: f64 = names
@@ -1418,22 +1744,36 @@ mod tests {
     ///
     /// Run at `crisis_blend_source` 1.0 and 0.0, because those are two
     /// different wirings of the same blend and the second one also removes
-    /// sector variance.
+    /// sector variance; and at both faces of the lag bit with the tilt on
+    /// and off, because the ORDER the tick applies the tilt, the injection
+    /// and the amplifier in is the whole content of
+    /// [`transmission_loadings`] and is the one thing algebra cannot check
+    /// about itself. A version that let the lag multiply the crisis
+    /// injection — which reads more natural than what `factors.rs` does —
+    /// passes every other test in this file and fails this one by 30 per
+    /// cent at saturation.
     #[test]
     fn the_regime_terms_reproduce_the_index_the_tick_builds() {
         let k = intraday_variance_factor();
         let names = roster();
+        // An explicit case list and not a cross product: a preset with the
+        // lag at 0.0 reads the same on both faces of the bit, so half of a
+        // cross product would be the same quadrature run twice, and this
+        // integral is the most expensive thing in the file.
         for &source in &[1.0, 0.0] {
+          for &(tilt, lag, lagged) in &[
+              (0.0, 0.0, false),      // neither wire: the calm identity
+              (0.025, 0.0, false),    // the tick-sign tilt alone
+              (0.025, 0.375, false),  // pt-v19's pair, unlagged session
+              (0.025, 0.375, true),   // pt-v19's pair, lagged session
+              (0.2, 1.1, true),       // far outside any preset, both large
+          ] {
             for &spike in &[0.0, 0.42, 0.98] {
                 for &v_f in &[3.0e-5, 5.766e-5, 2.4e-4] {
                     let mut p = PT_V18;
                     p.crisis_blend_source = source;
-                    // The tilt and its recentring off: both are on the
-                    // module's residual list and neither is what this test
-                    // is about.
-                    p.market_beta_down_asym = 0.0;
-                    p.market_beta_down_asym_lag = 0.0;
-                    p.market_beta_down_asym_recentre = 0.0;
+                    p.market_beta_down_asym = tilt;
+                    p.market_beta_down_asym_lag = lag;
 
                     let sigma_tick = mathx::sqrt(v_f) / mathx::sqrt(390.0);
                     // The index's per-tick market-driven return at a given
@@ -1462,7 +1802,7 @@ mod tests {
                                     .map(|s| (format!("S{s}"), 0.0))
                                     .collect(),
                                 crisis_spike: spike,
-                                prev_day_down: false,
+                                prev_day_down: lagged,
                                 market_sigma_tick: sigma_tick,
                             };
                             let out = crate::market::factors::calculate_live_factors(
@@ -1496,27 +1836,216 @@ mod tests {
                         }
                     };
 
-                    // The measured per-tick variance of the index's
-                    // market-driven return. The mean is zero by symmetry and
-                    // is checked rather than assumed.
-                    let mean = integrate_against_the_normal(index_at);
-                    assert!(mean.abs() < 1e-14, "the transmission has a mean: {mean}");
-                    let per_tick = integrate_against_the_normal(|z| index_at(z) * index_at(z));
+                    // THE RECENTRING OFFSET, TAKEN FROM THE ENGINE AND NOT
+                    // FROM ALGEBRA. `tilt_recentre` is a deterministic
+                    // constant added to every tick's noise, and it is a mean
+                    // correction rather than a variance term — this module
+                    // does not carry it and says so. At `z = 0` the market
+                    // factor is zero, so the amplifier is one and the
+                    // market, sector and idiosyncratic components are all
+                    // exactly zero: what the tick returns there IS the
+                    // offset. Reading it off the tick rather than
+                    // reconstructing `recentre * d * beta_w * sigma / sqrt(2 pi)`
+                    // keeps this test independent of the expression it is
+                    // checking, which is the whole point of the file.
+                    let offset = index_at(0.0);
+                    if tilt == 0.0 {
+                        assert_eq!(offset, 0.0, "no tilt, no recentring");
+                    }
+                    // The measured per-tick SECOND MOMENT of the index's
+                    // market-driven return, which is what this module sums.
+                    let per_tick = integrate_against_the_normal(|z| {
+                        let centred = index_at(z) - offset;
+                        centred * centred
+                    });
                     let measured_daily = 390.0 * per_tick;
 
                     let terms = index_conditional_variance_terms(
-                        &p, &names, 3, v_f, 0.0, 1.0, spike, k);
+                        &p, &names, 3, v_f, 0.0, 1.0, spike, lagged, k);
                     // `idio_raw` is what the generator would have drawn and
                     // did not, and `sector_raw` is zero at a zero sector
                     // sigma. What is left is the block under test.
-                    let want = terms.factor_raw + terms.crash_raw + terms.crisis_raw;
+                    let want = terms.factor_raw + terms.crash_raw + terms.crisis_raw
+                        + terms.tilt_raw;
                     assert!(
                         (want - measured_daily).abs() < 1e-9 * measured_daily,
-                        "source {source}, spike {spike}, v_f {v_f}: identity {want} \
+                        "source {source}, tilt {tilt}, lag {lag}, lagged {lagged}, \
+                         spike {spike}, v_f {v_f}: identity {want} \
                          against the tick's own {measured_daily}");
+
+                    // THE MEAN, which is the residual and not the term. With
+                    // the tilt off it is zero by symmetry; with it on, the
+                    // tilt moves the draw's mean and
+                    // `market_beta_down_asym_recentre` gives back exactly the
+                    // UNAMPLIFIED, UNLAGGED part of it, so what is left is a
+                    // drift this variance does not subtract. Asserted at both
+                    // ends: exactly zero where it must be, and bounded by the
+                    // size the module's residual list claims where it is not.
+                    let mean = integrate_against_the_normal(index_at);
+                    let drift_share = (390.0 * mean) * (390.0 * mean) / measured_daily;
+                    if tilt == 0.0 {
+                        assert!(mean.abs() < 1e-14,
+                                "an untilted transmission has a mean: {mean}");
+                    }
+                    if tilt == 0.025 && lag == 0.375 {
+                        assert!(drift_share < 0.005,
+                                "the recentring residual is {:.4} of the market block \
+                                 at lagged {lagged}, spike {spike}, v_f {v_f}",
+                                drift_share);
+                    }
                 }
             }
+          }
         }
+    }
+
+    /// **THE ANCHOR IS A MEAN OVER A COIN, NOT A READING AT ONE FACE.**
+    ///
+    /// `market_beta_down_asym_lag` is state and not a coupling: it does not
+    /// read one at the anchor the way `sector_vix_coupling` and the jump
+    /// rate scale do, so [`index_unconditional_variance`] cannot evaluate it
+    /// "at the point every coupling reads one". `prev_day_factor` is a
+    /// zero-mean accumulated sum, so the bit is a fair coin and the
+    /// unconditional variance is the average of the two faces — which is
+    /// what that function takes, and what this asserts.
+    ///
+    /// The gap between the two faces is the reason it matters. Evaluating at
+    /// the unlagged face alone — the obvious reading, and the one that would
+    /// have left `pt-v19`'s anchor where it was — is measured here, and it
+    /// is not a rounding difference.
+    ///
+    /// A preset with the wire OFF must be untouched, and is: the function
+    /// branches before the second evaluation, so `pt-v16` and everything
+    /// before it land on the bits they always did.
+    #[test]
+    fn the_anchor_averages_over_the_coin_it_cannot_read() {
+        let names = roster();
+        let bases: Vec<f64> = names.iter().map(|n| n.garch_variance).collect();
+        let p = crate::params::PT_V19;
+        let k = intraday_variance_factor();
+        let v_f = p.market_factor_sigma * p.market_factor_sigma;
+        let resting = resting_garch_variances(
+            &p, &names, &bases, v_f, p.sector_factor_sigma, k);
+        let at_rest: Vec<NameVariance> = names
+            .iter()
+            .enumerate()
+            .map(|(i, n)| NameVariance { garch_variance: resting[i], ..*n })
+            .collect();
+        let unlagged = index_conditional_variance(
+            &p, &at_rest, 3, v_f, p.sector_factor_sigma, 1.0, 0.0, false, k);
+        let lagged = index_conditional_variance(
+            &p, &at_rest, 3, v_f, p.sector_factor_sigma, 1.0, 0.0, true, k);
+        let got = index_unconditional_variance(&p, &names, 3, &bases);
+        assert_eq!(got, 0.5 * (unlagged + lagged), "the average is the average");
+        // The two faces, as VIX levels, which is the unit the anchor is in.
+        let vix = |v: f64| vix_from_variance(p.vix_variance_premium, v);
+        let shortfall = vix(got) / vix(unlagged) - 1.0;
+        println!(
+            "anchor: unlagged {:.4}, lagged {:.4}, mean {:.4}; the unlagged face is \
+             {:.2}% low", vix(unlagged), vix(lagged), vix(got), 100.0 * shortfall);
+        assert!(lagged > unlagged, "the lagged face must be the larger");
+        assert!(shortfall > 0.05,
+                "if the two faces agreed this would not be worth branching on: \
+                 {:.4}", shortfall);
+        // A preset without the wire evaluates once and lands on that.
+        let mut no_wire = p.clone();
+        no_wire.market_beta_down_asym_lag = 0.0;
+        let single = index_conditional_variance(
+            &no_wire, &at_rest, 3, v_f, p.sector_factor_sigma, 1.0, 0.0, false, k);
+        assert_eq!(
+            index_unconditional_variance(&no_wire, &names, 3, &bases), single,
+            "a preset without the lagged wire must evaluate once, on the bits");
+    }
+
+    /// **THE ONE RESIDUAL WHOSE SIGN IS KNOWN, MEASURED RATHER THAN
+    /// ASSERTED TO BE SMALL.**
+    ///
+    /// The tilt moves the transmission's MEAN as well as its variance, and
+    /// `market_beta_down_asym_recentre` gives back exactly the unamplified,
+    /// unlagged part of that. What is left on a lagged session is a genuine
+    /// daily drift, and this module's sum does not subtract it — so `V_t` is
+    /// the transmission's second moment where a variance would be that less
+    /// the squared mean, and is therefore HIGH by the squared mean.
+    ///
+    /// Every other item on the residual list is a term left out, which makes
+    /// `V_t` low. This one makes it high, so the list would be misleading
+    /// without its size, and a size nobody measured is what that section
+    /// exists to refuse. Measured here over the pin ladder's own regime
+    /// range, on the tick itself, at pt-v19's dials.
+    #[test]
+    fn the_recentring_residual_is_the_size_it_is_claimed_to_be() {
+        let k = intraday_variance_factor();
+        let names = roster();
+        let p = crate::params::PT_V19;
+        let base_v = p.market_factor_sigma * p.market_factor_sigma;
+        let mut worst_block = 0.0f64;
+        let mut worst_total = 0.0f64;
+        let mut at_anchor = (0.0f64, 0.0f64);
+        // The regime ratios the ladder visits: the anchor, and the factor
+        // variance at pins up to x 3.
+        for &fvar_ratio in &[1.0, 1.742, 2.246, 4.162, 9.0] {
+            let v_f = base_v * fvar_ratio;
+            let sigma_tick = mathx::sqrt(v_f) / mathx::sqrt(390.0);
+            let spike = 0.0;
+            let index_at = |z: f64| {
+                let mut total = 0.0;
+                for (i, n) in names.iter().enumerate() {
+                    let company = crate::market::factors::FactorCompany {
+                        id: format!("N{i}"),
+                        sector: format!("S{}", n.sector),
+                        beta: Some(n.beta),
+                        market_cap: n.market_cap,
+                        avg_volume: 1.0e7,
+                        shares_outstanding: 1.0e9,
+                        short_interest: 0.0,
+                        float: 1.0e9,
+                        garch_variance: n.garch_variance,
+                        last_daily_return: Some(0.0),
+                    };
+                    let shared = crate::market::factors::SharedFactors {
+                        market_factor: z * sigma_tick,
+                        sector_factors: (0..3).map(|s| (format!("S{s}"), 0.0)).collect(),
+                        crisis_spike: spike,
+                        prev_day_down: true,
+                        market_sigma_tick: sigma_tick,
+                    };
+                    let out = crate::market::factors::calculate_live_factors(
+                        &company, &[], 0.0, 1.0, &shared, &p, &mut NoNoise);
+                    total += n.weight * out.random_noise;
+                }
+                total
+            };
+            let offset = index_at(0.0);
+            let block = 390.0
+                * integrate_against_the_normal(
+                    |z| (index_at(z) - offset) * (index_at(z) - offset));
+            let mean_day = 390.0 * integrate_against_the_normal(index_at);
+            let terms = index_conditional_variance_terms(
+                &p, &names, 3, v_f, p.sector_factor_sigma, 1.0, spike, true, k);
+            let of_block = mean_day * mean_day / block;
+            let of_total = mean_day * mean_day / terms.total();
+            if fvar_ratio == 1.0 {
+                at_anchor = (of_block, of_total);
+            }
+            worst_block = mathx::max(worst_block, of_block);
+            worst_total = mathx::max(worst_total, of_total);
+            println!(
+                "fvar x{fvar_ratio}: drift {:.6e}/day, {:.4}% of the market block, \
+                 {:.4}% of V_t", mean_day, 100.0 * of_block, 100.0 * of_total);
+        }
+        // The drift is negative — the tilt takes more off the down side than
+        // the recentring gives back once the lag has scaled it — so it is a
+        // real downward pressure on the index and not a rounding artefact.
+        assert!(at_anchor.0 > 0.0, "the residual vanished at the anchor");
+        // The claims in the module docs, as bounds rather than as equalities:
+        // a quadrature figure quoted to four places would be a claim about
+        // the quadrature.
+        assert!(at_anchor.0 < 0.004, "at the anchor it is {:.5} of the block", at_anchor.0);
+        assert!(at_anchor.1 < 0.003, "at the anchor it is {:.5} of V_t", at_anchor.1);
+        assert!(worst_block < 0.008,
+                "the worst on the ladder is {:.5} of the block", worst_block);
+        assert!(worst_total < 0.008,
+                "the worst on the ladder is {:.5} of V_t", worst_total);
     }
 
     /// **AND THE STEP IS THE SIZE THE LOOP-GAIN RUN MEASURED.**
@@ -1552,13 +2081,13 @@ mod tests {
         for &(_x, fvar_ratio, vix) in pins.iter() {
             let spike = crate::market::tick::crisis_spike_for(&p, vix, 0.0);
             let terms = index_conditional_variance_terms(
-                &p, &names, 3, base_v * fvar_ratio, p.sector_factor_sigma, 1.0, spike, k);
+                &p, &names, 3, base_v * fvar_ratio, p.sector_factor_sigma, 1.0, spike, false, k);
             // Against the SAME state with the regime terms silenced, which
             // is what the old read-back returned there.
             let mut calm = p.clone();
             calm.crash_amplifier_slope = 0.0;
             let was = index_conditional_variance_terms(
-                &calm, &names, 3, base_v * fvar_ratio, p.sector_factor_sigma, 1.0, 0.0, k);
+                &calm, &names, 3, base_v * fvar_ratio, p.sector_factor_sigma, 1.0, 0.0, false, k);
             read.push((vix, spike, terms.total() / was.total()));
         }
         // Below the threshold the blend is off and only the amplifier acts,

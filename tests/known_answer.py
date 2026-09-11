@@ -222,7 +222,32 @@ import tradefloor
 # shipped -- 0.8.0 is unreleased -- so the vector under that name is still
 # in flight, and `params.rs`'s test that the two default constants agree is
 # unchanged because neither moved.
-KAT_VERSION = 16
+# 2026-09-11, second re-base of the same day, still inside 0.8.0 and still
+# pt-v19. The read-back now also carries the DOWNSIDE TRANSMISSION TILT and
+# its lagged wire -- `market_beta_down_asym` 0.025 and, since pt-v18,
+# `market_beta_down_asym_lag` 0.375. The tilt is a two-valued loading on the
+# market factor, so it splits the loading and not the amplifier's moment
+# (`index_var::transmission_loadings`); the lag multiplies that loading by
+# 1.375 on the session after a down market factor, which is 1.891 on the
+# market block on about half of all sessions. It was the largest single
+# omission the read-back ever had and it was on the module's residual list
+# rather than in the sum.
+#
+# The derived VIX anchor rises again on `Universe.random(40, seed=111)`,
+# 20.5346 to 23.7212, and `index_unconditional_variance` now averages the
+# identity over the lag bit rather than evaluating it at the unlagged face:
+# the bit is a fair coin on a zero-mean accumulated sum, and an anchor read
+# at one face of a coin is the mean of nothing. Every seeded pt-v19
+# trajectory moves a third time.
+#
+# `metadataSha256` does NOT move, for the fourth boundary running: the tilt
+# dials are not among the mispricing and crowd coefficients `model_preset()`
+# reports.
+#
+# THE CRISIS DIALS ARE NOT TOUCHED, and the reason is the finding recorded
+# in CHANGELOG.md: the stability condition they would be derived from does
+# not bind on them. See there.
+KAT_VERSION = 17
 
 SEED = 20260820
 DAYS = 250

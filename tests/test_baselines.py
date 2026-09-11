@@ -146,7 +146,23 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # lives entirely inside that opening window, so every agent here is
     # graded on a market roughly a fifth more volatile than the one the
     # preset was certified on at 252 and 504 days.
-    assert ranked == ["oracle", "mean_reversion", "momentum",
+    #
+    # Re-measured again when `market::index_var` took the downside
+    # transmission tilt and its lagged wire into the read-back: oracle
+    # +7.527%, momentum +1.954%, mean_reversion +1.920%, buy_and_hold
+    # -0.100%, random -1.146%. Momentum and mean-reversion swapped for the
+    # NINTH time, 0.034 points apart -- narrower than the 0.056 that was
+    # the record two boundaries ago, and about half of it. The bottom pair
+    # held and the oracle has still never moved.
+    #
+    # The same mechanism as the paragraph above, one turn further on: the
+    # derived anchor goes 20.17 to 22.23 on this roster, because the tilt
+    # multiplies the read-back's market block by 1.891 on the session after
+    # a down market factor and the unconditional variance now averages over
+    # that coin. The opening VIX is 20.18 against the anchor's 22.23, so a
+    # five-day run still lives inside the window the previous re-measurement
+    # named, and the volatility it is graded on has risen again.
+    assert ranked == ["oracle", "momentum", "mean_reversion",
                       "buy_and_hold", "random"]
 
 

@@ -881,7 +881,12 @@ impl Engine {
     /// - the **crisis blend**, through `crisis_spike_for` on the close's VIX
     ///   and the remembered universe stress. That is the SAME function
     ///   `compute_tick` calls, not a copy of it, so the read-back and the
-    ///   tick cannot disagree about when a crisis is on.
+    ///   tick cannot disagree about when a crisis is on;
+    /// - the **downside transmission tilt and its lagged wire**, through
+    ///   `market_vol.prev_day_down()` — the same accessor `simulate_tick`
+    ///   passes into `TickInputs`, read here AFTER `close_day_at` has rolled
+    ///   the day's factor into `prev_day_factor`, so it is the bit
+    ///   tomorrow's ticks will run under and not today's.
     ///
     /// `crisis_blend_variance_damp` is the one piece of the blend this does
     /// NOT carry: it scales the injection by a clamped fractional power of
@@ -919,6 +924,12 @@ impl Engine {
             sector_sigma,
             rate_scale,
             crisis_spike,
+            // THE LAGGED TRANSMISSION WIRE, and the timing is the point.
+            // `close_day_at` has already rolled `day_factor` into
+            // `prev_day_factor`, so this bit is the one TOMORROW's ticks
+            // will read — which is what a one-day-ahead variance needs. The
+            // same accessor the tick calls, not a copy of the comparison.
+            self.market_vol.prev_day_down(),
             crate::market::index_var::intraday_variance_factor(),
         )
     }

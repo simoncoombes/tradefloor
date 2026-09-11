@@ -1803,7 +1803,8 @@ impl PyEngine {
     /// The index variance the LAST VIX update read, term by term, or
     /// `None` if no day has advanced under `vix_level_identity`.
     ///
-    /// Keys: `factor`, `sector`, `idio` (the three noise blocks BEFORE the
+    /// Keys: `factor`, `sector`, `idio`, `crash`, `crisis`, `tilt` (the six
+    /// noise blocks BEFORE the
     /// intraday curve), `market_jump`, `idio_jump`, `news`, `k` (the
     /// curve's second moment, which multiplies the first three and not the
     /// last three), `total` (the variance itself, in fraction squared per
@@ -1845,6 +1846,12 @@ impl PyEngine {
         // can tell a crisis session from a calm one by the key alone.
         out.set_item("crash", terms.crash_raw)?;
         out.set_item("crisis", terms.crisis_raw)?;
+        // The transmission tilt, pre-`K` like the rest of the noise block
+        // and exactly 0.0 on a session with neither wire live. A reader can
+        // tell a lagged session from an unlagged one by this key alone,
+        // which is the one bit of the read-back's state that is not in the
+        // VIX it was read at.
+        out.set_item("tilt", terms.tilt_raw)?;
         out.set_item("market_jump", terms.market_jump)?;
         out.set_item("idio_jump", terms.idio_jump)?;
         out.set_item("news", terms.news)?;

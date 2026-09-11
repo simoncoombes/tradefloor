@@ -917,6 +917,23 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "response that RISES across the graded range -- is NOT met "
                 "by this switch or by any dial (programme/"
                 "code-work-required.md section 1)",
+        "stale": "THE BAND VERDICT ABOVE NO LONGER DESCRIBES THIS DIAL'S "
+                 "REGIME, and the dial is not the reason. `cert4b` measured "
+                 "a build whose index-variance read-back carried neither the "
+                 "crash amplifier, nor the crisis blend, nor the downside "
+                 "transmission tilt; all three are in `market::index_var` "
+                 "now, so every pt-v19 trajectory has moved twice since and "
+                 "the derived anchor with it (19.53 -> 23.72 on "
+                 "Universe.random(40, seed=111)). Re-measured on "
+                 "`facts.LEVEL_PROTOCOL` at the read-back as it stands, the "
+                 "same vector reads 17 of 18 at 252 days: the miss is "
+                 "`index_tail_dn3_pct` at 5.2590 against 0.47 to 1.96, and "
+                 "it is carried by two of the thirty rosters (114 and 115), "
+                 "which read 0.8680 pooled when dropped. The cause is a VIX "
+                 "loop whose gain the read-back has newly exposed, not this "
+                 "switch: see `market::index_var`'s module documentation and "
+                 "`tools/calibration/pin_ladder.py`. `presets/pt-v19.json` "
+                 "is deliberately left un-regenerated while this stands",
     },
     "vix_decay_ratio": {
         "kind": "measured",

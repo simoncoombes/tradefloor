@@ -420,6 +420,33 @@ pub struct ModelParams {
     pub crash_amplifier_threshold: f64,
     /// Extra market loading per baseline sigma beyond the threshold
     /// (§5.4 promotion).
+    ///
+    /// # This is the dial the VIX loop now answers to, and it is unbounded
+    /// in the regime
+    ///
+    /// `shock_magnitude` is normalised by the BASE sigma and not the
+    /// conditional one — deliberately, and `factors.rs` states and costs the
+    /// alternative — so the amplifier's conditional second moment
+    /// (`market::index_var::amplifier_moments`) grows as the square of the
+    /// regime ratio rather than staying flat in it. Under
+    /// `vix_level_identity` that moment is in the VIX's own target, so the
+    /// map from the VIX to the variance it implies is superlinear at the top
+    /// of the VIX's range. Measured on a pin ladder with the crisis blend
+    /// off (`tools/calibration/pin_ladder.py`), `implied(v) / v` falls to
+    /// 0.732 at VIX 40 and then rises: 0.854 at 80, 0.941 at 100. On that
+    /// slope it would cross one somewhere past 110 — an extrapolation, and
+    /// said to be one — and it crosses one INSIDE `vix_ceiling` on a roster
+    /// whose factor block is a larger share of the index's variance.
+    ///
+    /// That is not the amplifier being wrong. It is the amplifier having a
+    /// loop gain, which nothing measured while the read-back was blind to
+    /// it. Against a factor-variance process whose ORDINARY excursions reach
+    /// twenty to fifty times its target — see `market_vol_alpha`, and note
+    /// that the shipped mixture's fourth moment is finite — it takes the
+    /// VIX to `vix_ceiling` and the
+    /// loop holds it there: 81 of 7,560 seed-days on three of the
+    /// certification protocol's thirty rosters, with the crisis blend
+    /// switched entirely off. See `market::index_var`.
     pub crash_amplifier_slope: f64,
     /// VIX points past `CRISIS_VIX_THRESHOLD` for the sector→market blend
     /// to reach 1.0 before its cap (§5.4 promotion).
@@ -463,6 +490,37 @@ pub struct ModelParams {
     /// Raising this gain is the headroom. It multiplies the market factor
     /// and nothing else, so it buys co-movement in the one currency that
     /// does not dilute it.
+    ///
+    /// # It is UN-DERIVED at 0.8275881, and it was not re-derived
+    ///
+    /// The value came off pt-v13's search, against a VIX read-back that
+    /// could not see the blend at all. `market::index_var` sees it now, so
+    /// the dial has a loop to answer to and a stability condition to be
+    /// derived from: `implied(v) < v` for every `v` above
+    /// `crisis_vix_threshold`, which binds at `vix_ceiling` and is a
+    /// quadratic in this gain with a closed-form root. That root is 0.1496
+    /// on seeds 101 to 103.
+    ///
+    /// **It is not moved to that root, because the root does not settle
+    /// what it was supposed to settle.** At a gain of exactly 0.0 the VIX
+    /// still reaches `vix_ceiling` on 81 of 7,560 seed-days over the
+    /// certification protocol's thirty rosters, where pt-v19 before B4
+    /// reached it on 0 of 7,560. The runaway is the crash amplifier's
+    /// second moment against the factor variance's own ordinary dispersion,
+    /// and not the blend's; this dial can make that worse and cannot make
+    /// it well. See `market::index_var`'s module
+    /// documentation for the measurement and for the three routes that
+    /// would settle it, none of them a dial.
+    ///
+    /// A gain near 0.05 DOES pass the certified bands -- 18 of 18 at both
+    /// horizons, the down-tail row at 1.9522 of a 1.9600 ceiling at 252 and
+    /// 1.7561 at 504 -- and is still not shipped. It is a grid search on one
+    /// row, which is what bar B3 exists to end; that row is a `pooled_rate`
+    /// with no seed scale, so the value cannot carry the error bar a
+    /// `measured` dial owes; and the loop is no better at it, with the
+    /// ceiling reached on 93 of 7,560 seed-days against 81 at a gain of
+    /// zero. Passing a band by switching off the mechanism the dial exists
+    /// for is not the same thing as being right.
     pub crisis_blend_gain: f64,
     /// Where the crisis correlation injection is taken FROM. At 0.0 it
     /// comes out of the sector slot, which consumes the sector draw
@@ -569,6 +627,38 @@ pub struct ModelParams {
     /// market-wide variance responds to the last market-wide shock.
     /// This is the process that gives every name a common volatility
     /// regime; a name's own GJR-GARCH is idiosyncratic on top of it.
+    ///
+    /// # THE DISPERSION IS HEAVY, FINITE, AND TAPE-LIKE — AND IT IS NOW
+    /// LOAD-BEARING
+    ///
+    /// `alpha + beta + gamma / 2 < 1` makes the process revert to its target
+    /// in expectation; pt-v13's 0.28035 and 0.69245 give 0.9728 and pass it.
+    /// The fourth-moment condition `3 alpha^2 + 2 alpha beta + beta^2 < 1`
+    /// reads **1.1035** for this FAST COMPONENT ALONE and fails — but the
+    /// shipped process is a 0.65/0.35 mixture with `market_vol_slow_weight`,
+    /// its own condition is the spectral radius of a 4x4 matrix, and that
+    /// reads **0.9870**. The shipped factor variance has a finite fourth
+    /// moment. Both figures are the design repository's
+    /// `garch-derive-design.md`, which derived them before this note, and
+    /// every dial they depend on is identical from pt-v16 to pt-v19.
+    ///
+    /// What the process has is heavy, finite dispersion: variance-of-variance
+    /// 3.4 times its mean squared, implied factor kurtosis 13 against the
+    /// tape's own GARCH at 2.8 and 11.3. The per-seed spread is the
+    /// finite-sample dispersion of any GARCH at this persistence — a bare
+    /// recursion with no engine reproduces it — and the tape's own years
+    /// spread as widely. Pinned at a VIX whose target is 0.45 of baseline,
+    /// the variance is measured sitting at 11.7 times baseline for eighty
+    /// consecutive sessions on one of thirty certification rosters, and that
+    /// is ordinary rather than pathological.
+    ///
+    /// **Which is what makes it load-bearing now.** It was harmless while
+    /// the VIX could not see the crash amplifier. Since `market::index_var`
+    /// prices it, an excursion of that ordinary size implies a VIX above
+    /// `vix_ceiling` and the loop holds it there — so the read-back is
+    /// asking these two coefficients to carry a stability property they were
+    /// never derived for, and `garch-derive-design.md` has tape-derived
+    /// values (0.1059 and 0.8787, with error bars) waiting for the question.
     pub market_vol_alpha: f64,
     /// The market factor's variance persistence. `alpha + beta` is
     /// this process's persistence and is subject to the same
@@ -3798,9 +3888,22 @@ impl ModelParams {
     /// `crosscorr-confirm`).
     ///
     /// On the varying-roster certification protocol, which is the only
-    /// one that carries a band verdict, the four-dial cell reads 18 of 18
+    /// one that carries a band verdict, the four-dial cell read 18 of 18
     /// rows in band at BOTH horizons with pt-v18 reproducing its published
     /// certification to four places in the same run (`cert4b`, 2026-09-10).
+    ///
+    /// **THAT CERTIFICATION NO LONGER DESCRIBES THIS PRESET, and nothing in
+    /// this constructor is the reason.** `cert4b` measured a build whose
+    /// index-variance read-back carried neither the crash amplifier, nor the
+    /// crisis blend, nor the downside transmission tilt. All three are in it
+    /// now (`market::index_var`), so every pt-v19 trajectory has moved twice
+    /// since, and the panel has to be re-measured before this paragraph can
+    /// be restated. Re-measured on the same protocol at the read-back as it
+    /// now stands, the preset reads **17 of 18 at 252 days**: the miss is
+    /// `index_tail_dn3_pct` at 5.26 against a band of 0.47 to 1.96.
+    /// `python/tradefloor/presets/pt-v19.json` is deliberately NOT
+    /// regenerated while that is true, so
+    /// `test_a_record_describes_the_preset_it_names[pt-v19]` says so.
     ///
     /// # What was measured and left alone
     ///

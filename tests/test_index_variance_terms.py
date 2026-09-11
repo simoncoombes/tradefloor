@@ -3,7 +3,7 @@
 Nothing of `market::index_var` was reachable from Python: the engine
 exposed `vix_anchor` and the factor's own state and stopped there, so the
 one quantity the level identity is BUILT on -- the index's conditional
-variance, and which of its six blocks a VIX move went into -- could not be
+variance, and which of its nine blocks a VIX move went into -- could not be
 measured on a running engine at all. `Engine.index_variance_terms()` is
 that reading. It is an instrument and not a mechanism: it adds no draw, no
 state and no term, and `tests/known_answer.py` is the assertion of record
@@ -15,7 +15,7 @@ Three claims are asserted here, and the third is the one worth having.
    read-back is never computed, so the getter says `None` rather than
    handing back a dictionary of zeroes that reads as a market with no
    variance.
-2. **The parts are the whole.** `total` is the sum of the six terms
+2. **The parts are the whole.** `total` is the sum of the nine terms
    through `k`, on bits, and `implied` is that variance as a VIX through
    `(1 + premium) * 100 * sqrt(252 * V)`, on bits.
 3. **IT IS THE NUMBER THE UPDATE READ, AND THAT IS A DAY.** The identity's
@@ -32,6 +32,8 @@ from __future__ import annotations
 
 import math
 import struct
+
+import pytest
 
 import tradefloor as pt
 
@@ -135,23 +137,24 @@ def test_under_the_identity_every_day_reports_its_own_terms():
 
 
 def test_the_reported_total_is_the_sum_of_the_reported_terms():
-    """On bits, not to a tolerance. The FIVE noise blocks are reported
+    """On bits, not to a tolerance. The SIX noise blocks are reported
     BEFORE the intraday curve and the three jump-and-news blocks after it,
     because the curve reaches one half of the identity and not the other;
     a total that could not be rebuilt from the terms would leave the split
     unusable for the thing it exists for.
 
-    `crash` and `crisis` are the two regime blocks charter bar B4 added,
-    and they sit inside the `k` group with the other three: the crash
+    `crash` and `crisis` are the two regime blocks charter bar B4 added and
+    `tilt` is the downside transmission wire that followed them, and all
+    three sit inside the `k` group with the other three: the crash
     amplifier scales the market component before the intraday curve
     multiplies the whole noise term (`tick.rs`, `all_noises[i] *
-    intraday_vol_mult`), and so does the blend's injection.
+    intraday_vol_mult`), and so do the blend's injection and the tilt.
     """
     engine = pt.Engine(seed=SEED, universe=universe(),
                        model=model(vix_level_identity=1.0))
     for before, after, t in run(engine):
         want = (t["k"] * (t["factor"] + t["sector"] + t["idio"]
-                          + t["crash"] + t["crisis"])
+                          + t["crash"] + t["crisis"] + t["tilt"])
                 + t["market_jump"] + t["idio_jump"] + t["news"])
         assert bits(t["total"]) == bits(want), f'{t["total"]} vs {want}'
 
@@ -183,6 +186,51 @@ def test_the_regime_blocks_are_present_and_sized_like_a_calm_market():
                 f"a crisis term at VIX {before:.2f}, under the threshold "
                 f"{threshold:.2f}")
     assert saw_amplifier, "no day reported terms at all"
+
+
+def test_the_transmission_tilt_is_the_wire_the_preset_runs():
+    """THE TILT BLOCK, AND IT READS A BIT THE VIX DOES NOT CARRY.
+
+    `market_beta_down_asym` scales one side of a zero-mean draw, so it is
+    live on every session of any preset that sets it, and the block is the
+    tick-sign tilt's own second moment: `(1 + (1 + d)^2) / 2 - 1` of the
+    market block, 2.5 per cent at the shipped 0.025. `pt-v16` runs the tilt
+    WITHOUT the lagged wire, so on this preset the ratio is that constant on
+    every day -- which is the claim worth asserting, because it says the
+    block is the tilt and not something that merely correlates with it.
+
+    The lagged wire (`market_beta_down_asym_lag`, pt-v18 onward) is the half
+    that varies: it multiplies the same block by `(1 + lag)^2` on the session
+    after a down market factor and by one otherwise, so on a preset that sets
+    it the ratio takes exactly two values. Asserted here on an override
+    rather than on a preset name, so the claim is about the wire.
+    """
+    d = pt.ModelParams.from_preset(PRESET).to_dict()["market_beta_down_asym"]
+    assert d != 0.0, f"{PRESET} must run the tilt for this test to say anything"
+    want = (1.0 + (1.0 + d) ** 2) / 2.0 - 1.0
+    engine = pt.Engine(seed=SEED, universe=universe(),
+                       model=model(vix_level_identity=1.0))
+    for before, after, t in run(engine):
+        ratio = t["tilt"] / (t["factor"] + t["crash"])
+        assert ratio == pytest.approx(want, rel=1e-12), (
+            f"the tilt block is {ratio} of the market block where the "
+            f"tick-sign tilt alone is {want}")
+
+    # And with the lagged wire on, the same ratio takes the two values the
+    # bit allows and nothing between them.
+    lagged = pt.Engine(seed=SEED, universe=universe(),
+                       model=model(vix_level_identity=1.0,
+                                   market_beta_down_asym_lag=0.375))
+    faces = [(1.0 + want) * m - 1.0 for m in (1.0, 1.375 ** 2)]
+    seen = set()
+    for before, after, t in run(lagged, days=24):
+        ratio = t["tilt"] / (t["factor"] + t["crash"])
+        hit = [i for i, f in enumerate(faces)
+               if ratio == pytest.approx(f, rel=1e-11)]
+        assert hit, f"the lagged tilt read {ratio}, neither face of {faces}"
+        seen.add(hit[0])
+    assert seen == {0, 1}, (
+        f"twenty-four sessions should see both faces of a fair coin, saw {seen}")
 
 
 def test_the_implied_is_the_identity_on_the_total():
