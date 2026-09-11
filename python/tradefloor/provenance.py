@@ -471,14 +471,63 @@ OUT_OF_SCOPE = {
 
 #: The provenance of each shipped dial value.
 #:
-#: PARTIAL, AND THE REST IS DECLARED. Twenty-four entries: twenty read off
+#: PARTIAL, AND THE REST IS DECLARED. Twenty-five entries: twenty read off
 #: the code or off the doc comment that already carried the derivation,
-#: and four (pt-v19's) read off the design repository's measured record,
+#: four (pt-v19's four dials) read off the design repository's measured
+#: record, and one (`vix_target_shock_cap`, charter bar B4) read off the
+#: identity the code now derives it through --
 #: rather than invented, so the schema is exercised by real data. The
-#: other seventy-four names are in `UNPROVENANCED` and belong to the
+#: other seventy-three names are in `UNPROVENANCED` and belong to the
 #: workstreams that own them. Filling them in from here would be inventing
 #: derivations, which is the failure this module exists to prevent.
 DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
+    "vix_target_shock_cap": {
+        "kind": "derived",
+        "presets": {"pt-v16": 45.0, "pt-v18": 45.0, "pt-v19": 255.0},
+        "identity": "the image of `vix_return_clamp` under the return "
+                    "spike: `vix_return_gain * clamp ** vix_return_exponent`, "
+                    "which is 17.0 * 15.0 ** 1.0 = 255.0. The driving return "
+                    "is clamped one step before the spike is formed "
+                    "(economy/daily.rs), so a cap AT the clamp's image "
+                    "cannot bind anywhere the clamp does not and the pair "
+                    "carries one binding constraint between them instead of "
+                    "two",
+        "terms": {
+            "vix_return_gain 17.0": "the spike's slope, unchanged by this "
+                                    "derivation and not derived by it",
+            "vix_return_clamp 15.0": "the bound on the driving return, "
+                                     "itself outside the 6.39 per cent the "
+                                     "tape supplies a conditional median "
+                                     "for, so neither dial shapes the "
+                                     "response where the tape can grade it",
+            "vix_return_exponent 1.0": "at which the image is the product; "
+                                       "`rust/src/params.rs` writes the "
+                                       "product because `pow` is not `const` "
+                                       "and `the_default_cap_is_the_clamps_"
+                                       "own_image` asserts the two spellings "
+                                       "agree",
+        },
+        "source": "rust/src/params.rs, ModelParams::vix_target_shock_cap, "
+                  "section 'It was a shape parameter, and pt-v19 retires "
+                  "it'; the guard is rust/src/economy/daily.rs, module "
+                  "`fear_response_shape`",
+        "note": "WHY THE OLD VALUE WAS NOT A BOUNDARY CONDITION, which is "
+                "the part a derivation alone does not say. At 45.0 against "
+                "a gain of 17.0 the cap bound at 2.647 per cent of session "
+                "return, so a -2.7 per cent session and a -6.4 per cent one "
+                "produced identical fear -- a SHAPE parameter inside the "
+                "graded range, and an undeclared one until "
+                "`fear_response_shape` made every preset name it. The "
+                "loop-gain run (`loopgain-report.md` section 8.2) found what "
+                "it was doing there: 'vix_target_shock_cap as a brake is "
+                "compensating for a read-back that omits the crisis blend', "
+                "the index realising 4.0-4.9x the variance V_t priced above "
+                "`crisis_vix_threshold` against 1.2-1.4x below it. "
+                "`market::index_var` now prices the crash amplifier and the "
+                "crisis blend, so the fear arm has a mechanism balancing it "
+                "above the threshold and the brake is not load-bearing. "
+                "This is charter bar B4: no shipped preset had ever met it",
+    },
     "oil_supply_response": {
         "kind": "derived",
         "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
@@ -1516,7 +1565,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 
 #: Dials in scope that carry NO entry.
 #:
-#: This list is the finding. Seventy-four names declared here against
+#: This list is the finding. Seventy-three names declared here against
 #: ninety-seven dials in scope (one of them, `vix_mean_reversion`, beside
 #: an entry that predates this note), and several
 #: carry eight significant figures with no error bar anywhere --
@@ -1539,6 +1588,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #:
 #: Four names left on 2026-09-10 with pt-v19's entries: `vix_level_identity`,
 #: `vix_decay_ratio`, `sector_loading` and `volume_idio_variance_gain`. A
+#: fifth left on 2026-09-11 with charter bar B4: `vix_target_shock_cap`,
+#: which pt-v19 now sets to the image of its own clamp rather than to a
+#: value that bound inside the graded range. A
 #: `measured` entry names EVERY in-scope preset's value (asserted in
 #: `tests/test_dial_provenance.py`), so where pt-v16 and pt-v18 ship an
 #: older value for one of these -- 0.6 and 0.58821442 -- the entry says
@@ -1611,7 +1663,6 @@ UNPROVENANCED = (
     "vix_return_clamp",
     "vix_return_gain",
     "vix_return_source",
-    "vix_target_shock_cap",
     "volume_innovation_sigma",
     "volume_move_cap",
     "volume_move_floor",

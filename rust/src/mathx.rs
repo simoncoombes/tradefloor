@@ -96,6 +96,32 @@ pub fn tgamma(x: f64) -> f64 {
     libm::tgamma(x)
 }
 
+/// The complementary error function, `1 - erf(x)`.
+///
+/// Reached from one place: the standard normal's upper tail in
+/// [`crate::market::index_var`], where `Q(c) = erfc(c / sqrt(2)) / 2` is the
+/// factor the truncated second and fourth moments carry. Those moments are
+/// what price the crash amplifier's conditional tail, so this value is
+/// multiplied into the VIX's own variance read-back and compounds through the
+/// loop exactly as `cos` does.
+///
+/// Routed through `libm` for the module's own reason. `erfc` is a piecewise
+/// rational approximation and the platform implementations differ in the last
+/// places — and this one is worse than most, because the tail is EVALUATED
+/// where it is small: `erfc(3)` is 2.2e-05, so a relative difference in the
+/// last places of the polynomial is a relative difference in a term the
+/// amplifier multiplies by `a^2`. There is no `std` `erfc` to fall back to in
+/// any case, which is why this is the one function here that is not also an
+/// argument about V8: the reference implementation never computed a normal
+/// tail, so there are no recorded vectors to be in parity with. What is
+/// asserted instead, beside [`crate::market::index_var`], is the identity the
+/// value is used through — a moment check against the Monte Carlo the moments
+/// are moments of.
+#[inline]
+pub fn erfc(x: f64) -> f64 {
+    libm::erfc(x)
+}
+
 /// Square root.
 ///
 /// Delegates to `std` deliberately: IEEE-754 pins the result exactly, so all
@@ -124,6 +150,47 @@ mod tests {
         assert_eq!(pow(2.0, 10.0).to_bits(), 1024.0f64.to_bits());
         assert_eq!(sin(0.0).to_bits(), 0.0f64.to_bits());
         assert_eq!(cos(0.0).to_bits(), 1.0f64.to_bits());
+        assert_eq!(erfc(0.0).to_bits(), 1.0f64.to_bits());
+    }
+
+    /// `erfc` HAS NO RECORDED V8 VECTORS, so the anchors here carry more
+    /// weight than the one line above does for the others: there is no
+    /// 12,625-value parity file behind it, because the reference
+    /// implementation never computed a normal tail.
+    ///
+    /// What is asserted instead is the identity the function is USED
+    /// through. `market::index_var` reads it only as the standard normal's
+    /// upper tail `Q(c) = erfc(c / sqrt 2) / 2`, and that has properties a
+    /// wrong wiring cannot fake: it is 0.5 at zero, it is monotone, it
+    /// halves the symmetric two-sided tail, and at the exceedances the
+    /// amplifier is evaluated at it must still carry significant digits
+    /// where `1 - Phi(c)` would have cancelled to nothing.
+    #[test]
+    fn the_complementary_error_function_is_the_normals_upper_tail() {
+        let sqrt_two = sqrt(2.0);
+        let q = |c: f64| 0.5 * erfc(c / sqrt_two);
+        assert_eq!(q(0.0).to_bits(), 0.5f64.to_bits());
+        // The three-sigma tail to five places, a number anyone can check.
+        assert!((q(3.0) - 0.001349898).abs() < 5e-10, "Q(3) = {}", q(3.0));
+        assert!((q(1.0) - 0.158655254).abs() < 5e-10, "Q(1) = {}", q(1.0));
+        // Symmetry: Q(-c) = 1 - Q(c), to the last places.
+        for i in 0..=80 {
+            let c = i as f64 * 0.1;
+            assert!((q(-c) - (1.0 - q(c))).abs() < 1e-15, "asymmetric at {c}");
+        }
+        // Monotone, and STILL POSITIVE where the complement would have
+        // cancelled. At nine sigmas the tail is about 1.1e-19 and
+        // `1.0 - Phi(9.0)` is exactly zero in a double; the amplifier's
+        // floored-regime branch evaluates out here.
+        let mut prev = q(0.0);
+        for i in 1..=200 {
+            let c = i as f64 * 0.05;
+            let now = q(c);
+            assert!(now < prev, "the tail rose at {c}");
+            assert!(now > 0.0, "the tail underflowed at {c}");
+            prev = now;
+        }
+        assert!(q(9.0) > 0.0 && q(9.0) < 1e-18, "Q(9) = {}", q(9.0));
     }
 
     /// `exp` and `log` must round-trip on the band the price model actually

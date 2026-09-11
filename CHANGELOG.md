@@ -47,11 +47,79 @@ reading a level it was not reading before.
 pt-v18's mispricing and crowd coefficients, so the vector `model_preset()`
 reports is unchanged while the simulated one is not.
 
-**The fear response still flattens at 2.647 per cent of session return**,
-and no dial reaches it: `FLATTENS_AT` declares pt-v19 at the same point as
-pt-v16 and pt-v18, bound by the cap, while the tape keeps rising past it.
-The mechanism is recorded in the design repository as work the preset does
-not do.
+**The fear response rises across the whole graded range -- charter bar B4,
+which no shipped preset had ever met.** `FLATTENS_AT` no longer has a row
+for pt-v19, and `flattens_at` returns `None` for it. The dial that was
+flattening it, `vix_target_shock_cap`, moves from 45.0 to 255.0 -- the image
+of `vix_return_clamp` under the spike, `vix_return_gain * clamp`, at which
+the cap cannot bind anywhere the clamp does not. It is derived rather than
+searched and `provenance.DIAL_PROVENANCE` now carries it.
+
+**The cap could be retired because the read-back stopped being blind to its
+own regime.** `market::index_var` documented two mechanisms it omitted --
+the crash amplifier and the crisis blend -- as "conditional on a tail the
+closed form has no moment for". The moments exist and are elementary: with
+the regime ratio `s = sqrt(v_f) / market_factor_sigma` and the amplifier
+`A = 1 + m max(0, s|z| - T)`, the conditional variance carries
+`E[z^2 A^2] = 1 + 2a(M_3 - c M_2) + a^2(M_4 - 2c M_3 + c^2 M_2)` with
+`a = m s`, `c = T / s`, and `M_2`, `M_3`, `M_4` the standard normal's
+truncated moments in `phi` and `Phi`. The crisis blend's spike is a
+deterministic function of the close's VIX, so it enters as a loading shift
+rather than as a moment. `IndexVarianceTerms` gains `crash_raw` and
+`crisis_raw`, `total()` sums them inside the intraday-curve group, and
+`Engine.index_variance_terms()` reports both.
+
+The loop-gain run had found the consequence from the other direction: above
+`crisis_vix_threshold` the index realised 4.0 to 4.9 times the variance the
+VIX priced, against 1.2 to 1.4 below it, and its ruling was that
+"`vix_target_shock_cap` as a brake is compensating for a read-back that
+omits the crisis blend". The read-back now carries that step itself.
+
+**The derived VIX anchor rises with the amplifier it now prices.** On
+`Universe.random(40, seed=111)` it moves from 20.1656 to 20.5346, +1.83 per
+cent, which is the 5.41 per cent the amplifier adds to the factor block at
+the anchor's own regime ratio of exactly 1.0, through the factor's share of
+the index's variance and the square root the identity takes. Every seeded pt-v19 trajectory changes, so the known-answer digest
+moves and `KAT_VERSION` bumps.
+
+**And pt-v19's certified panel does not survive it. The old read-back's
+conservatism was load-bearing for the loop's stability. The size of that
+is now measured rather than suspected.** On a pinned ladder -- `pin_macro(vix =
+x * anchor)` before every open, then read what the identity implies, over
+seeds 101 to 103 at 80 scored days per seed per pin -- the static map
+`implied / pinned` is:
+
+| pin `x` | 0.70 | 1.00 | 1.50 | 1.60 | 1.75 | 2.00 | 2.50 | 3.00 |
+|---|---|---|---|---|---|---|---|---|
+| pinned VIX | 13.5 | 19.3 | 28.9 | 30.9 | 33.8 | 38.6 | 48.2 | 57.9 |
+| before | 0.980 | 0.835 | 0.745 | 0.736 | 0.727 | 0.716 | 0.698 | 0.689 |
+| after | 0.963 | 0.828 | 0.764 | 0.761 | **1.156** | **1.267** | **1.335** | **1.425** |
+
+The bar between the fourth and fifth columns is `crisis_vix_threshold`,
+30.88. Below it the two agree within two per cent, so the calm regime is
+barely moved: the median VIX over ten seeds goes 13.875 to 14.497 and the
+derived anchor 20.1656 to 20.5346, which is the amplifier and the loop's
+own amplification of it. Above it the old map stayed a contraction at 0.70
+and this one crosses one and keeps climbing, so there is no fixed point below
+`vix_ceiling`: days above the threshold go from 1.03 to 17.90 per cent and
+the ceiling, never visited before, is reached on 37 of 2,520 seed-days.
+
+On the certified LEVEL protocol that costs `index_tail_dn3_pct` its band --
+5.6972 per cent against 0.47 to 1.96, where it read 1.5671 at band position
+0.736 -- and `index_drift_pct` its floor, at 1.5545 against 2.9. `S` at 252
+goes from 11.876 to 20.889 over nineteen rows.
+
+**The read-back is right and the dials are what moved under it.** The
+identity is asserted against `factors::calculate_live_factors` itself, so
+the engine really does realise that much variance in a crisis.
+`crisis_blend_gain` and `crisis_vix_threshold` were searched against a
+read-back blind to them and are now un-derived: at saturation the blend raises every name's market
+loading from `beta_i` to `beta_i + 0.811`, which is 3.3x on the factor
+block, and nothing in the search ever saw what that does to the loop. The
+loop-gain report's §8.2 named this outcome in advance and named whose call
+it is. **pt-v19 is not shippable as the default until the crisis dials are
+re-derived**, and `python/tradefloor/presets/pt-v19.json` is deliberately
+left un-regenerated so that `test_preset_records.py` says so.
 
 **Five dials leave the default's live surface and six join it.** Under
 `vix_level_identity` the VIX is derived from the index's conditional

@@ -864,8 +864,38 @@ impl Engine {
     /// per-name GARCH states and the jumps, so every state it reads is
     /// TOMORROW's — which is what a one-day-ahead variance means and what
     /// an implied volatility prices. The VIX-driven quantities (the sector
-    /// draw's sigma, the jump arrival rate) are read at the close's VIX,
-    /// which is the information the close has.
+    /// draw's sigma, the jump arrival rate, **and the crisis blend's
+    /// spike**) are read at the close's VIX, which is the information the
+    /// close has.
+    ///
+    /// # The regime, and why it is passed rather than assumed
+    ///
+    /// The variance this returns is now REGIME-AWARE, which is charter bar
+    /// B4. Two mechanisms the closed form used to be blind to reach it:
+    ///
+    /// - the **crash amplifier**, through the conditional factor variance
+    ///   already passed as `factor_variance` — `index_var` forms the regime
+    ///   ratio `sqrt(v_f) / market_factor_sigma` from it, which is the
+    ///   quantity `factors.rs` builds `shock_magnitude` from, so there is
+    ///   no new state and nothing here to keep in step;
+    /// - the **crisis blend**, through `crisis_spike_for` on the close's VIX
+    ///   and the remembered universe stress. That is the SAME function
+    ///   `compute_tick` calls, not a copy of it, so the read-back and the
+    ///   tick cannot disagree about when a crisis is on.
+    ///
+    /// `crisis_blend_variance_damp` is the one piece of the blend this does
+    /// NOT carry: it scales the injection by a clamped fractional power of
+    /// the draw itself, which is not a polynomial in `z` and has no moment
+    /// in `phi` and `Phi`. It is 0.0 in every shipped preset and inert there
+    /// through `factors.rs`'s own branch. A preset that set it would have
+    /// this read-back price the UNDAMPED blend and therefore overstate the
+    /// crisis, and that is declared here and on
+    /// [`IndexVarianceTerms::crisis_raw`] rather than caught at runtime —
+    /// the residual is the residual, and a panic on a legal dial
+    /// combination would be a worse answer than a stated one.
+    ///
+    /// [`IndexVarianceTerms::crisis_raw`]:
+    ///     crate::market::index_var::IndexVarianceTerms::crisis_raw
     fn index_conditional_variance_terms_now(
         &self,
     ) -> crate::market::index_var::IndexVarianceTerms {
@@ -879,6 +909,8 @@ impl Engine {
             (1.0 - self.params.jump_vix_coupling)
                 + ((self.params.jump_vix_coupling * ratio) * ratio)
         };
+        let crisis_spike = crate::market::tick::crisis_spike_for(
+            &self.params, self.economy.vix, self.universe_stress);
         crate::market::index_var::index_conditional_variance_terms(
             &self.params,
             &names,
@@ -886,6 +918,7 @@ impl Engine {
             self.market_vol.variance(),
             sector_sigma,
             rate_scale,
+            crisis_spike,
             crate::market::index_var::intraday_variance_factor(),
         )
     }

@@ -289,6 +289,50 @@ pub fn sector_sigma_at(p: &ModelParams, economy: &EconomyState, vix_anchor: f64)
     }
 }
 
+/// The crisis blend's spike, `0.0` below [`ModelParams::crisis_vix_threshold`]
+/// and rising to [`ModelParams::crisis_blend_cap`] on the ramp above it.
+///
+/// A DETERMINISTIC FUNCTION OF THE STATE the close already holds — today's
+/// VIX and the remembered universe stress — and no draw. That is what lets
+/// [`crate::market::index_var`] price the blend's contribution to the index's
+/// conditional variance rather than leave it as an unmodelled tail: the spike
+/// is not a random variable, so the blend's injection is a known multiple of
+/// the market factor and its second moment is the factor's own.
+///
+/// Lifted out of [`compute_tick`], where it stood inline, for the reason
+/// `sector_sigma_at` was: the read-back and the tick must not be able to
+/// disagree about when a crisis is on. The arithmetic is the arithmetic that
+/// stood there, branch for branch, so every preset is bit-identical.
+///
+/// # Universe memory
+///
+/// Without it this blend is a lookup on today's VIX and nothing else: the
+/// tick VIX drops back under the threshold and the whole cross-section
+/// decouples in the same tick, so a crisis leaves no trace. With it,
+/// remembered stress from earlier days holds the blend up while it decays,
+/// which is what real correlation does after a panic. The branch keeps every
+/// earlier preset bit-identical — at weight zero this is the instant stress
+/// and no arithmetic has touched it.
+pub fn crisis_spike_for(p: &ModelParams, vix: f64, universe_stress: f64) -> f64 {
+    // Today's stress, in VIX points above the crisis threshold.
+    let instant_stress = if vix > p.crisis_vix_threshold {
+        vix - p.crisis_vix_threshold
+    } else {
+        0.0
+    };
+    let effective_stress = if p.universe_stress_weight == 0.0 {
+        instant_stress
+    } else {
+        instant_stress
+            + p.universe_stress_weight * mathx::max(universe_stress - instant_stress, 0.0)
+    };
+    if effective_stress > 0.0 {
+        mathx::min(p.crisis_blend_cap, effective_stress / p.crisis_blend_ramp)
+    } else {
+        0.0
+    }
+}
+
 /// The factor the valuation's fundamentals are restated by, from the
 /// economy's own integrated nominal output.
 ///
@@ -744,31 +788,7 @@ pub fn simulate_market_tick(
     // makes crossing it MEAN something: the blend saturates at its 0.8
     // cap by VIX ≈ 26.6, the ceiling of what the macro chain can produce,
     // instead of asking for a VIX of 64 that cannot exist.
-    // Today's stress, in VIX points above the crisis threshold.
-    let instant_stress = if economy.vix > p.crisis_vix_threshold {
-        economy.vix - p.crisis_vix_threshold
-    } else {
-        0.0
-    };
-    // UNIVERSE MEMORY. Without it this blend is a lookup on today's VIX and
-    // nothing else: the tick VIX drops back under the threshold and the
-    // whole cross-section decouples in the same tick, so a crisis leaves no
-    // trace. With it, remembered stress from earlier days holds the blend
-    // up while it decays, which is what real correlation does after a
-    // panic. The branch keeps every earlier preset bit-identical -- at
-    // weight zero this is `instant_stress` and no arithmetic has touched it.
-    let effective_stress = if p.universe_stress_weight == 0.0 {
-        instant_stress
-    } else {
-        instant_stress
-            + p.universe_stress_weight
-                * mathx::max(inputs.universe_stress - instant_stress, 0.0)
-    };
-    let vix_correlation_spike = if effective_stress > 0.0 {
-        mathx::min(p.crisis_blend_cap, effective_stress / p.crisis_blend_ramp)
-    } else {
-        0.0
-    };
+    let vix_correlation_spike = crisis_spike_for(p, economy.vix, inputs.universe_stress);
 
     // The sector draw's sigma is `sector_sigma_for`, shared with the
     // overnight move; the arithmetic is the one that stood here.

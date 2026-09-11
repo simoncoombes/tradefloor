@@ -135,17 +135,54 @@ def test_under_the_identity_every_day_reports_its_own_terms():
 
 
 def test_the_reported_total_is_the_sum_of_the_reported_terms():
-    """On bits, not to a tolerance. The three noise blocks are reported
+    """On bits, not to a tolerance. The FIVE noise blocks are reported
     BEFORE the intraday curve and the three jump-and-news blocks after it,
     because the curve reaches one half of the identity and not the other;
     a total that could not be rebuilt from the terms would leave the split
-    unusable for the thing it exists for."""
+    unusable for the thing it exists for.
+
+    `crash` and `crisis` are the two regime blocks charter bar B4 added,
+    and they sit inside the `k` group with the other three: the crash
+    amplifier scales the market component before the intraday curve
+    multiplies the whole noise term (`tick.rs`, `all_noises[i] *
+    intraday_vol_mult`), and so does the blend's injection.
+    """
     engine = pt.Engine(seed=SEED, universe=universe(),
                        model=model(vix_level_identity=1.0))
     for before, after, t in run(engine):
-        want = (t["k"] * (t["factor"] + t["sector"] + t["idio"])
+        want = (t["k"] * (t["factor"] + t["sector"] + t["idio"]
+                          + t["crash"] + t["crisis"])
                 + t["market_jump"] + t["idio_jump"] + t["news"])
         assert bits(t["total"]) == bits(want), f'{t["total"]} vs {want}'
+
+
+def test_the_regime_blocks_are_present_and_sized_like_a_calm_market():
+    """THE READ-BACK PRICES THE REGIME IT RUNS IN — charter bar B4.
+
+    Two claims, and they are opposite ones, which is why they are here
+    together. The crash amplifier is NOT silent in an ordinary market: the
+    threshold sits about two conditional sigmas out at the anchor and the
+    term is worth a few per cent of the factor block, so a zero here is a
+    read-back that lost the mechanism again. The crisis blend IS silent:
+    `crisis_vix_threshold` is 25.5 on pt-v16 and an ordinary run does not
+    reach it, so the term must be EXACTLY zero rather than small — that is
+    the branch, not arithmetic that happens to be tiny.
+    """
+    engine = pt.Engine(seed=SEED, universe=universe(),
+                       model=model(vix_level_identity=1.0))
+    threshold = engine.model_params["crisis_vix_threshold"]
+    saw_amplifier = False
+    for before, after, t in run(engine):
+        assert t["crash"] > 0.0, "the amplifier went silent in an ordinary market"
+        assert t["crash"] < 0.25 * t["factor"], (
+            f'the amplifier is carrying {t["crash"] / t["factor"]:.2f} of the '
+            f"factor block in a calm market, which is a crisis reading")
+        saw_amplifier = True
+        if before <= threshold:
+            assert t["crisis"] == 0.0, (
+                f"a crisis term at VIX {before:.2f}, under the threshold "
+                f"{threshold:.2f}")
+    assert saw_amplifier, "no day reported terms at all"
 
 
 def test_the_implied_is_the_identity_on_the_total():

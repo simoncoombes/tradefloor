@@ -1840,6 +1840,11 @@ impl PyEngine {
         out.set_item("factor", terms.factor_raw)?;
         out.set_item("sector", terms.sector_raw)?;
         out.set_item("idio", terms.idio_raw)?;
+        // The two regime terms (charter B4). Both are pre-`K` like the three
+        // above and both are exactly 0.0 outside their regime, so a reader
+        // can tell a crisis session from a calm one by the key alone.
+        out.set_item("crash", terms.crash_raw)?;
+        out.set_item("crisis", terms.crisis_raw)?;
         out.set_item("market_jump", terms.market_jump)?;
         out.set_item("idio_jump", terms.idio_jump)?;
         out.set_item("news", terms.news)?;

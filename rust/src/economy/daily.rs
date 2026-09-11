@@ -1849,6 +1849,24 @@ mod vix_return_shape {
 /// silent shape change into a declared one, and it is the only form of
 /// the test that can pass today and still fail the day somebody
 /// reintroduces the defect.
+///
+/// # pt-v19 is the first preset that does not need a row here
+///
+/// Charter bar B4. The table below is unchanged for the eighteen presets
+/// that shipped with the defect and pt-v19 has left it: its cap is the
+/// image of its own clamp, so the cap cannot bind before the clamp, and
+/// the clamp is at 15 per cent — outside [`GRADED_ABS_R`] and outside
+/// anything this market produces.
+///
+/// **What made that affordable is one level down.** The cap was not an
+/// arbitrary brake: `loopgain-report.md` §8.2 measured the index realising
+/// four to five times the variance `V_t` priced above
+/// `crisis_vix_threshold`, so the fear arm had nothing balancing it there
+/// and the cap was holding the divergence. `market::index_var` now prices
+/// the crash amplifier and the crisis blend — see
+/// [`crate::market::index_var::amplifier_moments`] — so the read-back
+/// carries the regime and the brake has a mechanism behind it instead of a
+/// constant.
 #[cfg(test)]
 mod fear_response_shape {
     use super::*;
@@ -1903,11 +1921,19 @@ mod fear_response_shape {
         ("pt-v15", 2.647, Binder::Cap),
         ("pt-v16", 2.647, Binder::Cap),
         ("pt-v18", 2.647, Binder::Cap),
-        // pt-v19 inherits pt-v18's cap 45 against gain 17 and stops rising
-        // at the same 2.647 per cent: the four dials it moves are not in
-        // the fear channel's clamp or cap, and the test measured it here
-        // rather than assumed it. Charter bar B4 stays unmet by it.
-        ("pt-v19", 2.647, Binder::Cap),
+        // pt-v19 IS NOT HERE, and that is charter bar B4 met. Its cap is
+        // the image of its own clamp (`vix_return_gain * vix_return_clamp`,
+        // 255.0), so the cap cannot bind before the clamp does and the
+        // clamp sits at 15 per cent -- outside `GRADED_ABS_R` and outside
+        // anything this market produces. Its response rises across the
+        // whole graded range and `flattens_at` returns `None` for it, which
+        // is the `(None, None)` arm below.
+        //
+        // The dial was not raised on its own. `market::index_var` prices
+        // the crash amplifier and the crisis blend, so the read-back
+        // carries the regime and the fear arm has a mechanism balancing it
+        // above `crisis_vix_threshold`; the cap had been the brake standing
+        // in for that. See `ModelParams::vix_target_shock_cap`.
     ];
 
     /// Which dial ends the rise. Named rather than inferred at the call
@@ -2009,33 +2035,84 @@ mod fear_response_shape {
         assert!(wrong.is_empty(), "{}", wrong.join("\n"));
     }
 
-    /// The default is one of the nine, and that is the finding.
+    /// **THE SHIPPED DEFAULT'S FEAR RESPONSE RISES ACROSS THE GRADED
+    /// RANGE. That is charter bar B4, and it was unmet by every preset
+    /// this table has a row for.**
     ///
-    /// Pinned on its own so it cannot be lost inside a list: the day the
-    /// SHIPPED DEFAULT stops flattening its own fear response this test
-    /// fails, and somebody has fixed the mechanism rather than edited a
-    /// table.
+    /// This test used to assert the opposite. It was written to fail the
+    /// day somebody fixed the mechanism, and its message said what fixing
+    /// it would require: "this test and `FLATTENS_AT` both need updating,
+    /// and the down tail needs re-measuring, because the cap was holding
+    /// it." All three were done, and it is now the positive form of the
+    /// same guard — a preset that reintroduced the cap as a shape parameter
+    /// would fail it exactly as the old one failed a fix.
+    ///
+    /// Pinned on its own rather than left to the table above, for the
+    /// reason the old one was: what matters is the DEFAULT, and a property
+    /// of the default can be lost inside a list of eighteen.
     #[test]
-    fn the_shipped_default_flattens_its_own_fear_response() {
+    fn the_shipped_default_carries_its_fear_response_across_the_graded_range() {
         let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
             .expect("the default preset resolves");
-        let at = flattens_at(&p).expect(
-            "the default's fear response no longer flattens inside the graded range. If \
-             that is deliberate, this test and FLATTENS_AT both need updating, and the \
-             down tail needs re-measuring, because the cap was holding it.",
-        );
         assert!(
-            at < 3.0,
-            "the default flattens at {at:.3} per cent, which is not where it did"
+            flattens_at(&p).is_none(),
+            "the default's fear response flattens at {:?} per cent, inside the \
+             {GRADED_ABS_R} per cent the tape grades. That is charter bar B4 lost \
+             again: read `ModelParams::vix_target_shock_cap` before adding a row to \
+             FLATTENS_AT.",
+            flattens_at(&p)
         );
-        assert_eq!(binder_of(&p), Binder::Cap, "the default is bound by its cap");
-        // FLAT, not merely non-rising: past the binding return the target
-        // takes the same spike from a -2.7 per cent session and a -6.4 per
-        // cent one. That equality is the defect stated as arithmetic.
+        // RISING, not merely non-flattening. `flattens_at` sweeps at
+        // 0.0001 per cent and returns on the first non-increase, so the two
+        // are the same claim -- but the endpoints are what a reader wants,
+        // and a response that rose by a millionth of a point would satisfy
+        // the sweep and satisfy nobody.
+        let shallow = response(&p, 0.710);
+        let deep = response(&p, GRADED_ABS_R);
+        assert!(
+            deep > 8.0 * shallow,
+            "the response at -{GRADED_ABS_R} per cent is {deep:.2} against {shallow:.2} \
+             at -0.71, a ratio of {:.2}. The tape's own conditional medians rise from \
+             0.710 to 9.830 over that range, a ratio of 13.8.",
+            deep / shallow
+        );
+        // AND THE CAP IS WHERE THE DERIVATION PUTS IT, which is the other
+        // half: a cap raised to a round number nobody can defend would pass
+        // every assertion above.
+        assert_eq!(binder_of(&p), Binder::Clamp, "the clamp is the binding dial now");
+        the_default_cap_is_the_clamps_own_image();
+    }
+
+    /// The cap is the image of the clamp under the spike, so it cannot bind
+    /// anywhere the clamp does not.
+    ///
+    /// Called from the test above as well as standing on its own: it is the
+    /// derivation `ModelParams::vix_target_shock_cap` claims, and a claim
+    /// in a doc comment that no test reads is a claim that rots.
+    #[test]
+    fn the_default_cap_is_the_clamps_own_image() {
+        let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+            .expect("the default preset resolves");
+        let image = p.vix_return_gain * mathx::pow(p.vix_return_clamp, p.vix_return_exponent);
         assert_eq!(
-            response(&p, at),
-            response(&p, GRADED_ABS_R),
-            "the response past the binding return is no longer constant"
+            p.vix_target_shock_cap, image,
+            "the cap is {} where the clamp's image is {image}. A cap above the image \
+             is inert and a cap below it is a second binding constraint.",
+            p.vix_target_shock_cap
+        );
+        // At the shipped exponent of 1.0 the image is the PRODUCT, which is
+        // what `pt_v19` writes, because `pow` is not `const`. If the
+        // exponent ever moves off 1.0 the two spellings part company and
+        // this is where that is noticed.
+        assert_eq!(p.vix_return_exponent, 1.0, "the const-context spelling assumes it");
+        assert_eq!(p.vix_target_shock_cap, p.vix_return_gain * p.vix_return_clamp);
+        // And the clamp itself is outside the graded range, so neither dial
+        // shapes the response where the tape can see it.
+        assert!(
+            p.vix_return_clamp > GRADED_ABS_R,
+            "the clamp at {} is inside the graded {GRADED_ABS_R}, so it is now the \
+             shape parameter the cap used to be",
+            p.vix_return_clamp
         );
     }
 }

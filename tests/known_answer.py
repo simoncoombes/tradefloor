@@ -195,7 +195,34 @@ import tradefloor
 # 0.7.0: none of the four dials is among the mispricing and crowd
 # coefficients `model_preset()` reports, so what the library says about
 # itself is unchanged while what it simulates is not.
-KAT_VERSION = 15
+# 2026-09-11: charter bar B4, still inside 0.8.0 and still pt-v19. The
+# index's conditional variance read-back now prices the regime it runs in:
+# `market::index_var` carries the crash amplifier's conditional second
+# moment (`amplifier_moments`, a closed form in `phi` and `Phi` over the
+# standard normal's truncated second, third and fourth moments) and the
+# crisis blend's loading shift, as two new terms inside `total()`'s
+# intraday-curve group. The module had listed both as "conditional on a tail
+# the closed form has no moment for"; the moments exist and are elementary.
+#
+# Two consequences move every seeded pt-v19 trajectory. The derived VIX
+# anchor rises -- 20.1656 to 20.5346 on `Universe.random(40, seed=111)`,
+# which is the 5.4 per cent the amplifier adds to the factor block at the
+# anchor's own regime ratio of exactly 1.0 -- and `vix_target_shock_cap`
+# moves from 45.0 to 255.0, the image of `vix_return_clamp` under the spike,
+# because the cap had been the brake standing in for the missing read-back
+# (`loopgain-report.md` section 8.2) and no longer needs to be.
+#
+# `metadataSha256` does NOT move here, for the third boundary running:
+# neither the cap nor the read-back is among the mispricing and crowd
+# coefficients `model_preset()` reports, so what the library says about
+# itself is unchanged while what it simulates is not.
+#
+# THE PRESET NAME DOES NOT MOVE and neither default constant does. This is
+# not an era boundary in the sense the three above are: pt-v19 has not
+# shipped -- 0.8.0 is unreleased -- so the vector under that name is still
+# in flight, and `params.rs`'s test that the two default constants agree is
+# unchanged because neither moved.
+KAT_VERSION = 16
 
 SEED = 20260820
 DAYS = 250

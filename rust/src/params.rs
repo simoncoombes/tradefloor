@@ -2299,6 +2299,35 @@ pub struct ModelParams {
     /// Ceiling on the VIX target's whole excursion, in points: the return
     /// spike plus the inflation and shock adjustments. Shipped 12.0, which
     /// binds long before a real crisis does.
+    ///
+    /// # It was a shape parameter, and pt-v19 retires it
+    ///
+    /// At 45.0 against a `vix_return_gain` of 17.0 it BOUND at 2.647 per
+    /// cent of session return — deep inside the 6.39 per cent the tape
+    /// supplies a conditional median for — so a -2.7 per cent session and a
+    /// -6.4 per cent one produced identical fear. That is a shape, not a
+    /// boundary, and `economy::daily::fear_response_shape` is the guard
+    /// that made every preset declare it.
+    ///
+    /// **The loop-gain run says what the cap was actually doing**
+    /// (`loopgain-report.md` §8.2): it was "compensating for a read-back
+    /// that omits the crisis blend". The index realised 4.0 to 4.9 times the
+    /// variance `V_t` priced above `crisis_vix_threshold` and 1.2 to 1.4
+    /// below it, so the fear arm had nothing to balance it above the
+    /// threshold and the cap was the brake on the divergence. With
+    /// `market::index_var` pricing its own regime that brake has a
+    /// mechanism to hold it instead, and the dial goes back to being the
+    /// boundary condition it is documented as.
+    ///
+    /// pt-v19 therefore sets it to the image of `vix_return_clamp` under the
+    /// spike — `vix_return_gain * clamp^vix_return_exponent`, 255.0 at the
+    /// shipped 17.0, 15.0 and 1.0. **That is a derived value and not a
+    /// tuned one**: the return is already bounded one step earlier, so at
+    /// this value the cap cannot bind anywhere the clamp does not, and the
+    /// pair has one binding constraint between them instead of two. The
+    /// value is asserted against its own derivation by
+    /// `the_default_cap_is_the_clamps_own_image`, so it moves with the gain
+    /// and the clamp rather than being a number to remember.
     pub vix_target_shock_cap: f64,
     /// Upper bound on the VIX state itself, in points.
     ///
@@ -3834,6 +3863,22 @@ impl ModelParams {
         // `volume_idio_sigma` stay at 0.0, so the per-name volume STATE is
         // still memoryless; this is a stateless channel.
         p.volume_idio_variance_gain = 0.20;
+        // CHARTER BAR B4. `market::index_var` now prices the crash
+        // amplifier and the crisis blend, so the read-back carries the
+        // regime it runs in and the fear arm has something to balance it
+        // above `crisis_vix_threshold`. `vix_target_shock_cap` was the
+        // brake standing in for that (`loopgain-report.md` §8.2) and at
+        // 45.0 against a gain of 17.0 it bound at 2.647 per cent of session
+        // return -- inside the 6.39 per cent the tape grades, which is what
+        // B4 asks the response to rise across.
+        //
+        // The value is DERIVED, not searched: the image of
+        // `vix_return_clamp` under the spike, so the cap cannot bind
+        // anywhere the clamp does not and the pair has one binding
+        // constraint between them. `vix_return_exponent` is 1.0 here, so
+        // the image is the product; `the_default_cap_is_the_clamps_own_image`
+        // asserts both halves of that rather than trusting the comment.
+        p.vix_target_shock_cap = p.vix_return_gain * p.vix_return_clamp;
         p
     }
 
