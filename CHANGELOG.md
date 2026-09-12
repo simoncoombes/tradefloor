@@ -351,8 +351,8 @@ over 120 rosters at 252 sessions, free-running, with the crisis blend
 switched entirely off: `vix_ceiling` is reached on **5 of 120 rosters over
 25 seed-days**, against 11 of 120 and 164 with the switch off on the same
 build. Six of the eleven runaway rosters stop reaching the ceiling at all
-and the five that survive hold it for 2 to 9 sessions where they held it for
-5 to 39. At the shipped blend gain the ceiling days fall from 1,477 to 405.
+and the five that survive hold it for 2 to 9 sessions where those same five
+held it for 6 to 39. At the shipped blend gain the ceiling days fall from 1,477 to 405.
 Both switch-off arms reproduce the earlier census exactly, 11 of 120 with
 164 days and 30 of 120 with 1,477, so the comparison is arm for arm on one
 build.
