@@ -163,6 +163,15 @@ PARAM_SPECS: dict[str, dict] = {
     # measurements, not fitted, and a tunable exponent is the defect
     # this dial exists to remove.
     "order_flow_impact_law": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    # Also a SWITCH, and the same box for the same reason. 0.0 denominates
+    # the crash amplifier's shock in the BASELINE factor sigma and every
+    # nonzero value denominates it in the tick's own CONDITIONAL sigma;
+    # there is no half-normalised shock, so the axis has two levels and a
+    # search over it reports a step. What chooses it is the VIX loop's
+    # stability condition (`market::index_var`), not a panel row, which is
+    # why a step is the right reading and a gradient would be a fiction.
+    "crash_amplifier_conditional_sigma": {
+        "kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
     # A SHARE of demand, so [0, 1]. Above 1.0 supply outruns demand every
     # day and inventory ramps upward instead of downward, which is the
     # defect inverted.

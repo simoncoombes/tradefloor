@@ -471,16 +471,107 @@ OUT_OF_SCOPE = {
 
 #: The provenance of each shipped dial value.
 #:
-#: PARTIAL, AND THE REST IS DECLARED. Twenty-five entries: twenty read off
+#: PARTIAL, AND THE REST IS DECLARED. Twenty-six entries: twenty read off
 #: the code or off the doc comment that already carried the derivation,
 #: four (pt-v19's four dials) read off the design repository's measured
-#: record, and one (`vix_target_shock_cap`, charter bar B4) read off the
-#: identity the code now derives it through --
+#: record, and two (`vix_target_shock_cap` and
+#: `crash_amplifier_conditional_sigma`, both charter bar B4) read off the
+#: identity the code now derives them through --
 #: rather than invented, so the schema is exercised by real data. The
 #: other seventy-three names are in `UNPROVENANCED` and belong to the
 #: workstreams that own them. Filling them in from here would be inventing
 #: derivations, which is the failure this module exists to prevent.
 DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
+    "crash_amplifier_conditional_sigma": {
+        "kind": "derived",
+        "presets": {"pt-v19": 1.0},
+        "identity": "the VIX loop's stability condition. Under "
+                    "`vix_level_identity` the deterministic map is "
+                    "`v -> implied(v)`, the state lives on "
+                    "`[10, vix_ceiling]`, and the top of that interval is "
+                    "absorbing exactly when `implied(v) >= v` near it, so "
+                    "the condition is `(S) implied(v) < v` for every v in "
+                    "`(crisis_vix_threshold, vix_ceiling]`. `implied(v)` "
+                    "carries the crash amplifier's second moment "
+                    "`E[z^2 A^2]` (`market::index_var::amplifier_moments`), "
+                    "which at `a = m s` and `c = T / s` grows without bound "
+                    "in the regime ratio `s = sqrt(v_f) / "
+                    "market_factor_sigma` -- so the map is SUPERLINEAR and "
+                    "(S) fails at the ceiling for a large enough excursion, "
+                    "whatever any dial is set to. Normalising the shock by "
+                    "the tick's own conditional sigma sets `a = m` and "
+                    "`c = T`: `E[z^2 A^2]` becomes a constant of the dials, "
+                    "the amplified factor block is linear in `v_f` exactly "
+                    "as the unamplified one is, `implied(v)` is "
+                    "asymptotically linear in `v`, and the map cannot cross "
+                    "the diagonal however far the factor variance excurses. "
+                    "The value is 1.0 because the dial is a SWITCH with no "
+                    "interior: `factors.rs` branches at `== 0.0` and every "
+                    "other value selects the same normaliser",
+        "terms": {
+            "crash_amplifier_slope 0.2": "`m`, unchanged by this and not "
+                                         "derived by it. It is the dial "
+                                         "whose loop gain B4 exposed, and "
+                                         "what this changes is the "
+                                         "denomination of its argument, not "
+                                         "its size",
+            "crash_amplifier_threshold 2.0": "`T`, likewise unchanged. Under "
+                                             "the switch it is read in "
+                                             "conditional sigmas, so the "
+                                             "amplifier fires on the same "
+                                             "few per cent of ticks in every "
+                                             "regime instead of on a share "
+                                             "that rises with the regime",
+            "vix_level_identity 1.0": "what makes this a stability question "
+                                      "at all. With the identity off the "
+                                      "amplifier's moment is not in the "
+                                      "VIX's target, the map has no gain "
+                                      "through it, and the baseline "
+                                      "normaliser costs nothing but the "
+                                      "panel rows below",
+            "market_vol_alpha 0.28035, market_vol_beta 0.69245":
+                "the factor variance's own persistence, which supplies the "
+                "excursions the superlinearity converts into a ceiling. NOT "
+                "moved: the shipped 0.65/0.35 mixture's fourth-moment "
+                "condition is 0.9870, under one, and its dispersion matches "
+                "the tape's own GARCH (implied factor kurtosis 13 against "
+                "11.3). Recalibrating them was remedy 2 and was declined "
+                "because it makes the excursions rarer without making the "
+                "map stable",
+        },
+        "source": "rust/src/params.rs, "
+                  "ModelParams::crash_amplifier_conditional_sigma; the "
+                  "condition and the closed form are "
+                  "rust/src/market/index_var.rs "
+                  "(`amplifier_moments`, `index_conditional_variance_terms`) "
+                  "and the instrument is tools/calibration/pin_ladder.py. "
+                  "The read-back is asserted against "
+                  "`factors::calculate_live_factors` itself by "
+                  "`the_conditional_normaliser_reproduces_the_index_the_"
+                  "tick_builds`, which carries a negative control at 22x "
+                  "base variance so a build whose read-back had not followed "
+                  "the tick cannot pass it",
+        "note": "WHAT IT COSTS, AND WHY THE OLD APPRAISAL DOES NOT SURVIVE. "
+                "The alternative normaliser was built and measured on "
+                "2026-08-22 and cost 0.03 of volatility clustering, 0.10 of "
+                "excess kurtosis and 0.006 of correlation, for 'only the "
+                "constancy of the firing rate'. Those figures were measured "
+                "on a preset whose VIX could not see the amplifier at all, "
+                "so the PRICE was measured and the PURCHASE was not: "
+                "constancy buys the loop's stability, which was not on the "
+                "ledger. The re-measurement on pt-v19 is in CHANGELOG.md. "
+                "What is given up is real and is given up knowingly: with a "
+                "constant normaliser the amplifier no longer turns a "
+                "variance regime into a correlation regime, which is what "
+                "real crises do -- the crisis blend, `sector_vix_coupling` "
+                "and the jump coupling carry that, and none of them has an "
+                "unbounded loop gain through the read-back. THE DIAL IS A "
+                "SWITCH AND BELONGS IN A TWO-LEVEL SET: `atlas.SWITCH_DIALS` "
+                "does not exist, so `atlas_survey.ZERO_SHIPPED_RANGES` "
+                "carries it with the defect written down -- a Latin "
+                "hypercube over [0, 1] never draws zero and would survey it "
+                "permanently on",
+    },
     "vix_target_shock_cap": {
         "kind": "derived",
         "presets": {"pt-v16": 45.0, "pt-v18": 45.0, "pt-v19": 255.0},
@@ -1583,7 +1674,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: Dials in scope that carry NO entry.
 #:
 #: This list is the finding. Seventy-three names declared here against
-#: ninety-seven dials in scope (one of them, `vix_mean_reversion`, beside
+#: ninety-eight dials in scope (one of them, `vix_mean_reversion`, beside
 #: an entry that predates this note), and several
 #: carry eight significant figures with no error bar anywhere --
 #: `crisis_blend_gain` at 0.8275881, `crisis_vix_threshold` at 30.88325108,
@@ -1607,7 +1698,11 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: `vix_decay_ratio`, `sector_loading` and `volume_idio_variance_gain`. A
 #: fifth left on 2026-09-11 with charter bar B4: `vix_target_shock_cap`,
 #: which pt-v19 now sets to the image of its own clamp rather than to a
-#: value that bound inside the graded range. A
+#: value that bound inside the graded range. The list has not GROWN since,
+#: which is the point worth recording:
+#: `crash_amplifier_conditional_sigma` arrived on 2026-09-11 carrying its
+#: own entry, so the one dial added for the stability fix never spent a
+#: commit here. A
 #: `measured` entry names EVERY in-scope preset's value (asserted in
 #: `tests/test_dial_provenance.py`), so where pt-v16 and pt-v18 ship an
 #: older value for one of these -- 0.6 and 0.58821442 -- the entry says

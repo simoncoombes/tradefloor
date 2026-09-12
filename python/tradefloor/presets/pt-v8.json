@@ -2,11 +2,12 @@
   "schema": 1,
   "preset": "pt-v8",
   "fingerprint": "pt-v8",
-  "coefficient_digest": "0d22daf50bf50fe5a2caeea7bd089a583cd96147c535c6edd08913a338039438",
+  "coefficient_digest": "8f0c66f1baa945eba3b611f8d0b54a24d10686382cd3bcfd04db63b84e1290c2",
   "coefficients": {
     "book_levels": 10.0,
     "buyback_payout_share": 0.0,
     "cascade_symmetry": 0.0,
+    "crash_amplifier_conditional_sigma": 0.0,
     "crash_amplifier_slope": 0.2,
     "crash_amplifier_threshold": 2.0,
     "crisis_blend_cap": 0.98,

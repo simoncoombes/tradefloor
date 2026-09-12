@@ -383,6 +383,24 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # point (0.0, 0.0) -- and a survey that lands inside the interval gets
     # the same opening as 1.0, which the dial's own tests assert.
     "cycle_stationary_opening": (0.0, 1.0),
+    # Which sigma the crash amplifier measures a shock in. A SWITCH on
+    # exactly the same footing as the entry above -- the branch is at zero
+    # and every nonzero value selects the conditional normaliser -- and the
+    # entry is here because the zero-shipped guard demands a range, not
+    # because the interval means anything.
+    #
+    # AND IT IS WORSE HERE THAN ABOVE, WHICH IS RECORDED RATHER THAN FIXED.
+    # The plan draws a Latin hypercube over each axis, and a hypercube over
+    # [0, 1] never draws exactly 0.0, so this axis surveys the dial
+    # PERMANENTLY ON and its map has no off arm at all. `cycle_stationary_
+    # opening` has the same defect and gets away with it because its two
+    # levels differ only in a day-zero state; this one changes the crash
+    # amplifier's denomination on every tick of every run. The right
+    # treatment is a two-level set -- `atlas.SWITCH_DIALS`, which does not
+    # exist yet -- surveyed at its ends rather than sampled over an
+    # interval. Until it does, read any surface over this axis as a
+    # measurement of the conditional normaliser alone.
+    "crash_amplifier_conditional_sigma": (0.0, 1.0),
     # News peer transfer: weights of a peer's surprise, natural unit range.
     "news_peer_weight": (0.0, 1.0),
     "news_peer_weight_down": (0.0, 1.0),

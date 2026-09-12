@@ -388,6 +388,18 @@ fn standard_normal_upper_tail(c: f64) -> f64 {
 /// sits 6.7 sigmas out and `A` is 1 for every tick of a year; at `s` 2.0 it
 /// sits at one sigma and a third of the session is amplified.
 ///
+/// # The normaliser is a switch, and at its far end `s` is 1
+///
+/// `crash_amplifier_conditional_sigma` makes the tick divide by
+/// `sigma_tick` rather than by `base`. The shock magnitude is then `|z|`,
+/// so `a = m` and `c = T` and **both moments are constants of the dials**.
+/// Callers pass the ratio, so this function does not branch: the caller
+/// passes `1.0` when the switch is on, and `s` when it is off. See
+/// [`ModelParams::crash_amplifier_conditional_sigma`](crate::params::ModelParams::crash_amplifier_conditional_sigma)
+/// for why pt-v19 needs that — in short, `E[z² A²]` growing in `s` is the
+/// superlinearity that makes `vix_ceiling` absorbing under
+/// `vix_level_identity`, and a constant removes it at the mechanism.
+///
 /// # The moments
 ///
 /// `f A(|f|)` is ODD in `f`, so it has no mean and the amplifier moves no
@@ -826,9 +838,28 @@ pub fn index_conditional_variance_terms(
     // amplifier normalises by — the ratio `factors.rs` builds
     // `shock_magnitude` from, written here in daily units because the
     // `sqrt(390)` on each side cancels. See `amplifier_moments`.
+    //
+    // UNDER `crash_amplifier_conditional_sigma` THE RATIO DROPS OUT. The
+    // tick then divides by the sigma it drew with, so `shock_magnitude` is
+    // `|z|` and the amplifier is `1 + m(|z| - T)` above `|z| > T` — which is
+    // `amplifier_moments` at a ratio of exactly 1.0, and `E[z^2 A^2]` is
+    // then a CONSTANT of the dials rather than a function of the regime.
+    // That is the whole of the stability fix: the amplified factor block
+    // becomes linear in `v_f`, so `implied(v)` is asymptotically linear in
+    // `v` and the map cannot cross the diagonal. A zero factor variance
+    // still returns the no-amplifier pair, through the same guard, because
+    // the quotient the tick would form there is 0/0 and the tick guards it
+    // the same way.
     let regime_ratio = mathx::sqrt(factor_variance) / p.market_factor_sigma;
+    let amplifier_ratio = if p.crash_amplifier_conditional_sigma == 0.0 {
+        regime_ratio
+    } else if regime_ratio > 0.0 {
+        1.0
+    } else {
+        0.0
+    };
     let (amp_1, amp_2) =
-        amplifier_moments(p.crash_amplifier_slope, p.crash_amplifier_threshold, regime_ratio);
+        amplifier_moments(p.crash_amplifier_slope, p.crash_amplifier_threshold, amplifier_ratio);
     // `E[z² A²] - 1` rather than `E[z² A²]`: `factor_raw` already carries
     // the 1, and keeping the increment is what lets the calm sum reproduce
     // the sum this replaced on bits.
@@ -1650,7 +1681,10 @@ mod tests {
     fn the_amplifier_moments_are_the_moments_they_claim() {
         for &m in &[0.05, 0.2, 0.5] {
             for &t in &[1.5, 2.0, 3.0] {
-                for &s in &[0.3, 0.6, 0.965, 1.32, 1.5, 2.04, 3.0] {
+                // 1.0 is in the list because it is the ONLY ratio
+                // `crash_amplifier_conditional_sigma` ever produces, so the
+                // switch's whole closed form is this test's `s = 1.0` row.
+                for &s in &[0.3, 0.6, 0.965, 1.0, 1.32, 1.5, 2.04, 3.0] {
                     let amp = |z: f64| {
                         let mag = z.abs() * s;
                         if mag > t { 1.0 + (mag - t) * m } else { 1.0 }
@@ -1674,13 +1708,19 @@ mod tests {
     /// AND THE REGIME DEPENDENCE IS THE POINT, so it is asserted as a
     /// SHAPE rather than as a set of values.
     ///
-    /// The amplifier's normaliser is the BASE sigma, a constant
-    /// (`factors.rs`: "extreme stays denominated in absolute units"), so its
-    /// contribution must rise monotonically with the regime ratio and go to
-    /// nothing in a floored regime. A version that normalised by the
-    /// conditional sigma instead — the alternative `factors.rs` weighs and
-    /// rejects — would be FLAT in `s`, and flat is exactly the defect B4
-    /// exists to remove.
+    /// With `crash_amplifier_conditional_sigma` at 0.0 the amplifier's
+    /// normaliser is the BASE sigma, a constant (`factors.rs`: "extreme
+    /// stays denominated in absolute units"), so its contribution must rise
+    /// monotonically with the regime ratio and go to nothing in a floored
+    /// regime.
+    ///
+    /// **That rise is the loop gain**, which is why the shape is worth
+    /// asserting rather than assuming: `E[z² A²]` here is inside the VIX's
+    /// own target under `vix_level_identity`, so a second moment that grows
+    /// in `s` is a map that grows in `v`. pt-v19 switches the normaliser and
+    /// buys a flat one; `the_conditional_normaliser_is_flat_in_the_regime`
+    /// is this test's counterpart at that end, and the two together are the
+    /// whole of what the switch does.
     #[test]
     fn the_amplifier_costs_more_the_deeper_the_regime() {
         let p = PT_V18;
@@ -1712,6 +1752,76 @@ mod tests {
             amplifier_moments(p.crash_amplifier_slope, p.crash_amplifier_threshold, 1.0);
         assert!(at_anchor > 1.03 && at_anchor < 1.08,
                 "the amplifier at the anchor reads {at_anchor}");
+    }
+
+    /// **THE SWITCH'S CLAIM, AS A SHAPE: FLAT IN THE REGIME, AND THE
+    /// AMPLIFIED BLOCK LINEAR IN THE FACTOR VARIANCE.**
+    ///
+    /// The counterpart of the test above. `crash_amplifier_conditional_sigma`
+    /// is worth shipping only if `E[z² A²]` stops depending on how deep the
+    /// factor-variance excursion went, because that dependence is the loop
+    /// gain and nothing else in the map is worse than quadratic in `v`. So
+    /// this asserts the two consequences directly on
+    /// `index_conditional_variance_terms`, over a range of factor variances
+    /// forty times wide — wider than the deepest excursion b4read1 measured
+    /// (peak 21.68 times base on the runaway seeds):
+    ///
+    /// - `crash_raw / factor_raw` is the SAME DOUBLE at every one of them,
+    ///   so the amplifier is a constant inflation of the factor block;
+    /// - `factor_raw + crash_raw` is therefore proportional to `v_f`, which
+    ///   is what makes `implied(v)` asymptotically linear in `v`.
+    ///
+    /// **On the closed form's own arithmetic and not on bits, and the
+    /// difference is worth stating.** `amplifier_moments` returns the same
+    /// pair of doubles at every regime here — that part IS exact, and it is
+    /// where the claim lives. What this test reads is `crash_raw`, which is
+    /// `factor_raw * (E[z²A²] - 1)`, so dividing it back out is a multiply
+    /// and a divide round trip and lands within an ulp rather than on it.
+    /// The tolerance is 8 ulp of the ratio; a regime-dependent moment misses
+    /// by four per cent at `s` 3.74, which is eleven orders of magnitude
+    /// larger.
+    #[test]
+    fn the_conditional_normaliser_is_flat_in_the_regime() {
+        let k = intraday_variance_factor();
+        let names = roster();
+        let mut p = crate::params::PT_V19;
+        assert_eq!(p.crash_amplifier_conditional_sigma, 1.0,
+                   "pt-v19 is the preset this dial was added for");
+        let base = p.market_factor_sigma * p.market_factor_sigma;
+        let at = |p: &ModelParams, ratio: f64| {
+            index_conditional_variance_terms(
+                p, &names, 3, base * ratio, p.sector_factor_sigma, 1.0, 0.0, false, k)
+        };
+        let anchor = at(&p, 1.0);
+        let flat = anchor.crash_raw / anchor.factor_raw;
+        assert!(flat > 0.0, "the amplifier must still cost something: {flat}");
+        let tol = 8.0 * f64::EPSILON;
+        let slope = (anchor.factor_raw + anchor.crash_raw) / base;
+        for &ratio in &[0.25, 0.5, 1.0, 2.0, 3.74, 9.0, 21.68, 40.0] {
+            let terms = at(&p, ratio);
+            let share = terms.crash_raw / terms.factor_raw;
+            assert!((share - flat).abs() <= tol * flat,
+                    "the amplifier's share moved at v_f = {ratio} x base: \
+                     {share} against {flat}");
+            // And the amplified block is linear in `v_f`: same constant of
+            // proportionality at every ratio.
+            let got = (terms.factor_raw + terms.crash_raw) / (base * ratio);
+            assert!((got - slope).abs() <= tol * slope,
+                    "the amplified factor block stopped being linear in v_f \
+                     at {ratio} x base: {got} against {slope}");
+        }
+        // The negative control, on the same roster and the same ratios: with
+        // the switch OFF the share is not flat, and it is the deep regimes
+        // that separate. Without this the test above would pass on a build
+        // where the amplifier had simply been switched off.
+        p.crash_amplifier_conditional_sigma = 0.0;
+        let shallow = at(&p, 1.0);
+        let deep = at(&p, 21.68);
+        assert!(deep.crash_raw / deep.factor_raw
+                    > 4.0 * shallow.crash_raw / shallow.factor_raw,
+                "the baseline normaliser's share barely moved: {} against {}",
+                deep.crash_raw / deep.factor_raw,
+                shallow.crash_raw / shallow.factor_raw);
     }
 
     /// A generator that draws nothing, so the per-name idiosyncratic term
@@ -1892,6 +2002,134 @@ mod tests {
                                 "the recentring residual is {:.4} of the market block \
                                  at lagged {lagged}, spike {spike}, v_f {v_f}",
                                 drift_share);
+                    }
+                }
+            }
+          }
+        }
+    }
+
+    /// **THE SWITCH'S CLOSED FORM, AGAINST THE ENGINE, NOT AGAINST ITSELF.**
+    ///
+    /// The same check as above and for the same reason, with
+    /// `crash_amplifier_conditional_sigma` on. It is a separate test rather
+    /// than another axis of that one because the quadrature is the most
+    /// expensive thing in this file and the two ends of a switch do not need
+    /// the same sweep: what is at risk here is only whether the read-back's
+    /// `amplifier_ratio` branch matches the tick's `shock_magnitude` branch,
+    /// so the case list keeps both blend wirings, both faces of the lag bit
+    /// and both saturations of the spike, and spends the rest of its budget
+    /// on the REGIME — which is the whole quantity the switch removes.
+    ///
+    /// `1.25e-3` is about twenty-two times the factor's baseline variance:
+    /// deeper than the peak excursion b4read1 measured on the runaway seeds
+    /// (21.68 times base), and the regime where the two normalisers disagree
+    /// most. An algebraic test cannot tell the two branches apart there; the
+    /// engine can.
+    #[test]
+    fn the_conditional_normaliser_reproduces_the_index_the_tick_builds() {
+        let k = intraday_variance_factor();
+        let names = roster();
+        for &source in &[1.0, 0.0] {
+          for &(tilt, lag, lagged) in &[
+              (0.0, 0.0, false),      // neither wire
+              (0.025, 0.375, false),  // pt-v19's pair, unlagged session
+              (0.025, 0.375, true),   // pt-v19's pair, lagged session
+          ] {
+            for &spike in &[0.0, 0.98] {
+                for &v_f in &[1.7e-5, 5.766e-5, 1.25e-3] {
+                    let mut p = PT_V18;
+                    p.crash_amplifier_conditional_sigma = 1.0;
+                    p.crisis_blend_source = source;
+                    p.market_beta_down_asym = tilt;
+                    p.market_beta_down_asym_lag = lag;
+
+                    let sigma_tick = mathx::sqrt(v_f) / mathx::sqrt(390.0);
+                    let index_at = |z: f64| {
+                        let mut total = 0.0;
+                        for (i, n) in names.iter().enumerate() {
+                            let company = crate::market::factors::FactorCompany {
+                                id: format!("N{i}"),
+                                sector: format!("S{}", n.sector),
+                                beta: Some(n.beta),
+                                market_cap: n.market_cap,
+                                avg_volume: 1.0e7,
+                                shares_outstanding: 1.0e9,
+                                short_interest: 0.0,
+                                float: 1.0e9,
+                                garch_variance: n.garch_variance,
+                                last_daily_return: Some(0.0),
+                            };
+                            let shared = crate::market::factors::SharedFactors {
+                                market_factor: z * sigma_tick,
+                                sector_factors: (0..3)
+                                    .map(|s| (format!("S{s}"), 0.0))
+                                    .collect(),
+                                crisis_spike: spike,
+                                prev_day_down: lagged,
+                                // THE NORMALISER UNDER TEST. The tick reads
+                                // this and nothing else once the switch is
+                                // on, so passing the same `sigma_tick` the
+                                // draw above was scaled by is what makes
+                                // this a check of the branch rather than of
+                                // a coincidence.
+                                market_sigma_tick: sigma_tick,
+                            };
+                            let out = crate::market::factors::calculate_live_factors(
+                                &company, &[], 0.0, 1.0, &shared, &p, &mut NoNoise);
+                            total += n.weight * out.random_noise;
+                        }
+                        total
+                    };
+                    let index_at = |z: f64| {
+                        let base = index_at(z);
+                        if source == 1.0 || spike == 0.0 {
+                            base
+                        } else {
+                            let leak: f64 = names
+                                .iter()
+                                .map(|n| {
+                                    n.weight
+                                        * crate::market::factors::sector_loading_for(&p, n.beta)
+                                })
+                                .sum::<f64>()
+                                * z * sigma_tick * spike * (1.0 - source);
+                            base + leak
+                        }
+                    };
+                    let offset = index_at(0.0);
+                    let per_tick = integrate_against_the_normal(|z| {
+                        let centred = index_at(z) - offset;
+                        centred * centred
+                    });
+                    let measured_daily = 390.0 * per_tick;
+
+                    let terms = index_conditional_variance_terms(
+                        &p, &names, 3, v_f, 0.0, 1.0, spike, lagged, k);
+                    let want = terms.factor_raw + terms.crash_raw + terms.crisis_raw
+                        + terms.tilt_raw;
+                    assert!(
+                        (want - measured_daily).abs() < 1e-9 * measured_daily,
+                        "source {source}, tilt {tilt}, lag {lag}, lagged {lagged}, \
+                         spike {spike}, v_f {v_f}: identity {want} \
+                         against the tick's own {measured_daily}");
+
+                    // AND THE OLD CLOSED FORM MUST FAIL HERE, at the deep
+                    // regime, or this test would pass on a build where the
+                    // read-back had not followed the tick. Same terms with
+                    // the read-back's switch off against the tick's on.
+                    if v_f > 1.0e-3 {
+                        let mut stale = p;
+                        stale.crash_amplifier_conditional_sigma = 0.0;
+                        let stale_terms = index_conditional_variance_terms(
+                            &stale, &names, 3, v_f, 0.0, 1.0, spike, lagged, k);
+                        let stale_want = stale_terms.factor_raw + stale_terms.crash_raw
+                            + stale_terms.crisis_raw + stale_terms.tilt_raw;
+                        assert!(stale_want > 1.5 * measured_daily,
+                                "a read-back on the OLD normaliser reads \
+                                 {stale_want} against the tick's {measured_daily}, \
+                                 which is close enough that this test proves \
+                                 nothing about which branch was taken");
                     }
                 }
             }

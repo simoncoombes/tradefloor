@@ -119,6 +119,15 @@ PERTURBATIONS = [
     ("news_market_weight", 0.4, False),        # needs news; none sent
     ("crash_amplifier_threshold", 1.0, True),
     ("crash_amplifier_slope", 0.4, True),
+    # Perturbed DOWNWARD, because the default already carries it: pt-v19
+    # sets it to 1.0, so the perturbation that says something is the one
+    # back to the baseline normaliser. It moves on a three-session probe for
+    # the reason the dial exists -- at 1.0 the amplifier fires on the same
+    # few per cent of ticks in every regime, and at 0.0 a calm regime puts
+    # the threshold about nine conditional sigmas out and the amplifier is
+    # silent -- so the two builds differ on the first session that draws a
+    # two-sigma market factor.
+    ("crash_amplifier_conditional_sigma", 0.0, True),
     ("crisis_blend_ramp", 0.7, False),         # needs VIX > 25.5; macro
     ("crisis_blend_cap", 0.4, False),          # starts at the default 15
     # The crisis blend's source only acts above the crisis threshold, which a

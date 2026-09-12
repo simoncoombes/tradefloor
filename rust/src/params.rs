@@ -448,6 +448,75 @@ pub struct ModelParams {
     /// certification protocol's thirty rosters, with the crisis blend
     /// switched entirely off. See `market::index_var`.
     pub crash_amplifier_slope: f64,
+    /// Which sigma the crash amplifier measures a shock in: the BASELINE
+    /// constant (0.0, every preset before pt-v19) or the tick's own
+    /// CONDITIONAL sigma (nonzero).
+    ///
+    /// # A switch, and it is one on purpose
+    ///
+    /// There is no half-normalised shock. `factors.rs` branches on
+    /// `== 0.0` and reads the conditional sigma on every other value, so
+    /// the MAGNITUDE is unused and the two admissible values are the two
+    /// ends. It belongs in `atlas.SWITCH_DIALS` for that reason and NOT in
+    /// the survey's zero-shipped ranges: a Latin hypercube over `[0, 1]`
+    /// never draws exactly zero, so an axis would survey the dial
+    /// permanently ON and report the far end as the whole map.
+    /// `cycle_stationary_opening` and `garch_omega_sector_scaled` are the
+    /// same shape and carry the same note.
+    ///
+    /// At 0.0 nothing is computed that was not computed before and no draw
+    /// moves, so every preset from pt-v1 to pt-v18 is BIT-IDENTICAL.
+    ///
+    /// # What it changes, in one line
+    ///
+    /// `shock_magnitude` is `|F| / sigma`. With the baseline sigma the
+    /// amplifier's argument is `s|z|` for the regime ratio
+    /// `s = sqrt(v_f) / market_factor_sigma`, so a high-variance regime
+    /// pushes more ticks past `crash_amplifier_threshold` AND pushes them
+    /// further past it. With the conditional sigma the argument is `|z|`
+    /// and the regime drops out entirely.
+    ///
+    /// # Why pt-v19 needs it, which is a stability result and not a taste
+    ///
+    /// In `market::index_var`'s closed form the amplifier's second moment
+    /// is `E[z^2 A^2]` at `a = m s`, `c = T / s`, which grows without
+    /// bound in `s`. Under `vix_level_identity` that moment is inside the
+    /// VIX's own target, so the map `v -> implied(v)` is SUPERLINEAR at the
+    /// top of the VIX's range: `implied(v) / v` falls to 0.732 at VIX 40
+    /// and then rises, 0.854 at 80 and 0.941 at 100, and it crosses one
+    /// inside `vix_ceiling` on a roster whose factor block is a larger
+    /// share of the index's variance. The ceiling is then absorbing, and
+    /// measured it is absorbed: 81 of 7,560 seed-days on three of the
+    /// certification protocol's thirty rosters with the crisis blend
+    /// switched entirely OFF, and 11 of 120 rosters over the population
+    /// b4read1 censused, where pt-v19 before charter bar B4 reached it on
+    /// 0 of 7,560.
+    ///
+    /// At nonzero this dial sets `a = m` and `c = T`, so `E[z^2 A^2]` is
+    /// CONSTANT in the regime, the amplified factor block is linear in
+    /// `v_f` exactly as the unamplified one is, and the map cannot cross
+    /// the diagonal however far the factor variance excurses. The runaway
+    /// b4read1 decomposed onto the draw stream (14 of 120 runs with the
+    /// roster held, 0 of 120 with the stream held) is removed at its
+    /// mechanism rather than made rarer.
+    ///
+    /// # What it costs, which was priced before it was needed
+    ///
+    /// The alternative was built and measured on 2026-08-22, on a preset
+    /// whose VIX could not see the amplifier: 0.03 of volatility
+    /// clustering, 0.10 of excess kurtosis and 0.006 of correlation, for
+    /// "only the constancy of the firing rate". The magnitudes are
+    /// re-measured on pt-v19 in `CHANGELOG.md`; the APPRAISAL is what has
+    /// changed, because constancy now buys the loop's stability, which was
+    /// not on the ledger when the trade was first priced.
+    ///
+    /// And the realism the baseline normaliser was keeping is real and is
+    /// given up knowingly: with a constant normaliser the amplifier turns
+    /// a variance regime into a correlation regime, which is what crises
+    /// do. What replaces it is the rest of the crisis apparatus — the
+    /// blend, `sector_vix_coupling`, the jump coupling — none of which has
+    /// an unbounded loop gain through the read-back.
+    pub crash_amplifier_conditional_sigma: f64,
     /// VIX points past `CRISIS_VIX_THRESHOLD` for the sector→market blend
     /// to reach 1.0 before its cap (§5.4 promotion).
     pub crisis_blend_ramp: f64,
@@ -2660,6 +2729,7 @@ impl ModelParams {
             news_market_weight: factors::NEWS_MARKET_WEIGHT,
             crash_amplifier_threshold: factors::CRASH_AMPLIFIER_THRESHOLD,
             crash_amplifier_slope: factors::CRASH_AMPLIFIER_SLOPE,
+            crash_amplifier_conditional_sigma: 0.0,
             crisis_blend_ramp: tick::CRISIS_BLEND_RAMP,
             crisis_blend_cap: tick::CRISIS_BLEND_CAP,
             crisis_blend_gain: 0.5,
@@ -3982,6 +4052,23 @@ impl ModelParams {
         // the image is the product; `the_default_cap_is_the_clamps_own_image`
         // asserts both halves of that rather than trusting the comment.
         p.vix_target_shock_cap = p.vix_return_gain * p.vix_return_clamp;
+        // THE STABILITY CONDITION, and this is the dial that meets it. B4
+        // put the crash amplifier inside the VIX's own target, and the
+        // amplifier's second moment grows without bound in the regime ratio
+        // because its shock is denominated in the BASELINE sigma -- so the
+        // map `v -> implied(v)` is superlinear at the top of the VIX's
+        // range and `vix_ceiling` is absorbing on rosters the certification
+        // protocol actually draws. Normalising by the tick's own
+        // conditional sigma sets `a = m` and `c = T` in
+        // `market::index_var::amplifier_moments`, which makes `E[z^2 A^2]`
+        // constant in the regime, the amplified factor block linear in
+        // `v_f`, and the map incapable of crossing the diagonal however far
+        // the factor variance excurses.
+        //
+        // DERIVED and not searched: it is the only value other than the
+        // baseline reading, the dial has no interior, and what chooses it
+        // is the condition `implied(v) < v` and not a panel row.
+        p.crash_amplifier_conditional_sigma = 1.0;
         p
     }
 
@@ -4058,6 +4145,7 @@ impl ModelParams {
             "news_market_weight" => self.news_market_weight,
             "crash_amplifier_threshold" => self.crash_amplifier_threshold,
             "crash_amplifier_slope" => self.crash_amplifier_slope,
+            "crash_amplifier_conditional_sigma" => self.crash_amplifier_conditional_sigma,
             "crisis_blend_ramp" => self.crisis_blend_ramp,
             "crisis_blend_cap" => self.crisis_blend_cap,
             "crisis_blend_gain" => self.crisis_blend_gain,
@@ -4224,6 +4312,7 @@ impl ModelParams {
             "news_market_weight" => out.news_market_weight = value,
             "crash_amplifier_threshold" => out.crash_amplifier_threshold = value,
             "crash_amplifier_slope" => out.crash_amplifier_slope = value,
+            "crash_amplifier_conditional_sigma" => out.crash_amplifier_conditional_sigma = value,
             "crisis_blend_ramp" => out.crisis_blend_ramp = value,
             "crisis_blend_cap" => out.crisis_blend_cap = value,
             "crisis_blend_gain" => out.crisis_blend_gain = value,
@@ -4429,6 +4518,7 @@ impl ModelParams {
 pub fn settable_names() -> Vec<&'static str> {
     vec![
         "cascade_symmetry",
+        "crash_amplifier_conditional_sigma",
         "crash_amplifier_slope",
         "crash_amplifier_threshold",
         "crisis_blend_cap",

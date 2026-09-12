@@ -275,6 +275,75 @@ pt-v13 on carries; or give `crisis_blend_variance_damp` a moment, which asks for
 incomplete-gamma integral where the rest of the module needs only `phi` and
 `Phi`.
 
+**The first of those routes is taken. `crash_amplifier_conditional_sigma`
+is a new dial, 0.0 on every preset up to pt-v18 and 1.0 on pt-v19.** At 0.0
+the crash amplifier divides the market shock by `market_factor_sigma /
+sqrt(390)`, a constant, so its argument is `s|z|` for the regime ratio `s =
+sqrt(v_f) / market_factor_sigma`, and `E[z^2 A^2]` grows as the square of
+`s`. At 1.0 it divides by the tick's own `market_sigma_tick`, the sigma the
+draw was actually scaled by, so the argument is `|z|` and the closed form's
+`a = m s`, `c = T / s` become `a = m`, `c = T`. Both amplifier moments are
+then constants of the dials. The amplified factor block is linear in `v_f`
+in the same way the unamplified block is, `implied(v)` is asymptotically
+linear in `v`, and the map has a fixed point below `vix_ceiling` for any
+excursion the variance process can make.
+
+The dial is a switch. `factors.rs` branches at `== 0.0` and every other
+value selects the conditional normaliser, so there is no half-normalised
+shock and the magnitude is unused. It belongs in a two-level survey set
+rather than on an interval axis; `atlas.SWITCH_DIALS` does not exist, so
+`atlas_survey.ZERO_SHIPPED_RANGES` carries it with that written down, since
+a Latin hypercube over [0, 1] never draws zero and would survey the dial
+permanently on. `cycle_stationary_opening` and `garch_omega_sector_scaled`
+have the same shape.
+
+**pt-v1 through pt-v18 are bit-identical.** Measured over seventeen presets
+and five seeds (101, 102, 103, 111, 114) as a digest of every name column,
+every economy scalar, the market variance state and the draw counts at each
+close: 85 of 85 agree, and the five pt-v19 rows are the only ones that move.
+`KAT_VERSION` goes to 18.
+
+**The derived VIX anchor does not move, at 23.7212 on `Universe.random(40,
+seed=111)`.** `index_unconditional_variance` evaluates the identity at `v_f
+= market_factor_sigma^2`, where the regime ratio is 1.0 and the two
+normalisers agree by construction, so this boundary moves the regime
+response and leaves the level the VIX rests at alone. `metadataSha256` holds
+for the fifth boundary running.
+
+**The closed form is checked twice, and the second check is the one that can
+tell the two branches apart.** `the_amplifier_moments_are_the_moments_they_
+claim` integrates `A` as the tick writes it against the normal by Simpson
+quadrature over 240,001 points at 3 slopes, 3 thresholds and 8 regime ratios
+including the 1.0 the switch produces, and holds to a part in 10^9.
+`the_conditional_normaliser_reproduces_the_index_the_tick_builds` drives
+`factors::calculate_live_factors` over the same quadrature at both blend
+wirings, three tilt and lag combinations, two spikes and three factor
+variances, the deepest of them `v_f` = 1.25e-3, about 22 times base and
+deeper than the peak excursion the census measured on the runaway seeds. It
+carries a negative control at that depth: a read-back left on the old
+normaliser has to read more than 1.5 times what the tick returns, so a build
+whose read-back had not followed the tick fails rather than passes.
+`the_conditional_normaliser_is_flat_in_the_regime` asserts the consequence
+on `index_conditional_variance_terms`, that `crash_raw / factor_raw` holds
+within 8 ulp across factor variances from 0.25 to 40 times base, with the
+switch off as its negative control.
+
+**Two local guards moved and both are costs rather than adjustments.**
+`test_nonvacuity.py` drives a pinned VIX of 200 to force the circuit breaker
+to bind, and a pinned VIX of 200 is exactly a deep regime, so on this build
+the breaker binds on 0, 75, 16 and 54 rows across seeds 2024, 7, 101 and
+555; the seed that test uses stopped binding. The scenario goes to 400 and
+-0.95, where it binds on 592, 931, 555 and 624.
+`test_facts.py::test_volume_and_volatility_arrive_together_since_the_volume_
+fix` reads the median `volume_abs_return_corr` over twelve seeds at 0.4825
+against 0.4927, still inside its 0.46 to 0.66 band, with the 0.7015 outlier
+on seed 6 gone and the count of seeds outside the band going from three to
+four.
+
+The census that decides whether this works is registered as `b4fix1` in the
+design repository, with the ceiling-day count it has to reach and the count
+that would say the superlinearity was not the whole mechanism.
+
 **Five dials leave the default's live surface and six join it.** Under
 `vix_level_identity` the VIX is derived from the index's conditional
 variance rather than declared, so `market_vol_vix_anchor`,

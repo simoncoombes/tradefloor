@@ -191,8 +191,10 @@ pub struct SharedFactors {
     /// `params.market_factor_sigma`. Carried rather than recomputed
     /// because the two differ by the whole of the factor's variance
     /// process, and the one quantity that can recentre the downside tilt
-    /// exactly is the sigma the draw actually used. Read only by
-    /// `market_beta_down_asym_recentre`.
+    /// exactly is the sigma the draw actually used. Read by
+    /// `market_beta_down_asym_recentre`, and — since the crash amplifier
+    /// gained a normaliser switch — by `crash_amplifier_conditional_sigma`
+    /// as well, which is the same quantity for the same reason.
     pub market_sigma_tick: f64,
 }
 
@@ -533,21 +535,45 @@ pub fn calculate_live_factors(
     // this threshold in the old units.
     //
     // Since the factor's variance became conditional (`factor_vol`), the
-    // constant here is the BASELINE sigma, deliberately: "extreme" stays
+    // constant here was the BASELINE sigma, deliberately: "extreme" stayed
     // denominated in absolute units — the reference's own semantics — so a
-    // high-variance factor regime pushes MORE ticks past the threshold and
-    // the amplifier converts variance regimes into correlation regimes,
-    // which is what real crises do. The alternative (normalising by the
-    // conditional sigma, so the amplifier always fires on the same ~5%
-    // tail regardless of regime) was built and measured on the published
-    // panel: it costs 0.03 of volatility clustering (0.245 -> 0.216),
-    // 0.10 of excess kurtosis (3.14 -> 3.04) and 0.006 of correlation at
-    // the shipped constants (results/market-factor-vol-2026-08-22-*.json),
-    // and buys only the constancy of the firing rate. In a calm (floored)
-    // factor regime the threshold sits ~9 conditional sigmas out and the
-    // amplifier is silent, which is the other half of the same realism.
-    let shock_magnitude =
-        shared.market_factor.abs() / (params.market_factor_sigma / mathx::sqrt(390.0));
+    // high-variance factor regime pushed MORE ticks past the threshold and
+    // the amplifier converted variance regimes into correlation regimes,
+    // which is what real crises do. In a calm (floored) factor regime the
+    // threshold sits ~9 conditional sigmas out and the amplifier is silent,
+    // which is the other half of the same realism.
+    //
+    // `crash_amplifier_conditional_sigma` NORMALISES BY THE CONDITIONAL
+    // SIGMA INSTEAD, and it is a switch: `== 0.0` is the baseline reading
+    // and every other value is the conditional one, so a preset written
+    // before the dial is bit-identical through the branch. The alternative
+    // was built and measured on the published panel on 2026-08-22 and cost
+    // 0.03 of volatility clustering (0.245 -> 0.216), 0.10 of excess
+    // kurtosis (3.14 -> 3.04) and 0.006 of correlation at the shipped
+    // constants (results/market-factor-vol-2026-08-22-*.json), and bought
+    // "only the constancy of the firing rate". That appraisal was made on a
+    // preset whose VIX could not see the amplifier at all. Under
+    // `vix_level_identity` the amplifier's second moment is INSIDE the
+    // VIX's own target, and with the baseline normaliser it grows as the
+    // square of the regime ratio, so the loop's map is superlinear and
+    // `vix_ceiling` is absorbing — measured on 11 of 120 rosters with the
+    // crisis blend switched entirely off. Constancy of the firing rate now
+    // buys the loop's stability. See `ModelParams::
+    // crash_amplifier_conditional_sigma` and `market::index_var`.
+    //
+    // `market_sigma_tick` is the sigma the draw ACTUALLY used, carried on
+    // `SharedFactors` rather than recomputed, for the same reason
+    // `market_beta_down_asym_recentre` reads it: the two differ by the
+    // whole of the factor's variance process. Guarded at zero, where the
+    // quotient would be 0/0 — a factor that cannot move cannot be extreme,
+    // and `amplifier_moments` returns the same no-amplifier pair there.
+    let shock_magnitude = if params.crash_amplifier_conditional_sigma == 0.0 {
+        shared.market_factor.abs() / (params.market_factor_sigma / mathx::sqrt(390.0))
+    } else if shared.market_sigma_tick > 0.0 {
+        shared.market_factor.abs() / shared.market_sigma_tick
+    } else {
+        0.0
+    };
     let crash_amplifier = if shock_magnitude > params.crash_amplifier_threshold {
         1.0 + (shock_magnitude - params.crash_amplifier_threshold) * params.crash_amplifier_slope
     } else {
@@ -1602,6 +1628,56 @@ mod tests {
         // The same 1.5-conditional-sigma tick of a HALF-baseline (calm,
         // floored) regime is nowhere near the absolute threshold: silent.
         assert_eq!(amplifier_at(base_tick * 0.5 * 1.5), 1.0);
+    }
+
+    /// **AND THE SWITCH TAKES THAT REGIME-DEPENDENCE OUT, WHICH IS THE
+    /// WHOLE OF IT.**
+    ///
+    /// The test above is this dial's own negative: at 0.0 the same
+    /// conditional multiple reads differently in two regimes, and above
+    /// 0.0 it must read IDENTICALLY, because the normaliser is the sigma
+    /// the draw used. That is what makes `E[z^2 A^2]` constant in the
+    /// regime in `market::index_var::amplifier_moments`, and it is the
+    /// stability condition's whole content.
+    ///
+    /// Asserted on BITS across three regimes spanning a factor of forty in
+    /// variance, not to a tolerance: the claim is that the regime ratio
+    /// divides out of the expression, and an expression it divides out of
+    /// returns the same double.
+    #[test]
+    fn the_conditional_normaliser_fires_at_the_same_multiple_in_every_regime() {
+        let base_tick = crate::market::tick::MARKET_FACTOR_SIGMA / 390.0f64.sqrt();
+        let c = company();
+        let mut p = crate::params::PT_V1;
+        p.crash_amplifier_conditional_sigma = 1.0;
+        // `z` in conditional sigmas, and the regime the tick was drawn in.
+        let amplifier_at = |z: f64, regime: f64| {
+            let mut s = shared();
+            s.market_sigma_tick = base_tick * regime;
+            s.market_factor = z * s.market_sigma_tick;
+            factors_with(&p, &c, &[], 0.0, &s).random_noise / s.market_factor
+        };
+        for &z in &[0.5, 1.5, 1.99, 2.0, 2.5, 4.0, 7.0] {
+            let at_base = amplifier_at(z, 1.0);
+            for &regime in &[0.3, 0.5, 2.0, 6.3] {
+                assert_eq!(
+                    amplifier_at(z, regime), at_base,
+                    "z {z} reads differently at regime {regime}: the regime \
+                     ratio did not divide out");
+            }
+        }
+        // And it is the amplifier being read and not a constant: the
+        // threshold is 2.0 baseline sigmas, so a 1.99-sigma tick is silent
+        // and a 2.5-sigma one is not, in EVERY regime.
+        assert_eq!(amplifier_at(1.99, 6.3), 1.0);
+        assert!(amplifier_at(2.5, 0.3) > 1.0);
+        // A regime with no width at all cannot produce an extreme tick.
+        // 0/0 would be NaN and would propagate into every name's price;
+        // the guard makes it the no-amplifier reading instead.
+        let mut dead = shared();
+        dead.market_sigma_tick = 0.0;
+        dead.market_factor = 0.0;
+        assert_eq!(factors_with(&p, &c, &[], 0.0, &dead).random_noise, 0.0);
     }
 
     #[test]

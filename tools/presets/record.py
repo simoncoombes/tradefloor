@@ -245,9 +245,20 @@ def write_coefficients() -> int:
     byte as they are. What it must NOT be used for is a preset whose
     coefficients actually moved: that is a new preset, and a new preset
     needs the panel.
+
+    A REFUSAL SKIPS ONE RECORD AND DOES NOT ABORT THE RUN, which it used to.
+    The refusal is per record and the bookkeeping change is global, so
+    stopping at the first one left the records after it in the sort order
+    stale for a reason that had nothing to do with them -- half a rewrite,
+    which is worse than either end of it. The run still fails (this returns
+    1) and the refused record is still not written; what changed is that the
+    other seventeen are not collateral. This bit on 2026-09-11, when
+    `crash_amplifier_conditional_sigma` was added while `pt-v19.json` was
+    deliberately un-regenerated for `vix_target_shock_cap`.
     """
     import tradefloor
 
+    refused = []
     for path in sorted(OUT.glob("*.json")):
         record = json.loads(path.read_text(encoding="utf-8"))
         # `to_dict()` whole, exactly as `build` passes it, `name` included:
@@ -260,7 +271,8 @@ def write_coefficients() -> int:
         if moved:
             print(f"  REFUSED {path.name}: {len(moved)} existing coefficient(s) "
                   f"moved, which is a new preset and needs --panel: {moved}")
-            return 1
+            refused.append(path.name)
+            continue
         record["coefficient_digest"] = coefficient_digest(values)
         record["coefficients"] = {k: values[k] for k in sorted(values)}
         text = json.dumps(record, indent=2, ensure_ascii=False) + chr(10)
@@ -268,6 +280,9 @@ def write_coefficients() -> int:
         added = sorted(set(values) - set(before))
         print(f"  wrote {path.relative_to(ROOT)}"
               + (f"  (+{', '.join(added)})" if added else ""))
+    if refused:
+        print(f"{len(refused)} record(s) not written: {', '.join(refused)}")
+        return 1
     return 0
 
 

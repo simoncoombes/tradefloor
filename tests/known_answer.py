@@ -247,7 +247,26 @@ import tradefloor
 # THE CRISIS DIALS ARE NOT TOUCHED, and the reason is the finding recorded
 # in CHANGELOG.md: the stability condition they would be derived from does
 # not bind on them. See there.
-KAT_VERSION = 17
+#
+# v18: the stability fix itself, and still inside 0.8.0 and still pt-v19.
+# `crash_amplifier_conditional_sigma` denominates the crash amplifier's
+# shock in the tick's own conditional sigma rather than in the baseline
+# constant, which makes `E[z^2 A^2]` a constant of the dials instead of a
+# function of the regime and takes the superlinearity out of the VIX's map.
+# A new dial, default 0.0, branch-guarded at both its read sites, so
+# pt-v1 through pt-v18 are BIT-IDENTICAL -- measured over seventeen presets
+# and five seeds -- and pt-v19 sets it to 1.0, so every seeded pt-v19
+# trajectory moves a fourth time.
+#
+# TWO THINGS THAT DO NOT MOVE, and both are checks rather than conveniences.
+# `metadataSha256` holds for the fifth boundary running: this dial is not
+# among the mispricing and crowd coefficients `model_preset()` reports. And
+# THE DERIVED ANCHOR HOLDS TOO, at 23.7212 on `Universe.random(40,
+# seed=111)` -- `index_unconditional_variance` evaluates the identity at
+# `v_f = market_factor_sigma^2`, where the regime ratio is exactly 1.0 and
+# the two normalisers agree by construction. So this boundary moves the
+# regime RESPONSE and nothing about the level the VIX rests at.
+KAT_VERSION = 18
 
 SEED = 20260820
 DAYS = 250
