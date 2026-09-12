@@ -2233,20 +2233,16 @@ mod fear_response_shape {
     /// **THE SHIPPED CEILING, PINNED WITH ITS PROVENANCE, AND ORDERED
     /// AGAINST THE CAP.**
     ///
-    /// 173.1087 is b4fix6's solution of `C - implied(C) >= 17 * 6.39` on a
-    /// pin ladder (three seeds, eighteen pins from 14 to 260, blend OFF,
-    /// residual 8.82 from the ladder's spread across seeds). `implied(C)`
-    /// there is the SETTLED read-back at a pin, the level the map sustains
-    /// when the VIX is held at `C` and the factor variance relaxes to its
-    /// target. It is not the read-back the state carries on the days it
-    /// actually reaches a ceiling: those are variance excursions, 8.5 to
-    /// 30 times the factor's base, on which the identity read 114 to 146 at
-    /// a VIX of 108.63 with no session at all. The two quantities are
-    /// reconciled in `ceiling-derivation-independent.md` section 4.5 and
-    /// the b4fix7 result, and the condition above is sufficient for the
-    /// settled map only. What the value has that a chosen one does not is
-    /// a stated condition, a stated residual, and a measured clip rate of
-    /// zero: no graded statistic reads it on the record.
+    /// 181.3295 is the solution of `C - implied(C) >= 17 * 6.39` on b4fix7's
+    /// settled pin ladder of the map this preset runs (crisis blend at 0,
+    /// ten rosters, burn 250, pins 14 to 260, residual 8.64 from the
+    /// ladder's spread across rosters). `implied(C)` there is the SETTLED
+    /// read-back at a pin, the level the map sustains when the VIX is held
+    /// at `C`; it is not the read-back the state carries on a variance
+    /// excursion, and the condition is sufficient for the settled map only
+    /// (`ceiling-derivation-independent.md` sections 8 to 14). What the
+    /// record shows at gain 0 is a clip rate of zero over 30,240 seed-days
+    /// with a highest VIX of 73.9 and a highest read-back of 93.2.
     ///
     /// Pinned so that a preset which moves the ceiling without re-solving
     /// the condition and re-measuring the census fails here.
@@ -2254,10 +2250,10 @@ mod fear_response_shape {
     fn the_default_ceiling_is_pinned_to_its_solve_and_sits_under_the_cap() {
         let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
             .expect("the default preset resolves");
-        const CEILING_SOLVED: f64 = 173.1087;
+        const CEILING_SOLVED: f64 = 181.3295;
         assert_eq!(
             p.vix_ceiling, CEILING_SOLVED,
-            "the ceiling is {} where b4fix6's ladder solved {CEILING_SOLVED}. Re-solve \
+            "the ceiling is {} where b4fix7's settled ladder solved {CEILING_SOLVED}. Re-solve \
              `C - implied(C) >= gain * GRADED_ABS_R` on a ladder and re-measure the \
              census before moving it.",
             p.vix_ceiling

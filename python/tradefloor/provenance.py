@@ -625,7 +625,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_ceiling": {
         "kind": "derived",
-        "presets": {"pt-v19": 173.1087},
+        "presets": {"pt-v19": 181.3295},
         "identity": "the smallest C with `C - implied(C) >= "
                     "vix_return_gain * GRADED_ABS_R` = 108.63, where "
                     "`implied(C)` is the read-back the map sustains with "
@@ -661,23 +661,24 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                        "condition above, whose fixed "
                                        "point is `implied(C) + 108.63` "
                                        "at any rate",
-            "implied(C)": "MEASURED, and the whole of the residual. On "
-                          "the ladder it is the settled read-back at a "
-                          "pin; its spread across three rosters carried "
-                          "through the local slope is +/- 8.82 on C*. "
-                          "The ladder's 40-session burn was sized for a "
-                          "persistence of 0.97 and the factor's is now "
-                          "0.979, so the ladder reads the settled level "
-                          "5 to 15 per cent low and C* is a low "
-                          "reading; the blend, which the preset runs, "
-                          "raises the same condition to about 195",
+            "implied(C)": "MEASURED, and the whole of the residual: the "
+                          "settled read-back at a pin, 51.81 at pin 108 "
+                          "and 77.65 at pin 200, whose spread across ten "
+                          "rosters carried through the local slope is "
+                          "+/- 8.64 on C*. The ladders before b4fix7 ran "
+                          "a 40-session burn sized for a persistence of "
+                          "0.97 where the factor's is 0.979 and read the "
+                          "settled level 9 per cent low, which is how the "
+                          "value this replaces (173.1087) came to sit "
+                          "under its own condition",
             "vix_target_shock_cap 255.0": "must stay above the ceiling or "
                                           "the cap binds first. Asserted",
         },
         "solve": {
-            "condition": "C - implied(C) >= 108.63 on the pin ladder",
-            "bracket": "pins 160 and 180",
-            "tolerance": 8.82,
+            "condition": "C - implied(C) >= 108.63 on the settled blend-off "
+                         "pin ladder, the map pt-v19 runs at gain 0",
+            "bracket": "pins 180 and 200",
+            "tolerance": 8.64,
             "met": True,
         },
         "source": "programme/results/b4fix6-registration.md section 2 "
@@ -693,11 +694,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "under_the_cap`, on `update_economy_daily` itself with "
                   "a silent RNG",
         "clip_rate": {
-            "at_173.1087": "0 of 30,240 seed-days on 120 rosters at 252 "
-                           "sessions, highest VIX 120.38 (b4fix6 "
-                           "derived census). The 95 per cent upper "
-                           "bound on a rate that reads zero in 30,240 "
-                           "is 1.2e-4 per seed-day",
+            "at_gain_0": "0 of 30,240 seed-days on 120 rosters at 252 "
+                         "sessions, highest VIX 73.9, highest read-back "
+                         "93.2 (b4fix9 gain-0 census, ceiling 173.1; a "
+                         "ceiling of 181.33 is above both). The 95 per "
+                         "cent upper bound on a rate that reads zero in "
+                         "30,240 is 1.2e-4 per seed-day",
+            "at_173.1087_with_the_blend": "0 of 30,240, highest VIX 120.38 "
+                                          "(b4fix6, b4fix7)",
             "at_108.63": "4 of 30,240 on 3 rosters. Decomposed per day: "
                          "on three of the four the read-back ALONE was "
                          "above the ceiling (146.17, 142.58, 114.10) "
@@ -726,28 +730,17 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                      "173.1087 inert on the record is "
                                      "that the STATE does not reach it, "
                                      "measured, and not the condition",
-        "note": "WHAT THIS VALUE IS AND IS NOT, against charter bar B3. "
-                "B3 refuses a constant whose value was chosen to make a "
-                "graded statistic pass. No graded statistic reads this "
-                "one: at 173.1087 the clamp is touched on 0 of 30,240 "
-                "seed-days and the held-roster panels are identical to "
-                "the bit with the ceiling at 108.63 or at 173.1087, so "
-                "there is nothing the value could have been tuned "
-                "against. What it carries instead is a stated condition, "
-                "a measured residual, and a measured clip rate, and a "
-                "value that is inert on the record can be moved anywhere "
-                "above the record's maximum without a row moving. That "
-                "is a BOUND, and whether a bound satisfies B3 by being "
-                "inert or needs a kind of its own is a ruling this entry "
-                "does not make; it is put to Simon in "
-                "ceiling-derivation-independent.md. The ledger entry "
-                "before this one said `derived`, called the value 'the "
-                "image of the range the tape grades under the fear "
-                "response', and named a test that checked the product "
-                "and called it 'the session at which fear alone reaches "
-                "the ceiling'. That was a term of the target read as a "
-                "bound on the state, and it is withdrawn. Fear alone, "
-                "from rest, reaches 34 to 36",
+        "note": "CHARTER BAR B3, ruled 2026-09-12 (RULINGS R15): a bound "
+                "that never binds on the record cannot have been tuned "
+                "against any graded statistic, so inertness satisfies B3 "
+                "and the entry stays `derived`, with the condition, the "
+                "solve and the measured clip rate as its evidence. Two "
+                "earlier values are withdrawn: 108.63, 'the image of the "
+                "range the tape grades under the fear response', which "
+                "read a term of the target as a bound on the state (fear "
+                "alone, from rest, reaches 34 to 36); and 173.1087, the "
+                "solve of this condition on a 40-session-burn ladder, "
+                "which sat 8 under the settled crossing on the same map",
     },
     "market_vol_alpha": {
         "kind": "measured",
@@ -924,63 +917,74 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "permanently on",
     },
     "crisis_blend_gain": {
-        "kind": "undetermined",
-        "presets": {"pt-v16": 0.8275881, "pt-v18": 0.8275881,
-                    "pt-v19": 0.8275881},
-        "what_would_determine_it": "Simon's adoption of the DERIVED value, "
-                                   "which is 0 with the form retired: "
-                                   "programme/crisis-blend-derivation.md and "
-                                   "programme/results/b4fix9-result.md in the "
-                                   "design repository (2026-09-12). Until "
-                                   "that ruling the shipped 0.8275881 is "
-                                   "pt-v13's search optimum, carrying eight "
-                                   "significant figures and no error bar",
-        "derivation_on_the_record": "the tape's VIX has no crisis attractor "
-                                    "(conditional drift negative in every "
-                                    "level bin above 22.5 at five and twenty "
-                                    "days; crisis spells above 30.88 have a "
-                                    "median length of two sessions); the "
-                                    "tape's cross-sectional correlation is a "
-                                    "function of realised common volatility, "
-                                    "rho = -0.366 + 0.277 log(sigma_ann%), "
-                                    "R^2 0.69, slope sd 0.025, and the VIX "
-                                    "level adds nothing once volatility is "
-                                    "in; the model's factor share of variance "
-                                    "already gives that curve with no lift "
-                                    "(thirty seeds on the held roster: slope "
-                                    "0.283, every populated bin within 0.03). "
-                                    "A loading lift keyed on the VIX level "
-                                    "feeds the identity and the VIX target "
-                                    "and gives the model's map a stable fixed "
-                                    "point at 33 to 36 that the tape does not "
-                                    "have; measured free-running, the shipped "
-                                    "model's one-day drift is +0.82 at a VIX "
-                                    "of 32.5 to 35 where the tape's is -0.35",
-        "what_the_shipped_value_costs": "years with a VIX above 60 on 18 per "
-                                        "cent of runs against the tape's 5.7 "
-                                        "per cent of years, a highest VIX of "
-                                        "120 against the tape's 82.69, days "
-                                        "above the crisis threshold 1.35 "
-                                        "times the tape's, and crisis spells "
-                                        "with a p90 of 36 sessions against "
-                                        "the tape's 13 (b4fix9 census, 120 "
-                                        "rosters)",
-        "what_the_derived_value_costs": "corr_persistence_acf1 on the held "
-                                        "roster at 504 days reads 0.1493 "
-                                        "against a floor of 0.19, and "
-                                        "abs_return_acf1 and vix_ar1_debiased "
-                                        "worsen with it: three persistence "
-                                        "rows, which the blend was buying by "
-                                        "holding the model in a crisis regime "
-                                        "the tape refutes. The deficit is "
-                                        "volatility and VIX persistence at "
-                                        "the monthly scale (VIX acf1 of "
-                                        "21-day means 0.46 against the tape's "
-                                        "0.62) and is the next derivation, "
-                                        "not a reason to keep the lift",
-        "source": "rust/src/params.rs, ModelParams::crisis_blend_gain, "
-                  "which records the value as un-derived; "
-                  "programme/crisis-blend-derivation.md sections 1 to 4",
+        "kind": "derived",
+        "presets": {"pt-v16": 0.8275881, "pt-v18": 0.8275881, "pt-v19": 0.0},
+        "identity": "zero, the identity: the tape supports no loading lift. "
+                    "Three measured facts, none needing the model. (1) The "
+                    "tape's VIX has no crisis attractor: its conditional "
+                    "drift by level is negative in every bin above 22.5 at "
+                    "five and twenty days, the linear drift above 30 crosses "
+                    "zero at 29.6, and crisis spells above 30.88 have a "
+                    "median length of two sessions. (2) Its cross-sectional "
+                    "correlation is a function of realised common "
+                    "volatility, rho = -0.366 + 0.277 log(sigma_ann%), R^2 "
+                    "0.69 on 158 21-day sub-windows of the forty-name "
+                    "reference roster, and the VIX level adds nothing once "
+                    "volatility is in (partial coefficient -0.35). (3) This "
+                    "model's factor share of each name's variance already "
+                    "gives that curve with no lift: thirty seeds on the held "
+                    "roster read slope 0.283 with every populated bin within "
+                    "0.03 of the tape's. A lift keyed on the VIX level feeds "
+                    "the identity and the VIX target and gives the map a "
+                    "stable fixed point at 33 to 36 the tape does not have; "
+                    "free-running the shipped model's one-day drift was "
+                    "+0.82 at a VIX of 32.5 to 35 against the tape's -0.35",
+        "terms": {
+            "the tape fit's slope 0.277": "year-block bootstrap sd 0.025 "
+                                          "over 2,000 draws; the RESIDUAL "
+                                          "of this derivation, which any "
+                                          "lift large enough to move the "
+                                          "model's slope by one sd exceeds",
+            "the model's slope at gain 0": "0.283 on 690 sub-windows, thirty "
+                                           "seeds, held roster, b4fix9; "
+                                           "bins under 10 / 10-15 / 15-20 / "
+                                           "20-30: 0.202 / 0.307 / 0.407 / "
+                                           "0.485 against the tape's 0.210 "
+                                           "/ 0.321 / 0.428 / 0.507",
+            "pt-v16 and pt-v18 at 0.8275881": "pt-v13's search optimum, "
+                                              "eight significant figures, "
+                                              "no error bar; kept in those "
+                                              "presets for bit-identity "
+                                              "and not re-derived",
+        },
+        "source": "programme/crisis-blend-derivation.md and "
+                  "programme/results/b4fix9-result.md, design repository; "
+                  "rust/src/params.rs, ModelParams::pt_v19",
+        "what_the_value_costs": "corr_persistence_acf1 on the held roster "
+                                "at 504 days reads 0.1493 against a floor "
+                                "of 0.19, and abs_return_acf1 and "
+                                "vix_ar1_debiased worsen with it: three "
+                                "persistence rows the old value was buying "
+                                "by holding the model in a crisis regime "
+                                "the tape refutes (years above 60 on 18 per "
+                                "cent of runs against the tape's 5.7; a "
+                                "highest VIX of 120 against 82.69; spells "
+                                "with a p90 of 36 sessions against 13). "
+                                "The deficit is monthly-scale volatility "
+                                "and VIX persistence (VIX acf1 of 21-day "
+                                "means 0.46 against the tape's 0.62) and is "
+                                "derived on its own; adopted with the row "
+                                "red by Simon's ruling of 2026-09-12 (R16)",
+        "what_the_value_buys": "the tape's VIX distribution on every "
+                               "per-year statistic (runs above 60: 3.3 per "
+                               "cent against 5.7; highest 73.9 against "
+                               "82.69; days above 30.88 5.1 against 7.2 "
+                               "per cent), crisis spells with median 2 and "
+                               "p90 13 exactly the tape's, a drift with no "
+                               "second attractor, index_tail_dn3_pct 0.624 "
+                               "and 0.696 in band, excess_kurtosis on the "
+                               "held roster at 504 days 8.1160 against a "
+                               "floor of 7.1",
     },
     "vix_target_shock_cap": {
         "kind": "derived",

@@ -651,7 +651,16 @@ pub struct ModelParams {
     /// and nothing else, so it buys co-movement in the one currency that
     /// does not dilute it.
     ///
-    /// # It is UN-DERIVED at 0.8275881, and it was not re-derived
+    /// # DERIVED TO ZERO for pt-v19, 2026-09-12
+    ///
+    /// The tape's VIX has no crisis attractor and its correlation is a
+    /// function of realised common volatility, which this model's factor
+    /// share already reproduces with no lift; a lift keyed on the VIX
+    /// level gives the map a second stable fixed point the tape refutes.
+    /// See `pt_v19` and programme/crisis-blend-derivation.md. The account
+    /// below is the value's history and stands for pt-v13 to pt-v18.
+    ///
+    /// # It was UN-DERIVED at 0.8275881 from pt-v13 to pt-v18
     ///
     /// The value came off pt-v13's search, against a VIX read-back that
     /// could not see the blend at all. `market::index_var` sees it now, so
@@ -4190,6 +4199,46 @@ impl ModelParams {
         // `crash_amplifier_conditional_sigma` made it asymptotically
         // linear. The index tail goes 3.0677 -> 1.9124 at 252 days.
         p.market_vol_vix_excursion = 1.0;
+        // THE CRISIS BLEND, DERIVED TO ZERO AND ITS FORM RETIRED.
+        //
+        // Three facts from the tape, none of which needs the model
+        // (programme/crisis-blend-derivation.md, design repository). The
+        // VIX has no crisis attractor: its conditional drift by level is
+        // negative in every bin above 22.5 at five and twenty days, and
+        // crisis spells above 30.88 have a median length of two sessions.
+        // Its cross-sectional correlation is a function of realised common
+        // volatility, `rho = -0.366 + 0.277 log(sigma_ann%)` with R^2 0.69
+        // (slope sd 0.025, year-block bootstrap), and the VIX level adds
+        // nothing once volatility is in. And this model's factor share of
+        // each name's variance already gives that curve with no lift:
+        // thirty seeds on the held roster read slope 0.283 with every
+        // populated bin within 0.03 of the tape's.
+        //
+        // The shipped blend keyed a loading lift on the VIX level, which
+        // fed the identity, which fed the VIX target: a positive feedback
+        // that gave the map a stable fixed point at 33 to 36 (settled
+        // ladder, ten rosters) and, free-running over 120 rosters, a
+        // positive one-day drift of +0.82 at a VIX of 32.5 to 35 where the
+        // tape's is -0.35. What it bought, three persistence rows, it
+        // bought by holding the model in a crisis regime the tape does not
+        // have: years above 60 three times as often as the tape, a
+        // highest VIX of 120 against 82.69, crisis spells with a p90 of 36
+        // sessions against 13.
+        //
+        // DERIVED as the identity: the tape supports no lift, and the
+        // residual is the tape fit's slope sd, which any lift large enough
+        // to matter exceeds. Measured at 0 (b4fix9): the VIX distribution
+        // is the tape's on every per-year statistic, spells median 2 and
+        // p90 13 exactly the tape's, `index_tail_dn3_pct` 0.624 and 0.696
+        // in band; and `corr_persistence_acf1` on the held roster at 504
+        // days reads 0.1493 against a floor of 0.19, with
+        // `abs_return_acf1` and `vix_ar1_debiased` worse beside it. Those
+        // are a monthly-scale volatility and VIX persistence deficit
+        // (VIX acf1 of 21-day means 0.46 against the tape's 0.62), owned by
+        // the reversion rate and the loop's memory, and are derived next
+        // rather than papered over with a lift. Adopted by Simon's ruling
+        // of 2026-09-12 (R16), with the row red.
+        p.crisis_blend_gain = 0.0;
         // THE CEILING, WHICH CLAMPS THE STATE AND NOT THE TARGET.
         //
         // `vix_ceiling` bounds the VIX after the reversion step,
@@ -4213,39 +4262,38 @@ impl ModelParams {
         // 114.10): variance excursions of 8.5 to 30 times the factor's
         // base, with the session a passenger.
         //
-        // THE VALUE. 173.1087 solves `C - implied(C) >= 108.63`, the
-        // ceiling a VIX already at C comes off on a session at the top of
-        // the graded range, with `implied(C)` the settled read-back at a
-        // pin. b4fix6 measured `implied(C)` on `pin_ladder.py` (three
-        // rosters, eighteen pins from 14 to 260, crisis blend off, 40 burn
-        // and 80 scored sessions): `C - implied(C)` is monotone, 98.833 at
-        // pin 160 and 113.780 at 180, crossing at 173.1087, residual
-        // +/- 8.82 from the ladder's spread across rosters through the
-        // local slope. The closed-form map solved from the same rosters
-        // puts the condition at 177 to 184 with the blend off and 193 to
-        // 201 with it on; the ladder reads the settled level low because
-        // its burn was sized for a persistence the factor no longer has.
+        // THE VALUE. 181.3295 solves `C - implied(C) >= 108.63`, the ceiling
+        // a VIX already at C comes off on a session at the top of the
+        // graded range, with `implied(C)` the settled read-back at a pin,
+        // on the map this preset runs, which with `crisis_blend_gain` at
+        // 0 is the blend-off map: b4fix7's settled ladder, ten rosters,
+        // burn 250 and 80 scored sessions, pins 14 to 260. `C - implied(C)`
+        // is monotone, 107.653 at pin 180 and 122.350 at 200, crossing at
+        // 181.3295, residual +/- 8.64 from the ladder's spread across
+        // rosters through the local slope. The closed-form map on three of
+        // those rosters puts the crossing at 176.6 to 184.3.
         //
-        // What the condition is NOT: sufficient for the state the VIX
-        // carries when it reaches a ceiling. The settled read-back at a
-        // pin of 108 is about 47; on the days the state reached 108.63 the
-        // identity read 114 to 146. A graded session holds a VIX on any
-        // clamp the read-back can exceed by 108.63. What makes 173.1087
-        // inert is measured, not derived: 0 of 30,240 seed-days at the
-        // clamp on 120 rosters, highest VIX 120.38. The held-roster panels
-        // are identical to the bit at 108.63 and at 173.1087; on the
-        // varying roster the tail reads 1.3147 at 252 and 1.5838 at 504,
-        // `excess_kurtosis` on the held roster at 504 reads 7.3005 either
-        // way.
+        // The values this replaces: 108.63 read a term of the target as a
+        // bound on the state; 173.1087 was b4fix6's solve of this condition
+        // on a 40-session-burn ladder, which read the settled level 9 per
+        // cent low. Both are withdrawn.
         //
-        // AGAINST CHARTER BAR B3. No graded statistic reads this value on
-        // the record, so it could not have been tuned against one; it
-        // carries a stated condition, a measured residual and a measured
-        // clip rate. That makes it a bound. Whether a bound satisfies B3
-        // by being inert or needs a kind of its own in the ledger is a
-        // ruling, put to Simon in the design note and not taken here.
-        // `vix_target_shock_cap` is 255.0 and stays above it.
-        p.vix_ceiling = 173.1087;
+        // WHAT IT IS NOT PROVEN FOR. The condition is sufficient for the
+        // settled map. It does not cover the state the VIX carries on a
+        // variance excursion, and with a session at the top of the graded
+        // range every day on top of a sustained excursion the state's fixed
+        // point is above 300. That is a stated gap. What the record shows
+        // at gain 0 is measured: 0 of 30,240 seed-days at the clamp on 120
+        // rosters, highest VIX 73.9, highest read-back 93.2, and the map
+        // has one fixed point (b4fix9).
+        //
+        // CHARTER BAR B3, ruled 2026-09-12 (R15): a bound that never binds
+        // on the record cannot have been tuned against any graded
+        // statistic, so inertness satisfies B3 and the ledger entry stays
+        // `derived`, carrying the condition, the solve and the measured
+        // clip rate as its evidence. `vix_target_shock_cap` is 255.0 and
+        // stays above it.
+        p.vix_ceiling = 181.3295;
         // THE FACTOR'S OWN MEMORY, MEASURED ON THE TAPE INSTEAD OF
         // SEARCHED, which the line above makes possible.
         //

@@ -40,27 +40,54 @@ static map from asymptotically linear to sublinear: `implied(v)/v` at a
 pinned VIX of 80 reads 0.474 against 0.651, and `ratio(80)/ratio(40)` reads
 0.729 against a closed-form 0.707.
 
-**`vix_ceiling` moves from 80.0 to 173.1087.** The ceiling bounds the VIX
+**`crisis_blend_gain` moves from 0.8275881 to 0, and the blend's form is
+retired.** The tape's VIX has no crisis attractor: its conditional drift by
+level is negative in every bin above 22.5 at five and twenty days, and
+crisis spells above 30.88 have a median length of two sessions. Its
+cross-sectional correlation is a function of realised common volatility,
+`rho = -0.366 + 0.277 log(sigma)` with R^2 0.69 on 158 21-day sub-windows
+of the forty-name reference roster, and the VIX level adds nothing once
+volatility is in. The model's factor share of each name's variance already
+gives that curve with no lift: thirty seeds on the held roster read slope
+0.283 with every populated bin within 0.03 of the tape's. The blend keyed
+a loading lift on the VIX level, which fed the identity, which fed the VIX
+target, and free-running over 120 rosters that gave a positive one-day
+drift of +0.82 at a VIX of 32.5 to 35 where the tape's is -0.35: a stable
+crisis regime the tape does not have. At 0 the VIX distribution is the
+tape's on every per-year statistic (runs with a maximum above 60 3.3 per
+cent against the tape's 5.7 and the old 18.3; highest 73.9 against 82.69
+and the old 120.4; days above 30.88 5.1 per cent against 7.2 and 9.7), the
+spells have median 2 and p90 13 exactly as the tape's, and
+`index_tail_dn3_pct` reads 0.624 at 252 days and 0.696 at 504. What it
+costs is three persistence rows: `corr_persistence_acf1` on the held
+roster at 504 days reads 0.1493 against a floor of 0.19, and
+`abs_return_acf1` and `vix_ar1_debiased` worsen beside it. The old value
+was buying those rows by holding the model in crisis. The deficit is
+monthly-scale volatility and VIX persistence (VIX acf1 of 21-day means
+0.46 against the tape's 0.62), owned by the reversion rate and the loop's
+memory, and is derived next rather than covered by a lift. The row ships
+red on this decision.
+
+**`vix_ceiling` moves from 80.0 to 181.3295.** The ceiling bounds the VIX
 after the reversion step, `x + 0.10 (target - x)`, so a session at the top
 of the graded range moves the VIX from rest by 10.86 points and no session
 the tape grades reaches a ceiling from rest. What reaches one is the
 identity's own level on a variance excursion: at 108.63 the clamp was
-touched on 4 of 30,240 seed-days over 120 rosters, and on three of the four
-the index's conditional variance implied a VIX above the ceiling with no
-fear response at all (146.17, 142.58 and 114.10). 173.1087 is the smallest
-`C` with `C - implied(C) >= 17.0 * 6.39` on a pin ladder, where
-`implied(C)` is the read-back the map sustains at a pin of `C`, solved on
-three rosters at eighteen pins from 14 to 260 with a residual of 8.82 from
-the ladder's spread. That condition holds for the settled map and not for
-the excursions the state carries when it reaches a clamp; what makes the
-value inert is measured: 0 of 30,240 seed-days at the clamp, highest VIX
-120.38. `economy::daily::fear_response_shape` asserts the update rule the
-value rests on, against `update_economy_daily` with a silent RNG, and the
-ledger entry records the condition, the residual, the clip rate and the
-charter bar B3 question a bound raises. An earlier entry in this section
-called 108.63 the image of the graded range under the fear response, which
-read a term of the target as a bound on the state, and that entry is
-withdrawn along with the test that asserted it.
+touched on 4 of 30,240 seed-days, and on three of the four the index's
+conditional variance implied a VIX above the ceiling with no fear response
+at all. 181.3295 is the smallest `C` with `C - implied(C) >= 17.0 * 6.39`
+on a settled pin ladder of the map the preset runs (ten rosters, burn 250,
+pins 14 to 260), where `implied(C)` is the read-back the map sustains at a
+pin of `C`, with a residual of 8.64 from the ladder's spread. The
+condition holds for the settled map and not for the excursions the state
+carries when it reaches a clamp; what the record shows at gain 0 is
+measured: 0 of 30,240 seed-days at the clamp, highest VIX 73.9, highest
+read-back 93.2. `economy::daily::fear_response_shape` asserts the update
+rule against `update_economy_daily` with a silent RNG, and the ledger
+entry carries the condition, the residual and the clip rate. Two earlier
+values in this section are withdrawn: 108.63, which read a term of the
+target as a bound on the state, and 173.1087, which solved the condition
+on a ladder whose 40-session burn read the settled level 9 per cent low.
 
 **`market_vol_alpha`, `market_vol_gamma` and `market_vol_beta` take the
 tape's GJR fit**: 0.0066, 0.1556 and 0.8946, against the pt-v14 search
@@ -80,24 +107,17 @@ at 252 days and from 4.6786 to 1.5905 at 504, both in band. The panel is
 eighteen of eighteen at both horizons. `S` over nineteen rows is 26.575
 against pt-v18's 42.128 at 252, and 38.747 against 43.994 at 504.
 
-**The certified panels do not read the ceiling.** With it at 108.63 or at
-173.1087 the held-roster panels are identical to the bit at both horizons,
-because the held roster never approaches either value. On the varying
-roster the tail reads 1.3147 at 252 days and 1.5838 at 504, and
-`excess_kurtosis` at 504 reads 7.5018, against 1.3280, 1.5905 and 7.3567
-at 108.63; the four clamp days no longer clip and nothing else moves.
+**The certified panels do not read the ceiling.** At gain 0 no measured
+trajectory comes within 100 points of it, so every panel below is the same
+at 173.1087 and at 181.3295 to the bit.
 
-**`excess_kurtosis` at 504 days on the held roster reads 7.3005 against a
-floor of 7.1.** pt-v14, pt-v16 and pt-v18 read 10.8275, 9.4473 and 10.4101
-on the same panel, so pt-v19 is the weakest of the four on this row by 2.1.
-All four hold fourteen of fourteen shape rows, which makes that count a
-property of the panel rather than of pt-v19. A seed-block bootstrap over the
-thirty certification seeds, 4,000 resamples, puts the row below its floor on
-42.9 per cent of blocks, where pt-v18 reads 0.0 per cent. The tape's
-coefficients are the cause. At the pt-v14 optima the unclamped fast
-component had no finite fourth moment and its kurtosis was held down only by
-`market_vol_ceiling_multiple`. The GJR triple recovers part of what the
-symmetric fit gave up.
+**`excess_kurtosis` at 504 days on the held roster reads 8.1160 against a
+floor of 7.1**, 1.4 seed standard deviations above it. It read 7.3005 with
+the blend on, 0.28 seed-sd above the floor; pt-v14, pt-v16 and pt-v18 read
+10.8275, 9.4473 and 10.4101 on the same panel. The tape's coefficients
+are the cause of the gap to those three: at the pt-v14 optima the unclamped
+fast component had no finite fourth moment and its kurtosis was held down
+only by `market_vol_ceiling_multiple`.
 
 
 **pt-v19 is pt-v18 with four dials, each measured.** `vix_level_identity`
