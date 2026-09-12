@@ -2083,6 +2083,58 @@ mod fear_response_shape {
         the_default_cap_is_the_clamps_own_image();
     }
 
+    /// **THE CEILING IS THE GRADED RANGE'S OWN IMAGE, and that is what
+    /// makes charter bar B4 and a fixed point below the ceiling
+    /// consistent.**
+    ///
+    /// They were not. pt-v18 capped the fear spike at 45, below the ceiling
+    /// of 80, so fear alone could never reach the ceiling; B4 required the
+    /// brake off and `vix_target_shock_cap` became the clamp's image at
+    /// 255.0, but the ceiling stayed at 80. At `vix_return_gain` 17 a down
+    /// session of `r` per cent targets the VIX at `17 r`, so it targets 80
+    /// at **4.706 per cent** -- inside the [`GRADED_ABS_R`] that the test
+    /// above requires the response to RISE across. Above that session size
+    /// the response is required to rise and is clamped, which is a
+    /// contradiction between two acceptance criteria and not a tuning
+    /// problem: `b4fix2` measured every ceiling day in a 120-roster census
+    /// as a large down session, none of them a variance excursion.
+    ///
+    /// So the ceiling is derived the same way the cap is, from the range
+    /// the tape actually grades rather than from the clamp: `gain *
+    /// GRADED_ABS_R`. A ceiling below it re-creates the contradiction; a
+    /// ceiling above it is inert, because a session past `GRADED_ABS_R` is
+    /// outside what the tape can grade and a clamp there is the clamp
+    /// doing its job.
+    #[test]
+    fn the_ceiling_is_the_graded_ranges_own_image() {
+        let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+            .expect("the default preset resolves");
+        let image = p.vix_return_gain * mathx::pow(GRADED_ABS_R, p.vix_return_exponent);
+        assert_eq!(
+            p.vix_ceiling, image,
+            "the ceiling is {} where the graded range's image is {image}. Below it              the fear response B4 requires to keep rising meets a clamp INSIDE the              range the tape grades, which is charter bar B4 and the loop's fixed              point contradicting each other.",
+            p.vix_ceiling
+        );
+        // The session at which the fear channel alone reaches the ceiling
+        // is exactly the top of the graded range, stated as the reader
+        // wants it rather than left implicit in the product above.
+        let reaches_at = mathx::pow(p.vix_ceiling / p.vix_return_gain, 1.0 / p.vix_return_exponent);
+        assert!(
+            (reaches_at - GRADED_ABS_R).abs() < 1e-9,
+            "fear alone reaches the ceiling at {reaches_at} per cent, not at the              graded range's {GRADED_ABS_R}"
+        );
+        // And the cap does not bind first, or the ceiling would never be
+        // the binding constraint it is derived to be. The cap is the
+        // CLAMP's image and the clamp is 15 per cent, well past the graded
+        // range, so this is an ordering the two derivations already imply
+        // and it is asserted rather than assumed.
+        assert!(
+            p.vix_target_shock_cap > p.vix_ceiling,
+            "the shock cap {} is at or under the ceiling {}, so the cap binds first              and the ceiling's derivation is moot",
+            p.vix_target_shock_cap, p.vix_ceiling
+        );
+    }
+
     /// The cap is the image of the clamp under the spike, so it cannot bind
     /// anywhere the clamp does not.
     ///

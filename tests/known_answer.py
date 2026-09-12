@@ -266,7 +266,7 @@ import tradefloor
 # `v_f = market_factor_sigma^2`, where the regime ratio is exactly 1.0 and
 # the two normalisers agree by construction. So this boundary moves the
 # regime RESPONSE and nothing about the level the VIX rests at.
-KAT_VERSION = 18
+KAT_VERSION = 19
 
 SEED = 20260820
 DAYS = 250

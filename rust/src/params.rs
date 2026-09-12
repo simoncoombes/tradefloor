@@ -4161,6 +4161,91 @@ impl ModelParams {
         // baseline reading, the dial has no interior, and what chooses it
         // is the condition `implied(v) < v` and not a panel row.
         p.crash_amplifier_conditional_sigma = 1.0;
+        // THE LOOP'S VARIANCE ARM, CUT. `garch-derive-design.md` finding 4:
+        // under `vix_level_identity` the VIX IS the index's conditional
+        // variance in points plus a fear excursion, so a target reading
+        // `(VIX / anchor)^2` reads the factor's own variance back to
+        // itself. §3.3 of that note shows the target then reverts the
+        // factor toward `c * s_f` of its own level, which makes
+        // `market_vol_vix_coupling` a loop-gain dial wearing a fear
+        // channel's name. The loop's static gain theta is about 0.62, of
+        // which the factor arm carries 0.45, and a standing bias is
+        // amplified by `1 / (1 - theta)` = 2.7x before it reaches
+        // anything. Reading the EXCURSION above the identity's own
+        // read-back takes that to about 1.1x.
+        //
+        // DERIVED, and it is `garch-derive-design` §3.4's option C, which
+        // that note recorded as the root cause and flagged rather than
+        // proposed. It is not preferred over option A because it is
+        // upstream: it makes option B's REJECTED correction identically
+        // zero rather than estimating it. Option B would correct the
+        // tape's beta by `[beta_tape - (1 - alpha_tape) c s_f] / (1 - c
+        // s_f)` = 0.844 and was rejected because `c` is unprovenanced and
+        // `s_f` is a roster property; at `c s_f` = 0 that expression is
+        // `beta_tape` exactly. The dependency is removed, not approximated.
+        //
+        // Measured, b4fix2: the static map's pin-80 ratio 0.651 -> 0.474
+        // and `ratio(80)/ratio(40)` 0.937 -> 0.729 against a
+        // parameter-free sqrt law's 0.707, so the map is SUBLINEAR where
+        // `crash_amplifier_conditional_sigma` made it asymptotically
+        // linear. The index tail goes 3.0677 -> 1.9124 at 252 days.
+        p.market_vol_vix_excursion = 1.0;
+        // THE CEILING IS THE IMAGE OF THE GRADED RANGE, and it had to move
+        // because charter bar B4 moved the thing it was balanced against.
+        //
+        // pt-v18 capped the fear spike at 45, BELOW the ceiling of 80, so
+        // fear alone could never reach the ceiling. B4 required that brake
+        // off and `vix_target_shock_cap` went to the derived
+        // `vix_return_gain * vix_return_clamp` = 255.0. The ceiling did not
+        // move with it, and at gain 17 a down session targets the VIX at
+        // `17 r`, so it targets 80 at **4.706 per cent** -- INSIDE the 6.39
+        // per cent `GRADED_ABS_R` that B4 requires the response to rise
+        // across. B4 and "the VIX has a fixed point below its ceiling"
+        // were then mutually unsatisfiable, measured: every ceiling day in
+        // b4fix2's census was a large down session and none was a variance
+        // excursion walking the VIX up.
+        //
+        // DERIVED by the same construction as the cap it is now consistent
+        // with: `vix_return_gain * GRADED_ABS_R` = 17.0 * 6.39 = 108.63,
+        // the image of the range the tape grades under the fear response,
+        // and the smallest ceiling at which B4's rise can complete without
+        // meeting a clamp. `the_ceiling_is_the_graded_ranges_own_image`
+        // asserts both halves rather than trusting this comment.
+        //
+        // What still clamps is the clamp working: 1 of 120 rosters and 4
+        // seed-days of 30,240, and three of those four are sessions of
+        // -7.29, -11.47 and -10.25 per cent, outside the range the tape
+        // grades, with the fourth the day after the -11.47 while the VIX
+        // comes off at `vix_mean_reversion` 0.10 a day.
+        p.vix_ceiling = 108.63;
+        // THE FACTOR'S OWN MEMORY, MEASURED ON THE TAPE INSTEAD OF
+        // SEARCHED, which the line above makes possible.
+        //
+        // Gaussian QMLE GARCH(1,1) on the tape's index over the whole span
+        // (`garch-derive-design.md` §0): alpha 0.1059 with a sandwich se of
+        // 0.0093 and a year-block bootstrap sd of 0.0128, beta 0.8787 with
+        // 0.0092 and 0.0152, `corr(alpha, beta)` -0.88. They replace
+        // pt-v14 search optima that carry no error bar at all, which is
+        // charter bar B3.
+        //
+        // WHY THEY ARE ONLY TRANSPORTABLE NOW. Finding 4 of that note says
+        // the tape's REDUCED-FORM values placed in the factor and then run
+        // through the loop count the loop's memory twice, and its arm G
+        // measured the cost on this row: a tail of 3.60 against arm B's
+        // 2.61. b4fix2 re-measured it on this build and agreed -- the tape
+        // values alone read 3.2271 at 252 against 3.0677 without them,
+        // WORSE. `market_vol_vix_excursion` removes the double count at its
+        // mechanism, and the same values then read 1.8194.
+        //
+        // Their own fourth-moment condition `3a^2 + 2ab + b^2` is 0.993
+        // against the shipped fast component's 1.104, so the factor gains a
+        // finite fourth moment it did not have. The 0.65/0.35 mixture
+        // dilutes them to about (0.085, 0.895) -- finding 1 -- which is a
+        // KNOWN RESIDUAL and is not corrected here, because inflating a
+        // measured coefficient to cancel a mixture is a constant
+        // compensating for a mechanism.
+        p.market_vol_alpha = 0.1059;
+        p.market_vol_beta = 0.8787;
         p
     }
 

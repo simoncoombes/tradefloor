@@ -128,16 +128,17 @@ PERTURBATIONS = [
     # silent -- so the two builds differ on the first session that draws a
     # two-sigma market factor.
     ("crash_amplifier_conditional_sigma", 0.0, True),
-    # Which VIX the factor's variance target reads. Perturbed UPWARD: the
-    # default ships 0.0, and the perturbation that says something is the one
-    # onto the excursion form. It moves on a three-session probe because the
-    # default runs `vix_level_identity`, so the VIX leaves the derived
-    # anchor on day one and the read-back it is measured against is a
-    # different number from the anchor from the first close onward. On a
-    # preset without the identity it would be inert, which is what
+    # Which VIX the factor's variance target reads. Perturbed DOWNWARD,
+    # because the default now carries it: pt-v19 sets it to 1.0, so the
+    # perturbation that says something is the one back to the anchor form.
+    # It moves on a three-session probe because the default runs
+    # `vix_level_identity`, so the VIX leaves the derived anchor on day one
+    # and the read-back the ratio is measured against is a different number
+    # from the anchor from the first close onward. On a preset without the
+    # identity the two forms would be incomparable, which is what
     # `params.rs::the_excursion_switch_requires_the_identity` refuses to let
     # ship.
-    ("market_vol_vix_excursion", 1.0, True),
+    ("market_vol_vix_excursion", 0.0, True),
     ("crisis_blend_ramp", 0.7, False),         # needs VIX > 25.5; macro
     ("crisis_blend_cap", 0.4, False),          # starts at the default 15
     # The crisis blend's source only acts above the crisis threshold, which a

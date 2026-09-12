@@ -302,12 +302,6 @@ POST_BASELINE = {
         "25.5, the safe-haven gate at economy/daily.rs:983. A SEPARATE "
         "dial from `crisis_vix_threshold`, which the required presets move "
         "to 30.88325108, so the two gates have silently diverged",
-    "vix_ceiling":
-        "80.0, applied at economy/daily.rs:1145 -- and its own docstring "
-        "says 'A CHOSEN constant and not a derived one, declared here so a "
-        "reader can disagree with it'. A dial that admits this in prose "
-        "and is invisible to the audit is the exact pairing this partition "
-        "exists to stop",
     "volume_move_floor":
         "0.6, one of four tick-engine literals promoted to dials in 0.3.0 "
         "at the values they already had",
@@ -355,21 +349,6 @@ RETURNED_TO_BASELINE = {
 OUT_OF_SCOPE = {
     "crisis_blend_variance_damp":
         "inert at 0.0: market/factors.rs:473 branches on `== 0.0`",
-    "market_vol_vix_excursion":
-        "inert at 0.0: engine.rs branches on `== 0.0` in `close_market` and "
-        "passes `self.vix_anchor` on that arm, which is the expression that "
-        "stood at the call site, so no arithmetic on the other branch runs "
-        "and 85 of 85 preset-seed digests are identical across its arrival. "
-        "It is gated TWICE over, and the second gate is the one that makes "
-        "this entry safe to write: `vix_level_identity` must also be "
-        "non-zero for the dial to have a read-back to be an excursion "
-        "above, and `params.rs::the_excursion_switch_requires_the_identity` "
-        "refuses any preset that sets one without the other. Move EITHER "
-        "partner and this entry becomes false -- b4fix2 measured what the "
-        "dial is worth (the index tail 3.0677 -> 1.9124 at 252 and the "
-        "static map's pin-80 ratio 0.651 -> 0.474) and the reason no preset "
-        "sets it is recorded in that run's result, not an absence of "
-        "evidence",
     "fair_value_book_floor":
         "inert at 0.0: the book floor is not applied to profitable "
         "companies, and the valuation is the reference implementation's",
@@ -497,6 +476,201 @@ OUT_OF_SCOPE = {
 #: workstreams that own them. Filling them in from here would be inventing
 #: derivations, which is the failure this module exists to prevent.
 DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
+    "market_vol_vix_excursion": {
+        "kind": "derived",
+        "presets": {"pt-v19": 1.0},
+        "identity": "the loop's own double count, removed at its "
+                    "mechanism. Under `vix_level_identity` the VIX IS "
+                    "the index's conditional variance in points plus a "
+                    "fear excursion, so a factor variance target built "
+                    "from `(VIX / anchor)^2` reads the factor's own "
+                    "variance back to itself: garch-derive-design.md "
+                    "3.3 shows it reverts the factor toward `c * s_f` "
+                    "of its own level, which makes "
+                    "`market_vol_vix_coupling` a loop-gain dial wearing "
+                    "a fear channel's name. Reading the EXCURSION above "
+                    "the identity's own read-back instead makes the "
+                    "ratio exactly 1.0 when the VIX is what the "
+                    "variance implies, so the target is exactly `base` "
+                    "and only the fear excursion lifts it. The value is "
+                    "1.0 because the dial is a SWITCH with no interior: "
+                    "engine.rs branches at `== 0.0` and every other "
+                    "value selects the same form",
+        "terms": {
+            "theta about 0.62": "the loop's static gain, `sum_k s_k "
+                                "c_k` (loop-gain-design.md 2.1), of "
+                                "which the factor arm carries about "
+                                "0.45 and the instantaneous sector, "
+                                "jump and per-name couplings about "
+                                "0.11. A standing bias in the target "
+                                "moves the level by `1 / (1 - theta)` = "
+                                "2.7x; cutting the variance arm leaves "
+                                "the instantaneous couplings and about "
+                                "1.1x",
+            "s_f c_f about 0.49": "the factor's share of the index's "
+                                  "conditional variance times its "
+                                  "effective static coupling. "
+                                  "Eliminating the regime ratio gives "
+                                  "`u^2 - u (1 - s_f c_f) - s_f c_f "
+                                  "(v/A)^2 = 0` for `u = I^2/A^2`, so "
+                                  "the read-back grows as sqrt(v) and "
+                                  "`implied(v)/v` falls as `v^(-1/2)`. "
+                                  "MEASURED on the pin ladder: the "
+                                  "pin-80 ratio is 0.474 against 0.651 "
+                                  "and `ratio(80)/ratio(40)` is 0.729 "
+                                  "against the parameter-free 0.707",
+            "market_vol_alpha 0.1059, market_vol_beta 0.8787":
+                "the pair this makes transportable. "
+                "garch-derive-design finding 4 says tape reduced-form "
+                "values run through the loop count its memory twice; "
+                "3.4's option B would correct beta by `[beta_tape - "
+                "(1 - alpha_tape) c s_f] / (1 - c s_f)` and was "
+                "rejected for depending on an unprovenanced dial and on "
+                "the roster. At `c s_f` = 0 that expression is "
+                "`beta_tape` exactly",
+        },
+        "source": "rust/src/params.rs, "
+                  "ModelParams::market_vol_vix_excursion; the branch is "
+                  "rust/src/engine.rs `close_market` and the ratio is "
+                  "rust/src/market/factor_vol.rs `close_day_at`. The "
+                  "sign that makes the fixed point unique is asserted "
+                  "by `the_excursion_form_makes_the_target_fall_as_the_"
+                  "read_back_rises` with the anchor branch as a "
+                  "negative control, and the exactness at a zero "
+                  "excursion by `a_vix_at_its_own_read_back_targets_"
+                  "the_baseline_exactly` on the bits. The design note "
+                  "is programme/garch-derive-design.md 3.4 option C, "
+                  "which flagged it and did not propose it",
+        "note": "MEASURED, b4fix2 and b4fix4 in the design repository. "
+                "`index_tail_dn3_pct` 3.0677 -> 1.9124 at 252 days and "
+                "4.6786 -> 1.7429 at 504, the panel 17 of 18 -> 18 of "
+                "18 at both horizons, and the census ceiling days "
+                "25 -> 15. The remedy it was measured against -- the "
+                "tape values alone, which is what the brief led with -- "
+                "moves the tail the WRONG way, 3.0677 -> 3.2271, which "
+                "is finding 4's double count showing up on this build",
+    },
+    "vix_ceiling": {
+        "kind": "derived",
+        "presets": {"pt-v19": 108.63},
+        "identity": "the image of the range the tape grades under the "
+                    "fear response: `vix_return_gain * GRADED_ABS_R` = "
+                    "17.0 * 6.39 = 108.63. It is the same construction "
+                    "`vix_target_shock_cap` uses on the CLAMP, and it "
+                    "had to follow it. At 80.0 a down session of 4.706 "
+                    "per cent targeted the ceiling, INSIDE the 6.39 per "
+                    "cent charter bar B4 requires the fear response to "
+                    "keep rising across, so B4 and a fixed point below "
+                    "the ceiling were mutually unsatisfiable -- not as "
+                    "an argument but as a measurement, b4fix2 finding "
+                    "every ceiling day in a 120-roster census to be a "
+                    "large down session and none a variance excursion. "
+                    "Below the image the contradiction returns; above "
+                    "it the ceiling is inert, because a session past "
+                    "the graded range is outside what the tape grades",
+        "terms": {
+            "vix_return_gain 17.0": "the tape's own fear slope, "
+                                    "measured and left alone here. The "
+                                    "gain sweep put 17 in the well with "
+                                    "both directions worse",
+            "GRADED_ABS_R 6.39": "the range the tape grades, "
+                                 "economy/daily.rs, and the same "
+                                 "constant `flattens_at` sweeps for "
+                                 "charter bar B4",
+            "vix_target_shock_cap 255.0": "the clamp's image under the "
+                                          "same response, and it must "
+                                          "stay ABOVE the ceiling or "
+                                          "the cap binds first and this "
+                                          "derivation is moot. "
+                                          "Asserted",
+        },
+        "source": "rust/src/params.rs, ModelParams::pt_v19; the "
+                  "derivation is asserted by "
+                  "`economy::daily::the_ceiling_is_the_graded_ranges_"
+                  "own_image`, which checks the product, the session at "
+                  "which fear alone reaches the ceiling, and the cap's "
+                  "ordering against it rather than trusting the "
+                  "comment",
+        "note": "ITS OWN DOCSTRING USED TO SAY it was a CHOSEN constant "
+                "and not a derived one, declared so a reader could "
+                "disagree with it, and it sat in POST_BASELINE on "
+                "exactly that ground. It is derived now. What still "
+                "reaches it is the clamp working: 1 of 120 rosters and "
+                "4 seed-days of 30,240, and three of those four are "
+                "sessions of -7.29, -11.47 and -10.25 per cent with the "
+                "fourth the day after the -11.47 while the VIX comes "
+                "off at `vix_mean_reversion` 0.10 a day",
+    },
+    "market_vol_alpha": {
+        "kind": "measured",
+        "date": "2026-09-07",
+        "estimator": "Gaussian quasi-maximum-likelihood GARCH(1,1) on "
+                     "the tape's index log returns, whole span, with a "
+                     "sandwich (QMLE) covariance and a year-block "
+                     "bootstrap beside it",
+        "script": "the estimator module reproduced whole in "
+                  "programme/garch-derive-design.md Appendix B; "
+                  "numpy-only Gaussian QMLE, no scipy, run in "
+                  "dev/tf-getter's .venv",
+        "standard_error": 0.0093,
+        "presets": {"pt-v16": 0.28035004, "pt-v18": 0.28035004,
+                    "pt-v19": 0.1059},
+        "identity": "Gaussian QMLE GARCH(1,1) on the tape's index over "
+                    "the whole span. alpha = 0.1059, sandwich se "
+                    "0.0093, year-block bootstrap sd 0.0128; "
+                    "`corr(alpha, beta)` is -0.88, so the pair moves "
+                    "together and the coefficient's error bar is "
+                    "narrower than the two separately suggest",
+        "source": "programme/garch-derive-design.md 0 and 2, design "
+                  "repository; the estimator, its window and its two "
+                  "residual treatments are 2.1 to 2.3",
+        "note": "A MEASUREMENT REPLACING A SEARCH OPTIMUM, which is "
+                "charter bar B3: pt-v14's 0.28035004 carries no error "
+                "bar at all. It is only transportable because "
+                "`market_vol_vix_excursion` removes the loop's double "
+                "count -- finding 4 -- and measured without it the same "
+                "value moves the index tail the wrong way, 3.0677 to "
+                "3.2271. The 0.65/0.35 mixture dilutes the pair to "
+                "about (0.085, 0.895), which is finding 1 and is a "
+                "KNOWN RESIDUAL left uncorrected, because inflating a "
+                "measured coefficient to cancel a mixture is a constant "
+                "compensating for a mechanism",
+    },
+    "market_vol_beta": {
+        "kind": "measured",
+        "date": "2026-09-07",
+        "estimator": "Gaussian quasi-maximum-likelihood GARCH(1,1) on "
+                     "the tape's index log returns, whole span, with a "
+                     "sandwich (QMLE) covariance and a year-block "
+                     "bootstrap beside it",
+        "script": "the estimator module reproduced whole in "
+                  "programme/garch-derive-design.md Appendix B; "
+                  "numpy-only Gaussian QMLE, no scipy, run in "
+                  "dev/tf-getter's .venv",
+        "standard_error": 0.0092,
+        "presets": {"pt-v16": 0.69244622, "pt-v18": 0.69244622,
+                    "pt-v19": 0.8787},
+        "identity": "the same estimator and the same fit as "
+                    "`market_vol_alpha`: beta = 0.8787, sandwich se "
+                    "0.0092, year-block bootstrap sd 0.0152. "
+                    "`alpha + beta` is 0.9846 +/- 0.0046 against the "
+                    "shipped 0.9728, and the fourth-moment condition "
+                    "`3a^2 + 2ab + b^2` is 0.993 against the shipped "
+                    "fast component's 1.104 -- so the factor gains a "
+                    "finite fourth moment it did not have",
+        "source": "programme/garch-derive-design.md 0 and 2, design "
+                  "repository",
+        "note": "3.4's option B would have corrected this value for "
+                "the loop, to 0.844, and that note REJECTED the "
+                "correction because it depends on `c` (an unprovenanced "
+                "dial) and on `s_f` (a roster property), and a value "
+                "that depends on the roster belongs in the engine as an "
+                "identity rather than in a preset. "
+                "`market_vol_vix_excursion` makes the correction "
+                "identically zero instead of estimating it: at "
+                "`c s_f` = 0 the expression is `beta_tape` exactly. The "
+                "dependency is removed, not approximated",
+    },
     "crash_amplifier_conditional_sigma": {
         "kind": "derived",
         "presets": {"pt-v19": 1.0},
@@ -1758,8 +1932,6 @@ UNPROVENANCED = (
     "jump_sigma_market",
     "jump_vix_coupling",
     "market_factor_sigma",
-    "market_vol_alpha",
-    "market_vol_beta",
     "market_vol_ceiling_multiple",
     "market_vol_floor_multiple",
     "market_vol_slow_persistence",
@@ -1783,7 +1955,6 @@ UNPROVENANCED = (
     "sector_loading_beta_slope",
     "sector_vix_coupling",
     "usd_crisis_vix_threshold",
-    "vix_ceiling",
     "vix_cycle_amplitude",
     "vix_mean_reversion",
     "vix_realised_vol_weight",
