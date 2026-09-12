@@ -530,6 +530,20 @@ a step-0 miss is the symptom to expect. Adding the field by hand is a
 one-line edit to `meta`, so a recording that predates this does not have
 to be made again.
 
+**`finrobot.Transcript.save` stamps what every other save stamps.**
+`finrobot.Transcript` predates the shared `Transcript` and kept its own
+`save`, which wrote the bytes and stamped nothing, so the FinRobot
+recording re-made at this boundary was the only one of five without a
+`recorded_utc`. Both fields are facts about the artefact rather than about
+the framework -- when the recording became a file, and the market a
+transcript that never met an engine would run under -- so the two stamps
+now live in one place, `common.stamp_artefact`, and both `save` methods
+call it. `setdefault` on both, as before: a re-save keeps the recorded
+time and market. A FinRobot transcript that never met a market now records
+the shipped default as its floor, exactly as the shared class does, and
+`stamp_preset` still overwrites that floor with the running engine's
+fingerprint on the first recorded exchange.
+
 
 ## 0.7.1
 

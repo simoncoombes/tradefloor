@@ -1163,51 +1163,76 @@ class Transcript:
         Windows and one made on Linux from the same transcript are the
         same file. Recordings get committed, diffed and hashed, and text
         mode would answer all three differently per machine.
+
+        What the file gains on the way -- when it was written and, as a
+        floor, which market -- is :func:`stamp_artefact`'s, shared with
+        ``finrobot.Transcript.save`` so the two cannot say different things
+        about the same kind of file.
         """
-        import datetime
         import pathlib
-        # WHEN, stamped here because here is where a recording becomes an
-        # artefact. Every committed fixture carries `recorded_utc` and
-        # `test_callable.py` asserts it, and nothing set it: the field
-        # reached the first fixtures by hand and every recording made since
-        # has been written without it, so the check passed only for as long
-        # as nobody re-recorded. A recording that cannot say when it was made
-        # is one nobody can place against the model that produced it.
-        #
-        # Set only if absent, so re-saving a loaded transcript keeps the time
-        # it was RECORDED rather than the time it was last written.
-        self.meta.setdefault(
-            "recorded_utc",
-            datetime.datetime.now(datetime.timezone.utc)
-            .replace(microsecond=0).isoformat())
-        # WHICH MARKET, for the same reason and with the same rule. A replay
-        # key is a digest of the exact observation the model was sent, and
-        # every price in that observation comes out of the preset -- so a
-        # recording that cannot name its preset cannot explain the one way it
-        # is guaranteed to fail. It is not a hypothetical: moving the default
-        # from pt-v18 to pt-v19 missed all five committed recordings at step
-        # zero, and no field in any of them said so.
-        #
-        # `setdefault` again, and the value is only the DEFAULT preset,
-        # because a transcript holds no engine and cannot ask one. That guess
-        # is right for a transcript that never met a market -- a fresh
-        # recorder, a hand-built fixture -- and every adapter overwrites it
-        # with the truth long before here: `stamp_preset` writes the running
-        # engine's own fingerprint on the first recorded exchange. So this is
-        # the floor, not the reading.
-        #
-        # The hazard it shares with `recorded_utc` is stated rather than
-        # solved: loading a pre-0.8.0 recording and saving it again stamps
-        # today's default onto a market it was not recorded in, exactly as
-        # that line stamps today's date onto a recording made last year. The
-        # remedy for both is the same -- do not re-save a recording you did
-        # not make -- and adding the field to a legacy fixture is a one-line
-        # edit that says what it actually ran under.
-        self.meta.setdefault("model_preset",
-                             ModelParams.from_preset().fingerprint)
+        stamp_artefact(self.meta)
         target = pathlib.Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(self.to_json().encode("utf-8"))
+
+
+def stamp_artefact(meta: dict[str, Any]) -> None:
+    """Stamp on ``meta`` the two facts a recording gains when it becomes a file.
+
+    Called from every ``save`` in this package -- :meth:`Transcript.save`
+    here and ``finrobot.Transcript.save``, which predates this class and
+    keeps its own -- because both fields are properties of the ARTEFACT and
+    not of the framework that produced the responses. A recording is a file
+    of exchanges keyed by digests of observations whichever adapter made
+    it, and two saves with two rules make the same kind of file mean two
+    different things depending on which class wrote it. That is not
+    hypothetical: the FinRobot recording re-made at 0.8.0 shipped without
+    ``recorded_utc`` while the other four carried it, because its ``save``
+    had its own copy of the write and no copy of the stamps.
+
+    WHEN, stamped here because here is where a recording becomes an
+    artefact. Every committed fixture carries ``recorded_utc`` and
+    ``test_callable.py`` asserts it, and for a long time nothing set it:
+    the field reached the first fixtures by hand and every recording made
+    since was written without it, so the check passed only for as long as
+    nobody re-recorded. A recording that cannot say when it was made is
+    one nobody can place against the model that produced it. UTC, whole
+    seconds, ISO 8601: what a reader compares against a provider's model
+    dates, and nothing finer than the file's own timestamp would support.
+
+    Set only if absent, so re-saving a loaded transcript keeps the time it
+    was RECORDED rather than the time it was last written.
+
+    WHICH MARKET, for the same reason and with the same rule. A replay key
+    is a digest of the exact observation the model was sent, and every
+    price in that observation comes out of the preset -- so a recording
+    that cannot name its preset cannot explain the one way it is guaranteed
+    to fail. It is not a hypothetical: moving the default from pt-v18 to
+    pt-v19 missed all five committed recordings at step zero, and no field
+    in any of them said so.
+
+    ``setdefault`` again, and the value is only the DEFAULT preset, because
+    a transcript holds no engine and cannot ask one. That guess is right
+    for a transcript that never met a market -- a fresh recorder, a
+    hand-built fixture -- and every adapter overwrites it with the truth
+    long before here: :func:`stamp_preset` writes the running engine's own
+    fingerprint on the first recorded exchange. So this is the floor, not
+    the reading.
+
+    The hazard the two stamps share is stated rather than solved: loading
+    a pre-0.8.0 recording and saving it again stamps today's default onto a
+    market it was not recorded in, exactly as the other line stamps today's
+    date onto a recording made last year. The remedy for both is the same
+    -- do not re-save a recording you did not make -- and adding the field
+    to a legacy fixture is a one-line edit that says what it actually ran
+    under.
+    """
+    import datetime
+    meta.setdefault(
+        "recorded_utc",
+        datetime.datetime.now(datetime.timezone.utc)
+        .replace(microsecond=0).isoformat())
+    meta.setdefault("model_preset", ModelParams.from_preset().fingerprint)
 
 
 def preset_of(obs: Any) -> str | None:

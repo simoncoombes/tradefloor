@@ -184,7 +184,8 @@ from .common import stamp_resume_counts
 #: own replay branch -- it predates `ReplayMixin` and its miss messages name
 #: FinRobot -- but which market a recording was made in is not a FinRobot
 #: question, and a second spelling of it is a second thing to get wrong.
-from .common import preset_of, refuse_a_changed_preset, stamp_preset
+from .common import (preset_of, refuse_a_changed_preset, stamp_artefact,
+                     stamp_preset)
 from .common import jsonable as _as_jsonable
 
 #: The macro fields FinRobot is shown. Bound to ``counterfactual.MACRO_FIELDS``
@@ -833,6 +834,16 @@ class Transcript:
     :func:`~tradefloor.integrations.common.stamp_preset`. The mandate and
     the market are the two halves of the question FinRobot was asked, and
     ``_refuse_a_changed_mandate`` guarded only the first of them.
+
+    :meth:`save` stamps what every recording gains on becoming a file --
+    ``recorded_utc``, and ``model_preset`` as a floor -- through
+    :func:`~tradefloor.integrations.common.stamp_artefact`, the one rule
+    the shared :class:`~tradefloor.integrations.common.Transcript` uses.
+    This class predates that one and kept its own ``save``, which wrote the
+    bytes and stamped nothing, so the FinRobot recording re-made at 0.8.0
+    was the only one of five without a date. Both fields are facts about
+    the artefact rather than about FinRobot, and a second copy of the rule
+    here would be a second thing to drift.
     """
 
     __slots__ = ("meta", "entries", "_by_digest")
@@ -891,6 +902,7 @@ class Transcript:
         mode would answer all three differently per machine.
         """
         import pathlib
+        stamp_artefact(self.meta)
         target = pathlib.Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(self.to_json().encode("utf-8"))
