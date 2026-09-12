@@ -4190,69 +4190,61 @@ impl ModelParams {
         // `crash_amplifier_conditional_sigma` made it asymptotically
         // linear. The index tail goes 3.0677 -> 1.9124 at 252 days.
         p.market_vol_vix_excursion = 1.0;
-        // THE CEILING IS THE IMAGE OF THE GRADED RANGE, and it had to move
-        // because charter bar B4 moved the thing it was balanced against.
+        // THE CEILING, WHICH CLAMPS THE STATE AND NOT THE TARGET.
         //
-        // pt-v18 capped the fear spike at 45, BELOW the ceiling of 80, so
-        // fear alone could never reach the ceiling. B4 required that brake
-        // off and `vix_target_shock_cap` went to the derived
-        // `vix_return_gain * vix_return_clamp` = 255.0. The ceiling did not
-        // move with it, and at gain 17 a down session targets the VIX at
-        // `17 r`, so it targets 80 at **4.706 per cent** -- INSIDE the 6.39
-        // per cent `GRADED_ABS_R` that B4 requires the response to rise
-        // across. B4 and "the VIX has a fixed point below its ceiling"
-        // were then mutually unsatisfiable, measured: every ceiling day in
-        // b4fix2's census was a large down session and none was a variance
-        // excursion walking the VIX up.
+        // `vix_ceiling` bounds the VIX after the reversion step,
+        // `x + vix_mean_reversion * (target - x)` (economy/daily.rs:1141).
+        // `vix_return_gain * GRADED_ABS_R` = 108.63 is the fear channel's
+        // term of the TARGET for a session at the top of the graded range.
+        // This preset shipped 108.63 for a day under the claim that it was
+        // "the image of the graded range under the fear response" and that
+        // fear alone reached it at 6.39 per cent. Neither was about the
+        // state: a graded session from rest moves the VIX by 0.10 * 108.63
+        // = 10.86 points, and the graded range's image on the state from
+        // rest is 34 to 36. programme/results/ceiling-derivation-
+        // independent.md in the design repository derives the update and
+        // `economy::daily::fear_response_shape` asserts it on
+        // `update_economy_daily` itself.
         //
-        // DERIVED by the same construction as the cap it is now consistent
-        // with: `vix_return_gain * GRADED_ABS_R` = 17.0 * 6.39 = 108.63,
-        // the image of the range the tape grades under the fear response,
-        // and the smallest ceiling at which B4's rise can complete without
-        // meeting a clamp. `the_ceiling_is_the_graded_ranges_own_image`
-        // asserts both halves rather than trusting this comment.
+        // What reaches a ceiling is the identity's own level. The VIX
+        // reached 108.63 on 4 of 30,240 seed-days over 120 rosters, and on
+        // three of the four the index's conditional variance implied a VIX
+        // above the ceiling with no fear response at all (146.17, 142.58,
+        // 114.10): variance excursions of 8.5 to 30 times the factor's
+        // base, with the session a passenger.
         //
-        // What still clamps is the clamp working: 1 of 120 rosters and 4
-        // seed-days of 30,240, and three of those four are sessions of
-        // -7.29, -11.47 and -10.25 per cent, outside the range the tape
-        // grades, with the fourth the day after the -11.47 while the VIX
-        // comes off at `vix_mean_reversion` 0.10 a day.
-        // 108.63 was `vix_return_gain * GRADED_ABS_R` and it was the
-        // right shape of derivation applied to the wrong starting point:
-        // it prices a graded session FROM REST and the constraint binds
-        // from an ELEVATED state. Measured, the VIX reached 108.63 on 3 of
-        // 120 rosters, and on three of those four seed-days the index's own
-        // conditional variance implied a VIX above the ceiling with NO fear
-        // response at all, 142.58 at the highest. The clamp was binding on
-        // the read-back, not on the session.
+        // THE VALUE. 173.1087 solves `C - implied(C) >= 108.63`, the
+        // ceiling a VIX already at C comes off on a session at the top of
+        // the graded range, with `implied(C)` the settled read-back at a
+        // pin. b4fix6 measured `implied(C)` on `pin_ladder.py` (three
+        // rosters, eighteen pins from 14 to 260, crisis blend off, 40 burn
+        // and 80 scored sessions): `C - implied(C)` is monotone, 98.833 at
+        // pin 160 and 113.780 at 180, crossing at 173.1087, residual
+        // +/- 8.82 from the ladder's spread across rosters through the
+        // local slope. The closed-form map solved from the same rosters
+        // puts the condition at 177 to 184 with the blend off and 193 to
+        // 201 with it on; the ladder reads the settled level low because
+        // its burn was sized for a persistence the factor no longer has.
         //
-        // The condition from the map instead. At a VIX of `C` the level the
-        // map sustains is `implied(C)`, the read-back at that pin, and a
-        // graded session adds at most `vix_return_gain * GRADED_ABS_R` on
-        // top of it. So the ceiling a graded session cannot reach is the
-        // smallest `C` with
+        // What the condition is NOT: sufficient for the state the VIX
+        // carries when it reaches a ceiling. The settled read-back at a
+        // pin of 108 is about 47; on the days the state reached 108.63 the
+        // identity read 114 to 146. A graded session holds a VIX on any
+        // clamp the read-back can exceed by 108.63. What makes 173.1087
+        // inert is measured, not derived: 0 of 30,240 seed-days at the
+        // clamp on 120 rosters, highest VIX 120.38. The held-roster panels
+        // are identical to the bit at 108.63 and at 173.1087; on the
+        // varying roster the tail reads 1.3147 at 252 and 1.5838 at 504,
+        // `excess_kurtosis` on the held roster at 504 reads 7.3005 either
+        // way.
         //
-        //     C - implied(C) >= vix_return_gain * GRADED_ABS_R = 108.63
-        //
-        // `implied(C)` is measured on `pin_ladder.py`, three seeds, eighteen
-        // pins from 14 to 260, and `C - implied(C)` is monotone with a
-        // single crossing: 60.589 at pin 108, 98.833 at 160, 113.780 at 180.
-        // **C* = 173.1087**, bracketed by pins 160 and 180, residual
-        // +/- 8.82 carried from the ladder's own spread across seeds through
-        // the local slope. A measured constant with a stated residual, not a
-        // value chosen because a census cleared it: b4fix6 solved it from
-        // the ladder before it ran a single census arm.
-        //
-        // It buys criterion 2 outright. The census goes from 3 of 120
-        // rosters and 4 ceiling days to **0 of 120 and 0**, with the highest
-        // VIX over 120 rosters at 120.38 against the 173.1087 ceiling, so
-        // the headroom is measured rather than assumed. It costs nothing
-        // measurable: the held-roster panels are identical to the bit at
-        // both horizons, and on the varying roster the tail goes 1.3280 to
-        // 1.3147 and `excess_kurtosis` at 504 goes 7.3567 to 7.5018.
-        //
-        // `vix_target_shock_cap` is 255.0 and stays above it, so the cap
-        // still cannot bind before the ceiling.
+        // AGAINST CHARTER BAR B3. No graded statistic reads this value on
+        // the record, so it could not have been tuned against one; it
+        // carries a stated condition, a measured residual and a measured
+        // clip rate. That makes it a bound. Whether a bound satisfies B3
+        // by being inert or needs a kind of its own in the ledger is a
+        // ruling, put to Simon in the design note and not taken here.
+        // `vix_target_shock_cap` is 255.0 and stays above it.
         p.vix_ceiling = 173.1087;
         // THE FACTOR'S OWN MEMORY, MEASURED ON THE TAPE INSTEAD OF
         // SEARCHED, which the line above makes possible.

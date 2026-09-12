@@ -2083,74 +2083,197 @@ mod fear_response_shape {
         the_default_cap_is_the_clamps_own_image();
     }
 
-    /// **THE CEILING IS THE GRADED RANGE'S OWN IMAGE, and that is what
-    /// makes charter bar B4 and a fixed point below the ceiling
-    /// consistent.**
-    ///
-    /// They were not. pt-v18 capped the fear spike at 45, below the ceiling
-    /// of 80, so fear alone could never reach the ceiling; B4 required the
-    /// brake off and `vix_target_shock_cap` became the clamp's image at
-    /// 255.0, but the ceiling stayed at 80. At `vix_return_gain` 17 a down
-    /// session of `r` per cent targets the VIX at `17 r`, so it targets 80
-    /// at **4.706 per cent** -- inside the [`GRADED_ABS_R`] that the test
-    /// above requires the response to RISE across. Above that session size
-    /// the response is required to rise and is clamped, which is a
-    /// contradiction between two acceptance criteria and not a tuning
-    /// problem: `b4fix2` measured every ceiling day in a 120-roster census
-    /// as a large down session, none of them a variance excursion.
-    ///
-    /// So the ceiling is derived the same way the cap is, from the range
-    /// the tape actually grades rather than from the clamp: `gain *
-    /// GRADED_ABS_R`. A ceiling below it re-creates the contradiction; a
-    /// ceiling above it is inert, because a session past `GRADED_ABS_R` is
-    /// outside what the tape can grade and a clamp there is the clamp
-    /// doing its job.
-    #[test]
-    fn the_ceiling_is_the_graded_ranges_own_image() {
+    /// A draw-free RNG, as `vix_level_identity` above defines one: the
+    /// economy's own noise on the VIX is `N(0, 0.15)` and with it silent the
+    /// update below is arithmetic on the dials, so it can be asserted to
+    /// 1e-9 rather than to a tolerance that would hide a wrong term.
+    struct Silent;
+    impl crate::rng::Rng for Silent {
+        fn next_f64(&mut self) -> f64 {
+            0.5
+        }
+        fn next_normal(&mut self) -> f64 {
+            0.0
+        }
+    }
+
+    /// The VIX the default preset's update leaves after ONE session of
+    /// `session_pct` (negative is a down day), from a state `vix` whose
+    /// read-back is `implied`. Every other term of the target is zero
+    /// here and the test says why for each: the gains are equal so the
+    /// zero-mean correction is zero, inflation sits at 2 so its adder is
+    /// zero, there is no active shock, `vix_jump_intensity` is zero, and
+    /// the RNG is silent.
+    fn vix_after_one_session(vix: f64, implied: f64, session_pct: f64) -> f64 {
+        use crate::economy::state::{create_initial_economy_state, InitialEconomyOptions};
         let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
             .expect("the default preset resolves");
-        let image = p.vix_return_gain * mathx::pow(GRADED_ABS_R, p.vix_return_exponent);
-        assert!(
-            p.vix_ceiling >= image,
-            "the ceiling is {} and the graded range's image is {image}. Below the              image a graded session reaches the clamp FROM REST, which is charter              bar B4 and the loop's fixed point contradicting each other.",
-            p.vix_ceiling
-        );
-        // AND THE IMAGE IS ONLY THE NECESSARY HALF. It prices a session from
-        // rest; the constraint binds from an ELEVATED state, because the VIX
-        // a session lands on already carries the read-back. The sufficient
-        // condition is `C - implied(C) >= image`, where `implied(C)` is the
-        // level the map sustains at a pin of C, and it is not computable
-        // from the dials -- it is measured on `pin_ladder.py`. b4fix6 swept
-        // eighteen pins from 14 to 260 on three seeds, found `C - implied(C)`
-        // monotone with a single crossing, and solved
-        //
-        //     C* = 173.1087,  residual +/- 8.82
-        //
-        // bracketed by pins 160 and 180. That is the shipped value, and it
-        // is pinned here so a preset that moved the ceiling without
-        // re-solving the condition fails rather than silently reintroducing
-        // the clamp the derivation exists to move out of reach.
+        assert_eq!(p.vix_level_identity, 1.0, "the arithmetic below is the identity's");
+        assert_eq!(p.vix_return_gain, p.vix_return_gain_up,
+                   "unequal gains would put E[spike] back into the target");
+        assert_eq!(p.vix_jump_intensity, 0.0);
+        let mut economy = create_initial_economy_state(&InitialEconomyOptions::default());
+        economy.vix = vix;
+        economy.inflation_rate = 2.0;
+        let inputs = DailyInputs {
+            vix_level_identity: p.vix_level_identity,
+            vix_implied_from_market: implied,
+            vix_index_sigma_pct: 1.0,
+            market_day_return_pct: session_pct,
+            vix_mean_reversion: p.vix_mean_reversion,
+            vix_decay_ratio: p.vix_decay_ratio,
+            vix_return_gain: p.vix_return_gain,
+            vix_return_gain_up: p.vix_return_gain_up,
+            vix_return_exponent: p.vix_return_exponent,
+            vix_return_clamp: p.vix_return_clamp,
+            vix_target_shock_cap: p.vix_target_shock_cap,
+            vix_ceiling: p.vix_ceiling,
+            vix_return_source: p.vix_return_source,
+            vix_jump_intensity: p.vix_jump_intensity,
+            game_day: 40,
+            ..Default::default()
+        };
+        update_economy_daily(&economy, &inputs, &mut Silent).vix
+    }
+
+    /// **THE CEILING CLAMPS THE STATE, AND THE STATE MOVES
+    /// `vix_mean_reversion` OF THE WAY TO THE TARGET IN A DAY.**
+    ///
+    /// The test that stood here asserted `vix_ceiling == vix_return_gain *
+    /// GRADED_ABS_R` and called the quotient "the session at which fear
+    /// alone reaches the ceiling". Both halves were arithmetic on the dials
+    /// and neither was about the quantity the ceiling clamps. `gain *
+    /// GRADED_ABS_R` is the fear channel's term of the TARGET, the target
+    /// also carries the read-back `I`, and the clamp at `:1141` is applied
+    /// to `vix + (target - vix) * vix_mean_reversion`, the STATE after the
+    /// reversion step. So a session of `r` from a state `x` leaves
+    ///
+    ///     x' = clamp(0.9 x + 0.1 (I + 17 r), 10, C)
+    ///
+    /// and "fear alone", from rest, moves the VIX by `0.1 * 17 * 6.39` =
+    /// 10.863 points, not 108.63. This asserts that arithmetic against
+    /// `update_economy_daily` itself, over a spread of read-backs, to 1e-9.
+    /// `programme/results/ceiling-derivation-independent.md` in the design
+    /// repository derives it and what follows from it.
+    #[test]
+    fn a_graded_session_moves_the_state_a_tenth_of_the_way_to_its_target() {
+        let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+            .expect("the default preset resolves");
+        let m = p.vix_mean_reversion;
+        let spike = p.vix_return_gain * GRADED_ABS_R;
+        for i in 0..=45 {
+            let implied = 15.0 + i as f64;
+            // From REST: the state is the read-back, which is what "rest"
+            // means under the identity.
+            let x = implied;
+            let want = x + m * (implied + spike - x);
+            let got = vix_after_one_session(x, implied, -GRADED_ABS_R);
+            assert!(
+                (got - want).abs() < 1e-9,
+                "from rest at {x}: the update left {got}, the arithmetic says {want}"
+            );
+            assert!(
+                got < p.vix_ceiling - 100.0,
+                "a graded session from rest at {x} reached {got}; the ceiling is \
+                 {} and the old test's 'fear alone reaches it at 6.39 per cent' \
+                 was never true of the state",
+                p.vix_ceiling
+            );
+        }
+        // The from-rest image of the graded range on the state, stated as a
+        // number so the next reader has it: at a read-back of 21 it is
+        // 21 + 10.863, a third of the 108.63 that used to be called the
+        // point where fear alone reaches the ceiling.
+        let from_rest = vix_after_one_session(21.0, 21.0, -GRADED_ABS_R);
+        assert!((from_rest - (21.0 + m * spike)).abs() < 1e-9, "{from_rest}");
+    }
+
+    /// **A VIX AT THE CEILING IS HELD THERE BY A SESSION EXACTLY WHEN THE
+    /// TARGET IS AT OR ABOVE THE CEILING**, `I + 17 r >= C`.
+    ///
+    /// This is the relation the measurement that refuted the old
+    /// derivation was reporting: at 108.63 sessions of -4.15 and -3.51 per
+    /// cent kept the VIX on the clamp, because the read-back `I` those days
+    /// carried put `I + 17 r` above it. The threshold session is
+    /// `(C - I) / 17`, and it is INSIDE the graded range whenever `I` is
+    /// above `C - 108.63`. At the shipped ceiling that is a read-back of
+    /// about 64, which the identity reaches on a factor variance of a few
+    /// times its base. So the ceiling is not non-sticky by placement at any
+    /// value the model's read-back can exceed by 108.63; what makes it
+    /// inert on the record is that the STATE does not reach it (b4fix6's
+    /// census: 0 of 30,240 seed-days at the clamp, highest VIX 120.38 over
+    /// 120 rosters at 252 days).
+    #[test]
+    fn a_vix_at_the_ceiling_is_held_there_iff_the_target_is_at_or_above_it() {
+        let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+            .expect("the default preset resolves");
+        let c = p.vix_ceiling;
+        let m = p.vix_mean_reversion;
+        for implied in [40.0, 64.5, 90.0, 120.0, 142.58] {
+            let threshold = (c - implied) / p.vix_return_gain;
+            let above = vix_after_one_session(c, implied, -(threshold + 0.01));
+            assert_eq!(above, c, "target above the ceiling and the state came off it: {above}");
+            let below_r = threshold - 0.01;
+            let below = vix_after_one_session(c, implied, -below_r);
+            let want = c + m * (implied + p.vix_return_gain * below_r - c);
+            assert!(
+                below < c && (below - want).abs() < 1e-9,
+                "target below the ceiling: the update left {below}, the arithmetic says {want}"
+            );
+            if implied > c - p.vix_return_gain * GRADED_ABS_R {
+                assert!(
+                    threshold < GRADED_ABS_R,
+                    "at a read-back of {implied} the holding session {threshold} should be \
+                     inside the graded range"
+                );
+            }
+        }
+    }
+
+    /// **THE SHIPPED CEILING, PINNED WITH ITS PROVENANCE, AND ORDERED
+    /// AGAINST THE CAP.**
+    ///
+    /// 173.1087 is b4fix6's solution of `C - implied(C) >= 17 * 6.39` on a
+    /// pin ladder (three seeds, eighteen pins from 14 to 260, blend OFF,
+    /// residual 8.82 from the ladder's spread across seeds). `implied(C)`
+    /// there is the SETTLED read-back at a pin, the level the map sustains
+    /// when the VIX is held at `C` and the factor variance relaxes to its
+    /// target. It is not the read-back the state carries on the days it
+    /// actually reaches a ceiling: those are variance excursions, 8.5 to
+    /// 30 times the factor's base, on which the identity read 114 to 146 at
+    /// a VIX of 108.63 with no session at all. The two quantities are
+    /// reconciled in `ceiling-derivation-independent.md` section 4.5 and
+    /// the b4fix7 result, and the condition above is sufficient for the
+    /// settled map only. What the value has that a chosen one does not is
+    /// a stated condition, a stated residual, and a measured clip rate of
+    /// zero: no graded statistic reads it on the record.
+    ///
+    /// Pinned so that a preset which moves the ceiling without re-solving
+    /// the condition and re-measuring the census fails here.
+    #[test]
+    fn the_default_ceiling_is_pinned_to_its_solve_and_sits_under_the_cap() {
+        let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+            .expect("the default preset resolves");
         const CEILING_SOLVED: f64 = 173.1087;
         assert_eq!(
             p.vix_ceiling, CEILING_SOLVED,
-            "the ceiling is {} where b4fix6's ladder solved {CEILING_SOLVED}.              Re-solve `C - implied(C) >= {image}` on a ladder before moving it;              the value is measured, not chosen.",
+            "the ceiling is {} where b4fix6's ladder solved {CEILING_SOLVED}. Re-solve \
+             `C - implied(C) >= gain * GRADED_ABS_R` on a ladder and re-measure the \
+             census before moving it.",
             p.vix_ceiling
         );
-        // The session at which the fear channel ALONE reaches the ceiling,
-        // which is now past the graded range rather than exactly at it.
-        let reaches_at = mathx::pow(p.vix_ceiling / p.vix_return_gain, 1.0 / p.vix_return_exponent);
-        assert!(
-            reaches_at > GRADED_ABS_R,
-            "fear alone reaches the ceiling at {reaches_at} per cent, inside the              graded range's {GRADED_ABS_R}"
-        );
-        // And the cap does not bind first, or the ceiling would never be
-        // the binding constraint it is derived to be. The cap is the
-        // CLAMP's image and the clamp is 15 per cent, well past the graded
-        // range, so this is an ordering the two derivations already imply
-        // and it is asserted rather than assumed.
+        // The fear term of the target alone is 108.63; a ceiling under it
+        // would be reached by a from-rest TARGET inside the graded range,
+        // which is necessary for the condition above and nothing like
+        // sufficient.
+        let image = p.vix_return_gain * mathx::pow(GRADED_ABS_R, p.vix_return_exponent);
+        assert!(p.vix_ceiling > image, "{} is under the target's fear term {image}", p.vix_ceiling);
+        // And the cap does not bind first. The cap is the CLAMP's image and
+        // the clamp is 15 per cent, so this is an ordering the two
+        // derivations already imply, asserted rather than assumed.
         assert!(
             p.vix_target_shock_cap > p.vix_ceiling,
-            "the shock cap {} is at or under the ceiling {}, so the cap binds first              and the ceiling's derivation is moot",
+            "the shock cap {} is at or under the ceiling {}, so the cap binds first",
             p.vix_target_shock_cap, p.vix_ceiling
         );
     }

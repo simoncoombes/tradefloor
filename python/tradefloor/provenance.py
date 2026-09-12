@@ -481,22 +481,30 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                      "same series and window by the same estimator, and "
                      "compared by likelihood ratio",
         "script": "the estimator module reproduced whole in "
-                  "programme/garch-derive-design.md Appendix B",
-        # NOT a standard error: the per-coefficient sandwich bars for
-        # the GJR triple are NOT on the record where the symmetric
-        # fit's are (garch-derive-design 2.4 reports the triple and
-        # its NLL, not its covariance), and that is a real gap rather
-        # than something to fill in. What IS measured is the evidence
-        # for the term being non-zero at all, which is this
-        # adoption's actual residual: the likelihood ratio against the
-        # symmetric fit on the same tape and window.
+                  "programme/garch-derive-design.md Appendix B, extended "
+                  "to the GJR form (the score recursion gains the term "
+                  "`1[r < 0] r^2`); the fit and its sandwich are in "
+                  "programme/results/ceiling-derivation-independent.md "
+                  "of the design repository, section 7",
+        # The GJR fit's OWN sandwich bar. This entry shipped for a day
+        # with its point estimate pasted into the bar field, and then
+        # with no bar at all while the symmetric fit's bars sat on the
+        # other two coefficients of the same triple. The three bars
+        # below are from one fit of the GJR form on the same 8,959
+        # returns the symmetric fit used: Bollerslev-Wooldridge sandwich,
+        # residual kurtosis E[z^4] 5.06. The likelihood ratio stays
+        # beside it because it is the evidence the term is there at all.
+        "estimate": 0.1556,
+        "standard_error": 0.0180,
         "residual": {
             "kind": "likelihood ratio against the symmetric GARCH(1,1)",
             "statistic": 305.0,
             "degrees_of_freedom": 1,
             "nll_gjr": 3551.49,
             "nll_symmetric": 3703.97,
-            "per_coefficient_standard_errors": "NOT ON THE RECORD",
+            "sandwich_correlations": "corr(alpha, gamma) -0.70, "
+                                     "corr(gamma, beta) -0.21, "
+                                     "corr(alpha, beta) -0.48",
         },
         "presets": {"pt-v19": 0.1556},
         "identity": "the tape's leverage response, at a LIKELIHOOD RATIO "
@@ -617,81 +625,161 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_ceiling": {
         "kind": "derived",
-        "presets": {"pt-v19": 108.63},
-        "identity": "the image of the range the tape grades under the "
-                    "fear response: `vix_return_gain * GRADED_ABS_R` = "
-                    "17.0 * 6.39 = 108.63. It is the same construction "
-                    "`vix_target_shock_cap` uses on the CLAMP, and it "
-                    "had to follow it. At 80.0 a down session of 4.706 "
-                    "per cent targeted the ceiling, INSIDE the 6.39 per "
-                    "cent charter bar B4 requires the fear response to "
-                    "keep rising across, so B4 and a fixed point below "
-                    "the ceiling were mutually unsatisfiable -- not as "
-                    "an argument but as a measurement, b4fix2 finding "
-                    "every ceiling day in a 120-roster census to be a "
-                    "large down session and none a variance excursion. "
-                    "Below the image the contradiction returns; above "
-                    "it the ceiling is inert, because a session past "
-                    "the graded range is outside what the tape grades",
+        "presets": {"pt-v19": 173.1087},
+        "identity": "the smallest C with `C - implied(C) >= "
+                    "vix_return_gain * GRADED_ABS_R` = 108.63, where "
+                    "`implied(C)` is the read-back the map sustains with "
+                    "the VIX pinned at C: the level at which a session at "
+                    "the top of the graded range leaves the target "
+                    "`implied(C) + 17 r` at or below the ceiling, so a VIX "
+                    "already at C comes off it. Solved on b4fix6's pin "
+                    "ladder (three rosters, eighteen pins from 14 to 260, "
+                    "40 burn and 80 scored sessions, crisis blend OFF): "
+                    "`C - implied(C)` is monotone, 98.833 at pin 160 and "
+                    "113.780 at pin 180, and crosses 108.63 at "
+                    "C* = 173.1087. The closed-form map in "
+                    "ceiling-derivation-independent.md, solved from the "
+                    "same rosters' anchor-point terms, puts the same "
+                    "condition at 177 to 184 with the blend off and 193 "
+                    "to 201 with it on, which is the preset's own map",
         "terms": {
-            "vix_return_gain 17.0": "the tape's own fear slope, "
-                                    "measured and left alone here. The "
-                                    "gain sweep put 17 in the well with "
-                                    "both directions worse",
+            "vix_return_gain 17.0": "the tape's fear slope, measured and "
+                                    "left alone. Enters as the target's "
+                                    "fear term, which is what 108.63 is",
             "GRADED_ABS_R 6.39": "the range the tape grades, "
-                                 "economy/daily.rs, and the same "
-                                 "constant `flattens_at` sweeps for "
-                                 "charter bar B4",
-            "vix_target_shock_cap 255.0": "the clamp's image under the "
-                                          "same response, and it must "
-                                          "stay ABOVE the ceiling or "
-                                          "the cap binds first and this "
-                                          "derivation is moot. "
-                                          "Asserted",
+                                 "economy/daily.rs, the constant "
+                                 "`flattens_at` sweeps for charter bar "
+                                 "B4",
+            "vix_mean_reversion 0.10": "what the ceiling clamps is the "
+                                       "STATE after `x + 0.10 (target - "
+                                       "x)`, so a session from rest moves "
+                                       "the VIX by 0.10 * 17 * 6.39 = "
+                                       "10.86 points and the graded "
+                                       "range's image on the state from "
+                                       "rest is 34 to 36. The reversion "
+                                       "rate does not enter the "
+                                       "condition above, whose fixed "
+                                       "point is `implied(C) + 108.63` "
+                                       "at any rate",
+            "implied(C)": "MEASURED, and the whole of the residual. On "
+                          "the ladder it is the settled read-back at a "
+                          "pin; its spread across three rosters carried "
+                          "through the local slope is +/- 8.82 on C*. "
+                          "The ladder's 40-session burn was sized for a "
+                          "persistence of 0.97 and the factor's is now "
+                          "0.979, so the ladder reads the settled level "
+                          "5 to 15 per cent low and C* is a low "
+                          "reading; the blend, which the preset runs, "
+                          "raises the same condition to about 195",
+            "vix_target_shock_cap 255.0": "must stay above the ceiling or "
+                                          "the cap binds first. Asserted",
         },
-        "source": "rust/src/params.rs, ModelParams::pt_v19; the "
-                  "derivation is asserted by "
-                  "`economy::daily::the_ceiling_is_the_graded_ranges_"
-                  "own_image`, which checks the product, the session at "
-                  "which fear alone reaches the ceiling, and the cap's "
-                  "ordering against it rather than trusting the "
-                  "comment",
-        "note": "ITS OWN DOCSTRING USED TO SAY it was a CHOSEN constant "
-                "and not a derived one, declared so a reader could "
-                "disagree with it, and it sat in POST_BASELINE on "
-                "exactly that ground. It is derived now. What still "
-                "reaches it is the clamp working: 1 of 120 rosters and "
-                "4 seed-days of 30,240, and three of those four are "
-                "sessions of -7.29, -11.47 and -10.25 per cent with the "
-                "fourth the day after the -11.47 while the VIX comes "
-                "off at `vix_mean_reversion` 0.10 a day",
+        "solve": {
+            "condition": "C - implied(C) >= 108.63 on the pin ladder",
+            "bracket": "pins 160 and 180",
+            "tolerance": 8.82,
+            "met": True,
+        },
+        "source": "programme/results/b4fix6-registration.md section 2 "
+                  "and programme/results/ceiling-derivation-independent"
+                  ".md, design repository; rust/src/params.rs, "
+                  "ModelParams::pt_v19. The relations the value rests "
+                  "on are asserted by "
+                  "`economy::daily::a_graded_session_moves_the_state_a_"
+                  "tenth_of_the_way_to_its_target`, "
+                  "`a_vix_at_the_ceiling_is_held_there_iff_the_target_"
+                  "is_at_or_above_it` and "
+                  "`the_default_ceiling_is_pinned_to_its_solve_and_sits_"
+                  "under_the_cap`, on `update_economy_daily` itself with "
+                  "a silent RNG",
+        "clip_rate": {
+            "at_173.1087": "0 of 30,240 seed-days on 120 rosters at 252 "
+                           "sessions, highest VIX 120.38 (b4fix6 "
+                           "derived census). The 95 per cent upper "
+                           "bound on a rate that reads zero in 30,240 "
+                           "is 1.2e-4 per seed-day",
+            "at_108.63": "4 of 30,240 on 3 rosters. Decomposed per day: "
+                         "on three of the four the read-back ALONE was "
+                         "above the ceiling (146.17, 142.58, 114.10) "
+                         "with sessions of -10.31, -4.10 and -9.73 per "
+                         "cent; the fourth carried a read-back of 96.99 "
+                         "and a -3.46 per cent session. The clamp was "
+                         "binding on the identity's own level on "
+                         "variance excursions of 8.5 to 30 times the "
+                         "factor's base, with the fear channel a "
+                         "passenger",
+        },
+        "what_the_condition_is_not": "sufficient for the state the VIX "
+                                     "carries when it reaches a ceiling. "
+                                     "`implied(C)` on the ladder is the "
+                                     "settled level at a pin; on the "
+                                     "days the state reached 108.63 the "
+                                     "identity read 114 to 146, because "
+                                     "the variance was at an excursion "
+                                     "and not at its target. At any "
+                                     "ceiling the read-back can exceed by "
+                                     "108.63, a graded session holds a "
+                                     "VIX on the clamp; with the factor "
+                                     "at its 32x clamp that is a "
+                                     "read-back of 176 to 190 and a "
+                                     "ceiling near 300. What makes "
+                                     "173.1087 inert on the record is "
+                                     "that the STATE does not reach it, "
+                                     "measured, and not the condition",
+        "note": "WHAT THIS VALUE IS AND IS NOT, against charter bar B3. "
+                "B3 refuses a constant whose value was chosen to make a "
+                "graded statistic pass. No graded statistic reads this "
+                "one: at 173.1087 the clamp is touched on 0 of 30,240 "
+                "seed-days and the held-roster panels are identical to "
+                "the bit with the ceiling at 108.63 or at 173.1087, so "
+                "there is nothing the value could have been tuned "
+                "against. What it carries instead is a stated condition, "
+                "a measured residual, and a measured clip rate, and a "
+                "value that is inert on the record can be moved anywhere "
+                "above the record's maximum without a row moving. That "
+                "is a BOUND, and whether a bound satisfies B3 by being "
+                "inert or needs a kind of its own is a ruling this entry "
+                "does not make; it is put to Simon in "
+                "ceiling-derivation-independent.md. The ledger entry "
+                "before this one said `derived`, called the value 'the "
+                "image of the range the tape grades under the fear "
+                "response', and named a test that checked the product "
+                "and called it 'the session at which fear alone reaches "
+                "the ceiling'. That was a term of the target read as a "
+                "bound on the state, and it is withdrawn. Fear alone, "
+                "from rest, reaches 34 to 36",
     },
     "market_vol_alpha": {
         "kind": "measured",
         "date": "2026-09-07",
-        "estimator": "Gaussian quasi-maximum-likelihood GARCH(1,1) on "
-                     "the tape's index log returns, whole span, with a "
-                     "sandwich (QMLE) covariance and a year-block "
-                     "bootstrap beside it",
+        "estimator": "GJR-GARCH(1,1) by Gaussian quasi-maximum "
+                     "likelihood on the tape's index log returns, whole "
+                     "span, with a Bollerslev-Wooldridge sandwich "
+                     "covariance; the symmetric GARCH(1,1) fit on the "
+                     "same series is recorded beside it",
         "script": "the estimator module reproduced whole in "
-                  "programme/garch-derive-design.md Appendix B; "
-                  "numpy-only Gaussian QMLE, no scipy, run in "
-                  "dev/tf-getter's .venv",
-        # The symmetric fit's bar, kept because it is the one that was
-        # measured; the shipped VALUE is the GJR fit's and that fit's own
-        # per-coefficient bars are not on the record. See
-        # `market_vol_gamma`, which carries the evidence for the triple.
-        "standard_error": 0.0093,
-        "standard_error_is_for": "the symmetric GARCH(1,1) fit's alpha "
-                                 "0.1059, NOT the shipped GJR alpha 0.0066",
+                  "programme/garch-derive-design.md Appendix B, in its "
+                  "GJR form; numpy-only Gaussian QMLE, no scipy",
+        # THE BAR IS THE GJR FIT'S, FOR THE GJR VALUE. This entry shipped
+        # for a day carrying the symmetric fit's bar (0.0093, which
+        # belongs to 0.1059) beside the GJR value 0.0066. The sandwich on
+        # the GJR fit itself reads 0.0109, so the shipped alpha is 0.6
+        # standard errors from zero: the tape's variance responds to
+        # down moves through gamma and the symmetric-term alpha is not
+        # distinguishable from nothing. That is a property of the tape
+        # and is recorded rather than smoothed over.
+        "estimate": 0.0066,
+        "standard_error": 0.0109,
         "presets": {"pt-v16": 0.28035004, "pt-v18": 0.28035004,
                     "pt-v19": 0.0066},
-        "identity": "Gaussian QMLE GARCH(1,1) on the tape's index over "
-                    "the whole span. alpha = 0.1059, sandwich se "
-                    "0.0093, year-block bootstrap sd 0.0128; "
-                    "`corr(alpha, beta)` is -0.88, so the pair moves "
-                    "together and the coefficient's error bar is "
-                    "narrower than the two separately suggest",
+        "identity": "GJR(1,1) by Gaussian QMLE on the tape's index over "
+                    "the whole span: omega 0.0202, alpha 0.0066 "
+                    "(sandwich se 0.0109), gamma 0.1556 (0.0180), beta "
+                    "0.8946 (0.0085); corr(alpha, gamma) -0.70, "
+                    "corr(alpha, beta) -0.48. The symmetric fit on the "
+                    "same series reads alpha 0.1059 (0.0093), beta "
+                    "0.8787 (0.0092), corr -0.88, and is the "
+                    "pseudo-true symmetric approximation of this one",
         "source": "programme/garch-derive-design.md 0 and 2, design "
                   "repository; the estimator, its window and its two "
                   "residual treatments are 2.1 to 2.3",
@@ -710,30 +798,28 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "market_vol_beta": {
         "kind": "measured",
         "date": "2026-09-07",
-        "estimator": "Gaussian quasi-maximum-likelihood GARCH(1,1) on "
-                     "the tape's index log returns, whole span, with a "
-                     "sandwich (QMLE) covariance and a year-block "
-                     "bootstrap beside it",
+        "estimator": "GJR-GARCH(1,1) by Gaussian quasi-maximum "
+                     "likelihood on the tape's index log returns, whole "
+                     "span, with a Bollerslev-Wooldridge sandwich "
+                     "covariance; the symmetric GARCH(1,1) fit on the "
+                     "same series is recorded beside it",
         "script": "the estimator module reproduced whole in "
-                  "programme/garch-derive-design.md Appendix B; "
-                  "numpy-only Gaussian QMLE, no scipy, run in "
-                  "dev/tf-getter's .venv",
-        # As `market_vol_alpha`: the symmetric fit's bar beside the GJR
-        # fit's value, said rather than blurred.
-        "standard_error": 0.0092,
-        "standard_error_is_for": "the symmetric GARCH(1,1) fit's beta "
-                                 "0.8787, NOT the shipped GJR beta 0.8946",
+                  "programme/garch-derive-design.md Appendix B, in its "
+                  "GJR form; numpy-only Gaussian QMLE, no scipy",
+        # As `market_vol_alpha`: the GJR fit's own bar for the GJR value.
+        "estimate": 0.8946,
+        "standard_error": 0.0085,
         "presets": {"pt-v16": 0.69244622, "pt-v18": 0.69244622,
                     "pt-v19": 0.8946},
-        "identity": "the same estimator and the same fit as "
-                    "`market_vol_alpha`, in its GJR form: beta = 0.8946 "
-                    "against the symmetric fit's 0.8787, sandwich se "
-                    "0.0092, year-block bootstrap sd 0.0152. "
-                    "`alpha + beta` is 0.9846 +/- 0.0046 against the "
-                    "shipped 0.9728, and the fourth-moment condition "
-                    "`3a^2 + 2ab + b^2` is 0.993 against the shipped "
-                    "fast component's 1.104 -- so the factor gains a "
-                    "finite fourth moment it did not have",
+        "identity": "the same fit as `market_vol_alpha`: beta = 0.8946, "
+                    "sandwich se 0.0085, corr(beta, omega) -0.67. The "
+                    "GJR persistence `alpha + gamma/2 + beta` is 0.9790; "
+                    "the symmetric fit's `alpha + beta` is 0.9846 +/- "
+                    "0.0046 against the pt-v14 optima's 0.9728. The "
+                    "fourth-moment condition `3a^2 + 2ab + b^2` is 0.993 "
+                    "at the symmetric values against the old fast "
+                    "component's 1.104, so the factor gains a finite "
+                    "fourth moment it did not have",
         "source": "programme/garch-derive-design.md 0 and 2, design "
                   "repository",
         "note": "3.4's option B would have corrected this value for "
@@ -2224,6 +2310,33 @@ def validate_entry(dial: str, entry: Any) -> list[str]:
                     "zero. Record the bar the estimator produced, or record "
                     "the residual that was actually measured and say which."
                 )
+            # A BAR BELONGS TO ONE ESTIMATE, and when the entry lists more
+            # than one shipped value the bar does not say which. That is
+            # how `market_vol_alpha` shipped the symmetric fit's 0.0093
+            # (the bar for 0.1059, a value in no preset) beside the GJR
+            # value 0.0066: two values in `presets`, one bar, and nothing
+            # tying the bar to either. So an entry with more than one
+            # distinct shipped value must name the `estimate` its bar
+            # qualifies, and that estimate must be one of the values that
+            # ship. A bar for a value nobody ships is a bar for a
+            # different measurement.
+            shipped = {v for v in (entry.get("presets") or {}).values()
+                       if isinstance(v, (int, float)) and not isinstance(v, bool)}
+            if len(shipped) > 1:
+                est = entry.get("estimate")
+                if not isinstance(est, (int, float)) or isinstance(est, bool):
+                    problems.append(
+                        f"{dial}: standard_error {se} sits beside "
+                        f"{len(shipped)} distinct shipped values and the entry "
+                        "does not say which one it is the bar for. Add "
+                        "`estimate`, the value the estimator produced."
+                    )
+                elif est not in shipped:
+                    problems.append(
+                        f"{dial}: `estimate` {est} is in no shipped preset "
+                        f"({sorted(shipped)}), so standard_error {se} is the "
+                        "bar for a measurement this entry does not ship."
+                    )
 
     solve = entry.get("solve")
     if solve is not None:
