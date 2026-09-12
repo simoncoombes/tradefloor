@@ -110,12 +110,12 @@ def model(overrides: dict) -> "tf.ModelParams":
 
 
 def _pinned_run(job):
-    seed, pin, overrides = job
+    seed, pin, overrides, burn, scored = job
     universe = tf.Universe.random(ROSTER, seed=seed)
     engine = tf.Engine(seed=seed, universe=universe, model=model(overrides))
     anchor = engine.vix_anchor
     rows = []
-    for day in range(BURN + SCORED):
+    for day in range(burn + scored):
         # BEFORE every open, so the whole session runs at the pinned level
         # and the close reads it. `pin_macro` writes the state; it does not
         # hold it, and the day's update moves it.
@@ -129,7 +129,7 @@ def _pinned_run(job):
                 f"{PRESET} reported no index variance terms: the ladder needs "
                 f"vix_level_identity on, and this arm has it off")
         snap = engine.state_snapshot()
-        if day >= BURN:
+        if day >= burn:
             rows.append({
                 "seed": seed, "pin": pin, "anchor": anchor,
                 "factor": terms["factor"], "crash": terms["crash"],
@@ -169,20 +169,21 @@ def cmd_ladder(args):
         overrides["crisis_vix_threshold"] = 1.0e6
     pins = [float(x) for x in args.pins.split(",")]
     seeds = [int(x) for x in args.seeds.split(",")]
-    jobs = [(s, p, overrides) for p in pins for s in seeds]
+    burn, scored = args.burn, args.scored
+    jobs = [(s, p, overrides, burn, scored) for p in pins for s in seeds]
     rows = []
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         for chunk in pool.map(_pinned_run, jobs):
             rows.extend(chunk)
     if args.out:
         json.dump({"preset": PRESET, "overrides": overrides, "seeds": seeds,
-                   "burn": BURN, "scored": SCORED, "rows": rows},
+                   "burn": burn, "scored": scored, "rows": rows},
                   open(args.out, "w"))
     by_pin: dict[float, list] = {}
     for r in rows:
         by_pin.setdefault(r["pin"], []).append(r)
     print(f"{PRESET} + {json.dumps(overrides)}")
-    print(f"seeds {seeds}, {SCORED} scored sessions per seed per pin")
+    print(f"seeds {seeds}, {burn} burn and {scored} scored sessions per seed per pin")
     print(f"{'pinned':>8} {'implied':>9} {'imp/pin':>8} {'after-pin':>10} "
           f"{'v_f/base':>9} {'anchor':>8}")
     base = tf.ModelParams.from_preset(PRESET).to_dict()["market_factor_sigma"] ** 2
@@ -335,6 +336,17 @@ def main():
     lad.add_argument("--blend-off", action="store_true",
                      help="switch the crisis blend off, which is what the "
                           "gain solver needs")
+    # The defaults are the module's BURN and SCORED, so every ladder on
+    # the record reproduces. They are options because the 40-session burn
+    # was sized for a persistence of 0.97 (a half-life of 23 sessions) and
+    # pt-v19's factor persists at 0.979 (33 sessions), so a ladder at the
+    # default reads the settled level low at every pin; a settled ladder
+    # needs a burn of several half-lives. Recorded in
+    # programme/pin-ladder-burn.md in the design repository.
+    lad.add_argument("--burn", type=int, default=BURN,
+                     help=f"sessions discarded before scoring (default {BURN})")
+    lad.add_argument("--scored", type=int, default=SCORED,
+                     help=f"sessions scored per seed per pin (default {SCORED})")
     lad.add_argument("--out")
     lad.set_defaults(func=cmd_ladder)
 
