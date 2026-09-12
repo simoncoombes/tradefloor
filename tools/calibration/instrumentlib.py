@@ -172,6 +172,16 @@ PARAM_SPECS: dict[str, dict] = {
     # why a step is the right reading and a gradient would be a fiction.
     "crash_amplifier_conditional_sigma": {
         "kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    # THE THIRD TWO-LEVEL SWITCH, and the same reading applies. At 0.0 the
+    # factor's variance target reads the VIX's LEVEL against a fixed anchor
+    # and at every nonzero value it reads the VIX's EXCURSION above the
+    # level the index's own conditional variance implies. There is no half
+    # excursion: `engine.rs` branches at `== 0.0` and the two admissible
+    # values are the two ends, so the axis has two levels and a search over
+    # it reports a step. What chooses it is the loop's static gain -- the
+    # variance arm of theta, about 0.45 of 0.62 -- and not a panel row.
+    "market_vol_vix_excursion": {
+        "kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
     # A SHARE of demand, so [0, 1]. Above 1.0 supply outruns demand every
     # day and inventory ramps upward instead of downward, which is the
     # defect inverted.

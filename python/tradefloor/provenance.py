@@ -355,6 +355,21 @@ RETURNED_TO_BASELINE = {
 OUT_OF_SCOPE = {
     "crisis_blend_variance_damp":
         "inert at 0.0: market/factors.rs:473 branches on `== 0.0`",
+    "market_vol_vix_excursion":
+        "inert at 0.0: engine.rs branches on `== 0.0` in `close_market` and "
+        "passes `self.vix_anchor` on that arm, which is the expression that "
+        "stood at the call site, so no arithmetic on the other branch runs "
+        "and 85 of 85 preset-seed digests are identical across its arrival. "
+        "It is gated TWICE over, and the second gate is the one that makes "
+        "this entry safe to write: `vix_level_identity` must also be "
+        "non-zero for the dial to have a read-back to be an excursion "
+        "above, and `params.rs::the_excursion_switch_requires_the_identity` "
+        "refuses any preset that sets one without the other. Move EITHER "
+        "partner and this entry becomes false -- b4fix2 measured what the "
+        "dial is worth (the index tail 3.0677 -> 1.9124 at 252 and the "
+        "static map's pin-80 ratio 0.651 -> 0.474) and the reason no preset "
+        "sets it is recorded in that run's result, not an absence of "
+        "evidence",
     "fair_value_book_floor":
         "inert at 0.0: the book floor is not applied to profitable "
         "companies, and the valuation is the reference implementation's",
