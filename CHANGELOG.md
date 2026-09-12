@@ -29,6 +29,61 @@ fourteen of fourteen mechanism rows where pt-v18 sits at twelve.
 
 <!-- release-note-ends -->
 
+**pt-v19 takes three more dials.** `market_vol_vix_excursion` 1.0 makes the
+market factor's variance target read the VIX's excursion above the level the
+index's own conditional variance implies, instead of the VIX's level against
+a fixed anchor. Under `vix_level_identity` the old form fed the factor's own
+variance back to itself, which `garch-derive-design.md` finding 4 measured
+as the loop counting its memory twice. Cutting it takes the loop's
+amplification of a standing bias from about 2.7x to about 1.1x, and the
+static map from asymptotically linear to sublinear: `implied(v)/v` at a
+pinned VIX of 80 reads 0.474 against 0.651, and `ratio(80)/ratio(40)` reads
+0.729 against a closed-form 0.707.
+
+**`vix_ceiling` moves from 80.0 to 108.63**, which is `vix_return_gain` 17.0
+times `GRADED_ABS_R` 6.39. At a ceiling of 80 a down session of 4.706 per
+cent reached it, inside the 6.39 per cent that charter bar B4 requires the
+fear response to keep rising across, so the two could not both hold.
+`vix_target_shock_cap` was derived from the clamp the same way at `b76e825`
+and the ceiling had not followed it.
+
+**`market_vol_alpha`, `market_vol_gamma` and `market_vol_beta` take the
+tape's GJR fit**: 0.0066, 0.1556 and 0.8946, against the pt-v14 search
+optima 0.28035004 and 0.69244622, which carry no error bar. The same
+estimator on the same tape and window prefers the GJR form over the
+symmetric one at a likelihood ratio of 305 on one degree of freedom. The
+three are one measurement and none of them ships alone.
+
+**What the three buy.** On `facts.LEVEL_PROTOCOL` at thirty seeds with the
+roster drawn per seed, `index_tail_dn3_pct` comes in from 3.0677 to 1.3280
+at 252 days and from 4.6786 to 1.5905 at 504, both in band. The panel is
+eighteen of eighteen at both horizons. `S` over nineteen rows is 26.575
+against pt-v18's 42.128 at 252, and 38.747 against 43.994 at 504.
+
+**The VIX still reaches its ceiling, on 3 of 120 rosters and 4 seed-days of
+30,240.** Two of those four days are sessions of -10.31 and -9.73 per cent,
+outside the range the tape grades. The other two are sessions of -4.10 and
+-3.46 per cent, inside it. On three of the four the index's own conditional
+variance implies a VIX above the ceiling with no fear response at all,
+142.58 being the highest, so the clamp binds on the read-back rather than on
+the session. The ceiling's derivation prices a session from rest and the
+constraint binds from an elevated state, which is recorded in
+`programme/results/b4fix6-registration.md` with the ceiling that follows
+from the map instead.
+
+**`excess_kurtosis` at 504 days on the held roster is the weakest row in
+this release, and it is worse than pt-v18's.** It reads 7.3005 against a
+floor of 7.1. pt-v14, pt-v16 and pt-v18 read 10.8275, 9.4473 and 10.4101 on
+the same panel, and all four presets hold fourteen of fourteen shape rows,
+so that count is not a property of pt-v19. A seed-block bootstrap over the
+thirty certification seeds, 4,000 resamples, puts the row below its floor on
+42.9 per cent of blocks, where pt-v18 reads 0.0 per cent. The tape's
+coefficients are the cause. At the pt-v14 optima the unclamped fast
+component had no finite fourth moment and its kurtosis was held down only by
+`market_vol_ceiling_multiple`; the GJR triple recovers part of what the
+symmetric fit gave up and not all of it.
+
+
 **pt-v19 is pt-v18 with four dials, each measured.** `vix_level_identity`
 1.0 and `vix_decay_ratio` 1.0 make the VIX read the index's own conditional
 variance instead of the market factor's through a wrong conversion;
@@ -411,10 +466,11 @@ and the row that is out of band is the tail, which the switch improves.
 
 `programme/results/b4fix1-result.md` in the design repository carries the
 per-roster table, the seven acceptance criteria scored one by one, and the
-full prediction ledger. Three of the seven are met, one is met with the four
-standing failures named, and three are not: there is no fixed point below
-the ceiling on five rosters, the tail row is out of band, and the panel is
-17 of 18 rather than 18 of 18.
+full prediction ledger. At that commit three of the seven were met and three
+were not: there was no fixed point below the ceiling on five rosters, the
+tail row was out of band, and the panel was 17 of 18. Every figure in this
+section describes the preset as it stood then, and three more dials have
+moved since; the entry at the top of this file carries what ships.
 
 **Five dials leave the default's live surface and six join it.** Under
 `vix_level_identity` the VIX is derived from the index's conditional
