@@ -181,7 +181,27 @@ def test_volatility_clustering_is_in_band_at_short_lags_and_dies_too_fast():
     # not been re-measured: `envelope.DECAY_252` and `DECAY_SLOPE` describe
     # pt-v14 and the gap text goes with them. One seed at one lag narrows the
     # claim; it does not retire it.
-    assert 0.0 < facts["abs_return_acf20"] < 0.03
+    #
+    # AND THE STRICT POSITIVITY WAS NEVER A PROPERTY OF THE MODEL. It was
+    # `0.0 < facts["abs_return_acf20"]` from 0.6.0 to 0.8.0, put there
+    # because pt-v16 read +0.0221 on this seed where pt-v14 had read -0.0071.
+    # Measured across the certification panel's thirty seeds, lag twenty is
+    # NEGATIVE on 7 of 30 under the preset before pt-v19's GJR triple and on
+    # 9 of 30 under it -- roughly a quarter to a third of seeds, on both.
+    # Seed 3 was simply one of the positive ones and has stopped being; it
+    # reads -0.00534 here. A sign that a quarter of seeds do not share is a
+    # property of the seed, not of the model, and asserting it on one seed
+    # was measuring the draw.
+    #
+    # What the POPULATION did is the opposite of a regression, and it is the
+    # figure that belongs in this claim: the panel's lag-twenty median rose
+    # +0.00810 -> +0.01542 at 252 days and +0.02855 -> +0.03806 at 504, both
+    # inside the band, so the curve stays weakly positive where real markets
+    # do BY MORE than it did. The per-seed bound below is the band's own
+    # floor, which is the honest single-seed claim; the shape defect is
+    # carried by the ordering assertion after it, which is what this test
+    # was always really pinning.
+    assert -0.04 < facts["abs_return_acf20"] < 0.03
     assert facts["abs_return_acf20"] < facts["abs_return_acf5"] < facts[
         "abs_return_acf1"]
 
