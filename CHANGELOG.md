@@ -476,16 +476,62 @@ shrinks it further. The tool's production roster is forty tickers, where
 the anchor inflation is far milder, so what this bounds is the six-name
 synthetic.
 
-**Five committed agent recordings are pinned to pt-v18 rather than
-re-recorded**: `callable`, `langgraph`, `pydantic_ai`, `openai_agents` and
-`finrobot`. A recording is keyed by a digest of the exact observation the
-model was sent, and every price in that observation moved at this boundary.
-Each example script and each replaying test now names pt-v18, the preset
-the recordings were made under, so they reproduce across this boundary and
-every later one. The recordings themselves are unchanged, because
-re-recording is a live run against a provider rather than an edit to a
-file. The pin decides which market a replay runs in; the `model_preset`
-field below decides whether a later mismatch is audible.
+**Five committed agent recordings are re-recorded live against pt-v19 as
+it ships**: `callable`, `langgraph`, `pydantic_ai`, `openai_agents` and
+`finrobot`, 145 exchanges over claude-opus-5, claude-sonnet-4-5 and
+gpt-5.2. A recording is keyed by a digest of the exact observation the
+model was sent, and every price in that observation moved when pt-v19 took
+its final dials, so all five would have missed at step 0 -- and, since
+each carried `model_preset: "pt-v18"`, the guard below refused them
+first. The `PRESET = "pt-v18"` pin that stood in for a re-recording is
+gone from the five example scripts and from the thirteen replay sites in
+seven files that read it: `test_fingerprint.py`, `test_boundary.py`,
+`test_render.py`, `test_callable.py`, `test_openai_agents.py`,
+`test_pydantic_ai_replay.py` and `tools/boundary/run.py`. Each example
+runs on the shipped default again, which is the market its own recording
+was made in, and each recording names that market: `stamp_preset` wrote
+`pt-v19` on the first exchange of every run, off the running engine,
+before `save` could fall back to its default. The FinRobot recording
+carries `recorded_utc` like the other four, through the shared stamp
+above. `examples/experiments/liquidity-crisis/` keeps its `pt-v16` pin and
+the two fixtures it reads are untouched.
+
+**A re-recording is a new experiment.** The agents met a different market
+and answered it differently. The common cause is in the prompts: both
+rosters hold four names, so the derived VIX anchor opens the roster
+`callable`, `openai_agents` and `pydantic_ai` share at 24.3276 against
+pt-v18's 15.4618, and the duration roster `langgraph` and `finrobot` share
+at 21.5390 against the same 15.4618, read off the day-zero prompt in each
+fixture. `openai_agents` trades 7 times, as the pt-v18 recording did and
+against the pt-v16 recording's 3, and the market refuses one leg of its
+day-4 decision at 2.06x against the 2.00x cap where the pt-v18 run overshot
+on no step at all; the pinned values in
+`test_the_committed_recording_replays_end_to_end` move with it. `callable`
+trades 12 times, as before, and returns +1.18 per cent against +1.81.
+`pydantic_ai`'s shocked arm finishes at $10.37m against the control's
+$10.59m, holding 7.8 per cent of net worth in the longest-duration name
+against the control's 23.7, where under pt-v18 the same comparison read
+39.4 against 32.9, in the other direction. `langgraph`'s arms finish at
+$51.64m and $50.34m against $53.65m and $51.64m, the shocked arm lighter in
+every name with the largest cut in the mid-duration one rather than the
+long. `finrobot`'s shocked arm ends holding 9.9 per cent of net worth in the
+longest-duration name against the control arm's 16.2, and 62.3 per cent
+of the shortest against 29.7, the same direction as under pt-v18, where
+the long name read 16.0 against 22.0; the arms finish at $50.38m and
+$50.27m.
+
+**Two notebook passages state numbers the cells below them no longer
+print.** `openai_agents/five_days.ipynb` sets out a three-row table of
+briefs against trades, refusals and worst overshoot, and its committed row
+reads 3 trades, 1 refusal and 2.19x; the run under it now reads 7, 1 and
+2.06x. `pydantic_ai/rate_shock.ipynb` reads the shocked arm holding 20.1
+per cent of the longest-duration name against the control's 27.2, and 20.6
+against 16.8 of the shortest; the table above it now prints 7.8 against
+23.7 and 2.9 against 8.5, so the first comparison survives the boundary in
+direction and the second inverts. Both passages described the pt-v16
+recording and had already drifted from the pt-v18 one they were shipped
+beside. They are left as they stand, because rewriting a reading to match
+a fresh run is a call about what the demonstration is for.
 
 **A recording names the market it was made in.** `Transcript.meta` gains
 `model_preset`: the simulation preset's fingerprint, in the vocabulary
@@ -506,9 +552,9 @@ boundary were all one cause with no field in any artefact naming it.
 The seven committed fixtures gain the field, with no other byte changed.
 
 **Two of those seven were not recorded in the market they were assumed to
-be.** Five belong to the integration examples pinned at the last commit and
-are `pt-v18`, which their green replays prove. The two the liquidity-crisis
-study reads, `finrobot/rate-ladder.json` and
+be.** Five belong to the integration examples and are `pt-v19`, the market
+they were re-recorded in, which their green replays prove. The two the
+liquidity-crisis study reads, `finrobot/rate-ladder.json` and
 `finrobot/liquidity-crisis.json`, are `pt-v16`. Three independent readings
 agree on that: the study pins `pt-v16` and was never part of the pinning
 commit; the shipped default at the commit that recorded both files was

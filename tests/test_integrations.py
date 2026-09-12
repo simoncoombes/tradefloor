@@ -1276,11 +1276,13 @@ def test_a_recorded_null_response_is_not_diagnosed_as_missing():
 
 # -- the preset a recording was made in --------------------------------------
 
-#: The preset the five integration recordings were made under, and the one
-#: their example scripts pin. Written out here rather than read off a
-#: fixture, so a test that asserts the guard fires cannot be satisfied by a
-#: fixture that quietly changed. `FIXTURE_PRESETS` below carries the whole
-#: set, which is NOT uniform: two of the seven are pt-v16.
+#: A preset that is NOT the shipped default, standing in for the market a
+#: recording was made in when the default has since moved past it. It was
+#: the default until 0.8.0 and the five integration recordings were made
+#: under it until they were re-recorded on pt-v19. Written out here rather
+#: than read off a fixture, so a test that asserts the guard fires cannot
+#: be satisfied by a fixture that quietly changed. `FIXTURE_PRESETS` below
+#: carries what each committed recording actually names.
 #:
 #: It has to differ from the shipped default for these tests to mean
 #: anything, and it does -- the default is pt-v19. A release that made this
@@ -1325,11 +1327,12 @@ def test_re_saving_a_transcript_keeps_the_preset_it_recorded(tmp_path):
 
 
 def test_a_recording_stamps_the_engine_it_ran_on_not_the_shipped_default():
-    """The case a save-time stamp alone would get confidently wrong. Every
-    shipped integration example pins `PRESET = "pt-v18"` and re-records
-    through it, so the interesting recording is exactly the one whose market
-    is NOT the default -- and a fixture stamped "pt-v19" because that is
-    what shipped would be worse than the honest gap it replaced."""
+    """The case a save-time stamp alone would get confidently wrong. A
+    recording made against a named non-default preset -- a pinned study
+    such as `examples/experiments/liquidity-crisis/`, or any run that
+    passes `model=` -- is exactly the one whose market is NOT the default,
+    and a fixture stamped with whatever shipped would be worse than the
+    honest gap it replaced."""
     assert RECORDED_PRESET != tf.ModelParams.from_preset().fingerprint, (
         "this test is only worth running while the pin is not the default")
     recorder = ci.Transcript()
@@ -1427,28 +1430,30 @@ def test_preset_of_reads_the_engine_the_observation_carries():
 #: rather than assumed. The day-zero macro block a recording carries is a
 #: function of the preset and of nothing else on this path -- day-zero
 #: PRICES are identical across every shipped preset, so they say nothing.
-#: Four of the five pt-v18 recordings open at vix 15.4619 with inflation
-#: 0.0282 where the two pt-v16 ones open at 15.0000 and 0.0200; the fifth,
-#: `openai_agents/five-days.json`, prints no macro block at all and is
-#: dated by its replay instead.
+#: The five integration recordings open at a derived VIX where the two
+#: pt-v16 ones open at the declared 15.0000 with inflation 0.0200; one of
+#: the five, `openai_agents/five-days.json`, prints no macro block at all
+#: and is dated by its replay instead.
 #:
-#: The split was found by this change and is the reason it exists. Five of
-#: the seven belong to the integration examples pinned at `854eba5`, and
-#: the pin is what proves them: they replay green under pt-v18, which a
-#: recording made in another market could not do. The other two belong to
+#: The set is NOT uniform, so this table is written out per file. Five
+#: of the seven belong to the integration examples and were re-recorded
+#: live against pt-v19 at 0.8.0, on the shipped default rather than on a
+#: pin; each replays green under it, which a recording made in another
+#: market could not do. The other two belong to
 #: `examples/experiments/liquidity-crisis/`, which pins `PRESET = "pt-v16"`
-#: and was never part of that pinning commit. Three readings agree on the
-#: pair: that pin, the macro opening below, and `DEFAULT_PRESET_NAME` at
-#: the commit that recorded them, which was pt-v16. Backfilling all seven
-#: at pt-v18 would have written a false provenance into two of them.
+#: deliberately and is a pinned historical study rather than notebook
+#: material. Three readings agree on that pair: the pin, the macro opening
+#: below, and `DEFAULT_PRESET_NAME` at the commit that recorded them, which
+#: was pt-v16. A blanket value across all seven would write a false
+#: provenance into two of them.
 FIXTURE_PRESETS = {
-    "callable/five-days.json": "pt-v18",
+    "callable/five-days.json": "pt-v19",
     "finrobot/liquidity-crisis.json": "pt-v16",
     "finrobot/rate-ladder.json": "pt-v16",
-    "finrobot/rate-shock.json": "pt-v18",
-    "langgraph/rate-shock.json": "pt-v18",
-    "openai_agents/five-days.json": "pt-v18",
-    "pydantic_ai/rate-shock.json": "pt-v18",
+    "finrobot/rate-shock.json": "pt-v19",
+    "langgraph/rate-shock.json": "pt-v19",
+    "openai_agents/five-days.json": "pt-v19",
+    "pydantic_ai/rate-shock.json": "pt-v19",
 }
 
 
@@ -1483,9 +1488,9 @@ def test_the_day_zero_macro_dates_each_fixture_to_the_preset_it_names():
 
     That is enough to date a recording without rebuilding its market: a
     prompt opening at exactly 15.0 was recorded through pt-v16, and one
-    that does not was not. Two of the seven fixtures open at 15.0, and
-    backfilling all seven at pt-v18 would have written a false provenance
-    into both.
+    that does not was not. Two of the seven fixtures open at 15.0, and a
+    blanket value across all seven would write a false provenance into
+    both.
     """
     declared = (15.0, 0.02)
     #: The named presets that open at the declared constants. Listed rather
