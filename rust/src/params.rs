@@ -4244,8 +4244,50 @@ impl ModelParams {
         // KNOWN RESIDUAL and is not corrected here, because inflating a
         // measured coefficient to cancel a mixture is a constant
         // compensating for a mechanism.
-        p.market_vol_alpha = 0.1059;
-        p.market_vol_beta = 0.8787;
+        //
+        // THE SYMMETRIC FIT IS AN APPROXIMATION AND THE TAPE SAYS SO, so
+        // the GJR triple below replaces it rather than sitting beside it.
+        // The values here are the GJR fit's, not the GARCH(1,1) fit's.
+        p.market_vol_alpha = 0.0066;
+        p.market_vol_beta = 0.8946;
+        // THE LEVERAGE RESPONSE, at a likelihood ratio of 305 on one degree
+        // of freedom. `garch-derive-design.md` §2.4 fitted both forms to the
+        // same tape and the same window:
+        //
+        //   GARCH(1,1)  omega 0.0190  alpha 0.1059  ---           beta 0.8787  NLL 3703.97
+        //   GJR(1,1)    omega 0.0202  alpha 0.0066  gamma 0.1556  beta 0.8946  NLL 3551.49
+        //
+        // 2 * 152.5 = 305 on one degree of freedom. That note's own words:
+        // "the real index's variance responds to DOWN moves almost
+        // exclusively; the symmetric 0.1059 is the pseudo-true symmetric
+        // approximation of that." It recorded the triple and did not adopt
+        // it because `market_vol_gamma` was outside §2.2's list.
+        //
+        // WHY IT IS ADOPTED NOW. The symmetric approximation spreads a
+        // one-sided response evenly and discards most of it, and what it
+        // discards is exactly fourth moment. With it, the envelope's SHAPE
+        // panel -- the fourteen rows measured on the HELD roster, which is
+        // the protocol that certifies `excess_kurtosis` -- read 6.7284 at
+        // 504 days against a band floor of 7.1 and 13 of 14 in band. With
+        // the triple it reads **7.3005 and 14 of 14 at both horizons**. The
+        // certification protocol's varying roster read 7.2496 and hid the
+        // miss; it is not the bar for a shape row and was not used as one.
+        //
+        // AND IT DID NOT COST THE TAIL, which was the registered risk: a
+        // GJR puts variance behind down moves and `index_tail_dn3_pct`
+        // counts down moves. Measured, it IMPROVES: 1.8194 -> 1.3280 at 252
+        // and 1.5838 -> 1.5905 at 504, both in band, and the panel stays 18
+        // of 18 at both horizons on the varying roster.
+        //
+        // The fourth-moment coefficient of the GJR form (Appendix A:
+        // `3a^2 + 3ag + 1.5g^2 + 2ab + bg + b^2`) is 0.9909, under one, so
+        // the finite fourth moment the tape's coefficients bought survives
+        // the asymmetry. `component_step` loads `alpha + gamma` on a down
+        // day and `alpha` on an up one, and omega gives back `gamma/2`, so
+        // the dial redistributes variance between the two states rather
+        // than adding any -- and it passes 0.0 for the SLOW component,
+        // which is where §2.4's fit does not reach.
+        p.market_vol_gamma = 0.1556;
         p
     }
 
