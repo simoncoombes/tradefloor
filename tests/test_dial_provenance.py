@@ -475,3 +475,31 @@ def test_the_completeness_check_fires_when_a_dial_has_neither():
             pv.check()
         finally:
             pv.UNPROVENANCED = real
+
+
+def test_a_bar_beside_two_shipped_values_has_to_say_which_one_it_is_for():
+    """The bar belongs to one estimate, and the entry has to name it.
+
+    `market_vol_alpha` shipped the symmetric fit's 0.0093 (the bar for
+    0.1059, a value in no preset) beside the GJR value 0.0066: two values
+    in `presets`, one bar, nothing tying the bar to either. The presence
+    check passed it and the paste check passed it. This is the rule that
+    would have refused it, driven by the artefact itself.
+    """
+    good = pv.DIAL_PROVENANCE["market_vol_alpha"]
+    assert not pv.validate_entry("market_vol_alpha", good)
+
+    unnamed = dict(good)
+    unnamed.pop("estimate")
+    problems = pv.validate_entry("market_vol_alpha", unnamed)
+    assert any("does not say which one" in p for p in problems), problems
+
+    other_fit = dict(good, estimate=0.1059)
+    problems = pv.validate_entry("market_vol_alpha", other_fit)
+    assert any("in no shipped preset" in p for p in problems), problems
+
+    # One shipped value needs no `estimate`: the bar can only be for it.
+    single = {"kind": "measured", "presets": {"pt-v16": 1.0},
+              "source": "the tape", "date": "2026-09-05", "script": "x.py",
+              "standard_error": 0.01}
+    assert not pv.validate_entry("some_dial", single)
