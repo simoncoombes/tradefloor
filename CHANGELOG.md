@@ -513,8 +513,8 @@ $10.59m, holding 7.8 per cent of net worth in the longest-duration name
 against the control's 23.7, where under pt-v18 the same comparison read
 39.4 against 32.9, in the other direction. `langgraph`'s arms finish at
 $51.64m and $50.34m against $53.65m and $51.64m, the shocked arm lighter in
-every name with the largest cut in the mid-duration one rather than the
-long. `finrobot`'s shocked arm ends holding 9.9 per cent of net worth in the
+every name, with the largest cut falling on the mid-duration name and the
+smallest on the long one. `finrobot`'s shocked arm ends holding 9.9 per cent of net worth in the
 longest-duration name against the control arm's 16.2, and 62.3 per cent
 of the shortest against 29.7, the same direction as under pt-v18, where
 the long name read 16.0 against 22.0; the arms finish at $50.38m and
