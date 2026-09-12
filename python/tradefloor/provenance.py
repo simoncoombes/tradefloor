@@ -923,6 +923,65 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "hypercube over [0, 1] never draws zero and would survey it "
                 "permanently on",
     },
+    "crisis_blend_gain": {
+        "kind": "undetermined",
+        "presets": {"pt-v16": 0.8275881, "pt-v18": 0.8275881,
+                    "pt-v19": 0.8275881},
+        "what_would_determine_it": "Simon's adoption of the DERIVED value, "
+                                   "which is 0 with the form retired: "
+                                   "programme/crisis-blend-derivation.md and "
+                                   "programme/results/b4fix9-result.md in the "
+                                   "design repository (2026-09-12). Until "
+                                   "that ruling the shipped 0.8275881 is "
+                                   "pt-v13's search optimum, carrying eight "
+                                   "significant figures and no error bar",
+        "derivation_on_the_record": "the tape's VIX has no crisis attractor "
+                                    "(conditional drift negative in every "
+                                    "level bin above 22.5 at five and twenty "
+                                    "days; crisis spells above 30.88 have a "
+                                    "median length of two sessions); the "
+                                    "tape's cross-sectional correlation is a "
+                                    "function of realised common volatility, "
+                                    "rho = -0.366 + 0.277 log(sigma_ann%), "
+                                    "R^2 0.69, slope sd 0.025, and the VIX "
+                                    "level adds nothing once volatility is "
+                                    "in; the model's factor share of variance "
+                                    "already gives that curve with no lift "
+                                    "(thirty seeds on the held roster: slope "
+                                    "0.283, every populated bin within 0.03). "
+                                    "A loading lift keyed on the VIX level "
+                                    "feeds the identity and the VIX target "
+                                    "and gives the model's map a stable fixed "
+                                    "point at 33 to 36 that the tape does not "
+                                    "have; measured free-running, the shipped "
+                                    "model's one-day drift is +0.82 at a VIX "
+                                    "of 32.5 to 35 where the tape's is -0.35",
+        "what_the_shipped_value_costs": "years with a VIX above 60 on 18 per "
+                                        "cent of runs against the tape's 5.7 "
+                                        "per cent of years, a highest VIX of "
+                                        "120 against the tape's 82.69, days "
+                                        "above the crisis threshold 1.35 "
+                                        "times the tape's, and crisis spells "
+                                        "with a p90 of 36 sessions against "
+                                        "the tape's 13 (b4fix9 census, 120 "
+                                        "rosters)",
+        "what_the_derived_value_costs": "corr_persistence_acf1 on the held "
+                                        "roster at 504 days reads 0.1493 "
+                                        "against a floor of 0.19, and "
+                                        "abs_return_acf1 and vix_ar1_debiased "
+                                        "worsen with it: three persistence "
+                                        "rows, which the blend was buying by "
+                                        "holding the model in a crisis regime "
+                                        "the tape refutes. The deficit is "
+                                        "volatility and VIX persistence at "
+                                        "the monthly scale (VIX acf1 of "
+                                        "21-day means 0.46 against the tape's "
+                                        "0.62) and is the next derivation, "
+                                        "not a reason to keep the lift",
+        "source": "rust/src/params.rs, ModelParams::crisis_blend_gain, "
+                  "which records the value as un-derived; "
+                  "programme/crisis-blend-derivation.md sections 1 to 4",
+    },
     "vix_target_shock_cap": {
         "kind": "derived",
         "presets": {"pt-v16": 45.0, "pt-v18": 45.0, "pt-v19": 255.0},
@@ -2063,7 +2122,6 @@ UNPROVENANCED = (
     "crash_amplifier_slope",
     "crash_amplifier_threshold",
     "crisis_blend_cap",
-    "crisis_blend_gain",
     "crisis_blend_ramp",
     "crisis_blend_source",
     "crisis_vix_threshold",
