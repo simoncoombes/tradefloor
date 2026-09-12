@@ -1,4 +1,4 @@
-//! Market-maker quoting — ported from the reference implementation's
+//! Market-maker quoting, ported from the reference implementation's
 //! market-maker module.
 //!
 //! **Tier 1: zero transcendentals, zero RNG, zero imports.** Every operation
@@ -16,7 +16,7 @@
 //!
 //! The ladder is deterministic on purpose. The legacy display book randomised
 //! level sizes, so the depth a player saw was never the depth they traded
-//! against. Same shape, no randomness — displayed depth IS executable depth.
+//! against. Same shape, no randomness, so displayed depth IS executable depth.
 //!
 //! # Faithfulness notes
 //!
@@ -24,9 +24,9 @@
 //!   level. Exchanges quote on a tick grid, and rounding keeps prices there;
 //!   it also means the port must round at exactly the same points, not once
 //!   at the end.
-//! - **Sizes floor, with a minimum of 1.** `Math.floor` then `Math.max(1, …)`,
-//!   in that order — flooring a sub-1 size to 0 and then raising it is not
-//!   the same as raising then flooring.
+//! - **Sizes floor, with a minimum of 1.** `Math.floor` then
+//!   `Math.max(1, ...)`, in that order, because flooring a sub-1 size to 0 and
+//!   then raising it is not the same as raising then flooring.
 //! - **The ask is floored to `bidPrice + 0.01`**, not to fair value. A
 //!   crossed or zero-width quote is never valid, and this is what prevents
 //!   one when a collapsing fair value drives the bid into the floor.

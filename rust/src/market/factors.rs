@@ -1,4 +1,4 @@
-//! Price factors — the LIVE subset, ported from the reference
+//! Price factors, the LIVE subset, ported from the reference
 //! implementation.
 //!
 //! # Only four factors reach the price
@@ -10,7 +10,7 @@
 //! |---|---|
 //! | `company_news` | news shock into `s` |
 //! | `order_flow_impact` | the PERMANENT (information) component of flow |
-//! | `short_squeeze_effect` | forced flow — squeezes and stop cascades |
+//! | `short_squeeze_effect` | forced flow, squeezes and stop cascades |
 //! | `random_noise` | the GARCH-scaled innovation |
 //!
 //! The other ten are dead on this path, and **D7 decided they are not
@@ -23,8 +23,8 @@
 //!
 //! # Draw schedule
 //!
-//! **Exactly one normal, always** — the idiosyncratic noise term. It is taken
-//! partway through the noise computation, BEFORE `crash_amplifier` is
+//! **Exactly one normal, always**, for the idiosyncratic noise term. It is
+//! taken partway through the noise computation, BEFORE `crash_amplifier` is
 //! evaluated, and that position is contractual: the tape records draws in
 //! order, so a port that hoisted the draw to the top of the function would
 //! produce the same count and a different stream.

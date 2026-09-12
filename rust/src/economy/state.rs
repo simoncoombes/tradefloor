@@ -7,14 +7,14 @@
 //! in the reference implementation is wider; the omissions are listed in
 //! the port notes under WP3 and summarised here:
 //!
-//! - **`derived` / `computeDerivedIndicators`** — a 70-field struct that
+//! - **`derived` / `computeDerivedIndicators`** is a 70-field struct that
 //!   `updateEconomyDaily` recomputes on its last line and nothing in the
 //!   price loop reads (the surface audit §0). Verified to consume **zero** draws,
 //!   which is what makes leaving it out safe: an omission that shifted the
 //!   stream would not be an omission, it would be a divergence.
-//! - **`SECTOR_SENSITIVITIES` / `calculateSectorEconomicImpact`** — feeds
+//! - **`SECTOR_SENSITIVITIES` / `calculateSectorEconomicImpact`** feeds
 //!   only the discarded `economicImpact` factor.
-//! - **Narrative strings** — announcement text, forward guidance, shock
+//! - **Narrative strings** are announcement text, forward guidance, shock
 //!   headlines. The strings are out of scope; **the draws that select them
 //!   are not**, and are consumed here exactly where the original consumes
 //!   them.

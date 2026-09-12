@@ -1,15 +1,15 @@
-//! Fair value — Layer 2 of the stationary price decomposition.
+//! Fair value, Layer 2 of the stationary price decomposition.
 //!
 //! Ported from the reference implementation's fair-value module.
 //!
 //! # Why this module is held to a stricter standard than the rest
 //!
 //! The reference implementation's fair-value module contains **zero
-//! transcendental calls** — `Math.max` and
-//! ordinary arithmetic only. Every operation is exactly specified by IEEE-754,
-//! so unlike the mispricing path (where Chrome, Firefox and Safari disagree
-//! with each other about `Math.cos`; see the determinism notes) this
-//! module can and must be **bit-identical** to the reference implementation.
+//! transcendental calls**, `Math.max` and ordinary arithmetic only. Every
+//! operation is exactly specified by IEEE-754, so unlike the mispricing path
+//! (where Chrome, Firefox and Safari disagree with each other about
+//! `Math.cos`; see the determinism notes) this module can and must be
+//! **bit-identical** to the reference implementation.
 //!
 //! `tests/fair_value_parity.rs` therefore gates on exact equality across 250
 //! recorded cases. Any mismatch is a defect here, not a rounding disagreement.
@@ -19,8 +19,8 @@
 //! The original module comment explains the design and is worth preserving in
 //! substance: the old price layer integrated fourteen forces with no conserved
 //! quantity, which is why no amount of coefficient tuning stabilised it. Fair
-//! value is a **pure function** of current fundamentals and macro state —
-//! recomputed, never integrated — so it cannot drift from fundamentals by
+//! value is a **pure function** of current fundamentals and macro state
+//! (recomputed, never integrated), so it cannot drift from fundamentals by
 //! construction. Price is then `fairValue * exp(s)` with `s` stationary.
 //!
 //! Purity is not decoration here; it is the property the whole model rests on,

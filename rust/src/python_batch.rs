@@ -1,6 +1,6 @@
 //! Vectorised engines: one call advances N independent markets.
 //!
-//! # What this is for, and what it is not for
+//! # Scope
 //!
 //! It is for vector environments and sweeps, the shape Gymnasium's vector
 //! envs consume, and the shape a hyperparameter sweep wants.

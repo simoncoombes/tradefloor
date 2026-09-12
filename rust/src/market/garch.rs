@@ -3,7 +3,7 @@
 //! asymmetry term.
 //!
 //! **Tier 1: no transcendentals, no RNG.** A handful of multiplies, one
-//! sign compare, a clamp, and a lookup — held to bit-parity.
+//! sign compare, a clamp, and a lookup, held to bit-parity.
 //!
 //! # What GARCH is doing here
 //!
@@ -12,7 +12,7 @@
 //! rather than uniform noise. `ALPHA` is how much yesterday's surprise feeds
 //! through; `BETA` is how much of yesterday's volatility persists; `GAMMA`
 //! is how much MORE a negative surprise feeds through than a positive one
-//! of the same size — the leverage effect, which real equities have and a
+//! of the same size, the leverage effect, which real equities have and a
 //! symmetric GARCH structurally cannot (the return enters squared, so its
 //! sign is destroyed; design finding 8, CALIBRATION.md §3.5). The effective
 //! persistence is `ALPHA + BETA + GAMMA/2`, the asymmetry term being live on
@@ -29,7 +29,7 @@
 //! three eras after it stopped being true, and the test that would have
 //! caught it asserts on these constants rather than on a preset.
 //!
-//! GJR (Glosten–Jagannathan–Runkle) rather than EGARCH, deliberately:
+//! GJR (Glosten-Jagannathan-Runkle) rather than EGARCH, deliberately:
 //! EGARCH's log-variance form needs `exp`/`log` per name per day, which
 //! would drag the volatility process out of Tier 1 and into the bit-parity
 //! budget. GJR is a compare and a multiply.
@@ -38,17 +38,17 @@
 //!
 //! `updateGarchVariance` tries WASM first and falls back to this arithmetic.
 //! `WASM-ORACLE.md` §3 establishes the two agree on all reachable inputs, and
-//! decisions D1–D3 already settled that the new era takes the JS side where
-//! they differ. There is no WASM in this crate, so the fallback is simply
-//! what the function is — with one deliberate divergence: the reference has
-//! no `GAMMA` term. The term is written as a guarded `+=` AFTER the
-//! reference's three-term sum, never folded into it, so that at `GAMMA = 0`
-//! the arithmetic is bit-identical to the reference form (floating-point
-//! addition is not associative; a re-associated four-term sum would change
-//! every trajectory even at zero). The shipped `GAMMA` is nonzero — an era
-//! decision, calibrated by `tools/calibration/sweep_gjr_gamma.py` — and the
-//! zero-`GAMMA` bit-identity is what keeps the term revisitable without
-//! re-litigating the structure.
+//! decisions D1 to D3 already settled that the new era takes the JS side
+//! where they differ. There is no WASM in this crate, so the fallback is
+//! simply what the function is, with one deliberate divergence: the
+//! reference has no `GAMMA` term. The term is written as a guarded `+=` AFTER
+//! the reference's three-term sum, never folded into it, so that at
+//! `GAMMA = 0` the arithmetic is bit-identical to the reference form
+//! (floating-point addition is not associative; a re-associated four-term sum
+//! would change every trajectory even at zero). The shipped `GAMMA` is
+//! nonzero (an era decision, calibrated by
+//! `tools/calibration/sweep_gjr_gamma.py`) and the zero-`GAMMA` bit-identity
+//! is what keeps the term revisitable without re-litigating the structure.
 
 use crate::mathx;
 

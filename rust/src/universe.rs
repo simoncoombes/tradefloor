@@ -17,9 +17,9 @@
 //! # These ranges are editorial, and say so
 //!
 //! Unlike the sector anchors, nothing here is pinned by a golden vector. They
-//! are chosen to produce a *plausible* cross-section — a spread of market
+//! are chosen to produce a *plausible* cross-section (a spread of market
 //! caps, P/E ratios near each sector's anchor, loss-makers among the
-//! growth names — rather than uniform noise, which would make every study run
+//! growth names) rather than uniform noise, which would make every study run
 //! on a market that looks nothing like one.
 //!
 //! What IS guaranteed is determinism: the same `(n, seed)` gives the same

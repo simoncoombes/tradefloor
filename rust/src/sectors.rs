@@ -21,8 +21,8 @@
 //!
 //! # Order is contractual
 //!
-//! Sectors iterate in the declared order below — `technology` through
-//! `transportation` — because draw schedules depend on it. This is the order
+//! Sectors iterate in the declared order below (`technology` through
+//! `transportation`) because draw schedules depend on it. This is the order
 //! in the reference implementation's `SECTOR_CONFIGS` literal. A `HashMap` here would be a
 //! correctness bug, not a style choice, which is why it is a fixed array.
 

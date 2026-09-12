@@ -1001,12 +1001,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "macro_burn_in_days": {
         # THE SOURCE CLAIMS A MEASUREMENT AND SHIPS NO ERROR BAR. The
-        # docstring reads "The length is measured -- 755 is the day the
-        # last field enters one stationary standard deviation of its mean
-        # and stays there", with unemployment at 119 days, inflation 419
-        # and the ten-year 705. No script, no date, and no dispersion: the
-        # day a field enters a band is a random variable, and one path's
-        # value for it is one draw.
+        # docstring's "The length is measured" section says 755 is the day
+        # the last field enters one stationary standard deviation of its
+        # mean and stays there, with unemployment at 119 days, inflation
+        # 419 and the ten-year 705. No script, no date, and no dispersion:
+        # the day a field enters a band is a random variable, and one
+        # path's value for it is one draw.
         #
         # Under this schema that is not a measurement, and the refusal is
         # the point. Charter 3.2 reaches the same place from the other
@@ -1030,10 +1030,10 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "source_claims_a_measurement_without_an_error_bar": True,
     },
     "market_beta_down_asym": {
-        # The dial's own docstring reads "0.0 -- every shipped preset -- is
-        # bit-identical", and pt-v16 and pt-v18 both ship 0.025. Verified
-        # 2026-09-05. So the sentence that would BE the derivation is about
-        # a value the default does not use.
+        # The dial's own docstring calls 0.0 bit-identical and says that is
+        # what every shipped preset uses, but pt-v16 and pt-v18 both ship
+        # 0.025. Verified 2026-09-05. So the sentence that would BE the
+        # derivation is about a value the default does not use.
         "kind": "undetermined",
         "presets": {"pt-v16": 0.025, "pt-v18": 0.025, "pt-v19": 0.025},
         "what_would_determine_it": "a daily-scale measurement of what 0.025 "

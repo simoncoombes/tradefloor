@@ -20,7 +20,8 @@
 //! whole simulated market has drifted apart.
 //!
 //! Fixes belong upstream in the reference implementation first, where the
-//! existing test suite can catch them — then they arrive here as an ordinary re-port.
+//! existing test suite can catch them. They then arrive here as an ordinary
+//! re-port.
 
 // `!(x > 0.0)` rather than `x <= 0.0` is a deliberate, load-bearing idiom
 // throughout this crate: the negated form also rejects NaN, and it is how the

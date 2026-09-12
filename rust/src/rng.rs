@@ -1,6 +1,6 @@
 //! PCG32, ported from the reference implementation.
 //!
-//! # What this is a port of, and why it can be exact
+//! # An exact port of the integer core
 //!
 //! The reference implementation emulates a 64-bit PCG32 using pairs of 32-bit
 //! integers, because its bitwise operators are 32-bit (`Math.imul`, `>>> 0`).
@@ -13,7 +13,7 @@
 //! than a hope. This is the one part of the whole engine port where that is
 //! true.
 //!
-//! # It applies to the integer core ONLY — measured
+//! # The measured exception for `next_normal`
 //!
 //! An earlier version of this file, and several summaries of it, described the
 //! RNG port as bit-identical without qualification. That is **false for
@@ -28,9 +28,9 @@
 //! Measured across all 60,000 recorded draws in `prng-normals.json` by
 //! `tests/prng_normals_full.rs`. **The first divergence is at draw 12.**
 //!
-//! `reference_parity_smoke.rs` checks six normals and passes — it stops six draws
-//! short of the first mismatch. A test can pass because it is too small, and
-//! this is what that looks like.
+//! `reference_parity_smoke.rs` checks six normals and passes, stopping six
+//! draws short of the first mismatch. A test can pass because it is too
+//! small, and this is what that looks like.
 //!
 //! The divergence is not a defect: it is the same finding as
 //! the determinism notes, since Box-Muller routes through `cos` and
@@ -57,8 +57,8 @@
 //!
 //! # Why this crate does not use `std` for maths
 //!
-//! Rust's `f64::cos` delegates to the platform libm — MSVC's CRT on Windows,
-//! glibc on Linux, Apple's on macOS. The `libm` crate is a pure-Rust port of
+//! Rust's `f64::cos` delegates to the platform libm (MSVC's CRT on Windows,
+//! glibc on Linux, Apple's on macOS). The `libm` crate is a pure-Rust port of
 //! MUSL's, which shares fdlibm ancestry with V8's implementation, and it
 //! reproduces V8 exactly on the case that failed.
 //!
@@ -68,7 +68,7 @@
 //! 2. **Determinism across platforms.** With `std`, the same Python wheel
 //!    would produce different numbers on Linux and Windows. For a library
 //!    whose entire selling point is reproducible markets, that is disqualifying
-//!    on its own — this crate would need to vendor its maths even if V8 parity
+//!    on its own. This crate would need to vendor its maths even if V8 parity
 //!    were not a goal.
 //!
 //! So: no `std` transcendentals anywhere in this crate. Everything routes

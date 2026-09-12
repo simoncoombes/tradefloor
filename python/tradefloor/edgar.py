@@ -260,7 +260,7 @@ the macro must be. Otherwise every company starts mispriced by the
     # `fair_value`'s own signature was built for this: its
     # `neutral_discount_rate` argument documents that a caller recomputing a
     # run's fair value passes that run's own rate. This is that caller.
-    from . import ModelParams              # noqa: PLC0415 -- circular at import
+    from . import ModelParams              # noqa: PLC0415 (circular at import)
     params = (model if isinstance(model, ModelParams)
               else ModelParams.from_preset() if model is None
               else ModelParams.from_preset(model))

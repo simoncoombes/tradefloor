@@ -1,15 +1,15 @@
-//! Economy — the price-relevant chain, ported from the reference
+//! Economy, the price-relevant chain, ported from the reference
 //! implementation.
 //!
 //! # Scope
 //!
 //! The reference implementation's economy module is 2,221 lines; roughly
-//! 1,250 of them are on the price path. What the price loop actually needs is four scalars —
-//! `corporate_bond_yield` (falling back to `federal_funds_rate`),
-//! `qe_pe_boost` and `vix` — but producing them requires most of the daily
-//! macro step: the Taylor rule needs inflation and unemployment, which need
-//! Phillips and Okun, which need the GDP cycle. So the CHAIN is in scope even
-//! though the indicator fan-out is not.
+//! 1,250 of them are on the price path. What the price loop actually needs
+//! is four scalars, `corporate_bond_yield` (falling back to
+//! `federal_funds_rate`), `qe_pe_boost` and `vix`, but producing them
+//! requires most of the daily macro step: the Taylor rule needs inflation and
+//! unemployment, which need Phillips and Okun, which need the GDP cycle. So
+//! the CHAIN is in scope even though the indicator fan-out is not.
 //!
 //! Deliberately **not** ported, each for a stated reason:
 //!
@@ -17,14 +17,14 @@
 //! |---|---|
 //! | `computeDerivedIndicators` (70 fields) | Not on the price-critical path (the surface audit §0). Verified to consume **zero draws**, which is what makes the omission invisible to the shared stream. |
 //! | `SECTOR_SENSITIVITIES`, `calculateSectorEconomicImpact` | Feeds only the discarded `economicImpact` factor. |
-//! | `generateEconomicDataRelease`, `generateMonthlyEconomicShock`, `generateSurpriseShock` | Narrative generators. They DO draw, but they are not called from the daily chain — the caller invokes them separately, so they belong to WP5's assembly, not here. |
+//! | `generateEconomicDataRelease`, `generateMonthlyEconomicShock`, `generateSurpriseShock` | Narrative generators. They DO draw, but they are not called from the daily chain. The caller invokes them separately, so they belong to WP5's assembly, not here. |
 //! | Announcement / headline / guidance strings | Narrative. **The draws that select them are ported**; see [`central_bank`]. |
 //!
 //! # WASM is absent by construction
 //!
 //! Every `isWasmEconomyReady()` branch resolves to the JS side, per decisions
-//! D1–D3 and D5 in the port notes. Those branches are not
-//! ported as runtime conditionals — there is no WASM here to be ready — so
+//! D1 to D3 and D5 in the port notes. Those branches are not
+//! ported as runtime conditionals (there is no WASM here to be ready), so
 //! the JS formula is inlined and the decision recorded at each site.
 //!
 //! `wasmCalculateVixTarget` is imported by the economy module and never

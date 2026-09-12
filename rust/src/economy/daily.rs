@@ -4,7 +4,7 @@
 //!
 //! This function is saturated with draws and the count is **state
 //! dependent**. Getting the values right while taking one draw too many or
-//! too few is not a partial success — the stream is shared with the whole
+//! too few is not a partial success. The stream is shared with the whole
 //! engine, so every later consumer on that day receives different numbers and
 //! the simulation diverges for a reason that has nothing to do with the
 //! economy.
@@ -19,23 +19,23 @@
 //!
 //! | When | Draws |
 //! |---|---|
-//! | Every day | **9 normals** — oil inventory, oil price, gold, copper, USD, trade balance, VIX, 10Y, fear/greed |
-//! | Phase just changed (ANY phase) | +1 **uniform** — the GDP shock, drawn even when discarded |
+//! | Every day | **9 normals**, oil inventory, oil price, gold, copper, USD, trade balance, VIX, 10Y, fear/greed |
+//! | Phase just changed (ANY phase) | +1 **uniform**, the GDP shock, drawn even when discarded |
 //! | Quarter start | +1 normal (GDP growth) |
-//! | Month start | +8 normals — GDP drift, unemployment, jobs, inflation, consumer confidence, business confidence, housing, home starts |
+//! | Month start | +8 normals, GDP drift, unemployment, jobs, inflation, consumer confidence, business confidence, housing, home starts |
 //! | OPEC decision day | +1 to +3 uniforms, branch-dependent |
 //!
 //! The 10Y normal is **D5, decided**: keep it. Production takes zero draws
-//! there, but only because `??` short-circuits when WASM returns a value —
+//! there, but only because `??` short-circuits when WASM returns a value,
 //! an artefact of evaluation order, not a modelling choice. See
 //! the port notes.
 //!
 //! # WASM is absent by construction
 //!
 //! Every `isWasmEconomyReady()` branch in the original resolves to the JS
-//! side here, per decisions D1–D3. Those branches are not ported as runtime
-//! conditionals — there is no WASM in this crate to be ready — so the JS
-//! formula is inlined directly and the decision is recorded at each site.
+//! side here, per decisions D1 to D3. Those branches are not ported as
+//! runtime conditionals (there is no WASM in this crate to be ready), so the
+//! JS formula is inlined directly and the decision is recorded at each site.
 
 use super::state::*;
 use crate::mathx::{self, clamp_via_min_max as clamp};

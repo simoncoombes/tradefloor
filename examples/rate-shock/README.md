@@ -201,6 +201,36 @@ Twenty days later the two markets are apart, in the same order:
 
 And the two books:
 
+<!-- DOCS-0.8.0 PLACEHOLDER. The block below has no provenance and no test,
+     and it does not balance.
+
+     counterfactual.py reads the default preset through
+     tf.ModelParams.from_preset() with no argument, so this market is
+     whatever the default is. The default moved to pt-v18 at 0.7.0 and to
+     pt-v19 at 0.8.0, and every price moved with it. This README names no
+     preset, no version and no date, so there is no way to tell which market
+     produced these figures.
+
+     tests/test_rate_shock_demo.py asserts the structure (the nine checks,
+     the intervention being the only difference, the rerun, the agent
+     cutting risk) and never the printed dollars. The integration table in
+     examples/integrations/README.md is asserted by
+     test_integration_examples.py, which is why that one was caught going
+     stale and this one was not.
+
+     The book is long-only: the agent's weights are a positive tilt,
+     Portfolio.gross_exposure sums absolute position values and leverage is
+     gross over equity, so equity = cash / (1 - leverage). That gives a
+     control NAV of $50,263,857 and a shocked NAV of $54,392,017. Both arms
+     fork from one book, so the difference must equal the difference in P&L
+     since the fork, which is $476,320. It is $4,128,160, leaving
+     $3,651,840 unaccounted for. These figures cannot all come from one run
+     of the current code.
+
+     Re-run counterfactual.py on the shipped preset, paste the block, state
+     the preset and version beside it, and assert it the way the
+     integrations table is asserted. -->
+
 ```
                                     control          +200bps
   final gross exposure                0.93x            0.37x

@@ -1,11 +1,11 @@
 //! Arrow record batches, behind the `python` feature.
 //!
-//! # Why Arrow rather than returning arrays
+//! # Arrow rather than arrays
 //!
 //! One seed at tick grain for 100 names over a trading year is roughly 9.8
 //! million rows per table. Returning that as Python objects is not slow, it is
-//! unusable. Returning it as raw bytes — which is what this package did before
-//! — is usable but leaves the consumer to reconstruct types, names and null
+//! unusable. Returning it as raw bytes (which is what this package did before)
+//! is usable but leaves the consumer to reconstruct types, names and null
 //! masks by hand, and gets no further than NumPy.
 //!
 //! Arrow record batches handed over through the **C Data Interface** reach
@@ -18,7 +18,7 @@
 //! Every numeric column is `Float64`. There is no f32 option and there will
 //! not be one. Bit-exactness is the product: the known-answer gate hashes
 //! these buffers, and a half-precision "memory-saving" variant would be a
-//! different market that happens to plot the same — a silent parity-breaking
+//! different market that happens to plot the same, a silent parity-breaking
 //! switch sitting in the public API.
 //!
 //! Identifiers are the exception, and are integers rather than strings:

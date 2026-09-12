@@ -1,4 +1,4 @@
-//! The deterministic maths layer — Phase 1.
+//! The deterministic maths layer, Phase 1.
 //!
 //! **Every transcendental in this crate goes through this module.** Nothing
 //! else may call `f64::exp`, `f64::ln`, `f64::powf`, `f64::sin` or `f64::cos`
@@ -18,7 +18,7 @@
 //! the reference implementation requires the maths to agree exactly.
 //!
 //! **2. Determinism across platforms.** `std`'s float maths delegates to the
-//! platform libm — MSVC's CRT on Windows, glibc on Linux, Apple's on macOS.
+//! platform libm (MSVC's CRT on Windows, glibc on Linux, Apple's on macOS).
 //! They do not agree with each other. A Python wheel built on `std` would
 //! therefore produce *different markets on different operating systems*, which
 //! for a library whose entire premise is reproducible backtests is

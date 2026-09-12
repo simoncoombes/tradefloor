@@ -1,11 +1,11 @@
-//! The runtime parameter seam — `ModelParams`, the settable half of the
+//! `ModelParams`, the runtime parameter seam and the settable half of the
 //! model preset (CALIBRATION.md §5, PYTHON-API-DESIGN.md §3).
 //!
 //! # What this is
 //!
 //! The model's coefficients as a value instead of a rebuild. Every constant
-//! in the live dynamics chain — the tick loop, the per-name GARCH close, the
-//! market factor's variance process — is carried here as a plain `f64`, and
+//! in the live dynamics chain (the tick loop, the per-name GARCH close, the
+//! market factor's variance process) is carried here as a plain `f64`, and
 //! the engine reads the field where it used to read the `pub const`. The
 //! constants themselves REMAIN, as the definition of the shipped preset:
 //! [`PT_V1`] is built from them, so every existing test asserting a constant
@@ -18,39 +18,39 @@
 //! arithmetic: same values, same operations, same order. Rust neither
 //! reassociates nor contracts floating point under any default profile, and
 //! this crate additionally bans `mul_add` and non-`mathx` transcendentals.
-//! The one hazard §5.3 names — a `const` deriving another — is handled by
+//! The one hazard §5.3 names (a `const` deriving another) is handled by
 //! deriving once, in the constructor: the circuit-breaker band multipliers
 //! ([`ModelParams::breaker_up`]/[`ModelParams::breaker_down`]) are computed
 //! when the params are built, never per call site. The acceptance gate is
 //! trajectory equality: an engine built from `PT_V1` must reproduce the
-//! const build's known-answer digest bit for bit, and does — see
+//! const build's known-answer digest bit for bit, and does. See
 //! `tests/test_model_params.py`.
 //!
 //! # Membership (§5.2), drawn here
 //!
 //! Four classes, and the draw-schedule rule above all: **nothing settable
 //! may change how many draws are taken or in what order.** A preset changes
-//! what the draws are multiplied into, never the schedule — that is what
+//! what the draws are multiplied into, never the schedule, which is what
 //! keeps every preset comparable under common random numbers and replayable
 //! against order logs.
 //!
-//! 1. **Settable** — the live dynamics numbers ([`settable_names`]): the searched
-//!    surface (both variance processes, the factor sigmas and their scale,
-//!    the mispricing dynamics) plus the guards that live in the threaded
-//!    chain (the mispricing cap, the crowd lean cap, the price breaker and
-//!    hard cap). Guards are settable but excluded from any *search* — a
-//!    loss that can widen a breaker to buy kurtosis will do so; that
-//!    exclusion lives in the search configuration, not here, because "you
-//!    may not change the model" was never the rule. "A changed model has a
-//!    different name" is.
-//! 2. **Derived bits** — `mispricing_phi` and `s_phi_tick` are carried as
+//! 1. **Settable.** The live dynamics numbers ([`settable_names`]): the
+//!    searched surface (both variance processes, the factor sigmas and their
+//!    scale, the mispricing dynamics) plus the guards that live in the
+//!    threaded chain (the mispricing cap, the crowd lean cap, the price
+//!    breaker and hard cap). Guards are settable but excluded from any
+//!    *search*, because a loss that can widen a breaker to buy kurtosis will
+//!    do so; that exclusion lives in the search configuration, not here,
+//!    because "you may not change the model" was never the rule. "A changed
+//!    model has a different name" is.
+//! 2. **Derived bits.** `mispricing_phi` and `s_phi_tick` are carried as
 //!    V8's recorded bits and are never set directly. Overriding
 //!    `mispricing_half_life_days` recomputes both via `mathx::pow`,
 //!    documented as deterministic-but-not-bit-identical to any recorded
 //!    constant (API §3's verbatim policy). An override equal to the shipped
-//!    half-life keeps the recorded bits — sameness of value must mean
+//!    half-life keeps the recorded bits, because sameness of value must mean
 //!    sameness of bits.
-//! 3. **Carried, read-only** — the rest of Appendix A's preset surface:
+//! 3. **Carried, read-only.** The rest of Appendix A's preset surface:
 //!    fair-value coefficients, the economy's daily-chain constants, the
 //!    book geometry, the sector sigma table, `daily_shock_cap` and
 //!    `crisis_vix_threshold`. Visible in the dict and covered by the
@@ -58,19 +58,19 @@
 //!    threaded through their call sites, and accepting an override the
 //!    engine would ignore is exactly the fingerprint lie this type exists
 //!    to make impossible. They become settable when their chains are
-//!    threaded (the "+2–3 days" half of §5.3's estimate).
-//! 4. **Excluded outright** — the draw-schedule surface: market hours, the
+//!    threaded (the "+2 to 3 days" half of §5.3's estimate).
+//! 4. **Excluded outright.** The draw-schedule surface: market hours, the
 //!    390 tick base, the calendar constants (`DAYS_PER_MONTH`,
 //!    `OIL_OPEC_INTERVAL`), the sector key set and order, the
 //!    `ReferenceEma` tape-parity trio, `ANNOUNCEMENT_VARIANTS`, and the
 //!    dead `MEAN_REVERSION_*` pair. Not in the dict at all: they are the
-//!    schedule, the time base, or parity plumbing — a different model, not
-//!    a tuning parameter.
+//!    schedule, the time base, or parity plumbing, which is a different
+//!    model rather than a tuning parameter.
 //!
 //! # The fingerprint
 //!
 //! First 8 hex chars of sha256 over the canonical serialisation: parameter
-//! names sorted, values as big-endian IEEE-754 bit patterns — the
+//! names sorted, values as big-endian IEEE-754 bit patterns, the
 //! known-answer convention, because decimals differ for reasons that are
 //! not the model. A `ModelParams` bit-identical to a shipped preset
 //! fingerprints as that preset's NAME; anything else is `custom-XXXXXXXX`.

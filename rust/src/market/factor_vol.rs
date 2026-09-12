@@ -1,4 +1,4 @@
-//! Conditional volatility for the SHARED market factor — the structural
+//! Conditional volatility for the SHARED market factor, the structural
 //! change finding 14 named, and the escape from the trade it measured.
 //!
 //! # Why the factor needs its own variance process
@@ -8,8 +8,8 @@
 //! variance, and every point of share it took both Gaussian-diluted the
 //! fat tails the per-name GARCH produces and added to total volatility.
 //! The eight-point sweep behind finding 14 proved the real correlation
-//! band (0.25–0.35) unreachable by that constant at any value: the band
-//! arrives only at sigma ≈ 0.021, where excess kurtosis has collapsed to
+//! band (0.25 to 0.35) unreachable by that constant at any value: the band
+//! arrives only at sigma near 0.021, where excess kurtosis has collapsed to
 //! 1.26 against a band floor of 3. Correlation was being bought with
 //! kurtosis at a fixed rate.
 //!
@@ -28,11 +28,11 @@
 //!
 //! Measured at the shipped constants (six-seed medians, the published
 //! method, committed in `tools/calibration/results/market-factor-vol-*`):
-//! cross-sectional correlation **0.260** and excess kurtosis **3.14** —
-//! both inside their real bands for the first time in this model's
-//! history — with volatility clustering 0.245 (in band), pooled
+//! cross-sectional correlation **0.260** and excess kurtosis **3.14**
+//! (both inside their real bands for the first time in this model's
+//! history), with volatility clustering 0.245 (in band), pooled
 //! volatility 41.8% (down from 48.3%), and the leverage effect intact at
-//! −0.094. The constant-sigma sweep bought correlation 0.089 at the same
+//! -0.094. The constant-sigma sweep bought correlation 0.089 at the same
 //! kurtosis floor; the process does not move along that curve, it
 //! dissolves it.
 //!
@@ -42,15 +42,15 @@
 //! reverting to the baseline [`MARKET_FACTOR_SIGMA`]²:
 //!
 //! ```text
-//! v' = (1 − α − β)·target + α·ε² + β·v      then clamped to
+//! v' = (1 - α - β)·target + α·ε² + β·v      then clamped to
 //!      [FLOOR_MULTIPLE·base, CEILING_MULTIPLE·base]
 //! ```
 //!
-//! where ε is the day's accumulated market factor — the sum of the tick
+//! where ε is the day's accumulated market factor (the sum of the tick
 //! draws, whose conditional variance over a 390-tick session is exactly
-//! `v` — and `target` is the baseline variance scaled by (VIX/anchor)²:
+//! `v`), and `target` is the baseline variance scaled by (VIX/anchor)²:
 //! VIX read as the factor's implied volatility, per
-//! [`MARKET_VOL_VIX_COUPLING`]. The coupling ships ON (1.0) — the era
+//! [`MARKET_VOL_VIX_COUPLING`]. The coupling ships ON (1.0), the era
 //! decision that closed finding 6's open question; the constant's doc
 //! carries the measurement and the argument.
 //!
@@ -58,37 +58,37 @@
 //!
 //! The state is a function of values already drawn (the tick's market
 //! factor, accumulated) and of macro state already evolved (VIX, when
-//! coupled). The market stream's schedule — 1 normal per tick for the
-//! factor, drawn in `simulate_market_tick` — is untouched in count, kind
+//! coupled). The market stream's schedule (1 normal per tick for the
+//! factor, drawn in `simulate_market_tick`) is untouched in count, kind
 //! and position. This is the same trick the per-name GARCH uses in
 //! `daily.rs`, and it is what keeps the 2026-08 stream split's alignment
 //! guarantee intact: the schedule remains a pure function of (status,
 //! active set, sector count).
 //!
-//! # Stationarity, with the arithmetic — and one condition knowingly traded
+//! # Stationarity and the one condition knowingly traded
 //!
 //! - **Mean reversion / covariance stationarity of the recursion**:
 //!   α + β = 0.45 + 0.5 = 0.95 < 1. The unclamped process reverts to the
-//!   target with a shock half-life of ln(2)/ln(1/0.95) ≈ 13.5 days —
-//!   volatile stretches are two-to-five-week regimes, several per year.
+//!   target with a shock half-life of ln(2)/ln(1/0.95), about 13.5 days.
+//!   Volatile stretches are two-to-five-week regimes, several per year.
 //! - **Boundedness**: the clamp confines the state to
 //!   [0.05·base, 8·base] absolutely, so every moment of the SHIPPED
 //!   process exists trivially, and the quiet-run fixed point
-//!   ω/(1−β) = 0.1·base sits ABOVE the floor — the floor is unreachable
-//!   from any admissible state (v' ≥ ω + β·floor = 0.075·base) and is a
+//!   ω/(1-β) = 0.1·base sits ABOVE the floor. The floor is unreachable
+//!   from any admissible state (v' >= ω + β·floor = 0.075·base) and is a
 //!   pure worst-case guarantee, not a regime the process lives in.
 //! - **The condition deliberately not satisfied**: the unclamped fourth-
-//!   moment condition (α+β)² + 2α² < 1 evaluates to 0.9025 + 0.405 =
-//!   1.31 — violated, so the UNCLAMPED factor's kurtosis would diverge;
+//!   moment condition (α+β)² + 2α² < 1 evaluates to 0.9025 + 0.405 = 1.31,
+//!   which violates it, so the UNCLAMPED factor's kurtosis would diverge;
 //!   the ceiling is load-bearing for the fourth moment, and it does bind
-//!   in bursts at these parameters (a 2σ day from twice-baseline variance
-//!   reaches it in two steps). This is a measured trade, not an
+//!   in bursts at these parameters (a 2 sigma day from twice-baseline
+//!   variance reaches it in two steps). This is a measured trade, not an
 //!   oversight: the realism panel measures ONE 252-day window, the factor
 //!   is one shared path per seed, and every parameterisation satisfying
 //!   the fourth-moment condition was measured to deliver a median
-//!   one-year SAMPLE kurtosis of at most ~1.7 (α 0.15–0.25 at
-//!   persistence 0.95–0.985, ceilings 5–20, standalone recursion over 300
-//!   windows) — the asymptotic tails such processes do have live at
+//!   one-year SAMPLE kurtosis of at most ~1.7 (α 0.15 to 0.25 at
+//!   persistence 0.95 to 0.985, ceilings 5 to 20, standalone recursion over
+//!   300 windows), and the asymptotic tails such processes do have live at
 //!   horizons the panel cannot see. The shipped α trades asymptotic
 //!   niceness for tails that EXIST in the year being measured, and the
 //!   clamp supplies the boundedness the dropped condition used to.
@@ -104,7 +104,7 @@
 //!
 //! Multiplies, adds, one `mathx::max`/`min` pair, and a `sqrt`
 //! (IEEE-exact on every platform) at the day boundary. No
-//! transcendentals, no RNG — the same discipline as `garch.rs`, and the
+//! transcendentals, no RNG, the same discipline as `garch.rs`, and the
 //! reason GARCH was chosen over an EGARCH/log-variance form, which would
 //! have dragged `exp`/`log` into the daily state chain.
 

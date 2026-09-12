@@ -1,4 +1,4 @@
-//! Microstructure — ported from the reference implementation.
+//! Microstructure, ported from the reference implementation.
 //!
 //! One spread model, one book, shared by display and execution. The
 //! reference-implementation header explains why that matters and is not repeated here; what
@@ -10,15 +10,15 @@
 //! including [`build_live_book`] is a pure function of its inputs and is held
 //! to bit-identical parity. [`settle_price_through_book`] additionally draws
 //! from the seeded generator, so its parity is conditional on the draw
-//! schedule matching exactly — see below.
+//! schedule matching exactly. See below.
 //!
-//! # The draw schedule is load-bearing
+//! # The four-or-zero draw schedule
 //!
 //! `settle_price_through_book` consumes **exactly four uniform draws, or
 //! exactly zero. Never any other number.** Four when it reaches the flow
-//! loop, zero when any guard returns early — and every guard sits *before*
-//! the loop except the final "nothing traded" check, which runs after all
-//! four draws are already spent.
+//! loop, zero when any guard returns early. Every guard sits *before* the
+//! loop except the final "nothing traded" check, which runs after all four
+//! draws are already spent.
 //!
 //! This is not an implementation detail that happens to be true. The
 //! generator is a single shared stream: every company settling on every tick
@@ -36,7 +36,7 @@
 //! and `market::SettleDrawPolicy::FourOrZero` preserves it. The engine's
 //! own generated schedule pre-draws the four uniforms unconditionally
 //! (`FourAlways`) and serves this function from the buffer, so the market
-//! stream's position cannot depend on which guard fired — an early return
+//! stream's position cannot depend on which guard fired. An early return
 //! leaves drawn values unused rather than draws untaken. This function's
 //! own contract is unchanged either way.
 //!
@@ -59,7 +59,7 @@
 //! # Faithfulness notes
 //!
 //! - **`||` is not `??`.** `baseQuoteSize` falls through a chain of `||`, so
-//!   a volume of exactly zero — or a NaN — moves to the next candidate. A
+//!   a volume of exactly zero (or a NaN) moves to the next candidate. A
 //!   port using "if present" semantics would stop at a real zero and quote a
 //!   one-share book. `makerInventory` and `shortInterest`, by contrast, use
 //!   `??`, where a real zero must be kept. The distinction is preserved per

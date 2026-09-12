@@ -5,18 +5,18 @@
 //!
 //! Four phases, and the boundaries between them matter:
 //!
-//! 1. **Factors** — per company, compute the four live shock factors. Takes
+//! 1. **Factors.** Per company, compute the four live shock factors. Takes
 //!    one normal and one uniform per company. The uniform is *stashed*, not
 //!    used: it is consumed in phase 3.
-//! 2. **Price** — the `s`-process, then `price = fairValue × exp(s)`, then the
+//! 2. **Price.** The `s`-process, then `price = fairValue * exp(s)`, then the
 //!    circuit breaker on the MODEL price.
-//! 3. **Volume** — consumes the uniforms stashed in phase 1.
-//! 4. **Settlement** — the book decides what actually printed, then the
+//! 3. **Volume.** Consumes the uniforms stashed in phase 1.
+//! 4. **Settlement.** The book decides what actually printed, then the
 //!    breaker is applied again to the PRINT.
 //!
 //! The phase-1 uniform being consumed two phases later is the trap here. A
 //! port that drew it in phase 3, where it is used, would produce identical
-//! counts and a completely different stream — the same class of mistake as
+//! counts and a completely different stream, the same class of mistake as
 //! WP3's object-literal draw.
 //!
 //! # The factor model moves fair value OR price, never both

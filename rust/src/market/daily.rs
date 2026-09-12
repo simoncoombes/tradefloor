@@ -8,11 +8,11 @@
 //! mistake for store plumbing. They are not. Two of them are what make the
 //! `s`-process and GARCH behave across DAYS rather than within one:
 //!
-//! - **The momentum roll.** `mispricingMomentum = s − sPrevClose`, then
-//!   `sPrevClose = s`. Yesterday's re-rating becomes today's herding input —
-//!   the `θ` term in the AR(2). Without it `MOMENTUM_THETA` multiplies a value
-//!   that never changes, the process collapses to AR(1), and every claim in
-//!   `mispricing.rs` about the characteristic roots stops applying.
+//! - **The momentum roll.** `mispricingMomentum = s - sPrevClose`, then
+//!   `sPrevClose = s`. Yesterday's re-rating becomes today's herding input,
+//!   the `theta` term in the AR(2). Without it `MOMENTUM_THETA` multiplies a
+//!   value that never changes, the process collapses to AR(1), and every
+//!   claim in `mispricing.rs` about the characteristic roots stops applying.
 //! - **The GARCH innovation.** The variance update is fed the day's
 //!   accumulated `randomNoise`, NOT the day's total return. Those differ:
 //!   the total return includes fair-value moves, and feeding those back into
@@ -26,7 +26,7 @@
 //!
 //! **Zero.** Every function here is a pure state transition. That is worth
 //! asserting rather than assuming, because a draw hidden in the close would
-//! desynchronise the stream once per simulated day — slowly enough to look
+//! desynchronise the stream once per simulated day, slowly enough to look
 //! like a modelling difference rather than a bug.
 
 use super::tick::TickCompany;

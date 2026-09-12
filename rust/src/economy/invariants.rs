@@ -1,8 +1,8 @@
-//! INVARIANTS 6.1–6.8, as property tests.
+//! INVARIANTS 6.1 to 6.8, as property tests.
 //!
 //! These are deliberately NOT parity tests. The vectors already hold the port
 //! to the reference implementation bit for bit; what these assert is that the MODEL is
-//! right — that Okun's law has the sign economics gives it, that the Fed cuts
+//! right, that Okun's law has the sign economics gives it, that the Fed cuts
 //! into a collapse. A port can be perfectly faithful to a broken model, and
 //! these are the tests that would notice.
 

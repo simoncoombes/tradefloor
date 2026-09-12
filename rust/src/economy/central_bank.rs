@@ -3,19 +3,20 @@
 //!
 //! # Draw schedule
 //!
-//! A meeting that does not happen costs **zero** draws — the early return
-//! precedes everything. A meeting that does happen costs:
+//! A meeting that does not happen costs **zero** draws, because the early
+//! return precedes everything. A meeting that does happen costs:
 //!
 //! | Site | Draws |
 //! |---|---|
 //! | The rate decision | **1 uniform**, but only on the two deep-recession cut branches |
-//! | The announcement variant | **1 uniform, always** — all seven cases pick from six strings, including `hold`/`default` |
+//! | The announcement variant | **1 uniform, always**, all seven cases pick from six strings, including `hold`/`default` |
 //! | Scheduling the next meeting | **1 uniform, always** |
 //!
 //! so 2 or 3 uniforms per meeting, never any other count.
 //!
-//! The announcement TEXT is out of scope — it is narrative, and this crate
-//! does not build strings. **The draw that selects it is not out of scope.**
+//! The announcement TEXT is out of scope, because it is narrative and this
+//! crate does not build strings. **The draw that selects it is not out of
+//! scope.**
 //! Skipping it would shift the stream for every later consumer, so the draw
 //! is taken and the chosen index returned, which is also what lets the
 //! parity harness prove the draw happened at the right point with the right

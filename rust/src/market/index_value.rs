@@ -5,14 +5,14 @@
 //! # Why there is no rate-of-change limit
 //!
 //! An index is a DERIVED quantity: its value is whatever its constituents'
-//! market caps imply, and nothing else. There used to be a ±0.5%/tick clamp
-//! here and removing it was a bug fix, not a relaxation — the failure it
-//! caused is worth keeping in view, because it is the most expensive kind
+//! market caps imply, and nothing else. There used to be a +/-0.5%/tick
+//! clamp here and removing it was a bug fix, not a relaxation. The failure
+//! it caused is worth keeping in view, because it is the most expensive kind
 //! of feedback loop this engine has produced.
 //!
 //! Clamping made the published value lag the true aggregate. The divisor
 //! recalibration in `updateMarketIndices` then read that lag as a change in
-//! index COMPOSITION and adjusted the divisor to compensate — which moved the
+//! index COMPOSITION and adjusted the divisor to compensate, which moved the
 //! published value further from the aggregate, which looked like more
 //! composition change. Measured on seed 31337 over one simulated year:
 //! constituent market cap ended at 0.909x with all 50 companies alive and
@@ -20,10 +20,10 @@
 //! divisor had inflated **32.9x**.
 //!
 //! Under `STATIONARY_PRICE_MODEL` there is no per-tick constituent clamp
-//! either: names are bounded only by the ±25% session breaker, so an earnings
-//! gap legitimately moves a constituent — and the index — in a single tick.
-//! That is designed behaviour and the divisor logic does not depend on any
-//! per-tick bound.
+//! either: names are bounded only by the +/-25% session breaker, so an
+//! earnings gap legitimately moves a constituent (and the index) in a single
+//! tick. That is designed behaviour and the divisor logic does not depend on
+//! any per-tick bound.
 
 /// The value, absolute change and percentage change of an index.
 #[derive(Debug, Clone, Copy, PartialEq)]

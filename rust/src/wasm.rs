@@ -4,12 +4,12 @@
 //! twice: as WebAssembly inside a browser, and as a Python extension module
 //! for backtesting". This is the first half, and it is deliberately thin.
 //!
-//! ## What is NOT here, and why that is the point
+//! ## Exclusions
 //!
 //! No day loop. No initial-state mapping. No macro step. Every one of those
-//! is a modelling decision, and every one lives in the core --
-//! [`crate::engine::Engine::close_day`],
-//! [`crate::universe::InstrumentInit::to_tick_company`] — precisely so that
+//! is a modelling decision, and every one lives in the core
+//! ([`crate::engine::Engine::close_day`],
+//! [`crate::universe::InstrumentInit::to_tick_company`]), precisely so that
 //! this file cannot make them differently from the Python binding.
 //!
 //! That constraint is the reason this module exists at all rather than a
@@ -26,7 +26,7 @@
 //!
 //! WebAssembly specifies IEEE-754 exactly for add, subtract, multiply,
 //! divide and square root, and this crate ships its own `exp`, `log`, `sin`
-//! and `cos` rather than calling the platform libm — which is the usual
+//! and `cos` rather than calling the platform libm, which is the usual
 //! reason a browser build disagrees with a native one. Between them the main
 //! sources of divergence are removed.
 //!
@@ -52,7 +52,7 @@
 //! services through JavaScript, not through a POSIX layer, which is why
 //! this target and not `wasm32-wasip1`.
 //!
-//! The core is unaffected because it asks for none of them -- its only
+//! The core is unaffected because it asks for none of them. Its only
 //! dependencies are `libm` and `sha2`, and the single `std::fs` call in the
 //! crate is `#[cfg(test)]`. That is not luck; it is what made this binding a
 //! day's work rather than a port.
@@ -60,8 +60,8 @@
 //! One ergonomic consequence worth knowing: a Rust panic compiles to an
 //! `unreachable` trap, which reaches JavaScript as
 //! `RuntimeError: unreachable executed` with no message. This surface
-//! returns `Result` rather than panicking, so a caller sees real errors --
-//! but a consumer debugging their own integration will want
+//! returns `Result` rather than panicking, so a caller sees real errors, but
+//! a consumer debugging their own integration will want
 //! `console_error_panic_hook`, which is one dependency and one call, and is
 //! deliberately not imposed here.
 

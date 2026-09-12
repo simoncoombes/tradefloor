@@ -3,8 +3,8 @@
 //! # Why a seed is not enough
 //!
 //! "Same seed, same market" holds only when nothing else varies. But the
-//! market an agent trades in depends on the agent's own orders — they apply
-//! pressure and move the price — so two runs with one seed and different order
+//! market an agent trades in depends on the agent's own orders (they apply
+//! pressure and move the price), so two runs with one seed and different order
 //! flow are different markets, correctly.
 //!
 //! A seed therefore reproduces a run only if you also reproduce every input:

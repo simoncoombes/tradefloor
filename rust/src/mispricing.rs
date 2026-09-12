@@ -1,14 +1,14 @@
-//! Mispricing — the daily `s`-process, ported from the reference
+//! Mispricing, the daily `s`-process, ported from the reference
 //! implementation.
 //!
-//! # What this module is, and what it is NOT
+//! # Scope
 //!
 //! **It is not the model the tick loop runs.** It has zero callers in the
 //! reference implementation, which uses a per-tick inline variant inside its
 //! market module
 //! (WP4), which applies the same ideas at 1/390 of a day per tick and never
 //! calls through here. The reference implementation file's own header claims to own the live
-//! price model, and that claim is wrong — see the port plan, Phase 2 course
+//! price model, and that claim is wrong. See the port plan, Phase 2 course
 //! correction, item 4. It is deliberately not repeated above.
 //!
 //! What this module actually is: the **daily-step API for the Python library**
@@ -19,21 +19,21 @@
 //! # The process
 //!
 //! ```text
-//! s_t = φ·s_{t-1} + θ·(s_{t-1} − s_{t-2}) + ε_t + shocks_t
+//! s_t = φ·s_{t-1} + θ·(s_{t-1} - s_{t-2}) + ε_t + shocks_t
 //! ```
 //!
 //! φ comes from a stated half-life rather than a bare coefficient; θ is a
-//! bounded momentum term — yesterday's *change* in mispricing partially
+//! bounded momentum term, so yesterday's *change* in mispricing partially
 //! continues, which is what herding is. As an AR(2) with `a₁ = φ+θ` and
-//! `a₂ = −θ`, it is stationary iff `a₂ > −1`, `a₁ + a₂ < 1`, `a₂ − a₁ < 1`,
-//! which for `0 ≤ φ,θ < 1` reduces to exactly `φ < 1` and `θ < 1`.
+//! `a₂ = -θ`, it is stationary iff `a₂ > -1`, `a₁ + a₂ < 1`, `a₂ - a₁ < 1`,
+//! which for `0 <= φ,θ < 1` reduces to exactly `φ < 1` and `θ < 1`.
 //!
 //! Pure and deterministic: the caller supplies the innovation, already drawn
 //! from the seeded, GARCH-scaled stream. No RNG in here.
 //!
 //! # Tier
 //!
-//! **Tier 1 — hard bit-identical — for everything except [`apply_mispricing`]**,
+//! **Tier 1 (hard bit-identical) for everything except [`apply_mispricing`]**,
 //! whose single `exp` makes it Tier 2. In practice that `exp` sees arguments
 //! bounded to `[-0.9, 0.9]`, and all 375 recorded cases match exactly.
 //!

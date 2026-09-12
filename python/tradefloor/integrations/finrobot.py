@@ -176,7 +176,7 @@ from .common import DecisionError as _CommonDecisionError
 #: own :func:`digest` takes the rendered prompt and is the replay key; it is
 #: deliberately str-only and does not change. This one is for hashing a
 #: config, which is a dict.
-from .common import check_prior as _check_prior  # noqa: F401 -- parity
+from .common import check_prior as _check_prior  # noqa: F401 (parity)
 from .common import moment_of, refuse_replay_reask  # noqa: F401
 from .common import digest as _digest_any
 from .common import stamp_resume_counts

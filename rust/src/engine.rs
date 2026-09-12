@@ -1,4 +1,4 @@
-//! The engine — WP5. Where the port becomes something you can run.
+//! The engine, WP5. Where the port becomes something you can run.
 //!
 //! # What this owns, and what it deliberately does not
 //!
@@ -6,7 +6,7 @@
 //! the central bank. That is all.
 //!
 //! Events, AI decisions, whale trades, corporate actions and earnings stay in
-//! the embedder and cross this boundary as **data** — news impulses and
+//! the embedder and cross this boundary as **data**, news impulses and
 //! impact-queue entries, not behaviour. That split is not a simplification;
 //! it is what makes the boundary tractable. Whale events, for instance, reach
 //! the price only through the generic news channels, so there is nothing to
@@ -14,19 +14,19 @@
 //!
 //! # The streams are split, and that is the 2026-08 era boundary
 //!
-//! The reference ran every consumer — market, economy, microstructure,
-//! embedder — off ONE PCG32 stream, so changing what any consumer drew
+//! The reference ran every consumer (market, economy, microstructure,
+//! embedder) off ONE PCG32 stream, so changing what any consumer drew
 //! shifted every draw every other consumer saw afterwards. This engine
 //! instead derives three independent substreams from the root seed
 //! ([`crate::rng::stream`] documents the derivation contract):
 //!
-//! - **market** — everything inside `simulate_market_tick`, settlement
+//! - **market** is everything inside `simulate_market_tick`, settlement
 //!   included. With [`SettleDrawPolicy::FourAlways`] its schedule is a pure
 //!   function of (status, active set, sector count): no price, macro value
 //!   or order flow can move its position.
-//! - **economy** — the daily macro chain, whose draw count genuinely
+//! - **economy** is the daily macro chain, whose draw count genuinely
 //!   depends on macro state. Its branches stay its own problem now.
-//! - **external** — [`Engine::draw_uniform`] / [`Engine::draw_normal`]:
+//! - **external** is [`Engine::draw_uniform`] / [`Engine::draw_normal`]:
 //!   seed-derived, reproducible, and incapable of perturbing the market.
 //!
 //! One seed still fully determines the whole simulation. What the split
@@ -34,9 +34,9 @@
 //! (pinned-versus-baseline), or the embedder's own consumption (cutover),
 //! and every other domain's sequence is bit-identical.
 //!
-//! Each stream keeps its own Box-Muller spare, inside its own `GameRng` —
-//! the parity of normal draws is per-stream state and never crosses
-//! between domains.
+//! Each stream keeps its own Box-Muller spare, inside its own `GameRng`. The
+//! parity of normal draws is per-stream state and never crosses between
+//! domains.
 //!
 //! Replaying a PRE-SPLIT recorded stream is still possible:
 //! [`Engine::tick_with`] and [`Engine::advance_day_with`] take an external
@@ -45,7 +45,7 @@
 //!
 //! # Columnar access
 //!
-//! State is held internally as `Vec<TickCompany>` — array-of-structs — because
+//! State is held internally as `Vec<TickCompany>` (array-of-structs) because
 //! that is what WP4's gated tick operates on, and re-shaping it would
 //! invalidate 18,720 verified values for a layout preference.
 //!

@@ -1,4 +1,4 @@
-//! Central limit order book — price-time priority matching.
+//! Central limit order book with price-time priority matching.
 //!
 //! Ported from the reference implementation's order book, which is
 //! **zero imports and zero transcendentals**: the most self-contained module
@@ -11,7 +11,7 @@
 //! rendered book being display-only. That conflicts with the realism mandate:
 //! real exchanges do not compute a fill price from a formula, they match two
 //! orders. This is the matching core, and the consequence that matters is that
-//! **slippage on size becomes emergent rather than modelled** — a large order
+//! **slippage on size becomes emergent rather than modelled**. A large order
 //! pays more because it eats real levels, not because a coefficient says so.
 //!
 //! # Faithfulness notes

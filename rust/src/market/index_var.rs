@@ -1,18 +1,18 @@
-//! The index's own one-day-ahead conditional variance — the quantity a VIX
-//! prices, and the one the engine never computed.
+//! The index's own one-day-ahead conditional variance. A VIX prices this
+//! quantity, and the engine never computed it.
 //!
 //! # Why this module exists
 //!
 //! The only place the market's own volatility reached the VIX was
 //! `engine.rs`'s read-back, which returned the market FACTOR's conditional
-//! sigma scaled by `market_vol_vix_anchor / market_factor_sigma` — 2105.1
+//! sigma scaled by `market_vol_vix_anchor / market_factor_sigma`, 2105.1
 //! VIX points per unit of daily sigma where the identity (one point is one
 //! per cent annualised) is `100 * sqrt(252)` = 1587.5. Two errors in one
 //! line: a conversion 1.326x the identity's, and the wrong referent. The
 //! index is not the factor. Measured on the certified roster the index
-//! carries **2.05x the factor's variance** — factor 55 per cent, jumps 23,
-//! sector and idiosyncratic 11, the intraday curve's inflation 4.6, news 3
-//! — and none of the remainder ever reached the VIX.
+//! carries **2.05x the factor's variance** (factor 55 per cent, jumps 23,
+//! sector and idiosyncratic 11, the intraday curve's inflation 4.6, news 3),
+//! and none of the remainder ever reached the VIX.
 //!
 //! What this module computes is the right-hand side of
 //!
@@ -36,7 +36,7 @@
 //!
 //! - **The downside transmission tilt's RECENTRING RESIDUAL**, which is the
 //!   half of the tilt that is a drift and not a variance. The tilt itself
-//!   is carried — see [`IndexVarianceTerms::tilt_raw`] — but
+//!   is carried (see [`IndexVarianceTerms::tilt_raw`]), but
 //!   `market_beta_down_asym` scales one side of a zero-mean draw and so
 //!   moves its MEAN, and `market_beta_down_asym_recentre` gives back
 //!   exactly the unamplified, unlagged mean. What is left over is
@@ -66,25 +66,25 @@
 //!   point.** [`resting_garch_variances`] solves the rest point from a noise
 //!   variance that carries the market factor unamplified and untilted, so the
 //!   anchor's per-name block is short wherever the tick's absolute floor does
-//!   not already bind — which on the shipped preset is nearly nowhere.
+//!   not already bind, which on the shipped preset is nearly nowhere.
 //!
 //! **"Together those are worth about five per cent of `V_t`" used to stand
 //! here, and it is no longer true.** It was true of the list this one
 //! replaced, which had four items and the largest of them at 1.5 per cent.
 //! The figure is withdrawn rather than re-estimated: nobody has measured
 //! the new list and a number nobody measured is what this section exists to
-//! refuse. What survives unchanged is the principle — they are not quietly
+//! refuse. What survives unchanged is the principle. They are not quietly
 //! folded into a coefficient, and the residual is the residual.
 //!
 //! # The downside transmission tilt and its lagged wire
 //!
 //! **The largest omission this module ever had, and it was on the residual
 //! list above rather than in the sum.** `market_beta_down_asym` scales one
-//! side of a zero-mean draw, which raises its variance by `a + a^2/2` — 2.5
+//! side of a zero-mean draw, which raises its variance by `a + a^2/2`, 2.5
 //! per cent of the factor term at the shipped 0.025.
 //! `market_beta_down_asym_lag`, which pt-v18 introduced at **0.375**, scales
 //! the whole transmission by `1 + lag` on the session after a down day
-//! whatever the tick's own sign — so it multiplies the factor term by
+//! whatever the tick's own sign, so it multiplies the factor term by
 //! `(1 + lag)^2` = **1.891** on those days, not by 1.025. `prev_day_down`
 //! reads `prev_day_factor < 0.0` on a zero-mean accumulated sum, so it is
 //! true on about half of all sessions, and the read-back was short by 89
@@ -93,13 +93,13 @@
 //! It is carried now, and it needed no new machinery: the wire is a
 //! deterministic one-bit state the close already holds
 //! (`factor_vol::prev_day_down`, passed in rather than re-derived), and the
-//! tilt is elementary because `z^2 A^2` is EVEN — the amplifier cannot tell
+//! tilt is elementary because `z^2 A^2` is EVEN. The amplifier cannot tell
 //! the two half-lines apart, so the tilt splits the loading and not the
 //! moment. See [`IndexVarianceTerms::tilt_raw`] for the derivation and
 //! [`transmission_loadings`] for the two loadings it is built from.
 //!
 //! What it costs: the read-back rises by `(1 + (1 + a)^2)/2 - 1` of the
-//! market block on a lagged session with `a = lag` — 89 per cent — and by
+//! market block on a lagged session with `a = lag` (89 per cent) and by
 //! 2.5 per cent of it on every session through the tick-sign tilt. That is
 //! a level change on the anchor as well as on the conditional read, which
 //! is why [`index_unconditional_variance`] now averages the identity over
@@ -107,13 +107,13 @@
 //! a fair coin on a zero-mean sum, and an anchor read at one face of it
 //! would be the mean of nothing.
 //!
-//! # The crash amplifier and the crisis blend — charter bar B4
+//! # The crash amplifier and the crisis blend, charter bar B4
 //!
 //! **These two used to be on the list above**, described as "conditional on
-//! a tail the closed form has no moment for … silent through the calm range
-//! this variance is read over, and understated in a crisis". The second half
-//! of that was true and the first half was not: the moments exist and are
-//! elementary, and this module now carries them. See
+//! a tail the closed form has no moment for ... silent through the calm
+//! range this variance is read over, and understated in a crisis". The
+//! second half of that was true and the first half was not: the moments
+//! exist and are elementary, and this module now carries them. See
 //! [`amplifier_moments`] for the derivation and
 //! [`IndexVarianceTerms::crash_raw`] / [`IndexVarianceTerms::crisis_raw`]
 //! for what each buys.
@@ -121,8 +121,8 @@
 //! The consequence of leaving them out was not a rounding error. The
 //! loop-gain run (`programme/results/loopgain2/loopgain-report.md`, P3)
 //! measured the index realising **4.0 to 4.9 times** the variance `V_t`
-//! priced at pins above the crisis threshold, against 1.22 to 1.44 below
-//! it — a step, in the one place the read-back was blind. `vix_target_shock_cap`
+//! priced at pins above the crisis threshold, against 1.22 to 1.44 below it,
+//! a step in the one place the read-back was blind. `vix_target_shock_cap`
 //! was the brake holding the resulting divergence, which made a boundary
 //! condition into a shape parameter and flattened the fear response inside
 //! the range the tape can grade. That is charter bar B4, and no shipped
@@ -149,8 +149,8 @@
 //!
 //! The bar is `crisis_vix_threshold`, 30.88. **Below it the two agree to
 //! within two per cent and the map stays under one, so the calm regime is
-//! untouched.** Above it the old read-back stayed at 0.70 — a contraction,
-//! which is the brake — and this one crosses one and keeps climbing. The
+//! untouched.** Above it the old read-back stayed at 0.70 (a contraction,
+//! which is the brake) and this one crosses one and keeps climbing. The
 //! between-pin gain runs 1.23 to 1.68 up there against 0.87 to 0.93 before.
 //! A map above one has no fixed point, so a state that crosses the
 //! threshold runs to `vix_ceiling`: measured over ten seeds at 252 days,
@@ -162,7 +162,7 @@
 //! by `the_regime_terms_reproduce_the_index_the_tick_builds`: the engine
 //! really does realise that much variance in a crisis, and the blend really
 //! does raise every name's market loading from `beta_i` to
-//! `beta_i + crisis_blend_gain * spike` — 1.81 against 1.0 at saturation,
+//! `beta_i + crisis_blend_gain * spike`, 1.81 against 1.0 at saturation,
 //! which is 3.3x on the factor block before the amplifier touches it. What
 //! was wrong was a VIX that could not see it.
 //!
@@ -182,20 +182,20 @@
 //!
 //! The condition the crisis dials would be derived from is writable now.
 //! Under `vix_level_identity` the VIX's deterministic map is
-//! `v -> implied(v)` — the fear excursion is made zero-mean by
+//! `v -> implied(v)`. The fear excursion is made zero-mean by
 //! `expected_return_spike`, and on a pinned ladder the loop's own fixed
-//! point sits within a fifth of a VIX point of the identity's — pinned at
+//! point sits within a fifth of a VIX point of the identity's. Pinned at
 //! 14 with the blend off, `implied / pinned` reads 1.007 while the day's
-//! own update reads -0.015 — so that is a measurement and not an
+//! own update reads -0.015, so that is a measurement and not an
 //! assumption. The VIX lives on `[10, vix_ceiling]`, and the top of that
 //! interval is absorbing exactly when `implied(v) >= v` near it. So:
 //!
 //! > **(S)** `implied(v) < v` for every `v` in
 //! > `(crisis_vix_threshold, vix_ceiling]`.
 //!
-//! `implied(v) / v` rises on the saturated range — `amplifier_moments`' own
+//! `implied(v) / v` rises on the saturated range (`amplifier_moments`' own
 //! second moment rises with the regime ratio while every other block is at
-//! most quadratic in `v` — and the spike is saturated at the ceiling for any
+//! most quadratic in `v`) and the spike is saturated at the ceiling for any
 //! threshold under `vix_ceiling - ramp * cap`. **So (S) binds at the ceiling
 //! and there alone, and the binding constraint does not contain
 //! `crisis_vix_threshold` at all.** With `crisis_blend_source` 1.0 the
@@ -213,8 +213,8 @@
 //! and re-measuring the ladder at it confirms `implied(80)/80 = 0.942`.
 //!
 //! **And it does not settle anything, because the runaway is not the
-//! blend's.** With `crisis_blend_gain` set to exactly **0.0** — the blend
-//! switched off, not merely reduced — the VIX still reaches `vix_ceiling`
+//! blend's.** With `crisis_blend_gain` set to exactly **0.0** (the blend
+//! switched off, not merely reduced) the VIX still reaches `vix_ceiling`
 //! on 81 of 7,560 seed-days over the certification protocol's thirty
 //! rosters, on three of them (110, 114 and 115); at `48cfcab`, without the
 //! tilt term, 78 on the same three. Before B4 it reached the ceiling on 0
@@ -229,8 +229,8 @@
 //! same seeds either way. Roster properties barely separate the runs that
 //! reach the ceiling from those that do not (`beta_w` 0.983 against 0.968);
 //! the factor variance's own peak over baseline separates them sevenfold,
-//! 21.68 against 3.05. The blend is a multiplier and a large one — the
-//! shipped gain takes 11 runs of 120 to 30, and 164 ceiling days to 1,477 —
+//! 21.68 against 3.05. The blend is a multiplier and a large one (the
+//! shipped gain takes 11 runs of 120 to 30, and 164 ceiling days to 1,477)
 //! and it is not the cause. Measured by `b4read1`, whose registration and
 //! result live in the design repository.
 //!
@@ -243,14 +243,14 @@
 //!   the record; the SHIPPED process is a 0.65/0.35 mixture whose own
 //!   condition is the spectral radius of a 4x4 matrix and reads 0.9870,
 //!   **under one**, so the shipped factor variance has a finite fourth
-//!   moment. Its dispersion is heavy and finite — implied factor kurtosis
-//!   13 against the tape's own GARCH at 11.3 — and is the finite-sample
+//!   moment. Its dispersion is heavy and finite (implied factor kurtosis
+//!   13 against the tape's own GARCH at 11.3) and is the finite-sample
 //!   dispersion of any GARCH at this persistence. The excursion this
 //!   read-back turns into a ceiling-pinned VIX is the variance process
 //!   behaving like the tape, which makes the finding worse and not better;
 //! - those excursions are upstream of everything here, and the read-back
-//!   cannot reach them. Pinned at VIX 14 — the loop cut, the target held at
-//!   0.45 times base — seed 114's factor variance sits at a median 11.7
+//!   cannot reach them. Pinned at VIX 14 (the loop cut, the target held at
+//!   0.45 times base), seed 114's factor variance sits at a median 11.7
 //!   times base over eighty scored sessions on pt-v19 before B4, at
 //!   `48cfcab` and at this commit alike, the three agreeing to within one
 //!   per cent, where seed 101 reads 0.38. The residual is the derived
@@ -260,7 +260,7 @@
 //!   sigma out, so `amplifier_moments`' second moment is 3.48: the
 //!   amplifier term is two and a half times the factor block and this
 //!   identity reads back an implied VIX of 157 from a state the old
-//!   read-back reported as a high but bounded one. Correctly — it is
+//!   read-back reported as a high but bounded one. Correctly, since it is
 //!   asserted against the tick.
 //!
 //! So the dial whose loop gain the read-back has newly exposed is
@@ -272,9 +272,9 @@
 //! problem: the bands can be satisfied while the loop stays broken, so the
 //! bands are not what decides this. The routes that would settle it, none
 //! of them a dial on this module: normalise `crash_amplifier`'s
-//! `shock_magnitude` by the CONDITIONAL sigma rather than the base one —
-//! the alternative `factors.rs` weighs and rejects, whose cost it has
-//! already measured — which makes `E[z^2 A^2]` flat in the regime and
+//! `shock_magnitude` by the CONDITIONAL sigma rather than the base one
+//! (the alternative `factors.rs` weighs and rejects, whose cost it has
+//! already measured), which makes `E[z^2 A^2]` flat in the regime and
 //! removes the superlinear term from (S) entirely; or recalibrate
 //! `market_vol_alpha` and `market_vol_beta`, which the design repository has
 //! already derived from the tape at 0.1059 and 0.8787 against the shipped
