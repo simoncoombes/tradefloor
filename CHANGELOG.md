@@ -71,17 +71,17 @@ constraint binds from an elevated state, which is recorded in
 `programme/results/b4fix6-registration.md` with the ceiling that follows
 from the map instead.
 
-**`excess_kurtosis` at 504 days on the held roster is the weakest row in
-this release, and it is worse than pt-v18's.** It reads 7.3005 against a
-floor of 7.1. pt-v14, pt-v16 and pt-v18 read 10.8275, 9.4473 and 10.4101 on
-the same panel, and all four presets hold fourteen of fourteen shape rows,
-so that count is not a property of pt-v19. A seed-block bootstrap over the
+**`excess_kurtosis` at 504 days on the held roster reads 7.3005 against a
+floor of 7.1.** pt-v14, pt-v16 and pt-v18 read 10.8275, 9.4473 and 10.4101
+on the same panel, so pt-v19 is the weakest of the four on this row by 2.1.
+All four hold fourteen of fourteen shape rows, which makes that count a
+property of the panel rather than of pt-v19. A seed-block bootstrap over the
 thirty certification seeds, 4,000 resamples, puts the row below its floor on
 42.9 per cent of blocks, where pt-v18 reads 0.0 per cent. The tape's
 coefficients are the cause. At the pt-v14 optima the unclamped fast
 component had no finite fourth moment and its kurtosis was held down only by
-`market_vol_ceiling_multiple`; the GJR triple recovers part of what the
-symmetric fit gave up and not all of it.
+`market_vol_ceiling_multiple`. The GJR triple recovers part of what the
+symmetric fit gave up.
 
 
 **pt-v19 is pt-v18 with four dials, each measured.** `vix_level_identity`
