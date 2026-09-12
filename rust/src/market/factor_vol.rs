@@ -518,10 +518,22 @@ impl MarketVarianceState {
         self.close_day_at(params, params.market_vol_vix_anchor, vix)
     }
 
-    /// [`Self::close_day_with`] against an EXPLICIT anchor -- what the
-    /// engine calls, so that `vix_level_identity`'s derived anchor reaches
-    /// the forward map. At `params.market_vol_vix_anchor` this is the
-    /// arithmetic that stood here, to the bit.
+    /// [`Self::close_day_with`] against an EXPLICIT denominator for the VIX
+    /// ratio -- what the engine calls, so that `vix_level_identity`'s
+    /// derived anchor reaches the forward map. At
+    /// `params.market_vol_vix_anchor` this is the arithmetic that stood
+    /// here, to the bit.
+    ///
+    /// **It is a DENOMINATOR and not an anchor**, and the two stopped being
+    /// the same thing at `market_vol_vix_excursion`. This argument is the
+    /// only use either ever had here: `vix / denominator` is formed once
+    /// and handed to `vix_response`, and nothing else in this function or
+    /// in `update_market_variance_at` reads it. Under the excursion switch
+    /// the engine passes the identity's own read-back instead of a
+    /// constant, which makes the ratio a fear excursion rather than a
+    /// level; see [`crate::params::ModelParams::market_vol_vix_excursion`].
+    /// The name is `vix_ratio_denominator` so a reader cannot take it for
+    /// the dial.
     /// Returns the variance TARGETS this close reverted toward:
     /// `(fast, slow)`, with `slow` absent when there is no slow component.
     ///
@@ -547,7 +559,7 @@ impl MarketVarianceState {
     pub fn close_day_at(
         &mut self,
         params: &crate::params::ModelParams,
-        vix_anchor: f64,
+        vix_ratio_denominator: f64,
         vix: f64,
     ) -> (f64, Option<f64>) {
         // The fear the target reads, not necessarily today's print. Real
@@ -567,7 +579,7 @@ impl MarketVarianceState {
             sm
         };
         let base = params.market_factor_sigma * params.market_factor_sigma;
-        let vix_ratio = vix / vix_anchor;
+        let vix_ratio = vix / vix_ratio_denominator;
         let target = base
             * (1.0 - params.market_vol_vix_coupling
                 + params.market_vol_vix_coupling * vix_response(params, vix_ratio));
@@ -580,7 +592,7 @@ impl MarketVarianceState {
         // nothing to an argument about how floats behave.
         if w == 0.0 {
             self.variance = update_market_variance_at(
-                params, vix_anchor, self.variance, self.day_factor, vix);
+                params, vix_ratio_denominator, self.variance, self.day_factor, vix);
             self.fast_variance = self.variance;
             self.prev_day_factor = self.day_factor;
             self.day_factor = 0.0;
@@ -1083,6 +1095,100 @@ mod close_day_targets {
                 .close_day_at(&p, p.market_vol_vix_anchor, 20.0);
             assert_eq!(got.1.is_some(), w != 0.0,
                        "slow weight {w} reported slow target {:?}", got.1);
+        }
+    }
+
+    /// **THE STABILITY PROPERTY `market_vol_vix_excursion` BUYS, asserted
+    /// on the arithmetic rather than on a census.**
+    ///
+    /// At a PINNED VIX the old form's target is a CONSTANT in the variance:
+    /// the denominator is the anchor, so however far the factor excurses
+    /// the target it is pulled toward does not move, and nothing in the map
+    /// argues the excursion back down. Under the excursion switch the
+    /// denominator is the read-back, which RISES with the variance, so the
+    /// target FALLS. That is the sign that makes the fixed point unique and
+    /// attracting: an increasing function of the variance (the variance
+    /// itself) meets a decreasing one (its target) exactly once.
+    ///
+    /// Asserted here on `close_day_at` directly, at a ladder of
+    /// denominators standing in for a ladder of variances, because that is
+    /// the function the engine hands the choice to. Which denominator the
+    /// engine picks is `engine.rs`'s branch and the 85-of-85 digest's
+    /// business.
+    #[test]
+    fn the_excursion_form_makes_the_target_fall_as_the_read_back_rises() {
+        let mut p = ModelParams::pt_v19();
+        p.market_vol_slow_weight = 0.0; // the single-component branch: one target, no mixture
+        let base = p.market_factor_sigma * p.market_factor_sigma;
+        let vix = 80.0;
+
+        // A rising read-back is a rising conditional variance. The anchor
+        // is where the two forms agree by construction.
+        let denominators = [
+            p.market_vol_vix_anchor,
+            2.0 * p.market_vol_vix_anchor,
+            4.0 * p.market_vol_vix_anchor,
+            8.0 * p.market_vol_vix_anchor,
+        ];
+        let mut previous = f64::INFINITY;
+        for &d in denominators.iter() {
+            let (target, _) = MarketVarianceState::new_with(&p).close_day_at(&p, d, vix);
+            assert!(
+                target < previous,
+                "the target did not fall when the read-back rose to {d}: {target} \
+                 against {previous}. Without this sign the excursion switch is not \
+                 a stability result, it is a relabelling."
+            );
+            previous = target;
+        }
+
+        // And it falls TOWARD the uncoupled floor `base * (1 - coupling)`
+        // rather than through it, because the response is non-negative.
+        let floor = base * (1.0 - p.market_vol_vix_coupling);
+        assert!(
+            previous > floor,
+            "the target fell to {previous}, at or under the uncoupled floor {floor}"
+        );
+
+        // The CONTROL, and it is what makes the assertion above mean
+        // something: at the anchor denominator the target does not depend
+        // on the variance at all, which is the old form's whole problem.
+        let a = MarketVarianceState::new_with(&p)
+            .close_day_at(&p, p.market_vol_vix_anchor, vix).0;
+        let b = MarketVarianceState::new_with(&p)
+            .close_day_at(&p, p.market_vol_vix_anchor, vix).0;
+        assert_eq!(a.to_bits(), b.to_bits());
+    }
+
+    /// When the VIX is EXACTLY what the variance implies there is no fear
+    /// excursion, and the target is EXACTLY the baseline variance -- to the
+    /// bit, at any coupling, which is the property that makes the rest
+    /// point the identity's own rather than a dial's.
+    ///
+    /// The same exactness the anchor branch has always had at
+    /// `vix == market_vol_vix_anchor`, moved onto a denominator that
+    /// changes every day. `1.0 - c + c * 1.0` must be exactly 1.0 and
+    /// `base * 1.0` exactly `base`; at coupling 0.9540498202999739 that is
+    /// a claim about floating point and not about algebra, so it is
+    /// asserted on the bits.
+    #[test]
+    fn a_vix_at_its_own_read_back_targets_the_baseline_exactly() {
+        let base_params = ModelParams::pt_v19();
+        let base = base_params.market_factor_sigma * base_params.market_factor_sigma;
+        for &coupling in &[0.0, 0.5, 0.9540498202999739, 1.0] {
+            for &vix in &[10.0, 19.53, 23.7212, 55.0, 80.0] {
+                let mut p = base_params.clone();
+                p.market_vol_vix_coupling = coupling;
+                p.market_vol_slow_weight = 0.0;
+                // denominator == vix: the VIX is exactly its read-back.
+                let (target, _) = MarketVarianceState::new_with(&p).close_day_at(&p, vix, vix);
+                assert_eq!(
+                    target.to_bits(),
+                    base.to_bits(),
+                    "at coupling {coupling} and vix {vix} a zero excursion targeted \
+                     {target} rather than the baseline {base}"
+                );
+            }
         }
     }
 }

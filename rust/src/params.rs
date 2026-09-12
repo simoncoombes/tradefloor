@@ -517,6 +517,97 @@ pub struct ModelParams {
     /// blend, `sector_vix_coupling`, the jump coupling — none of which has
     /// an unbounded loop gain through the read-back.
     pub crash_amplifier_conditional_sigma: f64,
+    /// WHICH VIX the market factor's variance target reads: the LEVEL
+    /// against a fixed anchor (0.0, every preset before pt-v19) or the
+    /// EXCURSION above the level the index's own conditional variance
+    /// already implies (nonzero).
+    ///
+    /// # A switch, and it is one on purpose
+    ///
+    /// There is no half-excursion. `engine.rs` branches on `== 0.0` and
+    /// reads the identity's own read-back on every other value, so the
+    /// MAGNITUDE is unused and the two admissible values are the two ends.
+    /// It belongs in `atlas.SWITCH_DIALS` beside
+    /// [`ModelParams::crash_amplifier_conditional_sigma`],
+    /// `cycle_stationary_opening` and `garch_omega_sector_scaled`, and NOT
+    /// in the survey's zero-shipped ranges, for the reason all four carry:
+    /// a Latin hypercube over `[0, 1]` never draws exactly zero and would
+    /// survey the dial permanently ON.
+    ///
+    /// At 0.0 the engine passes `self.vix_anchor` exactly as it did, so
+    /// nothing is computed that was not computed before, no draw moves,
+    /// and every preset from pt-v1 to pt-v18 is BIT-IDENTICAL.
+    ///
+    /// # The double count it removes, which is a RECORDED finding
+    ///
+    /// `garch-derive-design.md` finding 4. Under
+    /// [`ModelParams::vix_level_identity`] the VIX IS the index's own
+    /// conditional variance in points, plus a fear excursion. The factor's
+    /// target then reads `(VIX / anchor)^2`, which is mostly the factor's
+    /// OWN variance coming back to it: §3.3 of that note shows the target
+    /// reverts the factor toward `c * s_f` of its own level, so
+    /// `market_vol_vix_coupling` — a fear-to-variance channel when the VIX
+    /// came from a phase table — became a LOOP-GAIN dial the moment the
+    /// identity shipped, doing a job its name does not say.
+    ///
+    /// The cost is measured, not argued. The loop's static gain is
+    /// `theta = sum_k s_k c_k` (`loop-gain-design.md` §2.1) and the factor
+    /// term carries about 0.45 of it against 0.11 for the instantaneous
+    /// sector, jump and per-name couplings together. A standing bias `L`
+    /// in the target moves the level by `1 / (1 - theta)`: **2.7x at the
+    /// shipped theta of about 0.62.** Every excursion in the fear channel
+    /// is amplified by that factor before it reaches the variance, and the
+    /// variance's own excursions are amplified again on the way back.
+    ///
+    /// # What it changes, in one line
+    ///
+    /// The ratio's denominator. At 0.0 it is `market_vol_vix_anchor` (or
+    /// the derived anchor under the identity), a CONSTANT; at nonzero it is
+    /// `vix_from_variance(vix_variance_premium, V_t)` evaluated on the
+    /// session's own index variance — the level the identity says this VIX
+    /// ought to be. The ratio is then 1.0 whenever the VIX is exactly what
+    /// the variance implies, the target is exactly `base`, and what lifts
+    /// it is the fear excursion ALONE.
+    ///
+    /// # Why that is a stability result and not a taste
+    ///
+    /// At a PINNED VIX `v` the target becomes `base (1 - c + c v^2 / I(V)^2)`
+    /// with `I(V)` the read-back, which is DECREASING in the variance where
+    /// the old form was constant in it. The variance's fixed point solves an
+    /// increasing function against a decreasing one, so it is unique and
+    /// globally attracting at every pin.
+    ///
+    /// Free-running, the VIX is `I + E` for a fear excursion `E` that
+    /// `vix_return_clamp` bounds. The ratio is `(1 + E / I)`, and `I` grows
+    /// with the variance while `E` does not — so the regime ratio DECAYS as
+    /// the variance excurses and the target falls back to `base`. The
+    /// runaway `b4fix1` left behind (5 of 120 rosters, 25 seed-days, after
+    /// the amplifier's superlinearity was removed) is a day-to-day
+    /// excursion amplified 2.7x around a map that already contracts; this
+    /// takes the amplification to about 1.1x, and it does so by removing
+    /// the term rather than by making the excursions rarer.
+    ///
+    /// # What it does NOT touch, deliberately
+    ///
+    /// `theta_i`, the instantaneous couplings — `sector_vix_coupling`,
+    /// `jump_vix_coupling`, `garch_vix_coupling`. Those read the VIX the
+    /// same day it prints and close the loop through the tick rather than
+    /// through the variance target; §3.4's option C names the variance
+    /// arm and only the variance arm. They are about 0.11 of theta and
+    /// they stay.
+    ///
+    /// Nor does it touch the four dials in the fear channel that
+    /// `flattens_at` reads, so charter bar B4 is a property of
+    /// `vix_return_clamp`, `vix_return_gain`, `vix_return_exponent` and
+    /// `vix_target_shock_cap` alone and is untouched by this.
+    ///
+    /// # It is only meaningful under the identity
+    ///
+    /// Off `vix_level_identity` there is no read-back to be an excursion
+    /// above, and `vix_implied_from_market` is either zero or the FACTOR's
+    /// sigma on a different scale. `the_excursion_switch_requires_the_
+    /// identity` asserts no shipped preset sets one without the other.
+    pub market_vol_vix_excursion: f64,
     /// VIX points past `CRISIS_VIX_THRESHOLD` for the sector→market blend
     /// to reach 1.0 before its cap (§5.4 promotion).
     pub crisis_blend_ramp: f64,
@@ -2730,6 +2821,7 @@ impl ModelParams {
             crash_amplifier_threshold: factors::CRASH_AMPLIFIER_THRESHOLD,
             crash_amplifier_slope: factors::CRASH_AMPLIFIER_SLOPE,
             crash_amplifier_conditional_sigma: 0.0,
+            market_vol_vix_excursion: 0.0,
             crisis_blend_ramp: tick::CRISIS_BLEND_RAMP,
             crisis_blend_cap: tick::CRISIS_BLEND_CAP,
             crisis_blend_gain: 0.5,
@@ -4146,6 +4238,7 @@ impl ModelParams {
             "crash_amplifier_threshold" => self.crash_amplifier_threshold,
             "crash_amplifier_slope" => self.crash_amplifier_slope,
             "crash_amplifier_conditional_sigma" => self.crash_amplifier_conditional_sigma,
+            "market_vol_vix_excursion" => self.market_vol_vix_excursion,
             "crisis_blend_ramp" => self.crisis_blend_ramp,
             "crisis_blend_cap" => self.crisis_blend_cap,
             "crisis_blend_gain" => self.crisis_blend_gain,
@@ -4313,6 +4406,7 @@ impl ModelParams {
             "crash_amplifier_threshold" => out.crash_amplifier_threshold = value,
             "crash_amplifier_slope" => out.crash_amplifier_slope = value,
             "crash_amplifier_conditional_sigma" => out.crash_amplifier_conditional_sigma = value,
+            "market_vol_vix_excursion" => out.market_vol_vix_excursion = value,
             "crisis_blend_ramp" => out.crisis_blend_ramp = value,
             "crisis_blend_cap" => out.crisis_blend_cap = value,
             "crisis_blend_gain" => out.crisis_blend_gain = value,
@@ -4519,6 +4613,7 @@ pub fn settable_names() -> Vec<&'static str> {
     vec![
         "cascade_symmetry",
         "crash_amplifier_conditional_sigma",
+        "market_vol_vix_excursion",
         "crash_amplifier_slope",
         "crash_amplifier_threshold",
         "crisis_blend_cap",
@@ -4779,6 +4874,33 @@ mod tests {
             .expect("DEFAULT_PRESET_NAME must name a shipped preset");
         assert_eq!(named.digest(), crate::engine::Engine::default_model().digest());
         assert_eq!(named.fingerprint(), DEFAULT_PRESET_NAME);
+    }
+
+    /// `market_vol_vix_excursion` is an excursion above the level the
+    /// index's own conditional variance implies, and off
+    /// `vix_level_identity` there IS no such level: the engine's
+    /// `vix_implied_from_market` is either zero or the FACTOR's sigma on a
+    /// scale of `anchor / market_factor_sigma` rather than the identity's
+    /// `100 sqrt(252)`. A preset that set one without the other would run a
+    /// ratio whose denominator means something else, silently, and every
+    /// number it produced would be wrong in a way no band would catch.
+    ///
+    /// Asserted over every shipped preset rather than over pt-v19 alone,
+    /// because the mistake this prevents is a FUTURE preset's.
+    #[test]
+    fn the_excursion_switch_requires_the_identity() {
+        for name in ModelParams::preset_names() {
+            let p = ModelParams::preset(name).expect("a name from preset_names resolves");
+            if p.market_vol_vix_excursion != 0.0 {
+                assert!(
+                    p.vix_level_identity != 0.0,
+                    "{name} reads the VIX's EXCURSION into the factor's variance target \
+                     but does not run `vix_level_identity`, so there is no read-back for \
+                     the excursion to be above. See \
+                     `ModelParams::market_vol_vix_excursion`."
+                );
+            }
+        }
     }
 
     #[test]

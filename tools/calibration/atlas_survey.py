@@ -401,6 +401,22 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # interval. Until it does, read any surface over this axis as a
     # measurement of the conditional normaliser alone.
     "crash_amplifier_conditional_sigma": (0.0, 1.0),
+    # Which VIX the factor's variance target reads: the level against a
+    # fixed anchor, or the excursion above the identity's own read-back.
+    # THE THIRD SWITCH IN THIS BLOCK, and it carries the same defect as the
+    # two above for the same reason: the branch is at zero, every nonzero
+    # value selects the excursion form, and a Latin hypercube over [0, 1]
+    # never draws exactly 0.0, so this axis surveys the dial PERMANENTLY ON.
+    # It belongs in the two-level set `atlas.SWITCH_DIALS`, which still does
+    # not exist. Until it does, read any surface over this axis as a
+    # measurement of the excursion form alone.
+    #
+    # This one is the most misleading of the three if that caveat is
+    # dropped, because the dial does not change a magnitude anywhere: it
+    # changes what the ratio's denominator MEANS, from a constant to a
+    # state variable. A response surface in it is two models, not one model
+    # at two settings.
+    "market_vol_vix_excursion": (0.0, 1.0),
     # News peer transfer: weights of a peer's surprise, natural unit range.
     "news_peer_weight": (0.0, 1.0),
     "news_peer_weight_down": (0.0, 1.0),

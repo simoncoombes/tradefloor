@@ -2150,6 +2150,48 @@ impl Engine {
             self.companies.len(),
             "one sector base variance per company"
         );
+        // WHAT THE FACTOR'S VARIANCE TARGET MEASURES THE VIX AGAINST, and
+        // it has to be read HERE, before the per-name GARCH loop below
+        // moves a single name's variance.
+        //
+        // At `market_vol_vix_excursion` 0.0 this is `self.vix_anchor`, the
+        // expression that stood at the call site, so the argument is the
+        // same f64 and every preset through pt-v18 is bit-identical with
+        // no arithmetic executed on this branch at all.
+        //
+        // At nonzero it is the level the identity says today's VIX ought to
+        // be: the read-back of the index's conditional variance AS THE
+        // SESSION TRADED IT. Every input is engine state that
+        // `state_snapshot` carries — the names' GARCH variances before the
+        // loop, `market_vol.variance()` before its own close, and
+        // `economy.vix` before the macro chain advances — so a restored
+        // engine recomputes the same number rather than inheriting one.
+        // That is why it is recomputed and not taken from
+        // `last_index_variance`, which is deliberately out of the hash.
+        //
+        // `prev_day_down()` here is the bit TODAY's ticks read, because
+        // `close_day_at` has not rolled `day_factor` yet. The economy
+        // update's own call reads it after that roll and gets tomorrow's,
+        // which is what a one-day-ahead variance needs and this is not:
+        // this prices the session that just happened.
+        //
+        // See `ModelParams::market_vol_vix_excursion` for why the ratio's
+        // denominator is the whole mechanism.
+        let vix_ratio_denominator = if self.params.market_vol_vix_excursion == 0.0 {
+            self.vix_anchor
+        } else {
+            let implied = crate::market::index_var::vix_from_variance(
+                self.params.vix_variance_premium,
+                self.index_conditional_variance_terms_now().total(),
+            );
+            // A read-back of zero or worse is not reachable — the factor
+            // variance is floored at `market_vol_floor_multiple` times base
+            // and the sum is of non-negative terms — but a denominator is
+            // the one place where "not reachable" is worth a line rather
+            // than a panic in somebody's overnight run. Falling back to the
+            // anchor makes such a day read as the old form did.
+            if implied > 0.0 { implied } else { self.vix_anchor }
+        };
         for (i, company) in self.companies.iter_mut().enumerate() {
             close_day_with(
                 &self.params,
@@ -2158,6 +2200,10 @@ impl Engine {
                     daily_innovation: request.daily_innovations[i],
                     sector_base_daily_variance: request.sector_base_variances[i],
                     vix: self.economy.vix,
+                    // The PER-NAME channel is `garch_vix_coupling`, one of
+                    // the instantaneous couplings, and it keeps the anchor.
+                    // §3.4's option C names the variance arm of the loop and
+                    // only the variance arm.
                     vix_anchor: self.vix_anchor,
                     avg_volume: request.avg_volume,
                 },
@@ -2168,8 +2214,11 @@ impl Engine {
         // above and with the same zero-draw discipline. The VIX read here
         // is the day's TRADING value — the macro chain has not advanced
         // yet, exactly as the per-name updates see the day they closed.
-        self.last_market_targets =
-            Some(self.market_vol.close_day_at(&self.params, self.vix_anchor, self.economy.vix));
+        self.last_market_targets = Some(self.market_vol.close_day_at(
+            &self.params,
+            vix_ratio_denominator,
+            self.economy.vix,
+        ));
         // The forced-flow reservoir drains on stress days and rebuilds in
         // calm. Updated only while the mechanism is live: at gain 0 or
         // reservoir 0 the state stays exactly 0.0 and nothing changes.
