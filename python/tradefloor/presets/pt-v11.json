@@ -186,9 +186,9 @@
   "default_since": null,
   "measured": {
     "tradefloor_version": "0.8.0",
-    "commit": "7b3577c74f8c384cf8a0a37a76b0b7c347473b06",
+    "commit": "c8a0b14ce9fc40e032dc6359415d5c2ee7b401d5",
     "workers": 30,
-    "wall_seconds": 703.7,
+    "wall_seconds": 734.9,
     "method": {
       "roster": "Universe.random(40, seed=111)",
       "heldout_universe": "Universe.random(60, seed=909)",
@@ -607,7 +607,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 15.475609133997933,
-        "z0_bootstrap": 13.38531987928179,
+        "z0_bootstrap": 13.400606963078257,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -622,7 +622,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 4.160257449503538,
-        "z0_bootstrap": 4.6020750396907335,
+        "z0_bootstrap": 4.505955105939162,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -637,7 +637,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 2.0018643942123204,
-        "z0_bootstrap": 2.099094630668545,
+        "z0_bootstrap": 2.084415462481228,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -652,7 +652,7 @@
         "at_the_cut": false,
         "counted": false,
         "z0_normal": 0.20934375544027153,
-        "z0_bootstrap": 0.5036457070984589,
+        "z0_bootstrap": 0.4761203011033404,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -667,7 +667,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 9.013750727426315,
-        "z0_bootstrap": 10.330964251323984,
+        "z0_bootstrap": 10.239847608642798,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -682,7 +682,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 38.46839096618396,
-        "z0_bootstrap": 51.86399052584505,
+        "z0_bootstrap": 52.41758674360458,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -697,7 +697,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 2.0912959296451343,
-        "z0_bootstrap": 4.1568283556106564,
+        "z0_bootstrap": 4.156837081455906,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -712,7 +712,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 0.030446178592955144,
-        "z0_bootstrap": 0.05577800593778164,
+        "z0_bootstrap": 0.055407498842053156,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -727,7 +727,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": -0.1831343052636853,
-        "z0_bootstrap": -0.227068589513447,
+        "z0_bootstrap": -0.22607401476057568,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -742,7 +742,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 15.218812812048746,
-        "z0_bootstrap": 17.163484535483413,
+        "z0_bootstrap": 17.281651417261163,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -757,7 +757,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 2.9586442444681156,
-        "z0_bootstrap": 2.1993945166386006,
+        "z0_bootstrap": 2.1975762753684402,
         "tolerance": 0.06486,
         "band_windows": 9
       }

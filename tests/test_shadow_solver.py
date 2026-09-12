@@ -838,17 +838,41 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     # would leave the direction assertion below resting on a margin the
     # solver can cross.
     #
+    # Re-swept again when pt-v19 took the tape's GJR triple, which re-dealt
+    # it a fourth time: the four-day advance at -4.00 now reads a plain
+    # trial of 9.09 against a no-jump 19.50, so it finds the jump alone and
+    # the premise inverted AGAIN -- in the same direction as at 0.7.0 and
+    # for the same reason the six-name recovery count went 3 to 4 two
+    # commits ago. A factor whose variance reacts to a down shock with
+    # `alpha + gamma` = 0.1622 and to an up one with 0.0066 makes a planted
+    # DOWNWARD jump easier to separate from the market aggregate, so the
+    # plain path misses less often.
+    #
+    # The same grid re-swept -- ten advance counts by seven planted normals,
+    # seventy cells -- and THREE are decisive here, against five at 0.8.0
+    # and one at 0.7.0. The retry guard is needed less often on this preset
+    # than on the last one, which is the sign this change is making the
+    # solver's job easier rather than harder.
+    #
+    # The day chosen is the widest of the three by its NARROWER side, which
+    # is the rule the 0.8.0 sweep used: zero days of advance and a planted
+    # normal of -4.50. The reused Jacobian leaves the trial at 19.35 against
+    # a no-jump 16.92 -- 2.4 nats worse, so it is rejected -- and a Jacobian
+    # of its own reaches 9.26, 7.7 nats better, so it is accepted. Of the
+    # other two, one recovers a normal of +0.028, inside the 0.6 of zero
+    # that the 0.8.0 comment already rules out as a margin the solver can
+    # cross, and the other is 0.9 nats on the retry side against this cell's
+    # 7.7.
+    #
     # The fix is unchanged and still guarded, on a day that still needs it.
     rng = np.random.default_rng(7)
-    for i in range(4):
-        _planted_day(11 + i, None, rng)
-    fwd, r_obs = _planted_day(15, -4.00, rng)
+    fwd, r_obs = _planted_day(11, -4.50, rng)
     found = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
     assert found["jump_market"] is not None
     # On the SIZE, for the reason the planted-jump test above gives at
     # length: `jump_market` is the recovered normal and the direction lives
     # in `jump_mean_market + jump_sigma_market * z`. Measured here the
-    # normal is -1.234 against a sign change at +3.4645.
+    # normal is -0.797 against a sign change at +3.4645.
     assert found["jump_market"] < shadow.upward_threshold(
         dict(tf.ModelParams.from_preset().to_dict()))
 

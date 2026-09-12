@@ -385,10 +385,6 @@ OUT_OF_SCOPE = {
         "being inert is why that value is not derived on the shipped path",
     "idio_sigma_beta_exponent":
         "inert at 0.0: market/factors.rs:98 branches on `== 0.0`",
-    "market_vol_gamma":
-        "inert at 0.0: the GJR term at market/factor_vol.rs:395 loads "
-        "`gamma` on the squared shock and omega compensates by `gamma/2`, "
-        "so zero is the symmetric update exactly",
     "market_vol_vix_smooth":
         "inert at 0.0: market/factor_vol.rs:536 branches on `== 0.0` and "
         "reads the raw print",
@@ -476,6 +472,60 @@ OUT_OF_SCOPE = {
 #: workstreams that own them. Filling them in from here would be inventing
 #: derivations, which is the failure this module exists to prevent.
 DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
+    "market_vol_gamma": {
+        "kind": "measured",
+        "date": "2026-09-07",
+        "estimator": "GJR-GARCH(1,1) by Gaussian quasi-maximum "
+                     "likelihood on the tape's index log returns, whole "
+                     "span, fitted beside a symmetric GARCH(1,1) on the "
+                     "same series and window by the same estimator, and "
+                     "compared by likelihood ratio",
+        "script": "the estimator module reproduced whole in "
+                  "programme/garch-derive-design.md Appendix B",
+        "standard_error": 0.1556,
+        "presets": {"pt-v19": 0.1556},
+        "identity": "the tape's leverage response, at a LIKELIHOOD RATIO "
+                    "of 2 * 152.5 = 305 on one degree of freedom. Same "
+                    "tape, same window, same estimator:\n"
+                    "  GARCH(1,1) omega 0.0190 alpha 0.1059 beta 0.8787 "
+                    "NLL 3703.97\n"
+                    "  GJR(1,1)   omega 0.0202 alpha 0.0066 gamma 0.1556 "
+                    "beta 0.8946 NLL 3551.49\n"
+                    "garch-derive-design.md 2.4: 'the real index's "
+                    "variance responds to DOWN moves almost exclusively; "
+                    "the symmetric 0.1059 is the pseudo-true symmetric "
+                    "approximation of that.' This ships the fit rather "
+                    "than the approximation, so `market_vol_alpha` and "
+                    "`market_vol_beta` carry the GJR triple's values and "
+                    "not the symmetric fit's -- the three are ONE "
+                    "measurement and moving any of them alone would ship "
+                    "a vector no fit produced",
+        "source": "programme/garch-derive-design.md 2.4, design "
+                  "repository. The dial is applied at "
+                  "rust/src/market/factor_vol.rs `component_step`, which "
+                  "loads `alpha + gamma` on a down day and `alpha` on an "
+                  "up one and gives back `gamma/2` through omega, so it "
+                  "redistributes variance between the two states rather "
+                  "than adding any; it passes 0.0 for the SLOW "
+                  "component, which is where 2.4's fit does not reach",
+        "note": "WHY IT WAS ADOPTED, having been recorded and declined. "
+                "2.4 left it to Simon because `market_vol_gamma` was "
+                "outside 2.2's dial list. What made it necessary is the "
+                "envelope's SHAPE panel -- the fourteen rows measured on "
+                "the HELD roster, which is the protocol that certifies "
+                "`excess_kurtosis`. With the symmetric fit that row read "
+                "6.7284 at 504 days against a band floor of 7.1, 13 of "
+                "14 in band; with the triple it reads 7.3005 and 14 of "
+                "14 at both horizons. The symmetric approximation spreads "
+                "a one-sided response evenly and discards most of the "
+                "fourth moment with it. MEASURED, b4fix5. The registered "
+                "risk -- that putting variance behind down moves would "
+                "cost `index_tail_dn3_pct`, which counts down moves -- "
+                "did not materialise: the tail improved, 1.8194 to "
+                "1.3280 at 252. The GJR fourth-moment coefficient "
+                "`3a^2 + 3ag + 1.5g^2 + 2ab + bg + b^2` is 0.9908, under "
+                "one, so the finite fourth moment survives the asymmetry",
+    },
     "market_vol_vix_excursion": {
         "kind": "derived",
         "presets": {"pt-v19": 1.0},
@@ -614,7 +664,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "dev/tf-getter's .venv",
         "standard_error": 0.0093,
         "presets": {"pt-v16": 0.28035004, "pt-v18": 0.28035004,
-                    "pt-v19": 0.1059},
+                    "pt-v19": 0.0066},
         "identity": "Gaussian QMLE GARCH(1,1) on the tape's index over "
                     "the whole span. alpha = 0.1059, sandwich se "
                     "0.0093, year-block bootstrap sd 0.0128; "
@@ -649,9 +699,10 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "dev/tf-getter's .venv",
         "standard_error": 0.0092,
         "presets": {"pt-v16": 0.69244622, "pt-v18": 0.69244622,
-                    "pt-v19": 0.8787},
+                    "pt-v19": 0.8946},
         "identity": "the same estimator and the same fit as "
-                    "`market_vol_alpha`: beta = 0.8787, sandwich se "
+                    "`market_vol_alpha`, in its GJR form: beta = 0.8946 "
+                    "against the symmetric fit's 0.8787, sandwich se "
                     "0.0092, year-block bootstrap sd 0.0152. "
                     "`alpha + beta` is 0.9846 +/- 0.0046 against the "
                     "shipped 0.9728, and the fourth-moment condition "

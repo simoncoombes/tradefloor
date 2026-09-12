@@ -180,7 +180,19 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # less of the tick-to-tick reversal momentum trades and more of the
     # drift-to-fair mean-reversion trades, which is the direction this pair
     # moved. The oracle has still never moved.
-    assert ranked == ["oracle", "mean_reversion", "momentum",
+    # Re-measured again when pt-v19 took the tape's GJR triple: oracle
+    # +7.667%, momentum +2.969%, mean_reversion +1.744%, buy_and_hold
+    # -0.203%, random -1.012%. Momentum and mean-reversion swapped for the
+    # ELEVENTH time, 1.225 points apart, and back to the order pt-v18 had.
+    #
+    # It is the same pair moving for the same reason as last time, in
+    # reverse. The symmetric fit's alpha 0.1059 reacted to every shock;
+    # the GJR's loads `alpha + gamma` = 0.1622 on a DOWN day and 0.0066 on
+    # an up one. A five-session window therefore has its variance
+    # concentrated behind the down moves, which is where momentum's
+    # continuation signal lives and where mean-reversion's snap-back does
+    # not. The oracle has still never moved, in eleven swaps.
+    assert ranked == ["oracle", "momentum", "mean_reversion",
                       "buy_and_hold", "random"]
 
 

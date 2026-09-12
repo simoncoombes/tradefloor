@@ -124,20 +124,20 @@ PRESET = "pt-v19"
 #: failure, and it stays whichever way the verdicts read. A row the default
 #: preset fails is never widened to pass and never folded into this count.
 CERTIFIED: dict[str, float] = {
-    "annualised_vol_pct": 27.3664,
-    "excess_kurtosis": 6.3019,
-    "return_acf1": 0.0024,
-    "abs_return_acf1": 0.0661,
-    "abs_return_acf5": 0.0412,
-    "abs_return_acf20": 0.0179,
-    "cross_sectional_corr": 0.3580,
-    "volume_abs_return_corr": 0.5191,
-    "leverage_effect": -0.0510,
-    "volume_change_acf1": -0.2710,
-    "corr_asymmetry": 0.0239,
-    "corr_asymmetry_lagged": 0.1155,
-    "sector_excess_corr": 0.1813,
-    "corr_persistence_acf1": 0.2495,
+    "annualised_vol_pct": 28.3793,
+    "excess_kurtosis": 6.9220,
+    "return_acf1": 0.0004,
+    "abs_return_acf1": 0.1042,
+    "abs_return_acf5": 0.0678,
+    "abs_return_acf20": 0.0200,
+    "cross_sectional_corr": 0.3832,
+    "volume_abs_return_corr": 0.5249,
+    "leverage_effect": -0.0488,
+    "volume_change_acf1": -0.2706,
+    "corr_asymmetry": 0.0105,
+    "corr_asymmetry_lagged": 0.1130,
+    "sector_excess_corr": 0.1889,
+    "corr_persistence_acf1": 0.2696,
 }
 
 #: The LEVEL rows the default preset reads at the certified horizon,
@@ -172,7 +172,7 @@ CERTIFIED_LEVEL: dict[str, float] = {
     # 1.15 -- so 3.15 standard errors above the floor. pt-v18 read 5.7957 at
     # position 0.32; pt-v16 read -13.6431 and was held red here for three
     # eras, and this row exists because of that.
-    "index_drift_pct": 6.3022,
+    "index_drift_pct": 6.5390,
 }
 
 #: The CRISIS rows, reserved for the fear gauge and the index tail, measured
@@ -199,8 +199,8 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # floor of 2.60; pt-v16 read 1.9557 and was BELOW it. The VIX level
     # identity and the symmetric fall-rate are what moved it, and this is
     # the row they were composed to move.
-    "fear_gauge_dn1": 2.9175,
-    "fear_gauge_dn3": 7.7283,
+    "fear_gauge_dn1": 2.9020,
+    "fear_gauge_dn3": 7.6507,
     # The index tail row on the same thirty seeds: 118 sessions at or below
     # -3 per cent in 7,530, a pooled rate of 1.5671 per cent against a band
     # of 0.47 to 1.96 and a tape centre of 1.213. IN band, at band position
@@ -222,7 +222,7 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # that as data beside the verdict. Year two IS measured for this preset,
     # on the same seeds in the same run: 1.2989 per cent over 504 days,
     # inside the same band, where pt-v16 read 2.500 and was high.
-    "index_tail_dn3_pct": 1.8194,
+    "index_tail_dn3_pct": 1.3280,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -311,20 +311,20 @@ RULERS_BY_HORIZON: dict[int, tuple[dict[str, tuple[float, float]],
 #: The count is still MEASURED rather than certified: the certified horizon
 #: is 252 because that is where `CERTIFIED` was measured.
 MEASURED_504: dict[str, float] = {
-    "annualised_vol_pct": 28.0585,
-    "excess_kurtosis": 6.7284,
-    "return_acf1": 0.0047,
-    "abs_return_acf1": 0.1157,
-    "abs_return_acf5": 0.0764,
-    "abs_return_acf20": 0.0400,
-    "cross_sectional_corr": 0.3692,
-    "volume_abs_return_corr": 0.5484,
-    "leverage_effect": -0.0507,
-    "volume_change_acf1": -0.2522,
-    "corr_asymmetry": 0.0043,
-    "corr_asymmetry_lagged": 0.0596,
-    "sector_excess_corr": 0.1875,
-    "corr_persistence_acf1": 0.2829,
+    "annualised_vol_pct": 28.9478,
+    "excess_kurtosis": 7.3005,
+    "return_acf1": 0.0017,
+    "abs_return_acf1": 0.1251,
+    "abs_return_acf5": 0.0881,
+    "abs_return_acf20": 0.0570,
+    "cross_sectional_corr": 0.3737,
+    "volume_abs_return_corr": 0.5594,
+    "leverage_effect": -0.0595,
+    "volume_change_acf1": -0.2513,
+    "corr_asymmetry": -0.0035,
+    "corr_asymmetry_lagged": 0.0981,
+    "sector_excess_corr": 0.1891,
+    "corr_persistence_acf1": 0.3080,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.

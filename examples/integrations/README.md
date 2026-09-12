@@ -60,10 +60,10 @@ two adapters:
 
 | example | trades | return | impact |
 |---|---|---|---|
-| [`callable/five_days.py`](callable/five_days.py) | 3 | +1.74% | +1.57 bps |
-| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 3 | +1.74% | +1.57 bps |
-| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 3 | +6.96% | +7.83 bps |
-| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 1 | +0.57% | +0.00 bps |
+| [`callable/five_days.py`](callable/five_days.py) | 3 | +1.39% | +4.44 bps |
+| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 3 | +1.39% | +4.44 bps |
+| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 3 | +5.43% | +4.46 bps |
+| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 1 | +0.55% | -13.45 bps |
 
 Re-measured at 0.8.0, where the default preset moved to pt-v19 and every
 price in these markets moved with it. Nothing else about these examples
