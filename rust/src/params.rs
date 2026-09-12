@@ -4217,7 +4217,43 @@ impl ModelParams {
         // -7.29, -11.47 and -10.25 per cent, outside the range the tape
         // grades, with the fourth the day after the -11.47 while the VIX
         // comes off at `vix_mean_reversion` 0.10 a day.
-        p.vix_ceiling = 108.63;
+        // 108.63 was `vix_return_gain * GRADED_ABS_R` and it was the
+        // right shape of derivation applied to the wrong starting point:
+        // it prices a graded session FROM REST and the constraint binds
+        // from an ELEVATED state. Measured, the VIX reached 108.63 on 3 of
+        // 120 rosters, and on three of those four seed-days the index's own
+        // conditional variance implied a VIX above the ceiling with NO fear
+        // response at all, 142.58 at the highest. The clamp was binding on
+        // the read-back, not on the session.
+        //
+        // The condition from the map instead. At a VIX of `C` the level the
+        // map sustains is `implied(C)`, the read-back at that pin, and a
+        // graded session adds at most `vix_return_gain * GRADED_ABS_R` on
+        // top of it. So the ceiling a graded session cannot reach is the
+        // smallest `C` with
+        //
+        //     C - implied(C) >= vix_return_gain * GRADED_ABS_R = 108.63
+        //
+        // `implied(C)` is measured on `pin_ladder.py`, three seeds, eighteen
+        // pins from 14 to 260, and `C - implied(C)` is monotone with a
+        // single crossing: 60.589 at pin 108, 98.833 at 160, 113.780 at 180.
+        // **C* = 173.1087**, bracketed by pins 160 and 180, residual
+        // +/- 8.82 carried from the ladder's own spread across seeds through
+        // the local slope. A measured constant with a stated residual, not a
+        // value chosen because a census cleared it: b4fix6 solved it from
+        // the ladder before it ran a single census arm.
+        //
+        // It buys criterion 2 outright. The census goes from 3 of 120
+        // rosters and 4 ceiling days to **0 of 120 and 0**, with the highest
+        // VIX over 120 rosters at 120.38 against the 173.1087 ceiling, so
+        // the headroom is measured rather than assumed. It costs nothing
+        // measurable: the held-roster panels are identical to the bit at
+        // both horizons, and on the varying roster the tail goes 1.3280 to
+        // 1.3147 and `excess_kurtosis` at 504 goes 7.3567 to 7.5018.
+        //
+        // `vix_target_shock_cap` is 255.0 and stays above it, so the cap
+        // still cannot bind before the ceiling.
+        p.vix_ceiling = 173.1087;
         // THE FACTOR'S OWN MEMORY, MEASURED ON THE TAPE INSTEAD OF
         // SEARCHED, which the line above makes possible.
         //

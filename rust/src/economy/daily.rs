@@ -2110,18 +2110,38 @@ mod fear_response_shape {
         let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
             .expect("the default preset resolves");
         let image = p.vix_return_gain * mathx::pow(GRADED_ABS_R, p.vix_return_exponent);
-        assert_eq!(
-            p.vix_ceiling, image,
-            "the ceiling is {} where the graded range's image is {image}. Below it              the fear response B4 requires to keep rising meets a clamp INSIDE the              range the tape grades, which is charter bar B4 and the loop's fixed              point contradicting each other.",
+        assert!(
+            p.vix_ceiling >= image,
+            "the ceiling is {} and the graded range's image is {image}. Below the              image a graded session reaches the clamp FROM REST, which is charter              bar B4 and the loop's fixed point contradicting each other.",
             p.vix_ceiling
         );
-        // The session at which the fear channel alone reaches the ceiling
-        // is exactly the top of the graded range, stated as the reader
-        // wants it rather than left implicit in the product above.
+        // AND THE IMAGE IS ONLY THE NECESSARY HALF. It prices a session from
+        // rest; the constraint binds from an ELEVATED state, because the VIX
+        // a session lands on already carries the read-back. The sufficient
+        // condition is `C - implied(C) >= image`, where `implied(C)` is the
+        // level the map sustains at a pin of C, and it is not computable
+        // from the dials -- it is measured on `pin_ladder.py`. b4fix6 swept
+        // eighteen pins from 14 to 260 on three seeds, found `C - implied(C)`
+        // monotone with a single crossing, and solved
+        //
+        //     C* = 173.1087,  residual +/- 8.82
+        //
+        // bracketed by pins 160 and 180. That is the shipped value, and it
+        // is pinned here so a preset that moved the ceiling without
+        // re-solving the condition fails rather than silently reintroducing
+        // the clamp the derivation exists to move out of reach.
+        const CEILING_SOLVED: f64 = 173.1087;
+        assert_eq!(
+            p.vix_ceiling, CEILING_SOLVED,
+            "the ceiling is {} where b4fix6's ladder solved {CEILING_SOLVED}.              Re-solve `C - implied(C) >= {image}` on a ladder before moving it;              the value is measured, not chosen.",
+            p.vix_ceiling
+        );
+        // The session at which the fear channel ALONE reaches the ceiling,
+        // which is now past the graded range rather than exactly at it.
         let reaches_at = mathx::pow(p.vix_ceiling / p.vix_return_gain, 1.0 / p.vix_return_exponent);
         assert!(
-            (reaches_at - GRADED_ABS_R).abs() < 1e-9,
-            "fear alone reaches the ceiling at {reaches_at} per cent, not at the              graded range's {GRADED_ABS_R}"
+            reaches_at > GRADED_ABS_R,
+            "fear alone reaches the ceiling at {reaches_at} per cent, inside the              graded range's {GRADED_ABS_R}"
         );
         // And the cap does not bind first, or the ceiling would never be
         // the binding constraint it is derived to be. The cap is the
