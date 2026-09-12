@@ -300,8 +300,8 @@ have the same shape.
 **pt-v1 through pt-v18 are bit-identical.** Measured over seventeen presets
 and five seeds (101, 102, 103, 111, 114) as a digest of every name column,
 every economy scalar, the market variance state and the draw counts at each
-close: 85 of 85 agree, and the five pt-v19 rows are the only ones that move.
-`KAT_VERSION` goes to 18.
+close: 85 of 85 agree, and the five pt-v19 rows are the only ones that move,
+which takes `KAT_VERSION` to 18.
 
 **The derived VIX anchor does not move, at 23.7212 on `Universe.random(40,
 seed=111)`.** `index_unconditional_variance` evaluates the identity at `v_f
@@ -338,11 +338,83 @@ the breaker binds on 0, 75, 16 and 54 rows across seeds 2024, 7, 101 and
 fix` reads the median `volume_abs_return_corr` over twelve seeds at 0.4825
 against 0.4927, still inside its 0.46 to 0.66 band, with the 0.7015 outlier
 on seed 6 gone and the count of seeds outside the band going from three to
-four.
+four. The certified row is measured rather than inferred from that: on
+`facts.LEVEL_PROTOCOL` it reads 0.5136 at 252 days and 0.5551 at 504, in
+band at both, so the fixture's per-seed count is a property of twelve seeds
+on one roster. Its ceiling goes to five, which is the majority the count was
+always there to assert, with both readings written down beside it.
 
-The census that decides whether this works is registered as `b4fix1` in the
-design repository, with the ceiling-day count it has to reach and the count
-that would say the superlinearity was not the whole mechanism.
+**The census says the remedy cuts the runaway by 85 per cent and does not
+end it, so it does not meet its bar.** Registered as `b4fix1` before the box
+with a prediction of zero ceiling days and a stated stop condition. Measured
+over 120 rosters at 252 sessions, free-running, with the crisis blend
+switched entirely off: `vix_ceiling` is reached on **5 of 120 rosters over
+25 seed-days**, against 11 of 120 and 164 with the switch off on the same
+build. Six of the eleven runaway rosters stop reaching the ceiling at all
+and the five that survive hold it for 2 to 9 sessions where they held it for
+5 to 39. At the shipped blend gain the ceiling days fall from 1,477 to 405.
+Both switch-off arms reproduce the earlier census exactly, 11 of 120 with
+164 days and 30 of 120 with 1,477, so the comparison is arm for arm on one
+build.
+
+**The static map is fixed, which is the half that worked.** On a pinned
+ladder with the blend off, seeds 101 to 103, `implied(v) / v` reads:
+
+| pinned VIX | 14 | 20 | 26 | 32 | 40 | 50 | 60 | 70 | 80 |
+|---|---|---|---|---|---|---|---|---|---|
+| switch off | 1.007 | 0.840 | 0.770 | 0.740 | 0.732 | 0.746 | 0.775 | 0.812 | 0.854 |
+| switch on | 1.022 | 0.848 | 0.769 | 0.726 | 0.695 | 0.674 | 0.662 | 0.655 | 0.651 |
+
+The switch-off row reproduces the map already on the record, which turns up
+after pin 40. The switch-on row falls from pin 20 upward and flattens toward
+a constant, which is an asymptotically linear map with slope under one. So
+`implied(v) < v` holds at every pin with margin, and the ceiling is not an
+absorbing state of the mean map.
+
+**Which locates what is left.** A pinned ladder removes the day-to-day
+excursion by construction, so a contracting mean map and a census that still
+touches the ceiling on the hottest draw streams are consistent with each
+other: what remains is the excursion around the map. The residual still
+follows the draw stream, since holding the roster at one universe and
+varying the market seed reaches the ceiling on the same seeds, and varying
+the roster with the market seed held reaches it on 0 of 120. The loop's gain
+is lower on the input side as well, with seed 219's factor variance peaking
+at 16.58 times base where it peaked at 26.59.
+
+**The panel.** On `facts.LEVEL_PROTOCOL` at 252 days, thirty seeds, the
+roster drawn per seed: `index_tail_dn3_pct` comes in from 5.2590 to
+**3.0677** against a band of 0.47 to 1.96 and is still out,
+`index_drift_pct` is in band at **5.5439**, and `S` over nineteen rows is
+**23.119** against pt-v18's 42.128 measured in the same run. Seventeen of
+eighteen rows in band, at 504 as well, where the tail reads 4.6786 and `S`
+is 27.933 against pt-v18's 43.994. pt-v18 measures 42.128 here where the
+figure on the record is 56.00; pt-v18 is bit-identical across this change,
+so that difference is not this commit and is recorded rather than resolved.
+
+**The costs the 2026-08-22 note priced, re-measured on pt-v19** and paired
+on the same thirty seeds and rosters, switch on minus switch off:
+
+| row | 252 delta | 504 delta | 2026-08-22 price |
+|---|---|---|---|
+| `abs_return_acf1` | -0.0078 | -0.0677 | -0.03 |
+| `excess_kurtosis` | -0.0902 | +0.4518 | -0.10 |
+| `cross_sectional_corr` | -0.0015 | -0.0582 | -0.006 |
+
+At 252 days every one is at or under the priced figure, at 0.26, 0.90 and
+0.25 times it, and the panel's room absorbs them with a lot to spare, since
+`excess_kurtosis` reads 8.9109 against a band of 1.6 to 41.0 and
+`abs_return_acf1` 0.0587 against 0.02 to 0.22. At 504 days they are 2.3, 4.5
+and 9.7 times the priced figures and the kurtosis sign flips;
+`abs_return_acf1` spends about a third of its distance to its 0.04 floor and
+stays in band. No row leaves its band because of them,
+and the row that is out of band is the tail, which the switch improves.
+
+`programme/results/b4fix1-result.md` in the design repository carries the
+per-roster table, the seven acceptance criteria scored one by one, and the
+full prediction ledger. Three of the seven are met, one is met with the four
+standing failures named, and three are not: there is no fixed point below
+the ceiling on five rosters, the tail row is out of band, and the panel is
+17 of 18 rather than 18 of 18.
 
 **Five dials leave the default's live surface and six join it.** Under
 `vix_level_identity` the VIX is derived from the index's conditional

@@ -106,7 +106,7 @@ Two encodings appear:
 
 | Form | Where | Example |
 |---|---|---|
-| `{ "dec": …, "bits": … }` | individual cases | `{ "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" }` |
+| `{ "dec": ..., "bits": ... }` | individual cases | `{ "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" }` |
 | bare bits string | bulk arrays and row tables | `"3FEFA1E827A1B38C"` |
 
 `dec` is the shortest round-trip decimal, **for humans only**. It is exact

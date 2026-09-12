@@ -47,10 +47,21 @@ Rules, set by the plan owner:
   emphasis.
 - Prefer the specific number, filename, or field name over a characterisation
   of it.
-- ASCII punctuation only. No em dashes, en dashes, typographic minus signs or
-  arrows.
+- ASCII punctuation only. No em dashes, en dashes, typographic minus signs,
+  arrows, ellipsis characters, bullet glyphs or check marks.
 
 When a sentence could open a blog post, rewrite it.
+
+The rules above are this repository's own and predate the standard named
+next. Since 2026-09-12 the reference for all copy here is
+`human-writing-prompt.md` in the `kill-ai-prose` repository, adopted by the
+plan owner. Where the two overlap they agree; where the prompt goes further,
+it governs. Its mechanically checkable rules are asserted by
+`tests/test_brand_commitments.py`, which also records which of them were
+measured and deliberately left out, and with what counts. Its vocabulary
+lists are guidance rather than assertions, on the prompt's own terms: a word
+that is the precise term stays, which is why `leverage` appears here as the
+financial term and is not banned.
 
 `tools/prose/prose.py` checks the mechanical rules and reports file, line and
 text. It is canonical in this repository and `tradefloor-docs` vendors it, so
