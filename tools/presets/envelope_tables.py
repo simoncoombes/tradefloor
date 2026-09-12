@@ -105,8 +105,17 @@ def rewrite(text: str, name: str, values: dict[str, float]) -> tuple[str, list]:
 
 def figures(record: dict) -> list[str]:
     """The numbers prose quotes, computed from the record and the rulers."""
-    sys.path.insert(0, str(ROOT / "python"))
-    from tradefloor import facts
+    # The INSTALLED package first. On a box the wheel is installed and the
+    # source tree has no `_core`, so putting `python/` at the front of the
+    # path made `import tradefloor` resolve to the source package and fail
+    # on `from . import _core` (b4fix7, 2026-09-12, the first time this
+    # step ever got past its argument parsing). The source path is a
+    # fallback for a bare checkout, where the extension sits in the tree.
+    try:
+        from tradefloor import facts
+    except ImportError:
+        sys.path.insert(0, str(ROOT / "python"))
+        from tradefloor import facts
 
     lines = []
     lp = record["level_protocol"]
