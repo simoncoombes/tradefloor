@@ -1,12 +1,9 @@
 # Contributing
 
-Thanks for looking. A few things about this codebase are unusual, and
-knowing them first will save you a wasted afternoon.
-
-## The one rule everything else follows
-
 **A change to the simulated trajectory is a breaking change**, whatever its
 size.
+
+## Breaking changes
 
 Given a seed, a roster and a macro state, `tradefloor` produces one market and
 the same market on every platform. Published results cite a seed and a model
@@ -42,7 +39,7 @@ block-style subset the schema uses, because the package depends on nothing
 and a configuration file should not change that. pyyaml is here so
 `tests/test_yaml_subset.py` can check that reader against a real parser on
 every fragment it accepts and every scenario the repository ships. Without
-it those tests skip, and a skip and a pass are the same colour.
+it those tests skip and the run still reports green.
 
 ## Tests
 
@@ -69,13 +66,14 @@ in about 590s. So the suite has more than doubled and the wall time has
 roughly tripled, and neither figure is wrong for its own commit. On a
 contended four-core machine the same run has taken over 1,000 seconds of CPU.
 
-Two things move the count without anything being wrong. `tests/test_tool_help.py` parametrises over
-`tools/calibration/*.py`, so adding a tool adds a test: one landed after
-`ca4fa6a` and the tree now collects 1,359. And `tests/test_mcp.py` and
-`tests/test_mcp_integration.py` call `pytest.importorskip("mcp")` at module
-level, so without the `mcp` extra their 93 tests never enter the count at all
-and collection reports 1,266 -- a missing extra shows up as a smaller total,
-not as a column of skips.
+Two things move the count without anything being wrong.
+`tests/test_tool_help.py` parametrizes over `tools/calibration/*.py`, so
+adding a tool adds a test: one landed after `ca4fa6a` and the tree now
+collects 1,359. And `tests/test_mcp.py` and `tests/test_mcp_integration.py`
+call `pytest.importorskip("mcp")` at module level, so without the `mcp`
+extra their 93 tests never enter the count at all and collection reports
+1,266. A missing extra shows up as a smaller total, and no skips appear in
+the output.
 
 Some suites are opt-in and skip cleanly rather than failing. Three different
 reasons put a test in the skip column, and they read identically in the
@@ -86,13 +84,13 @@ results), or `TRADEFLOOR_SLOW_TESTS` being unset. Only the last is a choice you
 made.
 
 `TRADEFLOOR_SLOW_TESTS=1` adds two things: the example notebooks, which are
-executed rather than read (`tests/test_examples.py` walks `examples/` and
-parametrises over what it finds, so its count moves when an example is added
--- the script syntax checks run on every pass, because a rename that missed a
-reference should fail whether or not you remembered the flag), and the one
-MCP test that runs a full 252-day evaluation. That test costs what it costs
-because a result AT the certified horizon exists only once a run has reached
-that horizon.
+executed rather than read, and the one MCP test that runs a full 252-day
+evaluation. `tests/test_examples.py` walks `examples/` and parametrizes over
+what it finds, so its count moves when an example is added. The script
+syntax checks run on every pass, because a rename that missed a reference
+should fail whether or not you remembered the flag. The MCP test costs what
+it costs because a result AT the certified horizon exists only once a run
+has reached that horizon.
 
 The Rust parity suites compare against golden vectors generated from the
 reference implementation. They are the evidence for the port being
@@ -105,7 +103,7 @@ bit-identical, so if you change anything in `rust/src/market/` or
 pull request that has passed the determinism gate on all five targets, and
 only the owner merges, with `dev` carrying the same requirement.
 
-**Every piece of work gets its own branch.** Not `dev` directly, not `main`.
+Every piece of work gets its own branch, never `dev` or `main` directly.
 
 ```
 feature branch  ->  dev  ->  main  ->  tag
@@ -119,7 +117,7 @@ feature branch  ->  dev  ->  main  ->  tag
 | `docs/<name>` | prose and the notebooks. The site itself lives in the private `tradefloor-docs` repo and is changed there, not here. |
 | `chore/<name>` | tooling, CI, release plumbing |
 
-**One preset per branch, always.** Two presets on one branch cannot be
+One branch carries one preset. Two presets on one branch cannot be
 measured against each other, and the losing one cannot be dropped without
 rewriting the history of the winner. The measurement is the deliverable, so
 the branch is the unit that carries it.
@@ -135,17 +133,17 @@ checked in `tradefloor-docs`, so there is no docs build here to require.
 `main` remains the stricter of the two, because it requires a branch to be up
 to date before a merge and `dev` does not.
 
-**Neither branch allows a force push or a deletion.** A rewritten `dev` used
-to be a normal way to tidy up; it is now blocked, because a calibration run
+Neither branch allows a force push or a deletion. A rewritten `dev` used to
+be a normal way to tidy up. It is now blocked, because a calibration run
 that cloned it cannot be reproduced afterwards if its commits are gone.
 
 ## Code layout
 
-**If it decides something about the market, it belongs in `rust/src/`, not
-in a binding.**
+If it decides something about the market, it belongs in `rust/src/` and not
+in a binding.
 
 The engine is consumed twice, as a Python extension and as WebAssembly, and
-a modelling decision implemented separately in each is a fork dressed up as
+a modeling decision implemented separately in each is a fork dressed up as
 glue code. The divergence is invisible until a whole
 simulated market has drifted apart. The day loop lived in the Python binding
 until the browser build needed it too; moving it was a day's work that
@@ -162,7 +160,7 @@ globbed `0*`, so the first unnumbered example added to `examples/` was
 invisible to CI on the day it landed. It compiled nowhere, executed nowhere,
 and nothing said so.
 
-Three tiers, each with a rule about who owns it.
+The tree has three tiers, each with a rule about who owns it.
 
 ```
 examples/
@@ -184,19 +182,19 @@ tests/
     fixtures/<name>/            recorded input, committed, one copy
 ```
 
-**The numbers are a curriculum.** `00` onward are steps a reader takes in
+The numbers are a curriculum. `00` onward are steps a reader takes in
 order. They use the core library and at most an extra this project ships, and
 adding one adds a lesson. A study teaches nothing in particular. It asks one
 question, it may need an optional extra, and nothing about it follows from
 the example before it, so it gets a name and a directory.
 
-**A study is one directory.** The script and the notebook for one experiment
+A study is one directory. The script and the notebook for one experiment
 present the same experiment two ways. Splitting them across `examples/` and a
 top-level `notebooks/` puts two halves of one thing in two places, and
 `notebooks/` becomes a second unordered pile the day a second one arrives. The
 notebook imports the module; the module is the source of truth.
 
-**Artifacts are output, fixtures are input, and they live apart.** A run
+Artifacts are output, fixtures are input, and they live apart. A run
 writes an artifact, the artifact describes that run, and running again
 regenerates it. So it sits beside the run that wrote it, in
 `examples/<study>/artifacts/`, git-ignored. A fixture is recorded
@@ -205,13 +203,13 @@ the example read the SAME one, because two copies of a recording can drift
 apart. So fixtures are committed, under `tests/fixtures/<name>/`, whoever
 reads them.
 
-**An integration is a subpackage member, an optional extra, and a study.**
+An integration is a subpackage member, an optional extra, and a study.
 The adapter follows three rules, set out in
 `python/tradefloor/integrations/__init__.py`: lazy import, never reached by
 `import tradefloor`, one extra named after the framework. Its runnable half
 is a study like any other.
 
-**Every example is checked.** `tests/test_examples.py` walks `examples/`
+Every example is checked. `tests/test_examples.py` walks `examples/`
 instead of globbing, so a new example cannot arrive invisible again. Scripts
 are syntax-checked on every run; notebooks are executed behind
 `TRADEFLOOR_SLOW_TESTS=1`.
@@ -219,26 +217,27 @@ are syntax-checked on every run; notebooks are executed behind
 ## Style
 
 The comment density here is higher than most codebases and it is
-deliberate. The convention is that a comment explains **why**, and
-especially why the obvious alternative is wrong, which is usually because
-it was tried. If you remove a guard that looks redundant, check whether its comment
-says what happened last time.
+deliberate. The convention is that a comment explains why, and especially
+why the obvious alternative is wrong, which is usually because it was tried.
+If you remove a guard that looks redundant, check whether its comment says
+what happened last time.
 
 Numbers in prose carry their measurement. "Roughly a quarter" is a
 convention; "0.0239 against a band of -0.08 to 0.06, thirty seeds at 252
 days" is a measurement. Only the second kind belongs in a docstring. That
 one is `return_acf1` on the shipped preset, and you can read both halves of
-it back out of `tradefloor.envelope.CERTIFIED` and `tradefloor.facts.REAL_MARKETS`
-rather than taking this file's word for it.
+it back out of `tradefloor.envelope.CERTIFIED` and
+`tradefloor.facts.REAL_MARKETS` rather than taking this file's word for it.
 
 Punctuation is ASCII. No em dashes, en dashes, typographic minus signs or
-arrows, in prose or in a docstring: use ` -- ` and `-`. The minus sign is the
-one that bites, because it looks right and is a different character from the
-one in the number beside it.
+arrows, in prose or in a docstring. Where an em dash would go, use a comma,
+parentheses, or two sentences. A spaced hyphen in its place carries the same
+pause and is banned too. Negative numbers take the ASCII hyphen-minus, `-`.
+The minus sign is the one that bites, because it looks right and is a
+different character from the one in the number beside it.
 
 ## Reporting a determinism failure
 
-This is the most valuable bug you can find. If two platforms disagree on
-`python tests/known_answer.py`, please open an issue with both digests, both
-platforms, and the output of `tradefloor.version()`. That is enough to start;
-we can reproduce the rest.
+If two platforms disagree on `python tests/known_answer.py`, open an issue
+with both digests, both platforms, and the output of `tradefloor.version()`.
+That is enough to start, and we can reproduce the rest.

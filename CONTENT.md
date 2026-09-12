@@ -1,9 +1,8 @@
 # Content guidelines
 
-What every written surface in this repository and in `tradefloor-docs` has to
-meet: the register, the banned constructions, the budgets and the per-surface
-rules. `RELEASING.md` holds the order things happen in at a release. This is
-the document to work from while writing.
+Every written surface in this repository and in `tradefloor-docs` has to
+meet the register, the banned constructions, the budgets and the per-surface
+rules below. `RELEASING.md` holds the order things happen in at a release.
 
 The register below moved here from the product brief when that document
 left the repository, because it is the half of it that still binds.
@@ -14,9 +13,6 @@ Two tools check the mechanical half:
 python tools/prose/prose.py     # the house style, over this repo's prose
 python tools/release/check.py   # every budget below, plus release state
 ```
-
-Neither can see register, so read a clean run as the mechanical half
-passing and nothing more.
 
 ## Register
 
@@ -45,12 +41,12 @@ Rules, set by the plan owner:
   "the identity held through a crisis".
 - No em-dash asides, no rhetorical questions, no single-sentence paragraphs for
   emphasis.
-- Prefer the specific number, filename, or field name over a characterisation
+- Prefer the specific number, filename, or field name over a characterization
   of it.
 - ASCII punctuation only. No em dashes, en dashes, typographic minus signs,
-  arrows, ellipsis characters, bullet glyphs or check marks.
-
-When a sentence could open a blog post, rewrite it.
+  arrows, ellipsis characters, bullet glyphs or check marks. Where an em
+  dash would go, use a comma, parentheses, or two sentences, and never a
+  spaced hyphen in its place.
 
 The rules above are this repository's own and predate the standard named
 next. Since 2026-09-12 the reference for all copy here is
@@ -67,11 +63,6 @@ financial term and is not banned.
 text. It is canonical in this repository and `tradefloor-docs` vendors it, so
 one copy of the rules checks both trees. It cannot see register, so a clean
 run is not a passing grade.
-
-This section is the register: what the writing sounds like. `CONTENT.md` is
-the other half, and holds the budgets and the per-surface rules, including
-how long a release note may run and which surfaces name the default preset in
-prose.
 <!-- prose: on -->
 
 Dual-licensed MIT OR Apache-2.0, at the user's option, which is the
@@ -79,15 +70,15 @@ Rust-ecosystem norm and what `pyproject.toml` and `rust/Cargo.toml` both
 declare. The repository must not reference the commercial product the engine
 was ported from.
 
-**The visual identity is deliberately decoupled from the subject matter.** A
+The visual identity is deliberately decoupled from the subject matter. A
 first attempt themed the documentation as trading-desk stationery, deriving
 its world from markets. The plan owner rejected it: theming the library to
-its domain reads as a game artifact and couples the library's identity to the
-product it was extracted from. The standing commitment is the contemporary
-enterprise documentation standard, executed straight, with the Anthropic and
-Mintlify class of developer documentation as the craft bar. Neutral ground,
-one accent, no costume, no subject-derived metaphor. Light and dark are both
-supported.
+its domain reads as a game artifact and couples the library's identity to
+the product it was extracted from. The standing commitment is the
+contemporary enterprise documentation standard, executed straight, at the
+level of the Anthropic and Mintlify developer documentation. Pages use
+neutral ground and one accent, with no costume and no metaphor drawn from
+the subject. Light and dark are both supported.
 
 ## Budgets
 
@@ -105,24 +96,23 @@ where the good ones already sat rather than where an ideal would be.
 | site page description | 120 to 165 characters | `build.py` |
 | heading, any surface | 60 characters, noun phrase | `prose.py` |
 
-**Why 250 for a release note.** It is what `release.yml` publishes to GitHub
-and what the release-notes page renders. The median of the twelve sections
-before 0.6.0 is 139 words. 0.4.0 (233) and 0.2.0 (240) both moved the default
-preset, the largest kind of change this project makes, and explained
-themselves inside the budget. 0.6.0 reached 1,257, which is an unreadable
-release page.
+The 250 words are what `release.yml` publishes to GitHub and what the
+release-notes page renders. The median of the twelve sections before 0.6.0
+is 139 words. 0.4.0 (233) and 0.2.0 (240) both moved the default preset, the
+largest kind of change this project makes, and explained themselves inside
+the budget. 0.6.0 reached 1,257, which is an unreadable release page.
 
 The budget binds the newest section only. The ones below it were published
 under their tags, and rewriting a release note afterwards edits a record
 somebody may have read.
 
-**What goes above the marker:** what changed, what breaks, what to pin, what
-got worse. **What goes below:** how it was measured, why it was done that
-way, and what nearly went wrong. Nothing is deleted to meet the budget; it
-moves.
+Above the marker go what changed, what breaks, what to pin and what got
+worse. Below it go how it was measured, why it was done that way, and what
+nearly went wrong. Nothing is deleted to meet the budget, and a line that
+does not fit moves down.
 
-**Moving is not free for every line, because the two halves have different
-readers.** The text above the marker is what `release.yml` publishes to
+Moving a line down has a cost, because the two halves have different
+readers. The text above the marker is what `release.yml` publishes to
 GitHub, and that reader never sees the block below it. So a line that states
 a consequence somebody has to act on cannot be shortened by leaving the
 explanation underneath: "recompute them" with the object below the marker
@@ -134,20 +124,19 @@ consequence either fits above in full or the budget gives.
 
 ### CHANGELOG.md
 
-Write prose in place of a bulleted catalogue, newest first, under a
+Write prose in place of a bulleted catalog, newest first, under a
 `## X.Y.Z` heading, with ASCII punctuation only, which
 `tests/test_brand_commitments.py` enforces.
 
 State a regression in the same breath as the improvement it paid for. Every
-section that made something worse says so above the marker, and that is the
-convention worth keeping most.
+section that made something worse says so above the marker.
 
 ### README.md
 
 It is the PyPI project page, so every link must be absolute;
 `tests/test_readme_links.py` fails on a relative one.
 
-**It names the default preset twice**, in prose, and neither line is a
+It names the default preset twice, in prose, and neither line is a
 version location. `tools/release/check.py` checks both against the build.
 A release that moves the default has to move these.
 
@@ -158,14 +147,14 @@ most. A title is a heading, so it is a noun phrase or a plain statement of
 what changed, never a clever one. "A ban nobody checked, enforced" was a real
 title and is the shape to avoid.
 
-- **Titles say what changed.** No oblique headlines, no wordplay, no
+- Titles say what changed, with no oblique headlines, no wordplay and no
   colon-and-flourish.
-- **Commit messages stay abstract**, because both repositories are public.
+- Commit messages stay abstract, because both repositories are public.
   Say what changed and why at the level a reader outside the project needs.
   Leave out finding counts, tool and check names, internal process narrative,
   who asked for what, and the shape of the session that produced the work.
   This is the one place the "prefer the specific number" rule is reversed.
-- **A pull request body takes the specifics** the commit message left out:
+- A pull request body takes the specifics the commit message left out:
   the counts, the measured values, the checks that ran and what they said.
   It has a reviewer, and a reviewer needs the evidence.
 - No definition by negation in either. "Point the runner at the current
@@ -178,7 +167,7 @@ author rather than on a check.
 
 - A notebook's committed output is part of the content. A reader on GitHub
   sees it without running anything, so it should show a real run.
-- **A recorded fixture is content with an expiry.** Anything keyed to the
+- A recorded fixture is content with an expiry. Anything keyed to the
   market, such as a replay keyed to the exact text an agent was sent, dies
   when the default preset moves and has to be re-recorded.
 - A notebook that needs a key should run without one and say what it did
@@ -189,9 +178,9 @@ author rather than on a check.
 
 ### Docstrings and code comments
 
-**Out of scope, deliberately.** The rules were written for prose a reader
-meets, not for a comment beside the line it explains. `prose.py` does not
-read them and no budget applies.
+These are out of scope, deliberately. The rules were written for prose a
+reader meets, not for a comment beside the line it explains. `prose.py` does
+not read them and no budget applies.
 
 One convention does: where a comment carries a measured number, it carries
 the value it replaced too. Those comments are the only record of how a figure

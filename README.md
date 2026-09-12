@@ -3,7 +3,7 @@
 [![determinism](https://github.com/simoncoombes/tradefloor/actions/workflows/determinism.yml/badge.svg)](https://github.com/simoncoombes/tradefloor/actions/workflows/determinism.yml)
 [![PyPI](https://img.shields.io/pypi/v/tradefloor.svg)](https://pypi.org/project/tradefloor/)
 [![crates.io](https://img.shields.io/crates/v/tradefloor.svg)](https://crates.io/crates/tradefloor)
-[![licence: MIT OR Apache-2.0](https://img.shields.io/badge/licence-MIT%20OR%20Apache--2.0-blue.svg)](#licence)
+[![license: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
 A market simulator you can run a strategy against, with a Rust core and a
@@ -13,8 +13,9 @@ Give it a seed and a list of companies. It runs a market forward: prices, a
 limit order book, fills, and an economy that moves each day. Your orders match
 against real depth, so your trades move the price.
 
-Real market data cannot tell you what happens if you trade differently, or what
-caused a move. This can, because it computed every price.
+Real market data cannot tell you what happens if you trade differently, or
+what caused a move, because nobody recorded the alternative. This simulator
+computed every price, so it can.
 
 ## Documentation
 
@@ -30,15 +31,15 @@ pip install tradefloor
 
 > Formerly **pretium**. Versions through 0.4.3 were published under that
 > name and remain installable forever; results recorded against them replay
-> under those exact versions. The rename changed no behaviour: 0.5.0
+> under those exact versions. The rename changed no behavior, and 0.5.0
 > reproduces the same known-answer digest on every platform.
 
 Wheels for Linux, macOS and Windows on CPython 3.11+. No dependencies. The same
 engine is a Rust crate: `cargo add tradefloor`.
 
-The API can still change before 1.0. A published result cannot: new
-coefficients ship as a new preset, so a run you cited last month replays this
-month.
+The API can still change before 1.0. A published result cannot change,
+because new coefficients ship as a new preset, so a run you cited last month
+replays this month.
 
 ## The demo
 
@@ -49,10 +50,10 @@ python examples/rate-shock/counterfactual.py
 Run an agent in a controlled market, checkpoint the world and fork it, then
 raise rates by 200bps in one branch and compare what the same agent does next.
 
-**One changed variable, in the same world and with the same agent.** The run
-takes two seconds and needs no keys and no network. It prints the nine checks
-that prove the two branches started identical, the step at which the agent's
-behaviour changed, and the side-by-side. The walkthrough is
+The run changes one variable in the same world with the same agent, takes
+two seconds, and needs no keys and no network. It prints the nine checks that
+prove the two branches started identical, the step at which the agent's
+behavior changed, and the side-by-side. The walkthrough is
 [Your first counterfactual experiment](https://github.com/simoncoombes/tradefloor/blob/main/examples/rate-shock/README.md).
 
 ## First run
@@ -132,7 +133,7 @@ recession will do to markets. It lets you state those assumptions and measure
 how an agent behaves under them.
 
 Six scenarios ship inside the package, so `Scenario.load` works on a plain
-`pip install` -- each one recording what it was measured to be worth. Their
+`pip install`, and each one records what it was measured to be worth. Their
 [source is here](https://github.com/simoncoombes/tradefloor/tree/main/python/tradefloor/scenarios).
 `tradefloor scenario list` names them, and `tradefloor scenario targets`
 lists every target and what it actually reaches.
@@ -143,10 +144,27 @@ lists every target and what it actually reaches.
 bands, and four more on a protocol that varies the roster with the seed. The
 default preset, `pt-v19`, holds all fourteen at one year and at two years, on
 the certification roster and on a held-out one, at thirty seeds each, and all
-fourteen at the real centre where `pt-v18` held twelve. It holds the other four
-as well: the index level returns +6.5 per cent a year inside a band of 2.9 to
-11.9, and the -3 per cent fear row reads 5.8 against a tape centre of 5.7,
-where `pt-v18` read 3.2 against a floor of 2.6.
+fourteen at the real center where `pt-v18` held twelve.
+
+<!-- DOCS-0.8.0 PLACEHOLDER. The sentence that stood here read: "It holds the
+     other four as well: the index level returns +6.5 per cent a year inside a
+     band of 2.9 to 11.9, and the -3 per cent fear row reads 5.8 against a
+     tape centre of 5.7, where pt-v18 read 3.2 against a floor of 2.6."
+
+     Two of those figures are on the record against a different preset. In
+     tradefloor-design, programme/results/cert4b/certcomp-verdict.txt, the
+     +6.5 (6.5177) and the 5.8 (5.8162) belong to the arm named
+     cert-fourdial, which is pt-v18 plus four dials, not pt-v19. pt-v19's own
+     readings on the same varying-roster protocol, from
+     programme/results/b4fix2-scored.json, are index_drift_pct 5.5439 at 252
+     and fear_gauge_dn3 7.6548, so the fear row is roughly 7.7 rather than
+     5.8. The pt-v18 halves (3.2473, band floor 2.6) are correct.
+
+     The paragraph above is also measured on the 2026-09-10 panel, run at
+     engine daf20e6, before the last six dials moved. README.md and
+     python/tradefloor/envelope.py have not been touched since. Restore this
+     sentence from a panel of the shipped preset, and re-confirm the sentence
+     above it at the same time. -->
 
 One row reads further from real than before: the crisis lever is 5.28x
 against real markets' 6.16x, where `pt-v18` read 6.53x.
@@ -217,12 +235,12 @@ and they come in no particular order.
 
 ## Agent frameworks
 
-The framework decides; Tradefloor runs the market it decides in. Each adapter
-under `tradefloor.integrations` carries one framework's output through the
-same loop of observation, decision, execution and evaluation, so two
-frameworks can be measured on one market through one harness.
+The framework decides, and tradefloor runs the market it decides in. Each
+adapter under `tradefloor.integrations` carries one framework's output
+through the same loop of observation, decision, execution and evaluation, so
+two frameworks can be measured on one market through one harness.
 
-| Framework | Tradefloor support |
+| Framework | tradefloor support |
 |---|---|
 | [Plain Python](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/callable/five_days.py) | Generic callable |
 | [OpenAI Agents SDK](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/openai_agents/five_days.py) | Adapter |
@@ -245,12 +263,12 @@ adapter records each exchange keyed by a digest of the exact input it sent
 and replays that recording later with the framework uninstalled. The four
 sit together in
 [`examples/integrations/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/integrations),
-which sets out what each framework contributes and what Tradefloor keeps.
+which sets out what each framework contributes and what tradefloor keeps.
 
 ## FinRobot integration
 
 Evaluate a [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot)
-financial AI agent inside a controlled Tradefloor market. Run shared history,
+financial AI agent inside a controlled tradefloor market. Run shared history,
 checkpoint the world, fork it, raise rates by 200bps in one branch, and compare
 how the same agent responds. The canonical rate-shock experiment, with the
 agent swapped and nothing else moved.
@@ -268,7 +286,7 @@ no network and no FinRobot install.
 - [`examples/integrations/finrobot/rate_shock.ipynb`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/finrobot/rate_shock.ipynb)
 
 FinRobot is a project of the AI4Finance Foundation, licensed Apache-2.0. The
-notebooks above are a Tradefloor integration for FinRobot, maintained in this
+notebooks above are a tradefloor integration for FinRobot, maintained in this
 repository without endorsement from AI4Finance, and they form no part of
 FinRobot's own interface.
 
@@ -283,7 +301,7 @@ size.
 To cite the software, see [CITATION.cff](https://github.com/simoncoombes/tradefloor/blob/main/CITATION.cff). To cite a result, use its
 `RunManifest`.
 
-## Licence
+## License
 
 MIT OR Apache-2.0, at your option, which is the Rust-ecosystem norm. See
 [LICENSE-MIT](https://github.com/simoncoombes/tradefloor/blob/main/LICENSE-MIT)

@@ -3,7 +3,7 @@
 One tag drives everything. `git push origin vX.Y.Z` starts the workflow that
 builds five wheels, builds the sdist, proves they agree, publishes to PyPI
 and writes the GitHub release. The steps below are the parts a tag cannot do
-for you, and the checks that exist because something once went wrong.
+for you.
 
 Every item here is either automated and named so you know not to do it by
 hand, or manual and ordered so the irreversible steps come last.
@@ -19,7 +19,7 @@ python tools/release/check.py --version X.Y.Z
 
 It reports and changes nothing. Every row in it exists because that thing was
 wrong once and nothing noticed. What it cannot check it prints at the end
-under "Still yours", so a step that needs judgement is visible rather than
+under "Still yours", so a step that needs judgment is visible rather than
 implied.
 
 ### 1. Version locations
@@ -62,15 +62,16 @@ calls `sys.exit("CHANGELOG.md has no section for ...")`, the step runs under
 the time you see the failure the wheels are already on PyPI, which is the one
 step that cannot be undone. Write the section before you tag, not after.
 
-Write prose, with no em dashes or en dashes anywhere;
-`tests/test_brand_commitments.py` enforces that on `CHANGELOG.md`, and
-`tools/prose/prose.py` checks the rest of the house style.
+Write prose with ASCII punctuation only. Where an em dash would go, use a
+comma, parentheses, or two sentences. A spaced hyphen in its place carries
+the same pause and is banned too. `tests/test_brand_commitments.py` enforces
+the character ban on `CHANGELOG.md`, and `tools/prose/prose.py` checks the
+rest of the house style.
 
-**250 words above the marker.** That is the budget, and
-`tests/test_prose.py` fails over it. Everything above
-`<!-- release-note-ends -->` is what `release.yml` publishes as the GitHub
-release note and what the release-notes page renders; everything below it is
-kept and not published.
+The budget above the marker is 250 words, and `tests/test_prose.py` fails
+over it. Everything above `<!-- release-note-ends -->` is what `release.yml`
+publishes as the GitHub release note and what the release-notes page
+renders. Everything below it is kept and not published.
 
 The budget exists because this project used to write changelog sections as
 essays and they grew: 0.3.0 ran to 375 words, 0.6.0 reached 1,257 against a
@@ -107,7 +108,7 @@ TRADEFLOOR_SLOW_TESTS=1 python -m pytest tests/test_examples.py -q
 cd rust && cargo test --offline
 ```
 
-**Rebuild before you read any of it.** The suite compares a source tree
+Rebuild before you read any of it. The suite compares a source tree
 against a compiled extension, so a tree that has moved past its build reports
 drift everywhere and none of it is real. On 2026-08-30 an extension exposing
 101 settable parameters against a tree carrying 106 produced thirteen
@@ -153,30 +154,30 @@ method no longer produces, and a figure it flags is a documentation defect
 until someone corrects it." Nothing in CI runs it, so if it is not run here
 the guarantee is only a sentence.
 
-**Check what it actually ran before reading it.** The report's header used to
+Check what it actually ran before reading it. The report's header used to
 say "Full run" whatever `--only` was passed. The 0.3.0 report on disk covered
 3 of 30 groups and 54 of 308 figures in 3 seconds, said "Full run", and showed
 no `MOVED` rows at all, because the groups that move were never measured. A
 partial run now labels itself `PARTIAL RUN: n of N`, and `meta.groups_run` in
 `figures.json` is the field that settles it.
 
-**Run it on AWS, not here.** A 504-day 40-name measurement holds about 1.6 GB
-per worker, so eight workers is roughly 13 GB, and it has taken this machine
-out once mid-run. `tools/calibration/aws/user-data-remeasure.sh` runs it on a
-96-vCPU box: 285 figures in 301 seconds at 64 workers, about twenty cents.
-Sixty-four rather than ninety-six because `remeasure` uses a thread pool, so
-the ceiling is how much of the engine releases the GIL, not the core
-count.
+Run it on AWS rather than on this machine. A 504-day 40-name measurement
+holds about 1.6 GB per worker, so eight workers is roughly 13 GB, and it has
+taken this machine out once mid-run.
+`tools/calibration/aws/user-data-remeasure.sh` runs it on a 96-vCPU box: 285
+figures in 301 seconds at 64 workers, about twenty cents. Sixty-four rather
+than ninety-six because `remeasure` uses a thread pool, so the ceiling is
+how much of the engine releases the GIL, not the core count.
 
-**The `perf` group's figures are laptop-bound.** They are marked
+The `perf` group's figures are laptop-bound. They are marked
 `machine_bound` and never fail, and a cloud run reports its own hardware. Do
 not let a cloud number rewrite a published laptop one.
 
 It writes `tools/remeasure/out/REPORT.md`. Read the **Doc edits needed**
-table: every row is a published number this build does not produce. `MOVED`
-after an engine change is an edit list, not a failure -- a new default preset
-moves figures by design -- but the edits have to land before the next step,
-because step 5 is what publishes them. `structural_fail` rows are boolean
+table: every row is a published number this build does not produce. A
+`MOVED` row after an engine change is an edit list, because a new default
+preset moves figures by design. The edits have to land before the next step,
+since step 5 is what publishes them. `structural_fail` rows are boolean
 claims that stopped being true and are worse than a moved number.
 
 The last stored run is the record of what was current at that release. The
@@ -197,8 +198,8 @@ python tools/remeasure/resync.py --apply
 `inventory.json` records, per published figure, the value the page states and
 the line it states it on. A docs rewrite moves both and nothing re-reads them,
 so the gate ends up comparing today's engine against yesterday's prose. At
-0.3.0 that produced **106 MOVED rows and three structural_fail rows, and not
-one of them was a documentation defect.** Fifty described content the rewrite
+0.3.0 that produced 106 MOVED rows and three structural_fail rows, and not
+one of them was a documentation defect. Fifty described content the rewrite
 had deleted, several were reading the wrong column of a table the page gets
 right, and the rest recorded a value the page no longer prints.
 
@@ -207,20 +208,21 @@ page and the surrounding lines mention what the row measures, and retires a
 row only when neither the value nor its subject is there. Anything else it
 leaves for a human, and that residue needs reading rather than clearing.
 
-**Three of the 0.3.0 rows were the measurement tool, not the inventory.**
-`measures.py` called `separation("momentum", "mean_reversion")` where the page
-prints `separation("mean_reversion", "momentum")`, which reverses every win
-count, and compared momentum to random where the page compares mean-reversion
-to random -- a different test. The horizon bullet measured momentum's capture
-where the page says "the same mean-reversion agent". When a row disagrees,
+Three of the 0.3.0 rows were the measurement tool, not the inventory.
+`measures.py` called `separation("momentum", "mean_reversion")` where the
+page prints `separation("mean_reversion", "momentum")`, which reverses every
+win count, and compared momentum to random where the page compares
+mean-reversion to random, which is a different test. The horizon bullet
+measured momentum's capture where the page says "the same mean-reversion
+agent". When a row disagrees,
 check what the tool measures against what the page claims before editing
 either.
 
 The gate is worth reading only once it comes back clean. 0.3.0 finished at 285
 figures, 199 reproduced, zero MOVED.
 
-**Since 0.5.0 this step could not do its job, and said so in neither
-direction.** The documentation left this repository for `tradefloor-docs` at
+Since 0.5.0 this step could not do its job, and said so in neither
+direction. The documentation left this repository for `tradefloor-docs` at
 0.5.0 and was rebuilt from Markdown into `.dc.html` under new page names.
 `inventory.json` still cites `docs/*.md`, so 257 of its 260 rows name a file
 nothing holds. `resync.py` defaulted to `--figures out-0.3.0/figures.json`, a
@@ -229,7 +231,7 @@ run with zero MOVED rows, so it walked nothing, opened nothing and printed
 instead. Both are fixed: the default is the current run, `--docs-root` (or
 `TRADEFLOOR_DOCS`) resolves pages outside this repository, an unreadable page
 is reported rather than raised, and a report in which every row was
-unreadable exits non-zero, which are the three behaviours
+unreadable exits non-zero, which are the three behaviors
 `tests/test_resync.py` now holds against a regression.
 
 The data is still stale. At 0.6.1 the gate ran clean mechanically, 260
@@ -237,22 +239,23 @@ figures, zero `structural_fail`, and reported 83 MOVED of which all 83 name a
 page no root holds. Judged by resync's own standard of a unique distinctive
 match, five of those re-point automatically, ten are pages still printing a
 pt-v12 number, and fifty-four state neither value anywhere. Re-pointing the
-inventory at the new page set is therefore a piece of work with judgement in
+inventory at the new page set is therefore a piece of work with judgment in
 it and not a `--apply` away. The register itself now follows the pages it
 describes: `remeasure.py` and `resync.py` resolve it from `--inventory`,
 then `TRADEFLOOR_DOCS/tools/remeasure/inventory.json`, then the copy still
 committed here, and each prints which of the three it read. A
 `TRADEFLOOR_DOCS` holding no register stops the run and says so, since a
 quiet fall back to the copy here would report the old register's figures
-under the new one's name, which is the failure this section describes. The 0.6.1 run is stored under
-`tools/remeasure/out-0.6.1/` as the record of where this stands.
+under the new one's name, which is the failure this section describes. The
+0.6.1 run is stored under `tools/remeasure/out-0.6.1/` as the record of
+where this stands.
 
 ### 5. Documentation site
 
-**The site is not in this repository.** It is `simoncoombes/tradefloor-docs`,
-private, and Vercel serves its `docs/` directory verbatim from `main` with no
-build step, so a push there is a deploy that is live in about a minute.
-`docs/`, `tools/docs/learn/` and `build_site.py` all left with it. The four
+The site lives in `simoncoombes/tradefloor-docs`, a private repository, and
+Vercel serves its `docs/` directory verbatim from `main` with no build step,
+so a push there is a deploy that is live in about a minute. `docs/`,
+`tools/docs/learn/` and `build_site.py` all left with it. The four
 commands this step used to give you have not existed here since that move,
 which is the same failure this step already carries a warning about: a step
 that names paths nobody has is worse than no step, because it reads as done.
@@ -260,7 +263,7 @@ that names paths nobody has is worse than no step, because it reads as done.
 Documentation does not follow a release on its own. In the docs repo, on a
 branch:
 
-**5.1 Re-vendor what the site checks itself against**, from this tag:
+5.1 Re-vendor what the site checks itself against, from this tag:
 `pyproject.toml`, `rust/src/params.rs`, `python/tradefloor/_core.pyi`,
 `measurements/`, `rust/goldens/*.json`, `examples/data/`,
 `python/tradefloor/presets/*.json` and `tools/prose/prose.py`. The last two
@@ -271,7 +274,7 @@ lists each one and why it is there. The site builds its parameter and API
 reference out of these, so a stale copy is a page that describes the previous
 release.
 
-**5.2 Regenerate the two inventories against the RELEASED wheel.**
+5.2 Regenerate the two inventories against the RELEASED wheel.
 
 ```
 python -m venv /tmp/rel && /tmp/rel/bin/pip install tradefloor==X.Y.Z
@@ -288,7 +291,7 @@ unreleased dials as shipped, under a version that agreed. `params.py` digests
 the settable list beside the version for exactly this reason, and `--check`
 reports the difference in those terms.
 
-**5.3 Build, and pass all five checks** before opening the PR:
+5.3 Build, and pass all five checks before opening the PR:
 
 ```
 python tools/docs/learn/build.py
@@ -304,7 +307,8 @@ node   tools/docs/learn/wraps.cjs  docs
 from the last commit touching its sources, so committing moves the date the
 next build writes. A tree still dirty on the third run is a bug, not churn.
 
-**5.4 Open a PR.** Main is production there; it is merged, never pushed to.
+5.4 Open a PR. Main is production there and is merged rather than pushed
+to.
 
 ### 5b. If this release moves the default preset
 
@@ -312,15 +316,19 @@ The rarest release and the one that touches most. Everything below moved at
 0.6.0, and the ones marked NEW were found by breaking rather than by being on
 a list.
 
-**What a default move changes, in order:**
+A default move changes seven things, in the order below.
 
-**1. The certified envelope.** `envelope.PRESET`, `CERTIFIED` and
-`MEASURED_504` describe the shipped default by the module's own contract, and
-`tests/test_envelope.py` asserts `model_preset()["name"] == envelope.PRESET`.
-Measure the new preset beside the outgoing one in a single paired run, so the
-comparison is not two runs on two days.
+#### 1. The certified envelope
 
-**2. The preset record**, generated rather than typed:
+`envelope.PRESET`, `CERTIFIED` and `MEASURED_504` describe the shipped
+default by the module's own contract, and `tests/test_envelope.py` asserts
+`model_preset()["name"] == envelope.PRESET`. Measure the new preset beside
+the outgoing one in a single paired run, so the comparison is not two runs
+on two days.
+
+#### 2. The preset record
+
+Generate the record rather than typing it.
 
 ```
 python tools/presets/record.py --panel <the preset_panel artefact>
@@ -334,14 +342,18 @@ read by `tradefloor.preset_record` and by the site.
 cannot disagree. That binding is what 0.6.0 lacked: the panel was re-typed by
 hand and `DECAY_252` beside it was not, and nothing failed.
 
-**3. The determinism baseline.** Every seeded trajectory changes, so
-`KAT_VERSION` bumps and `tests/known_answer.json` is regenerated. Produce the
-new digest on two architectures before committing it; the baseline note
-records that it was, and at 0.6.0 a Windows build and a Graviton box agreed
-before the five-target gate ever ran.
+#### 3. The determinism baseline
 
-**4. Test expectations pinned to the old default.** NEW, and the largest
-unplanned piece of 0.6.0, where six broke in three shapes:
+Every seeded trajectory changes, so `KAT_VERSION` bumps and
+`tests/known_answer.json` is regenerated. Produce the new digest on two
+architectures before committing it. The baseline note records that it was,
+and at 0.6.0 a Windows build and a Graviton box agreed before the
+five-target gate ever ran.
+
+#### 4. Test expectations pinned to the old default (NEW)
+
+This was the largest unplanned piece of 0.6.0, where six expectations broke
+in three shapes:
 
 - a dial that was inert becomes live, so its perturbation entry flips
 - a scenario stops reaching a threshold because the new preset runs calmer,
@@ -350,27 +362,30 @@ unplanned piece of 0.6.0, where six broke in three shapes:
 
 Re-measure each expectation. Do not relax one. Keep the replaced value in the
 comment beside it: those comments are how the fifth momentum and
-mean-reversion swap was recognised as the fifth.
+mean-reversion swap was recognized as the fifth.
 
-**5. Anything recorded and keyed to the market.** NEW. A replay fixture keyed
-to the exact text an agent was sent dies when the market moves.
-`tests/fixtures/finrobot/rate-shock.json` had to be re-recorded live against
-the model at 0.6.0. Grep `tests/fixtures/` for anything a market change
-invalidates before assuming the suite covers it.
+#### 5. Anything recorded and keyed to the market (NEW)
 
-**6. Prose that names the preset.** NEW. `README.md` states the default twice
-and neither line is a version location, so nothing in step 1 catches them.
-`tools/release/check.py` now does. Also sweep `python/` for prose figures:
-`scenario.py` and `interventions.py` both described a boundary that a preset
-had moved.
+A replay fixture keyed to the exact text an agent was sent dies when the
+market moves. `tests/fixtures/finrobot/rate-shock.json` had to be
+re-recorded live against the model at 0.6.0. Grep `tests/fixtures/` for
+anything a market change invalidates before assuming the suite covers it.
 
-**7. The published grid, and the site.** Almost every figure the site
-publishes was measured under one preset and almost none say which. When the
-default moved from `pt-v12` to `pt-v14`, nothing re-measured: six pages went
-on quoting pt-v12 numbers until 2026-08-29, reporting a pooled capture of
-+0.783 where the shipped default gives +0.878, and a sign test of 9-3 where
-it is 11-1. Two pages also printed a `separation()` shape the function has
-never returned.
+#### 6. Prose that names the preset (NEW)
+
+`README.md` states the default twice and neither line is a version location,
+so nothing in step 1 catches them. `tools/release/check.py` now does. Also
+sweep `python/` for prose figures: `scenario.py` and `interventions.py` both
+described a boundary that a preset had moved.
+
+#### 7. The published grid and the site
+
+Almost every figure the site publishes was measured under one preset and
+almost none say which. When the default moved from `pt-v12` to `pt-v14`,
+nothing re-measured: six pages went on quoting pt-v12 numbers until
+2026-08-29, reporting a pooled capture of +0.783 where the shipped default
+gives +0.878, and a sign test of 9-3 where it is 11-1. Two pages also
+printed a `separation()` shape the function has never returned.
 
 ```python
 u = tf.Universe.random(30, seed=11)
@@ -388,11 +403,11 @@ write the preset beside it.
 `tools/remeasure/inventory.json`, which lives in this repository and was never
 vendored, so the prose-figure check does not run there at all.
 
-**What a default move does NOT change.** A figure measured under a preset
-that is still selectable stays true; it just stops describing the default. Say
-which preset it describes rather than deleting it. Where a constant could not
-be re-measured in time, mark it in place: `DECAY_252` and `DECAY_SLOPE` carry
-that mark today.
+A default move leaves other figures alone. One measured under a preset that
+is still selectable stays true and only stops describing the default. Say
+which preset it describes rather than deleting it. Where a constant could
+not be re-measured in time, mark it in place: `DECAY_252` and `DECAY_SLOPE`
+carry that mark today.
 
 ### 5c. Document the API this release makes public
 
@@ -407,11 +422,10 @@ wrong, and the pages carry no version of their own to warn them.
 
 Two things to check while doing it, because both have been wrong before:
 
-- **An argument that changed meaning needs its own note.** Say so
-  plainly. Code that already passes it is now doing something different,
-  and its author will not think to re-read a page about a call they
-  already use.
-- **A signature that gained an optional argument still changes the docs**,
+- An argument that changed meaning needs its own note. Say so plainly. Code
+  that already passes it is now doing something different, and its author
+  will not think to re-read a page about a call they already use.
+- A signature that gained an optional argument still changes the docs,
   because the API pages publish signatures from the vendored stub and a
   stale stub publishes the old one.
 
@@ -437,12 +451,12 @@ any relative link and on any absolute link naming a file that is not there.
 gh workflow run determinism.yml --ref <branch> -f targets=all
 ```
 
-**Read the run you just started, not the newest one in the list.**
+Read the run you just started, and not the newest one in the list.
 `gh run list --workflow=determinism.yml --branch <b> --limit 1` returns the
 previous run until the new one registers, and that previous run is green on an
 older commit. Take the run id from the `gh workflow run` output or from
 `gh run view <id>`, and check `headSha` matches the commit you mean to tag.
-Reading the wrong row is a green tick on the wrong artefact.
+Reading the wrong row is a green tick on the wrong artifact.
 
 `targets=all` is spelled out because the dispatch default is `unverified`,
 which runs only `macos-x86_64` and `windows-x86_64`. Those two are the
@@ -462,7 +476,7 @@ It also runs on pushes touching `rust/**`, `python/**`, `pyproject.toml` or
 the workflow itself. A tag push runs all five regardless of any input: a
 release must not ship on a partial gate.
 
-**`all targets agree` is now a REQUIRED check on `main` and on `dev`**, so
+`all targets agree` is now a REQUIRED check on `main` and on `dev`, so
 this step is no longer advisory. The five-target run is what admits the pull
 request, which means it has to be dispatched against the release branch and
 be green before the merge, not against `main` afterwards. The two-target push
@@ -481,45 +495,44 @@ That changes the order this used to describe. The old sequence merged to
 `main` and then dispatched the gate against it, which cannot happen now: the
 gate has to be green BEFORE the merge, because it is what admits the merge.
 
-1. **Branch from `main`.** `release/X.Y.Z`. The version bump, the changelog
+1. Branch from `main`, onto `release/X.Y.Z`. The version bump, the changelog
    section and the rebuilt site all belong on it.
-2. **Push the branch.** An AWS remeasure clones by branch name, so anything
-   the release needs must be on the remote before the run is launched.
-3. **Open the pull request into `main`.** Push fires the determinism gate at
-   two targets; the required check is the five-target run, so dispatch it
+2. Push the branch. An AWS remeasure clones by branch name, so anything the
+   release needs must be on the remote before the run is launched.
+3. Open the pull request into `main`. Push fires the determinism gate at two
+   targets. The required check is the five-target run, so dispatch it
    explicitly against the BRANCH:
    `gh workflow run determinism.yml --ref release/X.Y.Z -f targets=all`.
-4. **Wait for both required checks**, `all targets agree` and `build`. Read
-   the run you started; the newest in the list is often a different one. See
-   step 7.
-5. **Merge the pull request.** Pages serves from `main/docs`, so this is the
+4. Wait for both required checks, `all targets agree` and `build`. Read the
+   run you started, because the newest in the list is often a different one.
+   See step 7.
+5. Merge the pull request. Pages serves from `main/docs`, so this is the
    step that publishes the site. Nothing before it is visible to a reader.
-6. **Check the tag target is the merged commit.** `git rev-parse origin/main`
-   against the merge commit, compared rather than assumed. A squash merge
-   makes a NEW commit, so the SHA that passed the gate differs from the one
-   you are
-   about to tag. The gate ran on the same tree, which covers the code, but
-   the tag must point at what is on `main`.
+6. Check the tag target is the merged commit. Compare `git rev-parse
+   origin/main` against the merge commit rather than assuming it. A squash
+   merge makes a NEW commit, so the SHA that passed the gate differs from
+   the one you are about to tag. The gate ran on the same tree, which covers
+   the code, but the tag must point at what is on `main`.
 7. **Tag `origin/main` and push the tag.** That is the irreversible step: a
    PyPI version number cannot be reused.
-8. **Watch both registries publish.** The tag drives PyPI and crates.io in
+8. Watch both registries publish. The tag drives PyPI and crates.io in
    parallel, and the GitHub release waits for both. Nothing to run by hand.
-9. **Check docs.rs.** A 404 in the first minutes is the build queue, not a
-   failure. Compare against an earlier version: if `0.2.0` returns 200 and the
-   new one still 404s after ten minutes, the build failed and the crate page
-   says why.
-10. **Reset `dev` to `main`.** It is the integration branch, not a fork, and
-    a stale `dev` is how the site and the model drift apart. `dev` blocks
+9. Check docs.rs. A 404 in the first minutes is the build queue, not a
+   failure. Compare against an earlier version: if `0.2.0` returns 200 and
+   the new one still 404s after ten minutes, the build failed and the crate
+   page says why.
+10. Reset `dev` to `main`. It is the integration branch, not a fork, and a
+    stale `dev` is how the site and the model drift apart. `dev` blocks
     force pushes, so this is a merge, not a reset, unless it is a
     fast-forward.
 
-**Check the branch after any step that moves branches.** A `git push origin
+Check the branch after any step that moves branches. A `git push origin
 main` run from another branch reports `Everything up-to-date` and pushes
 nothing, which reads exactly like a successful deploy. `git branch
 --show-current` after every checkout, and compare `git rev-parse --short HEAD
 origin/main` before believing a push.
 
-**The owner can still push directly to `main`.** `enforce_admins` is off, so
+The owner can still push directly to `main`. `enforce_admins` is off, so
 protection is a workflow, and a hotfix is possible at three in the morning. A
 release that skipped the pull request also skipped the required checks, which
 are the only thing standing between a tag and an unreproducible wheel on PyPI.
@@ -536,7 +549,7 @@ runs one fixed simulation inside every wheel and compares digests, then
 publish, then the GitHub release. A disagreement between targets fails the
 release rather than shipping.
 
-Publishing uses **Trusted Publishing**. No API token exists anywhere; GitHub
+Publishing uses Trusted Publishing. No API token exists anywhere; GitHub
 mints a short-lived OIDC token for the `pypi` environment and PyPI exchanges
 it. There is nothing to rotate and nothing to leak.
 
@@ -546,7 +559,7 @@ publishes, because that is the direction a mistake is recoverable in.
 ## Publishing the crate
 
 Automated, from 0.4.3. The tag drives both registries: `publish to PyPI` and
-`publish to crates.io` run in parallel off the same verified artefacts, and
+`publish to crates.io` run in parallel off the same verified artifacts, and
 the GitHub release waits for both, so a half-published version fails the run
 rather than passing quietly.
 
@@ -566,7 +579,7 @@ uploading. That check matters more than it sounds: sixteen of nineteen
 integration tests read the 140 MB parity corpus that `exclude` deliberately
 keeps out, and they panic when it is absent. What remains is `circuit_breaker`,
 `roster_mutation` and `stream_alignment` plus the unit tests. They are excluded
-**by name**, so a new test is not silently dropped: add one that reads
+by name, so a new test is not silently dropped: add one that reads
 `goldens/` and it must go in `exclude` too, or a consumer running `cargo test`
 concludes the crate is broken.
 
@@ -585,20 +598,20 @@ cargo package --list             # what would actually ship
 cargo publish
 ```
 
-**Check docs.rs after.** A 404 in the first minutes is the build queue, not a
+Check docs.rs after. A 404 in the first minutes is the build queue, not a
 failure. Compare against an earlier version: if `0.3.0` returns 200 and the new
 one still 404s after ten minutes, the build failed and the crate page says why.
 
 ## After
 
-- **Verify from the outside**, not from your working tree:
+- Verify from the outside, not from your working tree:
   ```
   pip install tradefloor                     # the wheel
   pip install --no-binary :all: tradefloor   # the sdist, compiled from source
   ```
   The second is the path that was broken in 0.1.0 and nobody noticed until
   the release had gone out.
-- **Verify what was published, not that publishing happened.** Install the
+- Verify what was published, not that publishing happened. Install the
   wheel from PyPI and ask it what it is:
   ```
   python -c "import tradefloor as tf; print(tf.version(), tf.model_preset()['name'])"
@@ -608,7 +621,7 @@ one still 404s after ten minutes, the build failed and the crate page says why.
   from the wrong commit, which no amount of local green will show you. At
   0.6.0 both agreed, which is how the published envelope was known to
   describe the preset the wheel actually runs.
-- **The site deploys from its own repository.** `docs/`, `tools/docs/` and
+- The site deploys from its own repository. `docs/`, `tools/docs/` and
   `build_site.py` left this repository at 0.5.0. There is no Pages workflow
   here and no committed `docs/` tree; `.github/workflows/` holds
   `determinism.yml`, `release.yml` and `suite.yml`. Step 5 is the whole of
@@ -620,7 +633,7 @@ one still 404s after ten minutes, the build failed and the crate page says why.
 
 | failure | what caught it | what stops it now |
 |---|---|---|
-| sdist rejected, licence files declared at the root and packaged under `rust/` | PyPI, at upload | `license-files` declared explicitly; the sdist is verified before tagging |
+| sdist rejected, license files declared at the root and packaged under `rust/` | PyPI, at upload | `license-files` declared explicitly; the sdist is verified before tagging |
 | README links dead on PyPI, fine on GitHub | a human reading the live page | `tests/test_readme_links.py` |
 | `calibrate.py --help` crashed on a literal `%` in prose | trying to use it | `tests/test_tool_help.py`, every tool in the directory |
 | a release job half-published: wheels up, sdist refused, no way to replace | the job failed after uploading | `skip-existing`, so a re-run fills the gap |
@@ -633,16 +646,16 @@ one still 404s after ten minutes, the build failed and the crate page says why.
 | `CITATION.cff` shipped the previous release's date | reading the field at the tag | it is named in step 1 as the field that goes stale |
 | a push reported `Everything up-to-date` while the fix sat on another branch | comparing SHAs rather than reading the push output | the branch check in the shipping list |
 
-The pattern in all five: **correct everywhere the author looks, wrong only in
-the destination.** The checks above therefore run against the artifact, and
-the last step installs from PyPI.
+Many of these failures were correct everywhere the author looked and wrong
+only in the destination. The checks above therefore run against the
+artifact, and the last step installs from PyPI.
 
 ## Version policy
 
 A change to the simulated trajectory is a breaking change however small it
 looks, because a market that runs differently from the same seed invalidates
 every published result that cited it. Coefficient changes therefore arrive as
-a **new model preset**, never as an edit to an existing one, and old presets
+a new model preset, never as an edit to an existing one, and old presets
 keep running exactly as they did.
 
 This is why `pt-v1` through `pt-v12` all still exist and reproduce, and why a

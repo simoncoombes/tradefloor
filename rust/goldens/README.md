@@ -190,13 +190,14 @@ Sequences: `0`, `1`, `2`, `3`, `4`, `2^31-1`, `2^31`, `2^32-1`.
 
 - **`prng-raw-u32`**, first 10,000 raw 32-bit PCG-XSH-RR outputs for all six
   seeds at sequences 0 and 1, plus 512 each across six further sequences.
-  `PCG32` is not exported, so these are recovered as `nextFloat() × 2^32`, which
+  `PCG32` is not exported, so these are recovered as `nextFloat() * 2^32`, which
   is exact because `nextFloat()` divides by a power of two.
 - **`prng-floats`**, **`prng-normals`**, first 10,000 outputs of `nextFloat()`
   and `nextNormal()` per seed.
-- **`prng-nextint`**, 18 ranges × 3 seeds × 512 draws, including non-power-of-two
-  ranges where the modulo bias is real and must be reproduced, plus three
-  `min > max` cases in a separate `pathological` block.
+- **`prng-nextint`**, 18 ranges by 3 seeds by 512 draws, including
+  non-power-of-two ranges where the modulo bias is real and must be
+  reproduced, plus three `min > max` cases in a separate `pathological`
+  block.
 - **`prng-nextbool`**, 10 probabilities including 0, 1, subnormal and
   out-of-range, plus the zero-argument default.
 - **`prng-mixed-sequence`**, four scripted 2,000-op interleavings of all four
@@ -214,29 +215,31 @@ Sequences: `0`, `1`, `2`, `3`, `4`, `2^31-1`, `2^31`, `2^32-1`.
 - **`mispricing-constants`**, all eight exported constants, plus the four
   intermediate values `MISPRICING_PHI` is built from.
 - **`mispricing-step-cases`**, 58,080 single steps: 22 finite boundary-adjacent
-  `s` values × 22 `sPrev` × 10 innovations × 12 shocks, covering each cap **at**,
-  **one ULP inside** and **one ULP beyond**, plus subnormals and `-0`. The ULP
+  `s` values by 22 `sPrev` by 10 innovations by 12 shocks, covering each cap
+  **at**, **one ULP inside** and **one ULP beyond**, plus subnormals and
+  `-0`. The ULP
   neighbours are computed by bit manipulation rather than typed as decimals,
   because `0.14999999999999999` rounds straight back onto `0.15` and would have
   tested nothing, the first draft did exactly that. A separate `nonFinite`
   block records the 396 NaN/Infinity combinations.
-- **`mispricing-trajectory-*`**, five scenarios × 100,000 sequential steps.
+- **`mispricing-trajectory-*`**, five scenarios by 100,000 sequential steps.
   Inputs are recorded explicitly rather than regenerated, so a PRNG bug cannot
   masquerade as a mispricing bug. Every step's `s` is recorded so a harness can
   report the **index** at which divergence starts, not merely that it did:
-  - `calm`, 1.5% innovations, no shocks. sd(s) = 11.1%, which is the ≈10% the
-    module docstring predicts.
+  - `calm`, 1.5% innovations, no shocks. sd(s) = 11.1%, which is the 10% or
+    so the module docstring predicts.
   - `garch-clustered`, GARCH(1,1)-scaled innovations, volatility clustering.
   - `news-shocks`, sparse shocks drawn wider than `DAILY_SHOCK_CAP`; the shock
     clamp fires 1,993 times, the `s` clamp 5 times.
   - `extreme-clamped`, 54,105 of 100,000 steps land exactly on
-    `±MISPRICING_CAP`. The clamp is the hot path, not an edge case.
+    `+/-MISPRICING_CAP`. The clamp is the hot path, not an edge case.
   - `denormal-drift`, starts at `5e-324` with innovations near the denormal
     floor. 49,018 distinct values out of 100,000 steps, because gradual
     underflow keeps collapsing them, and one exact zero.
 - **`mispricing-apply`**, **`mispricing-crowd-lean`**, **`mispricing-roots`**,
   **`mispricing-impulse`**, full cross products over boundary inputs
-  (15 fair values × 25 `s` values; 21 × 21 crowd-lean inputs; 15 φ × 13 θ).
+  (15 fair values by 25 `s` values, 21 by 21 crowd-lean inputs, and 15 phi by
+  13 theta).
   `mispricing-roots` covers both branches of the discriminant test (125 real,
   70 complex). `mispricing-impulse` includes a 5,000-step unit-root case.
 
@@ -249,8 +252,8 @@ cost a day if missed.
 
 1. **`MISPRICING_PHI = Math.pow(0.5, 1/60)` is a transcendental result computed
    by V8 at module load.** Rust `f64::powf` may differ in the last ULP, and a
-   one-ULP φ compounds through the entire `s`-process. Hardcode the literal from
-   `mispricing-constants.json` -> `constants.MISPRICING_PHI.bits`
+   one-ULP phi compounds through the entire `s`-process. Hardcode the literal
+   from `mispricing-constants.json` -> `constants.MISPRICING_PHI.bits`
    (`3FEFA1E827A1B38C` = `0.9885140203528962`).
 
 2. **`clamp` is `x < lo ? lo : x > hi ? hi : x`.** NaN fails both comparisons and
@@ -262,7 +265,7 @@ cost a day if missed.
    `applyMispricing` is the only place this matters.
 
 4. **Order of operations in `stepMispricing` is contractual.**
-   `((φ·s + momentum) + innovation) + shock`, strictly left to right, with
+   `((phi * s + momentum) + innovation) + shock`, strictly left to right, with
    `momentum` computed first from the *unclamped* `s` and `sPrev`. Do not
    reassociate and **do not use `mul_add`**, a fused multiply-add changes the
    last bit.

@@ -1,4 +1,4 @@
-"""`python -m tradefloor` -- read a scenario file without running a market.
+"""`python -m tradefloor` reads a scenario file without running a market.
 
 A scenario is configuration, and configuration that can only be checked by
 running a hundred-day simulation is configuration nobody checks. These
@@ -81,7 +81,7 @@ def _load(target: str) -> Scenario:
     resolves to a shipped scenario is one, and everything else is a path.
 
     Reading the file rather than handing the string to
-    `Scenario.from_yaml` -- which takes a path OR a document -- keeps "no
+    `Scenario.from_yaml` (which takes a path OR a document) keeps "no
     such file" as "no such file". Passed a document, `from_yaml` would parse
     a mistyped filename as YAML and report a schema error.
     """

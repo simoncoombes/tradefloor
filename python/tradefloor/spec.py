@@ -1,6 +1,6 @@
 """A strategy as data: declarative, versioned, hashable.
 
-Everything else in a run serialises, hashes and round-trips: the seed, the
+Everything else in a run serializes, hashes and round-trips: the seed, the
 universe fingerprint, the model preset, the scenario, the order log. The
 strategy did not. ``evaluate`` takes any object with an ``act`` method, so the
 moment a result depends on an agent it depends on a Python callable that
@@ -66,9 +66,9 @@ built fresh inside every call, which also closes a real trap: agents are
 stateful, and a reused instance carries one market's history into the next
 with no visible symptom. It is also what an MCP server needs, since a tool
 cannot accept a callable, and what stops callers inventing their own
-serialisation on the way to one.
+serialization on the way to one.
 
-**Blend weights are normalised, canonically.** Selection ranks the blended
+**Blend weights are normalized, canonically.** Selection ranks the blended
 score and takes the top k, so the agent is invariant under any positive
 scaling of the weight vector: weights of 1.2/0.8 and 0.6/0.4 build
 bit-identical agents. Taking weights as given would therefore let two
@@ -76,7 +76,7 @@ textually different specs name the same strategy under different
 fingerprints: identity finer than the thing identified, which defeats
 comparability from the opposite direction to semantic drift. Weights are
 divided by the sum of their absolute values at construction; signs and
-ratios. Everything behaviourally meaningful survives, including the
+ratios. Everything behaviorally meaningful survives, including the
 net-short-signal tilt a negative weight expresses.
 """
 
@@ -166,7 +166,7 @@ def _refuse_unknown(what: str, given: Mapping[str, Any],
 
 
 def _canonical_component(raw: Mapping[str, Any]) -> dict[str, Any]:
-    """One blend component, validated, weight not yet normalised."""
+    """One blend component, validated, weight not yet normalized."""
     if not isinstance(raw, Mapping) or "kind" not in raw:
         raise ValidationError(
             f"a blend component must be a mapping with a 'kind', got {raw!r}"
@@ -259,10 +259,10 @@ def _canonical_signal(raw: Any) -> dict[str, Any]:
                 "A component that nets to nothing is not part of the strategy."
             )
 
-    # Normalise to unit absolute mass. Selection ranks the blended score and
+    # Normalize to unit absolute mass. Selection ranks the blended score and
     # takes the top k, so the agent is invariant under positive scaling of
     # the weight vector, so 1.2/0.8 and 0.6/0.4 build bit-identical agents,
-    # and an unnormalised form would hash equal strategies apart. Signs and
+    # and an unnormalized form would hash equal strategies apart. Signs and
     # ratios survive, so a net-short-signal tilt is still expressible.
     total = sum(abs(c["weight"]) for c in merged.values())
     ordered = sorted(merged.values(), key=_identity_of)
@@ -271,7 +271,7 @@ def _canonical_signal(raw: Any) -> dict[str, Any]:
 
     # A blend of one ranked signal at weight +1.0 IS that signal: the rank of
     # a score orders exactly as the score, ties broken the same way, so the
-    # collapse is behaviourally exact and keeps the fingerprint honest. A
+    # collapse is behaviorally exact and keeps the fingerprint honest. A
     # single 'random' does NOT collapse: the bare signal weights names by
     # draw magnitude, the component only by draw order. And a single
     # negative weight does not either, because the reversed ordering agrees
@@ -294,13 +294,13 @@ def _contains_random(signal: Mapping[str, Any]) -> bool:
 
 
 class StrategySpec:
-    """A declarative strategy: buildable, serialisable, hashable.
+    """A declarative strategy: buildable, serializable, hashable.
 
     Immutable once constructed, for the same reason ``ModelParams`` would be:
     a fingerprint of a mutable object is a lie waiting to be told. Construct
     through the named constructors (:meth:`hold`, :meth:`random`,
     :meth:`momentum`, :meth:`mean_reversion`, :meth:`oracle`, :meth:`blend`)
-    or pass the parts directly; either way the spec is canonicalised and
+    or pass the parts directly; either way the spec is canonicalized and
     validated here, at construction, where a mistake is visible.
 
     Defaults mirror the shipped baselines field for field, so
@@ -490,7 +490,7 @@ class StrategySpec:
         Weights are on the signal, not the portfolio: the components' ranks
         are combined FIRST and ``top_k`` selects from the blended ranking,
         which is a different strategy from selecting top-k from each and
-        merging. Weights are normalised to unit absolute mass at
+        merging. Weights are normalized to unit absolute mass at
         construction. See this module's docstring for why taking them as
         given would hash equal strategies apart.
 
@@ -509,10 +509,10 @@ class StrategySpec:
         return json.loads(self.to_json(indent=None))
 
     def to_json(self, **kwargs: Any) -> str:
-        """Serialise the canonical form.
+        """Serialize the canonical form.
 
         What is written is the CANONICAL spec, with defaults materialised,
-        weights normalised and components merged and sorted, not the keystrokes
+        weights normalized and components merged and sorted, not the keystrokes
         that built it. A reader of the JSON sees every parameter the strategy
         ran under, including the ones the author never typed.
         """
@@ -555,10 +555,10 @@ class StrategySpec:
 
     @property
     def fingerprint(self) -> str:
-        """sha256 over the canonical serialisation.
+        """sha256 over the canonical serialization.
 
         The hash is over CONTENT, not keystrokes: sorted keys, no
-        whitespace, defaults materialised, blend weights normalised and
+        whitespace, defaults materialised, blend weights normalized and
         components merged and sorted. Whitespace, key order, writing a
         default explicitly, scaling every weight by two, or listing
         components in a different order all leave it unchanged, which is a
@@ -804,7 +804,7 @@ class _DailyCadence:
         steps_per_day = getattr(obs, "steps_per_day", 1)
         if steps_per_day > 1 and obs.step % steps_per_day:
             return {}
-        # The same observation, re-labelled as one decision per day: the step
+        # The same observation, re-labeled as one decision per day: the step
         # counter becomes the day index and steps_per_day becomes 1, so a
         # wrapped agent's "one-day lookback" resolves to one daily
         # observation rather than to however many steps the harness runs.

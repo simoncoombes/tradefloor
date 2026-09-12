@@ -883,7 +883,7 @@ class Explanation:
         How far that reaches is measured rather than assumed. On the
         market factor and on this name's settlement uniforms a slip of
         one address moves the close; on its idiosyncratic, sector, news
-        and jump draws the slip lands on a neighbour's slot and the close
+        and jump draws the slip lands on a neighbor's slot and the close
         is bit-identical inside the day. Nor does a replay establish that
         a node addresses the right NAME at all, since a node built off
         another company's tag carries that company's addresses and values
@@ -1158,7 +1158,7 @@ class Explanation:
         rows = [_row(path, node, parent) for path, node, parent in self._walk]
         schema = pa.schema(
             [(name, getattr(pa, kind)()) for name, kind in self.COLUMNS],
-            # One entry, because arrow-schema serialises a metadata map in
+            # One entry, because arrow-schema serializes a metadata map in
             # iteration order at the boundary and more than one key gives
             # non-deterministic bytes.
             metadata={"caveats": " ".join(self.caveats)})

@@ -40,7 +40,7 @@ a paragraph in front of it.
 # What a solve may claim
 
 Where a value comes from a solve, the entry records the tolerance and whether
-it was met. **A solve that did not converge produces NO entry** -- not a last
+it was met. **A solve that did not converge produces NO entry**, not a last
 iterate under a name that asserts convergence. `converged_offset` is why: a
 field name asserted a condition nothing checked, and the value it carried was
 read as settled for hours.
@@ -49,7 +49,7 @@ read as settled for hours.
 
 `REQUIRED_PRESETS` are the presets whose vectors a user actually runs: the
 shipped default and any candidate for it. A dial needs an entry where one of
-those sets it to something other than `BASELINE`'s value -- that is the set of
+those sets it to something other than `BASELINE`'s value. That is the set of
 choices the project has made, as against the baseline it measures everything
 from.
 
@@ -76,11 +76,11 @@ audit was blind to it.
 **Name the failure for what it is: a guard reporting green because its
 subject moved out of its scope.** Every test here passed on 2026-09-06 with
 a tape measurement, an exponent whose shipped value is not the measured one,
-and a live per-name floor all outside the question being asked -- and the
+and a live per-name floor all outside the question being asked, and the
 suite could not have said so, because the completeness assertion is over
 `required_dials()` and `required_dials()` was the thing that had shrunk. A
 green run meant "everything in scope is accounted for", and scope was
-silently the wrong set. The lesson generalises past this module: when a
+silently the wrong set. The lesson generalizes past this module: when a
 scope is computed rather than declared, ask what has left it since the
 computation was written.
 
@@ -106,7 +106,7 @@ returns 129. **The partition is over the 129**, because the question is
 module constants exposed read-only through the by-name getter
 (`inflation_target`, `phillips_curve_coeff`, `fiscal_multiplier` and so
 on), twelve are the sector table's per-sector sigmas read through a
-`strip_prefix` branch, and two -- `mispricing_phi` and `s_phi_tick` -- are
+`strip_prefix` branch, and two (`mispricing_phi` and `s_phi_tick`) are
 struct fields DERIVED from `mispricing_half_life_days` whose setter refuses
 them by name. Every dial already in scope is inside the 129, so nothing was
 lost by choosing it.
@@ -118,7 +118,7 @@ question, and this module does not pretend to ask it.
 
 # What `OUT_OF_SCOPE` may and may not mean
 
-It means **this dial cannot be a choice that needs justifying** -- it is
+It means **this dial cannot be a choice that needs justifying**. It is
 inert at the shipped value, or unread because a partner dial gates it. Each
 entry names the gate, because "the docstring says it is bit-identical" is
 the kind of evidence this module exists to distrust:
@@ -130,7 +130,7 @@ mistake made here.** `price_breaker_fraction` was classified dead because
 nothing outside `params.rs` mentions it. It is not dead: its setter derives
 `breaker_up` and `breaker_down` from it (`params.rs:4022`), the engine reads
 those, and `the_breaker_band_is_derived_once_at_construction` pins the
-behaviour. **A dial can reach the engine under another name**, so searching
+behavior. **A dial can reach the engine under another name**, so searching
 for its own name in the consumer measures the wrong thing, and a negative
 result from the wrong instrument is not evidence.
 
@@ -144,7 +144,7 @@ gate that was read, not on a name that was searched for.
 
 It does **not** mean "nobody has looked". A dial that is LIVE at its
 shipped value and that no preset moves is a chosen constant, and it belongs
-in `POST_BASELINE` with no entry -- which is to say in `UNPROVENANCED`,
+in `POST_BASELINE` with no entry, which is to say in `UNPROVENANCED`,
 whose whole purpose is to record an admitted gap. Filing a live constant
 under out-of-scope would hide it, and hiding it is the failure this
 partition was built to end.
@@ -223,7 +223,7 @@ POST_BASELINE = {
 
     # ---- live at the shipped value and moved by no preset -------------
     # Everything below entered scope with the partition. Each one is READ
-    # on the shipped path -- the read site is named -- and sits at a value
+    # on the shipped path (the read site is named) and sits at a value
     # `pt-v1` carries because the dial did not exist when `pt-v1` was
     # written. That is a chosen constant by the charter's definition, so it
     # is in scope and it is in `UNPROVENANCED` until somebody derives or
@@ -320,7 +320,7 @@ POST_BASELINE = {
 #: Presets that RETURN a moved dial to the baseline value, on purpose and on
 #: a measurement. Declared, because the difference rule is blind to a
 #: return: the dial is in scope through the preset that moved it, and the
-#: preset that moved it back reads as "leaves it at the pt-v1 value" -- the
+#: preset that moved it back reads as "leaves it at the pt-v1 value", the
 #: one thing an entry is refused for claiming. Each name here puts that
 #: preset in scope for the dial at the baseline value, so its entry can
 #: record what was measured. `audit()` refuses a declaration whose preset
@@ -336,7 +336,7 @@ RETURNED_TO_BASELINE = {
 
 #: Settable dials that cannot be a choice needing justification, and why.
 #:
-#: NOT "nobody has looked" -- that is what `UNPROVENANCED` is for. An entry
+#: NOT "nobody has looked". That is what `UNPROVENANCED` is for. An entry
 #: here claims the dial is INERT at the value every preset ships, or unread
 #: because a partner gates it, or not read at all, and it names the gate so
 #: the claim can be checked. Every reason below was read off the engine
@@ -344,7 +344,7 @@ RETURNED_TO_BASELINE = {
 #: the evidence this module distrusts.
 #:
 #: A dial whose gate is another dial is only inert while that partner sits
-#: where it sits. Move the partner and this entry becomes false -- which is
+#: where it sits. Move the partner and this entry becomes false, which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
     "crisis_blend_variance_damp":
@@ -470,9 +470,9 @@ OUT_OF_SCOPE = {
 #: four (pt-v19's four dials) read off the design repository's measured
 #: record, and two (`vix_target_shock_cap` and
 #: `crash_amplifier_conditional_sigma`, both charter bar B4) read off the
-#: identity the code now derives them through --
-#: rather than invented, so the schema is exercised by real data. The
-#: other seventy-three names are in `UNPROVENANCED` and belong to the
+#: identity the code now derives them through, rather than invented, so the
+#: schema is exercised by real data. The other seventy-three names are in
+#: `UNPROVENANCED` and belong to the
 #: workstreams that own them. Filling them in from here would be inventing
 #: derivations, which is the failure this module exists to prevent.
 DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
@@ -826,8 +826,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "buyback_payout_share": {
         # The code calls this "the one CHOSEN constant in this era" and
         # sources it to the US large-cap filing record. That is a MEASURED
-        # claim, and it carries no residual -- the filing record's
-        # across-firm dispersion is cited nowhere -- so it cannot be
+        # claim, and it carries no residual (the filing record's
+        # across-firm dispersion is cited nowhere), so it cannot be
         # recorded as measured under this schema. Recording it as
         # undetermined is not a demotion of the source; it is the schema
         # refusing to call a point estimate a measurement.
@@ -871,8 +871,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # No admissible derived value EXISTS, which is a stronger statement
         # than "not yet derived" and is why this entry is worth writing.
         # Derived from the real leverage effect the GJR asymmetry is 0.6548,
-        # which puts persistence at 1.0722 -- non-stationary, 1.28x the
-        # largest admissible value, and worse on the omega identity
+        # which puts persistence at 1.0722. That is non-stationary, 1.28x
+        # the largest admissible value, and worse on the omega identity
         # manifold at 1.039. Under either omega no stationary GJR asymmetry
         # reproduces the real -0.042.
         #
@@ -900,7 +900,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # 2.070/2.440 = 0.848 at near-identical bucket sizes, so the up side
         # is about 85 per cent of the down.
         #
-        # And the pair that ships is 17.0/17.0 -- a DIAL ratio of 1.000,
+        # And the pair that ships is 17.0/17.0, a DIAL ratio of 1.000,
         # which every preset from pt-v9 carries. The design note's table
         # labels 0.40 as "shipped"; 25.0/10.0 is pt-v1 through pt-v8. So the
         # shipped dials sit on the far side of the tape figure from every
@@ -967,8 +967,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "vix_return_exponent": {
         # A MEASUREMENT EXISTS AND IT IS NOT OF THIS VALUE. The tape's down
         # side fits dVIX = 1.003 |r|^1.1996, R squared 0.9947 over eight
-        # bucket medians on 8,960 sessions, standard error 0.0357 -- a 95
-        # per cent interval of 1.112 to 1.287, and 1.132 count-weighted.
+        # bucket medians on 8,960 sessions, standard error 0.0357. That is a
+        # 95 per cent interval of 1.112 to 1.287, and 1.132 count-weighted.
         # The shipped value is 1.0.
         #
         # 1.0 is the exponent at which the power form reduces to the linear
@@ -1128,9 +1128,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # figure below is either read from a result note that names its box or
     # recomputed from that box's per-seed panels with the library's own
     # nineteen-row rule at fix/dn3-error-bar (`loss.scoring_rule`, blind on
-    # nothing). Where the two routes differ -- the notes' script route puts
+    # nothing). Where the two routes differ (the notes' script route puts
     # pt-v18 at 54.90 / 47.37 and the library at 56.00 / 48.59 on the same
-    # 120 panels -- the library's figure is the one quoted and the note's
+    # 120 panels), the library's figure is the one quoted and the note's
     # is given beside it. Golf scores, lower is better; "paired" means the
     # difference across the same seeds with a paired seed bootstrap (100
     # resamples of the seed index, the same index for both arms).
@@ -1813,7 +1813,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # that line. The mean-of-the-pair construction is a rule for picking
         # the numbers under the dial, not a value read off the process, and
         # the docstring says so in as many words. Recording it as derived
-        # because the neighbouring entries are would be exactly the
+        # because the neighboring entries are would be exactly the
         # inherited authority this module exists to refuse.
         "kind": "undetermined",
         "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
@@ -1865,14 +1865,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: This list is the finding. Seventy-three names declared here against
 #: ninety-eight dials in scope (one of them, `vix_mean_reversion`, beside
 #: an entry that predates this note), and several
-#: carry eight significant figures with no error bar anywhere --
+#: carry eight significant figures with no error bar anywhere:
 #: `crisis_blend_gain` at 0.8275881, `crisis_vix_threshold` at 30.88325108,
 #: `market_vol_vix_anchor` at 15.98426471. A search optimum with decimal
 #: places is still a search optimum.
 #:
 #: NOT EVERY DIAL WITH A DEFECT IS IN THIS SET. `garch_omega` ships 2e-06 in
 #: every preset and is not named in `POST_BASELINE`, so it is out of scope
-#: here -- while the identity at `rust/src/market/garch.rs` puts the shipped
+#: here, while the identity at `rust/src/market/garch.rs` puts the shipped
 #: value 18.4x short. A dial every preset gets equally wrong is a defect the
 #: difference rule is not shaped to catch, because that rule asks "what did
 #: we choose", not "what is right". It enters the set the moment a preset
@@ -1894,7 +1894,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: commit here. A
 #: `measured` entry names EVERY in-scope preset's value (asserted in
 #: `tests/test_dial_provenance.py`), so where pt-v16 and pt-v18 ship an
-#: older value for one of these -- 0.6 and 0.58821442 -- the entry says
+#: older value for one of these (0.6 and 0.58821442), the entry says
 #: what the record measured about that value (the paired control; a
 #: plateau) rather than leaving it here.
 UNPROVENANCED = (
@@ -2020,9 +2020,9 @@ def required_dials() -> dict[str, dict[str, float]]:
 
     And a third, DECLARED rather than computed: a preset named in
     `RETURNED_TO_BASELINE` for a dial is in scope for that dial at the
-    baseline value it ships. The difference rule cannot see a return --
+    baseline value it ships. The difference rule cannot see a return.
     pt-v19 sets `vix_decay_ratio` to 1.0, which is pt-v1's value, on a
-    measurement that pt-v16's 0.6 is the dominated control of -- and
+    measurement that pt-v16's 0.6 is the dominated control of, and
     under the movers-only rule no entry could name pt-v19 for it without
     being refused as claiming a preset that "leaves it at the baseline
     value". `moved_dials` is unchanged, so the audit still reports who

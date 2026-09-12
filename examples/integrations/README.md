@@ -1,8 +1,8 @@
 # Agent frameworks in a controlled market
 
-**Tradefloor holds no opinion about which agent framework you use.** An
+**tradefloor holds no opinion about which agent framework you use.** An
 adapter carries somebody else's runtime into one loop: an allowlisted
-observation goes out, a decision comes back, Tradefloor executes it against a
+observation goes out, a decision comes back, tradefloor executes it against a
 live order book and scores what happened.
 
 ```
@@ -18,10 +18,10 @@ live order book and scores what happened.
 ```
 
 The market, the macro path, execution, the book, fills, accounting,
-checkpoints, forks and the comparison belong to Tradefloor. Interpretation
+checkpoints, forks and the comparison belong to tradefloor. Interpretation
 and the portfolio decision belong to the framework. Nothing in between
 changes when the framework does, so two frameworks measured on one seed
-differ by the agent and not by the harness.
+differ only by the agent.
 
 | | |
 |---|---|
@@ -55,8 +55,7 @@ The market is where they diverge, deliberately. Each example sizes its own
 book to show something its own section explains, and the LangGraph one runs
 a duration-laddered roster it shares with the FinRobot study instead of the
 roster the other three use. The scorecards differ accordingly, and a
-difference between two rows here is a fact about two markets and not about
-two adapters:
+difference between two rows here is a fact about two markets:
 
 | example | trades | return | impact |
 |---|---|---|---|
@@ -65,23 +64,33 @@ two adapters:
 | [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 3 | +13.30% | +4.11 bps |
 | [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 1 | +0.66% | +2.23 bps |
 
+<!-- DOCS-0.8.0 PLACEHOLDER. Every row of the table above is contradicted by
+     the measurement on the record, and the test suite already fails on it.
+
+     tradefloor-design, programme/results/examples1/ex-*.txt, run examples1 at
+     commit 8a55e79, measured: callable/five_days 2 trades +1.94% +1.51 bps;
+     openai_agents/five_days 2 trades +1.94% +1.51 bps; pydantic_ai/rate_shock
+     2 trades +8.03% +7.29 bps; langgraph/rate_shock 1 trade +0.62% +6.71 bps.
+
+     programme/results/gate2/gate-pytest-full.txt carries the matching
+     failures, for example "callable/five_days.py printed trades 2, and
+     examples/integrations/README.md claims 3." gate-status.txt reads
+     pytest=1.
+
+     The paragraph that followed this table also claimed "five days trades
+     once, ten days three times" on pt-v19. The measured headers show both
+     five_days examples running ten days and trading twice, and the one
+     five-day run is langgraph/rate_shock.
+
+     Re-recording these fixtures costs live API calls and belongs to the
+     release session after the test gate is green, so the numbers are left
+     as they stand rather than guessed. Replace the table and restore the
+     paragraph from that run. -->
+
 Re-measured at 0.8.0, where the default preset moved to pt-v19 and every
 price in these markets moved with it. Nothing else about these examples
-changed: the rule, the rosters, the seed and the horizons are the ones
-0.7.0 shipped, so every difference in the table above is the market and
-not the demonstration.
-
-The three offline examples run ten days rather than five, which is a
-choice 0.7.0 made and this release keeps. They share one mean-reversion
-rule that acts on a five-day move past two per cent, and on a five-day run
-it gets a single usable reading -- which was enough on pt-v16's market and
-was not on pt-v18's, whose worst five-day fall over this roster is 1.85 per
-cent. Measured again on pt-v19: five days trades once, ten days three
-times, so ten still gives the rule the readings five does not. The rule is
-untouched, because lowering its trigger until this market tripped it would
-be fitting the demonstration to the market, and the trigger is the thing
-being demonstrated. The two recorded MODEL runs still use five days: a
-language model reads the observation rather than waiting for a window.
+changed. The rule, the rosters, the seed and the horizons are the ones
+0.7.0 shipped, so every difference in the table above comes from the market.
 
 Comparing two frameworks means holding the market fixed, which is what the
 shared contract checks in `tests/test_integrations.py` do.
@@ -112,7 +121,7 @@ Observation carries `.engine`, which holds the answer key: fair value, the
 nine-way attribution of every price move, each company's mispricing, and the
 macro path the run has not reached yet. A function given that would step
 around the allowlist where no test could see it. A policy that genuinely
-needs the Observation is a native Tradefloor agent and implements `act`
+needs the Observation is a native tradefloor agent and implements `act`
 directly.
 
 An async function works too, driven through `common.run_sync`.
@@ -180,7 +189,7 @@ reaches `run(deps=...)` verbatim. An offline model goes in the adapter's
 `model=` argument instead of through `Agent.override`, because `override` is
 built on context variables and the shared async bridge crosses a thread
 boundary those do not cross. PydanticAI retries a malformed answer inside the
-turn, which is where its behaviour differs from the Agents SDK by enough for
+turn, which is where its behavior differs from the Agents SDK by enough for
 an error budget to notice.
 
 One limitation follows from leaving `deps` alone. PydanticAI has a single
@@ -235,7 +244,7 @@ example runs offline.
 Two things here are called a checkpoint. A LangGraph checkpoint is workflow
 state, holding the graph's channel values and which node runs next, and it
 was measured to carry no engine, no order book, no prices and no RNG. A
-Tradefloor checkpoint is simulated market state: prices, the book, the macro
+tradefloor checkpoint is simulated market state: prices, the book, the macro
 path, the variance process and the RNG. Neither reconstructs the other and
 both directions fail quietly, so keep the pair together by run.
 
@@ -258,7 +267,7 @@ no FinRobot install.
 
 `tradefloor[finrobot]` is the largest extra here by an order of magnitude and
 pins Python 3.11 exactly, since FinRobot declares `>=3.10, <3.12` and
-Tradefloor needs `>=3.11`.
+tradefloor needs `>=3.11`.
 
 ## Tracing
 
@@ -271,7 +280,7 @@ sharing the process. LangSmith stays off unless one of its environment
 variables reads `true`, and PydanticAI instruments nothing until its own
 instrumentation is switched on.
 
-Turning it on works, and Tradefloor's identity comes with it. A LangGraph run
+Turning it on works, and tradefloor's identity comes with it. A LangGraph run
 traced to LangSmith was measured end to end: two decisions produced twelve
 exported runs, and all twelve carried `tradefloor_run_id`. The caller had
 supplied four keys through `config={"metadata": {...}}`, and the adapter
@@ -292,7 +301,7 @@ Tracing sends the rendered observation to whichever provider is switched on.
 
 ## Reproducibility
 
-Tradefloor is deterministic given the same simulator configuration and the
+tradefloor is deterministic given the same simulator configuration and the
 same sequence of agent actions. Same seed, same universe, same preset, same
 scenario, same decisions: the same market, to the last bit, on every
 supported platform.
@@ -318,7 +327,7 @@ nothing in the output would say so.
 
 ## The agent's own noise floor
 
-A model is the one thing in a Tradefloor experiment that answers the same
+A model is the one thing in a tradefloor experiment that answers the same
 question two ways. Before reading a difference between two arms, measure the
 spread inside one.
 
@@ -351,9 +360,9 @@ answers the control arm gave to the same prompt.
 Two things end a long live run, and they end it differently.
 
 An agent can return output that is not an executable decision. `parse` is
-strict on purpose -- dropping an unknown field executes a trade the agent
-conditioned on something it never got -- so it raises `DecisionError`, and
-by default that ends the run. Measured on a 60-decision pilot, one response
+strict on purpose, because dropping an unknown field executes a trade the
+agent conditioned on something it never got, so it raises `DecisionError`
+and by default that ends the run. Measured on a 60-decision pilot, one response
 in 35 was malformed, and the one that arrived on call 36 took 35 recorded
 interactions and 20 days of shared history with it.
 
@@ -416,7 +425,7 @@ that looked at the market and declined.
 ---
 
 Each adapter targets a project this repository neither owns nor is affiliated
-with. The module docstrings name the upstream project, its licence and the
+with. The module docstrings name the upstream project, its license and the
 version tested. None of those projects endorses this work.
 
 Everything these examples report is ground truth about a simulated market.

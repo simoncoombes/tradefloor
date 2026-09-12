@@ -43,7 +43,7 @@ leaves the original untouched.
 ``clone`` is a SHALLOW copy, and that is a trap worth naming: an attribute
 not passed arrives as the original agent's own list, so ``cloned.tools.
 append(x)`` also appends to the user's agent. Anything this module ever adds
-must be passed as a new list -- ``clone(tools=[*agent.tools, extra])`` --
+must be passed as a new list, ``clone(tools=[*agent.tools, extra])``,
 never appended to the clone.
 
 The instructions are the other half of not altering the agent. The standing
@@ -57,7 +57,7 @@ change to who the agent is.
 ``output_type`` is ``common.decision_model()``, the shared Pydantic
 rendering of ``common.decision_schema()``, bound in strict mode. The
 provider then constrains generation to the contract: the side enum, the
-non-negative quantity, ``additionalProperties: false`` -- which is what
+non-negative quantity, ``additionalProperties: false``, which is what
 stops a model inventing ``order_type`` or ``limit_price``, fields this
 market has no execution path for.
 
@@ -72,9 +72,9 @@ schema and the ``strict`` flag on both of its paths, the Responses API at
 ``models/openai_responses.py:2047`` and Chat Completions at
 ``models/chatcmpl_converter.py:117``. What differs is who receives it.
 OpenAI implements strict structured outputs natively, so the contract is
-enforced during generation. Route the same agent elsewhere -- through
+enforced during generation. Route the same agent elsewhere (through
 ``agents.extensions.models.litellm_model.LitellmModel`` to Anthropic, say,
-which this adapter supports and which has no native equivalent -- and the
+which this adapter supports and which has no native equivalent) and the
 schema is TRANSLATED into whatever that provider offers. It still usually
 works, and validation on this side is unchanged either way because
 :func:`~tradefloor.integrations.common.parse_decision` runs regardless. But
@@ -105,8 +105,8 @@ exceptions included, because it cannot tell a signal from a crash. This
 framework signals through exceptions, so :meth:`OpenAIAgentsAdapter._run`
 sorts them here, on purpose, rather than letting the default decide.
 
-Four are OUTCOMES -- the agent was asked and produced no executable
-decision -- and become
+Four are OUTCOMES (the agent was asked and produced no executable
+decision) and become
 :class:`~tradefloor.integrations.common.DecisionError`:
 
 - ``ModelBehaviorError``: the output did not satisfy the bound contract.
@@ -126,7 +126,7 @@ decision -- and become
   ``DecisionError`` and continue, which is a decision they take with the
   fact in hand rather than one this adapter takes for them.
 
-Everything else -- a timeout, a transport failure, a misconfiguration --
+Everything else (a timeout, a transport failure, a misconfiguration)
 is a FAILURE and is left to ``act``, which wraps it in
 :class:`~tradefloor.integrations.common.FrameworkError` with the chain
 intact. The two are scored differently by an experiment: the model said
@@ -145,7 +145,7 @@ already running.
 ## Tracing is off unless asked for
 
 The SDK's tracing is ON by default and exports to OpenAI. It skips the
-export when no ``OPENAI_API_KEY`` is set, but that is not a guarantee -- a
+export when no ``OPENAI_API_KEY`` is set, but that is not a guarantee. A
 developer with a key in their shell running an evaluation WOULD ship trace
 data. So every run this adapter starts passes ``tracing_disabled=True``
 unless ``tracing=True`` was asked for, and it is set per run rather than
@@ -165,7 +165,7 @@ The key is a digest of the input, so changing the brief or the observation
 mapping makes every lookup miss and the replay refuses, naming the step.
 What a key over the input cannot see is a change to something that never
 enters it. The user's agent carries its OWN instructions, and those reach
-the model as ``system_instructions`` rather than as part of the input --
+the model as ``system_instructions`` rather than as part of the input,
 so replacing the agent entirely leaves every recorded key intact. Measured
 before this was guarded: an agent instructed "BUY EVERYTHING" and one
 instructed "SELL EVERYTHING" produced byte-identical replay keys, and the
@@ -184,7 +184,7 @@ Live decisions cost money and a model answers differently every time.
 ``mode="replay"`` reads recorded responses keyed by
 :func:`~tradefloor.integrations.common.digest` of the exact input, and never
 reaches :meth:`OpenAIAgentsAdapter._run`, which is where the SDK is
-imported -- so a replay needs no API key, no network and no
+imported, so a replay needs no API key, no network and no
 ``openai-agents`` install. ``examples/integrations/openai_agents/five_days.py``
 records a run and replays it in the same script.
 """
@@ -208,7 +208,7 @@ EXTRA = "openai-agents"
 
 #: Recorded in adapter metadata, so a transcript says what produced it and
 #: where to go and read that thing. The entry point is the ASYNC one on
-#: purpose -- see the module docstring on why the SDK's own sync entry point
+#: purpose; see the module docstring on why the SDK's own sync entry point
 #: is unusable from a notebook.
 FRAMEWORK_URL = "https://github.com/openai/openai-agents-python"
 ENTRY_POINT = "agents.Runner.run"
@@ -219,9 +219,9 @@ ENTRY_POINT = "agents.Runner.run"
 #:
 #: Bumped when a SHIPPED brief changes what the agent is told to do, which is
 #: not a cosmetic bar: an earlier draft named only one of the two size limits
-#: and changed the recorded behaviour of the same model on the same market.
-#: Revisions before the first release stay at 1 -- claiming a 2 would imply a
-#: 1 somebody could be holding -- and ``instructions_digest`` distinguishes
+#: and changed the recorded behavior of the same model on the same market.
+#: Revisions before the first release stay at 1, because claiming a 2 would
+#: imply a 1 somebody could be holding. ``instructions_digest`` distinguishes
 #: them meanwhile.
 BRIEF_VERSION = "1"
 
@@ -269,9 +269,9 @@ recorded as an error rather than as a considered decision not to trade.
 def payload_of(call: Any) -> dict[str, Any]:
     """The serialized observation, recovered from a recorded model call.
 
-    A helper for running this adapter offline. Scripting a model -- with
+    A helper for running this adapter offline. Scripting a model (with
     ``agents.testing.ScriptedModel``, or any other
-    :class:`agents.models.interface.Model` -- means answering a call whose
+    :class:`agents.models.interface.Model`) means answering a call whose
     input is whatever this module chose to send, and that layout is this
     module's business rather than the caller's. This reads it back, so a
     scripted model can decide from the same payload a real one would see:
@@ -287,8 +287,8 @@ def payload_of(call: Any) -> dict[str, Any]:
     model = ScriptedModel([ModelStep.respond(answer)] * 8)
     ```
 
-    Takes anything carrying the SDK's ``input`` -- a ``ModelCall``, or the
-    input list itself -- because the two are equally natural to have in hand
+    Takes anything carrying the SDK's ``input``, either a ``ModelCall`` or the
+    input list itself, because the two are equally natural to have in hand
     at the point a scripted model answers.
     """
     import json
@@ -364,7 +364,7 @@ def _model_name(model: Any) -> str:
     The class name alone was not enough. Two ``LitellmModel`` instances
     pointed at different providers rendered identically, so a field whose
     job is saying what produced a recording said the same thing about two
-    different models -- the same defect the reviewer found in the shared
+    different models, the same defect the reviewer found in the shared
     ``jsonable`` helper, in this module's own spelling of it. A ``.model``
     attribute holding a STRING is the SDK's own convention for the model
     name and is safe to name: it is a model identifier, not a secret, and
@@ -404,9 +404,9 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
     accident.
 
     ``model`` is an :class:`agents.models.interface.Model` instance handed to
-    ``RunConfig(model=...)``, which the SDK honours ahead of the agent's own
+    ``RunConfig(model=...)``, which the SDK honors ahead of the agent's own
     model and ahead of its provider lookup. It is how a run happens with no
-    network -- pass ``agents.testing.ScriptedModel`` -- and it is what the
+    network (pass ``agents.testing.ScriptedModel``) and it is what the
     test suite and the shipped example use. Leave it ``None`` and the user's
     agent talks to whatever it was configured to talk to.
 
@@ -422,7 +422,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
     # keyword-only, which is the shape every adapter in this subpackage
     # takes: `CallableAgentAdapter(fn)`, `PydanticAIAdapter(agent)`,
     # `LangGraphAdapter(runnable)`. This one was keyword-only at first, and
-    # `OpenAIAgentsAdapter(llm)` -- the first line anybody writes -- raised
+    # `OpenAIAgentsAdapter(llm)`, the first line anybody writes, raised
     # TypeError, which no offline test caught because every test passed the
     # agent by keyword and so agreed with the code instead of checking it.
     # It still defaults to None so that `fork()`, which rebuilds the twin as
@@ -474,17 +474,17 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
                 # version beside somebody else's text would label it with a
                 # version it has nothing to do with, and a later mismatch
                 # would report two identical versions with different
-                # digests -- true, and useless.
+                # digests, which is true and useless.
                 instructions_version=(BRIEF_VERSION if brief == BRIEF
                                       else ""),
                 # BOTH halves of what the agent was told: the user's own
                 # system prompt and the standing brief. Digesting only the
-                # brief would reopen the hole this field exists to close --
+                # brief would reopen the hole this field exists to close:
                 # two arms hand-built with different agent instructions
                 # would publish the same identity and ``agree()`` would
                 # call them identical. Digesting only the agent's
                 # instructions would miss a changed brief, which is exactly
-                # what moved this module's own recorded behaviour once.
+                # what moved this module's own recorded behavior once.
                 instructions_digest=digest({
                     "agent": _instructions_digest(
                         getattr(agent, "instructions", None)),
@@ -520,7 +520,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         self.tracing = bool(tracing)
         self.run_id = run_id
         #: What turns the payload into the JSON half of :meth:`input_items`.
-        #: The brief stays a separate first message either way -- structured
+        #: The brief stays a separate first message either way: structured
         #: output means this adapter never concatenates instructions onto
         #: rendered text the way FinRobot and LangGraph do. Defaults to
         #: :class:`~tradefloor.render.JSONRenderer`, which reproduces this
@@ -550,7 +550,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         in the keyed input. So swapping the agent entirely leaves every
         recorded key intact: every lookup hits, the run completes, and the
         decisions replayed were taken by an agent nobody is running any
-        more. Measured before this guard existed -- an agent instructed
+        more. Measured before this guard existed: an agent instructed
         "BUY EVERYTHING" and one instructed "SELL EVERYTHING" produced
         byte-identical replay keys. That is a property of any adapter whose
         **instructions travel separately from the keyed input**, not an
@@ -567,7 +567,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         configured. A transcript that records no digest never claimed
         anything, so it is not known to be wrong, and refusing it would
         break hand-written fixtures for no safety gain. Replay WITHOUT an
-        agent is the ordinary path -- it needs no SDK and no key -- and it
+        agent is the ordinary path (it needs no SDK and no key) and it
         asserts nothing about whose instructions produced the recording, so
         there is nothing to contradict.
         """
@@ -609,7 +609,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
 
         The exchange is declared before either branch, so the record carries
         the same input and the same key whether the response came from the
-        SDK or from a recording -- which is what lets a replayed record be
+        SDK or from a recording, which is what lets a replayed record be
         compared with the live one it came from.
 
         The response is a JSON STRING, one level deep, in both branches. That
@@ -665,8 +665,8 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         this adapter keeps of its own, and `self.renderer` only ever
         decides how the SECOND message reads. On the default renderer,
         :class:`~tradefloor.render.JSONRenderer`, the second message is the
-        payload as sorted, indented JSON -- character for character what
-        this method always sent -- which is what keeps it exactly
+        payload as sorted, indented JSON, character for character what
+        this method always sent, which is what keeps it exactly
         recoverable by :func:`payload_of`, so a scripted model decides from
         the same dict a real one is shown. A renderer whose text is not
         JSON (:class:`~tradefloor.render.TextRenderer`, say) is valid here
@@ -684,7 +684,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         """The user's agent with the decision contract bound, built once.
 
         ``clone`` rather than assignment, so the user's own agent keeps the
-        output type it had -- which for almost every agent is none at all.
+        output type it had, which for almost every agent is none at all.
         An agent that already declares one is REFUSED rather than
         overridden: it was built to return something specific, and quietly
         replacing that would discard a contract its author is relying on
@@ -717,7 +717,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         """The per-run configuration: the model override and tracing.
 
         Per run rather than through the SDK's process-global switches, so
-        nothing here changes the behaviour of other code sharing the
+        nothing here changes the behavior of other code sharing the
         process. See the module docstring on why tracing defaults off.
         """
         if not self.tracing:
@@ -743,7 +743,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         """One real SDK run, returned as the decision in JSON.
 
         The framework is imported HERE and nowhere earlier, so replaying a
-        recorded run -- and ``import tradefloor`` -- never need the SDK
+        recorded run, and ``import tradefloor`` too, never need the SDK
         installed. See this subpackage's ``__init__`` for the rule.
         """
         sdk = require(
@@ -798,7 +798,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         Unwrapping the framework's envelope is the adapter's job:
         ``RunResult`` is the envelope and ``final_output`` is the decision.
         It is normally an instance of ``decision_model()``, because that is
-        what was bound -- but a run that HANDS OFF ends on a different
+        what was bound, but a run that HANDS OFF ends on a different
         agent, with that agent's output type, and the bound contract does
         not follow the handoff. That case is refused here rather than
         allowed to reach ``parse_decision`` as some unrelated object.
@@ -811,8 +811,8 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
             return final.model_dump_json()
         if isinstance(final, str):
             # A plain-text final output, which means the bound type was not
-            # in force. parse_decision still gets its chance -- it reads a
-            # JSON object out of prose -- and refuses readably if there is
+            # in force. parse_decision still gets its chance (it reads a
+            # JSON object out of prose) and refuses readably if there is
             # no decision in there.
             return final
         if isinstance(final, dict):
@@ -835,7 +835,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         The user's ``agent`` is SHARED, not copied, and so are the transcript
         and the recorder. Sharing the agent is safe precisely because this
         module never mutates it, and copying one would clone whatever HTTP
-        client its model settings hold -- wasteful at best, a shared socket
+        client its model settings hold: wasteful at best, a shared socket
         at worst. Both directions want the transcript shared too: a replay of
         one arm must read the same recorded run as the other, and a live
         recording of both arms belongs in one file.

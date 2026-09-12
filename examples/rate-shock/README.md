@@ -13,12 +13,11 @@ The wheel carries the library, not the examples, so the clone is what puts
 the script on disk. `matplotlib` is optional and only decides whether you get
 the chart.
 
-It runs in about two seconds and answers one question:
+It runs in about two seconds. It puts the same trading agent in two copies of
+one market, raises interest rates by 200 basis points in one copy, and
+measures how the agent's positions, turnover and P&L differ twenty days later.
 
-> **How does the exact same trading agent behave when interest rates
-> unexpectedly rise by 200 basis points?**
-
-The reason that question is hard anywhere else is that history ran once. You
+The comparison is hard to make anywhere else because history ran once. You
 can find a real hiking cycle and see what a strategy did through it, but you
 cannot see what the *same* strategy would have done in the *same* market
 without the hike, because that market does not exist. Here it does, because
@@ -41,7 +40,7 @@ the simulator computed it.
 
 ---
 
-## 1 -- Create the market
+## 1. Create the market
 
 Four companies, written down rather than drawn from a seed, so the roster is
 pinned exactly and small enough to hold in your head. They differ in the one
@@ -54,14 +53,14 @@ property that decides rate sensitivity in this model:
 | `BRDG` | industrials | 0.06 | short-duration cyclical |
 | `STAP` | consumer staples | 0.01 | minimal-duration defensive |
 
-Fair value in Tradefloor is earnings times a target multiple, and the multiple
+Fair value in tradefloor is earnings times a target multiple, and the multiple
 is discounted by
 
 ```
 rate_adjustment = 1 - (discount - 0.04) * 1.5 * (1 + growth * 2)
 ```
 
-Revenue growth **is** the duration term. A 200bp rise costs `NOVA` about 5.3%
+Revenue growth is the duration term. A 200bp rise costs `NOVA` about 5.3%
 of its multiple and `STAP` about 3.1%.
 
 That correspondence is honest for this market and does not transfer. A real
@@ -77,13 +76,13 @@ world = World(
 )
 ```
 
-The two pinned rates are the macro regime **both** branches will run under.
-Pinning them is what makes the control a control: the arms differ in the level
-of one thing, not in whether it was pinned at all.
+The two pinned rates are the macro regime both branches will run under.
+Pinning them gives each arm a fixed regime, so the only difference between the
+arms is the level of one field.
 
 ---
 
-## 2 -- Run an agent
+## 2. Run an agent
 
 `MacroAwareAgent` is deterministic, has no RNG and no LLM, and fits on a page.
 Three rules:
@@ -97,13 +96,13 @@ weight_i     = gross x 1 / (1 + 0.35 x growth_i x 100bp), normalised
 
 It reads the policy rate off `obs.engine.macro_state`, and its own recent
 prices for the volatility term. It never reads `mispricing_s`, fair value or
-the factor attribution -- those are what the simulator knows and a trader does
-not.
+the factor attribution, because those are what the simulator knows and a
+trader does not.
 
-It is not a moving-average crossover on purpose. A price rule would react to
-the shock only *after* the shock moved prices, so its divergence would be the
-market's, borrowed. This one reads the rate, so a change in its behaviour is a
-change in its behaviour.
+The agent takes its signal from the policy rate itself. A moving-average or
+other price rule would react to the shock only *after* the shock moved prices,
+so its divergence would be the market's, borrowed. Reading the rate directly
+means the divergence measured here belongs to the agent.
 
 ```python
 world.run(days=20)
@@ -114,7 +113,7 @@ exactly.
 
 ---
 
-## 3 -- Checkpoint and fork
+## 3. Checkpoint and fork
 
 ```python
 mark = world.checkpoint(label="before the rate shock")
@@ -147,32 +146,32 @@ experiment inside one script and the second for anything you save or cite.
 
 ---
 
-## 4 -- Introduce the rate shock
+## 4. Introduce the rate shock
 
 ```python
 shock.intervene(federal_funds_rate=0.06, corporate_bond_yield=0.075)
 ```
 
-One call, one arm, two fields -- a parallel 200bp shift of the policy rate the
-agent watches and the corporate bond yield equities are discounted off.
+The call raises two fields in one arm by 200bp in parallel, the policy rate
+the agent watches and the corporate bond yield equities are discounted off.
 
-Both, and not the policy rate alone, because of how this model transmits:
-`federal_funds_rate` reaches a valuation *only* by steering the corporate bond
-yield, recomputed at central-bank meetings, the first scheduled 45
-days out. A policy-rate hike by itself would move the agent and not the
-market. `tests/test_macro_transmission.py` pins that map.
+Both fields move because of how this model transmits. `federal_funds_rate`
+reaches a valuation *only* by steering the corporate bond yield, recomputed at
+central-bank meetings, the first scheduled 45 days out. A policy-rate hike on
+its own would move the agent while leaving the market where it was, and
+`tests/test_macro_transmission.py` pins that map.
 
 `intervene` writes macro fields and nothing else. It cannot reach the
-portfolio, the book or the agent -- an intervention that could would not be a
-controlled variable.
+portfolio, the book or the agent, because an intervention that could reach
+them would not be a controlled variable.
 
 It is recorded three times over: on the world, in the `Scenario` the world
-derives, and -- once the next day opens and `pin_macro` runs -- in the engine's
-own order log, which travels inside the checkpoint and the manifest.
+derives, and in the engine's own order log once the next day opens and
+`pin_macro` runs. That log travels inside the checkpoint and the manifest.
 
 ---
 
-## 5 -- Compare
+## 5. Compare
 
 ```python
 control.run(days=20)
@@ -212,7 +211,7 @@ And the two books:
   max drawdown since                  7.08%            4.45%
 ```
 
-The behaviour comes first here deliberately. The P&L difference is one draw of
+The behavior comes first here deliberately. The P&L difference is one draw of
 one market, and a single seed measures the seed as much as the decision;
 `tf.rank` is the tool for "is this policy better", across many seeds with a
 paired test. What this experiment establishes is narrower and stronger: the
@@ -235,16 +234,15 @@ examples/rate-shock/artifacts/
 
 Both `RunManifest` files reproduce: `tf.RunManifest.from_json(text).reproduce()`
 replays the recorded log and refuses on a digest mismatch, so somebody with
-only the JSON rebuilds the same market -- including the intervention, which
+only the JSON rebuilds the same market, including the intervention, which
 rides inside the log as a `pin_macro` entry.
 
 ## Swapping the agent
 
 `World` calls `act(obs)` and, if they exist, `decision()` and `state()`.
 Anything with those methods drops in without changing the market, the
-checkpoint, the fork, the intervention, the execution or the comparison. That
-separation is the point: Tradefloor owns the experiment, and the agent is the
-subject being measured.
+checkpoint, the fork, the intervention, the execution or the comparison.
+tradefloor owns the experiment, and the agent is the subject being measured.
 
 ## What this does not claim
 

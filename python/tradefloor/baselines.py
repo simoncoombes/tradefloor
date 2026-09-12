@@ -38,11 +38,11 @@ TWICE across engine changes. Two eras ago mean-reversion beat the Oracle in
 a third of its pairs; at `pt-v10` momentum did and mean-reversion never did,
 and this docstring drew that moral. On `pt-v12` it has swung back: mean
 reversion beats it in five of twelve markets and momentum in none. Take the
-lesson to be the durable part -- the Oracle knows the *level* of mispricing
+lesson to be the durable part. The Oracle knows the *level* of mispricing
 without error and spends that knowledge on a fixed equal-weight rule, so
 whichever signal the current coefficients reward will out-earn it under the
-same constraints -- and not the winner's name, which is a property of the
-preset. Even the old "agents trading no signal never beat it once" no longer
+same constraints. The winner's name is a property of the preset, not the
+lesson. Even the old "agents trading no signal never beat it once" no longer
 holds cleanly: buy-and-hold squeaks past at 1.02 on seed 1. Random still
 never does.
 
@@ -127,7 +127,7 @@ from ._core import Engine, GameRng
 from .harness import FACTOR_NAMES, Observation
 
 # The stream the random baseline draws on. Distinct from the market stream, so
-# a random agent's decisions cannot perturb the market it is trading in --
+# a random agent's decisions cannot perturb the market it is trading in,
 # which would make it a different experiment per agent and destroy the
 # same-seed comparison the harness is built on.
 RANDOM_AGENT_STREAM = 71
@@ -187,7 +187,7 @@ def _book(tickers, longs, shorts, gross, k):
     trades. Its P&L then measures the accumulation rather than the signal, and
     `gross` stops meaning gross.
 
-    Naming every ticker -- zero for the ones not selected -- makes the target a
+    Naming every ticker (zero for the ones not selected) makes the target a
     portfolio rather than a wish list. Measured before and after when this
     fix landed: the trend baselines went from 72 and 82 rejected trades to
     none.
@@ -262,7 +262,7 @@ class _Trend:
 
     The agent sees one observation per decision step, so a lookback of six is
     six steps. It equals one day only when ``steps_per_day`` is six, which is
-    the harness default -- so the default agent is a one-day trader by a
+    the harness default, so the default agent is a one-day trader by a
     coincidence of two defaults matching, not by contract. Change
     ``steps_per_day`` and the same number means a different horizon.
 
@@ -369,12 +369,12 @@ class Oracle:
     Its P&L is the denominator that makes every other agent's readable. Report
     scores as a fraction of it, not as bare currency.
 
-    It is a REFERENCE, not a maximum -- see this module's docstring. It gets
+    It is a REFERENCE, not a maximum. See this module's docstring. It gets
     the same gross exposure and participation cap as every other baseline,
     and spends them on a naive rule: equal weight, long the ``top_k`` most
     underpriced names and short the ``top_k`` most overpriced. Agents do
-    beat it -- mean reversion in 5 of 12 markets on the grid stated in the
-    module docstring -- and that is a result rather than a fault.
+    beat it (mean reversion in 5 of 12 markets on the grid stated in the
+    module docstring), and that is a result rather than a fault.
 
     Three further caveats, all worth knowing before quoting a capture ratio:
 
@@ -454,7 +454,7 @@ class Oracle:
 
         Computed here rather than by calling the scorer's own
         ``_dominant_factor``. Sharing the function would make the test a
-        tautology -- the scorer agreeing with itself -- where two independent
+        tautology (the scorer agreeing with itself), where two independent
         implementations agreeing is evidence.
         """
         if self._engine is None:
@@ -495,7 +495,7 @@ def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str
     what a perfectly-informed reference earned in *that* market removes
     exactly that.
 
-    A ratio ABOVE 1.0 is legal and does occur -- on the measured grid in
+    A ratio ABOVE 1.0 is legal and does occur, on the measured grid in
     this module's docstring, in 5 of mean-reversion's 12 markets, once for
     buy-and-hold, and never for random. The Oracle is not an upper bound: it holds the
     same gross exposure as everyone else and spends it on a naive

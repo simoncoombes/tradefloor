@@ -1,6 +1,6 @@
 """Stylised facts: what these markets look like, measured, next to real ones.
 
-A simulator you cannot characterise is a simulator you cannot reason about. If
+A simulator you cannot characterize is a simulator you cannot reason about. If
 you are going to conclude anything from a strategy's performance here, you need
 to know which properties of real markets this model reproduces and which it
 does not, and the second list is the one that matters, because that is where a
@@ -8,8 +8,8 @@ conclusion will fail to transfer.
 
 So this measures, and the numbers below were produced by running it. An
 earlier era could add "they are not targets the model was tuned to hit";
-this one cannot -- four of the panel's statistics became calibration
-targets at the 2026-08 era boundary -- so the disclosure of which, and of
+this one cannot, because four of the panel's statistics became calibration
+targets at the 2026-08 era boundary, so the disclosure of which, and of
 how the held-out checks read, is part of the measurement now. The bands
 themselves carry provenance since 2026-08-22 (`REAL_MARKETS_PROVENANCE`):
 the previous set was inherited, and a verdict against an unprovenanced
@@ -40,12 +40,12 @@ for, and why a certificate here is THREE counts and not one.
 Two eras of caveats attach. First, the 2026-08 model changes (the GJR
 asymmetry term, conditional volatility on the shared market factor, that
 volatility's VIX coupling) were CALIBRATED against the statistics this
-module reports -- see "Which statistics were targets" below. Second, the
+module reports; see "Which statistics were targets" below. Second, the
 BANDS themselves were re-derived on 2026-08-22: the previous bands were
 inherited without provenance, and re-deriving them from real data at this
-module's own method moved several verdicts in BOTH directions --
+module's own method moved several verdicts in BOTH directions:
 clustering at lag one left its band, the leverage effect entered its
-band -- see "Where the bands come from" below. A verdict is a comparison
+band. See "Where the bands come from" below. A verdict is a comparison
 of a measurement against a band, and both halves now carry provenance.
 
 Fourteen is the SHAPE count and not the graded count. A fifteenth row,
@@ -56,7 +56,7 @@ equal-weight premium read off two equal-weight series against it, a
 centre of 7.37 with a standard error of 2.25, so a band of 2.9 to 11.9
 (see `REAL_MARKETS_PROVENANCE`). It exists because the fourteen shape
 statistics could all read in band on a market losing a fifth of its
-value in a year -- and did. The certified set is therefore split: `SHAPE`
+value in a year, and did. The certified set is therefore split: `SHAPE`
 rows are graded as a median over the certification seeds, `LEVEL` rows
 as a thirty-seed mean because their seed noise is a large fraction of
 their band, and `CRISIS` rows are reserved for the fear gauge. The level
@@ -68,7 +68,7 @@ the two differ by half the cross-sectional variance. See
 
 Every figure below: `Universe.random(40, seed=111)` (fingerprint
 5d8de78b55aad752), 252 days, `measure()` per sim seed, median over seeds 1
-to 6 -- re-measured at known-answer v8 (era digest 1ee64998...), where the
+to 6, re-measured at known-answer v8 (era digest 1ee64998...), where the
 superseded figures beside them are marked with the era they belonged to.
 
 **That roster no longer exists.** The universe generator was reconciled so
@@ -99,9 +99,9 @@ convention that row carried at the time.
 
 **Stocks move together, and stop being diversifiable in a crisis.** Mean
 pairwise correlation of daily returns is **+0.257** (seed range +0.205 to
-+0.456), inside the re-derived +0.08 to +0.56 -- a real decade's own
++0.456), inside the re-derived +0.08 to +0.56, a real decade's own
 calm-market spread, which the superseded +0.25/+0.35 band was narrower
-than -- and measured at +0.024 one era ago, the largest gap this module
+than. It measured +0.024 one era ago, the largest gap this module
 has ever carried. The mechanism that closed it: the shared market factor
 now carries its own conditional-variance process at a baseline sigma of
 0.016 against the reference's 0.003, funded by scaling per-name
@@ -109,12 +109,12 @@ idiosyncratic noise by 0.84 rather than added on top. The crisis half is
 the VIX coupling: pinned VIX 45 takes the same correlation to +0.68 (see
 `tradefloor.scenario`); the real crisis reading is +0.63.
 
-**Fat tails survive the correlation -- at the thin end of a wide band.**
+**Fat tails survive the correlation, at the thin end of a wide band.**
 Excess kurtosis is **+3.1** (+2.4 to +5.7 across seeds), inside the
 re-derived +1.6 to +41. The width is honest: a fourth moment on 252 days
 is noise-dominated, and one genuine single-name event (NVDA's +26%
 earnings day in 2016) put a real window at 36.7. Two readings follow.
-The old +3/+10 band claimed a precision the estimator does not have --
+The old +3/+10 band claimed a precision the estimator does not have:
 its top sat below the real windows' MEDIAN of 11. And the model sits
 below every one of ten real windows (minimum 5.6): its pooled tails are
 thin for a real cross-section, just not provably outside a band this
@@ -125,19 +125,19 @@ at lag twenty is **-0.006** (-0.044 to +0.009), inside the re-derived
 -0.04 to +0.08. Read the band before the verdict: real WITHIN-YEAR
 lag-20 readings are themselves near zero (-0.015 to +0.059 across
 windows), so this row says the model matches real markets at the
-horizon the panel measures -- not that its volatility memory matches
+horizon the panel measures, not that its volatility memory matches
 the long-sample fact that real clustering persists for months. It does
 not; a 252-day window simply cannot see that fact, in the model or in
 real data.
 
 **Volume arrives with volatility.** Volume against absolute return is
-**+0.585** (+0.541 to +0.655), inside the re-derived +0.46 to +0.66 --
+**+0.585** (+0.541 to +0.655), inside the re-derived +0.46 to +0.66,
 the tightest band on the panel, because every real window of a decade
 reads 0.50 to 0.64. It read +0.105 before the era boundary: the
 `avg_volume` feedback compounded the level a percent-plus a day, and
 that trend swamped the covariation. The level is held now, and the
-per-tick channel -- volume scales with the size of the day's move by
-construction -- shows through.
+per-tick channel (volume scales with the size of the day's move by
+construction) shows through.
 
 **The leverage effect exists, and at the honest band it is in band.**
 Today's signed return against tomorrow's absolute return is **-0.085**,
@@ -147,8 +147,8 @@ index-strength leverage from a per-name estimator: Bouchaud, Matacz and
 Potters measured the single-stock effect an order of magnitude weaker
 than the index effect, and real per-name windows read -0.11 to +0.01
 (median -0.04). The GJR term that made the sign stable remains real
-work -- a symmetric variance process produces no asymmetry at any
-coefficients -- but the "too weak" verdict this row carried was a
+work (a symmetric variance process produces no asymmetry at any
+coefficients) but the "too weak" verdict this row carried was a
 verdict against the wrong band. Mind the sign when reading this row: a
 value ABOVE a band whose top is zero is an effect too WEAK, not too
 strong, so `_verdict` and `band_distance` below carry their own sign
@@ -158,13 +158,13 @@ handling.
 
 **Returns are positively autocorrelated, and real ones are not.** Measured
 at **+0.249** at lag one (+0.237 to +0.443), in six seeds of six, against
-a real band around zero. The AR(2) mispricing process showing through --
+a real band around zero. The AR(2) mispricing process shows through,
 untouched by the era boundary, and none of the era's sweeps targeted it.
 It has a consequence you must carry into any conclusion drawn here:
 
 > **Momentum is mechanically profitable in this market in a way it is not
 > in real markets.** An agent that trades serial correlation has an edge
-> here that is an artefact of the process, not a skill that transfers.
+> here that is an artifact of the process, not a skill that transfers.
 
 This is the specific mechanism behind the general warning that this harness
 ranks agents against each other rather than certifying real-world skill. If
@@ -174,7 +174,7 @@ ranking here says very little about which is better anywhere else.
 **Volatility clustering is too strong at short lags for the horizon it
 is measured on.** |return| autocorrelation at lag one is **+0.242**
 (+0.189 to +0.454) against a re-derived within-year band of +0.02 to
-+0.22, and at lag five **+0.090** against +0.02 to +0.09 -- outside by
++0.22, and at lag five **+0.090** against +0.02 to +0.09, outside by
 two parts in ten thousand, on the boundary at any noise scale, but
 strictly outside and reported as such. The lag-one verdict is a band
 correction, not a model change: the superseded +0.15/+0.35 band was the
@@ -185,20 +185,20 @@ read 0.04 to 0.18. The era's calibration raised clustering toward the
 long-sample number at a within-year method, and against the honest band
 it overshot. Lag five was banded (2026-08-22) for a sharper reason:
 phase 2's instrument found a parameter corner with lag-one clustering
-comfortably in band and lag-five at -0.001 -- the lag-one statistic
-satisfied while the memory behind it is zero -- so every measured lag
+comfortably in band and lag-five at -0.001, the lag-one statistic
+satisfied while the memory behind it is zero, so every measured lag
 is now banded and the corner is priced.
 
-**Volatility is high.** About **41.5% annualised** (39% to 50% across
-seeds) against a re-derived band of 15 to 36 -- the calm-decade spread
+**Volatility is high.** About **41.5% annualized** (39% to 50% across
+seeds) against a re-derived band of 15 to 36, the calm-decade spread
 of a real 40-name large-cap cross-section, its ceiling extended to
 CLMX's since-1997 typical-stock 36%. Down from 53% pre-era, because the
 factor's variance was funded rather than added, and still above the
 band for a reason about how a universe is generated rather than about
 the price process: a generated roster is deliberately dispersed and
 skews small, which the mega-cap reference biases against, and the real
-crisis year read 45. Prefer ratios -- capture against the oracle,
-shortfall in basis points -- over raw percentages.
+crisis year read 45. Prefer ratios (capture against the oracle,
+shortfall in basis points) over raw percentages.
 
 **Volume shocks do not persist, by construction.** Volume CHANGES
 autocorrelate at **-0.446** (-0.454 to -0.425) against a re-derived
@@ -207,7 +207,7 @@ markets sit near zero here, and at this estimator that was simply wrong:
 every real window of a decade reads -0.22 to -0.30, because
 real daily volume is a persistent level plus large day-to-day noise,
 and differencing such a series is negatively autocorrelated. The band
-was relocated, not widened -- and the model is still outside it,
+was relocated, not widened, and the model is still outside it,
 because its volume noise is PURELY independent day to day and
 differencing that sits near -0.5 as arithmetic. The gap to real
 markets shrank from a mislocated 0.40 to a real 0.13, and it still
@@ -222,19 +222,19 @@ so a forecast here is never wrong twice running.
 
 The dependence rows stopped being pure measurements at the era boundary:
 the sweeps that chose the era's constants (`tools/calibration/`) scored
-candidates on the panel statistics, at this exact method -- this
+candidates on the panel statistics, at this exact method: this
 universe, these seeds, this horizon. Correlation, kurtosis, clustering
 at lag one and the leverage effect are calibrated quantities; return
 autocorrelation, the volatility level and the volume-change
 autocorrelation were not targeted. A statistic a model was tuned to hit
-is evidence about the tuning, not the model -- and the band
+is evidence about the tuning, not the model, and the band
 re-derivation sharpened that reading in both directions. Clustering at
 lag one, a calibrated statistic, is now OUT of band: the calibration
 drove it toward the long-sample textbook value at a within-year method,
 the shape tuning toward an unprovenanced target takes when seen from the
-other side. And the held-out fragility this section used to report --
-correlation slipping under the floor on fresh seeds, leverage halving
-on fresh universes -- largely dissolves under honest bands: on thirty
+other side. And the held-out fragility this section used to report
+(correlation slipping under the floor on fresh seeds, leverage halving
+on fresh universes) largely dissolves under honest bands: on thirty
 fresh seeds (101-130) every one of the ten verdicts is the SAME as on
 the published seeds, because verdicts that flipped on a re-measurement
 were a symptom of bands narrower than the statistic's own seed noise.
@@ -245,13 +245,13 @@ inherit these figures.
 ## Where the bands come from
 
 The bands were re-derived on 2026-08-22, because the previous set was
-inherited without provenance -- nobody could say which market, period,
+inherited without provenance, and nobody could say which market, period,
 frequency or estimator "+0.25 to +0.35" described. Each band now
 carries its provenance as data in `REAL_MARKETS_PROVENANCE`: the
 empirical claim, the reference-panel windows (ten 252-day windows of 40
 US large caps, 2015-2025, measured with THIS module's estimators at
 THIS panel's method), the retrieved sources with what each actually
-measured, and any named judgement call. The derivation rule was fixed
+measured, and any named judgment call. The derivation rule was fixed
 before any verdict was looked at; the two inward clamps it needed (the
 clustering floor, the leverage top) are named on their rows and decide
 no current verdict. One band is marked INDICATIVE (volume-change
@@ -265,33 +265,33 @@ The first four this module reported were chosen before anyone looked at
 dependence, and all four come from one instrument's price series taken on its
 own. Nothing looked across instruments and nothing looked between price and
 volume. Every realism gap later found in this project sat in that blind spot:
-the cross-sectional correlation, the volume behaviour and the missing leverage
+the cross-sectional correlation, the volume behavior and the missing leverage
 effect were all invisible to the report while it kept passing. A report that
-never leaves a single series will keep passing while the joint behaviour is
+never leaves a single series will keep passing while the joint behavior is
 wrong.
 
-The four dependence statistics cost one function and no modelling decision, and
+The four dependence statistics cost one function and no modeling decision, and
 they are the ones that say where a conclusion drawn here stops transferring.
 The last two, clustering at lags five and twenty, were promoted from
 measured-but-unbanded to banded when phase 2's instrument demonstrated the
 general lesson: any statistic that is measured but not banded is a hole an
-optimiser can walk through, and it found the lag-five hole unprompted.
+optimizer can walk through, and it found the lag-five hole unprompted.
 
 ## What the era closed, and what remains
 
 An earlier version of this section asked "can the mismatches be fixed?"
 and answered that each was a decision about diverging from the reference
-implementation. The 2026-08 era took those decisions -- argued, gated
-divergence, each with its sweep committed under `tools/calibration/` --
+implementation. The 2026-08 era took those decisions (argued, gated
+divergence, each with its sweep committed under `tools/calibration/`)
 and the record of which gap needed which KIND of change is worth keeping:
 
 - **Cross-sectional correlation** was proven unreachable by the factor's
   constant sigma (the band arrived only where kurtosis had collapsed) and
   was closed by a model change: conditional volatility on the factor,
   funded from the idiosyncratic side.
-- **Clustering** resisted every calibration lever -- persistence already
+- **Clustering** resisted every calibration lever (persistence already
   at the reference's 0.99, and raising the variance ceiling bought +0.016
-  of clustering for twenty points of volatility -- and was closed by the
+  of clustering for twenty points of volatility) and was closed by the
   same factor process, the one market-wide clustering needed.
 - **Volume against volatility** was closed by removing the average-volume
   feedback that compounded the level and buried the covariation.
@@ -301,17 +301,17 @@ and the record of which gap needed which KIND of change is worth keeping:
 What remains, and what each would take:
 
 - **Return autocorrelation is one constant away, and the constant stays
-  unpulled.** `MOMENTUM_THETA` from 0.25 to 0.05 measured +0.034 --
-  inside the band -- with volatility and kurtosis essentially unchanged.
+  unpulled.** `MOMENTUM_THETA` from 0.25 to 0.05 measured +0.034,
+  inside the band, with volatility and kurtosis essentially unchanged.
   That counterfactual was measured on the PRE-era model and has not been
   re-run; the mechanism it names is untouched. It remains a decision
   about the mispricing process itself (the herding term is load-bearing
-  for the model's identity), not a calibration detail -- though
+  for the model's identity), not a calibration detail, though
   `ModelParams.from_preset("pt-v1", momentum_theta=...)` now lets anyone
   measure the counterfactual without a rebuild, honestly fingerprinted.
 - **The volatility level** is a property of the universe generator, not
   the price process, and would be recalibrated there.
-- **Volume dynamics** need a model -- persistent volume shocks -- not a
+- **Volume dynamics** need a model (persistent volume shocks) and not a
   constant. Until then -0.45 is structural; the honest gap to real
   markets is 0.13, not the 0.40 the mislocated band used to charge.
 - **Short-lag clustering strength** is the era's own overshoot: the
@@ -322,7 +322,7 @@ What remains, and what each would take:
 ## What a measurement is for, when it disagrees with you
 
 Worth recording because it was tested: the GARCH process was being fed the
-day's TOTAL RETURN rather than its noise component -- the documented fallback,
+day's TOTAL RETURN rather than its noise component, the documented fallback,
 taken by accident on every close. Fixing that was expected to strengthen
 clustering, since it is the correction that makes the variance process see the
 shock the model says it should. It did the opposite: clustering fell from +0.12
@@ -332,7 +332,7 @@ The fix stayed anyway. It is what the model specifies, and the alternative is
 keeping a bug because it happened to score better on a statistic. That is how
 a model gets tuned toward its own report card instead of toward being right.
 When this was recorded these numbers were measurements rather than targets;
-four of them have since BECOME targets -- the calibration the era boundary
+four of them have since BECOME targets, in the calibration the era boundary
 performed, disclosed above. The held-out checks exist for that: they are
 where the report card stops being the thing that was tuned.
 
@@ -358,13 +358,13 @@ from .universe_util import fingerprint_of
 
 #: What the same statistics look like for real daily equity returns, at THIS
 #: module's own measurement method. Ranges rather than points, because they
-#: vary by market, period and universe -- and a single number would imply a
+#: vary by market, period and universe, and a single number would imply a
 #: precision nobody has. Every band was re-derived on 2026-08-22 from a
 #: reference panel of real markets measured with this module's own estimator
 #: functions, reconciled against the retrieved stylised-facts literature;
 #: `REAL_MARKETS_PROVENANCE` below carries, per band, what the empirical
 #: claim is and where each edge comes from. The bands these replaced were
-#: inherited without provenance, and re-derivation moved most of them --
+#: inherited without provenance, and re-derivation moved most of them,
 #: including relocating one (volume-change autocorrelation) whose old range
 #: did not contain ANY observed real-market reading at this estimator.
 REAL_MARKETS = {
@@ -393,7 +393,7 @@ REAL_MARKETS = {
     # -0.09 (`NULLS`), not a longer window: both presets read 22 to 24 of
     # thirty seeds on the real side there.
     "corr_persistence_acf1": (-0.19, 0.54),
-    # The LEVEL row, graded from 2026-09-03. Annualised return of the
+    # The LEVEL row, graded from 2026-09-03. Annualized return of the
     # daily-rebalanced equal-weight portfolio, percent a year, a price
     # return. The centre is the cap-weighted S&P 500 price return over 75
     # calendar years plus the equal-weight premium in price terms, and the
@@ -418,7 +418,7 @@ REAL_MARKETS = {
     "fear_gauge_dn1": (0.70, 4.03),
     "fear_gauge_dn3": (2.60, 9.58),
     # The index TAIL row, graded from 2026-09-06: the share of sessions, in
-    # percent, whose cap-weighted index return is at or below -3 percent --
+    # percent, whose cap-weighted index return is at or below -3 percent,
     # the count of the sessions the two rows above condition on. Until this
     # row existed, everything the project knew about the index tail was
     # ungraded, and a model could reach the real count with a third more
@@ -427,8 +427,8 @@ REAL_MARKETS = {
     # The band is the LEVEL row's form and not the shape rows'. This row
     # grades a mean over the certification seeds, so the question is
     # "is the model's ensemble rate consistent with the real long-run rate,
-    # given how well the tape knows it" -- centre plus or minus the
-    # multiplier times the centre's own standard error -- not "could one
+    # given how well the tape knows it", centre plus or minus the
+    # multiplier times the centre's own standard error, not "could one
     # real year read this", which is what `BAND_RULE` answers and which on
     # these windows gives [-1.18, 14.27]: a floor below zero and a ceiling
     # that admits 2008 every year.
@@ -455,7 +455,7 @@ REAL_MARKETS = {
     #
     # RESIDUAL: one window, 2008-06..2009-06, carries 33 of the 107 hits.
     # Without it the centre falls to 0.864 and the standard error to 0.199,
-    # which is a different quantity -- the non-2008 crash rate -- and a
+    # which is a different quantity (the non-2008 crash rate) and a
     # model that never produces a 2008 would pass it. The band says
     # "the unconditional crash rate, 2008 included, known to about a third
     # of itself at one standard error", and that is the true state of
@@ -472,9 +472,9 @@ REAL_MARKETS = {
 }
 
 #: Where each band comes from, carried as data so a reader can ask the
-#: library rather than trust a docstring. The full derivation -- the window
+#: library rather than trust a docstring. The full derivation (the window
 #: table, the retrieved sources with what each actually measured, and the
-#: verdict moves -- is recorded in tradefloor-design/REALISM-BANDS.md.
+#: verdict moves) is recorded in tradefloor-design/REALISM-BANDS.md.
 #:
 #: The shared derivation, applied blind to every statistic before any
 #: verdict was looked at: the reference panel is 40 US large-cap stocks
@@ -483,8 +483,8 @@ REAL_MARKETS = {
 #: to 2025-07 with THIS module's estimator functions at THIS panel's method
 #: (per-instrument medians, pooled marginals, mean pairwise correlation).
 #: The window straddling the COVID crash is excluded and reported beside
-#: each band as the crisis reading -- the panel measures a typical year,
-#: and this library measures crisis behaviour under pinned scenarios
+#: each band as the crisis reading, since the panel measures a typical year,
+#: and this library measures crisis behavior under pinned scenarios
 #: instead. Band = [min - s, max + s] over the nine remaining windows,
 #: where s is the across-window sd with the single most extreme window
 #: dropped (so one draw cannot inflate the noise scale it is priced in),
@@ -896,8 +896,8 @@ REAL_MARKETS_PROVENANCE = {
         # above, 2.66. The error is the panel's own form on the recorded
         # across-window trimmed sd, MEDIAN_SE_FACTOR * 0.64 / sqrt(9), and
         # `centre_df` is 9 - 2: the trim drops one window and the sd spends
-        # one. The nine window VALUES are not in this package -- they are
-        # `fear_band.py`'s output and were never committed -- so the error
+        # one. The nine window VALUES are not in this package (they are
+        # `fear_band.py`'s output and were never committed) so the error
         # here re-derives from a summary and not from the readings, which is
         # the one place on this row where a record stands in for a
         # measurement.
@@ -932,8 +932,8 @@ REAL_MARKETS_PROVENANCE = {
         # THE CENTRE IS THE POOLED MEDIAN, +5.73, and not the 5.30 in the
         # triple above. The model's row is POOLED over every seed's sessions
         # (`AGGREGATE`), so the like-for-like tape quantity is the median of
-        # the 107 real sessions since 1990 -- which the `sources` entry
-        # below already records -- and 5.30 is the median of the ten WINDOW
+        # the 107 real sessions since 1990 (which the `sources` entry
+        # below already records) and 5.30 is the median of the ten WINDOW
         # medians the band was built from. Two estimators of two quantities;
         # scoring the pooled model row against 5.30 is the wrong-ruler error
         # on this row, and it is the reason the centre is written here as a
@@ -946,14 +946,14 @@ REAL_MARKETS_PROVENANCE = {
         # their sessions pooled, the median taken, 2,000 draws at seed
         # 20260905 (`tools/calibration/fear_band.py`, `dn3_error`), sd
         # 0.6539, and the bootstrap centres at +5.60, 0.13 below the
-        # recorded centre -- a fifth of its own sd. Seeds 20260906-8 give
+        # recorded centre, a fifth of its own sd. Seeds 20260906-8 give
         # 0.642, 0.643, 0.646; 10,000 draws give 0.6533.
         #
         # NOT the ten windows the band was built from. That was the form
         # first written here, and it was run (2026-09-08, `programme/
         # results/objective-blind-spots.md` section 3.1): sd 0.588 on nine
         # degrees of freedom, but its ten blocks hold 92 of the 107 sessions
-        # and it centres at +5.33, 0.40 below the centre -- two thirds of
+        # and it centres at +5.33, 0.40 below the centre, two thirds of
         # its own sd. The five-session floor is the BAND's condition, so a
         # window can carry a median of its own; the pooled median needs no
         # floor, and an error estimated on a different sample from the
@@ -1067,8 +1067,8 @@ REAL_MARKETS_PROVENANCE = {
 
 #: The tape's own index tail, window by window, as data.
 #:
-#: `REAL_MARKETS_WINDOWS` is a different corpus -- forty US large caps over
-#: one decade, read PER NAME -- and this row's real side is a cap-weighted
+#: `REAL_MARKETS_WINDOWS` is a different corpus (forty US large caps over
+#: one decade, read PER NAME) and this row's real side is a cap-weighted
 #: INDEX over thirty-five years, so it cannot live there and does not. The
 #: two tables are read through the same three functions (`real_windows`,
 #: `real_centre`, `real_centre_se`), which branch on which corpus holds the
@@ -1082,7 +1082,7 @@ REAL_MARKETS_PROVENANCE = {
 #: reproducible and this one decides a band edge. The windows are
 #: non-overlapping blocks of consecutive RETURNS, anchored at the LATEST
 #: return and walking back; the remainder at the start of the series is
-#: dropped, and it is derived from the series length rather than chosen --
+#: dropped, and it is derived from the series length rather than chosen:
 #: 8,960 returns less 35 blocks of 252 is 140. Two consequences, both load
 #: bearing:
 #:
@@ -1092,8 +1092,8 @@ REAL_MARKETS_PROVENANCE = {
 #: the series grew;
 #:
 #: and the blocks are contiguous in RETURN space, so no session falls
-#: between two of them. Blocking the BARS instead -- 253-bar blocks giving
-#: 252 returns each -- drops one seam return at every boundary, 34 of them
+#: between two of them. Blocking the BARS instead (253-bar blocks giving
+#: 252 returns each) drops one seam return at every boundary, 34 of them
 #: here, and those seams are sessions the tape holds. The two constructions
 #: agree on 107 hits in 8,820 sessions and on the centre, and differ in the
 #: across-window sd, 2.3613 under this rule against 2.3711 bar-blocked,
@@ -1190,7 +1190,7 @@ def index_tail_rates(horizon_days: int) -> tuple[float, ...]:
 #:
 #: `REAL_MARKETS_PROVENANCE` carries only three numbers per row, the min,
 #: median and max across windows, which is enough to read a band's derivation
-#: and not enough to re-derive one. This is the table those three summarise:
+#: and not enough to re-derive one. This is the table those three summarize:
 #: ten 253-bar windows of the same 40 US large caps, 2015-07 to 2025-07,
 #: measured with THIS module's estimators at THIS panel's method.
 #:
@@ -1202,8 +1202,8 @@ def index_tail_rates(horizon_days: int) -> tuple[float, ...]:
 #: from this table rather than trusting that they match.
 #:
 #: FOURTEEN ROWS OF FOURTEEN since 2026-09-05. The four correlation-structure
-#: rows -- corr_asymmetry, corr_asymmetry_lagged, sector_excess_corr and
-#: corr_persistence_acf1 -- had no per-window record here until the mechanism
+#: rows (corr_asymmetry, corr_asymmetry_lagged, sector_excess_corr and
+#: corr_persistence_acf1) had no per-window record here until the mechanism
 #: gate needed the DISPERSION of a row across real years and not only its
 #: centre: `facts.real_centre_se` cannot be derived from a min, a median and a
 #: max, and reading one off the band edges would recover an interval a
@@ -1212,15 +1212,15 @@ def index_tail_rates(horizon_days: int) -> tuple[float, ...]:
 #: crisis index and the same estimators; each of their shipped bands
 #: re-derives from them by `band_from_windows` with no adjustment, which is
 #: what `tests/test_reference_windows.py` now checks for all fourteen.
-#: `abs_return_acf5`'s provenance TRIPLE still summarises a different window
+#: `abs_return_acf5`'s provenance TRIPLE still summarizes a different window
 #: set from this one, so that triple is not derivable from these values and
-#: the test excludes it by name rather than by tolerance -- the row's
+#: the test excludes it by name rather than by tolerance. The row's
 #: per-window readings here are this window set's, and its centre and
 #: dispersion come from them.
 #:
 #: What this unblocks: any re-derivation of a band, a leave-one-window-out
 #: null of the panel against real data, and any method that needs the
-#: dispersion of a statistic across real years rather than its range -- which
+#: dispersion of a statistic across real years rather than its range, which
 #: is what the mechanism gate's centre diagnostic needs on every row.
 REAL_MARKETS_WINDOWS = {
     "windows": (
@@ -1253,7 +1253,7 @@ REAL_MARKETS_WINDOWS = {
         "leverage_effect": (-0.109, -0.020, -0.087, -0.113, -0.128, 0.014, -0.038, -0.043, -0.007, -0.042),
         "volume_change_acf1": (-0.221, -0.242, -0.255, -0.259, -0.284, -0.266, -0.238, -0.296, -0.263, -0.239),
         # The four correlation-structure rows, added 2026-09-05 from the same
-        # measurements the triples above summarise. The first three come from
+        # measurements the triples above summarize. The first three come from
         # tradefloor-design/real_panel_results.json (retrieved 2026-08-25, the
         # ten windows in this table's order) and the fourth from
         # tradefloor-design/real-corr-persistence-bands.json (retrieved
@@ -1284,8 +1284,8 @@ REAL_MARKETS_WINDOWS = {
 #: promoted from the design repository's
 #: `realism-bands-504-reference-panel.json` (retrieved 2026-08-29). Until it
 #: existed the library carried 504-bar BANDS with no windows underneath
-#: them, so `real_centre_se` -- the dispersion of a row across real years at
-#: the window length it is graded at -- was undetermined at 504 on every
+#: them, so `real_centre_se` (the dispersion of a row across real years at
+#: the window length it is graded at) was undetermined at 504 on every
 #: row, and `centre_distance` refused the horizon for want of one.
 #:
 #: THIRTEEN rows, not fourteen: `corr_persistence_acf1` is measured on its
@@ -1340,8 +1340,8 @@ REAL_MARKETS_WINDOWS_504 = {
 #: non-overlapping 21-day SUB-windows, so a 505-bar window holds 24 of them
 #: and the row's evidence base is not the panel's. The design repository
 #: measured it separately (`real-corr-persistence-bands.json`, retrieved
-#: 2026-08-25) over five 504-bar windows rather than six -- its series starts
-#: one window later -- and FOUR of them are non-crisis, which is why
+#: 2026-08-25) over five 504-bar windows rather than six (its series starts
+#: one window later) and FOUR of them are non-crisis, which is why
 #: `BAND_WINDOWS_EXCEPTIONS` already records a four-window band for this row
 #: at this horizon. Reading it out of `REAL_MARKETS_WINDOWS_504` would take a
 #: dispersion across six windows of a quantity measured on five.
@@ -1452,7 +1452,7 @@ def band_from_windows(key: str, values: Sequence[float]) -> tuple[float, float]:
 #: data, so `tests/test_reference_windows.py` derives every shipped band as
 #: the rule plus its named adjustment and a band that is neither is caught.
 #: A row absent here ships the rule's band exactly. `abs_return_acf5` is
-#: absent because its provenance summarises a different window set and its
+#: absent because its provenance summarizes a different window set and its
 #: band is not derivable from `REAL_MARKETS_WINDOWS` at all.
 #:
 #: Clamp #2 has a cost the table states: the 2020-07..2021-07 window reads
@@ -1488,7 +1488,7 @@ REAL_MARKETS_ADJUSTMENTS: dict[str, dict[str, tuple[float, str, str]]] = {
 #: non-crisis windows, and why. EMPTY, and that is the finding rather than an
 #: omission: `REAL_MARKETS_504`'s own note records that the literature
 #: reconciliation applied to `REAL_MARKETS` "needs a retrieved,
-#: horizon-compatible source per statistic and is a human judgement that has
+#: horizon-compatible source per statistic and is a human judgment that has
 #: not been made at this horizon", so every 504-bar edge is the mechanical
 #: rule's and nothing else. The table exists so the derivation test has one
 #: shape at both horizons and so the first 504-bar adjustment has to be
@@ -1521,7 +1521,7 @@ REAL_MARKETS_ADJUSTMENTS_504: dict[str, dict[str, tuple[float, str, str]]] = {}
 #: loss reported. A six-seed sd also carries ~32% relative sampling error
 #: (1/sqrt(2(n-1))) against ~13% at thirty seeds, and thirty matches the
 #: phase-2 instrument's protocol, so these scales and the instrument's
-#: Jacobian rows are directly comparable -- the independently measured
+#: Jacobian rows are directly comparable. The independently measured
 #: seed_sd in tools/calibration/results/jacobian-pt-v1-2026-08-22-chunk1
 #: .json agrees with every overlapping entry here to six significant
 #: figures. The values are re-derivable in-repo (the engine is
@@ -1575,12 +1575,12 @@ SEED_SD = {
 #:
 #: They are mostly TIGHTER, not looser, which is the opposite of what the
 #: first attempt assumed: the model looked flattered by the 252-day bands on
-#: kurtosis specifically, whose 252-day floor of 1.6 hid a real failure --
-#: real markets read 7.1 to 22 over two-year windows against the model's 5.2.
+#: kurtosis specifically, whose 252-day floor of 1.6 hid a real failure.
+#: Real markets read 7.1 to 22 over two-year windows against the model's 5.2.
 #:
 #: Mechanical bands only. The literature reconciliation applied to
 #: `REAL_MARKETS` needs a retrieved, horizon-compatible source per statistic
-#: and is a human judgement that has not been made at this horizon.
+#: and is a human judgment that has not been made at this horizon.
 REAL_MARKETS_504 = {
     "annualised_vol_pct": (16, 34),
     "excess_kurtosis": (7.1000000000000005, 22),
@@ -1607,7 +1607,7 @@ REAL_MARKETS_504 = {
 #: seeds the 504-day scales run from 0.46 of the 252-day ones
 #: (`volume_abs_return_corr`) to 0.86 (`corr_asymmetry_lagged`). EVERY row
 #: falls, which is what an estimator does on a longer window, so an
-#: objective reusing `SEED_SD` at 504 days under-penalises every row.
+#: objective reusing `SEED_SD` at 504 days under-penalizes every row.
 #:
 #: RE-MEASURED 2026-09-06. The table shipped until then was pt-v3 on roster
 #: fingerprint 5d8de78b, which the generator reconciliation retired, while
@@ -1628,7 +1628,7 @@ REAL_MARKETS_504 = {
 #: project has published divided by a denominator up to 5.2x too large
 #: (kurtosis, 3.78 against 0.73), so a statistic reported as sitting 0.6 seed
 #: sd inside its 504-day band sits over three. The band VERDICTS are
-#: unaffected -- a scale moves no band -- and the 504 arm of
+#: unaffected (a scale moves no band) and the 504 arm of
 #: `loss.dual_horizon_loss` is affected as the square, so kurtosis
 #: contributed about 27x less to that objective than it should have.
 SEED_SD_504 = {
@@ -1702,8 +1702,8 @@ SEED_SD_504_PROVENANCE = {
     },
 }
 
-#: Where SEED_SD's values come from, carried as data so any consumer -- the
-#: loss report, a calibration manifest -- can quote it rather than assert it.
+#: Where SEED_SD's values come from, carried as data so any consumer (the
+#: loss report, a calibration manifest) can quote it rather than assert it.
 SEED_SD_PROVENANCE = {
     "source": "re-measured on the shipped baseline preset: facts.measure() "
               "on the committed panel roster, 252 days, seeds 101-130, "
@@ -1770,7 +1770,7 @@ SEED_SD_PROVENANCE = {
 #: rather than on the held panel roster, and the reason each crisis row
 #: carries none. A consumer that scales a row by its seed sd reads
 #: `SEED_SD.get(row)` and reports None where there is no entry; it never
-#: substitutes a neighbour's.
+#: substitutes a neighbor's.
 SEED_SD_LEVEL_PROVENANCE = {
     "rows": ("index_drift_pct",),
     "source": "facts.measure() at pt-v1 on Universe.random(40, seed=s) with "
@@ -1840,12 +1840,12 @@ SEED_SD_LEVEL_PROVENANCE = {
 # The VIX's persistence, and the ruler a run of a given length is graded by
 #
 # One estimator, one window, one debias, and all three named wherever the
-# number appears. The row this section exists for -- the model's
-# `vix_ar1_debiased` -- is a PER-RUN reading: one seed's daily VIX levels
+# number appears. The row this section exists for, the model's
+# `vix_ar1_debiased`, is a PER-RUN reading: one seed's daily VIX levels
 # over the run, the lag-one autocorrelation about that run's own mean, the
 # median across seeds, then the first-order small-sample correction at the
 # run's length. The figure it was compared against for months, 0.976, is the
-# WHOLE-SPAN autocorrelation of ^VIX -- one series of 8,960 bars, and it
+# WHOLE-SPAN autocorrelation of ^VIX, one series of 8,960 bars, and it
 # checks at 0.9772.
 #
 # Those are two different quantities and the model's is the smaller one. The
@@ -1907,8 +1907,8 @@ def debias_ar1(rho: float, n: int) -> float:
 
     A lag-one autocorrelation estimated about the sample's OWN mean is
     biased DOWN by about `(1 + 3 rho) / n`. At n = 252 and rho near 0.93
-    that is 0.015 -- the same size as the distance between the model and
-    the tape -- so leaving it out would read a correct model as too fast.
+    that is 0.015, the same size as the distance between the model and
+    the tape, so leaving it out would read a correct model as too fast.
 
     Both sides of the comparison carry it, which is the point of putting it
     here: the correction cancels only if the ruler and the row apply the
@@ -1925,8 +1925,8 @@ def debias_ar1(rho: float, n: int) -> float:
 def median_ar1_debiased(readings: Iterable[float], *, n: int) -> float:
     """The median of several raw lag-one readings, debiased at their length.
 
-    The aggregation the model's row already used -- median first, then the
-    correction on the median -- kept in that order because the correction
+    The aggregation the model's row already used (median first, then the
+    correction on the median) kept in that order because the correction
     is monotone in rho and the rows on the record were computed this way.
     """
     values = [float(r) for r in readings]
@@ -1970,7 +1970,7 @@ def median_level_ar1(runs: Iterable[Sequence[float]], *, length: int) -> float:
 def vix_levels(macro: Any) -> list[float]:
     """The daily VIX level series of a recorded run, from its macro table.
 
-    `Engine.macro_table()`'s `vix` column in day order -- the series every
+    `Engine.macro_table()`'s `vix` column in day order, the series every
     harness reporting a VIX AR1 has been rebuilding for itself out of
     `state_snapshot()["economy"]["vix"]`, one seed at a time. One reader, so
     the MODEL side of the comparison is as fixed as the estimator is.
@@ -2038,7 +2038,7 @@ def persistence_statistics(macro: Any, *, days: int) -> dict[str, Any]:
     ONE RUN, so this is `level_ar1` debiased at the run length and NOT
     `median_level_ar1`, which is the median ACROSS runs. A harness taking
     the median of these across seeds lands on the same number, because
-    `debias_ar1` is affine and increasing -- which is what lets a per-run
+    `debias_ar1` is affine and increasing, which is what lets a per-run
     row answer for a ruler defined across runs.
 
     `level_ar1` REFUSES a series with no lag-one pair and a constant one,
@@ -2139,7 +2139,7 @@ def real_vix_ar1(days: Any, *, what: str = "this measurement") -> float:
 # nothing read it. `loss.dual_horizon_loss` exists because a search bought one
 # horizon's realism with the other's; `tools/calibration/evaluate_axes.py`
 # graded the one axis whose purpose is a different horizon against the 252-day
-# bands while labelling them "the TRUE bands", and published a `generalises`
+# bands while labeling them "the TRUE bands", and published a `generalises`
 # verdict from it.
 #
 # So the horizon becomes data. Any scoring call can now ask what horizon its
@@ -2202,9 +2202,9 @@ def register_ruler_table(table: Mapping[str, Any], days: int,
     """Record the horizon a band or noise table was derived at.
 
     For a table this module does not define. `envelope.BANDS_504` is the
-    seventeen-row 504-day set -- the fourteen shape rows of
+    seventeen-row 504-day set (the fourteen shape rows of
     `REAL_MARKETS_504` plus the level and crisis rows carrying their 252-day
-    bands, each with its argument inline there -- and it is the table
+    bands, each with its argument inline there) and it is the table
     `envelope.score` grades a 504-day panel with. Registered rather than
     copied here, because a second copy of a band table is a second thing to
     keep in step, and `test_envelope` already pins that these two agree.
@@ -2226,8 +2226,8 @@ def rulers_for_horizon(
     """The bands and the noise scale derived at `days`, or a refusal.
 
     The refusal is the point. Every horizon this project has measured at
-    other than 252 and 504 -- 60 in a shipped example, 180 in a test, 756 and
-    1008 and 2520 on boxes -- has no band set, and grading one of those
+    other than 252 and 504 (60 in a shipped example, 180 in a test, 756 and
+    1008 and 2520 on boxes) has no band set, and grading one of those
     against the 252-day bands compares two different quantities and returns a
     plausible number. So this raises, and names the horizons that do have a
     ruler.
@@ -2251,7 +2251,7 @@ def rulers_for_horizon(
 def horizon_of_table(table: Any) -> tuple[int | None, str | None]:
     """Which horizon a band or noise table was derived at, and its name.
 
-    ``(None, None)`` for a table nobody registered -- a caller's own bands, or
+    ``(None, None)`` for a table nobody registered: a caller's own bands, or
     a re-estimated noise scale from `loss.seed_sd_from_panels`. Unknown is
     reported as unknown rather than guessed: an unregistered table is
     UNCHECKED, and a guess is the fallback this module is removing.
@@ -2272,8 +2272,8 @@ def horizon_of_panels(panels: Iterable[Any], *,
                       what: str = "these panels") -> int | None:
     """The single horizon a set of measured panels was taken at.
 
-    ``None`` when no panel records one -- an already-aggregated median, or a
-    mapping a caller built by hand -- which is unknown rather than 252. A MIX
+    ``None`` when no panel records one (an already-aggregated median, or a
+    mapping a caller built by hand) which is unknown rather than 252. A MIX
     raises: a median over panels taken at two horizons is a statistic of
     neither, and that is exactly as wrong as the ruler mismatch and harder to
     see.
@@ -2302,9 +2302,9 @@ def check_ruler_horizon(*, panel_days: int | None,
 
     Three disagreements, each of which has happened:
 
-    * a 504-day panel against the 252-day bands -- `evaluate_axes.py`'s
+    * a 504-day panel against the 252-day bands, in `evaluate_axes.py`'s
       horizon axis, and the reason this function exists;
-    * a 60-day panel against the 252-day bands -- `07-research-workflow.py`;
+    * a 60-day panel against the 252-day bands, in `07-research-workflow.py`;
     * the right bands with the other horizon's noise scale, which
       `dual_horizon_loss` calls "the wrong-ruler error in a subtler dress"
       and which rescales every distance without changing a band verdict.
@@ -2371,14 +2371,14 @@ LEVEL = ("index_drift_pct",)
 #: The index tail row is CRISIS and not LEVEL: it counts the sessions the
 #: two fear rows condition on, so the three are read together, and the
 #: report already gives the group its own verdict. LEVEL would
-#: fit the arithmetic -- a rate is a first moment -- and was not chosen
+#: fit the arithmetic (a rate is a first moment) and was not chosen
 #: because the level row's protocol note and its `SEED_SD` treatment are
 #: specific to the drift.
 CRISIS = ("fear_gauge_dn1", "fear_gauge_dn3", "index_tail_dn3_pct")
 #: SCORED BUT NOT BANDED, and the only group that is.
 #:
-#: `SHAPE + LEVEL + CRISIS` is an exact partition of `REAL_MARKETS` -- the
-#: banded rows, which `envelope.certify` reads -- and `test_facts` asserts
+#: `SHAPE + LEVEL + CRISIS` is an exact partition of `REAL_MARKETS` (the
+#: banded rows, which `envelope.certify` reads) and `test_facts` asserts
 #: it. This group sits outside that partition on purpose: section 1.5 ruled
 #: on the RULER for the VIX's persistence and not on a band for it, and a
 #: band is a separate derivation nobody has done. So the row enters the
@@ -2389,7 +2389,7 @@ CRISIS = ("fear_gauge_dn1", "fear_gauge_dn3", "index_tail_dn3_pct")
 #: `RULERS_BY_HORIZON`, and READ BY NOTHING: not `envelope.CERTIFIED`, not
 #: `loss.rule_table`, not `measure`. With the row absent, raising
 #: `vix_mean_reversion` improved `S` by 12 to 31 points while taking this
-#: statistic from within one standard error of its ruler to five and more --
+#: statistic from within one standard error of its ruler to five and more,
 #: an objective that priced one end of a dial and not the other. That is
 #: section 1.3's defect exactly: the row that could not fail was the row
 #: that was not there.
@@ -2477,7 +2477,7 @@ def aggregate_value(key: str, values: Sequence[float]) -> float:
     """One graded value for `key` from its per-seed readings.
 
     A `pooled_rate` row reads the MEAN here, which is the pooled rate
-    exactly when every run contributed the same number of sessions --
+    exactly when every run contributed the same number of sessions,
     the certification protocol's case. `aggregate_panels` divides the two
     sums instead and needs no such condition, so a consumer holding the
     per-seed counts should use that; this function has only the rates.
@@ -2544,7 +2544,7 @@ def pooled_sessions(panels: Sequence[Mapping[str, Any]], key: str) -> int:
 #: Panel rows that are MEASURED AND REPORTED BUT NOT GRADED, against the
 #: reason no band exists for them. A key here is deliberately absent from
 #: `REAL_MARKETS`, so it earns no verdict, cannot pass, cannot fail, and
-#: cannot enter `envelope.CERTIFIED` -- and `report` says why at the point
+#: cannot enter `envelope.CERTIFIED`, and `report` says why at the point
 #: it prints the number, reading this dict rather than a retyped sentence.
 #:
 #: A row with no band is worth having anyway. The alternative is not
@@ -2705,8 +2705,8 @@ def zumbach_asymmetry(returns: Sequence[float], n: int) -> float | None:
     """Time-reversal asymmetry of volatility feedback, at horizon `n`.
 
     `A(n) = corr(P^2, Qp) - corr(Qm, F^2)`, where over a window of `n`
-    sessions either side of `t`, `P` is the past trend, `Qm` the past realised
-    variance, `F` the future trend and `Qp` the future realised variance. It
+    sessions either side of `t`, `P` is the past trend, `Qm` the past realized
+    variance, `F` the future trend and `Qp` the future realized variance. It
     asks whether a past TREND predicts future variance better than past
     variance predicts a future trend, which for a time-reversible process it
     does not.
@@ -2759,7 +2759,7 @@ def zumbach_asymmetry(returns: Sequence[float], n: int) -> float | None:
 def zumbach_asymmetry_pooled(
     series: Sequence[Sequence[float]], n: int
 ) -> float | None:
-    """`zumbach_asymmetry` across names, pooled by terms after standardising.
+    """`zumbach_asymmetry` across names, pooled by terms after standardizing.
 
     Pooling is what makes the estimator usable at 252 sessions: it is a
     fourth-moment object and one name of one year does not carry it. Each name
@@ -2768,7 +2768,7 @@ def zumbach_asymmetry_pooled(
     WITHIN a name before pooling, never across the join between two.
 
     One difference from the bare form, which is a property rather than a
-    defect: standardising also CENTRES each name, and centring changes the
+    defect: standardizing also CENTRES each name, and centring changes the
     trend terms whenever a name's mean return is not zero. So on a drifting
     series the two functions differ, and neither is wrong. Pass a single name
     to this function rather than to `zumbach_asymmetry` if the centred
@@ -2812,17 +2812,17 @@ def _daily_series(bars: dict) -> dict[int, list[tuple[int, float, float]]]:
     return {i: sorted(rows) for i, rows in grouped.items()}
 
 
-#: Sessions in a year, for annualising a per-session quantity.
+#: Sessions in a year, for annualizing a per-session quantity.
 TRADING_DAYS_PER_YEAR = 252
 
 
 def _index_drift_pct(
     series: dict[int, list[tuple[int, float, float]]],
 ) -> float | None:
-    """Annualised drift of the equal-weight index, in percent a year.
+    """Annualized drift of the equal-weight index, in percent a year.
 
-    The panel's FIRST MOMENT. Every other row here is a shape statistic --
-    a spread, a fourth moment, an autocorrelation, a correlation -- and
+    The panel's FIRST MOMENT. Every other row here is a shape statistic (a
+    spread, a fourth moment, an autocorrelation, a correlation) and
     every one of them is invariant, or nearly so, to what the index level
     does. Nine of the fourteen are exactly invariant to adding a constant
     drift to every name on every day, because they centre their arguments
@@ -3047,8 +3047,9 @@ def _dependence(
 
     Three of them condition the pairwise correlation on something, and exist
     because the unconditional mean over all pairs is blind to the structure
-    that matters (CORRELATION-REVIEW-2026-08-25.md §1): a single scalar cannot
-    see whether correlation is higher on down days than up days, whether
+    that matters (CORRELATION-REVIEW-2026-08-25.md section 1). A single
+    scalar cannot see whether correlation is higher on down days than up
+    days, whether
     same-sector pairs co-move more than cross-sector pairs, or whether either
     varies in time. A search cannot preserve what it cannot see, so these are
     measured BEFORE any mechanism that would move them is built.
@@ -3101,7 +3102,7 @@ def _dependence(
                     (same_sector if sectors[a] == sectors[b] else cross_sector).append(rho)
 
         # Conditional correlation: the same pairwise mean, on a subset of
-        # days chosen by the standardised equal-weight market return. The
+        # days chosen by the standardized equal-weight market return. The
         # threshold is one standard deviation each side, so at 252 days each
         # tail holds roughly forty sessions; expect a wide across-seed spread
         # and read the band beside its seed-sd rather than as a point.
@@ -3246,13 +3247,13 @@ def band_distance(value: float, low: float, high: float) -> float:
 
     Zero anywhere inside the band, including on either boundary, and the
     distance to the NEAREST edge outside it. Defined here, next to `_verdict`,
-    because the two share the hazard: on a band that sits at or below zero --
-    leverage, -0.16 to 0.00, or volume-change acf, -0.32 to -0.20 -- naive
+    because the two share the hazard: on a band that sits at or below zero
+    (leverage, -0.16 to 0.00, or volume-change acf, -0.32 to -0.20) naive
     handling silently inverts. `_verdict` solves the wording half (above such
     a band is "too weak", and the improving direction is DOWN); this solves
     the arithmetic half. The specific failure this form exists to prevent is
     the one-sided max(0, value - high), under which a leverage effect of
-    -0.5 -- a large OVERSHOOT past the strong edge -- would read as
+    -0.5, a large OVERSHOOT past the strong edge, would read as
     satisfying the band. The two-sided form charges it low - value = 0.34,
     on the same footing as the absent-effect exit on the weak side.
 
@@ -3277,7 +3278,7 @@ def measure(
 
     Ten statistics against `REAL_MARKETS`: two marginal, describing one
     return series on its own, and eight dependence, describing how things
-    move together -- across time, across stocks, with volume, and
+    move together: across time, across stocks, with volume, and
     asymmetrically with their own sign. The split is the finding, so
     `report` prints it in two sections.
 
@@ -3297,8 +3298,8 @@ def measure(
     exception is `cross_sectional_corr`, which is inherently pairwise and is a
     mean over every pair.
 
-    A dependence statistic that cannot be measured on the run -- pairwise
-    correlation over a single instrument, say -- comes back as None rather than
+    A dependence statistic that cannot be measured on the run (pairwise
+    correlation over a single instrument, say) comes back as None rather than
     as zero, and `compare_to_real_markets` omits it.
     """
     if days < 2:
@@ -3337,8 +3338,8 @@ def measure(
     # The VIX's own persistence. Section 1.5's ruler was derived, recorded in
     # RULERS_BY_HORIZON and read by nothing: every harness that wanted this
     # row rebuilt the series for itself, which is what `vix_levels` was
-    # written to end. The series is already recorded above -- `record(day)`
-    # once per session -- so the row costs one lag-one autocorrelation and
+    # written to end. The series is already recorded above (`record(day)`
+    # once per session) so the row costs one lag-one autocorrelation and
     # no extra simulation.
     #
     # ONE RUN, so this is `level_ar1` debiased at the run length and NOT
@@ -3511,11 +3512,11 @@ def index_tail_statistics(
 
 
 def _excess_kurtosis(values: Sequence[float]) -> float | None:
-    """The population fourth standardised moment less three, or None.
+    """The population fourth standardized moment less three, or None.
 
     `panel_statistics`'s form, on the index's own return series rather than
     on the pooled per-name one. None where the series is too short to
-    standardise or does not move at all: zero is a real reading of a
+    standardize or does not move at all: zero is a real reading of a
     Gaussian series and would be a false pass on an empty one.
     """
     if len(values) < 2:
@@ -3623,8 +3624,8 @@ def panel_statistics(
 #: property of the rule and not a matter of preference: draw `n` standard
 #: normal windows, build `[min - s, max + s]` with `trimmed_sd` exactly as
 #: `shared_rule` does, and ask how often a fresh draw from the same law
-#: falls outside. Nine windows -- the count every shipped 252-bar band rests
-#: on -- lets a correct reading out 6.49 per cent of the time.
+#: falls outside. Nine windows, the count every shipped 252-bar band rests
+#: on, lets a correct reading out 6.49 per cent of the time.
 #: `band_rule_false_alarm` re-derives these live and
 #: `tests/test_mechanism_gate.py` holds the table to a re-derivation rather
 #: than to itself.
@@ -3685,8 +3686,8 @@ BAND_WINDOWS_EXCEPTIONS: dict[int, dict[str, int]] = {
 #: smooth law: sqrt(pi / 2). An identity, so it is written as one.
 MEDIAN_SE_FACTOR = math.sqrt(math.pi / 2)
 
-#: The mechanism-absent reading of each shape row -- what a model WITHOUT
-#: the mechanism the row is named for reads on it -- with how it was arrived
+#: The mechanism-absent reading of each shape row, what a model WITHOUT
+#: the mechanism the row is named for reads on it, with how it was arrived
 #: at, in the three-word vocabulary this project grades a derivation by:
 #: `derived` from an identity, `measured` with a residual, or
 #: `undetermined`. A row whose null the run's own shape decides carries an
@@ -3698,7 +3699,7 @@ MEDIAN_SE_FACTOR = math.sqrt(math.pi / 2)
 #: cent of the time (`BAND_RULE_TOLERANCE`). The panel grades the MEDIAN of
 #: thirty seeds, whose sampling sd is about a quarter of one seed's, so the
 #: graded quantity is known about five times more precisely than the
-#: interval it is judged against -- and the interval was never built to
+#: interval it is judged against, and the interval was never built to
 #: exclude anything. It contains the mechanism-absent reading whenever the
 #: real effect at its weak end is within about one across-year sd of the
 #: null, and measured with each preset's own seed noise a null model's
@@ -3708,7 +3709,7 @@ MEDIAN_SE_FACTOR = math.sqrt(math.pi / 2)
 #:
 #: A band verdict answers "could a real year read this". It cannot also
 #: answer "is a model without the mechanism excluded", because one interval
-#: has one width and the two questions have different scales -- real
+#: has one width and the two questions have different scales: real
 #: across-year dispersion for the first, the protocol's own resolution at
 #: thirty seeds for the second. So the panel publishes THREE counts
 #: (`envelope.certify`) and this table is what the second is measured
@@ -3843,8 +3844,8 @@ LEVEL_ONLY = ("annualised_vol_pct", "volume_change_acf1")
 #: named for a long-memory fact that is not visible inside one year on the
 #: longer real record: over 34 non-crisis 252-bar windows of a 32-name
 #: 1990-2025 reference the within-year lag-20 reading is +0.005, 1.1
-#: across-window standard errors from zero, and a CORRECT model -- thirty
-#: seeds about that centre with that dispersion -- passes the sign gate 17
+#: across-window standard errors from zero, and a CORRECT model (thirty
+#: seeds about that centre with that dispersion) passes the sign gate 17
 #: per cent of the time. The panel's own decade reads +0.020 and would
 #: certify it, so the row's certifiability depends on which decade is taken
 #: as the truth, and that is not a certificate. At 504 days both references
@@ -3967,7 +3968,7 @@ def persistence_null(sub_windows: int, *, draws: int = 50_000,
     """`corr_persistence_acf1`'s mechanism-absent reading at `sub_windows`.
 
     The MEDIAN of `_autocorrelation(x, 1)` over `draws` samples of
-    `sub_windows` iid standard normals -- the estimator's own null, computed
+    `sub_windows` iid standard normals, the estimator's own null, computed
     by calling the estimator the panel calls rather than a re-derivation of
     it, so a change to `_autocorrelation` moves the null with it.
 
@@ -4057,8 +4058,8 @@ def real_windows(key: str, *,
         # DEBIASED, one per window, because the MODEL's row is debiased and
         # section 1.5's whole finding was a debiased reading graded against
         # a raw one. `debias_ar1` is affine and increasing, so the median of
-        # these IS `REAL_VIX_AR1[horizon_days]` to the last bit -- asserted
-        # in `tests/test_vix_ar1_ruler.py` -- and the ruler cannot drift away
+        # these IS `REAL_VIX_AR1[horizon_days]` to the last bit (asserted
+        # in `tests/test_vix_ar1_ruler.py`) and the ruler cannot drift away
         # from the rule by being computed twice.
         #
         # The error is then this module's own median estimator,
@@ -4097,14 +4098,14 @@ def real_centre(key: str, *,
     """The real reading for `key` a correct model aims at, by the row's estimator.
 
     The MEDIAN over the windows for a row graded as a median, which is every
-    row but one, and the MEAN for a row graded as a mean or a pooled rate --
-    the estimator has to follow the quantity on the real side too, or the
+    row but one, and the MEAN for a row graded as a mean or a pooled rate.
+    The estimator has to follow the quantity on the real side too, or the
     band's centre and the value graded against it are two different
     statistics. On the index tail row the two differ by 3.1x, 1.213 against
     0.397, for the reason `AGGREGATE` gives.
 
     From the per-window table where it exists, and from the middle of
-    `REAL_MARKETS_PROVENANCE`'s (min, median, max) triple otherwise -- the
+    `REAL_MARKETS_PROVENANCE`'s (min, median, max) triple otherwise, the
     same quantity, recorded to three places. A provenance entry whose
     `windows` is not an ORDERED triple is not a triple of that kind and is
     refused rather than read positionally: `abs_return_acf5` records eight
@@ -4115,13 +4116,13 @@ def real_centre(key: str, *,
         if AGGREGATE.get(key) in ("mean", "pooled_rate"):
             return statistics.fmean(windows)
         return statistics.median(windows)
-    # The fallback is a MEDIAN -- that is what the middle of the triple is --
+    # The fallback is a MEDIAN, which is what the middle of the triple is,
     # so it answers for a row graded as a median and for no other. Returning
     # it for a mean row would hand back a different statistic under the same
     # name, and on the index tail row the two differ by a factor of three
     # (0.397 against 1.213). It is also the horizon guard: a row whose
     # windows are absent AT THIS HORIZON must not be answered from a triple
-    # summarising another one.
+    # summarizing another one.
     if AGGREGATE.get(key) in ("mean", "pooled_rate"):
         return None
     recorded = REAL_MARKETS_PROVENANCE.get(key, {}).get("windows")
@@ -4142,7 +4143,7 @@ def real_centre_se(key: str, *,
     and no trim, because a centre that counts the extreme window and a scale
     that pretends it is not in the draw are inconsistent. On the index tail
     row that is the difference between 0.3991 and 0.2452, and the larger one
-    is the honest number -- one window of thirty-five carries a third of the
+    is the honest number: one window of thirty-five carries a third of the
     events.
 
     None for a row with no per-window record, which since the 504-bar
@@ -4151,7 +4152,7 @@ def real_centre_se(key: str, *,
     the centre, not its dispersion, and inverting the band edges for it
     would recover an interval a rounding quantum wide and call it a number.
     Those three carry a `centre_se` in `REAL_MARKETS_PROVENANCE` where one
-    has been derived, and `rule_row` -- not this function -- is what reads
+    has been derived, and `rule_row`, not this function, is what reads
     it: this is the WINDOW dispersion, and a recorded error is a different
     provenance under the same name.
     """
@@ -4175,8 +4176,8 @@ def real_centre_df(key: str, *,
     `real_centre_se` actually use, read off the same `AGGREGATE` entry, so
     the count cannot drift from the scale it belongs to.
 
-    For the three rows with no window table -- the level row and the two
-    fear rows -- it is `centre_df` in `REAL_MARKETS_PROVENANCE`, recorded
+    For the three rows with no window table (the level row and the two
+    fear rows) it is `centre_df` in `REAL_MARKETS_PROVENANCE`, recorded
     beside the one-line derivation that produced it. The index tail row
     records one too and does NOT read it here: its windows exist at both
     horizons, so a fixed 34 would be right at 252 and wrong at 504, where
@@ -4223,7 +4224,7 @@ def rule_row(key: str, *, horizon_days: int = TRADING_DAYS_PER_YEAR,
     record as the pooled tape median, +5.73 over the 107 sessions since
     1990, with no error beside it until the window-block bootstrap ran
     (2026-09-09, `REAL_MARKETS_PROVENANCE["fear_gauge_dn3"]["centre_se"]`,
-    0.6539 on 19 degrees of freedom) -- four days in which every score
+    0.6539 on 19 degrees of freedom), four days in which every score
     taken was a sum over eighteen of nineteen rows and said so. What
     would trip the guard again is a row added to `REAL_MARKETS` with a
     centre and no window table and no recorded `centre_se` or
@@ -4241,8 +4242,8 @@ def rule_row(key: str, *, horizon_days: int = TRADING_DAYS_PER_YEAR,
     `tradefloor-design/programme/RULINGS-2026-09-06.md`: `se` is the
     WITHIN-DECADE standard error of the 2015-2025 reference panel, and the
     measured disagreement between that decade and the 32-name 1990-2025
-    reference -- one to three `se` on three rows, recorded in
-    `centre_distance`'s docstring -- is NOT folded into it. Widening `se`
+    reference (one to three `se` on three rows, recorded in
+    `centre_distance`'s docstring) is NOT folded into it. Widening `se`
     by that gap would make the objective honest about the decade at the
     cost of discrimination on exactly the rows where it bites. So a fit to
     this centre is a fit to the decade, and that is now a decision rather
@@ -4252,7 +4253,7 @@ def rule_row(key: str, *, horizon_days: int = TRADING_DAYS_PER_YEAR,
     EVERY VALUE IS DERIVED FROM THE WINDOWS, and no stored summary is read
     from any file. `centre`, `se` and `df` come from `real_centre`,
     `real_centre_se` and `real_centre_df`, which read the window tables and
-    `trimmed_sd` -- the median-centred trim `BAND_RULE` names. The design
+    `trimmed_sd`, the median-centred trim `BAND_RULE` names. The design
     repository's `bands-504-noncrisis.json` carries a `trimmed_sd` field
     per row that was written on 2026-08-22 and never regenerated after the
     trim centre was named on 2026-09-04, so its values are the superseded
@@ -4262,7 +4263,7 @@ def rule_row(key: str, *, horizon_days: int = TRADING_DAYS_PER_YEAR,
     which is why nothing here reads one. The three rows with no window
     table read `centre`, `centre_se` and `centre_df` from
     `REAL_MARKETS_PROVENANCE`, where the record IS the measurement and is
-    labelled as such.
+    labeled as such.
     """
     windows = real_windows(key, horizon_days=horizon_days)
     prov = REAL_MARKETS_PROVENANCE.get(key, {})
@@ -4397,8 +4398,8 @@ def mechanism_verdict(values: Sequence[float], key: str, *,
     estimators for a thirty-seed median disagree by up to a factor of two on
     the skewed rows and two verdicts on the shipped default flip with the
     choice, so the gate is the exact, distribution-free test that needs
-    neither -- it IS the order-statistic confidence interval of the median
-    excluding the null -- and both standard errors are reported beside it as
+    neither. It IS the order-statistic confidence interval of the median
+    excluding the null, and both standard errors are reported beside it as
     effect sizes. What that costs is about 64 per cent of a z-test's power
     on a Gaussian row, which still leaves a correct model certified at 0.95
     to 1.00 on every row certifiable at 252 days.
@@ -4486,7 +4487,7 @@ def centre_distance(values: Sequence[float], key: str, *,
     `z_r = (median - centre) / sqrt(se_m^2 + se_real^2)`, reported and never
     a gate: the real centre is one decade of one market, `se_real` is a
     within-decade error, and a gate on it would encode 2015-2025 as the
-    truth with a precision the reference does not have -- the 32-name
+    truth with a precision the reference does not have. The 32-name
     1990-2025 reference puts three rows one to three `se_real` away from the
     panel's decade.
 
@@ -4496,8 +4497,8 @@ def centre_distance(values: Sequence[float], key: str, *,
 
     UNDETERMINED at any horizon with no per-window record, rather than
     answered with the wrong ruler. The real dispersion of a row across years
-    is a property of the window length -- clustering at lag 20 reads +0.005
-    over 252 bars and +0.030 over 504 on the same reference -- so a 504-day
+    is a property of the window length (clustering at lag 20 reads +0.005
+    over 252 bars and +0.030 over 504 on the same reference) so a 504-day
     model median against the 252-bar windows would be the same error on the
     centre side that `envelope.score` refuses on the band side, and it would
     be invisible because the answer is a plausible number. Since the 504-bar
@@ -4510,8 +4511,8 @@ def centre_distance(values: Sequence[float], key: str, *,
 
     THE MULTIPLIER FOLLOWS THE HORIZON TOO. `band_windows(key,
     horizon_days)` gives the window count the row's band at that horizon
-    rests on -- nine at 252, five at 504, four for `corr_persistence_acf1`
-    at 504 -- and the threshold is `centre_multiplier` of that count's own
+    rests on: nine at 252, five at 504, four for `corr_persistence_acf1`
+    at 504. The threshold is `centre_multiplier` of that count's own
     `band_rule_tolerance`: 1.846, 1.378 and 1.175. Reading a 504-day panel
     against the 252-day tolerance would hold a five-window band to a
     nine-window band's false-alarm rate, which is the same wrong-ruler shape
@@ -4521,7 +4522,7 @@ def centre_distance(values: Sequence[float], key: str, *,
     and its normal-approximation standard error for a row graded as a
     median. For the pooled-rate row they are the MEAN of the per-seed rates
     and `sd / sqrt(n)`, because a median of a zero-inflated count is not an
-    estimator of its frequency; the field keeps its name so a serialised
+    estimator of its frequency; the field keeps its name so a serialized
     certificate has one shape, and `estimator` says which quantity it holds.
     """
     if key not in REAL_MARKETS:
@@ -4630,8 +4631,8 @@ def compare_to_real_markets(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for key, (low, high) in bands.items():
         value = facts.get(key)
-        # A statistic that could not be measured -- one instrument, or a run
-        # too short to difference volume -- is ABSENT here rather than present
+        # A statistic that could not be measured (one instrument, or a run
+        # too short to difference volume) is ABSENT here rather than present
         # as a zero, because zero is a real reading and would land inside some
         # of these bands.
         if value is None:
@@ -4644,7 +4645,7 @@ def compare_to_real_markets(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
             "matches": low <= value <= high,
             # Which ruler this verdict came from, on the row rather than
             # beside it, because a verdict travels alone: `report` prints
-            # rows, a certificate serialises rows, and a row that does not
+            # rows, a certificate serializes rows, and a row that does not
             # name its bands can be read against the wrong ones by the next
             # reader as easily as it was computed against them.
             "horizon_days": int(days),
@@ -4660,11 +4661,11 @@ def compare_to_real_markets(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
             ),
             # How FAR outside, twice over: in the statistic's own units, and
             # in units of its across-seed sampling noise at the baseline
-            # (`SEED_SD`, or `SEED_SD_504` for a 504-day panel -- the scale
+            # (`SEED_SD`, or `SEED_SD_504` for a 504-day panel, the scale
             # for the panel's OWN horizon, since the two differ by factors
             # from 0.80 to 3.23), so exits are comparable across statistics
             # whose scales differ by three orders of magnitude. Per-statistic
-            # fields, deliberately -- this function still refuses to add
+            # fields, deliberately, because this function still refuses to add
             # them up, for the reason in the docstring.
             "band_distance": distance,
             "scaled_distance": distance / sd if sd else None,
@@ -4728,12 +4729,12 @@ def report(facts: dict[str, Any]) -> str:
         lines += [row(key) for key in CRISIS]
 
     # The ungraded rows, derived from the ruler in use rather than listed, so
-    # a row can never be printed as graded because a list went stale -- and so
+    # a row can never be printed as graded because a list went stale, and so
     # a horizon whose band set covers fewer rows says which rows it lost. At
     # 504 days `REAL_MARKETS_504` holds the fourteen shape rows only, so the
     # level and crisis rows move into this section: their 504-day bands are
-    # `envelope.BANDS_504`'s judgement to reuse the 252-day ones with an
-    # argument per row, and that judgement is not this module's to make
+    # `envelope.BANDS_504`'s judgment to reuse the 252-day ones with an
+    # argument per row, and that judgment is not this module's to make
     # silently.
     graded_here, _ = rulers_for_horizon(facts["days"])
     ungraded = [key for key in LABELS if key not in graded_here]

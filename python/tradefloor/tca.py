@@ -35,8 +35,8 @@ below about 1.33x the instrument's average minute volume a floor applies
 and the term is flat, above 10x it is capped and flat again, and between
 them it scales. Both constants live in ``order_imbalance`` in
 ``rust/src/market/factors.rs``. Setting ``order_flow_impact_law`` to 1.0
-replaces both clamps with the measured law -- linear in participation
-below the knee, square root above it -- so the term never goes flat. The
+replaces both clamps with the measured law (linear in participation
+below the knee, square root above it), so the term never goes flat. The
 band between the clamps is identical either way.
 
 There is a second bound past it and it is not in the cost law. The session
@@ -61,7 +61,8 @@ The response is linear in what actually fills, not in what you ask for.
 
 Implementation shortfall, signed so positive is always a cost:
 
-    shortfall = Σ quantity × (fill price − counterfactual price at that step)
+    shortfall = sum over steps of
+        quantity * (fill price - counterfactual price at that step)
 
 A buyer who paid more than the untraded world's price has a positive
 shortfall. So does a seller who received less. Reporting a signed difference
@@ -130,7 +131,7 @@ class Execution:
         self.fills = list(fills)
         # One cross-section per decision step, in both worlds. The path rather
         # than the endpoint, because a fill has to be priced against what the
-        # untraded market was doing AT THAT MOMENT -- comparing it to a closing
+        # untraded market was doing AT THAT MOMENT. Comparing it to a closing
         # price would charge the trader for the market's own drift.
         self.baseline_path = baseline_path
         self.actual_path = actual_path
@@ -143,7 +144,7 @@ class Execution:
         # meaningless without the book it was paid against, and the book is a
         # property of the roster.
         self.universe_fingerprint = universe_fingerprint
-        # And which MODEL priced it -- both worlds ran the same one, so this
+        # And which MODEL priced it. Both worlds ran the same one, so this
         # is one value. A shipped preset's name or custom-XXXXXXXX, the same
         # honesty mechanism as Scorecard's: a cost measured under a modified
         # coefficient set can never present as one paid in the benchmark
@@ -163,7 +164,7 @@ class Execution:
                 continue
             # quantity is signed: positive bought, negative sold. Multiplying
             # by the price difference gives a cost in both directions without
-            # a branch -- a seller who received less has a negative quantity
+            # a branch. A seller who received less has a negative quantity
             # and a negative difference.
             total += fill["quantity"] * (fill["price"] - reference)
         return total
@@ -227,7 +228,7 @@ class Execution:
 
         Worth reading before believing a low shortfall. An order that only
         half filled only paid half the impact, and the untraded half cost
-        nothing precisely because it never happened -- measured on this
+        nothing precisely because it never happened. Measured on this
         build (half the ADV of the first name of ``Universe.random(20,
         seed=7)``, sim seed 2026), a request for 4,856 shares filled 483,
         because that was the whole displayed depth. The cheapest execution

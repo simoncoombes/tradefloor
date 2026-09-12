@@ -153,7 +153,7 @@ class Instrument:
     ``short_interest`` is a SHARE COUNT, not a fraction: the squeeze rule
     divides it by the float. Values strictly between 0 and 1 are refused for a
     company with a meaningful share count, because that is what a fraction
-    looks like and the mistake is otherwise silent -- three hundredths of one
+    looks like and the mistake is otherwise silent. Three hundredths of one
     share gives a ratio of 3e-11 and a squeeze that can never fire.
     """
 
@@ -289,7 +289,7 @@ class Engine:
         day_of_week: int = ..., volatility: float = ...,
     ) -> int | None: ...
 
-    # Columnar reads. Raw little-endian f64 bytes, not arrays -- read with
+    # Columnar reads. Raw little-endian f64 bytes, not arrays. Read them with
     # numpy.frombuffer(buf, dtype="<f8"). Typed as bytes because that is what
     # crosses the boundary; calling it ndarray would imply a dependency the
     # core does not have.
@@ -308,8 +308,8 @@ class Engine:
     ) -> ArrowStream: ...
     def truth(self, *, day: int | None = ...) -> ArrowStream: ...
     # day, tick, instrument_id, print, model_price, shock, absorbed, clamp,
-    # and -- only when `settle_depth_counterfactual(True)` ran before the
-    # session -- unbounded_print and liquidity_share. `clamp` is the print
+    # and, only when `settle_depth_counterfactual(True)` ran before the
+    # session, unbounded_print and liquidity_share. `clamp` is the print
     # breaker's part of `absorbed`; the book's is `absorbed - clamp`. The
     # schema's one metadata key says which shape came back and why.
     def prints(self, *, day: int | None = ...) -> ArrowStream: ...

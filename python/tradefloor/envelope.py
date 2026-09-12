@@ -13,7 +13,7 @@ estimate from a stochastic simulator invites a precision it does not have:
 `abs_return_acf20` reads +0.0087 at the shipped preset, and the across-seed
 range is wide enough that a single seed can read either side of zero. The
 band distance is reported in units of that spread, which is the same
-weighting `tradefloor.loss` uses -- so "how far out" is denominated in the
+weighting `tradefloor.loss` uses, so "how far out" is denominated in the
 model's own noise rather than in the statistic's arbitrary units.
 
 **A membership check** (`check`). Given a horizon, the statistics a strategy
@@ -31,13 +31,13 @@ There is also a practical failure mode. A scalar travels and a caveat does
 not. "87% realistic" is quotable in a way that "volatility memory turns
 negative by lag 30, where real markets stay weakly positive out to lag 60"
 is not, so a single number reliably becomes the thing people cite INSTEAD
-of the gaps -- which is exactly backwards, because the gaps are what decide
+of the gaps, which is exactly backwards, because the gaps are what decide
 whether a result means anything. A boolean with reasons attached cannot be
 quoted without its reasons.
 
 ## Provenance
 
-The constants below are measurements, not judgements, and every one is
+The constants below are measurements, not judgments, and every one is
 reproducible from the tooling in `tools/calibration/`. They describe the
 shipped default preset, which `PRESET` names.
 
@@ -75,8 +75,8 @@ PRESET = "pt-v19"
 #: the horizon here is that `CERTIFIED` was MEASURED here, on thirty seeds
 #: and two held-out axes.
 #:
-#: The old reason -- that the thinnest 504-day row cleared its ceiling by
-#: only 0.11 -- no longer applies: `annualised_vol_pct` read 33.89 under
+#: The old reason (that the thinnest 504-day row cleared its ceiling by
+#: only 0.11) no longer applies: `annualised_vol_pct` read 33.89 under
 #: pt-v12, 30.24 under pt-v14, 28.12 under pt-v16, 25.40 under pt-v18 and
 #: 23.81 under pt-v19, against the same 34.0 ceiling throughout. The
 #: horizon stays 252 because that is where the certification was measured,
@@ -106,13 +106,13 @@ PRESET = "pt-v19"
 #:
 #: What "held-out" means here, exactly, because the word carries more weight
 #: than it earns if left alone. It means simulation seeds the calibration
-#: never drew and a roster it never ran, so it tests that the fit generalises
+#: never drew and a roster it never ran, so it tests that the fit generalizes
 #: across draws rather than sitting on thirty lucky ones. It does NOT mean a
 #: withheld sample of real market data: the bands in `facts.REAL_MARKETS` are
 #: derived from real-market windows once and used both to tune and to grade,
 #: with no empirical train/test split behind them. And the held-out universe
 #: comes from the same `Universe.random()` generator as the training one, a
-#: different draw rather than a different market -- `GAPS`
+#: different draw rather than a different market. `GAPS`
 #: "roster-concentration" measures what changes when the roster's SHAPE
 #: changes, and it changes the count.
 #: The SHAPE rows only. The level and crisis rows are held in
@@ -141,7 +141,7 @@ CERTIFIED: dict[str, float] = {
 }
 
 #: The LEVEL rows the default preset reads at the certified horizon,
-#: measured as a thirty-seed mean on `facts.LEVEL_PROTOCOL` -- seeds 101 to
+#: measured as a thirty-seed mean on `facts.LEVEL_PROTOCOL`: seeds 101 to
 #: 130, 252 days, the roster varying WITH the seed, because a level that
 #: describes the MODEL cannot be measured on one draw (`facts.AGGREGATE`).
 #:
@@ -158,7 +158,7 @@ CERTIFIED: dict[str, float] = {
 #: readings replace those on one ruler rather than beside another.
 #: `python/tradefloor/presets/pt-v19.json` carries both under
 #: `level_protocol`, and `tests/test_preset_records.py` binds this table to
-#: it -- the binding `DECAY_252` below still does not have. The table
+#: it, the binding `DECAY_252` below still does not have. The table
 #: itself is WRITTEN from that record by `tools/presets/envelope_tables.py`
 #: rather than typed, since 0.8.0.
 #:
@@ -169,7 +169,7 @@ CERTIFIED: dict[str, float] = {
 CERTIFIED_LEVEL: dict[str, float] = {
     # The default preset RETURNS 6.52 per cent a year, inside a band of 2.90
     # to 11.90 at band position 0.40, on a thirty-seed standard error of
-    # 1.15 -- so 3.15 standard errors above the floor. pt-v18 read 5.7957 at
+    # 1.15, so 3.15 standard errors above the floor. pt-v18 read 5.7957 at
     # position 0.32; pt-v16 read -13.6431 and was held red here for three
     # eras, and this row exists because of that.
     "index_drift_pct": 6.5177,
@@ -180,21 +180,21 @@ CERTIFIED_LEVEL: dict[str, float] = {
 #:
 #: All three are IN BAND at this default. They are still reported apart from
 #: the fourteen shape rows, because they are certified on a different
-#: protocol and a green shape panel says nothing about them -- not because
+#: protocol and a green shape panel says nothing about them, not because
 #: they are failing. `check` computes each verdict rather than asserting it;
 #: it asserted "held red" here until 0.7.0, which was true of every default
 #: through pt-v16 and would have been a false statement the day one held.
 CERTIFIED_CRISIS: dict[str, float] = {
     # The -1 per cent row reads 2.4353 in a band of 0.70 to 4.03, at band
     # position 0.52, 0.22 below a centre of 2.66. pt-v18 read 1.5834 at
-    # position 0.27 and pt-v16 0.9500 at 0.09 -- inside, and six standard
+    # position 0.27 and pt-v16 0.9500 at 0.09: inside, and six standard
     # errors below centre, which is the reading that made a count of
     # rows-in-band an insufficient answer. This is the first default to read
     # the row near its centre, and it is still a pass rather than evidence
     # that the small-session response is right.
     #
     # The -3 per cent row reads 5.8162, pooled over 118 sessions, at band
-    # position 0.46 -- 0.13 tape standard errors above the tape's pooled
+    # position 0.46, 0.13 tape standard errors above the tape's pooled
     # median of 5.73. pt-v18 read 3.2473 at position 0.09, close to the
     # floor of 2.60; pt-v16 read 1.9557 and was BELOW it. The VIX level
     # identity and the symmetric fall-rate are what moved it, and this is
@@ -204,7 +204,7 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # The index tail row on the same thirty seeds: 118 sessions at or below
     # -3 per cent in 7,530, a pooled rate of 1.5671 per cent against a band
     # of 0.47 to 1.96 and a tape centre of 1.213. IN band, at band position
-    # 0.74 -- where pt-v18 read 1.5803 at 0.75, so the four dials left this
+    # 0.74, where pt-v18 read 1.5803 at 0.75, so the four dials left this
     # row where it was (paired over seeds, pt-v18 minus pt-v19 is +0.0133
     # on a standard error of 0.1055). It is nearer its CEILING than its
     # floor, and this row is the one that says when there are too many
@@ -228,9 +228,9 @@ CERTIFIED_CRISIS: dict[str, float] = {
 #: Bands re-derived at a 504-day window, from the same reference roster and
 #: estimators as `facts.REAL_MARKETS`. Scoring a 504-day measurement against
 #: the 252-day bands is the wrong ruler, and it flatters the model on
-#: kurtosis while being harsher elsewhere -- these are mostly TIGHTER.
+#: kurtosis while being harsher elsewhere, since these are mostly TIGHTER.
 BANDS_504: dict[str, tuple[float, float]] = {
-    # The level band is an annualised long-run mean whose width is the
+    # The level band is an annualized long-run mean whose width is the
     # centre's own uncertainty, so the same band grades a 504-day reading;
     # the model's resolution at 504 days is finer, and the centre's is not.
     "index_drift_pct": (2.9, 11.9),
@@ -246,7 +246,7 @@ BANDS_504: dict[str, tuple[float, float]] = {
     # seventeen non-overlapping 504-return windows of the same series give a
     # centre of 1.2372 (106 hits in 8,568), an across-window sd of 1.6916, a
     # standard error of 0.4103 and a raw band of [0.4797, 1.9946], which
-    # rounds outward to [0.47, 2.00] -- the same band within a twentieth of
+    # rounds outward to [0.47, 2.00], the same band within a twentieth of
     # its own width.
     # `facts.INDEX_TAIL_WINDOWS` carries both window sets and
     # `tests/test_reference_windows.py` re-derives both bands from them.
@@ -271,8 +271,8 @@ BANDS_504: dict[str, tuple[float, float]] = {
 }
 
 # So `facts.check_ruler_horizon` can identify this table when it arrives as an
-# argument. `facts` cannot name it -- `envelope` imports `facts`, not the
-# other way -- and a table the checker cannot identify is a table it cannot
+# argument. `facts` cannot name it (`envelope` imports `facts`, not the
+# other way) and a table the checker cannot identify is a table it cannot
 # refuse.
 _facts.register_ruler_table(BANDS_504, 504, "envelope.BANDS_504")
 
@@ -287,7 +287,7 @@ _facts.register_ruler_table(BANDS_504, 504, "envelope.BANDS_504")
 #: The names are module-qualified and they name the table this function
 #: ACTUALLY grades with. `score` reported `"REAL_MARKETS_504"` at 504 days
 #: while scoring against `BANDS_504`, which is a different table with three
-#: more rows -- a small thing, and the same shape as every finding this
+#: more rows, a small thing, and the same shape as every finding this
 #: branch is repairing: a label asserting a provenance the code did not have.
 RULERS_BY_HORIZON: dict[int, tuple[dict[str, tuple[float, float]],
                                    dict[str, float], str]] = {
@@ -302,7 +302,7 @@ RULERS_BY_HORIZON: dict[int, tuple[dict[str, tuple[float, float]],
 #: (pt-v10 and pt-v11). `volume_move_cap` closed that row.
 #:
 #: Read the headroom, not just the count. Under pt-v12 this table's thinnest
-#: row was `annualised_vol_pct` at 33.89 against a ceiling of 34.0 -- 0.11 of
+#: row was `annualised_vol_pct` at 33.89 against a ceiling of 34.0, 0.11 of
 #: room on a statistic whose seed spread is far wider, so the count was
 #: genuine but would have flipped on a change that barely moved the model.
 #: pt-v19 reads 23.81 there, 10.19 of room, having widened it at each of the
@@ -344,7 +344,7 @@ MEASURED_504: dict[str, float] = {
 #: autocorrelation run on `facts.LEVEL_PROTOCOL` at thirty seeds, which is a
 #: box job. What must NOT fix it: `atlas_survey.decay_slope` fits the same
 #: quantity through lags 1, 5 and 20, all three of which sit in `CERTIFIED`
-#: above -- so a slope for the shipped default is one line away, and it is a
+#: above, so a slope for the shipped default is one line away, and it is a
 #: THREE-POINT estimator where `DECAY_SLOPE` is a ten-point one. Substituting
 #: it would put two estimators under one name, which is the error this
 #: project has made three times and documents in `facts.REAL_TAIL3`,
@@ -400,7 +400,7 @@ GAPS: tuple[Gap, ...] = (
     # band and was the only row of fourteen to miss at that horizon. pt-v12
     # reads -0.2572 at 504 days against a band of -0.29 to -0.21 and -0.2656
     # at 252, comfortably inside both, so the restriction it carried is
-    # lifted rather than reworded (§114).
+    # lifted rather than reworded (section 114).
     #
     # Worth remembering what this gap claimed before it was closed. Its first
     # version said the row was UNREACHABLE without spending a passing
@@ -747,7 +747,7 @@ def intervals(
 ) -> dict[str, dict[str, Any]]:
     """Per-statistic spread across seeds, beside the median and the band.
 
-    `panels` is a sequence of `facts.measure` results, one per seed -- the
+    `panels` is a sequence of `facts.measure` results, one per seed, the
     same input `loss.band_distance_loss` takes. Returns, for each statistic:
 
         median      the point estimate a single panel would report
@@ -763,7 +763,7 @@ def intervals(
 
     `typical_straddles` is the field worth reading. A statistic whose MEDIAN
     sits inside its band while its p10-p90 range crosses an edge is not
-    comfortably in band -- it is in band on AVERAGE and out of band on a
+    comfortably in band. It is in band on AVERAGE and out of band on a
     large minority of seeds. That distinction is invisible in a point
     estimate, and a user running one seed meets it.
     `extremes_straddle` uses min and max instead, where a crossing is close
@@ -806,7 +806,7 @@ def intervals(
             # and only one of them is defensible as evidence.
             #
             # `extremes_straddle` uses the min and max, and with thirty draws
-            # an extreme crossing an edge is close to expected -- it says
+            # an extreme crossing an edge is close to expected. It says
             # "some seed did this", which is worth knowing and is not a
             # finding.
             #
@@ -873,14 +873,14 @@ def check(
     """Does this question fall inside the envelope?
 
     `horizon_days` is how long the simulation runs, in trading days.
-    `statistics` names the panel statistics the result leans on -- the
+    `statistics` names the panel statistics the result leans on, the
     properties of the market the conclusion would change with. Pass the
     keys of `facts.REAL_MARKETS`; unknown names are refused rather than
     ignored, because a silently dropped statistic is a silently granted
     certification.
 
     `macro_regime` says the result depends on the ECONOMY reaching a
-    particular state -- an inflation regime, a policy crisis -- rather than on
+    particular state (an inflation regime, a policy crisis) rather than on
     a scenario you drive yourself. It fires `macro-range`, because the
     endogenous economy stays in a moderate band and cannot get to its own
     crisis regimes.
@@ -926,7 +926,7 @@ def check(
         # 14 ... missing only volume_change_acf1" and stayed that way after
         # pt-v12 brought that row inside its 504-day band, so `check` was
         # telling callers a statistic missed while quoting a number that is
-        # plainly inside the band printed beside it (§114).
+        # plainly inside the band printed beside it (section 114).
         out = [k for k, v in MEASURED_504.items()
                if not (BANDS_504[k][0] <= v <= BANDS_504[k][1])]
         held = (f"holds all {len(MEASURED_504)} against horizon-matched bands"
@@ -971,7 +971,7 @@ def check(
         # pt-v12 brought it inside the 504-day band (-0.2572 against
         # -0.29..-0.21). The arm is deleted rather than made conditional: a
         # gap that no longer exists in GAPS cannot be looked up, and the
-        # lookup is what failed when the gap was retired (§114).
+        # lookup is what failed when the gap was retired (section 114).
         if name == "abs_return_acf20":
             g = by_id["decay-shape"]
             fire(g, (
@@ -1095,16 +1095,16 @@ def score(panel: Mapping[str, float], *,
           horizon_days: int = CERTIFIED_HORIZON_DAYS) -> dict[str, Any]:
     """How a measured panel sits against the bands for its own horizon.
 
-    `panel` maps statistic names to measured values -- what
+    `panel` maps statistic names to measured values, what
     `facts.measure()` returns, or a median across seeds.
 
     The horizon chooses the ruler. That is why this exists as a function
     rather than a comparison anyone can write inline: a
     504-day panel scored against the 252-day bands is the wrong-ruler
     error, and it has been made repeatedly in this project. It flatters the
-    model on kurtosis -- the 5.2 that pt-v3 read at 504 days sits
+    model on kurtosis (the 5.2 that pt-v3 read at 504 days sits
     comfortably inside the 252-day band of 1.6 to 41 and is OUT of the
-    horizon-matched 7.1 to 22 -- while being harsher elsewhere. The shipped
+    horizon-matched 7.1 to 22) while being harsher elsewhere. The shipped
     preset reads 7.75 there, inside. That is what grading a 504-day panel
     with `BANDS_504` buys.
 
@@ -1121,8 +1121,8 @@ def score(panel: Mapping[str, float], *,
     fact. Nothing here answers "is the panel green" without a group.
 
     A HORIZON WITH NO RULER IS REFUSED. This used to read `far = horizon_days
-    > CERTIFIED_HORIZON_DAYS`, so a 756-day panel -- and the 1,008-day runs
-    the settling study makes -- scored against the 504-day bands with nothing
+    > CERTIFIED_HORIZON_DAYS`, so a 756-day panel (and the 1,008-day runs
+    the settling study makes) scored against the 504-day bands with nothing
     saying so, and 253 scored against the 252-day ones. The lookup below has
     two keys and refuses everything else by name, because a band set derived
     at one window is not an approximate ruler for another window: it is a
@@ -1219,12 +1219,12 @@ def tail_block(panels: Sequence[Mapping[str, Any]], *,
     `se_m`, and at thirty seeds it is about the same size. A verdict whose
     margin to the nearer band edge is under one `se_m` is therefore a
     verdict this run cannot resolve, and it is flagged rather than reported
-    as a clean pass or a clean failure -- the treatment `mechanism_verdict`
+    as a clean pass or a clean failure, the treatment `mechanism_verdict`
     gives a sign count sitting on its cut.
 
     `stationary_opening` is the run's own answer to whether every seed
     opened at phase age zero. On the current opening year one is
-    all-expansion on every seed and year two a synchronised contraction, so
+    all-expansion on every seed and year two a synchronized contraction, so
     a rate measured there reads the OPENING and not the model; passed False,
     the block is graded, printed and NOT counted, with the reason carried as
     data. Passed None it says the opening was not stated, which is not the
@@ -1281,7 +1281,7 @@ def tail_block(panels: Sequence[Mapping[str, Any]], *,
         # Within one run standard error of the nearer edge, on EITHER side:
         # the run cannot resolve this verdict. `margin` is signed, positive
         # inside the band and negative outside it, so the flag takes its
-        # magnitude -- a reading far outside is resolved, not at the edge.
+        # magnitude: a reading far outside is resolved, not at the edge.
         "at_the_edge": se_m is not None and abs(margin) < se_m,
         "zero_share": sum(1 for h in hits if h == 0) / len(hits),
         "five_or_more_share": sum(1 for h in hits if h >= 5) / len(hits),
@@ -1332,7 +1332,7 @@ def certify(panels: Sequence[Mapping[str, float]], *,
     whose sampling sd is about a quarter of one seed's. The band is
     therefore about five times wider than the resolution of the thing it
     judges, and it contains the mechanism-absent reading on five of the
-    fourteen rows -- measured with the shipped preset's own seed noise, a
+    fourteen rows. Measured with the shipped preset's own seed noise, a
     null model's graded median passes the band with probability 1.000 on
     three of them. Fourteen of fourteen in band is a true statement about
     fidelity and says nothing at all about whether the mechanisms are
@@ -1426,8 +1426,8 @@ def certification_record(result: Mapping[str, Any]) -> dict[str, Any]:
 
     JSON-safe, and it drops the fidelity block because a preset record
     already carries `panel_252` and `in_band` beside this. What it keeps per
-    row is the sign test itself -- the count, the cut, the null and the
-    verdict -- plus both effect sizes, so a reader can see how far from the
+    row is the sign test itself (the count, the cut, the null and the
+    verdict) plus both effect sizes, so a reader can see how far from the
     cut a verdict sat without re-running anything.
 
     Defined here rather than in the tool that writes records, so the tool and
@@ -1506,7 +1506,7 @@ def certification_report(result: Mapping[str, Any]) -> str:
         def effect(value: float | None) -> str:
             # None where the seeds do not scatter at all, which makes the
             # standard error zero and the ratio undefined. The GATE still has
-            # an answer there -- it counts sides and needs no estimator --
+            # an answer there, since it counts sides and needs no estimator,
             # so a dash in an effect-size column is not a missing verdict.
             return f"{value:>+8.2f}" if value is not None else f"{'--':>8s}"
 
@@ -1601,10 +1601,10 @@ def regressions(panel: Mapping[str, float], *,
 
     That is not hypothetical. `pt-v4` halves the dual-horizon loss and is
     the first vector ever to close the thin-tails gap, retired at 0.2.0 when
-    the shipped preset closed it too -- and it surrenders
+    the shipped preset closed it too, and it surrenders
     `return_acf1` at the certified horizon, on training seeds, held-out
     seeds and a held-out universe alike. It was called a win twice before
-    anyone counted (CALIBRATION-FOLLOWUPS §33).
+    anyone counted (CALIBRATION-FOLLOWUPS section 33).
 
     The trade pt-v4 pays was later shown to be a wiring accident rather
     than a law. A jump landed on `mispricing_s` after the momentum roll had
@@ -1612,12 +1612,12 @@ def regressions(panel: Mapping[str, float], *,
     re-rating and continued it: fattening the tail and adding return
     continuation were the same write. `pt-v5` separates them and holds both,
     nine of the original ten at the certified horizon with the 504-day tail
-    closed (§38,
-    §45). That does not soften the policy below. pt-v5 passes the controls
-    and is still not the default, because passing §8 is not certification
+    closed (sections 38 and 45). That does not soften the policy below.
+    pt-v5 passes the controls and is still not the default, because passing
+    section 8 is not certification
     and `CERTIFIED` is measured on the shipped preset.
 
-    So the count is a function now rather than a judgement. An empty list
+    So the count is a function now rather than a judgment. An empty list
     means the candidate certifies at least as well as what ships; a
     non-empty one names exactly what it costs, and the policy that follows
     is simple: **a candidate that regresses the certified horizon does not
@@ -1635,7 +1635,7 @@ def regressions(panel: Mapping[str, float], *,
     theirs = score(panel, horizon_days=horizon_days)["statistics"]
     lost = []
     for name, row in theirs.items():
-        # Being outside the calibration objective is not a licence to lose
+        # Being outside the calibration objective is not a license to lose
         # the row. Until 0.2.0 every `structural` statistic was skipped here,
         # on the reasoning that the shipped preset did not hold them either;
         # pt-v10 holds all fourteen at the certified horizon, so that
@@ -1653,7 +1653,7 @@ def regressions(panel: Mapping[str, float], *,
 
 
 def certified() -> dict[str, Any]:
-    """The envelope as a plain mapping, for serialising into a manifest.
+    """The envelope as a plain mapping, for serializing into a manifest.
 
     The statistics carry their group. The shape rows are what a green panel
     certifies; the level and crisis rows are reported with their own

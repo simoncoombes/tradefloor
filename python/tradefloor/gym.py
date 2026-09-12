@@ -47,7 +47,7 @@ from .portfolio import Portfolio
 from .universe_util import as_universe
 
 # A name that is "a module or None", and a base class that is "Env or object",
-# are both things a type checker is right to object to -- and both are the
+# are both things a type checker is right to object to, and both are the
 # correct runtime shape for an optional dependency. Ignored with the reason
 # rather than contorting the runtime to satisfy the checker.
 try:  # pragma: no cover - exercised by the absence path, not the presence one
@@ -107,7 +107,7 @@ class TradingEnv(_Base):
         self.universe = as_universe(universe)
         self.base_seed = int(seed)
         self.macro = macro
-        # The coefficient set every episode runs -- a preset name or a
+        # The coefficient set every episode runs, either a preset name or a
         # ModelParams, fixed at construction like the universe. Per-episode
         # models would make a policy's replay buffer a mixture of markets
         # with nothing in the observation to tell them apart; train against
@@ -138,12 +138,12 @@ class TradingEnv(_Base):
             # warning is right to ask and the answer is that no finite bound
             # is true. A step is 65 ticks; the circuit breaker caps each tick
             # at 25% of the previous close, so a step's log return is bounded
-            # only by 1.25**65 -- a number no policy should be told is the
+            # only by 1.25**65, a number no policy should be told is the
             # range. Cash as a fraction of net worth can go negative when
             # levered and above one when net short.
             #
             # A bound the environment can exceed is worse than infinity, not
-            # better: wrappers that normalise against the space would silently
+            # better: wrappers that normalize against the space would silently
             # emit out-of-range observations, and a clipping wrapper would
             # discard real information. Infinity is the honest declaration.
             self.observation_space = spaces.Box(
@@ -168,8 +168,8 @@ class TradingEnv(_Base):
         if _gym is not None:
             # Gymnasium keeps its own generator on the base class and its API
             # checker enforces that reset seeds it. This environment does not
-            # use `self.np_random` -- all randomness lives in the engine's
-            # PCG32 stream -- but skipping the call would make a conforming
+            # use `self.np_random` (all randomness lives in the engine's
+            # PCG32 stream), but skipping the call would make a conforming
             # env fail conformance, and would leave a second, unseeded
             # generator sitting on the object for any wrapper that reaches
             # for it.
@@ -203,7 +203,7 @@ class TradingEnv(_Base):
             raise ValidationError("action contains non-finite values")
         # Clipped rather than rejected. A policy emitting 1.3 early in training
         # is normal, and killing the episode for it would make the environment
-        # teach optimiser hygiene instead of trading.
+        # teach optimizer hygiene instead of trading.
         action = _np.clip(action, -1.0, 1.0)
 
         rejected = self._rebalance(action)
@@ -275,8 +275,8 @@ class TradingEnv(_Base):
                 self.portfolio.execute(self.engine, ticker, delta)
             except (OrderError, ValidationError):
                 # A refused trade is information, not a failure. Being unable
-                # to reach a target -- because the book is thin or leverage is
-                # capped -- is a fact about the action, and the agent should
+                # to reach a target, because the book is thin or leverage is
+                # capped, is a fact about the action, and the agent should
                 # experience it rather than have the episode die.
                 rejected += 1
         return rejected

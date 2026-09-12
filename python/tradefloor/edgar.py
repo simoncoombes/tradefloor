@@ -16,7 +16,7 @@ generator was told to have.
 
 1. **A synthetic universe**, via ``Universe.random``. Works.
 2. **Real fundamentals as initial conditions**, which is this. Works.
-3. **Replicating a specific company's realised behaviour**, which does **not**
+3. **Replicating a specific company's realized behavior**, which does **not**
    work, and this needs saying before a user discovers it. The dynamics are
    the preset's, not the company's: the GARCH coefficients are model-global,
    base variance and anchor P/E are sector-level, and beta and spread are
@@ -71,7 +71,7 @@ TURNOVER = 0.005
 
 # The stream initial mispricing is drawn from. Distinct from the market stream
 # and from universe generation, so seeding a universe's dispersion cannot
-# perturb the market it is built for -- the same isolation the generator has.
+# perturb the market it is built for, the same isolation the generator has.
 MISPRICING_STREAM = 37
 
 
@@ -93,7 +93,7 @@ def _beta_for(sector: str) -> float:
 
 
 class Snapshot:
-    """A frozen set of filings, hashable and serialisable.
+    """A frozen set of filings, hashable and serializable.
 
     The reproducible input to an experiment. A citable specification names it
     by hash alongside the seed, preset and macro path.
@@ -110,7 +110,7 @@ class Snapshot:
         self.excluded = [dict(r) for r in excluded]
         self.notes = dict(notes or {})
 
-    # -- serialisation ----------------------------------------------------
+    # -- serialization ----------------------------------------------------
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -124,7 +124,7 @@ class Snapshot:
         }
 
     def to_json(self) -> str:
-        # sort_keys and a fixed separator, so the serialisation is canonical
+        # sort_keys and a fixed separator, so the serialization is canonical
         # and the hash is a property of the CONTENT rather than of dict
         # ordering. A hash that moved when a key order changed would be
         # useless as an identifier.
@@ -132,7 +132,7 @@ class Snapshot:
 
     @property
     def hash(self) -> str:
-        """sha256 over the canonical serialisation."""
+        """sha256 over the canonical serialization."""
         return hashlib.sha256(self.to_json().encode("utf-8")).hexdigest()
 
     def save(self, path: str) -> str:
@@ -175,7 +175,7 @@ class Snapshot:
         )
         # Preserve the version that BUILT it, not the version reading it. A
         # snapshot built by loader 1 and read by loader 2 is still a loader-1
-        # artifact, and relabelling it would erase the provenance that makes
+        # artifact, and relabeling it would erase the provenance that makes
         # it citable.
         snap.loader_version = payload.get("loader_version", LOADER_VERSION)
         return snap
@@ -211,7 +211,7 @@ def to_instruments(
 
     Fair value under WHICH model: `model` names it, defaulting to the shipped
     default, and it must be the model the engine then runs for the same reason
-    the macro must be -- otherwise every company starts mispriced by the
+the macro must be. Otherwise every company starts mispriced by the
     difference between two valuations.
 
     That is well-defined, needs no second data source, and is consistent with
@@ -249,12 +249,12 @@ def to_instruments(
     # under one valuation and run under another starts mispriced by the
     # difference. `neutral_discount_rate` is the rate at which the multiple
     # sits on its sector anchor, it became settable before pt-v18 and pt-v18
-    # is the first preset to move it -- 0.0482 against the 0.04 every
+    # is the first preset to move it, 0.0482 against the 0.04 every
     # earlier preset ships and `fair_value` still assumes when nobody says
     # otherwise. Measured on the EDGAR path at the 0.7.0 boundary: matching
     # the macro left a day-zero |s| of 0.0169 where pt-v16 left 0.0005, and
     # the separation from a MISMATCHED rate regime collapsed from 201x to
-    # 4.9x -- so the check that matching the macro matters was most of the
+    # 4.9x, so the check that matching the macro matters was most of the
     # way to not mattering.
     #
     # `fair_value`'s own signature was built for this: its
@@ -358,7 +358,7 @@ _SUBMISSIONS = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 # EPS, equity and share count each have one obvious tag. Revenue does not:
 # ASC 606 filers use RevenueFromContractWithCustomer..., older and financial
 # filers use Revenues or SalesRevenueNet. Tried in order, first hit wins, and
-# a company matching none simply has no growth figure rather than a zero --
+# a company matching none simply has no growth figure rather than a zero,
 # which would be a claim of flat revenue rather than an absence.
 #: Implied price per share, `public_float / shares_outstanding`, outside
 #: which a filing is treated as mis-tagged rather than as a very large or
@@ -373,12 +373,12 @@ _SUBMISSIONS = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 #: shares near $700k would survive. Measured against the live SEC, that was
 #: an order of magnitude too loose to catch anything: the scale errors imply
 #: prices of $97k (ONTO), $116k (MGRC) and $143k (OLED), all comfortably
-#: under a million, and they ranked ABOVE Nvidia -- whose own filing is
+#: under a million, and they ranked ABOVE Nvidia, whose own filing is
 #: correct at an implied $163. A filter that admits every error it was
 #: written to reject is worse than none, because it looks like diligence.
 #:
 #: $10,000 is the working ceiling. It clears the genuinely high-priced US
-#: listings -- NVR near $7k, Booking near $5k -- and rejects every scale
+#: listings (NVR near $7k, Booking near $5k) and rejects every scale
 #: error seen. It also rejects Berkshire's A shares. That trade was made on
 #: purpose: one real company excluded, against several hundred
 #: mis-tagged filings admitted. B shares are unaffected.
@@ -409,7 +409,7 @@ def default_transport(user_agent: str, *, timeout: float = 30.0, clock=None,
     Injectable, and the injection point is the whole design: :func:`fetch` is
     pure given a transport, so the derivation is tested against recorded
     responses with no socket in the test suite. That matters more here than it
-    usually would -- the one part of this library that cannot be
+    usually would, because the one part of this library that cannot be
     deterministic is the part that talks to the network, so the boundary is
     drawn tightly around it.
     """
@@ -476,7 +476,7 @@ def _frame(transport, taxonomy: str, tag: str, unit: str, period: str):
         if cik is None or val is None:
             continue
         # Frames are one point per filer per period, but a duplicate would
-        # otherwise resolve by whichever the JSON listed last -- an ordering
+        # otherwise resolve by whichever the JSON listed last, an ordering
         # dependency. Stated rather than incidental.
         out[int(cik)] = float(val)
     return out
@@ -486,7 +486,7 @@ def _fiscal_year_for(as_of: str, fiscal_year: int | None) -> int:
     """Which annual frame to ask for, given a date.
 
     Annual reports for calendar year Y are filed between February and April of
-    Y+1, so before April the CY(Y-1) frame holds a fraction of the market --
+    Y+1, so before April the CY(Y-1) frame holds a fraction of the market,
     and not a random fraction. Early filers are large, well-resourced and
     clean-audit; a universe built from them is biased in a way that looks like
     data rather than like a sampling artifact. Hence the shift back a year.
@@ -554,11 +554,11 @@ def fetch(
     equity against its market value while a software company carries almost
     none. Measured on the live SEC for CY2025, the top 150 by equity came
     back **27% financial services and 17% technology**, with five banks in
-    the top ten -- against roughly 13% and 30% for the S&P 500. So the
+    the top ten, against roughly 13% and 30% for the S&P 500. So the
     default roster is bank-heavy by construction, and any realism measured on
     it inherits that.
 
-    ``"public_float"`` ranks by ``dei:EntityPublicFloat`` instead -- the
+    ``"public_float"`` ranks by ``dei:EntityPublicFloat`` instead, the
     aggregate market value of stock held by non-affiliates, filed on the 10-K
     cover page. It is the one market-derived number in EDGAR, and it produces
     a roster whose composition resembles a real index.
@@ -566,21 +566,21 @@ def fetch(
     Its two costs are real and are not hidden. It is **stale**: as-of the
     last business day of the most recently completed second fiscal quarter,
     so six to eighteen months old depending on the filer. And it is
-    **float, not capitalisation** -- it excludes affiliate and insider
+    **float, not capitalization**, since it excludes affiliate and insider
     holdings, which understates founder-controlled companies specifically.
 
     It is also visibly mis-tagged in places: XBRL scale errors put several
     filers above any real company's market value. Rather than a magic
     threshold, the implausible ones are rejected by a quantity that means
-    something -- the implied price per share, ``public_float / shares``,
-    which must land in ``PLAUSIBLE_IMPLIED_PRICE``. A filer whose filing
+    something. The implied price per share, ``public_float / shares``,
+    must land in ``PLAUSIBLE_IMPLIED_PRICE``. A filer whose filing
     implies a share price of eight million dollars has a units error, and
     saying so in those terms beats saying "too big".
 
     Neither ranking is a market-cap ranking, because EDGAR has no prices.
     For that, set ``initial_price`` yourself from a market data source.
 
-    ``user_agent`` is required and must identify you -- the SEC's fair-access
+    ``user_agent`` is required and must identify you. The SEC's fair-access
     policy asks for a name and a contact address, e.g.
     ``"Jane Roe jane@example.org"``. Requests without one are refused at the
     edge, and this function will not invent one on your behalf.
@@ -599,7 +599,7 @@ def fetch(
     submissions calls on a four-filer market, 11 frame calls under
     ``public_float``.
 
-    The result is a frozen artifact. Save it, hash it, cite it -- and do not
+    The result is a frozen artifact. Save it, hash it, cite it, and do not
     expect a re-fetch to reproduce it. EDGAR is not append-only: companies
     amend and restate, so the same query returns different numbers next year.
     So the snapshot, rather than the query, is the input to everything
@@ -650,13 +650,13 @@ def fetch(
     #
     # Measured against the live SEC for CY2023: `dei` covers 2,717 filers and
     # `us-gaap` covers 4,971, overlapping partially. Of the 5,716 filers with
-    # diluted EPS, the dei tag alone reaches 1,966 -- the union reaches 4,733.
+    # diluted EPS, the dei tag alone reaches 1,966 and the union reaches 4,733.
     # Taking dei and only falling back when it came back EMPTY dropped more
     # than half the usable universe, and it did so invisibly: the result was a
     # perfectly good smaller universe with no indication that most of the
     # market had been filtered out for want of a share count.
     #
-    # dei wins a tie because it is the cover-page figure -- as-of the filing
+    # dei wins a tie because it is the cover-page figure, as-of the filing
     # date rather than the period end, so it is the more current of the two.
     shares = _frame(get, "us-gaap", "CommonStockSharesOutstanding", "shares",
                     instant)
@@ -807,7 +807,7 @@ def fetch(
         # Reports what the ranking ACTUALLY was. This read
         # "stockholders_equity" unconditionally when `rank_by` landed,
         # so a float-ranked snapshot carried a note saying it was
-        # equity-ranked -- the identical bug class as `model_preset()`'s
+        # equity-ranked, the identical bug class as `model_preset()`'s
         # hardcoded "pt-v1" default, fixed hours earlier in this same
         # session, reintroduced by the person who fixed it. A provenance
         # field that does not follow the thing it describes is worse than
@@ -850,8 +850,8 @@ def _requested_ciks(ciks: Sequence[int | str]) -> list[int]:
     A CIK named twice raises. Deduplicating it silently would make the
     included and excluded counts add up to fewer filers than were asked for,
     with nothing saying which request the extra one was. A caller whose
-    roster holds two share classes of one company -- three of the S&P 500's
-    503 lines do -- resolves that in the roster, where the second line can be
+    roster holds two share classes of one company (three of the S&P 500's
+    503 lines do) resolves that in the roster, where the second line can be
     recorded as the share class it is.
     """
     out: list[int] = []
@@ -903,13 +903,13 @@ def _requested_ciks(ciks: Sequence[int | str]) -> list[int]:
 #     registered keeps its original code, and the SEC does not backfill.
 #
 # Overrides are checked before ranges, so a four-digit code can escape its
-# major group -- pharmaceuticals out of chemicals, computers out of machinery,
+# major group: pharmaceuticals out of chemicals, computers out of machinery,
 # REITs out of finance. That is where most of the accuracy lives.
 
 _SIC_OVERRIDES: dict[int, str] = {}
 
 # Codes that map to no sector rather than to a wrong one. 6770 is blank
-# checks -- SPACs and shells, which have a share count and no business -- and
+# checks (SPACs and shells, which have a share count and no business) and
 # 9995/9999 are the SEC's own "nonclassifiable" bucket.
 _SIC_EXCLUDE = frozenset({0, 6770, 9995, 9999})
 
@@ -928,7 +928,7 @@ _override([3672, 3674, 3675, 3676, 3677, 3678, 3679], "technology")
 # Telephone and broadcast equipment: the maker is technology; the CARRIER,
 # further down in major group 48, is telecommunications.
 _override([3661, 3663, 3669], "technology")
-# Motor vehicles inside transportation equipment (37) -- consumer, not
+# Motor vehicles inside transportation equipment (37) is consumer, not
 # industrial, because demand is discretionary household spending.
 _override(range(3711, 3717), "consumer_discretionary")
 # Medical instruments inside instruments (38).
@@ -948,11 +948,11 @@ _override([5411, 5412, 5912], "consumer_staples")
 # Real estate and REITs inside the finance division (60-67).
 _override(list(range(6500, 6600)) + [6798], "real_estate")
 # Prepackaged software, data processing and computer services inside business
-# services (73) -- this is where most of the modern technology sector lives,
+# services (73). This is where most of the modern technology sector lives,
 # under a code written before the industry existed.
 _override(range(7370, 7380), "technology")
 # Commercial physical and biological research inside engineering services (87):
-# contract research organisations and pre-revenue biotech.
+# contract research organizations and pre-revenue biotech.
 _override([8731], "healthcare")
 
 # Major-group ranges, checked only when no override matched. Inclusive on both
@@ -1007,7 +1007,7 @@ _SIC_RANGES: tuple[tuple[int, int, str], ...] = (
 def sector_for_sic(sic) -> str | None:
     """Map an SEC SIC code to one of the model's twelve sectors.
 
-    Returns ``None`` for a code with no sensible home -- 6770 blank checks,
+    Returns ``None`` for a code with no sensible home: 6770 blank checks,
     9995 nonclassifiable, an empty string on a filer that never got one. A
     guess would be worse than an exclusion: it would put a shell company in a
     sector and give it that sector's volatility and anchor P/E.

@@ -5,7 +5,7 @@ returns TABLES, which are not small. Everything here is arranged so you never
 hold more than a few at once.
 
 The arithmetic that motivates it. One recorded engine keeps fourteen f64
-buffers of `days x ticks x instruments` -- price, volume, mispricing,
+buffers of `days x ticks x instruments`: price, volume, mispricing,
 fundamental and anchor, plus one per attribution component, and there are nine
 of those. At 252 days, 390 ticks and 100 instruments that is 9.8 million
 elements per buffer, about 1.10 GB retained, and the `truth` table it
@@ -131,7 +131,7 @@ def sweep(
 
     # A bounded window, not `executor.map` over everything. map would submit
     # every seed at once and hold every finished table until the caller got to
-    # it, which is the memory this function exists to avoid -- and it would do
+    # it, which is the memory this function exists to avoid, and it would do
     # it while looking lazy, because map returns an iterator.
     with ThreadPoolExecutor(max_workers=workers) as pool:
         pending: deque = deque()

@@ -6,9 +6,9 @@ round-trips, and process-level parallelism for seed sweeps. Forcing those into
 the extension would mean hand-rolling JSON escaping and reimplementing a
 process pool, both worse than the standard library versions.
 
-Determinism is the point. The same seed and the same inputs are designed to
-produce bit-identical output on Linux, macOS and Windows, because the library
-ships its own transcendental maths rather than calling the platform's libm.
+The same seed and the same inputs are designed to produce bit-identical
+output on Linux, macOS and Windows, because the library ships its own
+transcendental math rather than calling the platform's libm.
 """
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ __all__ = [
 ]
 
 # The fields an Instrument round-trips through JSON. Declared once, in one
-# order, so serialising and deserialising cannot drift apart the way two
+# order, so serializing and deserializing cannot drift apart the way two
 # hand-written field lists eventually do.
 _INSTRUMENT_FIELDS = (
     "ticker", "sector", "initial_price", "shares_outstanding", "eps",
@@ -149,7 +149,7 @@ _INSTRUMENT_FIELDS = (
     "short_interest",
 )
 
-# Bumped when the serialised shape changes. A file written by a newer version
+# Bumped when the serialized shape changes. A file written by a newer version
 # is refused rather than silently misread, because a missing field would
 # quietly become a default and produce a universe nobody specified.
 _UNIVERSE_SCHEMA = 1
@@ -160,7 +160,7 @@ class Universe(list):
 
     A ``list`` subclass, deliberately. Roster order is contractual, since the engine
     iterates instruments in index order and draws as it goes, so a reordered
-    universe is a different market from the same seed. Modelling it as a
+    universe is a different market from the same seed. Modeling it as a
     mapping would invite exactly the ``{ticker: instrument}`` dict that has no
     stable order, and a ``sort_by(ticker)`` somewhere upstream would be a
     silent, total divergence.
@@ -176,7 +176,7 @@ class Universe(list):
         A generator is not a convenience here. A realistic study needs on the
         order of a hundred names, and nobody hand-authors a hundred rosters,
         so without this the practical universe size is "however many someone
-        was willing to type", which is not a modelling choice anyone made.
+        was willing to type", which is not a modeling choice anyone made.
 
         ``seed`` is the UNIVERSE seed and is independent of the simulation
         seed. That separation is what makes "same universe, different market
@@ -199,7 +199,7 @@ class Universe(list):
 
         Takes a :class:`tradefloor.edgar.Snapshot` or a path to a saved one.
         Extra keyword arguments are the macro conditions the fair values are
-        computed under, and they must match the macro the engine then runs --
+        computed under, and they must match the macro the engine then runs;
         otherwise every company starts mispriced by the difference, which is a
         quiet way to get a universe nobody specified.
         """
@@ -211,7 +211,7 @@ class Universe(list):
 
     @property
     def fingerprint(self) -> str:
-        """sha256 over the roster's canonical serialisation.
+        """sha256 over the roster's canonical serialization.
 
         Identity for a universe, where the ticker list is not. Tickers are
         generated positionally, so ``random(40, seed=1)`` and
@@ -231,11 +231,11 @@ class Universe(list):
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     def to_json(self, **kwargs: Any) -> str:
-        """Serialise to JSON.
+        """Serialize to JSON.
 
         A citable specification has to be able to name its universe exactly,
         and ``random(108, seed=7)`` is only citable while the generator is
-        versioned with the model. Serialising the roster itself is the escape
+        versioned with the model. Serializing the roster itself is the escape
         hatch: it pins the exact instruments regardless of what any later
         generator would produce.
         """
@@ -312,11 +312,11 @@ def _run_one(args: tuple) -> Any:
     """One seed, in one worker. Module-level so it is picklable.
 
     The universe crosses as JSON rather than as objects. That is not a
-    workaround, since a serialised universe is the same universe by construction
+    workaround, since a serialized universe is the same universe by construction
     (there is a test), and it means a worker rebuilds from a specification
     rather than depending on whatever a pickle happened to preserve.
 
-    A scenario crosses as its REALISED PATH, one dict per day, for the same
+    A scenario crosses as its REALIZED PATH, one dict per day, for the same
     reason and one more: the workers are threads sharing an address space, so
     handing them a driver that closed over mutable state would be a race
     waiting to happen. A list of dicts cannot be.
@@ -327,7 +327,7 @@ def _run_one(args: tuple) -> Any:
     # The model crosses as the OBJECT, unlike the universe. Same reasoning,
     # opposite conclusion: what makes thread-shared state safe here is
     # immutability, and ModelParams is immutable by construction where a
-    # Universe is a mutable list. Serialising it would round-trip through
+    # Universe is a mutable list. Serializing it would round-trip through
     # from_dict for no isolation gained.
     engine = Engine(
         seed=seed,
@@ -421,7 +421,7 @@ def run_many(
 
     Parallelising *within* a run is therefore off the table by construction,
     not merely unimplemented. If you find yourself wanting ``n_threads=``, the
-    honest answer is that it could only be honoured by changing the market.
+    honest answer is that it could only be honored by changing the market.
 
     Each worker constructs its own engine from its own seed, so the isolation
     is total: two workers share no state, and running with ``workers=1``
@@ -441,15 +441,15 @@ def run_many(
     # Threads, and why that is not a compromise
 
     The engine releases the GIL for the whole session compute, so a thread
-    pool gives real parallelism with no serialisation of the universe into
+    pool gives real parallelism with no serialization of the universe into
     each worker and no pickling of results back.
 
     It also WORKS in the places a process pool does not. Windows spawns rather
-    than forks, and spawning re-imports ``__main__`` in every child -- which a
+    than forks, and spawning re-imports ``__main__`` in every child, which a
     notebook, a REPL and a piped script do not have. The children die, the
     parent waits, and the sweep hangs with no error. That is the single most
     likely way to use this library, so the process pool was not an
-    optimisation with an edge case; it was broken where it mattered most.
+    optimization with an edge case; it was broken where it mattered most.
 
     ``workers`` is still not defaulted to the core count: a sweep small enough
     to be interactive can be faster serially, and quietly making it slower
@@ -477,7 +477,7 @@ def run_many(
         "cycle": macro.cycle,
     }
     hour, minute, day_of_week = start
-    # The scenario is passed as its REALISED PATH rather than as the object.
+    # The scenario is passed as its REALIZED PATH rather than as the object.
     # A path is plain data, so a worker cannot be handed a driver that closes
     # over shared state, and the sweep records exactly what it ran.
     path = None if scenario is None else [scenario.at(d) for d in range(days)]
@@ -500,13 +500,13 @@ def run_many(
     # whole session compute. Three things follow, and the third is why this
     # was changed:
     #
-    #   - no universe serialised into every worker
+    #   - no universe serialized into every worker
     #   - no pickling of results back
     #   - it works from a notebook, a REPL or a piped script
     #
     # A process pool did not. On Windows the spawn start method re-imports
     # `__main__` in each child, and a REPL, a notebook or a script fed on
-    # stdin has no importable `__main__` -- so the children die and the parent
+    # stdin has no importable `__main__`, so the children die and the parent
     # waits for results that will never arrive. Measured as a ten-minute hang
     # on a twenty-seed sweep, with no error and no output. Jupyter is where
     # this library is most likely to be used, and the process pool could not
@@ -527,7 +527,7 @@ class FlowImpact:
 
     Named for what it measures rather than for the category it belongs to.
     It was called `Counterfactual`, which claimed the general concept while
-    doing one narrow part of it -- and the library now has three
+    doing one narrow part of it, and the library now has three
     counterfactuals (this, :func:`tradefloor.tca.analyse`, and
     :func:`tradefloor.scenario.compare`), so the general name pointed at the
     least general tool.
@@ -541,7 +541,7 @@ class FlowImpact:
        This measures one specific, narrower thing: the effect of an order
        IMBALANCE fed to the factor model, which is the information channel
        alone. No order is submitted and no liquidity is consumed, so the book
-       channel -- where a large trade's cost actually comes from -- is not
+       channel (where a large trade's cost actually comes from) is not
        exercised at all.
 
        That channel is also bounded at both ends. Below about 1.3x the
@@ -624,15 +624,15 @@ class FlowImpact:
 
         Measured, not assumed: a 390-tick session consumes 19,110 draws with
         or without flow. (Adding an INSTRUMENT is a different matter and does
-        shift the schedule -- 4,900 draws at six names against 5,500 at seven
-        -- so a roster edit does not give you a counterfactual.)
+        shift the schedule, 4,900 draws at six names against 5,500 at seven,
+        so a roster edit does not give you a counterfactual.)
 
         Over several DAYS one non-noise channel qualifies the emptiness,
         since the 2026-08 VIX coupling: flow that moves the cap-weighted
         market return moves the same-day VIX, VIX sets the shared factor's
         variance target, and untraded names feel it two closes later.
-        Intermittent -- the VIX reaction clamps the market return at
-        +/-0.03% -- but real: measured on this build, flow of 200,000
+        Intermittent, because the VIX reaction clamps the market return at
+        +/-0.03%, but real. Measured on this build, flow of 200,000
         shares against the first name of ``Universe.random(20, seed=7)``
         run for ten days leaks nothing at sim seeds 2026 and 7 and moves
         one untouched name +22.8 bps at sim seed 11. Pin VIX in both

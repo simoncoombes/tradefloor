@@ -8,14 +8,14 @@ from that one difference.
 ## The strategy surface is data, never a callable
 
 `evaluate` accepts any object with an `act` method. A tool call cannot
-carry one, and the alternative -- accepting a string of Python and running
-it -- would make this server a remote code execution endpoint with a market
+carry one, and the alternative (accepting a string of Python and running
+it) would make this server a remote code execution endpoint with a market
 simulator attached. :class:`tradefloor.StrategySpec` already closed this gap
 for citability, and its module docstring anticipated this exact use:
 
-    It is also what an MCP server needs -- a tool cannot accept a callable
-    -- and what stops callers inventing their own serialisation on the way
-    to one.
+    It is also what an MCP server needs, since a tool cannot accept a
+    callable, and what stops callers inventing their own serialization on
+    the way to one.
 
 So the grammar the spec expresses is the grammar this server exposes, and
 what the spec cannot say, this server cannot run. Path dependence,
@@ -28,20 +28,20 @@ This part goes beyond ordinary MCP plumbing, and carries real weight.
 
 A person calling `evaluate` has the docstring, the README and the realism
 envelope page in reach. A model calling `evaluate_strategies` has the tool
-result and nothing else, and it will summarise that result to a human who
-has even less. The failure mode is not hypothetical -- it is the single
+result and nothing else, and it will summarize that result to a human who
+has even less. The failure mode is not hypothetical. It is the single
 most repeated failure in this project's history: a correct number under a
 sentence that inverted it. A design document described crisis severity as
 arriving "through correlation" when that was backwards for one of two
 parameters. A survey classifier printed `[MOVES]` for a parameter measured
 to move things the wrong way. Every one had sound arithmetic and a wrong
-connecting sentence, because **a number invites scepticism and a sentence
+connecting sentence, because **a number invites skepticism and a sentence
 does not**.
 
 A model handed `{"return_pct": 88.7}` will report that a strategy made
 88.7%. So every tool here returns a `caveats` list beside its numbers, and
 the caveats are **computed from the envelope and the measured facts at call
-time** -- never retyped prose. That rule has already earned itself: while
+time**, never retyped prose. That rule has already earned itself: while
 this module was being written, the product brief and `README.md` were both found
 still asserting a return autocorrelation of +0.219 and +0.249 from an
 earlier preset, where the shipped `pt-v3` measures 0.0485 across the
@@ -93,7 +93,7 @@ except ImportError as exc:  # pragma: no cover - exercised by the install path
 # A model will cheerfully ask for 500 days across 40 seeds because nothing in
 # the request looks expensive. These caps exist so a tool call cannot become
 # a compute job: the whole surface is meant to answer inside a conversation.
-# Every one of them is a wall-clock decision, not a modelling one -- the
+# Every one of them is a wall-clock decision, not a modeling one. The
 # library itself imposes none of them, and a caller who wants more should use
 # the library.
 
@@ -102,7 +102,7 @@ MAX_DAYS = 60
 #: The day cap for a BACKGROUND job, set to the certified horizon itself.
 #:
 #: This is the point of having jobs at all. `MAX_DAYS` is 60 because a
-#: 252-day evaluation takes about 95 seconds and would block a tool call --
+#: 252-day evaluation takes about 95 seconds and would block a tool call,
 #: which meant every result this server could produce was a SHORT WINDOW on
 #: a market whose realism is certified annually. A job is not merely a
 #: convenience for slow work; it is what lets the answer reach the horizon
@@ -129,17 +129,17 @@ MAX_SEEDS = 12
 #: An earlier draft of this module exposed ONLY these, on the stated grounds
 #: that free-form building was "a fluent API over 40-odd engine fields" and
 #: would let a model pin macro state nobody calibrated. Both halves were
-#: wrong. A scenario pins a SHORT, VALIDATED list of macro fields -- eleven
+#: wrong. A scenario pins a SHORT, VALIDATED list of macro fields (eleven
 #: since the intervention framework exposed four the economy already
-#: carried -- not forty; unknown
+#: carried) rather than forty; unknown
 #: names are refused with the valid list; and `Scenario` already round-trips
 #: through `to_json`/`from_json`, so it is data in exactly the way a
 #: `StrategySpec` is data.
 #:
 #: The reasoning was also inconsistent with this server's whole design. The
-#: caveat engine exists so that questions can be ALLOWED AND LABELLED rather
-#: than forbidden -- and the envelope already carries a `scenario_magnitude`
-#: gap for precisely the risk being invoked. Forbidding here while labelling
+#: caveat engine exists so that questions can be ALLOWED AND LABELED rather
+#: than forbidden, and the envelope already carries a `scenario_magnitude`
+#: gap for precisely the risk being invoked. Forbidding here while labeling
 #: everywhere else was a rule with no principle behind it.
 #:
 #: `build_scenario` now authors one, and `run_stress_scenario` takes either
@@ -152,7 +152,7 @@ def _packaged() -> tuple[str, ...]:
 
     Read from the package rather than listed, so the pack and this server
     cannot disagree about what exists. Distinct from `SCENARIOS` above, which
-    are CONSTRUCTORS -- shapes built from arguments. These are documents: a
+    are CONSTRUCTORS, shapes built from arguments. These are documents: a
     named collection of explicit interventions somebody wrote down, with a
     fingerprint, which is what makes one citable.
     """
@@ -184,8 +184,8 @@ def _provenance(**extra: Any) -> dict[str, Any]:
     """What is needed to re-run this exact result somewhere else.
 
     Present on every successful result, because a number from a simulator
-    without its seed and fingerprints is not a measurement -- it is an
-    anecdote, and a model summarising it cannot tell the difference.
+    without its seed and fingerprints is not a measurement. It is an
+    anecdote, and a model summarizing it cannot tell the difference.
     """
     preset = tf.model_preset()
     return {
@@ -288,7 +288,7 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
                    + "; ".join(v.reasons))
 
     # The envelope calls any horizon at or under the certified one "inside",
-    # and it is right to -- its gaps are about running LONGER. But that
+    # and it is right to, because its gaps are about running LONGER. But that
     # leaves the opposite risk unstated, and this server can only ever run
     # short: MAX_DAYS is well under the certified horizon because a
     # 252-day evaluation takes about 95 seconds and a tool call has to
@@ -369,7 +369,7 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
 
 
 #: The pool a concentrated roster is selected from. `Universe.random` is
-#: prefix-stable -- random(20, seed)[:10] == random(10, seed) -- so drawing
+#: prefix-stable (random(20, seed)[:10] == random(10, seed)) so drawing
 #: one fixed pool and filtering it is deterministic in (size, seed, sectors)
 #: without depending on how many names happened to match.
 _POOL = MAX_UNIVERSE * 4
@@ -384,7 +384,7 @@ def _build_universe(size: int, seed: int,
     NAMED gaps in the realism envelope, and `envelope.check` already takes
     `sector_concentrated` as an argument. A server that could not build a
     concentrated roster could not ask about a gap its own product
-    documents -- so this exists to make that gap reachable, and the second
+    documents, so this exists to make that gap reachable, and the second
     return value is what tells the caveat engine to say so.
     """
     if not 2 <= size <= MAX_UNIVERSE:
@@ -405,7 +405,7 @@ def _build_universe(size: int, seed: int,
         raise ValueError(
             f"only {len(chosen)} names in {sorted(want)} within a pool of "
             f"{_POOL}; ask for fewer than {size} or add a sector")
-    # Roster ORDER is contractual -- the engine draws in index order -- and
+    # Roster ORDER is contractual (the engine draws in index order) and
     # pool order is preserved here, so the same request is the same market.
     return tf.Universe(chosen), True
 
@@ -425,7 +425,7 @@ def _resolve_universe(doc: Any) -> tuple[Any, bool, dict[str, Any]]:
     Two forms. `{"size": n, "seed": s, "sectors": [...]}` generates one;
     `{"instruments": [...]}` builds one from explicit rows. The canonical
     document comes back so a result's provenance records the roster as it
-    was ASKED FOR, not merely its fingerprint -- a fingerprint identifies a
+    was ASKED FOR, not merely its fingerprint. A fingerprint identifies a
     roster to someone who already has it, and a document reconstructs it.
     """
     if isinstance(doc, str):
@@ -455,8 +455,8 @@ def _resolve_universe(doc: Any) -> tuple[Any, bool, dict[str, Any]]:
             try:
                 built.append(tf.Instrument(row["ticker"], row["sector"], **kw))
             except tf.ValidationError as exc:
-                # The library's messages name the trap -- short_interest is a
-                # SHARE COUNT, not a fraction -- so pass them through whole.
+                # The library's messages name the trap (short_interest is a
+                # SHARE COUNT, not a fraction) so pass them through whole.
                 raise ValueError(f"instrument {i} ({row['ticker']}): "
                                  f"{exc}") from exc
         universe = tf.Universe(built)
@@ -464,7 +464,7 @@ def _resolve_universe(doc: Any) -> tuple[Any, bool, dict[str, Any]]:
         for inst in universe:
             counts[inst.sector] = counts.get(inst.sector, 0) + 1
         # A hand-authored roster counts as concentrated unless it spans most
-        # of the sector space -- the gap is about the CROSS-SECTION, and a
+        # of the sector space: the gap is about the CROSS-SECTION, and a
         # caller who picked the names picked the cross-section.
         concentrated = len(counts) < max(2, len(tf.sectors()) // 2)
         return universe, concentrated, {"instruments": rows}
@@ -478,7 +478,7 @@ def _resolve_universe(doc: Any) -> tuple[Any, bool, dict[str, Any]]:
 
 
 #: Names of strategies whose `spec_version` this server supplied. Reported in
-#: the result rather than kept quiet -- see `_normalise`.
+#: the result rather than kept quiet. See `_normalise`.
 _ASSUMED = "spec_version_assumed"
 
 
@@ -491,8 +491,8 @@ def _normalise(doc: Any) -> tuple[str, bool]:
     claiming, via its fingerprint, to be what was written.
 
     That reasoning is about documents being READ BACK. This server is an
-    authoring surface -- a model composes a spec here and runs it in the same
-    breath -- and a model will omit the field essentially every time, turning
+    authoring surface (a model composes a spec here and runs it in the same
+    breath) and a model will omit the field essentially every time, turning
     a mandatory version into a guaranteed wasted round trip.
 
     So: a document with NO version is stamped with the current one, exactly
@@ -899,7 +899,7 @@ def rank_strategies(
 
     `rank` takes a factory rather than instances because agents are stateful
     and a reused instance carries one market's history into the next with no
-    visible symptom. Specs are immune -- they are rebuilt per seed -- which
+    visible symptom. Specs are immune, since they are rebuilt per seed, which
     is why this server only ever passes specs.
     """
     seeds = seeds or [1, 2, 3, 4, 5, 6]
@@ -954,7 +954,7 @@ def rank_strategies(
     ]
 
     # The question anyone actually has is "is A really better than B", and a
-    # league table cannot answer it -- so run the paired sign test between
+    # league table cannot answer it, so run the paired sign test between
     # the submitted strategies and every entrant that beat or trailed them.
     order = [r["name"] for r in records]
     tests = []
@@ -1023,7 +1023,7 @@ def _scenario_from(doc: Any, days: int) -> Any:
         raise ValueError(f"a scenario must be an object, got "
                          f"{type(doc).__name__}")
     # A document that came back from `build_scenario` is `Scenario`'s OWN
-    # serialisation -- a pinned path, not the steps that generated it. Round
+    # serialization, a pinned path and not the steps that generated it. Round
     # -tripping it has to go through `Scenario.from_json`, or handing a tool
     # its own output back would fail, which is the first thing anyone tries.
     if "path" in doc and "steps" not in doc:
@@ -1036,7 +1036,7 @@ def _scenario_from(doc: Any, days: int) -> Any:
     # form a person writes in YAML (`version` + `scenario`), and the resolved
     # form `Scenario.to_json` produces (`schema` + `shocks`). Both are the
     # same experiment, and both route through the library's own loaders
-    # rather than being re-implemented here -- a second opinion about what a
+    # rather than being re-implemented here. A second opinion about what a
     # scenario means is a second thing to keep right.
     if "version" in doc and "scenario" in doc:
         try:
@@ -1104,7 +1104,7 @@ def _scenario_from(doc: Any, days: int) -> Any:
                 "small to see over a hundred days."
 )
 def list_scenarios() -> dict[str, Any]:
-    """The catalogue: shipped documents, constructors, and the registry.
+    """The catalog: shipped documents, constructors, and the registry.
 
     A model authoring a scenario is choosing between twelve targets whose
     effect sizes differ by three orders of magnitude, and nothing on the wire
@@ -1296,7 +1296,7 @@ def run_stress_scenario(
     # The same entrants twice: once shocked, once not. Baselines are rebuilt
     # per call rather than shared between the two runs, because a reference
     # agent is stateful and reusing one would carry the shocked market's
-    # history into the control -- which would corrupt the very difference
+    # history into the control, which would corrupt the very difference
     # this tool exists to report, with no visible symptom.
     def entrants() -> dict[str, Any]:
         out: dict[str, Any] = dict(specs)
@@ -1309,8 +1309,8 @@ def run_stress_scenario(
                               days=days, scenario=built)
         # The control is the same world WITHOUT the thing being tested. For a
         # macro PATH that is no scenario at all. For a scenario carrying
-        # INTERVENTIONS it is the same pins with the interventions removed --
-        # otherwise a scenario that both holds a level and shocks it would
+        # INTERVENTIONS it is the same pins with the interventions removed.
+        # Otherwise a scenario that both holds a level and shocks it would
         # have its level counted as part of the shock.
         against = (built.without_interventions() if built.interventions
                    else None)
@@ -1325,7 +1325,7 @@ def run_stress_scenario(
         # Differenced on the ROUNDED figures, so a reader who subtracts the
         # two numbers shown gets the number shown. Rounding the exact
         # difference instead would leave the result disagreeing with its own
-        # arithmetic by up to 1e-4 -- small, invisible, and the sort of thing
+        # arithmetic by up to 1e-4: small, invisible, and the sort of thing
         # a model reports as a discrepancy.
         hi = round(s.return_pct, 4)
         lo = round(base.return_pct, 4) if base else None
@@ -1381,10 +1381,10 @@ def explain_price_move(
     day: int = 1,
     top_n: int = 10,
 ) -> dict[str, Any]:
-    """The labelled-dataset output, and the thing no historical data has.
+    """The labeled-dataset output, and the thing no historical data has.
 
     You can observe that a stock fell. You cannot observe that 60% of the
-    fall was order-flow pressure and the rest was noise -- unless something
+    fall was order-flow pressure and the rest was noise, unless something
     computed it, and something did.
     """
     if not 1 <= day <= MAX_DAYS:
@@ -1412,7 +1412,7 @@ def explain_price_move(
         # Rounded for readability, but the residual is measured on the
         # ROUNDED values that are actually returned. Reporting the model's
         # ~1e-16 residual next to figures rounded to 1e-10 would be a
-        # sentence contradicting its own numbers -- the exact failure this
+        # sentence contradicting its own numbers, the exact failure this
         # module exists to prevent. What is returned is what is checked.
         shown = {f: round(v, 12) for f, v in parts.items()}
         shown_total = round(total, 12)
@@ -1566,7 +1566,7 @@ def build_universe(size: int = 40, seed: int = 111,
 
     Rosters were previously only reachable as `(size, seed)` arguments on
     every other tool, which made two questions unaskable: a
-    sector-CONCENTRATED roster -- one of the six named envelope gaps -- and
+    sector-CONCENTRATED roster (one of the six named envelope gaps) and
     a hand-authored one. Both are expressible as data, so both belong here.
 
     Returns a `universe` document. Pass it to any run tool as `universe` and
@@ -1619,8 +1619,8 @@ def build_universe(size: int = 40, seed: int = 111,
 
 # -- background jobs -------------------------------------------------------
 #
-# The simulator releases the GIL during a run -- measured: 412 main-thread
-# ticks during a 2.81s evaluation -- so a thread pool is enough and a process
+# The simulator releases the GIL during a run (measured at 412 main-thread
+# ticks during a 2.81s evaluation) so a thread pool is enough and a process
 # pool would buy nothing but pickling.
 #
 # Jobs live in this process. If the client restarts the server, they are
@@ -1637,7 +1637,7 @@ MAX_RUNNING_JOBS = 2
 MAX_KEPT_JOBS = 32
 
 #: The tools worth running in the background. The cheap ones are absent on
-#: purpose -- a job for a 40ms call is two round trips to save nothing.
+#: purpose: a job for a 40ms call is two round trips to save nothing.
 JOBBABLE = ("evaluate_strategies", "rank_strategies", "run_stress_scenario")
 
 _jobs: dict[str, dict[str, Any]] = {}
@@ -1651,7 +1651,7 @@ def _estimate_seconds(tool: str, args: dict[str, Any]) -> float:
     """A rough wall-clock estimate, from measured cost.
 
     Anchored on three measurements at 40 names with the six reference
-    entrants: 0.5s at 5 days, 20s at 60, 95s at 252 -- about 0.38 s/day.
+    entrants: 0.5s at 5 days, 20s at 60, 95s at 252, about 0.38 s/day.
     Scaled by roster size and, for a ranking, by the number of seeds. It is
     an estimate and the field says so; a model deciding whether to wait or
     poll needs an order of magnitude, not a promise.

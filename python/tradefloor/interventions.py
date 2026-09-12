@@ -27,7 +27,7 @@ and a scenario that appeared to run would be measuring nothing.
 
 So every entry here is a field some part of the engine actually reads, and
 each one records WHAT reads it and HOW FAST it arrives. That second column is
-not decoration. Only five things reach a price directly -- the policy rate,
+not decoration. Only five things reach a price directly: the policy rate,
 the corporate bond yield, the QE boost, VIX and the cycle phase, plus quoted
 depth through the book. Everything else in the economy reaches the market
 through the macro chain: a monthly inflation update, then the central bank's
@@ -53,7 +53,7 @@ checkpoint. See :meth:`tradefloor.Scenario.apply`.
 `multiply` is not expressible as a path computed in advance, because the value
 it multiplies is whatever the endogenous chain has arrived at by day `at`.
 So an intervention READS the field, applies its operation, and writes the
-result back -- which is also why the audit trail can report `previous: 82.14,
+result back, which is also why the audit trail can report `previous: 82.14,
 new: 115.00` rather than restating the recipe.
 
 That read and that write have to be in the same units, or a `multiply` by 1.4
@@ -96,8 +96,8 @@ OPERATIONS = ("set", "add", "multiply")
 #: "Belongs to the chain again" is doing real work in that sentence. For a
 #: macro field, ending a window means simply not writing any more: the daily
 #: chain recomputes the field, or mean-reverts it, or the central bank does.
-#: Two targets have no such dynamics -- nothing in the engine writes
-#: `avg_volume` or `tariff_rate` -- so for those the scenario puts the level
+#: Two targets have no such dynamics (nothing in the engine writes
+#: `avg_volume` or `tariff_rate`), so for those the scenario puts the level
 #: back itself when the last window on that target closes, and records the
 #: restore in the audit trail. Without that, a twenty-five day liquidity
 #: crisis lasted for the rest of the run while its own description said it
@@ -108,7 +108,7 @@ SHAPES = ("impulse", "permanent", "hold", "ramp")
 _NEEDS_DURATION = ("hold", "ramp")
 
 #: Which half of a scenario an intervention belongs to. The engine treats
-#: both identically -- the split is a claim about EVIDENCE, not about
+#: both identically. The split is a claim about EVIDENCE, not about
 #: mechanism. A shock is what the scenario asserts happened; a transmission is
 #: what the author assumes it did next. Keeping them apart is what lets a
 #: report say "this scenario assumes a 1.5pp inflation pass-through" instead
@@ -167,7 +167,7 @@ class Target:
         # it was written.
         self.numeric = numeric
         # Whether the engine's own dynamics move this field back on their
-        # own. Every macro field does -- the daily chain recomputes it, or
+        # own. Every macro field does: the daily chain recomputes it, or
         # mean-reverts it, or the central bank does. Two do not: nothing in
         # the engine writes `avg_volume` (the close policy is Hold) or
         # `tariff_rate`. For those, "held for twenty-five days" has to be
@@ -197,7 +197,7 @@ class Target:
         operation. `check` sees the multiplier; it cannot see what the
         multiplier will produce, because that depends on where the endogenous
         chain has arrived. So the result is checked too, on the day it is
-        written -- which is the only place the answer exists.
+        written, which is the only place the answer exists.
 
         Without this, `add -500` on macro.vix wrote a VIX of -485 and the
         market traded a session against it: `(vix/15)^2` squares away the
@@ -244,7 +244,7 @@ def _rate_check(low: float = _RATE_MIN, high: float = _RATE_MAX) -> Callable[[st
     """Catch the percent-for-fraction slip where it is written.
 
     Rates are FRACTIONS at this boundary: 2% is 0.02. Passing 2 gives 200%,
-    which the engine refuses -- but sixty days later, inside a run, with a
+    which the engine refuses, but sixty days later, inside a run, with a
     traceback that names `pin_macro` rather than the line of YAML that said
     it. A `set` is checked against the band directly; an `add` is checked
     against the band's WIDTH, because the largest honest delta cannot exceed
@@ -721,8 +721,8 @@ def suggest(name: str) -> str:
 
     Three cases, and they are worth telling apart. A near-miss on a real
     target is a typo and gets the spelling. A name in :data:`UNSUPPORTED` is
-    not a typo at all -- the reader has a mechanism in mind that this model
-    does not have -- and gets the reason and the nearest real lever. Anything
+    not a typo at all (the reader has a mechanism in mind that this model
+    does not have) and gets the reason and the nearest real lever. Anything
     else gets the whole registry, because a list of twelve names is shorter
     than a conversation.
     """
@@ -856,7 +856,7 @@ class Intervention:
             return day == self.at
         return day < self.at + self.duration
 
-    # -- serialisation -----------------------------------------------------
+    # -- serialization -----------------------------------------------------
 
     def as_dict(self) -> dict[str, Any]:
         """The canonical resolved form. This is what gets fingerprinted.
@@ -957,7 +957,7 @@ def _whole(name: str, value: Any) -> int:
     """An integer day count, refusing the float that looks like one.
 
     ``at: 50.0`` is almost always a YAML slip rather than an intention, and
-    accepting it would put a float in the fingerprint where an int belongs --
+    accepting it would put a float in the fingerprint where an int belongs,
     so the same scenario written two ways would fingerprint differently.
     """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -980,8 +980,8 @@ def _read_at(raw: Any, where: str = "") -> int:
     The two are the same thing. The long form exists because "day 50" after a
     fork is genuinely ambiguous in the abstract, and a document that says
     which one it means stays readable when this library grows the other. This
-    build supports RELATIVE only -- days since the run began applying the
-    scenario -- and refuses `absolute` by name rather than silently treating
+    build supports RELATIVE only (days since the run began applying the
+    scenario) and refuses `absolute` by name rather than silently treating
     it as relative, which would move every shock in the file.
     """
     if isinstance(raw, dict):
@@ -1051,7 +1051,7 @@ class Firing:
 
     The point of recording this rather than the recipe: a `multiply` says
     x1.40, and what a reader needs to know afterwards is that oil went from
-    82.14 to 115.00 -- which depends on where the endogenous chain had got to.
+    82.14 to 115.00, which depends on where the endogenous chain had got to.
 
     ``operation`` is the intervention's own operation, with one addition:
     ``"release"`` is the write that puts a level back when the last window on

@@ -1,4 +1,4 @@
-# Will a financial AI agent reduce risk in a market crisis?
+# A FinRobot agent's exposure cut in a liquidity crisis
 
 A [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent
 manages twenty-four real companies and fifty million dollars for twenty
@@ -23,9 +23,9 @@ its usual depth.
 | crisis | 0.636 | -0.128 | 17/20 |
 
 Gross exposure moves for two reasons, and only one of them is the agent.
-The second column holds the market still: at each decision, exposure
-immediately before the fills and immediately after, at the same arrival
-prices. The sign flips.
+The second column holds the market still by measuring exposure immediately
+before the fills and immediately after, at the same arrival prices, and it
+changes sign between the arms.
 
 Across four live replications the crisis arm carried less exposure in
 three. Two observations about the fourth, without reading more into them:
@@ -113,14 +113,14 @@ packaged file to an arm forked on day 20 fires it on day 70. Fifty
 post-fork days before the shock is fifty days of the two arms drifting
 apart on nothing but the agent answering the same question two ways.
 
-So `at: 0`, and nothing else. Both fingerprints are recorded, and the
-notebook checks that every shock, value and window matches the packaged
-file rather than asking you to believe it.
+So the file changes `at` to 0 and nothing else. Both fingerprints are
+recorded, and the notebook checks that every shock, value and window matches
+the packaged file.
 
-`market.liquidity` is the one target here that is not a macro field, and
-the only lever that touches execution. It scales the volume column the
-market maker quotes off, so every ladder level thins and the same trade
-costs more to put on.
+`market.liquidity` is the one target here that touches execution. The
+other targets in the scenario are macro fields. It scales the volume
+column the market maker quotes off, so every ladder level thins and the
+same trade costs more to put on.
 
 ## What is not here
 

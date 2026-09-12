@@ -29,12 +29,20 @@ fourteen of fourteen mechanism rows where pt-v18 sits at twelve.
 
 <!-- release-note-ends -->
 
-**pt-v19 is pt-v18 with four dials, each measured.** `vix_level_identity`
-1.0 and `vix_decay_ratio` 1.0 make the VIX read the index's own conditional
-variance instead of the market factor's through a wrong conversion;
-`sector_loading` 0.8 pays for what that does to same-sector correlation;
-`volume_idio_variance_gain` 0.20 switches on a per-name volume-variance
-channel that had shipped at zero since it was written.
+**pt-v19 is pt-v18 with ten dials moved, each measured.** Four of them
+arrived on 2026-09-10. `vix_level_identity` 1.0 and `vix_decay_ratio` 1.0
+make the VIX read the index's own conditional variance instead of the market
+factor's through a wrong conversion. `sector_loading` 0.8 pays for what that
+does to same-sector correlation, and `volume_idio_variance_gain` 0.20
+switches on a per-name volume-variance channel that had shipped at zero since
+it was written.
+
+**Six more followed inside 0.8.0**, and the sections below record each one.
+`vix_target_shock_cap` moves from 45.0 to 255.0 and
+`crash_amplifier_conditional_sigma` from 0.0 to 1.0. Then on 2026-09-12
+`market_vol_vix_excursion` moves from 0.0 to 1.0, `vix_ceiling` from 80.0 to
+108.63, and `market_vol_alpha` and `market_vol_beta` from the pt-v14 search
+optima 0.28035004 and 0.69244622 to the tape-derived 0.1059 and 0.8787.
 
 **The deep fear row is the change.** `fear_gauge_dn3` reads the tape's
 centre within a tenth of a standard error, where pt-v18 sat 3.8 below it
@@ -47,17 +55,17 @@ reading a level it was not reading before.
 pt-v18's mispricing and crowd coefficients, so the vector `model_preset()`
 reports is unchanged while the simulated one is not.
 
-**The fear response rises across the whole graded range -- charter bar B4,
-which no shipped preset had ever met.** `FLATTENS_AT` no longer has a row
+**The fear response rises across the whole graded range.** That is charter
+bar B4, which no shipped preset had ever met. `FLATTENS_AT` no longer has a row
 for pt-v19, and `flattens_at` returns `None` for it. The dial that was
-flattening it, `vix_target_shock_cap`, moves from 45.0 to 255.0 -- the image
-of `vix_return_clamp` under the spike, `vix_return_gain * clamp`, at which
+flattening it, `vix_target_shock_cap`, moves from 45.0 to 255.0, the image
+of `vix_return_clamp` under the spike (`vix_return_gain * clamp`), at which
 the cap cannot bind anywhere the clamp does not. It is derived rather than
 searched and `provenance.DIAL_PROVENANCE` now carries it.
 
 **The cap could be retired because the read-back stopped being blind to its
-own regime.** `market::index_var` documented two mechanisms it omitted --
-the crash amplifier and the crisis blend -- as "conditional on a tail the
+own regime.** `market::index_var` documented two mechanisms it omitted,
+the crash amplifier and the crisis blend, as "conditional on a tail the
 closed form has no moment for". The moments exist and are elementary: with
 the regime ratio `s = sqrt(v_f) / market_factor_sigma` and the amplifier
 `A = 1 + m max(0, s|z| - T)`, the conditional variance carries
@@ -70,7 +78,7 @@ rather than as a moment. `IndexVarianceTerms` gains `crash_raw` and
 `Engine.index_variance_terms()` reports both.
 
 The loop-gain run had found the consequence from the other direction: above
-`crisis_vix_threshold` the index realised 4.0 to 4.9 times the variance the
+`crisis_vix_threshold` the index realized 4.0 to 4.9 times the variance the
 VIX priced, against 1.2 to 1.4 below it, and its ruling was that
 "`vix_target_shock_cap` as a brake is compensating for a read-back that
 omits the crisis blend". The read-back now carries that step itself.
@@ -79,14 +87,15 @@ omits the crisis blend". The read-back now carries that step itself.
 `Universe.random(40, seed=111)` it moves from 20.1656 to 20.5346, +1.83 per
 cent, which is the 5.41 per cent the amplifier adds to the factor block at
 the anchor's own regime ratio of exactly 1.0, through the factor's share of
-the index's variance and the square root the identity takes. Every seeded pt-v19 trajectory changes, so the known-answer digest
-moves and `KAT_VERSION` bumps.
+the index's variance and the square root the identity takes. Every seeded
+pt-v19 trajectory changes, so the known-answer digest moves and
+`KAT_VERSION` bumps.
 
 **And pt-v19's certified panel does not survive it. The old read-back's
 conservatism was load-bearing for the loop's stability. The size of that
-is now measured rather than suspected.** On a pinned ladder -- `pin_macro(vix =
-x * anchor)` before every open, then read what the identity implies, over
-seeds 101 to 103 at 80 scored days per seed per pin -- the static map
+is now measured rather than suspected.** On a pinned ladder (`pin_macro(vix
+= x * anchor)` before every open, then read what the identity implies, over
+seeds 101 to 103 at 80 scored days per seed per pin) the static map
 `implied / pinned` is:
 
 | pin `x` | 0.70 | 1.00 | 1.50 | 1.60 | 1.75 | 2.00 | 2.50 | 3.00 |
@@ -104,28 +113,39 @@ and this one crosses one and keeps climbing, so there is no fixed point below
 `vix_ceiling`: days above the threshold go from 1.03 to 17.90 per cent and
 the ceiling, never visited before, is reached on 37 of 2,520 seed-days.
 
-On the certified LEVEL protocol that costs `index_tail_dn3_pct` its band --
-5.6972 per cent against 0.47 to 1.96, where it read 1.5671 at band position
-0.736 -- and `index_drift_pct` its floor, at 1.5545 against 2.9. `S` at 252
+On the certified LEVEL protocol that costs `index_tail_dn3_pct` its band
+(5.6972 per cent against 0.47 to 1.96, where it read 1.5671 at band position
+0.736) and `index_drift_pct` its floor, at 1.5545 against 2.9. `S` at 252
 goes from 11.876 to 20.889 over nineteen rows.
 
 **The read-back is right and the dials are what moved under it.** The
 identity is asserted against `factors::calculate_live_factors` itself, so
-the engine really does realise that much variance in a crisis.
+the engine really does realize that much variance in a crisis.
 `crisis_blend_gain` and `crisis_vix_threshold` were searched against a
-read-back blind to them and are now un-derived: at saturation the blend raises every name's market
-loading from `beta_i` to `beta_i + 0.811`, which is 3.3x on the factor
-block, and nothing in the search ever saw what that does to the loop. The
-loop-gain report's §8.2 named this outcome in advance and named whose call
-it is. **pt-v19 is not shippable as the default until the crisis dials are
-re-derived**, and `python/tradefloor/presets/pt-v19.json` is deliberately
-left un-regenerated so that `test_preset_records.py` says so.
+read-back blind to them and are now un-derived. At saturation the blend
+raises every name's market loading from `beta_i` to `beta_i + 0.811`, which
+is 3.3x on the factor block, and nothing in the search ever saw what that
+does to the loop. The loop-gain report's section 8.2 named this outcome in
+advance and named whose call it is. **pt-v19 is not shippable as the default
+until the crisis dials are re-derived**, and
+`python/tradefloor/presets/pt-v19.json` is deliberately left un-regenerated
+so that `test_preset_records.py` says so.
+
+<!-- DOCS-0.8.0 UNRESOLVED. The paragraph above says pt-v19 cannot ship as
+     the default until the crisis dials are re-derived. The release note
+     above the marker says the default moves to pt-v19. Both describe the
+     tree as it stands: rust/src/params.rs:2770 sets DEFAULT_PRESET_NAME to
+     pt-v19, and presets/pt-v19.json is still un-regenerated, which
+     tests/test_preset_records.py fails on. tests/known_answer.json records
+     four separate times that "0.8.0 is unreleased and the vector under that
+     name is still in flight". One of these two statements has to go before
+     the tag, and the choice belongs to the release session. -->
 
 **The read-back also carries the downside transmission tilt now, which was
 the larger omission of the three.** `market_beta_down_asym` scales one side
 of a zero-mean draw and `market_beta_down_asym_lag`, which pt-v18 introduced
 at 0.375, scales the whole transmission by `1 + lag` on the session after a
-down market factor whatever the tick's own sign -- so it multiplies the
+down market factor whatever the tick's own sign, so it multiplies the
 read-back's market block by `(1 + lag)^2` = **1.891 on about half of all
 sessions**, and the module had it on its residual list rather than in its
 sum. It needed no new machinery: `z^2 A^2` is even, so the amplifier cannot
@@ -146,7 +166,7 @@ Simpson quadrature at both blend wirings, both faces of the lag bit, four
 tilt/lag pairs, three spikes and three factor variances, and holds to a part
 in 10^9. The ORDER matters and is what that test is for: the tick applies
 the tilt and the lag to `beta_i * F` and adds the crisis injection
-AFTERWARDS, so the lag does not multiply the injection -- the reading that
+AFTERWARDS, so the lag does not multiply the injection. The reading that
 looks more natural fails by 30 per cent at saturation and passes every
 algebraic test in the file. What is still left out is the tilt's effect on
 the transmission's MEAN, which `market_beta_down_asym_recentre` gives back
@@ -162,30 +182,31 @@ VIX anchor rises again on `Universe.random(40, seed=111)`, 20.5346 to
 `KAT_VERSION` bumps to 17. On the certified LEVEL protocol at 252 days,
 thirty seeds and the roster drawn per seed, `index_drift_pct` returns to its
 band at **3.0420** from 1.5545, `index_tail_dn3_pct` falls to 5.2590 from
-5.6972 -- still out -- and `S` over nineteen rows falls to **16.143** from
+5.6972, still out, and `S` over nineteen rows falls to **16.143** from
 20.889, against pt-v18's 56.00. Seventeen of eighteen rows in band.
 
 **And the crisis dials cannot close the last row, which is the finding.**
 The stability condition is writable now. Under `vix_level_identity` the
 VIX's deterministic map is `v -> implied(v)`: the fear excursion is made
 zero-mean by `expected_return_spike`, and on a pinned ladder the loop's own
-fixed point sits within a fifth of a VIX point of the identity's -- pinned at
-14 with the blend off, `implied / pinned` reads 1.007 and the day's own update
-reads -0.015 -- which is measured and not assumed. The state
+fixed point sits within a fifth of a VIX point of the identity's. Pinned at
+14 with the blend off, `implied / pinned` reads 1.007 and the day's own
+update reads -0.015, which is measured rather than assumed. The state
 lives on `[10, vix_ceiling]`, whose top is absorbing exactly when
 `implied(v) >= v` near it, so the condition is `implied(v) < v` for every
 `v` above the crisis threshold. `implied(v) / v` rises on the saturated
 range and the spike is saturated at the ceiling for any threshold under
 `vix_ceiling - ramp * cap`, **so the condition binds at the ceiling and
-there alone -- and the binding constraint does not contain
+there alone, and the binding constraint does not contain
 `crisis_vix_threshold` at all.** At `crisis_blend_source` 1.0 it is a
 quadratic in the gain with a closed-form positive root; measured on seeds
 101 to 103 that root is `crisis_blend_gain` = **0.1496** against the shipped
 0.8276, and re-measuring the ladder at it reads `implied(80) / 80` = 0.942.
 
 That root does not settle it, and neither does any other value. With
-`crisis_blend_gain` set to exactly **0.0** -- the blend switched off, not
-reduced -- the VIX still reaches `vix_ceiling` on **81 of 7,560 seed-days**
+`crisis_blend_gain` set to exactly **0.0**, which switches the blend off
+rather than reducing it, the VIX still reaches `vix_ceiling` on **81 of
+7,560 seed-days**
 over the certification protocol's thirty rosters, on three of them (110, 114
 and 115). At `48cfcab`, with the tilt term absent and the same arm, it was
 78 on the same three; before B4 it was 0 of 7,560 with no seed exceeding 60,
@@ -208,19 +229,19 @@ The chain, measured and each step separately:
 
 - the market factor's variance process makes excursions of twenty to fifty
   times its target lasting tens of sessions, **and they are ordinary**. The
-  fast component alone fails the fourth-moment condition -- `3 alpha^2 +
+  fast component alone fails the fourth-moment condition (`3 alpha^2 +
   2 alpha beta + beta^2` = **1.1035**, a figure already on the record in the
-  design repository's `garch-derive-design.md` -- but that document also
+  design repository's `garch-derive-design.md`), but that document also
   says what would otherwise have been got wrong here: the SHIPPED process is
   a 0.65/0.35 mixture, its own condition is the spectral radius of a 4x4
   matrix, and that reads **0.9870**, under one. The shipped factor variance
   has a finite fourth moment. Every dial it depends on is identical from
   pt-v16 to pt-v19. What the process has instead is heavy, finite
-  dispersion -- variance-of-variance 3.4 times its mean squared, implied
-  factor kurtosis 13, against the tape's own GARCH at 2.8 and 11.3 -- and
+  dispersion: variance-of-variance 3.4 times its mean squared, implied
+  factor kurtosis 13, against the tape's own GARCH at 2.8 and 11.3. And
   the per-seed spread is the finite-sample dispersion of any GARCH at this
   persistence, reproduced by a bare recursion with no engine and matched by
-  the tape's own year-to-year spread of realised variance. **That makes the
+  the tape's own year-to-year spread of realized variance. **That makes the
   finding worse rather than better:** the excursion the read-back turns into
   a ceiling-pinned VIX is the variance process behaving like the tape;
 - those excursions are upstream of the read-back and of the loop. Pinned at
@@ -228,8 +249,8 @@ The chain, measured and each step separately:
   factor variance sits at a median **11.7 times base** over eighty scored
   sessions on pt-v19 before B4, at `48cfcab` and at this commit alike, the
   three agreeing to within one per cent, where seed 101 reads 0.38;
-- at the regime ratio that implies -- 3.74, where the amplifier's threshold
-  sits half a conditional sigma out -- `amplifier_moments`' second moment is
+- at the regime ratio that implies (3.74, where the amplifier's threshold
+  sits half a conditional sigma out) `amplifier_moments`' second moment is
   **3.48**, so the amplifier term is two and a half times the factor block
   and the identity reads an implied VIX of **157** out of a state the old
   read-back reported as high but bounded. Correctly: the identity is
@@ -237,9 +258,9 @@ The chain, measured and each step separately:
 
 So the dial whose loop gain B4 exposed is `crash_amplifier_slope` against
 `market_vol_alpha` and `market_vol_beta`, not `crisis_blend_gain`. The
-crisis blend sits on top of that and can make it worse -- the gain 0.8276
-takes the ceiling from 78 seed-days to 487, and ten rosters run away instead
-of three -- but no value of it makes the loop well. `index_tail_dn3_pct` is
+crisis blend sits on top of that and can make it worse, because the gain
+0.8276 takes the ceiling from 78 seed-days to 487 and ten rosters run away
+instead of three. No value of it makes the loop well. `index_tail_dn3_pct` is
 a pooled rate and seeds 114 and 115 carry the whole miss: at the derived
 root the row reads 2.2311 pooled and **0.8680 with those two rosters
 dropped**.
@@ -250,8 +271,8 @@ row is monotone in the gain and crosses its band ceiling near 0.055; at
 ceiling of 1.9600, `S` 17.974) and **18 of 18 at 504** (tail 1.7561, `S`
 18.633). Three things are wrong with shipping it. It is a grid search on
 one row, which is the practice charter bar B3 exists to end, and that row
-is a `pooled_rate` with no seed scale -- `envelope.score` returns no
-`room_sd` for it -- so the value cannot carry the error bar a `measured`
+is a `pooled_rate` with no seed scale (`envelope.score` returns no
+`room_sd` for it), so the value cannot carry the error bar a `measured`
 dial is required to carry. At 252 days it clears its band by four parts in
 a thousand. And it does not fix the loop: at 0.05 the VIX still reaches
 `vix_ceiling` on 93 of 7,560 seed-days, against 81 at a gain of zero and 0

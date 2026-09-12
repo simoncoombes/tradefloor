@@ -33,7 +33,7 @@ response to the engine runs through :func:`parse` and :func:`orders_from`.
 :class:`~tradefloor.harness.Observation` carries ``.engine``, and the engine
 knows the answer key: :func:`tradefloor.fair_value`, the nine-way factor
 :meth:`~tradefloor.Engine.attribution` of every price move, each company's
-``mispricing_s``, and -- through a :class:`~tradefloor.Scenario` -- the macro
+``mispricing_s``, and (through a :class:`~tradefloor.Scenario`) the macro
 path the run has not reached yet. An agent reading any of those inverts the
 simulator, and the experiment around it measures nothing.
 
@@ -58,7 +58,7 @@ model coefficient no exchange publishes. ``tests/test_finrobot.py`` runs the
 mapping against an engine proxy that raises on the forbidden attributes, so a
 future edit reaching for one fails on the access.
 
-Company fundamentals -- sector, EPS, book value, revenue growth, beta -- do
+Company fundamentals (sector, EPS, book value, revenue growth, beta) do
 not come off the engine either. The caller supplies them as ``fundamentals``.
 An analyst reads all five off a filing, and keeping them out of the adapter
 leaves one less line to audit.
@@ -66,11 +66,11 @@ leaves one less line to audit.
 What that does NOT do is withhold the valuation, and an earlier version of
 this docstring claimed it did. :func:`tradefloor.fair_value` is public, and
 its arguments are ``sector``, ``eps``, ``book_value_per_share`` and
-``revenue_growth`` -- the four fields the caller is invited to supply --
+``revenue_growth``, the four fields the caller is invited to supply,
 plus ``federal_funds_rate`` and ``corporate_bond_yield``, both in
 ``OBSERVABLE_MACRO``. So a caller who supplies full fundamentals has supplied
 the means to reconstruct the model's own anchor, and no engine attribute is
-read to do it -- the ``Sealed`` proxy in ``tests/test_finrobot.py`` cannot
+read to do it. The ``Sealed`` proxy in ``tests/test_finrobot.py`` cannot
 see it happen, and neither can any allowlist of engine reads.
 
 Two different claims sit here and they are worth separating, because three
@@ -83,7 +83,7 @@ four supplied and two observable, so there is nothing approximate about it.
 applies it as ``fair_value * exp(s)``, so the inversion is
 ``log(price / fair_value)`` and not ``price / fair_value - 1``; the ratio
 form is simply the wrong arithmetic and every figure derived from it was an
-artefact. Even the right inversion lands near rather than on, because a
+artifact. Even the right inversion lands near rather than on, because a
 traded price carries microstructure on top of the anchor. How near depends
 on the roster and the moment, which is why no distance is quoted here. The
 tolerance lives in
@@ -94,17 +94,17 @@ The boundary is unchanged by this: a native agent reads ``mispricing_s``
 straight off the engine without reconstructing anything, and the allowlist
 still stops that. What is true is narrower and worth stating plainly.
 Supplying fundamentals is the caller's decision about their own experiment,
-this adapter only declines to make it for them, and the shipped example --
-which does supply all five -- is trading that ground-truth distance for a
+this adapter only declines to make it for them, and the shipped example
+(which does supply all five) is trading that ground-truth distance for a
 roster an analyst could reason about.
 
 ## Which FinRobot abstraction
 
 :class:`finrobot.agents.workflow.SingleAssistant`, FinRobot's supported
 single-agent entry point, driven through the real ``autogen`` chat plumbing.
-It assembles a ``finrobot.agents.workflow.FinRobot`` assistant -- an
+It assembles a ``finrobot.agents.workflow.FinRobot`` assistant (an
 ``autogen.AssistantAgent`` subclass, including FinRobot's own role-prompt
-preprocessing -- opposite an ``autogen.UserProxyAgent``.
+preprocessing) opposite an ``autogen.UserProxyAgent``.
 
 Two constructor arguments matter:
 
@@ -145,7 +145,7 @@ old one.
 
 What a key over the input cannot see is a change to something that never
 enters it. The mandate reaches FinRobot as the agent profile, not as part of
-the prompt, so editing it leaves every recorded key intact -- the run
+the prompt, so editing it leaves every recorded key intact: the run
 completes, all sixty digests match, and the decisions replayed were taken
 under instructions nobody is running any more. That is a property of any
 adapter whose instructions travel separately from the keyed input, not a
@@ -181,8 +181,8 @@ from .common import moment_of, refuse_replay_reask  # noqa: F401
 from .common import digest as _digest_any
 from .common import stamp_resume_counts
 #: The preset guard, shared rather than reimplemented. This adapter keeps its
-#: own replay branch -- it predates `ReplayMixin` and its miss messages name
-#: FinRobot -- but which market a recording was made in is not a FinRobot
+#: own replay branch (it predates `ReplayMixin` and its miss messages name
+#: FinRobot) but which market a recording was made in is not a FinRobot
 #: question, and a second spelling of it is a second thing to get wrong.
 from .common import preset_of, refuse_a_changed_preset, stamp_preset
 from .common import jsonable as _as_jsonable
@@ -202,7 +202,7 @@ SIDES = ("BUY", "SELL", "HOLD")
 #: not give. A model that writes ``stop_loss`` believes it has protection and
 #: sizes accordingly; dropping the field buys at market with none, and the
 #: trace records a decision the agent never made. The two fields a model
-#: reaches for most -- ``order_type`` and ``limit_price`` -- get refusals
+#: reaches for most, ``order_type`` and ``limit_price``, get refusals
 #: naming the missing capability, because Tradefloor executes market sweeps
 #: only: ``Portfolio.execute`` takes a signed share count and sweeps the live
 #: book, and there is no resting order at the agent boundary.
@@ -210,7 +210,7 @@ DECISION_FIELDS = ("actions", "rationale")
 ACTION_FIELDS = ("symbol", "side", "quantity")
 
 #: Price rows kept for the recent-return and volatility lines. Five days at
-#: the library's six steps a day: long enough for a realised-volatility number
+#: the library's six steps a day: long enough for a realized-volatility number
 #: to mean something, short enough to describe recent conditions.
 HISTORY_STEPS = 30
 
@@ -309,7 +309,7 @@ class DecisionError(_CommonDecisionError):
     ``ValidationError`` directly, which reaches ``ValidationError`` by the
     same path and adds one thing: code written against the shared adapter
     layer catches FinRobot's refusals without naming FinRobot. Nothing that
-    already caught this stops catching it -- that is the only reason the base
+    already caught this stops catching it, which is the only reason the base
     moved.
 
     It raises instead of repairing. A guess at what the model meant would be a
@@ -325,12 +325,12 @@ class Action:
 
     def __init__(self, symbol: str, side: str, quantity: float = 0.0) -> None:
         # Validated rather than trusted. `Action("A", "SHORT", -5)` used to
-        # construct: `signed()` returns 0.0 for an unrecognised side, so an
+        # construct: `signed()` returns 0.0 for an unrecognized side, so an
         # unknown side became a silent hold, and a negative SELL became a
         # sign-flipped BUY. Both are the kind of quiet wrongness `parse`
         # exists to refuse, one layer below where it refuses it.
         #
-        # Case is normalised in `parse`, not here, because leniency belongs
+        # Case is normalized in `parse`, not here, because leniency belongs
         # at the boundary where model output arrives and this constructor is
         # reached with values already checked.
         if side not in SIDES:
@@ -405,7 +405,7 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
     portfolio. See the module docstring for why that matters.
 
     ``history`` is the adapter's own record of the prices it has already been
-    shown. A recent return and a realised volatility come from that, without
+    shown. A recent return and a realized volatility come from that, without
     asking the simulator for either.
 
     ``detail`` switches the payload into its large-universe form, and it is
@@ -461,7 +461,7 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
     portfolio = obs.portfolio
     # The funding limit, and what is left under it. Without these the payload
     # states a participation cap worth several times equity and never states
-    # the constraint that actually refuses the trade -- an agent that sizes to
+    # the constraint that actually refuses the trade. An agent that sizes to
     # what it was told then scores zero fills and reads as a bad agent when it
     # was misled. Measured on the native OpenAI path: twelve rejections, no
     # trades. `None` where no limit is configured, never a made-up number,
@@ -511,7 +511,7 @@ def _window_return(rows: Sequence[Sequence[float]], i: int,
 
 
 def _volatility(rows: Sequence[Sequence[float]], i: int) -> float | None:
-    """Realised volatility of the step returns held in ``rows``."""
+    """Realized volatility of the step returns held in ``rows``."""
     if len(rows) < 3:
         return None
     steps = [rows[k][i] / rows[k - 1][i] - 1.0
@@ -524,20 +524,20 @@ def render(payload: dict[str, Any], *, objective: str = "") -> str:
 
     A thin wrapper over :class:`tradefloor.render.TextRenderer`. This
     function and :class:`~tradefloor.render.TextRenderer` were briefly two
-    implementations of the same text -- this one written first, the other
-    added generalised over ``units``, ``order`` and ``language`` for the
-    P6 observation-invariance experiment -- and ``tests/test_render.py``
+    implementations of the same text (this one written first, the other
+    added generalized over ``units``, ``order`` and ``language`` for the
+    P6 observation-invariance experiment) and ``tests/test_render.py``
     proved them character for character equal before this wrapper existed.
     Keeping both would have meant one drifting from the other the first
     time either changed, silently, with nothing to say so; this is the
     fix. ``objective``, when given, is appended as its own section here
     rather than inside the renderer, the same choice
-    :meth:`FinRobotAdapter.act` makes for its own default renderer -- a
+    :meth:`FinRobotAdapter.act` makes for its own default renderer: a
     renderer renders the payload, and a mandate is the caller's.
 
     A payload carrying ``detail`` renders in the large-universe form: a
     sector summary, one compact row per symbol, and a full block for
-    EXACTLY the symbols ``payload["detail"]`` names -- no union with
+    EXACTLY the symbols ``payload["detail"]`` names, and no union with
     whatever is held, because this function calls
     :class:`~tradefloor.render.TextRenderer` at its default
     ``union_held=False``, which is what makes it byte-identical to what
@@ -572,7 +572,7 @@ def _no_duplicate_keys(pairs: list) -> dict[str, Any]:
     ``"actions": [], "actions": [...]`` resolved to whichever the model
     emitted second, silently, and nothing recorded that a first statement
     existed. :func:`parse` refuses duplicate SYMBOLS one layer up for exactly
-    this reason -- two instructions with no defined order -- and the JSON
+    this reason (two instructions with no defined order) and the JSON
     layer owed the same principle to duplicate keys.
     """
     keys = [key for key, _ in pairs]
@@ -631,7 +631,7 @@ def parse(text: str) -> Decision:
     # defect in released code rather than a lenience.
     #
     # A model that half-follows the mandate writes what it would say to a
-    # person -- `{"recommendation": "trim NOVA", "confidence": 0.8}` -- and
+    # person (`{"recommendation": "trim NOVA", "confidence": 0.8}`) and
     # the brace search above finds it. Read as a hold, that run completes
     # with trades=0 and an empty errors list, which is EXACTLY the shape of
     # an agent that considered the market and declined. Measured against the
@@ -784,7 +784,7 @@ def orders_from(decision: Decision, obs: Any, *,
         # participate in" as "no cap at all": with avg_volume or
         # max_participation at zero, a 1e12-share order passed through whole
         # with no note, while the payload showed the agent max_order_shares
-        # of exactly 0.0 -- the observation and the enforcement stating
+        # of exactly 0.0, with the observation and the enforcement stating
         # opposite things. Clipped to zero, the order falls out as dust
         # below and the note says what happened.
         cap = max(0.0, max_participation * obs.avg_volume(action.symbol))
@@ -818,8 +818,8 @@ class Transcript:
 
     A file of these lets ``python rate_shock.py`` reproduce a real agent run
     with no API key, no network and no FinRobot install. It holds what
-    re-executing and auditing the experiment need -- the prompt, the raw
-    response, the parsed decision -- and nothing else. No API keys, no account
+    re-executing and auditing the experiment need (the prompt, the raw
+    response, the parsed decision) and nothing else. No API keys, no account
     identifiers, no request IDs, no provider headers.
 
     ``meta`` records what the run cannot reconstruct: the FinRobot version,
@@ -857,7 +857,7 @@ class Transcript:
         """The whole recorded entry, or None only when none exists.
 
         Distinct from :meth:`response_for`, which returns None BOTH for a
-        missing entry and for an entry whose recorded response is null --
+        missing entry and for an entry whose recorded response is null,
         two situations with opposite remedies, which :meth:`_ask` has to
         tell apart.
         """
@@ -901,7 +901,7 @@ def _refuse_a_changed_mandate(transcript: "Transcript | None",
     """Refuse a replay whose instructions are not the recorded ones.
 
     The replay key is the digest of the rendered prompt, and the mandate does
-    NOT travel in that prompt -- it reaches FinRobot as the agent profile, a
+    NOT travel in that prompt. It reaches FinRobot as the agent profile, a
     separate constructor argument. So editing the mandate leaves every
     recorded key intact: the run completes, all sixty digests match, and the
     decisions replayed were taken under instructions nobody is running any
@@ -917,7 +917,7 @@ def _refuse_a_changed_mandate(transcript: "Transcript | None",
     fallback for a recording made before the digest was stamped: an older
     transcript carries the version and not the hash, and a deliberate version
     bump is at least caught. A transcript carrying neither cannot be checked
-    and is allowed through -- refusing those would break every recording made
+    and is allowed through. Refusing those would break every recording made
     before this existed, and they are no worse off than they were.
     """
     if transcript is None:
@@ -988,18 +988,18 @@ class FinRobotAdapter:
     ``renderer`` is what turns the observation into the text FinRobot reads,
     in place of the ``detail=`` argument :func:`observe` and :func:`render`
     took directly until this argument existed. Left at ``None``, it defaults
-    to ``TextRenderer(detail=panel or None, union_held=True)`` -- a
+    to ``TextRenderer(detail=panel or None, union_held=True)``, a
     renderer that reproduces this adapter's own historical text character
     for character, which is what lets the shipped fixtures keep replaying.
     ``union_held`` is this adapter's own setting and not
     :func:`observe`'s or :func:`render`'s: it restores the "a name you
     hold is always detailed" guarantee this class always gave, without
     changing what those two functions publish for a caller who reaches
-    them directly -- see :class:`~tradefloor.render.TextRenderer`. Pass a
-    :class:`~tradefloor.render.Renderer` of your own -- another
+    them directly. See :class:`~tradefloor.render.TextRenderer`. Pass a
+    :class:`~tradefloor.render.Renderer` of your own (another
     :class:`~tradefloor.render.TextRenderer` with different ``units``,
-    ``order`` or ``language``, or a :class:`~tradefloor.render.JSONRenderer`
-    -- to change what FinRobot is shown without changing ``panel`` or any
+    ``order`` or ``language``, or a :class:`~tradefloor.render.JSONRenderer`)
+    to change what FinRobot is shown without changing ``panel`` or any
     other argument here. :meth:`fork` copies whichever renderer this
     instance holds, and :meth:`state` publishes its :meth:`~.Renderer.key`
     so two arms built by hand cannot silently disagree about it.
@@ -1070,7 +1070,7 @@ class FinRobotAdapter:
         self.panel: tuple[str, ...] = tuple(sorted({str(s) for s in panel}))
         #: What turns the observation into text. Built from ``panel`` when
         #: nobody passed one, so the default reproduces this adapter's own
-        #: history -- see the class docstring -- and stays a real object on
+        #: history (see the class docstring) and stays a real object on
         #: every path, including the default one, because :meth:`provenance`
         #: and :meth:`state` both publish its :meth:`~.Renderer.key`.
         if renderer is not None:
@@ -1110,7 +1110,7 @@ class FinRobotAdapter:
         first = entries[0] if entries and isinstance(entries[0], dict) else {}
         # Rendered rather than passed through, for the same reason the digest
         # is: a caller may hold anything under these names, and `AdapterInfo`
-        # refuses what it cannot serialise. Constructing an adapter must not
+        # refuses what it cannot serialize. Constructing an adapter must not
         # fail on a config the released version accepted.
         generation = {field: _as_jsonable(config[field])
                       for field in ("temperature", "top_p", "max_tokens",
@@ -1133,7 +1133,7 @@ class FinRobotAdapter:
             # `str()` because the mandate is a caller-supplied argument and
             # `digest` is str-only; a non-string one used to reach FinRobot
             # and fail there, not fail construction here. For a string
-            # mandate -- every real one -- this is the identical digest, so
+            # mandate (every real one) this is the identical digest, so
             # the recorded fixture keeps matching.
             instructions_digest=digest(str(self.mandate)),
             config_digest=_digest_any(_as_jsonable(config)) if config else "",
@@ -1149,7 +1149,7 @@ class FinRobotAdapter:
     def provenance(self) -> dict[str, Any]:
         """What ``Transcript.meta`` should carry, as the shared layer shapes
         it: the framework's identity plus the two Tradefloor-side settings a
-        recording cannot reconstruct without them -- the decision cadence,
+        recording cannot reconstruct without them: the decision cadence,
         without which an agent asked once a day and one asked every step read
         as the same agent, and the participation cap, which decides what
         "clipped" means in the record."""
@@ -1192,7 +1192,7 @@ class FinRobotAdapter:
         # `self.renderer` decides which symbols get a full block: its
         # `detail` was the standing panel at construction, and it unions
         # that with whatever `payload["assets"][i]["position"]` says is
-        # held right now -- see `TextRenderer`. `observe` above builds the
+        # held right now; see `TextRenderer`. `observe` above builds the
         # same allowlisted payload for every renderer; nothing about
         # rendering choices reaches it.
         body = self.renderer.render(payload)
@@ -1202,8 +1202,8 @@ class FinRobotAdapter:
         try:
             response = self._ask(prompt, key, obs)
         except IntegrationError:
-            # Already one of the adapter family's own -- a DecisionError from
-            # a replay miss, a MissingDependencyError naming the extra --
+            # Already one of the adapter family's own (a DecisionError from
+            # a replay miss, a MissingDependencyError naming the extra)
             # and already actionable. Wrapping one again would bury the pip
             # command or the missing digest a level down.
             raise
@@ -1276,7 +1276,7 @@ class FinRobotAdapter:
             # questions, and nothing else in this dictionary would say so.
             "panel": list(self.panel),
             # The renderer's identity, not the panel's, is what actually
-            # decided the text -- two arms could carry the same panel and
+            # decided the text. Two arms could carry the same panel and
             # different `units` or `order` and answer different questions
             # with `panel` alone reporting them identical. Named `renderer`
             # rather than `renderer_key`: the credential scan every adapter's
@@ -1293,7 +1293,7 @@ class FinRobotAdapter:
         object holds a FinRobot assistant holding an HTTP client, and copying
         one is wasteful at best and a shared socket at worst. The copy takes
         the decision state and SHARES the transcript and the recorder. Both
-        directions want that -- a replay of one arm must read the same
+        # directions want that: a replay of one arm must read the same
         recorded run as the other, and a live recording of both arms belongs
         in one file.
 
@@ -1369,7 +1369,7 @@ class FinRobotAdapter:
             # Stamp the provenance on first write rather than leaving it to
             # the caller. `_refuse_a_changed_mandate` can only refuse a
             # mismatched replay if the recording says what it ran under, and
-            # a fresh `Transcript()` has empty `meta` -- so before this, the
+            # a fresh `Transcript()` has empty `meta`, so before this, the
             # only transcript in the world that armed the guard was the
             # committed fixture, because it was stamped by hand. Every
             # recording a user made landed in the permissive branch, forever.
@@ -1394,8 +1394,8 @@ class FinRobotAdapter:
     def call_or_resume(self, key: str, live: Any) -> Any:
         """The answer recorded for ``key`` in :attr:`prior`, or ``live()``.
 
-        Any live run can die -- a rate limit, a dropped connection, a
-        keyboard interrupt -- and without this the second attempt re-asks
+        Any live run can die (a rate limit, a dropped connection, a
+        keyboard interrupt) and without this the second attempt re-asks
         every question it already holds an answer to. Measured: a 60-call
         pilot died on call 36 and the 35 answers it had paid for were
         unreachable to the next attempt.
@@ -1451,8 +1451,8 @@ class FinRobotAdapter:
     def _finrobot(self) -> Any:
         """The real FinRobot ``SingleAssistant``, built once and reused.
 
-        Imported here instead of at module scope, so that replay mode -- and
-        ``import tradefloor`` -- never require FinRobot to be installed.
+        Imported here instead of at module scope, so that replay mode, and
+        ``import tradefloor`` too, never require FinRobot to be installed.
         """
         if self._assistant is not None:
             return self._assistant
@@ -1461,7 +1461,7 @@ class FinRobotAdapter:
         except ImportError as exc:
             # MissingDependencyError rather than a plain ImportError, and it
             # loses nothing: it IS an ImportError, so every caller written
-            # against the old behaviour still catches it. What it adds is
+            # against the old behavior still catches it. What it adds is
             # membership of the adapter error family, which is what lets
             # `act` tell a missing install apart from a framework that failed
             # and pass this through with its own message instead of wrapping

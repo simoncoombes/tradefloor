@@ -60,7 +60,7 @@ five separate times.
 `branch` used to construct a fresh engine and write
 :meth:`Engine.state_snapshot` into it. The engine holds the generator
 position, a cached Box-Muller spare, per-company GARCH variance, maker
-inventories, the mispricing carry -- and, beside all of those, per-DAY state.
+inventories, the mispricing carry, and beside all of those, per-DAY state.
 The snapshot carried the columns and the generator and missed the
 accumulators, so a fork taken BETWEEN two sessions of the same day lost the
 day's attribution and the market-open flag; it re-opened the day on its next
@@ -91,7 +91,7 @@ without anyone remembering to carry it.
 the market state, and not the order log, the recorded tape or the pending
 jump. Those are history and output rather than state, and the method says so.
 
-## Why the SERIALISED form is still the log
+## Why the SERIALIZED form is still the log
 
 A copy cannot leave the process. A checkpoint has to, so it is data: the seed,
 the universe and the order log, which is already the reproduction mechanism,
@@ -148,9 +148,9 @@ class Checkpoint:
         instead of describing it: `derived_from` on a
         :class:`tradefloor.RunManifest` records this string.
 
-        Over `to_json`, which is canonical -- sorted keys, fixed separators
-        -- so the digest is a fact about the checkpoint rather than about how
-        it happened to be serialised. It therefore covers the label and the
+        Over `to_json`, which is canonical (sorted keys, fixed separators),
+        so the digest is a fact about the checkpoint rather than about how
+        it happened to be serialized. It therefore covers the label and the
         version that wrote it, both of which are part of what a citation
         means.
         """
@@ -180,7 +180,7 @@ class Checkpoint:
         # "custom-" prefix: `resume` passes None straight to Engine, so
         # None is only honest for the model Engine defaults to. Under the
         # prefix test, a run under some other shipped preset would
-        # checkpoint as None and silently resume under the default -- the
+        # checkpoint as None and silently resume under the default, which is
         # exact substitution the fingerprint exists to make impossible.
         #
         # It happened: through 0.1.4 `ModelParams.from_preset()` with no
@@ -214,7 +214,7 @@ class Checkpoint:
 
         Pass ``universe`` to resume onto a roster you already hold rather than
         the one carried in the checkpoint. It is checked against the recorded
-        fingerprint and refused on a mismatch -- tickers are generated
+        fingerprint and refused on a mismatch, because tickers are generated
         positionally, so two universes can share every name and no
         fundamentals, and comparing names would be checking almost nothing.
         """
@@ -262,7 +262,7 @@ class Checkpoint:
             raise ValidationError(f"count must be at least 1, got {count}")
         return [self.resume() for _ in range(count)]
 
-    # -- serialisation ----------------------------------------------------
+    # -- serialization ----------------------------------------------------
 
     def to_json(self) -> str:
         """The whole checkpoint as JSON: seed, universe, log and macro.
@@ -339,9 +339,9 @@ class Checkpoint:
         universe = Universe.from_json(json.dumps(payload["universe"]))
         recorded = payload.get("universe_fingerprint")
         if recorded is not None and recorded != universe.fingerprint:
-            # The universe travelled and arrived changed. Restoring anyway
+            # The universe traveled and arrived changed. Restoring anyway
             # would give a market with the right prices and the wrong fair
-            # values -- plausible in every visible way, and wrong in the one
+            # values, plausible in every visible way, and wrong in the one
             # that drives everything.
             raise ValidationError(
                 "the universe in this checkpoint does not match its recorded "

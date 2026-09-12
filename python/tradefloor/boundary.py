@@ -1,5 +1,5 @@
 """Find the smallest intervention that flips an agent's decision, and map
-where its behaviour is discontinuous across the shipped scenarios.
+where its behavior is discontinuous across the shipped scenarios.
 
 :func:`tradefloor.compare` says whether one intervention changed what an
 agent did. This module asks the next question: how far does a lever have

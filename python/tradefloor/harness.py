@@ -58,16 +58,16 @@ if TYPE_CHECKING:
 # Engine.attribution's accepted values. Engine.FACTORS returns the same names
 # at runtime, but as plain strings.
 #
-# Three of them -- reversion, momentum, crowd_lean -- are the model's own
+# Three of them (reversion, momentum, crowd_lean) are the model's own
 # dynamics rather than shocks, and they are here because they genuinely move
 # prices. An "explanation" that could only ever name a shock would be unable
 # to say "nothing happened; it drifted back toward fair value", which is the
 # correct answer most of the time.
 # The ninth, `jump`, arrived on 2026-08-26: `apply_jumps` moves `s` after
 # the tick loop, so the eight above did not reconstruct a day on which one
-# fired, on any preset carrying jumps (§74). The tenth, `overnight`, arrived
-# on 2026-09-04: `apply_overnight` moves `s` at the open before any tick,
-# and the tape books it on the day's first row.
+# fired, on any preset carrying jumps (section 74). The tenth, `overnight`,
+# arrived on 2026-09-04: `apply_overnight` moves `s` at the open before any
+# tick, and the tape books it on the day's first row.
 FACTOR_NAMES: tuple[
     Literal["reversion"], Literal["momentum"], Literal["crowd_lean"],
     Literal["company_news"], Literal["order_flow_impact"],
@@ -112,10 +112,10 @@ class Observation:
         return {}                     # once a day, correctly
     ```
 
-    ``step`` itself stays a run-wide counter: it is what makes an
-    observation's position in the run unambiguous, it is what the fills table
-    stamps, and changing its meaning would silently re-time every agent
-    already written against it, which is the same defect in a new place.
+    ``step`` itself stays a run-wide counter. It gives an observation an
+    unambiguous position in the run, the fills table stamps it, and changing
+    its meaning would silently re-time every agent already written against
+    it, which is the same defect in a new place.
     """
 
     __slots__ = ("step", "day", "tickers", "prices", "portfolio", "engine",
@@ -258,17 +258,17 @@ class Scorecard:
         # What market this score came from. A leaderboard without it is a
         # table of numbers that cannot be re-run: the seed alone does not
         # identify a market, because the same seed over a different roster is
-        # a different market -- and tickers do not distinguish rosters, since
+        # a different market, and tickers do not distinguish rosters, since
         # they are generated positionally.
         self.seed = seed
         self.universe_fingerprint = universe_fingerprint
         # And what STRATEGY earned it. Filled when the agent was built from a
         # StrategySpec (or carries one); empty for a hand-written Python
-        # agent, which is the honest reading -- such a result is reproducible
+        # agent, which is the honest reading. Such a result is reproducible
         # only by citing code at a commit, not from this card.
         self.strategy_fingerprint = strategy_fingerprint
         # And what MODEL priced it. A shipped preset's name, or
-        # custom-XXXXXXXX for a run under a modified coefficient set --
+        # custom-XXXXXXXX for a run under a modified coefficient set. It is
         # the same honesty mechanism as the strategy fingerprint, so a
         # leaderboard row under a non-shipped model can never present as
         # the benchmark market.
@@ -297,13 +297,13 @@ def session_clock(start: tuple[int, int, int], step_within_day: int,
     That was not cosmetic. Time of day drives the intraday activity profile:
     measured on twenty names, a day run as six 65-tick steps all starting at
     09:30 produced **1,840,015,161** shares of volume against **1,181,790,628**
-    for the same day run as one 390-tick session -- 56% too much, because the
+    for the same day run as one 390-tick session, 56% too much, because the
     busiest hour was counted six times.
 
     With the clock advancing, a stepped day is **bit-identical** to the single
     session: prices, GARCH variance and draw count, for every split tried
     (2x195, 3x130, 4x100, 6x65). That is the property an evaluation harness
-    needs -- stepping is how the agent is given a turn, and it must not be a
+    needs. Stepping is how the agent is given a turn, and it must not be a
     change to the market.
 
     Steps that run past the close are allowed rather than refused. The engine
@@ -352,9 +352,9 @@ def evaluate(
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
-    One market. Every agent meets the same one, so the comparison is exact
-    -- but a verdict from a single seed is a measurement of
-    that seed as much as of the agents. See :func:`tradefloor.rank` for the
+    One market. Every agent meets the same one, so the comparison is exact,
+    but a verdict from a single seed is a measurement of that seed as much
+    as of the agents. See :func:`tradefloor.rank` for the
     across-seed version, and :func:`leaderboard` for the measured size of the
     effect.
 
@@ -392,7 +392,7 @@ def evaluate(
 
     # The baseline market: the same seed with nobody trading. Every agent's
     # impact is measured against this, so it is computed once rather than per
-    # agent -- and because it is the same run each time, the comparison between
+    # agent, and because it is the same run each time, the comparison between
     # two agents' impact is a comparison and not two separate experiments.
     # Computed ONCE for the whole evaluation. Every agent runs the same
     # market, so a per-agent hash would be the same value hashed N times.
@@ -606,7 +606,7 @@ def leaderboard(scores: dict[str, Scorecard], by: str = "pnl") -> list[Scorecard
 
        Use this to read one market. To rank agents, use :func:`tradefloor.rank`,
        which takes the verdict across seeds and reports a paired sign test
-       saying whether the ordering is established at all -- because even the
+       saying whether the ordering is established at all, because even the
        across-seed aggregate can order two agents that a paired test cannot
        separate.
     """

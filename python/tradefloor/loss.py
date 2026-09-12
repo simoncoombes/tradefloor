@@ -1,7 +1,7 @@
 """The calibration objective: band distance, noise-scaled, diagonally weighted.
 
 This module turns the realism panel of `tradefloor.facts` into the number a
-calibration search minimises:
+calibration search minimizes:
 
     d_k    = max(0, lo_k - m_k, m_k - hi_k)      # zero inside the band
     L_real = sum over k of (d_k / s_k)^2
@@ -9,7 +9,7 @@ calibration search minimises:
 where m_k is the panel median of statistic k, [lo_k, hi_k] is its
 real-market band (`facts.REAL_MARKETS`), and s_k is its across-seed
 standard deviation at the shipped baseline (`facts.SEED_SD`). Each
-statistic's band exit is priced in units of its own sampling noise -- the
+statistic's band exit is priced in units of its own sampling noise, the
 simulated-method-of-moments weighting discipline with a deliberately
 DIAGONAL matrix. Not the full inverse covariance: ten moments estimated
 from thirty seeds make the full inverse ill-conditioned, and using it
@@ -19,7 +19,7 @@ weighting was used so the choice stays visible.
 
 There is no unweighted form, on purpose. Pooled volatility is numerically
 ~40 on a band of width ~20 while every autocorrelation is measured in
-hundredths, so an unweighted sum is not a neutral default -- it is a
+hundredths, so an unweighted sum is not a neutral default. It is a
 volatility objective wearing a ten-statistic costume. `band_distance_loss`
 therefore refuses to run without a positive s_k for every statistic in the
 loss, rather than falling back to weights of one.
@@ -28,20 +28,20 @@ loss, rather than falling back to weights of one.
 
 Membership is data, not conditionals:
 
-- `LIVE_TARGETS` -- the five statistics the search is trying to move into
+- `LIVE_TARGETS`: the five statistics the search is trying to move into
   band, lag-5 clustering among them since the band re-derivation closed
   the zero-memory corner phase 2's instrument found.
-- `CONSTRAINTS` -- the four statistics in band at the baseline. They
+- `CONSTRAINTS`: the four statistics in band at the baseline. They
   contribute zero loss there and push back only when a candidate drives
-  them out; a calibration that fixed correlation by breaking kurtosis --
-  or reached lag-5 clustering by destroying the leverage effect -- would
+  them out. A calibration that fixed correlation by breaking kurtosis,
+  or reached lag-5 clustering by destroying the leverage effect, would
   trade a documented gap for a new one.
-- Structural exclusions -- everything in `facts.REAL_MARKETS` not named
+- Structural exclusions: everything in `facts.REAL_MARKETS` not named
   above, now only the volume-change autocorrelation: a held volume level
   plus independent per-tick noise sits near -0.5 at any coefficients,
   against a real band of -0.32 to -0.20, and no parameter reaches the
   row. It appears in every result this module returns, with its band
-  distance, as the standing falsification verdict -- but an optimiser
+  distance, as the standing falsification verdict. But an optimizer
   pointed at a target no parameter reaches does not fail cleanly: it
   distorts every other parameter chasing it, then "succeeds" by
   overfitting. Excluding it is the identifiability gate applied.
@@ -61,8 +61,8 @@ a promoted statistic's band, verdict wording and seed sd already ship in
 `compare_to_real_markets` refuses to emit a single realism score, and that
 refusal is a considered position: a model is realistic in some respects
 and not others, and one number hides exactly the structure that matters.
-This loss does not reopen that question. It is an OPTIMISATION DEVICE --
-a search direction for calibration tooling -- not a published metric, and
+This loss does not reopen that question. It is an OPTIMIZATION DEVICE,
+a search direction for calibration tooling, not a published metric, and
 the published artifact remains the ten-row panel with per-statistic
 verdicts. That is why `band_distance_loss` returns the full per-statistic
 breakdown with the scalar inside it rather than a bare float, why the
@@ -109,11 +109,11 @@ LIVE_TARGETS = (
 #: In band at the baseline; constraints rather than targets. Zero loss
 #: where they stand, resistance when a candidate drives them out.
 #: `leverage_effect` joined when the re-derived band (per-name Pearson,
-#: -0.16 to 0.00) put the shipped GJR-backed model inside it -- it is
+#: -0.16 to 0.00) put the shipped GJR-backed model inside it. It is
 #: reachable (the falsification certificates reach -0.12 in band through
 #: `garch_gamma`) and in band, which is this tuple's definition.
 #: `abs_return_acf20` is here for the same reason lag 5 became live: a
-#: measured statistic outside the loss is a direction an optimiser can
+#: measured statistic outside the loss is a direction an optimizer can
 #: break for free.
 #:
 #: It was promoted to LIVE_TARGETS on 2026-08-23 to make the search chase
@@ -123,7 +123,7 @@ LIVE_TARGETS = (
 #: SIX TIMES the model's entire defect (-0.004 against real's +0.020, a
 #: gap of 0.024). The band is wide because that dispersion is real, so no
 #: role, margin or penalty can make a single 252-day panel distinguish a
-#: market with the right tail from one with none -- three successive
+#: market with the right tail from one with none. Three successive
 #: searches proved it, each removing a real obstacle and finding another
 #: behind it.
 #:
@@ -139,7 +139,7 @@ CONSTRAINTS = (
 )
 
 #: Reported in every result, excluded from the loss: the panel statistics
-#: no lever has been shown to move cleanly, so an optimiser pointed at them
+#: no lever has been shown to move cleanly, so an optimizer pointed at them
 #: distorts everything else chasing them. Membership is about the OBJECTIVE,
 #: not about reachability. Two members were called structurally unreachable
 #: until 0.2.0 and are not: the shipped preset holds volume_change_acf1 and
@@ -147,7 +147,7 @@ CONSTRAINTS = (
 #: complement so that
 #: promoting a statistic is genuinely a one-tuple edit, and so a statistic
 #: added to `facts.REAL_MARKETS` is excluded-but-reported by default rather
-#: than silently optimised against.
+#: than silently optimized against.
 #:
 #: The level row `index_drift_pct` sits here for now and is the exception
 #: to the rule above: it is meant to be charged for, because a search that
@@ -161,8 +161,8 @@ CONSTRAINTS = (
 #:
 #: The index tail row `index_tail_dn3_pct` is structural and is meant to
 #: STAY here, which makes it the second exception. Its band is the tape's
-#: own uncertainty -- thirty-five years, one of which holds a third of the
-#: events -- so it is [0.47, 1.96] on a centre of 1.21, and a band distance
+#: own uncertainty (thirty-five years, one of which holds a third of the
+#: events), so it is [0.47, 1.96] on a centre of 1.21, and a band distance
 #: is flat at zero across everything a search would try. An objective term
 #: that is flat over the whole feasible region contributes nothing but
 #: noise at the edges, which is the edge-finding failure the panel's own
@@ -181,7 +181,7 @@ def seed_sd_from_panels(
 
     `panels` is a sequence of `facts.measure` results, one per seed. Returns
     a mapping suitable for `band_distance_loss(seed_sd=...)`, covering every
-    statistic in `facts.REAL_MARKETS` -- structural ones included, so a
+    statistic in `facts.REAL_MARKETS`, structural ones included, so a
     later promotion needs no re-measurement here.
 
     This is the estimator behind the shipped `facts.SEED_SD` (there is a
@@ -221,8 +221,8 @@ def band_distance_loss(
 ) -> dict[str, Any]:
     """L_real: the squared, noise-scaled band distances, summed over the live set.
 
-    `panel` is either one statistics mapping -- a `facts.measure` result, or
-    already-aggregated medians -- or a sequence of per-seed panels, in which
+    `panel` is either one statistics mapping (a `facts.measure` result, or
+    already-aggregated medians) or a sequence of per-seed panels, in which
     case each statistic's m_k is its MEDIAN across seeds. That is how the
     calibration instrument evaluates a candidate on its fixed seed list.
 
@@ -230,7 +230,7 @@ def band_distance_loss(
     shipped `facts.SEED_SD`, measured at the baseline preset; phase 2's
     thirty-seed re-estimate (see `seed_sd_from_panels`) is passed here
     rather than edited in. Every statistic in the loss must have a positive
-    scale -- a missing or zero s_k raises instead of defaulting to an
+    scale. A missing or zero s_k raises instead of defaulting to an
     unweighted term, because an unweighted sum is a choice, and this
     function will not make it by accident.
 
@@ -247,13 +247,13 @@ def band_distance_loss(
         }
 
     All thirteen panel statistics appear in `"statistics"`, in panel order.
-    Structural rows carry their measured value and band distance --
+    Structural rows carry their measured value and band distance, so
     the standing falsification verdict rides along with every loss
-    evaluation -- but their `"contribution"` is None and they are absent
+    evaluation, but their `"contribution"` is None and they are absent
     from the sum. `"contribution"` is (d_k/s_k)^2 exactly for the rows in
     the loss, so the sum of non-None contributions IS `"loss"`.
 
-    An optimisation device, not a published metric: report the eight-row
+    An optimization device, not a published metric: report the eight-row
     panel (`facts.report`), not this number.
     """
     if isinstance(panel, Mapping):
@@ -280,10 +280,10 @@ def band_distance_loss(
     )
 
     # And "avoidable" was not enough: `evaluate_axes.py` ran a 504-day axis
-    # through the default bands and the default scales for weeks, labelled
+    # through the default bands and the default scales for weeks, labeled
     # them "the TRUE bands", and published a `generalises` verdict from the
-    # result. The panels say what horizon they were measured at -- `measure`
-    # records `days` -- so the pairing is CHECKED here rather than left to
+    # result. The panels say what horizon they were measured at (`measure`
+    # records `days`), so the pairing is CHECKED here rather than left to
     # the caller. A panel that records no horizon, and a table nobody
     # registered, are unknown rather than wrong and pass unchecked; the
     # defaults are checked, because the defaults are what the mistake used.
@@ -319,9 +319,9 @@ def band_distance_loss(
         present = [v for v in values if v is not None]
         if len(present) < len(values) or key not in graded:
             if in_loss:
-                # A statistic the search optimises against cannot silently
+                # A statistic the search optimizes against cannot silently
                 # contribute zero because a candidate broke its
-                # measurability -- that would make unmeasurable an
+                # measurability, which would make unmeasurable an
                 # attractive direction.
                 raise ValidationError(
                     f"statistic {key!r} is in the loss but missing from "
@@ -377,7 +377,7 @@ def band_distance_loss(
         "seed_sd_provenance": provenance,
         "panels": len(panels),
         # Which ruler this loss was taken with, and at what horizon, so a
-        # serialised certificate carries the answer instead of leaving a
+        # serialized certificate carries the answer instead of leaving a
         # reader to infer it from the tool that wrote the file. `None` where
         # the tables are the caller's own and no horizon could be attached.
         "horizon_days": horizon,
@@ -399,7 +399,7 @@ def dual_horizon_loss(
     after producing the best 252-day fit this project had seen. The cause is
     structural rather than unlucky: the objective read one horizon and the
     validation read the other, so trading the second for the first was free
-    to the optimiser and only visible afterwards.
+    to the optimizer and only visible afterwards.
 
     This is the fix, prescribed twice in the record before it was built. The
     252-day panel is scored against `facts.REAL_MARKETS` with
@@ -408,12 +408,12 @@ def dual_horizon_loss(
     noise scale, because both are horizon-dependent and pairing one with the
     other's is the wrong-ruler error in a subtler dress: measured, the
     504-day scales differ from the 252-day ones by factors from 0.80 to
-    3.23, so reusing `SEED_SD` there would over-penalise excess kurtosis
-    threefold while under-penalising volatility.
+    3.23, so reusing `SEED_SD` there would over-penalize excess kurtosis
+    threefold while under-penalizing volatility.
 
     # The weighting is a choice, stated rather than hidden
 
-    `weight_504` defaults to 1.0 -- equal weight -- and that is a judgement
+    `weight_504` defaults to 1.0, equal weight, and that is a judgment
     rather than a derivation. There is no principled exchange rate between a
     252-day band exit and a 504-day one. Equal weighting says "a
     seed-sd of miss matters the same at either horizon", which is defensible
@@ -472,7 +472,7 @@ def dual_horizon_loss(
 # The rule replaces the COUNT and leaves the band alone. Per certified row,
 #
 #     z_i = (T_i - c_i) / sqrt(se_R,i^2 + se_M,i^2)
-#     S   = sum_i (nu_i + 1) * ln(1 + z_i^2 / nu_i)          minimised
+#     S   = sum_i (nu_i + 1) * ln(1 + z_i^2 / nu_i)          minimized
 #
 # `T_i` is the row's graded statistic on the candidate's own seeds, by the
 # row's own estimator (`facts.AGGREGATE`); `c_i` is the tape centre by the
@@ -488,9 +488,9 @@ def dual_horizon_loss(
 # Far out the square's influence is unbounded and the t's is not, and that
 # is the difference that matters here: under a quadratic, a row the model
 # CANNOT reach is bought down at the expense of every row it can, and the
-# optimiser reports the best available compensation. At the corpus's own
-# degrees of freedom -- one row at z = 6 with nu = 5, three at the centre
-# with nu = 8 -- moving the far row to 4 and the three to 1.5 SAVES 13.25
+# optimizer reports the best available compensation. At the corpus's own
+# degrees of freedom (one row at z = 6 with nu = 5, three at the centre
+# with nu = 8), moving the far row to 4 and the three to 1.5 SAVES 13.25
 # under the square and COSTS 2.7 under the rule, so the miss stays visible
 # at its own |z| instead of being smeared across the panel.
 # `tests/test_scoring_rule.py` builds that case and asserts the two signs.
@@ -566,7 +566,7 @@ def rule_fingerprint(table: Mapping[str, Mapping[str, Any]]) -> str:
     the tape moves: the 504-bar windows landed after the corpus was measured,
     the level row's centre was re-derived in September, and
     `fear_gauge_dn3`'s error landed on 2026-09-09 and moved the fingerprint
-    at both horizons -- every score taken before it is an eighteen-row sum
+    at both horizons, so every score taken before it is an eighteen-row sum
     and every score after it a nineteen-row one. So every result carries the
     fingerprint of the table it used, and two scores with different
     fingerprints are two numbers rather than a comparison.
@@ -604,9 +604,9 @@ def rule_term(z: float, df: float) -> float:
 def _band_of(key: str, horizon_days: int) -> tuple[float, float] | None:
     """The row's band at this horizon, for the diagnostic and never for `S`.
 
-    `envelope` owns the seventeen-row table at 504 -- the fourteen shape
+    `envelope` owns the seventeen-row table at 504 (the fourteen shape
     bands plus the level and crisis rows carrying their 252-day bands, each
-    argued in that module -- so it is imported HERE rather than at module
+    argued in that module), so it is imported HERE rather than at module
     scope: `envelope` reads `loss.STRUCTURAL` inside one of its own
     functions, and a module-level import in both directions is a cycle
     waiting for whichever is loaded first.
@@ -672,8 +672,8 @@ def scoring_rule(panels: Sequence[Mapping[str, Any]], *,
     unreachable row down at every other row's expense.
 
     A ROW THE TAPE CANNOT SCORE IS LISTED, NEVER SUBSTITUTED. `blind` maps
-    the row to the reason, `S` sums the rest, and no neighbour's centre or
-    error is read for it -- `SEED_SD_LEVEL_PROVENANCE` already rules that for
+    the row to the reason, `S` sums the rest, and no neighbor's centre or
+    error is read for it. `SEED_SD_LEVEL_PROVENANCE` already rules that for
     the seed scale and the rule inherits it for both terms. A score printed
     without its blind list is not a score: it is a sum over an unnamed subset
     presented as a sum over the panel.
@@ -728,7 +728,7 @@ def scoring_rule(panels: Sequence[Mapping[str, Any]], *,
             # The band POSITION, printed and never summed. The half-width is
             # 2.6 to 6.2 combined standard errors across the rows, set by the
             # band rule's rounding and range, so summing it would weight rows
-            # against each other by an accident of the band's geometry --
+            # against each other by an accident of the band's geometry,
             # which is the geometry the objective exists to stop reading.
             "band_position": (None if band is None or measured is None
                               or band[1] == band[0]
@@ -789,7 +789,7 @@ def scoring_rule_from_medians(medians: Mapping[str, float], *,
     candidate's own and has to come from somewhere the caller names:
     `se_model` and `df_model` are REQUIRED keyword arguments with NO
     DEFAULT, and that is the guard. What it refuses is a call that lets the
-    frozen `facts.SEED_SD` tables become the model term by omission -- the
+    frozen `facts.SEED_SD` tables become the model term by omission, the
     one substitution the design note measures as wrong by a factor of 0.46
     to 6.04 against the vectors a search actually visits.
 
@@ -890,15 +890,15 @@ def scoring_rule_from_medians(medians: Mapping[str, float], *,
 # errors BELOW its tape centre at 252 days and at z = +4.38 at 504, where it
 # carries 47 per cent of pt-v16's whole score. The model's row moves between
 # the horizons and the tape's does not: 0.536 against 0.5345. Any single
-# number hides that, whichever way it is formed -- a weighted sum by
+# number hides that, whichever way it is formed: a weighted sum by
 # averaging it away, a certified-horizon-only score by never looking.
 #
 # WHAT IT COSTS, stated because it is not free. There is no maximum any
 # more, only a frontier: two candidates can each be better on one horizon
 # and neither dominates. `beats` becomes dominance and a generation has a
 # non-dominated SET rather than a winner. `atlas.Survey.pareto` makes the
-# same argument and this uses its definition of dominance -- no other row at
-# least as good on every objective and strictly better on one -- rather than
+# same argument and this uses its definition of dominance (no other row at
+# least as good on every objective and strictly better on one) rather than
 # a second one.
 #
 # WHAT IT REFUSES. `dual_scoring_rule` returns no key holding a combined
@@ -907,8 +907,8 @@ def scoring_rule_from_medians(medians: Mapping[str, float], *,
 #
 # R7, the companion ruling, is stated where it applies: `se_R` is the
 # WITHIN-DECADE standard error of the 2015-2025 panel, and the measured
-# disagreement between that decade and the 1990-2025 reference -- one to
-# three `se_R` on three rows -- is NOT folded into it. That is now a
+# disagreement between that decade and the 1990-2025 reference (one to
+# three `se_R` on three rows) is NOT folded into it. That is now a
 # decision rather than a default, so `rule_row`'s docstring carries it.
 # --------------------------------------------------------------------------
 
@@ -922,7 +922,7 @@ def _dual(results: Mapping[int, Mapping[str, Any]]) -> dict[str, Any]:
     The shape is deliberately awkward for a caller that wants a scalar: the
     per-horizon results sit under `horizons`, `S_252` and `S_504` are
     conveniences for reading, and there is no `S`. `combined` records why,
-    in the output, so a reader of a serialised score does not have to know
+    in the output, so a reader of a serialized score does not have to know
     the ruling to understand the shape.
     """
     out: dict[str, Any] = {
@@ -950,7 +950,7 @@ def dual_scoring_rule(panels_by_horizon: Mapping[int, Sequence[Mapping[str, Any]
                       bootstrap_seed: int = 20260905) -> dict[str, Any]:
     """`S` at every horizon in `panels_by_horizon`, side by side, uncombined.
 
-    `panels_by_horizon` maps a horizon to that horizon's per-seed panels --
+    `panels_by_horizon` maps a horizon to that horizon's per-seed panels, and
     `{252: [...], 504: [...]}` is what a gate run produces. Each horizon is
     scored against ITS OWN tape table, because the tape's centre and its
     error are both properties of the window length: `abs_return_acf20` reads
@@ -997,10 +997,10 @@ def dominates(candidate: Mapping[int, float], incumbent: Mapping[int, float],
               *, tolerance: Mapping[int, float]) -> bool:
     """Is `candidate` better at one horizon and no worse at any, beyond noise?
 
-    `atlas.Survey.pareto`'s definition, on a minimised score: no worse on
+    `atlas.Survey.pareto`'s definition, on a minimized score: no worse on
     every horizon and strictly better on at least one. The tolerance is what
-    makes it usable on measurements rather than on exact numbers -- a
-    difference inside it is not a difference -- and it is the panel's own
+    makes it usable on measurements rather than on exact numbers, since a
+    difference inside it is not a difference, and it is the panel's own
     per-horizon figure, `centre_multiplier(band_rule_tolerance(...))` times
     the paired standard error, rather than a cutoff chosen here.
 

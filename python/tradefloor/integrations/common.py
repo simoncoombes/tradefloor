@@ -24,7 +24,7 @@ rationale. Tradefloor owns the market, the macro path, execution, the order
 book, fills, accounting, checkpoints, forks, interventions and the
 comparison. A framework MUST NOT mutate engine state, and every path from a
 framework RESPONSE to the engine runs through :func:`parse_decision` and
-:func:`orders_from` -- but that is validation, not confinement. ``act`` and
+:func:`orders_from`, but that is validation, not confinement. ``act`` and
 ``ask`` hold the Observation, the Observation carries the live engine, and
 the seam is not sandboxed: the adapter boundary is exactly an ordinary
 agent's, no tighter. The serializer's allowlist and the contract checks
@@ -37,8 +37,8 @@ believing in a property nobody enforces.
 
 :class:`~tradefloor.harness.Observation` carries ``.engine``, and the engine
 knows the answer key: :func:`tradefloor.fair_value`, the nine-way factor
-attribution of every price move, each company's ``mispricing_s``, and --
-through a :class:`~tradefloor.Scenario` -- the macro path the run has not
+attribution of every price move, each company's ``mispricing_s``, and,
+through a :class:`~tradefloor.Scenario`, the macro path the run has not
 reached yet. An agent reading any of those inverts the simulator, and the
 experiment around it measures nothing.
 
@@ -66,9 +66,9 @@ gave.
 decision. :func:`orders_from` is market-shaped and needs the Observation: an
 unknown symbol raises, an oversized order is clipped to the participation cap
 with the clip returned as a note, and sub-one-share dust is dropped. The
-split matters because the two failures mean different things -- the first is
+split matters because the two failures mean different things. The first is
 the framework failing its output contract, the second is a well-formed
-decision the market cannot take -- and an experiment scores them differently.
+decision the market cannot take, and an experiment scores them differently.
 
 ## Replay
 
@@ -77,14 +77,14 @@ answers. Tradefloor's market is deterministic; a model behind an API is not.
 :class:`Transcript` records every interaction keyed by :func:`digest` of the
 exact input the framework was sent, and :func:`replay_response` reads it
 back. Change the observation mapping and the digest changes, the key goes
-missing, and the replay RAISES naming the step -- keyed by (arm, step) it
+missing, and the replay RAISES naming the step. Keyed by (arm, step) it
 would answer the new question with a response given to the old one. Replay
 needs no framework, no network and no API key.
 
 A recording also names the MARKET it was made in. ``meta["model_preset"]``
-carries the simulation preset's fingerprint -- a shipped name like
+carries the simulation preset's fingerprint, a shipped name like
 ``"pt-v18"``, or ``custom-XXXXXXXX`` for an overridden vector, the same
-vocabulary :attr:`tradefloor.Scorecard.model_fingerprint` uses -- and
+vocabulary :attr:`tradefloor.Scorecard.model_fingerprint` uses, and
 :func:`replay_response` refuses a replay running under a different one.
 Without it, moving the default preset moved every price in every recorded
 observation, all five committed agent recordings missed at step zero, and
@@ -111,7 +111,7 @@ from ..counterfactual import MACRO_FIELDS
 
 #: The macro fields an adapter may show its framework. Bound to
 #: ``counterfactual.MACRO_FIELDS`` itself, so the two cannot drift apart over
-#: what a macro experiment covers -- the library has already settled which
+#: what a macro experiment covers. The library has already settled which
 #: macro fields a run is ABOUT, and that set leaves out ``qe_pe_boost``, a
 #: model coefficient no exchange publishes.
 OBSERVABLE_MACRO = MACRO_FIELDS
@@ -121,7 +121,7 @@ OBSERVABLE_MACRO = MACRO_FIELDS
 SIDES = ("BUY", "SELL", "HOLD")
 
 #: Price rows kept for the recent-return and volatility lines. Five days at
-#: the library's six steps a day: long enough for a realised-volatility number
+#: the library's six steps a day: long enough for a realized-volatility number
 #: to mean something, short enough to describe recent conditions.
 HISTORY_STEPS = 30
 
@@ -158,8 +158,8 @@ class MissingDependencyError(IntegrationError, ImportError):
     """An optional dependency is not installed.
 
     Also an :class:`ImportError`, deliberately: the FinRobot adapter raised a
-    plain ImportError for this case, and callers written against it -- and
-    against the general Python convention for a missing module -- keep
+    plain ImportError for this case, and callers written against it (and
+    against the general Python convention for a missing module) keep
     working. Raised by :func:`require`, which puts the exact pip command in
     the message, because "ModuleNotFoundError: No module named 'agents'"
     tells a user neither that the dependency is optional nor how to get it.
@@ -171,7 +171,7 @@ class FrameworkError(IntegrationError):
 
     The network died, the provider refused, the framework raised out of its
     own plumbing. Distinct from :class:`DecisionError` because the framework
-    never produced an output to judge -- an experiment scoring "the agent
+    never produced an output to judge. An experiment scoring "the agent
     answered badly" should not count "the call never completed" in the same
     column. The original exception rides on ``__cause__``.
     """
@@ -219,7 +219,7 @@ class MarketRefusalError(DecisionError):
     Raised by :func:`orders_from` for a symbol the market does not list. A
     subclass of :class:`DecisionError` rather than a sibling, because the
     FinRobot integration raises one class for both stages and callers written
-    against that behaviour -- catch DecisionError, charge the agent a step --
+    against that behavior (catch DecisionError, charge the agent a step)
     must keep catching everything a decision can fail with.
     """
 
@@ -231,15 +231,15 @@ def require(module: str, *, extra: str | None = None, pip: str | None = None,
     ``extra`` names the tradefloor extra that installs the module, and wins
     over ``pip``, which names a bare requirement for a dependency no extra
     carries. The point is that the error is actionable text: the extra, the
-    exact pip command, and the original exception chained -- never a raw
+    exact pip command, and the original exception chained, never a raw
     ModuleNotFoundError reaching the user of an adapter they installed on
     purpose and configured halfway.
 
     ``note`` is the sentence that goes AFTER the pip command: the version
     constraint or collision worth knowing before running it. It exists
-    because the FinRobot adapter's hand-written refusal ends with one --
+    because the FinRobot adapter's hand-written refusal ends with one,
     "FinRobot supports Python 3.10 and 3.11 only, and Tradefloor needs 3.11
-    or later, so the two overlap at 3.11 exactly" -- and that is the
+    or later, so the two overlap at 3.11 exactly", and that is the
     sentence that matters: without it, somebody on Python 3.12 runs the
     command and gets a resolver failure they cannot interpret. Every
     framework has a floor or a ceiling worth stating here.
@@ -273,8 +273,8 @@ def run_sync(awaitable: Any) -> Any:
     it is shared because every framework needs it and the failure it guards
     against only shows up in a notebook. The frameworks' own synchronous
     entry points raise when called from a thread that already has a running
-    event loop -- the OpenAI Agents SDK's ``Runner.run_sync`` raises a bare
-    RuntimeError, and Jupyter runs everything inside a loop -- so an adapter
+    event loop (the OpenAI Agents SDK's ``Runner.run_sync`` raises a bare
+    RuntimeError, and Jupyter runs everything inside a loop) so an adapter
     built on them works in a script and dies in the notebook the same reader
     tries next. Call the framework's ASYNC entry point and hand the
     coroutine here instead.
@@ -288,8 +288,8 @@ def run_sync(awaitable: Any) -> Any:
     What this does not buy, stated plainly: it does not make Tradefloor
     concurrent. One decision runs at a time and the market waits for it, as
     the run loop requires. And every call gets a FRESH event loop, so an
-    object bound to a loop -- an aiohttp session opened outside, a
-    framework client that caches its loop -- cannot be created once and
+    object bound to a loop (an aiohttp session opened outside, a
+    framework client that caches its loop) cannot be created once and
     awaited across calls. Create loop-bound resources inside the coroutine.
     """
     import asyncio
@@ -314,7 +314,7 @@ def run_sync(awaitable: Any) -> Any:
     except RuntimeError:
         return asyncio.run(coro)
 
-    # A loop is already running in this thread -- a notebook, or a caller
+    # A loop is already running in this thread: a notebook, or a caller
     # driving the World from inside async code. Nesting is not an option and
     # neither is raising, so the coroutine gets its own thread and its own
     # loop. `Future.result()` re-raises the exception OBJECT raised inside,
@@ -332,11 +332,11 @@ class Action:
     """One validated instruction: a symbol, a side, and a share count.
 
     The constructor validates the two fields that carry direction, because
-    :meth:`signed` returns 0.0 for any side it does not recognise -- so a
+    :meth:`signed` returns 0.0 for any side it does not recognize, so a
     hand-built ``Action("A", "SHORT", 5)`` handed straight to
     :func:`orders_from` would silently become a hold, and a negative
     quantity would flip the trade's sign. Refused here instead; case is
-    normalised by :func:`parse_decision`, which is where lenient input
+    normalized by :func:`parse_decision`, which is where lenient input
     belongs.
     """
 
@@ -382,8 +382,8 @@ class Decision:
     """What the framework decided at one decision point, after validation.
 
     ``rationale`` is a short comment that never affects execution. It is
-    recorded -- :meth:`FrameworkAdapter.decision` publishes it, and the
-    counterfactual comparison reads it -- but no character of it reaches
+    recorded (:meth:`FrameworkAdapter.decision` publishes it, and the
+    counterfactual comparison reads it) but no character of it reaches
     :func:`orders_from`.
     """
 
@@ -470,8 +470,8 @@ def decision_model() -> Any:
 
     The canonical decision contract is stated ONCE, in
     :func:`decision_schema`, and this model reads every constraint out of
-    that schema -- the side enum, the quantity floor, the symbol length, the
-    field descriptions, which fields are required -- rather than repeating
+    that schema (the side enum, the quantity floor, the symbol length, the
+    field descriptions, which fields are required) rather than repeating
     them. The first version repeated them, drifted immediately, and the
     drift was expensive in exactly the place a model is used: the
     constraints a bound model carries land in the schema the provider is
@@ -479,15 +479,15 @@ def decision_model() -> Any:
     where a framework retries on validation failure the model's refusal is
     repaired inside the turn. Anything the model waves through instead dies
     one layer later in :func:`parse_decision` and costs the step. Whether a
-    retry exists is framework-specific -- PydanticAI retries within the
+    retry exists is framework-specific: PydanticAI retries within the
     turn; the OpenAI Agents SDK makes one call and raises on the first
-    invalid response -- so an adapter must not assume one.
+    invalid response. An adapter must not assume one.
     ``tests/test_integrations.py`` asserts the two renderings agree field
     by field, which is what actually protects this.
 
     On top of what a JSON Schema can express, the model enforces the two
-    rules only code can state -- HOLD carries no quantity, no symbol named
-    twice -- and normalises a lowercase side before the enum check, because
+    rules only code can state (HOLD carries no quantity, no symbol named
+    twice) and normalizes a lowercase side before the enum check, because
     case carries no meaning here and rejecting it would score a correct
     decision as a failure. Belt and braces is deliberate:
     :func:`parse_decision` stays total regardless of what any framework
@@ -574,8 +574,8 @@ def parse_decision(raw: Any) -> Decision:
     Accepts the three shapes framework output arrives in: a
     :class:`Decision` already built (revalidated, because "already a
     Decision" says nothing about what was put in it), a mapping with
-    ``actions`` and ``rationale`` keys -- which is also what a Pydantic
-    model's ``model_dump()`` produces -- and a text response holding a JSON
+    ``actions`` and ``rationale`` keys (which is also what a Pydantic
+    model's ``model_dump()`` produces) and a text response holding a JSON
     object, fences and trailing prose tolerated.
 
     Structural validation only: this checks that the answer is a decision.
@@ -583,14 +583,14 @@ def parse_decision(raw: Any) -> Decision:
     :func:`orders_from`, which has the observation needed to answer it.
 
     It never unwraps a framework's envelope. A mapping without an
-    ``actions`` key -- graph state, a result wrapper -- is refused rather
+    ``actions`` key (graph state, a result wrapper) is refused rather
     than read as a hold; extracting the decision from whatever a framework
     returns is the adapter's job, in ``ask()``, before this is called.
 
     And it never drops a key it does not know, at either level. A
     ``stop_loss`` or a ``time_in_force`` silently discarded would leave the
     agent believing it has protection this market cannot give, and would
-    let the dict path accept output the schema-bound model path refuses --
+    let the dict path accept output the schema-bound model path refuses,
     two arms of one study running two contracts. The same inputs are driven
     through both paths by ``tests/test_integrations.py``, which asserts
     they agree on accept-versus-refuse.
@@ -613,7 +613,7 @@ def _no_duplicate_keys(pairs: list) -> dict[str, Any]:
     '"actions": [], "actions": [...]' resolved to whichever the model
     emitted second, silently, and nothing recorded that a first statement
     existed. `_decision_from_mapping` refuses duplicate SYMBOLS one layer
-    up for exactly this reason -- two instructions with no defined order --
+    up for exactly this reason (two instructions with no defined order)
     and the JSON layer owed the same principle to duplicate keys.
     """
     keys = [key for key, _ in pairs]
@@ -676,12 +676,12 @@ def _decision_from_mapping(raw: dict[str, Any]) -> Decision:
     """The one validator. Every input shape funnels through here."""
     # An ABSENT key is refused; an EMPTY list is accepted. The distinction is
     # load-bearing. A mapping with no 'actions' key at all is almost never a
-    # decision -- it is a framework's own envelope: LangGraph graph state
+    # decision. It is a framework's own envelope: LangGraph graph state
     # carrying 'messages', a result wrapper, a different structured type from
     # a misconfigured run. Defaulting it to [] scored every one of those as a
     # considered HOLD: the run completed, the scorecard showed trades=0 and
     # an empty errors list, and nothing said otherwise. `{"actions": null}`
-    # stays a no-op -- the key is present, so its author addressed the
+    # stays a no-op, because the key is present, so its author addressed the
     # question and declined it.
     if "actions" not in raw:
         keys = ", ".join(sorted(str(k) for k in raw)) or "none"
@@ -834,7 +834,7 @@ def orders_from(decision: Decision, obs: Any, *,
         # participate in" as "no cap at all": with avg_volume or
         # max_participation at zero, a 1e12-share order passed through
         # whole with no note, while the serialized observation showed the
-        # agent max_order_shares of exactly 0.0 -- the observation and the
+        # agent max_order_shares of exactly 0.0, with the observation and the
         # enforcement stating opposite things. Clipped to zero, the order
         # falls out as dust below and the note says what happened.
         cap = max(0.0, max_participation * obs.avg_volume(action.symbol))
@@ -865,20 +865,20 @@ def serialize_observation(obs: Any, *,
     portfolio. See the module docstring for why that matters.
 
     ``history`` is the adapter's own record of the prices it has already been
-    shown -- :attr:`FrameworkAdapter.history` -- so a recent return and a
-    realised volatility come from the agent's memory, without asking the
+    shown (:attr:`FrameworkAdapter.history`) so a recent return and a
+    realized volatility come from the agent's memory, without asking the
     simulator for either. The derivation lives here rather than on the
     adapter because it is a pure function of the rows, and one implementation
     means every framework quotes the same numbers from the same window.
 
-    Company fundamentals -- sector, EPS, book value, revenue growth, beta --
+    Company fundamentals (sector, EPS, book value, revenue growth, beta)
     do not come off the engine either. The caller supplies them as
     ``fundamentals``, keyed by ticker; an analyst reads all five off a
     filing, and keeping them out of the adapter leaves one less line to
     audit. Worth stating plainly rather than implying otherwise:
     :func:`tradefloor.fair_value` is a public function, so a caller who
     supplies the full set of valuation inputs has also supplied the means
-    to reconstruct the model's anchor EXACTLY -- and, through
+    to reconstruct the model's anchor EXACTLY and, through
     ``log(price / fair_value)``, to land near the mispricing on top of it.
     Near, never on: a traded price carries microstructure the anchor does
     not, and the ratio form of that inversion is the wrong arithmetic
@@ -889,8 +889,8 @@ def serialize_observation(obs: Any, *,
     about their own experiment; what this function guarantees is only that
     it never makes the decision for them.
 
-    How the payload is RENDERED is the adapter's decision -- a chat framework
-    wants prose, a graph framework wants the dict itself -- but what it may
+    How the payload is RENDERED is the adapter's decision (a chat framework
+    wants prose, a graph framework wants the dict itself) but what it may
     contain is settled here, so nothing outside the allowlist can appear in
     any framework's input by accident.
 
@@ -899,7 +899,7 @@ def serialize_observation(obs: Any, *,
     MARKET can absorb per order; ``portfolio.max_leverage`` and
     ``portfolio.buying_power`` are the funding cap on what this BOOK can
     hold. The binding one is usually the funding cap, and it used to be the
-    one the payload hid -- see the comment at the portfolio block for what
+    one the payload hid; see the comment at the portfolio block for what
     that cost.
     """
     macro_state = obs.engine.macro_state
@@ -931,8 +931,8 @@ def serialize_observation(obs: Any, *,
     # The funding headroom: additional gross notional before the leverage
     # cap refuses the trade. Stated because the payload used to name ONE
     # size limit, max_order_shares, and it was not the binding one: four
-    # independent agents -- two frontier models, a documentation example
-    # and this module's own first example -- sized to the stated cap, were
+    # independent agents (two frontier models, a documentation example
+    # and this module's own first example) sized to the stated cap, were
     # refused at the leverage limit the payload never mentioned, and scored
     # zero trades. An agent that trusts the observation must not read as a
     # worse trader than one that second-guesses it. None means what it
@@ -967,9 +967,9 @@ def _window_return(rows: Sequence[Sequence[float]], i: int,
     the market. From the number alone the agent cannot tell the two apart.
 
     The longest window is one step short of its label, KNOWINGLY. A
-    five-day return needs ``steps + 1`` rows -- 31 at six steps a day --
+    five-day return needs ``steps + 1`` rows, 31 at six steps a day,
     and ``HISTORY_STEPS`` keeps 30, so once the buffer is full "return_5d"
-    spans 29 intervals: 4.83 days, permanently, labelled five. The honest
+    spans 29 intervals: 4.83 days, permanently, labeled five. The honest
     fix is ``HISTORY_STEPS = steps_per_day * 5 + 1``, and it is
     deliberately not made: this value is rendered into every adapter's
     recorded input, so correcting the arithmetic moves every committed
@@ -981,15 +981,15 @@ def _window_return(rows: Sequence[Sequence[float]], i: int,
 
     The window is load-bearing beyond this file. The value it produces is
     rendered into FinRobot's prompt, and FinRobot's recorded replay keys
-    are digests of that prompt -- so tuning the window moves every key in
+    are digests of that prompt, so tuning the window moves every key in
     the committed transcript at ``tests/fixtures/finrobot/``, with no key
     change anywhere here to make that visible, and the shipped example and
     notebook stop replaying. Adding a FIELD to the payload is safe (the
     render names its fields one at a time); changing a rendered VALUE is
     what invalidates a recording. FinRobot keeps its own byte-identical
     copy deliberately, and, in ``tests/test_finrobot.py``,
-    ``test_the_serializer_agrees_with_the_shared_one`` compares the values
-    -- which is what fails first if either side is tuned.
+    ``test_the_serializer_agrees_with_the_shared_one`` compares the values,
+    which is what fails first if either side is tuned.
     """
     if len(rows) < 2:
         return None
@@ -1001,7 +1001,7 @@ def _window_return(rows: Sequence[Sequence[float]], i: int,
 
 
 def _volatility(rows: Sequence[Sequence[float]], i: int) -> float | None:
-    """Realised volatility of the step returns held in ``rows``.
+    """Realized volatility of the step returns held in ``rows``.
 
     The formula is load-bearing the same way :func:`_window_return`'s
     window is: its value is rendered into FinRobot's prompt, whose digest
@@ -1023,8 +1023,8 @@ def _volatility(rows: Sequence[Sequence[float]], i: int) -> float | None:
 def jsonable(value: Any) -> Any:
     """A JSON-able rendering of ``value``, for digesting and recording.
 
-    A framework config is somebody else's object graph -- HTTP clients,
-    callbacks, filter callables -- and digesting one directly raised
+    A framework config is somebody else's object graph (HTTP clients,
+    callbacks, filter callables) and digesting one directly raised
     ``TypeError`` out of ``json.dumps`` on configurations released adapters
     accepted; ``TypeError`` is not a :class:`~tradefloor.ValidationError`,
     so a caller catching the library's refusals did not catch it either.
@@ -1052,9 +1052,9 @@ def jsonable(value: Any) -> Any:
 def digest(data: Any) -> str:
     """The replay key: SHA-256 of the exact input the framework was sent.
 
-    A string or bytes is hashed as-is, which is the FinRobot behaviour and
+    A string or bytes is hashed as-is, which is the FinRobot behavior and
     the right one for a rendered prompt. Anything else is hashed as canonical
-    JSON -- sorted keys, no whitespace -- so two dicts that mean the same
+    JSON (sorted keys, no whitespace) so two dicts that mean the same
     thing produce the same key whatever order they were built in.
 
     Sixteen hex characters: ample for the few dozen decision points of one
@@ -1063,7 +1063,7 @@ def digest(data: Any) -> str:
     A rule for every caller, learned three separate times in one review: if
     you compute a fingerprint, something must FAIL when it differs, and a
     test must prove that something fails. A digest that is recorded and
-    never compared is provenance theatre -- it decorates the artifact
+    never compared is provenance theater. It decorates the artifact
     while two different setups replay as one.
     """
     if isinstance(data, bytes):
@@ -1081,8 +1081,8 @@ class Transcript:
 
     A file of these lets an experiment reproduce a real agent run with no API
     key, no network and no framework install. It holds what re-executing and
-    auditing the experiment need -- the input, the raw response, and the
-    step it happened at -- and nothing else. No API keys, no account
+    auditing the experiment need (the input, the raw response, and the
+    step it happened at) and nothing else. No API keys, no account
     identifiers, no request IDs, no provider headers. The conventional entry
     fields are ``arm``, ``step``, ``day``, ``digest``, ``prompt`` and
     ``response``; a committed fixture should carry no others.
@@ -1096,7 +1096,7 @@ class Transcript:
 
     It also records ``model_preset``: the fingerprint of the simulation
     preset the recording was made against, in the vocabulary
-    :attr:`tradefloor.Engine.model_fingerprint` uses -- a shipped preset's
+    :attr:`tradefloor.Engine.model_fingerprint` uses: a shipped preset's
     name when the market was bit-identical to it, ``custom-XXXXXXXX``
     otherwise. The instructions and the market are the two halves of the
     question the model was asked, and until 0.8.0 ``meta`` named only one of
@@ -1104,8 +1104,8 @@ class Transcript:
     existed for the same reason, in its own words: a checkpoint of a
     custom-model run that resumed under the default would replay a plausible
     market that is not the one it froze. A transcript replayed under a moved
-    preset does the same thing one step earlier -- every key misses, because
-    every price the digest covers moved -- and the refusal a reader then
+    preset does the same thing one step earlier: every key misses, because
+    every price the digest covers moved, and the refusal a reader then
     meets names a step number rather than the cause.
     """
 
@@ -1131,7 +1131,7 @@ class Transcript:
         """The whole recorded entry, or None only when none exists.
 
         Distinct from :meth:`response_for`, which returns None BOTH for a
-        missing entry and for an entry whose recorded response is null --
+        missing entry and for an entry whose recorded response is null,
         two situations with opposite remedies, which
         :func:`replay_response` has to tell apart.
         """
@@ -1167,7 +1167,7 @@ class Transcript:
         import datetime
         import pathlib
         # WHEN, stamped here because here is where a recording becomes an
-        # artefact. Every committed fixture carries `recorded_utc` and
+        # artifact. Every committed fixture carries `recorded_utc` and
         # `test_callable.py` asserts it, and nothing set it: the field
         # reached the first fixtures by hand and every recording made since
         # has been written without it, so the check passed only for as long
@@ -1182,7 +1182,7 @@ class Transcript:
             .replace(microsecond=0).isoformat())
         # WHICH MARKET, for the same reason and with the same rule. A replay
         # key is a digest of the exact observation the model was sent, and
-        # every price in that observation comes out of the preset -- so a
+        # every price in that observation comes out of the preset, so a
         # recording that cannot name its preset cannot explain the one way it
         # is guaranteed to fail. It is not a hypothetical: moving the default
         # from pt-v18 to pt-v19 missed all five committed recordings at step
@@ -1190,8 +1190,8 @@ class Transcript:
         #
         # `setdefault` again, and the value is only the DEFAULT preset,
         # because a transcript holds no engine and cannot ask one. That guess
-        # is right for a transcript that never met a market -- a fresh
-        # recorder, a hand-built fixture -- and every adapter overwrites it
+        # is right for a transcript that never met a market (a fresh
+        # recorder, a hand-built fixture) and every adapter overwrites it
         # with the truth long before here: `stamp_preset` writes the running
         # engine's own fingerprint on the first recorded exchange. So this is
         # the floor, not the reading.
@@ -1200,8 +1200,8 @@ class Transcript:
         # solved: loading a pre-0.8.0 recording and saving it again stamps
         # today's default onto a market it was not recorded in, exactly as
         # that line stamps today's date onto a recording made last year. The
-        # remedy for both is the same -- do not re-save a recording you did
-        # not make -- and adding the field to a legacy fixture is a one-line
+        # remedy for both is the same, do not re-save a recording you did
+        # not make, and adding the field to a legacy fixture is a one-line
         # edit that says what it actually ran under.
         self.meta.setdefault("model_preset",
                              ModelParams.from_preset().fingerprint)
@@ -1216,7 +1216,7 @@ def preset_of(obs: Any) -> str | None:
     Read off the engine the observation carries, because that is the only
     object in the whole replay path that knows: an adapter is constructed
     before any market exists and is handed one observation at a time. Reading
-    it here rather than in the caller keeps the one spelling -- there is
+    it here rather than in the caller keeps the one spelling. There is
     exactly one way to name a preset in this package, and a second would be
     a fingerprint that disagrees with the manifests, the scorecards and the
     checkpoints.
@@ -1240,7 +1240,7 @@ def stamp_preset(recorder: "Transcript | None", obs: Any) -> None:
     somebody remembered to set ``meta`` is off in exactly the runs nobody
     was careful about. :meth:`Transcript.save` also stamps the field, but
     only with the DEFAULT preset, and the interesting recordings are the
-    ones made under a pinned non-default -- every shipped integration
+    ones made under a pinned non-default. Every shipped integration
     example pins ``PRESET`` and re-records through it, so a save-time guess
     would write "pt-v19" into a fixture recorded on pt-v18 and produce a
     confidently wrong provenance where there had been an honest gap.
@@ -1271,8 +1271,8 @@ def refuse_a_changed_preset(transcript: "Transcript | None",
     recording that could name it.
 
     So this is checked BEFORE the lookup, not instead of it. The lookup
-    still refuses -- it is the guard that cannot be forgotten, because it is
-    the lookup -- and this runs first so that a reader meets the cause
+    still refuses (it is the guard that cannot be forgotten, because it is
+    the lookup) and this runs first so that a reader meets the cause
     rather than its first symptom. Same shape as
     ``finrobot._refuse_a_changed_mandate``, which refuses the other half of
     the same question.
@@ -1282,14 +1282,14 @@ def refuse_a_changed_preset(transcript: "Transcript | None",
     happens at construction, where nothing can skip it. This one happens
     inside the run, where :class:`~tradefloor.counterfactual.World` with
     ``on_refusal="skip"`` would charge a ``DecisionError`` to the agent and
-    carry on -- turning a replay against the wrong market into an agent that
+    carry on, turning a replay against the wrong market into an agent that
     refused every decision, completed, and published that. ``ReplayMiss``
     exists for precisely that distinction and World re-raises it.
 
     A transcript with NO ``model_preset`` is warned about and allowed
     through. Every recording made before 0.8.0 is in that state, and
     refusing them would break working replays on upgrade for a fact the
-    library never asked anyone to record -- the same call
+    library never asked anyone to record, the same call
     ``_refuse_a_changed_mandate`` makes for a transcript carrying neither
     digest nor version. Allowed is not silent, though: an unnamed market is
     how a day was lost, so it says so once, where the person running the
@@ -1325,8 +1325,8 @@ def replay_response(transcript: Transcript, key: str, *, step: int,
                     day: int, preset: str | None = None) -> Any:
     """The recorded response for ``key``, or a refusal naming the step.
 
-    The one lookup every replaying adapter performs, centralised so the
-    error message -- the part a user actually meets -- is written once and
+    The one lookup every replaying adapter performs, centralized so the
+    error message (the part a user actually meets) is written once and
     says the same thing everywhere: which step missed, why a miss means the
     inputs changed, and that replaying anyway would answer this question
     with a response given to a different one.
@@ -1339,14 +1339,14 @@ def replay_response(transcript: Transcript, key: str, *, step: int,
     A missing ENTRY and a recorded NULL are told apart, because their
     remedies are opposite: a missing key means the inputs changed and the
     run needs re-recording; a null response means the recording is right
-    there and holds no answer -- the live call likely failed mid-run and
-    the failure was written down -- and sending the user off to re-record
+    there and holds no answer (the live call likely failed mid-run and
+    the failure was written down) and sending the user off to re-record
     the whole run would spend money to rediscover a file they already
     have.
 
     ``preset`` is the fingerprint of the market this replay is running,
     from :func:`preset_of`. Given one, the recorded preset is checked
-    FIRST, so the reader meets the cause -- a moved market -- rather than
+    FIRST, so the reader meets the cause, a moved market, rather than
     the missing digest that is only its first symptom. See
     :func:`refuse_a_changed_preset`. It defaults to None so that an adapter
     written against the old signature keeps working; that adapter loses the
@@ -1381,7 +1381,7 @@ def replay_response(transcript: Transcript, key: str, *, step: int,
 #: Words that, as the HEAD of a key name, mean the entry is a credential.
 #: Head-segment matching, not substring matching: "token" in "max_tokens"
 #: is True, and max_tokens is the second most common generation parameter
-#: in existence -- a scan that refuses it refuses the ``generation``
+#: in existence. A scan that refuses it refuses the ``generation``
 #: field's primary use case, and a credential check that fires on that
 #: gets worked around, which costs more than the hole it closes. English
 #: compounds are head-final: ``api_key`` IS a key, ``token_budget`` is a
@@ -1390,7 +1390,7 @@ def replay_response(transcript: Transcript, key: str, *, step: int,
 #: tokens; "credentials" holds them, so the plural is listed where it is
 #: itself the secret). The joined spellings are here because segmentation
 #: cannot split them, and a suffix match would refuse "monkey".
-#: "session_key" still costs somebody a rename -- that trade stands, for a
+#: "session_key" still costs somebody a rename, and that trade stands, for a
 #: name whose head they chose.
 _SECRET_WORDS = frozenset((
     "key", "token", "secret", "password", "passwd", "credential",
@@ -1410,8 +1410,8 @@ class Moment:
 
     A resample happens after the run, so the Observation those decisions
     were taken against is gone. Every adapter that reads the observation
-    inside its live call reads exactly two fields off it -- ``step`` and
-    ``day``, for a trace tag or an error message -- and both are on the
+    inside its live call reads exactly two fields off it, ``step`` and
+    ``day``, for a trace tag or an error message, and both are on the
     record entry the input came from. This carries those two and nothing
     else, so an adapter reaching for market state here fails loudly rather
     than resampling against a stale price.
@@ -1460,7 +1460,7 @@ def check_prior(prior: "Transcript | None", *, mode: str,
     paid calls into a run.
 
     ``prior`` is a recording an earlier live run produced. Any live run can
-    die -- a rate limit, a dropped connection, a keyboard interrupt -- and
+    die (a rate limit, a dropped connection, a keyboard interrupt) and
     without a resume the second attempt re-asks every question it already
     holds an answer to. On a digest hit the recorded answer is reused; on a
     miss the provider is called. Same keying as the replay path, different
@@ -1512,7 +1512,7 @@ def refuse_changed_instructions(prior: "Transcript | None",
     """Refuse a resume whose instructions are not the recorded ones.
 
     The transcript key is a digest of the INPUT, and an adapter's
-    instructions do not travel in that input -- they reach the framework as
+    instructions do not travel in that input. They reach the framework as
     a system prompt, an agent profile or a constructor argument. So editing
     them leaves every recorded key intact: the resume completes, every
     digest matches, and the answers it reuses were given under instructions
@@ -1524,7 +1524,7 @@ def refuse_changed_instructions(prior: "Transcript | None",
 
     A prior carrying no ``instructions_digest`` in its meta is allowed
     through. It cannot be checked, and refusing it would break every
-    recording made before this existed for no gain -- those runs are no
+    recording made before this existed for no gain, since those runs are no
     worse off than they were. An adapter that leaves
     ``instructions_digest`` empty is in the same position, and the fix
     there is to stamp one.
@@ -1566,12 +1566,12 @@ def _credential_free(mapping: dict[str, Any], where: str) -> dict[str, Any]:
     The open mappings on :class:`AdapterInfo` moved the no-credentials
     boundary from shape to validation, so the validation has to be real:
     key names are checked recursively, string values against anchored
-    secret shapes, and the whole thing must be JSON-serialisable, because
+    secret shapes, and the whole thing must be JSON-serializable, because
     it is written into transcripts and printed by the fork agreement.
 
     Deep, not shallow, and that is the boundary itself: the first version
     took ``dict(mapping)``, which shares every NESTED structure with the
-    caller's object -- so building a config, handing it over and mutating
+    caller's object, so building a config, handing it over and mutating
     it afterwards (the completely normal shape) put unscanned values into
     what :meth:`FrameworkAdapter.provenance` writes into committed
     transcript meta. A scan-once-share-forever guard is a guard against
@@ -1623,14 +1623,14 @@ class AdapterInfo:
     ``MultiAssistantWithLeader`` are different experiments), the ``mode``
     (a recording of a replay is a different document from a recording of a
     live run), the upstream ``framework_url`` for attribution, the
-    instructions version and digest, and ``generation`` -- the parameters
+    instructions version and digest, and ``generation``, the parameters
     like temperature that most make an LLM run irreproducible, kept as a
     mapping because every framework has them and none share the spelling.
 
     ``extra`` is the open, JSON-able mapping for provenance that is
     genuinely per-framework. The first version had fixed slots only, on the
     argument that an open dict would eventually be handed a whole config
-    carrying an API key -- and then the shipped FinRobot fixture's meta
+    carrying an API key, and then the shipped FinRobot fixture's meta
     needed twelve keys and four of them had a home. The boundary moved from
     shape to VALIDATION: ``generation`` and ``extra`` are refused at
     construction if any key or value in them looks like a credential, so
@@ -1642,7 +1642,7 @@ class AdapterInfo:
     Tradefloor-side settings) belongs in ``Transcript.meta``, and
     :meth:`reference` is a citation string for
     ``RunManifest.of(strategy=...)``, which takes a reference string for
-    any agent that is not a :class:`~tradefloor.StrategySpec` -- an LLM
+    any agent that is not a :class:`~tradefloor.StrategySpec`. An LLM
     adapter is not one, and forcing it into one would fingerprint a
     strategy that never existed.
     """
@@ -1722,12 +1722,12 @@ class FrameworkAdapter:
     harnesses.
 
     Implements the four methods :class:`~tradefloor.counterfactual.World`
-    looks for -- :meth:`act`, and the optional :meth:`decision`,
-    :meth:`state` and :meth:`fork` -- and :meth:`act` alone is what
+    looks for (:meth:`act`, and the optional :meth:`decision`,
+    :meth:`state` and :meth:`fork`) and :meth:`act` alone is what
     :func:`tradefloor.evaluate` needs. A subclass implements :meth:`ask`,
     the ONE method that reaches its framework, and everything on either side
-    of that call -- the price memory, the cadence, the serialisation, the
-    two-stage validation, the record -- runs shared code that
+    of that call (the price memory, the cadence, the serialization, the
+    two-stage validation, the record) runs shared code that
     ``tests/test_integrations.py`` checks once for everybody.
 
     ``every`` is the decision cadence in steps. At the library's six steps a
@@ -1738,7 +1738,7 @@ class FrameworkAdapter:
     :meth:`fork` copies it.
 
     Constructors are keyword-only all the way down, because :meth:`fork`
-    rebuilds the twin as ``type(self)(**self.fork_kwargs())`` -- a subclass
+    rebuilds the twin as ``type(self)(**self.fork_kwargs())``, and a subclass
     with a required positional argument could not be forked, and the failure
     would surface two arms into an experiment instead of here.
     """
@@ -1782,20 +1782,20 @@ class FrameworkAdapter:
 
         ``payload`` is the :func:`serialize_observation` output; render it
         however the framework reads best. ``obs`` is passed for ``step`` and
-        ``day`` in error messages and transcript entries -- do NOT read
+        ``day`` in error messages and transcript entries. Do NOT read
         market state off it here, because anything the framework should see
         is already in the payload and the allowlist test cannot see what
         this method reads.
 
         Call :meth:`record_exchange` with the exact input you sent the
-        framework -- and the transcript key, if you recorded one -- so the
+        framework (and the transcript key, if you recorded one) so the
         record joins the exchange to the decision it produced.
 
         Return the decision in any shape :func:`parse_decision` accepts: a
         :class:`Decision`, a dict, or a JSON string. Raise
         :class:`MissingDependencyError` (via :func:`require`) if the
         framework is not installed; any other exception is wrapped in
-        :class:`FrameworkError` by :meth:`act` with the chain preserved --
+        :class:`FrameworkError` by :meth:`act` with the chain preserved,
         INCLUDING exceptions a framework raises as control flow rather than
         as failure, a human-in-the-loop interrupt among them. ``act`` cannot
         tell a signal from a crash, so if your framework communicates
@@ -1852,15 +1852,15 @@ class FrameworkAdapter:
         """Declare the exact framework input behind the decision under way.
 
         Call it inside :meth:`ask`. ``prompt`` is whatever the framework was
-        actually given -- rendered text, a message list, the payload itself
-        -- and ``key`` is the transcript digest if the adapter computed one;
+        actually given (rendered text, a message list, the payload itself)
+        and ``key`` is the transcript digest if the adapter computed one;
         left out, it is :func:`digest` of the prompt, which is the same
         value a recorder keyed by the same input would use.
 
         This exists because the record entry has to carry the whole chain:
         observation to input to response to validated action to order. The
         first version recorded only the validated half, the transcript held
-        the other half keyed by digest, and nothing joined them -- an
+        the other half keyed by digest, and nothing joined them. An
         artifact wanting to show what the model SAID beside what it TRADED
         had to hand-join two files. The gap shipped into three adapters
         before anything noticed, so now a contract check asserts the join.
@@ -1913,14 +1913,14 @@ class FrameworkAdapter:
         # The observation end of the chain this record is documented to
         # carry. It was missing: the entry began at the rendered input, so
         # nothing joined a decision back to what the agent was shown, and
-        # `resample` -- which asks one recorded input again -- had nothing
+        # `resample` (which asks one recorded input again) had nothing
         # to re-ask an adapter that renders from the payload rather than
         # from text.
         entry["payload"] = payload
         # The exchange, when ask() declared one, in the same keys the
         # FinRobot record and the Transcript use, so the three join without
-        # translation. The response is always in hand -- it is what ask()
-        # returned -- normalised to the JSON-able form the record needs.
+        # translation. The response is always in hand, since it is what ask()
+        # returned, normalized to the JSON-able form the record needs.
         if self._exchange is not None:
             entry["digest"] = self._exchange["digest"]
             entry["prompt"] = self._exchange["prompt"]
@@ -1948,13 +1948,13 @@ class FrameworkAdapter:
         The price memory and the last decision: everything surviving from
         one step to the next that could make two arms behave differently for
         some reason other than the intervention. Framework configs stay out
-        of this dictionary and out of any subclass's additions to it -- a
+        of this dictionary and out of any subclass's additions to it. A
         config carries an API key, and this dictionary gets printed.
 
         ``instructions_digest`` is in, and it is here for the arms a fork
         does not build. A forked pair shares one ``info`` and cannot
-        disagree on it; two arms built BY HAND -- the obvious way to compare
-        two configurations of the same framework -- could run different
+        disagree on it; two arms built BY HAND (the obvious way to compare
+        two configurations of the same framework) could run different
         instructions while ``agree()`` reported identical on every check,
         confirming a controlled comparison that was not one. A schema
         version cannot notice that; the digest of the instructions can, and
@@ -1977,7 +1977,7 @@ class FrameworkAdapter:
         the same agent, and the participation cap, which decides what
         "clipped" means in the record. They live here rather than on
         :class:`AdapterInfo` because they are this adapter's settings, not
-        the framework's identity -- but a recording needs both halves, so
+        the framework's identity, but a recording needs both halves, so
         this is the one dictionary a recorder should write.
         """
         out = self.info.as_dict()
@@ -1989,8 +1989,8 @@ class FrameworkAdapter:
         """The constructor arguments a fork is rebuilt with.
 
         A subclass that adds constructor arguments extends this rather than
-        overriding :meth:`fork`, so the copy semantics -- what is shared,
-        what is deep-copied -- stay in one place.
+        overriding :meth:`fork`, so the copy semantics (what is shared,
+        what is deep-copied) stay in one place.
         """
         return {"info": self.info, "every": self.every,
                 "fundamentals": self.fundamentals,
@@ -2029,7 +2029,7 @@ class ReplayMixin:
     :func:`digest`, :class:`Transcript` and :func:`replay_response` were
     shared from the start, and the branch that USES them was left to each
     adapter. That was backwards. The leaves are the parts nobody gets
-    wrong; the control flow is where the drift-dangerous decisions live --
+    wrong; the control flow is where the drift-dangerous decisions live:
     which input the key is computed over, which branch runs, what gets
     recorded. An adapter written in six months that keys its transcript on
     (arm, step) instead of on the input passes every test it has, and its
@@ -2037,7 +2037,7 @@ class ReplayMixin:
     sharing the lookup cannot prevent that, because the lookup sits
     downstream of the choice that goes wrong. Measured across the first
     four adapters, the ask() bodies were 18 to 33 percent line-similar and
-    their control flow was identical -- the signature of a skeleton that
+    their control flow was identical, the signature of a skeleton that
     wants one home.
 
     Use it beside the base, mixin first:
@@ -2050,7 +2050,7 @@ class ReplayMixin:
 
     The mixin owns ``mode``, ``transcript`` and ``recorder``, implements
     :meth:`FrameworkAdapter.ask`, stages the exchange into the record, and
-    shares the transcript AND the recorder across :meth:`fork` -- a replay
+    shares the transcript AND the recorder across :meth:`fork`. A replay
     of one arm must read the same recorded run as its sibling, and a live
     recording of both arms belongs in one file. Do not override ``ask`` on
     an adapter that takes the mixin; the skeleton is the point of it.
@@ -2059,8 +2059,8 @@ class ReplayMixin:
 
     - :meth:`prepare` turns the payload into ``(key_material, prompt)``:
       what the replay key is computed over, and what the framework is
-      actually sent. Usually they are the same object -- a rendered prompt
-      hashes as itself -- but they are two return values because they are
+      actually sent. Usually they are the same object (a rendered prompt
+      hashes as itself) but they are two return values because they are
       two decisions: an adapter may key on ``{payload, instructions}``
       while sending a rendered prompt, and a hook that assumed "hash what
       you send" would force it to key on something it did not choose.
@@ -2144,9 +2144,9 @@ class ReplayMixin:
         response = (self.call(obs, prompt) if resumed is None
                     else resumed.get("response"))
         if self.recorder is not None:
-            # The response is recorded AS RETURNED, never re-serialised.
+            # The response is recorded AS RETURNED, never re-serialized.
             # Replay hands back exactly what was recorded, so live and
-            # replay must return the same shape -- a JSON string
+            # replay must return the same shape. A JSON string
             # json.dumps'd here would replay one parse level short, against
             # a recording that looked fine when it was written.
             stamp_preset(self.recorder, obs)
@@ -2173,7 +2173,7 @@ class ReplayMixin:
         # SHARED, not copied, in both directions on purpose: a replay of
         # one arm must read the same recorded run as its sibling, and a
         # live recording of both arms belongs in one file. `prior` shares
-        # for the same reason -- a resume that only one arm consulted
+        # for the same reason: a resume that only one arm consulted
         # would pay for one arm and not the other.
         kwargs.update(mode=self.mode, transcript=self.transcript,
                       recorder=self.recorder, prior=self.prior)

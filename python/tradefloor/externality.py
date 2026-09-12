@@ -124,7 +124,7 @@ class Externality:
         self.matrix = matrix
         self.diagonal = diagonal
         #: The diagonal in basis points of the notional that agent traded
-        #: over the window. Currency alone does not compare a $10m programme
+        #: over the window. Currency alone does not compare a $10m program
         #: to a $100k one, which is the same argument `tca.py` makes.
         self.diagonal_bps = diagonal_bps
         self.cohort_pnl = cohort_pnl
@@ -264,7 +264,7 @@ class Externality:
                          "kind": kind, "value": value})
 
     def as_dict(self) -> dict[str, Any]:
-        """Artifact-shaped, like :meth:`Comparison.as_dict`. JSON-serialisable
+        """Artifact-shaped, like :meth:`Comparison.as_dict`. JSON-serializable
         and carrying nothing an agent was not shown."""
         return {
             "labels": list(self.labels),

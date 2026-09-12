@@ -7,7 +7,7 @@ config file. Scenario documents are configuration, so they had to be readable
 without a dependency.
 
 The alternative was `pyyaml` behind an optional extra, which would have made
-the documented first line of the feature -- `Scenario.from_yaml(...)` -- fail
+the documented first line of the feature, `Scenario.from_yaml(...)`, fail
 on a default install. So this reads the subset the scenario schema actually
 uses:
 
@@ -36,8 +36,8 @@ it does not implement is worse than no parser: it reads a document as
 something other than what it says. So every YAML feature outside the subset
 raises, and says which feature it was:
 
-- tags (`!!python/object`, or any `!`) -- the construct behind every YAML
-  deserialisation CVE, and this reader has no code that could build an object
+- tags (`!!python/object`, or any `!`), the construct behind every YAML
+  deserialization CVE, and this reader has no code that could build an object
   from one;
 - anchors and aliases (`&`, `*`), including merge keys (`<<`);
 - flow collections (`{...}`, `[...]`);
@@ -51,8 +51,8 @@ raises, and says which feature it was:
 Because none of those is implemented, none of them is reachable. A scenario
 file cannot name a Python type, cannot import, cannot construct, and cannot
 alias one part of the document into another. The output is dicts, lists,
-strings, numbers, booleans and None -- and the scenario loader then refuses
-every key it does not recognise, so the reachable surface is the schema.
+strings, numbers, booleans and None, and the scenario loader then refuses
+every key it does not recognize, so the reachable surface is the schema.
 
 Numbers are narrower than YAML 1.1 on purpose, and the narrowing is a
 REFUSAL rather than a different answer. `1:30` is ninety to a YAML parser and
@@ -127,9 +127,9 @@ class _Doc:
     """The significant lines, plus the raw ones a block scalar has to re-read.
 
     Blank lines and comments are dropped before parsing, which keeps the
-    indent logic short. A block scalar cannot use the dropped version --
-    a blank line inside `>` is a paragraph break and a `#` inside `|` is
-    text -- so it reads the raw lines back by number instead.
+    indent logic short. A block scalar cannot use the dropped version,
+    because a blank line inside `>` is a paragraph break and a `#` inside
+    `|` is text, so it reads the raw lines back by number instead.
 
     ``ends_with_newline`` is carried for the same reader. YAML's default
     chomping keeps ONE trailing line break, and a block that runs to the end
@@ -329,7 +329,7 @@ def _finish_pair(doc: _Doc, index: int, rest: str, indent: int,
     nxt = doc.lines[index]
     if nxt.indent > indent:
         return _parse_block(doc, index, nxt.indent)
-    # A sequence may sit at its key's own indent -- `shocks:` on one line and
+    # A sequence may sit at its key's own indent. `shocks:` on one line and
     # `- target: ...` at the same column on the next is the commonest way
     # anybody writes YAML, and reading it as an empty value would drop every
     # intervention in the file without an error.
@@ -587,7 +587,7 @@ _AMBIGUOUS = (
 #:
 #: `operation: -` is not the string "-": the dash opens a block sequence,
 #: and a real parser calls the document malformed. Reading it as text is
-#: the wrong kind of permissive -- it accepts a file nothing else will.
+#: the wrong kind of permissive, because it accepts a file nothing else will.
 #: `-2` is fine, because the indicator only applies when a space follows.
 _INDICATOR_ALONE = frozenset("-?:")
 _INDICATOR_RESERVED = frozenset("%@`,")

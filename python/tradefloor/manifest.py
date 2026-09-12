@@ -26,7 +26,7 @@ the library or embedded in the manifest. A fingerprint identifies; it cannot
 reconstruct, because you cannot invert a hash. So the manifest EMBEDS
 everything user-supplied: the roster itself (never a recipe for one, since generators change
 across versions, and an EDGAR query is not the data it returned), the macro
-initial conditions, the realised scenario path, the full order log, and the
+initial conditions, the realized scenario path, the full order log, and the
 strategy when it is a :class:`StrategySpec`.
 
 The one component that cannot always be embedded is a hand-written Python
@@ -53,7 +53,7 @@ library could quote held still while the numbers moved. A manifest that
 trusted names would replay on the wrong build, produce a plausible market,
 and manufacture exactly the false confidence it exists to prevent.
 
-So the era identity here is behavioural: :func:`era_fingerprint` runs a
+So the era identity here is behavioral: :func:`era_fingerprint` runs a
 small fixed simulation: generator draws, fair value across every sector,
 the daily mispricing step, and a coupled engine run through day closes, and
 digests it, the same canonical-f64 discipline as ``tests/known_answer.py``.
@@ -208,7 +208,7 @@ _CENTRAL_BANK_FIELDS = (
 #: Every key `Engine.state_snapshot` carries. :func:`state_hash` checks a
 #: snapshot against this before hashing, so a field added to the engine
 #: raises here rather than being left silently out of every leaf a ledger
-#: holds -- the failure `state_snapshot` itself has had six times.
+#: holds, the failure `state_snapshot` itself has had six times.
 _SNAPSHOT_KEYS = (
     "columns", "rng", "tickers", "model_fingerprint",
     "attribution", "tick_components", "tick_fundamental", "tick_anchor",
@@ -224,7 +224,7 @@ _SNAPSHOT_KEYS = (
     # The day's jump and overnight move, waiting for the tape row that
     # carries them. They are applied at a day boundary and written onto the
     # FIRST TICK OF THE NEXT DAY, so between the close and that row they are
-    # pending state -- and a snapshot that dropped them let a resumed run's
+    # pending state, and a snapshot that dropped them let a resumed run's
     # record lose a day's jump while the continuous run's kept it.
     #
     # Hashed for the same reason the overlay above is: they decide what the
@@ -254,7 +254,7 @@ def _sha(text: str) -> str:
 
 
 def _f64(buf: bytearray, value: float) -> None:
-    """One f64 in canonical big-endian form, NaN normalised.
+    """One f64 in canonical big-endian form, NaN normalized.
 
     The same rule as the known-answer test, for the same reason: no decimal
     formatting anywhere near a digest, and one quiet-NaN bit pattern, because
@@ -498,7 +498,7 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _f64(buf, snapshot["universe_stress"])
     _f64(buf, snapshot["forced_flow_spent"])
     # LENGTH-PREFIXED, because these two are empty between the tape row that
-    # consumes them and the close that fills them again -- unlike every
+    # consumes them and the close that fills them again, unlike every
     # per-slot array above, which always follows the roster. An empty buffer
     # and a roster-length one of zeros are different states and hash apart.
     for name in ("pending_jump", "pending_overnight"):
@@ -600,7 +600,7 @@ def state_hash(snapshot: dict[str, Any]) -> str:
 
 
 def era_fingerprint() -> str:
-    """Digest of a fixed probe simulation: the build's behavioural identity.
+    """Digest of a fixed probe simulation: the build's behavioral identity.
 
     Two builds that agree here produce the same numbers for the arithmetic
     the probe exercises: the generator, fair value across every sector and
@@ -806,8 +806,8 @@ class DayLedger:
     ## The leaf is taken after the close
 
     Not after ``record``, so a run that never recorded a tape still ledgers,
-    and the state a leaf commits to is the one the next day starts from.
-    That is what makes day d checkable from day d - 1.
+    and the state a leaf commits to is the one the next day starts from, so
+    day d can be checked against day d - 1's leaf.
     """
 
     __slots__ = ("leaves", "snapshots")
@@ -886,7 +886,7 @@ class DayLedger:
             index //= 2
         return out
 
-    # -- serialisation -----------------------------------------------------
+    # -- serialization -----------------------------------------------------
 
     def to_json(self, *, with_snapshots: bool = True) -> str:
         """The ledger as JSON: the file that travels beside a manifest.
@@ -1005,7 +1005,7 @@ def _snapshot_from_json(payload: dict[str, Any]) -> dict[str, Any]:
 class RunManifest:
     """A finished run as one shareable, self-verifying document.
 
-    Built by :meth:`of` from the engine that ran, serialised with
+    Built by :meth:`of` from the engine that ran, serialized with
     :meth:`to_json`, and checked by whoever receives it with
     :meth:`reproduce`. See the module docstring for what it carries, what it
     refuses, and why the era check is a digest rather than a version number.
@@ -1036,7 +1036,7 @@ class RunManifest:
         its fingerprint) or a reference string for a hand-written agent,
         "repo X at commit Y", which the manifest records as referenced, not
         carried, and declares in :attr:`gaps`. An agent OBJECT is refused:
-        the manifest cannot serialise code, and accepting it would embed a
+        the manifest cannot serialize code, and accepting it would embed a
         ``repr`` while implying it embedded a strategy.
 
         ``universe_source`` is optional provenance (the ``random(n, seed)``
@@ -1250,7 +1250,7 @@ class RunManifest:
 
         A component that arrives not matching the fingerprint it was written
         with is refused BY NAME, before anything runs: a manifest that
-        travelled and arrived changed no longer describes the run it came
+        traveled and arrived changed no longer describes the run it came
         from, and replaying it anyway would produce a market that fails the
         result check for a reason the error could no longer locate.
         """
@@ -1401,7 +1401,7 @@ class RunManifest:
         already in hand.
 
         This used to lead with "an unmeasured platform pair" in every case,
-        and print the pair -- which was often the SAME platform twice, so the
+        and print the pair, which was often the SAME platform twice, so the
         sentence disproved itself while sending the reader to the Rust core.
         It happened for real: a manifest taken on a fork whose order log was
         empty reported a suspected Windows-versus-Windows arithmetic
@@ -1464,7 +1464,7 @@ class RunManifest:
         """The half of the lineage claim a manifest can check alone.
 
         Without the checkpoint there is no way to confirm the first entries
-        ARE its log -- :meth:`verify_lineage` is for a reader who holds it.
+        ARE its log; :meth:`verify_lineage` is for a reader who holds it.
         What is checkable here is that the claim is not self-contradictory: a
         run cannot have branched from a point later than its own history.
         """
@@ -1554,7 +1554,7 @@ class RunManifest:
             # carries the legacy nine-coefficient dict and a newer one the
             # full surface, and a key only one side knows is a difference
             # of BOOKKEEPING, not of model, since the era probe above this
-            # block is what catches a behavioural change the comparison
+            # block is what catches a behavioral change the comparison
             # cannot see.
             full = ModelParams.from_preset(ours["name"]).to_dict()
             disagreeing = sorted(
@@ -1629,7 +1629,7 @@ class RunManifest:
 
         The declaration alone is a claim: it names a digest, and a reader
         holding only the manifest cannot test it. A reader holding the
-        checkpoint can, and this test covers it -- the fingerprint must match,
+        checkpoint can, and this test covers it: the fingerprint must match,
         and the run's first entries must be the checkpoint's log.
 
         Raises rather than returning a bool, for the same reason
@@ -1697,7 +1697,7 @@ class RunManifest:
 
     @property
     def scenario(self) -> Scenario | None:
-        """The realised macro path, as a :class:`Scenario`, or None."""
+        """The realized macro path, as a :class:`Scenario`, or None."""
         payload = self._doc.get("scenario")
         if payload is None:
             return None
@@ -2244,7 +2244,7 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
             start, end = spans[day]
             # The roster first, and only the roster. `restore_state` refuses a
             # snapshot whose tickers are not the engine's, because the columns
-            # are positional -- so a run that listed or delisted a name before
+            # are positional, so a run that listed or delisted a name before
             # this day has to reach the shape the snapshot was taken at. These
             # entries carry the fundamentals a column cannot (sector, earnings,
             # book value), and they take draws, which the restore below

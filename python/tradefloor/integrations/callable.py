@@ -3,8 +3,8 @@
 The reference implementation of the adapter contract in ``common.py``, and
 the smallest thing that exercises all of it: the observation allowlist, the
 two-stage validation, the cadence, the record, and the four methods both
-harnesses look for. The framework adapters -- FinRobot, and the ones under
-construction beside it -- are this shape with :meth:`ask` pointed at
+harnesses look for. The framework adapters (FinRobot, and the ones under
+construction beside it) are this shape with :meth:`ask` pointed at
 something that costs money.
 
 It is also useful in its own right, twice over. A decision RULE written as
@@ -18,7 +18,7 @@ measuring two validators.
 ## The function receives the serialized payload, not the Observation
 
 ``fn`` is called with the :func:`~tradefloor.integrations.common.serialize_observation`
-output -- a JSON-able dict -- and never with the Observation itself. The
+output, a JSON-able dict, and never with the Observation itself. The
 Observation carries ``.engine``, and the engine knows the answer key. A
 function handed the Observation could read
 ``obs.engine.macro_state`` today and ``obs.engine.attribution`` tomorrow,
@@ -36,13 +36,13 @@ it is also the reference implementation of the replay skeleton: attach a
 with that transcript and the run reproduces without the function ever
 being called. For a deterministic rule that buys nothing, which is why
 ``mode`` defaults to "live" here where a framework adapter defaults to
-"replay" -- but a callable wrapping something non-deterministic (a local
+"replay". A callable wrapping something non-deterministic (a local
 model, say) gets record-once-replay-forever exactly as FinRobot does.
 
 ## Async goes through the one shared bridge
 
-Tradefloor's run loop is synchronous -- ``World.run`` and ``evaluate`` call
-``act`` inline -- and an async ``fn`` is supported by handing its coroutine
+Tradefloor's run loop is synchronous, since ``World.run`` and ``evaluate``
+call ``act`` inline, and an async ``fn`` is supported by handing its coroutine
 to :func:`~tradefloor.integrations.common.run_sync`, the one bridge every
 adapter uses. The bridge, not a local answer, because the failure it guards
 against only shows up in a notebook: a naive ``asyncio.run`` works in a
@@ -83,7 +83,7 @@ class CallableAgentAdapter(ReplayMixin, FrameworkAdapter):
     :class:`~tradefloor.integrations.common.Decision`, a dict with an
     ``actions`` list, or a JSON string. Invalid output raises
     :class:`~tradefloor.integrations.common.DecisionError`, exactly as it
-    would from a framework -- this adapter repairs nothing, because its
+    would from a framework. This adapter repairs nothing, because its
     other job is being the baseline a framework is compared against.
     """
 
@@ -99,8 +99,8 @@ class CallableAgentAdapter(ReplayMixin, FrameworkAdapter):
         # `fn` defaults to None rather than being required, so the refusal
         # below owns the message; a bare TypeError from the signature would
         # not say what a valid `fn` looks like. It stays required in replay
-        # mode too -- it is the policy this adapter IS, and fork rebuilds
-        # around it -- though a replay never calls it.
+        # mode too, because it is the policy this adapter IS and fork
+        # rebuilds around it, though a replay never calls it.
         if not callable(fn):
             raise ValidationError(
                 f"CallableAgentAdapter wraps a callable, got "
@@ -132,8 +132,8 @@ class CallableAgentAdapter(ReplayMixin, FrameworkAdapter):
         if inspect.iscoroutine(out):
             # The RESULT is checked rather than the function: a partial or a
             # wrapper carries a coroutine function past any constructor
-            # check. run_sync is the one shared bridge -- see the module
-            # docstring -- and it works whether or not this thread already
+            # check. run_sync is the one shared bridge (see the module
+            # docstring) and it works whether or not this thread already
             # has a running event loop.
             out = run_sync(out)
         return out

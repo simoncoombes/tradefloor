@@ -2,7 +2,7 @@
 
 `evaluate` scores every agent against one seed. That is the right primitive,
 it is what makes a comparison exact, since all agents see the identical market
-but it is the wrong unit of judgement, and the difference is not small.
+but it is the wrong unit of judgment, and the difference is not small.
 
 Measured on this build, with the reference agents over
 ``Universe.random(30, seed=11)``, ten days, sim seeds 0 through 11:
@@ -107,7 +107,7 @@ class AgentRecord:
 
     ``captures`` and ``pnls`` are parallel to the ranking's ``seeds``, so a
     result can always be traced back to the market that produced it. A capture
-    is ``None`` where it could not be measured -- see :class:`Ranking`.
+    is ``None`` where it could not be measured. See :class:`Ranking`.
     """
 
     __slots__ = ("name", "seeds", "captures", "pnls", "wins",
@@ -135,7 +135,7 @@ class AgentRecord:
 
         Pooled rather than averaged, and the difference is not cosmetic. A
         per-seed ratio divides by whatever the reference happened to earn in
-        that market, which on a short horizon can be almost nothing --
+        that market, which on a short horizon can be almost nothing. As
         measured at three days on the grid in this module's docstring, a
         seed where the reference earned 1.1% of capital produced a capture
         ratio of **+3.85**, and one such seed drags a median of ten far
@@ -148,8 +148,8 @@ class AgentRecord:
         markets, what fraction of what the reference captured did this agent
         capture?
 
-        Seeds where the reference lost money are excluded from both sums --
-        see :attr:`Ranking.unmeasurable` -- because a negative denominator
+        Seeds where the reference lost money are excluded from both sums
+        (see :attr:`Ranking.unmeasurable`), because a negative denominator
         flips the sign of everything above it.
         """
         numerator = 0.0
@@ -166,7 +166,7 @@ class AgentRecord:
 
         Kept because a per-seed ratio is a true fact about its own seed and
         the distribution is worth seeing. But a median OF ratios inherits
-        every explosion in the tail -- see :attr:`pooled_capture` -- so it is
+        every explosion in the tail (see :attr:`pooled_capture`), so it is
         no longer what the table sorts on.
         """
         values = self.measured
@@ -219,9 +219,9 @@ class Ranking:
         self.records = records
         self.seeds = seeds
         #: What the reference earned on each seed, parallel to ``seeds``. This
-        #: is the denominator, and it varies several-fold across seeds --
-        #: measured $10.6k to $36.8k over ten three-day seeds on the grid in
-        #: this module's docstring -- so the headline number pools rather
+        #: is the denominator, and it varies several-fold across seeds
+        #: (measured $10.6k to $36.8k over ten three-day seeds on the grid
+        #: in this module's docstring), so the headline number pools rather
         #: than averages ratios.
         self.reference_pnls = reference_pnls
         #: Seeds where capture was not measurable because the reference did
@@ -231,7 +231,7 @@ class Ranking:
         self.unmeasurable = unmeasurable
         self.universe_fingerprint = universe_fingerprint
         self.oracle = oracle
-        #: The model every seed ran under -- one value, because ranking
+        #: The model every seed ran under. One value, because ranking
         #: agents across different models would compare markets, not
         #: agents. A shipped preset's name or custom-XXXXXXXX.
         self.model_fingerprint = model_fingerprint
@@ -273,7 +273,7 @@ class Ranking:
         Both agents traded the same market on each seed, so comparing them
         seed by seed removes the market from the question. Returns the win
         counts and a ``decisive`` flag, which is true only when one agent won
-        on every paired seed -- the strongest claim a sign test can make and
+        on every paired seed, the strongest claim a sign test can make and
         the only one that needs no distributional assumption at all.
 
         ``p_value`` is the two-sided probability of a split at least this
@@ -364,7 +364,7 @@ def _sign_test(wins_a: int, wins_b: int) -> float | None:
 
     Written out rather than pulled from scipy, which this library does not
     depend on. Exact, so it stays honest at the tiny trial counts a sweep of
-    eight or twelve seeds actually produces -- where a normal approximation
+    eight or twelve seeds actually produces, where a normal approximation
     would report a confident p-value on four observations.
     """
     n = wins_a + wins_b

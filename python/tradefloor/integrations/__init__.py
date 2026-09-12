@@ -7,22 +7,22 @@ the same way, so this subpackage is a place and not a file:
     Tradefloor         market, macro, execution, accounting, checkpoints,
                        forks, interventions, comparison
 
-A framework adapter MUST NOT touch engine state, and it is worth being
-precise about what enforces that: validation, not confinement. Every
-decision is validated before anything is executed -- but the adapter
-receives the :class:`~tradefloor.harness.Observation`, and the Observation
-carries the live engine, exactly as it does for any ordinary agent. The
+A framework adapter MUST NOT touch engine state. Every decision is
+validated before anything is executed, but nothing confines the adapter:
+it receives the :class:`~tradefloor.harness.Observation`, and the
+Observation carries the live engine, exactly as it does for any ordinary
+agent. The
 boundary is EQUAL to an agent's, not tighter. The allowlist serializer and
 the mutation checks in ``tests/test_integrations.py`` catch a cooperating
 author's accident; nothing here sandboxes the seam against code that
 reaches for ``obs.engine`` on purpose, and no docstring should tell an
-author otherwise -- an author who believes the harness holds a property
+author otherwise. An author who believes the harness holds a property
 does not defend it themselves.
 
-``common.py`` is the shared half of every adapter -- the observation
+``common.py`` is the shared half of every adapter: the observation
 allowlist, the decision model and its two-stage validation, transcripts and
-replay, adapter metadata, and the :class:`~.common.FrameworkAdapter` base --
-derived from the FinRobot integration, which came first and settled those
+replay, adapter metadata, and the :class:`~.common.FrameworkAdapter` base.
+It is derived from the FinRobot integration, which came first and settled those
 questions. ``callable.py`` is the reference adapter over a plain Python
 function, and the template a new framework adapter starts from. ``common``
 depends on nothing outside the library, so importing it never needs any
@@ -50,7 +50,7 @@ stating.
 ## Attribution
 
 Each adapter targets a project this repository neither owns nor is
-affiliated with. The module docstrings name the upstream project, its licence
+affiliated with. The module docstrings name the upstream project, its license
 and the version tested. None of those projects endorses this work.
 """
 

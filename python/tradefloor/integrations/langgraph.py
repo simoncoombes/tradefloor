@@ -32,13 +32,13 @@ Measured against langgraph 1.2.11, every one of those has the ancestry
 
 It is still the wrong check. ``Runnable`` is a nominal ABC with no
 ``__subclasshook__``, so ``isinstance(obj, Runnable)`` is ``False`` for a
-plain object with a perfectly good ``invoke`` -- which is exactly the
+plain object with a perfectly good ``invoke``, which is exactly the
 deterministic double a test wants to pass, and exactly what
 ``tests/test_langgraph.py`` uses. Importing ``Runnable`` to run the check
 would also drag ``langchain_core`` onto the import path to reject the one
 caller who does not need it. So the check is
 ``callable(getattr(obj, "invoke", None))``, and the only class named by
-name is ``StateGraph`` -- duck-checked, never imported -- because an
+name is ``StateGraph`` (duck-checked, never imported) because an
 uncompiled builder has no ``invoke`` at all and the one-word fix is worth
 saying out loud.
 
@@ -46,7 +46,7 @@ saying out loud.
 
 ``input_builder`` and ``output_parser`` are not conveniences. A graph's
 state schema belongs to whoever wrote the graph, and three measured
-behaviours of langgraph 1.2.11 say what happens when an adapter guesses it:
+behaviors of langgraph 1.2.11 say what happens when an adapter guesses it:
 
 - **An undeclared key is dropped before the node runs.** Sending
   ``{"observation": ...}`` to a graph whose schema does not declare
@@ -59,8 +59,8 @@ behaviours of langgraph 1.2.11 say what happens when an adapter guesses it:
   stranger's code and says nothing about the real cause.
 - **A missing key is a bare ``KeyError`` from the node.**
 
-The default input therefore carries BOTH shapes -- ``observation`` and
-``messages`` -- because a graph that declares only one gets what it needs
+The default input therefore carries BOTH shapes, ``observation`` and
+``messages``, because a graph that declares only one gets what it needs
 and the unused half is dropped harmlessly. That is what makes the default
 work for a graph written for this harness AND for the message-shaped
 graphs ``create_react_agent`` produces, with no hook at all. Anything else
@@ -74,10 +74,10 @@ decision, and
 :func:`~tradefloor.integrations.common.parse_decision` refuses it by
 design: a mapping with no ``actions`` key used to validate as an empty
 action list, so a graph whose plumbing was wrong scored as an agent that
-considered the market and declined -- ``trades=0``, no errors, nothing to
+considered the market and declined: ``trades=0``, no errors, nothing to
 distinguish it from a real hold. :func:`default_output_parser` extracts
 the decision from the three envelopes a graph realistically returns, and
-REFUSES anything it does not recognise rather than falling through to a
+REFUSES anything it does not recognize rather than falling through to a
 hold.
 
 ## An interrupting graph is refused, and that is a decision
@@ -92,7 +92,7 @@ to still be where it stopped. A Tradefloor market has no such place:
 returns, and the book, the macro path and the variance process move with
 it. There is nothing to resume INTO. A decision answered an hour later
 would be about a market that no longer exists, and scoring the pause as a
-hold would record a paused workflow as a considered choice -- the same
+hold would record a paused workflow as a considered choice, the same
 silent-hold failure the envelope rules exist to stop.
 
 Where it is caught is worth knowing, because it is not where you would
@@ -100,7 +100,7 @@ guess. Measured on langgraph 1.2.11, ``GraphInterrupt`` never escapes
 ``invoke``: with a checkpointer, without one, raised directly by a node,
 and from a subgraph, all four come back as ``{"__interrupt__":
 [Interrupt(...)]}`` inside the returned state. LangGraph's own docstring
-agrees -- "Never raised directly, or surfaced to the user". So the primary
+agrees: "Never raised directly, or surfaced to the user". So the primary
 handler is in :func:`default_output_parser`, not an ``except`` clause;
 :func:`_reraise_known` covers the exception route as well, so the
 diagnosis reads the same either way. Both raise
@@ -128,7 +128,7 @@ Tradefloor checkpoint says nothing about what the agent had been
 thinking. Keep them paired by run, and do not treat either as a save file
 for the pair. ``thread_id`` is addressed through
 ``config["configurable"]["thread_id"]``, and this adapter derives a fresh
-one per decision by default -- see :class:`LangGraphAdapter`.
+one per decision by default. See :class:`LangGraphAdapter`.
 
 ## The module name does not shadow the package
 
@@ -198,10 +198,10 @@ class GraphInterruptedError(DecisionError):
     string-matching a message or reaching through ``__cause__``. It is a
     :class:`~tradefloor.integrations.common.DecisionError` because at the
     Tradefloor boundary the fact that matters is that no decision was
-    produced -- not a
+    produced, not a
     :class:`~tradefloor.integrations.common.FrameworkError`, because
     nothing failed: an interrupting graph did exactly what it was built to
-    do. See :func:`default_output_parser` for why it cannot be honoured.
+    do. See :func:`default_output_parser` for why it cannot be honored.
     """
 
 
@@ -218,7 +218,7 @@ def render(payload: dict[str, Any], *, instructions: str = INSTRUCTIONS,
     JSON rather than prose, and sorted, for two reasons. It is what a graph
     built around a chat model handles best without a second parser between
     it and the facts, and a canonical ordering makes the text a stable
-    replay key -- an unordered dump would produce a different digest for
+    replay key, because an unordered dump would produce a different digest for
     the same market on a different run.
 
     Rendered from the PAYLOAD only, never from the Observation. The
@@ -237,8 +237,8 @@ def _user_message(text: str) -> Any:
 
     A real ``langchain_core.messages.HumanMessage`` when LangGraph is
     installed, because a graph that type-checks its messages should get the
-    class it expects. On a bare install -- which is the duck-typed
-    ``.invoke`` object a test uses, where there is no graph to satisfy --
+    class it expects. On a bare install (which is the duck-typed
+    ``.invoke`` object a test uses, where there is no graph to satisfy)
     it falls back to ``{"role": "user", "content": ...}``, the shape
     ``add_messages`` coerces to exactly the same ``HumanMessage`` when
     there is one. :func:`~tradefloor.integrations.common.require` is still
@@ -269,9 +269,9 @@ def default_input_builder(payload: dict[str, Any], *,
     schema does not declare is dropped before any node runs, so the unused
     half costs nothing, while a graph handed only the half it does not read
     fails deep inside its own nodes. A graph declaring ``observation`` gets
-    the structured payload; a graph declaring ``messages`` -- the shape
-    ``MessagesState`` and ``create_react_agent`` use, which is most of them
-    -- gets the same facts as text. Neither is told about the other.
+    the structured payload; a graph declaring ``messages`` (the shape
+    ``MessagesState`` and ``create_react_agent`` use, which is most of them)
+    gets the same facts as text. Neither is told about the other.
 
     Takes the payload and not the Observation, for the reason
     :func:`render` gives.
@@ -287,8 +287,8 @@ def _text_of(message: Any) -> str:
     ``AIMessage.content`` is a string for most providers and a list of
     content blocks for some. Both arrive here, and a parser that handled
     only the string would work against one model and return nothing against
-    the next -- which, before the shared parser learned to refuse an
-    envelope, scored as a considered hold.
+    the next. Before the shared parser learned to refuse an
+    envelope, that scored as a considered hold.
     """
     if isinstance(message, str):
         return message
@@ -358,18 +358,18 @@ def default_output_parser(result: Any) -> Any:
     function accepts and lets the shared validator do the deciding. The
     ladder, first match wins:
 
-    1. a :class:`~tradefloor.integrations.common.Decision`, or a string --
+    1. a :class:`~tradefloor.integrations.common.Decision`, or a string:
        passed straight through
-    2. a mapping carrying ``actions`` -- it IS the decision already
-    3. a mapping carrying ``decision`` -- the natural shape for a graph
+    2. a mapping carrying ``actions``: it IS the decision already
+    3. a mapping carrying ``decision``: the natural shape for a graph
        written for this harness, which puts its answer in a state key
-    4. a mapping carrying ``messages`` -- the ``MessagesState`` shape; the
+    4. a mapping carrying ``messages``: the ``MessagesState`` shape; the
        last message's text is taken, fences and trailing prose included,
        because the shared text parser tolerates both
 
     Anything else RAISES. That is the whole point of this function. A
-    mapping this cannot read is a plumbing failure -- a graph that never
-    reached its decision node, a state key spelled differently -- and
+    mapping this cannot read is a plumbing failure (a graph that never
+    reached its decision node, a state key spelled differently) and
     returning an empty decision for one would score it as an agent that
     considered the market and declined, with ``trades=0`` and an empty
     error list. There is nothing in a scorecard that would tell the two
@@ -384,7 +384,7 @@ def default_output_parser(result: Any) -> Any:
         # a checkpointer, without one, raised directly by a node, and from a
         # subgraph, all four return `{"__interrupt__": [Interrupt(...)]}` as
         # part of the state. LangGraph's own `GraphInterrupt` docstring says
-        # so -- "Never raised directly, or surfaced to the user".
+        # so: "Never raised directly, or surfaced to the user".
         #
         # It is checked before `decision` because a checkpointed thread can
         # carry a decision written on an earlier step, and answering this
@@ -399,7 +399,7 @@ def default_output_parser(result: Any) -> Any:
         # purpose. It is FALSE for a graph state channel, where `None` is
         # the unwritten default: a node that failed, never ran, or swallowed
         # an exception leaves exactly that, and reading it as a considered
-        # decline scores the failure at trades=0 with an empty error list --
+        # decline scores the failure at trades=0 with an empty error list,
         # indistinguishable from an agent that looked and declined.
         #
         # It is the same argument this module's docstring makes about
@@ -409,7 +409,7 @@ def default_output_parser(result: Any) -> Any:
         # at its default had that decision silently discarded, because
         # `actions` is examined first.
         if result.get("actions") is not None:
-            # The decision FIELDS, extracted -- not the whole state. A graph
+            # The decision FIELDS, extracted, not the whole state. A graph
             # returns everything its schema declares, so a state carrying
             # `actions` almost always carries `observation`, `notes` and the
             # rest beside it, and `parse_decision` refuses unknown keys (it
@@ -429,7 +429,7 @@ def default_output_parser(result: Any) -> Any:
             text = _text_of(messages[-1])
             # Parsed HERE rather than handed back for `act` to parse, so
             # that a message carrying no decision is reported as what it is
-            # -- a graph that talked instead of deciding -- rather than as
+            # (a graph that talked instead of deciding) rather than as
             # the shared parser's "no JSON object", which does not mention
             # the envelope the text came out of and leaves the reader
             # looking for a bug in their prompt rather than their graph.
@@ -473,7 +473,7 @@ class LangGraphAdapter(FrameworkAdapter):
     scores = tf.evaluate({"graph": agent}, seed=7, universe=roster)
     ```
 
-    ``runnable`` is anything with an ``invoke`` method -- a
+    ``runnable`` is anything with an ``invoke`` method: a
     ``CompiledStateGraph``, a ``create_react_agent`` agent, any LangChain
     ``Runnable``, or a plain object of your own. An object with only
     ``ainvoke`` is driven through
@@ -488,7 +488,7 @@ class LangGraphAdapter(FrameworkAdapter):
     anything
     :func:`~tradefloor.integrations.common.parse_decision` accepts. Both
     default to the module-level functions of the same name, and the
-    defaults are built so that a graph ignoring them still works -- see the
+    defaults are built so that a graph ignoring them still works. See the
     module docstring for the three measured reasons a fixed state schema
     would not.
 
@@ -499,8 +499,8 @@ class LangGraphAdapter(FrameworkAdapter):
 
     ``config`` is a ``RunnableConfig`` merged into the one this adapter
     builds. Tradefloor run identity goes into ``config["metadata"]``,
-    because that is the key measured to arrive intact at a node --
-    ``run_name`` is consumed by the tracer and does not -- and a
+    because that is the key measured to arrive intact at a node
+    (``run_name`` is consumed by the tracer and does not), and a
     ``"tradefloor"`` tag goes into ``config["tags"]``. Your keys survive;
     the Tradefloor ones are added beside them.
 
@@ -514,7 +514,7 @@ class LangGraphAdapter(FrameworkAdapter):
 
     ``mode`` is ``"live"`` or ``"replay"``. Replay reads a recorded
     :class:`~tradefloor.integrations.common.Transcript` and needs no graph,
-    no LangGraph install and no network -- worth having even though a local
+    no LangGraph install and no network. It is worth having even though a local
     graph is free, because a graph with a language model in it is neither
     free nor deterministic, and a recorded run is how such an experiment
     stays reproducible.
@@ -557,7 +557,7 @@ class LangGraphAdapter(FrameworkAdapter):
             instructions_digest=self.info.instructions_digest)
         #: The caller's own builder, or `None`. Kept apart from
         #: `input_builder` below so :meth:`fork_kwargs` can tell "nobody
-        #: passed one" from "the default was resolved and stored" -- the
+        #: passed one" from "the default was resolved and stored". The
         #: default is now bound to `self.renderer`, and passing the BOUND
         #: method through a fork would leave the twin calling the parent's
         #: renderer forever, which is the one thing a fork must not do.
@@ -567,8 +567,8 @@ class LangGraphAdapter(FrameworkAdapter):
         self.instructions = instructions
         #: What turns the payload into the text half of the graph input and
         #: of the record. Defaults to :class:`~tradefloor.render.JSONRenderer`,
-        #: which reproduces this adapter's own historical body -- sorted,
-        #: indented JSON -- character for character; see :meth:`_render_prompt`.
+        #: which reproduces this adapter's own historical body (sorted,
+        #: indented JSON) character for character; see :meth:`_render_prompt`.
         if renderer is not None:
             check_renderer(renderer, where="renderer")
         self.renderer: Renderer = renderer if renderer is not None else JSONRenderer()
@@ -578,8 +578,8 @@ class LangGraphAdapter(FrameworkAdapter):
     def provenance(self) -> dict[str, Any]:
         """The base's provenance, plus which renderer produced the text.
 
-        Every other field the base already carries -- the framework, the
-        cadence, the participation cap -- describes what ran; this is the
+        Every other field the base already carries (the framework, the
+        cadence, the participation cap) describes what ran; this is the
         one that says how the market was shown, and it is what
         :func:`~tradefloor.render.Renderer.key` names.
         """
@@ -600,8 +600,8 @@ class LangGraphAdapter(FrameworkAdapter):
         which does not change what the market showed the agent; and a
         transcript has to be readable and diffable by a person, which a
         dict of message objects is not. The text already carries both
-        things that determine the answer -- the instructions and the
-        payload -- so a recording survives a change to how the input is
+        things that determine the answer (the instructions and the
+        payload) so a recording survives a change to how the input is
         assembled and correctly misses when the market or the mandate
         moved.
         """
@@ -662,9 +662,9 @@ class LangGraphAdapter(FrameworkAdapter):
         :meth:`_default_input_builder` for the live graph input, so the two
         cannot drift apart: a custom renderer changes what both see, not
         only what a transcript remembers. Byte-identical to the module-level
-        :func:`render` on this adapter's default construction -- `renderer`
+        :func:`render` on this adapter's default construction (`renderer`
         left at :class:`~tradefloor.render.JSONRenderer` and `instructions`
-        left at `INSTRUCTIONS` -- which is what keeps a shipped fixture
+        left at `INSTRUCTIONS`) which is what keeps a shipped fixture
         replaying.
         """
         body = self.renderer.render(payload)
@@ -704,7 +704,7 @@ class LangGraphAdapter(FrameworkAdapter):
 
         ``invoke`` first, because it is the only method a duck-typed object
         is guaranteed to have and because calling it from inside a running
-        event loop is measurably fine -- Tradefloor's loop is synchronous
+        event loop is measurably fine, since Tradefloor's loop is synchronous
         and never runs one anyway. ``ainvoke`` is the fallback for an
         object that has only that, and it goes through the shared
         :func:`~tradefloor.integrations.common.run_sync` bridge rather than
@@ -778,7 +778,7 @@ class LangGraphAdapter(FrameworkAdapter):
         The graph, the transcript and the recorder are SHARED, not copied.
         A compiled graph may hold a checkpointer and, with a model behind
         it, an HTTP client; deep-copying one is wasteful at best and a
-        shared socket at worst. Both directions want the sharing anyway --
+        shared socket at worst. Both directions want the sharing anyway:
         a replay of one arm must read the same recorded run as the other,
         and a live recording of both arms belongs in one file. The hooks
         are the policy, and two arms disagreeing about how the observation
@@ -836,7 +836,7 @@ def _reraise_known(exc: Exception) -> None:
     knowledge lives here, where the framework is known.
 
     Measured on langgraph 1.2.11, ``GraphInterrupt`` does NOT escape
-    ``invoke`` -- an interrupt comes back in the result, and
+    ``invoke``. An interrupt comes back in the result, and
     :func:`default_output_parser` is what meets it. This clause exists for
     the paths that measurement cannot cover: a caller's own runnable, a
     nested construct, a future version that changes its mind. It costs a
@@ -847,7 +847,7 @@ def _reraise_known(exc: Exception) -> None:
     ``GraphRecursionError`` stays a
     :class:`~tradefloor.integrations.common.FrameworkError`, because unlike
     an interrupt it IS a failure: the graph ran out of steps without
-    reaching an answer. Only the message changes, to name the knob -- the
+    reaching an answer. Only the message changes, to name the knob. The
     base's "raised GraphRecursionError instead of returning a decision" is
     accurate and does not tell anyone that ``recursion_limit`` is theirs to
     raise.
@@ -856,7 +856,7 @@ def _reraise_known(exc: Exception) -> None:
         from langgraph.errors import GraphInterrupt, GraphRecursionError
     except ImportError:
         # A duck-typed runnable on an install with no LangGraph. Nothing to
-        # recognise; `act` wraps it as it would any other framework failure.
+        # recognize; `act` wraps it as it would any other framework failure.
         return
 
     if isinstance(exc, GraphInterrupt):
@@ -878,9 +878,9 @@ def _check_runnable(runnable: Any) -> None:
 
     Duck-typed, never ``isinstance``: see the module docstring. The
     ``StateGraph`` case is named because it is the mistake that will
-    actually be made -- ``compile()`` is easy to forget, an uncompiled
+    actually be made: ``compile()`` is easy to forget, an uncompiled
     builder has no ``invoke`` at all, and the generic message would not
-    say the one word that fixes it. It is recognised by shape rather than
+    say the one word that fixes it. It is recognized by shape rather than
     by import so that the check costs nothing, and works, when LangGraph
     is not installed.
     """
@@ -921,7 +921,7 @@ def _describe(runnable: Any, instructions: str,
     try:
         version = importlib.metadata.version("langgraph")
     except Exception:                                        # noqa: BLE001
-        # Not installed, or installed without metadata -- a duck-typed
+        # Not installed, or installed without metadata: a duck-typed
         # runnable, most likely. An empty string is the honest answer; a
         # guess would put a version in a citation that nothing ran.
         version = ""
@@ -941,7 +941,7 @@ def _as_jsonable(value: Any) -> Any:
     :class:`~tradefloor.integrations.common.Decision`; neither is JSON. The
     unrepresentable parts become their type name, which is enough to make
     two configs comparable by digest and keeps an object that cannot be
-    serialised from raising in the middle of a run.
+    serialized from raising in the middle of a run.
     """
     if isinstance(value, Decision):
         return value.as_dict()

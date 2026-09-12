@@ -84,7 +84,7 @@ def apply_log(
     """Execute recorded entries against an engine that already exists.
 
     :func:`replay` builds the engine and calls this; a caller that has one
-    already -- a verifier replaying a single day onto a restored state -- calls
+    already (a verifier replaying a single day onto a restored state) calls
     it directly. Splitting the two is what stops a sampled verification
     reimplementing the operation table, where a missed entry would replay a
     day the log does not describe and report the difference as tampering.

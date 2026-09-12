@@ -1,11 +1,12 @@
 # Examples
 
-Two tiers, and they are different things. `CONTRIBUTING.md` has the rule; the
-short version is that the numbers are a curriculum and a directory is a study.
+The examples come in two tiers. The numbered files are a curriculum, read in
+order, and each directory is a self-contained study. `CONTRIBUTING.md` has
+the rule that decides which tier a new example joins.
 
 ## Start here
 
-**[`rate-shock/counterfactual.py`](rate-shock/counterfactual.py)** is the
+[`rate-shock/counterfactual.py`](rate-shock/counterfactual.py) is the
 canonical demo: one market, one agent, twenty days of shared history, a
 checkpoint, a fork into two identical worlds, +200bps in one of them, and a
 comparison of what the same agent did next. It runs in about two seconds and
@@ -16,9 +17,9 @@ python examples/rate-shock/counterfactual.py
 ```
 
 The five-minute walkthrough is
-[**Your first counterfactual experiment**](rate-shock/README.md).
+[Your first counterfactual experiment](rate-shock/README.md).
 The agent it runs is [`rate-shock/agent.py`](rate-shock/agent.py), which is
-a parameter -- swap it for your own and nothing else in the experiment moves.
+a parameter. Swap it for your own and nothing else in the experiment moves.
 
 ## The reading order
 
@@ -53,9 +54,9 @@ same experiment two ways, and writes its output to its own git-ignored
 
 | | what it asks |
 |---|---|
-| [`rate-shock/`](rate-shock/) | Does the agent actually react to macro conditions? Checkpoint, fork, +200bps in one arm, compare. Two seconds, no keys |
-| [`finrobot/`](finrobot/) | The same experiment with a real [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent in place of the native one. Replays a recorded run by default, so it needs no API key |
-| [`experiments/liquidity-crisis/`](experiments/liquidity-crisis/) | Will a financial AI agent reduce risk in a market crisis? A checkpoint, a two-way fork, and the packaged `liquidity_crisis` scenario on one arm. An executed notebook, replayed from a recording |
+| [`rate-shock/`](rate-shock/) | Whether the agent reacts to macro conditions. Checkpoint, fork, +200bps in one arm, compare. Two seconds, no keys |
+| [`integrations/finrobot/`](integrations/finrobot/) | The same experiment with a real [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent in place of the native one. Replays a recorded run by default, so it needs no API key |
+| [`experiments/liquidity-crisis/`](experiments/liquidity-crisis/) | Whether a financial AI agent reduces risk in a market crisis. A checkpoint, a two-way fork, and the packaged `liquidity_crisis` scenario on one arm. An executed notebook, replayed from a recording |
 
 ## Running them
 
@@ -71,9 +72,10 @@ dependencies.
 `rate-shock/counterfactual.py` runs in about two seconds,
 `07-research-workflow.py` in about five and `10-forking-a-market.py` in about
 two, and none of them needs anything extra. The first writes a chart if
-`matplotlib` is installed and says so if it is not. `finrobot/rate_shock.py`
-also runs on the core library alone in its default replay mode; `--live` is
-the one that needs `tradefloor[finrobot]`, Python 3.11 and an API key.
+`matplotlib` is installed and says so if it is not.
+`integrations/finrobot/rate_shock.py` also runs on the core library alone in
+its default replay mode, and `--live` is the one that needs
+`tradefloor[finrobot]`, Python 3.11 and an API key.
 `08-claude-agent.py` needs `tradefloor[claude]` and an API key, and spends
 money per decision, so it's the one file here that isn't run automatically.
 
@@ -82,12 +84,12 @@ money per decision, so it's the one file here that isn't run automatically.
 `tests/test_examples.py` checks them. It walks `examples/` rather than
 globbing `0*`, so both tiers are covered and a new example cannot arrive
 unchecked. The scripts are syntax-checked on every test run, which catches a
-rename that missed a reference. `rate-shock/counterfactual.py` gets more than
-that: `tests/test_rate_shock_demo.py`
-runs it end to end on every test run and checks its claims, not only its exit
-code -- that the arms started identical, that nothing diverged before the
-intervention, that the experiment reruns to the bit, and that both manifests
-reproduce. `finrobot/rate_shock.py` has the same in
+rename that missed a reference. `rate-shock/counterfactual.py` gets more from
+`tests/test_rate_shock_demo.py`, which runs it end to end on every test run
+and checks its claims as well as its exit code. Those claims are that the
+arms started identical, that nothing diverged before the intervention, that
+the experiment reruns to the bit, and that both manifests reproduce.
+`integrations/finrobot/rate_shock.py` has the same in
 `tests/test_finrobot.py`, which replays its recorded FinRobot run end to end
 on every pass. The rest is opt-in, because executing every notebook takes
 about a minute:

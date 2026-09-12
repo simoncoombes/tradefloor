@@ -161,11 +161,11 @@ class Portfolio:
 
     @staticmethod
     def _apply(position: Position, filled: float, price: float) -> None:
-        """Update a position, realising P&L only on the part that closes.
+        """Update a position, realizing P&L only on the part that closes.
 
         Average-cost basis. The branch that matters is a trade crossing through
         zero: selling more than you hold flips you short, and only the part
-        that actually closed realises P&L. Booking the whole trade as a close
+        that actually closed realizes P&L. Booking the whole trade as a close
         would report profit on shares that were never held, and it would look
         plausible, because the number would still be finite and the direction
         still right.
@@ -291,7 +291,7 @@ class Portfolio:
         """The fill log as an Arrow stream, joinable to the tape.
 
         ``tickers`` is the roster, so fills carry an ``instrument_id`` index
-        rather than a repeated string -- and so this table joins to ``bars``
+        rather than a repeated string, and so this table joins to ``bars``
         and ``truth`` on that key rather than on text.
 
         The join is the point: ``bars`` says where the price was, this says
@@ -305,7 +305,7 @@ class Portfolio:
         ``step`` is a GLOBAL counter, so a fill at ``day=1, step=6`` under
         four steps a day looks wrong and joins to nothing. Recovering the tick
         needed ``steps_per_day`` and ``ticks_per_step``, which appear in no
-        table -- so the join was possible only for someone who still had the
+        table, so the join was possible only for someone who still had the
         call that produced the data.
 
         ``tick`` is the number of ticks already run that day when the order
@@ -336,7 +336,7 @@ class Portfolio:
         time, which is most of what it is for.
 
         ``tick`` is required rather than defaulted. Defaulting it would put
-        every fill at tick zero -- a table that joins cleanly, to the wrong
+        every fill at tick zero, a table that joins cleanly, to the wrong
         bar, with nothing to indicate it. That is worse than a TypeError.
         See :meth:`fills_table` for what the value means.
         """
