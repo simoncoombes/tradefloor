@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v9",
   "fingerprint": "pt-v9",
-  "coefficient_digest": "576a7f8e97df37ba072ba41c2a8fd9173def3f0336d85d226601fdaface85db7",
+  "coefficient_digest": "3f44a0445131af789afaac84e3abcdae23f17f4e8a67b4a742582c0b0ed3fa1e",
   "coefficients": {
     "book_levels": 10.0,
     "buyback_payout_share": 0.0,
@@ -84,6 +84,7 @@
     "market_vol_slow_weight": 0.0,
     "market_vol_vix_anchor": 15.0,
     "market_vol_vix_coupling": 0.9540498202999739,
+    "market_vol_vix_excursion": 0.0,
     "market_vol_vix_exponent": 2.0,
     "market_vol_vix_smooth": 0.0,
     "mispricing_cap": 0.9,
