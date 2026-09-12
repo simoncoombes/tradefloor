@@ -40,19 +40,39 @@ static map from asymptotically linear to sublinear: `implied(v)/v` at a
 pinned VIX of 80 reads 0.474 against 0.651, and `ratio(80)/ratio(40)` reads
 0.729 against a closed-form 0.707.
 
-**`vix_ceiling` moves from 80.0 to 108.63**, which is `vix_return_gain` 17.0
-times `GRADED_ABS_R` 6.39. At a ceiling of 80 a down session of 4.706 per
-cent reached it, inside the 6.39 per cent that charter bar B4 requires the
-fear response to keep rising across, so the two could not both hold.
-`vix_target_shock_cap` was derived from the clamp the same way at `b76e825`
-and the ceiling had not followed it.
+**`vix_ceiling` moves from 80.0 to 173.1087.** The ceiling bounds the VIX
+after the reversion step, `x + 0.10 (target - x)`, so a session at the top
+of the graded range moves the VIX from rest by 10.86 points and no session
+the tape grades reaches a ceiling from rest. What reaches one is the
+identity's own level on a variance excursion: at 108.63 the clamp was
+touched on 4 of 30,240 seed-days over 120 rosters, and on three of the four
+the index's conditional variance implied a VIX above the ceiling with no
+fear response at all (146.17, 142.58 and 114.10). 173.1087 is the smallest
+`C` with `C - implied(C) >= 17.0 * 6.39` on a pin ladder, where
+`implied(C)` is the read-back the map sustains at a pin of `C`, solved on
+three rosters at eighteen pins from 14 to 260 with a residual of 8.82 from
+the ladder's spread. That condition holds for the settled map and not for
+the excursions the state carries when it reaches a clamp; what makes the
+value inert is measured: 0 of 30,240 seed-days at the clamp, highest VIX
+120.38. `economy::daily::fear_response_shape` asserts the update rule the
+value rests on, against `update_economy_daily` with a silent RNG, and the
+ledger entry records the condition, the residual, the clip rate and the
+charter bar B3 question a bound raises. An earlier entry in this section
+called 108.63 the image of the graded range under the fear response, which
+read a term of the target as a bound on the state, and that entry is
+withdrawn along with the test that asserted it.
 
 **`market_vol_alpha`, `market_vol_gamma` and `market_vol_beta` take the
 tape's GJR fit**: 0.0066, 0.1556 and 0.8946, against the pt-v14 search
 optima 0.28035004 and 0.69244622, which carry no error bar. The same
 estimator on the same tape and window prefers the GJR form over the
 symmetric one at a likelihood ratio of 305 on one degree of freedom. The
-three are one measurement and none of them ships alone.
+three are one measurement and none of them ships alone. Their sandwich
+standard errors from the GJR fit itself are 0.0109, 0.0180 and 0.0085, so
+the shipped alpha is 0.6 standard errors from zero and the tape's variance
+responds to down moves through gamma. The ledger carried the symmetric
+fit's bars beside these values for a day; it now carries the GJR fit's, and
+its guard refuses a bar that does not name the estimate it belongs to.
 
 **What the three buy.** On `facts.LEVEL_PROTOCOL` at thirty seeds with the
 roster drawn per seed, `index_tail_dn3_pct` comes in from 3.0677 to 1.3280
@@ -60,16 +80,12 @@ at 252 days and from 4.6786 to 1.5905 at 504, both in band. The panel is
 eighteen of eighteen at both horizons. `S` over nineteen rows is 26.575
 against pt-v18's 42.128 at 252, and 38.747 against 43.994 at 504.
 
-**The VIX still reaches its ceiling, on 3 of 120 rosters and 4 seed-days of
-30,240.** Two of those four days are sessions of -10.31 and -9.73 per cent,
-outside the range the tape grades. The other two are sessions of -4.10 and
--3.46 per cent, inside it. On three of the four the index's own conditional
-variance implies a VIX above the ceiling with no fear response at all,
-142.58 being the highest, so the clamp binds on the read-back rather than on
-the session. The ceiling's derivation prices a session from rest and the
-constraint binds from an elevated state, which is recorded in
-`programme/results/b4fix6-registration.md` with the ceiling that follows
-from the map instead.
+**The certified panels do not read the ceiling.** With it at 108.63 or at
+173.1087 the held-roster panels are identical to the bit at both horizons,
+because the held roster never approaches either value. On the varying
+roster the tail reads 1.3147 at 252 days and 1.5838 at 504, and
+`excess_kurtosis` at 504 reads 7.5018, against 1.3280, 1.5905 and 7.3567
+at 108.63; the four clamp days no longer clip and nothing else moves.
 
 **`excess_kurtosis` at 504 days on the held roster reads 7.3005 against a
 floor of 7.1.** pt-v14, pt-v16 and pt-v18 read 10.8275, 9.4473 and 10.4101
