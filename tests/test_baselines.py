@@ -162,7 +162,25 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # that coin. The opening VIX is 20.18 against the anchor's 22.23, so a
     # five-day run still lives inside the window the previous re-measurement
     # named, and the volatility it is graded on has risen again.
-    assert ranked == ["oracle", "momentum", "mean_reversion",
+    # Re-measured again when pt-v19 took its final three dials -- the
+    # excursion switch, the derived ceiling and the tape's GARCH
+    # coefficients: oracle +7.451%, mean_reversion +2.569%, momentum
+    # +0.677%, buy_and_hold -0.209%, random -1.209%. Momentum and
+    # mean-reversion swapped for the TENTH time, and this one is not the
+    # narrow margin every swap before it was: **1.892 points apart**,
+    # against 0.518 at the widest previous swap. Momentum fell from +1.954%
+    # while mean-reversion rose from +1.920%, so the pair separated rather
+    # than crossing.
+    #
+    # That is the coefficients and not the ceiling. `market_vol_alpha` goes
+    # 0.28035 to 0.1059 and `market_vol_beta` 0.69245 to 0.8787, so the
+    # factor's variance persistence rises (alpha + beta 0.9728 -> 0.9846)
+    # while its per-shock burstiness falls by nearly two thirds. A
+    # five-session window on a smoother, more persistent variance path has
+    # less of the tick-to-tick reversal momentum trades and more of the
+    # drift-to-fair mean-reversion trades, which is the direction this pair
+    # moved. The oracle has still never moved.
+    assert ranked == ["oracle", "mean_reversion", "momentum",
                       "buy_and_hold", "random"]
 
 

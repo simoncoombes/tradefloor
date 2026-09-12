@@ -352,12 +352,44 @@ def test_the_day_step_is_delta_in_the_day_sums_own_sigma():
 def test_the_day_effect_grows_with_the_tick_count():
     """A fixed delta is a fixed number of day sigmas, and a day with more
     ticks carries more noise, so the effect grows with T. Measured on the
-    market factor over 20, 40, 80 and 160 ticks, four names at seed 99."""
+    market factor over 20, 40, 80 and 160 ticks, four names at seed 99.
+
+    THE PREMISE IS CHECKED AND IT HOLDS. `tick.rs` scales a tick by a FIXED
+    `1 / sqrt(390)`, not by `1 / sqrt(T)`, so the day-accumulated market
+    factor's sd really does grow as sqrt(T): measured over sixty seeds it
+    reads 1.750e-3, 2.323e-3, 3.532e-3 and 5.070e-3 at 20, 40, 80 and 160
+    ticks, a 20-to-160 ratio of 2.90 against sqrt(8) = 2.83.
+
+    THE MARKET JUMP IS HELD OFF, and that is the whole of what changed here.
+    `noise.attribute` shifts the factor and re-runs; `jump_vix_coupling`
+    makes the market jump's INTENSITY a function of the VIX, so a shift can
+    flip a Bernoulli draw and move the price by a whole jump. One flipped
+    coin on one seed with four names swamps a sqrt(T) trend, and a Bernoulli
+    inside a monotonicity assertion is not a monotone quantity at all.
+
+    It went unnoticed because the coin had been landing the same way on both
+    sides. At pt-v19's tape-derived `market_vol_alpha` / `market_vol_beta`
+    it stops: shipped reads 0.0650, 0.1175, 0.4700, 0.4425 -- NOT monotone,
+    at the 80-to-160 step -- and the same build with the old search optima
+    reads 0.0425, 0.1175, 0.3825, 0.4650, monotone. Ruled out by measurement
+    before the jump was found: `market_vol_ceiling_multiple` at 16, 40 and
+    400 (identical to the bit), `crash_amplifier_slope` 0,
+    `crisis_blend_gain` 0, `price_breaker_fraction` 0.999, `volume_move_cap`
+    1e9, `market_vol_vix_excursion` 0 and `vix_ceiling` 80 -- none moves it.
+    `jump_intensity_market` 0 makes it monotone, which is the negative
+    control this docstring rests on.
+
+    So the channel under test is held and the confounding one is switched
+    off, which is what attributing to `market_factor_z` meant all along.
+    Neither assertion is weakened: both are the ones that were here.
+    """
     universe = tf.Universe.random(4, seed=99)
+    model = tf.ModelParams.from_preset(tf.model_preset()["name"],
+                                       jump_intensity_market=0.0)
     effects = []
     for ticks in (20, 40, 80, 160):
         root = World(seed=SEED, universe=universe, agent=Buyer(),
-                     steps_per_day=1, ticks_per_step=ticks)
+                     steps_per_day=1, ticks_per_step=ticks, model=model)
         attribution = noise.attribute(root, (1, 1),
                                       noise.column("price", 1), "day",
                                       streams=["market"], delta=1.0)

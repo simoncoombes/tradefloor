@@ -185,10 +185,10 @@
   },
   "default_since": null,
   "measured": {
-    "tradefloor_version": "0.6.2",
-    "commit": "ee22c65daf7c6d80435cb5822feb416ea3327b62",
-    "workers": 96,
-    "wall_seconds": 513.7,
+    "tradefloor_version": "0.8.0",
+    "commit": "7b3577c74f8c384cf8a0a37a76b0b7c347473b06",
+    "workers": 30,
+    "wall_seconds": 703.7,
     "method": {
       "roster": "Universe.random(40, seed=111)",
       "heldout_universe": "Universe.random(60, seed=909)",
@@ -196,7 +196,7 @@
       "heldout_seeds": "1-30 (30)",
       "bands_252": "facts.REAL_MARKETS",
       "bands_504": "facts.REAL_MARKETS_504",
-      "index_tail_not_measured": "index_tail_dn3_pct is NOT measured by this tool. It is certified on facts.LEVEL_PROTOCOL, where the roster varies with the seed, and this tool holds Universe.random(40, seed=111); the two protocols differ by 13.4 percent on the shipped preset (1.2749 varying against 1.124 held). A held-roster figure under this row's name would be compared with the certified one, so none is emitted. What would fill it: a level-protocol arm in this tool, which is a box job and a Phase 1 follow-on rather than part of the row's own branch.",
+      "index_tail_not_measured": "index_tail_dn3_pct is NOT measured by this tool. It is certified on facts.LEVEL_PROTOCOL, where the roster varies with the seed, and this tool holds Universe.random(40, seed=111); the two protocols differ by 13.4 percent on pt-v16 (1.2749 varying against 1.124 held). A held-roster figure under this row's name would be compared with the certified one, so none is emitted. What would fill it: a level-protocol arm in this tool, which is a box job and a Phase 1 follow-on rather than part of the row's own branch.",
       "crisis_lever": "annualised vol at held VIX 65 over held VIX 5, certified roster, 252 days, thirty seeds",
       "real_crisis_lever": 6.16,
       "mechanism": "facts.mechanism_verdict per row on the per-seed panels of the cell: an exact sign test against the row's mechanism-absent reading (facts.NULLS) at the cut the band's own false-alarm rate gives (facts.sign_cut). Three counts, never one: in band, mechanism shown, at real centre"
@@ -277,7 +277,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 9.006145036897012,
-        "z0_bootstrap": 18.893307830056585,
+        "z0_bootstrap": 17.99699524366976,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -292,7 +292,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 6.311928991003323,
-        "z0_bootstrap": 5.407972479815685,
+        "z0_bootstrap": 5.247049659173109,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -307,7 +307,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 5.724455866328318,
-        "z0_bootstrap": 8.983328100562995,
+        "z0_bootstrap": 9.073696557982887,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -322,7 +322,7 @@
         "at_the_cut": false,
         "counted": false,
         "z0_normal": 0.5822319302707193,
-        "z0_bootstrap": 1.3288361292810114,
+        "z0_bootstrap": 1.3425112259087804,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -337,7 +337,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 5.533847433837152,
-        "z0_bootstrap": 4.950914852894798,
+        "z0_bootstrap": 4.824382124486144,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -352,7 +352,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 40.60709831634719,
-        "z0_bootstrap": 61.406707198153505,
+        "z0_bootstrap": 58.08927417247656,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -367,7 +367,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 3.3072150332587964,
-        "z0_bootstrap": 11.753102879073468,
+        "z0_bootstrap": 11.94587769211477,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -382,7 +382,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": -0.0919040599250295,
-        "z0_bootstrap": -0.3457774204804679,
+        "z0_bootstrap": -0.34561467107126576,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -397,7 +397,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": -1.2152418986579143,
-        "z0_bootstrap": -1.4721337839130204,
+        "z0_bootstrap": -1.4945161295839626,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -412,7 +412,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": -0.13348284803882526,
-        "z0_bootstrap": -0.14836779186972834,
+        "z0_bootstrap": -0.1453146297506502,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -427,7 +427,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 1.4432842019600567,
-        "z0_bootstrap": 0.9493142644488078,
+        "z0_bootstrap": 0.9517517930858125,
         "tolerance": 0.06486,
         "band_windows": 9
       }
@@ -607,7 +607,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 8.193370001810178,
-        "z0_bootstrap": 14.697997534881777,
+        "z0_bootstrap": 15.179674213212568,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -622,7 +622,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 9.328640405005277,
-        "z0_bootstrap": 13.299643851827767,
+        "z0_bootstrap": 12.703073333149694,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -637,7 +637,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 6.049802457004746,
-        "z0_bootstrap": 9.474032985213992,
+        "z0_bootstrap": 9.425675825950435,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -652,7 +652,7 @@
         "at_the_cut": false,
         "counted": false,
         "z0_normal": -0.034739827177981734,
-        "z0_bootstrap": -0.08194629195696845,
+        "z0_bootstrap": -0.08793522883988857,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -667,7 +667,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 7.605227134070534,
-        "z0_bootstrap": 13.261004268760557,
+        "z0_bootstrap": 13.214568116948664,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -682,7 +682,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 57.767340348397944,
-        "z0_bootstrap": 85.80810879877698,
+        "z0_bootstrap": 85.5208203423182,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -697,7 +697,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 5.393331930587134,
-        "z0_bootstrap": 6.051587510679048,
+        "z0_bootstrap": 6.011172482377179,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -712,7 +712,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": -0.5218420982144283,
-        "z0_bootstrap": -1.5680900998161302,
+        "z0_bootstrap": -1.6458878825422159,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -727,7 +727,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": -1.7692716290938084,
-        "z0_bootstrap": -1.9437837458389848,
+        "z0_bootstrap": -2.060689154674165,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -742,7 +742,7 @@
         "at_the_cut": true,
         "counted": true,
         "z0_normal": 1.5655270285025025,
-        "z0_bootstrap": 1.892586777907756,
+        "z0_bootstrap": 1.8840596460111279,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -757,7 +757,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 2.0131436651562784,
-        "z0_bootstrap": 2.1778326938625012,
+        "z0_bootstrap": 2.2734545756436266,
         "tolerance": 0.06486,
         "band_windows": 9
       }

@@ -266,13 +266,20 @@ def test_a_resumed_run_carries_its_whole_record(short_days):
 #:
 #:     n    preset   anchor   down found   spurious   upward recovered
 #:     6    pt-v18   15.984      4 / 4          0          0 / 3
-#:     6    pt-v19   27.170      3 / 4          0          0 / 3
-#:     12   pt-v18   15.984      4 / 4          0          1 / 3
-#:     12   pt-v19   20.256      4 / 4          2          2 / 3
-#:     20   pt-v18   15.984      4 / 4          2          2 / 3
-#:     20   pt-v19   20.879      4 / 4          1          2 / 3
-#:     40   pt-v18   15.984      4 / 4          1          2 / 3
-#:     40   pt-v19   19.866      4 / 4          1          2 / 3
+#:     6    pt-v19   27.170      4 / 4          0          0 / 3
+#:     40   pt-v18   15.984      4 / 4          0*         2 / 3
+#:     40   pt-v19   19.866      4 / 4          2          3 / 3
+#:
+#: (* 1 at the intermediate pt-v19 the rows below were first measured on.)
+#:
+#: THE SIX-NAME ROW READ 3 OF 4 ONCE, and the row it read it on is worth
+#: keeping because it is what sent this file looking. While pt-v19 carried
+#: the pt-v14 SEARCH optima for `market_vol_alpha` and `market_vol_beta`
+#: the six-name count fell to 3 -- measured, with 12, 20 and 40 names all
+#: still at 4 -- and the tape-derived 0.1059 / 0.8787 put it back. The
+#: factor is a third as bursty at the tape's coefficients, so the market
+#: aggregate stops being a cheap enough explanation to absorb a planted
+#: jump whole. The anchor did not move to fix it; the burstiness did.
 #:
 #: Read it in two directions. **Down the columns**: "no spurious company
 #: jump" and "an upward jump is not recoverable" hold at SIX names and
@@ -386,11 +393,11 @@ def test_a_planted_downward_market_jump_is_recovered(short_days):
     # six-name index is barely diversified, so its DERIVED anchor is 27.17
     # against 19.87 on forty, and the market aggregate outbids the jump.
     found, spurious = sweep(UNIVERSE)
-    assert found == 3, (
-        f"{found} of 4 recovered on the six-name synthetic where 3 is the "
-        "measured figure for this preset. Up is an improvement and down is "
-        "a regression; either way re-read the table on JUMP_UNIVERSE before "
-        "moving this number")
+    assert found == 4, (
+        f"only {found} of 4 recovered on the six-name synthetic. This read "
+        "3 while pt-v19 carried the pt-v14 search optima for "
+        "`market_vol_alpha` and `market_vol_beta`; the tape-derived values "
+        "restored it. Re-read the table on JUMP_UNIVERSE before moving it")
     assert spurious == 0
 
 

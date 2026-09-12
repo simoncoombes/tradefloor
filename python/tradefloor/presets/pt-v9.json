@@ -185,10 +185,10 @@
   },
   "default_since": null,
   "measured": {
-    "tradefloor_version": "0.6.2",
-    "commit": "ee22c65daf7c6d80435cb5822feb416ea3327b62",
-    "workers": 96,
-    "wall_seconds": 513.7,
+    "tradefloor_version": "0.8.0",
+    "commit": "7b3577c74f8c384cf8a0a37a76b0b7c347473b06",
+    "workers": 30,
+    "wall_seconds": 703.7,
     "method": {
       "roster": "Universe.random(40, seed=111)",
       "heldout_universe": "Universe.random(60, seed=909)",
@@ -196,7 +196,7 @@
       "heldout_seeds": "1-30 (30)",
       "bands_252": "facts.REAL_MARKETS",
       "bands_504": "facts.REAL_MARKETS_504",
-      "index_tail_not_measured": "index_tail_dn3_pct is NOT measured by this tool. It is certified on facts.LEVEL_PROTOCOL, where the roster varies with the seed, and this tool holds Universe.random(40, seed=111); the two protocols differ by 13.4 percent on the shipped preset (1.2749 varying against 1.124 held). A held-roster figure under this row's name would be compared with the certified one, so none is emitted. What would fill it: a level-protocol arm in this tool, which is a box job and a Phase 1 follow-on rather than part of the row's own branch.",
+      "index_tail_not_measured": "index_tail_dn3_pct is NOT measured by this tool. It is certified on facts.LEVEL_PROTOCOL, where the roster varies with the seed, and this tool holds Universe.random(40, seed=111); the two protocols differ by 13.4 percent on pt-v16 (1.2749 varying against 1.124 held). A held-roster figure under this row's name would be compared with the certified one, so none is emitted. What would fill it: a level-protocol arm in this tool, which is a box job and a Phase 1 follow-on rather than part of the row's own branch.",
       "crisis_lever": "annualised vol at held VIX 65 over held VIX 5, certified roster, 252 days, thirty seeds",
       "real_crisis_lever": 6.16,
       "mechanism": "facts.mechanism_verdict per row on the per-seed panels of the cell: an exact sign test against the row's mechanism-absent reading (facts.NULLS) at the cut the band's own false-alarm rate gives (facts.sign_cut). Three counts, never one: in band, mechanism shown, at real centre"
@@ -610,7 +610,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 15.586716265961151,
-        "z0_bootstrap": 18.240152840831513,
+        "z0_bootstrap": 18.16303056763471,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -625,7 +625,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 3.876729204729553,
-        "z0_bootstrap": 4.496637766726547,
+        "z0_bootstrap": 4.424940393887567,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -640,7 +640,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 2.212714981531589,
-        "z0_bootstrap": 2.78757250484652,
+        "z0_bootstrap": 2.768090640598758,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -655,7 +655,7 @@
         "at_the_cut": false,
         "counted": false,
         "z0_normal": -0.09597843631948909,
-        "z0_bootstrap": -0.1484884278550038,
+        "z0_bootstrap": -0.14754001840593084,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -670,7 +670,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 8.956889986001753,
-        "z0_bootstrap": 11.006532501905784,
+        "z0_bootstrap": 10.728666540212947,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -685,7 +685,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 74.12985783421111,
-        "z0_bootstrap": 79.22631062312928,
+        "z0_bootstrap": 79.2485612773784,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -700,7 +700,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 1.0996762996510658,
-        "z0_bootstrap": 2.8080101161308475,
+        "z0_bootstrap": 2.7501671111612445,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -715,7 +715,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 0.015164693777185987,
-        "z0_bootstrap": 0.03166345530146828,
+        "z0_bootstrap": 0.03172707552139533,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -730,7 +730,7 @@
         "at_the_cut": true,
         "counted": true,
         "z0_normal": -0.8044770226391327,
-        "z0_bootstrap": -1.4195550817017597,
+        "z0_bootstrap": -1.4331964412467855,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -745,7 +745,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 17.59070128973826,
-        "z0_bootstrap": 17.7800482224361,
+        "z0_bootstrap": 17.607139348542283,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -760,7 +760,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 3.4365774589858944,
-        "z0_bootstrap": 2.3664104884149135,
+        "z0_bootstrap": 2.3172042962897925,
         "tolerance": 0.06486,
         "band_windows": 9
       }
