@@ -482,7 +482,22 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                      "compared by likelihood ratio",
         "script": "the estimator module reproduced whole in "
                   "programme/garch-derive-design.md Appendix B",
-        "standard_error": 0.1556,
+        # NOT a standard error: the per-coefficient sandwich bars for
+        # the GJR triple are NOT on the record where the symmetric
+        # fit's are (garch-derive-design 2.4 reports the triple and
+        # its NLL, not its covariance), and that is a real gap rather
+        # than something to fill in. What IS measured is the evidence
+        # for the term being non-zero at all, which is this
+        # adoption's actual residual: the likelihood ratio against the
+        # symmetric fit on the same tape and window.
+        "residual": {
+            "kind": "likelihood ratio against the symmetric GARCH(1,1)",
+            "statistic": 305.0,
+            "degrees_of_freedom": 1,
+            "nll_gjr": 3551.49,
+            "nll_symmetric": 3703.97,
+            "per_coefficient_standard_errors": "NOT ON THE RECORD",
+        },
         "presets": {"pt-v19": 0.1556},
         "identity": "the tape's leverage response, at a LIKELIHOOD RATIO "
                     "of 2 * 152.5 = 305 on one degree of freedom. Same "
@@ -662,7 +677,13 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "programme/garch-derive-design.md Appendix B; "
                   "numpy-only Gaussian QMLE, no scipy, run in "
                   "dev/tf-getter's .venv",
+        # The symmetric fit's bar, kept because it is the one that was
+        # measured; the shipped VALUE is the GJR fit's and that fit's own
+        # per-coefficient bars are not on the record. See
+        # `market_vol_gamma`, which carries the evidence for the triple.
         "standard_error": 0.0093,
+        "standard_error_is_for": "the symmetric GARCH(1,1) fit's alpha "
+                                 "0.1059, NOT the shipped GJR alpha 0.0066",
         "presets": {"pt-v16": 0.28035004, "pt-v18": 0.28035004,
                     "pt-v19": 0.0066},
         "identity": "Gaussian QMLE GARCH(1,1) on the tape's index over "
@@ -697,7 +718,11 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "programme/garch-derive-design.md Appendix B; "
                   "numpy-only Gaussian QMLE, no scipy, run in "
                   "dev/tf-getter's .venv",
+        # As `market_vol_alpha`: the symmetric fit's bar beside the GJR
+        # fit's value, said rather than blurred.
         "standard_error": 0.0092,
+        "standard_error_is_for": "the symmetric GARCH(1,1) fit's beta "
+                                 "0.8787, NOT the shipped GJR beta 0.8946",
         "presets": {"pt-v16": 0.69244622, "pt-v18": 0.69244622,
                     "pt-v19": 0.8946},
         "identity": "the same estimator and the same fit as "
@@ -2167,6 +2192,38 @@ def validate_entry(dial: str, entry: Any) -> list[str]:
             "more decimal places, and it is refused here rather than read as "
             "a measurement"
         )
+
+    # PRESENCE WAS NOT ENOUGH, and an audit found out how. On 2026-09-12
+    # `market_vol_gamma` shipped with `standard_error` 0.1556 -- its own
+    # POINT ESTIMATE, pasted into the bar field. The check above passed it,
+    # because something was there. A bar equal to the value says the
+    # coefficient is one sigma from zero, which for a term adopted at a
+    # likelihood ratio of 305 is not merely wrong but backwards.
+    #
+    # So a numeric bar must be positive, finite, and smaller than the value
+    # it qualifies on at least one shipped preset. A bar that is not
+    # numeric -- a dict recording a likelihood ratio, say -- is left to the
+    # entry, because the shapes an honest residual can take are not
+    # enumerable here; what is refused is the shape that LOOKS like a
+    # standard error and is not one.
+    se = entry.get("standard_error")
+    if isinstance(se, (int, float)) and not isinstance(se, bool):
+        if not (se > 0.0) or se != se or se in (float("inf"), float("-inf")):
+            problems.append(
+                f"{dial}: standard_error is {se!r}, which is not a positive "
+                "finite number"
+            )
+        else:
+            same = sorted({v for v in (entry.get("presets") or {}).values()
+                           if isinstance(v, (int, float)) and abs(v) == se})
+            if same:
+                problems.append(
+                    f"{dial}: standard_error {se} is EXACTLY a shipped value "
+                    f"{same}. That is the point estimate pasted into the bar "
+                    "field, and it claims the coefficient is one sigma from "
+                    "zero. Record the bar the estimator produced, or record "
+                    "the residual that was actually measured and say which."
+                )
 
     solve = entry.get("solve")
     if solve is not None:
