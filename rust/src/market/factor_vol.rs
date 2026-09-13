@@ -379,6 +379,60 @@ fn vix_response(params: &crate::params::ModelParams, vix_ratio: f64) -> f64 {
     }
 }
 
+/// The shock share and the carried share for this close, after the factor's
+/// own variance excursion has moved them.
+///
+/// `delta = excursion * ln(variance / target)`, `alpha + delta` against
+/// `beta - delta`. The sum is invariant, so persistence, the unconditional
+/// level and omega's mean reversion are all untouched and only the SPLIT
+/// moves. `delta` is clamped by the GJR fourth-moment coefficient
+/// `3a^2 + 3ag + 1.5g^2 + 2ab + bg + b^2`, held at 0.999 and solved here from
+/// `beta` and `gamma` rather than written down, so a preset that moves either
+/// cannot lose the finite fourth moment silently.
+///
+/// Returns the dialled pair unchanged at `market_vol_alpha_excursion == 0.0`,
+/// which is the bit-identity branch every preset before 0.8.0 takes.
+fn alpha_beta_at(
+    params: &crate::params::ModelParams,
+    current_variance: f64,
+    target_variance: f64,
+) -> (f64, f64) {
+    let alpha = params.market_vol_alpha;
+    let beta = params.market_vol_beta;
+    let k = params.market_vol_alpha_excursion;
+    if k == 0.0 || target_variance <= 0.0 || current_variance <= 0.0 {
+        return (alpha, beta);
+    }
+    let delta = k * (current_variance / target_variance).ln();
+    // The largest rotation the fourth moment allows, from
+    // `3a^2 + a(3g + 2b') + (1.5g^2 + b'g + b'^2) = 0.999` with the rotation
+    // b' = beta - d and a = alpha + d substituted; solved numerically by
+    // bisection because the substitution is quadratic in `d` with
+    // coefficients in `beta` and `gamma`, and a closed form here would be a
+    // second spelling of the same condition for a reader to get wrong.
+    let g = params.market_vol_gamma;
+    let m4 = |d: f64| {
+        let (a, b) = (alpha + d, beta - d);
+        3.0 * a * a + 3.0 * a * g + 1.5 * g * g + 2.0 * a * b + b * g + b * b
+    };
+    let (mut lo, mut hi) = (0.0_f64, 0.5_f64);
+    if m4(0.0) >= 0.999 {
+        // The shipped triple is already at the bound; no rotation is safe.
+        return (alpha, beta);
+    }
+    for _ in 0..60 {
+        let mid = 0.5 * (lo + hi);
+        if m4(mid) < 0.999 {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    let bound = lo;
+    let d = mathx::max(-bound, mathx::min(delta, bound));
+    (alpha + d, beta - d)
+}
+
 fn update_toward_with(
     params: &crate::params::ModelParams,
     current_variance: f64,
@@ -394,11 +448,18 @@ fn update_toward_with(
     // symmetric update, which is what every preset before the dial ships.
     let gamma = params.market_vol_gamma;
     let leverage = if day_factor < 0.0 { gamma } else { 0.0 };
-    let omega = (1.0 - params.market_vol_alpha - params.market_vol_beta - 0.5 * gamma)
-        * target_variance;
+    // THE SHOCK SHARE MOVES WITH THE FACTOR'S OWN EXCURSION, which is what
+    // the tape's clustering does and a constant share cannot say: see
+    // `ModelParams::market_vol_alpha_excursion` for the measurement and for
+    // why the pair ROTATES rather than the share lifting. At 0.0 -- every
+    // preset before 0.8.0 -- `delta` is zero, `alpha` and `beta` are the
+    // dialled pair and every term below is the arithmetic that predates
+    // this, to the bit.
+    let (alpha, beta) = alpha_beta_at(params, current_variance, target_variance);
+    let omega = (1.0 - alpha - beta - 0.5 * gamma) * target_variance;
     let new_var = omega
-        + (params.market_vol_alpha + leverage) * day_factor * day_factor
-        + params.market_vol_beta * current_variance;
+        + (alpha + leverage) * day_factor * day_factor
+        + beta * current_variance;
     // `max(min(x, ceiling), floor)` — the same bound order as
     // `garch.rs`, which is contractual there because it is visible when
     // the bounds cross. The bounds here are multiples of a positive

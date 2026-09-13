@@ -854,6 +854,65 @@ pub struct ModelParams {
     /// same-week phenomenon, and the slow component carries long-horizon
     /// clustering, not asymmetry.
     pub market_vol_gamma: f64,
+
+    /// How far the common factor's SHOCK SHARE moves with the factor's own
+    /// variance excursion. 0.0 is a constant share, which is every preset
+    /// before 0.8.0 and is bit-identical to the arithmetic that predates
+    /// this dial.
+    ///
+    /// # What the tape says, and why a constant share cannot say it
+    ///
+    /// MEASURED on the index, 19,014 sessions 1950-2025
+    /// (`programme/results/reactive/`, design repository). Regress
+    /// `|r_t|` on `|r_{t-1}|`, the standardised log of trailing realised
+    /// volatility over `w` sessions ending at `t-1`, and their product.
+    /// The product's coefficient is how much clustering MOVES with the
+    /// state, and the tape reads:
+    ///
+    /// ```text
+    ///   w =   5 sessions   +0.0941 +/- 0.0047      (20 error bars)
+    ///   w =  21 sessions   +0.0694 +/- 0.0042
+    ///   w =  63 sessions   +0.0474 +/- 0.0047
+    ///   w = 252 sessions   +0.0187 +/- 0.0059
+    /// ```
+    ///
+    /// Two things follow. The response is REAL and it is FAST: strongest
+    /// at a week and decaying as the window lengthens, so it is a
+    /// days-to-weeks mechanism rather than a regime. And the tape's
+    /// BASELINE clustering at the weekly window is NEGATIVE (-0.058):
+    /// almost all of the real market's volatility clustering is
+    /// conditional on the last week having been rough, and a constant
+    /// shock share has no way to spell that.
+    ///
+    /// The shipped model has about a fifth of the response
+    /// (+0.0158 +/- 0.0064 at w = 5 on the composed vector, +0.0483 on
+    /// pt-v18) and the WRONG SIGN at a quarter and a year. This dial is
+    /// the mechanism that gap asks for.
+    ///
+    /// # The form, and why it is a rotation rather than a lift
+    ///
+    /// `delta = excursion * ln(variance / target)`, then
+    /// `alpha_t = alpha + delta` and `beta_t = beta - delta`. The PAIR
+    /// moves, not the share alone, so `alpha + beta` is invariant and with
+    /// it the persistence, the unconditional level and omega's
+    /// mean-reversion. What changes is the split between yesterday's shock
+    /// and the carried state, which is what clustering is.
+    ///
+    /// Lifting alpha alone was the obvious form and the fourth moment
+    /// refuses it. The GJR coefficient
+    /// `3a^2 + 3ag + 1.5g^2 + 2ab + bg + b^2` reads 0.9908 at the shipped
+    /// triple, and raising alpha alone crosses one at 0.0120 -- half a
+    /// thousandth of headroom. Rotating gives six times as much (`delta`
+    /// to 0.020 at 0.9984), because what the fourth moment objects to is
+    /// total persistence and the rotation does not add any. This is the
+    /// same one-parameter-fewer argument that put `g = p - 1` on the VIX
+    /// response and the ratio form on the sector state.
+    ///
+    /// `delta` is CLAMPED at the value that holds that coefficient at
+    /// 0.999, computed from `beta` and `gamma` rather than written down,
+    /// so a preset that moves either cannot silently lose the finite
+    /// fourth moment the tape's coefficients bought.
+    pub market_vol_alpha_excursion: f64,
     /// Cap on the market factor's variance, as a multiple of its calm
     /// level. A CAP, not a lever: it does nothing until the variance
     /// reaches it, so raising it above where it already binds changes
@@ -3036,6 +3095,7 @@ impl ModelParams {
             market_vol_alpha: factor_vol::MARKET_VOL_ALPHA,
             market_vol_beta: factor_vol::MARKET_VOL_BETA,
             market_vol_gamma: 0.0,
+            market_vol_alpha_excursion: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
             market_vol_vix_coupling: factor_vol::MARKET_VOL_VIX_COUPLING,
@@ -4765,6 +4825,7 @@ impl ModelParams {
             "market_vol_alpha" => self.market_vol_alpha,
             "market_vol_beta" => self.market_vol_beta,
             "market_vol_gamma" => self.market_vol_gamma,
+            "market_vol_alpha_excursion" => self.market_vol_alpha_excursion,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
             "market_vol_vix_coupling" => self.market_vol_vix_coupling,
@@ -4945,6 +5006,7 @@ impl ModelParams {
             "market_vol_alpha" => out.market_vol_alpha = value,
             "market_vol_beta" => out.market_vol_beta = value,
             "market_vol_gamma" => out.market_vol_gamma = value,
+            "market_vol_alpha_excursion" => out.market_vol_alpha_excursion = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
             "market_vol_vix_coupling" => out.market_vol_vix_coupling = value,
@@ -5194,6 +5256,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_alpha",
         "market_vol_beta",
         "market_vol_gamma",
+        "market_vol_alpha_excursion",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",
         "market_vol_slow_gain",
