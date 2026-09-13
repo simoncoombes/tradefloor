@@ -140,6 +140,7 @@ fn run_world(policy: SettleDrawPolicy, trader_flow: f64) -> (Vec<f64>, usize) {
                 news_impact_queue: &[],
                 order_volumes: &order_volumes,
                 sector_keys: &sector_keys,
+                sector_sigmas: &[],
                 // The constant-sigma baseline: these tests predate the factor's
                 // variance process and pin behaviour at its baseline level.
                 market_sigma_daily: MARKET_FACTOR_SIGMA,

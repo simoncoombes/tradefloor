@@ -444,6 +444,58 @@ OUT_OF_SCOPE = {
     "vix_jump_scale":
         "unread while `vix_jump_intensity` is 0.0, and 0.0 itself scales "
         "any jump to nothing (economy/daily.rs:1132)",
+    # The seven VIX-dynamics dials of programme/results/vix-dynamics.md,
+    # each derived from the tape and each shipped at the value where its
+    # branch is not taken. They leave this bucket together with the preset
+    # that turns them on.
+    "vix_return_level_exponent":
+        "inert at 0.0: economy/daily.rs `return_spike_at_level` and "
+        "`expected_return_spike_at_level` branch to the level-blind "
+        "functions when it, `vix_return_level_exponent_up` (0.0) and "
+        "`vix_return_exponent_up` (1.0) all sit at their defaults; move "
+        "any one of the three and all three are read",
+    "vix_return_exponent_up":
+        "inert at 1.0, by the same three-way branch as "
+        "`vix_return_level_exponent`: the up side keeps the linear "
+        "arithmetic of `return_spike_for`",
+    "vix_return_level_exponent_up":
+        "inert at 0.0, by the same three-way branch as "
+        "`vix_return_level_exponent`",
+    "vix_innovation_sigma":
+        "inert at 0.0: economy/daily.rs takes the shipped `0.15 * "
+        "volatility` scale by the same expression when it and "
+        "`vix_innovation_return_sigma` are both 0.0; the draw is the same "
+        "draw either way",
+    "vix_innovation_return_sigma":
+        "inert at 0.0, by the same two-way branch as "
+        "`vix_innovation_sigma`",
+    "vix_jump_level_scale":
+        "unread while `vix_jump_intensity` and `vix_jump_return_intensity` "
+        "are both 0.0 (no arrival is drawn), and 0.0 itself selects "
+        "`vix_jump_scale`'s points for any arrival",
+    "vix_jump_return_intensity":
+        "inert at 0.0: economy/daily.rs takes the arrival draw only when "
+        "it or `vix_jump_intensity` is non-zero, and adds its term to the "
+        "rate only when it is non-zero itself",
+    # The two per-component states of vix-dynamics.md section 19 and the
+    # idiosyncratic-rate switch; each a branch at 0.0.
+    "sector_vol_alpha":
+        "inert at 0.0 while `sector_vol_beta` is also 0.0: engine.rs "
+        "`sector_state_on` is false, the tick draws every sector at "
+        "`tick::sector_sigma_at` and the read-back prices that scalar",
+    "sector_vol_beta":
+        "inert at 0.0 while `sector_vol_alpha` is also 0.0, by the same "
+        "branch as `sector_vol_alpha`",
+    "jump_idio_excitation":
+        "inert at 0.0: engine.rs `apply_jumps` reads and writes the "
+        "per-name excitation only when it is non-zero, and the arrival "
+        "draw is taken at every rate",
+    "jump_idio_excitation_decay":
+        "unread while `jump_idio_excitation` is 0.0",
+    "jump_idio_vix_decoupled":
+        "inert at 0.0: engine.rs `apply_jumps` and index_var.rs "
+        "`jump_intensities` take the shipped VIX-scaled idiosyncratic rate "
+        "unless it is non-zero",
     "vix_target_offset":
         "inert at 0.0: a constant added to the VIX target, and the level "
         "identity retires it outright",

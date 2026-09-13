@@ -279,6 +279,26 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # real P(VIX>30) tail; 12/yr at 30 points is far past plausible.
     "vix_jump_intensity": (0.0, 12.0),
     "vix_jump_scale": (0.0, 30.0),
+    # The VIX-dynamics dials (programme/results/vix-dynamics.md), each
+    # shipped at the value where its branch is not taken and each MEASURED
+    # on the tape with an error bar, so the box is drawn around the
+    # measurement rather than searched: a Latin hypercube over it maps the
+    # neighbourhood of a derived value, and the same written-down defect
+    # its siblings above carry applies -- the hypercube never draws the
+    # exact zero at which the branch is off.
+    "vix_return_level_exponent": (0.0, 1.0),
+    "vix_return_level_exponent_up": (-1.5, 0.0),
+    "vix_innovation_sigma": (0.0, 0.06),
+    "vix_innovation_return_sigma": (0.0, 0.04),
+    "vix_jump_level_scale": (0.0, 4.0),
+    "vix_jump_return_intensity": (0.0, 12.0),
+    # The per-component states (vix-dynamics.md 19), boxes around the
+    # measured values; the same hypercube caveat as the rows above.
+    "sector_vol_alpha": (0.0, 0.2),
+    "sector_vol_beta": (0.0, 0.98),
+    "jump_idio_excitation": (0.0, 4.0),
+    "jump_idio_excitation_decay": (0.0, 0.9),
+    "jump_idio_vix_decoupled": (0.0, 1.0),
     # Flow composition: lean per VIX point above threshold. At 0.001 and
     # the covid peak (40 points above), the daily common shock is 0.04 --
     # twice the crowd cap; 0.005 is far past plausible and bounds the box.
