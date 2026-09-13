@@ -211,10 +211,6 @@ POST_BASELINE = {
         "`vix_level_identity` is non-zero, so no preset has had to move it "
         "-- and 0.252 is a measurement, which is exactly the kind of number "
         "that must not be invisible because it arrived as a default",
-    "vix_return_exponent":
-        "the power form's exponent, shipped inert at 1.0 under ruling R4 "
-        "while the tape reads 1.200. A dial whose shipped value is not the "
-        "measured one is the case this module exists for",
     "idio_sigma_floor":
         "the per-name sigma floor, which replaced an inline literal at the "
         "value the literal carried. Ships at 1e-4 in every preset and binds "
@@ -448,54 +444,13 @@ OUT_OF_SCOPE = {
     # each derived from the tape and each shipped at the value where its
     # branch is not taken. They leave this bucket together with the preset
     # that turns them on.
-    "vix_return_level_exponent":
-        "inert at 0.0: economy/daily.rs `return_spike_at_level` and "
-        "`expected_return_spike_at_level` branch to the level-blind "
-        "functions when it, `vix_return_level_exponent_up` (0.0) and "
-        "`vix_return_exponent_up` (1.0) all sit at their defaults; move "
-        "any one of the three and all three are read",
-    "vix_return_exponent_up":
-        "inert at 1.0, by the same three-way branch as "
-        "`vix_return_level_exponent`: the up side keeps the linear "
-        "arithmetic of `return_spike_for`",
-    "vix_return_level_exponent_up":
-        "inert at 0.0, by the same three-way branch as "
-        "`vix_return_level_exponent`",
     "vix_innovation_sigma":
         "inert at 0.0: economy/daily.rs takes the shipped `0.15 * "
         "volatility` scale by the same expression when it and "
         "`vix_innovation_return_sigma` are both 0.0; the draw is the same "
         "draw either way",
-    "vix_innovation_return_sigma":
-        "inert at 0.0, by the same two-way branch as "
-        "`vix_innovation_sigma`",
-    "vix_jump_level_scale":
-        "unread while `vix_jump_intensity` and `vix_jump_return_intensity` "
-        "are both 0.0 (no arrival is drawn), and 0.0 itself selects "
-        "`vix_jump_scale`'s points for any arrival",
-    "vix_jump_return_intensity":
-        "inert at 0.0: economy/daily.rs takes the arrival draw only when "
-        "it or `vix_jump_intensity` is non-zero, and adds its term to the "
-        "rate only when it is non-zero itself",
     # The two per-component states of vix-dynamics.md section 19 and the
     # idiosyncratic-rate switch; each a branch at 0.0.
-    "sector_vol_alpha":
-        "inert at 0.0 while `sector_vol_beta` is also 0.0: engine.rs "
-        "`sector_state_on` is false, the tick draws every sector at "
-        "`tick::sector_sigma_at` and the read-back prices that scalar",
-    "sector_vol_beta":
-        "inert at 0.0 while `sector_vol_alpha` is also 0.0, by the same "
-        "branch as `sector_vol_alpha`",
-    "jump_idio_excitation":
-        "inert at 0.0: engine.rs `apply_jumps` reads and writes the "
-        "per-name excitation only when it is non-zero, and the arrival "
-        "draw is taken at every rate",
-    "jump_idio_excitation_decay":
-        "unread while `jump_idio_excitation` is 0.0",
-    "jump_idio_vix_decoupled":
-        "inert at 0.0: engine.rs `apply_jumps` and index_var.rs "
-        "`jump_intensities` take the shipped VIX-scaled idiosyncratic rate "
-        "unless it is non-zero",
     "vix_target_offset":
         "inert at 0.0: a constant added to the VIX target, and the level "
         "identity retires it outright",
@@ -1040,7 +995,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_target_shock_cap": {
         "kind": "derived",
-        "presets": {"pt-v16": 45.0, "pt-v18": 45.0, "pt-v19": 255.0},
+        "presets": {"pt-v16": 45.0, "pt-v18": 45.0, "pt-v19": 158.8524},
         "identity": "the image of `vix_return_clamp` under the return "
                     "spike: `vix_return_gain * clamp ** vix_return_exponent`, "
                     "which is 17.0 * 15.0 ** 1.0 = 255.0. The driving return "
@@ -1188,7 +1143,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # not be the response ratio, and nobody has measured the shipped
         # one.
         "kind": "undetermined",
-        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 17.0},
+        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 0.049},
         "what_would_determine_it": "the shipped pair's RESPONSE ratio at 2 "
                                    "per cent, measured the way the tape's "
                                    "0.848 was, and a value for this dial "
@@ -1255,9 +1210,41 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # calling it one is precisely the move this module refuses. A
         # residual attaches to the value it was computed for, and 0.0357
         # was computed for 1.1996.
-        "kind": "undetermined",
-        "presets": {"pt-v16": 1.0, "pt-v18": 1.0, "pt-v19": 1.0},
-        "what_would_determine_it": "the question asked on an arm whose "
+        #
+        # RESOLVED AT 0.8.0, which is what this entry was waiting for. The
+        # text above stands for pt-v16 and pt-v18, which still ship 1.0.
+        # pt-v19 now ships 1.4483, an engine-shaped fit of the same law on
+        # the same tape: the free down-side fit reads `|r|^p V^-g` with
+        # p 1.1996 and g 0.49 +/- 0.12, and the standardised form the engine
+        # runs takes `g = p - 1`, which puts the pair at 1.4483 / 0.4483
+        # (vix-dynamics.md sections 2.3 and 5). The shipped value IS the
+        # measured one, for the first time on this dial.
+        "kind": "measured",
+        "source": "programme/results/vix-dynamics.md sections 2.3 to 2.5 (design repo)",
+        "date": "2026-09-13",
+        "estimator": "bucket-median regression of dVIX on |r| and the VIX "
+                     "level, down sessions, whole span, refitted in the "
+                     "engine's own standardised form so the exponent the "
+                     "dial carries is the exponent that was fitted",
+        "script": "programme/scripts/vix-updown-fit.py and the vixprobe "
+                  "series (design repo); the fit and its residual are "
+                  "programme/results/vix-dynamics.md sections 2.3 to 2.5",
+        "estimate": 1.4483,
+        "standard_error": 0.12,
+        "residual": {
+            "kind": "F against the shipped level-blind form on the same "
+                    "bucket medians",
+            "statistic": 118.0,
+            "note": "the level-blind form is REFUSED at F = 118, so the "
+                    "level exponent is not an optional refinement of it",
+        },
+        "presets": {"pt-v19": 1.4483},
+        "identity": "the down-side response is `gain * |r|^p * V^-g` with "
+                    "`g = p - 1`, the one-parameter-fewer standardised "
+                    "form; the free fit's g of 0.49 +/- 0.12 contains "
+                    "p - 1 = 0.4483",
+        "what_would_determine_it": "RESOLVED for pt-v19; for the earlier "
+                                   "presets, the question asked on an arm whose "
                                    "index sd is near the tape's, which no "
                                    "arm in wsa16 or wsa17 was, with the "
                                    "shape residual read beside the "
@@ -1275,6 +1262,238 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "inert_at_shipped_value": True,
         "ruling": "R4 -- ruled out of pt-v19 until 2.4 is measured "
                   "properly, and the ruling stands",
+    },
+    # ======================================================================
+    # THE 0.8.0 VECTOR. Eleven dials that shipped inert at 0.0 and are live
+    # in pt-v19 from 2026-09-13. Every figure is read off
+    # programme/results/vix-dynamics.md in the design repository, which is
+    # also where each falsifier and each box are recorded. They were
+    # measured BEFORE they were scored: no value below was chosen because it
+    # cleared a band, which is the B3 defect this module refuses.
+    # ======================================================================
+    "vix_return_level_exponent": {
+        "kind": "derived",
+        "presets": {"pt-v19": 0.4483},
+        "identity": "`p - 1` where p is `vix_return_exponent` 1.4483. The "
+                    "engine runs the standardised form of the down-side "
+                    "law, in which the level exponent is not free: fixing "
+                    "it at `p - 1` is the one-parameter-fewer model, and "
+                    "the free fit's g of 0.49 +/- 0.12 contains 0.4483",
+        "terms": {"vix_return_exponent": "1.4483, the entry above"},
+        "source": "programme/results/vix-dynamics.md section 2.3, and the "
+                  "derived vector of section 5",
+        "date": "2026-09-13",
+    },
+    "vix_return_exponent_up": {
+        "kind": "measured",
+        "source": "programme/results/vix-dynamics.md section 2.3 (design repo)",
+        "date": "2026-09-13",
+        "estimator": "bucket-median regression on UP sessions, whole span, "
+                     "the same estimator as the down side and fitted "
+                     "separately because the tape's two sides are two laws",
+        "script": "programme/scripts/vix-updown-fit.py (design repo); "
+                  "vix-dynamics.md section 2.3",
+        "estimate": 0.5433,
+        "standard_error": 0.04,
+        "residual": {
+            "kind": "the free up-side fit this is shaped from",
+            "p_up": 0.60,
+            "note": "CONCAVE in the move, against the down side's convex "
+                    "1.4483: the two sides are not one law with a sign",
+        },
+        "presets": {"pt-v19": 0.5433},
+        "identity": "the up-side response is `gain * |r|^p_up * V^-g_up`",
+    },
+    "vix_return_level_exponent_up": {
+        "kind": "derived",
+        "presets": {"pt-v19": -1.0},
+        "identity": "the RATIO form in the level: an up-side response "
+                    "proportional to the VIX is `V^-g_up` with g_up = -1. "
+                    "The free fit reads -0.85 +/- 0.12, which is 1.2 "
+                    "standard errors from -1, so the ratio form is the "
+                    "one-parameter-fewer model the tape does not refuse",
+        "terms": {"free fit": "-0.85 +/- 0.12, vix-dynamics.md section 2.3"},
+        "source": "programme/results/vix-dynamics.md sections 2.3 and 5",
+        "date": "2026-09-13",
+    },
+    "vix_innovation_return_sigma": {
+        "kind": "measured",
+        "source": "programme/results/vix-dynamics.md sections 3 and 12 (design repo)",
+        "date": "2026-09-13",
+        "estimator": "Gaussian maximum likelihood on the within-window "
+                     "residual of the fitted response law: the "
+                     "return-coupled component of the VIX innovation",
+        "script": "programme/scripts/vixstats.py, the form-controlled "
+                  "residual estimator (design repo); vix-dynamics.md "
+                  "sections 3 and 12",
+        "estimate": 0.0175,
+        "standard_error": 0.0015,
+        "residual": {
+            "kind": "form-controlled residual sd, model against tape",
+            "model": 0.032,
+            "tape": 0.036,
+            "note": "measured on the shipped vector at 120 rosters. The "
+                    "companion `vix_innovation_sigma` DERIVES TO ZERO: the "
+                    "VIX's own innovation is the variance forecast's, "
+                    "which is why the tape's residual persists",
+        },
+        "presets": {"pt-v19": 0.0175},
+        "identity": "the residual a level-aware law leaves, which a "
+                    "level-blind law books as innovation and which the "
+                    "`vix_dlog_innovation_sd` row of new-rows.md reads",
+    },
+    "vix_jump_level_scale": {
+        "kind": "measured",
+        "source": "programme/results/vix-dynamics.md section 3.2 (design repo)",
+        "date": "2026-09-13",
+        "estimator": "cumulant inversion on the standardised residual of "
+                     "the fitted response law: the jump size reproducing "
+                     "the residual's third and fourth cumulants at the "
+                     "derived arrival rate",
+        "script": "programme/scripts/vixstats.py and t3_resid.py (design "
+                  "repo); vix-dynamics.md section 3.2",
+        "estimate": 1.700,
+        "standard_error": 0.35,
+        "residual": {
+            "kind": "the VIX daily excess kurtosis it is fitted to",
+            "tape": 2.66,
+            "note": "the model reaches 0.72 on the shipped vector, short "
+                    "for the reason section 5.5 gives: the index's own "
+                    "tail is thinner than the tape's and a convex response "
+                    "caps the VIX fourth moment below it. The dial is not "
+                    "what is short",
+        },
+        "presets": {"pt-v19": 1.700},
+        "identity": "the jump size in LEVEL units, which is what makes the "
+                    "response scale-free; 0.0 selects the points of "
+                    "`vix_jump_scale` instead",
+    },
+    "vix_jump_return_intensity": {
+        "kind": "derived",
+        "presets": {"pt-v19": 6.199},
+        "identity": "the derived 2.24 arrivals a year spread over the "
+                    "down-return distribution as `max(0, -r)`: a rate per "
+                    "year per percentage point of down move, which "
+                    "integrates back to 2.24/yr on the tape's own return "
+                    "distribution",
+        "terms": {"2.24/yr": "the arrival rate the cumulant inversion "
+                             "behind `vix_jump_level_scale` implies, "
+                             "vix-dynamics.md section 3.2",
+                  "max(0, -r)": "the carrier, because the tape's VIX jumps "
+                                "arrive on down sessions"},
+        "source": "programme/results/vix-dynamics.md sections 3.2 and 5",
+        "date": "2026-09-13",
+    },
+    "sector_vol_alpha": {
+        "kind": "measured",
+        "source": "programme/results/vix-dynamics.md sections 19.1 and 19.7 (design repo)",
+        "date": "2026-09-13",
+        "estimator": "GARCH(1,1) by Gaussian quasi-maximum likelihood on "
+                     "the sector factor daily return STANDARDISED by the "
+                     "model's own VIX-coupled target, which is the ratio "
+                     "form: the state multiplies the target rather than "
+                     "adding a variance to it",
+        "script": "programme/scripts/t25_sector_jump_forms.py and "
+                  "t26_sector_net_of_vix.py (design repo); vix-dynamics.md "
+                  "sections 19.1 and 19.7",
+        "estimate": 0.067,
+        "standard_error": 0.043,
+        "residual": {
+            "kind": "the persistence the pair implies, against the tape",
+            "estimate": 0.904,
+            "standard_error": 0.069,
+            "note": "sd of the log scale 0.331. The ADDITIVE form of the "
+                    "same state was measured on vixdyn8 and is worse at "
+                    "504 by 2.68 against a paired error bar of 1.60",
+        },
+        "presets": {"pt-v19": 0.067},
+        "identity": "the shock share of the sector variance state",
+    },
+    "sector_vol_beta": {
+        "kind": "measured",
+        "source": "programme/results/vix-dynamics.md section 19.7 (design repo)",
+        "date": "2026-09-13",
+        "estimator": "the same GARCH(1,1) fit as `sector_vol_alpha`, the "
+                     "persistence coefficient of the same pair",
+        "script": "programme/scripts/t25_sector_jump_forms.py (design "
+                  "repo); vix-dynamics.md section 19.7",
+        "estimate": 0.837,
+        "standard_error": 0.111,
+        "residual": {
+            "kind": "alpha + beta against the tape's sector persistence",
+            "estimate": 0.904,
+            "standard_error": 0.069,
+        },
+        "presets": {"pt-v19": 0.837},
+        "identity": "the carry-over of the sector variance state. The "
+                    "state is a ratio with fixed point 1.0, so beta alone "
+                    "with alpha at 0.0 leaves it there forever, which is "
+                    "why the pair is jointly live and singly inert",
+    },
+    "jump_idio_excitation": {
+        "kind": "measured",
+        "source": "programme/results/vix-dynamics.md section 19.1 (design repo)",
+        "date": "2026-09-13",
+        "estimator": "the tape's conditional jump intensity on the k days "
+                     "after a name's own jump, fitted as "
+                     "`1 + a * decay^(k-1)` over the per-name jump series",
+        "script": "programme/scripts/t25_sector_jump_forms.py (design "
+                  "repo); vix-dynamics.md section 19.1",
+        "estimate": 2.0,
+        "standard_error": 0.33,
+        "residual": {
+            "kind": "the amplitude interval and the branching ratio",
+            "interval": [1.5, 2.8],
+            "branching_ratio": 0.13,
+            "branching_interval": [0.09, 0.25],
+            "note": "the tape's intensity is 3.3x on the day after a jump. "
+                    "MEASURED on the box, the excitation moves nothing the "
+                    "panel reads: a branching ratio of 0.13 on a rate of a "
+                    "few a year per name is too little mass. It ships "
+                    "because it is correct in kind and costs nothing, and "
+                    "that reading is recorded rather than hidden",
+        },
+        "presets": {"pt-v19": 2.0},
+        "identity": "the self-excitation amplitude of a name's own jump "
+                    "arrival: `h' = decay * h + a * 1[jump]` with "
+                    "intensity `lambda_0 (1 + h)`",
+    },
+    "jump_idio_excitation_decay": {
+        "kind": "measured",
+        "source": "programme/results/vix-dynamics.md section 19.1 (design repo)",
+        "date": "2026-09-13",
+        "estimator": "the same conditional-intensity fit as "
+                     "`jump_idio_excitation`, its decay coefficient",
+        "script": "programme/scripts/t25_sector_jump_forms.py (design "
+                  "repo); vix-dynamics.md section 19.1",
+        "estimate": 0.72,
+        "standard_error": 0.09,
+        "residual": {
+            "kind": "the branching ratio the pair implies",
+            "estimate": 0.13,
+            "interval": [0.09, 0.25],
+            "note": "`a * p_0 / (1 - rho)`, under one, so the excitation "
+                    "is sub-critical and the intensity does not run away",
+        },
+        "presets": {"pt-v19": 0.72},
+        "identity": "the day-on-day carry-over of a name's excitation state",
+    },
+    "jump_idio_vix_decoupled": {
+        "kind": "derived",
+        "presets": {"pt-v19": 1.0},
+        "identity": "a SWITCH rather than a quantity: 1.0 takes the "
+                    "VIX-squared scaling off the idiosyncratic arrival "
+                    "rate. The shipped rate is "
+                    "`jump_vix_coupling * (VIX/anchor)^2`, and "
+                    "vix-dynamics.md section 19.1 measures that the tape "
+                    "does NOT support a variance coupling of the "
+                    "idiosyncratic rate in sd units. The market jump's own "
+                    "coupling is a separate question and is untouched",
+        "terms": {"the measurement": "vix-dynamics.md section 19.1, the "
+                                     "component-by-component decomposition "
+                                     "of a name's variance"},
+        "source": "programme/results/vix-dynamics.md sections 19.1 and 19.5",
+        "date": "2026-09-13",
     },
     "macro_burn_in_days": {
         # THE SOURCE CLAIMS A MEASUREMENT AND SHIPS NO ERROR BAR. The
@@ -1364,7 +1583,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_mean_reversion": {
         "kind": "measured",
-        "presets": {"pt-v16": 0.06, "pt-v18": 0.10, "pt-v19": 0.10},
+        "presets": {"pt-v16": 0.06, "pt-v18": 0.10, "pt-v19": 0.27},
         "source": "the same nineteen-row objective and the same thirty-seed "
                   "arm, with `market_beta_down_asym_lag` pinned at 0.375",
         "date": "2026-09-07",

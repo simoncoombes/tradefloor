@@ -212,7 +212,13 @@ PERTURBATIONS = [
     # on any preset and keeps the parameter's wiring proven rather than
     # excused.
     ("garch_vix_coupling", 0.8, False),    # scales the clamp reference by (vix/anchor)^2, and the harness runs at the anchor, where that is exactly 1.0 at any coupling
-    ("garch_ceiling_multiple", 0.9, False),   # measured not to bind under pt-v10 at 0.9, 1.05, 2.0 or 20.0: the trimmed idio scale keeps per-name variance under the clamp's reference
+    # LIVE at the 0.8.0 vector adoption. The old reason was measured and was
+    # true of pt-v10: at 0.9, 1.05, 2.0 and 20.0 the trimmed idiosyncratic
+    # scale kept per-name variance under the clamp's reference, so the ceiling
+    # never bound. pt-v19 now ships the per-name memory at `garch_beta` 0.7905
+    # and a sector variance state, and per-name variance reaches a multiple of
+    # 0.9. The dial has not changed; what it gates now happens.
+    ("garch_ceiling_multiple", 0.9, True),
     ("garch_floor_multiple", 0.99, True),
     ("garch_omega_sector_scaled", 1.0, True),
     ("idio_sigma_floor", 0.0, True),
@@ -673,7 +679,10 @@ PERTURBATIONS = [
     ("vix_decay_ratio", 0.3, True),  # was False; the burn-in reaches it (see above)
     # The jump arrival rate. Non-zero means the mechanism draws, which is why
     # it is in ECONOMY_STREAM_MOVERS below.
-    ("vix_jump_intensity", 0.5, True),
+    # RE-VALUED at the 0.8.0 vector adoption. Ships 0.0; 0.5 no longer
+    # reaches the market on this vector and 2.0 does, so the probe needs the
+    # larger step to say anything.
+    ("vix_jump_intensity", 2.0, True),
     # The size of a jump once one arrives. The other half of the pair: with
     # the intensity at 0.0 there is no arrival to scale.
     ("vix_jump_scale", 1.0, False),
@@ -686,7 +695,10 @@ PERTURBATIONS = [
     # not taken.
     ("vix_return_level_exponent", 0.5, True),
     ("vix_return_exponent_up", 0.6, True),
-    ("vix_return_level_exponent_up", -1.0, True),
+    # RE-VALUED at the 0.8.0 vector adoption, NOT re-flagged. pt-v19 now
+    # ships -1.0, so the old perturbation of -1.0 was the shipped
+    # value itself: a row that perturbs nothing and can never fail. -0.5 moves; so do 0.0 and -2.0.
+    ("vix_return_level_exponent_up", -0.5, True),
     # The innovation pair: either one non-zero selects the level-scaled
     # noise over the shipped 0.15 points, so each moves alone.
     ("vix_innovation_sigma", 0.03, True),
@@ -696,7 +708,10 @@ PERTURBATIONS = [
     ("vix_jump_level_scale", 1.0, False),
     # The return-driven arrival rate: non-zero takes the arrival draw, which
     # is why it is in ECONOMY_STREAM_MOVERS below with `vix_jump_intensity`.
-    ("vix_jump_return_intensity", 6.0, True),
+    # RE-VALUED at the 0.8.0 vector adoption. pt-v19 ships 6.199 and 6.0 is
+    # close enough to it to move nothing; 0.0 moves and 12.0 does not, so
+    # the dial reads as a switch on this vector rather than as a rate.
+    ("vix_jump_return_intensity", 0.0, True),
     # The two per-component states of vix-dynamics.md section 19 and the
     # idiosyncratic-rate switch. The sector state moves on the first tick
     # (either dial switches it on and the sector draw's sigma is the
@@ -708,13 +723,26 @@ PERTURBATIONS = [
     # MEASURED False: the state is a ratio with fixed point 1.0, and with
     # no shock share (alpha 0.0) beta alone leaves it at 1.0 forever --
     # the draw is then the stateless one to the bit.
-    ("sector_vol_beta", 0.9, False),
-    ("jump_idio_excitation", 2.0, False),
+    # LIVE at the 0.8.0 vector adoption. Its old reason -- inert while
+    # `sector_vol_alpha` is also 0.0 -- was true and pt-v19 now ships alpha
+    # at 0.067, so the sector variance state is read and beta with it.
+    ("sector_vol_beta", 0.9, True),
+    # RE-VALUED at the 0.8.0 vector adoption. pt-v19 now ships 2.0, so this
+    # row perturbed to the SHIPPED value: the fingerprint never became
+    # `custom-` and the row could not fail. Measured at 0.0, 1.0 and 4.0,
+    # across and around the shipped value, it moves nothing on this probe,
+    # because the excitation state is only read after a jump has ARRIVED and
+    # three sessions on this roster deliver none. `jump_idio_vix_decoupled` is
+    # live in the same block because it changes the arrival RATE instead.
+    ("jump_idio_excitation", 4.0, False),
     ("jump_idio_excitation_decay", 0.7, False),
     # MEASURED True, not the guess: under the identity the read-back's
     # idiosyncratic-jump term prices the unscaled rate from the first
     # close, so the VIX moves on day one whether or not a name jumps.
-    ("jump_idio_vix_decoupled", 1.0, True),
+    # RE-VALUED at the 0.8.0 vector adoption, NOT re-flagged. pt-v19 now
+    # ships 1.0, so the old perturbation of 1.0 was the shipped
+    # value itself: a row that perturbs nothing and can never fail. 0.0 moves (it is the switch's off position); 0.5 does not.
+    ("jump_idio_vix_decoupled", 0.0, True),
     # An upper bound on the VIX state, shipped at 80.0. INERT at 40.0 for a
     # reason the probe's own range gives rather than a dead wire: the VIX
     # reads 14.8477, 15.0094 and 15.0644 over the three days, so a bound at
@@ -854,6 +882,32 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # `vix_jump_intensity` on every session it is non-zero, for the same
     # reason: the draw IS the mechanism.
     "vix_jump_return_intensity",
+    # NINE ARRIVED WITH THE 0.8.0 VECTOR, and they arrived together, which is
+    # what says this is the documented mechanism rather than a leak.
+    #
+    # MEASURED on this probe: each of the nine moves the economy stream by
+    # EXACTLY +1 draw and the market stream by 0, against a baseline of 8,407
+    # economy and 17,082 market draws. One extra state-dependent macro site
+    # fires; nothing about the market's schedule moves, which is the invariant
+    # a paired comparison actually needs.
+    #
+    # WHY NOW. The comment above gives the mechanism: 755 days of macro run in
+    # front of every probe and the chain has state-dependent draw sites, so a
+    # dial that changes the macro path changes which of them fire. The
+    # composed vector changes the VIX trajectory, the VIX feeds the macro
+    # state, and the path now sits beside ONE decision boundary that any of
+    # these nine nudges across. That they all move it by the same single draw
+    # is the evidence for one boundary rather than nine mechanisms: a leak
+    # would not be uniform.
+    #
+    # None of them is a macro dial by intent. They reach the boundary through
+    # the VIX (`vix_return_gain_up`, `usd_crisis_vix_threshold`), through the
+    # market path that feeds it (`market_factor_sigma`, `price_hard_cap`, the
+    # three jump dials) or through the OPEC arm's own decision day
+    # (`oil_supply_response`, `oil_seasonality_target`).
+    "market_factor_sigma", "usd_crisis_vix_threshold", "price_hard_cap",
+    "jump_intensity_idio", "jump_mean_market", "jump_sigma_market",
+    "vix_return_gain_up", "oil_supply_response", "oil_seasonality_target",
 })
 
 
