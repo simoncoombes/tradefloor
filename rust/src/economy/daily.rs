@@ -152,6 +152,27 @@ pub struct DailyInputs<'a> {
     /// anchor is. See `ModelParams::vix_target_offset`, which carries the
     /// reasoning and the limitation.
     pub vix_target_offset: f64,
+    /// The level dependence of the fear response and the up side's own
+    /// exponent. See `ModelParams::vix_return_level_exponent`,
+    /// `::vix_return_exponent_up` and `::vix_return_level_exponent_up`;
+    /// at (0.0, 1.0, 0.0) `return_spike_at_level` is a BRANCH to
+    /// `return_spike_for` and every preset up to pt-v19 is bit-identical.
+    pub vix_return_level_exponent: f64,
+    pub vix_return_exponent_up: f64,
+    pub vix_return_level_exponent_up: f64,
+    /// The VIX's own innovation, as a fraction of its level per session,
+    /// and the part of it that scales with the session return. See
+    /// `ModelParams::vix_innovation_sigma`; at (0.0, 0.0) the noise is the
+    /// shipped `0.15 * volatility` points, computed by the same expression.
+    pub vix_innovation_sigma: f64,
+    pub vix_innovation_return_sigma: f64,
+    /// A fear event's size in units of the day's innovation scale, and the
+    /// part of its arrival rate that rises with a down session. See
+    /// `ModelParams::vix_jump_level_scale`; at 0.0 the event is
+    /// `vix_jump_scale` points, and with both intensities at 0.0 no draw
+    /// is taken.
+    pub vix_jump_level_scale: f64,
+    pub vix_jump_return_intensity: f64,
     /// Monthly fraction of the inflation gap closed toward the 2% target.
     /// Threaded like `vix_mean_reversion`: the shipped 0.55 was a literal
     /// inside the inflation update, which made inflation's persistence and
@@ -245,6 +266,13 @@ impl<'a> Default for DailyInputs<'a> {
             usd_crisis_vix_threshold: CRISIS_VIX_THRESHOLD,
             vix_ceiling: 80.0,
             vix_target_offset: 0.0,
+            vix_return_level_exponent: 0.0,
+            vix_return_exponent_up: 1.0,
+            vix_return_level_exponent_up: 0.0,
+            vix_innovation_sigma: 0.0,
+            vix_innovation_return_sigma: 0.0,
+            vix_jump_level_scale: 0.0,
+            vix_jump_return_intensity: 0.0,
             daily_credit_floor_gain: 0.0,
             oil_supply_response: 0.0,
             oil_opec_symmetry: 0.0,
@@ -399,6 +427,83 @@ pub fn return_spike_for(current: f64, gain: f64, gain_up: f64, exponent: f64) ->
     } else {
         gain * mathx::pow(-current, exponent)
     }
+}
+
+/// [`return_spike_for`] with the LEVEL in it: the target's response to the
+/// session return can fall, or rise, with the VIX the session opened from.
+///
+/// ```text
+/// down    gain    * |r|^exponent     * vix^(-level_exponent)
+/// up     -gain_up * |r|^exponent_up  * vix^(-level_exponent_up)
+/// ```
+///
+/// At `level_exponent` 0.0, `exponent_up` 1.0 and `level_exponent_up` 0.0
+/// -- every preset up to pt-v19 -- this is a BRANCH to `return_spike_for`
+/// and the general arithmetic is never evaluated, so those presets
+/// reproduce to the bit. The measurement behind the form, its error bars
+/// and the value each dial derives to are on
+/// `ModelParams::vix_return_level_exponent`.
+pub fn return_spike_at_level(
+    current: f64,
+    gain: f64,
+    gain_up: f64,
+    exponent: f64,
+    exponent_up: f64,
+    level_exponent: f64,
+    level_exponent_up: f64,
+    vix: f64,
+) -> f64 {
+    if level_exponent == 0.0 && exponent_up == 1.0 && level_exponent_up == 0.0 {
+        return return_spike_for(current, gain, gain_up, exponent);
+    }
+    if current < 0.0 {
+        let level = if level_exponent == 0.0 { 1.0 } else { mathx::pow(vix, -level_exponent) };
+        gain * mathx::pow(-current, exponent) * level
+    } else if current > 0.0 {
+        let level = if level_exponent_up == 0.0 { 1.0 } else { mathx::pow(vix, -level_exponent_up) };
+        -gain_up * mathx::pow(current, exponent_up) * level
+    } else {
+        0.0
+    }
+}
+
+/// [`expected_return_spike`] for the level-dependent form: the mean of
+/// [`return_spike_at_level`] over `r ~ N(0, sigma^2)`, which is what the
+/// identity subtracts so the fear excursion is zero-mean.
+///
+/// ```text
+/// E[spike] = 0.5 gain    vix^(-level_exponent)    E|r|^exponent
+///          - 0.5 gain_up vix^(-level_exponent_up) E|r|^exponent_up
+/// E|r|^q   = sigma^q 2^(q/2) Gamma((q + 1) / 2) / sqrt(pi)
+/// ```
+///
+/// The level factors are constants given the VIX the session opened from,
+/// so they pass straight through the expectation; the two absolute moments
+/// are the Gaussian ones `expected_return_spike` already carries, with the
+/// up side's own order. Same branch as the spike: at the three defaults it
+/// IS `expected_return_spike`, evaluated by that function.
+pub fn expected_return_spike_at_level(
+    sigma_pct: f64,
+    gain: f64,
+    gain_up: f64,
+    exponent: f64,
+    exponent_up: f64,
+    level_exponent: f64,
+    level_exponent_up: f64,
+    vix: f64,
+) -> f64 {
+    if level_exponent == 0.0 && exponent_up == 1.0 && level_exponent_up == 0.0 {
+        return expected_return_spike(sigma_pct, gain, gain_up, exponent);
+    }
+    let moment = |q: f64| -> f64 {
+        mathx::pow(sigma_pct, q)
+            * mathx::pow(2.0, 0.5 * q)
+            * mathx::tgamma(0.5 * (q + 1.0))
+            / mathx::sqrt(core::f64::consts::PI)
+    };
+    let down = if level_exponent == 0.0 { 1.0 } else { mathx::pow(vix, -level_exponent) };
+    let up = if level_exponent_up == 0.0 { 1.0 } else { mathx::pow(vix, -level_exponent_up) };
+    0.5 * (gain * down * moment(exponent) - gain_up * up * moment(exponent_up))
 }
 
 /// One simulated day of the macro chain.
@@ -1052,9 +1157,11 @@ pub fn update_economy_daily(
         (1.0 - s) * inputs.market_return_pct + s * inputs.market_day_return_pct
     };
     let current_mkt_ret_vix = mathx::max(-clamp_vix, mathx::min(clamp_vix, driving_return));
-    let return_spike = return_spike_for(
+    let return_spike = return_spike_at_level(
         current_mkt_ret_vix, inputs.vix_return_gain,
-        inputs.vix_return_gain_up, inputs.vix_return_exponent);
+        inputs.vix_return_gain_up, inputs.vix_return_exponent,
+        inputs.vix_return_exponent_up, inputs.vix_return_level_exponent,
+        inputs.vix_return_level_exponent_up, economy.vix);
     let inflation_adj = mathx::max(0.0, (economy.inflation_rate - 3.0) * 0.2);
     let shock_adj = shock_gdp_impact.abs() * 2.0;
     target_vix += mathx::min(
@@ -1070,11 +1177,15 @@ pub fn update_economy_daily(
     // instead, computed each day from the index's conditional sigma: see
     // `expected_return_spike`. Nothing is fitted and nothing is left over.
     if identity_level {
-        target_vix -= expected_return_spike(
+        target_vix -= expected_return_spike_at_level(
             inputs.vix_index_sigma_pct,
             inputs.vix_return_gain,
             inputs.vix_return_gain_up,
             inputs.vix_return_exponent,
+            inputs.vix_return_exponent_up,
+            inputs.vix_return_level_exponent,
+            inputs.vix_return_level_exponent_up,
+            economy.vix,
         );
     }
 
@@ -1125,11 +1236,46 @@ pub fn update_economy_daily(
     // Exogenous fear events (round 134). STRICTLY no draws at zero: any
     // draw here would shift every later draw in the economy schedule and
     // break bit-reproduction of recorded runs.
-    let fear_jump = if inputs.vix_jump_intensity != 0.0 {
-        let p_daily = inputs.vix_jump_intensity / 252.0;
+    //
+    // THE VIX'S OWN INNOVATION. The shipped noise is 0.15 points a day,
+    // under one per cent of the level; the tape's VIX, once its response
+    // to the index return is removed, moves by 3.3 per cent of its level
+    // a session plus a part that scales with the session's own size. See
+    // `ModelParams::vix_innovation_sigma`. With both innovation dials at
+    // 0.0 the scale is the expression that stood here, `0.15 * volatility`,
+    // and the draw is the same draw.
+    let innovation_on = inputs.vix_innovation_sigma != 0.0
+        || inputs.vix_innovation_return_sigma != 0.0;
+    let vix_noise_sd = if innovation_on {
+        let s0 = inputs.vix_innovation_sigma;
+        let sr = inputs.vix_innovation_return_sigma * current_mkt_ret_vix;
+        economy.vix * mathx::sqrt(s0 * s0 + sr * sr)
+    } else {
+        0.15 * volatility
+    };
+    let fear_jump = if inputs.vix_jump_intensity != 0.0
+        || inputs.vix_jump_return_intensity != 0.0
+    {
+        // The arrival rate per year, with the part that rises on a down
+        // session added only when that dial is set, so a preset carrying
+        // the constant rate alone computes exactly what it did.
+        let rate = if inputs.vix_jump_return_intensity != 0.0 {
+            inputs.vix_jump_intensity
+                + inputs.vix_jump_return_intensity * mathx::max(0.0, -current_mkt_ret_vix)
+        } else {
+            inputs.vix_jump_intensity
+        };
+        let p_daily = rate / 252.0;
         if rng.next_f64() < p_daily {
-            // Exponential magnitude: mean `vix_jump_scale` points.
-            inputs.vix_jump_scale * -mathx::log(mathx::max(rng.next_f64(), 1e-12))
+            // Exponential magnitude: mean `vix_jump_scale` points, or mean
+            // `vix_jump_level_scale` innovation scales.
+            let draw = -mathx::log(mathx::max(rng.next_f64(), 1e-12));
+            if inputs.vix_jump_level_scale != 0.0 {
+                let unit = if innovation_on { vix_noise_sd } else { economy.vix };
+                inputs.vix_jump_level_scale * unit * draw
+            } else {
+                inputs.vix_jump_scale * draw
+            }
         } else {
             0.0
         }
@@ -1139,7 +1285,7 @@ pub fn update_economy_daily(
     new_state.vix = clamp(
         economy.vix
             + (target_vix - economy.vix) * vix_mr
-            + random_normal(rng, 0.0, 0.15 * volatility)
+            + random_normal(rng, 0.0, vix_noise_sd)
             + fear_jump,
         10.0,
         inputs.vix_ceiling,

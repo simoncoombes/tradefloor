@@ -566,6 +566,13 @@ fn name_noise_variance(
 fn jump_intensities(p: &ModelParams, rate_scale: f64) -> (f64, f64) {
     if p.jump_vix_coupling == 0.0 {
         (p.jump_intensity_market, p.jump_intensity_idio)
+    } else if p.jump_idio_vix_decoupled != 0.0 {
+        // The tape's idiosyncratic jump rate does not rise with variance
+        // (vix-dynamics.md 19.1: `var^-0.20` on the name's own, `var^0.05`
+        // on the market's, in sd units), so the VIX-squared scale stays on
+        // the market jump alone. `engine.rs::apply_jumps` takes the same
+        // branch.
+        (p.jump_intensity_market * rate_scale, p.jump_intensity_idio)
     } else {
         (
             p.jump_intensity_market * rate_scale,
@@ -802,9 +809,46 @@ pub fn index_conditional_variance_terms(
     prev_day_down: bool,
     k: f64,
 ) -> IndexVarianceTerms {
+    // One sigma for every sector and no jump excitation: the stateless
+    // sector draw and the independent jump arrivals every preset up to
+    // pt-v19 runs. The per-sector loop below multiplies the same scalar it
+    // multiplied before, so this wrapper is bit-identical to the body it
+    // replaced.
+    let sigmas = vec![sector_sigma; sector_count];
+    index_conditional_variance_terms_with_states(
+        p, names, sector_count, factor_variance, &sigmas, &[], jump_rate_scale,
+        crisis_spike, prev_day_down, k)
+}
+
+/// [`index_conditional_variance_terms`] with the two per-component STATES
+/// `programme/results/vix-dynamics.md` section 19 derives: a variance per
+/// sector (`sector_sigmas`, one daily sigma per sector key, the sector
+/// draw's own GARCH state when `sector_vol_alpha` / `_beta` are set) and a
+/// jump-excitation level per name (`jump_excitations`, in `names`' order;
+/// empty means none). The tape gives the sector residual a persistence of
+/// 0.971 and the idiosyncratic jump a self-excitation of 2.0 at decay
+/// 0.72, and a read-back that priced the stateless forms while the tick
+/// ran the stateful ones would be the same defect this module was written
+/// to close.
+pub fn index_conditional_variance_terms_with_states(
+    p: &ModelParams,
+    names: &[NameVariance],
+    sector_count: usize,
+    factor_variance: f64,
+    sector_sigmas: &[f64],
+    jump_excitations: &[f64],
+    jump_rate_scale: f64,
+    crisis_spike: f64,
+    prev_day_down: bool,
+    k: f64,
+) -> IndexVarianceTerms {
     let mut beta_w = 0.0;
     let mut weight_sq = 0.0;
     let mut idio_var = 0.0;
+    // The excitation-weighted `sum w_i^2 h_i`, zero when no excitation is
+    // carried, so the idiosyncratic jump term below adds nothing on a
+    // preset without the state.
+    let mut excited_sq = 0.0;
     // The index's TOTAL sector loading, which is not the same object as the
     // per-sector accumulator beside it: the sector block needs each sector's
     // own loaded weight squared, and the crisis blend's leak through the
@@ -814,7 +858,7 @@ pub fn index_conditional_variance_terms(
     // sector is zero, not a panic" read on both.
     let mut sector_loaded_total = 0.0;
     let mut sector_loaded = vec![0.0; sector_count];
-    for name in names {
+    for (index, name) in names.iter().enumerate() {
         beta_w += name.weight * name.beta;
         weight_sq += name.weight * name.weight;
         let idio = idio_sigma_daily(p, name);
@@ -824,9 +868,13 @@ pub fn index_conditional_variance_terms(
             sector_loaded[name.sector] += loaded;
             sector_loaded_total += loaded;
         }
+        if let Some(h) = jump_excitations.get(index) {
+            excited_sq += name.weight * name.weight * h;
+        }
     }
     let mut sector_var = 0.0;
-    for loaded in sector_loaded.iter() {
+    for (s, loaded) in sector_loaded.iter().enumerate() {
+        let sector_sigma = sector_sigmas[s];
         sector_var += loaded * loaded * sector_sigma * sector_sigma;
     }
 
@@ -928,6 +976,14 @@ pub fn index_conditional_variance_terms(
     let sig = p.jump_sigma_market;
     let market_jump = lambda_m * (mu * mu + sig * sig) - (lambda_m * mu) * (lambda_m * mu);
     let idio_jump = weight_sq * lambda_i * p.jump_sigma_idio * p.jump_sigma_idio;
+    // The excited arrivals, `sum w_i^2 lambda_i h_i sigma_J^2`, added only
+    // when an excitation is carried so the expression above stands
+    // untouched on every preset without the state.
+    let idio_jump = if excited_sq != 0.0 {
+        idio_jump + excited_sq * lambda_i * p.jump_sigma_idio * p.jump_sigma_idio
+    } else {
+        idio_jump
+    };
 
     let news = weight_sq * p.endogenous_news_intensity
         * p.endogenous_news_sigma

@@ -503,6 +503,11 @@ pub struct TickInputs<'a> {
     /// Sector keys in the order `SECTOR_CONFIGS` enumerates them. The ORDER
     /// is contractual: one normal is drawn per key, in this order.
     pub sector_keys: &'a [String],
+    /// One DAILY sigma per sector key from the engine's per-sector variance
+    /// state (`sector_vol_alpha` / `_beta`), or EMPTY, which is the stateless
+    /// draw at `sector_sigma_at` every preset up to pt-v19 runs. See
+    /// `programme/results/vix-dynamics.md` section 19.
+    pub sector_sigmas: &'a [f64],
     /// Whether yesterday's session accumulated a DOWN market factor.
     /// Read only by the lagged transmission wire
     /// (`market_beta_down_asym_lag`); false everywhere that dial is 0.0,
@@ -796,6 +801,13 @@ pub fn simulate_market_tick(
     let mut sector_factors = Vec::with_capacity(inputs.sector_keys.len());
     for (sector_index, sector) in inputs.sector_keys.iter().enumerate() {
         rng.site(crate::rng::Site::SectorZ, sector_index as u32);
+        // The sector's own variance state when one is running, else the
+        // shared VIX-coupled sigma -- the same multiply in the same order
+        // when `sector_sigmas` is empty.
+        let sector_sigma = match inputs.sector_sigmas.get(sector_index) {
+            Some(s) => *s,
+            None => sector_sigma,
+        };
         let idiosyncratic = rng.next_normal() * sector_sigma * tick_scale;
         // Where the blend takes from. At source 0.0 the sector draw is
         // attenuated and the market factor injected through this slot, the

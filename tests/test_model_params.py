@@ -658,6 +658,44 @@ PERTURBATIONS = [
     # The size of a jump once one arrives. The other half of the pair: with
     # the intensity at 0.0 there is no arrival to scale.
     ("vix_jump_scale", 1.0, False),
+    # The VIX-dynamics dials (programme/results/vix-dynamics.md). The three
+    # form dials move on the probe because the default runs the identity:
+    # the down side's level factor reads the VIX on a falling session, and
+    # the up side's exponent and level factor enter the zero-mean
+    # correction `expected_return_spike_at_level` on EVERY session, up or
+    # down. Each is perturbed away from the value at which the branch is
+    # not taken.
+    ("vix_return_level_exponent", 0.5, True),
+    ("vix_return_exponent_up", 0.6, True),
+    ("vix_return_level_exponent_up", -1.0, True),
+    # The innovation pair: either one non-zero selects the level-scaled
+    # noise over the shipped 0.15 points, so each moves alone.
+    ("vix_innovation_sigma", 0.03, True),
+    ("vix_innovation_return_sigma", 0.02, True),
+    # The event's size unit: with both intensities at 0.0 there is no
+    # arrival to size, so alone it is inert, like `vix_jump_scale`.
+    ("vix_jump_level_scale", 1.0, False),
+    # The return-driven arrival rate: non-zero takes the arrival draw, which
+    # is why it is in ECONOMY_STREAM_MOVERS below with `vix_jump_intensity`.
+    ("vix_jump_return_intensity", 6.0, True),
+    # The two per-component states of vix-dynamics.md section 19 and the
+    # idiosyncratic-rate switch. The sector state moves on the first tick
+    # (either dial switches it on and the sector draw's sigma is the
+    # state's); the excitation moves only if a name jumps inside the
+    # probe and the decay is unread until it does; the switch moves the
+    # idiosyncratic arrival threshold, which a three-session probe reaches
+    # only if a uniform lands between the two rates.
+    ("sector_vol_alpha", 0.06, True),
+    # MEASURED False: the state is a ratio with fixed point 1.0, and with
+    # no shock share (alpha 0.0) beta alone leaves it at 1.0 forever --
+    # the draw is then the stateless one to the bit.
+    ("sector_vol_beta", 0.9, False),
+    ("jump_idio_excitation", 2.0, False),
+    ("jump_idio_excitation_decay", 0.7, False),
+    # MEASURED True, not the guess: under the identity the read-back's
+    # idiosyncratic-jump term prices the unscaled rate from the first
+    # close, so the VIX moves on day one whether or not a name jumps.
+    ("jump_idio_vix_decoupled", 1.0, True),
     # An upper bound on the VIX state, shipped at 80.0. INERT at 40.0 for a
     # reason the probe's own range gives rather than a dead wire: the VIX
     # reads 14.8477, 15.0094 and 15.0644 over the three days, so a bound at
@@ -793,6 +831,10 @@ PERTURBATIONS = [
 ECONOMY_STREAM_MOVERS = frozenset({
     "vix_jump_intensity", "macro_burn_in_days", "phase_target_range_draw",
     "cycle_stationary_opening", "inflation_reversion",
+    # The return-driven arrival rate takes the same arrival draw as
+    # `vix_jump_intensity` on every session it is non-zero, for the same
+    # reason: the draw IS the mechanism.
+    "vix_jump_return_intensity",
 })
 
 

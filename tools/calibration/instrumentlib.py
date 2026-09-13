@@ -258,6 +258,29 @@ PARAM_SPECS: dict[str, dict] = {
     "vix_decay_ratio": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.2, 1.5)},
     "vix_jump_intensity": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 24.0)},
     "vix_jump_scale": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 30.0)},
+    # The VIX-dynamics dials (programme/results/vix-dynamics.md). Each is a
+    # measured quantity with its own error bar, so the box is the measured
+    # value's neighbourhood and not a search range: the tape decides them.
+    # The level exponents are the response's power in the VIX (down
+    # measured +0.49 +/- 0.12, up -0.85 +/- 0.12); the innovation sigmas are
+    # fractions of the level per session (0.033, 0.018 per per cent); the
+    # jump scale is in innovation-scale units (1.7) and the return-driven
+    # rate in events a year per per cent of down session (6.2).
+    "vix_return_level_exponent": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.5)},
+    "vix_return_exponent_up": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.2, 1.5)},
+    "vix_return_level_exponent_up": {"kind": "abs", "step_unit": 0.05, "hard_range": (-2.0, 0.5)},
+    "vix_innovation_sigma": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.1)},
+    "vix_innovation_return_sigma": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.06)},
+    "vix_jump_level_scale": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 5.0)},
+    "vix_jump_return_intensity": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 24.0)},
+    # The per-component states (vix-dynamics.md 19): measured on the
+    # reference panel with their bars, so the boxes are the measurements'
+    # neighbourhoods, not search ranges.
+    "sector_vol_alpha": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 0.3)},
+    "sector_vol_beta": {"kind": "abs", "step_unit": 0.02, "hard_range": (0.0, 0.99)},
+    "jump_idio_excitation": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 5.0)},
+    "jump_idio_excitation_decay": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.95)},
+    "jump_idio_vix_decoupled": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
     "forced_flow_gain": {"kind": "abs", "step_unit": 0.0001, "hard_range": (0.0, 0.01)},
     "forced_flow_threshold": {"kind": "abs", "step_unit": 1.0, "hard_range": (20.0, 60.0)},
     "forced_flow_beta_exponent": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 3.0)},

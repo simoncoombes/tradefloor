@@ -262,6 +262,24 @@ pub struct Engine {
     economy: EconomyState,
     central_bank: CentralBankState,
     sector_keys: Vec<String>,
+    /// The per-sector variance state as a RATIO to the VIX-coupled target
+    /// (`tick::sector_sigma_at` squared): the sector's daily variance is
+    /// `target * s`, `s` a GARCH(1,1) with unconditional mean 1.0 on the
+    /// standardised daily factor. Live when `sector_vol_alpha` or `_beta`
+    /// is set; 0.0 means "not yet seeded" and reads as 1.0. See
+    /// `programme/results/vix-dynamics.md` sections 19 and 19.7.
+    sector_variance: Vec<f64>,
+    /// The day's accumulated sector factor per sector key, the shock the
+    /// state updates on at the close; reset at each close.
+    sector_day_factor: Vec<f64>,
+    /// The target variance (`sector_sigma_at` squared) the day's sector
+    /// draws were scaled by, recorded in the tick loop so the close
+    /// standardises the day's factor by the scale it was drawn at, not by
+    /// the target after the close moved the VIX. 0.0 until the first tick.
+    sector_target_day: f64,
+    /// The per-name jump excitation `h_i`, live when `jump_idio_excitation`
+    /// is set: the idiosyncratic arrival rate is `lambda (1 + h_i)`.
+    jump_excitation: Vec<f64>,
     /// Per-company attribution, accumulated across the current day.
     ///
     /// Four entries per company -- company_news, order_flow_impact,
@@ -703,6 +721,10 @@ impl Engine {
             forced_flow_spent: 0.0,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
+            sector_variance: vec![0.0; sector_keys.len()],
+            sector_day_factor: vec![0.0; sector_keys.len()],
+            sector_target_day: 0.0,
+            jump_excitation: vec![0.0; companies_len],
             sector_keys,
             draws: StreamDraws::default(),
             current_day: 0,
@@ -803,6 +825,90 @@ impl Engine {
     /// `advance_day_with` builds the day's index return from, so the
     /// variance and the return it is the variance OF are weighted the same
     /// way. Bankrupt and unlisted names are skipped by both.
+    /// Whether the per-sector variance state is running: either of its
+    /// two dials set. A branch, so every preset at (0.0, 0.0) never reads
+    /// or writes the state.
+    fn sector_state_on(&self) -> bool {
+        self.params.sector_vol_alpha != 0.0 || self.params.sector_vol_beta != 0.0
+    }
+
+    /// One daily sigma per sector key from the state, or EMPTY when the
+    /// state is off (the tick and the read-back then use the shared
+    /// VIX-coupled sigma exactly as before). An unseeded sector reads the
+    /// target it would be seeded at.
+    fn sector_sigmas_now(&self) -> Vec<f64> {
+        if !self.sector_state_on() {
+            return Vec::new();
+        }
+        let target = crate::market::tick::sector_sigma_at(
+            &self.params, &self.economy, self.vix_anchor);
+        self.sector_variance
+            .iter()
+            .map(|s| if *s > 0.0 { target * crate::mathx::sqrt(*s) } else { target })
+            .collect()
+    }
+
+    /// The jump excitation of each name `index_variance_names` lists, in
+    /// that order, or EMPTY when the excitation dial is 0.0.
+    fn index_variance_excitations(&self) -> Vec<f64> {
+        if self.params.jump_idio_excitation == 0.0 {
+            return Vec::new();
+        }
+        let mut total = 0.0;
+        for c in self.companies.iter() {
+            if c.is_public && !c.is_bankrupt && c.stock.market_cap > 0.0 {
+                total += c.stock.market_cap;
+            }
+        }
+        if !(total > 0.0) {
+            return Vec::new();
+        }
+        let mut out = Vec::with_capacity(self.companies.len());
+        for (i, c) in self.companies.iter().enumerate() {
+            if !c.is_public || c.is_bankrupt || c.stock.market_cap <= 0.0 {
+                continue;
+            }
+            out.push(self.jump_excitation.get(i).copied().unwrap_or(0.0));
+        }
+        out
+    }
+
+    /// The close of the per-sector variance state: a symmetric GARCH(1,1)
+    /// per sector on the day's accumulated sector factor, reverting to the
+    /// VIX-coupled sigma the stateless draw uses as its long-run level,
+    /// clamped to the per-name multiples. `programme/results/vix-dynamics.md`
+    /// 19.1 measures the tape's sector residual at persistence 0.971 +/-
+    /// 0.018 with a shock share of 0.063 +/- 0.018.
+    fn close_sector_state(&mut self) {
+        if !self.sector_state_on() {
+            return;
+        }
+        let p = &self.params;
+        // The scale the day's draws were made at. The ratio form: the
+        // GARCH(1,1) runs on the factor standardised by the VIX-coupled
+        // target, so the coupling's own state is kept whole and the
+        // sector's memory net of it is what the dials carry (19.7).
+        let target = if self.sector_target_day > 0.0 {
+            self.sector_target_day
+        } else {
+            let sigma = crate::market::tick::sector_sigma_at(p, &self.economy, self.vix_anchor);
+            sigma * sigma
+        };
+        let a = p.sector_vol_alpha;
+        let b = p.sector_vol_beta;
+        for k in 0..self.sector_keys.len() {
+            let prev = if self.sector_variance[k] > 0.0 { self.sector_variance[k] } else { 1.0 };
+            let d = self.sector_day_factor[k];
+            let z2 = if target > 0.0 { d * d / target } else { 0.0 };
+            let raw = (1.0 - a - b) + a * z2 + b * prev;
+            self.sector_variance[k] = crate::mathx::max(
+                crate::mathx::min(raw, p.garch_ceiling_multiple),
+                p.garch_floor_multiple,
+            );
+            self.sector_day_factor[k] = 0.0;
+        }
+    }
+
     fn index_variance_names(&self) -> Vec<crate::market::index_var::NameVariance> {
         let mut total = 0.0;
         for c in self.companies.iter() {
@@ -916,12 +1022,22 @@ impl Engine {
         };
         let crisis_spike = crate::market::tick::crisis_spike_for(
             &self.params, self.economy.vix, self.universe_stress);
-        crate::market::index_var::index_conditional_variance_terms(
+        // The two per-component states, empty when their dials are 0.0, in
+        // which case the read-back prices the shared sigma and the
+        // independent arrivals exactly as before.
+        let sigmas = if self.sector_state_on() {
+            self.sector_sigmas_now()
+        } else {
+            vec![sector_sigma; self.sector_keys.len()]
+        };
+        let excitations = self.index_variance_excitations();
+        crate::market::index_var::index_conditional_variance_terms_with_states(
             &self.params,
             &names,
             self.sector_keys.len(),
             self.market_vol.variance(),
-            sector_sigma,
+            &sigmas,
+            &excitations,
             rate_scale,
             crisis_spike,
             // THE LAGGED TRANSMISSION WIRE, and the timing is the point.
@@ -1528,6 +1644,12 @@ impl Engine {
             SettleDrawPolicy::FourOrZero => crate::market::tick::MARKET_FACTOR_SIGMA,
         };
 
+        // The per-sector sigmas from the state, or empty (the stateless draw).
+        let sector_sigmas = self.sector_sigmas_now();
+        if !sector_sigmas.is_empty() {
+            let t = crate::market::tick::sector_sigma_at(&self.params, &self.economy, self.vix_anchor);
+            self.sector_target_day = t * t;
+        }
         let outcome = simulate_market_tick(
             &mut self.companies,
             &TickInputs {
@@ -1551,6 +1673,7 @@ impl Engine {
                 news_impact_queue: request.news_impact_queue,
                 order_volumes: request.order_volumes,
                 sector_keys: &self.sector_keys,
+                sector_sigmas: &sector_sigmas,
                 market_sigma_daily,
                 vix_anchor: self.vix_anchor,
                 settle_draws,
@@ -1567,6 +1690,13 @@ impl Engine {
         // not drawn), and the replay path accumulates harmlessly into
         // state it never reads.
         self.market_vol.accumulate(outcome.shared_factors.market_factor);
+        if self.sector_state_on() {
+            for (k, (_, f)) in outcome.shared_factors.sector_factors.iter().enumerate() {
+                if let Some(acc) = self.sector_day_factor.get_mut(k) {
+                    *acc += *f;
+                }
+            }
+        }
 
         // Accumulate the APPLIED contributions, which is the same quantity the
         // `truth` table reports per tick -- so the day total of a column here
@@ -2219,6 +2349,7 @@ impl Engine {
             vix_ratio_denominator,
             self.economy.vix,
         ));
+        self.close_sector_state();
         // The forced-flow reservoir drains on stress days and rebuilds in
         // calm. Updated only while the mechanism is live: at gain 0 or
         // reservoir 0 the state stays exactly 0.0 and nothing changes.
@@ -2287,7 +2418,20 @@ impl Engine {
         let ratio = self.economy.vix / self.vix_anchor;
         let rate_scale = if p.jump_vix_coupling == 0.0 { 1.0 } else { (1.0 - p.jump_vix_coupling) + ((p.jump_vix_coupling * ratio) * ratio) };
         let intensity_market = if p.jump_vix_coupling == 0.0 { p.jump_intensity_market } else { p.jump_intensity_market * rate_scale };
-        let intensity_idio = if p.jump_vix_coupling == 0.0 { p.jump_intensity_idio } else { p.jump_intensity_idio * rate_scale };
+        // The idiosyncratic rate: scaled by the VIX like the market's unless
+        // `jump_idio_vix_decoupled` says the tape does not support that
+        // (vix-dynamics.md 19.1), and excited by the name's own recent jumps
+        // when `jump_idio_excitation` is set. Both are branches at 0.0.
+        let intensity_idio = if p.jump_vix_coupling == 0.0 { p.jump_intensity_idio } else if p.jump_idio_vix_decoupled != 0.0 { p.jump_intensity_idio } else { p.jump_intensity_idio * rate_scale };
+        let excite = p.jump_idio_excitation;
+        let excite_decay = p.jump_idio_excitation_decay;
+        let mut excitation = if excite != 0.0 {
+            let mut e = std::mem::take(&mut self.jump_excitation);
+            if e.len() < self.companies.len() { e.resize(self.companies.len(), 0.0); }
+            e
+        } else {
+            Vec::new()
+        };
         self.jump_rng.site(Site::JumpMarketU, 0);
         let u_market = self.jump_rng.next_f64();
         self.jump_rng.site(Site::JumpMarketZ, 0);
@@ -2299,7 +2443,12 @@ impl Engine {
             let u = self.jump_rng.next_f64();
             self.jump_rng.site(Site::JumpCompanyZ, index as u32);
             let z = self.jump_rng.next_normal();
-            let idio = if u < intensity_idio { p.jump_sigma_idio * z } else { 0.0 };
+            let rate = if excite != 0.0 { intensity_idio * (1.0 + excitation[index]) } else { intensity_idio };
+            let jumped = u < rate;
+            let idio = if jumped { p.jump_sigma_idio * z } else { 0.0 };
+            if excite != 0.0 {
+                excitation[index] = excite_decay * excitation[index] + if jumped { excite } else { 0.0 };
+            }
             let total = (market + idio) - compensator;
             if total != 0.0 {
                 if let Some(s) = company.stock.mispricing_s {
@@ -2316,6 +2465,9 @@ impl Engine {
                     }
                 }
             }
+        }
+        if excite != 0.0 {
+            self.jump_excitation = excitation;
         }
         // mechanism:jumps end
     }
@@ -2468,6 +2620,13 @@ impl Engine {
                 vix_decay_ratio: self.params.vix_decay_ratio,
                 vix_jump_intensity: self.params.vix_jump_intensity,
                 vix_jump_scale: self.params.vix_jump_scale,
+                vix_return_level_exponent: self.params.vix_return_level_exponent,
+                vix_return_exponent_up: self.params.vix_return_exponent_up,
+                vix_return_level_exponent_up: self.params.vix_return_level_exponent_up,
+                vix_innovation_sigma: self.params.vix_innovation_sigma,
+                vix_innovation_return_sigma: self.params.vix_innovation_return_sigma,
+                vix_jump_level_scale: self.params.vix_jump_level_scale,
+                vix_jump_return_intensity: self.params.vix_jump_return_intensity,
                 vix_return_gain: self.params.vix_return_gain,
                 vix_realised_vol_weight: self.params.vix_realised_vol_weight,
                 vix_return_source: self.params.vix_return_source,

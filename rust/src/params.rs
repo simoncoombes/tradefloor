@@ -2139,6 +2139,194 @@ pub struct ModelParams {
     pub vix_jump_intensity: f64,
     /// Mean size of a fear event, in VIX points (exponential draw).
     pub vix_jump_scale: f64,
+    /// How the DOWN-side fear response falls with the VIX the session
+    /// opened from: the spike is `gain * |r|^p * VIX^(-this)`.
+    ///
+    /// # The measurement
+    ///
+    /// `programme/results/vix-dynamics.md` (design repo), on ^GSPC and
+    /// ^VIX 1990-01-03..2025-07-30, 8,959 aligned sessions. The VIX's
+    /// session change in points regressed on the session return and the
+    /// prior level, weighted by 1/VIX so the residual is in fractions of
+    /// the level:
+    ///
+    /// ```text
+    /// dVIX = a + kappa VIX + b_d |r|^p_d (VIX/20)^(-g_d)      r < 0
+    ///      = a + kappa VIX - b_u |r|^p_u (VIX/20)^(-g_u)      r >= 0
+    ///
+    ///   down   b 0.990 +/- 0.067   p 1.442 +/- 0.076   g +0.492 +/- 0.124
+    ///   up     b 0.961 +/- 0.072   p 0.596 +/- 0.037   g -0.852 +/- 0.122
+    /// ```
+    ///
+    /// (calendar-year block bootstrap, 300 draws). The level-blind form
+    /// every preset runs -- `g = 0` on both sides -- is refused at F(2,
+    /// 8951) = 118, and the multiplicative "ratio" form `dVIX/VIX ~ r` is
+    /// refused harder still (F = 588): on the down side the response in
+    /// points FALLS with the level, as `VIX^(-0.49)`, and the level
+    /// exponent is the same in every decade (0.47, 0.50, 0.47, 0.47 for the
+    /// 1990s to the 2020s) while the scale `b` moves by +/- 20 per cent.
+    ///
+    /// # The form the tape supports, and what this dial's value is
+    ///
+    /// `g_d = p_d - 1` is inside the error bar (0.44 against 0.49 +/-
+    /// 0.12; the restriction costs 0.15 per cent of the weighted SSR), and
+    /// it is the STANDARDISED-RETURN form: `dVIX = gain VIX (|r| / VIX)^p`,
+    /// the VIX responding in proportion to itself to the return measured in
+    /// units of itself. It carries no reference level, so the gain has a
+    /// meaning without one. The derived value is therefore
+    /// `vix_return_exponent - 1` = **0.448** at the derived exponent 1.448,
+    /// and the gain that reproduces the tape's same-day response is
+    /// `3.754 / vix_mean_reversion` (the update transmits `mr` of the
+    /// target spike on the day), less the part the identity's read-back
+    /// already contributes -- both measured in the design note.
+    ///
+    /// 0.0 -- every preset up to pt-v19 -- is a branch, not arithmetic:
+    /// `economy::daily::return_spike_at_level` returns `return_spike_for`
+    /// there and the level is never read.
+    pub vix_return_level_exponent: f64,
+    /// The UP side's own exponent: the spike on an up session is
+    /// `-gain_up * |r|^this * VIX^(-vix_return_level_exponent_up)`.
+    ///
+    /// Measured with the down side above: **0.596 +/- 0.037** whole span
+    /// (0.49 to 0.66 by decade), and 0.543 in the restricted form this
+    /// dial and its partner implement. The up side is CONCAVE -- a +2 per
+    /// cent session lowers the VIX by less than twice what a +1 per cent
+    /// one does -- where the earlier bucket-median fit that read 1.04 had
+    /// no level in it, and big up sessions come at high levels. 1.0 is the
+    /// linear form the arithmetic stood in and is bit-identical with the
+    /// two level exponents at 0.0.
+    pub vix_return_exponent_up: f64,
+    /// How the UP-side response scales with the level. Measured
+    /// **-0.852 +/- 0.122** (the response in points RISES with the level,
+    /// nearly in proportion), against which the ratio form `-1.0` is
+    /// within 1.2 standard errors and is what the restricted form carries:
+    /// `-gain_up * VIX * |r|^p_u`, the VIX giving back a fraction of itself
+    /// on an up session. The two sides are different laws -- surprise in
+    /// units of priced volatility on the way up, proportional relief on the
+    /// way down -- and the tape distinguishes them at F(2, 8951) = 43. 0.0
+    /// is the level-blind branch.
+    pub vix_return_level_exponent_up: f64,
+    /// The VIX's own innovation, as a fraction of its level per session.
+    ///
+    /// # Why it exists
+    ///
+    /// The shipped noise is `N(0, 0.15)` POINTS -- under one per cent of the
+    /// level -- and `vix_jump_intensity` is 0.0 on every preset, so the
+    /// model's VIX is an image of its own index return: corr(dVIX, r)
+    /// -0.977 against the tape's -0.804, R^2 0.954 against 0.646, the sd of
+    /// the daily log change 0.105 against 0.064 and its excess kurtosis
+    /// 0.16 against 2.66 (scorecard-coverage.md 3.1). Once the response
+    /// form above is removed from the tape's dVIX, what is left is
+    /// proportional to the level (`log|e| ~ 1.08 log VIX`, bootstrap sd
+    /// 0.06) and its scale grows with the session's own size:
+    ///
+    /// ```text
+    /// sd(e / VIX | r) = sqrt(s0^2 + (c r)^2)
+    ///   s0 = 0.0331 [0.0316, 0.0346]   c = 0.0179 [0.0135, 0.0232] per per cent
+    /// ```
+    ///
+    /// (Gaussian MLE on the within-window residual of 35 windows, window
+    /// bootstrap). This dial is `s0`; the partner
+    /// `vix_innovation_return_sigma` is `c`. The residual is the WITHIN-
+    /// window one because a model with fixed coefficients has no
+    /// between-year variation of its response to supply; the whole-span
+    /// residual (0.0341, 0.0253) counts that variation as innovation and a
+    /// model given it lands below the tape's median window on R^2.
+    ///
+    /// At (0.0, 0.0) the draw's scale is `0.15 * volatility` by the same
+    /// expression, and the draw is the same draw, so every preset up to
+    /// pt-v19 reproduces to the bit.
+    pub vix_innovation_sigma: f64,
+    /// The part of the innovation scale that rises with the session return,
+    /// per per cent: see `vix_innovation_sigma`. Measured 0.0179 [0.0135,
+    /// 0.0232]. What it buys, on the tape's own returns: the per-window
+    /// excess kurtosis of the daily log VIX change reads 1.48 with `s0`
+    /// alone and 2.09 with both, against 2.66 measured; and it is the
+    /// component the whole-span kurtosis of 6.9 mostly comes from.
+    pub vix_innovation_return_sigma: f64,
+    /// A fear event's mean size in units of the day's innovation scale
+    /// (`VIX * sqrt(s0^2 + (c r)^2)`, or `VIX` when the innovation dials
+    /// are off), exponential draw. Non-zero selects that unit over
+    /// `vix_jump_scale`'s points.
+    ///
+    /// Derived by cumulant inversion on the scale-standardised within-
+    /// window residual `z`: with `kappa_3 = 6 lam mu^3` and `kappa_4 = 24
+    /// lam mu^4` for a Poisson(lam) count of Exp(mu) jumps on a Gaussian,
+    /// `mu = kappa_4 / (4 kappa_3)` = **1.70** and `lam = kappa_3 / (6
+    /// mu^3)` = 0.0089 a day (2.24 a year), leaving the Gaussian 94.9 per
+    /// cent of the variance. The closed form is checked against 2-D
+    /// quadrature of the density to 2e-13 with a negative control that
+    /// fails at 2e-2. The skew of `z` is 0.26 +/- 0.04 and its excess
+    /// kurtosis 1.77 +/- 0.21 (window bootstrap), so the innovation is not
+    /// Gaussian at seven standard errors; the rate's own error bar is wide
+    /// (bootstrap 0.05 to 3.8 a year) because two decades hold most of the
+    /// events.
+    pub vix_jump_level_scale: f64,
+    /// The part of the fear-event arrival rate, per YEAR per per cent of
+    /// DOWN session, that rises with the session: the daily probability is
+    /// `(vix_jump_intensity + this * max(0, -r)) / 252`. The tape's
+    /// residual skew on down sessions rises with the size of the session
+    /// (0.38, 0.46, 0.59, 1.76 for |r| under 0.5, 0.5-1, 1-2, 2-3 per cent
+    /// within windows) and is flat on up sessions, so the events cluster
+    /// with the crashes rather than arriving on their own clock. At the
+    /// derived mean rate of 2.24 a year spread this way the value is
+    /// **6.2** (0.0246 a day per per cent). Non-zero takes the arrival
+    /// draw; with both intensities at 0.0 no draw is taken and the schedule
+    /// is the shipped one.
+    pub vix_jump_return_intensity: f64,
+    /// The per-sector variance state's shock share: the sector factor's
+    /// daily variance is `T * s`, with `T` the VIX-coupled sigma squared
+    /// the stateless draw uses (`tick::sector_sigma_at`) and `s` a
+    /// symmetric GARCH(1,1) of unconditional mean 1 on the factor
+    /// standardised by `T`: `s' = (1 - a - b) + a d^2 / T + b s`, `d` the
+    /// day's accumulated sector factor, `s` clamped to the per-name
+    /// multiples. The ratio form keeps the coupling's own state whole (at
+    /// `sector_vix_coupling` 1.0 the target already tracks the VIX) and
+    /// adds the sector's memory net of it. Either dial non-zero switches
+    /// the state on; at (0.0, 0.0) the tick draws at `sector_sigma_at`
+    /// exactly as before and the read-back prices the same scalar.
+    ///
+    /// MEASURED (`programme/results/vix-dynamics.md` 19.7): a GARCH(1,1)
+    /// QMLE on each of seven sectors' market residuals of the 40-name
+    /// reference panel, 2015-2025, divided by the VIX close the session
+    /// opened from over its median, reads alpha **0.067 +/- 0.043**, beta
+    /// 0.837 +/- 0.111, persistence 0.904 +/- 0.069 (half-life about
+    /// seven sessions). The plain fit (19.1: 0.063 / 0.908, persistence
+    /// 0.971) absorbs the VIX's own level into beta; composed additively
+    /// on the coupled target it smoothed that channel away and the
+    /// clustering rows FELL (`vixdyn8`).
+    pub sector_vol_alpha: f64,
+    /// The per-sector variance state's persistence term, **0.837** by the
+    /// same measurement. See [`ModelParams::sector_vol_alpha`].
+    pub sector_vol_beta: f64,
+    /// Self-excitation of a name's idiosyncratic jumps: after a jump the
+    /// name's arrival rate is `lambda (1 + h)` with `h' = decay h + this`.
+    /// 0.0 -- every preset up to pt-v19 -- is a branch: the rate is
+    /// `lambda` and the state is never read or written; the arrival test
+    /// takes the same uniform per name per session at every rate, so no
+    /// draw moves either way.
+    ///
+    /// MEASURED (vix-dynamics.md 19.1): on the reference panel the rate of
+    /// a 3-sd idiosyncratic move at lag k after one reads 3.29, 1.84, 2.13,
+    /// 1.68, 1.58 times the base at k = 1..5 and 1.0 by k = 12, fitted as
+    /// `1 + 2.0 x 0.72^(k-1)`: amplitude **2.0** [1.5, 2.8], branching ratio
+    /// 0.13 (stationary by a wide margin). The model's independent arrivals
+    /// read a lag-one ratio of 1.7 with no memory past a day.
+    pub jump_idio_excitation: f64,
+    /// The excitation's daily decay, **0.72** [0.48, 0.79] (half-life two
+    /// sessions) by the same measurement. Unread while
+    /// [`ModelParams::jump_idio_excitation`] is 0.0.
+    pub jump_idio_excitation_decay: f64,
+    /// Takes the VIX-squared scaling (`jump_vix_coupling`) off the
+    /// IDIOSYNCRATIC arrival rate, leaving it on the market jump. 0.0 --
+    /// every preset -- keeps the shipped arithmetic; non-zero is a switch.
+    ///
+    /// MEASURED (vix-dynamics.md 19.1): the panel's idiosyncratic jump rate,
+    /// in units of the name's own trailing sd, reads `var^-0.20` against the
+    /// name's own variance and `var^0.05` against the market's -- flat, not
+    /// squared. The coupling was an unprovenanced constant on this rate, in
+    /// the family the crisis blend's gain belonged to.
+    pub jump_idio_vix_decoupled: f64,
     /// Flow composition (the design record's FLOW-COMPOSITION campaign):
     /// a stress-activated COMMON flow lean in the price path -- forced,
     /// correlated selling above a fear threshold, which is the real-market
@@ -2901,6 +3089,25 @@ impl ModelParams {
             vix_decay_ratio: 1.0,
             vix_jump_intensity: 0.0,
             vix_jump_scale: 0.0,
+            // The seven below are the VIX-dynamics dials of
+            // programme/results/vix-dynamics.md. Each default is the
+            // value at which its branch is not taken, so every preset
+            // written before them reproduces to the bit; `1.0` for the up
+            // exponent is the linear form the arithmetic stood in.
+            vix_return_level_exponent: 0.0,
+            vix_return_exponent_up: 1.0,
+            vix_return_level_exponent_up: 0.0,
+            vix_innovation_sigma: 0.0,
+            vix_innovation_return_sigma: 0.0,
+            vix_jump_level_scale: 0.0,
+            vix_jump_return_intensity: 0.0,
+            // The two per-component states of vix-dynamics.md section 19
+            // and the idiosyncratic-rate switch, all branches at 0.0.
+            sector_vol_alpha: 0.0,
+            sector_vol_beta: 0.0,
+            jump_idio_excitation: 0.0,
+            jump_idio_excitation_decay: 0.0,
+            jump_idio_vix_decoupled: 0.0,
             forced_flow_gain: 0.0,
             forced_flow_threshold: 40.0,
             forced_flow_beta_exponent: 0.0,
@@ -4443,6 +4650,18 @@ impl ModelParams {
             "vix_decay_ratio" => self.vix_decay_ratio,
             "vix_jump_intensity" => self.vix_jump_intensity,
             "vix_jump_scale" => self.vix_jump_scale,
+            "vix_return_level_exponent" => self.vix_return_level_exponent,
+            "vix_return_exponent_up" => self.vix_return_exponent_up,
+            "vix_return_level_exponent_up" => self.vix_return_level_exponent_up,
+            "vix_innovation_sigma" => self.vix_innovation_sigma,
+            "vix_innovation_return_sigma" => self.vix_innovation_return_sigma,
+            "vix_jump_level_scale" => self.vix_jump_level_scale,
+            "vix_jump_return_intensity" => self.vix_jump_return_intensity,
+            "sector_vol_alpha" => self.sector_vol_alpha,
+            "sector_vol_beta" => self.sector_vol_beta,
+            "jump_idio_excitation" => self.jump_idio_excitation,
+            "jump_idio_excitation_decay" => self.jump_idio_excitation_decay,
+            "jump_idio_vix_decoupled" => self.jump_idio_vix_decoupled,
             "forced_flow_gain" => self.forced_flow_gain,
             "forced_flow_threshold" => self.forced_flow_threshold,
             "forced_flow_beta_exponent" => self.forced_flow_beta_exponent,
@@ -4611,6 +4830,18 @@ impl ModelParams {
             "vix_decay_ratio" => out.vix_decay_ratio = value,
             "vix_jump_intensity" => out.vix_jump_intensity = value,
             "vix_jump_scale" => out.vix_jump_scale = value,
+            "vix_return_level_exponent" => out.vix_return_level_exponent = value,
+            "vix_return_exponent_up" => out.vix_return_exponent_up = value,
+            "vix_return_level_exponent_up" => out.vix_return_level_exponent_up = value,
+            "vix_innovation_sigma" => out.vix_innovation_sigma = value,
+            "vix_innovation_return_sigma" => out.vix_innovation_return_sigma = value,
+            "vix_jump_level_scale" => out.vix_jump_level_scale = value,
+            "vix_jump_return_intensity" => out.vix_jump_return_intensity = value,
+            "sector_vol_alpha" => out.sector_vol_alpha = value,
+            "sector_vol_beta" => out.sector_vol_beta = value,
+            "jump_idio_excitation" => out.jump_idio_excitation = value,
+            "jump_idio_excitation_decay" => out.jump_idio_excitation_decay = value,
+            "jump_idio_vix_decoupled" => out.jump_idio_vix_decoupled = value,
             "forced_flow_gain" => out.forced_flow_gain = value,
             "forced_flow_threshold" => out.forced_flow_threshold = value,
             "forced_flow_beta_exponent" => out.forced_flow_beta_exponent = value,
@@ -4843,6 +5074,18 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_decay_ratio",
         "vix_jump_intensity",
         "vix_jump_scale",
+        "vix_return_level_exponent",
+        "vix_return_exponent_up",
+        "vix_return_level_exponent_up",
+        "vix_innovation_sigma",
+        "vix_innovation_return_sigma",
+        "vix_jump_level_scale",
+        "vix_jump_return_intensity",
+        "sector_vol_alpha",
+        "sector_vol_beta",
+        "jump_idio_excitation",
+        "jump_idio_excitation_decay",
+        "jump_idio_vix_decoupled",
         "forced_flow_gain",
         "forced_flow_threshold",
         "forced_flow_beta_exponent",
