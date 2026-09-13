@@ -4571,6 +4571,105 @@ impl ModelParams {
         // than adding any -- and it passes 0.0 for the SLOW component,
         // which is where §2.4's fit does not reach.
         p.market_vol_gamma = 0.1556;
+
+        // ==================================================================
+        // THE COMPOSED VECTOR, adopted 2026-09-13 (`wtcomp1-result.md`).
+        //
+        // Everything below is measured on the tape in
+        // `programme/results/vix-dynamics.md` and scored in
+        // `programme/results/wtcomp1-result.md`, a 2^3 factorial plus
+        // pt-v18 at 120 rosters at BOTH horizons. Against the whole-tape
+        // tables plus the four new rows this vector reads 30.56 / 38.14
+        // where pt-v18 reads 31.56 / 41.44: ahead at both horizons, and at
+        // 504 ahead on 98 per cent of resampled roster draws with the 90
+        // per cent interval of the paired difference excluding zero.
+        //
+        // The three changes compose ADDITIVELY -- every cell of the 2^3
+        // lands within 1.40 of the sum of its main effects -- because they
+        // reach different rows. The factor's slow pole is worth nothing at
+        // 252 and two points at 504; the two per-name states are worth two
+        // at 252 and one at 504. Neither alone cleared both horizons, which
+        // is why no earlier arm was proposed.
+        //
+        // WHY THIS IS NOT THE SCORE THAT STARTED THE CAMPAIGN. pt-v19's
+        // original 15-point margin was measured against rule tables centred
+        // on 2015-2025. `programme/results/whole-tape.md` re-centres them on
+        // the whole tape and that margin does not survive: the preset this
+        // block replaces reads 61.5 / 61.0 on the honest tables, behind
+        // pt-v18 at both horizons. The vector below is the first arm that
+        // is ahead on a table its own centres were not chosen against.
+
+        // THE RESPONSE LAW IS TWO LAWS (vix-dynamics.md section 2). Down
+        // sessions are convex in the move and fall with the level; up
+        // sessions are concave and proportional to it. The shipped
+        // level-blind form is REFUSED at F = 118 against the tape.
+        p.vix_return_exponent = 1.4483;
+        p.vix_return_level_exponent = 0.4483;
+        p.vix_return_exponent_up = 0.5433;
+        p.vix_return_level_exponent_up = -1.0;
+
+        // THE MEMORY AND THE GAIN ARE ONE CONSTRAINT, not two dials
+        // (vix-dynamics.md section 11, and R13 withdrawn). `vix_return_gain`
+        // was never independent of `vix_mean_reversion`: the pair satisfies
+        // a single condition and (0.10, 17.0) was a valid point on it read
+        // at the WRONG memory. At the tape's memory the gain is 8.83.
+        p.vix_mean_reversion = 0.27;
+        p.vix_return_gain = 8.83;
+        p.vix_return_gain_up = 0.049;
+
+        // THE INNOVATION. `vix_innovation_sigma` derives to ZERO: the VIX's
+        // own innovation is the variance forecast's, which is why the tape's
+        // residual persists. What remains is the return-coupled term.
+        p.vix_innovation_sigma = 0.0;
+        p.vix_innovation_return_sigma = 0.0175;
+        p.vix_jump_level_scale = 1.700;
+        p.vix_jump_return_intensity = 6.199;
+
+        // THE CAP IS STILL THE CLAMP'S OWN IMAGE, under the law above
+        // rather than under the level-blind one. The identity generalises:
+        // `gain * clamp^p * floor^(-g)`, which at the shipped p = 1 and
+        // g = 0 is the `gain * clamp` this block used to derive and at
+        // 8.83 * 15^1.4483 * 10^-0.4483 is 158.8524. It is a LITERAL
+        // because `powf` is not available in a `const fn`; the identity is
+        // asserted in the test suite rather than trusted here.
+        //
+        // OPEN, AND FLAGGED RATHER THAN PAPERED OVER: at 158.85 the cap now
+        // sits BELOW `vix_ceiling` (181.3295), which the ceiling's own
+        // provenance says must not happen, because a cap under the ceiling
+        // binds first. The ceiling was solved on the map the LEVEL-BLIND law
+        // runs; this law's map is a different one and the ceiling has to be
+        // re-solved on it. Neither bound is anywhere near binding -- the
+        // measured maximum VIX on this vector is 60.59 over 12 rosters at
+        // 504 days, 48 points clear of even the retired 108.63 -- so this is
+        // an ordering defect in the record rather than a live clamp, and it
+        // is the one measurement this adoption still owes.
+        p.vix_target_shock_cap = 158.8524;
+
+        // THE PER-NAME MEMORY (vix-dynamics.md section 15.4). The tape's
+        // per-name |r| autocorrelation needs a persistence the shipped
+        // 0.6853 cannot carry; 0.7905 is the value that puts the name's
+        // total at the tape's 0.9416.
+        p.garch_beta = 0.7905;
+
+        // THE FACTOR'S SLOW POLE (vix-dynamics.md section 17.4), from the
+        // tape's forward-21-session realised-variance impulse response:
+        // 0.9913 in [0.975, 1.0]. It replaces a 0.98 that was never read off
+        // anything, and it is what carries the 504-day horizon.
+        p.market_vol_slow_persistence = 0.9913;
+
+        // THE TWO PER-NAME STATES (vix-dynamics.md sections 19.5 and 19.7),
+        // in the RATIO form: a GARCH(1,1) on the sector factor standardised
+        // by its VIX-coupled target, and a jump excitation on the name. The
+        // tape puts the sector's variance persistence at 0.904 and jumps at
+        // 3.3x the day after one with a branching ratio of 0.13. The
+        // ADDITIVE form of the same two states was measured and is worse at
+        // 504 by 2.68 against a paired error bar of 1.60 (`whole-tape.md`
+        // section 8), which is why the ratio form is what ships.
+        p.sector_vol_alpha = 0.067;
+        p.sector_vol_beta = 0.837;
+        p.jump_idio_excitation = 2.0;
+        p.jump_idio_excitation_decay = 0.72;
+        p.jump_idio_vix_decoupled = 1.0;
         p
     }
 
