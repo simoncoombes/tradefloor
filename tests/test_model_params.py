@@ -429,15 +429,34 @@ PERTURBATIONS = [
     ("inflation_ceiling", 10.0, False),       # binds only when inflation reaches 6%
     ("inflation_floor", -3.0, False),         # binds only when inflation reaches -1%
     ("inflation_reversion", 0.15, True),  # was False; the burn-in reaches it (see above)      # monthly; reaches prices via the bond yield at the first meeting (day 45)
-    # LIVE at 0.8.0, and NOT because the gate moved -- because the VIX did.
-    # The derived anchor runs the probe at 21.79 to 22.28 instead of pt-v18's
-    # 15.58 to 15.73, so a gate at 18.0 is now crossed and the crisis blend
-    # fires. The reason is the probe's own range rather than the wiring, and
-    # a ladder says so: 18.0 moves nine columns and 1.21 of a price, 21.0
-    # moves 0.68, and 22.5, 25.0 and 30.0 move nothing at all. The shipped
-    # threshold is still out of the probe's reach, which is why the crisis
-    # BLEND's own dials above still read inert.
-    ("crisis_vix_threshold", 18.0, True),
+    # INERT again at 0.8.0, and NOT because the gate moved or the VIX did --
+    # because `crisis_blend_gain` derives to 0.0 and the blend it gates is
+    # retired (programme/results/vix-dynamics.md sections 13 and 14: the tape
+    # has no crisis attractor, its conditional drift is negative in every
+    # level bin above 22.5, and the model's stable fixed point at VIX 33-36
+    # was the blend's).
+    #
+    # It was True while the gain was non-zero: the derived anchor runs the
+    # probe at 21.79 to 22.28 instead of pt-v18's 15.58 to 15.73, so a gate at
+    # 18.0 is crossed and the blend fired. The crossing still happens; there
+    # is nothing on the other side of it.
+    #
+    # The ladder this table's convention asks for, MEASURED on the default
+    # preset (three days, seed 42, the probe above), which separates a dead
+    # dial from a dead mechanism:
+    #
+    #   crisis_vix_threshold 18.0 alone ............. 0 columns move
+    #   with crisis_blend_gain 0.5 .................. 9 columns move
+    #   with crisis_blend_gain 2.0 .................. 9 columns move
+    #   crisis_blend_gain 2.0 alone ................. 0 columns move
+    #
+    # So the wiring is intact and the pair is JOINTLY live and individually
+    # inert: the threshold needs a gain to gate, and the gain needs a
+    # threshold the probe can reach (the shipped one is 30.88, out of its
+    # range, which is why the entry below has always read False). A table
+    # that perturbs one dial at a time cannot see a mechanism held shut by
+    # two, and this comment is where that is on the record.
+    ("crisis_vix_threshold", 18.0, False),
     ("jump_vix_coupling", 1.0, True),  # was False; the burn-in reaches it (see above)
     ("crisis_blend_gain", 2.0, False),
     # Was inert with reason "sigma ships at 0.0, so alone this generates

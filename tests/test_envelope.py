@@ -1,5 +1,6 @@
 """The realism envelope as data: intervals, and the membership check."""
 
+import re
 from unittest import mock
 
 import pytest
@@ -148,8 +149,71 @@ def test_the_volume_change_row_is_now_inside_at_both_horizons():
     assert not any(g.id == "volume-change" for g in env.GAPS)
 
     # And the horizon gap's own reason must not claim a row misses while
-    # quoting a number inside the band it prints beside it.
-    assert "missing" not in " ".join(far.reasons), far.reasons
+    # quoting a number inside the band it prints beside it (§114).
+    #
+    # This asserted `"missing" not in reasons`, which is a PROXY for that
+    # property and only holds while no row misses at 504 at all. It was true
+    # when written and stopped being true when the adopted vector took
+    # `corr_persistence_acf1` to 0.1493 against a 504-day band of (0.19,
+    # 0.49): a genuine miss, correctly reported, failing a test that meant to
+    # catch a false one. The property is asserted directly below, which is
+    # strictly stronger -- it catches the stale-sentence defect whether or not
+    # any row happens to miss.
+    reason = " ".join(far.reasons)
+    computed = {k for k, v in env.MEASURED_504.items()
+                if not (env.BANDS_504[k][0] <= v <= env.BANDS_504[k][1])}
+    segment = reason.split("missing ", 1)[1].split(". The thin one")[0] if computed else ""
+    named = {k: float(v)
+             for k, v in re.findall(r"(\w+) at (-?[\d.]+) against \(", segment)}
+
+    # No row the sentence names as missing is inside the band beside it, and
+    # the number it quotes is the one MEASURED_504 holds.
+    for row, quoted in named.items():
+        lo, hi = env.BANDS_504[row]
+        assert not (lo <= quoted <= hi), (
+            f"the reason names {row} as missing at {quoted}, which is inside "
+            f"the band ({lo}, {hi}) it prints beside it")
+        assert quoted == pytest.approx(env.MEASURED_504[row], abs=5e-5), (
+            f"the reason quotes {row} at {quoted}; MEASURED_504 says "
+            f"{env.MEASURED_504[row]}")
+    # And every row that does miss is named, so the sentence cannot go stale
+    # in the other direction either.
+    assert set(named) == computed, (set(named), computed)
+    # This test's own subject: whichever rows miss at 504, volume_change_acf1
+    # is not one of them.
+    assert "volume_change_acf1" not in named
+
+
+def test_the_stale_sentence_assertion_actually_bites():
+    """The control for the assertions in the test above.
+
+    §114's defect was a hardcoded sentence naming a row as missing while
+    quoting a number inside the band printed beside it. The sentence is
+    computed now, so the assertions that guard it pass by construction, and an
+    assertion that cannot fail is not a test. This replays the defect against
+    the same assertions and requires them to catch it.
+    """
+    stale = (
+        "horizon 504d exceeds the certified 252d. At 504 days the model holds "
+        "13 of 14 against horizon-matched bands, missing volume_change_acf1 at "
+        "-0.2572 against (-0.29, -0.21). The thin one is annualised_vol_pct."
+    )
+    computed = {k for k, v in env.MEASURED_504.items()
+                if not (env.BANDS_504[k][0] <= v <= env.BANDS_504[k][1])}
+    segment = stale.split("missing ", 1)[1].split(". The thin one")[0]
+    named = {k: float(v)
+             for k, v in re.findall(r"(\w+) at (-?[\d.]+) against \(", segment)}
+    assert named == {"volume_change_acf1": -0.2572}
+
+    # The first assertion: named as missing, but inside the band beside it.
+    lo, hi = env.BANDS_504["volume_change_acf1"]
+    assert lo <= -0.2572 <= hi, "the replayed defect needs a row that is inside"
+    with pytest.raises(AssertionError):
+        assert not (lo <= named["volume_change_acf1"] <= hi)
+
+    # The second: the named set disagrees with the computed one.
+    with pytest.raises(AssertionError):
+        assert set(named) == computed
 
 
 def test_an_unknown_statistic_is_refused_not_ignored():
