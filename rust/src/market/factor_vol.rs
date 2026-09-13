@@ -661,10 +661,29 @@ impl MarketVarianceState {
             return (target, None);
         }
 
+        // THE FAST COMPONENT'S SHOCK SHARE MOVES WITH ITS OWN EXCURSION.
+        // `alpha_beta_at` returns the dialled pair unchanged at
+        // `market_vol_alpha_excursion` 0.0, which is every preset before
+        // 0.8.0 and is bit-identical.
+        //
+        // It is applied HERE and not only in `update_toward_with`, which was
+        // the first place it went and was the wrong one: that function is the
+        // SINGLE-component path, reached only at `market_vol_slow_weight`
+        // 0.0, and no shipped preset takes it. The `alphax1` box measured six
+        // settings of the dial and got six bit-identical trajectories, which
+        // is what a dial wired to a branch nothing runs looks like.
+        //
+        // The SLOW component is deliberately left alone. It carries the
+        // autonomous level on a damped VIX coupling and its own
+        // `slow_alpha_beta`; the tape's response decays with the window
+        // (+0.094 at a week against +0.019 at a year), so the mechanism
+        // belongs on the fast component and putting it on both would spend
+        // the same measurement twice.
+        let (fast_alpha, fast_beta) = alpha_beta_at(params, self.fast_variance, target);
         let fast = clamp_variance(
             params,
             component_step(self.fast_variance, self.day_factor, target,
-                           params.market_vol_alpha, params.market_vol_beta,
+                           fast_alpha, fast_beta,
                            params.market_vol_gamma),
         );
         // The slow component may revert to a LESS VIX-coupled target than
