@@ -2,6 +2,51 @@
 
 ## Unreleased
 
+**A slow stochastic level on the market factor's variance target, and the
+determinism baseline that had gone stale under it.** `market_vol_level_
+persistence` 0.9977 and `market_vol_level_sigma` 0.047, both shipping at
+0.0 and bit-identical there, put a lognormal AR(1) on the baseline variance
+the two components revert to. Every candidate that buys fat tails by adding
+variance-of-variance to the recursion is a random-coefficient recursion, and
+those are the entries of the fourth-moment operator whose spectral radius
+has to stay under one; it reads 0.9841 at the shipped triple. A term that
+moves only `omega` does not appear in that operator at all, so the composed
+condition separates and the tail does not come out of the moment
+condition's budget. Its normal is drawn once a session on a NINTH stream,
+`stream::MARKET_VOL_LEVEL`, unconditionally, so no settable can move the
+draw schedule and the zero arm is the same random world as the live one.
+
+Measured on one box, 120 rosters at both horizons: at the derived pair it
+takes the whole-tape nineteen from 19.60 to 17.23 at 252 days and 22.75 to
+17.61 at 504. It was derived to buy the index tail row and it buys the tail
+row, the pooled fourth moment, the correlation persistence, the volume
+mean-reversion and the leverage effect -- every one of them a statistic
+about how dispersed the market's own volatility is over a window. It costs
+`vix_ar1_debiased`, which is the VIX loop amplifying the level, measured
+here for the first time and named as undetermined in the derivation.
+
+**`KAT_VERSION` bumps to 21 and `tests/known_answer.json` is regenerated,
+for an era boundary that happened three commits ago.** The composed vector
+became pt-v19 at `7e7c1a3`, eighteen coefficients moved at once and every
+seeded trajectory with them, and the baseline was not regenerated. Nobody
+saw it because every calibration box since `wtcomp1` was launched with
+`SKIP_GATE_IF_KAT`, which skips the whole suite when the digest matches the
+value it is handed -- so the gate reported green by not running, and this
+test, which exists to say exactly this, was one of seventy-eight that were
+failing unseen. `simulationSha256` moves to `1cc1c4088a05`, produced on
+Windows x86_64 and Amazon Linux x86_64 before committing;
+`metadataSha256` does not move, for the sixth boundary running.
+
+**A checkpoint carries four states it had been dropping.**
+`sector_variance`, `jump_excitation`, `sector_day_factor` and
+`sector_target_day` are all live on pt-v19 and none was in
+`Engine::state_snapshot` or in the state hash, so a restored or forked
+engine continued a different market while its hash said it was the same
+one, and a sampled verification passed days it should have failed. No
+trajectory moves. `jump_excitation` follows the roster and was not resized
+by `add_company` or `remove_company`, which is issue #148 again on a second
+array.
+
 **The scoring rule scores `fear_gauge_dn3`.** The row's tape side had a
 centre, the pooled median +5.73 over the 107 sessions since 1990 at or
 below -3 per cent, and no error, so `facts.rule_row` refused it by name and

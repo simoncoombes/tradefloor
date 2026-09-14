@@ -266,7 +266,37 @@ import tradefloor
 # `v_f = market_factor_sigma^2`, where the regime ratio is exactly 1.0 and
 # the two normalisers agree by construction. So this boundary moves the
 # regime RESPONSE and nothing about the level the VIX rests at.
-KAT_VERSION = 20
+# v19: the COMPOSED VECTOR became pt-v19 (`7e7c1a3`), and this baseline was
+# not regenerated for it until 2026-09-13. Eighteen coefficients moved at
+# once -- the blend-off VIX response law and its gain pair, the per-name
+# GARCH memory `garch_beta` 0.7905, the factor's slow pole
+# `market_vol_slow_persistence` 0.9913, the two per-name states
+# (`sector_vol_alpha`, `sector_vol_beta`, `jump_idio_excitation` and its
+# decay and decoupling) and the derived ceiling -- so every seeded pt-v19
+# trajectory moved a fifth time, deliberately, and the fixture went on
+# claiming `c0b3c357`.
+#
+# THE GAP IS THE FINDING and it is recorded as one. `gate-run-2026-09-13.md`
+# in the design repository: every box since `wtcomp1` was launched with
+# `SKIP_GATE_IF_KAT`, which skips the whole suite when the digest matches
+# the value it is handed. The digest matched on every one of them, so the
+# gate reported green by not running, and this test -- which exists to say
+# exactly this -- was one of seventy-eight nobody saw.
+#
+# TWO ARCHITECTURES, per RELEASING.md item 3. `1cc1c4088a05` is the reading
+# on Windows x86_64 and on Amazon Linux x86_64 (the `levelsec1` box,
+# `i-0dc725e36108e6322`, whose own transcript is committed under
+# `programme/results/levelsec1/known-answer.txt`). Character for character.
+#
+# `metadataSha256` does NOT move, for the sixth boundary running: none of
+# the eighteen is among the mispricing and crowd coefficients
+# `model_preset()` reports.
+#
+# THE SLOW VARIANCE LEVEL IS NOT IN THIS. `market_vol_level_sigma` ships at
+# 0.0 and is bit-identical there, and its draw is on a stream of its own, so
+# the digest above is the same one `833fb29` printed before the level
+# existed. When the level is adopted this bumps again.
+KAT_VERSION = 21
 
 SEED = 20260820
 DAYS = 250
