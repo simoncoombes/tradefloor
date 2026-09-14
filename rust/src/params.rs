@@ -4824,6 +4824,47 @@ impl ModelParams {
         p.jump_idio_excitation = 2.0;
         p.jump_idio_excitation_decay = 0.72;
         p.jump_idio_vix_decoupled = 1.0;
+        // THE SLOW VARIANCE LEVEL AND THE SECTOR LOADING, adopted 2026-09-14
+        // from `levsec3` (`levsec3-result.md`) after `levelsec1`, `levsec2`
+        // and `levsec3` measured them on 22 arms and 120 rosters at both
+        // horizons.
+        //
+        // The level is the mechanism this preset was missing and it is the
+        // largest single change the campaign has measured. It takes
+        // `index_tail_dn3_pct` from 0.608 to 1.023 against a tape of 1.213,
+        // `excess_kurtosis` from 8.56 to 12.21 against 11.06,
+        // `corr_persistence_acf1` from -0.007 to a reading that clears its
+        // own band, and it leaves `annualised_vol_pct` at 27.10 against
+        // 27.66 because it is normalised on the square root of the level and
+        // started from the level's stationary distribution.
+        //
+        // `market_vol_level_sigma` 0.085 is MEASURED and not solved. The
+        // derivation in `cascade-fourth-moment.md` 4.3 said 0.047 by setting
+        // the LEVEL's window-mean dispersion equal to the INDEX's deficit;
+        // the level drives the FACTOR, which is about half the index, and
+        // the transmission is measured at 0.50 at 252 and 0.69 at 504, flat
+        // in the dose (`level-phi.md` 6 and 7). Read off the engine's own
+        // output, the sigma that reproduces the tape's window log-variance
+        // dispersion is 0.091 at 252 and 0.078 at 504; 0.085 is the midpoint
+        // and the arm confirms the fit: `sd(log var)` reads 0.693 and 0.771
+        // against a tape of 0.723 +/- 0.072.
+        //
+        // `market_vol_level_persistence` stays at 4.3's 0.9977.
+        // `level-phi.md` 2 measures a shorter half-life on a better
+        // estimator -- 127 to 249 sessions against 295 -- and the two tape
+        // spans disagree by more than their own error, so the revision is
+        // recorded and NOT taken: no arm has run at it.
+        p.market_vol_level_persistence = 0.9977;
+        p.market_vol_level_sigma = 0.085;
+        // The loading was derived against a centre the record then replaced.
+        // `params.rs` recorded 0.8 as the value that "puts it back on centre
+        // (0.1641 against 0.1640 at 252)", and 0.1640 was the 2015-2025
+        // forty-name centre; the whole tape puts the row at 0.1178. 0.60 is
+        // the DERIVED replacement (`sector-loading.md` 6.3) and the
+        // `levelsec1` sweep MEASURED the centring loading at 0.596 at 252
+        // and 0.609 at 504 on this base. The row goes from a term of 2.67 to
+        // 0.00 at both horizons.
+        p.sector_loading = 0.60;
         p
     }
 

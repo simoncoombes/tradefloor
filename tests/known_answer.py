@@ -296,7 +296,30 @@ import tradefloor
 # 0.0 and is bit-identical there, and its draw is on a stream of its own, so
 # the digest above is the same one `833fb29` printed before the level
 # existed. When the level is adopted this bumps again.
-KAT_VERSION = 21
+# v20: the SLOW VARIANCE LEVEL and the SECTOR LOADING are adopted into
+# pt-v19 (2026-09-14). `market_vol_level_persistence` 0.9977,
+# `market_vol_level_sigma` 0.085 and `sector_loading` 0.8 to 0.60, measured
+# on 22 arms across three boxes and 120 rosters at both horizons
+# (`levelsec1-result.md`, `levsec2-result.md`, `levsec3-result.md`).
+#
+# The level consumes its own normal once a session on the ninth stream, so
+# this boundary moves the trajectory for a reason no previous one has: not a
+# coefficient, a DRAW. Every preset from pt-v1 to pt-v18 still reproduces bit
+# for bit -- the draw is taken on a stream nothing else reads and the
+# multiplier is exactly 1.0 at `market_vol_level_sigma` 0.0 -- so what moves
+# here is pt-v19's trajectory and nothing else's.
+#
+# `metadataSha256` does NOT move, for the seventh boundary running: none of
+# the three is among the mispricing and crowd coefficients `model_preset()`
+# reports.
+#
+# What this boundary buys, and it is the largest of the five:
+# `index_tail_dn3_pct` 0.608 to 1.023 against a tape of 1.213,
+# `excess_kurtosis` 8.56 to 12.21 against 11.06, `sector_excess_corr` 0.179
+# to 0.117 against 0.118, and the objective from 30.56 to 23.08 at 252 and
+# 38.08 to 21.82 at 504 against pt-v18's 31.56 and 41.44 -- 5.3 and 7.8
+# paired error bars with every roster resample ahead.
+KAT_VERSION = 22
 
 SEED = 20260820
 DAYS = 250

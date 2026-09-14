@@ -387,15 +387,6 @@ OUT_OF_SCOPE = {
         "REFUTED as a mechanism by the `alphax2` box, which found the "
         "clustering response flat from 0.0 to 0.40; it stays in the tree at "
         "zero with the refutation beside it",
-    "market_vol_level_persistence":
-        "unread while `market_vol_level_sigma` is 0.0 -- engine.rs takes the "
-        "`sigma == 0.0` branch at the close and never enters the recursion",
-    "market_vol_level_sigma":
-        "inert at 0.0: the close branches on `== 0.0`, the multiplier is "
-        "exactly 1.0 and `close_day_scaled` calls the function the close "
-        "called before the level existed. The draw on "
-        "`stream::MARKET_VOL_LEVEL` is still taken, which is what keeps the "
-        "schedule off the settables, and it moves nothing",
     "market_vol_vix_smooth":
         "inert at 0.0: market/factor_vol.rs:536 branches on `== 0.0` and "
         "reads the raw print",
@@ -1778,9 +1769,146 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "(sector-corr-result.md section 1, crosscorr-result.md "
                 "section 1)",
     },
+    "market_vol_level_persistence": {
+        "kind": "derived",
+        "presets": {"pt-v19": 0.9977},
+        "identity": "the autocorrelation of the T-session MEANS of a "
+                    "log-AR(1), in closed form from the AR(1) "
+                    "autocovariance. With Var(mean) = (1/T^2) sum_ij "
+                    "phi^|i-j| and Cov(mean_w, mean_w+1) = (1/T^2) sum_ij "
+                    "phi^|T+j-i|, the ratio of the two is a function of phi "
+                    "and T alone -- the level's own dispersion cancels -- and "
+                    "it is monotone in phi, so the tape's observed "
+                    "window-to-window autocorrelation of log window variance "
+                    "pins phi by bisection. The identity is what makes this "
+                    "derived rather than fitted: nothing about the SIZE of "
+                    "the level enters it, only its memory",
+        "terms": {
+            "acf1 0.48 on the window log variance": "the tape's "
+                                                    "window-to-window "
+                                                    "autocorrelation, "
+                                                    "^GSPC 252-session "
+                                                    "non-overlapping "
+                                                    "windows. Divided by "
+                                                    "the level's share of "
+                                                    "the window-scale "
+                                                    "variance to give the "
+                                                    "LEVEL's own window "
+                                                    "acf, because "
+                                                    "independent rosters "
+                                                    "carry none of their "
+                                                    "own: 0.649 on "
+                                                    "1990-2025 and 0.727 "
+                                                    "on 1950-2026",
+            "T = 252": "the window the identity is evaluated at. The 504 "
+                       "solve gives 0.995 and 0.997 on the two spans and is "
+                       "weaker: its acf1 is estimated on 18 points, which "
+                       "cascade-fourth-moment.md 4.3 names as the weakest of "
+                       "the four inputs",
+            "the two spans": "0.99728 and 0.99802, agreeing at 0.6 of their "
+                             "own error, and 0.9977 is their mean",
+        },
+        "source": "the slow variance level is a lognormal AR(1) multiplying "
+                  "the market factor's variance TARGET. Its persistence is "
+                  "derived from the window-to-window autocorrelation of the "
+                  "log variance of non-overlapping 252-session windows of "
+                  "^GSPC, solved through the closed-form autocorrelation of "
+                  "the T-session means of an AR(1) "
+                  "(cascade-fourth-moment.md 4.3, design repository). The "
+                  "two spans agree at 0.6 of their own error, 0.99728 on "
+                  "1990-2025 and 0.99802 on 1950-2026, and 0.9977 is their "
+                  "mean: a half-life of 295 sessions",
+        "date": "2026-09-13",
+        "script": "programme/scripts/cascade-level.py section B "
+                  "(cascade-fourth-moment.md 4.3); confirmed on the arm by "
+                  "levsec3 (levsec3-result.md section 3)",
+        "residual": "REVISED AND NOT TAKEN, and the revision is on the "
+                    "record rather than in the value. "
+                    "programme/results/level-phi.md re-derives this on the "
+                    "estimator 4.3 itself named as the one it should have "
+                    "used -- the log realised-variance autocorrelation over "
+                    "lags 60 to 1000 sessions rather than a single window "
+                    "lag -- and gets 0.9946 to 0.9972, half-lives of 127 to "
+                    "249 sessions against 295. Within each span the three "
+                    "block sizes agree to the third decimal, which the "
+                    "one-lag form cannot check; the two SPANS disagree by "
+                    "more than their own jackknife error, 140 sessions on "
+                    "1990-2025 against 235 on 1950-2026. No arm has run at "
+                    "the revised value, so the shipped one is the one that "
+                    "was measured and the revision is the next thing to test",
+        "estimator": "the window-to-window acf1 of log window variance, 36 "
+                     "non-overlapping windows since 1990 and 76 since 1950, "
+                     "jackknife over windows",
+        "note": "mechanism: log L(t) = phi log L(t-1) + sigma xi(t), with L "
+                "multiplying the baseline variance both components revert to "
+                "(market/factor_vol.rs close_day_scaled). It moves only "
+                "omega, so the fourth-moment operator whose spectral radius "
+                "has to stay under one -- 0.9841 at the shipped triple -- "
+                "does not see it at all, and the composed condition "
+                "separates into rho(T) < 1 and a finite second moment of L. "
+                "That is the whole argument for this form over a third "
+                "variance component. The level is STARTED FROM ITS "
+                "STATIONARY DISTRIBUTION: an AR(1) at this half-life started "
+                "from zero has covered 42 per cent of its variance by day "
+                "252, and every recording sat five per cent low in "
+                "volatility until it was",
+    },
+    "market_vol_level_sigma": {
+        "kind": "measured",
+        "presets": {"pt-v19": 0.085},
+        "source": "the sigma that reproduces the tape's window log-variance "
+                  "dispersion, READ OFF THE ENGINE'S OWN OUTPUT rather than "
+                  "solved. sd(log var) across 120 rosters goes 0.3964, "
+                  "0.4606, 0.5123, 0.5956, 0.7145 at 252 as sigma goes 0, "
+                  "0.035, 0.047, 0.064, 0.090, against a tape of 0.723 "
+                  "+/- 0.072 on 1950-2026 and 0.766 +/- 0.104 on 1990-2025, "
+                  "and fits sd^2 = 0.1624 + 43.82 sigma^2 on five monotone "
+                  "points. The sigma that reaches the tape is 0.091 at 252 "
+                  "and 0.078 at 504; 0.085 is the midpoint (level-phi.md "
+                  "section 6). Because the number comes off the index the "
+                  "engine produced, the VIX loop, the clamps and the "
+                  "factor's share of index variance are all inside it and "
+                  "none of them has to be assumed",
+        "date": "2026-09-13 (levelsec1, the five-point fit); 2026-09-14 "
+                "(levsec3, the arm at 0.085)",
+        "script": "programme/results/whole-tape/scripts/score_wt.py and "
+                  "levsec_analyse.py on the levelsec1 and levsec3 "
+                  "recordings; the fit is level-phi.md section 6",
+        "residual": "CONFIRMED BY THE ARM IT PREDICTED. At 0.085 the model "
+                    "reads sd(log var) 0.693 at 252 and 0.771 at 504, inside "
+                    "the tape's 0.723 +/- 0.072 and 0.766 +/- 0.104 at both "
+                    "horizons, from a base of 0.394 and 0.355. It does not "
+                    "move across the vix_mean_reversion sweep, 0.6923 to "
+                    "0.6942 at 252, so the calibration belongs to this dial "
+                    "and not to the VIX's. A single sigma cannot centre both "
+                    "horizons -- 0.091 against 0.078 -- and that gap is the "
+                    "same 252/504 asymmetry the tail and fourth-moment rows "
+                    "show; the shorter half-life of level-phi.md section 2 "
+                    "is what would close it and has not been run",
+        "estimator": "the sd across rosters of the log of each roster's own "
+                     "session-return variance; jackknife over rosters on the "
+                     "model side and over non-overlapping windows on the tape",
+        "note": "cascade-fourth-moment.md 4.3 derived 0.047 and it is WRONG "
+                "by about a factor of two, for a reason that is now "
+                "measured: it set the LEVEL's window-mean dispersion equal "
+                "to the INDEX's deficit, and the level drives the FACTOR, "
+                "which is about half the index. The transmission is 0.50 at "
+                "252 and 0.69 at 504, flat in the dose across four settings "
+                "(level-phi.md section 7), and 0.047 / 0.50 is 0.094. What "
+                "this buys: index_tail_dn3_pct 0.608 to 1.023 against a tape "
+                "of 1.213, excess_kurtosis 8.56 to 12.21 against 11.06, "
+                "corr_persistence_acf1 from below zero to 0.1224 against "
+                "0.2288. What it costs: vix_ar1_debiased 0.9402 to 0.9646 "
+                "against a tape of 0.9299 +/- 0.0144, the VIX reading the "
+                "index's implied level back with the level's own memory. "
+                "levsec3 swept vix_mean_reversion and found a setting that "
+                "puts that row exactly on the tape and costs five others -- "
+                "the objective goes 23.1 to 106.9 across the sweep -- so the "
+                "miss is carried rather than traded for",
+    },
     "sector_loading": {
         "kind": "measured",
-        "presets": {"pt-v16": 0.58821442, "pt-v18": 0.58821442, "pt-v19": 0.8},
+        "presets": {"pt-v16": 0.58821442, "pt-v18": 0.58821442, "pt-v19": 0.60},
         "source": "pt-v16 and pt-v18 ship 0.58821442, set by an earlier "
                   "preset without provenance; what the record says of it is "
                   "the sectorcomp cell in pt-v18's own regime (identity "
@@ -1831,6 +1959,20 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "+0.0216 / +0.0213 (+0.7 / +2.2 tape se) and the sector "
                     "row loses 4.6 tape se at 504 (crosscorr-result.md "
                     "section 2)",
+        "superseded": "pt-v19 shipped 0.8 until 2026-09-14 and now ships "
+                      "0.60. Everything above is the record of the 0.8 "
+                      "choice and it was honest: it centred the row on the "
+                      "2015-2025 forty-name centre of 0.1640. The whole-tape "
+                      "re-centring moved that centre to 0.1178 and the value "
+                      "with it. 0.60 is DERIVED in sector-loading.md 6.3 "
+                      "from a response exponent measured on the pt-v18 base, "
+                      "and MEASURED on the composed base by the levelsec1 "
+                      "sweep, which puts the centring loading at 0.596 at "
+                      "252 and 0.609 at 504 -- the derivation right to 0.004 "
+                      "on a transfer that was itself refuted, since the "
+                      "fitted exponent is 1.44 against a registered [1.5, "
+                      "2.0]. The row goes from a term of 2.67 to 0.00 at "
+                      "both horizons",
         "estimator": "as `vix_level_identity`; the sector row's tape error "
                      "is `facts.rule_row`'s 0.008954 at 252 (median of nine "
                      "non-crisis windows)",

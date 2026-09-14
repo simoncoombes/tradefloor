@@ -237,20 +237,29 @@ PERTURBATIONS = [
     # different questions, which is why one is a test and the other was a
     # box.
     ("market_vol_alpha_excursion", 0.20, True),
-    # The slow variance LEVEL's two dials, added at 0.8.0, and they read
-    # differently for the reason the slow component's three parts do: SIGMA
-    # is the switch. The close branches on `market_vol_level_sigma == 0.0`
-    # and never enters the recursion, so persistence alone cannot reach the
-    # variance at all -- MEASURED False at 0.99. Sigma alone is live even at
-    # zero persistence, because a white-noise level is still a level, so it
-    # reads True and does so at 0.05 and at 0.15.
+    # The slow variance LEVEL's two dials, added at 0.8.0 and turned ON in
+    # pt-v19 on 2026-09-14. BOTH read True now, and persistence reads True
+    # only BECAUSE the default ships `market_vol_level_sigma` 0.085.
+    #
+    # It read False until the adoption and the reason is worth keeping:
+    # SIGMA is the switch. The close branches on
+    # `market_vol_level_sigma == 0.0` and never enters the recursion, so on
+    # any preset shipping the level off, persistence cannot reach the
+    # variance at all. This row therefore measures the DEFAULT and not the
+    # dial -- which is what this table's docstring says every row here does
+    # -- and it flipped on the day the default changed, with the assertion's
+    # own message naming the two possibilities and the stale inert reason
+    # being the right one.
+    #
+    # Sigma is live even at zero persistence: a white-noise level is still
+    # a level.
     #
     # Neither moves a draw on either declared stream, and that is worth a
     # line rather than an inference: the level's own normal is taken once a
     # session on `stream::MARKET_VOL_LEVEL`, unconditionally, whatever the
-    # dials read. A dial that gated its own draw would put the schedule on a
-    # settable, which is the thing §5.2 forbids.
-    ("market_vol_level_persistence", 0.99, False),
+    # dials read. A dial that gated its own draw would put the schedule on
+    # a settable, which is the thing the draw-schedule rule forbids.
+    ("market_vol_level_persistence", 0.99, True),
     ("market_vol_level_sigma", 0.05, True),
     ("market_vol_ceiling_multiple", 0.5, True),
     ("market_vol_floor_multiple", 2.0, True),
