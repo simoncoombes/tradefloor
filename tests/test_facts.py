@@ -367,8 +367,57 @@ def test_the_leverage_effect_is_real_since_the_gjr_term(facts):
     single-name estimator) that median is in band. What this fixture pins
     is that the effect exists and points the right way on a single seed,
     not band membership of a noisy single-seed estimate.
+
+    THE THRESHOLD MOVED OFF THE SINGLE SEED, and the reason is that the
+    single seed could never carry it. This test read
+    `facts["leverage_effect"] < -0.02` and failed at pt-v19 on -0.018983,
+    short by 0.001017. MEASURED on the fixture's own protocol --
+    `Universe.random(40, seed=111)`, 252 days, one `measure()` per seed,
+    the protocol `facts.SEED_SD` is taken on -- twelve seeds, 101 to 112,
+    on pt-v19, 2026-09-14:
+
+        -0.011781 -0.048797 -0.035806 -0.058698 -0.031977 -0.045052
+        -0.092620 -0.002941 -0.044875 -0.044812 -0.056335 -0.038040
+
+    median -0.044843, mean -0.042645, across-seed sd **0.022777**. So the
+    0.001017 the old assertion failed by is 0.045 of one standard
+    deviation of its own estimator: the bar was 22 times finer than the
+    instrument reading it. Two of the twelve seeds sit above -0.02 (101 at
+    -0.011781 and 108 at -0.002941) on a preset where the effect is not in
+    doubt -- every one of the twelve is negative and the median is 2.2
+    times the threshold -- so the old bar carried a one-in-six chance of
+    failing per seed and told you nothing about the model when it did.
+    `facts.SEED_SD["leverage_effect"]` is 0.0769 at the pt-v1 baseline the
+    table is frozen at, which says the same thing three times over.
+
+    So the claim is made on an instrument that can carry it. The direction
+    stays on the single seed, where a sign is all a single seed resolves;
+    the SIZE moves to the twelve-seed median, and the twelve are the same
+    count and the same protocol `test_the_volume_correlation_is_in_band`
+    already spends in this file.
     """
-    assert facts["leverage_effect"] < -0.02
+    # what one seed resolves: the sign
+    assert facts["leverage_effect"] < 0.0, (
+        f"the leverage effect reads {facts['leverage_effect']:+.6f} on the "
+        "fixture seed. A non-negative reading is the effect absent or "
+        "reversed, which is what the symmetric GARCH used to give")
+
+    # what the size needs: more than one seed
+    from statistics import median
+    vals = [measure(seed=s, universe=UNIVERSE, days=252)["leverage_effect"]
+            for s in range(101, 113)]
+    mid = median(vals)
+    assert mid < -0.02, (
+        f"the twelve-seed median leverage effect is {mid:+.6f} against "
+        f"-0.02. Measured -0.044843 on 2026-09-14: {vals}")
+    assert all(v < 0.0 for v in vals), (
+        f"a seed read the leverage effect as absent or reversed: {vals}")
+    # And how many seeds may sit above the threshold while the effect is
+    # real. Not a count chosen to clear the reading: at the measured mean
+    # and sd the per-seed probability of landing above -0.02 is 0.16, so
+    # twelve seeds expect 1.9 with a binomial sd of 1.27, and six is 3.2
+    # of those sd above expectation. The reading is two.
+    assert sum(1 for v in vals if v >= -0.02) <= 6, vals
 
 
 def test_a_weak_leverage_effect_would_read_as_weak_not_as_too_high():

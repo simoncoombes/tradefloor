@@ -3196,8 +3196,12 @@ pub struct ModelParams {
     /// `programme/results/ceiling-and-omega.md` 3 in the design repository.
     ///
     /// The value is asserted against its own derivation by
-    /// `the_default_cap_is_the_clamps_own_image`, which as of 2026-09-14
-    /// still computes the LEVEL-BLIND spelling and is red on pt-v19.
+    /// `the_default_cap_is_the_clamps_own_image`. That test computed the
+    /// LEVEL-BLIND spelling `gain * clamp^p` = 445.9577 and was red on
+    /// pt-v19 until 2026-09-14; it now computes the image WITH the level
+    /// in it, `gain * clamp^p * floor^(-g)` = 158.85236 at the VIX floor
+    /// of 10, which is the spike's supremum over the domain the update
+    /// admits. See `programme/results/fear-response-shape.md`.
     pub vix_target_shock_cap: f64,
     /// Upper bound on the VIX state itself, in points.
     ///
@@ -4081,10 +4085,14 @@ impl ModelParams {
     /// | crisis co-movement @VIX45 | 0.697 | 0.696 | 0.664..0.727 |
     /// | crisis sector excess @VIX45 | +0.110 | +0.109 | real +0.103 |
     ///
-    /// **14 of 14 at two years is the first time this project has measured
-    /// it.** pt-v3 held 7, pt-v10 and pt-v11 hold 13. The row that closed,
-    /// `volume_change_acf1`, is the one the `volume-change` gap was written
-    /// about, and the one §21 through §23 called structurally unreachable.
+    /// The row that closed at two years is `volume_change_acf1`, the one
+    /// the `volume-change` gap was written about and the one §21 through
+    /// §23 called structurally unreachable; at pt-v11 it read -0.3156
+    /// against a band of -0.29 to -0.21 and at pt-v12 it reads -0.2656,
+    /// inside. That is the finding. This paragraph led with "**14 of 14 at
+    /// two years is the first time this project has measured it**" until
+    /// 2026-09-14; see `pt_v19` for why a band count is not a preset's
+    /// quality figure.
     ///
     /// A region rather than a point: caps of 8, 12 and 20 all read 14/14 at
     /// both horizons with a held-out universe at 14/14, and the statistics
@@ -4697,6 +4705,18 @@ impl ModelParams {
     /// one that carries a band verdict, the four-dial cell read 18 of 18
     /// rows in band at BOTH horizons with pt-v18 reproducing its published
     /// certification to four places in the same run (`cert4b`, 2026-09-10).
+    ///
+    /// **THAT COUNT IS NOT A QUALITY FIGURE, recorded 2026-09-14.** It is
+    /// quoted above because it is what the run reported and because the
+    /// paragraph below turns on it having changed. `facts.REAL_MARKETS`
+    /// and `envelope.BANDS_504` are derived from 2015-2025 windows; the
+    /// 0.8.0 scoring rule was re-centred on 1987-2025 and these band
+    /// tables were not, so a band count grades a preset against a ruler
+    /// the project stopped scoring with. A band result is stated as the
+    /// rows that are out and how far, the way the `17 of 18` reading below
+    /// and the `sector_excess_corr` reading in
+    /// `python/tradefloor/presets/pt-v19.json` are stated. Two presets are
+    /// compared on `loss.scoring_rule`, never on their counts.
     ///
     /// **THAT CERTIFICATION NO LONGER DESCRIBES THIS PRESET, and nothing in
     /// this constructor is the reason.** `cert4b` measured a build whose

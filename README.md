@@ -140,16 +140,33 @@ lists every target and what it actually reaches.
 ## Realism
 
 `tf.facts.measure()` scores fourteen shape statistics against real-market
-bands, and four more on a protocol that varies the roster with the seed. The
-default preset, `pt-v19`, holds all fourteen at one year and at two years, on
-the certification roster and on a held-out one, at thirty seeds each, and all
-fourteen at the real centre where `pt-v18` held twelve. It holds the other four
-as well: the index level returns +6.5 per cent a year inside a band of 2.9 to
-11.9, and the -3 per cent fear row reads 5.8 against a tape centre of 5.7,
-where `pt-v18` read 3.2 against a floor of 2.6.
+bands, and four more on a protocol that varies the roster with the seed. At
+the default preset, `pt-v19`, one of the fourteen is out, the same one in
+every cell: `sector_excess_corr` reads 0.1011 against a floor of 0.11 at
+one year and 0.10421 against 0.11 at two years, on the certification roster
+and on a held-out one, at thirty seeds each -- 1.39 and 1.22 seed standard
+deviations below the floor, in all four cells. No other row is out anywhere.
+That reading is what `sector_loading` 0.60 was derived to produce: it puts
+the row on the whole-tape centre of 0.1178, and the floor it misses comes
+from 2015-2025 windows that the 0.8.0 scoring rule replaced. The two rulers
+disagree about this row and about no other.
 
-One row reads further from real than before: the crisis lever is 5.28x
-against real markets' 6.16x, where `pt-v18` read 6.53x.
+It holds the other four: the index level returns +6.6 per cent a year inside
+a band of 2.9 to 11.9, and the -3 per cent fear row reads 6.4 against a tape
+centre of 5.7, where `pt-v18` read 3.2 against a floor of 2.6.
+
+Three rows read further from real than `pt-v18` does. `annualised_vol_pct`
+and `abs_return_acf5` leave the tape's centre where `pt-v18` sits on it, and
+`sector_excess_corr` is off centre under both. And the crisis lever -- held
+VIX 65 over held VIX 5 -- reads 2.07x against real markets' 6.16x, where
+`pt-v18` read 6.53x.
+
+Corrected 2026-09-14. This section said `pt-v19` held all fourteen rows and
+all fourteen centres where `pt-v18` held twelve, and gave the level rows as
++6.5 and 5.8 and the lever as 5.28x. Those are readings of a different
+vector -- `pt-v18` plus four dials, with `sector_loading` 0.8 -- measured
+before the slow variance level and `sector_loading` 0.60 were adopted. On
+the vector that ships, the centre comparison runs the other way.
 
 Five of the fourteen were calibration targets, and the bands both tuned the
 model and graded it. So this is a stated envelope, not a test against market

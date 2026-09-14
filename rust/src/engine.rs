@@ -4799,19 +4799,124 @@ mod tests {
         assert_eq!(e.draws_consumed() - before, 2 + out.draws_consumed);
     }
 
+    /// A draw source that records the call sites it is told about, in
+    /// order, and counts the draws taken at each. `Site` is a no-op on
+    /// every generator that is not the logged one, so the ORDER of the
+    /// three macro stages is otherwise unobservable from outside
+    /// `advance_day_with`.
+    struct SiteTrace {
+        inner: GameRng,
+        seen: Vec<(Site, usize)>,
+    }
+
+    impl Rng for SiteTrace {
+        fn next_f64(&mut self) -> f64 {
+            if let Some(last) = self.seen.last_mut() {
+                last.1 += 1;
+            }
+            self.inner.next_f64()
+        }
+        fn next_normal(&mut self) -> f64 {
+            if let Some(last) = self.seen.last_mut() {
+                last.1 += 1;
+            }
+            self.inner.next_normal()
+        }
+        fn site(&mut self, site: Site, tag: u32) {
+            self.seen.push((site, 0));
+            self.inner.site(site, tag);
+        }
+    }
+
+    /// The daily step visits the macro chain, then the cycle roll, then the
+    /// central bank, in that order, and the first of the three moves state.
+    ///
+    /// # What this test used to assert, and why that assertion is gone
+    ///
+    /// It read the VIX before and after and required it to have changed.
+    /// Under `vix_level_identity`, which pt-v19 turns on, that is a
+    /// property the model deliberately gave up. The VIX's target is the
+    /// index's own conditional variance read back in points, less the
+    /// closed form of the fear excursion's mean, and neither depends on the
+    /// calendar. Its innovation is `vix * sqrt(s0^2 + (s_r * r)^2)` with
+    /// `vix_innovation_sigma` derived to 0.0, so on a session whose return
+    /// is zero the noise term is exactly zero too. pt-v19 also runs a
+    /// 755-day macro burn-in, which drives the VIX onto the floating-point
+    /// fixed point of that map before the test's first call. The engine
+    /// this module builds never opens a session, so its day return is 0.0
+    /// and the VIX reproduces to the bit, day after day. Measured here: it
+    /// holds at 23.768839023837387 across eleven consecutive calls.
+    ///
+    /// The economy still steps, which was the thing being probed. Gold, the
+    /// dollar, oil, the ten-year and the greed index all move on the same
+    /// call. So the probe is `gold_price`, which carries an unconditional
+    /// `random_normal` term and cannot sit still while the chain runs.
+    ///
+    /// The VIX law that replaced the old one is asserted at the end: the
+    /// VIX is a function of the session, so a flat session leaves it
+    /// bit-identical and a down session raises it.
     #[test]
     fn the_daily_step_runs_economy_then_cycle_then_the_bank() {
-        let mut e = engine(21);
-        let vix_before = e.economy().vix;
-        let out = e.advance_day(&DayAdvanceRequest {
+        let day = DayAdvanceRequest {
             volatility: 0.7,
             active_shocks: &[],
             market_return_pct: 0.0,
             game_day: 1,
             timestamp: 24 * 60,
-        });
+        };
+
+        let mut e = engine(21);
+        let before = e.economy().clone();
+        let mut trace = SiteTrace {
+            inner: GameRng::new(21, stream::ECONOMY),
+            seen: Vec::new(),
+        };
+        e.advance_day_with(&day, &mut trace);
+
+        let sites: Vec<Site> = trace.seen.iter().map(|(s, _)| *s).collect();
+        assert_eq!(
+            sites,
+            vec![Site::EconomyDaily, Site::EconomyCycle, Site::CentralBank],
+            "the daily step must visit the three stages once each, in order"
+        );
+        assert!(
+            trace.seen[0].1 > 0,
+            "the macro chain must draw; it took {} draws",
+            trace.seen[0].1
+        );
+        assert_ne!(
+            e.economy().gold_price,
+            before.gold_price,
+            "the macro chain ran without moving the state it draws for"
+        );
+
+        // The draw count the counting entry point reports is the same work.
+        let mut counted = engine(21);
+        let out = counted.advance_day(&day);
         assert!(out.draws_consumed > 0, "the daily macro step must draw");
-        assert_ne!(e.economy().vix, vix_before, "the economy must have stepped");
+
+        // THE VIX LAW THIS TEST NOW CARRIES. The flat engine above took the
+        // same call and its VIX did not move by one bit, because under the
+        // identity a VIX at rest with a zero session return has nothing to
+        // move it. Open a session and take the index down five per cent and
+        // the same call moves it, which is the direction the fear channel
+        // is wired in.
+        assert_eq!(
+            e.economy().vix.to_bits(),
+            before.vix.to_bits(),
+            "a flat session moved the VIX, which the identity has no term for"
+        );
+        let mut down = engine(21);
+        down.open_market();
+        for c in down.companies_mut().iter_mut() {
+            c.stock.price *= 0.95;
+        }
+        down.advance_day(&day);
+        assert!(
+            down.economy().vix > before.vix + 1.0,
+            "a five per cent down session must raise the VIX; it read {}",
+            down.economy().vix
+        );
     }
 
     #[test]

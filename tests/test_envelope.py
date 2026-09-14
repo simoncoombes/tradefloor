@@ -30,6 +30,7 @@ def test_the_certified_panel_covers_every_measured_statistic():
     assert sorted(env.MEASURED_504) == sorted(SHAPE)
 
 
+@pytest.mark.ship_bar
 def test_all_fourteen_are_in_band_at_the_certified_horizon():
     """Nine of ten until 2026-08-25, when the panel grew to fourteen, then
     twelve of fourteen on pt-v3. Since the 2026-08-26 era boundary the

@@ -112,7 +112,52 @@ def test_the_solve_reaches_a_day_whose_draws_are_known(short_days):
     assert np.max(np.abs(day["residual"])) < 5e-3
     assert day["jump_market"] is None and day["jump_company"] == {}
     assert len(day["jacobian_idio_norm"]) == len(UNIVERSE)
-    assert all(v > 0 for v in day["jacobian_idio_norm"])
+
+    # AND THE SENSITIVITY COLUMN SAYS WHAT THE TOOL SAYS IT SAYS.
+    #
+    # This line used to read `all(v > 0 ...)`. Strict positivity of a
+    # one-sided finite difference at step 1.0, taken on a close that lives
+    # on a cent grid, is not a property of the solver: it is a statement
+    # about where the accepted solution happened to land on the staircase.
+    # The tool does not believe it either -- `CLAMP_BELOW` exists so that a
+    # column too small to invert can be NAMED, and `shadow()` publishes
+    # those names in a `clamped` field rather than refusing the day.
+    #
+    # MEASURED over twenty configurations, `Universe.random(6, seed=3)` at
+    # engine seeds 11 to 20 on pt-v19 and pt-v18, 40 ticks, sigma 1e-3: a
+    # column reads EXACTLY zero on pt-v19 seed 11 and on pt-v18 seed 15, so
+    # the old bar fails on both presets and was passing here only because
+    # this test runs at seed 11, where pt-v18 lands on 0.00099 instead of
+    # on 0.00000. It never separated the two presets and it never separated
+    # a working solve from a broken one.
+    #
+    # What the twenty DO support is asserted instead. The clamp count is
+    # never above one of six (1 on two of ten pt-v19 seeds, 1 on four of
+    # ten pt-v18 seeds, 0 otherwise), and the median column runs 0.00232 to
+    # 0.00451, which is 2.3 to 4.5 times `CLAMP_BELOW`. So the day is
+    # identified for the roster as a whole and at most one name is not; two
+    # clamped names of six would be a real regression and fails here.
+    norms = day["jacobian_idio_norm"]
+    assert all(math.isfinite(v) and v >= 0.0 for v in norms), norms
+    clamped = [i for i, v in enumerate(norms) if v <= shadow.CLAMP_BELOW]
+    assert len(clamped) <= 1, (
+        f"{len(clamped)} of {len(UNIVERSE)} names are binding clamps, "
+        f"against at most one over twenty measured configurations: {norms}")
+    assert sorted(norms)[len(norms) // 2] > shadow.CLAMP_BELOW, norms
+
+    # And the one that clamps on THIS day, with the mechanism, because a
+    # count alone would not say whether the right name is the quiet one.
+    # The roster's cheapest name opens at $5.00, so one cent of it is
+    # 0.00200 in log return against 0.00006 to 0.00032 on the other five.
+    # Measured grid-free (the same difference at step 8.0, which crosses
+    # enough risers to average over the tread) one sigma of a name's own
+    # idiosyncratic draw is worth 2.1 ticks of its own grid on that name
+    # against 17.0, 17.5, 24.4, 25.6 and 51.7 on the rest. It has an order
+    # of magnitude less headroom than any other name, and it is the one
+    # the step-1.0 difference reads as zero.
+    assert clamped == [int(min(range(len(prices)), key=lambda i: prices[i]))], (
+        f"the clamped name is not the cheapest one: norms {norms} against "
+        f"prices {[round(p, 2) for p in prices]}")
 
 
 def test_a_jump_at_the_previous_close_is_addressed(short_days):
@@ -408,15 +453,61 @@ def test_an_upward_market_jump_is_not_recoverable(short_days):
     at +3.46, and the prior on that normal costs more than the likelihood
     can repay. Reported rather than left for a reader to infer from a
     count of zero.
+
+    ASSERTED ON THE SIZE, not on whether the indicator fired, for the
+    reason `test_a_planted_downward_market_jump_is_recovered` gives at
+    length two tests above: `jump_market` is the recovered NORMAL and the
+    jump lives in `jump_mean_market + jump_sigma_market * z`. This used to
+    read `out["jump_market"] is None`, and at pt-v19 that proxy separated
+    from the property it stands for. MEASURED here, seeds 41, 42 and 43 at
+    planted normals 4.14, 6.0 and 8.0, which are jumps of +16.6, +62.4 and
+    +111.6 basis points: two fire nothing, and the middle one fires a
+    normal of 3.500053, which is a jump of **+0.87 basis points**. That is
+    1.4 per cent of the jump planted under it. The solver has not
+    recovered an upward jump; it has accepted an indicator at a normal a
+    hair past the sign change, where the size it buys is nil.
+
+    So the claim `jump_recovery` publishes -- "no upward jump at any size
+    to +112" -- is intact, and the executable form of it is a bar on the
+    size. Two bars, both taken from what the word RECOVERED means rather
+    than fitted to the reading:
+
+    a jump that comes back at under half the size planted has not been
+    recovered. Measured 0.0, 1.4 and 0.0 per cent against that fifty.
+
+    and the solver does not reach the planted normal. Measured 3.500053
+    against a plant at 6.0, and nothing at all against 4.14 and 8.0.
+
+    A bar on the price grid was considered and refused. The recovered
+    +0.87 basis points is 1.6 ticks of the dearest name's cent grid at
+    $177.80 and 0.04 of the cheapest at $5.00, so the roster does not put
+    one number under it and a bar that quoted either end would be picking
+    the end that clears.
     """
     model = dict(tf.ModelParams.from_preset().to_dict())
     zero_at = -model["jump_mean_market"] / model["jump_sigma_market"]
     assert 3.0 < zero_at < 4.0
+
+    def size_bp(z):
+        return 1e4 * (model["jump_mean_market"]
+                      + model["jump_sigma_market"] * z)
+
     rng = np.random.default_rng(7)
     for i, z in enumerate((4.14, 6.0, 8.0)):
         fwd, r_obs = _planted_day(41 + i, z, rng)
         out = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
-        assert out["jump_market"] is None
+        planted = size_bp(z)
+        assert planted > 0.0, z          # the plant really is upward
+        got = 0.0 if out["jump_market"] is None else size_bp(out["jump_market"])
+        assert got < 0.5 * planted, (
+            f"seed {41 + i}: a planted upward jump of {planted:+.1f} basis "
+            f"points came back at {got:+.2f}, which is more than half of "
+            "it. An upward market jump is recoverable after all")
+        if out["jump_market"] is not None:
+            assert out["jump_market"] < z, (
+                f"seed {41 + i}: the solver reached a normal of "
+                f"{out['jump_market']:.4f} against a plant at {z}, so it "
+                "got the jump back")
     said = shadow.jump_recovery(model)
     assert "upward" in said and "DOWNWARD" in said
 
@@ -888,15 +979,40 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     # nats worse, so it is rejected -- and a Jacobian of its own reaches 10.00,
     # 7.9 nats better, so it is accepted.
     #
+    # SIXTH SWEEP, 2026-09-14, on the working tree that carries the market-side
+    # warm-up. Re-dealt a sixth time: seed 19 at -2.27 now reads a plain trial
+    # of 6.82 against a no-jump 18.47, so it finds the jump alone and the
+    # premise has now inverted on four of six sweeps. That is the pattern
+    # itself and it is worth stating plainly: this test's DAY does not survive
+    # a change to the market, and every sweep since 0.7.0 has had to re-pick
+    # it. The mechanism under test -- a trial that reuses a Jacobian with no
+    # column for the unknown it has just added, retried with one of its own --
+    # has never moved, and the assertions below have never been relaxed.
+    #
+    # The same grid re-swept, ten seeds (11 to 20) by seven planted normals
+    # (-1.50, -2.27, -3.00, -3.10, -3.50, -4.00, -4.50), seventy cells at
+    # TICKS 40 and sigma 1e-3, `Universe.random(6, seed=3)`, the generator
+    # re-seeded at 7 for each cell so a cell is the same day the test builds.
+    # Exactly ONE is decisive, against one at the b4fix10 boundary, three at
+    # the GJR boundary, five at 0.8.0 and one at 0.7.0.
+    #
+    # The day chosen is again the only candidate: seed 15, planted normal
+    # -4.00. The reused Jacobian leaves the trial at 37.60 against a no-jump
+    # 25.71 -- 11.9 nats worse, so it is rejected -- and a Jacobian of its own
+    # reaches 9.87, 15.8 nats better, so it is accepted. It is also the widest
+    # cell any sweep has produced on its narrower side (11.9 nats against the
+    # 2.4 and 4.0 the last two settled for), and it recovers a normal of
+    # -2.284, well clear of the 0.6 of zero the 0.8.0 comment rules out.
+    #
     # The fix is unchanged and still guarded, on a day that still needs it.
     rng = np.random.default_rng(7)
-    fwd, r_obs = _planted_day(19, -2.27, rng)
+    fwd, r_obs = _planted_day(15, -4.00, rng)
     found = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
     assert found["jump_market"] is not None
     # On the SIZE, for the reason the planted-jump test above gives at
     # length: `jump_market` is the recovered normal and the direction lives
     # in `jump_mean_market + jump_sigma_market * z`. Measured here the
-    # normal is -1.429 against a sign change at +3.4645, clear of both that
+    # normal is -2.284 against a sign change at +3.4645, clear of both that
     # and of zero, so this assertion does not rest on a margin the solver can
     # cross.
     assert found["jump_market"] < shadow.upward_threshold(

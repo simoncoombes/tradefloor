@@ -2,9 +2,34 @@
 
 ## Unreleased
 
+**The default preset moves to pt-v19.** Every seeded trajectory changes, so
+a run that did not name a preset will not replay against earlier versions.
+Naming a preset still replays exactly, and every preset from pt-v1 on stays
+selectable.
+
+**pt-v19's panel, row by row, and one row is out.** `sector_excess_corr`
+reads 0.1011 against a floor of 0.11 at 252 days and 0.10421 against 0.11
+at 504, 1.39 and 1.22 seed standard deviations below the floor. It is out
+in all four cells of the record (both horizons, the held-out universe and
+the held-out seeds). No other row is out in any cell. That reading is
+what `sector_loading` 0.60 was derived to produce, because the dial was set
+against the whole-tape centre 0.1178 while `facts.REAL_MARKETS` still
+carries a floor derived from 2015-2025 windows. Nine of the ten mechanism
+rows show
+their mechanism, and eleven of the fourteen sit at the tape's centre, where
+pt-v18 sits at twelve. pt-v18 is off centre on `volume_change_acf1` and
+`sector_excess_corr`; pt-v19 is off centre on `annualised_vol_pct`,
+`abs_return_acf5` and `sector_excess_corr`.
+
+The slow stochastic level that produced this preset, the `KAT_VERSION`
+bump, the checkpoint fix, the nineteenth scored row and the figures
+corrected on 2026-09-14 are below the marker.
+
+<!-- release-note-ends -->
+
 **A slow stochastic level on the market factor's variance target, and the
 determinism baseline that had gone stale under it.** `market_vol_level_
-persistence` 0.9977 and `market_vol_level_sigma` 0.047, both shipping at
+persistence` 0.9977 and `market_vol_level_sigma` 0.085, both defaulting to
 0.0 and bit-identical there, put a lognormal AR(1) on the baseline variance
 the two components revert to. Every candidate that buys fat tails by adding
 variance-of-variance to the recursion is a random-coefficient recursion, and
@@ -16,9 +41,12 @@ condition's budget. Its normal is drawn once a session on a NINTH stream,
 `stream::MARKET_VOL_LEVEL`, unconditionally, so no settable can move the
 draw schedule and the zero arm is the same random world as the live one.
 
-Measured on one box, 120 rosters at both horizons: at the derived pair it
-takes the whole-tape nineteen from 19.60 to 17.23 at 252 days and 22.75 to
-17.61 at 504. It was derived to buy the index tail row and it buys the tail
+Measured on one box, 120 rosters at both horizons: at the derived pair --
+`sigma` 0.047, superseded by the 0.085 that ships -- it takes the whole-tape
+nineteen from 19.60 to 17.23 at 252 days and 22.75 to 17.61 at 504. At the
+pair that does ship, with `sector_loading` 0.60 beside it, the same
+objective reads 23.1 at 252 and 21.8 at 504 against pt-v18's 31.6 and 41.4.
+It was derived to buy the index tail row and it buys the tail
 row, the pooled fourth moment, the correlation persistence, the volume
 mean-reversion and the leverage effect -- every one of them a statistic
 about how dispersed the market's own volatility is over a window. It costs
@@ -63,18 +91,36 @@ it had claimed to since 2026-09-05, and `loss.rule_fingerprint` moves at
 both horizons: a score taken before this change is not comparable with one
 taken after it.
 
-**The default preset moves to pt-v19.** Every seeded trajectory changes, so
-a run that did not name a preset will not replay against earlier versions.
-Naming a preset still replays exactly, and every preset from pt-v1 on stays
-selectable.
+**The in-band count grades a preset with a ruler the project stopped
+scoring with, so this changelog quotes rows and distances instead.** It
+quoted a count here until 2026-09-14, in a sentence claiming fourteen of
+fourteen in band and fourteen of fourteen at centre. The preset record that sentence describes says thirteen and
+eleven. `facts.REAL_MARKETS` and `envelope.BANDS_504` are derived from
+2015-2025 windows, which the 0.8.0 scoring rule replaced with whole-tape
+centres and did not replace here, so the count grades a preset against a
+ruler the project stopped scoring with. Read the named rows and their
+distances instead. `envelope.certify` returns `in_band` and `room_sd` per
+statistic, and every preset record carries its `misses` by name, so the
+rows are always available.
 
-**pt-v19 holds every certified row on one ruler**, fourteen of fourteen at
-both horizons and both holdout blocks, and sits at the tape's centre on
-fourteen of fourteen mechanism rows where pt-v18 sits at twelve.
-
-<!-- release-note-ends -->
-
-**pt-v19 takes three more dials.** `market_vol_vix_excursion` 1.0 makes the
+**More figures describing an earlier pt-v19 than the one that ships,
+corrected 2026-09-14.** The slow level's `sigma` opened this note as 0.047.
+`cascade-fourth-moment.md` derived that figure and `level-phi.md` then
+found the derivation in error; the shipped value is 0.085, and the `S`
+figures quoted beside it were measured at 0.047 and are now labelled as
+such. Two others were corrected outside this file, and both were the same
+mistake. The crisis lever read 5.28x in `README.md` and in `envelope.py`'s
+`scenario-magnitude` gap, measured on pt-v18 plus four dials with
+`sector_loading` 0.8; `presets/pt-v19.json` records **2.0714** against real
+markets' 6.16, which makes it the row this default reads furthest from
+real, and under a third of pt-v18's 6.5258. And the 504-day
+`annualised_vol_pct` read 23.81 in `envelope.py`, which was that same
+four-dial preset's figure, surviving four regenerations of the table
+beneath it; it reads 23.3899. The paragraphs below this marker are the
+working log of a vector that moved several times, and a figure in one of
+them describes the preset of its own day and not necessarily this one. The
+rule for reading a band result is in `programme/band-count-rule.md` in the
+design repository.**pt-v19 takes three more dials.** `market_vol_vix_excursion` 1.0 makes the
 market factor's variance target read the VIX's excursion above the level the
 index's own conditional variance implies, instead of the VIX's level against
 a fixed anchor. Under `vix_level_identity` the old form fed the factor's own
@@ -172,12 +218,20 @@ variance instead of the market factor's through a wrong conversion;
 `volume_idio_variance_gain` 0.20 switches on a per-name volume-variance
 channel that had shipped at zero since it was written.
 
+> SUPERSEDED, 2026-09-14. The three paragraphs that follow describe the
+> pt-v19 of this boundary, and every one of their figures moved when the
+> vector was recomposed. The shipped preset differs from pt-v18 in
+> thirty-two coefficients, not four, and carries `sector_loading` 0.60.
+
 **The deep fear row is the change.** `fear_gauge_dn3` reads the tape's
 centre within a tenth of a standard error, where pt-v18 sat 3.8 below it
-and passed its band at the ninth percentile.
+and passed its band at the ninth percentile. (On the shipped vector it
+reads 6.3920 against a tape centre of 5.73, about one standard error above
+it, where the sentence above this bracket says a tenth of one.)
 
 **The crisis lever falls from 6.53x to 5.28x**, which follows from the VIX
-reading a level it was not reading before.
+reading a level it was not reading before. (On the shipped vector it falls
+much further, to 2.0714.)
 
 **`metadataSha256` does not move at this boundary.** pt-v19 carries
 pt-v18's mispricing and crowd coefficients, so the vector `model_preset()`

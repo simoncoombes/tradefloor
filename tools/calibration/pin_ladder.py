@@ -185,21 +185,86 @@ def cmd_ladder(args):
     print(f"{PRESET} + {json.dumps(overrides)}")
     print(f"seeds {seeds}, {burn} burn and {scored} scored sessions per seed per pin")
     print(f"{'pinned':>8} {'implied':>9} {'imp/pin':>8} {'after-pin':>10} "
-          f"{'v_f/base':>9} {'anchor':>8}")
+          f"{'v_f/base':>9} {'anchor':>8} {'drift/se':>9} {'settled':>8}")
     base = tf.ModelParams.from_preset(PRESET).to_dict()["market_factor_sigma"] ** 2
+    unsettled = []
     for pin in pins:
         rs = by_pin[pin]
         implied = statistics.fmean(r["implied"] for r in rs)
         after = statistics.fmean(r["after"] for r in rs)
         v_f = statistics.median(r["v_f"] for r in rs) / base
         anchor = statistics.fmean(r["anchor"] for r in rs)
+        drift, settled = _settling(rs, scored)
+        if not settled:
+            unsettled.append(pin)
         print(f"{pin:8.2f} {implied:9.3f} {implied / pin:8.3f} "
-              f"{after - pin:10.3f} {v_f:9.2f} {anchor:8.3f}")
+              f"{after - pin:10.3f} {v_f:9.2f} {anchor:8.3f} "
+              f"{drift:9.2f} {'yes' if settled else 'NO':>8}")
     print("\nimp/pin under 1 contracts; at or above 1 the pinned level "
           "sustains itself.\nafter-pin is the same map through the engine's "
           "own update: the two agreeing\nis the evidence that the fear "
           "excursion is zero-mean, which is what lets\nthe gain below be "
           "solved on the identity alone.")
+    print(_SETTLING_NOTE)
+    if unsettled:
+        print(f"\nUNSETTLED at pins {unsettled}: the scored window is still "
+              f"reading a transient at those pins, so their LEVEL is biased "
+              f"toward the opening. Re-run with a larger --burn. The shape of "
+              f"the ladder survives; the level does not.")
+
+
+#: The seventh measurement defect, made visible where it happens.
+#:
+#: `pin-ladder-burn.md` (2026-09-11): the 40-session default was sized by a
+#: comment claiming "about a dozen half-lives" at a persistence of 0.97. The
+#: half-life at 0.97 is 23 sessions, so forty is under two; at pt-v19's GJR
+#: triple, `alpha + gamma/2 + beta` = 0.979, it is 33. The factor variance
+#: opens at base and the pinned target is several times base at a high pin,
+#: so the scored window reads the relaxation and not the level -- the
+#: ladders on the record are 8 to 17 per cent low, one-sidedly, which makes
+#: `C - implied(C)` high and the ceiling's crossing early.
+#:
+#: That note asked for three things. `--burn` and `--scored` arrived with
+#: b4fix7; the DEFAULT was deliberately left alone so that every ladder on
+#: the record reproduces, and it is still 40/80, so a run that does not pass
+#: `--burn` is still under-burned. What was missing was any way to TELL --
+#: the ladder printed a level with no statement about whether it had
+#: settled. This is that statement, and it costs nothing: the rows are
+#: already in hand.
+_SETTLING_NOTE = (
+    "\ndrift/se is the settling check (pin-ladder-burn.md): the mean v_f of "
+    "the scored\nwindow's first quarter minus its last, over the standard "
+    "error of that difference.\nUnder two it is settled. A ladder that has "
+    "not settled reports a LEVEL biased toward\nthe state's opening, which "
+    "is base -- low at a high pin, high at a low one."
+)
+
+
+def _settling(rows, scored):
+    """`(drift / se, settled)` for one pin's scored window.
+
+    The quantity is the first quartile's mean `v_f` minus the last's, in
+    standard errors of that difference, pooled across the pin's seeds. It
+    answers the only question a burn has: is what remains in the window a
+    level, or the tail of a walk toward one.
+
+    Paired per seed, because the seeds differ from each other by far more
+    than either quartile differs from the other within a seed, and an
+    unpaired difference would be swamped by that.
+    """
+    by_seed: dict[int, list] = {}
+    for r in rows:
+        by_seed.setdefault(r["seed"], []).append(r["v_f"])
+    q = max(1, scored // 4)
+    diffs = [statistics.fmean(v[:q]) - statistics.fmean(v[-q:])
+             for v in by_seed.values() if len(v) >= 2 * q]
+    if len(diffs) < 2:
+        return float("nan"), True
+    se = statistics.stdev(diffs) / math.sqrt(len(diffs))
+    if se == 0.0:
+        return float("nan"), True
+    t = statistics.fmean(diffs) / se
+    return t, abs(t) < 2.0
 
 
 # ── gain ─────────────────────────────────────────────────────────────────

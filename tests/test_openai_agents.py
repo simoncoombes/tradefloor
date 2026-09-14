@@ -1314,6 +1314,7 @@ needs_fixture = pytest.mark.skipif(
     not FIXTURE.exists(), reason="no recorded run committed")
 
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_committed_recording_replays_end_to_end():
     """The shipped fixture, replayed through `evaluate` with a model that

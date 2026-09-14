@@ -494,19 +494,75 @@ def test_the_callable_adapter_meets_the_shared_contract(check):
 
 # -- the committed recordings ------------------------------------------------
 
+_FIXTURE_ROOT = pathlib.Path(__file__).resolve().parent.joinpath("fixtures")
+
+#: What each directory under `tests/fixtures/` holds.
+#:
+#: The recordings were the only thing under `fixtures/` for long enough
+#: that `*/*.json` read as "every recording", and it stopped being true the
+#: day `fixtures/scoring/` arrived carrying four certification panels.
+#: Nothing announced it. The panels are not transcripts, so the checks
+#: below read each one as an empty recording and the suite reported five
+#: failures that named a missing `entries` key rather than a fixture set
+#: that had grown a second kind.
+#:
+#: The glob INSIDE a recordings directory stays a glob, which is the
+#: property the old comment was protecting: a sixth recording arrives
+#: covered and a renamed one cannot quietly leave. What must now be
+#: declared is a DIRECTORY, because a directory is where the kind lives,
+#: and a kind the checks do not know is a kind they will misread.
+#:
+#: `panel-roster-40.json` sits at the top level rather than in a directory
+#: of its own and is read by `test_loss.py` by name; the top level is not
+#: globbed here and needs no entry.
+FIXTURE_KINDS = {
+    "callable": "recordings",
+    "finrobot": "recordings",
+    "langgraph": "recordings",
+    "openai_agents": "recordings",
+    "pydantic_ai": "recordings",
+    #: Four `b4fix7` certification panels, thirty seeds each, read by
+    #: `tests/test_scoring_conformance.py`. Per-seed scoring rows, not a
+    #: transcript.
+    "scoring": "scoring-panels",
+}
+
+_RECORDING_DIRS = {name for name, kind in FIXTURE_KINDS.items()
+                   if kind == "recordings"}
+
 #: Every committed recording, discovered rather than listed, so a sixth
 #: fixture arrives covered and a renamed one cannot quietly leave.
-_FIXTURES = sorted(
-    pathlib.Path(__file__).resolve().parent.joinpath("fixtures")
-    .glob("*/*.json"))
+_FIXTURES = sorted(p for p in _FIXTURE_ROOT.glob("*/*.json")
+                   if p.parent.name in _RECORDING_DIRS)
+
+
+def test_every_fixture_directory_declares_what_it_holds():
+    """A directory of a kind nobody declared gets read as the wrong kind.
+
+    This is the check the five failures wanted. Before it, a new directory
+    under `fixtures/` was silently enrolled in the recordings checks and
+    failed them one file at a time with a message about a missing key. Now
+    the directory itself fails, once, and says what to do about it."""
+    found = sorted(p.name for p in _FIXTURE_ROOT.iterdir()
+                   if p.is_dir() and not p.name.startswith(("_", ".")))
+    assert found == sorted(FIXTURE_KINDS), (
+        f"fixture directories {found} against declared "
+        f"{sorted(FIXTURE_KINDS)}. Add the new one to FIXTURE_KINDS saying "
+        "what it holds: 'recordings' enrols it in the replay checks below, "
+        "anything else leaves it to whatever test owns it.")
 
 
 def test_there_are_committed_recordings_to_check():
     """Guards the guard: a glob matching nothing would make the test below
     pass by vacuum, and the suite would report the recordings healthy
     while reading none of them -- which is exactly the state an audit
-    found two of five fixtures in."""
+    found two of five fixtures in.
+
+    It now also guards the filter above it. A `FIXTURE_KINDS` that lost
+    every `recordings` entry would empty `_FIXTURES` and leave the replay
+    checks passing on nothing, which is the same vacuum by another route."""
     assert len(_FIXTURES) >= 5, [p.as_posix() for p in _FIXTURES]
+    assert _RECORDING_DIRS, FIXTURE_KINDS
 
 
 @pytest.mark.parametrize("path", _FIXTURES, ids=lambda p: p.parent.name)
@@ -1463,10 +1519,15 @@ def test_every_committed_fixture_names_the_preset_it_was_recorded_in():
     A fixture that loses the field replays only until the default next
     moves, and a fixture that carries the WRONG one refuses a replay that
     would have worked. The second is the worse failure, so the expected
-    value is written out per recording with the measurement behind it."""
-    root = pathlib.Path(__file__).parent / "fixtures"
-    fixtures = sorted(root.glob("*/*.json"))
-    found = {"/".join(p.relative_to(root).parts): p for p in fixtures}
+    value is written out per recording with the measurement behind it.
+
+    Over the RECORDINGS, which is `_FIXTURES` and not a second glob of its
+    own: a recording carries a `model_preset` and a scoring panel does not,
+    so a raw `*/*.json` here asked four certification panels which market
+    they were recorded in and reported the fixture set as having moved.
+    One list of recordings, in one place, is the repair."""
+    root = _FIXTURE_ROOT
+    found = {"/".join(p.relative_to(root).parts): p for p in _FIXTURES}
     assert set(found) == set(FIXTURE_PRESETS), (
         "the fixture set moved; update FIXTURE_PRESETS with the preset the "
         "new recording was made in, measured rather than assumed")

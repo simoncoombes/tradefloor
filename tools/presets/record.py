@@ -45,6 +45,17 @@ DEFAULT_SINCE = {
 }
 
 
+def moved_values(was: dict[str, float], now: dict[str, float]) -> list[str]:
+    """The names both vectors carry at DIFFERENT values.
+
+    `restamp.py`'s rule, in one place: a name ADDED to `ModelParams` changes
+    every record's digest and moves no trajectory, and a name whose VALUE
+    moved is a different model wearing the same label. Only the second
+    invalidates a measured panel.
+    """
+    return sorted(k for k in set(was) & set(now) if was[k] != now[k])
+
+
 def coefficient_digest(values: dict[str, float]) -> str:
     """A citable identity for the coefficient vector itself.
 
@@ -145,6 +156,76 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
     }
 
 
+def carry_level_protocol(record: dict, path: pathlib.Path) -> str:
+    """Carry an existing `level_protocol` block onto a rebuilt record.
+
+    THE BLOCK CANNOT BE REBUILT HERE AND MUST NOT BE DROPPED HERE. `build`
+    assembles a record from a panel measured with the roster HELD at
+    `Universe.random(40, seed=111)`, and `level_protocol` is measured on
+    `facts.LEVEL_PROTOCOL`, where the roster varies with the seed -- a
+    different run on a different protocol. A fresh `--panel` therefore
+    returns a dict with no such key, and writing it over the committed file
+    silently deletes a thirty-seed measurement that cost a box.
+
+    That is not hypothetical. pt-v18's block went at d4cfe22 and pt-v19's at
+    31ef261, both of them `--panel` regenerations by somebody fixing
+    something else, and the result was defect-26: `envelope.CERTIFIED_LEVEL`
+    and `CERTIFIED_CRISIS` left with nothing measured behind them,
+    `envelope_tables.py` refusing to run, and the published level rows
+    frozen on a preset that no longer existed.
+
+    So the block is carried, and carrying it is only honest while the
+    preset's coefficient VALUES have not moved. If they have, the block
+    describes a different model and is dropped -- LOUDLY, naming the tool
+    that replaces it, which is the difference between this and what
+    happened.
+    """
+    if not path.exists():
+        return ""
+    was = json.loads(path.read_text(encoding="utf-8")).get("level_protocol")
+    if not was:
+        return ""
+    stamped = was.get("coefficients")
+    if stamped is None:
+        record["level_protocol"] = was
+        return ("carried level_protocol forward UNCHECKED: it was written "
+                "before the block stamped the vector it ran on, so nothing "
+                "here can tell whether the preset has moved under it")
+    changed = moved_values(stamped, record["coefficients"])
+    if changed:
+        return ("DROPPED level_protocol: %d coefficient(s) moved since it was "
+                "measured (%s), so it describes a different %s. Re-measure "
+                "with tools/presets/level_panel.py and level_rows.py, then "
+                "record.py --level-rows."
+                % (len(changed), ", ".join(changed[:6]), record["preset"]))
+    record["level_protocol"] = was
+    added = sorted(set(record["coefficients"]) - set(stamped))
+    return ("carried level_protocol forward"
+            + ("; +%d dial(s) added inert since (%s)" % (len(added), ", ".join(added))
+               if added else ""))
+
+
+def place_level_protocol(record: dict) -> dict:
+    """`level_protocol` after the mechanism blocks, wherever it was set.
+
+    One spelling of the field order, so a record written by `--panel` and one
+    written by `--level-rows` cannot end up with the same fields in two
+    different orders and a diff that reads as a change.
+    """
+    if "level_protocol" not in record:
+        return record
+    ordered = {}
+    for key, value in record.items():
+        if key == "level_protocol":
+            continue
+        ordered[key] = value
+        if key == "mechanism_heldout_seeds":
+            ordered["level_protocol"] = record["level_protocol"]
+    if "level_protocol" not in ordered:      # a record written before that field
+        ordered["level_protocol"] = record["level_protocol"]
+    return ordered
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--panel", required=False,
@@ -167,7 +248,7 @@ def main() -> int:
                          "record was written")
     ap.add_argument("--level-rows", metavar="ROWS",
                     help="write ONLY the LEVEL_PROTOCOL block onto the record "
-                         "the given ptv18-envelope-rows.py artefact names. "
+                         "the given level_rows.py artefact names. "
                          "envelope.CERTIFIED_LEVEL and CERTIFIED_CRISIS are "
                          "certified on a protocol no panel measures, so they "
                          "reach a record through here or not at all")
@@ -204,8 +285,10 @@ def main() -> int:
     for name in sorted(panel["presets"]):
         values = tradefloor.ModelParams.from_preset(name).to_dict()
         record = build(name, panel, values)
-        text = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
         path = OUT / f"{name}.json"
+        note = carry_level_protocol(record, path)
+        record = place_level_protocol(record)
+        text = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
         if args.check:
             if not path.exists():
                 drift.append(f"{path.name} is missing")
@@ -216,12 +299,17 @@ def main() -> int:
                 # to agree is the SCIENCE.
                 for field in ("coefficient_digest", "mechanisms", "panel_252",
                               "panel_504", "in_band", "misses", "crisis_lever",
-                              "mechanism_252", "mechanism_heldout_seeds"):
-                    if have.get(field) != record[field]:
+                              "mechanism_252", "mechanism_heldout_seeds",
+                              # A block this run would DROP is drift and the
+                              # loudest kind: it is a measurement about to be
+                              # deleted by a tool that cannot remake it.
+                              "level_protocol"):
+                    if have.get(field) != record.get(field):
                         drift.append(f"{path.name}: {field} differs")
         else:
             path.write_text(text, encoding="utf-8", newline="\n")
-            print(f"  wrote {path.relative_to(ROOT)}")
+            print(f"  wrote {path.relative_to(ROOT)}"
+                  + (f"  ({note})" if note else ""))
 
     if args.check:
         for d in drift:
@@ -325,6 +413,7 @@ def write_mechanism_gate(panel_path: str) -> int:
                 ordered["mechanism_252"] = record["mechanism_252"]
                 ordered["mechanism_heldout_seeds"] = \
                     record["mechanism_heldout_seeds"]
+        ordered = place_level_protocol(ordered)
         path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
                         encoding="utf-8", newline="\n")
         counts = record["mechanism_252"]["counts"]
@@ -358,6 +447,14 @@ def write_level_protocol(rows_path: str) -> int:
     The refusal belongs here, at the write, rather than at the measurement:
     the readings are worth keeping either way, and it is publishing them that
     the verdict has to gate.
+
+    REFUSES, the same way, a measurement of a preset whose coefficient VALUES
+    have moved since -- `restamp.py`'s rule, which it applies to the panel
+    blocks and this now applies to the level block. A name ADDED to
+    `ModelParams` is inert and carries; a value that moved is a different
+    model wearing the same name, and the readings were taken on the old one.
+    The vector is stamped INTO the block so `--panel` can make the same
+    judgement later instead of deleting what it cannot rebuild.
     """
     doc = json.loads(pathlib.Path(rows_path).read_text(encoding="utf-8"))
     name = doc["target"]
@@ -376,10 +473,29 @@ def write_level_protocol(rows_path: str) -> int:
         return 1
 
     record = json.loads(path.read_text(encoding="utf-8"))
+    ran = doc.get("target_coefficients")
+    if ran is None:
+        print(f"  NOTE: {pathlib.Path(rows_path).name} does not carry the "
+              f"vector it ran, so the block is written UNCHECKED against "
+              f"{name}'s coefficients. level_rows.py has stamped it since "
+              f"2026-09-14.")
+    else:
+        changed = moved_values(ran, record["coefficients"])
+        if changed:
+            print(f"REFUSED: {len(changed)} of {name}'s coefficients have "
+                  f"moved since this measurement ({', '.join(changed[:6])}), "
+                  f"so it describes a different model under the same name. "
+                  f"Re-measure with tools/presets/level_panel.py.",
+                  file=sys.stderr)
+            return 1
+
     record["level_protocol"] = {
         "certified_level": doc["certified_level"],
         "certified_crisis": doc["certified_crisis"],
         "certification": doc["certification_record"],
+        # The vector the readings were taken on, so a later `--panel` can tell
+        # a block that still describes this preset from one that does not.
+        "coefficients": (dict(sorted(ran.items())) if ran is not None else None),
         "control": {
             "preset": doc["control"],
             "reproduced": True,
@@ -394,15 +510,7 @@ def write_level_protocol(rows_path: str) -> int:
             "days": doc.get("days"),
         },
     }
-    ordered = {}
-    for key, value in record.items():
-        if key == "level_protocol":
-            continue
-        ordered[key] = value
-        if key == "mechanism_heldout_seeds":
-            ordered["level_protocol"] = record["level_protocol"]
-    if "level_protocol" not in ordered:      # a record written before that field
-        ordered["level_protocol"] = record["level_protocol"]
+    ordered = place_level_protocol(record)
     path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
                     encoding="utf-8", newline="\n")
     rows = dict(doc["certified_level"])

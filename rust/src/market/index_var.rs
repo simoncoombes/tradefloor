@@ -2352,28 +2352,52 @@ mod tests {
                 "the worst on the ladder is {:.5} of V_t", worst_total);
     }
 
-    /// **AND THE STEP IS THE SIZE THE LOOP-GAIN RUN MEASURED.**
+    /// THE STEP IS THE GAIN'S, AND AT THE SHIPPED GAIN THERE IS NO STEP.
+    ///
+    /// # What this test used to assert
     ///
     /// P3 of `loopgain-report.md` measured realised variance over `V_t` at
-    /// nine pins: 1.22 to 1.44 for pins at or below x 1.5, then 3.99, 4.30
-    /// and 4.92 at x 1.75, 2.0 and 2.5. The ratio is flat below the crisis
-    /// threshold and steps by about 2.8x across it, and a read-back that
-    /// priced its own regime would carry that step rather than leave it in
-    /// the residual.
+    /// nine pins: 1.22 to 1.44 at or below x 1.5 of base factor variance,
+    /// then 3.99, 4.30 and 4.92 at x 1.75, 2.0 and 2.5. The ratio was flat
+    /// under `crisis_vix_threshold` and stepped about 2.8x across it, and
+    /// this test required the read-back to carry that step on pt-v19.
     ///
-    /// So this asserts the STEP and not the level: the identity's own ratio
-    /// `V_t(regime) / V_t(calm)` across the threshold, at the factor
-    /// variances and VIX levels those pins ran at. The level cannot be
-    /// asserted here — the measured ratio also carries the between-day
-    /// variance of `V_t` itself, the jumps and the tilt — but a step of the
-    /// right size in the right place is what B4 asks for and what nine
-    /// presets did not have.
+    /// Those nine pins are the MODEL's own numbers, not the tape's, which
+    /// the old name got wrong. The step in them is the crisis blend: above
+    /// the threshold the blend lifts every name's market loading from
+    /// `beta_i` to `beta_i + crisis_blend_source * crisis_blend_gain *
+    /// spike`, and the run that produced them carried pt-v18's gain of
+    /// 0.8275881. pt-v19 derives `crisis_blend_gain` to exactly 0.0 on tape
+    /// evidence (`programme/crisis-blend-derivation.md`: cross-sectional
+    /// correlation is a function of realised common volatility, `rho =
+    /// -0.366 + 0.277 log(sigma_ann%)`, R^2 0.69, and the VIX level adds
+    /// nothing once volatility is in). With no lift there is no step, in
+    /// the read-back or in the realised variance the read-back is compared
+    /// against. So the old assertion required the shipped preset to produce
+    /// something the shipped preset was changed to stop producing.
+    ///
+    /// # What it asserts now
+    ///
+    /// Both halves of one law, on the same pins and the same roster, so the
+    /// gain is the only thing that differs between them.
+    ///
+    /// At pt-v19's own gain of 0.0 the read-back is BIT-INVARIANT to the
+    /// crisis spike, even at pins where `crisis_spike_for` returns a
+    /// saturated 0.98. The ratio against an amplifier-off baseline reads
+    /// 1.0360, 1.0426, 1.0447 and 1.0486 across the ladder, so it rises by
+    /// under half a per cent between pins and does nothing at all at the
+    /// threshold. That is the derivation's claim in the code: no lift keyed
+    /// on the VIX level.
+    ///
+    /// At pt-v18's gain on the same base, the step across the threshold is
+    /// 2.94x, inside the 2 to 4 band the old test asserted and beside the
+    /// 2.78 the loop-gain run recorded. pt-v18 itself reads 3.24. So the
+    /// read-back still prices the blend for every preset that carries one,
+    /// which is pt-v11 through pt-v18, and what pt-v19 changed is the dial.
     #[test]
-    fn the_read_back_carries_the_step_the_tape_measured() {
+    fn the_step_across_the_threshold_is_the_blend_gains_and_nothing_else() {
         let k = intraday_variance_factor();
         let names = roster();
-        let p = crate::params::PT_V19;
-        let base_v = p.market_factor_sigma * p.market_factor_sigma;
         // `fvar/base` and the pin VIX, from the loop-gain table.
         let pins = [
             (1.00, 0.931, 19.53),
@@ -2381,36 +2405,79 @@ mod tests {
             (1.75, 2.246, 34.17),
             (2.50, 4.162, 48.82),
         ];
-        let mut read = Vec::new();
-        for &(_x, fvar_ratio, vix) in pins.iter() {
-            let spike = crate::market::tick::crisis_spike_for(&p, vix, 0.0);
-            let terms = index_conditional_variance_terms(
-                &p, &names, 3, base_v * fvar_ratio, p.sector_factor_sigma, 1.0, spike, false, k);
-            // Against the SAME state with the regime terms silenced, which
-            // is what the old read-back returned there.
+
+        // One pin, read three ways: the regime terms, the same terms with
+        // the spike forced to zero, and the amplifier-off baseline the old
+        // read-back returned.
+        let read = |p: &ModelParams, fvar_ratio: f64, vix: f64| {
+            let base_v = p.market_factor_sigma * p.market_factor_sigma;
+            let v_f = base_v * fvar_ratio;
+            let spike = crate::market::tick::crisis_spike_for(p, vix, 0.0);
+            let at = |q: &ModelParams, s: f64| {
+                index_conditional_variance_terms(
+                    q, &names, 3, v_f, p.sector_factor_sigma, 1.0, s, false, k).total()
+            };
             let mut calm = p.clone();
             calm.crash_amplifier_slope = 0.0;
-            let was = index_conditional_variance_terms(
-                &calm, &names, 3, base_v * fvar_ratio, p.sector_factor_sigma, 1.0, 0.0, false, k);
-            read.push((vix, spike, terms.total() / was.total()));
+            (spike, at(p, spike), at(p, 0.0), at(&calm, 0.0))
+        };
+
+        // ── pt-v19, gain 0.0: the spike is live and the read-back is deaf
+        //    to it ──────────────────────────────────────────────────────
+        let shipped = crate::params::PT_V19;
+        assert_eq!(shipped.crisis_blend_gain, 0.0,
+                   "this half is about the derived zero; the preset now carries {}",
+                   shipped.crisis_blend_gain);
+        let mut ratios = Vec::new();
+        for &(x, fvar_ratio, vix) in pins.iter() {
+            let (spike, regime, no_spike, calm) = read(&shipped, fvar_ratio, vix);
+            // The precondition that stops this being vacuous: above the
+            // threshold the spike really is computed and really saturates.
+            if vix > shipped.crisis_vix_threshold {
+                assert!(spike >= shipped.crisis_blend_cap,
+                        "x {x} at VIX {vix} must saturate the spike; it read {spike}");
+            } else {
+                assert_eq!(spike, 0.0, "x {x} at VIX {vix} is not a crisis");
+            }
+            assert_eq!(regime.to_bits(), no_spike.to_bits(),
+                       "x {x}: a spike of {spike} moved the read-back at gain \
+                        0.0, {regime:e} against {no_spike:e}");
+            ratios.push(regime / calm);
         }
-        // Below the threshold the blend is off and only the amplifier acts,
-        // so the ratio is modest and rising.
-        assert_eq!(read[0].1, 0.0, "the anchor is not a crisis");
-        assert_eq!(read[1].1, 0.0, "x 1.5 is under the threshold at VIX 29.29");
-        assert!(read[0].2 > 1.0 && read[0].2 < 1.10,
-                "the calm range must not be inflated: {:.3}", read[0].2);
-        assert!(read[1].2 > read[0].2, "the amplifier must rise with the regime");
-        assert!(read[1].2 < 1.25, "still the calm range: {:.3}", read[1].2);
-        // Across the threshold the blend saturates almost at once -- 34.17
-        // is 3.3 points above 30.88 on a ramp of 1.4 against a cap of 0.98 --
-        // so the step is a step and not a slope.
-        assert!(read[2].1 >= p.crisis_blend_cap, "the spike saturates by x 1.75");
-        let step = read[2].2 / read[1].2;
+        // The amplifier alone, and `crash_amplifier_conditional_sigma` 1.0
+        // makes its second moment flat in the regime, so the ladder barely
+        // moves and the threshold is not a feature of it.
+        for (i, &r) in ratios.iter().enumerate() {
+            assert!(r > 1.0 && r < 1.06,
+                    "pin {i} reads {r:.4}, outside the amplifier's own band");
+        }
+        for i in 1..ratios.len() {
+            let between = ratios[i] / ratios[i - 1];
+            assert!(between < 1.02,
+                    "pin {i} steps {between:.4}x over pin {}, which is a step \
+                     the shipped preset has no term for", i - 1);
+        }
+
+        // ── The same call at pt-v18's gain: the blend is priced ─────────
+        let mut geared = shipped;
+        geared.crisis_blend_gain = PT_V18.crisis_blend_gain;
+        assert!(geared.crisis_blend_gain > 0.0, "pt-v18 ships a blend");
+        let mut geared_ratios = Vec::new();
+        for &(_x, fvar_ratio, vix) in pins.iter() {
+            let (_spike, regime, _no_spike, calm) = read(&geared, fvar_ratio, vix);
+            geared_ratios.push(regime / calm);
+        }
+        // Below the threshold the two presets agree to the bit, because the
+        // gain multiplies a spike of zero.
+        assert_eq!(geared_ratios[0].to_bits(), ratios[0].to_bits());
+        assert_eq!(geared_ratios[1].to_bits(), ratios[1].to_bits());
+        let step = geared_ratios[2] / geared_ratios[1];
         assert!(step > 2.0 && step < 4.0,
-                "the step across the threshold reads {step:.2}x, where the tape's \
-                 realised variance steps 2.78x (3.992 over 1.438)");
-        assert!(read[3].2 > read[2].2, "and it keeps rising above the threshold");
+                "the step across the threshold reads {step:.2}x, where the \
+                 loop-gain run's realised variance stepped 2.78x \
+                 (3.992 over 1.438)");
+        assert!(geared_ratios[3] > geared_ratios[2],
+                "and it keeps rising above the threshold");
     }
 
     /// The identity converts a variance to VIX points through

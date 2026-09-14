@@ -185,8 +185,14 @@ def test_facts_panel_statistics_is_what_measure_reports():
     stats = facts.panel_statistics(engine.bars(grain="day"), universe)
     fear = facts.fear_statistics(engine.bars(grain="day"),
                                  engine.macro_table(), universe)
+    # `burn` is part of the identity for the reason the two fingerprints are:
+    # a panel read over a settled window and one read from a cold open are
+    # different measurements. `measure` always emits it, 0 where nothing was
+    # discarded, so the hand-built identity carries it at the same value the
+    # call above ran at rather than leaving the reader to infer a default.
     identity = {"seed": 3, "universe_fingerprint": facts.fingerprint_of(universe),
-                "model_fingerprint": engine.model_fingerprint, "days": 40}
+                "model_fingerprint": engine.model_fingerprint, "days": 40,
+                "burn": 0}
     persistence = facts.persistence_statistics(engine.macro_table(), days=40)
     assert set(stats) <= set(measured)
     assert all(measured[k] == v for k, v in stats.items())
@@ -405,23 +411,58 @@ def test_the_day_effect_grows_with_the_tick_count():
     # end to end, against 0.0375, 0.1525, 0.2925, 0.4950 on pt-v18, a factor
     # of 13. MEASURED 2026-09-13.
     #
-    # It SATURATES, and the strict sort this asserted could not say so. The
-    # rise is steep to 80 ticks and flat-to-falling after: 0.4850 at 80,
-    # 0.4725 at 160, 0.4400 at 320. That is the day's factor being spread
-    # over more and smaller ticks against a price path that clamps, and it
-    # arrives earlier on pt-v19 because its market is more volatile. A sort
-    # over four points reports that as a failure; it is a property, and the
-    # point at which it arrives is worth pinning rather than tripping over.
-    assert effects[:3] == sorted(effects[:3]), effects
+    # THE SATURATION CLAIM IS WITHDRAWN, 2026-09-14, and the strict sort it
+    # displaced is back. The claim was that the rise is steep to 80 ticks
+    # and flat-to-falling after -- 0.4850 at 80, 0.4725 at 160, 0.4400 at
+    # 320 -- pinned as `0.8 * effects[2] < effects[3] <= 1.1 * effects[2]`.
+    # It was measured on ONE seed, and the ratio it bands is a one-seed
+    # quantity that no band of width 0.3 can hold.
+    #
+    # MEASURED on the market-side warm-up tree, `Universe.random(4,
+    # seed=99)`, `jump_intensity_market` 0, delta 1.0, one day, engine
+    # seeds 42 to 51, the same ladder of 20, 40, 80 and 160 ticks:
+    #
+    #   42  0.0825 0.1200 0.3600 0.4550   e3/e2 1.264
+    #   43  0.1000 0.1750 0.3525 0.6450   e3/e2 1.830
+    #   44  0.0700 0.1600 0.2650 0.4700   e3/e2 1.774
+    #   45  0.0475 0.2975 0.3475 0.4750   e3/e2 1.367
+    #   46  0.0750 0.1075 0.3825 0.4425   e3/e2 1.157
+    #   47  0.1075 0.1975 0.4500 0.6450   e3/e2 1.433
+    #   48  0.1500 0.1950 0.4875 0.7150   e3/e2 1.467
+    #   49  0.0850 0.2800 0.3800 0.8275   e3/e2 2.178
+    #   50  0.0800 0.3075 0.3375 0.7850   e3/e2 2.326
+    #   51  0.1075 0.1250 0.3400 0.4050   e3/e2 1.191
+    #
+    # The ratio runs 1.157 to 2.326, median 1.450, sd 0.411. ZERO of ten
+    # land inside the 0.8-to-1.1 the assertion asked for, so the band was
+    # not a near miss on this tree; the quantity it describes is somewhere
+    # else entirely. The effect grows at the last step on every one of the
+    # ten, and it grows FASTER than the sqrt(2) the fixed `1 / sqrt(390)`
+    # tick scaling predicts on six of them. Whatever clamp made the old
+    # reading flatten by 160 ticks does not bind there on this tree. That
+    # is a change in the model's behaviour and it is filed as one; it is
+    # not repaired here, because repairing it would move the draw
+    # schedule.
+    #
+    # So the assertion goes back to the strict sort over all FOUR points,
+    # which is what this test carried before the saturation comment cut it
+    # to three, and which ten of ten seeds support. A model that saturates
+    # again inside the ladder will fail this and say so.
+    assert effects == sorted(effects), effects
     # Four, which is the bound this test has always carried, over the range
     # that rises. pt-v19 gives 27.7 and pt-v18 7.8, so the bound separates a
     # model where the day's length matters from one where it does not
     # without pinning either preset's slope.
+    #
+    # IT IS THIN AND THE SAME TEN SEEDS SAY SO, recorded here rather than
+    # moved, because it passes today and lowering a passing bar is the
+    # thing this file is not for. `effects[2] / effects[0]` reads 4.36 on
+    # seed 42 and runs 3.16 to 7.32 over the ten, with 43, 44 and 51 below
+    # four. The sqrt(T) premise the docstring states predicts 2.0 for a
+    # four-fold day, so four is a bar somebody chose and not one anybody
+    # derived. Whoever moves this next should put it on the ten seeds the
+    # way `test_the_leverage_effect_is_real_since_the_gjr_term` was.
     assert effects[2] > 4 * effects[0], effects
-    # And the saturation itself: past the rise the effect does not KEEP
-    # growing, and it does not collapse either. A model where doubling the
-    # day's length doubled the effect again would be one without a clamp.
-    assert 0.8 * effects[2] < effects[3] <= 1.1 * effects[2], effects
 
 
 # -- the counted caveats can be restated over merged rows ---------------------

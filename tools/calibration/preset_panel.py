@@ -44,9 +44,20 @@ differ in which seeds they draw, so a mechanism verdict that holds on one and
 not the other is trap 15 in the second count.
   crisis_lever  annualised volatility under a held VIX 65 divided by the same
                 under a held VIX 5, on the CERTIFIED roster over 252 days at
-                thirty seeds. This is deliberately NOT scenario_response's
-                held-VIX half, which pins 120 days on a 20-name roster and
-                answers a different question with a similar-looking number.
+                thirty seeds, AFTER a 252-session burn at the pin. This is
+                deliberately NOT scenario_response's held-VIX half, which
+                pins 120 days on a 20-name roster and answers a different
+                question with a similar-looking number.
+
+                The burn arrived on 2026-09-14 and it is the eighth
+                measurement defect of `programme/results/measurement-integrity.md`
+                closed. Every `crisis_lever` block committed before that
+                date was read from a cold open, is low by four to eight per
+                cent, and is low by a DIFFERENT amount on each preset --
+                see `LEVER_BURN`. Those blocks are not corrected in place;
+                they will move the next time a preset is re-recorded, and
+                the artefact now carries `crisis_lever_burn` so the two
+                generations can be told apart.
 
 Usage:
     python tools/calibration/preset_panel.py --workers 190 \\
@@ -58,6 +69,7 @@ from __future__ import annotations
 import argparse
 import json
 import multiprocessing as mp
+import pathlib
 import statistics
 import sys
 import time
@@ -121,6 +133,33 @@ TAIL_NOT_MEASURED = (
 LEVER_LO, LEVER_HI = 5.0, 65.0
 REAL_LEVER = 6.16
 
+#: Sessions traded and discarded before the lever's window, and this is the
+#: EIGHTH measurement defect of `measurement-integrity.md`, fixed.
+#:
+#: `Scenario().hold(vix=)` pins the VIX from day zero. The factor variance
+#: does not start there: it opens at the preset's unconditional level and
+#: relaxes toward the pinned target at the preset's own
+#: `alpha + beta + gamma/2`. The opening level is ABOVE the target at VIX 5
+#: and BELOW it at VIX 65, so the two transients run in OPPOSITE directions
+#: and their ratio -- the lever -- is biased low; and because the relaxation
+#: rate is a coefficient, the bias differs BETWEEN PRESETS, which is the
+#: part that makes a lever table unreadable rather than merely low.
+#:
+#: MEASURED on the box `metalever2`, thirty seeds, one 504-day pinned run
+#: per seed and pin, read on year one and year two: the low pin settles DOWN
+#: (pt-v18 -2.84 +/- 1.64 at VIX 5) and the high pin UP (+6.12 +/- 3.88 at
+#: VIX 65), and the lever moves 6.5258 -> 7.0581 on pt-v18 (+8.2 per cent)
+#: and 2.7981 -> 2.9157 on the then-pt-v19 (+4.2 per cent). The ORDERING
+#: survived, so nothing on the record flipped; the levels were all low.
+#:
+#: 252 and not some rounder number because 252 is what was measured: year
+#: two of that run is the settled reading, and `facts.measure(days=252,
+#: burn=252)` reproduces it to the bit, the burn being the same traded
+#: sessions with the recorder switched off. The real figure the lever is
+#: read against (6.16, `real_vix_lever.py`) is a regime-conditional STEADY
+#: STATE, so a settled window is also the only like-for-like comparison.
+LEVER_BURN = 252
+
 
 def _commit() -> str | None:
     """The checkout this measurement ran in, or None outside a checkout."""
@@ -171,18 +210,43 @@ def _job(spec):
     elif key in ("lever_lo", "lever_hi"):
         vix = LEVER_LO if key == "lever_lo" else LEVER_HI
         p = facts.measure(seed=seed, universe=_roster(ROSTER_N, ROSTER_SEED),
-                          days=252, model=preset,
+                          days=252, burn=LEVER_BURN, model=preset,
                           scenario=Scenario().hold(vix=vix))
     else:
         raise ValueError(key)
-    return key, preset, seed, {k: p[k] for k in PANEL}
+    # `PANEL` is the certified row list; `days` and `burn` are the window
+    # the rows were read over, and they travel with every panel because a
+    # row without its window is not comparable with the same row measured
+    # over a different one. See `crisis_lever_burn` below.
+    return key, preset, seed, {k: p[k] for k in PANEL} | {
+        "days": p["days"], "burn": p["burn"]}
 
 
 def _median_panel(rows: list[dict]) -> dict:
     # Each row by its own estimator: medians for the shape rows and a mean
     # for the level row, which is what the band's width was set against.
+    # Only the certified rows, so the shape of a `panel_252` block in a
+    # committed record is exactly the shape `record.py` has always read.
+    # The WINDOW is reported separately by `_window_of`.
     return {k: facts.aggregate_value(k, [r[k] for r in rows if r.get(k) is not None])
             for k in PANEL if any(r.get(k) is not None for r in rows)}
+
+
+def _window_of(rows: list[dict]) -> tuple[int, int]:
+    """The `(days, burn)` every seed of a cell ran, or a refusal.
+
+    Carried, never aggregated. An aggregate over runs of two different
+    lengths -- or over a settled and a cold-open reading -- is a number with
+    no protocol, and the eighth measurement defect is what happens when a
+    figure like that is shipped without its window written down beside it.
+    """
+    windows = {(int(r["days"]), int(r["burn"])) for r in rows}
+    if len(windows) != 1:
+        raise SystemExit(
+            f"REFUSED: these {len(rows)} per-seed panels carry "
+            f"{sorted(windows)} for (days, burn). A median across windows "
+            f"is not a measurement of any of them")
+    return windows.pop()
 
 
 def _count_in_band(panel: dict, bands: dict) -> tuple[int, list[str]]:
@@ -195,6 +259,151 @@ def _count_in_band(panel: dict, bands: dict) -> tuple[int, list[str]]:
     return len(PANEL) - len(misses), misses
 
 
+#: The band tables this tool will grade against, by basis name. The seam is
+#: FOUR call sites and this dict is all four of them: `--band-basis` picks a
+#: row and every `_count_in_band` reads it.
+#:
+#: The key is the basis's own short name and the value is the pair of table
+#: symbols, which `facts.band_basis` resolves to an era, a window count and a
+#: rule. Nothing here is a band; a band is a thing with a provenance and the
+#: point of this dict is that the provenance travels with it.
+BAND_BASES = {
+    "shipped": ("facts.REAL_MARKETS", "facts.REAL_MARKETS_504"),
+    "universal": ("facts.REAL_MARKETS_UNIVERSAL",
+                  "facts.REAL_MARKETS_UNIVERSAL_504"),
+}
+
+
+def _tables(basis: str) -> tuple[dict, dict, dict]:
+    """The (252, 504, method-stamp) triple for a band basis.
+
+    The stamp is the BASIS and not the symbol. A record that says
+    `"bands_252": "facts.REAL_MARKETS"` records a name: swap that dict's
+    contents and the record still asserts the same provenance while every
+    count under it changes. That is how today's defect stayed invisible, and
+    it is why the era, the window count and the rule go in beside the name.
+    """
+    if basis not in BAND_BASES:
+        raise SystemExit(
+            f"REFUSED: {basis!r} is not a band basis this tool knows; the "
+            f"bases are {sorted(BAND_BASES)}")
+    name252, name504 = BAND_BASES[basis]
+    t252 = getattr(facts, name252.split(".", 1)[1])
+    t504 = getattr(facts, name504.split(".", 1)[1])
+    stamp = {}
+    for field, name in (("bands_252", name252), ("bands_504", name504)):
+        b = facts.band_basis(name)
+        stamp[field] = name
+        stamp[field + "_basis"] = {
+            "era": b["era"], "roster": b["roster"],
+            "n_windows": b["n_windows"], "rule": b["rule"],
+            "tolerance": b["tolerance"], "rows": b["rows"],
+        }
+    stamp["band_basis"] = basis
+    return t252, t504, stamp
+
+
+def rescore(artefact: str, basis: str, out: str, records_dir: str) -> int:
+    """Re-score a retained artefact against a different band basis.
+
+    Desk cost. It re-reads the panels the measuring run already retained and
+    re-runs only the band-derived half -- the four `_count_in_band` calls and
+    the basis stamp. It re-measures nothing, so no draw schedule is touched
+    and the known-answer digest cannot move.
+
+    IT REFUSES A PRESET WHOSE ARTEFACT IS NOT THE ONE ITS RECORD WAS BUILT
+    FROM, and that refusal is the point rather than an inconvenience. Re-
+    scoring `pt-v19` out of a panel measured on a different `pt-v19` would
+    write a record whose counts and whose panel came from two vectors, which
+    is defect-26 with the arrow reversed. The check is exact: the artefact's
+    panel must reproduce the committed record's own `panel_252` and
+    `panel_504` blocks to the bit.
+    """
+    doc = json.loads(pathlib.Path(artefact).read_text(encoding="utf-8"))
+    t252, t504, stamp = _tables(basis)
+    ship252, ship504, _ = _tables("shipped")
+    refused, done = [], []
+    for name in sorted(doc["presets"]):
+        cell = doc["presets"][name]
+        rec_path = pathlib.Path(records_dir) / f"{name}.json"
+        if not rec_path.exists():
+            refused.append(f"{name}: no committed record at {rec_path}")
+            continue
+        rec = json.loads(rec_path.read_text(encoding="utf-8"))
+        drift = [k for k in PANEL
+                 if cell["panel_252"][k] != rec["panel_252"][k]
+                 or cell["panel_504"][k] != rec["panel_504"][k]]
+        if drift:
+            # The artefact is a DIFFERENT measurement of this preset's name.
+            # Its panels are refused; the record's own retained panel blocks
+            # are the only copy of the measurement the record publishes, so
+            # the 252 and 504 cells are re-scored off those and the cells
+            # that need per-seed rows are marked unrescorable rather than
+            # filled from the wrong run.
+            refused.append(
+                f"{name}: this artefact's panel is not the one the committed "
+                f"record was built from -- {len(drift)} of {len(PANEL)} rows "
+                f"differ, worst "
+                + max(((abs(cell['panel_252'][k] - rec['panel_252'][k]), k)
+                       for k in drift))[1]
+                + ". The record's own panel blocks were used for 252 and 504; "
+                  "the held-out cells have no retained per-seed rows on this "
+                  "preset's own measurement and are left unscored")
+            cell = dict(cell)
+            cell["panel_252"] = dict(rec["panel_252"])
+            cell["panel_504"] = dict(rec["panel_504"])
+            cell["per_seed_252"] = None
+            cell["per_seed_heldout_seeds"] = None
+            cell["panel_source"] = (
+                f"the committed record {rec_path.name}, not {artefact}: no "
+                f"retained preset-panel artefact carries the measurement this "
+                f"record publishes")
+            doc["presets"][name] = cell
+        hos = (_median_panel(cell["per_seed_heldout_seeds"])
+               if cell.get("per_seed_heldout_seeds") else None)
+        hou = cell.get("panel_heldout_universe")
+        cell["in_band_252"], cell["misses_252"] = _count_in_band(
+            cell["panel_252"], t252)
+        cell["in_band_504"], cell["misses_504"] = _count_in_band(
+            cell["panel_504"], t504)
+        if hos is None:
+            cell["in_band_heldout_seeds"] = None
+            cell["misses_heldout_seeds"] = None
+        else:
+            cell["in_band_heldout_seeds"], cell["misses_heldout_seeds"] = (
+                _count_in_band(hos, t252))
+        if hou is None:
+            # The measuring run kept the count and threw the panel away, so
+            # this cell cannot be re-scored and must not be carried forward
+            # under a basis it was not read at. Stated, not guessed.
+            cell["in_band_heldout_universe"] = None
+            cell["misses_heldout_universe"] = None
+            cell["heldout_universe_not_rescorable"] = (
+                "the retained artefact carries this cell's COUNT and not its "
+                "panel, so a re-score has nothing to read. What would fix it: "
+                "retain panel_heldout_universe the way panel_252 is retained")
+        else:
+            cell["in_band_heldout_universe"], cell["misses_heldout_universe"] \
+                = _count_in_band(hou, t252)
+        done.append(name)
+    doc["method"] = dict(doc.get("method", {})) | stamp
+    doc["rescored_from"] = {
+        "artefact": str(artefact),
+        "was": {k: v for k, v in _tables("shipped")[2].items()},
+        "refused": refused,
+        "note": "band-derived fields only. The panels, the per-seed rows, "
+                "the mechanism blocks and the lever are the measuring run's "
+                "and are unchanged; nothing here re-measures anything",
+    }
+    pathlib.Path(out).write_text(json.dumps(doc, indent=1), encoding="utf-8")
+    print(f"re-scored {len(done)} of {len(doc['presets'])} presets against "
+          f"{basis}: {stamp['bands_252']} / {stamp['bands_504']}")
+    for r in refused:
+        print(f"  REFUSED {r}")
+    print(f"wrote {out}")
+    return 1 if refused else 0
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=6)
@@ -204,7 +413,27 @@ def main() -> None:
                     help="cap the seed count. FOR SMOKE TESTS ONLY: every "
                          "published count here is a thirty-seed median, and "
                          "a count without its seed count is trap 15.")
+    ap.add_argument("--band-basis", default="shipped", choices=sorted(BAND_BASES),
+                    help="which band basis to grade against. The default is "
+                         "the shipped 2015-2025 decade band; `universal` is "
+                         "the 1987-2025 whole-tape band of "
+                         "certification-bands.md section 14")
+    ap.add_argument("--rescore", metavar="ARTEFACT",
+                    help="re-score a retained preset-panel artefact against "
+                         "--band-basis and write it to --out. Desk cost: it "
+                         "re-reads panels and re-runs only the band half, so "
+                         "no draw schedule is touched")
+    ap.add_argument("--records", default=str(
+        pathlib.Path(__file__).resolve().parents[2]
+        / "python" / "tradefloor" / "presets"),
+        help="where the committed records live, which --rescore checks its "
+             "artefact against before re-scoring a preset")
     args = ap.parse_args()
+
+    if args.rescore:
+        sys.exit(rescore(args.rescore, args.band_basis, args.out,
+                         args.records))
+    t252, t504, band_stamp = _tables(args.band_basis)
 
     names = args.only.split(",") if args.only else presets()
     train = TRAIN_SEEDS[:args.seeds] if args.seeds else TRAIN_SEEDS
@@ -249,6 +478,11 @@ def main() -> None:
         phos = _median_panel(collected[("heldout_seeds", preset)])
         lo = _median_panel(collected[("lever_lo", preset)])
         hi = _median_panel(collected[("lever_hi", preset)])
+        lever_days, lever_burn = _window_of(collected[("lever_lo", preset)])
+        if (lever_days, lever_burn) != _window_of(collected[("lever_hi", preset)]):
+            raise SystemExit(
+                "REFUSED: the lever's two pins ran different windows, so "
+                "their ratio is not a lever")
 
         # The mechanism certificate, from the per-seed panels rather than
         # from their median. Both 252-day cells, because the count that
@@ -266,10 +500,10 @@ def main() -> None:
         certhos = envelope.certify(collected[("heldout_seeds", preset)],
                                    stationary_opening=stationary)
 
-        n252, miss252 = _count_in_band(p252, facts.REAL_MARKETS)
-        n504, miss504 = _count_in_band(p504, facts.REAL_MARKETS_504)
-        nhou, misshou = _count_in_band(phou, facts.REAL_MARKETS)
-        nhos, misshos = _count_in_band(phos, facts.REAL_MARKETS)
+        n252, miss252 = _count_in_band(p252, t252)
+        n504, miss504 = _count_in_band(p504, t504)
+        nhou, misshou = _count_in_band(phou, t252)
+        nhos, misshos = _count_in_band(phos, t252)
 
         results[preset] = {
             "panel_252": p252,
@@ -290,6 +524,16 @@ def main() -> None:
             "vol_at_vix_5": lo["annualised_vol_pct"],
             "vol_at_vix_65": hi["annualised_vol_pct"],
             "crisis_lever": hi["annualised_vol_pct"] / lo["annualised_vol_pct"],
+            # The lever's WINDOW, beside the lever. Read from the panels
+            # rather than from `LEVER_BURN`, so the number in the artefact
+            # is the one the runs actually used and not the one the module
+            # currently declares. A lever read from a cold open and a lever
+            # read from a settled one are different measurements of the
+            # same name; every `crisis_lever` block written before
+            # 2026-09-14 is the first kind and says nothing, which is the
+            # eighth measurement defect.
+            "crisis_lever_window_days": lever_days,
+            "crisis_lever_burn": lever_burn,
         }
         r = results[preset]
         mc = r["mechanism_252"]["counts"]
@@ -325,13 +569,20 @@ def main() -> None:
             "heldout_universe": f"Universe.random({HELDOUT_N}, seed={HELDOUT_SEED})",
             "train_seeds": f"{train[0]}-{train[-1]} ({len(train)})",
             "heldout_seeds": f"{heldout[0]}-{heldout[-1]} ({len(heldout)})",
-            "bands_252": "facts.REAL_MARKETS",
-            "bands_504": "facts.REAL_MARKETS_504",
+            # The basis, not only the name. See `_tables`.
+            **band_stamp,
             "index_tail_not_measured": TAIL_NOT_MEASURED,
             "crisis_lever": (
                 f"annualised vol at held VIX {LEVER_HI:.0f} over held VIX "
-                f"{LEVER_LO:.0f}, certified roster, 252 days, thirty seeds"
+                f"{LEVER_LO:.0f}, certified roster, 252 days, thirty seeds, "
+                f"after {LEVER_BURN} discarded sessions at the pin. The burn "
+                f"is the eighth measurement defect of measurement-integrity.md "
+                f"repaired: without it each pin's window averages the factor "
+                f"variance's walk toward the pinned target, the two pins walk "
+                f"in opposite directions, and the ratio reads 4 to 8 per cent "
+                f"low by an amount that is a property of the preset"
             ),
+            "crisis_lever_burn": LEVER_BURN,
             "real_crisis_lever": REAL_LEVER,
             "mechanism": (
                 "facts.mechanism_verdict per row on the per-seed panels of "

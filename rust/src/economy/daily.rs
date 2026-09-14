@@ -2023,7 +2023,42 @@ mod fear_response_shape {
     /// bucket, 22 sessions of ^GSPC 1990-2025. Measured rather than
     /// chosen, and past it the property is not asserted, because past it
     /// there is no real number to compare with.
+    ///
+    /// That bucket is the one `wsa17-result.md` records as MISMATCHED: on
+    /// a pt-v16 arm the model put 336 of 7,560 sessions past -5 per cent
+    /// against the tape's 22 of 8,959, at an index sd of 3.135 against
+    /// about 1.1. The mismatch makes the bucket useless for comparing a
+    /// conditional MEDIAN across the two. It does not touch the use here,
+    /// which asks only how deep the tape grades at all: what is wanted is
+    /// the far end of a domain, not a statistic conditional on landing in
+    /// it.
     const GRADED_ABS_R: f64 = 6.390;
+
+    /// The shallow end of the same table, the median of the tape's
+    /// `-1.0 to -0.5 per cent` bucket. The pair bounds the range over
+    /// which the response's shape is asserted.
+    const SHALLOW_ABS_R: f64 = 0.710;
+
+    /// The floor `update_economy_daily` clamps the VIX state to, so no
+    /// session after the first is driven from a level under it. Pinned
+    /// against the update itself in
+    /// [`the_default_cap_is_the_clamps_own_image`] rather than copied off
+    /// the line, because the cap's whole derivation rests on it.
+    const VIX_STATE_FLOOR: f64 = 10.0;
+
+    /// The index sigmas the zero-mean correction is asserted at, in per
+    /// cent a session. 0.6 is a calm year, 1.0 is about the tape's
+    /// unconditional level and 2.5 is a crisis. A correction computed with
+    /// the wrong moment order is right at one sigma and wrong at the other
+    /// two, which is the failure `expected_return_spike` documents and no
+    /// single-sigma test can see.
+    const SIGMAS: &[f64] = &[0.6, 1.0, 2.5];
+
+    /// Levels to assert the response at, spanning the state floor to the
+    /// shipped ceiling. It has to be a spread rather than one value:
+    /// under pt-v19 the response is a function of two arguments, and a
+    /// test that fixes one of them cannot see half the law.
+    const LEVELS: &[f64] = &[10.0, 15.0, 21.0, 30.0, 60.0, 120.0, 181.3295];
 
     /// EVERY SHIPPED PRESET, and the return at which its fear response
     /// stops rising. There is no third column of presets that behave.
@@ -2033,7 +2068,7 @@ mod fear_response_shape {
     /// session is a tenth of a typical one. The last nine cap the spike at
     /// 45 against a gain of 17 and stop at 2.647 per cent. Both are deep
     /// inside the range the tape grades, and the tape's own response rises
-    /// across all of it — 1.000 points per per cent at -0.7, 1.538 at
+    /// across all of it, 1.000 points per per cent at -0.7 and 1.538 at
     /// -6.4.
     ///
     /// THE DEFECT WAS MOVED, NOT FIXED, and the tree says so in its own
@@ -2041,14 +2076,20 @@ mod fear_response_shape {
     /// [`crate::params::ModelParams::vix_return_clamp`] documents the first
     /// era exactly: "Shipped 0.03, so a -10% day and a -3% day produce
     /// identical fear. A crash is exactly where that assumption is worst."
-    /// pt-v9 raised that clamp from 0.03 to 15 -- and set a cap of 45
-    /// against a gain of 17, which reinstates identical fear from 2.647 per
-    /// cent up. The binding constraint moved by a factor of 88 and stopped
+    /// pt-v9 raised that clamp from 0.03 to 15 and set a cap of 45 against
+    /// a gain of 17, which reinstates identical fear from 2.647 per cent
+    /// up. The binding constraint moved by a factor of 88 and stopped
     /// being documented; it never went away.
     ///
     /// Each entry is a declared DEFECT, not a permission. The list is
     /// exhaustive in both directions and the binding dial is recomputed
     /// rather than trusted, so the table cannot rot either way.
+    ///
+    /// Every preset in this table is LEVEL-BLIND on the down side, which
+    /// is what lets one number describe it. That is asserted rather than
+    /// assumed: a preset whose response depends on the VIX it opened from
+    /// has a different flattening point at every level, so a row here
+    /// would be a reading of one level pretending to be a property.
     const FLATTENS_AT: &[(&str, f64, Binder)] = &[
         ("pt-v1", 0.030, Binder::Clamp),
         ("pt-v2", 0.030, Binder::Clamp),
@@ -2068,12 +2109,15 @@ mod fear_response_shape {
         ("pt-v16", 2.647, Binder::Cap),
         ("pt-v18", 2.647, Binder::Cap),
         // pt-v19 IS NOT HERE, and that is charter bar B4 met. Its cap is
-        // the image of its own clamp (`vix_return_gain * vix_return_clamp`,
-        // 255.0), so the cap cannot bind before the clamp does and the
-        // clamp sits at 15 per cent -- outside `GRADED_ABS_R` and outside
-        // anything this market produces. Its response rises across the
-        // whole graded range and `flattens_at` returns `None` for it, which
-        // is the `(None, None)` arm below.
+        // the image of its own clamp under the shipped law, evaluated at
+        // the VIX floor: `gain * clamp^p * floor^(-g)` =
+        // `8.83 * 15^1.4483 * 10^-0.4483` = 158.8524. That is the spike's
+        // supremum over the whole domain the update admits, so the cap
+        // cannot bind anywhere the clamp does not, and the clamp sits at
+        // 15 per cent, outside `GRADED_ABS_R` and outside anything this
+        // market produces. Its response rises across the whole graded
+        // range at every level, `flattens_at` returns `None` for it, and
+        // that is the `(None, None)` arm below.
         //
         // The dial was not raised on its own. `market::index_var` prices
         // the crash amplifier and the crisis blend, so the read-back
@@ -2093,30 +2137,83 @@ mod fear_response_shape {
         Cap,
     }
 
-    /// The target's response to a DOWN session of size `r`, in VIX points,
-    /// with the inflation and shock adders at zero so this is the fear
-    /// channel alone. Clamp, then spike, then cap — the order
-    /// `update_economy_daily` applies them in.
-    fn response(p: &ModelParams, r: f64) -> f64 {
-        let clamped = mathx::max(-p.vix_return_clamp, mathx::min(p.vix_return_clamp, -r));
-        let spike = return_spike_for(
+    /// THE LAW THIS MODULE ASSERTS, in one place.
+    ///
+    /// `update_economy_daily` builds the VIX target from a SIGNED session
+    /// return `r` and the VIX `v` the session opened from. With the
+    /// inflation and shock adders at zero, so this is the fear channel
+    /// alone:
+    ///
+    /// ```text
+    /// x      = clip(r, -clamp, +clamp)
+    /// S(x,v) =  gain    |x|^exponent     v^(-level_exponent)      x < 0
+    ///        = -gain_up  x ^exponent_up  v^(-level_exponent_up)   x > 0
+    ///        =  0                                                 x = 0
+    /// target = implied + min(cap, S) - E[S | v, sigma]
+    /// v'     = clip(v + mr (target - v), 10, ceiling)
+    /// ```
+    ///
+    /// At pt-v19's dials: gain 8.83, exponent 1.4483, level_exponent
+    /// 0.4483, gain_up 0.049, exponent_up 0.5433, level_exponent_up -1.0,
+    /// clamp 15, cap 158.8524, mr 0.27, decay ratio 1.0, ceiling 181.3295.
+    /// So the down side is CONVEX in the move and FALLS with the level,
+    /// and the up side is CONCAVE in the move and is PROPORTIONAL to the
+    /// level, `level_exponent_up` being exactly -1.
+    ///
+    /// The measurement is `programme/results/vix-dynamics.md` section 2,
+    /// on 8,959 sessions of ^GSPC: `g_dn` = +0.49 +/- 0.12 with
+    /// P(g > 0) = 1.000, `p_dn` = 1.44 +/- 0.08, `g_up` = -0.85 +/- 0.12,
+    /// `p_up` = 0.60 +/- 0.04. The level-blind power form is refused
+    /// against the free form at F = 118 on 2 dof and the linear
+    /// level-blind form, which is what this module used to assert, at
+    /// F = 105 on 4.
+    ///
+    /// The zero-mean subtraction is not part of the shape: it is a
+    /// constant of the day rather than a function of the return, so it
+    /// lives in [`zero_mean_correction`] and enters only where the STATE
+    /// is asserted.
+    fn fear_term(p: &ModelParams, r: f64, vix: f64) -> f64 {
+        let clamped = mathx::max(-p.vix_return_clamp, mathx::min(p.vix_return_clamp, r));
+        let spike = return_spike_at_level(
             clamped,
             p.vix_return_gain,
             p.vix_return_gain_up,
             p.vix_return_exponent,
+            p.vix_return_exponent_up,
+            p.vix_return_level_exponent,
+            p.vix_return_level_exponent_up,
+            vix,
         );
         mathx::min(p.vix_target_shock_cap, spike)
     }
 
-    /// The smallest `r` in the graded range at which the response stops
-    /// rising, or `None` if it never does. Swept at 0.0001 per cent, so a
-    /// binding point anywhere in the range is located to three decimals.
-    fn flattens_at(p: &ModelParams) -> Option<f64> {
+    /// [`fear_term`] on a DOWN session of size `r`, `r` a positive
+    /// magnitude. The sign flip is here and nowhere else.
+    fn response(p: &ModelParams, r: f64, vix: f64) -> f64 {
+        fear_term(p, -r, vix)
+    }
+
+    /// [`fear_term`] on an UP session of size `r`, `r` a positive
+    /// magnitude. Negative, because an up session gives VIX back.
+    fn give_back(p: &ModelParams, r: f64, vix: f64) -> f64 {
+        fear_term(p, r, vix)
+    }
+
+    /// The smallest down session in the graded range at which the response
+    /// stops rising, FROM A STATE AT `vix`, or `None` if it never does.
+    /// Swept at 0.0001 per cent, so a binding point anywhere in the range
+    /// is located to three decimals.
+    ///
+    /// The level argument is the whole point. Under pt-v19 the cap's
+    /// binding session is `(cap * v^g / gain)^(1/p)`, which moves from
+    /// 15.00 at the floor to 36.78 at the ceiling, so a sweep at one level
+    /// answers a question about that level and nothing else.
+    fn flattens_at(p: &ModelParams, vix: f64) -> Option<f64> {
         let steps = 63_900usize;
-        let mut prev = response(p, 0.0);
+        let mut prev = response(p, 0.0, vix);
         for i in 1..=steps {
             let r = GRADED_ABS_R * i as f64 / steps as f64;
-            let now = response(p, r);
+            let now = response(p, r, vix);
             if now <= prev {
                 return Some(r);
             }
@@ -2125,19 +2222,85 @@ mod fear_response_shape {
         None
     }
 
+    /// The down session at which `vix_target_shock_cap` starts truncating,
+    /// from the dials alone and with the level in it:
+    ///
+    /// ```text
+    /// cap = gain |r|^p v^(-g)   =>   r = (cap v^g / gain)^(1/p)
+    /// ```
+    ///
+    /// At `g` = 0 this is the `(cap / gain)^(1/p)` the level-blind module
+    /// computed, so the eighteen presets that predate the level classify
+    /// exactly as they did.
+    fn cap_binds_at(p: &ModelParams, vix: f64) -> f64 {
+        if p.vix_return_gain <= 0.0 {
+            return f64::INFINITY;
+        }
+        let level = mathx::pow(vix, p.vix_return_level_exponent);
+        mathx::pow(
+            p.vix_target_shock_cap * level / p.vix_return_gain,
+            1.0 / p.vix_return_exponent,
+        )
+    }
+
+    /// The level at which the cap comes closest to binding, which is where
+    /// the spike is largest. The down spike carries `v^(-g)`, so at a
+    /// positive `g` that is the state floor and at a negative one the
+    /// ceiling. A comparison made at any other level would pass while the
+    /// cap bound somewhere the model can actually reach.
+    fn most_binding_level(p: &ModelParams) -> f64 {
+        if p.vix_return_level_exponent >= 0.0 {
+            VIX_STATE_FLOOR
+        } else {
+            p.vix_ceiling
+        }
+    }
+
     /// Which dial binds first, from the dials alone. Derived here and
     /// compared against the table, so the table records a reading of the
     /// preset rather than a memory of one.
     fn binder_of(p: &ModelParams) -> Binder {
-        let from_cap = mathx::pow(
-            p.vix_target_shock_cap / p.vix_return_gain,
-            1.0 / p.vix_return_exponent,
-        );
-        if p.vix_return_clamp <= from_cap {
+        if p.vix_return_clamp <= cap_binds_at(p, most_binding_level(p)) {
             Binder::Clamp
         } else {
             Binder::Cap
         }
+    }
+
+    /// Whether the down response depends on the level the session opened
+    /// from. `false` for pt-v1 through pt-v18 and `true` for pt-v19.
+    fn down_is_level_dependent(p: &ModelParams) -> bool {
+        p.vix_return_level_exponent != 0.0
+    }
+
+    /// `E|r|^k` for `r ~ N(0, sigma^2)`, the Gaussian absolute moment of
+    /// order `k`. Spelled out from the identity rather than called out of
+    /// `expected_return_spike_at_level`, so that a dropped level factor or
+    /// a wrong moment order in the implementation is exactly what the
+    /// state tests below catch.
+    fn abs_moment(sigma: f64, k: f64) -> f64 {
+        mathx::pow(sigma, k) * mathx::pow(2.0, 0.5 * k) * mathx::tgamma(0.5 * (k + 1.0))
+            / mathx::sqrt(core::f64::consts::PI)
+    }
+
+    /// `E[S]`, the standing excursion an asymmetric gain injects and the
+    /// identity subtracts each day:
+    ///
+    /// ```text
+    /// E[S] = 0.5 gain    v^(-level_exponent)    E|r|^exponent
+    ///      - 0.5 gain_up v^(-level_exponent_up) E|r|^exponent_up
+    /// ```
+    ///
+    /// It is a function of the level as well as the sigma, and it changes
+    /// SIGN: at pt-v19's dials and sigma 1 it is +1.137 at a VIX of 10 and
+    /// -3.259 at the ceiling, because the up side's give-back is
+    /// proportional to the level while the down side's response falls with
+    /// it. The pair crosses near a VIX of 41.
+    fn zero_mean_correction(p: &ModelParams, sigma: f64, vix: f64) -> f64 {
+        let down = mathx::pow(vix, -p.vix_return_level_exponent);
+        let up = mathx::pow(vix, -p.vix_return_level_exponent_up);
+        0.5 * (p.vix_return_gain * down * abs_moment(sigma, p.vix_return_exponent)
+            - p.vix_return_gain_up * up * abs_moment(sigma, p.vix_return_exponent_up))
     }
 
     #[test]
@@ -2146,12 +2309,42 @@ mod fear_response_shape {
         for name in ModelParams::preset_names() {
             let p = ModelParams::preset(name).expect("a name from preset_names resolves");
             let declared = FLATTENS_AT.iter().find(|(n, _, _)| n == name);
-            match (flattens_at(&p), declared) {
-                (Some(at), Some((_, want, want_binder))) => {
+
+            // A declared row is one number, so it may only describe a
+            // preset whose response is the same at every level. Checked
+            // before the sweep, because if it fails the sweep's answer is
+            // not the kind of thing the row claims to be.
+            if declared.is_some() && down_is_level_dependent(&p) {
+                wrong.push(format!(
+                    "{name} has a row in FLATTENS_AT and a level-dependent response \
+                     (vix_return_level_exponent {}). Its flattening point is a different \
+                     number at every VIX, so one value cannot state it.",
+                    p.vix_return_level_exponent
+                ));
+            }
+
+            // The earliest flattening point over the levels the state can
+            // actually occupy. For a level-blind preset every level gives
+            // the same answer and the first one settles it.
+            let mut earliest: Option<(f64, f64)> = None;
+            for &vix in LEVELS {
+                if let Some(at) = flattens_at(&p, vix) {
+                    if earliest.map_or(true, |(best, _)| at < best) {
+                        earliest = Some((at, vix));
+                    }
+                }
+                if !down_is_level_dependent(&p) {
+                    break;
+                }
+            }
+
+            match (earliest, declared) {
+                (Some((at, vix)), Some((_, want, want_binder))) => {
                     if (at - want).abs() >= 0.002 {
                         wrong.push(format!(
-                            "{name} stops rising at {at:.3} per cent, not the declared \
-                             {want:.3}. Read why the number moved before editing the table."
+                            "{name} stops rising at {at:.3} per cent from a VIX of {vix}, not \
+                             the declared {want:.3}. Read why the number moved before editing \
+                             the table."
                         ));
                     }
                     let binder = binder_of(&p);
@@ -2162,19 +2355,19 @@ mod fear_response_shape {
                         ));
                     }
                 }
-                (Some(at), None) => wrong.push(format!(
-                    "{name} stops rising at {at:.3} per cent and declares nothing. A \
-                     response that goes flat inside the range the tape grades is a SHAPE \
-                     change, not a boundary condition, and it must be declared."
+                (Some((at, vix)), None) => wrong.push(format!(
+                    "{name} stops rising at {at:.3} per cent from a VIX of {vix} and declares \
+                     nothing. A response that goes flat inside the range the tape grades is a \
+                     SHAPE change, not a boundary condition, and it must be declared."
                 )),
                 (None, Some(_)) => wrong.push(format!(
                     "{name} is declared in FLATTENS_AT but its response rises the whole \
-                     way. Remove it: a table that grants permission nobody needs will one \
-                     day grant it to a preset that does."
+                     way at every level. Remove it: a table that grants permission nobody \
+                     needs will one day grant it to a preset that does."
                 )),
-                // Nothing to say: it rises across the graded range, which
-                // is what a fear channel is for. No shipped preset reaches
-                // this arm today, and that is the finding.
+                // Nothing to say: it rises across the graded range at every
+                // level the state can occupy, which is what a fear channel
+                // is for. pt-v19 is the only preset on this arm.
                 (None, None) => {}
             }
         }
@@ -2182,51 +2375,154 @@ mod fear_response_shape {
     }
 
     /// **THE SHIPPED DEFAULT'S FEAR RESPONSE RISES ACROSS THE GRADED
-    /// RANGE. That is charter bar B4, and it was unmet by every preset
-    /// this table has a row for.**
+    /// RANGE, FROM EVERY LEVEL THE STATE CAN OCCUPY.** That is charter bar
+    /// B4, and it was unmet by every preset this table has a row for.
     ///
-    /// This test used to assert the opposite. It was written to fail the
-    /// day somebody fixed the mechanism, and its message said what fixing
-    /// it would require: "this test and `FLATTENS_AT` both need updating,
-    /// and the down tail needs re-measuring, because the cap was holding
-    /// it." All three were done, and it is now the positive form of the
-    /// same guard — a preset that reintroduced the cap as a shape parameter
-    /// would fail it exactly as the old one failed a fix.
+    /// This test used to assert the opposite, then it asserted the
+    /// positive form at one level. Neither could see the shipped law: the
+    /// response has two arguments now, and the version that swept only
+    /// `|r|` would have passed unchanged if `vix_return_level_exponent`
+    /// were silently set back to zero.
     ///
-    /// Pinned on its own rather than left to the table above, for the
-    /// reason the old one was: what matters is the DEFAULT, and a property
-    /// of the default can be lost inside a list of eighteen.
+    /// WHAT THIS CATCHES. A cap or clamp moved back inside the graded
+    /// range at any level, which is the pt-v9 defect returning. A response
+    /// that rises but by a millionth of a point, which the sweep alone
+    /// would accept. And a level factor whose sign flipped, because a
+    /// response that ROSE with the level would put its flattening point at
+    /// the ceiling rather than the floor and `most_binding_level` would
+    /// follow it there.
     #[test]
     fn the_shipped_default_carries_its_fear_response_across_the_graded_range() {
         let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
             .expect("the default preset resolves");
-        assert!(
-            flattens_at(&p).is_none(),
-            "the default's fear response flattens at {:?} per cent, inside the \
-             {GRADED_ABS_R} per cent the tape grades. That is charter bar B4 lost \
-             again: read `ModelParams::vix_target_shock_cap` before adding a row to \
-             FLATTENS_AT.",
-            flattens_at(&p)
-        );
-        // RISING, not merely non-flattening. `flattens_at` sweeps at
-        // 0.0001 per cent and returns on the first non-increase, so the two
-        // are the same claim -- but the endpoints are what a reader wants,
-        // and a response that rose by a millionth of a point would satisfy
-        // the sweep and satisfy nobody.
-        let shallow = response(&p, 0.710);
-        let deep = response(&p, GRADED_ABS_R);
-        assert!(
-            deep > 8.0 * shallow,
-            "the response at -{GRADED_ABS_R} per cent is {deep:.2} against {shallow:.2} \
-             at -0.71, a ratio of {:.2}. The tape's own conditional medians rise from \
-             0.710 to 9.830 over that range, a ratio of 13.8.",
-            deep / shallow
-        );
+        for &vix in LEVELS {
+            assert!(
+                flattens_at(&p, vix).is_none(),
+                "from a VIX of {vix} the default's fear response flattens at {:?} per cent, \
+                 inside the {GRADED_ABS_R} per cent the tape grades. That is charter bar B4 \
+                 lost again: read `ModelParams::vix_target_shock_cap` before adding a row to \
+                 FLATTENS_AT.",
+                flattens_at(&p, vix)
+            );
+            // RISING, not merely non-flattening, and by the exponent the
+            // tape measured. `flattens_at` sweeps at 0.0001 per cent and
+            // returns on the first non-increase, so it would accept a
+            // response that rose by a millionth of a point.
+            let shallow = response(&p, SHALLOW_ABS_R, vix);
+            let deep = response(&p, GRADED_ABS_R, vix);
+            assert!(
+                deep > 8.0 * shallow,
+                "from a VIX of {vix} the response at -{GRADED_ABS_R} per cent is {deep:.2} \
+                 against {shallow:.2} at -{SHALLOW_ABS_R}, a ratio of {:.2}. The tape's own \
+                 conditional medians rise from 0.710 to 9.830 over that range, a ratio of 13.8.",
+                deep / shallow
+            );
+            // AND THE RATIO IS THE SAME AT EVERY LEVEL, which is the
+            // separability the law claims: `S = gain |r|^p v^(-g)` factors,
+            // so the level moves the SCALE of the response and never its
+            // shape. 24.101 here, `(6.390 / 0.710)^1.4483`.
+            let want = mathx::pow(GRADED_ABS_R / SHALLOW_ABS_R, p.vix_return_exponent);
+            assert!(
+                (deep / shallow - want).abs() < 1e-9,
+                "from a VIX of {vix} the deep-to-shallow ratio is {} where the exponent alone \
+                 says {want}. The response has stopped factoring into a level and a shape.",
+                deep / shallow
+            );
+        }
         // AND THE CAP IS WHERE THE DERIVATION PUTS IT, which is the other
         // half: a cap raised to a round number nobody can defend would pass
         // every assertion above.
         assert_eq!(binder_of(&p), Binder::Clamp, "the clamp is the binding dial now");
         the_default_cap_is_the_clamps_own_image();
+    }
+
+    /// **THE DOWN RESPONSE FALLS WITH THE LEVEL AND THE UP RESPONSE IS
+    /// PROPORTIONAL TO IT.** Nothing in this module asserted that until
+    /// 2026-09-14, which is how the level-blind spellings survived the
+    /// preset that replaced them.
+    ///
+    /// `programme/results/vix-dynamics.md` section 2.4 measures it without
+    /// a fit, as conditional medians of `dV` by level tertile within an
+    /// `|r|` bin: in the 2 to 3 per cent bin the tape's down response is
+    /// 3.32 at a VIX of 18.8, 2.52 at 24.5 and 2.17 at 32.1, and its up
+    /// response over the same bin is -1.76, -2.17 and -2.40. Down falls,
+    /// up grows, before any form is imposed. Section 2.2 puts
+    /// `g_dn` at +0.49 +/- 0.12 with P(g > 0) = 1.000 and `g_up` at
+    /// -0.85 +/- 0.12 against the shipped -1.
+    ///
+    /// WHAT THIS CATCHES. `vix_return_level_exponent` set back to 0, which
+    /// is the change that turns the shipped law back into the one this
+    /// module used to assert and which every other test here would accept.
+    /// A level factor applied to the wrong side. And the up side losing
+    /// its concavity, which is the half of the measurement that has no
+    /// error bar overlapping 1.0 at all.
+    #[test]
+    fn the_down_response_falls_with_the_level_and_the_up_response_rises_with_it() {
+        let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+            .expect("the default preset resolves");
+        assert!(
+            p.vix_return_level_exponent > 0.0,
+            "the down response no longer falls with the level. The tape puts g_dn at \
+             +0.49 +/- 0.12 with P(g > 0) = 1.000 and refuses the level-blind power form \
+             at F = 118 on 2 dof (vix-dynamics.md 2.1, 2.2)."
+        );
+        assert!(
+            p.vix_return_level_exponent_up < 0.0,
+            "the up response no longer rises with the level. The tape puts g_up at \
+             -0.85 +/- 0.12, P(g_up > 0) = 0.000."
+        );
+        assert!(
+            p.vix_return_exponent > 1.0 && p.vix_return_exponent_up < 1.0,
+            "the down side is convex in the move and the up side concave: p_dn \
+             1.44 +/- 0.08, p_up 0.60 +/- 0.04 with P(p_up > 1) = 0.000. Read \
+             {} and {}.",
+            p.vix_return_exponent,
+            p.vix_return_exponent_up
+        );
+        for &r in &[0.710, 2.5, GRADED_ABS_R] {
+            let base_dn = response(&p, r, LEVELS[0]);
+            let base_up = give_back(&p, r, LEVELS[0]);
+            assert!(base_dn > 0.0 && base_up < 0.0, "a down session raises the VIX and an up \
+                     session gives it back: {base_dn} and {base_up}");
+            for &vix in LEVELS {
+                let want_dn = mathx::pow(vix / LEVELS[0], -p.vix_return_level_exponent);
+                let got_dn = response(&p, r, vix) / base_dn;
+                assert!(
+                    (got_dn - want_dn).abs() < 1e-9,
+                    "the down response at -{r} scales by {got_dn} from a VIX of {} to {vix}, \
+                     where `v^(-g)` says {want_dn}",
+                    LEVELS[0]
+                );
+                let want_up = mathx::pow(vix / LEVELS[0], -p.vix_return_level_exponent_up);
+                let got_up = give_back(&p, r, vix) / base_up;
+                assert!(
+                    (got_up - want_up).abs() < 1e-9,
+                    "the up give-back at +{r} scales by {got_up} from a VIX of {} to {vix}, \
+                     where `v^(-g_up)` says {want_up}",
+                    LEVELS[0]
+                );
+            }
+        }
+        // The size of it, stated so a reader has the number: over the floor
+        // to the ceiling the same -6.39 per cent session buys 46.16 points
+        // of target at a VIX of 10 and 12.59 at 181.33, a factor of 0.273.
+        // A level-blind law would put both at 129.59 and this ratio at 1.
+        let at_floor = response(&p, GRADED_ABS_R, VIX_STATE_FLOOR);
+        let at_ceiling = response(&p, GRADED_ABS_R, p.vix_ceiling);
+        assert!(
+            (at_floor - 46.1602).abs() < 1e-3 && (at_ceiling - 12.5920).abs() < 1e-3,
+            "the graded-top response reads {at_floor} at the floor and {at_ceiling} at the \
+             ceiling, where the dials say 46.1602 and 12.5920"
+        );
+        // And the up side is CONCAVE in the move: doubling an up session
+        // buys 2^0.5433 = 1.457 times the give-back, not twice.
+        let one = give_back(&p, 1.0, 21.0).abs();
+        let two = give_back(&p, 2.0, 21.0).abs();
+        assert!(
+            (two / one - mathx::pow(2.0, p.vix_return_exponent_up)).abs() < 1e-9 && two < 2.0 * one,
+            "doubling an up session multiplied the give-back by {}, not by 2^p_up",
+            two / one
+        );
     }
 
     /// A draw-free RNG, as `vix_level_identity` above defines one: the
@@ -2245,41 +2541,80 @@ mod fear_response_shape {
 
     /// The VIX the default preset's update leaves after ONE session of
     /// `session_pct` (negative is a down day), from a state `vix` whose
-    /// read-back is `implied`. Every other term of the target is zero
-    /// here and the test says why for each: the gains are equal so the
-    /// zero-mean correction is zero, inflation sits at 2 so its adder is
-    /// zero, there is no active shock, `vix_jump_intensity` is zero, and
-    /// the RNG is silent.
-    fn vix_after_one_session(vix: f64, implied: f64, session_pct: f64) -> f64 {
+    /// read-back is `implied`, with the index's conditional sigma at
+    /// `sigma_pct`.
+    ///
+    /// Every other term of the target is zero here and the reason is
+    /// stated for each: inflation sits at 2 so its adder is zero, there is
+    /// no active shock, the jump dials are left at the inputs' zero so the
+    /// branch is not taken, and the RNG is silent so the innovation is
+    /// zero whatever scale it would have had.
+    ///
+    /// The gains are NOT equal any more, which is the change that made the
+    /// version of this helper standing here permanently red. Under pt-v19
+    /// `vix_return_gain` is 8.83 and `vix_return_gain_up` is 0.049, the
+    /// excursion they inject is standing and positive at low levels and
+    /// negative at high ones, and the identity cancels it with
+    /// `expected_return_spike_at_level` rather than by keeping the two
+    /// dials equal. So the term is carried in the arithmetic below instead
+    /// of being assumed away, and the level exponents are passed through,
+    /// which the old helper did not do: it left them at `Default::default`
+    /// and so drove a LEVEL-BLIND update while claiming to test the
+    /// shipped preset.
+    fn vix_after_one_session(vix: f64, implied: f64, sigma_pct: f64, session_pct: f64) -> f64 {
         use crate::economy::state::{create_initial_economy_state, InitialEconomyOptions};
         let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
             .expect("the default preset resolves");
         assert_eq!(p.vix_level_identity, 1.0, "the arithmetic below is the identity's");
-        assert_eq!(p.vix_return_gain, p.vix_return_gain_up,
-                   "unequal gains would put E[spike] back into the target");
-        assert_eq!(p.vix_jump_intensity, 0.0);
         let mut economy = create_initial_economy_state(&InitialEconomyOptions::default());
         economy.vix = vix;
         economy.inflation_rate = 2.0;
         let inputs = DailyInputs {
             vix_level_identity: p.vix_level_identity,
             vix_implied_from_market: implied,
-            vix_index_sigma_pct: 1.0,
+            vix_index_sigma_pct: sigma_pct,
             market_day_return_pct: session_pct,
             vix_mean_reversion: p.vix_mean_reversion,
             vix_decay_ratio: p.vix_decay_ratio,
             vix_return_gain: p.vix_return_gain,
             vix_return_gain_up: p.vix_return_gain_up,
             vix_return_exponent: p.vix_return_exponent,
+            vix_return_exponent_up: p.vix_return_exponent_up,
+            vix_return_level_exponent: p.vix_return_level_exponent,
+            vix_return_level_exponent_up: p.vix_return_level_exponent_up,
             vix_return_clamp: p.vix_return_clamp,
             vix_target_shock_cap: p.vix_target_shock_cap,
             vix_ceiling: p.vix_ceiling,
             vix_return_source: p.vix_return_source,
-            vix_jump_intensity: p.vix_jump_intensity,
             game_day: 40,
             ..Default::default()
         };
         update_economy_daily(&economy, &inputs, &mut Silent).vix
+    }
+
+    /// The same step written from the identity rather than from the code:
+    /// the target is the read-back plus the capped fear term minus that
+    /// term's own mean, the state moves `vix_mean_reversion` of the way to
+    /// it (`vix_decay_ratio` of that when the target is BELOW the state),
+    /// and the result is clamped to `[10, vix_ceiling]`.
+    fn vix_step_by_hand(
+        p: &ModelParams,
+        vix: f64,
+        implied: f64,
+        sigma_pct: f64,
+        session_pct: f64,
+    ) -> f64 {
+        let target =
+            implied + fear_term(p, session_pct, vix) - zero_mean_correction(p, sigma_pct, vix);
+        let mr = if target < vix {
+            p.vix_mean_reversion * p.vix_decay_ratio
+        } else {
+            p.vix_mean_reversion
+        };
+        mathx::max(
+            VIX_STATE_FLOOR,
+            mathx::min(p.vix_ceiling, vix + (target - vix) * mr),
+        )
     }
 
     /// **THE CEILING CLAMPS THE STATE, AND THE STATE MOVES
@@ -2288,96 +2623,185 @@ mod fear_response_shape {
     /// The test that stood here asserted `vix_ceiling == vix_return_gain *
     /// GRADED_ABS_R` and called the quotient "the session at which fear
     /// alone reaches the ceiling". Both halves were arithmetic on the dials
-    /// and neither was about the quantity the ceiling clamps. `gain *
-    /// GRADED_ABS_R` is the fear channel's term of the TARGET, the target
-    /// also carries the read-back `I`, and the clamp at `:1141` is applied
-    /// to `vix + (target - vix) * vix_mean_reversion`, the STATE after the
-    /// reversion step. So a session of `r` from a state `x` leaves
+    /// and neither was about the quantity the ceiling clamps. The clamp at
+    /// `:1291` is applied to `vix + (target - vix) * vix_mean_reversion`,
+    /// the STATE after the reversion step, so a session of `r` from a state
+    /// `x` with a read-back `I` leaves
     ///
-    ///     x' = clamp(0.9 x + 0.1 (I + 17 r), 10, C)
+    ///     x' = clamp(x + mr (I + min(cap, S(r, x)) - E[S | x] - x), 10, C)
     ///
-    /// and "fear alone", from rest, moves the VIX by `0.1 * 17 * 6.39` =
-    /// 10.863 points, not 108.63. This asserts that arithmetic against
-    /// `update_economy_daily` itself, over a spread of read-backs, to 1e-9.
-    /// `programme/results/ceiling-derivation-independent.md` in the design
-    /// repository derives it and what follows from it.
+    /// and "fear alone", from rest at a read-back of 21, moves the VIX by
+    /// `0.27 * (33.099 - 0.539)` = 8.791 points rather than the 108.63 the
+    /// old derivation named. Three terms of that were missing from the test
+    /// this replaces: the exponent, the level factor, and the zero-mean
+    /// subtraction, which is only zero when the two gains are equal and
+    /// they are not.
+    ///
+    /// WHAT THIS CATCHES. Any change to the order the update composes the
+    /// clamp, the spike, the cap and the reversion in. A zero-mean
+    /// correction computed at the wrong moment order, which is right at one
+    /// sigma and wrong at the others, so three sigmas are swept. A level
+    /// factor dropped from either the spike or the correction, which the
+    /// spread of read-backs makes visible. And the asymmetric decay ratio
+    /// being applied on the wrong side of the comparison, which the up
+    /// sessions here reach.
     #[test]
-    fn a_graded_session_moves_the_state_a_tenth_of_the_way_to_its_target() {
+    fn a_graded_session_moves_the_state_its_reversion_share_of_the_way_to_its_target() {
         let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
             .expect("the default preset resolves");
         let m = p.vix_mean_reversion;
-        let spike = p.vix_return_gain * GRADED_ABS_R;
-        for i in 0..=45 {
-            let implied = 15.0 + i as f64;
-            // From REST: the state is the read-back, which is what "rest"
-            // means under the identity.
-            let x = implied;
-            let want = x + m * (implied + spike - x);
-            let got = vix_after_one_session(x, implied, -GRADED_ABS_R);
-            assert!(
-                (got - want).abs() < 1e-9,
-                "from rest at {x}: the update left {got}, the arithmetic says {want}"
-            );
-            assert!(
-                got < p.vix_ceiling - 100.0,
-                "a graded session from rest at {x} reached {got}; the ceiling is \
-                 {} and the old test's 'fear alone reaches it at 6.39 per cent' \
-                 was never true of the state",
-                p.vix_ceiling
-            );
+        for &sigma in SIGMAS {
+            for i in 0..=45 {
+                let implied = 15.0 + i as f64;
+                // From REST: the state is the read-back, which is what
+                // "rest" means under the identity.
+                for &session in &[-GRADED_ABS_R, -1.0, 0.0, 1.0, GRADED_ABS_R] {
+                    let want = vix_step_by_hand(&p, implied, implied, sigma, session);
+                    let got = vix_after_one_session(implied, implied, sigma, session);
+                    assert!(
+                        (got - want).abs() < 1e-9,
+                        "from rest at {implied} with sigma {sigma} and a session of {session}: \
+                         the update left {got}, the arithmetic says {want}"
+                    );
+                }
+                // And away from rest, so the reversion term is not
+                // multiplying a quantity that happens to be the fear term
+                // alone.
+                let away = implied + 12.0;
+                let want = vix_step_by_hand(&p, away, implied, sigma, -GRADED_ABS_R);
+                let got = vix_after_one_session(away, implied, sigma, -GRADED_ABS_R);
+                assert!(
+                    (got - want).abs() < 1e-9,
+                    "from {away} against a read-back of {implied}: the update left {got}, \
+                     the arithmetic says {want}"
+                );
+                assert!(
+                    got < p.vix_ceiling - 100.0,
+                    "a graded session from {away} reached {got}; the ceiling is {} and the \
+                     old test's 'fear alone reaches it at 6.39 per cent' was never true of \
+                     the state",
+                    p.vix_ceiling
+                );
+            }
         }
         // The from-rest image of the graded range on the state, stated as a
         // number so the next reader has it: at a read-back of 21 it is
-        // 21 + 10.863, a third of the 108.63 that used to be called the
-        // point where fear alone reaches the ceiling.
-        let from_rest = vix_after_one_session(21.0, 21.0, -GRADED_ABS_R);
-        assert!((from_rest - (21.0 + m * spike)).abs() < 1e-9, "{from_rest}");
+        // 21 + 8.791, where the level-blind law with the gain that shipped
+        // at pt-v16 put it at 21 + 10.863 and the derivation this replaces
+        // called it 108.63.
+        let from_rest = vix_after_one_session(21.0, 21.0, 1.0, -GRADED_ABS_R);
+        let fear = response(&p, GRADED_ABS_R, 21.0) - zero_mean_correction(&p, 1.0, 21.0);
+        assert!((from_rest - (21.0 + m * fear)).abs() < 1e-9, "{from_rest}");
+        assert!(
+            (from_rest - 29.791253).abs() < 1e-4,
+            "the graded session from rest at 21 leaves {from_rest}, where the dials say \
+             29.791253. If the dials moved, re-derive this rather than editing it."
+        );
     }
 
     /// **A VIX AT THE CEILING IS HELD THERE BY A SESSION EXACTLY WHEN THE
-    /// TARGET IS AT OR ABOVE THE CEILING**, `I + 17 r >= C`.
+    /// TARGET IS AT OR ABOVE THE CEILING**, `I + min(cap, S(r, C)) - E[S|C]
+    /// >= C`, and under the shipped law that needs a read-back of 134.74.
     ///
-    /// This is the relation the measurement that refuted the old
-    /// derivation was reporting: at 108.63 sessions of -4.15 and -3.51 per
-    /// cent kept the VIX on the clamp, because the read-back `I` those days
-    /// carried put `I + 17 r` above it. The threshold session is
-    /// `(C - I) / 17`, and it is INSIDE the graded range whenever `I` is
-    /// above `C - 108.63`. At the shipped ceiling that is a read-back of
-    /// about 64, which the identity reaches on a factor variance of a few
-    /// times its base. So the ceiling is not non-sticky by placement at any
-    /// value the model's read-back can exceed by 108.63; what makes it
-    /// inert on the record is that the STATE does not reach it (b4fix6's
-    /// census: 0 of 30,240 seed-days at the clamp, highest VIX 120.38 over
-    /// 120 rosters at 252 days).
+    /// The version of this test that stood here inverted the threshold as
+    /// `(C - I) / gain`, which is the level-blind law's spelling. At a
+    /// read-back of 40 it reads a session of 16.00 per cent on pt-v19's own
+    /// gain (8.31 on the gain of 17 it was written against) where the
+    /// shipped law needs 33.39, which the clamp does not admit at all. Two
+    /// things move it. The response at the ceiling carries `C^(-0.4483)`,
+    /// so the same session buys 12.59 points there against 46.16 at the
+    /// floor. And the target also subtracts `E[S|C]`, which is NEGATIVE at
+    /// the ceiling (-3.259 at sigma 1) because the up side's give-back is
+    /// proportional to the level, so it pushes the threshold the other way.
+    ///
+    /// The finding, and it is new. The engine admits sessions up to
+    /// `vix_return_clamp` at 15 per cent, and the largest spike that can
+    /// reach a state at the ceiling is `8.83 * 15^1.4483 * 181.3295^-0.4483`
+    /// = 43.333 points. So the ceiling is reachable at all only from a
+    /// settled read-back above `C - 43.333 + E[S|C]` = 134.74 at sigma 1
+    /// and 133.20 at sigma 3. `ceiling-and-omega.md` section 0 records the
+    /// headroom as "any settled read-back below 168.74"; that number is the
+    /// condition evaluated at the top of the GRADED range, `r` = 6.39,
+    /// where the fear term is 12.59, and the domain the update admits runs
+    /// to the clamp instead. The condition still holds on the map, whose
+    /// closed form puts `implied(181.3295)` at 70.2 to 75.9 across three
+    /// rosters, and it holds against the map's absolute upper bound of
+    /// 121.8 to 134.5 by 0.24 points at sigma 1 on the worst roster and
+    /// fails it by 1.30 at sigma 3. Nothing on the record goes near either:
+    /// b4fix6's census reads 0 of 30,240 seed-days at the clamp and the
+    /// measured maximum VIX on this vector is 60.59.
+    ///
+    /// WHAT THIS CATCHES. The threshold inverted without the level factor,
+    /// which is the bug this replaces. The cap reintroduced somewhere it
+    /// truncates a reachable session. And the non-stickiness the ceiling's
+    /// `derived` kind rests on: the last assertion drives the worst
+    /// admissible session from the highest read-back the map produces and
+    /// requires the state to come off the clamp.
     #[test]
     fn a_vix_at_the_ceiling_is_held_there_iff_the_target_is_at_or_above_it() {
         let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
             .expect("the default preset resolves");
         let c = p.vix_ceiling;
-        let m = p.vix_mean_reversion;
-        for implied in [40.0, 64.5, 90.0, 120.0, 142.58] {
-            let threshold = (c - implied) / p.vix_return_gain;
-            let above = vix_after_one_session(c, implied, -(threshold + 0.01));
-            assert_eq!(above, c, "target above the ceiling and the state came off it: {above}");
-            let below_r = threshold - 0.01;
-            let below = vix_after_one_session(c, implied, -below_r);
-            let want = c + m * (implied + p.vix_return_gain * below_r - c);
-            assert!(
-                below < c && (below - want).abs() < 1e-9,
-                "target below the ceiling: the update left {below}, the arithmetic says {want}"
-            );
-            if implied > c - p.vix_return_gain * GRADED_ABS_R {
+        for &sigma in SIGMAS {
+            let correction = zero_mean_correction(&p, sigma, c);
+            // The largest spike an admissible session can put on a state at
+            // the ceiling.
+            let reachable = response(&p, p.vix_return_clamp, c);
+            for implied in [40.0, 100.0, 134.5, 150.0, 160.0, 175.0] {
+                let need = c - implied + correction;
+                if need > reachable {
+                    // Not reachable at all: even the clamp's own session
+                    // leaves the target under the ceiling, so the state
+                    // must come off it.
+                    let held = vix_after_one_session(c, implied, sigma, -p.vix_return_clamp);
+                    assert!(
+                        held < c,
+                        "a read-back of {implied} at sigma {sigma} needs {need:.4} points of \
+                         spike and the clamp can only deliver {reachable:.4}, yet the state \
+                         stayed at {held}"
+                    );
+                    continue;
+                }
+                // Invert the response WITH the level in it.
+                let threshold = mathx::pow(
+                    need * mathx::pow(c, p.vix_return_level_exponent) / p.vix_return_gain,
+                    1.0 / p.vix_return_exponent,
+                );
                 assert!(
-                    threshold < GRADED_ABS_R,
-                    "at a read-back of {implied} the holding session {threshold} should be \
-                     inside the graded range"
+                    threshold > 0.0 && threshold <= p.vix_return_clamp,
+                    "the holding session at a read-back of {implied} is {threshold}, outside \
+                     the admissible range"
+                );
+                let above = vix_after_one_session(c, implied, sigma, -(threshold + 0.01));
+                assert_eq!(
+                    above, c,
+                    "target above the ceiling and the state came off it: {above}"
+                );
+                let below_r = threshold - 0.01;
+                let below = vix_after_one_session(c, implied, sigma, -below_r);
+                let want = vix_step_by_hand(&p, c, implied, sigma, -below_r);
+                assert!(
+                    below < c && (below - want).abs() < 1e-9,
+                    "target below the ceiling: the update left {below}, the arithmetic says \
+                     {want}"
                 );
             }
         }
+        // NON-STICKINESS ON THE MAP, which is what the ceiling's `derived`
+        // kind rests on. 75.9 is the highest settled `implied(181.3295)` of
+        // the three rosters in `ceiling-and-omega.md` section 4, and this
+        // drives the largest session the clamp admits from it.
+        let worst = vix_after_one_session(c, 75.9, 2.5, -p.vix_return_clamp);
+        assert!(
+            worst < c - 10.0,
+            "from the map's highest settled read-back the worst admissible session left the \
+             state at {worst}, within 10 points of the ceiling at {c}. The census that makes \
+             the ceiling inert needs re-measuring."
+        );
     }
 
-    /// **THE SHIPPED CEILING, PINNED WITH ITS PROVENANCE, AND ORDERED
-    /// AGAINST THE CAP.**
+    /// **THE SHIPPED CEILING, PINNED WITH ITS PROVENANCE. THE ORDERING
+    /// AGAINST THE CAP IS WITHDRAWN AND IS NOT ASSERTED HERE.**
     ///
     /// 181.3295 is the solution of `C - implied(C) >= 17 * 6.39` on b4fix7's
     /// settled pin ladder of the map this preset runs (crisis blend at 0,
@@ -2390,10 +2814,33 @@ mod fear_response_shape {
     /// record shows at gain 0 is a clip rate of zero over 30,240 seed-days
     /// with a highest VIX of 73.9 and a highest read-back of 93.2.
     ///
-    /// Pinned so that a preset which moves the ceiling without re-solving
-    /// the condition and re-measuring the census fails here.
+    /// THE ORDERING, WITHDRAWN 2026-09-14. The assertion that stood last
+    /// here was `vix_target_shock_cap > vix_ceiling`, on a recorded
+    /// invariant reading "must stay above the ceiling or the cap binds
+    /// first". The cap is 158.8524 and sits 22.4771 points UNDER the
+    /// ceiling on the shipped preset, and nothing binds first: the cap
+    /// truncates an additive term of the TARGET at `:1167` and the ceiling
+    /// truncates the STATE at `:1291`, so no expression compares them and
+    /// neither preempts the other at any pair of values. A cap under the
+    /// ceiling in fact makes the ceiling LESS sticky, which is the
+    /// direction the ceiling's own derivation wants.
+    /// `programme/results/ceiling-and-omega.md` sections 2 and 3 establish
+    /// that and `provenance.py` carries the withdrawal.
+    ///
+    /// AND THE CONDITION STOPPED CHOOSING A VALUE, which is the honest
+    /// state of the derivation. Re-solved on the shipping law the smallest
+    /// admissible `C` is 55.98 to 58.43 across three rosters, inside the
+    /// measured maximum VIX of 60.59, so the value that restores the
+    /// ordering is the value that breaks the census the `derived` kind
+    /// rests on. 181.3295 stays because it satisfies the condition and the
+    /// census, not because the condition solves to it.
+    ///
+    /// WHAT THIS CATCHES. A ceiling moved without re-solving the condition
+    /// and re-measuring the census. And a preset that puts the ceiling
+    /// under the fear term at the top of the graded range, which is
+    /// necessary for the condition and nothing like sufficient.
     #[test]
-    fn the_default_ceiling_is_pinned_to_its_solve_and_sits_under_the_cap() {
+    fn the_default_ceiling_is_pinned_to_its_solve_and_the_cap_ordering_is_withdrawn() {
         let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
             .expect("the default preset resolves");
         const CEILING_SOLVED: f64 = 181.3295;
@@ -2404,45 +2851,105 @@ mod fear_response_shape {
              census before moving it.",
             p.vix_ceiling
         );
-        // The fear term of the target alone is 108.63; a ceiling under it
-        // would be reached by a from-rest TARGET inside the graded range,
-        // which is necessary for the condition above and nothing like
-        // sufficient.
-        let image = p.vix_return_gain * mathx::pow(GRADED_ABS_R, p.vix_return_exponent);
-        assert!(p.vix_ceiling > image, "{} is under the target's fear term {image}", p.vix_ceiling);
-        // And the cap does not bind first. The cap is the CLAMP's image and
-        // the clamp is 15 per cent, so this is an ordering the two
-        // derivations already imply, asserted rather than assumed.
+        // The fear term at the top of the graded range, evaluated AT THE
+        // CEILING because that is the level the condition asks about. Under
+        // the level-blind law it was the constant 108.63; under the shipped
+        // law it is `8.83 * 6.39^1.4483 * C^-0.4483` = 12.5920, and the
+        // condition it feeds is met for any settled read-back below 168.74.
+        let term = response(&p, GRADED_ABS_R, p.vix_ceiling);
         assert!(
-            p.vix_target_shock_cap > p.vix_ceiling,
-            "the shock cap {} is at or under the ceiling {}, so the cap binds first",
-            p.vix_target_shock_cap, p.vix_ceiling
+            (term - 12.5920).abs() < 1e-3,
+            "the fear term at the ceiling reads {term}, where the dials say 12.5920"
+        );
+        assert!(
+            p.vix_ceiling > term,
+            "{} is under the target's fear term {term}",
+            p.vix_ceiling
+        );
+        // NO ORDERING AGAINST THE CAP IS ASSERTED. What is asserted is the
+        // property the cap actually has, which does not mention the
+        // ceiling.
+        assert_eq!(
+            binder_of(&p),
+            Binder::Clamp,
+            "the cap binds before the clamp, which is the ordering that does have a \
+             consequence"
         );
     }
 
-    /// The cap is the image of the clamp under the spike, so it cannot bind
-    /// anywhere the clamp does not.
+    /// The cap is the image of the clamp under the spike, evaluated at the
+    /// VIX floor, so it is the spike's supremum over the whole domain the
+    /// update admits and it cannot bind anywhere the clamp does not.
     ///
-    /// Called from the test above as well as standing on its own: it is the
+    /// ```text
+    /// cap = gain * clamp^exponent * floor^(-level_exponent)
+    ///     = 8.83 * 15^1.4483 * 10^-0.4483
+    ///     = 158.85236
+    /// ```
+    ///
+    /// The shipped value is 158.8524, the four-decimal rounding of that,
+    /// and it is a LITERAL in `pt_v19` because `powf` is not available in a
+    /// `const fn`. Rounding UP is what makes the cap strictly inert: at
+    /// 158.8524 the session that would truncate is 15.0000025 per cent
+    /// against a clamp of 15, so the cap never binds rather than binding on
+    /// a measure-zero corner.
+    ///
+    /// This test previously computed `gain * clamp^exponent` with no level
+    /// factor, which reads 445.9577, and asserted `vix_return_exponent ==
+    /// 1.0` beside it. Both were the level-blind law's spellings and the
+    /// second is false on the shipped preset by 0.4483.
+    ///
+    /// Called from `the_shipped_default_carries_its_fear_response_across_
+    /// the_graded_range` as well as standing on its own: it is the
     /// derivation `ModelParams::vix_target_shock_cap` claims, and a claim
     /// in a doc comment that no test reads is a claim that rots.
+    ///
+    /// WHAT THIS CATCHES. A cap set to a round number rather than to the
+    /// image, which is what pt-v9 through pt-v18 did at 45. A clamp moved
+    /// without the cap following it. The level exponent changed without the
+    /// cap being re-derived, which would leave an inert cap binding. And
+    /// the state floor moving off 10, which is pinned against the update
+    /// itself rather than read off the source line.
     #[test]
     fn the_default_cap_is_the_clamps_own_image() {
         let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
             .expect("the default preset resolves");
-        let image = p.vix_return_gain * mathx::pow(p.vix_return_clamp, p.vix_return_exponent);
+        // The floor, from `update_economy_daily` and not from a comment: a
+        // read-back of zero pulls the target below the floor and the state
+        // must stop there.
+        let floored = vix_after_one_session(VIX_STATE_FLOOR + 0.5, 0.0, 1.0, 0.0);
         assert_eq!(
-            p.vix_target_shock_cap, image,
-            "the cap is {} where the clamp's image is {image}. A cap above the image \
-             is inert and a cap below it is a second binding constraint.",
+            floored, VIX_STATE_FLOOR,
+            "the state floor is {floored}, not the {VIX_STATE_FLOOR} the cap's derivation \
+             evaluates the clamp's image at"
+        );
+        let image = p.vix_return_gain
+            * mathx::pow(p.vix_return_clamp, p.vix_return_exponent)
+            * mathx::pow(VIX_STATE_FLOOR, -p.vix_return_level_exponent);
+        assert!(
+            (p.vix_target_shock_cap - image).abs() < 1e-3,
+            "the cap is {} where the clamp's image at the floor is {image}. A cap above the \
+             image is inert and a cap below it is a second binding constraint.",
             p.vix_target_shock_cap
         );
-        // At the shipped exponent of 1.0 the image is the PRODUCT, which is
-        // what `pt_v19` writes, because `pow` is not `const`. If the
-        // exponent ever moves off 1.0 the two spellings part company and
-        // this is where that is noticed.
-        assert_eq!(p.vix_return_exponent, 1.0, "the const-context spelling assumes it");
-        assert_eq!(p.vix_target_shock_cap, p.vix_return_gain * p.vix_return_clamp);
+        assert!(
+            p.vix_target_shock_cap >= image,
+            "the cap {} is UNDER the spike's supremum {image}, so it truncates sessions the \
+             clamp admits and is a shape parameter again",
+            p.vix_target_shock_cap
+        );
+        // And it binds nowhere the state can be. The binding session runs
+        // 15.0000 at the floor to 36.7817 at the ceiling, against a clamp
+        // of 15.
+        for &vix in LEVELS {
+            let binds = cap_binds_at(&p, vix);
+            assert!(
+                binds >= p.vix_return_clamp,
+                "from a VIX of {vix} the cap truncates at {binds} per cent, inside the clamp \
+                 at {}. It is a second binding constraint again.",
+                p.vix_return_clamp
+            );
+        }
         // And the clamp itself is outside the graded range, so neither dial
         // shapes the response where the tape can see it.
         assert!(

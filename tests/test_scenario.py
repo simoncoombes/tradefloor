@@ -134,10 +134,46 @@ def test_a_vix_shock_raises_realised_volatility():
     variance rise is what gets asserted. Measured pooled close-to-close
     vol, shocked over flat on identical draws: 1.23x at seed 3, 1.25x at
     seed 5, 1.17x at seed 7.
+
+    IT WAS MEASURING THE WRONG FORTY DAYS, and on three seeds. Corrected
+    2026-09-14, after this read x1.029 at seed 5 against the 1.05 bar.
+    Two separate faults, both in the instrument:
+
+    The shock covers days 10 to 30 of a FORTY-day run, so half the returns
+    pooled into the reading come from calm days on both sides of it. A
+    shocked window diluted with its own control understates the rise by
+    about half. MEASURED on the warm-up tree, ten seeds, the same scenario
+    pair, whole run against the shocked window alone:
+
+        seed     3      5      7     11     13     17     19     23     29     31
+        whole 1.0550 1.0293 1.1106 1.0454 1.0566 1.0366 1.0407 1.0544 1.0791 1.0607
+        d10-30 1.1204 1.0299 1.2035 1.1032 1.2247 1.1076 1.0924 1.1097 1.1269 1.0768
+
+    Whole run: median 1.0547, across-seed sd 0.0235. The window: median
+    1.1087, sd 0.0570. So the effect the claim is about is twice the size
+    the old reading showed.
+
+    And a 1.05 bar per seed is inside that noise whichever window it
+    reads. On the whole run it sits 0.2 seed-sd above the median and six
+    of ten seeds clear it; seed 5, one of the three the test named, sits
+    1.08 sd below the median. A bar its own instrument resolves at chance
+    reports the seed and not the model.
+
+    So the mechanism is intact -- ten of ten seeds raise realised
+    volatility in the shocked window, minimum x1.0299 -- and what is
+    asserted is what ten seeds can carry: the DIRECTION on every seed,
+    where the instrument is sure, and the SIZE on the median, where the
+    ten-seed standard error is 0.0226 and the 1.1087 reading stands 2.6 of
+    them above 1.05.
     """
     import math
     import statistics
     import pyarrow as pa
+
+    #: The shock runs from day 10 over 20 days. Slicing the daily return
+    #: series to it is the whole correction: a ratio taken over all forty
+    #: days divides a shocked window by a control that is half shocked.
+    SHOCK_FROM, SHOCK_TO = 10, 30
 
     def pooled_vol(scenario, seed):
         engine = run_scenario(scenario, seed=seed, universe=UNIVERSE, days=40,
@@ -148,18 +184,31 @@ def test_a_vix_shock_raises_realised_volatility():
             series.setdefault(ticker, []).append(close)
         returns = []
         for closes in series.values():
-            returns += [math.log(closes[i + 1] / closes[i])
-                        for i in range(len(closes) - 1)]
+            daily = [math.log(closes[i + 1] / closes[i])
+                     for i in range(len(closes) - 1)]
+            returns += daily[SHOCK_FROM:SHOCK_TO]
         return statistics.pstdev(returns)
 
-    shock = Scenario.vix_shock(calm=15.0, peak=45.0, at=10, over=20)
+    shock = Scenario.vix_shock(calm=15.0, peak=45.0, at=SHOCK_FROM, over=20)
     flat = Scenario().hold(vix=15.0)
-    for seed in (3, 5, 7):
+    seeds = (3, 5, 7, 11, 13, 17, 19, 23, 29, 31)
+    ratios = []
+    for seed in seeds:
         ratio = pooled_vol(shock, seed) / pooled_vol(flat, seed)
-        assert ratio > 1.05, (
+        ratios.append(ratio)
+        assert ratio > 1.0, (
             f"seed {seed}: a spike to VIX 45 must raise realised volatility "
-            f"over the flat run on identical draws, got x{ratio:.3f}"
+            f"over the flat run on identical draws, got x{ratio:.4f}. Ten of "
+            "ten seeds were above 1.0 on 2026-09-14 and the lowest was "
+            "x1.0299, so a seed at or below 1.0 is the coupling gone rather "
+            "than a seed being unlucky"
         )
+    mid = statistics.median(ratios)
+    assert mid > 1.05, (
+        f"the median rise over {len(seeds)} seeds is x{mid:.4f} against "
+        f"1.05. Measured x1.1087 on 2026-09-14: "
+        f"{[round(r, 4) for r in ratios]}"
+    )
 
 
 # --------------------------------------------------------------------------

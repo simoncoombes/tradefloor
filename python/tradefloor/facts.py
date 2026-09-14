@@ -3268,6 +3268,7 @@ def measure(
     seed: int,
     universe: Sequence[Instrument],
     days: int = 252,
+    burn: int = 0,
     macro: Macro | None = None,
     scenario: Any = None,
     min_observations: int = 30,
@@ -3300,20 +3301,63 @@ def measure(
     A dependence statistic that cannot be measured on the run -- pairwise
     correlation over a single instrument, say -- comes back as None rather than
     as zero, and `compare_to_real_markets` omits it.
+
+    # `burn`: sessions run before the window, and why a pinned run needs them
+
+    ``burn`` sessions are traded and thrown away before day zero of the
+    recorded window. The run is one run -- same engine, same streams, same
+    scenario -- and the panel is measured on the last ``days`` of it.
+
+    It exists because a PINNED scenario has a transient and the panel has no
+    way to see it. ``Scenario().hold(vix=65)`` fixes the VIX from day zero,
+    but the factor variance opens at the preset's unconditional level and
+    walks to the pinned target at the preset's own
+    ``alpha + beta + gamma/2``; a whole-window statistic then averages that
+    walk. `measurement-integrity.md` 1.1 measured it on the crisis lever:
+    the low pin settles DOWN and the high pin UP, so the ratio of the two is
+    biased low by four to eight per cent, by an amount that is a property of
+    the preset and not of the lever. A burn is the only reading under which
+    "volatility at a held VIX of 65" is a number about the model rather than
+    about how long the window was.
+
+    THE SCENARIO'S CLOCK STARTS AT THE WINDOW, NOT AT THE BURN. The burn
+    runs at days ``-burn .. -1``, so a ``hold`` -- constant from day zero and
+    before it -- is in force for the whole burn, which is what makes the burn
+    settle anything; and an intervention at ``at: 50`` still fires fifty days
+    into the RECORDED window, where its note says it does. That is the same
+    reading :meth:`Scenario.apply` already documents for a checkpoint
+    resume: day zero is where the experiment starts, not where the engine
+    did.
+
+    A burn is NOT the market-side warm-up. ``market_burn_in_sessions``
+    settles the same states deterministically and without a draw, at the
+    level the close is about to read; it ships at 0.0 and it is a property
+    of the MODEL, so turning it on moves the coefficient fingerprint. This
+    argument is a property of the MEASUREMENT and moves nothing but the
+    window.
     """
     if days < 2:
         raise ValidationError("days must be at least 2 to have a return")
+    if burn < 0:
+        raise ValidationError(
+            f"burn is a number of sessions to discard before the window, "
+            f"got {burn}")
 
     engine = Engine(seed=seed, universe=universe, macro_state=macro,
                     model=model)
-    for day in range(days):
+    for day in range(-burn, days):
         if scenario is not None:
             scenario.apply(engine, day)
         engine.open_market()
         engine.run_session(9, 30, 3, 390)
         # Record before the close: the close advances the macro chain, and
         # the macro row must carry the values the day traded under.
-        engine.record(day)
+        #
+        # The burn is traded and not recorded, so every statistic below --
+        # the bars table, the macro table, the fear buckets and the VIX's
+        # own persistence -- reads the window and nothing before it.
+        if day >= 0:
+            engine.record(day)
         engine.close_market()
 
     facts: dict[str, Any] = {
@@ -3328,6 +3372,13 @@ def measure(
         # remove.
         "model_fingerprint": engine.model_fingerprint,
         "days": days,
+        # The window's own provenance, and it travels with the panel for the
+        # reason the two fingerprints do: a number read over a settled window
+        # and a number read from a cold open are different measurements, and
+        # a record that does not say which cannot be compared with either.
+        # Always present, 0 where nothing was discarded, so a reader never
+        # has to decide whether a missing key means zero or means unstated.
+        "burn": burn,
     }
     bars = engine.bars(grain="day")
     facts.update(panel_statistics(bars, universe,
@@ -3668,6 +3719,253 @@ BAND_RULE_TOLERANCE_PROVENANCE = {
                       "and the cut derived from it is at most this strict",
 }
 
+#: The band RULES this project has built a band with, by name, because a
+#: tolerance belongs to a rule and not to a window count.
+#:
+#: `spread` is `shared_rule`, `[min - s, max + s]`, and its false-alarm rate
+#: FOLLOWS the window count -- 0.06486 at nine, 0.16800 at five, 0.23998 at
+#: four, and 0.00688 at thirty-five. `BAND_RULE_TOLERANCE` is that rule's
+#: table and only that rule's.
+#:
+#: `fixed` is `median +/- t(n) * trimmed_sd` with `t(n)` SOLVED so the rate
+#: is the same at every window count. It is the rule the universal band of
+#: `certification-bands.md` section 14 is built with, adopted under
+#: `ruling-the-ruler-is-the-universal-band`, and under it the rate is an
+#: input rather than an output: the window count improves the ESTIMATE and
+#: does not change the size of the test.
+#:
+#: The two are named rather than switched on a flag because the defect this
+#: distinction exists to prevent is a function whose name promises one rule
+#: and whose body computes another. `band_rule_tolerance` takes the rule.
+BAND_RULES = ("spread", "fixed")
+
+#: The rate the `fixed` rule holds at every window count, which is the
+#: project's own nine-window design point, `BAND_RULE_TOLERANCE[9]`.
+#:
+#: DERIVED, and the derivation is the rule's definition rather than a
+#: measurement: `t(n)` is solved to make the rate this, so the rate is this
+#: by construction at any n. It is the same number the shipped 252-day bands
+#: have carried since 2026-09-05 and it was not chosen today -- which is
+#: what keeps the mechanism gate's cut from being fitted to a preset when
+#: the band under it moves.
+BAND_RULE_FIXED_TOLERANCE: float = 0.06486
+
+#: `t(n)` for the `fixed` rule: the multiplier that puts the rate at
+#: `BAND_RULE_FIXED_TOLERANCE` on `n` windows.
+#:
+#: MEASURED, by the same Monte Carlo `band_rule_false_alarm` runs and under
+#: the same null -- `n + 1` iid standard normals, the band from the first
+#: `n`, the verdict on the last -- at 200,000 draws and seed 20260905.
+#: `band_rule_fixed_false_alarm` re-derives any row of it.
+#:
+#: t(5) = 5.04 is the measurement that says the shipped 504-day bands are
+#: not the 252-day test: reaching the 252-day rate on five windows takes
+#: five standard deviations, because a five-window trimmed sd is a scale
+#: estimate on three kept points.
+BAND_RULE_FIXED_MULTIPLIER: dict[int, float] = {
+    5: 5.039474,
+    9: 2.982334,
+    16: 2.417688,
+    35: 2.111347,
+}
+
+BAND_RULE_FIXED_MULTIPLIER_PROVENANCE = {
+    "kind": "measured",
+    "claim": "the multiplier t(n) at which median +/- t * trimmed_sd over n "
+             "readings leaves a fresh reading from the same law outside "
+             "BAND_RULE_FIXED_TOLERANCE of the time",
+    "estimator": "facts.band_rule_fixed_false_alarm, solved for t: n + 1 iid "
+                 "standard normal draws, the band from the first n as the "
+                 "median plus and minus t times facts.trimmed_sd "
+                 "(unrounded), the verdict on the last",
+    "draws": 200_000,
+    "seed": 20260905,
+    "residual": "binomial standard error sqrt(p(1-p)/draws) = 0.00055 at "
+                "every row. CHECKED OUT OF SAMPLE, because a solve at its "
+                "own seed is in-sample by construction: at seed 20260914 "
+                "the achieved rates are 0.06545 at n=9, 0.06535 at n=16 and "
+                "0.06512 at n=35, and at seed 20260906 they are 0.06451, "
+                "0.06522 and 0.06494 -- every one inside 1.1 standard "
+                "errors of the target, on two fresh seeds derived "
+                "independently",
+    "instrument_check": "the same harness re-measures the spread rule at 4, "
+                        "5, 7 and 9 windows and reproduces "
+                        "BAND_RULE_TOLERANCE at a worst residual of 1e-05, "
+                        "which is what earns it the right to extend the "
+                        "rule to counts nobody has shipped",
+    "source": "tradefloor-design/programme/results/certification-bands.md "
+              "section 13.1 and results/band-basis-sweep.md section 2, "
+              "2026-09-14",
+    "why_not_extend_BAND_RULE_TOLERANCE": "because that table measures the "
+        "SPREAD rule, whose rate at 35 windows is 0.00688 and at 16 is "
+        "0.02535. Adding those keys would leave a table whose name reads "
+        "like the band's tolerance and whose body is a different band's",
+}
+
+#: The universal band: the fourteen shape rows scored against the whole tape
+#: rather than against one decade of it.
+#:
+#: `median +/- t(n) * trimmed_sd` over the 32-name 1987-06..2025-07
+#: non-crisis windows, unbridged, n = 35, with the two inward clamps of
+#: `REAL_MARKETS_ADJUSTMENTS` re-applied and the Campbell ceiling retired as
+#: redundant -- the band's own ceiling now reaches 41.0, past the 36.0 the
+#: adjustment moved the shipped edge out to.
+#:
+#: Derived in `certification-bands.md` section 14 and adopted under
+#: `ruling-the-ruler-is-the-universal-band`. THE MODEL IS MEASURED ON
+#: REALISM, NOT AGAINST ARTIFICIAL BANDS THAT MAY NOT BE ACCURATE, and this
+#: table is that sentence as data.
+#:
+#: CONFLICT OF INTEREST, RECORDED DELIBERATELY AND NOT TO BE DROPPED. It was
+#: known BEFORE adoption that pt-v19 goes 13 to 14 rows under this band
+#: while pt-v18 is untouched at 14 and 14. Choosing the ruler that passes
+#: your own candidate is the B3 defect one level up. The decision rests on
+#: three grounds that have nothing to do with that outcome: the shipped band
+#: is one decade against a rule spanning four; the fairness test passes at
+#: 4.8 per cent rejection against a designed 6.5; and this band still TAKES
+#: count away from four presets the decade band passed.
+#:
+#: Four rows carry a caveat and `BAND_BASIS` states each one:
+#: `excess_kurtosis`'s floor of -13.0 is below the theoretical minimum of -2
+#: and the row is roster-limited rather than era-limited;
+#: `corr_persistence_acf1` at 504 is on a protocol the 32-name pull does not
+#: reproduce; `abs_return_acf5` replaces a band whose window set no file
+#: holds; and the five level rows have NO universal band at either horizon,
+#: because the 32-name panel carries equities and four of the five are read
+#: off ^VIX, ^GSPC and RSP.
+REAL_MARKETS_UNIVERSAL: dict[str, tuple[float, float]] = {
+    "annualised_vol_pct": (12.0, 41.0),
+    "excess_kurtosis": (-13.0, 24.0),
+    "return_acf1": (-0.07, 0.06),
+    "abs_return_acf1": (0.02, 0.17),
+    "abs_return_acf5": (-0.03, 0.1),
+    "abs_return_acf20": (-0.05, 0.06),
+    "cross_sectional_corr": (0.09, 0.49),
+    "volume_abs_return_corr": (0.35, 0.64),
+    "leverage_effect": (-0.11, 0.0),
+    "volume_change_acf1": (-0.3, -0.2),
+    "corr_asymmetry": (-0.15, 0.23),
+    "corr_asymmetry_lagged": (-0.15, 0.33),
+    "sector_excess_corr": (0.04, 0.23),
+    "corr_persistence_acf1": (-0.48, 0.69),
+}
+
+#: The universal band at 504 bars, n = 16, on the same rule and the same
+#: windows. `REAL_MARKETS_ADJUSTMENTS_504` is empty and stays empty, so this
+#: table carries no clamp -- the same mechanism as the shipped 504 band,
+#: which also carries none. MEASURED that the clamp ruling costs nothing
+#: here either way: re-applying clamp #1 and clamp #2 at 504 moves zero of
+#: the 504 shape-row verdicts on the eighteen committed records.
+REAL_MARKETS_UNIVERSAL_504: dict[str, tuple[float, float]] = {
+    "annualised_vol_pct": (12.0, 40.0),
+    "excess_kurtosis": (-9.3, 24.0),
+    "return_acf1": (-0.05, 0.05),
+    "abs_return_acf1": (0.01, 0.19),
+    "abs_return_acf5": (-0.01, 0.11),
+    "abs_return_acf20": (-0.01, 0.07),
+    "cross_sectional_corr": (0.11, 0.52),
+    "volume_abs_return_corr": (0.34, 0.63),
+    "leverage_effect": (-0.1, 0.02),
+    "volume_change_acf1": (-0.3, -0.2),
+    "corr_asymmetry": (-0.06, 0.21),
+    "corr_asymmetry_lagged": (-0.12, 0.32),
+    "sector_excess_corr": (0.06, 0.21),
+    "corr_persistence_acf1": (-0.38, 0.88),
+}
+
+#: What every band table in this module IS, as opposed to what it is called.
+#:
+#: THIS IS THE DEFECT THE UNIVERSAL RULING EXPOSED, AND IT IS WHY THIS DICT
+#: EXISTS. A record that stamps `"bands_252": "facts.REAL_MARKETS"` records a
+#: NAME. Swap that dict's contents and every record on disk still asserts the
+#: same provenance, every count under it changes, and nothing anywhere
+#: disagrees. A name is not a basis. An era, a window count and a rule are.
+#:
+#: Anything that publishes a band verdict stamps the basis, not the symbol,
+#: and `programme/scripts/guards.py` guard 20
+#: (`published-constant-binds-its-vector`) refuses a band named without one.
+BAND_BASIS: dict[str, dict[str, Any]] = {
+    "facts.REAL_MARKETS": {
+        "era": "2015-07..2025-07",
+        "roster": "the certified forty, exactly",
+        "n_windows": 9,
+        "rule": "spread",
+        "tolerance": 0.06486,
+        "rows": 18,
+        "note": "one decade, one crisis window excluded. "
+                "corr_persistence_acf1 is the only row on a different count "
+                "at 504 (four, BAND_WINDOWS_EXCEPTIONS)",
+    },
+    "facts.REAL_MARKETS_504": {
+        "era": "2015-07..2025-07",
+        "roster": "the certified forty, exactly",
+        "n_windows": 5,
+        "rule": "spread",
+        "tolerance": 0.16800,
+        "rows": 14,
+        "note": "five windows, so this table is a LOOSER test than the 252 "
+                "one by a factor of two and a half, and four windows looser "
+                "still on corr_persistence_acf1 at 0.23998",
+    },
+    "facts.REAL_MARKETS_UNIVERSAL": {
+        "era": "1987-06..2025-07",
+        "roster": "32 of the certified forty, the ones trading before 1990; "
+                  "unbridged, carrying a stated level bias under 10 per cent "
+                  "of band width on 13 of 14 rows",
+        "n_windows": 35,
+        "rule": "fixed",
+        "tolerance": BAND_RULE_FIXED_TOLERANCE,
+        "multiplier": 2.111347,
+        "rows": 14,
+        "adjustments": "clamp #1 and clamp #2 re-applied; the Campbell "
+                       "ceiling retired as redundant",
+        "note": "four eras, three crisis windows excluded. Tested out of "
+                "sample: admits 120 of 126 forty-name real year-rows, a "
+                "rejection rate of 4.8 per cent against a designed 6.5",
+    },
+    "facts.REAL_MARKETS_UNIVERSAL_504": {
+        "era": "1987-06..2025-07",
+        "roster": "32 of the certified forty, the ones trading before 1990; "
+                  "unbridged",
+        "n_windows": 16,
+        "rule": "fixed",
+        "tolerance": BAND_RULE_FIXED_TOLERANCE,
+        "multiplier": 2.417688,
+        "rows": 14,
+        "adjustments": "none, the same as REAL_MARKETS_ADJUSTMENTS_504",
+        "note": "admits 64 of 65 forty-name real year-rows. "
+                "corr_persistence_acf1 is carried here on the walked "
+                "six-window protocol and NOT on the shipped sub-window one, "
+                "so its universal band is a band for a different quantity "
+                "until that row-definition ruling is made",
+    },
+}
+
+
+def band_basis(name: str) -> dict[str, Any]:
+    """What the band table called `name` is: its era, window count and rule.
+
+    Raises for a table with no recorded basis, because a band grading a
+    record with nothing said about where it came from is the state this
+    function exists to end.
+    """
+    try:
+        return BAND_BASIS[name]
+    except KeyError:
+        raise ValidationError(
+            f"{name!r} has no recorded band basis. A record that stamps a "
+            f"band's NAME and not its era, window count and rule asserts a "
+            f"provenance that survives the table's contents being replaced; "
+            f"tables with a basis are {sorted(BAND_BASIS)}"
+        ) from None
+
+
+register_ruler_table(REAL_MARKETS_UNIVERSAL, CERTIFIED_HORIZON_DAYS,
+                     "facts.REAL_MARKETS_UNIVERSAL")
+register_ruler_table(REAL_MARKETS_UNIVERSAL_504, 504,
+                     "facts.REAL_MARKETS_UNIVERSAL_504")
+
+
 #: How many non-crisis real windows each band set rests on, which is what
 #: sets that band's own tolerance. The 504 entry is the count for thirteen
 #: of the fourteen rows; `corr_persistence_acf1` rests on four there, so a
@@ -3893,13 +4191,73 @@ def band_rule_false_alarm(n_windows: int, *, draws: int = 200_000,
     return rate, math.sqrt(rate * (1.0 - rate) / draws)
 
 
-def band_rule_tolerance(n_windows: int) -> float:
-    """`BAND_RULE`'s false-alarm rate at `n_windows`, measured.
+def band_rule_fixed_false_alarm(n_windows: int, multiplier: float, *,
+                                draws: int = 200_000,
+                                seed: int = 20260905) -> tuple[float, float]:
+    """The `fixed` rule's false-alarm rate at `n_windows`: (rate, its se).
 
-    Raises rather than guessing for a window count nobody has measured: the
-    cut a gate reads comes from here, and a tolerance interpolated between
-    two measurements would be a chosen constant.
+    The same null and the same draws as `band_rule_false_alarm`, and a
+    different band: `median +/- multiplier * trimmed_sd` over the first
+    `n_windows` draws, the verdict on one more.
+
+    This exists so the `fixed` rule's tolerance is re-derivable the way the
+    `spread` rule's already is. Pass `BAND_RULE_FIXED_MULTIPLIER[n]` and it
+    returns `BAND_RULE_FIXED_TOLERANCE` to within the binomial error, which
+    is the check that the multiplier table has not drifted from the target
+    it was solved against.
     """
+    if n_windows < 2:
+        raise ValidationError(
+            f"n_windows must be at least 2 to have a band, got {n_windows}")
+    if draws < 1:
+        raise ValidationError(f"draws must be positive, got {draws}")
+    if not multiplier > 0.0:
+        raise ValidationError(
+            f"multiplier must be positive, got {multiplier}")
+    rng = random.Random(seed)
+    outside = 0
+    for _ in range(draws):
+        windows = [rng.gauss(0.0, 1.0) for _ in range(n_windows)]
+        centre = statistics.median(windows)
+        scale = trimmed_sd(windows)
+        fresh = rng.gauss(0.0, 1.0)
+        if abs(fresh - centre) > multiplier * scale:
+            outside += 1
+    rate = outside / draws
+    return rate, math.sqrt(rate * (1.0 - rate) / draws)
+
+
+def band_rule_tolerance(n_windows: int, *, rule: str = "spread") -> float:
+    """The false-alarm rate of `rule`'s band built on `n_windows`, measured.
+
+    THE RULE, NOT ONLY THE COUNT. A tolerance belongs to a band rule. The
+    `spread` rule's rate follows its window count and is looked up in
+    `BAND_RULE_TOLERANCE`; the `fixed` rule's is `BAND_RULE_FIXED_TOLERANCE`
+    at every count, because that is the quantity `t(n)` was solved against.
+    Handing a `fixed` band a `spread` tolerance -- or the reverse -- reads a
+    cut off the wrong instrument and returns a plausible integer, which is
+    the same wrong-ruler shape one level down.
+
+    Raises rather than guessing for a `spread` window count nobody has
+    measured: the cut a gate reads comes from here, and a tolerance
+    interpolated between two measurements would be a chosen constant.
+    """
+    if rule not in BAND_RULES:
+        raise ValidationError(
+            f"{rule!r} is not a band rule this project has built a band "
+            f"with; the rules are {list(BAND_RULES)}")
+    if rule == "fixed":
+        if n_windows not in BAND_RULE_FIXED_MULTIPLIER:
+            raise ValidationError(
+                f"the fixed rule's multiplier at {n_windows} windows is not "
+                f"measured; measured counts are "
+                f"{sorted(BAND_RULE_FIXED_MULTIPLIER)}. The TOLERANCE is "
+                f"{BAND_RULE_FIXED_TOLERANCE} at every count by "
+                f"construction, but a band nobody has solved t(n) for "
+                f"cannot be built, so solve it with "
+                f"facts.band_rule_fixed_false_alarm and record it with its "
+                f"residual rather than interpolating.")
+        return BAND_RULE_FIXED_TOLERANCE
     try:
         return BAND_RULE_TOLERANCE[n_windows]
     except KeyError:

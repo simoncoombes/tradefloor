@@ -138,6 +138,48 @@ def test_the_envelope_agrees_with_the_record_on_the_level_and_crisis_rows():
                 f"the record measured {measured[stat]}")
 
 
+def test_the_level_block_was_measured_on_the_preset_the_record_describes():
+    """The block's own vector against the record's, name by name.
+
+    A `level_protocol` block is a thirty-seed measurement on a protocol no
+    panel runs, so `record.py --panel` cannot rebuild it and carries it
+    forward instead. Carrying it is only honest while the preset's
+    coefficient VALUES have not moved: a name ADDED to `ModelParams` is
+    inert, and a value that moved is a different model wearing the same
+    name, which is `restamp.py`'s rule applied to this block.
+
+    Both halves of that went wrong at once. pt-v19's block was written from
+    `b4fix10` at `2d83167`, nineteen of its coefficients moved at 31ef261,
+    and then `record.py --panel` deleted the block rather than reporting it
+    stale, which left `envelope.CERTIFIED_LEVEL` published with nothing
+    behind it (defect-26). This is the check that fails on the first of
+    those without waiting for the second.
+
+    A block written before `level_rows.py` stamped the vector carries
+    `coefficients: null` and is skipped, with the gap named rather than
+    passed over in silence.
+    """
+    rec = load(RECORDS / f"{envelope.PRESET}.json")
+    block = rec.get("level_protocol")
+    assert block is not None, (
+        f"{envelope.PRESET}.json carries no level_protocol block; "
+        "test_the_envelope_agrees_with_the_record_on_the_level_and_crisis_rows "
+        "says what to do about it")
+    ran = block.get("coefficients")
+    if ran is None:
+        pytest.skip(
+            f"{envelope.PRESET}.json's level block predates the coefficient "
+            "stamp, so nothing here can tell whether the preset moved under "
+            "it. Re-measure with tools/presets/level_panel.py to close this.")
+    moved = sorted(k for k in set(ran) & set(rec["coefficients"])
+                   if ran[k] != rec["coefficients"][k])
+    assert not moved, (
+        f"{len(moved)} of {envelope.PRESET}'s coefficients have moved since "
+        f"its level block was measured ({', '.join(moved[:6])}), so "
+        f"envelope.CERTIFIED_LEVEL and CERTIFIED_CRISIS describe a preset "
+        f"that no longer exists")
+
+
 def test_every_level_and_crisis_row_the_envelope_publishes_is_graded():
     """Nothing in these two blocks is published without a band to read it.
 
@@ -154,6 +196,7 @@ def test_every_level_and_crisis_row_the_envelope_publishes_is_graded():
                 f"band, so it earns no verdict")
 
 
+@pytest.mark.ship_bar
 def test_the_envelope_and_the_record_agree_on_the_band_count():
     rec = load(RECORDS / f"{envelope.PRESET}.json")
     assert rec["in_band"]["252"] == len(envelope.CERTIFIED)
