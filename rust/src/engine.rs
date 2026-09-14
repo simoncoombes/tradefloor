@@ -586,6 +586,102 @@ impl Engine {
         Ok(())
     }
 
+    /// The per-SECTOR variance state, for checkpoints and forks.
+    ///
+    /// A GARCH(1,1) on each sector factor, standardised by its own target, so
+    /// its unconditional mean is exactly 1.0 and it multiplies the sector's
+    /// variance. Zero-length before the sector table existed, and exactly
+    /// 0.0 on every preset through pt-v18, where `sector_vol_alpha` and
+    /// `sector_vol_beta` are both 0.0. pt-v19 turns it on, and until this
+    /// was carried a restored engine continued the run with every sector
+    /// back at its target while the state hash said the two markets were
+    /// the same one.
+    pub fn sector_variance(&self) -> &[f64] {
+        &self.sector_variance
+    }
+
+    /// Put the per-sector variance states back. See
+    /// [`Engine::sector_variance`].
+    ///
+    /// A width mismatch is refused rather than resized, for the reason
+    /// [`Engine::set_volume_idio`] gives at length: the array is positional
+    /// against the sector table, so a pad or a truncation attaches each
+    /// state to whichever sector now sits at that index.
+    pub fn set_sector_variance(&mut self, values: &[f64]) -> Result<(), String> {
+        if values.len() != self.sector_variance.len() {
+            return Err(format!(
+                "this snapshot carries {} per-sector variance states and                  this engine's sector table holds {}. The states are                  positional against that table, so the restore is refused                  rather than padded or truncated.",
+                values.len(),
+                self.sector_variance.len(),
+            ));
+        }
+        self.sector_variance.copy_from_slice(values);
+        Ok(())
+    }
+
+    /// The day's accumulated per-sector factor, for checkpoints and forks.
+    ///
+    /// Zero at a day boundary and non-zero between the open and the close,
+    /// so it matters exactly where `attribution` and `tick_components`
+    /// matter: a fork taken mid-day. See [`Engine::sector_target_day`] for
+    /// its partner.
+    pub fn sector_day_factor(&self) -> &[f64] {
+        &self.sector_day_factor
+    }
+
+    /// The target variance the day's sector draws were scaled by.
+    ///
+    /// Recorded in the tick loop so the close standardises the day's factor
+    /// by the scale it was DRAWN at rather than by the target after the
+    /// close moved the VIX, which makes it per-day state and not a
+    /// derivable constant. 0.0 until the first tick of a day.
+    pub fn sector_target_day(&self) -> f64 {
+        self.sector_target_day
+    }
+
+    /// Put the sector day accumulators back. Width refused as elsewhere.
+    pub fn set_sector_day(&mut self, factor: &[f64], target: f64) -> Result<(), String> {
+        if factor.len() != self.sector_day_factor.len() {
+            return Err(format!(
+                "this snapshot carries {} per-sector day factors and this                  engine's sector table holds {}. The accumulators are                  positional against that table, so the restore is refused                  rather than padded or truncated.",
+                factor.len(),
+                self.sector_day_factor.len(),
+            ));
+        }
+        self.sector_day_factor.copy_from_slice(factor);
+        self.sector_target_day = target;
+        Ok(())
+    }
+
+    /// The per-NAME jump excitation state, for checkpoints and forks.
+    ///
+    /// A Hawkes-style self-excitation: a name that jumped carries a raised
+    /// intensity that decays over the following sessions. 0.0 on every
+    /// preset through pt-v18, where `jump_idio_excitation` is 0.0, and live
+    /// on pt-v19. Carried for the reason every state beside it is: a
+    /// checkpoint that dropped it resumed a market where nothing had ever
+    /// jumped.
+    pub fn jump_excitation(&self) -> &[f64] {
+        &self.jump_excitation
+    }
+
+    /// Put the per-name jump excitation back. See
+    /// [`Engine::jump_excitation`]. A width mismatch is refused, on the
+    /// reasoning in [`Engine::set_volume_idio`], and this write sits AFTER
+    /// that one in `restore_state`, so the boundary that docstring
+    /// describes is unchanged.
+    pub fn set_jump_excitation(&mut self, values: &[f64]) -> Result<(), String> {
+        if values.len() != self.jump_excitation.len() {
+            return Err(format!(
+                "this snapshot carries {} per-name jump excitation states                  and the roster holds {} companies. The states are                  positional against the roster, so this restore is refused                  rather than padded or truncated.",
+                values.len(),
+                self.jump_excitation.len(),
+            ));
+        }
+        self.jump_excitation.copy_from_slice(values);
+        Ok(())
+    }
+
     /// The day's endogenous news, for checkpoints and forks.
     ///
     /// Generated once in `open_market` and read by every tick of that day, so
@@ -3188,6 +3284,11 @@ impl Engine {
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);
         self.volume_idio.push(0.0);
+        // The per-name jump excitation follows the roster for the reason
+        // `volume_idio` above does, and it was left out for the same
+        // reason: it landed after this function was written. A name that
+        // joins has never jumped, so its excitation is 0.0.
+        self.jump_excitation.push(0.0);
         // The print decomposition, on the same argument as everything above
         // it: these are per-SLOT columns, and a roster edit that grew
         // `companies` without growing them would leave the new name reading
@@ -3241,6 +3342,12 @@ impl Engine {
         }
         if index < self.volume_idio.len() {
             self.volume_idio.remove(index);
+        }
+        // `Vec::remove` for the reason the line above uses it: the tail
+        // shifts down and keeps its relative order, so every remaining
+        // name keeps its own excitation.
+        if index < self.jump_excitation.len() {
+            self.jump_excitation.remove(index);
         }
         // Removed rather than left behind, because the tail shifts down by
         // one and a column that did not shift with it would report every
@@ -3711,6 +3818,33 @@ impl Engine {
         for value in &self.volume_idio {
             hash_f64(&mut buf, *value);
         }
+        // The two states the composed vector turned on. LENGTH-PREFIXED, the
+        // sector one because it follows the sector table rather than the
+        // roster and the name one because it is empty on an engine built
+        // with no companies -- the same reason the pending buffers below
+        // carry their lengths.
+        //
+        // Unhashed, these let a resumed day verify against a leaf it should
+        // not: two engines alike in every column and holding different
+        // sector variance revert to different sector targets tonight, and
+        // `test_sampled_verification` failed on exactly that.
+        hash_u32(&mut buf, self.sector_variance.len() as u32);
+        for value in &self.sector_variance {
+            hash_f64(&mut buf, *value);
+        }
+        hash_u32(&mut buf, self.jump_excitation.len() as u32);
+        for value in &self.jump_excitation {
+            hash_f64(&mut buf, *value);
+        }
+        // The sector state's two per-DAY companions, hashed for the reason
+        // `attribution` and `tick_components` above are: they are zero at a
+        // day boundary and they are the day's accumulated sector factor and
+        // the scale it was drawn at MID-DAY, which is where a fork is taken.
+        hash_u32(&mut buf, self.sector_day_factor.len() as u32);
+        for value in &self.sector_day_factor {
+            hash_f64(&mut buf, *value);
+        }
+        hash_f64(&mut buf, self.sector_target_day);
         hash_f64(&mut buf, self.universe_stress);
         hash_f64(&mut buf, self.forced_flow_spent);
         hash_f64(&mut buf, self.market_vol_log_level);

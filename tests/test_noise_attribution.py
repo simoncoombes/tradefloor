@@ -104,8 +104,8 @@ def test_arms_share_every_other_draw():
     """Common random numbers: the arms and the control consume the same
     draws per stream, so an effect is the draw's and not a reshuffle.
 
-    Stated on ``stream_positions``, which reports all seven streams.
-    ``draws_by_stream`` reports three, and four of the five streams
+    Stated on ``stream_positions``, which reports every stream.
+    ``draws_by_stream`` reports three, and the rest of the streams
     attributed at event level are invisible to it, so it cannot state this
     claim. Swept over every arm the plan builds rather than one.
     """
@@ -115,7 +115,11 @@ def test_arms_share_every_other_draw():
     assert set(control.engine.stream_positions()) == set(noise.STREAMS)
     assert len(control.engine.draws_by_stream()) == 3
     blind = set(noise.STREAMS) - set(control.engine.draws_by_stream())
-    assert blind == {"jumps", "news", "volume", "volume_idio", "overnight"}
+    # `market_vol_level` joined at 0.8.0 and is blind for the reason the
+    # five before it are: `draws_by_stream` counts the three streams an
+    # embedder can reach, and a mechanism stream is not one of them.
+    assert blind == {"jumps", "news", "volume", "volume_idio", "overnight",
+                     "market_vol_level"}
 
     attribution = noise.attribute(root, (1, 1), noise.column("price", 2),
                                   "event", streams=["news", "jumps"])
@@ -443,7 +447,7 @@ def test_an_economy_attribution_carries_its_caveats():
     assert "draw count depends on its own state" in named[0]
     # and the measurement the caveat promises
     measured = [c for c in attribution.caveats
-                if "draw positions on all eight streams" in c]
+                if "draw positions on all %d streams" % len(noise.STREAMS) in c]
     assert len(measured) == 1
     assert f"all {len(attribution.rows)} arms" in measured[0]
 

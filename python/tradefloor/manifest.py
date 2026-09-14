@@ -215,7 +215,9 @@ _SNAPSHOT_KEYS = (
     "market_open", "market_variance", "forced_flow_spent",
     "market_vol_log_level",
     "nominal_output_base", "volume_state",
-    "universe_stress", "volume_idio", "session_news", "economy",
+    "universe_stress", "volume_idio", "sector_variance", "jump_excitation",
+    "sector_day_factor", "sector_target_day",
+    "session_news", "economy",
     "central_bank", "day_count",
     # Added by the draw-addressing layer, and hashed for the reason the
     # refusal above exists: an installed overlay decides what the engine
@@ -496,6 +498,21 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _f64(buf, snapshot["volume_state"])
     for value in _column(snapshot["volume_idio"], n, "volume_idio"):
         _f64(buf, value)
+    # The two states the composed vector turned on, LENGTH-PREFIXED: the
+    # sector one follows the sector table rather than the roster, and the
+    # name one is empty on an engine built with no companies. Same reason
+    # the pending buffers below carry their lengths, and the same spelling.
+    for name in ("sector_variance", "jump_excitation", "sector_day_factor"):
+        raw = snapshot[name]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field {name!r} carries {len(raw)} bytes, which is "
+                "not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, name)
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    _f64(buf, snapshot["sector_target_day"])
     _f64(buf, snapshot["universe_stress"])
     _f64(buf, snapshot["forced_flow_spent"])
     # The market factor's slow variance level, in logs. Hashed beside the
@@ -714,6 +731,7 @@ LEDGER_SCHEMA = 1
 #: float syntax would round-trip it as some other NaN.
 _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
                    "tick_anchor", "volume_idio",
+                   "sector_variance", "jump_excitation", "sector_day_factor",
                    "pending_jump", "pending_overnight")
 
 

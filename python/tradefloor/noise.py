@@ -342,7 +342,7 @@ class Attribution:
                  interaction: float = 0.0, joint_rows: int = 0,
                  plan_caveats: list[str] | None = None,
                  control_draws: int = 0) -> None:
-        #: Every draw the control took, over the eight streams. Each row
+        #: Every draw the control took, over every stream. Each row
         #: carries the same number for its arm, so ``positions_match`` is
         #: checkable rather than asserted.
         self.control_draws = control_draws
@@ -440,10 +440,10 @@ def attribute(world: Any, window: Any, target: Any,
     is installed, the arm runs the same days with the same agent, and the
     target is read again. The effect is the difference. Every arm shares
     every other draw with the control, so the difference is the draw's and
-    not a reshuffle: ``stream_positions`` is identical across arms, on all
-    eight streams. ``draws_by_stream`` reports three of them and cannot
-    see jumps, news, volume or the per-name volume stream, which is four
-    of the five attributed at event level.
+    not a reshuffle: ``stream_positions`` is identical across arms, on
+    EVERY stream. ``draws_by_stream`` reports three of them and cannot see
+    jumps, news, volume or the per-name volume stream, which is four of
+    the five attributed at event level.
 
     Two perturbations, by what a draw is:
 
@@ -618,7 +618,7 @@ def attribute(world: Any, window: Any, target: Any,
     rows: list[dict] = []
     # Common random numbers is the whole claim, so it is measured rather
     # than assumed: every arm's stream positions are compared against the
-    # control's, on all eight streams. The economy chain is the one that
+    # control's, on every stream. The economy chain is the one that
     # can break it, because its draw count depends on its own state.
     control_positions = control.engine.stream_positions()
     for head, patches in plan:
@@ -726,7 +726,7 @@ def attribute(world: Any, window: Any, target: Any,
 
 
 def _total_draws(positions: dict) -> int:
-    """Every draw the eight streams have taken, as one number.
+    """Every draw the streams have taken, as one number.
 
     Carried on each row beside ``positions_match`` so the flag can be
     checked against something rather than taken on trust: an arm that
@@ -782,8 +782,11 @@ def row_caveats(rows: Sequence[dict], *, target: Any, last: int,
     elif matched:
         out.append(
             f"all {len(rows)} arms matched the control's draw positions on "
-            "all eight streams, so every effect is what that one draw did "
-            "to the target.")
+            # DERIVED from `STREAMS` rather than written. The sentence said
+            # "eight" and a ninth stream landed; a count in prose goes stale
+            # silently and this one had a test asserting the stale text.
+            f"all {len(STREAMS)} streams, so every effect is what that one "
+            "draw did to the target.")
     fired = sum(1 for r in rows if r["perturbation"] == "fire")
     if fired:
         # Which row is the control's own state is readable only where

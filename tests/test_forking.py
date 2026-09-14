@@ -1207,6 +1207,18 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "the key restores to it. What reaches this field is a snapshot whose "
         "economy carries output away from the restoring engine's own, which "
         "test_earnings_nominal_growth.py restores and then prices against.",
+    "sector_target_day":
+        "the target variance the day's sector draws were SCALED BY, read "
+        "once at the close to standardise the day's sector factor by the "
+        "scale it was drawn at. Its three companions -- sector_variance, "
+        "sector_day_factor and jump_excitation -- are all caught by this "
+        "scenario; this one is not, because the standardised factor only "
+        "reaches a price through the per-sector variance STATE, and the "
+        "state's recursion is what this scenario's preset drives. A market "
+        "that sees it is one where the VIX moves between the ticks and the "
+        "close, so the target after the close differs from the one the "
+        "draws were made at, and the sector state then carries the "
+        "difference into the next day.",
     "central_bank":
         "the meeting calendar runs off day_count, which IS restored, so both "
         "engines schedule the same meetings. A difference needs a run that "

@@ -2800,6 +2800,17 @@ impl PyEngine {
         // this and nothing called it. Carried now, while it is free.
         out.set_item("universe_stress", self.inner.universe_stress())?;
         out.set_item("volume_idio", f64_bytes(py, self.inner.volume_idio()))?;
+        // The two states pt-v19 turned on. Their own keys, so a snapshot
+        // written before they were carried restores to the zeros every
+        // preset through pt-v18 actually held.
+        out.set_item("sector_variance", f64_bytes(py, self.inner.sector_variance()))?;
+        out.set_item("jump_excitation", f64_bytes(py, self.inner.jump_excitation()))?;
+        // The sector state's two per-DAY companions, carried for the
+        // reason `attribution` and `tick_components` are: a fork taken
+        // mid-day needs the day's accumulated sector factor and the
+        // scale it was drawn at.
+        out.set_item("sector_day_factor", f64_bytes(py, self.inner.sector_day_factor()))?;
+        out.set_item("sector_target_day", self.inner.sector_target_day())?;
         // THE DAY'S JUMP AND OVERNIGHT MOVE, WAITING FOR A TAPE ROW.
         //
         // Both are applied at a day boundary, so no tick of that day can
@@ -3130,6 +3141,46 @@ impl PyEngine {
             self.inner
                 .set_volume_idio(&values)
                 .map_err(ValidationError::new_err)?;
+        }
+        // AFTER the volume states on purpose: `set_volume_idio`'s docstring
+        // describes a positional boundary -- what holds the snapshot's value
+        // when a width mismatch refuses, and what holds the engine's -- and
+        // adding these on that side leaves every sentence of it true.
+        //
+        // Absent means a snapshot from before these were carried, whose
+        // preset shipped both mechanisms at 0.0 and whose arrays were
+        // therefore all zeros, which is what a fresh engine holds.
+        // The day accumulators, restored together because the factor is
+        // only meaningful beside the scale it was drawn at. Absent means a
+        // snapshot from before they were carried, whose preset ran no
+        // sector state, and a fresh engine's zeros are what it described.
+        if let Some(raw) = snapshot.get_item("sector_day_factor")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            let target = match snapshot.get_item("sector_target_day")? {
+                Some(v) => v.extract()?,
+                None => 0.0,
+            };
+            self.inner
+                .set_sector_day(&values, target)
+                .map_err(ValidationError::new_err)?;
+        }
+        for (key, sector) in [("sector_variance", true), ("jump_excitation", false)] {
+            let Some(raw) = snapshot.get_item(key)? else { continue };
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            if sector {
+                self.inner.set_sector_variance(&values)
+            } else {
+                self.inner.set_jump_excitation(&values)
+            }
+            .map_err(ValidationError::new_err)?;
         }
         // Absent in a snapshot written before this was carried. Such a
         // snapshot described a day whose news this engine cannot know, so the
