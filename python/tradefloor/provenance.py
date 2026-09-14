@@ -486,6 +486,7 @@ OUT_OF_SCOPE = {
 #: derivations, which is the failure this module exists to prevent.
 DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "market_vol_gamma": {
+        "sandwich_bread": "CORRECTED 2026-09-14, defect-15: these bars were computed with the EXPECTED information in the sandwich's bread where Bollerslev-Wooldridge uses the OBSERVED HESSIAN. `arch` reproduces every point estimate to the sixth decimal and none of these bars; substituting the Hessian into our own sandwich reproduces `arch` to under 2e-6 with every other line unchanged (arch-crosscheck.md). The information-matrix equality that would make the two forms equivalent FAILS here and fails in the beta corner -- fifteen of sixteen elements of H - A within 0.4 se of zero, `(beta, beta)` at -4.44 -- so the expected form loses its justification and the Hessian form keeps its own. The year-block bootstrap agrees in direction. No shipped VALUE moves and the likelihood ratio 305 is untouched, so the GJR term's adoption is unaffected. ",
         "kind": "measured",
         "date": "2026-09-07",
         "estimator": "GJR-GARCH(1,1) by Gaussian quasi-maximum "
@@ -508,14 +509,16 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # residual kurtosis E[z^4] 5.06. The likelihood ratio stays
         # beside it because it is the evidence the term is there at all.
         "estimate": 0.1556,
-        "standard_error": 0.0180,
+        # Was 0.0180 under the expected-information bread; see the
+        # `sandwich_bread` note on this entry.
+        "standard_error": 0.0236,
         "residual": {
             "kind": "likelihood ratio against the symmetric GARCH(1,1)",
             "statistic": 305.0,
             "degrees_of_freedom": 1,
             "nll_gjr": 3551.49,
             "nll_symmetric": 3703.97,
-            "sandwich_correlations": "corr(alpha, gamma) -0.70, "
+            "sandwich_correlations": "corr(alpha, gamma) +0.12, "
                                      "corr(gamma, beta) -0.21, "
                                      "corr(alpha, beta) -0.48",
         },
@@ -756,6 +759,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "which sat 8 under the settled crossing on the same map",
     },
     "market_vol_alpha": {
+        "sandwich_bread": "CORRECTED 2026-09-14, defect-15: these bars were computed with the EXPECTED information in the sandwich's bread where Bollerslev-Wooldridge uses the OBSERVED HESSIAN. `arch` reproduces every point estimate to the sixth decimal and none of these bars; substituting the Hessian into our own sandwich reproduces `arch` to under 2e-6 with every other line unchanged (arch-crosscheck.md). The information-matrix equality that would make the two forms equivalent FAILS here and fails in the beta corner -- fifteen of sixteen elements of H - A within 0.4 se of zero, `(beta, beta)` at -4.44 -- so the expected form loses its justification and the Hessian form keeps its own. The year-block bootstrap agrees in direction. No shipped VALUE moves and the likelihood ratio 305 is untouched, so the GJR term's adoption is unaffected. ",
         "kind": "measured",
         "date": "2026-09-07",
         "estimator": "GJR-GARCH(1,1) by Gaussian quasi-maximum "
@@ -775,13 +779,15 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # distinguishable from nothing. That is a property of the tape
         # and is recorded rather than smoothed over.
         "estimate": 0.0066,
-        "standard_error": 0.0109,
+        # Was 0.0109 under the expected-information bread; OURS WAS THE
+        # WIDER ONE here, 1.33x, so the correction tightens it.
+        "standard_error": 0.0082,
         "presets": {"pt-v16": 0.28035004, "pt-v18": 0.28035004,
                     "pt-v19": 0.0066},
         "identity": "GJR(1,1) by Gaussian QMLE on the tape's index over "
                     "the whole span: omega 0.0202, alpha 0.0066 "
-                    "(sandwich se 0.0109), gamma 0.1556 (0.0180), beta "
-                    "0.8946 (0.0085); corr(alpha, gamma) -0.70, "
+                    "(sandwich se 0.0082), gamma 0.1556 (0.0236), beta "
+                    "0.8946 (0.0181); corr(alpha, gamma) +0.12, "
                     "corr(alpha, beta) -0.48. The symmetric fit on the "
                     "same series reads alpha 0.1059 (0.0093), beta "
                     "0.8787 (0.0092), corr -0.88, and is the "
@@ -802,6 +808,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "compensating for a mechanism",
     },
     "market_vol_beta": {
+        "sandwich_bread": "CORRECTED 2026-09-14, defect-15: these bars were computed with the EXPECTED information in the sandwich's bread where Bollerslev-Wooldridge uses the OBSERVED HESSIAN. `arch` reproduces every point estimate to the sixth decimal and none of these bars; substituting the Hessian into our own sandwich reproduces `arch` to under 2e-6 with every other line unchanged (arch-crosscheck.md). The information-matrix equality that would make the two forms equivalent FAILS here and fails in the beta corner -- fifteen of sixteen elements of H - A within 0.4 se of zero, `(beta, beta)` at -4.44 -- so the expected form loses its justification and the Hessian form keeps its own. The year-block bootstrap agrees in direction. No shipped VALUE moves and the likelihood ratio 305 is untouched, so the GJR term's adoption is unaffected. ",
         "kind": "measured",
         "date": "2026-09-07",
         "estimator": "GJR-GARCH(1,1) by Gaussian quasi-maximum "
@@ -814,11 +821,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "GJR form; numpy-only Gaussian QMLE, no scipy",
         # As `market_vol_alpha`: the GJR fit's own bar for the GJR value.
         "estimate": 0.8946,
-        "standard_error": 0.0085,
+        # Was 0.0085 under the expected-information bread. This is the
+        # 2.1x one and the corner where the information-matrix equality
+        # fails, which is why it is the largest of the four.
+        "standard_error": 0.0181,
         "presets": {"pt-v16": 0.69244622, "pt-v18": 0.69244622,
                     "pt-v19": 0.8946},
         "identity": "the same fit as `market_vol_alpha`: beta = 0.8946, "
-                    "sandwich se 0.0085, corr(beta, omega) -0.67. The "
+                    "sandwich se 0.0181, corr(beta, omega) -0.91. The "
                     "GJR persistence `alpha + gamma/2 + beta` is 0.9790; "
                     "the symmetric fit's `alpha + beta` is 0.9846 +/- "
                     "0.0046 against the pt-v14 optima's 0.9728. The "
