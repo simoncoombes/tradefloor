@@ -909,6 +909,429 @@
     },
     "tail": null
   },
+  "level_protocol": {
+    "certified_level": {
+      "index_drift_pct": 5.795725900673746
+    },
+    "certified_crisis": {
+      "fear_gauge_dn1": 1.5833803383878946,
+      "fear_gauge_dn3": 3.2472857097953636,
+      "index_tail_dn3_pct": 1.5803452855245683
+    },
+    "certification": {
+      "horizon_days": 252,
+      "seeds": 30,
+      "counts": {
+        "in_band": 14,
+        "in_band_of": 14,
+        "mechanism_shown": 9,
+        "mechanism_of": 10,
+        "at_centre": 13,
+        "at_centre_of": 14
+      },
+      "shown": [
+        "abs_return_acf1",
+        "abs_return_acf5",
+        "corr_asymmetry_lagged",
+        "corr_persistence_acf1",
+        "cross_sectional_corr",
+        "excess_kurtosis",
+        "leverage_effect",
+        "sector_excess_corr",
+        "volume_abs_return_corr"
+      ],
+      "not_shown": [
+        "corr_asymmetry"
+      ],
+      "reversed": [],
+      "at_the_cut": [],
+      "diagnostic": [
+        "abs_return_acf20"
+      ],
+      "in_band_and_reversed": [],
+      "rows": {
+        "excess_kurtosis": {
+          "k": 30,
+          "n": 30,
+          "cut": 21,
+          "null": 0.0,
+          "median": 9.151974347543812,
+          "p": 1.862645149230957e-09,
+          "verdict": "shown",
+          "at_the_cut": false,
+          "counted": true,
+          "z0_normal": 7.9828192942192135,
+          "z0_bootstrap": 12.34667510568453,
+          "tolerance": 0.06486,
+          "band_windows": 9
+        },
+        "abs_return_acf1": {
+          "k": 30,
+          "n": 30,
+          "cut": 21,
+          "null": 0.0,
+          "median": 0.06525048056167848,
+          "p": 1.862645149230957e-09,
+          "verdict": "shown",
+          "at_the_cut": false,
+          "counted": true,
+          "z0_normal": 2.217086748495344,
+          "z0_bootstrap": 4.429853739650905,
+          "tolerance": 0.06486,
+          "band_windows": 9
+        },
+        "abs_return_acf5": {
+          "k": 27,
+          "n": 30,
+          "cut": 21,
+          "null": 0.0,
+          "median": 0.03751593656817376,
+          "p": 8.430331945419312e-06,
+          "verdict": "shown",
+          "at_the_cut": false,
+          "counted": true,
+          "z0_normal": 1.5729927317976684,
+          "z0_bootstrap": 3.0270867422250998,
+          "tolerance": 0.06486,
+          "band_windows": 9
+        },
+        "abs_return_acf20": {
+          "k": 22,
+          "n": 30,
+          "cut": 21,
+          "null": 0.0,
+          "median": 0.009117936315759464,
+          "p": 0.016124801710247993,
+          "verdict": "shown",
+          "at_the_cut": false,
+          "counted": false,
+          "z0_normal": 0.743655333606446,
+          "z0_bootstrap": 2.379150195447675,
+          "tolerance": 0.06486,
+          "band_windows": 9
+        },
+        "cross_sectional_corr": {
+          "k": 30,
+          "n": 30,
+          "cut": 21,
+          "null": 0.0,
+          "median": 0.37397977555109096,
+          "p": 1.862645149230957e-09,
+          "verdict": "shown",
+          "at_the_cut": false,
+          "counted": true,
+          "z0_normal": 11.188963410205009,
+          "z0_bootstrap": 13.480600238253505,
+          "tolerance": 0.06486,
+          "band_windows": 9
+        },
+        "volume_abs_return_corr": {
+          "k": 30,
+          "n": 30,
+          "cut": 21,
+          "null": 0.0,
+          "median": 0.5110345326052634,
+          "p": 1.862645149230957e-09,
+          "verdict": "shown",
+          "at_the_cut": false,
+          "counted": true,
+          "z0_normal": 26.847320129644924,
+          "z0_bootstrap": 25.63120784997196,
+          "tolerance": 0.06486,
+          "band_windows": 9
+        },
+        "leverage_effect": {
+          "k": 28,
+          "n": 30,
+          "cut": 21,
+          "null": 0.0,
+          "median": -0.04411458724892224,
+          "p": 8.67992639541626e-07,
+          "verdict": "shown",
+          "at_the_cut": false,
+          "counted": true,
+          "z0_normal": 4.085493431584937,
+          "z0_bootstrap": 4.7120577488600475,
+          "tolerance": 0.06486,
+          "band_windows": 9
+        },
+        "corr_asymmetry": {
+          "k": 19,
+          "n": 30,
+          "cut": 21,
+          "null": 0.0,
+          "median": 0.026577117369701704,
+          "p": 0.20048842206597328,
+          "verdict": "not shown",
+          "at_the_cut": false,
+          "counted": true,
+          "z0_normal": 0.8310524222856902,
+          "z0_bootstrap": 1.3938662977381118,
+          "tolerance": 0.06486,
+          "band_windows": 9
+        },
+        "corr_asymmetry_lagged": {
+          "k": 24,
+          "n": 30,
+          "cut": 21,
+          "null": 0.0,
+          "median": 0.0844271755787944,
+          "p": 0.001430906355381012,
+          "verdict": "shown",
+          "at_the_cut": false,
+          "counted": true,
+          "z0_normal": 3.630012137870327,
+          "z0_bootstrap": 4.005250623474998,
+          "tolerance": 0.06486,
+          "band_windows": 9
+        },
+        "sector_excess_corr": {
+          "k": 30,
+          "n": 30,
+          "cut": 21,
+          "null": 0.0,
+          "median": 0.14252625274650027,
+          "p": 1.862645149230957e-09,
+          "verdict": "shown",
+          "at_the_cut": false,
+          "counted": true,
+          "z0_normal": 17.769364360592547,
+          "z0_bootstrap": 23.106456034623108,
+          "tolerance": 0.06486,
+          "band_windows": 9
+        },
+        "corr_persistence_acf1": {
+          "k": 24,
+          "n": 30,
+          "cut": 21,
+          "null": -0.09284725320217063,
+          "median": 0.16808042414157937,
+          "p": 0.001430906355381012,
+          "verdict": "shown",
+          "at_the_cut": false,
+          "counted": true,
+          "z0_normal": 3.70132647039418,
+          "z0_bootstrap": 3.437317887105271,
+          "tolerance": 0.06486,
+          "band_windows": 9
+        }
+      },
+      "centre": {
+        "annualised_vol_pct": {
+          "z_r": -0.45562364877977474,
+          "median": 24.506466990734015,
+          "real_centre": 25.9,
+          "se_m": 2.7435747049193977,
+          "se_real": 1.3517871726881703,
+          "at_centre": true,
+          "undetermined": null
+        },
+        "excess_kurtosis": {
+          "z_r": -0.9460890397837529,
+          "median": 9.151974347543812,
+          "real_centre": 11.06,
+          "se_m": 1.1464589151067526,
+          "se_real": 1.6591910672033003,
+          "at_centre": true,
+          "undetermined": null
+        },
+        "return_acf1": {
+          "z_r": 0.9291933734712718,
+          "median": 0.007854203605338669,
+          "real_centre": -0.006,
+          "se_m": 0.010496116527468414,
+          "se_real": 0.010589495004042243,
+          "at_centre": true,
+          "undetermined": null
+        },
+        "abs_return_acf1": {
+          "z_r": -0.5180952073100712,
+          "median": 0.06525048056167848,
+          "real_centre": 0.083,
+          "se_m": 0.029430729585101532,
+          "se_real": 0.017536359301235312,
+          "at_centre": true,
+          "undetermined": null
+        },
+        "abs_return_acf5": {
+          "z_r": -0.3057158371932604,
+          "median": 0.03751593656817376,
+          "real_centre": 0.045,
+          "se_m": 0.023850038089686085,
+          "se_real": 0.005519824461413181,
+          "at_centre": true,
+          "undetermined": null
+        },
+        "abs_return_acf20": {
+          "z_r": -0.7634199147142984,
+          "median": 0.009117936315759464,
+          "real_centre": 0.02,
+          "se_m": 0.012260970780026461,
+          "se_real": 0.00727017375315206,
+          "at_centre": true,
+          "undetermined": null
+        },
+        "cross_sectional_corr": {
+          "z_r": 0.5941435663497279,
+          "median": 0.37397977555109096,
+          "real_centre": 0.346,
+          "se_m": 0.03342398771364279,
+          "se_real": 0.03317456319378129,
+          "at_centre": true,
+          "undetermined": null
+        },
+        "volume_abs_return_corr": {
+          "z_r": -0.9808436503089856,
+          "median": 0.5110345326052634,
+          "real_centre": 0.536,
+          "se_m": 0.01903484333398986,
+          "se_real": 0.016897714311908982,
+          "at_centre": true,
+          "undetermined": null
+        },
+        "leverage_effect": {
+          "z_r": -0.10570493992135481,
+          "median": -0.04411458724892224,
+          "real_centre": -0.042,
+          "se_m": 0.010797860279953579,
+          "se_real": 0.016840162415310903,
+          "at_centre": true,
+          "undetermined": null
+        },
+        "volume_change_acf1": {
+          "z_r": -3.7888763621185912,
+          "median": -0.28689369171290185,
+          "real_centre": -0.255,
+          "se_m": 0.005417304259694947,
+          "se_real": 0.006442886485346302,
+          "at_centre": false,
+          "undetermined": null
+        },
+        "corr_asymmetry": {
+          "z_r": -1.1138654948268347,
+          "median": 0.026577117369701704,
+          "real_centre": 0.083401,
+          "se_m": 0.03198007328659865,
+          "se_real": 0.03974680225747316,
+          "at_centre": true,
+          "undetermined": null
+        },
+        "corr_asymmetry_lagged": {
+          "z_r": -0.5425386434736835,
+          "median": 0.0844271755787944,
+          "real_centre": 0.110982,
+          "se_m": 0.023258097320943544,
+          "se_real": 0.043066492118656596,
+          "at_centre": true,
+          "undetermined": null
+        },
+        "sector_excess_corr": {
+          "z_r": -1.7858904220530578,
+          "median": 0.14252625274650027,
+          "real_centre": 0.163995,
+          "se_m": 0.008020897644632884,
+          "se_real": 0.008954170010213402,
+          "at_centre": true,
+          "undetermined": null
+        },
+        "corr_persistence_acf1": {
+          "z_r": -0.6709739897896049,
+          "median": 0.16808042414157937,
+          "real_centre": 0.228778,
+          "se_m": 0.07049572077222413,
+          "se_real": 0.05668956744666251,
+          "at_centre": true,
+          "undetermined": null
+        }
+      },
+      "tail": {
+        "row": "index_tail_dn3_pct",
+        "horizon_days": 252,
+        "seeds": 30,
+        "hits": 119,
+        "sessions": 7530,
+        "rate": 1.5803452855245683,
+        "band": [
+          0.47,
+          1.96
+        ],
+        "in_band": true,
+        "verdict": "in",
+        "margin": 0.37965471447543164,
+        "se_m": 0.6102174294757675,
+        "real_centre": 1.2131519274376419,
+        "se_real": 0.3991338938844757,
+        "z_r": 0.5035846014479309,
+        "at_the_edge": true,
+        "zero_share": 0.36666666666666664,
+        "five_or_more_share": 0.16666666666666666,
+        "max_hits": 39,
+        "tape": {
+          "windows": 35,
+          "zero_share": 0.37142857142857144,
+          "five_or_more_share": 0.2,
+          "max_hits": 33
+        },
+        "counted": false,
+        "not_counted": "year one of a non-stationary opening: every seed opens in expansion at phase age zero, so the ensemble rate reads the opening and not the model -- 0.57x to 0.97x of the centre in year one and 2.06x to 2.19x in year two on the same preset and the same seeds. Graded and printed, not counted, until the run carries a stationary opening"
+      }
+    },
+    "coefficients": null,
+    "control": {
+      "preset": "pt-v16",
+      "reproduced": true,
+      "values": {
+        "index_drift_pct": -13.643092896551307,
+        "fear_gauge_dn1": 0.9499890654690217,
+        "fear_gauge_dn3": 1.9556904785119098,
+        "index_tail_dn3_pct": 1.2749003984063745
+      },
+      "published": {
+        "index_drift_pct": -13.6431,
+        "fear_gauge_dn1": 0.95,
+        "fear_gauge_dn3": 1.9557,
+        "index_tail_dn3_pct": 1.2749
+      }
+    },
+    "measured": {
+      "tradefloor_version": "0.6.2",
+      "commit": "ee22c65",
+      "protocol": "facts.LEVEL_PROTOCOL, roster varying with the seed",
+      "seeds": [
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        128,
+        129,
+        130
+      ],
+      "days": 252
+    }
+  },
   "in_band": {
     "252": 14,
     "504": 14,
