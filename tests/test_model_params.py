@@ -552,6 +552,25 @@ PERTURBATIONS = [
     # named preset breaks the assertion below for a reason that has
     # nothing to do with the parameter.
     ("market_beta_down_asym_recentre", 0.5, True),
+    # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
+    # is suppressed on a down tick of the factor and inflated on an up tick.
+    # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
+    # value. MEASURED at 0.05, 0.10, 0.15, 0.20, 0.50 and 1.00 -- every
+    # continuous column moves at every one of them, and NO stream's draw
+    # count moves at any of them, market or economy or the total.
+    #
+    # The draw line is the point of the entry rather than a by-product.
+    # This dial reshapes a shock the tick has ALREADY taken, so there is no
+    # branch anywhere in it that a draw sits behind; a version that needed a
+    # number would have needed a stream of its own, and would have been a
+    # larger change than a reallocation.
+    #
+    # Neutrality is not what this row measures and could not be: it is a
+    # SECOND-MOMENT identity over the half-lines of the factor and this
+    # probe is three sessions on ten names. The identity is measured in
+    # `market/factors.rs`'s own tests and quantified at finite tick counts
+    # by `the_variance_residual_is_the_binomial_one`.
+    ("market_idio_down_suppress", 0.15, True),
     # How much of oil demand supply answers. INERT over a probe this short,
     # and the reason is the mechanism rather than a wiring gap. Inventory
     # opens at 50 and the oil price feels it only outside the 40-to-60 dead

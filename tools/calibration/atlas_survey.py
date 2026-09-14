@@ -167,6 +167,23 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the box the way ramp=50 does above: strong-to-implausible.
     "market_beta_down_asym": (0.0, 0.1),
     "market_beta_down_asym_lag": (0.0, 0.1),
+    # The variance-neutral down-tick reallocation (`corr-asymmetry.md` §10,
+    # design repository): the idiosyncratic shock is suppressed by `1 - c`
+    # on a down tick of the factor and inflated by `sqrt(2 - (1 - c)^2)` on
+    # an up tick, which holds the unconditional variance exactly and raises
+    # the factor's share where `corr_asymmetry` looks.
+    #
+    # The box runs from the shipped 0.0 -- the mechanism off, and the arm
+    # every falsifier is read against -- to 0.5, which is
+    # strong-to-implausible in the sense the entries above use rather than a
+    # convention. At 0.5 a down tick carries a QUARTER of its idiosyncratic
+    # variance and an up tick 1.75 times it, which at the candidate's
+    # unconditional pairwise correlation of 0.322 is a tick-level
+    # conditional correlation of 0.65 down against 0.21 up: a gap of 0.44
+    # where the tape's DAY-level gap is 0.08. The registered response curve
+    # stops at 0.20 and the prediction solves near 0.15, so the box holds
+    # the useful region several times over.
+    "market_idio_down_suppress": (0.0, 0.5),
     # How far the market factor's shock share rotates with its own variance
     # excursion. The top is not a convention: `alpha_beta_at` clamps the
     # rotation at the value holding the GJR fourth-moment coefficient at

@@ -150,6 +150,19 @@ PARAM_SPECS: dict[str, dict] = {
     # drift of its own, which is the defect inverted rather than a
     # richer model.
     "market_beta_down_asym_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # The variance-neutral down-tick reallocation. Ships at 0.0, so the
+    # multiplicative box collapses and the hard range is what a search gets.
+    # The top is the construction's own domain rather than a taste: the down
+    # scale is `1 - c`, so at 1.0 a down tick's idiosyncratic shock is
+    # silenced entirely and the up tick's carries the whole budget at
+    # `sqrt(2)`, and past it `1 - c` would go negative and FLIP the shock's
+    # sign, which is not a reallocation of variance at all.
+    # `idio_suppress_scales` clamps there, so the surface above 1.0 is flat
+    # by construction and a search that walked into it would be reading a
+    # plateau. The step is 0.01 because the registered curve is 0.05 apart
+    # and the predicted solve sits near 0.15.
+    "market_idio_down_suppress": {"kind": "abs", "step_unit": 0.01,
+                                  "hard_range": (0.0, 1.0)},
     # The SHARE of nominal output growth the valuation's earnings carry.
     # A share, so [0, 1] rather than an open coefficient: 1.0 holds the
     # earnings share of nominal output constant, which is the reading the

@@ -118,6 +118,33 @@ pub fn idio_scale_for(params: &crate::params::ModelParams, beta: f64) -> f64 {
     }
 }
 
+/// The two scales the down-tick reallocation applies to a name's
+/// idiosyncratic shock, `(down, up)`, from `market_idio_down_suppress`.
+///
+/// `down` is `1 - c` and `up` is `sqrt(2 - down^2)`, so the two SQUARED
+/// scales sum to 2 and average to exactly one over an even split of the
+/// half-lines. That identity is the whole of the neutrality claim and it is
+/// why this returns the pair rather than the up scale alone: a reader who
+/// wants to check it has both numbers in one place, and
+/// `the_two_scales_average_to_one_to_within_an_ulp` checks it here rather
+/// than through a tick.
+///
+/// BOUNDED, and by the construction's own domain rather than by taste. The
+/// down scale is clamped to `[0, sqrt(2)]`, which is `c` in
+/// `[1 - sqrt(2), 1]`: at `c` = 1 the down tick's idiosyncratic shock is
+/// silenced entirely and the up tick's is scaled by `sqrt(2)`, the extreme
+/// of the reallocation, and past it `1 - c` goes negative and the transform
+/// FLIPS THE SHOCK'S SIGN on a down tick, which is not a reallocation of
+/// variance at all. The lower end admits the reversed arm a survey may want
+/// to run as a sign check and stops where `2 - down^2` does. `max` on that
+/// difference because `sqrt(2.0)` squared rounds to `2.0000000000000004`,
+/// so the clamp's own endpoint would otherwise hand `sqrt` a negative
+/// number and put a NaN into a price.
+pub fn idio_suppress_scales(suppress: f64) -> (f64, f64) {
+    let down = mathx::clamp(1.0 - suppress, 0.0, mathx::sqrt(2.0));
+    (down, mathx::sqrt(mathx::max(2.0 - down * down, 0.0)))
+}
+
 pub const S_COMPONENT_KEYS: [&str; 8] = [
     "reversion",
     "momentum",
@@ -523,6 +550,33 @@ pub fn calculate_live_factors(
     // contractual for the tape even though the two are independent.
     let idiosyncratic_noise =
         rng.next_normal() * idiosyncratic_sigma * cap_mult * volatility_multiplier;
+
+    // The variance-neutral down-tick REALLOCATION (`corr-asymmetry.md` §10).
+    // The tilt two blocks above is the same-day correlation wire and it
+    // multiplies: it buys share by adding variance, and the added variance
+    // is what makes its argmin on the nineteen the value it already ships.
+    // This buys the same share by MOVING it. The market leg is untouched
+    // and the idiosyncratic leg is suppressed by `(1 - c)` on a down tick
+    // and inflated by `sqrt(2 - (1 - c)^2)` on an up tick, so the two
+    // squared scales average to exactly one over an even split and no
+    // moment moves — see `ModelParams::market_idio_down_suppress` for the
+    // algebra, for what the `>= 0.0` boundary costs at a degenerate zero
+    // factor, and for why no recentring dial stands beside this one.
+    //
+    // AFTER the draw, deliberately and not incidentally: this reshapes a
+    // shock the tick has already taken, so no branch here can move the
+    // count or the order. At 0.0 neither multiply happens, so every preset
+    // that predates the dial is bit-identical rather than multiplied by a
+    // pair of ones.
+    let idiosyncratic_noise = if params.market_idio_down_suppress == 0.0 {
+        idiosyncratic_noise
+    } else {
+        let (down, up) = idio_suppress_scales(params.market_idio_down_suppress);
+        // `< 0.0`, the convention the tilt above already uses, so an exactly
+        // zero factor is an up tick on both wires and the two cannot
+        // disagree about what a down tick is.
+        idiosyncratic_noise * if shared.market_factor < 0.0 { down } else { up }
+    };
 
     // Crash correlation: when the market shock is extreme, everything loads
     // more heavily on it and diversification stops working — which is what
@@ -1191,6 +1245,276 @@ mod tests {
                 continue;
             }
             assert_eq!(p.market_beta_down_asym_recentre, 0.0, "{name}");
+        }
+    }
+
+    // ── The down-tick reallocation ────────────────────────────────────────
+
+    /// A name with no market and no sector exposure, so `random_noise` IS
+    /// the idiosyncratic term and the reallocation can be read off it
+    /// without the factor leg in the way. Beta 0.0 zeroes
+    /// `market_component` and the amplifier multiplies it, so the only
+    /// thing left in the sum is the shock this dial scales.
+    fn idio_only_company() -> FactorCompany {
+        let mut c = company();
+        c.beta = Some(0.0);
+        c
+    }
+
+    /// The tick's shared factors at a market factor of `z` conditional
+    /// sigmas. Deliberately NOT the `shared()` fixture: that one hands the
+    /// tick a factor of exactly 0.0, which is the up branch on both wires,
+    /// and a neutrality measured there would measure the degenerate case
+    /// the parameter's doc warns about.
+    fn shared_at(z: f64) -> SharedFactors {
+        let sigma_tick = crate::params::PT_V1.market_factor_sigma / mathx::sqrt(390.0);
+        SharedFactors {
+            market_factor: z * sigma_tick,
+            sector_factors: vec![("technology".into(), 0.0)],
+            crisis_spike: 0.0,
+            prev_day_down: false,
+            market_sigma_tick: sigma_tick,
+        }
+    }
+
+    fn with_suppress(c: f64) -> crate::params::ModelParams {
+        crate::params::PT_V1.with_override("market_idio_down_suppress", c).unwrap()
+    }
+
+    #[test]
+    fn the_two_scales_average_to_one_to_within_an_ulp() {
+        // The whole of the variance-neutrality claim, checked on the
+        // arithmetic rather than through a tick: `down^2 + up^2 == 2`, so
+        // their mean over an even split is one. Exact in exact arithmetic;
+        // in IEEE-754 the doubles round, and this pins HOW FAR -- the doc
+        // says one ulp and a reader is entitled to see the number.
+        let mut worst: f64 = 0.0;
+        for k in 0..=200 {
+            let c = k as f64 * 0.005; // 0.0 .. 1.0
+            let (down, up) = idio_suppress_scales(c);
+            let residual = (down * down + up * up - 2.0).abs();
+            worst = mathx::max(worst, residual);
+        }
+        // Four ulps of 2.0. Measured worst case over the grid above is
+        // under one; the bar is loose enough that a different rounding on
+        // another target is not a failure and tight enough that an
+        // arithmetic mistake is.
+        assert!(worst <= 4.0 * f64::EPSILON * 2.0,
+                "the two squared scales are off by {worst}, not by rounding");
+    }
+
+    #[test]
+    fn the_scales_are_bounded_by_the_constructions_own_domain() {
+        // At c = 0 the pair is exactly (1, 1) -- the identity, and it has
+        // to be exact rather than close, because the branch above is what
+        // makes a shipped preset bit-identical and this is what would be
+        // multiplied if anyone removed it.
+        assert_eq!(idio_suppress_scales(0.0), (1.0, 1.0));
+        // At c = 1 the down tick is silenced and the up tick carries the
+        // whole budget.
+        let (down, up) = idio_suppress_scales(1.0);
+        assert_eq!(down, 0.0);
+        assert_eq!(up, mathx::sqrt(2.0));
+        // Past the domain the clamp holds rather than flipping the shock's
+        // sign, and -- the reason the `max` is there -- neither end is NaN.
+        for c in [-5.0, -0.5, 1.5, 9.0] {
+            let (down, up) = idio_suppress_scales(c);
+            assert!(down.is_finite() && up.is_finite(), "c {c}: ({down}, {up})");
+            assert!(down >= 0.0 && up >= 0.0, "c {c}: ({down}, {up})");
+        }
+    }
+
+    #[test]
+    fn the_reallocation_is_inert_at_zero_on_both_half_lines() {
+        // The identity arm. `c` = 0.0 takes neither multiply, so a preset
+        // that predates the dial is bit-identical -- and it has to hold on
+        // a DOWN tick as well as an up one, because the branch that would
+        // break it is the down one.
+        let c = idio_only_company();
+        for z in [-3.0, -1.0, -0.25, 0.25, 1.0, 3.0] {
+            let s = shared_at(z);
+            let base = calculate_live_factors(
+                &c, &[], 0.0, 1.0, &s, &crate::params::PT_V1, &mut Fixed(0.7));
+            let dialled = calculate_live_factors(
+                &c, &[], 0.0, 1.0, &s, &with_suppress(0.0), &mut Fixed(0.7));
+            assert_eq!(base.random_noise, dialled.random_noise, "z {z}");
+        }
+    }
+
+    #[test]
+    fn a_down_tick_is_suppressed_and_an_up_tick_is_inflated() {
+        // The direction, which is the mechanism: the factor's SHARE has to
+        // rise where the statistic looks and fall where it does not.
+        let company = idio_only_company();
+        let p = with_suppress(0.15);
+        let base = |z: f64| calculate_live_factors(
+            &company, &[], 0.0, 1.0, &shared_at(z), &crate::params::PT_V1,
+            &mut Fixed(1.0)).random_noise;
+        let dialled = |z: f64| calculate_live_factors(
+            &company, &[], 0.0, 1.0, &shared_at(z), &p, &mut Fixed(1.0)).random_noise;
+
+        let (down, up) = idio_suppress_scales(0.15);
+        assert_eq!(dialled(-1.5), base(-1.5) * down);
+        assert_eq!(dialled(1.5), base(1.5) * up);
+        assert!(down < 1.0 && up > 1.0, "({down}, {up}) is not a reallocation");
+    }
+
+    #[test]
+    fn the_reallocation_moves_no_first_moment_at_any_tick() {
+        // Mean-neutrality, and it is stronger than "in expectation": the
+        // scale depends on the FACTOR's sign and not on the shock's, so the
+        // two arms of a symmetric shock are scaled by the same number and
+        // cancel to the bit at every single tick. That is why no recentring
+        // dial stands beside this one, where `market_beta_down_asym` needed
+        // `market_beta_down_asym_recentre`.
+        let company = idio_only_company();
+        for c in [0.05, 0.15, 0.40, 1.0] {
+            let p = with_suppress(c);
+            for z in [-3.0, -0.5, 0.5, 3.0] {
+                let s = shared_at(z);
+                let plus = calculate_live_factors(
+                    &company, &[], 0.0, 1.0, &s, &p, &mut Fixed(1.0)).random_noise;
+                let minus = calculate_live_factors(
+                    &company, &[], 0.0, 1.0, &s, &p, &mut Fixed(-1.0)).random_noise;
+                assert_eq!(plus + minus, 0.0, "c {c}, z {z}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_reallocation_holds_the_second_moment_over_a_symmetric_factor() {
+        // Variance-neutrality, measured through the tick rather than
+        // argued: the density-weighted mean of the squared shock over a
+        // symmetric grid of factor draws, dialled against undialled. The
+        // grid is the one `recentring_returns_the_mean_the_downside_tilt_
+        // injects` uses and it matters for the same reason it does there --
+        // except that here the WEIGHTS are not what carries the result. The
+        // scale depends on the factor only through its SIGN, so any
+        // symmetric grid gives the same answer; the weights are kept so the
+        // two tests read the factor the same way.
+        //
+        // The grid excludes z = 0 exactly. That is deliberate: an exactly
+        // zero factor is an up tick, and a grid containing one would be an
+        // uneven split of the half-lines, which is the one condition the
+        // neutrality needs.
+        let company = idio_only_company();
+        let grid: Vec<f64> = (1..=400).map(|k| k as f64 * 0.01)
+            .flat_map(|z| [z, -z]).collect();
+
+        let mean_square = |p: &crate::params::ModelParams| -> f64 {
+            let mut total = 0.0;
+            let mut weight = 0.0;
+            for z in &grid {
+                let w = mathx::exp(-z * z / 2.0);
+                let noise = calculate_live_factors(
+                    &company, &[], 0.0, 1.0, &shared_at(*z), p, &mut Fixed(1.0))
+                    .random_noise;
+                total += w * noise * noise;
+                weight += w;
+            }
+            total / weight
+        };
+
+        let base = mean_square(&crate::params::PT_V1);
+        for c in [0.05, 0.15, 0.40, 1.0] {
+            let ratio = mean_square(&with_suppress(c)) / base;
+            assert!((ratio - 1.0).abs() < 1e-12,
+                    "c {c}: the second moment moved to {ratio} of itself");
+        }
+    }
+
+    #[test]
+    fn a_degenerate_zero_factor_is_the_one_place_neutrality_fails() {
+        // The caveat the doc states, asserted rather than left as prose. A
+        // factor of exactly 0.0 takes the up branch on both wires, so a
+        // configuration in which the factor cannot move at all inflates the
+        // idiosyncratic variance by `2 - (1 - c)^2` instead of holding it.
+        // This is what makes the `shared()` fixture the wrong place to
+        // measure neutrality, and somebody will try.
+        let company = idio_only_company();
+        let s = shared();
+        assert_eq!(s.market_factor, 0.0, "the fixture's premise");
+        let base = calculate_live_factors(
+            &company, &[], 0.0, 1.0, &s, &crate::params::PT_V1, &mut Fixed(1.0))
+            .random_noise;
+        let (_, up) = idio_suppress_scales(0.15);
+        let dialled = calculate_live_factors(
+            &company, &[], 0.0, 1.0, &s, &with_suppress(0.15), &mut Fixed(1.0))
+            .random_noise;
+        assert_eq!(dialled, base * up);
+        assert!(up > 1.0, "and it is an INFLATION, which is the whole warning");
+    }
+
+    #[test]
+    fn the_variance_residual_is_the_binomial_one() {
+        // What "exactly neutral" does NOT mean. Neutrality is exact in
+        // EXPECTATION; over a finite run of `N` ticks the realised
+        // multiplier on the idiosyncratic variance is
+        // `M_N = (k/N) down^2 + (1 - k/N) up^2` with `k` the down-tick
+        // count, and `k ~ Binomial(N, 1/2)` because the sign of a symmetric
+        // draw is a fair coin. Linear in `k`, so
+        // `E[M_N] = 1` and `sd(M_N) = |down^2 - up^2| / (2 sqrt(N))`,
+        // which is `|1 - (1-c)^2| / sqrt(N)`.
+        //
+        // The closed form is confirmed against flipped coins rather than
+        // restated, because the step worth checking is the one from "a
+        // binomial count" to that expression.
+        let c = 0.15;
+        let (down, up) = idio_suppress_scales(c);
+        let n: usize = 390; // one session
+        let closed = (1.0 - down * down).abs() / mathx::sqrt(n as f64);
+
+        // A self-contained xorshift64*: this is a property of the ARITHMETIC
+        // and must not reach for an engine stream, whose schedule is a
+        // contract of its own.
+        let mut state: u64 = 0x2026_0914_a575_4e07;
+        let mut flip = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state & 1 == 1
+        };
+
+        let reps = 4000;
+        let mut sum = 0.0;
+        let mut sum_sq = 0.0;
+        for _ in 0..reps {
+            let mut k = 0usize;
+            for _ in 0..n {
+                if flip() {
+                    k += 1;
+                }
+            }
+            let frac = k as f64 / n as f64;
+            let m = frac * down * down + (1.0 - frac) * up * up;
+            sum += m;
+            sum_sq += m * m;
+        }
+        let mean = sum / reps as f64;
+        let sd = mathx::sqrt(sum_sq / reps as f64 - mean * mean);
+
+        assert!((mean - 1.0).abs() < 5.0 * closed / mathx::sqrt(reps as f64),
+                "the realised multiplier centres at {mean}, not at one");
+        assert!((sd / closed - 1.0).abs() < 0.10,
+                "sampled sd {sd} against the closed form {closed}");
+
+        // And the two figures the parameter's doc quotes, so the prose
+        // cannot drift from the arithmetic: 1.4 per cent of the
+        // idiosyncratic variance over one session, 0.089 per cent over a
+        // 252-session window.
+        assert!((closed - 0.0140).abs() < 0.0002, "one session: {closed}");
+        let window = (1.0 - down * down).abs() / mathx::sqrt((n * 252) as f64);
+        assert!((window - 0.00089).abs() < 0.00002, "252 sessions: {window}");
+    }
+
+    #[test]
+    fn every_preset_ships_the_reallocation_off() {
+        // The dial ships at 0.0 and the branch is at zero, so adding it
+        // moved no trajectory. Asserted against the presets rather than
+        // argued from the branch, as the recentring's own guard is.
+        for name in crate::params::ModelParams::preset_names() {
+            let p = crate::params::ModelParams::preset(name).expect("named");
+            assert_eq!(p.market_idio_down_suppress, 0.0, "{name}");
         }
     }
 

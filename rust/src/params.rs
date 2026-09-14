@@ -1101,6 +1101,156 @@ pub struct ModelParams {
     /// offset added before it would itself be amplified, delivering the
     /// form times `E[A]` rather than the form.
     pub market_beta_down_asym_recentre: f64,
+
+    /// Suppression of a name's IDIOSYNCRATIC shock on a down tick of the
+    /// market factor, with the up tick inflated to hold the unconditional
+    /// variance exactly. 0.0 -- every shipped preset -- is bit-identical by
+    /// branch, the way every wire in `factors.rs` is.
+    ///
+    /// # The tape measurement this exists for
+    ///
+    /// MEASURED, `programme/results/corr-asymmetry.md` sections 0 and 5
+    /// (design repository). `corr_asymmetry` at 504 is the largest single
+    /// row on the whole-tape nineteen -- 3.29 of 9.19 on the release
+    /// candidate -- and it is NOT a level deficit. The row and its lagged
+    /// partner SUM to 0.1195..0.1590 across all thirty measured
+    /// arm-horizon cells against a tape of 0.1291 at 252 and 0.1377 at 504.
+    /// The model has as much down-conditioned co-movement as the tape. What
+    /// is wrong is where it lands: the tape puts 47 per cent of it on the
+    /// SAME DAY at 252 and 60 per cent at 504, and every pt-v19 arm puts 8
+    /// to 15 per cent there. It is a routing defect, and it is a routing
+    /// defect no existing dial reaches -- paired over 120 rosters and 22
+    /// arms, the largest move any pt-v19 dial produces at 504 is
+    /// +0.0026 +/- 0.0012, three per cent of a 0.065 gap.
+    ///
+    /// # Why not the tilt that is already there
+    ///
+    /// `market_beta_down_asym` is the same-day wire, and its argmin on the
+    /// nineteen -- on slopes re-measured on the pt-v19 base itself -- is
+    /// the shipped 0.025 at BOTH horizons. Not near it: at it. The reason
+    /// is that it MULTIPLIES. Scaling the factor leg by `(1 + a)` on a down
+    /// tick raises the name's conditional variance by
+    /// `beta^2 s_f^2 ((1 + a)^2 - 1)`, so the factor's SHARE -- which is
+    /// what a pairwise correlation is -- rises only as
+    /// `q (1+a)^2 / (1 + q ((1+a)^2 - 1))` rather than as `q (1+a)^2`,
+    /// while the whole of the excess variance lands on
+    /// `annualised_vol_pct`, `excess_kurtosis` and the tails. The measured
+    /// bill on the pt-v19 base is +9.5 points of annualised volatility and
+    /// +0.27 of `return_acf1` per unit against +0.199 of the row, and
+    /// `return_acf1` has a tape error of 0.0106.
+    ///
+    /// # The form, and why this form
+    ///
+    /// A REALLOCATION rather than a multiplication. The market leg is left
+    /// exactly alone and the idiosyncratic shock is scaled instead:
+    ///
+    /// ```text
+    /// down tick (market_factor < 0):  e -> e * (1 - c)
+    /// up tick   (market_factor >= 0): e -> e * sqrt(2 - (1 - c)^2)
+    /// ```
+    ///
+    /// Nothing is added anywhere; the factor's share is raised where the
+    /// statistic looks and lowered where it does not. DERIVED, with `q` the
+    /// unconditional pairwise correlation (`cross_sectional_corr` reads
+    /// 0.3219 on the release candidate at 504), the tick-level conditional
+    /// correlations are
+    ///
+    /// ```text
+    /// q_down = q / (q + (1 - q) (1 - c)^2)
+    /// q_up   = q / (q + (1 - q) (2 - (1 - c)^2))
+    /// ```
+    ///
+    /// -- 0.394 and 0.269 at `c` = 0.15, a tick-level difference of 0.125.
+    /// At the day-level attenuation of 0.47 read off the existing tilt's
+    /// own contrast, that predicts about +0.059 of day-level
+    /// `corr_asymmetry` at 504 against a gap of 0.0646. FALSIFIER, and the
+    /// one that matters: if `d(corr_asymmetry)/dc` measures at or below the
+    /// tilt's own +0.199 the reallocating form buys nothing the
+    /// multiplying form does not and the mechanism is dead whatever else it
+    /// does. The 0.47 is read off ONE contrast of a DIFFERENT wire and is
+    /// the weakest number in the derivation.
+    ///
+    /// # The neutrality, exactly
+    ///
+    /// Let `f` be the tick's market factor and `e` the name's
+    /// idiosyncratic draw, with `E[e] = 0`, `Var[e] = s^2`, and `e` drawn
+    /// independently of `f`. The transform is `e' = m(f) e` with
+    /// `m = (1 - c)` on `{f < 0}` and `m = sqrt(2 - (1 - c)^2)` elsewhere.
+    ///
+    /// **Mean: exactly zero, and not because of the symmetry.**
+    /// `E[e'] = E[m(f)] E[e] = 0` for ANY `m` and any split of the line,
+    /// because `e` is an independent zero-mean draw. That is the sharpest
+    /// contrast with `market_beta_down_asym_recentre`: the tilt injects a
+    /// mean because it scales the draw WHOSE OWN SIGN IT BRANCHES ON, and
+    /// `E[f 1{f<0}]` is not zero. This branches on a different draw, so
+    /// there is no first moment to give back and no recentring dial beside
+    /// it.
+    ///
+    /// **Variance: exactly held, and it is the symmetry that buys it.**
+    /// `E[e'^2] = E[m(f)^2] s^2` with
+    /// `E[m(f)^2] = p (1-c)^2 + (1-p) (2 - (1-c)^2)` at `p = P(f < 0)`.
+    /// The inflation is DEFINED as the complement, so at `p = 1/2` the two
+    /// squared scales average to exactly 1 for every `c` -- which is why
+    /// there is no funding dial here either, and why `market::index_var`
+    /// needs no new term: its `idio * idio` is the unconditional variance
+    /// and this leaves it alone.
+    ///
+    /// # Where "exactly" stops, stated rather than asserted
+    ///
+    /// 1. **Exact in expectation, `O(N^{-1/2})` in a realisation.** Over
+    ///    `N` ticks the realised multiplier on the idiosyncratic variance
+    ///    is `M_N = (k/N)(1-c)^2 + (1 - k/N)(2 - (1-c)^2)` with
+    ///    `k ~ Binomial(N, 1/2)` -- the sign of a symmetric draw is a fair
+    ///    coin independent of every sigma in the recursion. So `E[M_N] = 1`
+    ///    exactly and `sd(M_N) = |1 - (1-c)^2| / sqrt(N)`. MEASURED against
+    ///    that closed form by `the_variance_residual_is_the_binomial_one`.
+    ///    At `c` = 0.15 it is 1.4 per cent of the idiosyncratic variance
+    ///    over one 390-tick session and 0.089 per cent over a 252-session
+    ///    window, which on a name whose idiosyncratic leg is two thirds of
+    ///    its variance is 0.03 per cent of its sigma.
+    /// 2. **One ulp of arithmetic.** `(1-c)^2` and `2 - (1-c)^2` are
+    ///    computed in doubles, so their mean is 1 to a relative `2^-52`
+    ///    rather than to the bit. Pinned by
+    ///    `the_two_scales_average_to_one_to_within_an_ulp`.
+    /// 3. **THE ZERO TICK.** The branch is `< 0.0`, the convention
+    ///    `market_beta_down_asym` already uses, so a factor of exactly
+    ///    `0.0` takes the UP branch. On a live draw that is a
+    ///    probability-zero event; on a degenerate configuration where the
+    ///    factor cannot move -- `market_factor_sigma` 0.0, or a fixture
+    ///    that hands the tick a zero factor -- EVERY tick takes the up
+    ///    branch and the idiosyncratic variance is inflated by
+    ///    `2 - (1-c)^2` rather than held. That is not a defect of the
+    ///    arithmetic; it is what "half the ticks are down" means when none
+    ///    of them is. It is written down because a zero-factor fixture is
+    ///    exactly where somebody would go to measure neutrality and would
+    ///    find it absent.
+    ///
+    /// # Three things it costs
+    ///
+    /// 1. **It is not CONDITIONALLY variance-neutral, and cannot be.** A
+    ///    name's per-tick total variance is
+    ///    `beta^2 s_f^2 + m(f)^2 s_i^2`, which is lower on a down tick and
+    ///    higher on an up tick -- that inequality IS the raised factor
+    ///    share. So a down DAY, which holds more down ticks than an up day,
+    ///    carries slightly less name-level variance: at `c` = 0.15 a
+    ///    55/45 day carries 0.972 of its idiosyncratic variance. The
+    ///    per-name GJR GARCH innovation is the day's noise and
+    ///    `garch_gamma` reads exactly that conditional moment, so the
+    ///    leverage channel sees a slightly SMALLER down-day squared return.
+    ///    Signed, small, and registered as a falsifier
+    ///    (`asymneut-registration.md` F7) rather than argued away.
+    /// 2. **The intraday leg only.** The overnight move composes a name
+    ///    through `idio_scale_for` as the tick does, and it is untouched
+    ///    here because there is no tick sign at the open. Nothing is lost
+    ///    on the shipped preset, where `overnight_variance_ratio` is 0.0
+    ///    and no price moves between sessions; on a preset that turned it
+    ///    on, the reallocation would cover the intraday part of the
+    ///    close-to-close return and not the gap.
+    /// 3. **NO DRAW, which is the point.** The transform reshapes a shock
+    ///    the tick has already taken, so the draw count and the draw order
+    ///    are untouched at every value and on every branch. A mechanism
+    ///    that needed a number would have needed a stream of its own.
+    pub market_idio_down_suppress: f64,
     /// How much of oil DEMAND is answered by supply on the daily step.
     /// 0.0 -- every preset before pt-v18 -- is bit-identical, and it is what
     /// the reference implementation does.
@@ -3199,6 +3349,7 @@ impl ModelParams {
             market_beta_down_asym: 0.0,
             market_beta_down_asym_lag: 0.0,
             market_beta_down_asym_recentre: 0.0,
+            market_idio_down_suppress: 0.0,
             oil_supply_response: 0.0,
             oil_opec_symmetry: 0.0,
             oil_seasonality_target: 0.0,
@@ -4972,6 +5123,7 @@ impl ModelParams {
             "market_beta_down_asym" => self.market_beta_down_asym,
             "market_beta_down_asym_lag" => self.market_beta_down_asym_lag,
             "market_beta_down_asym_recentre" => self.market_beta_down_asym_recentre,
+            "market_idio_down_suppress" => self.market_idio_down_suppress,
             "oil_supply_response" => self.oil_supply_response,
             "oil_opec_symmetry" => self.oil_opec_symmetry,
             "oil_seasonality_target" => self.oil_seasonality_target,
@@ -5155,6 +5307,7 @@ impl ModelParams {
             "market_beta_down_asym" => out.market_beta_down_asym = value,
             "market_beta_down_asym_lag" => out.market_beta_down_asym_lag = value,
             "market_beta_down_asym_recentre" => out.market_beta_down_asym_recentre = value,
+            "market_idio_down_suppress" => out.market_idio_down_suppress = value,
             "oil_supply_response" => out.oil_supply_response = value,
             "oil_opec_symmetry" => out.oil_opec_symmetry = value,
             "oil_seasonality_target" => out.oil_seasonality_target = value,
@@ -5410,6 +5563,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_beta_down_asym",
         "market_beta_down_asym_lag",
         "market_beta_down_asym_recentre",
+        "market_idio_down_suppress",
         "oil_opec_symmetry",
         "oil_seasonality_target",
         "cycle_hazard_per_month",

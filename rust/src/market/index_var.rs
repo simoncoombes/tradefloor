@@ -68,6 +68,16 @@
 //!   anchor's per-name block is short wherever the tick's absolute floor does
 //!   not already bind — which on the shipped preset is nearly nowhere.
 //!
+//! **`market_idio_down_suppress` is NOT on this list**, and that it is not
+//! is the one thing worth recording about it here. The dial scales a name's
+//! idiosyncratic shock by `1 - c` on a down tick and by
+//! `sqrt(2 - (1 - c)^2)` on an up tick, so the two SQUARED scales sum to 2
+//! and average to exactly one over an even split of the half-lines.
+//! [`name_noise_variance`]'s `idio * idio` is that unconditional variance,
+//! and this dial holds it exactly at every `c` -- so the identity needs no
+//! term for it, and needs none because of an exact cancellation rather than
+//! a small one. See `ModelParams::market_idio_down_suppress`.
+//!
 //! **"Together those are worth about five per cent of `V_t`" used to stand
 //! here, and it is no longer true.** It was true of the list this one
 //! replaced, which had four items and the largest of them at 1.5 per cent.

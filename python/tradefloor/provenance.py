@@ -387,6 +387,16 @@ OUT_OF_SCOPE = {
         "REFUTED as a mechanism by the `alphax2` box, which found the "
         "clustering response flat from 0.0 to 0.40; it stays in the tree at "
         "zero with the refutation beside it",
+    "market_idio_down_suppress":
+        "inert at 0.0: market/factors.rs branches on `== 0.0` after the "
+        "draw and neither scale is applied, so no preset that predates the "
+        "dial multiplies by a pair of ones. It takes NO draw at any value "
+        "-- it reshapes a shock the tick has already taken -- so the branch "
+        "cannot reach the schedule either. Registered unrun: "
+        "`programme/results/asymneut-registration.md` (design repository) "
+        "is the box that would give it a value, and until that box reports "
+        "the 0.0 is the absence of a measurement rather than the result of "
+        "one",
     "market_vol_vix_smooth":
         "inert at 0.0: market/factor_vol.rs:536 branches on `== 0.0` and "
         "reads the raw print",
