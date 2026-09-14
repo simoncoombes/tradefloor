@@ -410,6 +410,23 @@ fn alpha_beta_at(
     // bisection because the substitution is quadratic in `d` with
     // coefficients in `beta` and `gamma`, and a closed form here would be a
     // second spelling of the same condition for a reader to get wrong.
+    //
+    // THE BOUND IS THE SINGLE COMPONENT'S AND THIS FUNCTION RUNS ON THE FAST
+    // ONE OF TWO. That is conservative rather than wrong, and the direction
+    // matters: the composed mixture's own fourth-moment operator allows a
+    // rotation of about 0.1285 where this allows 0.0280
+    // (`cascade-fourth-moment.md`, design repository), so the clamp binds
+    // 4.6 times earlier than the condition it is protecting requires. It
+    // refuses rotations the mixture would tolerate and never permits one it
+    // would not.
+    //
+    // It is left as it is on purpose. Deriving the mixture bound here would
+    // be new arithmetic in a hot path for a dial that ships at 0.0 and that
+    // the `alphax2` box REFUTED -- six settings from 0.0 to 0.40 moved the
+    // clustering response it was built for by less than a twentieth of its
+    // own value. A conservative bound on a mechanism nobody turns on is the
+    // cheapest correct thing; a reader who turns it on should read the
+    // design note before trusting the headroom this reports.
     let g = params.market_vol_gamma;
     let m4 = |d: f64| {
         let (a, b) = (alpha + d, beta - d);
