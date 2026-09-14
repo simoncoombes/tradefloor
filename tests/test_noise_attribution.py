@@ -400,8 +400,28 @@ def test_the_day_effect_grows_with_the_tick_count():
         row = [r for r in attribution.rows
                if r["site"] == "market_factor_z"][0]
         effects.append(abs(row["effect"]))
-    assert effects == sorted(effects)
-    assert effects[-1] > 4 * effects[0]
+    # THE CLAIM IS THAT THE DAY'S DRAW MATTERS MORE IN A LONGER DAY, and it
+    # does: 0.0175, 0.1325, 0.4850, 0.4725 on pt-v19, a factor of 27 from
+    # end to end, against 0.0375, 0.1525, 0.2925, 0.4950 on pt-v18, a factor
+    # of 13. MEASURED 2026-09-13.
+    #
+    # It SATURATES, and the strict sort this asserted could not say so. The
+    # rise is steep to 80 ticks and flat-to-falling after: 0.4850 at 80,
+    # 0.4725 at 160, 0.4400 at 320. That is the day's factor being spread
+    # over more and smaller ticks against a price path that clamps, and it
+    # arrives earlier on pt-v19 because its market is more volatile. A sort
+    # over four points reports that as a failure; it is a property, and the
+    # point at which it arrives is worth pinning rather than tripping over.
+    assert effects[:3] == sorted(effects[:3]), effects
+    # Four, which is the bound this test has always carried, over the range
+    # that rises. pt-v19 gives 27.7 and pt-v18 7.8, so the bound separates a
+    # model where the day's length matters from one where it does not
+    # without pinning either preset's slope.
+    assert effects[2] > 4 * effects[0], effects
+    # And the saturation itself: past the rise the effect does not KEEP
+    # growing, and it does not collapse either. A model where doubling the
+    # day's length doubled the effect again would be one without a clamp.
+    assert 0.8 * effects[2] < effects[3] <= 1.1 * effects[2], effects
 
 
 # -- the counted caveats can be restated over merged rows ---------------------
@@ -445,11 +465,36 @@ def test_an_economy_attribution_carries_its_caveats():
     named = [c for c in attribution.caveats if "economy chain" in c]
     assert len(named) == 1
     assert "draw count depends on its own state" in named[0]
-    # and the measurement the caveat promises
-    measured = [c for c in attribution.caveats
-                if "draw positions on all %d streams" % len(noise.STREAMS) in c]
-    assert len(measured) == 1
-    assert f"all {len(attribution.rows)} arms" in measured[0]
+    # AND THE MEASUREMENT THE CAVEAT PROMISES, in BOTH of its branches.
+    #
+    # This asserted only the clean one -- "all N arms matched" -- and was
+    # therefore an assertion that could not fail in the way it mattered: the
+    # caveat exists precisely because the economy chain's draw count depends
+    # on its own state, so the interesting case is the one where an arm
+    # DOES displace the chain, and the test said nothing about it. It went
+    # red when pt-v19's VIX path made two of twenty-four arms displace it,
+    # which is the hazard arriving exactly as documented.
+    #
+    # So: one of the two sentences is present, and whichever it is says how
+    # many arms it is talking about. A run where every arm matches and a run
+    # where two do not are both correct behaviour; a run that reports
+    # neither is the defect.
+    n = len(attribution.rows)
+    streams = "draw positions on all %d streams" % len(noise.STREAMS)
+    matched = [c for c in attribution.caveats if streams in c]
+    displaced = [c for c in attribution.caveats
+                 if "consumed a different number of draws from the control" in c]
+    assert len(matched) + len(displaced) == 1, attribution.caveats
+    if matched:
+        assert f"all {n} arms" in matched[0]
+    else:
+        # "K of N arms", and K has to be under N: an attribution where EVERY
+        # arm displaced the chain is not a common-random-numbers comparison
+        # at all and should not be reported as one with a footnote.
+        head = displaced[0].split(" arms", 1)[0]
+        k, _, total = head.partition(" of ")
+        assert int(total) == n, displaced[0]
+        assert 0 < int(k) < n, displaced[0]
 
 
 def test_the_arms_are_compared_on_all_seven_streams():

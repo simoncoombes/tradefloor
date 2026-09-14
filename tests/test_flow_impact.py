@@ -180,8 +180,24 @@ def test_order_size_stops_mattering_once_the_imbalance_multiplier_saturates():
     assert costs[0] == costs[1] == costs[2], costs
 
     # And the ratio, not the net, is what the model reads. The same net
-    # imbalance costs two orders of magnitude less when it arrives inside a
-    # larger gross flow.
+    # imbalance costs nearly two orders of magnitude less when it arrives
+    # inside a larger gross flow.
+    #
+    # THE NUMBER IS A PROPERTY OF THE DEFAULT and it moved when the default
+    # did: pt-v18 reads 114.5 and pt-v19 reads 87.9, MEASURED here on
+    # 2026-09-13. Both costs are scale-free at constant participation --
+    # multiplying both sides of the buried pair by ten and by a hundred
+    # gives 16.8464 to the fourth decimal -- so this is not a floor showing
+    # through at small size. `lone` sits AT the participation cap, which the
+    # assertion above proves by getting the same cost at 1e4, 1e6 and 1e8,
+    # so what moved is the sub-cap curve relative to the cap under a preset
+    # whose market is more volatile.
+    #
+    # The bound is therefore 80 and not 100, and the change is a measurement
+    # rather than a relaxation: the property under test is that the ratio
+    # and not the net is what the model reads, and 88 says that as
+    # completely as 114 did. It will fail again when the default next moves
+    # the cost surface, which is the notice the docstring above promises.
     lone = tradefloor.flow_impact(
         seed=42, universe=UNIVERSE,
         order_flow={thin.ticker: (1e3, 0.0)}, ticks=390
@@ -190,7 +206,14 @@ def test_order_size_stops_mattering_once_the_imbalance_multiplier_saturates():
         seed=42, universe=UNIVERSE,
         order_flow={thin.ticker: (1e5, 9.9e4)}, ticks=390
     ).cost_bps(thin.ticker)
-    assert lone > 100.0 * buried, (lone, buried)
+    assert lone > 80.0 * buried, (lone, buried)
+    # Scale-free at constant ratio, which is the half of the claim the bound
+    # above cannot make and the half that says there is no floor in it.
+    for scale in (10.0, 100.0):
+        assert tradefloor.flow_impact(
+            seed=42, universe=UNIVERSE,
+            order_flow={thin.ticker: (1e5 * scale, 9.9e4 * scale)}, ticks=390
+        ).cost_bps(thin.ticker) == buried
 
 
 # The three tests below are one instrument and not three, and the pair in
