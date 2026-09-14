@@ -183,7 +183,7 @@
   },
   "mechanisms": {
     "jumps": {
-      "spec": "b27965bd06cd6fc3ae3199835bbd8e7007839460d3f67fba8489d6a80df79ff1",
+      "spec": "0ff870280c51c8d5596640b72099a93306a0503da1f48c582749a87abf7ee980",
       "stream": "jumps",
       "doses": {
         "jump_intensity_market": 0.0565753337,
@@ -192,6 +192,9 @@
         "jump_intensity_idio": 0.0068895346,
         "jump_sigma_idio": 0.0752080062,
         "jump_vix_coupling": 0.2626,
+        "jump_idio_vix_decoupled": 0.0,
+        "jump_idio_excitation": 0.0,
+        "jump_idio_excitation_decay": 0.0,
         "market_vol_vix_anchor": 15.98426471,
         "jump_momentum_share": 0.0,
         "jump_mean_compensated": 1.0
