@@ -220,6 +220,18 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # That is strong-to-implausible in the sense the entries above use: the
     # engine's clamps would be doing the modelling long before the top.
     "market_vol_level_sigma": (0.0, 0.15),
+    # The market-side warm-up, in SESSIONS. Not a share and not a rate, so
+    # its box comes off the thing it has to outlast rather than off a
+    # convention: the warm-up converges geometrically at the SLOW variance
+    # component's persistence, 0.9913, so the initial condition is down to
+    # 0.012 of itself by session 504 and to 0.002 by 756. A box that ran
+    # past about 700 would be surveying arithmetic that has stopped moving.
+    # 1,008 is four years, twice the registered length, and holds the whole
+    # of the useful region with the flat tail visible at the top -- which is
+    # what a survey wants, because a dial whose map goes flat is a dial
+    # whose value is bounded rather than free. The bottom is the shipped
+    # 0.0, the mechanism off and the arm every falsifier is read against.
+    "market_burn_in_sessions": (0.0, 1008.0),
     # A constant added to the VIX target, in points. Not a share, so its box
     # is drawn from the bias it exists to cancel rather than from the unit
     # interval: an asymmetric return gain leaves a standing POSITIVE

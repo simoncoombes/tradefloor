@@ -487,6 +487,14 @@ PARAM_SPECS: dict[str, dict] = {
                                      "hard_range": (0.0, 0.9995)},
     "market_vol_level_sigma":   {"kind": "abs", "step_unit": 0.02,
                                  "hard_range": (0.0, 0.15)},
+    # The market-side warm-up, in SESSIONS, so the step unit is a step in
+    # sessions and not a fraction: 63 is one quarter, the block the
+    # transient was traced in (`level-sigma-horizon.md` 2.2), and anything
+    # finer is below the resolution at which the envelope was measured.
+    # The top is twice the registered 504; see `atlas_survey`'s entry for
+    # why the map is flat past about 700.
+    "market_burn_in_sessions":  {"kind": "abs", "step_unit": 63.0,
+                                 "hard_range": (0.0, 1008.0)},
     # The slow variance component (pt-v4). All three ship at 0.0, so the
     # multiplicative [1/4x, 4x] box collapses on them and the hard range is
     # what a search actually gets -- see `calibration_box`.

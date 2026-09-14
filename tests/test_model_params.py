@@ -261,6 +261,22 @@ PERTURBATIONS = [
     # a settable, which is the thing the draw-schedule rule forbids.
     ("market_vol_level_persistence", 0.99, True),
     ("market_vol_level_sigma", 0.05, True),
+    # The market-side warm-up, added 2026-09-14 and shipping at 0.0 on
+    # every preset. MEASURED True on the probe below, and the reason it
+    # can be is the same reason `market_vol_level_persistence` reads True:
+    # the DEFAULT ships `market_vol_level_sigma` 0.085, so the level's
+    # stationary-opening arm runs, the warm-up's branch is inside it, and
+    # the first close hands the factor's two variance components a state
+    # they would otherwise have spent a hundred sessions travelling to. On
+    # a preset shipping the level off this dial would be inert -- which is
+    # the row this table measures the DEFAULT for, exactly as the two rows
+    # above do.
+    #
+    # It moves NO draw on any stream and it is not merely unconditional
+    # like the level's own normal: it takes no draw at all. The warm-up is
+    # a deterministic function of the level draw the close already makes,
+    # which is what let it land without declaring a stream.
+    ("market_burn_in_sessions", 504.0, True),
     ("market_vol_ceiling_multiple", 0.5, True),
     ("market_vol_floor_multiple", 2.0, True),
     ("market_vol_vix_coupling", 0.0, True),

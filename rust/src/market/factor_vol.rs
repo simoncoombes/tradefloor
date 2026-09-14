@@ -790,6 +790,127 @@ impl MarketVarianceState {
         (target, Some(slow_target))
     }
 
+    /// Warm the variance components to the slow LEVEL the run opens on,
+    /// before session one.
+    ///
+    /// # What is cold and why it matters
+    ///
+    /// `new_with` seeds both components at the UNSCALED baseline
+    /// `market_factor_sigma^2`, which is where a run with no level belongs.
+    /// The level opens from its own stationary distribution, so at the
+    /// shipped `sd(log L)` of 1.25 the target the components must reach is
+    /// displaced by a factor whose log has a standard deviation of 1.25 --
+    /// and they reach it on their own memory, 48 sessions for the fast
+    /// component and 115 for the slow. MEASURED, that transient is the
+    /// whole of the 252/504 gap the level's calibration was read through:
+    /// `programme/results/level-sigma-horizon.md` (design repository).
+    ///
+    /// # The recursion, and why it is the MEAN one
+    ///
+    /// `component_step` is
+    /// `(1 - a - b - g/2) * target + (a + lev) * f^2 + b * v`. Take the
+    /// expectation over the day's factor, which is conditionally
+    /// `N(0, v)`, so `E[f^2] = v`, and over the sign of that factor, which
+    /// is symmetric, so the GJR arm loads `g/2`:
+    ///
+    /// ```text
+    /// E[v'] = (1 - p) * target + p * v,    p = a + b + g/2
+    /// ```
+    ///
+    /// That is a linear recursion in `v` with the same fixed point and the
+    /// same memory as the stochastic one, and it is what "run in" means for
+    /// a state whose stochastic part is stationary from session one
+    /// anyway. Nothing is drawn, here or anywhere, at any setting of the
+    /// dial. The draw schedule cannot move; see
+    /// `ModelParams::market_burn_in_sessions`.
+    ///
+    /// `alpha_beta_at`'s rotation is not applied, and that is exact rather
+    /// than an omission: the rotation is volume-preserving in
+    /// `alpha + beta`, so `p` -- the only thing this recursion reads -- is
+    /// invariant to it.
+    ///
+    /// # The level's path
+    ///
+    /// `log_level` is the level the run OPENS on, drawn at this close from
+    /// the level's stationary distribution. The path before it is not
+    /// known and does not need to be: for an AR(1),
+    /// `E[log L_{1-k} | log L_1] = phi^k log L_1`, so the warm-up walks
+    /// that expected path forwards, arriving at `log_level` on the last
+    /// warm-up session. The normalisation `- stationary_var / 4` is the
+    /// same square-root normalisation the close applies, passed in rather
+    /// than recomputed so that the two cannot drift apart.
+    ///
+    /// # The VIX
+    ///
+    /// Held at the value the close is about to read, for the whole warm-up.
+    /// The VIX reverts at `vix_mean_reversion` -- a relaxation of about
+    /// three sessions on the shipped 0.27 -- so it is two orders of
+    /// magnitude faster than the states being warmed and is already at
+    /// whatever the opening asks for; treating it as a constant over the
+    /// warm-up is the same approximation `level-sigma-horizon.md` 2.2 makes
+    /// in the other direction when it treats the LEVEL as flat over the
+    /// engine's relaxation.
+    ///
+    /// The clamps apply on every warm-up session exactly as they do on a
+    /// real one, so a warm-up cannot deliver a state the close could not
+    /// have reached.
+    pub fn warm_to_level(
+        &mut self,
+        params: &crate::params::ModelParams,
+        vix_ratio_denominator: f64,
+        vix: f64,
+        log_level: f64,
+        stationary_var: f64,
+        sessions: i64,
+    ) {
+        if sessions <= 0 {
+            return;
+        }
+        let base0 = params.market_factor_sigma * params.market_factor_sigma;
+        let c = params.market_vol_vix_coupling;
+        let response = vix_response(params, vix / vix_ratio_denominator);
+        let coupled = 1.0 - c + c * response;
+        let damped = if params.market_vol_slow_vix_damp == 0.0 {
+            coupled
+        } else {
+            let cd = c * (1.0 - params.market_vol_slow_vix_damp);
+            1.0 - cd + cd * response
+        };
+        let phi = params.market_vol_level_persistence;
+        let p_fast =
+            params.market_vol_alpha + params.market_vol_beta + 0.5 * params.market_vol_gamma;
+        let (sa, sb) = slow_alpha_beta(params);
+        let p_slow = sa + sb;
+        let w = params.market_vol_slow_weight;
+        let mut fast = self.fast_variance;
+        let mut slow = self.slow_variance;
+        for step in 0..sessions {
+            // `k` sessions before session one, counting down to zero, so
+            // the last warm-up session sits on the level the close is
+            // about to use.
+            let k = (sessions - 1 - step) as f64;
+            let log_l = mathx::pow(phi, k) * log_level;
+            let base = base0 * mathx::exp(log_l - 0.25 * stationary_var);
+            fast = clamp_variance(params, (1.0 - p_fast) * (base * coupled) + p_fast * fast);
+            if w != 0.0 {
+                slow = clamp_variance(params, (1.0 - p_slow) * (base * damped) + p_slow * slow);
+            }
+        }
+        self.fast_variance = fast;
+        // The single-component branch of `close_day_scaled` carries no slow
+        // component at all, so there is none to warm and the mixture IS the
+        // fast state. `slow_variance` is left exactly where the close would
+        // leave it -- untouched -- because it is in the state hash and a
+        // warm-up that wrote a field the close does not write would make a
+        // warmed engine unreachable by running.
+        if w == 0.0 {
+            self.variance = fast;
+        } else {
+            self.slow_variance = slow;
+            self.variance = clamp_variance(params, (1.0 - w) * fast + w * slow);
+        }
+    }
+
     /// The state numbers, for checkpoints: `(variance, day_factor,
     /// fast_variance, slow_variance, prev_day_factor, smoothed_vix)`.
     /// `smoothed_vix` is a VIX-scale positive number while primed;
@@ -1335,5 +1456,86 @@ mod close_day_targets {
                 );
             }
         }
+    }
+
+    /// The warm-up lands on the state the mean recursion has as its fixed
+    /// point, which is the TARGET -- not `omega / (1 - beta)`, which is
+    /// where a zero-shock relaxation would land and is a fifth of it.
+    ///
+    /// Run at a level of exactly 1.0 (`log_level` 0 at a stationary
+    /// variance of 0) so the fixed point is a closed expression and the
+    /// assertion is about the recursion rather than about the level.
+    #[test]
+    fn the_warm_up_lands_on_the_target_and_not_on_the_zero_shock_rest_point() {
+        let p = ModelParams::pt_v19();
+        let base = p.market_factor_sigma * p.market_factor_sigma;
+        let vix = p.market_vol_vix_anchor;
+        let mut s = MarketVarianceState::new_with(&p);
+        s.warm_to_level(&p, p.market_vol_vix_anchor, vix, 0.0, 0.0, 2000);
+        // At the anchor the coupled target is exactly `base`.
+        // `(variance, day_factor, fast, slow, ...)` -- the day factor is
+        // the second element, so the components are 2 and 3.
+        let (v, _, f, sl, ..) = s.snapshot();
+        for (name, got) in [("mixture", v), ("fast", f), ("slow", sl)] {
+            assert!(
+                (got / base - 1.0).abs() < 1e-9,
+                "the {name} warmed to {got} against a target of {base}"
+            );
+        }
+        // The zero-shock rest point, for contrast: `omega / (1 - beta)` on
+        // the fast component is well under the target, so a warm-up that
+        // iterated the close with a zero day factor would have arrived
+        // somewhere else entirely and this test would fail.
+        let a = p.market_vol_alpha;
+        let b = p.market_vol_beta;
+        let g = p.market_vol_gamma;
+        let zero_shock = (1.0 - a - b - 0.5 * g) * base / (1.0 - b);
+        assert!(zero_shock < 0.5 * base,
+                "the contrast has gone: {zero_shock} against {base}");
+    }
+
+    /// The warm-up carries the level's own conditional-mean share, and the
+    /// share is `(1 - p) / (1 - p phi)` -- DERIVED in
+    /// `ModelParams::market_burn_in_sessions`, asserted here on the state
+    /// rather than on the derivation.
+    #[test]
+    fn the_warmed_components_carry_their_own_share_of_the_opening_level() {
+        let p = ModelParams::pt_v19();
+        let base = p.market_factor_sigma * p.market_factor_sigma;
+        let vix = p.market_vol_vix_anchor;
+        // A small level, so the linearisation the share is derived under
+        // is the thing being tested and the exponential's curvature is not.
+        let log_level = 0.01;
+        let mut s = MarketVarianceState::new_with(&p);
+        s.warm_to_level(&p, p.market_vol_vix_anchor, vix, log_level, 0.0, 4000);
+        let (_, _, fast, slow, ..) = s.snapshot();
+        let phi = p.market_vol_level_persistence;
+        let p_fast = p.market_vol_alpha + p.market_vol_beta + 0.5 * p.market_vol_gamma;
+        let (sa, sb) = slow_alpha_beta(&p);
+        let p_slow = sa + sb;
+        for (name, got, pers) in [
+            ("fast", fast, p_fast),
+            ("slow", slow, p_slow),
+        ] {
+            let want = (1.0 - pers) / (1.0 - pers * phi);
+            let read = (got / base).ln() / log_level;
+            assert!(
+                (read - want).abs() < 0.01,
+                "the {name} component carried {read} of the opening level \
+                 where (1-p)/(1-p phi) says {want}"
+            );
+        }
+    }
+
+    /// Nothing is warmed when there is nothing to warm to, and the state is
+    /// the constructor's to the bit. The guard that matters is the engine's
+    /// (`market_burn_in_sessions > 0.0`); this is the function's own.
+    #[test]
+    fn a_warm_up_of_no_sessions_is_the_state_that_stood_before_it() {
+        let p = ModelParams::pt_v19();
+        let before = MarketVarianceState::new_with(&p);
+        let mut after = MarketVarianceState::new_with(&p);
+        after.warm_to_level(&p, p.market_vol_vix_anchor, 20.0, 1.5, 1.57, 0);
+        assert_eq!(before, after);
     }
 }

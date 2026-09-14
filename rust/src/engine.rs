@@ -2503,7 +2503,54 @@ impl Engine {
             // stationary, so the sentinel firing spuriously costs one
             // session's autocorrelation and nothing else.
             self.market_vol_log_level = if self.market_vol_log_level == 0.0 {
-                crate::mathx::sqrt(stationary_var) * level_z
+                let opening = crate::mathx::sqrt(stationary_var) * level_z;
+                // THE MARKET-SIDE WARM-UP, and this is the only place it
+                // can go: the level it warms the variance to is drawn on
+                // the line above.
+                //
+                // `macro_burn_in_days` settles the ECONOMY by running
+                // `advance_day`, and `close_market` -- this function -- is
+                // never called during it, so the two variance components
+                // `close_day_scaled` is about to step have never run.
+                // They open at the unscaled baseline while the level has
+                // already opened at a stationary draw, and they spend the
+                // first hundred sessions travelling to it. That travel is
+                // what `level-sigma-horizon.md` measures as the whole of
+                // the 252/504 calibration gap.
+                //
+                // A BRANCH at 0.0 sessions, which is every preset through
+                // pt-v19: nothing runs, no state moves and no draw is
+                // taken -- here or anywhere, at any setting. See
+                // `ModelParams::market_burn_in_sessions` for why a
+                // conditional MEAN of the close's own recursion is enough
+                // and what it leaves behind, and `warm_to_level` for the
+                // recursion.
+                //
+                // `vix_ratio_denominator` above was computed from the COLD
+                // variance, because it is read before the per-name loop and
+                // the level is not drawn until here. One session's
+                // denominator, on the one session whose ticks already
+                // traded at the cold sigma; the VIX's own three-session
+                // relaxation closes it long before anything is recorded.
+                //
+                // `stationary_var > 0.0` is not belt and braces. At a
+                // persistence at or past one there is no stationary
+                // dispersion, the opening is exactly 0.0, the sentinel
+                // above never clears and the level restarts every session
+                // -- so a warm-up gated on the sentinel alone would run
+                // 504 iterations a day forever on a model that is a random
+                // walk and says so. There is also nothing to warm to.
+                if self.params.market_burn_in_sessions > 0.0 && stationary_var > 0.0 {
+                    self.market_vol.warm_to_level(
+                        &self.params,
+                        vix_ratio_denominator,
+                        self.economy.vix,
+                        opening,
+                        stationary_var,
+                        self.params.market_burn_in_sessions as i64,
+                    );
+                }
+                opening
             } else {
                 phi * self.market_vol_log_level + sigma * level_z
             };
