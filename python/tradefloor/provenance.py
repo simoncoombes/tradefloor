@@ -381,6 +381,21 @@ OUT_OF_SCOPE = {
         "being inert is why that value is not derived on the shipped path",
     "idio_sigma_beta_exponent":
         "inert at 0.0: market/factors.rs:98 branches on `== 0.0`",
+    "market_vol_alpha_excursion":
+        "inert at 0.0: market/factor_vol.rs `alpha_beta_at` branches on "
+        "`k == 0.0` and returns the dialled pair unchanged. Measured and "
+        "REFUTED as a mechanism by the `alphax2` box, which found the "
+        "clustering response flat from 0.0 to 0.40; it stays in the tree at "
+        "zero with the refutation beside it",
+    "market_vol_level_persistence":
+        "unread while `market_vol_level_sigma` is 0.0 -- engine.rs takes the "
+        "`sigma == 0.0` branch at the close and never enters the recursion",
+    "market_vol_level_sigma":
+        "inert at 0.0: the close branches on `== 0.0`, the multiplier is "
+        "exactly 1.0 and `close_day_scaled` calls the function the close "
+        "called before the level existed. The draw on "
+        "`stream::MARKET_VOL_LEVEL` is still taken, which is what keeps the "
+        "schedule off the settables, and it moves nothing",
     "market_vol_vix_smooth":
         "inert at 0.0: market/factor_vol.rs:536 branches on `== 0.0` and "
         "reads the raw print",

@@ -108,6 +108,8 @@ pub struct EngineRngState {
     pub news: RngState,
     /// The overnight stream, carried for the same reason.
     pub overnight: RngState,
+    /// The market factor's slow-level stream, carried for the same reason.
+    pub market_vol_level: RngState,
 }
 
 /// Cumulative draws per stream. Diagnostic, per D-R1: the single most
@@ -249,6 +251,7 @@ pub struct Engine {
     volume_idio_rng: GameRng,
     news_rng: GameRng,
     overnight_rng: GameRng,
+    market_vol_level_rng: GameRng,
     /// The move each name's `s` took at the last open under the overnight
     /// process, in roster order, 0.0 where nothing moved. Per-day state
     /// like the attribution: the tape books it onto the day's first row.
@@ -342,6 +345,10 @@ pub struct Engine {
     /// Forced-flow budget spent, in VIX-point-days. 0.0 while the
     /// reservoir dial ships 0.0; see `ModelParams::forced_flow_reservoir`.
     forced_flow_spent: f64,
+    /// The market factor's slow variance level, in logs. 0.0 means a
+    /// multiplier of exactly 1.0, which is every preset through pt-v19;
+    /// see `ModelParams::market_vol_level_sigma`.
+    market_vol_log_level: f64,
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
     volume_state: f64,
@@ -694,6 +701,7 @@ impl Engine {
             volume_idio_rng: GameRng::substream(seed, stream::VOLUME_IDIO),
             news_rng: GameRng::substream(seed, stream::NEWS),
             overnight_rng: GameRng::substream(seed, stream::OVERNIGHT),
+            market_vol_level_rng: GameRng::substream(seed, stream::MARKET_VOL_LEVEL),
             overnight_moves: vec![0.0; companies_len],
             companies,
             economy,
@@ -719,6 +727,7 @@ impl Engine {
             universe_stress: 0.0,
             volume_state: 0.0,
             forced_flow_spent: 0.0,
+            market_vol_log_level: 0.0,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             sector_variance: vec![0.0; sector_keys.len()],
@@ -1325,6 +1334,7 @@ impl Engine {
             volume_idio: self.volume_idio_rng.snapshot(),
             news: self.news_rng.snapshot(),
             overnight: self.overnight_rng.snapshot(),
+            market_vol_level: self.market_vol_level_rng.snapshot(),
         }
     }
 
@@ -1344,6 +1354,7 @@ impl Engine {
         self.volume_idio_rng = GameRng::restore(state.volume_idio);
         self.news_rng = GameRng::restore(state.news);
         self.overnight_rng = GameRng::restore(state.overnight);
+        self.market_vol_level_rng = GameRng::restore(state.market_vol_level);
     }
 
     /// Cumulative draws across all three streams. The per-stream split is
@@ -1371,6 +1382,7 @@ impl Engine {
             stream::NEWS => &self.news_rng,
             stream::VOLUME_IDIO => &self.volume_idio_rng,
             stream::OVERNIGHT => &self.overnight_rng,
+            stream::MARKET_VOL_LEVEL => &self.market_vol_level_rng,
             _ => panic!("unknown stream {id}"),
         }
     }
@@ -1385,6 +1397,7 @@ impl Engine {
             stream::NEWS => &mut self.news_rng,
             stream::VOLUME_IDIO => &mut self.volume_idio_rng,
             stream::OVERNIGHT => &mut self.overnight_rng,
+            stream::MARKET_VOL_LEVEL => &mut self.market_vol_level_rng,
             _ => panic!("unknown stream {id}"),
         }
     }
@@ -2344,10 +2357,76 @@ impl Engine {
         // above and with the same zero-draw discipline. The VIX read here
         // is the day's TRADING value — the macro chain has not advanced
         // yet, exactly as the per-name updates see the day they closed.
-        self.last_market_targets = Some(self.market_vol.close_day_at(
+        // THE SLOW STOCHASTIC VARIANCE LEVEL, one normal per session.
+        //
+        // Drawn UNCONDITIONALLY, whatever the dials read, and on a stream of
+        // its own: the schedule cannot depend on a settable, and the zero
+        // arm of this mechanism is therefore the SAME RANDOM WORLD as the
+        // live arm rather than a reshuffled one. See
+        // `rng::stream::MARKET_VOL_LEVEL` for why that distinction is what
+        // makes the comparison a measurement.
+        //
+        // At `market_vol_level_sigma` 0.0 -- every preset through pt-v19 --
+        // the draw is taken, `market_vol_log_level` stays exactly 0.0, the
+        // multiplier is exactly 1.0 and `close_day_scaled` calls the very
+        // function the close called before this existed.
+        self.market_vol_level_rng.site(Site::MarketVolLevelZ, 0);
+        let level_z = self.market_vol_level_rng.next_normal();
+        let market_vol_level = if self.params.market_vol_level_sigma == 0.0 {
+            1.0
+        } else {
+            let phi = self.params.market_vol_level_persistence;
+            let sigma = self.params.market_vol_level_sigma;
+            // A persistence at or past one has no stationary dispersion, so
+            // there is nothing to normalise against and nothing to start
+            // from: such a level is a random walk and its own
+            // non-stationarity is the thing to notice, not a NaN three
+            // thousand sessions later.
+            let one_minus = 1.0 - phi * phi;
+            let stationary_var = if one_minus > 0.0 { sigma * sigma / one_minus } else { 0.0 };
+            // STARTED FROM THE STATIONARY DISTRIBUTION, not from its centre.
+            //
+            // At the derived half-life of 295 sessions an AR(1) started at
+            // zero has covered 42 per cent of its variance by day 252 and
+            // the whole of the normalisation has been applied from day one,
+            // so every recording would sit about five per cent low in
+            // volatility and the box would measure a transient rather than
+            // the process. Measured before this line existed: the 120-day
+            // sample standard deviation read 0.9605 against a control's
+            // 1.0072, which is `exp(-sd^2/4 / 2)` to three figures.
+            //
+            // The tape's windows are draws from a market that has been
+            // running forever. This one has to be too, and one draw at the
+            // stationary scale is the whole of the burn-in.
+            //
+            // The sentinel for "not yet started" is a log level of EXACTLY
+            // 0.0, which is also a fresh engine's value and a pre-level
+            // snapshot's. It needs no flag beside it and cannot go wrong if
+            // it is ever hit by a genuine draw: re-starting a stationary
+            // AR(1) from its own stationary distribution leaves it
+            // stationary, so the sentinel firing spuriously costs one
+            // session's autocorrelation and nothing else.
+            self.market_vol_log_level = if self.market_vol_log_level == 0.0 {
+                crate::mathx::sqrt(stationary_var) * level_z
+            } else {
+                phi * self.market_vol_log_level + sigma * level_z
+            };
+            // NORMALISED ON THE SQUARE ROOT, not on the level. With
+            // `E[L] = 1` the median annualised volatility falls by
+            // `1 - exp(-sd^2/8)`, six per cent at the derived dispersion,
+            // and `annualised_vol_pct` is a graded row -- the mechanism
+            // would pay for its tail with a level nobody asked it to move.
+            // `E[sqrt(L)] = 1` instead, which subtracts `sd^2/4` from the
+            // log. A constant of the construction and not a free dial; see
+            // `ModelParams::market_vol_level_sigma`.
+            //
+            crate::mathx::exp(self.market_vol_log_level - 0.25 * stationary_var)
+        };
+        self.last_market_targets = Some(self.market_vol.close_day_scaled(
             &self.params,
             vix_ratio_denominator,
             self.economy.vix,
+            market_vol_level,
         ));
         self.close_sector_state();
         // The forced-flow reservoir drains on stress days and rebuilds in
@@ -2886,6 +2965,14 @@ impl Engine {
     /// disagree, and the caller cannot supply it correctly in any case --
     /// the value being asked for is the noise the session just accumulated.
     /// Read/write the forced-flow segment's spent budget, for checkpoints.
+    pub fn market_vol_log_level(&self) -> f64 {
+        self.market_vol_log_level
+    }
+
+    pub fn set_market_vol_log_level(&mut self, level: f64) {
+        self.market_vol_log_level = level;
+    }
+
     pub fn forced_flow_spent(&self) -> f64 {
         self.forced_flow_spent
     }
@@ -3576,7 +3663,7 @@ impl Engine {
         let rng = self.rng_state();
         for state in [
             rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
-            rng.news, rng.volume_idio, rng.overnight,
+            rng.news, rng.volume_idio, rng.overnight, rng.market_vol_level,
         ] {
             hash_u64(&mut buf, state.state);
             hash_u64(&mut buf, state.increment);
@@ -3626,6 +3713,7 @@ impl Engine {
         }
         hash_f64(&mut buf, self.universe_stress);
         hash_f64(&mut buf, self.forced_flow_spent);
+        hash_f64(&mut buf, self.market_vol_log_level);
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where
         // every per-slot array above always follows the roster. An empty

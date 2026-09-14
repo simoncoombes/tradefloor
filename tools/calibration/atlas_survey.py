@@ -167,6 +167,42 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the box the way ramp=50 does above: strong-to-implausible.
     "market_beta_down_asym": (0.0, 0.1),
     "market_beta_down_asym_lag": (0.0, 0.1),
+    # How far the market factor's shock share rotates with its own variance
+    # excursion. The top is not a convention: `alpha_beta_at` clamps the
+    # rotation at the value holding the GJR fourth-moment coefficient at
+    # 0.999, so past the point where the clamp binds on a typical excursion
+    # the dial buys nothing and the map would be flat there by
+    # construction. The `alphax2` box measured 0.0 to 0.40 and found the
+    # response flat across the whole of it, so 0.5 is already past
+    # strong-to-implausible and the box spans a refuted mechanism end to
+    # end.
+    "market_vol_alpha_excursion": (0.0, 0.5),
+    # The slow variance LEVEL's two dials. Both are bounded by the tape
+    # rather than by convention (`programme/results/cascade-fourth-moment.md`
+    # section 4.3, design repository): the derived pair is persistence
+    # 0.9977 [0.9945, 0.9992] and sigma 0.047 [0.035, 0.064].
+    #
+    # The persistence box has to CONTAIN the shipped 0.0 -- every range here
+    # does, and the survey refuses one that does not, because a map that
+    # cannot see the model you are running is a map of somewhere else. So it
+    # runs from 0.0, a white-noise level with no memory at all, to 0.9995,
+    # a half-life of 1,386 sessions, which is five and a half years and past
+    # the point where the tape can tell a level from a drift. The top is
+    # deliberately short of 1.0: at 1.0 there is no stationary dispersion to
+    # normalise against and the level is a random walk, which is a different
+    # model rather than a further setting. The useful region is the top
+    # thousandth -- the derived value is 0.9977 -- and a uniform box over
+    # the whole interval will spend most of its samples where the level
+    # reverts faster than the component it sits under. That is a real cost
+    # and it is the price of a range that includes the shipped value; the
+    # alternative is a box the survey would refuse.
+    "market_vol_level_persistence": (0.0, 0.9995),
+    # The sigma box spans zero -- the mechanism off, and the control arm --
+    # to 0.15, which at the derived persistence is a stationary
+    # `sd(log L)` of 2.2 and a two-sigma level swing of a factor of 80.
+    # That is strong-to-implausible in the sense the entries above use: the
+    # engine's clamps would be doing the modelling long before the top.
+    "market_vol_level_sigma": (0.0, 0.15),
     # A constant added to the VIX target, in points. Not a share, so its box
     # is drawn from the bias it exists to cancel rather than from the unit
     # interval: an asymmetric return gain leaves a standing POSITIVE

@@ -452,6 +452,28 @@ PARAM_SPECS: dict[str, dict] = {
                                  "hard_range": (0.0, 2.0)},
     "market_vol_vix_coupling":  {"kind": "abs", "step_unit": 0.1,
                                  "hard_range": (0.0, 1.0)},
+    # How far the factor's shock share rotates with its own variance
+    # excursion. Ships at 0.0, so the multiplicative box collapses and the
+    # hard range is what a search gets. The top is the parameter's own
+    # domain rather than a taste: `alpha_beta_at` clamps the rotation at the
+    # value holding the GJR fourth-moment coefficient at 0.999, so past the
+    # point where the clamp binds on a typical excursion the dial buys
+    # nothing and the surface is flat there by construction. The `alphax2`
+    # box measured 0.0 to 0.40 and found it flat across the whole of it.
+    "market_vol_alpha_excursion": {"kind": "abs", "step_unit": 0.05,
+                                   "hard_range": (0.0, 0.5)},
+    # The slow variance LEVEL, a lognormal AR(1) on the factor's variance
+    # target. Both ship at 0.0 and both are bounded by the tape rather than
+    # by convention; the derived pair is 0.9977 and 0.047. The persistence
+    # stops short of 1.0 because at 1.0 there is no stationary dispersion to
+    # normalise against and the level is a random walk -- a different model
+    # rather than a further setting -- and starts at 0.95, a half-life of 13
+    # sessions, where the level is no longer slower than the fast component
+    # it sits under.
+    "market_vol_level_persistence": {"kind": "abs", "step_unit": 0.01,
+                                     "hard_range": (0.0, 0.9995)},
+    "market_vol_level_sigma":   {"kind": "abs", "step_unit": 0.02,
+                                 "hard_range": (0.0, 0.15)},
     # The slow variance component (pt-v4). All three ship at 0.0, so the
     # multiplicative [1/4x, 4x] box collapses on them and the hard range is
     # what a search actually gets -- see `calibration_box`.

@@ -786,6 +786,7 @@ fn stream_name(id: u32) -> &'static str {
         crate::rng::stream::NEWS => "news",
         crate::rng::stream::VOLUME_IDIO => "volume_idio",
         crate::rng::stream::OVERNIGHT => "overnight",
+        crate::rng::stream::MARKET_VOL_LEVEL => "market_vol_level",
         _ => "unknown",
     }
 }
@@ -800,9 +801,10 @@ fn stream_id(name: &str) -> PyResult<u32> {
         "news" => crate::rng::stream::NEWS,
         "volume_idio" => crate::rng::stream::VOLUME_IDIO,
         "overnight" => crate::rng::stream::OVERNIGHT,
+        "market_vol_level" => crate::rng::stream::MARKET_VOL_LEVEL,
         other => {
             return Err(ValidationError::new_err(format!(
-                "unknown stream {other:?}; one of market, economy, external, jumps, volume, news, volume_idio, overnight"
+                "unknown stream {other:?}; one of market, economy, external, jumps, volume, news, volume_idio, overnight, market_vol_level"
             )))
         }
     })
@@ -2699,7 +2701,7 @@ impl PyEngine {
         // unmistakable at a glance and on restore.
         let mut rng_out = Vec::with_capacity(3 * crate::rng::stream::COUNT);
         for s in [rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
-                  rng.news, rng.volume_idio, rng.overnight] {
+                  rng.news, rng.volume_idio, rng.overnight, rng.market_vol_level] {
             rng_out.push(f64::from_bits(s.state));
             rng_out.push(f64::from_bits(s.increment));
             rng_out.push(s.spare.unwrap_or(f64::NAN));
@@ -2770,6 +2772,12 @@ impl PyEngine {
         // a snapshot without it restores to 0.0, which is bit-exact for
         // every run recorded while the reservoir dial shipped 0.0.
         out.set_item("forced_flow_spent", self.inner.forced_flow_spent())?;
+        // The market factor's slow variance level, in logs. Its own key
+        // for the reason the line above has one: a snapshot without it
+        // restores to 0.0, a multiplier of exactly 1.0, which is what
+        // every run recorded while `market_vol_level_sigma` shipped 0.0
+        // actually carried.
+        out.set_item("market_vol_log_level", self.inner.market_vol_log_level())?;
         // Nominal output when the run opened, the base of the growth
         // term's ratio. A constant of the run rather than advancing state,
         // and carried for the reason the two above are: an engine restored
@@ -3024,7 +3032,12 @@ impl PyEngine {
         let volume = if rng.len() >= 15 { stream(12) } else { current.volume };
         let news = if rng.len() >= 18 { stream(15) } else { current.news };
         let volume_idio = if rng.len() >= 21 { stream(18) } else { current.volume_idio };
-        let overnight = if rng.len() >= 3 * crate::rng::stream::COUNT { stream(3 * (crate::rng::stream::COUNT - 1)) } else { current.overnight };
+        let overnight = if rng.len() >= 24 { stream(21) } else { current.overnight };
+        let market_vol_level = if rng.len() >= 3 * crate::rng::stream::COUNT {
+            stream(3 * (crate::rng::stream::COUNT - 1))
+        } else {
+            current.market_vol_level
+        };
         self.inner.set_rng_state(crate::engine::EngineRngState {
             market: stream(0),
             economy: stream(3),
@@ -3034,6 +3047,7 @@ impl PyEngine {
             news,
             volume_idio,
             overnight,
+            market_vol_level,
         });
         if let Some(raw) = snapshot.get_item("draw_overlay")? {
             let entries: Vec<(u32, u8, u64, f64)> = raw.extract()?;
@@ -3150,6 +3164,11 @@ impl PyEngine {
         // snapshot, whose runs all carried 0.0.
         if let Some(raw) = snapshot.get_item("forced_flow_spent")? {
             self.inner.set_forced_flow_spent(raw.extract()?);
+        }
+        // Absent means a snapshot from a build without the slow level,
+        // whose runs all carried a multiplier of exactly 1.0.
+        if let Some(raw) = snapshot.get_item("market_vol_log_level")? {
+            self.inner.set_market_vol_log_level(raw.extract()?);
         }
         // Restore the growth term's base. Absent means a snapshot from a
         // build without the term, whose preset carries the dial at 0.0.

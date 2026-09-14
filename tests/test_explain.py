@@ -683,8 +683,12 @@ def test_the_source_engines_own_log_survives_every_explain():
     # the one before them, so the check is over a real log rather
     # than an empty one; 75 more since the overnight stream, one normal
     # for the market, one per sector of the engine's twelve and one per
-    # name of the twelve at each of the three opens.
-    assert sum(len(v) for v in before.values()) == 99_668 + 3 * (1 + 12 + 12)
+    # name of the twelve at each of the three opens; and 3 more since the
+    # slow variance level, one normal at each of the three CLOSES. The
+    # level's draw is taken whatever the dial reads -- that is what keeps
+    # the schedule off the settables -- so it is here at a preset that
+    # ships the mechanism off.
+    assert sum(len(v) for v in before.values()) == 99_668 + 3 * (1 + 12 + 12) + 3
     for day in (1, 2):
         assert e.explain(e.tickers[0], day).check() == []
     assert logged() == before

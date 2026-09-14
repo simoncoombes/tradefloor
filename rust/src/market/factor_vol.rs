@@ -623,6 +623,38 @@ impl MarketVarianceState {
         vix_ratio_denominator: f64,
         vix: f64,
     ) -> (f64, Option<f64>) {
+        self.close_day_scaled(params, vix_ratio_denominator, vix, 1.0)
+    }
+
+    /// The close, with the session's SLOW VARIANCE LEVEL applied.
+    ///
+    /// `level` multiplies the baseline variance the targets are built from,
+    /// so BOTH components' targets move together and neither component's
+    /// `alpha`, `beta` or `gamma` moves at all. That is the point of the
+    /// form: the fourth-moment operator reads the coefficients and not
+    /// `omega`, so a level cannot spend the moment condition's margin. See
+    /// `ModelParams::market_vol_level_persistence`.
+    ///
+    /// The CLAMPS are deliberately left on the unscaled baseline. They say
+    /// what this factor's variance may physically be, in multiples of its
+    /// calm level, and that is a statement about the market rather than
+    /// about the era: a level excursion that would take the variance past
+    /// the ceiling is a level excursion that gets clipped. At the derived
+    /// pair the clamp is nowhere near binding on the level alone -- two
+    /// standard deviations of `log L` is a factor of four against a
+    /// ceiling multiple of 32 -- so it binds only where it already did,
+    /// which is inside a VIX spike.
+    ///
+    /// At `level == 1.0` every path below is the arithmetic that predates
+    /// the level, to the bit, and the single-component branch is not
+    /// merely equivalent but the SAME CALL.
+    pub fn close_day_scaled(
+        &mut self,
+        params: &crate::params::ModelParams,
+        vix_ratio_denominator: f64,
+        vix: f64,
+        level: f64,
+    ) -> (f64, Option<f64>) {
         // The fear the target reads, not necessarily today's print. Real
         // volatility follows sustained fear with inertia; a model that
         // transmits every VIX print one-for-one into the variance target
@@ -640,6 +672,11 @@ impl MarketVarianceState {
             sm
         };
         let base = params.market_factor_sigma * params.market_factor_sigma;
+        // The slow level scales the baseline the targets revert to. The
+        // branch rather than an unconditional multiply because `x * 1.0`
+        // being exact is a property of IEEE-754 that a reader has to know
+        // to trust, and the zero arm of this mechanism is a CONTROL.
+        let base = if level == 1.0 { base } else { base * level };
         let vix_ratio = vix / vix_ratio_denominator;
         let target = base
             * (1.0 - params.market_vol_vix_coupling
@@ -652,8 +689,19 @@ impl MarketVarianceState {
         // update to the bit, and this is the only spelling that owes
         // nothing to an argument about how floats behave.
         if w == 0.0 {
-            self.variance = update_market_variance_at(
-                params, vix_ratio_denominator, self.variance, self.day_factor, vix);
+            // `update_market_variance_at` recomputes the baseline from the
+            // dials and so cannot see the level; at 1.0 it is called, so
+            // every preset that takes this branch is bit-identical by
+            // CALLING THE SAME FUNCTION rather than by an argument about
+            // two spellings agreeing. At any other level the target
+            // computed above -- the same expression, with the scaled
+            // baseline -- is handed to the step directly.
+            self.variance = if level == 1.0 {
+                update_market_variance_at(
+                    params, vix_ratio_denominator, self.variance, self.day_factor, vix)
+            } else {
+                update_toward_with(params, self.variance, self.day_factor, target)
+            };
             self.fast_variance = self.variance;
             self.prev_day_factor = self.day_factor;
             self.day_factor = 0.0;

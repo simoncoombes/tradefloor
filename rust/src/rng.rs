@@ -206,6 +206,9 @@ pub enum Site {
     OvernightMarketZ = 18,
     OvernightSectorZ = 19,
     OvernightIdioZ = 20,
+    /// The market factor's slow variance level, one normal per day at the
+    /// close on [`stream::MARKET_VOL_LEVEL`].
+    MarketVolLevelZ = 21,
 }
 
 impl Site {
@@ -232,6 +235,7 @@ impl Site {
             Site::OvernightMarketZ => "overnight_market_z",
             Site::OvernightSectorZ => "overnight_sector_z",
             Site::OvernightIdioZ => "overnight_idio_z",
+            Site::MarketVolLevelZ => "market_vol_level_z",
         }
     }
 }
@@ -412,12 +416,29 @@ pub mod stream {
     /// reproduces bit for bit and the known-answer digests do not move.
     pub const OVERNIGHT: u32 = 7;
 
+    /// The market factor's slow stochastic variance LEVEL, drawn once per
+    /// day at the close.
+    ///
+    /// Its own stream for the reason every stream after [`MARKET`] has one,
+    /// and the reason is sharper here than anywhere else. The level is a
+    /// mechanism whose whole purpose is to be compared against itself at
+    /// `market_vol_level_sigma` 0.0: if its draw came off [`MARKET`] the
+    /// zero arm and the live arm would differ by a RESHUFFLE of every
+    /// subsequent tick draw as well as by the level, and the two could not
+    /// be told apart on one seed. On a stream of its own the normal is
+    /// drawn UNCONDITIONALLY, whatever the dial reads, so the schedule
+    /// cannot depend on a settable; at sigma 0.0 the draw is taken, the
+    /// log-level stays exactly 0.0, the multiplier is exactly 1.0 and
+    /// every preset reproduces bit for bit with its known-answer digest
+    /// unmoved.
+    pub const MARKET_VOL_LEVEL: u32 = 8;
+
     /// How many streams there are. Every array indexed by stream id, the
     /// snapshot's generator and count vectors, the day mark's positions
     /// and the loops that enable, clear or stamp every stream are sized
     /// from this rather than written out: the eighth stream was met in
     /// four places that had written seven, each found by a box.
-    pub const COUNT: usize = 8;
+    pub const COUNT: usize = 9;
 
     /// Derived streams live at `256 + id`. See the module docs for why the
     /// offset exists.

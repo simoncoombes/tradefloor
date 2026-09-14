@@ -913,6 +913,98 @@ pub struct ModelParams {
     /// so a preset that moves either cannot silently lose the finite
     /// fourth moment the tape's coefficients bought.
     pub market_vol_alpha_excursion: f64,
+
+    /// How much of last session's slow variance LEVEL carries into this
+    /// one. Together with `market_vol_level_sigma` this is a lognormal
+    /// AR(1) multiplier on the factor's variance TARGET -- a level that
+    /// drifts over months, not a component that reverts over days.
+    ///
+    /// # Why a level rather than a third component
+    ///
+    /// DERIVED, `programme/results/cascade-fourth-moment.md` section 4.2
+    /// (design repository). Every candidate that buys fat tails by adding
+    /// variance-of-variance to the recursion -- a heavier `alpha`, a longer
+    /// slow pole, a third component, a random `gamma` -- is a
+    /// random-coefficient recursion, and those are exactly the entries of
+    /// the fourth-moment operator `T` whose spectral radius has to stay
+    /// under one. At the shipped triple `rho(T)` reads 0.9841 and the
+    /// campaign has already spent the margin.
+    ///
+    /// A term that moves only `omega` does not appear in `T` at all.
+    /// Scaling the target scales `omega_i = (1 - pers_i) * target` and
+    /// leaves every `a_i, b_i, g_i` untouched, so the composed condition
+    /// becomes `rho(T) < 1` AND `E[L^2] < infinity`, and the second holds
+    /// for every stationary lognormal at every `phi < 1` and every `sigma`.
+    /// The two conditions SEPARATE. That is the whole argument for this
+    /// form: it is the only one whose tail does not come out of the moment
+    /// condition's budget.
+    ///
+    /// # The value
+    ///
+    /// DERIVED from two MEASURED tape statistics, section 4.3: the
+    /// window log-variance dispersion of ^GSPC that the model does not
+    /// account for, and its window-to-window autocorrelation, solved
+    /// through the closed-form autocorrelation of the session means of an
+    /// AR(1). **0.9977 [0.9945, 0.9992]**, a half-life of 295 sessions
+    /// [126, 866]. The two 252-session tape windows (1990-2025 and
+    /// 1950-2026) agree at 0.6 of their own error.
+    ///
+    /// NOT derived: the estimator. The 504-window autocorrelation is the
+    /// weakest of the four inputs and it is what drags the 504 solve down
+    /// to 0.995. If this is adopted, `phi` should be re-derived from the
+    /// log realised-variance autocorrelation over a RANGE of lags rather
+    /// than from a single window lag.
+    ///
+    /// Ships at 0.0, which with `market_vol_level_sigma` 0.0 is a
+    /// multiplier of exactly 1.0 and bit-identical.
+    pub market_vol_level_persistence: f64,
+
+    /// The per-session innovation of the slow variance level, in log
+    /// units. 0.0 -- every preset through pt-v19 -- pins the level at
+    /// exactly 1.0 and leaves the target arithmetic that predates this
+    /// dial untouched, to the bit.
+    ///
+    /// **0.047 [0.035, 0.064]** DERIVED, section 4.3, equivalently a
+    /// stationary `sd(log L)` of **0.69 [0.56, 0.87]**: the dispersion of
+    /// window log-variance the tape has and the model does not,
+    /// `sqrt(tape^2 - model^2)`, carried through the AR(1) shrinkage
+    /// factor at the persistence above. The bar is the propagated
+    /// jackknife error on the two tape sds.
+    ///
+    /// # Three things it costs
+    ///
+    /// 1. **The level would fall if `E[L]` were normalised.** With
+    ///    `sd(log L)` 0.69 and `E[L] = 1`, `E[sqrt(L)]` is
+    ///    `exp(-sd^2/8)` = 0.942 and median annualised volatility drops
+    ///    six per cent -- and `annualised_vol_pct` is a graded row. So the
+    ///    normalisation here is `E[sqrt(L)] = 1`, which subtracts
+    ///    `sd^2/4` from the log level. A constant of the construction,
+    ///    not a free dial.
+    /// 2. **A draw.** One normal per session, on
+    ///    [`crate::rng::stream::MARKET_VOL_LEVEL`] and not on `MARKET`, so
+    ///    the schedule does not move and nothing else reshuffles. See that
+    ///    constant for why the isolation is what makes the zero arm a
+    ///    control rather than a different random world.
+    /// 3. **The VIX loop will amplify it, by an unmeasured factor.**
+    ///    `market_vol_vix_excursion` is 1.0 on pt-v19, so the target reads
+    ///    the VIX's excursion from the index's own implied level and a
+    ///    slow level moves that level. DERIVED as a bound: the standalone
+    ///    factor's window dispersion is 0.249 and the engine's index reads
+    ///    0.225, so the loop plus the 45 per cent non-factor share
+    ///    currently transmits at about 0.9. If that ratio holds the value
+    ///    above is right to within its own bar; if the loop amplifies, it
+    ///    is high. This is the single largest reason to read 4.3 as the
+    ///    starting point of a box rather than as a finished calibration.
+    ///
+    /// # What it is predicted to buy, registered before the box
+    ///
+    /// `index_tail_dn3_pct` at 252 from 0.608 to **0.86-1.03** against a
+    /// tape centre of 1.213; `excess_kurtosis` UNMOVED, because a
+    /// per-window level shift multiplies every name equally and the pooled
+    /// standardised statistic is invariant to it by construction.
+    /// FALSIFIER: if the tail row does not reach 0.80 at the derived pair,
+    /// the mechanism is wrong rather than under-dialled.
+    pub market_vol_level_sigma: f64,
     /// Cap on the market factor's variance, as a multiple of its calm
     /// level. A CAP, not a lever: it does nothing until the variance
     /// reaches it, so raising it above where it already binds changes
@@ -3096,6 +3188,8 @@ impl ModelParams {
             market_vol_beta: factor_vol::MARKET_VOL_BETA,
             market_vol_gamma: 0.0,
             market_vol_alpha_excursion: 0.0,
+            market_vol_level_persistence: 0.0,
+            market_vol_level_sigma: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
             market_vol_vix_coupling: factor_vol::MARKET_VOL_VIX_COUPLING,
@@ -4826,6 +4920,8 @@ impl ModelParams {
             "market_vol_beta" => self.market_vol_beta,
             "market_vol_gamma" => self.market_vol_gamma,
             "market_vol_alpha_excursion" => self.market_vol_alpha_excursion,
+            "market_vol_level_persistence" => self.market_vol_level_persistence,
+            "market_vol_level_sigma" => self.market_vol_level_sigma,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
             "market_vol_vix_coupling" => self.market_vol_vix_coupling,
@@ -5007,6 +5103,8 @@ impl ModelParams {
             "market_vol_beta" => out.market_vol_beta = value,
             "market_vol_gamma" => out.market_vol_gamma = value,
             "market_vol_alpha_excursion" => out.market_vol_alpha_excursion = value,
+            "market_vol_level_persistence" => out.market_vol_level_persistence = value,
+            "market_vol_level_sigma" => out.market_vol_level_sigma = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
             "market_vol_vix_coupling" => out.market_vol_vix_coupling = value,
@@ -5257,6 +5355,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_beta",
         "market_vol_gamma",
         "market_vol_alpha_excursion",
+        "market_vol_level_persistence",
+        "market_vol_level_sigma",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",
         "market_vol_slow_gain",

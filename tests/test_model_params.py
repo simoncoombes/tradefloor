@@ -228,6 +228,30 @@ PERTURBATIONS = [
     # the perturbation has to be TO a non-zero value; measured to move the
     # probe at 0.05 and at every larger value tried, and to move no draw.
     ("market_vol_gamma", 0.3, True),
+    # The shock share's rotation with the factor's own excursion, added at
+    # 0.8.0. Ships at 0.0, so the perturbation is TO a non-zero value.
+    # MEASURED to move the probe at 0.20 and to move no draw, on either
+    # stream: the rotation is arithmetic on state the close already holds.
+    # It moving the market is not a claim that it moves the STATISTIC it was
+    # built for -- the `alphax2` box refuted that -- and the two are
+    # different questions, which is why one is a test and the other was a
+    # box.
+    ("market_vol_alpha_excursion", 0.20, True),
+    # The slow variance LEVEL's two dials, added at 0.8.0, and they read
+    # differently for the reason the slow component's three parts do: SIGMA
+    # is the switch. The close branches on `market_vol_level_sigma == 0.0`
+    # and never enters the recursion, so persistence alone cannot reach the
+    # variance at all -- MEASURED False at 0.99. Sigma alone is live even at
+    # zero persistence, because a white-noise level is still a level, so it
+    # reads True and does so at 0.05 and at 0.15.
+    #
+    # Neither moves a draw on either declared stream, and that is worth a
+    # line rather than an inference: the level's own normal is taken once a
+    # session on `stream::MARKET_VOL_LEVEL`, unconditionally, whatever the
+    # dials read. A dial that gated its own draw would put the schedule on a
+    # settable, which is the thing §5.2 forbids.
+    ("market_vol_level_persistence", 0.99, False),
+    ("market_vol_level_sigma", 0.05, True),
     ("market_vol_ceiling_multiple", 0.5, True),
     ("market_vol_floor_multiple", 2.0, True),
     ("market_vol_vix_coupling", 0.0, True),

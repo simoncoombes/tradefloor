@@ -51,7 +51,7 @@ from typing import Any, Callable, NamedTuple, Sequence
 from ._core import Engine
 
 STREAMS = ("market", "economy", "external", "jumps", "volume", "news",
-           "volume_idio", "overnight")
+           "volume_idio", "overnight", "market_vol_level")
 KINDS = ("uniform", "normal")
 
 #: The call sites, in the order each stream meets them. The market
@@ -71,6 +71,7 @@ SITES = {
                   "overnight_idio_z"),
     "economy": ("economy_daily", "economy_cycle", "central_bank"),
     "external": ("external",),
+    "market_vol_level": ("market_vol_level_z",),
 }
 
 

@@ -213,6 +213,7 @@ _SNAPSHOT_KEYS = (
     "columns", "rng", "tickers", "model_fingerprint",
     "attribution", "tick_components", "tick_fundamental", "tick_anchor",
     "market_open", "market_variance", "forced_flow_spent",
+    "market_vol_log_level",
     "nominal_output_base", "volume_state",
     "universe_stress", "volume_idio", "session_news", "economy",
     "central_bank", "day_count",
@@ -497,6 +498,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _f64(buf, value)
     _f64(buf, snapshot["universe_stress"])
     _f64(buf, snapshot["forced_flow_spent"])
+    # The market factor's slow variance level, in logs. Hashed beside the
+    # line above and for the same reason: two engines alike in every column
+    # and sitting on different levels revert to different targets tonight.
+    _f64(buf, snapshot["market_vol_log_level"])
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer
