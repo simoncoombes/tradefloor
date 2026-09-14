@@ -1005,6 +1005,114 @@ pub struct ModelParams {
     /// FALSIFIER: if the tail row does not reach 0.80 at the derived pair,
     /// the mechanism is wrong rather than under-dialled.
     pub market_vol_level_sigma: f64,
+
+    /// How many sessions of market-side warm-up the factor's variance
+    /// components get before session one. 0.0 -- every preset through
+    /// pt-v19 -- runs nothing, touches no state and is bit-identical.
+    ///
+    /// # The defect
+    ///
+    /// [`ModelParams::macro_burn_in_days`] runs `Engine::advance_day`, the
+    /// ECONOMY path. `Engine::close_market` -- where the slow variance
+    /// LEVEL is drawn and where the factor's two variance components close
+    /// -- is never called during it. So the LEVEL opens from its own
+    /// stationary distribution (`market_vol_level_sigma`'s third paragraph)
+    /// and every variance state it acts THROUGH opens cold, at the
+    /// unscaled baseline `market_factor_sigma^2`.
+    ///
+    /// MEASURED, `programme/results/level-sigma-horizon.md` section 2.1
+    /// (design repository): cut each 504-session recording at session 252
+    /// and the two halves -- both 252-session windows of a level that is
+    /// stationary from session one -- do not read the same.
+    /// `sd(log window variance)` across 120 rosters reads 0.6938 +/- 0.0602
+    /// in the first half and 0.9570 +/- 0.0609 in the second at
+    /// `market_vol_level_sigma` 0.085, and the effect is ABSENT at sigma 0
+    /// (ratio 1.09 [0.90, 1.30]). The transient traces out over 98 to 145
+    /// sessions and is flat from about session 350.
+    ///
+    /// # What it does, and why it takes NO draw
+    ///
+    /// The level is a lognormal AR(1) and the components are linear in
+    /// their target, so the state a fully-run-in engine would hold has a
+    /// CLOSED conditional mean given the level the run opens on. This
+    /// steps each component's MEAN recursion --
+    /// `v <- (1 - p) * target + p * v` with `p = alpha + beta + gamma/2`,
+    /// which is `E[v_{t+1} | v_t]` exactly, since `E[f^2] = v` and the
+    /// leverage arm fires on half the days -- along
+    /// `E[log L_{1-k} | log L_1] = phi^k * log L_1`, the level's own
+    /// expected backward path.
+    ///
+    /// So the warm-up is a DETERMINISTIC function of a draw the close
+    /// already takes. It consumes nothing, from any stream, at any
+    /// setting: the draw schedule cannot move, no new stream is declared,
+    /// and `rng::stream`'s whole argument about draw-consuming mechanisms
+    /// does not have to be spent here. See
+    /// `MarketVarianceState::warm_to_level`.
+    ///
+    /// What that leaves behind. The component's state given the opening
+    /// level still has a conditional SPREAD -- the level's own innovations
+    /// over the component's memory, and the GARCH shocks -- which a
+    /// conditional mean cannot carry. DERIVED for the level's half of it:
+    /// its variance is 0.096 of the component's total for the fast
+    /// component and 0.207 for the slow, and because it decays on the
+    /// component's own memory while the conditional-mean term does not, a
+    /// 252-session window average retains 99.0 per cent of the stationary
+    /// window statistic's variance against the cold start's 59.6 (Monte
+    /// Carlo on the linearised recursion, 40,000 replications,
+    /// `tools/calibration/warmup_probe.py derive`).
+    ///
+    /// **MEASURED on the engine, that 99 per cent is optimistic and the
+    /// recovery is partial.** With the warm-up on, the factor's level
+    /// envelope over the first quarter reads 0.770 against 0.846
+    /// equilibrated -- 0.91, against a cold engine's 0.50 -- and the
+    /// per-name GARCH and the VIX inherit it within twenty sessions, at
+    /// 0.98 of their own equilibria against 0.64 and 0.56 cold. But the
+    /// window statistic the calibration is read through recovers 46 per
+    /// cent of its deficit, not 99: the split-half ratio goes 1.2539 to
+    /// 1.1197 +/- 0.1818 on 48 rosters. The three readings are each about
+    /// one standard error apart and were not reconciled;
+    /// `programme/results/warmup-registration.md` sections 4.1 and 7
+    /// register the gap and the stochastic warm-up that would close it.
+    ///
+    /// # 504
+    ///
+    /// DERIVED from the measured envelope: the transient is flat from
+    /// session 350 and 504 is the next round number past it. The recursion
+    /// converges geometrically at the SLOW component's persistence, so
+    /// 504 sessions leaves `0.9913^504` = 0.012 of the initial condition,
+    /// and anything past about 700 is arithmetically indistinguishable.
+    /// It is a session count rather than a switch so that the length is
+    /// falsifiable rather than assumed.
+    ///
+    /// # Two things it deliberately does not do
+    ///
+    /// It does not run at `market_vol_level_sigma` 0.0, and the reason is
+    /// MEASURED rather than tidy. With no level, the components' target is
+    /// `base` times the VIX's excursion from the index's own implied
+    /// level, and that excursion averages one -- so the constructor's
+    /// `base` is close to the right LOCATION and the block means show no
+    /// travel an error bar can separate from noise (32 seeds, eight
+    /// 63-session blocks: block one sits +0.080 in the log above the
+    /// blocks-3-to-8 mean, about one standard error, and block EIGHT sits
+    /// +0.137 above it in the same direction). What is cold there is the
+    /// cross-seed DISPERSION: 0.087 in the log on day one and 0.594
+    /// by day 300, 0.63 of equilibrium over the first quarter. **A
+    /// deterministic warm-up cannot supply a dispersion** -- every seed
+    /// would get the same number -- so running this at sigma 0 would buy
+    /// exactly zero. Closing that one needs a warm-up that DRAWS, which
+    /// needs a stream, which is a different change;
+    /// `programme/results/warmup-registration.md` section 7 item 6
+    /// registers it and says what it would cost.
+    ///
+    /// Keeping the zero-sigma arm untouched also keeps it usable as the
+    /// control for BOTH a warmed and an unwarmed ladder.
+    ///
+    /// The run's FIRST session still trades at the cold sigma, because the
+    /// level the components must be warmed to is not drawn until that
+    /// session's close. One session in 504, and the alternative is a draw
+    /// at construction -- which is a draw.
+    pub market_burn_in_sessions: f64,
+
     /// Cap on the market factor's variance, as a multiple of its calm
     /// level. A CAP, not a lever: it does nothing until the variance
     /// reaches it, so raising it above where it already binds changes
@@ -3067,15 +3175,29 @@ pub struct ModelParams {
     /// mechanism to hold it instead, and the dial goes back to being the
     /// boundary condition it is documented as.
     ///
-    /// pt-v19 therefore sets it to the image of `vix_return_clamp` under the
-    /// spike — `vix_return_gain * clamp^vix_return_exponent`, 255.0 at the
-    /// shipped 17.0, 15.0 and 1.0. **That is a derived value and not a
-    /// tuned one**: the return is already bounded one step earlier, so at
-    /// this value the cap cannot bind anywhere the clamp does not, and the
-    /// pair has one binding constraint between them instead of two. The
-    /// value is asserted against its own derivation by
-    /// `the_default_cap_is_the_clamps_own_image`, so it moves with the gain
-    /// and the clamp rather than being a number to remember.
+    /// pt-v19 therefore sets it to the SUPREMUM of the spike over the domain
+    /// the update admits — `vix_return_gain * clamp^vix_return_exponent *
+    /// floor^-vix_return_level_exponent`, where the floor is the 10.0 of the
+    /// state clamp. **That is a derived value and not a tuned one**: the
+    /// return is already bounded one step earlier and the spike FALLS with
+    /// the level, so at this value the cap cannot bind anywhere the clamp
+    /// does not and the pair has one binding constraint between them instead
+    /// of two. Under the level-blind law (`vix_return_level_exponent` 0) the
+    /// same expression is the product `gain * clamp`, which is the 255.0 at
+    /// 17.0 and 15.0 the earlier text quoted; under pt-v19's composed law it
+    /// is `8.83 * 15^1.4483 * 10^-0.4483` = 158.8524.
+    ///
+    /// **What the cap is NOT ordered against is `vix_ceiling`.** That
+    /// invariant was withdrawn on 2026-09-14: the cap truncates an additive
+    /// term of the TARGET and the ceiling truncates the STATE, so neither
+    /// binds "first" at any pair of values, and a cap under the ceiling
+    /// makes the ceiling less sticky rather than more. See
+    /// `ModelParams::pt_v19` at the cap's own assignment and
+    /// `programme/results/ceiling-and-omega.md` 3 in the design repository.
+    ///
+    /// The value is asserted against its own derivation by
+    /// `the_default_cap_is_the_clamps_own_image`, which as of 2026-09-14
+    /// still computes the LEVEL-BLIND spelling and is red on pt-v19.
     pub vix_target_shock_cap: f64,
     /// Upper bound on the VIX state itself, in points.
     ///
@@ -3340,6 +3462,7 @@ impl ModelParams {
             market_vol_alpha_excursion: 0.0,
             market_vol_level_persistence: 0.0,
             market_vol_level_sigma: 0.0,
+            market_burn_in_sessions: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
             market_vol_vix_coupling: factor_vol::MARKET_VOL_VIX_COUPLING,
@@ -4803,8 +4926,40 @@ impl ModelParams {
         // on the record cannot have been tuned against any graded
         // statistic, so inertness satisfies B3 and the ledger entry stays
         // `derived`, carrying the condition, the solve and the measured
-        // clip rate as its evidence. `vix_target_shock_cap` is 255.0 and
-        // stays above it.
+        // clip rate as its evidence.
+        //
+        // RE-DERIVED ON THE COMPOSED VECTOR'S LAW, 2026-09-14
+        // (`programme/results/ceiling-and-omega.md` 4 and 5). The condition
+        // above subtracts the target's fear term for a session at the top
+        // of the graded range. Under the level-blind law that was the
+        // constant `17 * 6.39` = 108.63; under the law this preset now runs
+        // it is `8.83 * 6.39^1.4483 * C^-0.4483`, which at C = 181.3295 is
+        // 12.5920 -- smaller by a factor of 8.6, two thirds of that the
+        // gain and the rest the level factor. So the condition here holds
+        // for any settled read-back under 168.7375, and the closed-form map
+        // re-run with today's dials reads `implied(181.3295)` at 70.15 to
+        // 75.89 with the largest read-back the engine ADMITS at that VIX --
+        // the factor variance pinned at its own 32x clamp -- at 121.8 to
+        // 134.5. The shipped ceiling cannot fail its own condition on this
+        // map at any variance the engine can reach.
+        //
+        // WHAT THE RE-DERIVATION DOES NOT DO IS PICK THE VALUE. The
+        // condition is a LOWER BOUND: monotone increasing on the left,
+        // non-increasing on the right, so once met it stays met. Taking the
+        // SMALLEST admissible C was defensible while that was 181 and the
+        // model never came within 60 points of it. On this law it collapses
+        // to 56 to 67 -- inside a record whose measured maximum VIX is
+        // 60.59 over 12 rosters at 504 days -- so the rule that produced
+        // 181.3295 now produces a ceiling that BINDS and forfeits the B3
+        // argument above. 181.3295 is therefore b4fix7's solve CARRIED
+        // FORWARD and re-verified, and the derivation's tightness is
+        // demoted in the record rather than the value moved to whatever
+        // restores an ordering.
+        //
+        // The ordering itself is withdrawn; see `vix_target_shock_cap`
+        // above. The sentence that stood here, "`vix_target_shock_cap` is
+        // 255.0 and stays above it", was true of a cap this preset no
+        // longer ships and of a consequence the code never had.
         p.vix_ceiling = 181.3295;
         // THE FACTOR'S OWN MEMORY, MEASURED ON THE TAPE INSTEAD OF
         // SEARCHED, which the line above makes possible.
@@ -4836,6 +4991,27 @@ impl ModelParams {
         // THE SYMMETRIC FIT IS AN APPROXIMATION AND THE TAPE SAYS SO, so
         // the GJR triple below replaces it rather than sitting beside it.
         // The values here are the GJR fit's, not the GARCH(1,1) fit's.
+        //
+        // AND THE FIT THAT PRODUCED THEM IS NOT THE MODEL THAT RUNS THEM,
+        // which the three provenance entries did not say until 2026-09-14
+        // (defect-16, `programme/results/ceiling-and-omega.md` 7 to 9). The
+        // fit estimated a FREE `omega` = 0.0202; `market/factor_vol.rs`
+        // `component_step` applies the triple VARIANCE-TARGETED,
+        // `omega = (1 - alpha - beta - gamma/2) * target`. Those are
+        // different models and the tape can tell them apart: the fitted
+        // model's own unconditional variance is 0.9656 against the tape's
+        // 1.3053 -- 0.7398 of it -- where targeting sets the ratio to one,
+        // and the restriction is rejected at a likelihood ratio of 7.06 on
+        // one degree of freedom. What it costs the TRIPLE is small: the
+        // constrained re-fit reads (0.0110, 0.1701, 0.8884), moves of
+        // +0.54, +0.62 and -0.35 of the corrected Bollerslev-Wooldridge
+        // bars, joint Wald 4.11 on 3 df. The fit pays for the constraint in
+        // persistence instead, 0.9790 -> 0.9844, +1.14 of its own bar. None
+        // of that is adopted: the level the constraint pins is the TAPE's
+        // and the engine's is `market_factor_sigma`, calibrated on its own
+        // evidence, so variance targeting is the only transport of these
+        // three that does not require inventing a level. The gap is
+        // recorded, not closed.
         p.market_vol_alpha = 0.0066;
         p.market_vol_beta = 0.8946;
         // THE LEVERAGE RESPONSE, at a likelihood ratio of 305 on one degree
@@ -4938,16 +5114,36 @@ impl ModelParams {
         // because `powf` is not available in a `const fn`; the identity is
         // asserted in the test suite rather than trusted here.
         //
-        // OPEN, AND FLAGGED RATHER THAN PAPERED OVER: at 158.85 the cap now
-        // sits BELOW `vix_ceiling` (181.3295), which the ceiling's own
-        // provenance says must not happen, because a cap under the ceiling
-        // binds first. The ceiling was solved on the map the LEVEL-BLIND law
-        // runs; this law's map is a different one and the ceiling has to be
-        // re-solved on it. Neither bound is anywhere near binding -- the
-        // measured maximum VIX on this vector is 60.59 over 12 rosters at
-        // 504 days, 48 points clear of even the retired 108.63 -- so this is
-        // an ordering defect in the record rather than a live clamp, and it
-        // is the one measurement this adoption still owes.
+        // THE CAP IS THE SPIKE'S SUPREMUM, which is the property the
+        // derivation wants, and 158.8524 is it. The down spike is
+        // `gain * |r|^p * vix^-g` with `g` = 0.4483 > 0, so it rises in the
+        // move and FALLS with the level: its supremum over the domain the
+        // update admits -- `|r| <= vix_return_clamp` after `:1152`,
+        // `vix >= 10` after the state clamp at `:1291` -- is attained at the
+        // corner (15, 10) and is this literal. The session at which the cap
+        // would truncate is `(cap * x^g / gain)^(1/p)`: 15.0000 exactly at
+        // the VIX floor, 18.8725 at a VIX of 21, 36.7817 at 181.33. The
+        // clamp binds first everywhere above the floor.
+        //
+        // THE ORDERING DEFECT, CLOSED 2026-09-14, AND THE INVARIANT
+        // WITHDRAWN RATHER THAN RESTORED. This block used to flag that at
+        // 158.85 the cap sits BELOW `vix_ceiling` (181.3295), which the
+        // ceiling's provenance said must not happen "because a cap under
+        // the ceiling binds first". It does sit below it, by 22.4771 points,
+        // and nothing binds first: the cap truncates an ADDITIVE TERM of
+        // the target (`:1167`) and the ceiling truncates the STATE after
+        // the reversion step (`:1291`). They bound different quantities and
+        // no expression compares them. A cap under the ceiling in fact
+        // makes the ceiling LESS sticky -- a state at C is held there iff
+        // `implied + min(cap, spike) >= C`, so the read-back needed to pin
+        // the VIX to the ceiling goes from -73.67 (none) at a cap of 255 to
+        // +22.48 here -- which is the direction the ceiling's own
+        // derivation wants. `programme/results/ceiling-and-omega.md`
+        // sections 3 to 5 in the design repository establish that, re-derive
+        // the ceiling's condition on THIS law, and record why the
+        // re-derivation's own answer (a ceiling of 56 to 67, which would
+        // restore the ordering and would clip a record whose measured
+        // maximum VIX is 60.59) is refused.
         p.vix_target_shock_cap = 158.8524;
 
         // THE PER-NAME MEMORY (vix-dynamics.md section 15.4). The tape's
@@ -5114,6 +5310,7 @@ impl ModelParams {
             "market_vol_alpha_excursion" => self.market_vol_alpha_excursion,
             "market_vol_level_persistence" => self.market_vol_level_persistence,
             "market_vol_level_sigma" => self.market_vol_level_sigma,
+            "market_burn_in_sessions" => self.market_burn_in_sessions,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
             "market_vol_vix_coupling" => self.market_vol_vix_coupling,
@@ -5298,6 +5495,7 @@ impl ModelParams {
             "market_vol_alpha_excursion" => out.market_vol_alpha_excursion = value,
             "market_vol_level_persistence" => out.market_vol_level_persistence = value,
             "market_vol_level_sigma" => out.market_vol_level_sigma = value,
+            "market_burn_in_sessions" => out.market_burn_in_sessions = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
             "market_vol_vix_coupling" => out.market_vol_vix_coupling = value,
@@ -5551,6 +5749,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_alpha_excursion",
         "market_vol_level_persistence",
         "market_vol_level_sigma",
+        "market_burn_in_sessions",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",
         "market_vol_slow_gain",
