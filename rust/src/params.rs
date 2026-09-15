@@ -4644,10 +4644,21 @@ impl ModelParams {
         //     0.10 -> 28.69 / 29.78     0.12 -> 25.65 / 32.84
         //     0.15 -> 23.87 / 42.79
         //
-        // R6 forbids a combined number that would pick one of these and
-        // hide the rest, and R10 makes the choice among them Simon's.
-        // RULED 0.10 on 2026-09-07. It is a decision, and a different
-        // ruling would have been equally consistent with the measurement.
+        // R6 does both jobs. It forbids a combined number that would pick
+        // one of these and hide the rest, and its third bullet is what
+        // makes the choice among them Simon's: a frontier shows every
+        // trade at once and lets a human choose. Text here used to cite
+        // R10 for that second job. R10 asks only whether `cmaes.py` may
+        // collapse the two horizons to rank a generation, and it has
+        // never been answered.
+        //
+        // RULED 0.10 on 2026-09-07, filed as R13 on 2026-09-08, and R13
+        // was WITHDRAWN on 2026-09-15. Box `sigmamr1` measured 0.10
+        // against 0.27 on the whole objective and 0.27 is ahead at both
+        // horizons and nearer the tape on `vix_ar1_debiased`, which is
+        // why pt-v19 below reads 0.27. The 0.10 stays here because a
+        // shipped preset's vector is frozen. It records what pt-v18 was
+        // released with. The ruling behind it no longer stands.
         //
         // What the ruling was made on. The scoring rule gained the VIX's
         // own persistence row this day (`facts.PERSISTENCE`), and 0.10 is

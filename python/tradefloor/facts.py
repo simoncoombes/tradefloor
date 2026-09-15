@@ -414,8 +414,16 @@ REAL_MARKETS = {
     # bucket alone would have scored this as mildly out of band for three
     # eras, and mildly out of band is the verdict that gets tuned at rather
     # than fixed; the -1 percent row reads inside its band on the same model.
-    # Bands from ^VIX against ^GSPC, 1990 to 2026, in `REAL_MARKETS_PROVENANCE`.
-    "fear_gauge_dn1": (0.70, 4.03),
+    # Bands from ^VIX against ^GSPC, in `REAL_MARKETS_PROVENANCE`, and THE TWO
+    # ROWS ARE ON DIFFERENT SPANS AND DIFFERENT FORMS. The -1 percent row was
+    # a 2015-2025 decade band until 2026-09-15 and is now the whole tape its
+    # data supports, 1990-01-03 to 2025-07-31, under
+    # `ruling-longest-tape-per-row`; the -3 percent row was never a decade
+    # object and keeps the spread rule it was built with. `FEAR_DN1_WINDOWS`
+    # below carries the -1 percent row's window readings so its band derives
+    # here rather than being typed in; the -3 percent row's do not exist in
+    # this package and its provenance says so.
+    "fear_gauge_dn1": (0.39, 3.03),
     "fear_gauge_dn3": (2.60, 9.58),
     # The index TAIL row, graded from 2026-09-06: the share of sessions, in
     # percent, whose cap-weighted index return is at or below -3 percent --
@@ -881,14 +889,106 @@ REAL_MARKETS_PROVENANCE = {
     # shadow solver fits the draws until the closes are the tape's, so a
     # gauge read downstream of solved closes repeats the tape back.
     "fear_gauge_dn1": {
+        # THIS ROW IS GRADED BY TWO WINDOW SETS AND THAT IS A KNOWN SPLIT,
+        # not an oversight, so read the two halves of this entry apart.
+        #
+        # THE BAND is the whole tape, adopted 2026-09-15: 33 non-crisis
+        # 252-session windows and 15 at 504, 1990-01-03 to 2025-07-31, under
+        # `ruling-longest-tape-per-row`. Everything about it is in the `band`
+        # block below and its readings are in `FEAR_DN1_WINDOWS`.
+        #
+        # THE CENTRE AND ITS ERROR are still the 2015-2025 decade's, 2.66 on
+        # nine windows, because moving them is a change to the SCORING RULE
+        # and not to a band: `loss.rule_table` reads `windows[1]` through
+        # `real_centre`, so every score on the record is against 2.66 and
+        # replacing it reopens all of them. That decision is decision 2 of
+        # `programme/results/ruling-four-level-rows.md` and it is Simon's.
+        # The size of the disagreement, recorded here rather than left to be
+        # rediscovered: the same estimator over the 33 whole-tape windows
+        # gives 1.71 and the pooled median over all 1,124 qualifying
+        # sessions since 1990 gives +1.85, so the decade centre runs 0.95
+        # above the tape. That gap is 3.55 of `centre_se` below, so a reading
+        # sitting exactly at the new band's centre is scored as three and a
+        # half tape errors low while being mid-band on the band's own scale.
         "claim": "median change in the volatility index on sessions at or below "
-                 "-1 percent, by the panel's shared rule: the statistic per "
-                 "252-session window over the reference panel's ten windows "
-                 "2015-07 to 2025-07, the COVID window excluded and reported as "
-                 "the crisis reading, band = [min - s, max + s] with s the "
-                 "across-window sd with the most extreme window dropped",
+                 "-1 percent. BAND: the whole-tape rule, median +/- t(n) times "
+                 "the across-window trimmed sd, over the non-crisis "
+                 "252-session windows of the paired ^VIX and ^GSPC record "
+                 "1990-01-03 to 2025-07-31, 33 of them at 252 and 15 at 504. "
+                 "CENTRE: still the reference panel's ten windows 2015-07 to "
+                 "2025-07, the COVID window excluded and reported as the "
+                 "crisis reading, median of the nine non-crisis window "
+                 "medians. The band superseded the decade's [min - s, max + s] "
+                 "= (0.70, 4.03) on 2026-09-15; the centre did not move and "
+                 "the triple below is still the decade's",
         "windows": (1.34, 2.66, 3.39),
         "crisis_window": 3.08,
+        # The adopted band, every term, so the edges derive here instead of
+        # being trusted. `tests/test_reference_windows.py` rebuilds both
+        # from `FEAR_DN1_WINDOWS` and refuses a typed edge.
+        #
+        # THE MULTIPLIER IS NOT A STUDENT-T QUANTILE. It is the project's
+        # own tolerance solve, 200,000 standard-normal draws at seed
+        # 20260905 against the nine-window false-alarm target
+        # `BAND_RULE_TOLERANCE[9]`, which is the same solve that produced
+        # `certification-bands/universal.json`'s multipliers for the
+        # fourteen shape rows; t(0.975) on 32 degrees of freedom is 2.0369
+        # and nobody should read 2.1310 as one. `band_rule_tolerance(33)`
+        # REFUSES, because the tolerance itself is measured at 4, 5, 7 and 9
+        # windows only, so carrying the nine-window rate to 33 is an
+        # assumption this entry inherits from the universal rule rather than
+        # one it introduces.
+        #
+        # THE WINDOW ANCHOR IS THE FIRST PAIRED SESSION AND NOT THE LAST BAR,
+        # which is where this band differs from every other whole-tape object
+        # in the project and the difference is named here so it is found
+        # rather than assumed. `INDEX_TAIL_WINDOWS` anchors at the tape's last
+        # bar and argues for it; `whole-tape/scripts/panel32.py` walks
+        # backward from the last bar too, so the universal band's windows end
+        # on 2025-07-31. This row's cut runs forward from 1990-01-03 and
+        # discards 140 returns at 252 (2025-01-08 to 2025-07-31) and 392 at
+        # 504 (2024-01-08 to 2025-07-31). MEASURED, at the same cut and the
+        # same n: the last-bar anchor gives [0.53, 2.95] at 252 and
+        # [0.78, 2.78] at 504, each edge rounded OUTWARD by this row's own
+        # rule. An earlier reading here put the 504 pair at [0.79, 2.77],
+        # which is the same unrounded edges taken to nearest instead of
+        # outward; 252 is unaffected because the two agree there. So the
+        # anchor used here is the WIDER of the two at both horizons, by 8.9
+        # and 7.4 per cent of the last-bar band's UNROUNDED width (2.6324
+        # against 2.4168 at 252, and 2.1308 against 1.9845 at 504; the
+        # percentages are on those unrounded widths and do not reproduce
+        # from the rounded pairs above). The direction favours any model
+        # sitting near the floor. It
+        # changes NO verdict on the record: over the 31 retained rec-* arms
+        # and both presets at both horizons the two anchors agree on all 66.
+        "band": {
+            "adopted": "2026-09-15",
+            "supersedes": (0.70, 4.03),
+            "rule": "median +/- t(n) * trimmed_sd, each edge rounded outward",
+            "series": "^VIX close change paired with the same session's "
+                      "close-to-close ^GSPC return",
+            "tape": ("1990-01-03", "2025-07-31"),
+            "anchor": "forward from the first paired session",
+            "crisis_rule": "a window is dropped if it holds 1987-10-19, "
+                           "2008-10-15 or 2020-03-16",
+            "horizons": {
+                252: {"blocks": 35, "n": 33, "t": 2.1309672358021348,
+                      "centre": 1.7100, "trimmed_sd": 0.6176423652439147,
+                      "unrounded": (0.3938234406945389, 3.0261747282507736),
+                      "band": (0.39, 3.03)},
+                504: {"blocks": 17, "n": 15, "t": 2.466699237340168,
+                      "centre": 1.6600, "trimmed_sd": 0.4319092157049549,
+                      "unrounded": (0.5946097144325069, 2.7253899803917117),
+                      "band": (0.59, 2.73)},
+            },
+            "source": "programme/results/five-rows/dn1-band.json, "
+                      "bands/to-2025-07-31; derived by "
+                      "five-rows/scripts/derive_dn1.py, which exits non-zero "
+                      "unless it first reproduces the shipped (0.70, 4.03), "
+                      "the recorded triple and universal.json's multipliers, "
+                      "and which opens no preset file. Re-run 2026-09-15 from "
+                      "the same caches: byte-identical output",
+        },
         # The tape side of the scoring rule. The model's row is a per-seed
         # median across a run's sessions aggregated as the median over
         # seeds, so the like-for-like tape centre is the MEDIAN of the nine
@@ -920,6 +1020,144 @@ REAL_MARKETS_PROVENANCE = {
         ),
     },
     "fear_gauge_dn3": {
+        # THE ROW'S RULER, NAMED, which is what it was missing rather than a
+        # band. Recorded 2026-09-15.
+        #
+        # `ruling-longest-tape-per-row` grades every row against the longest
+        # tape that row's own data supports. This row reads ^VIX against
+        # ^GSPC, and ^VIX BEGINS 1990-01-02: not the request floor but the
+        # series, confirmed by a fetch with `period1` at 1980-01-01 that
+        # returns 9,282 rows whose first bar is 1990-01-02, and again by a
+        # second independent fetch. So the row is already at its cap and
+        # there is nothing longer to move it to. It needs no re-derivation
+        # under the ruling and it never carried a decade band to supersede,
+        # which is what separates it from `fear_gauge_dn1`.
+        #
+        # ITS RULER IS 1990-01-03 TO 2026-09-02, 9,234 paired sessions and 36
+        # whole 252-session windows. NOT 1990-2025, and the difference is
+        # worth a line because this is the ONLY one of the nineteen graded
+        # rows whose ruler runs past the project's 2025-07-31 tape cut. The
+        # fourteen shape rows end 2025-07-31, `index_tail_dn3_pct` ends
+        # 2025-07-31, `index_drift_pct` ends 2025, `vix_ar1_debiased` ends
+        # 2025-07-30, and `fear_gauge_dn1`'s new band is cut at 2025-07-31.
+        #
+        # WHAT THE EXTRA YEAR BUYS, measured rather than assumed, by
+        # re-deriving at both cuts on the same caches: NOTHING THE BAND CAN
+        # SEE. At 2025-07-31 there are 35 whole windows against 36, and the
+        # SAME ten hold at least five qualifying sessions, because the last
+        # qualifying window ends 2023-01-04. Same triple (3.70, 5.30, 8.48),
+        # same trimmed sd 1.0972, same band (2.60, 9.58). The pooled centre
+        # is +5.7300 over the same 107 sessions at either cut. One term
+        # moves: the windows holding at least one qualifying session, which
+        # are the error's bootstrap blocks, are 20 here and would be 19 at
+        # the shorter cut, so `centre_blocks` below is the 2026-09-02 count.
+        #
+        # THE FORM IS THE SPREAD RULE AND NOT THE WHOLE-TAPE RULE, and that
+        # is a separate question from the span. The re-derivation is RULED
+        # ON and DONE: `ruling-nineteen-rows-with-dn3-re-derived` (Simon,
+        # 2026-09-15) took the option the recommendation had declined, and
+        # `section14` below carries what it produced. The short version is
+        # that the [2.16, 7.38] the ruling priced does not exist at the
+        # anchor section 14's own rule uses.
+        #
+        # [2.16, 7.38] IS THE FRONT-ANCHORED FIGURE. It reproduces to the
+        # quantum from the forward cut and from no other. Section 14's rule
+        # runs on `whole-tape/scripts/panel32.py`'s windows, which walk
+        # backward from the last bar, and `INDEX_TAIL_WINDOWS` anchors the
+        # same way. Cut the same tape backward and the five-session
+        # condition keeps FIVE windows instead of ten, two of them the
+        # crisis windows the rule drops, so n = 3 at 252: t(3) = 34.98 on a
+        # scale estimated from two kept points, and the interval is
+        # [-19.16, 28.58]. That is not a band. At 504 it is n = 4 and
+        # [-1.73, 11.14], whose floor is below anything this row can read.
+        #
+        # WHY THIS ROW AND NOT `fear_gauge_dn1`. The -1 per cent row's every
+        # window holds qualifying sessions, so its anchor moves each median
+        # a little. Here sixteen of thirty-six windows hold none and the
+        # qualifying sessions cluster inside a few months, so the anchor
+        # moves whole windows across the five-session condition. The band is
+        # anchor-sensitive where the other fear row's is not.
+        #
+        # WHAT IT WOULD HAVE COST THE CANDIDATES, measured rather than
+        # feared, because the ruling accepted the risk in advance: NOTHING.
+        # pt-v19 reads 6.3920 +/- 0.5001 at 252 and 6.1676 +/- 0.1921 at
+        # 504, pt-v18 3.2473 +/- 0.0800 and 3.1382 +/- 0.0598, and all four
+        # are inside all thirty of the band-producing cells in the anchor by
+        # conditioning sweep, the tightest of which is [2.16, 7.38] at 2.0
+        # of pt-v19's own standard errors. No count moves under any of them.
+        #
+        # AND THE CORRECTED DERIVATION IS A WEAKER RULER THAN THE ONE IT
+        # WOULD REPLACE, which is the finding that decides this. Over the
+        # 173 arm readings retained in the five per-seed boxes, the shipped
+        # band rejects 8, the front-anchored section 14 band rejects 12, and
+        # the best correctly anchored one, `last_bar_keep_crisis` below,
+        # rejects 5. Section 14's third ground for the universal band was
+        # that it is not a rubber stamp; on this row, at this row's own
+        # anchor, it is more of one than the band it replaces. So the
+        # re-derivation is RECORDED HERE AND NOT ADOPTED, on the same
+        # construction ground `programme/results/ship-bar-five-rows.md`
+        # section 3 refused it for `index_drift_pct` and
+        # `index_tail_dn3_pct`, and the row keeps the spread rule. The
+        # decade objection that motivates the universal band never reached
+        # this row: it was never a decade object.
+        "section14": {
+            "ruled": "ruling-nineteen-rows-with-dn3-re-derived, Simon "
+                     "2026-09-15",
+            "outcome": "derived and recorded, NOT adopted: at the project's "
+                       "own window anchor the rule gives no band at 252 and "
+                       "a floor below the row's range at 504, and its best "
+                       "correctly anchored form rejects 5 of 173 retained "
+                       "arm readings where the shipped band rejects 8",
+            "rule": "median +/- t(n) * trimmed_sd, each edge rounded "
+                    "outward, over the row's own conditioned windows",
+            "anchor_used_by_section_14": "last bar, as panel32.py and "
+                                         "INDEX_TAIL_WINDOWS both cut",
+            #: `(n, t, centre, trimmed_sd, low, high)` per variant. The
+            #: first two are the figure the ruling priced and are FRONT
+            #: anchored; the rest are the project's own anchor.
+            "variants": {
+                "front_drop_crisis_252": (8, 3.175579, 4.767499, 0.819959,
+                                          2.16, 7.38),
+                "front_drop_crisis_504": (6, 3.991761, 4.519999, 0.918269,
+                                          0.85, 8.19),
+                "last_bar_drop_crisis_252": (3, 34.977805, 4.709999, 0.682357,
+                                             -19.16, 28.58),
+                "last_bar_drop_crisis_504": (4, 7.930551, 4.705001, 0.810739,
+                                             -1.73, 11.14),
+                "last_bar_keep_crisis_252": (5, 5.039474, 5.869999, 0.983925,
+                                             0.91, 10.83),
+                "last_bar_keep_crisis_504": (6, 3.991761, 5.607500, 1.189435,
+                                             0.85, 10.36),
+            },
+            "arm_rejections_of_173": {"shipped": 8, "front_drop_crisis": 12,
+                                      "last_bar_keep_crisis": 5},
+            "moves_no_count": "pt-v19 and pt-v18 are IN at both horizons "
+                              "under every variant above and under the "
+                              "shipped band",
+            "source": "programme/results/dn3-rederive.md, and the three "
+                      "scripts under programme/results/dn3-rederive/scripts",
+        },
+        "ruler": {
+            "named": "2026-09-15",
+            "cap": "^VIX, whose first bar is 1990-01-02",
+            "tape": ("1990-01-03", "2026-09-02"),
+            "paired_sessions": 9234,
+            "blocks": 36,
+            "band_windows": 10,
+            "error_blocks": 20,
+            "compliant_with": "ruling-longest-tape-per-row: the span is the "
+                              "row's own data cap, so no longer tape exists",
+            "form": "the spread rule, kept. Section 14's rule was ruled on "
+                    "and re-derived on 2026-09-15 and did not replace it; "
+                    "`section14` above carries the measurement and the "
+                    "construction ground",
+            "anchor": "forward from the first paired session, which is NOT "
+                      "the project's rule and which this band is sensitive "
+                      "to; FEAR_DN3_WINDOWS carries the cut and the cost",
+            "cut_sensitivity": "band, triple, trimmed sd and pooled centre "
+                               "are identical at a 2025-07-31 cut; only "
+                               "error_blocks falls from 20 to 19",
+        },
         "claim": "median change in the volatility index on sessions at or below "
                  "-3 percent, POOLED across the certification seeds because a "
                  "252-day run holds none on about a third of seeds; the band "
@@ -928,7 +1166,26 @@ REAL_MARKETS_PROVENANCE = {
                  "shared rule applied across every 252-session window since "
                  "1990 that holds at least five such sessions, ten windows",
         "windows": (3.70, 5.30, 8.48),
+        # 7.12 IS A DECADE-PANEL READING AND EVERY OTHER NUMBER IN THIS BLOCK
+        # IS WHOLE-TAPE. Corrected 2026-09-15 by naming it rather than by
+        # changing it, because nothing reads the value and the fault is that
+        # it was unlabelled. It is the 2019-07-03..2020-07-01 window of the
+        # ten 252-session windows cut from 2015-07-01, which reads +7.1150
+        # over 14 qualifying sessions and is the window `fear_gauge_dn1`'s
+        # superseded decade band also reports as its crisis reading. The
+        # sources line below reads "ten windows since 1990 ... the 2020
+        # window 7.12 over 14 sessions", which invites reading 7.12 as one
+        # of those ten. It is not one of them. The whole-tape table's own
+        # 2020 window is 2020-01-06..2021-01-04 at +6.98 over 16 sessions,
+        # and it is IN the ten and IN the band, because this band excludes
+        # no window. `FEAR_DN3_WINDOWS` carries both crisis windows and
+        # `tests/test_reference_windows.py` asserts the distinction.
         "crisis_window": 7.12,
+        "crisis_window_corpus": "the ten 252-session windows cut from "
+                                "2015-07-01, NOT the whole-tape thirty-six "
+                                "this band is built on",
+        #: The whole-tape crisis windows, which ARE in the band's own ten.
+        "crisis_windows_whole_tape": ((6.39, 23), (6.98, 16)),
         # THE CENTRE IS THE POOLED MEDIAN, +5.73, and not the 5.30 in the
         # triple above. The model's row is POOLED over every seed's sessions
         # (`AGGREGATE`), so the like-for-like tape quantity is the median of
@@ -1185,6 +1442,269 @@ def index_tail_rates(horizon_days: int) -> tuple[float, ...]:
             "Run tools/calibration/tail_band.py at that horizon and record "
             "the windows rather than rescaling a rate from another one")
     return tuple(100.0 * hits / sessions for _, _, hits, sessions in windows)
+
+
+#: The -1 per cent fear row's own window readings, as data.
+#:
+#: WHY THIS TABLE EXISTS. Until 2026-09-15 this row's provenance said, in its
+#: own words, that "the nine window VALUES are not in this package -- they are
+#: `fear_band.py`'s output and were never committed -- so the error here
+#: re-derives from a summary and not from the readings, which is the one place
+#: on this row where a record stands in for a measurement". Adopting a new
+#: band on a row in that state would have moved the constant and left the
+#: gap, so the readings the band is built from are committed here and
+#: `tests/test_reference_windows.py` rebuilds both edges from them. A typed
+#: edge now fails a test instead of being believed.
+#:
+#: `(start, end, median, sessions, crisis)` per window, oldest first.
+#: `median` is the median ^VIX close change over the window's sessions whose
+#: same-day ^GSPC return was at or below -1 per cent, and `sessions` is how
+#: many such sessions the window held. `crisis` marks the windows the rule
+#: drops. The medians are recorded to four decimal places, which is lossless:
+#: ^VIX closes carry two, so a median is a two-place value or the midpoint of
+#: two, and both bands reproduce exactly from these figures.
+#:
+#: THE ANCHOR IS THE FIRST PAIRED SESSION, walking FORWARD, which is the
+#: opposite of `INDEX_TAIL_WINDOWS` above and of the universal panel, and the
+#: remainder is dropped at the END: 140 returns at 252 and 392 at 504. The
+#: cost is measured in `REAL_MARKETS_PROVENANCE["fear_gauge_dn1"]["band"]`
+#: and it moves no verdict on the record, but this is not the project's own
+#: anchor rule and the table says so rather than leaving it to be inferred.
+#:
+#: NO window here is empty. Every one of the 35 and 17 blocks holds at least
+#: four qualifying sessions, so the band's window count is the block count
+#: less the crisis drops and nothing else.
+FEAR_DN1_WINDOWS: dict[str, Any] = {
+    "series": "^VIX close change against the same session's ^GSPC return",
+    "threshold_pct": -1.0,
+    "tape": ("1990-01-03", "2025-07-31"),
+    "anchor": "forward from the first paired session; remainder dropped at "
+              "the end",
+    "crisis_dates": ("1987-10-19", "2008-10-15", "2020-03-16"),
+    "source": "programme/results/five-rows/dn1-band.json, "
+              "bands/to-2025-07-31, re-run 2026-09-15 byte-identical",
+    #: `(start, end, median, sessions, crisis)`, keyed on the window's
+    #: return count.
+    "windows": {
+        252: (
+            ("1990-01-03", "1990-12-31", 1.66, 42, False),
+            ("1991-01-02", "1991-12-30", 0.73, 25, False),
+            ("1991-12-31", "1992-12-28", 1.08, 11, False),
+            ("1992-12-29", "1993-12-27", 1.42, 7, False),
+            ("1993-12-28", "1994-12-23", 1.39, 15, False),
+            ("1994-12-27", "1995-12-22", 0.79, 4, False),
+            ("1995-12-26", "1996-12-20", 1.74, 16, False),
+            ("1996-12-23", "1997-12-19", 1.41, 31, False),
+            ("1997-12-22", "1998-12-21", 2.68, 33, False),
+            ("1998-12-22", "1999-12-21", 1.595, 40, False),
+            ("1999-12-22", "2000-12-19", 1.33, 52, False),
+            ("2000-12-20", "2001-12-26", 1.55, 55, False),
+            ("2001-12-27", "2002-12-26", 1.545, 72, False),
+            ("2002-12-27", "2003-12-26", 1.085, 38, False),
+            ("2003-12-29", "2004-12-28", 1.34, 20, False),
+            ("2004-12-29", "2005-12-27", 1.35, 17, False),
+            ("2005-12-28", "2006-12-27", 2.33, 13, False),
+            ("2006-12-28", "2007-12-28", 2.29, 34, False),
+            ("2007-12-31", "2008-12-29", 2.08, 75, True),
+            ("2008-12-30", "2009-12-29", 1.92, 54, False),
+            ("2009-12-30", "2010-12-29", 2.43, 38, False),
+            ("2010-12-30", "2011-12-28", 2.575, 48, False),
+            ("2011-12-29", "2012-12-31", 2.11, 21, False),
+            ("2013-01-02", "2013-12-31", 1.69, 17, False),
+            ("2014-01-02", "2014-12-31", 2.37, 19, False),
+            ("2015-01-02", "2015-12-31", 1.93, 31, False),
+            ("2016-01-04", "2016-12-30", 1.99, 22, False),
+            ("2017-01-03", "2018-01-02", 4.37, 4, False),
+            ("2018-01-03", "2019-01-03", 2.66, 33, False),
+            ("2019-01-04", "2020-01-03", 2.925, 14, False),
+            ("2020-01-06", "2021-01-04", 2.49, 46, True),
+            ("2021-01-05", "2022-01-03", 3.315, 20, False),
+            ("2022-01-04", "2023-01-04", 1.71, 63, False),
+            ("2023-01-05", "2024-01-05", 1.33, 28, False),
+            ("2024-01-08", "2025-01-07", 1.97, 20, False),
+        ),
+        504: (
+            ("1990-01-03", "1991-12-30", 1.31, 67, False),
+            ("1991-12-31", "1993-12-27", 1.195, 18, False),
+            ("1993-12-28", "1995-12-22", 1.26, 19, False),
+            ("1995-12-26", "1997-12-19", 1.46, 47, False),
+            ("1997-12-22", "1999-12-21", 2.19, 73, False),
+            ("1999-12-22", "2001-12-26", 1.48, 107, False),
+            ("2001-12-27", "2003-12-26", 1.4, 110, False),
+            ("2003-12-29", "2005-12-27", 1.35, 37, False),
+            ("2005-12-28", "2007-12-28", 2.33, 47, False),
+            ("2007-12-31", "2009-12-29", 2.0, 129, True),
+            ("2009-12-30", "2011-12-28", 2.48, 86, False),
+            ("2011-12-29", "2013-12-31", 1.775, 38, False),
+            ("2014-01-02", "2015-12-31", 2.1, 50, False),
+            ("2016-01-04", "2018-01-02", 2.01, 26, False),
+            ("2018-01-03", "2020-01-03", 2.79, 47, False),
+            ("2020-01-06", "2022-01-03", 2.915, 66, True),
+            ("2022-01-04", "2024-01-05", 1.66, 91, False),
+        ),
+    },
+    #: Which graded row this table is the real side of.
+    "rows": ("fear_gauge_dn1",),
+}
+
+
+def fear_dn1_windows(horizon_days: int, *,
+                     include_crisis: bool = False) -> tuple[float, ...]:
+    """The window medians the `fear_gauge_dn1` band is built from.
+
+    Crisis windows are EXCLUDED by default, because the band's rule drops
+    them; pass ``include_crisis=True`` to read the whole block set, which is
+    what a sensitivity on the crisis rule needs.
+    """
+    windows = FEAR_DN1_WINDOWS["windows"].get(int(horizon_days))
+    if windows is None:
+        raise ValidationError(
+            f"the fear_gauge_dn1 window table holds no {horizon_days}-session "
+            f"windows; measured horizons are "
+            f"{sorted(FEAR_DN1_WINDOWS['windows'])}. Run "
+            "programme/results/five-rows/scripts/derive_dn1.py at that "
+            "horizon and record the windows rather than rescaling a band "
+            "from another one")
+    return tuple(median for _, _, median, _, crisis in windows
+                 if include_crisis or not crisis)
+
+
+#: The -3 per cent fear row's own corpus, and the fourth window table.
+#:
+#: `REAL_MARKETS_PROVENANCE["fear_gauge_dn3"]` carried a triple, a trimmed sd
+#: and a window count and nothing a test could re-derive them from, which is
+#: the state `fear_gauge_dn1` was in until 2026-09-15. Landed 2026-09-15 with
+#: the section 14 re-derivation under `ruling-nineteen-rows-with-dn3-re-
+#: derived`, so the shipped edges stop being hand-typed literals.
+#:
+#: THE ANCHOR IS THE FIRST PAIRED SESSION, walking FORWARD, and the shipped
+#: band derives from that cut and no other. This is the same deviation
+#: `FEAR_DN1_WINDOWS` above records, and until now nothing said so for this
+#: row: `INDEX_TAIL_WINDOWS` anchors at the tape's last bar and argues for
+#: it, `whole-tape/scripts/panel32.py` walks backward from the last bar, and
+#: both fear rows walk forward. The remainder is dropped at the END, 162
+#: returns at both horizons.
+#:
+#: WHAT THE ANCHOR COSTS HERE IS NOT WHAT IT COSTS ON `fear_gauge_dn1`, and
+#: the difference is the reason this table exists. On that row every window
+#: holds qualifying sessions, so moving the cut moves each window's median a
+#: little. On this one SIXTEEN of the thirty-six windows hold no qualifying
+#: session at all and the qualifying ones cluster inside a few months, so
+#: moving the cut moves windows ACROSS the five-session condition: ten
+#: windows qualify at this anchor and five at the last-bar anchor. The band
+#: is therefore anchor-sensitive in a way the -1 per cent row's is not, and
+#: `REAL_MARKETS_PROVENANCE["fear_gauge_dn3"]["section14"]` carries the
+#: measurement at both anchors rather than one.
+#:
+#: `(start, end, median, sessions, crisis)` per window, oldest first, keyed
+#: on the window's return count. `median` is None where the window holds no
+#: qualifying session, which is what `fear_gauge_dn1`'s table never needs.
+FEAR_DN3_WINDOWS: dict[str, Any] = {
+    "series": "^VIX close change against the same session's ^GSPC return",
+    "threshold_pct": -3.0,
+    "tape": ("1990-01-03", "2026-09-02"),
+    "anchor": "forward from the first paired session; remainder dropped at "
+              "the end, 162 returns at both horizons",
+    "crisis_dates": ("1987-10-19", "2008-10-15", "2020-03-16"),
+    "band_condition": "at least five qualifying sessions in the window; no "
+                      "window is excluded for being a crisis, because a calm "
+                      "year holds no qualifying session at all and dropping "
+                      "the stressed ones leaves a different quantity",
+    "error_condition": "at least one qualifying session in the window, which "
+                       "is the twenty-block set `centre_se` bootstraps over",
+    "source": "programme/results/dn3-rederive/scripts/emit_table.py, run "
+              "2026-09-15 against the same two caches the band was built "
+              "from",
+    "windows": {
+        252: (
+            ("1990-01-03", "1990-12-31", 7.17, 1, False),
+            ("1991-01-02", "1991-12-30", 7.22, 1, False),
+            ("1991-12-31", "1992-12-28", None, 0, False),
+            ("1992-12-29", "1993-12-27", None, 0, False),
+            ("1993-12-28", "1994-12-23", None, 0, False),
+            ("1994-12-27", "1995-12-22", None, 0, False),
+            ("1995-12-26", "1996-12-20", 4.21, 1, False),
+            ("1996-12-23", "1997-12-19", 7.95, 1, False),
+            ("1997-12-22", "1998-12-21", 4.87, 5, False),
+            ("1998-12-22", "1999-12-21", None, 0, False),
+            ("1999-12-22", "2000-12-19", 2.83, 3, False),
+            ("2000-12-20", "2001-12-26", 4.57, 5, False),
+            ("2001-12-27", "2002-12-26", 3.7, 7, False),
+            ("2002-12-27", "2003-12-26", 1.72, 1, False),
+            ("2003-12-29", "2004-12-28", None, 0, False),
+            ("2004-12-29", "2005-12-27", None, 0, False),
+            ("2005-12-28", "2006-12-27", None, 0, False),
+            ("2006-12-28", "2007-12-28", 7.16, 1, False),
+            ("2007-12-31", "2008-12-29", 6.39, 23, True),
+            ("2008-12-30", "2009-12-29", 4.665, 12, False),
+            ("2009-12-30", "2010-12-29", 6.02, 5, False),
+            ("2010-12-30", "2011-12-28", 8.48, 6, False),
+            ("2011-12-29", "2012-12-31", None, 0, False),
+            ("2013-01-02", "2013-12-31", None, 0, False),
+            ("2014-01-02", "2014-12-31", None, 0, False),
+            ("2015-01-02", "2015-12-31", 10.8, 2, False),
+            ("2016-01-04", "2016-12-30", 8.51, 1, False),
+            ("2017-01-03", "2018-01-02", None, 0, False),
+            ("2018-01-03", "2019-01-03", 5.73, 5, False),
+            ("2019-01-04", "2020-01-03", None, 0, False),
+            ("2020-01-06", "2021-01-04", 6.98, 16, True),
+            ("2021-01-05", "2022-01-03", None, 0, False),
+            ("2022-01-04", "2023-01-04", 4.17, 8, False),
+            ("2023-01-05", "2024-01-05", None, 0, False),
+            ("2024-01-08", "2025-01-07", None, 0, False),
+            ("2025-01-08", "2026-01-09", 8.51, 3, False),
+        ),
+        504: (
+            ("1990-01-03", "1991-12-30", 7.195, 2, False),
+            ("1991-12-31", "1993-12-27", None, 0, False),
+            ("1993-12-28", "1995-12-22", None, 0, False),
+            ("1995-12-26", "1997-12-19", 6.08, 2, False),
+            ("1997-12-22", "1999-12-21", 4.87, 5, False),
+            ("1999-12-22", "2001-12-26", 3.8, 8, False),
+            ("2001-12-27", "2003-12-26", 3.415, 8, False),
+            ("2003-12-29", "2005-12-27", None, 0, False),
+            ("2005-12-28", "2007-12-28", 7.16, 1, False),
+            ("2007-12-31", "2009-12-29", 5.73, 35, True),
+            ("2009-12-30", "2011-12-28", 7.93, 11, False),
+            ("2011-12-29", "2013-12-31", None, 0, False),
+            ("2014-01-02", "2015-12-31", 10.8, 2, False),
+            ("2016-01-04", "2018-01-02", 8.51, 1, False),
+            ("2018-01-03", "2020-01-03", 5.73, 5, False),
+            ("2020-01-06", "2022-01-03", 6.98, 16, True),
+            ("2022-01-04", "2024-01-05", 4.17, 8, False),
+            ("2024-01-08", "2026-01-09", 8.51, 3, False),
+        ),
+    },
+    #: Which graded row this table is the real side of.
+    "rows": ("fear_gauge_dn3",),
+}
+
+
+def fear_dn3_windows(horizon_days: int, *,
+                     condition: int = 5,
+                     drop_crisis: bool = False) -> tuple[float, ...]:
+    """The window medians the `fear_gauge_dn3` band is built from.
+
+    `condition` is the minimum number of qualifying sessions a window must
+    hold, and it defaults to the band's own five. Pass 1 for the twenty-block
+    set the row's standard error bootstraps over.
+
+    Crisis windows are KEPT by default, because this band's rule excludes no
+    window; pass ``drop_crisis=True`` for section 14's form, which drops them
+    and which `REAL_MARKETS_PROVENANCE` prices rather than adopts.
+    """
+    windows = FEAR_DN3_WINDOWS["windows"].get(int(horizon_days))
+    if windows is None:
+        raise ValidationError(
+            f"the fear_gauge_dn3 window table holds no {horizon_days}-session "
+            f"windows; measured horizons are "
+            f"{sorted(FEAR_DN3_WINDOWS['windows'])}. Run "
+            "programme/results/dn3-rederive/scripts/emit_table.py at that "
+            "horizon and record the windows rather than rescaling a band "
+            "from another one")
+    return tuple(median for _, _, median, sessions, crisis in windows
+                 if sessions >= condition and not (drop_crisis and crisis))
+
 
 #: The reference panel's per-window readings, as data.
 #:
@@ -3802,6 +4322,365 @@ BAND_RULE_FIXED_MULTIPLIER_PROVENANCE = {
         "like the band's tolerance and whose body is a different band's",
 }
 
+#: The universal panel's per-window readings, as data.
+#:
+#: WHY THIS TABLE EXISTS. Until it landed, `REAL_MARKETS_UNIVERSAL` and
+#: `REAL_MARKETS_UNIVERSAL_504` were fifty-six typed edges with nothing in
+#: this package underneath them. The readings lived in the design
+#: repository's `whole-tape/panel32.json` and were never committed here, so
+#: no test could tell a measured edge from a mistyped one, and a typo in
+#: either table would have shipped green. That is the state `fear_gauge_dn1`
+#: was in until 2026-09-15, one table over, and it is the state any band is
+#: in when its provenance carries a summary in place of the numbers the
+#: summary is of. `tests/test_band_derivations.py` rebuilds all fifty-six
+#: edges from the readings below.
+#:
+#: WHAT IT IS. 32 of the certified forty, the names trading before 1990,
+#: measured with THIS module's estimators over non-overlapping windows that
+#: walk BACKWARD from the tape's last bar: 38 windows of 252 bars and 19 of
+#: 504, the newest of each ending 2025-07-31, over a span of 9,842 common
+#: bars opening 1986-07-09. The remainder is dropped at the START, which is
+#: `INDEX_TAIL_WINDOWS`'s anchor rule and the opposite of
+#: `FEAR_DN1_WINDOWS`'s.
+#:
+#: THE CRISIS DROPS ARE DERIVED AND NOT FLAGGED, which is the one place this
+#: table's shape differs from `FEAR_DN1_WINDOWS`. A window is crisis when it
+#: holds one of `crisis_dates`, which is the test the deriving tool applies,
+#: and three windows hold one at each horizon. That leaves 35 readings at
+#: 252 bars and 16 at 504, the two counts `BAND_BASIS` already records for
+#: these tables. A flag would be a second place to make the same mistake.
+#:
+#: SIX DECIMAL PLACES, and the precision decides a shipped edge rather than
+#: tidying one. `volume_abs_return_corr`'s 252-bar floor comes out of the
+#: rule at 0.35003030, three parts in a hundred thousand above 0.35, and
+#: `round_outward` floors it to 0.35. Round these readings to four places
+#: and the same arithmetic gives 0.34. One edge of fifty-six turns on the
+#: fifth decimal place of its inputs, so a table rounded shorter than this
+#: ships a different band.
+#:
+#: The last six 504-bar windows are `REAL_MARKETS_WINDOWS_504`'s six, label
+#: for label, because the two panels share an anchor and a window length and
+#: differ in roster and span alone.
+UNIVERSAL_WINDOWS: dict[str, Any] = {
+    "roster": "32 of the certified forty, the names trading before 1990",
+    "tape": ("1986-07-09", "2025-07-31"),
+    "common_bars": 9842,
+    "anchor": "backward from the last bar; remainder dropped at the start",
+    "crisis_dates": ("1987-10-19", "2008-10-15", "2020-03-16"),
+    "source": "tradefloor-design/programme/results/whole-tape/panel32.json, "
+              "promoted 2026-09-15; the bands it derives are "
+              "certification-bands.md section 14's, adopted under "
+              "ruling-the-ruler-is-the-universal-band",
+    #: Which band tables these readings are the real side of, per horizon.
+    "tables": {252: "facts.REAL_MARKETS_UNIVERSAL",
+               504: "facts.REAL_MARKETS_UNIVERSAL_504"},
+    #: `start..end` per window, oldest first, keyed on the window's bar count.
+    "windows": {
+        252: (
+            "1987-06-03..1988-06-01", "1988-06-02..1989-06-01",
+            "1989-06-02..1990-06-01", "1990-06-04..1991-06-03",
+            "1991-06-04..1992-06-02", "1992-06-03..1993-06-02",
+            "1993-06-03..1994-06-02", "1994-06-03..1995-06-02",
+            "1995-06-05..1996-06-03", "1996-06-04..1997-06-03",
+            "1997-06-04..1998-06-04", "1998-06-05..1999-06-07",
+            "1999-06-08..2000-06-06", "2000-06-07..2001-06-07",
+            "2001-06-08..2002-06-14", "2002-06-17..2003-06-17",
+            "2003-06-18..2004-06-18", "2004-06-21..2005-06-20",
+            "2005-06-21..2006-06-21", "2006-06-22..2007-06-25",
+            "2007-06-26..2008-06-25", "2008-06-26..2009-06-26",
+            "2009-06-29..2010-06-29", "2010-06-30..2011-06-29",
+            "2011-06-30..2012-06-29", "2012-07-02..2013-07-05",
+            "2013-07-08..2014-07-08", "2014-07-09..2015-07-09",
+            "2015-07-10..2016-07-11", "2016-07-12..2017-07-12",
+            "2017-07-13..2018-07-13", "2018-07-16..2019-07-17",
+            "2019-07-18..2020-07-17", "2020-07-20..2021-07-20",
+            "2021-07-21..2022-07-21", "2022-07-22..2023-07-25",
+            "2023-07-26..2024-07-26", "2024-07-29..2025-07-31",
+        ),
+        504: (
+            "1987-06-30..1989-06-27", "1989-06-28..1991-06-26",
+            "1991-06-27..1993-06-24", "1993-06-25..1995-06-23",
+            "1995-06-26..1997-06-23", "1997-06-24..1999-06-24",
+            "1999-06-25..2001-06-25", "2001-06-26..2003-07-02",
+            "2003-07-03..2005-07-05", "2005-07-06..2007-07-09",
+            "2007-07-10..2009-07-09", "2009-07-10..2011-07-11",
+            "2011-07-12..2013-07-15", "2013-07-16..2015-07-16",
+            "2015-07-17..2017-07-18", "2017-07-19..2019-07-22",
+            "2019-07-23..2021-07-22", "2021-07-23..2023-07-26",
+            "2023-07-27..2025-07-31",
+        ),
+    },
+    "values": {
+        252: {
+            "annualised_vol_pct": (47.553602, 24.702041, 27.768408, 35.519058,
+                28.333651, 27.461842, 27.709702, 24.528770, 26.193550,
+                28.331313, 31.907621, 41.522924, 43.256897, 43.255948,
+                31.419448, 39.113277, 21.345142, 20.592574, 19.840855,
+                18.511218, 29.250382, 68.738987, 26.760179, 20.295611,
+                29.617168, 19.147637, 16.493299, 18.465835, 24.996818,
+                16.924291, 20.725225, 23.362097, 45.721387, 27.456448,
+                27.864962, 26.357369, 21.802010, 28.497702),
+            "excess_kurtosis": (27.697675, 12.489926, 5.179617, 2.671543,
+                9.016349, 5.444510, 12.402307, 3.852995, 2.692265, 26.159179,
+                11.638725, 5.388458, 7.002522, 73.240618, 7.825345, 4.098790,
+                11.401950, 48.841708, 5.324672, 8.733467, 5.077461, 11.563627,
+                3.060190, 3.248565, 8.156041, 4.909856, 6.295597, 5.248241,
+                3.768983, 9.527720, 5.511385, 5.336323, 12.154527, 6.314437,
+                3.746005, 4.628931, 15.020817, 15.147852),
+            "return_acf1": (0.021189, -0.031655, 0.021175, 0.075673, 0.010005,
+                -0.002154, -0.008761, -0.030510, -0.006145, 0.000441,
+                -0.055543, -0.034634, 0.033149, -0.019500, -0.001113,
+                -0.045624, -0.024927, -0.004544, 0.002306, 0.013049, -0.010789,
+                -0.090485, -0.005584, 0.003652, -0.106959, -0.030329,
+                -0.002429, -0.029579, 0.023732, -0.021307, -0.039326,
+                -0.004744, -0.237206, -0.048067, 0.031761, -0.003690, 0.025677,
+                -0.004002),
+            "abs_return_acf1": (0.295262, 0.058754, 0.122034, 0.135267,
+                0.108061, 0.085651, 0.077678, 0.076602, 0.070829, 0.095068,
+                0.083175, 0.142042, 0.111162, 0.067406, 0.085507, 0.146195,
+                0.026198, 0.086808, 0.053317, 0.067132, 0.044392, 0.183506,
+                0.003106, 0.035682, 0.161408, 0.096663, 0.065694, 0.097626,
+                0.183839, 0.082535, 0.160455, 0.128213, 0.444010, 0.063127,
+                0.091134, 0.048776, 0.050082, 0.128579),
+            "abs_return_acf5": (0.207594, -0.001700, 0.003055, 0.042255,
+                0.004942, 0.036785, 0.003548, -0.001363, 0.017991, 0.045158,
+                -0.003228, 0.064301, 0.039302, 0.029921, 0.076158, 0.122071,
+                0.015421, 0.025687, 0.033481, 0.042058, 0.034917, 0.206641,
+                0.077356, -0.006618, 0.128206, 0.007841, 0.024701, 0.033143,
+                0.036559, 0.016151, 0.058422, 0.045264, 0.353807, 0.084169,
+                0.040546, 0.012769, 0.022923, 0.055731),
+            "abs_return_acf20": (0.022864, 0.002518, 0.026662, -0.000475,
+                0.010889, 0.007789, -0.010172, -0.006659, 0.024211, 0.020196,
+                0.006097, 0.023257, 0.042938, -0.004847, -0.006161, 0.043979,
+                -0.002724, 0.001657, -0.013316, -0.002852, -0.040411, 0.101925,
+                0.023613, -0.035023, 0.073663, -0.017384, 0.029891, -0.030127,
+                0.002288, -0.016663, 0.004556, 0.055307, 0.141282, 0.031681,
+                0.018703, 0.030019, -0.018484, 0.025849),
+            "cross_sectional_corr": (0.567469, 0.329196, 0.356467, 0.366649,
+                0.263070, 0.178299, 0.140048, 0.164978, 0.174190, 0.272961,
+                0.324635, 0.282499, 0.207203, 0.133112, 0.259477, 0.449937,
+                0.289465, 0.276191, 0.265320, 0.289831, 0.405576, 0.578953,
+                0.436345, 0.410907, 0.625201, 0.370786, 0.317532, 0.412820,
+                0.481511, 0.200814, 0.348083, 0.344638, 0.632600, 0.277017,
+                0.328427, 0.362520, 0.170525, 0.282782),
+            "volume_abs_return_corr": (0.462333, 0.371121, 0.360979, 0.377470,
+                0.366214, 0.414698, 0.387374, 0.418878, 0.350275, 0.380422,
+                0.400576, 0.462166, 0.489796, 0.473389, 0.490949, 0.521812,
+                0.489878, 0.499371, 0.499642, 0.510813, 0.518316, 0.488241,
+                0.460503, 0.461103, 0.536787, 0.495719, 0.471824, 0.530761,
+                0.614406, 0.608574, 0.586661, 0.497999, 0.644925, 0.537091,
+                0.504846, 0.493305, 0.498059, 0.521496),
+            "leverage_effect": (-0.135007, 0.023361, -0.063808, -0.029574,
+                -0.007300, -0.033266, -0.012047, 0.000939, 0.010640, -0.019945,
+                -0.055192, -0.048037, 0.012075, -0.052446, -0.041309,
+                -0.039703, -0.058483, -0.043742, -0.000745, -0.025163,
+                -0.008333, -0.095088, -0.065755, -0.002566, -0.086718,
+                -0.034262, -0.053845, 0.019669, -0.119136, 0.004985, -0.084896,
+                -0.117802, -0.137361, 0.008207, -0.046720, -0.042352,
+                -0.007179, -0.036570),
+            "volume_change_acf1": (-0.247007, -0.238848, -0.269536, -0.222354,
+                -0.239032, -0.182918, -0.219982, -0.278114, -0.205037,
+                -0.247061, -0.238994, -0.251375, -0.210951, -0.236130,
+                -0.257574, -0.252883, -0.219132, -0.244460, -0.245062,
+                -0.272221, -0.281531, -0.266974, -0.275182, -0.277185,
+                -0.264219, -0.251481, -0.263894, -0.254947, -0.232997,
+                -0.250623, -0.270219, -0.260605, -0.284683, -0.269213,
+                -0.244851, -0.298974, -0.269397, -0.244342),
+            "corr_asymmetry": (0.378005, -0.007232, 0.286864, -0.043035,
+                0.104860, 0.020770, 0.027422, 0.039761, 0.149462, 0.074034,
+                0.153287, 0.068261, -0.047820, 0.026746, 0.041254, -0.122980,
+                0.021752, -0.035174, 0.007803, 0.204310, 0.000300, -0.051040,
+                0.163837, 0.058134, 0.230296, 0.078307, -0.008692, 0.023758,
+                0.085293, 0.135383, 0.356487, -0.102110, 0.206879, 0.075954,
+                0.061987, -0.017337, -0.020530, 0.039555),
+            "corr_asymmetry_lagged": (0.280762, 0.148189, 0.282129, 0.003807,
+                0.062607, 0.080033, 0.138378, 0.083333, 0.031715, 0.038405,
+                0.212550, 0.127203, 0.007575, 0.003529, 0.090711, 0.007046,
+                0.132037, 0.092441, 0.118661, 0.264773, -0.069722, 0.154311,
+                0.135701, 0.072705, 0.172336, -0.013921, 0.205905, -0.171229,
+                0.143587, 0.117106, 0.199113, 0.419065, 0.056832, 0.135447,
+                -0.109537, 0.075845, 0.088450, 0.406664),
+            "sector_excess_corr": (0.005025, 0.060771, 0.064696, 0.124803,
+                0.096862, 0.195562, 0.162453, 0.112099, 0.149797, 0.101473,
+                0.105178, 0.121100, 0.159142, 0.205958, 0.172604, 0.111058,
+                0.108568, 0.115612, 0.136152, 0.132867, 0.113385, 0.126614,
+                0.116712, 0.126543, 0.086024, 0.109223, 0.126591, 0.169565,
+                0.160588, 0.225870, 0.179085, 0.162995, 0.119349, 0.235264,
+                0.236962, 0.197766, 0.173653, 0.176876),
+            "corr_persistence_acf1": (0.308527, 0.279320, -0.467629, 0.064058,
+                -0.298265, -0.456119, 0.370172, 0.137297, 0.688931, -0.189652,
+                0.284150, 0.372912, -0.112543, 0.471594, 0.296863, 0.031037,
+                -0.240169, -0.421899, -0.252407, 0.182274, 0.055839, 0.470124,
+                0.119592, 0.140506, 0.449633, 0.085069, 0.350149, -0.355760,
+                0.040606, 0.107607, 0.328961, 0.242444, 0.381648, -0.083515,
+                0.092939, 0.342837, -0.202587, 0.287776),
+        },
+        504: {
+            "annualised_vol_pct": (37.988152, 31.840505, 28.048137, 25.888098,
+                27.433065, 37.103249, 43.229551, 35.368002, 20.922066,
+                19.137987, 52.956806, 23.592836, 24.919052, 17.506794,
+                21.329889, 22.145330, 37.731511, 27.187147, 25.351876),
+            "excess_kurtosis": (36.360670, 3.579054, 7.771604, 8.710463,
+                16.421249, 7.488189, 40.237784, 5.585210, 29.097130, 6.977199,
+                18.054907, 3.624101, 9.536314, 5.734480, 5.881289, 5.466941,
+                14.716459, 4.222618, 16.413339),
+            "return_acf1": (0.019902, 0.053511, 0.010506, -0.011177, 0.000214,
+                -0.029998, 0.015851, -0.024916, -0.008823, 0.002207, -0.082162,
+                0.010329, -0.062307, -0.002907, 0.015849, 0.005918, -0.185552,
+                0.015576, -0.002283),
+            "abs_return_acf1": (0.273809, 0.145440, 0.108583, 0.083841,
+                0.091794, 0.148630, 0.088899, 0.159955, 0.074945, 0.063704,
+                0.245245, 0.045720, 0.145054, 0.087864, 0.188566, 0.151580,
+                0.377889, 0.075643, 0.107796),
+            "abs_return_acf5": (0.217476, 0.042639, 0.045404, 0.016718,
+                0.030612, 0.069973, 0.039212, 0.120916, 0.052489, 0.041054,
+                0.271815, 0.054341, 0.115157, 0.036614, 0.067013, 0.050773,
+                0.304851, 0.040998, 0.051888),
+            "abs_return_acf20": (0.066351, 0.030934, 0.015475, 0.008021,
+                0.040072, 0.042183, 0.029291, 0.055036, 0.015310, 0.013526,
+                0.157565, 0.013227, 0.080701, 0.005225, 0.049162, 0.041562,
+                0.134907, 0.027410, 0.023442),
+            "cross_sectional_corr": (0.514414, 0.360802, 0.215649, 0.152200,
+                0.227281, 0.292403, 0.171509, 0.380136, 0.271287, 0.273212,
+                0.539356, 0.423745, 0.529938, 0.367665, 0.387306, 0.342026,
+                0.535801, 0.340850, 0.238228),
+            "volume_abs_return_corr": (0.422011, 0.361634, 0.407698, 0.385106,
+                0.372068, 0.449182, 0.457755, 0.516158, 0.499736, 0.479283,
+                0.526433, 0.471414, 0.531663, 0.527327, 0.613660, 0.528575,
+                0.594509, 0.495023, 0.509120),
+            "leverage_effect": (-0.100984, -0.048716, -0.012328, -0.018358,
+                -0.014597, -0.051689, -0.007438, -0.034585, -0.051340,
+                -0.019724, -0.073068, -0.047073, -0.076106, -0.016807,
+                -0.080849, -0.096359, -0.102107, -0.045276, -0.025020),
+            "volume_change_acf1": (-0.216034, -0.240227, -0.204612, -0.219858,
+                -0.220262, -0.254332, -0.211951, -0.259610, -0.242476,
+                -0.258262, -0.264543, -0.278475, -0.245738, -0.261795,
+                -0.232085, -0.258842, -0.272957, -0.276355, -0.251747),
+            "corr_asymmetry": (0.386807, 0.086706, 0.060795, 0.027303,
+                0.111064, 0.087321, -0.026165, -0.064215, -0.005679, 0.100939,
+                0.019278, 0.104120, 0.194968, 0.027992, 0.092545, 0.088251,
+                0.162526, 0.025561, 0.032389),
+            "corr_asymmetry_lagged": (0.260696, 0.023755, 0.047362, 0.105595,
+                0.039762, 0.161451, -0.014413, 0.009822, 0.092627, 0.151413,
+                0.130869, 0.155244, 0.111407, -0.023503, 0.164274, 0.303050,
+                0.032857, 0.000053, 0.361708),
+            "sector_excess_corr": (0.015804, 0.098810, 0.152750, 0.137831,
+                0.121482, 0.116282, 0.180208, 0.136154, 0.113291, 0.134643,
+                0.125689, 0.119903, 0.095753, 0.153125, 0.180548, 0.172149,
+                0.150739, 0.218027, 0.175858),
+            "corr_persistence_acf1": (0.332173, -0.264004, 0.107614, 0.155850,
+                0.630274, 0.150822, 0.528826, 0.660670, -0.342393, 0.291133,
+                0.430331, 0.165456, 0.549624, -0.110857, 0.278577, 0.389668,
+                0.360935, 0.331504, 0.219027),
+        },
+    },
+}
+
+
+def universal_window_is_crisis(label: str) -> bool:
+    """Whether a `start..end` window holds one of the panel's crisis sessions.
+
+    The crisis rule as code, because the drop count is the difference
+    between a 35-window band and a 38-window one and the table records no
+    flag to disagree with.
+    """
+    start, _, end = label.partition("..")
+    return any(start <= date <= end
+               for date in UNIVERSAL_WINDOWS["crisis_dates"])
+
+
+def universal_windows(key: str, horizon_days: int, *,
+                      include_crisis: bool = False) -> tuple[float, ...]:
+    """The 32-name whole-tape readings the universal band for `key` is built from.
+
+    Crisis windows are EXCLUDED by default, because the band's rule drops
+    them; pass ``include_crisis=True`` for the whole block set, which is what
+    a sensitivity on the crisis rule needs.
+    """
+    horizon_days = int(horizon_days)
+    values = UNIVERSAL_WINDOWS["values"].get(horizon_days)
+    if values is None:
+        raise ValidationError(
+            f"the universal window table holds no {horizon_days}-bar "
+            f"windows; measured horizons are "
+            f"{sorted(UNIVERSAL_WINDOWS['values'])}. Re-run the 32-name pull "
+            "at that horizon and record the windows rather than rescaling a "
+            "band from another one")
+    if key not in values:
+        raise ValidationError(
+            f"{key!r} has no universal window readings. The 32-name panel "
+            f"carries equities, so the level and crisis rows read off ^VIX, "
+            f"^GSPC and RSP are absent from it by construction; the rows it "
+            f"holds are {sorted(values)}")
+    labels = UNIVERSAL_WINDOWS["windows"][horizon_days]
+    return tuple(
+        value for label, value in zip(labels, values[key])
+        if include_crisis or not universal_window_is_crisis(label))
+
+
+def band_from_windows_fixed(key: str, values: Sequence[float],
+                            multiplier: float) -> tuple[float, float]:
+    """The `fixed` rule in full: the band `multiplier` and the windows produce.
+
+    `BAND_RULES` names two rules and until now only one of them had code.
+    `band_from_windows` is `spread`, whose false-alarm rate follows the
+    window count; this is `fixed`, the median plus and minus `multiplier`
+    times the trimmed sd, where the multiplier is solved per window count so
+    the rate does not move. `BAND_BASIS` carries the multiplier each shipped
+    fixed-rule table was built with.
+    """
+    centre = statistics.median(list(values))
+    scale = trimmed_sd(values)
+    return (round_outward(centre - multiplier * scale, "low", key),
+            round_outward(centre + multiplier * scale, "high", key))
+
+
+_Adjustments = dict[str, dict[str, tuple[float, str, str]]]
+
+#: Where a shipped universal band departs from `band_from_windows_fixed` on
+#: its own windows, per horizon: `{horizon: {row: {edge: (value, kind, why)}}}`.
+#:
+#: `BAND_BASIS` states these in a sentence ("clamp #1 and clamp #2
+#: re-applied; the Campbell ceiling retired as redundant"). This is the same
+#: fact as data, so `tests/test_band_derivations.py` derives every shipped
+#: edge as the rule plus a named move and an edge that is neither fails.
+#:
+#: The two clamps are `REAL_MARKETS_ADJUSTMENTS`'s, re-applied to the whole
+#: span and costing more here than they do on the decade: clamp #2 excludes
+#: seven of the 35 windows at 252 rather than one of nine, because the
+#: leverage effect reads positive in seven whole-tape years. The 504 table
+#: carries no move at all, which is `REAL_MARKETS_ADJUSTMENTS_504`'s state
+#: and holds for the same reason: neither clamp binds there, the leverage
+#: effect being negative in all 16 windows and the clustering floor already
+#: above 0.02 raw.
+#:
+#: The Campbell ceiling is ABSENT rather than retired quietly: the rule's own
+#: ceiling at 252 is 41.0, past the 36.0 the shipped decade band was moved
+#: out to, so applying the literature move would round the band INWARD and
+#: REALISM-BANDS.md allows an outward move only.
+REAL_MARKETS_UNIVERSAL_ADJUSTMENTS: dict[int, _Adjustments] = {
+    252: {
+        "abs_return_acf1": {
+            "low": (0.02, "inward",
+                    "clamp #1, as on the decade band: zero or negative "
+                    "clustering appears in no retrieved source, and the "
+                    "rule's 0.00 would admit a model with no volatility "
+                    "memory. One of the 35 windows reads under 0.02, at "
+                    "0.0031, so the clamp costs one real year here"),
+        },
+        "leverage_effect": {
+            "high": (0.0, "inward",
+                     "clamp #2, as on the decade band: every retrieved "
+                     "source gives the effect a negative sign and the rule's "
+                     "+0.04 would certify a reversed one. The cost is SEVEN "
+                     "of the 35 windows, the years reading up to +0.0234, "
+                     "against one of nine on the decade band"),
+        },
+    },
+    504: {},
+}
+
+
 #: The universal band: the fourteen shape rows scored against the whole tape
 #: rather than against one decade of it.
 #:
@@ -3964,6 +4843,718 @@ register_ruler_table(REAL_MARKETS_UNIVERSAL, CERTIFIED_HORIZON_DAYS,
                      "facts.REAL_MARKETS_UNIVERSAL")
 register_ruler_table(REAL_MARKETS_UNIVERSAL_504, 504,
                      "facts.REAL_MARKETS_UNIVERSAL_504")
+
+
+# --------------------------------------------------------------------------
+# The RULED band: every row against the longest tape its own data supports
+#
+# `REAL_MARKETS_UNIVERSAL` covers the fourteen shape rows and stops there,
+# because the 32-name panel it is built from carries equities and the level
+# and crisis rows are read off ^VIX, ^GSPC and RSP. Registering it was not
+# enough to make anything read it: until this block landed, both
+# `RULERS_BY_HORIZON` tables held the 2015-2025 decade set at 252 and
+# `envelope.BANDS_504` at 504, so `envelope.score`, `envelope.certify` and
+# `loss.scoring_rule` could not produce a universal-basis verdict at all.
+# The ruling was adopted against one object and computed against another.
+#
+# This composes the ruled table under `ruling-longest-tape-per-row`: each
+# row takes the band derived on the longest span its own instrument
+# supports, and a row with no such band is ABSENT rather than filled from
+# the decade table. Absent is the honest state and it is what
+# `RULED_UNREADABLE` records; filling it would reproduce exactly the defect
+# this block exists to end, one row lower down.
+# --------------------------------------------------------------------------
+
+#: The 1928 tail row's own window readings, as data, back to where
+#: `INDEX_TAIL_WINDOWS` opens.
+#:
+#: WHY THIS TABLE EXISTS. `RULED_TAIL_BAND` below grades `index_tail_dn3_pct`
+#: on the basis `envelope.BAR_BAND_BASIS` names, so it is one of the sixteen
+#: bands the release bar is read on, and until this table landed it was two
+#: typed numbers. Its derivation was written out in the comment beneath it
+#: and there was nothing in this package to run that derivation against.
+#:
+#: WHAT IS HERE AND WHAT IS NOT. Only the windows OLDER than the shipped
+#: 1990 span: 62 at 252 returns and 31 at 504. The newer ones are
+#: `INDEX_TAIL_WINDOWS` unchanged, and `ruled_tail_windows` returns the two
+#: concatenated, so the 97-window and 48-window sets have one spelling of
+#: every window they share. The join is a real join and not an assertion
+#: about one: the last window here ends 1990-07-23 at 252 and the shipped
+#: table's first window opens 1990-07-24.
+#:
+#: `(start, end, hits, sessions)` per window, oldest first, keyed on the
+#: window's return count, which is `INDEX_TAIL_WINDOWS`'s form exactly. Same
+#: series, same threshold, same anchor at the tape's last bar, and the
+#: remainder dropped at the start, so the first counted session is
+#: 1928-04-09 at 252 returns and 1929-04-11 at 504.
+RULED_TAIL_WINDOWS: dict[str, Any] = {
+    "series": "^GSPC",
+    "column": "unadjusted close",
+    "threshold_pct": -3.0,
+    "anchor": "backward from the last bar; remainder dropped at the start",
+    "continues": "facts.INDEX_TAIL_WINDOWS, which holds the 1990 span",
+    "source": "tradefloor-design/programme/results/longest-tape/"
+              "tail-band.json, the 1927 cut; promoted 2026-09-15",
+    "rows": ("index_tail_dn3_pct",),
+    "windows": {
+        252: (
+            ("1928-04-09", "1929-04-10", 4, 252),
+            ("1929-04-11", "1930-04-11", 17, 252),
+            ("1930-04-14", "1931-04-16", 18, 252),
+            ("1931-04-17", "1932-04-15", 38, 252),
+            ("1932-04-18", "1933-04-28", 48, 252),
+            ("1933-05-01", "1934-05-02", 22, 252),
+            ("1934-05-03", "1935-05-07", 4, 252),
+            ("1935-05-08", "1936-05-07", 8, 252),
+            ("1936-05-08", "1937-05-10", 4, 252),
+            ("1937-05-11", "1938-05-10", 24, 252),
+            ("1938-05-11", "1939-05-15", 11, 252),
+            ("1939-05-16", "1940-05-16", 4, 252),
+            ("1940-05-17", "1941-05-19", 7, 252),
+            ("1941-05-20", "1942-05-22", 2, 252),
+            ("1942-05-25", "1943-05-25", 1, 252),
+            ("1943-05-26", "1944-05-24", 2, 252),
+            ("1944-05-25", "1945-05-28", 0, 252),
+            ("1945-05-29", "1946-06-06", 3, 252),
+            ("1946-06-07", "1947-06-09", 9, 252),
+            ("1947-06-10", "1948-06-11", 1, 252),
+            ("1948-06-14", "1949-06-13", 5, 252),
+            ("1949-06-14", "1950-06-16", 0, 252),
+            ("1950-06-19", "1951-06-20", 4, 252),
+            ("1951-06-21", "1952-06-24", 0, 252),
+            ("1952-06-25", "1953-06-26", 1, 252),
+            ("1953-06-29", "1954-06-29", 0, 252),
+            ("1954-06-30", "1955-06-28", 0, 252),
+            ("1955-06-29", "1956-06-27", 1, 252),
+            ("1956-06-28", "1957-06-28", 0, 252),
+            ("1957-07-01", "1958-06-27", 0, 252),
+            ("1958-06-30", "1959-06-29", 0, 252),
+            ("1959-06-30", "1960-06-28", 0, 252),
+            ("1960-06-29", "1961-06-29", 1, 252),
+            ("1961-06-30", "1962-06-29", 2, 252),
+            ("1962-07-02", "1963-07-01", 0, 252),
+            ("1963-07-02", "1964-07-01", 0, 252),
+            ("1964-07-02", "1965-07-01", 0, 252),
+            ("1965-07-02", "1966-06-30", 0, 252),
+            ("1966-07-01", "1967-06-30", 0, 252),
+            ("1967-07-03", "1968-07-11", 0, 252),
+            ("1968-07-12", "1969-08-13", 0, 252),
+            ("1969-08-14", "1970-08-11", 0, 252),
+            ("1970-08-12", "1971-08-10", 0, 252),
+            ("1971-08-11", "1972-08-07", 0, 252),
+            ("1972-08-08", "1973-08-09", 0, 252),
+            ("1973-08-10", "1974-08-08", 2, 252),
+            ("1974-08-09", "1975-08-07", 1, 252),
+            ("1975-08-08", "1976-08-05", 0, 252),
+            ("1976-08-06", "1977-08-05", 0, 252),
+            ("1977-08-08", "1978-08-04", 0, 252),
+            ("1978-08-07", "1979-08-03", 0, 252),
+            ("1979-08-06", "1980-08-01", 1, 252),
+            ("1980-08-04", "1981-08-03", 0, 252),
+            ("1981-08-04", "1982-08-02", 0, 252),
+            ("1982-08-03", "1983-07-29", 1, 252),
+            ("1983-08-01", "1984-07-27", 0, 252),
+            ("1984-07-30", "1985-07-26", 0, 252),
+            ("1985-07-29", "1986-07-28", 1, 252),
+            ("1986-07-29", "1987-07-27", 1, 252),
+            ("1987-07-28", "1988-07-25", 8, 252),
+            ("1988-07-26", "1989-07-24", 0, 252),
+            ("1989-07-25", "1990-07-23", 1, 252),
+        ),
+        504: (
+            ("1929-04-11", "1931-04-16", 35, 504),
+            ("1931-04-17", "1933-04-28", 86, 504),
+            ("1933-05-01", "1935-05-07", 26, 504),
+            ("1935-05-08", "1937-05-10", 12, 504),
+            ("1937-05-11", "1939-05-15", 35, 504),
+            ("1939-05-16", "1941-05-19", 11, 504),
+            ("1941-05-20", "1943-05-25", 3, 504),
+            ("1943-05-26", "1945-05-28", 2, 504),
+            ("1945-05-29", "1947-06-09", 12, 504),
+            ("1947-06-10", "1949-06-13", 6, 504),
+            ("1949-06-14", "1951-06-20", 4, 504),
+            ("1951-06-21", "1953-06-26", 1, 504),
+            ("1953-06-29", "1955-06-28", 0, 504),
+            ("1955-06-29", "1957-06-28", 1, 504),
+            ("1957-07-01", "1959-06-29", 0, 504),
+            ("1959-06-30", "1961-06-29", 1, 504),
+            ("1961-06-30", "1963-07-01", 2, 504),
+            ("1963-07-02", "1965-07-01", 0, 504),
+            ("1965-07-02", "1967-06-30", 0, 504),
+            ("1967-07-03", "1969-08-13", 0, 504),
+            ("1969-08-14", "1971-08-10", 0, 504),
+            ("1971-08-11", "1973-08-09", 0, 504),
+            ("1973-08-10", "1975-08-07", 3, 504),
+            ("1975-08-08", "1977-08-05", 0, 504),
+            ("1977-08-08", "1979-08-03", 0, 504),
+            ("1979-08-06", "1981-08-03", 1, 504),
+            ("1981-08-04", "1983-07-29", 1, 504),
+            ("1983-08-01", "1985-07-26", 0, 504),
+            ("1985-07-29", "1987-07-27", 2, 504),
+            ("1987-07-28", "1989-07-24", 8, 504),
+            ("1989-07-25", "1991-07-22", 2, 504),
+        ),
+    },
+    #: The moving-block bootstrap error of the centre, block length 3, at
+    #: 200,000 draws and seed 20260905. RECORDED rather than derived at
+    #: import because the draw is a second of CPU a horizon and this module
+    #: is imported to read a band, not to re-run one;
+    #: `moving_block_bootstrap_se` below is the derivation and
+    #: `tests/test_band_derivations.py` runs it against these two figures.
+    #:
+    #: The iid error the shipped 1990 span is licensed to use is 0.3213354
+    #: at 252, so the correction is a factor of 1.428. The licence is the
+    #: lag-1 autocorrelation of the window counts, +0.0595 on the 1990 span
+    #: and +0.5952 here.
+    "block_bootstrap_se": {252: 0.4589760671, 504: 0.4921387122},
+    "block_length": 3,
+    "bootstrap_draws": 200_000,
+    "bootstrap_seed": 20260905,
+}
+
+
+def ruled_tail_windows(horizon_days: int) -> tuple[tuple[Any, ...], ...]:
+    """The whole ^GSPC record's tail windows: the old ones plus the shipped ones.
+
+    One sequence, built from two tables, so no window is written down twice.
+    97 windows at 252 returns and 48 at 504.
+    """
+    horizon_days = int(horizon_days)
+    older = RULED_TAIL_WINDOWS["windows"].get(horizon_days)
+    newer = INDEX_TAIL_WINDOWS["windows"].get(horizon_days)
+    if older is None or newer is None:
+        raise ValidationError(
+            f"the 1928 tail table holds no {horizon_days}-return windows; "
+            f"measured horizons are {sorted(RULED_TAIL_WINDOWS['windows'])}. "
+            "Run the longest-tape cut at that horizon and record the windows "
+            "rather than rescaling a rate from another one")
+    return tuple(older) + tuple(newer)
+
+
+def ruled_tail_rates(horizon_days: int) -> tuple[float, ...]:
+    """Each whole-record window's rate at `horizon_days`, in percent of sessions."""
+    return tuple(100.0 * hits / sessions
+                 for _, _, hits, sessions in ruled_tail_windows(horizon_days))
+
+
+def moving_block_bootstrap_se(values: Sequence[float], block_length: int, *,
+                              draws: int = 200_000,
+                              seed: int = 20260905) -> float:
+    """The standard error of the mean under resampling in blocks of `block_length`.
+
+    The correction a serially dependent sample needs and `sd/sqrt(n)` does
+    not give. Blocks are drawn with replacement from every starting position
+    until the resample is at least as long as the sample, then trimmed to the
+    sample's length, which is the form the 1928 tail band was derived with.
+
+    Stdlib only, like `band_rule_false_alarm`: this module takes no runtime
+    dependency to re-derive one of its own constants.
+    """
+    values = list(values)
+    if block_length < 1 or block_length > len(values):
+        raise ValidationError(
+            f"block_length must be between 1 and {len(values)}, got "
+            f"{block_length}")
+    if draws < 2:
+        raise ValidationError(f"draws must be at least 2, got {draws}")
+    rng = random.Random(seed)
+    starts = len(values) - block_length + 1
+    means = []
+    for _ in range(draws):
+        sample: list[float] = []
+        while len(sample) < len(values):
+            k = rng.randrange(starts)
+            sample.extend(values[k:k + block_length])
+        means.append(statistics.fmean(sample[:len(values)]))
+    return statistics.stdev(means)
+
+
+#: `index_tail_dn3_pct` on the whole ^GSPC record, 1928-2025, with the error
+#: bar corrected for clustering. Adopted under
+#: `ruling-tail-row-1928-with-clustering-corrected`.
+#:
+#: DERIVED, and the derivation is the same `centre +/- t * se` the shipped
+#: band uses with one term replaced. Over the 97 non-overlapping 252-return
+#: windows the centre is 1.4891180 and `t` is
+#: `centre_multiplier(band_rule_tolerance(9))` = 1.8462218, both unchanged
+#: from the shipped span. The error is the MOVING-BLOCK BOOTSTRAP at block
+#: length 3, 0.4589761, in place of the iid `sd/sqrt(97)` of 0.3213354.
+#: 1.4891180 -/+ 1.8462218 * 0.4589761 = (0.641746, 2.336490), rounded
+#: outward at 0.01.
+#:
+#: WHY THE ERROR IS CORRECTED HERE AND NOWHERE ELSE, which is the whole
+#: argument. `REAL_MARKETS_PROVENANCE` licenses the iid form on two
+#: diagnostics this row runs and prints: a lag-1 autocorrelation of the
+#: window counts of +0.06, and a block bootstrap agreeing with the iid
+#: error to 3 per cent. On the 1928 span those two read +0.5952 and 43 per
+#: cent. 209 of the 364 hits fall in the 13 windows covering 1928-1940, so
+#: consecutive years do share their crashes and `sd/sqrt(97)` is about 40
+#: per cent too small at both edges. Correcting a variance estimate the
+#: data itself refuses is the same discipline applied to the error that is
+#: applied to the centre. `index_drift_pct` gets no such correction at the
+#: same 1928 start because its annual returns read a lag-1 of +0.0265,
+#: which licenses the iid form.
+#:
+#: THE COST, RECORDED SO IT IS NOT DISCOVERED LATER. A band this wide
+#: discriminates less, and this row will not decide between pt-v19 and
+#: pt-v18: both are in at both horizons. That is the honest representation
+#: of a row whose population moves this far, rather than a weakness. The
+#: -3 per cent session rate runs 6.38 per cent over 1928-40, 0.61 over
+#: 1941-59, 0.25 over 1960-89 and 1.21 over 1990-2025, a factor of 25
+#: between the extreme eras.
+RULED_TAIL_BAND: tuple[float, float] = (0.64, 2.34)
+
+#: The same construction at 504 bars, as the CHECK on carrying the 252 band
+#: at both horizons rather than as a second band.
+#:
+#: DERIVED here so the carry is argued rather than assumed, on the same
+#: grounds `BANDS_504` already gives for the shipped span: the row is a per
+#: SESSION rate, so a longer window measures the same quantity with more
+#: sessions. Over the 48 non-overlapping 504-return windows the centre is
+#: 1.4880952 and the block-3 bootstrap error is 0.4921387, giving
+#: (0.579498, 2.396692) and a rounded (0.57, 2.40). That is within 0.07 of
+#: `RULED_TAIL_BAND` at the floor and 0.06 at the ceiling, each about a
+#: twenty-fifth of the band's own width of 1.70, which is the same order of
+#: agreement the shipped span shows between [0.47, 1.96] and [0.47, 2.00].
+#: So `RULED_TAIL_BAND` grades both horizons and this number is the
+#: residual on that decision.
+RULED_TAIL_BAND_504_CHECK: tuple[float, float] = (0.57, 2.40)
+
+#: The two drift bands' input legs, as data.
+#:
+#: WHAT THIS CLOSES AND WHAT IT DOES NOT, said first because the difference
+#: is the whole value of the entry. `REAL_MARKETS["index_drift_pct"]` and
+#: `RULED_DRIFT_BAND` were both typed pairs: the arithmetic that produces
+#: them is written out in their comments, and none of the arithmetic's inputs
+#: was in this package, so a mistyped edge read the same as a measured one.
+#: The legs below make both bands a function of committed numbers, and
+#: `tests/test_band_derivations.py` rebuilds all four edges from them.
+#:
+#: They are SUMMARY STATISTICS AND NOT READINGS. `mean` and `sd` are taken
+#: over `n` calendar-year returns and the years themselves are still not
+#: committed anywhere, so this table cannot catch a mistyped LEG the way
+#: `UNIVERSAL_WINDOWS` catches a mistyped band. That is a smaller claim than
+#: the window tables make and it is the honest one: committing the readings
+#: is 98 annual ^GSPC returns, 22 RSP premia and 19 ^SPXEW premia, and it
+#: needs `tools/calibration/index_band.py` re-run against a ^GSPC cache back
+#: to 1927 plus the RSP and ^SPXEW pulls. This checkout holds ^GSPC from
+#: 1990 alone.
+#:
+#: `se` is NOT stored: it is `sd / sqrt(n)` and reproduces to ten places on
+#: every leg, so storing it would be a fifth literal saying what four already
+#: say.
+#:
+#: THE MISMATCH THE ROW ALREADY MADE, kept visible rather than smoothed
+#: over: the equal-weight premium is measured over 22 calendar years and
+#: applied to a 75-year or 98-year cap-weighted mean. No longer equal-weight
+#: record exists. `spxew` is the cross-check leg, 19 years of the index
+#: itself rather than the fund, and it reads the premium 0.47 points a year
+#: more negative than RSP does.
+DRIFT_LEGS: dict[str, dict[str, Any]] = {
+    "cw_1950": {
+        "series": "^GSPC", "first_year": 1951, "last_year": 2025, "n": 75,
+        "mean": 7.752456476408867, "sd": 16.233712459034702,
+        "lag1": -0.09362413446089514,
+        "what": "calendar-year S&P 500 price log returns, percent a year",
+    },
+    "cw_1927": {
+        "series": "^GSPC", "first_year": 1928, "last_year": 2025, "n": 98,
+        "mean": 6.081678157692151, "sd": 19.181607798611594,
+        "lag1": 0.02654499849314216,
+        "what": "the same over the whole ^GSPC record. The lag-1 of +0.0265 "
+                "is what licenses the iid error here where the TAIL row's "
+                "+0.5952 on the same span does not",
+    },
+    "rsp": {
+        "series": "RSP", "first_year": 2004, "last_year": 2025, "n": 22,
+        "mean": -0.3845924269384446, "sd": 5.832419663859103,
+        "what": "calendar-year differences of RSP against ^GSPC on "
+                "unadjusted closes, the equal-weight premium in price terms",
+    },
+    "spxew": {
+        "series": "^SPXEW", "first_year": 2007, "last_year": 2025, "n": 19,
+        "mean": -0.8534634431809142, "sd": 6.148950242528466,
+        "what": "the same premium off the equal-weight INDEX rather than the "
+                "fund; the cross-check leg, not a band input",
+    },
+    #: The model's own resolution at thirty seeds, which is the width's floor:
+    #: two seed sds over the root of the seed count. The seed sd is the 6.5
+    #: the row was derived against on 2026-09-03; `SEED_SD["index_drift_pct"]`
+    #: is 9.55716 today, measured later and on the varying roster, and the
+    #: band was NOT re-derived when it moved because two centre standard
+    #: errors bind at both spans and the resolution term never decides an
+    #: edge. `tests/test_band_derivations.py` asserts that it still does not.
+    "resolution": {"model_sd": 6.5, "seeds": 30,
+                   "half_width": 2.0 * 6.5 / math.sqrt(30)},
+    #: Which leg pairs with which cap-weighted span to make which band.
+    "bands": {"facts.REAL_MARKETS['index_drift_pct']": ("cw_1950", "rsp"),
+              "facts.RULED_DRIFT_BAND": ("cw_1927", "rsp")},
+    "rule": "centre = cap-weighted mean + premium mean; centre se in "
+            "quadrature; half-width = max(2 * centre se, the model's "
+            "resolution); each edge printed to one decimal place, which "
+            "rounds to NEAREST and not outward as the window-derived bands "
+            "do",
+    "source": "tools/calibration/index_band.py; the figures from "
+              "tradefloor-design/programme/results/longest-tape/"
+              "drift-band.json, run 2026-09-14, and the 1950 leg reproduces "
+              "the 2026-09-03 run REAL_MARKETS_PROVENANCE cites",
+}
+
+
+def drift_leg_band(cap_weighted: str, premium: str = "rsp") -> tuple[float, float]:
+    """One drift band, rebuilt from `DRIFT_LEGS`.
+
+    Returns the pair as it is printed, one decimal place, because the shipped
+    constants ARE that printed pair. Rounding is to nearest here and outward
+    on every window-derived band in this module; the difference is real and
+    it is `index_band.py`'s `%.1f`, not an oversight to be corrected in
+    passing.
+    """
+    try:
+        cw, prem = DRIFT_LEGS[cap_weighted], DRIFT_LEGS[premium]
+    except KeyError:
+        raise ValidationError(
+            f"no such drift leg; the legs are "
+            f"{sorted(k for k, v in DRIFT_LEGS.items() if 'mean' in v)}"
+        ) from None
+    centre = cw["mean"] + prem["mean"]
+    centre_se = math.hypot(cw["sd"] / math.sqrt(cw["n"]),
+                           prem["sd"] / math.sqrt(prem["n"]))
+    half = max(2.0 * centre_se, DRIFT_LEGS["resolution"]["half_width"])
+    return (round(centre - half, 1), round(centre + half, 1))
+
+
+#: `index_drift_pct` on the whole ^GSPC record, 1928-2025, 98 complete
+#: calendar years. Adopted under `ruling-longest-tape-per-row`.
+#:
+#: DERIVED, and every term is the shipped derivation's with the
+#: cap-weighted leg's span moved. `tools/calibration/index_band.py` hard
+#: codes `SERIES = {"^GSPC": "1950-01-01", ...}` and the series begins
+#: 1927-12-30, so the row had 98 complete years and used 75; no note in the
+#: programme gives a reason for 1950. On 98 years the cap-weighted mean is
+#: +6.0816782 with an sd of 19.1816078 and an se of 1.9376350, against
+#: +7.7524565 and 1.8745077 on 75. The RSP equal-weight premium leg is
+#: untouched at -0.3845924 with an se of 1.2434761, so the centre is
+#: +5.6970857 with an se of 2.3023167 and the band is the centre plus and
+#: minus the larger of two centre standard errors (4.6046333) and the
+#: model's own resolution at thirty seeds (2.3734644), giving
+#: (1.0924524, 10.3017191).
+#:
+#: IT MOVES NO COUNT, and that was PREDICTED TO HELP pt-v19 AND FALSIFIED.
+#: pt-v19 reads 6.6238 at 252 and 6.0151 at 504; pt-v18 reads 5.7957 and
+#: 5.1238. All four were already well clear of the old floor of 2.9 and all
+#: four stay in. Both presets move from the lower third of the band toward
+#: its middle.
+#:
+#: ONE LIMITATION, stated because extending the cap-weighted leg widens it:
+#: the equal-weight premium is measured over 22 calendar years and applied
+#: to a 98-year cap-weighted mean. The row already made that mismatch at 75
+#: years. No longer equal-weight record exists, so it can be named and not
+#: closed.
+RULED_DRIFT_BAND: tuple[float, float] = (1.1, 10.3)
+
+#: The composed ruled band at the certified horizon: the fourteen shape
+#: rows on the universal table, plus the two level and crisis rows that
+#: have a whole-tape band of their own.
+REAL_MARKETS_RULED: dict[str, tuple[float, float]] = dict(
+    REAL_MARKETS_UNIVERSAL,
+    index_drift_pct=RULED_DRIFT_BAND,
+    index_tail_dn3_pct=RULED_TAIL_BAND,
+)
+
+#: The composed ruled band at 504 bars. `corr_persistence_acf1` is HELD OUT
+#: here and not carried: `BAND_BASIS` records that its universal 504 band
+#: is on the walked six-window protocol and not the shipped sub-window one,
+#: so it is a band for a different quantity until the row-definition ruling
+#: is made. A row graded against a band for a different quantity is the
+#: defect this whole block exists to end, so the row is absent and
+#: `RULED_UNREADABLE` says why.
+REAL_MARKETS_RULED_504: dict[str, tuple[float, float]] = {
+    key: band for key, band in REAL_MARKETS_UNIVERSAL_504.items()
+    if key != "corr_persistence_acf1"
+}
+REAL_MARKETS_RULED_504["index_drift_pct"] = RULED_DRIFT_BAND
+REAL_MARKETS_RULED_504["index_tail_dn3_pct"] = RULED_TAIL_BAND
+
+#: Every graded row with NO ruled band, per horizon, and what would give it
+#: one. A consumer reads this instead of inferring absence from a missing
+#: key, and `envelope.score` reports these cells as UNREADABLE rather than
+#: dropping them or filling them from the decade table.
+#:
+#: Each of these is a named ship blocker held by Simon and none of them is
+#: the model missing a row.
+#: A marker, not a reason. Rows carrying it at 504 take the 252-day reason
+#: verbatim in the loop below this dict, so nothing that reads
+#: `RULED_UNREADABLE` ever gets a cross-reference in place of the text.
+AS_AT_252 = "as at 252"
+
+RULED_UNREADABLE: dict[int, dict[str, str]] = {
+    CERTIFIED_HORIZON_DAYS: {
+        "fear_gauge_dn1":
+            "no universal band at either horizon: the 32-name panel carries "
+            "equities and this row is read off ^VIX against ^GSPC. Blocker "
+            "four-level-rows-unbanded, waiting on one ruling on "
+            "fiverows-recommendation-nineteen-rows-with-the-ruler-named-per-row. "
+            "WHAT THE SHIPPED FALLBACK IS HAS CHANGED AND THIS ROW STAYING "
+            "HERE DOES NOT SAY OTHERWISE: on 2026-09-15 facts.REAL_MARKETS "
+            "and envelope.BANDS_504 stopped carrying the 2015-2025 decade "
+            "band for this row and started carrying its whole-tape band, "
+            "(0.39, 3.03) and (0.59, 2.73), under ruling-longest-tape-per-row. "
+            "That ruling is Simon's and stands; the one named above, which "
+            "decides how the BAR composes its ruled table row by row, is not "
+            "made, so the row is still absent from REAL_MARKETS_RULED. "
+            "Putting it there would be making that ruling rather than "
+            "waiting for it",
+        "fear_gauge_dn3":
+            "as fear_gauge_dn1. The section 14 re-derivation is RULED ON AND "
+            "DONE (ruling-nineteen-rows-with-dn3-re-derived, 2026-09-15) and "
+            "it did not replace this row's ruler: the 7.38 ceiling it was "
+            "made on is cut from windows anchored at the FIRST paired "
+            "session, and at the last-bar anchor the rule uses the "
+            "five-session condition leaves three non-crisis windows and no "
+            "band. REAL_MARKETS_PROVENANCE[...]['section14'] carries the "
+            "measurement at both anchors and the ground for not adopting it",
+        VIX_AR1_ROW:
+            "the band is DERIVED and NOT ADOPTED: vix-ar1-band-derivation.md "
+            "section 9 holds [0.82, 1.04] at 252 and [0.90, 1.01] at 504 and "
+            "names three rulings that have to be made before it lands. "
+            "Blocker vix-ar1-band-not-adopted",
+    },
+    504: {
+        "corr_persistence_acf1":
+            "TWO independent grounds, either of which alone holds this row "
+            "out. First, the universal 504 band is carried on the walked "
+            "six-window protocol and not the shipped sub-window one, so it "
+            "is a band for a different quantity. Second, and the stronger: "
+            "its floor would go NEGATIVE at -0.38 on a statistic whose "
+            "whole question is whether persistence is positive, and the "
+            "band is 1.260 wide against the decade band's 0.300, a factor "
+            "of 4.2. A floor below zero is also one no reading on the "
+            "record comes near, and that is an EMPIRICAL statement rather "
+            "than the arithmetic one this entry used to make. Corrected "
+            "2026-09-14 under producerband-corr-persistence-504-is-not-a-"
+            "dead-edge: an autocorrelation is bounded in [-1, 1], so -0.38 "
+            "is attainable in principle and the floor is NOT dead the way "
+            "vix_ar1_debiased's ceiling is dead, where debias_ar1's own "
+            "bound of 1 + 4/n puts the ceiling out of reach by arithmetic. "
+            "MEASURED over all 36 committed preset record cells the "
+            "readings run -0.00039 (pt-v2 at 252) to 0.32927 (pt-v19 at "
+            "504), and the lowest clears -0.38 by 0.3796. So switching "
+            "this row's constant would not make any preset on the record "
+            "pass, and it would retire "
+            "ruling-gain-zero-and-the-red-row-stands by accident, since "
+            "that ruling was decided on this exact statistic. The FIRST "
+            "ground above is the recorded one and holds on its own. "
+            "Blocker corr-persistence-504-unbanded, waiting on the "
+            "row-definition ruling",
+        "fear_gauge_dn1": AS_AT_252,
+        "fear_gauge_dn3": AS_AT_252,
+        VIX_AR1_ROW: AS_AT_252,
+    },
+}
+
+# A 504-day cell's reason is RESOLVED here rather than left pointing at the
+# 252-day block. `envelope.score` returns this string as the cell's own
+# `unreadable` field and a 504-day record carries the 504 block alone, so a
+# reason reading "as at 252" sends the reader to text the record does not
+# hold. That is `row-value-carries-its-container` applied to the reason
+# instead of to the value, and it costs one loop to avoid.
+def _resolve_as_at_252() -> None:
+    at_252 = RULED_UNREADABLE[CERTIFIED_HORIZON_DAYS]
+    for row, why in list(RULED_UNREADABLE[504].items()):
+        if why is AS_AT_252:
+            RULED_UNREADABLE[504][row] = (
+                "the same at 504 bars as at 252, and the reason there is "
+                "the reason here. " + at_252[row])
+
+
+_resolve_as_at_252()
+
+#: Which EDGES of a ruled band can reject, under
+#: `ruling-dead-edges-are-not-counted`: an edge is LIVE when a reading past
+#: it is resolvable by the row's own instrument, and DEAD otherwise.
+#:
+#: WHY THIS IS DATA AND NOT A COUNT. "Nineteen of nineteen" asserts
+#: nineteen rows each of which could have failed two ways. Two of them
+#: could not. Publishing the total alone claims a test that was never run,
+#: which is the same shape as a band named without its basis.
+#:
+#: `excess_kurtosis`'s floor is DEAD by arithmetic: excess kurtosis has a
+#: theoretical minimum of -2 and the floor is -13.0 at 252 and -9.3 at 504,
+#: so no reading exists below it. The floor is that low because the band is
+#: roster-limited rather than era-limited, which is why the row is
+#: published as roster-limited rather than merely one-sided. Blocker
+#: excess-kurtosis-floor-cannot-reject.
+#:
+#: `vix_ar1_debiased` is the FLOOR-ONLY row, and it is also one of the rows
+#: with no adopted ruled band. THOSE TWO FACTS CONTRADICT EACH OTHER AND
+#: THE CONTRADICTION IS LEFT STANDING HERE, because resolving it is a
+#: ruling and not a code change.
+#:
+#: Its ceiling is dead: `debias_ar1` is bounded above by `1 + 4/n` and the
+#: band's ceiling sits above that bound at 252, so no reading can fall
+#: outside it, and at 504 the ceiling is 0.42 of one ceiling standard error
+#: away, which the row's own instrument cannot resolve. So IF the row is
+#: graded, it is graded on its floor alone.
+#:
+#: But its band comes from `vix-ar1-band-derivation.md` and not from the
+#: universal panel, because ^VIX is not in the 32-name equity set, and
+#: section 9 there names three rulings that have to be made before it is
+#: adopted. Until they are, `RULED_UNREADABLE` holds the row and it is not
+#: graded at all. A row cannot be both floor-only and unreadable, so the
+#: entry below carries `class: "open"` and `edge_liveness_counts` reports
+#: it under whichever of the two states `RULED_UNREADABLE` puts it in.
+#: Changing that is one line, in `RULED_UNREADABLE`, once the ruling lands.
+#:
+#: WHAT THE PUBLISHED FORM NEEDS. "17 of 17 two-sided, 1 of 1 floor-only,
+#: 1 of 1 roster-limited" needs all nineteen rows readable: the two fear
+#: rows banded AND this row's derivation adopted. It is the state after
+#: every level-row ruling lands, not a description of today.
+BAND_EDGE_LIVENESS: dict[str, dict[str, Any]] = {
+    "excess_kurtosis": {
+        "low": False, "high": True, "class": "roster-limited",
+        "reason": "excess kurtosis has a theoretical minimum of -2 and the "
+                  "floor is below it, so no reading can fall outside; the "
+                  "band is roster-limited rather than era-limited",
+    },
+    VIX_AR1_ROW: {
+        "low": True, "high": False, "class": "open",
+        "would_be": "floor-only",
+        "reason": "the ceiling is dead: debias_ar1 is bounded above by "
+                  "1 + 4/n and the ceiling sits past that bound at 252, and "
+                  "at 504 it is 0.42 of one ceiling standard error away. "
+                  "The row is nonetheless UNREADABLE today, because its "
+                  "band is derived and not adopted, and a row cannot be "
+                  "both. The ruling decides which",
+    },
+}
+
+
+def ruled_band(key: str, days: Any) -> tuple[float, float] | None:
+    """The ruled band for one row at one horizon, or ``None`` when it has none.
+
+    ``None`` is a STATE and not a failure: `RULED_UNREADABLE[days][key]`
+    says why, and a caller that substitutes the decade band for it has
+    reintroduced the defect this module spent a day removing.
+    """
+    table = RULED_BY_HORIZON.get(int(days))
+    if table is None:
+        raise ValidationError(
+            f"no ruled band set exists at {days!r} days; the horizons with "
+            f"one are {sorted(RULED_BY_HORIZON)}")
+    band = table.get(key)
+    return None if band is None else (float(band[0]), float(band[1]))
+
+
+def edge_liveness(key: str) -> dict[str, Any]:
+    """Which of a row's two band edges can reject, and its published class."""
+    row = BAND_EDGE_LIVENESS.get(key)
+    if row is None:
+        return {"low": True, "high": True, "class": "two-sided",
+                "reason": "both edges are resolvable by the row's own "
+                          "instrument"}
+    return dict(row)
+
+
+def edge_liveness_counts(days: Any) -> dict[str, int]:
+    """The live/dead split of the ruled rows at one horizon, as a count each.
+
+    The form a count is PUBLISHED in, so "19 of 19" cannot be written by
+    accident: a reader gets "17 of 17 two-sided, 1 of 1 floor-only, 1 of 1
+    roster-limited" and can see that two of the nineteen were tested on one
+    edge.
+    """
+    table = RULED_BY_HORIZON[int(days)]
+    unreadable = RULED_UNREADABLE.get(int(days), {})
+    out: dict[str, int] = {}
+    for key in sorted(set(table) | set(unreadable)):
+        cls = ("unreadable" if key in unreadable
+               else edge_liveness(key)["class"])
+        out[cls] = out.get(cls, 0) + 1
+    return out
+
+
+def published_edge_form(days: Any) -> str:
+    """`edge_liveness_counts` as the sentence a report prints."""
+    counts = edge_liveness_counts(days)
+    order = ("two-sided", "floor-only", "ceiling-only", "roster-limited",
+             "unreadable")
+    parts = [f"{counts[c]} of {counts[c]} {c}"
+             for c in order if counts.get(c)]
+    return ", ".join(parts)
+
+
+#: The ruled band set per horizon, which is what a basis-aware scorer reads.
+RULED_BY_HORIZON: dict[int, dict[str, tuple[float, float]]] = {
+    CERTIFIED_HORIZON_DAYS: REAL_MARKETS_RULED,
+    504: REAL_MARKETS_RULED_504,
+}
+
+BAND_BASIS["facts.REAL_MARKETS_RULED"] = {
+    "era": "1987-06..2025-07 on the fourteen shape rows, 1928-2025 on "
+           "index_drift_pct and index_tail_dn3_pct",
+    "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP "
+              "on the two whole-record rows",
+    "n_windows": 35,
+    "rule": "fixed",
+    "tolerance": BAND_RULE_FIXED_TOLERANCE,
+    "multiplier": 2.111347,
+    "rows": len(REAL_MARKETS_RULED),
+    "composed": {
+        **{k: "facts.REAL_MARKETS_UNIVERSAL" for k in REAL_MARKETS_UNIVERSAL},
+        "index_drift_pct": "facts.RULED_DRIFT_BAND, 98 calendar years of "
+                           "^GSPC from 1927-12-30 plus the RSP premium",
+        "index_tail_dn3_pct": "facts.RULED_TAIL_BAND, 97 non-overlapping "
+                              "252-return windows from 1928-04-09 with a "
+                              "block-3 bootstrap error",
+    },
+    "adjustments": "clamp #1 and clamp #2 re-applied on the shape rows; the "
+                   "Campbell ceiling retired as redundant. The tail row's "
+                   "error bar is corrected for clustering and the drift "
+                   "row's is not, because the drift row's annual returns "
+                   "read a lag-1 of +0.0265 and the tail row's window "
+                   "counts read +0.5952",
+    "unreadable": sorted(RULED_UNREADABLE[CERTIFIED_HORIZON_DAYS]),
+    "note": "the composed band each row is graded against under "
+            "ruling-longest-tape-per-row. Three graded rows have no ruled "
+            "band and are absent rather than filled from the decade table",
+}
+
+BAND_BASIS["facts.REAL_MARKETS_RULED_504"] = {
+    "era": "1987-06..2025-07 on the thirteen shape rows carried, 1928-2025 "
+           "on index_drift_pct and index_tail_dn3_pct",
+    "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP "
+              "on the two whole-record rows",
+    "n_windows": 16,
+    "rule": "fixed",
+    "tolerance": BAND_RULE_FIXED_TOLERANCE,
+    "multiplier": 2.417688,
+    "rows": len(REAL_MARKETS_RULED_504),
+    "composed": {
+        **{k: "facts.REAL_MARKETS_UNIVERSAL_504"
+           for k in REAL_MARKETS_RULED_504
+           if k not in ("index_drift_pct", "index_tail_dn3_pct")},
+        "index_drift_pct": "facts.RULED_DRIFT_BAND, the same band at both "
+                           "horizons: its width is the centre's own "
+                           "uncertainty and the centre's resolution does "
+                           "not improve with the model's",
+        "index_tail_dn3_pct": "facts.RULED_TAIL_BAND, the same band at both "
+                              "horizons; facts.RULED_TAIL_BAND_504_CHECK "
+                              "carries the 48-window re-derivation that "
+                              "argues the carry",
+    },
+    "adjustments": "none on the shape rows, the same as "
+                   "REAL_MARKETS_ADJUSTMENTS_504",
+    "unreadable": sorted(RULED_UNREADABLE[504]),
+    "note": "corr_persistence_acf1 is HELD OUT here rather than carried: "
+            "its universal 504 band is on the walked six-window protocol "
+            "and not the shipped sub-window one",
+}
+
+register_ruler_table(REAL_MARKETS_RULED, CERTIFIED_HORIZON_DAYS,
+                     "facts.REAL_MARKETS_RULED")
+register_ruler_table(REAL_MARKETS_RULED_504, 504,
+                     "facts.REAL_MARKETS_RULED_504")
 
 
 #: How many non-crisis real windows each band set rests on, which is what
@@ -4957,8 +6548,88 @@ def centre_distance(values: Sequence[float], key: str, *,
     return out
 
 
-def compare_to_real_markets(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
+#: The basis every band-reading producer grades with when a caller names
+#: none. `envelope` imports this name rather than defining its own, so the
+#: default lives in the module that depends on nothing and there is exactly
+#: one of it.
+#:
+#: CHANGED FROM `shipped` TO `ruled` ON 2026-09-15, and the change is the
+#: whole point of this line. `ruling-the-ruler-is-the-universal-band` made
+#: the bar the universal whole-tape band on 2026-09-14 and the default was
+#: held at `shipped` deliberately, on the argument that flipping it would
+#: move every count in forty-odd tools and tests in one commit. That
+#: argument was about the cost of the change and never about which band is
+#: right, and the cost it names is the cost of a ruling that has been made:
+#: while the default read `shipped`, `facts.REAL_MARKETS` -- the 2015-2025
+#: decade table -- was what actually graded every caller who did not know
+#: to ask, which is every caller written before the basis argument existed.
+#: Simon's framing is the reason: the model has to be measured on REALISM,
+#: not against artificial bands that may not be accurate.
+#:
+#: WHAT THIS DOES NOT DO. It does not change `BAND_BASIS`, any band table,
+#: or any committed record. `shipped` is still a basis and still reachable
+#: by name, because a count taken against the decade band is still a real
+#: reading of a real table and the records on disk were taken that way.
+#: What moves is which one a caller gets for free.
+DEFAULT_BAND_BASIS = "ruled"
+
+
+def bands_for_basis(days: Any, basis: str = DEFAULT_BAND_BASIS
+                    ) -> tuple[dict[str, tuple[float, float]],
+                               dict[str, float], str, dict[str, str]]:
+    """The band table, the seed scale, the table's name and its blind rows.
+
+    The one place in this module that turns a basis into a ruler, so a
+    producer asks for a basis rather than reaching for a table. Returns the
+    unreadable map as its fourth item because a basis that cannot read a row
+    is a STATE a caller has to be able to report: dropping the row silently
+    is how "13 of 13" and "13 of 14" become the same printed number.
+
+    `shipped` keeps `RULERS_BY_HORIZON` exactly as it was, including the
+    known disagreement with `envelope.BANDS_504` at 504 -- that table has
+    seventeen rows to this one's fourteen and the two grade the same panel.
+    At `ruled` the disagreement does not arise, because both modules read
+    `RULED_BY_HORIZON`.
+    """
+    if basis == "shipped":
+        row = RULERS_BY_HORIZON.get(int(days))
+        if row is None:
+            rulers_for_horizon(days)          # raises with the full message
+        return row["bands"], row["seed_sd"], row["bands_name"], {}
+    if basis == "ruled":
+        table = RULED_BY_HORIZON.get(int(days))
+        if table is None:
+            raise ValidationError(
+                f"no ruled band set exists at {days!r} days; the horizons "
+                f"with one are {sorted(RULED_BY_HORIZON)}")
+        row = RULERS_BY_HORIZON[int(days)]
+        name = ("facts.REAL_MARKETS_RULED" if int(days) == CERTIFIED_HORIZON_DAYS
+                else "facts.REAL_MARKETS_RULED_504")
+        return (table, row["seed_sd"], name,
+                dict(RULED_UNREADABLE.get(int(days), {})))
+    raise ValidationError(
+        f"{basis!r} is not a band basis; the bases are ['ruled', 'shipped']. "
+        f"A basis is an era, a roster, a window count and a rule, and "
+        f"`facts.band_basis` states each one")
+
+
+def compare_to_real_markets(facts: dict[str, Any], *,
+                            basis: str = DEFAULT_BAND_BASIS
+                            ) -> dict[str, dict[str, Any]]:
     """Line each measured statistic up against the empirical range.
+
+    THE BASIS IS AN ARGUMENT, since 2026-09-15. Until then this function
+    read `RULERS_BY_HORIZON` and there was no way to ask it for anything
+    else, so the sentence "the producers read the ruled band" was true of
+    `envelope.score` and false here. `basis` defaults to
+    `DEFAULT_BAND_BASIS`, which is now `ruled`.
+
+    A ROW THE BASIS CANNOT READ IS PRESENT AND CARRIES ITS REASON. The
+    ruled table is absent three rows at 252 and four at 504, each a named
+    ship blocker. Such a row appears here with `matches` None, `verdict`
+    "unreadable" and no `real_range`, rather than being dropped: a caller
+    counting `matches` gets the same answer either way, and a caller
+    listing rows can tell "not tested" from "not measured".
 
     Returns a verdict per statistic rather than an overall score. A single
     "realism score" would average a property this model reproduces well against
@@ -4982,10 +6653,28 @@ def compare_to_real_markets(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
             "a panel assembled by hand must carry it too. Defaulting to the "
             f"{CERTIFIED_HORIZON_DAYS}-day bands is the error this refusal "
             "exists to prevent.")
-    bands, scales = rulers_for_horizon(days, what="this panel")
-    ruler_name = RULERS_BY_HORIZON[int(days)]["bands_name"]
+    rulers_for_horizon(days, what="this panel")   # the horizon refusal, kept
+    bands, scales, ruler_name, blind = bands_for_basis(days, basis)
 
     out: dict[str, dict[str, Any]] = {}
+    for key, why in blind.items():
+        # Only a row this panel actually measured. An unmeasured row is
+        # absent for a different reason and the two must not be merged.
+        if facts.get(key) is None:
+            continue
+        out[key] = {
+            "measured": facts[key],
+            "real_range": None,
+            "matches": None,
+            "horizon_days": int(days),
+            "ruler": ruler_name,
+            "basis": basis,
+            "verdict": "unreadable",
+            "direction": None,
+            "band_distance": None,
+            "scaled_distance": None,
+            "unreadable": why,
+        }
     for key, (low, high) in bands.items():
         value = facts.get(key)
         # A statistic that could not be measured -- one instrument, or a run
@@ -5007,6 +6696,9 @@ def compare_to_real_markets(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
             # reader as easily as it was computed against them.
             "horizon_days": int(days),
             "ruler": ruler_name,
+            # The BASIS beside the name, for the reason `BAND_BASIS` exists:
+            # a symbol whose contents can be swapped names no era.
+            "basis": basis,
             # `verdict` reads the sign of the band; `direction` is the raw
             # numeric comparison. They differ exactly where it matters: an
             # absent leverage effect is ABOVE its negative band and "too weak"
@@ -5030,7 +6722,8 @@ def compare_to_real_markets(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return out
 
 
-def report(facts: dict[str, Any]) -> str:
+def report(facts: dict[str, Any], *,
+           basis: str = DEFAULT_BAND_BASIS) -> str:
     """A human-readable summary, honest about the mismatches.
 
     Printed in two sections, because the split between them is the finding: a
@@ -5043,13 +6736,19 @@ def report(facts: dict[str, Any]) -> str:
     set produced the verdicts, and for two years there was only one answer;
     now there are two and the report says which.
     """
-    verdicts = compare_to_real_markets(facts)
-    ruler = RULERS_BY_HORIZON[int(facts["days"])]["bands_name"]
+    verdicts = compare_to_real_markets(facts, basis=basis)
+    graded_here, _, ruler, blind = bands_for_basis(facts["days"], basis)
 
     def row(key: str) -> str:
         verdict = verdicts.get(key)
         if verdict is None:
             return f"{LABELS[key]:22s} {'n/a':>10s}"
+        if verdict["real_range"] is None:
+            # Present, measured, and NOT TESTED. Printed in the table rather
+            # than quietly moved to the ungraded section, because the row is
+            # one the bar counts and the reason it carries is a blocker.
+            return (f"{LABELS[key]:22s} {verdict['measured']:>10.3f}  "
+                    f"{'no ruled band':>14s}   UNREADABLE")
         low, high = verdict["real_range"]
         mark = "matches" if verdict["matches"] else verdict["verdict"].upper()
         return (
@@ -5060,7 +6759,8 @@ def report(facts: dict[str, Any]) -> str:
     lines = [
         f"seed {facts['seed']}, {facts['instruments']} instruments, "
         f"{facts['days']} days, {facts['observations']:,} daily returns",
-        f"graded against {ruler}, derived at {facts['days']} days",
+        f"graded against {ruler} on the {basis} basis, "
+        f"derived at {facts['days']} days",
         "",
         f"{'statistic':22s} {'measured':>10s}  {'real markets':>14s}   verdict",
         "",
@@ -5093,8 +6793,26 @@ def report(facts: dict[str, Any]) -> str:
     # `envelope.BANDS_504`'s judgement to reuse the 252-day ones with an
     # argument per row, and that judgement is not this module's to make
     # silently.
-    graded_here, _ = rulers_for_horizon(facts["days"])
-    ungraded = [key for key in LABELS if key not in graded_here]
+    # `graded_here` is the basis's own table, bound at the top of this
+    # function. It used to be re-read from `rulers_for_horizon`, which is
+    # the shipped table whatever basis the verdicts above were taken at, so
+    # this section listed the wrong rows the moment a basis was passed.
+    # A row the basis cannot read is NOT listed here: it was printed in the
+    # table above as UNREADABLE, and listing it twice under two different
+    # reasons is the thing this section exists to avoid.
+    ungraded = [key for key in LABELS
+                if key not in graded_here and key not in blind]
+    shown_blind = [k for k in blind if facts.get(k) is not None]
+    if shown_blind:
+        lines += ["", f"unreadable on the {basis} basis: measured, and the "
+                      "ruler has no band for it"]
+        for key in shown_blind:
+            # `LABELS.get`, not `LABELS[...]`: `vix_ar1_debiased` is a graded
+            # row with no print label, so indexing raised a KeyError on every
+            # panel that carried it, which `facts.measure` emits on every run.
+            lines += textwrap.wrap(f"{LABELS.get(key, key)}: {blind[key]}",
+                                   72, initial_indent="  ",
+                                   subsequent_indent="  ")
     if ungraded:
         lines += ["", "reporting only: measured, not graded"]
         for key in ungraded:

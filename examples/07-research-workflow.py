@@ -327,8 +327,15 @@ def main() -> dict:
     # Not all in range, and not none. If every statistic matched, the
     # comparison would be doing no work; if none did, the model would be
     # unusable and the report should say so loudly.
-    assert any(not v["matches"] for v in verdicts.values())
-    assert any(v["matches"] for v in verdicts.values())
+    #
+    # GRADED ROWS ONLY. A row the basis cannot read carries `matches` None,
+    # and `not None` is True, so `any(not v["matches"] ...)` was satisfied by
+    # a row nobody tested once the default basis gained held-out rows. That
+    # would let a model in band on everything through an assertion written to
+    # prove the comparison does work.
+    graded = [v for v in verdicts.values() if v["matches"] is not None]
+    assert any(not v["matches"] for v in graded)
+    assert any(v["matches"] for v in graded)
 
     # 9. Every result names the market it came from. A seed does not identify
     #    a market -- the same seed over a different roster is a different one

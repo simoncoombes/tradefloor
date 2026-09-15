@@ -364,8 +364,15 @@ def test_score_reads_a_panel_against_its_own_horizon():
     """
     panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
     panel["excess_kurtosis"] = 5.23
-    near = env.score(panel, horizon_days=252)
-    far = env.score(panel, horizon_days=504)
+    # PINNED TO `shipped`, since the default moved to `ruled` on 2026-09-15.
+    # What this test binds is that the HORIZON picks the ruler, and the row
+    # it binds it on is `excess_kurtosis`, whose two decade bands disagree at
+    # 5.23. The ruled table's kurtosis bands are [-13.0, 24.0] and
+    # [-9.3, 24.0] and both contain 5.23, so reading this at the default
+    # would assert nothing about the horizon. The ruled arm below binds the
+    # same property on a row where the ruled tables DO disagree.
+    near = env.score(panel, horizon_days=252, basis="shipped")
+    far = env.score(panel, horizon_days=504, basis="shipped")
     # Module-qualified, and naming the table `score` actually grades with.
     # This read `"REAL_MARKETS_504"` at 504 days while the table in use was
     # `envelope.BANDS_504`, which has three more rows -- a label asserting a
@@ -379,6 +386,22 @@ def test_score_reads_a_panel_against_its_own_horizon():
         "504-day one; a score that missed that is measuring with the wrong "
         "ruler"
     )
+
+    # The same property at the basis the default now takes, on the row whose
+    # two RULED bands disagree: `corr_asymmetry` reads [-0.15, 0.23] at 252
+    # and [-0.06, 0.21] at 504, so 0.22 is in at one horizon and out at the
+    # other. A ruled score that ignored the horizon passes the decade arm
+    # above and fails here.
+    from tradefloor import facts
+    ruled = dict(panel, corr_asymmetry=0.22)
+    near_r = env.score(ruled, horizon_days=252, basis="ruled")
+    far_r = env.score({k: v for k, v in ruled.items()
+                       if k in facts.REAL_MARKETS_RULED_504},
+                      horizon_days=504, basis="ruled")
+    assert near_r["ruler"] == "facts.REAL_MARKETS_RULED"
+    assert far_r["ruler"] == "facts.REAL_MARKETS_RULED_504"
+    assert near_r["statistics"]["corr_asymmetry"]["in_band"]
+    assert not far_r["statistics"]["corr_asymmetry"]["in_band"]
 
 
 def test_score_reports_room_not_just_membership():

@@ -158,10 +158,15 @@ def main() -> int:
                 else:
                     med[k] = st.median(vals)
             sc = envelope.score(med, horizon_days=days)
+            # `is False`, not `not ...`: a row the basis cannot read carries
+            # `in_band` None and would otherwise be reported as a miss.
+            # `sc["of"]` already excludes them, so counting them here put the
+            # miss list and the denominator on different row sets.
             out = [k for k, v in sc["statistics"].items()
-                   if not v.get("in_band", True)]
+                   if v.get("in_band") is False]
             results[f"{shape}@{days}"] = {
                 "in_band": sc["in_band"], "of": sc["of"],
+                "unreadable": list(sc["unreadable"]),
                 # The split: a gate reads the shape count; the level and
                 # crisis rows are held red and never added to it.
                 "shape_in_band": sc.get("shape_in_band"), "shape_of": sc.get("shape_of"),

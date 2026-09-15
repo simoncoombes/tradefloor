@@ -230,11 +230,27 @@ CERTIFIED_LEVEL: dict[str, float] = {
 #: it asserted "held red" here until 0.7.0, which was true of every default
 #: through pt-v16 and would have been a false statement the day one held.
 CERTIFIED_CRISIS: dict[str, float] = {
-    # The -1 per cent row reads 1.7719 in a band of 0.70 to 4.03, at band
-    # position 0.32, 0.59 below a centre of 2.365. pt-v18 read 1.5834 at
-    # position 0.27 and pt-v16 0.9500 at 0.09. Inside, and below centre on
-    # every default this project has shipped, which is the reading that made
-    # a count of rows-in-band an insufficient answer.
+    # The -1 per cent row reads 1.7719 in a band of 0.39 to 3.03, at band
+    # position 0.52, 0.06 ABOVE a centre of 1.71. pt-v18 reads 1.5834 at
+    # position 0.45 and pt-v16 0.9500 at 0.21.
+    #
+    # THOSE THREE POSITIONS ARE NEW AND THE ROW'S STORY CHANGED WITH THEM.
+    # Until 2026-09-15 this band was the 2015-2025 decade's 0.70 to 4.03,
+    # where the same three readings sat at 0.32, 0.27 and 0.09, and the
+    # sentence here said they were "below centre on every default this
+    # project has shipped", which was the reading that made a count of
+    # rows-in-band an insufficient answer. Against the whole tape the
+    # default is not low: it is a twentieth of the band's width above
+    # centre. The model did not move. The ruler did, under
+    # `ruling-longest-tape-per-row`, and the old sentence was measuring the
+    # decade rather than the model.
+    #
+    # WHAT DID NOT CHANGE, and it is the half that still says the row is not
+    # settled: `loss.rule_table` still scores this row against the decade
+    # centre of 2.66, because moving a centre is a scoring-rule change and
+    # not a band change. So the row is mid-band on its band and 3.1 tape
+    # errors low on its score at the same time. `facts` carries the split in
+    # `REAL_MARKETS_PROVENANCE["fear_gauge_dn1"]`.
     #
     # The -3 per cent row reads 6.3920, the median of 52 pooled sessions, at
     # band position 0.54, a little above the centre of 6.09. pt-v18 read
@@ -283,7 +299,19 @@ BANDS_504: dict[str, tuple[float, float]] = {
     # The fear rows' bands are per-session statistics whose real-side
     # derivation is per 252-session window, and a 504-day reading pools
     # twice the sessions against the same real distribution.
-    "fear_gauge_dn1": (0.70, 4.03),
+    #
+    # THE TWO ROWS DIFFER HERE AND THEY DID NOT BEFORE 2026-09-15. The -1
+    # per cent row now carries its OWN 504 band, re-derived on 15 non-crisis
+    # 504-session windows of the whole tape rather than reusing the 252 one:
+    # the windows exist at both lengths, so reusing would be a choice where
+    # a derivation was available. It is TIGHTER than the 252 band at both
+    # edges, 2.14 wide against 2.64, because pooling twice the sessions per
+    # window narrows the spread across them. The -3 per cent row keeps the
+    # 252 band at both horizons, because its windows are conditioned on
+    # holding at least five qualifying sessions and re-cutting at 504 would
+    # change what the condition selects as well as the window length.
+    # `facts.REAL_MARKETS_PROVENANCE` carries both derivations.
+    "fear_gauge_dn1": (0.59, 2.73),
     "fear_gauge_dn3": (2.60, 9.58),
     # The index tail row's band is a per-SESSION rate, so a longer window
     # measures the same quantity with more sessions rather than a different
@@ -322,6 +350,26 @@ BANDS_504: dict[str, tuple[float, float]] = {
 # refuse.
 _facts.register_ruler_table(BANDS_504, 504, "envelope.BANDS_504")
 
+# And its BASIS, because this is the table `score` actually grades a 504-day
+# panel with and it was the one band table in the library with no entry in
+# `facts.BAND_BASIS`. A table that can grade a record and cannot say what it
+# is, is the defect that dict exists for; leaving the library's own 504 ruler
+# out of it would have been that defect with a smaller blast radius.
+_facts.BAND_BASIS["envelope.BANDS_504"] = {
+    "era": "2015-07..2025-07",
+    "roster": "the certified forty, exactly",
+    "n_windows": 5,
+    "rule": "spread",
+    "tolerance": 0.16800,
+    "rows": len(BANDS_504),
+    "note": "the fourteen shape rows of facts.REAL_MARKETS_504 plus the "
+            "level and crisis rows carrying their 252-day bands, each "
+            "argued inline above. It is NOT facts.REAL_MARKETS_504: that "
+            "table has fourteen rows and this one has seventeen, and "
+            "facts.report and preset_panel grade the same 504-day panel "
+            "against the fourteen-row one",
+}
+
 #: The seventeen-row ruler per horizon, which is what `score` grades with.
 #: `facts.RULERS_BY_HORIZON` holds the fourteen shape rows at 504;
 #: `BANDS_504` adds the level and crisis rows carrying their 252-day bands,
@@ -340,6 +388,51 @@ RULERS_BY_HORIZON: dict[int, tuple[dict[str, tuple[float, float]],
     CERTIFIED_HORIZON_DAYS: (REAL_MARKETS, SEED_SD, "facts.REAL_MARKETS"),
     504: (BANDS_504, SEED_SD_504, "envelope.BANDS_504"),
 }
+
+#: The same lookup with the BASIS as its first key, because a horizon does
+#: not determine a band table and pretending it does is the defect this
+#: block repairs.
+#:
+#: `shipped` is the 2015-2025 decade set above, unchanged, and it is still
+#: what every existing caller gets. `ruled` is the band the project ACTUALLY
+#: RULED: `ruling-the-ruler-is-the-universal-band` for the fourteen shape
+#: rows and `ruling-longest-tape-per-row` for the two whole-record rows.
+#: Until this dict landed the ruled table was registered in
+#: `facts._KNOWN_TABLES` and read by nothing, so the release bar was ruled
+#: against one object and computed against another.
+#:
+#: THE DEFAULT IS `ruled` SINCE 2026-09-15. It read `shipped` from the day
+#: this dict landed until then, on the argument that flipping it would move
+#: every count in forty-odd tools and tests in one commit. That argument
+#: was about cost, not about which band is right, and the ruling it was
+#: waiting on -- `ruling-the-ruler-is-the-universal-band` -- had already
+#: been made. While it read `shipped`, `facts.REAL_MARKETS` was what
+#: actually graded every caller that did not know to ask for a basis, which
+#: is every caller written before the argument existed. The one name that
+#: carries it is `facts.DEFAULT_BAND_BASIS`, imported below; the provenance
+#: is stated there.
+RULERS_BY_BASIS: dict[str, dict[int, tuple[dict[str, tuple[float, float]],
+                                           dict[str, float], str]]] = {
+    "shipped": RULERS_BY_HORIZON,
+    "ruled": {
+        CERTIFIED_HORIZON_DAYS: (_facts.REAL_MARKETS_RULED, SEED_SD,
+                                 "facts.REAL_MARKETS_RULED"),
+        504: (_facts.REAL_MARKETS_RULED_504, SEED_SD_504,
+              "facts.REAL_MARKETS_RULED_504"),
+    },
+}
+
+#: The basis `score` grades with when a caller names none. RE-EXPORTED, not
+#: redefined: `facts` needs the same default for `compare_to_real_markets`
+#: and `report`, `envelope` imports `facts` and not the reverse, so the one
+#: definition lives there and every producer in the library reads it. Two
+#: modules each holding their own "the default" is how the shipped library
+#: came to grade a panel two different ways at 504 days.
+DEFAULT_BAND_BASIS = _facts.DEFAULT_BAND_BASIS
+
+#: The basis the RELEASE BAR is read on, which is not the same question.
+#: `certify` reports this one beside the default and stamps both bases.
+BAR_BAND_BASIS = "ruled"
 
 #: The same panel at 504 days, against `BANDS_504`.
 #:
@@ -1286,7 +1379,8 @@ def check(
 
 
 def score(panel: Mapping[str, float], *,
-          horizon_days: int = CERTIFIED_HORIZON_DAYS) -> dict[str, Any]:
+          horizon_days: int = CERTIFIED_HORIZON_DAYS,
+          basis: str = DEFAULT_BAND_BASIS) -> dict[str, Any]:
     """How a measured panel sits against the bands for its own horizon.
 
     `panel` maps statistic names to measured values -- what
@@ -1341,7 +1435,12 @@ def score(panel: Mapping[str, float], *,
     if horizon_days < 1:
         raise ValidationError(
             f"horizon_days must be positive, got {horizon_days}")
-    if horizon_days not in RULERS_BY_HORIZON:
+    if basis not in RULERS_BY_BASIS:
+        raise ValidationError(
+            f"{basis!r} is not a band basis; the bases are "
+            f"{sorted(RULERS_BY_BASIS)}. A basis is an era, a window count "
+            f"and a rule, and `facts.band_basis` states each one")
+    if horizon_days not in RULERS_BY_BASIS[basis]:
         raise ValidationError(
             f"no band set has been derived at {horizon_days} days; the "
             f"horizons with a ruler are {sorted(RULERS_BY_HORIZON)}. A "
@@ -1354,17 +1453,64 @@ def score(panel: Mapping[str, float], *,
     # imports this module's facts and a top-level import would cycle.
     from .loss import STRUCTURAL
 
-    bands, noise, ruler_name = RULERS_BY_HORIZON[horizon_days]
+    bands, noise, ruler_name = RULERS_BY_BASIS[basis][horizon_days]
 
-    unknown = sorted(set(panel) - set(REAL_MARKETS))
+    from .facts import SHAPE, LEVEL, CRISIS, PERSISTENCE
+
+    # THE GATE IS THE LIBRARY'S GRADED ROWS, NOT ONE BAND TABLE'S KEYS.
+    #
+    # This read `set(REAL_MARKETS)` -- the eighteen-row decade table -- and
+    # `facts.PERSISTENCE` sits OUTSIDE that partition by construction, which
+    # `facts.SHAPE`'s neighbours say in as many words: `SHAPE + LEVEL +
+    # CRISIS` is an exact partition of `REAL_MARKETS` and the persistence
+    # row is the one group that is scored and not banded. So a measured
+    # panel carrying `vix_ar1_debiased` -- and `facts.measure` emits it on
+    # every run -- was REFUSED here, with `unknown statistics`, BEFORE any
+    # band lookup ran.
+    #
+    # That is the same fault this basis machinery was built to end, one row
+    # lower down. `REAL_MARKETS_UNIVERSAL` was registered and reachable by
+    # no lookup; the nineteenth row is reachable by no GATE. In both cases
+    # the ruling names an object the producer cannot address, and in both
+    # cases the reason has nothing to do with whether the row has a band.
+    #
+    # Admitting it moves NO count and NO verdict: the row still has no
+    # adopted band, so it falls through to the UNREADABLE branch below and
+    # reports the reason `facts.RULED_UNREADABLE` already records for it --
+    # the derivation in `vix-ar1-band-derivation.md` section 9 and the three
+    # rulings that have to land before it is adopted. What changes is that
+    # adopting that band becomes a table entry on its own, instead of a
+    # table entry plus this line, and that the row is now named as
+    # unreadable rather than refused as unknown. Absent with a stated reason
+    # is a different fact from rejected as a typo.
+    graded_rows = frozenset(SHAPE + LEVEL + CRISIS + PERSISTENCE)
+    unknown = sorted(set(panel) - graded_rows)
     if unknown:
         raise ValidationError(
-            f"unknown statistics {unknown}; expected keys of "
-            f"facts.REAL_MARKETS: {sorted(REAL_MARKETS)}")
+            f"unknown statistics {unknown}; the rows this library grades "
+            f"are facts.SHAPE + LEVEL + CRISIS + PERSISTENCE: "
+            f"{sorted(graded_rows)}")
 
+    unreadable_reasons = _facts.RULED_UNREADABLE.get(horizon_days, {})
     rows: dict[str, Any] = {}
     for name, measured in panel.items():
-        low, high = bands[name]
+        band = bands.get(name)
+        if band is None:
+            # A row this basis has no band for. UNREADABLE, by name and with
+            # the reason, rather than dropped or filled from another basis:
+            # a cell nobody can grade is a different thing from a cell that
+            # passed, and folding the two is how "38 of 38" gets written
+            # about a bar that tested 31.
+            rows[name] = {
+                "measured": measured,
+                "band": None, "distance": None, "in_band": None,
+                "room_sd": None,
+                "structural": name in STRUCTURAL,
+                "unreadable": unreadable_reasons.get(
+                    name, f"{ruler_name} carries no band for this row"),
+            }
+            continue
+        low, high = band
         sd = noise.get(name)
         rows[name] = {
             "measured": measured,
@@ -1374,31 +1520,64 @@ def score(panel: Mapping[str, float], *,
             "room_sd": (None if not sd
                         else min(measured - low, high - measured) / sd),
             "structural": name in STRUCTURAL,
+            "edges": _facts.edge_liveness(name),
         }
-    from .facts import SHAPE, LEVEL, CRISIS
-
     def count(group):
-        names = [n for n in rows if n in group]
+        names = [n for n in rows if n in group and rows[n]["in_band"] is not None]
         return sum(1 for n in names if rows[n]["in_band"]), len(names)
 
     shape_in, shape_of = count(SHAPE)
     level_in, level_of = count(LEVEL)
     crisis_in, crisis_of = count(CRISIS)
+    # 0 of 0 today, because the row has no adopted band at either horizon.
+    # It is reported rather than omitted so the count the bar needs exists
+    # before the band does: a group with no key is how a row goes missing
+    # from a nineteen-row claim without anything disagreeing.
+    persistence_in, persistence_of = count(PERSISTENCE)
     for name in rows:
         rows[name]["group"] = ("shape" if name in SHAPE else
-                               "level" if name in LEVEL else "crisis")
+                               "level" if name in LEVEL else
+                               "crisis" if name in CRISIS else "persistence")
+    unreadable = sorted(n for n in rows if rows[n]["in_band"] is None)
     return {
         "horizon_days": horizon_days,
         "ruler": ruler_name,
+        # THE BASIS, NOT THE NAME. `ruler` above is a symbol, and swapping
+        # that symbol's contents leaves every record asserting the same
+        # provenance while every count under it changes. This block is the
+        # era, the roster, the window count, the rule and the per-row
+        # composition, so a record carries what it was actually graded by.
+        "basis": basis,
+        "basis_detail": _facts.band_basis(ruler_name),
         "statistics": rows,
         "in_band": sum(1 for r in rows.values() if r["in_band"]),
-        "of": len(rows),
+        "of": sum(1 for r in rows.values() if r["in_band"] is not None),
+        # Named, never folded into `of`. Each of these is a ship blocker.
+        "unreadable": unreadable,
+        "unreadable_of": len(unreadable),
+        "edge_form": _facts.published_edge_form(horizon_days)
+                     if basis == BAR_BAND_BASIS else None,
+        # THE ROW SET `edge_form` COUNTED OVER, WHICH IS NOT THIS PANEL'S.
+        # `published_edge_form` counts the HORIZON's whole graded set, and
+        # `unreadable_of` above counts the rows this caller handed in, so
+        # the two disagree whenever a panel is short of nineteen rows. That
+        # is not hypothetical: `certify` grades
+        # `aggregate_panels(panels, keys=facts.SHAPE)`, so every certificate
+        # the library produces reads `unreadable_of` 0 at 252 beside an edge
+        # form saying "3 of 3 unreadable", and 1 beside "4 of 4" at 504.
+        # Both numbers are right about different row sets, which is exactly
+        # the state `row-value-carries-its-container` refuses, so each count
+        # now says what it was taken over.
+        "edge_form_rows": (sum(_facts.edge_liveness_counts(
+            horizon_days).values()) if basis == BAR_BAND_BASIS else None),
+        "panel_rows": len(rows),
         # The split. A gate reads `shape_in_band` against `shape_of`; the
         # level and crisis counts are reported beside it and never added
         # to it.
         "shape_in_band": shape_in, "shape_of": shape_of,
         "level_in_band": level_in, "level_of": level_of,
         "crisis_in_band": crisis_in, "crisis_of": crisis_of,
+        "persistence_in_band": persistence_in, "persistence_of": persistence_of,
     }
 
 
@@ -1567,7 +1746,24 @@ def certify(panels: Sequence[Mapping[str, float]], *,
             f"on one seed has no power. Got {len(panels)}")
 
     graded = _facts.aggregate_panels(panels, keys=_facts.SHAPE)
-    fidelity = score(graded, horizon_days=horizon_days)
+    # PINNED TO `shipped`, NOT TAKEN FROM THE DEFAULT, since 2026-09-15.
+    # This block exists to be the shipped reading BESIDE the ruled one, and
+    # its own comment below says so. It read the default, so when
+    # `DEFAULT_BAND_BASIS` moved to `ruled` the two blocks became the same
+    # count and the certificate lost the comparison it is built around --
+    # with `counts.basis` and `counts.basis_ruled` both naming the ruled
+    # table and nothing saying the shipped reading had gone. That is the
+    # defect family this branch is repairing, one storey up, so `certify`
+    # is the one producer in the library that names both of its bases and
+    # takes neither from the default.
+    fidelity = score(graded, horizon_days=horizon_days, basis="shipped")
+    # THE SAME PANEL AGAINST THE BAND THE PROJECT RULED, beside the band it
+    # ships. Both, never one: the shipped block keeps its meaning so no
+    # reader's number moves underneath them, and the ruled block is the
+    # first time anything in this library grades a panel against
+    # `ruling-the-ruler-is-the-universal-band`. Which of the two is the bar
+    # is Simon's decision and `BAR_BAND_BASIS` names it.
+    bar = score(graded, horizon_days=horizon_days, basis=BAR_BAND_BASIS)
 
     def readings(row: str) -> list[float]:
         return [p[row] for p in panels if p.get(row) is not None]
@@ -1597,6 +1793,7 @@ def certify(panels: Sequence[Mapping[str, float]], *,
         "seeds": len(panels),
         "graded": graded,
         "fidelity": fidelity,
+        "bar": bar,
         "mechanism": mechanism,
         "centre": centre,
         # The index tail row, which is neither a shape row nor a mechanism
@@ -1608,6 +1805,14 @@ def certify(panels: Sequence[Mapping[str, float]], *,
         "counts": {
             "in_band": fidelity["shape_in_band"],
             "in_band_of": fidelity["shape_of"],
+            # The same count on the ruled band, and the basis each was
+            # taken against. Two counts with two bases, because one count
+            # with one symbol is what let the bar be ruled against one
+            # object and computed against another for a fortnight.
+            "in_band_ruled": bar["shape_in_band"],
+            "in_band_ruled_of": bar["shape_of"],
+            "basis": fidelity["basis_detail"],
+            "basis_ruled": bar["basis_detail"],
             "mechanism_shown": len(shown),
             "mechanism_of": len(counted),
             "at_centre": len(at_centre),
@@ -1800,8 +2005,23 @@ def certification_report(result: Mapping[str, Any]) -> str:
 
 
 def regressions(panel: Mapping[str, float], *,
-                horizon_days: int = CERTIFIED_HORIZON_DAYS) -> list[str]:
+                horizon_days: int = CERTIFIED_HORIZON_DAYS,
+                basis: str = DEFAULT_BAND_BASIS) -> list[str]:
     """Statistics the SHIPPED preset holds in band and this panel does not.
+
+    BOTH SIDES ON ONE RULER, and that had to be repaired on 2026-09-15 when
+    the default basis moved. The candidate side came from `score` at
+    whatever basis was live while the baseline side read
+    `REAL_MARKETS[name]` by name, so a ruled-basis candidate was compared
+    with a decade-band baseline and a row could be reported lost because
+    the two sides were graded by different tables. `basis` now picks one
+    table and both sides read it.
+
+    A row the basis cannot read is SKIPPED rather than reported lost. Its
+    `in_band` is None, `not None` is True, and this function decides
+    whether a candidate becomes the default, so the difference between "the
+    candidate lost this row" and "nobody graded this row" is the whole
+    answer.
 
     The reconciliation this module was missing. The calibration objective
     sums two horizons; the envelope certifies one. A search can therefore
@@ -1842,7 +2062,11 @@ def regressions(panel: Mapping[str, float], *,
             f"regressions compares against CERTIFIED, which is measured at "
             f"{CERTIFIED_HORIZON_DAYS} days, not {horizon_days}. Use "
             f"`score` to read another horizon on its own ruler.")
-    theirs = score(panel, horizon_days=horizon_days)["statistics"]
+    theirs = score(panel, horizon_days=horizon_days, basis=basis)["statistics"]
+    # The shipped preset's own panel, graded by the SAME table, so the
+    # comparison is between two readings and not between two rulers.
+    ours = score(CERTIFIED, horizon_days=horizon_days,
+                 basis=basis)["statistics"]
     lost = []
     for name, row in theirs.items():
         # Being outside the calibration objective is not a licence to lose
@@ -1852,7 +2076,6 @@ def regressions(panel: Mapping[str, float], *,
         # reasoning expired and the skip with it. The condition below is the
         # one that always did the work: a row the shipped preset does not
         # hold in band cannot be lost by a candidate.
-        low, high = REAL_MARKETS[name]
         # A level or crisis row is certified on a different protocol, so it
         # is absent from `CERTIFIED` and skipped. CORRECTED 2026-09-14: this
         # read "is held red at the shipped preset", which was true through
@@ -1861,7 +2084,10 @@ def regressions(panel: Mapping[str, float], *,
         # The skip never depended on the verdict, only on the protocol.
         if name not in CERTIFIED:
             continue
-        if band_distance(CERTIFIED[name], low, high) == 0 and not row["in_band"]:
+        # `is False` and `is True`, never truthiness: a row this basis
+        # cannot read is None on both sides and belongs in neither list.
+        if ours.get(name, {}).get("in_band") is True and \
+                row["in_band"] is False:
             lost.append(name)
     return sorted(lost)
 

@@ -165,10 +165,20 @@ def test_two_medians_both_in_band_are_not_equal():
         edges[row] = hi - rounding_quantum(hi, row)
         assert lo <= edges[row] <= hi, row
 
+    # `basis="shipped"` named, since the default moved to `ruled` on
+    # 2026-09-15. The edge panel above is built out of `REAL_MARKETS_504`'s
+    # own ceilings, so the count it is compared against has to be taken on
+    # that same table; at the ruled basis `corr_persistence_acf1` has no band
+    # at 504 and `in_band` is None there, which would make the count
+    # assertion below a comparison against a row nobody graded. What this
+    # test binds is that the RULE separates two panels the COUNT cannot, and
+    # that property is about the rule rather than about the table.
     at_centre = loss.scoring_rule(constant_panels(centres),
-                                  horizon_days=504, rows=SHAPE)
+                                  horizon_days=504, rows=SHAPE,
+                                  basis="shipped")
     at_edge = loss.scoring_rule(constant_panels(edges),
-                                horizon_days=504, rows=SHAPE)
+                                horizon_days=504, rows=SHAPE,
+                                basis="shipped")
 
     # The count cannot tell them apart.
     assert all(at_centre["rows"][r]["in_band"] for r in SHAPE)

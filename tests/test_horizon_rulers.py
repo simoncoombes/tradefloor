@@ -195,17 +195,34 @@ def test_the_ruler_swap_changes_a_verdict_and_not_only_a_label():
     """A scoring call that renamed its ruler without changing the table would
     satisfy every name assertion above. This asserts the numbers.
     """
+    # PINNED TO `shipped` since the default moved to `ruled` on 2026-09-15.
+    # `KURTOSIS_PASSES_252_FAILS_504` is named for the DECADE tables and the
+    # ruled ones do not separate on it, so the decade arm has to name its
+    # basis to keep asserting what it was written to assert. The ruled arm
+    # below is the same property on `corr_asymmetry`, which the ruled tables
+    # do separate on.
     near = envelope.score(dict(envelope.CERTIFIED,
                                excess_kurtosis=KURTOSIS_PASSES_252_FAILS_504),
-                          horizon_days=252)
+                          horizon_days=252, basis="shipped")
     far = envelope.score({k: v for k, v in envelope.CERTIFIED.items()
                           if k in envelope.BANDS_504}
                          | {"excess_kurtosis": KURTOSIS_PASSES_252_FAILS_504},
-                         horizon_days=504)
+                         horizon_days=504, basis="shipped")
     assert near["statistics"]["excess_kurtosis"]["in_band"]
     assert not far["statistics"]["excess_kurtosis"]["in_band"]
     assert near["statistics"]["excess_kurtosis"]["band"] != (
         far["statistics"]["excess_kurtosis"]["band"])
+
+    near_r = envelope.score(dict(envelope.CERTIFIED, corr_asymmetry=0.22),
+                            horizon_days=252, basis="ruled")
+    far_r = envelope.score({k: v for k, v in envelope.CERTIFIED.items()
+                            if k in facts.REAL_MARKETS_RULED_504}
+                           | {"corr_asymmetry": 0.22},
+                           horizon_days=504, basis="ruled")
+    assert near_r["statistics"]["corr_asymmetry"]["in_band"]
+    assert not far_r["statistics"]["corr_asymmetry"]["in_band"]
+    assert near_r["statistics"]["corr_asymmetry"]["band"] != (
+        far_r["statistics"]["corr_asymmetry"]["band"])
 
 
 # --------------------------------------------------------------------------
@@ -235,10 +252,16 @@ def test_compare_to_real_markets_reads_the_horizon_off_the_panel():
     Checked on a row whose two bands disagree, so a function that swapped the
     reported ruler name without swapping the table fails here.
     """
+    # `basis="shipped"` named, for the reason in
+    # `test_the_ruler_swap_changes_a_verdict_and_not_only_a_label`: the row
+    # this is bound on separates the two DECADE tables and not the two ruled
+    # ones. The ruled arm is at the end of the function.
     near = facts.compare_to_real_markets(
-        panel_at(252, excess_kurtosis=KURTOSIS_PASSES_252_FAILS_504))
+        panel_at(252, excess_kurtosis=KURTOSIS_PASSES_252_FAILS_504),
+        basis="shipped")
     far = facts.compare_to_real_markets(
-        panel_at(504, excess_kurtosis=KURTOSIS_PASSES_252_FAILS_504))
+        panel_at(504, excess_kurtosis=KURTOSIS_PASSES_252_FAILS_504),
+        basis="shipped")
     # The verdict first, and it is the one that fires: before the fix the
     # 504-day panel was graded against the 252-day band and this row matched.
     assert near["excess_kurtosis"]["matches"]
@@ -252,6 +275,24 @@ def test_compare_to_real_markets_reads_the_horizon_off_the_panel():
         (facts.REAL_MARKETS_504["excess_kurtosis"][0]
          - KURTOSIS_PASSES_252_FAILS_504) / facts.SEED_SD_504[
             "excess_kurtosis"])
+
+    # The same at the default basis, which is `ruled`, on the row the ruled
+    # tables separate. The ruler name moves with the horizon here too, and a
+    # row the ruled table cannot read at 504 is PRESENT and says so rather
+    # than being dropped, which is what keeps 13 of 13 from printing as 13.
+    near_r = facts.compare_to_real_markets(panel_at(252, corr_asymmetry=0.22))
+    far_r = facts.compare_to_real_markets(panel_at(504, corr_asymmetry=0.22))
+    assert near_r["corr_asymmetry"]["matches"]
+    assert not far_r["corr_asymmetry"]["matches"]
+    assert near_r["corr_asymmetry"]["ruler"] == "facts.REAL_MARKETS_RULED"
+    assert far_r["corr_asymmetry"]["ruler"] == "facts.REAL_MARKETS_RULED_504"
+    assert near_r["corr_asymmetry"]["basis"] == "ruled"
+    held_out = far_r["corr_persistence_acf1"]
+    assert held_out["matches"] is None
+    assert held_out["verdict"] == "unreadable"
+    assert held_out["real_range"] is None
+    assert "corr-persistence-504-unbanded" in held_out["unreadable"]
+    assert "corr_persistence_acf1" not in facts.REAL_MARKETS_RULED_504
 
 
 def test_a_panel_that_does_not_say_its_horizon_is_refused():
@@ -271,14 +312,28 @@ def test_report_names_the_ruler_that_graded_it():
     """A table headed "real markets" over a horizon line said nothing about
     which of the two band sets produced the verdicts.
     """
-    text = facts.report(panel_at(252, instruments=40, observations=10_080))
+    text = facts.report(panel_at(252, instruments=40, observations=10_080),
+                        basis="shipped")
     assert "facts.REAL_MARKETS" in text
-    far = facts.report(panel_at(504, instruments=40, observations=20_160))
+    far = facts.report(panel_at(504, instruments=40, observations=20_160),
+                       basis="shipped")
     assert "facts.REAL_MARKETS_504" in far
     # At 504 the level and crisis rows have no band of their own, so they are
     # reported ungraded rather than graded against a 252-day one.
     assert "index_drift_pct" not in facts.REAL_MARKETS_504
     assert "reporting only" in far
+
+    # The default, which is `ruled`. The header names the BASIS as well as
+    # the table, because the table is a symbol and swapping its contents
+    # leaves every report asserting the same provenance.
+    ruled = facts.report(panel_at(504, instruments=40, observations=20_160))
+    assert "facts.REAL_MARKETS_RULED_504" in ruled
+    assert "on the ruled basis" in ruled
+    # And a row the ruled table holds out is printed as UNREADABLE with its
+    # reason, in the table rather than quietly moved to "reporting only".
+    assert "UNREADABLE" in ruled
+    assert "unreadable on the ruled basis" in ruled
+    assert "corr-persistence-504-unbanded" in ruled
 
 
 # --------------------------------------------------------------------------
@@ -295,9 +350,12 @@ def test_envelope_score_refuses_a_horizon_with_no_band_set():
             envelope.score(panel, horizon_days=days)
         assert str(days) in str(exc.value)
         assert "[252, 504]" in str(exc.value)
-    # Both horizons that DO have one still work.
+    # Both horizons that DO have one still work, on either basis, and each
+    # names the table it actually graded with rather than a horizon.
+    assert envelope.score(panel, horizon_days=252,
+                          basis="shipped")["ruler"] == "facts.REAL_MARKETS"
     assert envelope.score(panel, horizon_days=252)["ruler"] == \
-        "facts.REAL_MARKETS"
+        "facts.REAL_MARKETS_RULED"
 
 
 def test_shapley_ruler_withholds_at_a_horizon_with_no_band_set():

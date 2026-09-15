@@ -249,14 +249,28 @@ def _window_of(rows: list[dict]) -> tuple[int, int]:
     return windows.pop()
 
 
-def _count_in_band(panel: dict, bands: dict) -> tuple[int, list[str]]:
-    """How many of the fourteen sit inside their band, and which do not."""
-    misses = []
+def _count_in_band(panel: dict, bands: dict) -> tuple[int, list[str], list[str]]:
+    """How many sit inside their band, which do not, and which have none.
+
+    THE THIRD LIST IS THE ONE THAT MATTERS AND IT USED TO BE A `KeyError`.
+    A basis does not carry every row: `facts.REAL_MARKETS_RULED_504` holds
+    thirteen of `PANEL`'s fourteen, because `corr_persistence_acf1` is held
+    out of the ruled band at 504 on two recorded grounds
+    (`facts.RULED_UNREADABLE[504]`). A row the basis cannot read is named
+    here and taken OUT of the denominator, so `in_band` plus `misses` plus
+    `unreadable` is the panel and a count of "13" is never printed against a
+    fourteen that was not tested.
+    """
+    misses, unreadable = [], []
     for k in PANEL:
-        lo, hi = bands[k]
+        band = bands.get(k)
+        if band is None:
+            unreadable.append(k)
+            continue
+        lo, hi = band
         if not (lo <= panel[k] <= hi):
             misses.append(k)
-    return len(PANEL) - len(misses), misses
+    return len(PANEL) - len(misses) - len(unreadable), misses, unreadable
 
 
 #: The band tables this tool will grade against, by basis name. The seam is
@@ -267,10 +281,25 @@ def _count_in_band(panel: dict, bands: dict) -> tuple[int, list[str]]:
 #: symbols, which `facts.band_basis` resolves to an era, a window count and a
 #: rule. Nothing here is a band; a band is a thing with a provenance and the
 #: point of this dict is that the provenance travels with it.
+#:
+#: `ruled` IS THE BASIS THE RULING NAMES and `universal` is its component.
+#: `ruling-the-ruler-is-the-universal-band` makes the bar every row against
+#: the universal whole-tape band; `facts.REAL_MARKETS_RULED` is that table
+#: composed with the two whole-record rows, and it is what
+#: `envelope.RULERS_BY_BASIS['ruled']` returns, so grading here and grading
+#: in the library read the same object.
+#:
+#: The two differ on `PANEL` at 504 and only there. `universal` grades
+#: `corr_persistence_acf1` against (-0.38, 0.88), a band carried on the
+#: WALKED six-window protocol rather than the shipped sub-window one, so it
+#: is a band for a different quantity; `ruled` drops the row and
+#: `_count_in_band` names it unreadable. A count taken on `universal` at 504
+#: therefore includes one cell the ruled band refuses to grade.
 BAND_BASES = {
     "shipped": ("facts.REAL_MARKETS", "facts.REAL_MARKETS_504"),
     "universal": ("facts.REAL_MARKETS_UNIVERSAL",
                   "facts.REAL_MARKETS_UNIVERSAL_504"),
+    "ruled": ("facts.REAL_MARKETS_RULED", "facts.REAL_MARKETS_RULED_504"),
 }
 
 
@@ -362,29 +391,32 @@ def rescore(artefact: str, basis: str, out: str, records_dir: str) -> int:
         hos = (_median_panel(cell["per_seed_heldout_seeds"])
                if cell.get("per_seed_heldout_seeds") else None)
         hou = cell.get("panel_heldout_universe")
-        cell["in_band_252"], cell["misses_252"] = _count_in_band(
-            cell["panel_252"], t252)
-        cell["in_band_504"], cell["misses_504"] = _count_in_band(
-            cell["panel_504"], t504)
+        (cell["in_band_252"], cell["misses_252"],
+         cell["unreadable_252"]) = _count_in_band(cell["panel_252"], t252)
+        (cell["in_band_504"], cell["misses_504"],
+         cell["unreadable_504"]) = _count_in_band(cell["panel_504"], t504)
         if hos is None:
             cell["in_band_heldout_seeds"] = None
             cell["misses_heldout_seeds"] = None
+            cell["unreadable_heldout_seeds"] = None
         else:
-            cell["in_band_heldout_seeds"], cell["misses_heldout_seeds"] = (
-                _count_in_band(hos, t252))
+            (cell["in_band_heldout_seeds"], cell["misses_heldout_seeds"],
+             cell["unreadable_heldout_seeds"]) = _count_in_band(hos, t252)
         if hou is None:
             # The measuring run kept the count and threw the panel away, so
             # this cell cannot be re-scored and must not be carried forward
             # under a basis it was not read at. Stated, not guessed.
             cell["in_band_heldout_universe"] = None
             cell["misses_heldout_universe"] = None
+            cell["unreadable_heldout_universe"] = None
             cell["heldout_universe_not_rescorable"] = (
                 "the retained artefact carries this cell's COUNT and not its "
                 "panel, so a re-score has nothing to read. What would fix it: "
                 "retain panel_heldout_universe the way panel_252 is retained")
         else:
-            cell["in_band_heldout_universe"], cell["misses_heldout_universe"] \
-                = _count_in_band(hou, t252)
+            (cell["in_band_heldout_universe"],
+             cell["misses_heldout_universe"],
+             cell["unreadable_heldout_universe"]) = _count_in_band(hou, t252)
         done.append(name)
     doc["method"] = dict(doc.get("method", {})) | stamp
     doc["rescored_from"] = {
@@ -413,11 +445,24 @@ def main() -> None:
                     help="cap the seed count. FOR SMOKE TESTS ONLY: every "
                          "published count here is a thirty-seed median, and "
                          "a count without its seed count is trap 15.")
-    ap.add_argument("--band-basis", default="shipped", choices=sorted(BAND_BASES),
+    # THE LIBRARY'S NAME, NOT A SECOND DEFAULT. This read the literal
+    # "shipped", so on 2026-09-15 the library graded against the ruled band
+    # and this tool still wrote decade-band counts into artefacts that stamp
+    # a basis, which is one storey down from the defect the stamp exists for.
+    # Reading `facts.DEFAULT_BAND_BASIS` means the tool follows the ruling
+    # rather than restating it. It changes what a NEW measurement writes and
+    # nothing already on disk: `record.py` reads an artefact's counts, not
+    # these tables, so the eighteen committed records are untouched until
+    # somebody re-measures on purpose.
+    ap.add_argument("--band-basis", default=facts.DEFAULT_BAND_BASIS,
+                    choices=sorted(BAND_BASES),
                     help="which band basis to grade against. The default is "
-                         "the shipped 2015-2025 decade band; `universal` is "
-                         "the 1987-2025 whole-tape band of "
-                         "certification-bands.md section 14")
+                         f"{facts.DEFAULT_BAND_BASIS!r}, the band "
+                         "ruling-the-ruler-is-the-universal-band names; "
+                         "`shipped` is the 2015-2025 decade band the "
+                         "committed records were taken at, and `universal` "
+                         "is the shape-row component of the ruled table "
+                         "without its two whole-record rows")
     ap.add_argument("--rescore", metavar="ARTEFACT",
                     help="re-score a retained preset-panel artefact against "
                          "--band-basis and write it to --out. Desk cost: it "
@@ -500,18 +545,36 @@ def main() -> None:
         certhos = envelope.certify(collected[("heldout_seeds", preset)],
                                    stationary_opening=stationary)
 
-        n252, miss252 = _count_in_band(p252, t252)
-        n504, miss504 = _count_in_band(p504, t504)
-        nhou, misshou = _count_in_band(phou, t252)
-        nhos, misshos = _count_in_band(phos, t252)
+        n252, miss252, unr252 = _count_in_band(p252, t252)
+        n504, miss504, unr504 = _count_in_band(p504, t504)
+        nhou, misshou, unrhou = _count_in_band(phou, t252)
+        nhos, misshos, unrhos = _count_in_band(phos, t252)
 
         results[preset] = {
             "panel_252": p252,
             "panel_504": p504,
+            # Retained for the same reason `panel_252` is, and it was the one
+            # cell that was not. Every artefact written before 2026-09-14 kept
+            # `in_band_heldout_universe` -- a COUNT read at whatever band the
+            # run happened to grade against -- and threw the panel the count
+            # came from away, so that cell cannot be re-scored at any other
+            # basis: 252 of the 1,008 shape-row band verdicts on the eighteen
+            # committed records are unreachable from anything retained, and
+            # `--rescore` has to write null there rather than carry a
+            # decade-band count forward under a record stamped otherwise.
+            # This line does not repair the artefacts already written; it
+            # stops the next one from having the same hole.
+            "panel_heldout_universe": phou,
             "in_band_252": n252, "misses_252": miss252,
             "in_band_504": n504, "misses_504": miss504,
             "in_band_heldout_universe": nhou, "misses_heldout_universe": misshou,
             "in_band_heldout_seeds": nhos, "misses_heldout_seeds": misshos,
+            # The rows this basis could not read, named beside the count
+            # rather than folded into it. Empty on `shipped` and `universal`;
+            # `ruled` names `corr_persistence_acf1` at 504.
+            "unreadable_252": unr252, "unreadable_504": unr504,
+            "unreadable_heldout_universe": unrhou,
+            "unreadable_heldout_seeds": unrhos,
             "mechanism_252": envelope.certification_record(cert252),
             "mechanism_heldout_seeds": envelope.certification_record(certhos),
             # Kept so the certificate above is re-derivable from this
@@ -537,8 +600,13 @@ def main() -> None:
         }
         r = results[preset]
         mc = r["mechanism_252"]["counts"]
-        print(f"{preset:8s} 252:{n252:2d}/14  504:{n504:2d}/14  "
-              f"hoU:{nhou:2d}/14  hoS:{nhos:2d}/14  "
+        # The denominator is what the basis could READ, not the panel's
+        # length. Printing "13/14" when the fourteenth row has no band on
+        # this basis is the miss that a reader cannot tell from a failure.
+        print(f"{preset:8s} 252:{n252:2d}/{len(PANEL) - len(unr252):<2d} "
+              f"504:{n504:2d}/{len(PANEL) - len(unr504):<2d} "
+              f"hoU:{nhou:2d}/{len(PANEL) - len(unrhou):<2d} "
+              f"hoS:{nhos:2d}/{len(PANEL) - len(unrhos):<2d} "
               f"vol:{r['annualised_vol_pct']:5.1f}%  "
               f"lever:{r['crisis_lever']:.2f}x  "
               f"mech:{mc['mechanism_shown']:2d}/{mc['mechanism_of']}  "

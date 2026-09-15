@@ -147,6 +147,21 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
             "heldout_universe": p["misses_heldout_universe"],
             "heldout_seeds": p["misses_heldout_seeds"],
         },
+        # THE DENOMINATOR, WHICH `in_band` ABOVE DOES NOT CARRY. A basis does
+        # not band every row: `facts.REAL_MARKETS_RULED_504` holds thirteen of
+        # the fourteen, because `corr_persistence_acf1` is held out of the
+        # ruled band at 504. So pt-v19 under that basis reads 14 at 252 and 13
+        # at 504 with NO miss at either -- 13 of 13, not 13 of 14 -- and a
+        # bare 13 beside a bare 14 in the same dict reads as one short.
+        # `preset_panel._count_in_band` names the rows it could not read and
+        # this is where they reach the record; without it the count cannot be
+        # told from a failure. Additive, so schema 1 stays 1.
+        "unreadable": {
+            "252": p.get("unreadable_252"),
+            "504": p.get("unreadable_504"),
+            "heldout_universe": p.get("unreadable_heldout_universe"),
+            "heldout_seeds": p.get("unreadable_heldout_seeds"),
+        },
         "crisis_lever": {
             "ratio": p["crisis_lever"],
             "vol_at_vix_5": p["vol_at_vix_5"],
@@ -203,6 +218,189 @@ def carry_level_protocol(record: dict, path: pathlib.Path) -> str:
     return ("carried level_protocol forward"
             + ("; +%d dial(s) added inert since (%s)" % (len(added), ", ".join(added))
                if added else ""))
+
+
+def count_block_gradings(block: dict) -> dict[str, dict]:
+    """One count block's published count, recomputed at every basis.
+
+    MEASURED, NOT ASSERTED, and that distinction is the whole of this
+    function. The block retains in `centre` the median it graded for each of
+    the fourteen shape rows, so the count it published can be recomputed
+    against each band table the library knows and compared with what the
+    block says. A basis that reproduces the published count is a candidate
+    for the ruler this block was read against; one that does not is ruled
+    out. Nothing is stamped here that does not re-derive from the block's own
+    retained numbers.
+
+    Desk cost: fourteen band lookups per basis, no panel, no box. The level
+    block was thought to need a re-measurement to be re-scored because the
+    per-seed panels behind it were never retained -- they were not, and they
+    are not needed, because the aggregate it graded is the thing `centre`
+    keeps.
+    """
+    from tradefloor import envelope
+
+    centre = block.get("centre") or {}
+    published = (block.get("counts") or {}).get("in_band")
+    days = block.get("horizon_days")
+    panel = {row: c["median"] for row, c in centre.items()
+             if c.get("median") is not None}
+    if not panel or published is None or not days:
+        return {}
+    out = {}
+    for basis in sorted(envelope.RULERS_BY_BASIS):
+        try:
+            s = envelope.score(panel, horizon_days=days, basis=basis)
+        except Exception:                      # a basis this horizon has no table for
+            continue
+        out[basis] = {
+            "in_band": s["shape_in_band"], "of": s["shape_of"],
+            "ruler": s["ruler"], "basis_detail": s["basis_detail"],
+            "reproduces": s["shape_in_band"] == published,
+        }
+    return out
+
+
+def stamp_band_ruler(block: dict, label: str) -> str:
+    """Name the ruler one count block was graded by, and add the bar's.
+
+    THE DEFECT THIS CLOSES. `level_protocol.certification` publishes its own
+    `in_band`, its own `at_centre`, eleven mechanism row verdicts and a tail
+    verdict, and it names no band anywhere -- not a basis, not even a symbol.
+    The top-level `in_band` beside it is regraded on every `--panel` run at
+    whatever `--band-basis` the panel was measured at. Regenerate pt-v19 at
+    the basis the ship bar is ruled against and the file publishes
+    `in_band["252"] = 14` from one path and `level_protocol...in_band = 13`
+    from the other, in the same file, with nothing saying they are counts of
+    different things. They are: a different roster, thirty different seeds,
+    and now a different ruler.
+
+    So the block is made to say which. `counts.protocol` names the roster
+    protocol, `counts.band_basis` and `counts.basis` name the ruler the
+    published count re-derives at, and `counts.in_band_ruled` carries the
+    same panel against the band the bar is scored at, stamped
+    `counts.basis_ruled`. Two counts that no longer collide: at the bar's own
+    basis they agree with the top-level count, and where they differ the
+    field names say why.
+
+    REFUSES rather than guessing. If the published count reproduces at no
+    basis the library knows, the block was graded by something not on the
+    shelf and this says so instead of stamping a ruler onto it. If it
+    reproduces at several -- which is the ordinary case for a preset in band
+    everywhere -- no single ruler is claimed; the candidates are listed, and
+    that the count does not move between them is a stronger statement than
+    picking one.
+    """
+    from tradefloor import envelope
+
+    counts = block.get("counts")
+    if not isinstance(counts, dict) or counts.get("in_band") is None:
+        return ""
+    if counts.get("basis") and counts.get("basis_ruled"):
+        return ""                # written by a certify that already stamps
+    graded = count_block_gradings(block)
+    if not graded:
+        return ("; %s counts NOT STAMPED: the block retains no graded "
+                "medians, so the ruler behind its count cannot be re-derived "
+                "and must not be guessed" % label)
+    repro = sorted(b for b, v in graded.items() if v["reproduces"])
+    if not repro:
+        return ("; %s counts NOT STAMPED: in_band %s of %s reproduces at none "
+                "of %s (%s), so it was graded by a table this build does not "
+                "carry"
+                % (label, counts["in_band"], counts.get("in_band_of"),
+                   ", ".join(sorted(graded)),
+                   "; ".join("%s gives %d" % (b, graded[b]["in_band"])
+                             for b in sorted(graded))))
+    counts["protocol"] = _PROTOCOL_OF.get(label, label)
+    if len(repro) == 1:
+        counts["band_basis"] = repro[0]
+        counts["basis"] = graded[repro[0]]["basis_detail"]
+    else:
+        counts["band_basis"] = None
+        counts["band_basis_candidates"] = repro
+        counts["basis"] = {
+            "note": "this count is %d of %s at every basis this build carries "
+                    "(%s), so no one ruler is claimed for it"
+                    % (counts["in_band"], counts.get("in_band_of"),
+                       ", ".join(repro)),
+        }
+    bar = envelope.BAR_BAND_BASIS
+    if bar in graded:
+        counts["in_band_ruled"] = graded[bar]["in_band"]
+        counts["in_band_ruled_of"] = graded[bar]["of"]
+        counts["basis_ruled"] = graded[bar]["basis_detail"]
+    return ("; %s counts stamped %s, and the bar's basis %r reads %s of %s on "
+            "the same medians"
+            % (label, "/".join(repro), bar,
+               counts.get("in_band_ruled"), counts.get("in_band_ruled_of")))
+
+
+#: Every place a committed record publishes a band-derived `in_band` count,
+#: and what a reader has to be able to tell them apart by. Three blocks, three
+#: rosters or seed sets, and until 2026-09-15 none of them named a ruler.
+_COUNT_BLOCKS = (
+    ("mechanism_252", ("mechanism_252",)),
+    ("mechanism_heldout_seeds", ("mechanism_heldout_seeds",)),
+    ("level_protocol.certification", ("level_protocol", "certification")),
+)
+
+#: The run behind each count, in one line, because the ruler is only half of
+#: what tells two of these counts apart. `mechanism_252` and
+#: `level_protocol.certification` are both 252-day thirty-seed counts and they
+#: are of different rosters; naming only the band would leave a reader
+#: thinking a difference between them was a disagreement.
+_PROTOCOL_OF = {
+    "mechanism_252": "the certified roster held at Universe.random(40, "
+                     "seed=111), training seeds",
+    "mechanism_heldout_seeds": "the certified roster held at Universe.random("
+                               "40, seed=111), held-out seeds",
+    "level_protocol.certification": "facts.LEVEL_PROTOCOL, roster varying "
+                                    "with the seed",
+}
+
+
+def stamp_band_rulers(record: dict) -> str:
+    """Every band-derived count block in the record, made to name its ruler."""
+    note = ""
+    for label, path in _COUNT_BLOCKS:
+        block = record
+        for key in path:
+            block = (block or {}).get(key) or {}
+        if isinstance(block, dict) and block:
+            note += stamp_band_ruler(block, label)
+    return note
+
+
+def unnamed_band_counts(record: dict) -> list[str]:
+    """Band-derived counts in this record that name no ruler.
+
+    A record publishes four of them and they are counts of different things:
+    `in_band` on the held roster at two horizons and two seed sets, and
+    `level_protocol.certification.counts.in_band` on the varying-roster
+    protocol. Two of those can disagree honestly. What they may not do is
+    disagree in silence, which is what happens when the ruler is a symbol in
+    one place and absent in the other.
+    """
+    bad = []
+    method = (record.get("measured") or {}).get("method") or {}
+    if not method.get("band_basis"):
+        bad.append("measured.method names no band_basis, so the top-level "
+                   "in_band and misses say nothing about which table graded "
+                   "them")
+    for label, path in _COUNT_BLOCKS:
+        block = record
+        for key in path:
+            block = (block or {}).get(key) or {}
+        counts = block.get("counts") or {}
+        if counts.get("in_band") is None:
+            continue
+        if counts.get("basis") or counts.get("band_basis_candidates"):
+            continue
+        bad.append("%s publishes in_band %s of %s and names no basis, so a "
+                   "reader cannot tell it from the top-level count beside it"
+                   % (label, counts.get("in_band"), counts.get("in_band_of")))
+    return bad
 
 
 def place_level_protocol(record: dict) -> dict:
@@ -287,6 +485,10 @@ def main() -> int:
         record = build(name, panel, values)
         path = OUT / f"{name}.json"
         note = carry_level_protocol(record, path)
+        # After the carry, whichever way the carry went: a block carried
+        # UNCHECKED needs the ruler named just as much as a checked one, and
+        # more, since nothing else about it has been verified.
+        note += stamp_band_rulers(record)
         record = place_level_protocol(record)
         text = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
         if args.check:
@@ -299,6 +501,10 @@ def main() -> int:
                 # to agree is the SCIENCE.
                 for field in ("coefficient_digest", "mechanisms", "panel_252",
                               "panel_504", "in_band", "misses", "crisis_lever",
+                              # The denominator is science, not bookkeeping: a
+                              # count of 13 means one thing beside an empty
+                              # `unreadable` and another beside a named row.
+                              "unreadable",
                               "mechanism_252", "mechanism_heldout_seeds",
                               # A block this run would DROP is drift and the
                               # loudest kind: it is a measurement about to be
@@ -307,6 +513,24 @@ def main() -> int:
                     if have.get(field) != record.get(field):
                         drift.append(f"{path.name}: {field} differs")
         else:
+            # THE LAST GATE BEFORE TWO COUNTS GO INTO ONE FILE. A record's
+            # top-level `in_band` is regraded here at the panel's basis while
+            # `level_protocol` is carried forward from a run at whichever
+            # basis was live when it was measured. Writing both without
+            # naming either is how pt-v19 would have shipped a 14 and a 13 of
+            # the same-looking quantity, and the sweep that found it refused
+            # to write the eighteen records rather than do that. The refusal
+            # belongs here, at the write, where it can be answered.
+            unnamed = unnamed_band_counts(record)
+            if unnamed:
+                print(f"REFUSED: {path.name} would publish "
+                      f"{len(unnamed)} band-derived count(s) with no ruler "
+                      f"named: " + "; ".join(unnamed)
+                      + ". Re-measure or re-stamp the block rather than "
+                        "writing a count nobody can attribute",
+                      file=sys.stderr)
+                drift.append(f"{path.name}: {len(unnamed)} unnamed band count(s)")
+                continue
             path.write_text(text, encoding="utf-8", newline="\n")
             print(f"  wrote {path.relative_to(ROOT)}"
                   + (f"  ({note})" if note else ""))
@@ -316,7 +540,12 @@ def main() -> int:
             print(f"  {d}")
         print(f"{len(drift)} differences")
         return 1 if drift else 0
-    return 0
+    # A refusal in the write path leaves `drift` non-empty, and a run that
+    # refused to write a record must not exit 0. The other records are still
+    # written: the fault is per record and stopping at the first one leaves
+    # the rest stale for a reason that has nothing to do with them, which is
+    # the lesson `write_coefficients` already learned.
+    return 1 if drift else 0
 
 
 def write_coefficients() -> int:
@@ -510,9 +739,22 @@ def write_level_protocol(rows_path: str) -> int:
             "days": doc.get("days"),
         },
     }
+    # The same stamp the carried path gets, so a block written here and one
+    # carried forward by `--panel` cannot end up saying different amounts
+    # about the ruler behind the same count. A block from a `certify` that
+    # already stamps its basis is left alone.
+    #
+    # THE LEVEL BLOCK ONLY, because this mode promises to write the level
+    # block and leave the rest of the record where it is. The two mechanism
+    # blocks need the same stamp and they get it from `--panel`, which is the
+    # mode that owns them.
+    stamped_note = stamp_band_ruler(record["level_protocol"]["certification"],
+                                    "level_protocol.certification")
     ordered = place_level_protocol(record)
     path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
                     encoding="utf-8", newline="\n")
+    if stamped_note:
+        print(f" {stamped_note.lstrip(';')}")
     rows = dict(doc["certified_level"])
     rows.update(doc["certified_crisis"])
     print(f"  wrote {path.relative_to(ROOT)}  level_protocol: "
