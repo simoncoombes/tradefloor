@@ -602,10 +602,22 @@ def test_describe_simulator_serves_the_envelopes_verdicts_by_group():
     cert = envelope.certified()
     served_out = set(d["certified"]["statistics_out_of_band"])
     served_in = set(d["certified"]["statistics_in_band"])
+    # `is False` / `is True`, NOT truthiness. Since the default basis moved
+    # to `ruled` a row can be UNREADABLE -- `in_band` None, because the
+    # basis adopts no band for it -- and `not None` is True, so the old
+    # truthiness form counted an ungraded row as out of band and asserted
+    # the surface should serve it that way. Three states, tested as three.
+    served_unreadable = set(d["certified"]["statistics_unreadable"])
     assert served_out == {k for k, v in cert["statistics"].items()
-                          if not v["in_band"]}
+                          if v["in_band"] is False}
     assert served_in == {k for k, v in cert["statistics"].items()
-                         if v["in_band"]}
+                         if v["in_band"] is True}
+    assert served_unreadable == {k for k, v in cert["statistics"].items()
+                                 if v["in_band"] is None}
+    # The three sets partition the served statistics; nothing is served
+    # twice and nothing served is unaccounted for.
+    assert not (served_in & served_out) and not (served_in & served_unreadable)
+    assert d["certified"]["band_basis"] == cert["band_basis"]
     # Every shape row is in band, and the shape group is served whole so a
     # reader can tell a crisis row in band from the count a gate reads.
     assert set(SHAPE) <= served_in
@@ -621,7 +633,11 @@ def test_describe_simulator_serves_the_envelopes_verdicts_by_group():
     for row in LEVEL + CRISIS:
         if row not in cert["statistics"]:
             continue                       # unmeasured; asserted just below
-        expected = served_in if cert["statistics"][row]["in_band"] else served_out
+        # Three states again: an UNREADABLE row is served as neither in nor
+        # out, and the truthiness form sent it to `served_out`.
+        _verdict = cert["statistics"][row]["in_band"]
+        expected = (served_unreadable if _verdict is None
+                    else served_in if _verdict else served_out)
         assert row in expected, (
             f"{row} is served under the wrong verdict: the envelope reads "
             f"in_band={cert['statistics'][row]['in_band']}")

@@ -665,8 +665,8 @@ def tail_panels(hits, sessions=251, shape_at_centre=True):
 def test_the_tail_row_fails_where_every_shape_row_passes():
     """Fourteen of fourteen in band, and the index tail out.
 
-    Six hits in 251 sessions on every seed is 2.39 per cent, above a ceiling
-    of 1.96; three hits is 1.20 per cent, inside. Nothing else about the
+    Six hits in 251 sessions on every seed is 2.39 per cent, above the ruled
+    ceiling of 2.34; three hits is 1.20 per cent, inside. Nothing else about the
     panels changes between the two, so the verdict is the row's and not a
     side effect of the fixture.
     """
@@ -779,14 +779,18 @@ def test_a_verdict_inside_one_run_standard_error_of_an_edge_says_so():
     of its own; a margin smaller than the run's error is a verdict this run
     cannot resolve, whichever side it fell.
     """
-    # Five hits on every seed is 1.99 per cent, just above the 1.96 ceiling,
+    # RE-PINNED 2026-09-15 from five hits against 1.96 to six against 2.34.
+    # `certify` grades the tail on `BAR_BAND_BASIS`, which is the ruled
+    # band, so the edge this test sits a run on is the ruled ceiling. The
+    # pin moved and the claim did not: the assertions below are unchanged.
+    # Six hits on every seed is 2.39 per cent, just above the 2.34 ceiling,
     # and the seeds do not scatter at all, so the run's error is zero and
     # the verdict IS resolved.
-    tight = envelope.certify(tail_panels(5))["tail"]
+    tight = envelope.certify(tail_panels(6))["tail"]
     assert tight["verdict"] == "HIGH" and tight["se_m"] == 0
     assert not tight["at_the_edge"]
     # The same rate from a scattered mixture cannot be.
-    scattered = envelope.certify(tail_panels([0] * 15 + [10] * 15))["tail"]
+    scattered = envelope.certify(tail_panels([0] * 15 + [12] * 15))["tail"]
     assert scattered["rate"] == pytest.approx(tight["rate"])
     assert scattered["verdict"] == "HIGH"
     assert scattered["at_the_edge"]

@@ -1587,6 +1587,7 @@ TAIL_ROW = "index_tail_dn3_pct"
 
 def tail_block(panels: Sequence[Mapping[str, Any]], *,
                horizon_days: int = CERTIFIED_HORIZON_DAYS,
+               basis: str = DEFAULT_BAND_BASIS,
                stationary_opening: bool | None = None) -> dict[str, Any] | None:
     """The index tail row's certificate line, from the per-seed panels.
 
@@ -1625,7 +1626,12 @@ def tail_block(panels: Sequence[Mapping[str, Any]], *,
     # refuses a horizon with no band set: the row's real windows exist at two
     # lengths and a rate read against the other one's counts is a number that
     # looks plausible and means nothing.
-    if (horizon_days not in RULERS_BY_HORIZON
+    if basis not in RULERS_BY_BASIS:
+        raise ValidationError(
+            f"{basis!r} is not a band basis; the bases are "
+            f"{sorted(RULERS_BY_BASIS)}. A basis is an era, a window count "
+            f"and a rule, and `facts.band_basis` states each one")
+    if (horizon_days not in RULERS_BY_BASIS[basis]
             or int(horizon_days) not in _facts.INDEX_TAIL_WINDOWS["windows"]):
         raise ValidationError(
             f"the index tail row has no real windows at {horizon_days} days; "
@@ -1639,7 +1645,7 @@ def tail_block(panels: Sequence[Mapping[str, Any]], *,
     if any(h is None for h in hits) or not sum(n or 0 for n in sessions):
         return None
 
-    bands, _, _ = RULERS_BY_HORIZON[horizon_days]
+    bands, _, ruler_name = RULERS_BY_BASIS[basis][horizon_days]
     low, high = bands[TAIL_ROW]
     rate = 100.0 * sum(hits) / sum(sessions)
     rates = [100.0 * h / n for h, n in zip(hits, sessions) if n]
@@ -1653,6 +1659,12 @@ def tail_block(panels: Sequence[Mapping[str, Any]], *,
     return {
         "row": TAIL_ROW,
         "horizon_days": horizon_days,
+        # THE BASIS, NOT THE NAME, for the same reason `score` stamps both:
+        # a rate carrying only a band's symbol asserts the same provenance
+        # whatever the symbol now holds, and this row's two bases differ by
+        # 0.38 on the ceiling alone.
+        "basis": basis,
+        "basis_detail": _facts.band_basis(ruler_name),
         "seeds": len(rates),
         "hits": sum(hits),
         "sessions": sum(sessions),
@@ -1800,7 +1812,11 @@ def certify(panels: Sequence[Mapping[str, float]], *,
         # row: it counts events rather than reading a shape, so it has its
         # own line and its own three counts. None on panels that do not
         # carry it.
+        # PINNED TO `BAR_BAND_BASIS`, NOT TAKEN FROM THE DEFAULT, for the
+        # same reason `fidelity` and `bar` are pinned above: `certify` names
+        # both of its bases and takes neither from the default.
         "tail": tail_block(panels, horizon_days=horizon_days,
+                           basis=BAR_BAND_BASIS,
                            stationary_opening=stationary_opening),
         "counts": {
             "in_band": fidelity["shape_in_band"],
@@ -2092,7 +2108,7 @@ def regressions(panel: Mapping[str, float], *,
     return sorted(lost)
 
 
-def certified() -> dict[str, Any]:
+def certified(basis: str = DEFAULT_BAND_BASIS) -> dict[str, Any]:
     """The envelope as a plain mapping, for serialising into a manifest.
 
     The statistics carry their group. The shape rows are what a green panel
@@ -2100,23 +2116,55 @@ def certified() -> dict[str, Any]:
     verdicts, computed here from the band rather than assumed, and a level
     or crisis row whose certified value has not been measured yet is listed
     under ``unmeasured`` rather than given a number.
+
+    THE BASIS IS AN ARGUMENT, since 2026-09-15. This read `REAL_MARKETS`
+    directly, which is the shipped decade table and the one ruler a caller
+    could not ask it for anything else. That made this function the third
+    band path in the library, after `loss._band_of` and `tail_block`, and
+    the one a manifest is serialised from -- so a record could carry a
+    verdict on a ruler the ruling had superseded and say nothing about it.
+    A row the basis has no adopted band for now reports `band` and
+    `in_band` as None and is named in ``unreadable``, which is what `score`
+    does, rather than raising or borrowing another basis's band.
     """
     from .facts import SHAPE, LEVEL, CRISIS
+    from . import facts as _facts
+    if basis not in RULERS_BY_BASIS:
+        raise ValidationError(
+            f"{basis!r} is not a band basis; the bases are "
+            f"{sorted(RULERS_BY_BASIS)}. A basis is an era, a window count "
+            f"and a rule, and `facts.band_basis` states each one")
+    if CERTIFIED_HORIZON_DAYS not in RULERS_BY_BASIS[basis]:
+        raise ValidationError(
+            f"{basis!r} has no band set at the certified horizon of "
+            f"{CERTIFIED_HORIZON_DAYS} days; it carries "
+            f"{sorted(RULERS_BY_BASIS[basis])}")
+    bands, _, ruler_name = RULERS_BY_BASIS[basis][CERTIFIED_HORIZON_DAYS]
     statistics: dict[str, Any] = {}
     for table, group in ((CERTIFIED, "shape"), (CERTIFIED_LEVEL, "level"),
                          (CERTIFIED_CRISIS, "crisis")):
         for k, v in table.items():
+            band = bands.get(k)
             statistics[k] = {
                 "measured": v,
-                "band": list(REAL_MARKETS[k]),
-                "in_band": band_distance(v, *REAL_MARKETS[k]) == 0,
+                "band": list(band) if band is not None else None,
+                "in_band": (band_distance(v, *band) == 0
+                            if band is not None else None),
                 "group": group,
             }
     unmeasured = [k for k in LEVEL + CRISIS if k not in statistics]
+    unreadable = sorted(k for k, s in statistics.items()
+                        if s["in_band"] is None)
     return {
         "preset": PRESET,
         "certified_horizon_days": CERTIFIED_HORIZON_DAYS,
+        # THE BASIS, NOT THE NAME, for the reason `score` stamps both: a
+        # manifest carrying only a ruler's symbol asserts the same
+        # provenance whatever that symbol now holds.
+        "band_basis": basis,
+        "band_basis_detail": _facts.band_basis(ruler_name),
         "statistics": statistics,
+        "unreadable": unreadable,
         "groups": {"shape": list(SHAPE), "level": list(LEVEL), "crisis": list(CRISIS)},
         "unmeasured": unmeasured,
         "gaps": [

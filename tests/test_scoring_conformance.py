@@ -246,6 +246,16 @@ def test_the_independent_scorer_agrees_with_envelope_score(path):
     for key, stat in sc["statistics"].items():
         mine = ind["rows"][key]
         assert _close(stat["measured"], mine["T"]), (path.stem, key)
+        # A ROW WITH NO BAND ON THIS BASIS IS A ROW NEITHER SIDE GRADES.
+        # Under the ruled basis `fear_gauge_dn1`, `fear_gauge_dn3` and, at
+        # 504, `corr_persistence_acf1` have no adopted band; the scorer must
+        # say so rather than report a verdict, and the two implementations
+        # must agree about WHICH rows those are, which is the assertion here.
+        if stat["band"] is None:
+            assert mine["band"] is None, (path.stem, key, mine["band"])
+            assert stat["in_band"] is None, (path.stem, key)
+            continue
+        assert mine["band"] is not None, (path.stem, key, stat["band"])
         assert list(stat["band"]) == mine["band"], (path.stem, key)
         assert stat["in_band"] == (mine["band"][0] <= mine["T"] <= mine["band"][1])
 

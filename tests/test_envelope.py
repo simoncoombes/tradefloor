@@ -37,8 +37,18 @@ def test_all_fourteen_are_in_band_at_the_certified_horizon():
     default is pt-v10 and every statistic is in band, including the
     volume-change row no earlier preset held. Pinned so that a change to it
     is a decision, not a drift."""
+    # GRADED ON THE BASIS, NOT ON `REAL_MARKETS`. This read the shipped
+    # decade pair directly, which made the test a band path of its own and
+    # pinned the bar to the ruler `ruling-three-rows.md` R1 superseded. The
+    # row it tripped on was `sector_excess_corr`, whose shipped floor is one
+    # decade's cut on a forty-name roster; on the ruled basis it is in band
+    # and 0.74 scale units below the whole-tape centre. A change to this
+    # count is still a decision -- that decision is R1 and R4.
+    bands, _, _ = env.RULERS_BY_BASIS[env.DEFAULT_BAND_BASIS][
+        env.CERTIFIED_HORIZON_DAYS]
     in_band = [k for k, v in env.CERTIFIED.items()
-               if band_distance(v, *REAL_MARKETS[k]) == 0]
+               if bands.get(k) is not None
+               and band_distance(v, *bands[k]) == 0]
     # Fourteen SHAPE rows. The level row is graded and held red in its own
     # table, and it never joins this count.
     assert len(in_band) == 14, sorted(set(env.CERTIFIED) - set(in_band))
