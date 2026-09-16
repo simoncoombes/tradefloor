@@ -319,7 +319,7 @@ import tradefloor
 # to 0.117 against 0.118, and the objective from 30.56 to 23.08 at 252 and
 # 38.08 to 21.82 at 504 against pt-v18's 31.56 and 41.44 -- 5.3 and 7.8
 # paired error bars with every roster resample ahead.
-KAT_VERSION = 22
+KAT_VERSION = 23
 
 SEED = 20260820
 DAYS = 250
