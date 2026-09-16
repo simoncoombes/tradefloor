@@ -220,6 +220,16 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # That is strong-to-implausible in the sense the entries above use: the
     # engine's clamps would be doing the modelling long before the top.
     "market_vol_level_sigma": (0.0, 0.15),
+    # The daily fat-tail scale's degrees of freedom. NOT a continuous box:
+    # the dial is an integer whose domain is {0} union [5, 12], and (1, 5)
+    # is a HOLE a pair of bounds cannot express. The bottom of the live
+    # range is where the multiplier's second moment exists; the top is the
+    # draw schedule's count; 0 is OFF, a Gaussian innovation, and a
+    # different object rather than the bottom of a ladder. The bounds span
+    # 0 because 0 is what every preset through pt-v18 ships, and
+    # `with_override` is what enforces the hole -- by name, with the
+    # reason, before any seed runs.
+    "market_vol_shock_dof": (0.0, 12.0),
     # The market-side warm-up, in SESSIONS. Not a share and not a rate, so
     # its box comes off the thing it has to outlast rather than off a
     # convention: the warm-up converges geometrically at the SLOW variance

@@ -213,7 +213,7 @@ _SNAPSHOT_KEYS = (
     "columns", "rng", "tickers", "model_fingerprint",
     "attribution", "tick_components", "tick_fundamental", "tick_anchor",
     "market_open", "market_variance", "forced_flow_spent",
-    "market_vol_log_level",
+    "market_vol_log_level", "market_shock_scale",
     "nominal_output_base", "volume_state",
     "universe_stress", "volume_idio", "sector_variance", "jump_excitation",
     "sector_day_factor", "sector_target_day",
@@ -519,6 +519,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # line above and for the same reason: two engines alike in every column
     # and sitting on different levels revert to different targets tonight.
     _f64(buf, snapshot["market_vol_log_level"])
+    # The DAY's fat-tail scale multiplier, hashed beside the level above.
+    # Per-day state rather than advancing state, and covered for a reason
+    # the level does not have: `W` is drawn at the open and read by every
+    # tick of the session, so a mid-day fork that did not carry it would
+    # close the day at a different sigma than the morning traded at and
+    # verify against a leaf it should not.
+    _f64(buf, snapshot["market_shock_scale"])
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer

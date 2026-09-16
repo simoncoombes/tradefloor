@@ -909,9 +909,25 @@ pub struct ModelParams {
     /// response and the ratio form on the sector state.
     ///
     /// `delta` is CLAMPED at the value that holds that coefficient at
-    /// 0.999, computed from `beta` and `gamma` rather than written down,
-    /// so a preset that moves either cannot silently lose the finite
-    /// fourth moment the tape's coefficients bought.
+    /// 0.999, computed from `beta` and `gamma` rather than written down.
+    ///
+    /// # PERMANENTLY INERT SINCE THE JOINT FIT
+    ///
+    /// That clamp used to be phrased as "a preset that moves beta or gamma
+    /// cannot silently lose the finite fourth moment the tape's
+    /// coefficients bought". It is not that any more, because pt-v19 no
+    /// longer has one to lose: at the joint triple `m4(0.0)` reads **1.014**
+    /// and `alpha_beta_at` therefore returns the dialled pair for every
+    /// excursion, at every setting of this dial
+    /// (`joint-t-fit-adoption.md` 1.4).
+    ///
+    /// The clamp still does exactly what it was written to do -- it refuses
+    /// a rotation whose fourth moment it cannot vouch for -- and on pt-v19
+    /// that refusal is now total. The `alphax2` box had already refuted the
+    /// dial on its own terms. See `ModelParams::market_vol_shock_dof` for
+    /// why losing the fourth moment is the ADOPTION rather than a defect of
+    /// it, and `factor_vol`'s module header for what carries the moment
+    /// instead.
     pub market_vol_alpha_excursion: f64,
 
     /// How much of last session's slow variance LEVEL carries into this
@@ -1005,6 +1021,112 @@ pub struct ModelParams {
     /// FALSIFIER: if the tail row does not reach 0.80 at the derived pair,
     /// the mechanism is wrong rather than under-dialled.
     pub market_vol_level_sigma: f64,
+
+    /// Degrees of freedom of the DAILY fat-tail scale multiplier on the
+    /// market factor's tick sigma. **0.0 is off** -- a Gaussian
+    /// innovation, exactly the arithmetic that predates this dial, to the
+    /// bit -- and every preset through pt-v18 ships it there. pt-v19
+    /// ships **7**.
+    ///
+    /// # What it is, and why the engine needed one
+    ///
+    /// DERIVED, `joint-t-fit-adoption.md` sections 0 and 1 (design
+    /// repository), on the joint fit `fat-tail-shock-derivation.md`
+    /// section 6 named and did not make.
+    ///
+    /// Every innovation this engine draws is a Box-Muller normal. The
+    /// tape's standardised GJR residuals are not: refit under a t
+    /// likelihood they read `t(6.89) +/- 0.48`, profile [6.2, 7.8], and
+    /// the shipped `market_vol_alpha` / `_beta` / `_gamma` are that same
+    /// tape's fit under a GAUSSIAN likelihood -- **195 log-likelihood
+    /// units worse** than the joint fit on 8,960 sessions. The triple and
+    /// the shock shape are one estimation, and adopting three of its four
+    /// numbers without the fourth would be adopting a fit under an
+    /// assumption the fit refutes.
+    ///
+    /// The multiplier is `W = (nu - 2) / sum_{i < nu} z_i^2`, with
+    /// `E[W] = 1` and `E[W^2] = (nu - 2) / (nu - 4)`, applied as
+    /// `sigma_tick * sqrt(W)`. That is the CONSTRUCTION of a `t(nu)` at
+    /// integer `nu`, not an approximation of one, and it is why this dial
+    /// is an integer and why the form was chosen over a lognormal: see
+    /// "Why a t and not a lognormal" below.
+    ///
+    /// `nu` is the whole of its shape. The daily shock's kurtosis is
+    /// `3 (nu - 2) / (nu - 4)`, 5.0 at 7, and its tail is the t's. There
+    /// is no second parameter to set and none is offered.
+    ///
+    /// # Why 7
+    ///
+    /// A rounding of the fitted 6.89, inside its own bar, at a
+    /// log-likelihood cost of **0.02**. The profile refitted at `nu` 7.0
+    /// gives alpha 0, gamma 0.1820, persistence 0.9860 against the
+    /// adopted 0.0000 / 0.1826 / 0.9863, so the triple is taken unchanged
+    /// rather than re-rounded with it.
+    ///
+    /// # Why DAILY and not per tick
+    ///
+    /// Excess kurtosis added to each of 390 independent tick innovations
+    /// washes out of the day's sum as `(kappa - 3) / 390`. The fit is of
+    /// a DAILY recursion; the multiplier has to be a property of the day
+    /// or it is not the fitted object at all. So it is drawn once at the
+    /// open ([`crate::rng::stream::SHOCK_SCALE`]) and every tick of the
+    /// session reads the same `W`.
+    ///
+    /// # Why a t and not a lognormal
+    ///
+    /// MEASURED, section 3.2. On every ruler the campaign grades, the two
+    /// forms are indistinguishable at matched kurtosis (`sd(log RV)` 0.305
+    /// against 0.295); the rulers depend on the fourth moment and the two
+    /// are one fourth moment apart by construction. The tape's ESTIMATOR
+    /// is not a ruler: run on data generated from a lognormal multiplier
+    /// at the kurtosis-matched log-sd 0.725, the same t-GJR MLE that
+    /// produced the four numbers reads `nu` **5.77 +/- 0.21**, 2.3 bars
+    /// from the tape's 6.89, because the lognormal's shoulder past three
+    /// sigma is heavier (1.10 against 0.95 per cent). Run on this form it
+    /// reads 7.17 +/- 0.56.
+    ///
+    /// So the kurtosis map is the wrong map, the right one is a desk
+    /// calibration on simulated data rather than a closed form, and the t
+    /// avoids needing a map at all: it is the object the fit is OF, and
+    /// it transfers. The cost is twelve normals a session on a stream
+    /// nothing else reads. (If the lognormal is ever preferred for its one
+    /// draw, its value is log-sd 0.63 +/- 0.03 -- the value the ESTIMATOR
+    /// calibrates, not the 0.725 kurtosis matching gives.)
+    ///
+    /// # The domain
+    ///
+    /// 0 for off, or an integer in **[5, 12]**. 5 is where `E[W^2]`
+    /// exists; 12 is the draw schedule's own count
+    /// ([`crate::engine::SHOCK_SCALE_DRAWS`]), because a `dof` above it
+    /// would need a thirteenth normal and the schedule may not depend on
+    /// a settable. A non-integer or out-of-range value is refused by name
+    /// at `with_override`, beside `price_breaker_fraction`'s band.
+    ///
+    /// # What it costs, registered
+    ///
+    /// A draw -- twelve per session, unconditionally, on a stream of its
+    /// own so the off arm is a CONTROL rather than a different random
+    /// world. And the fast component's fourth moment: at the joint triple
+    /// `m4` reads 1.014 with ANY shock and the mixture's operator reads
+    /// `rho(T)` 1.0104 with `t(7)`, so `clamp_variance` is the only thing
+    /// bounding the unconditional kurtosis -- which is what the module
+    /// header says it was for at PT_V1. MEASURED: it binds on 0.0001 per
+    /// cent of sessions, one in a million. The process is strictly
+    /// stationary (Lyapunov -0.033) with a return tail index of **2.94**
+    /// against the tape's 2.92 +/- 0.14. The engine is being moved INTO
+    /// the class the tape is in, not out of it.
+    ///
+    /// # Predicted, registered before the box
+    ///
+    /// At pt-v19's vector with the level at 0: `sd(log RV)` 0.27
+    /// [0.25, 0.29] from 0.346, the VIX-on-realised log-slope 0.71 +/-
+    /// 0.03 from 0.925, `excess_kurtosis` 9 to 10 from 13.24,
+    /// `index_tail_dn3_pct` 0.65 to 0.85 on the certification protocol
+    /// against a ruled floor of 0.64 -- the row nearest a floor and the
+    /// one the deferred skew (Hansen lambda -0.115) is for.
+    /// **FALSIFIER**: `sd(log RV)` under 0.24 OR the log-slope over 0.78
+    /// at level 0 withdraws the adoption.
+    pub market_vol_shock_dof: f64,
 
     /// How many sessions of market-side warm-up the factor's variance
     /// components get before session one. 0.0 -- every preset through
@@ -3466,6 +3588,7 @@ impl ModelParams {
             market_vol_alpha_excursion: 0.0,
             market_vol_level_persistence: 0.0,
             market_vol_level_sigma: 0.0,
+            market_vol_shock_dof: 0.0,
             market_burn_in_sessions: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
@@ -5043,8 +5166,59 @@ impl ModelParams {
         // evidence, so variance targeting is the only transport of these
         // three that does not require inventing a level. The gap is
         // recorded, not closed.
-        p.market_vol_alpha = 0.0066;
-        p.market_vol_beta = 0.8946;
+        // ==================================================================
+        // THE JOINT t-GJR FIT, adopted 2026-09-16
+        // (`joint-t-fit-adoption.md`, design repository).
+        //
+        // The three coefficients below and `market_vol_gamma` and
+        // `market_vol_shock_dof` are ONE ESTIMATION, not four choices. The
+        // values this preset shipped until today -- alpha 0.0066, beta
+        // 0.8946, gamma 0.1556 -- are `garch-derive-design.md` 2.4's fit of
+        // the same tape under a GAUSSIAN likelihood. Refit jointly with the
+        // shock's degrees of freedom, on the same 8,960 sessions, the tape
+        // gives:
+        //
+        //   alpha 0.0000  (at the boundary; 0 at every nu under 10 on the profile)
+        //   beta  0.8950  +/- 0.0069
+        //   gamma 0.1826  +/- 0.0135
+        //   nu    6.89    +/- 0.48, profile [6.2, 7.8]
+        //   persistence 0.9863, against the Gaussian fit's 0.9790
+        //
+        // and it is **195 log-likelihood units** better. The Gaussian
+        // likelihood was pricing the residual tail as variance and paying
+        // for it in alpha; under a t likelihood alpha goes to the boundary
+        // and the leverage term takes the whole of the response.
+        //
+        // WHY ALL FIVE MOVE TOGETHER. Adopting the triple without `nu`
+        // would be adopting a fit under the assumption that fit refutes,
+        // and the profile shows the numbers are not separable: alpha is 0
+        // at every `nu` the residuals admit. `market_vol_shock_dof` 7 is
+        // the rounding of 6.89, 0.02 log-lik units, and the triple is taken
+        // at the unrounded optimum rather than refitted at 7 (which gives
+        // gamma 0.1820 -- 0.04 of its bar).
+        //
+        // WHAT THE HALVES SAY, and it is the same thing
+        // `fat-tail-shock-derivation.md` 8 already recorded: 1990-2007 and
+        // 2008-2025 read beta 0.938 / 0.857, gamma 0.108 / 0.259 and nu
+        // 8.3 / 6.5 -- five to ten within-sample bars apart. The pooled
+        // bars above are the honest bars for a pooled reading and the tape
+        // cannot pin these to a half.
+        //
+        // WHAT DOES NOT TRANSFER: the fit's omega. The engine has no omega
+        // dial (`component_step`); variance targeting replaces it, exactly
+        // as `provenance.py`'s `applied_form` entry already says of the
+        // Gaussian fit, so the fit's long-run vol of 17.56 is a property of
+        // the fitted model and not a number to carry across.
+        //
+        // NOT ADOPTED HERE: the skew. A Hansen skew-t GJR on the same tape
+        // reads lambda -0.115 +/- 0.014, 34.8 log-lik on one degree of
+        // freedom, and moves none of the five above by a fifth of a bar --
+        // it is separable and it is a separate change. The form the draw
+        // contract admits (a mean-variance mixture) takes the return tail
+        // index to 2.15-2.44 against the tape's 2.92 +/- 0.14, so it needs
+        // its own derivation and its own falsifier. Section 3.3.
+        p.market_vol_alpha = 0.0000;
+        p.market_vol_beta = 0.8950;
         // THE LEVERAGE RESPONSE, at a likelihood ratio of 305 on one degree
         // of freedom. `garch-derive-design.md` §2.4 fitted both forms to the
         // same tape and the same window:
@@ -5074,15 +5248,53 @@ impl ModelParams {
         // and 1.5838 -> 1.5905 at 504, both in band, and the panel stays 18
         // of 18 at both horizons on the varying roster.
         //
-        // The fourth-moment coefficient of the GJR form (Appendix A:
-        // `3a^2 + 3ag + 1.5g^2 + 2ab + bg + b^2`) is 0.9909, under one, so
-        // the finite fourth moment the tape's coefficients bought survives
-        // the asymmetry. `component_step` loads `alpha + gamma` on a down
-        // day and `alpha` on an up one, and omega gives back `gamma/2`, so
-        // the dial redistributes variance between the two states rather
-        // than adding any -- and it passes 0.0 for the SLOW component,
-        // which is where §2.4's fit does not reach.
-        p.market_vol_gamma = 0.1556;
+        // THE FOURTH MOMENT IS GONE, and that is the adoption, not a
+        // defect of it. The paragraph here used to read "the finite fourth
+        // moment the tape's coefficients bought survives the asymmetry",
+        // and at the Gaussian triple it did: `m4` read 0.9909.
+        //
+        // At the joint triple `m4(0.0)` reads **1.014** -- with ANY shock,
+        // Gaussian included -- and the mixture's second-moment operator on
+        // `(fast, slow)` reads `rho(T)` **1.0104** with `t(7)` against
+        // 0.9840 at the shipped triple (MEASURED, section 4.1). The 0.65 /
+        // 0.35 mixture dilutes the fast loading and buys 0.037 of radius;
+        // it does not buy the 0.048 the joint fit spends. So the fast
+        // component has no unconditional fourth moment by adoption.
+        //
+        // WHY THAT IS THE RIGHT PLACE TO BE. The TAPE has no fourth moment
+        // either (`fat-tail-shock-derivation.md` 4.1). The process here is
+        // strictly stationary at every live combination (`E[log a]` -0.029
+        // to -0.034) with a finite variance (Kesten `k*` 1.44 to 1.69) and
+        // a return tail index of 2.94 against the tape's 2.92 +/- 0.14.
+        // `clamp_variance` is what bounds every unconditional moment --
+        // which is what `factor_vol`'s module header says it was for at
+        // PT_V1, and what
+        // `the_recursion_reverts_and_the_clamp_carries_the_fourth_moment`
+        // asserts on purpose. The one thing that changes is its meaning:
+        // at the Gaussian triple the clamp was a worst-case guarantee
+        // behind a condition that held without it, and here the condition
+        // does not hold and the clamp is load-bearing. MEASURED, it binds
+        // on 0.0001 per cent of sessions -- one in a million -- so within
+        // any measured horizon the state never meets it and the window
+        // statistics are the unclamped process's.
+        //
+        // `market_vol_alpha_excursion` becomes PERMANENTLY inert at this
+        // triple: `alpha_beta_at` refuses every rotation once `m4(0.0)` is
+        // over 0.999, so it returns the dialled pair whatever the dial
+        // reads. The `alphax2` box had already refuted it.
+        //
+        // `component_step` still loads `alpha + gamma` on a down day and
+        // `alpha` on an up one, and omega gives back `gamma/2`, so gamma
+        // redistributes variance between the two states rather than adding
+        // any -- and it still passes 0.0 for the SLOW component, which is
+        // where neither fit reaches.
+        p.market_vol_gamma = 0.1826;
+
+        // THE DAILY FAT-TAIL SCALE, the fourth number of the joint fit.
+        // 7 is the rounding of nu 6.89 [6.2, 7.8]. Twelve normals a session
+        // on `stream::SHOCK_SCALE`, a `t(7)` by seven squared normals; see
+        // `ModelParams::market_vol_shock_dof` for the whole of it.
+        p.market_vol_shock_dof = 7.0;
 
         // ==================================================================
         // THE COMPOSED VECTOR, adopted 2026-09-13 (`wtcomp1-result.md`).
@@ -5202,38 +5414,79 @@ impl ModelParams {
         p.jump_idio_excitation = 2.0;
         p.jump_idio_excitation_decay = 0.72;
         p.jump_idio_vix_decoupled = 1.0;
-        // THE SLOW VARIANCE LEVEL AND THE SECTOR LOADING, adopted 2026-09-14
-        // from `levsec3` (`levsec3-result.md`) after `levelsec1`, `levsec2`
-        // and `levsec3` measured them on 22 arms and 120 rosters at both
-        // horizons.
+        // THE SECTOR LOADING, adopted 2026-09-14 from `levsec3`
+        // (`levsec3-result.md`) after `levelsec1`, `levsec2` and `levsec3`
+        // measured it on 22 arms and 120 rosters at both horizons.
         //
-        // The level is the mechanism this preset was missing and it is the
-        // largest single change the campaign has measured. It takes
-        // `index_tail_dn3_pct` from 0.608 to 1.023 against a tape of 1.213,
-        // `excess_kurtosis` from 8.56 to 12.21 against 11.06,
-        // `corr_persistence_acf1` from -0.007 to a reading that clears its
-        // own band, and it leaves `annualised_vol_pct` at 27.10 against
-        // 27.66 because it is normalised on the square root of the level and
-        // started from the level's stationary distribution.
+        // THE SLOW VARIANCE LEVEL WAS ADOPTED IN THE SAME CHANGE AND IS
+        // WITHDRAWN BELOW. Its history is kept because the withdrawal only
+        // makes sense against it: at `market_vol_level_sigma` 0.085 the
+        // level took `index_tail_dn3_pct` from 0.608 to 1.023 against a
+        // tape of 1.213, `excess_kurtosis` from 8.56 to 12.21 against
+        // 11.06, `corr_persistence_acf1` from -0.007 to a reading that
+        // cleared its own band, and left `annualised_vol_pct` at 27.10
+        // against 27.66. It was the largest single change the campaign had
+        // measured, and 0.085 was MEASURED and not solved -- the midpoint
+        // of the 0.091 at 252 and 0.078 at 504 that reproduce the tape's
+        // window log-variance dispersion off the engine's own output
+        // (`level-phi.md` 6 and 7), where 4.3's closed-form derivation had
+        // said 0.047.
         //
-        // `market_vol_level_sigma` 0.085 is MEASURED and not solved. The
-        // derivation in `cascade-fourth-moment.md` 4.3 said 0.047 by setting
-        // the LEVEL's window-mean dispersion equal to the INDEX's deficit;
-        // the level drives the FACTOR, which is about half the index, and
-        // the transmission is measured at 0.50 at 252 and 0.69 at 504, flat
-        // in the dose (`level-phi.md` 6 and 7). Read off the engine's own
-        // output, the sigma that reproduces the tape's window log-variance
-        // dispersion is 0.091 at 252 and 0.078 at 504; 0.085 is the midpoint
-        // and the arm confirms the fit: `sd(log var)` reads 0.693 and 0.771
-        // against a tape of 0.723 +/- 0.072.
+        // What none of that could see is that the deficit it was measured
+        // against was the GAUSSIAN fit's. See the withdrawal below.
         //
-        // `market_vol_level_persistence` stays at 4.3's 0.9977.
-        // `level-phi.md` 2 measures a shorter half-life on a better
-        // estimator -- 127 to 249 sessions against 295 -- and the two tape
-        // spans disagree by more than their own error, so the revision is
-        // recorded and NOT taken: no arm has run at it.
+        // `market_vol_level_persistence` stays at 4.3's 0.9977 and is inert
+        // at sigma 0. `level-phi.md` 2 measures a shorter half-life on a
+        // better estimator -- 127 to 249 sessions against 295 -- and the
+        // two tape spans disagree by more than their own error, so the
+        // revision is recorded and NOT taken: no arm has run at it.
+
+        // AND THE LEVEL GOES TO ZERO, on the same evidence.
+        //
+        // Everything above this line is why. The level was derived
+        // (`cascade-fourth-moment.md` 4.3) as `sqrt(tape^2 - model^2)` on
+        // the window log-variance, at a model base of 0.195 -- the
+        // dispersion the GAUSSIAN-fitted engine could not make. The joint
+        // fit makes some of it without a level: the base is MEASURED at
+        // 0.2383 on this build, 120 rosters at 252 sessions, against a
+        // desk prediction of 0.27 [0.25, 0.29] and the tape's 0.41. That
+        // is a registered MISS and it fired the adoption note's falsifier;
+        // see the CHANGELOG entry and section 7 of the note. What it does
+        // NOT do is bring the level back, because the reason the level
+        // goes is the next paragraph and not the size of this number.
+        //
+        // The argument the level was built on was that fat tails had to be
+        // bought OUTSIDE the fourth-moment budget, because the budget was
+        // spent (`rho(T)` 0.9841) and a term that moves only omega does not
+        // appear in `T`. The joint fit puts the recursion outside that
+        // budget the way the TAPE is, so the argument no longer applies.
+        //
+        // WHAT ZERO COSTS AND BUYS, PREDICTED on the desk (section 1.3)
+        // and MEASURED on this build beside it: `sd(log RV)` 0.27
+        // predicted, 0.2383 read, against the tape's 0.41; the
+        // VIX-on-realised tracking slope 0.71 predicted, 0.7708 read,
+        // against the tape's 0.67 +/- 0.04, from 0.925 at the level. Both
+        // miss their bars in the same direction, which is the desk's
+        // transmission being optimistic rather than the mechanism being
+        // absent -- the slope IS the level's share `s_L` and nothing else
+        // (the share rule of `level-exogeneity-repair.md` 3 holds to 0.006
+        // on every arm), and at `s_L` 0 it is the engine's own. Zero also
+        // costs most of the level's kurtosis and persistence lift.
+        //
+        // WHY NOT A SMALLER SIGMA. 0.047 reads slope 0.87, `s_L` 0.50,
+        // which the tracking ruler bounds at 0.2. The tape under its own
+        // efficient burst model admits `s_L` 0.01 [0, 0.12] -- sigma at
+        // most 0.018 -- and a sigma chosen inside [0, 0.018] to lift
+        // `index_tail_dn3_pct` would be exactly the compensation
+        // `sigma-settlement-plan.md` 0 named. The tape under its efficient
+        // fit prices no slow level, so this ships none, and 0.018 goes in
+        // the box as the second arm so the cost of that choice is measured
+        // rather than argued.
+        //
+        // `market_vol_level_persistence` stays where 4.3 put it and is
+        // inert at sigma 0, as every preset through pt-v18 ships it.
         p.market_vol_level_persistence = 0.9977;
-        p.market_vol_level_sigma = 0.085;
+        p.market_vol_level_sigma = 0.0;
         // The loading was derived against a centre the record then replaced.
         // `params.rs` recorded 0.8 as the value that "puts it back on centre
         // (0.1641 against 0.1640 at 252)", and 0.1640 was the 2015-2025
@@ -5341,6 +5594,7 @@ impl ModelParams {
             "market_vol_alpha_excursion" => self.market_vol_alpha_excursion,
             "market_vol_level_persistence" => self.market_vol_level_persistence,
             "market_vol_level_sigma" => self.market_vol_level_sigma,
+            "market_vol_shock_dof" => self.market_vol_shock_dof,
             "market_burn_in_sessions" => self.market_burn_in_sessions,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
@@ -5526,6 +5780,38 @@ impl ModelParams {
             "market_vol_alpha_excursion" => out.market_vol_alpha_excursion = value,
             "market_vol_level_persistence" => out.market_vol_level_persistence = value,
             "market_vol_level_sigma" => out.market_vol_level_sigma = value,
+            // The one dial on this surface with a DISCRETE domain, refused
+            // by name here for the reason `price_breaker_fraction` is: the
+            // value decides how many of the open's twelve scale normals
+            // the multiplier reads, and a 6.89 silently truncated to 6
+            // would ship a different distribution than the one the caller
+            // asked for and name it after the one they wanted.
+            //
+            // 0 is off. [5, 12] is live: below 5 the multiplier has no
+            // second moment (`E[W^2] = (nu - 2) / (nu - 4)`), and above 12
+            // the draw would need a thirteenth normal the schedule does
+            // not take -- the schedule is a constant and may not depend on
+            // a settable. See `ModelParams::market_vol_shock_dof`.
+            "market_vol_shock_dof" => {
+                if value != value.trunc() {
+                    return Err(format!(
+                        "market_vol_shock_dof is the degrees of freedom of a \
+                         chi-square built from that many squared normals, so \
+                         it must be a whole number, got {value}. The fitted \
+                         6.89 rounds to 7 at a log-likelihood cost of 0.02."
+                    ));
+                }
+                if value != 0.0 && !(5.0..=12.0).contains(&value) {
+                    return Err(format!(
+                        "market_vol_shock_dof must be 0 (off, a Gaussian \
+                         innovation) or an integer in [5, 12], got {value}. \
+                         Below 5 the multiplier has no second moment; above \
+                         12 it would need more normals than the open's fixed \
+                         schedule draws."
+                    ));
+                }
+                out.market_vol_shock_dof = value;
+            }
             "market_burn_in_sessions" => out.market_burn_in_sessions = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
@@ -5780,6 +6066,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_alpha_excursion",
         "market_vol_level_persistence",
         "market_vol_level_sigma",
+        "market_vol_shock_dof",
         "market_burn_in_sessions",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",

@@ -688,7 +688,16 @@ def test_the_source_engines_own_log_survives_every_explain():
     # level's draw is taken whatever the dial reads -- that is what keeps
     # the schedule off the settables -- so it is here at a preset that
     # ships the mechanism off.
-    assert sum(len(v) for v in before.values()) == 99_668 + 3 * (1 + 12 + 12) + 3
+    #
+    # And 36 more since the daily fat-tail scale: TWELVE normals at each of
+    # the three OPENS, after the overnight draws. Twelve whatever
+    # `market_vol_shock_dof` reads, for the same reason the level's one is
+    # taken whatever its sigma reads -- twelve is the top of the dial's
+    # live range, so the schedule is a constant and no setting can move it.
+    # This preset ships the dial at 0 and the draws are here anyway, which
+    # is the whole of the claim.
+    assert sum(len(v) for v in before.values()) == (
+        99_668 + 3 * (1 + 12 + 12) + 3 + 3 * 12)
     for day in (1, 2):
         assert e.explain(e.tickers[0], day).check() == []
     assert logged() == before

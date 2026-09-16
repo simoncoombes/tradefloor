@@ -27,6 +27,89 @@ corrected on 2026-09-14 are below the marker.
 
 <!-- release-note-ends -->
 
+**The joint t-GJR fit: the shock gets a distribution, and three shipped
+coefficients are re-derived with it.** `market_vol_shock_dof`, a new dial at
+0 on every preset through pt-v18 and **7** on pt-v19, puts a daily scale
+multiplier `W = (nu - 2) / sum of nu squared normals` on the market factor's
+tick sigma -- a Student-t innovation at integer degrees of freedom, built
+out of normals because `mathx` has no inverse incomplete gamma and a t by
+quantile is out. With it, `market_vol_alpha` 0.0066 to **0.0000**,
+`market_vol_beta` 0.8946 to **0.8950**, `market_vol_gamma` 0.1556 to
+**0.1826**, and `market_vol_level_sigma` 0.085 to **0**.
+
+Those are not four decisions. The tape's standardised GJR residuals are
+`t(6.89)` [6.2, 7.8], and the triple pt-v19 shipped is the same tape's fit
+under a Gaussian likelihood -- **195 log-likelihood units worse** on the
+same 8,960 sessions. Refit jointly, alpha goes to the boundary at every nu
+the residuals admit and the leverage term takes the whole of the response.
+Adopting three of the four numbers would be adopting a fit under the
+assumption that fit refutes.
+
+DAILY and not per tick: excess kurtosis added to each of 390 tick
+innovations washes out of the day's sum as `(kappa - 3) / 390`, and the fit
+is of a daily recursion. TWELVE normals a session, unconditionally, at the
+open on a TENTH stream, `stream::SHOCK_SCALE` -- twelve being the top of the
+dial's live range, so no setting can move the draw schedule. The off arm is
+therefore the same random world as the live one, seed for seed. pt-v1
+through pt-v18 are bit-identical, measured over seventeen presets and five
+seeds, 85 of 85.
+
+**The level goes back to zero because the deficit it was measured against
+was the Gaussian fit's.** `market_vol_level_sigma` was derived as
+`sqrt(tape^2 - model^2)` on the window log-variance at a model base of
+0.195, then read off the engine at 0.085. The joint fit makes part of that
+dispersion itself. What a slow level would have left to do is `s_L`, its
+share of window dispersion; the tracking ruler bounds that at 0.2 and the
+tape under its own efficient burst model admits 0.01 [0, 0.12]. So it
+returns to the baseline and its dial leaves the provenance table.
+
+**AND THE REGISTERED FALSIFIER FIRED.** `joint-t-fit-adoption.md` section 7
+registered `sd(log RV)` at 0.27 [0.25, 0.29] with a falsifier under 0.24,
+and the engine reads **0.2383** over 120 rosters at 252 sessions, with the
+VIX-on-realised log-slope at **0.7708** against a predicted 0.71 +/- 0.03
+and a threshold of 0.78. Two graded predictions miss with it:
+`excess_kurtosis` 11.82 against 9 to 10 (its fire threshold is 11.5) and
+`index_tail_dn3_pct` 0.6408 on 120 varying rosters against 0.95 to 1.20.
+The one row the note called at risk is the one that HELD -- the tail on the
+thirty-seed certification protocol reads 0.8101 against a ruled floor of
+0.64 and a prediction of 0.65 to 0.85 -- and the derived VIX anchor is
+bit-identical at 23.2498571448 as predicted. The decomposition the adoption
+rested on, two thirds the triple and one third the shocks with the rest the
+mixture, does not transfer to the engine at the size the desk predicted.
+
+The dial set lands anyway, because the four numbers are one estimation with
+bars and the alternative is shipping a fit under the assumption it refutes.
+What the firing withdraws is the CLAIM that this repairs the dispersion, and
+under section 7's own terms the recommendation of section 0 is withdrawn
+with it. No dial is moved off a graded row to cover the miss.
+
+**A checkpoint hazard the tenth stream would have made silent.** The
+restore path located the last stream as `COUNT - 1`, which is correct only
+while the most recently added stream is inert -- and `SHOCK_SCALE` is
+pt-v19's live multiplier. Left alone, a nine-stream checkpoint would have
+restored a LIVE generator to its seed-derived position and reported
+success, continuing a different volatility path: `defect-22-closed-states-carried`
+recurring. Both sites now carry explicit per-stream offsets, and the
+draw-count pad handles every missing trailing stream instead of exactly one.
+
+**The fast component gives up its finite fourth moment, and the adoption is
+what that sentence describes.** At the joint triple the GJR
+fourth-moment coefficient reads 1.014 with any shock and the mixture's
+operator reads 1.0104 with `t(7)`. What bounds the unconditional moments is
+`clamp_variance`, the job `factor_vol`'s module header gives it at PT_V1,
+and it binds on one session in a million. The tape has no fourth moment
+either: the process is strictly stationary at Lyapunov -0.033 with a return
+tail index of 2.94 against the tape's 2.92 +/- 0.14.
+`market_vol_alpha_excursion` becomes permanently inert on pt-v19, since
+`alpha_beta_at` refuses every rotation past 0.999.
+
+NOT adopted: the skew. A Hansen skew-t GJR on the same tape reads lambda
+-0.115 +/- 0.014 at 34.8 log-likelihood on one degree of freedom and moves
+none of the four numbers, but the form the draw contract admits takes the
+return tail index to 2.15-2.44 against the tape's 2.92. That needs its own
+derivation and its own falsifier on the tape's tail index, and it gets them
+after this lands.
+
 **A slow stochastic level on the market factor's variance target, and the
 determinism baseline that had gone stale under it.** `market_vol_level_
 persistence` 0.9977 and `market_vol_level_sigma` 0.085, both defaulting to

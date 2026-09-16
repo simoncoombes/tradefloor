@@ -343,6 +343,40 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    # WITHDRAWN FROM SCOPE 2026-09-16, and this is the one entry here that
+    # used to be a DIAL_PROVENANCE record rather than a dial nobody moved.
+    #
+    # pt-v19 shipped 0.085 from 2026-09-14 and returns it to 0.0 with the
+    # joint t-GJR fit (`joint-t-fit-adoption.md` 1.3). The gate is exact:
+    # `Engine::close_market` branches on `market_vol_level_sigma == 0.0`,
+    # never enters the recursion, and `close_day_scaled` takes the SAME
+    # CALL it took before the level existed. At 0.0 the level's normal is
+    # still drawn -- unconditionally, on `stream::MARKET_VOL_LEVEL` -- and
+    # `market_vol_level_persistence` and `market_burn_in_sessions` are
+    # inert behind this dial with it.
+    #
+    # WHY IT WENT BACK, in one line, because the measurement that put it at
+    # 0.085 was not wrong about what it measured: 0.085 was derived and
+    # then read off the engine as the sigma reproducing the tape's window
+    # log-variance dispersion that the model could not make -- and the
+    # model that could not make it was the GAUSSIAN-fitted one. The joint
+    # fit makes part of it -- MEASURED 0.2383 against the level-off 0.195
+    # and a desk prediction of 0.27, a registered miss recorded in the
+    # CHANGELOG. What is left for a slow level to do is `s_L`, the
+    # level's share of window dispersion, and the tracking ruler bounds
+    # that at 0.2 while the tape under its own efficient burst model admits
+    # 0.01 [0, 0.12] -- sigma at most 0.018. A sigma chosen inside that to
+    # lift `index_tail_dn3_pct` would be the compensation
+    # `sigma-settlement-plan.md` 0 named, so none is chosen. The record of
+    # the 0.085 measurement is in `params.rs`'s `pt_v19` and in the design
+    # repository; it is not kept here, because an entry in this table
+    # asserts a live choice and there is no longer one to assert.
+    "market_vol_level_sigma":
+        "inert at 0.0 on every shipped preset: rust/src/engine.rs "
+        "close_market branches on `market_vol_level_sigma == 0.0` and the "
+        "target multiplier is exactly 1.0, so the level, its persistence "
+        "and the market-side warm-up are all unreachable. Withdrawn from "
+        "0.085 by the joint t-GJR fit, joint-t-fit-adoption.md 1.3",
     "crisis_blend_variance_damp":
         "inert at 0.0: market/factors.rs:473 branches on `== 0.0`",
     "fair_value_book_floor":
@@ -508,6 +542,19 @@ OUT_OF_SCOPE = {
 #: other seventy-three names are in `UNPROVENANCED` and belong to the
 #: workstreams that own them. Filling them in from here would be inventing
 #: derivations, which is the failure this module exists to prevent.
+#: What `market_vol_alpha`, `_beta` and `_gamma` carried until 2026-09-16,
+#: and why one sentence is shared by all three: they are ONE estimation and
+#: they were superseded by ONE estimation. Repeating it per entry is the
+#: point -- an entry that did not say this would read as a dial somebody
+#: re-measured on its own, which is the shape the joint fit refuses.
+SUPERSEDED_BY_JOINT_T = (
+    "SUPERSEDED 2026-09-16 by the joint t-GJR fit "
+    "(joint-t-fit-adoption.md 1.1): the same estimator on the same 8,960 "
+    "sessions of the same tape, with the shock's degrees of freedom fitted "
+    "rather than assumed infinite, reads alpha 0.0000, beta 0.8950, gamma "
+    "0.1826, nu 6.89 [6.2, 7.8] -- 195 log-likelihood units better."
+)
+
 DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "market_vol_gamma": {
         "sandwich_bread": "CORRECTED 2026-09-14, defect-15: these bars were computed with the EXPECTED information in the sandwich's bread where Bollerslev-Wooldridge uses the OBSERVED HESSIAN. `arch` reproduces every point estimate to the sixth decimal and none of these bars; substituting the Hessian into our own sandwich reproduces `arch` to under 2e-6 with every other line unchanged (arch-crosscheck.md). The information-matrix equality that would make the two forms equivalent FAILS here and fails in the beta corner -- fifteen of sixteen elements of H - A within 0.4 se of zero, `(beta, beta)` at -4.44 -- so the expected form loses its justification and the Hessian form keeps its own. The year-block bootstrap agrees in direction. No shipped VALUE moves and the likelihood ratio 305 is untouched, so the GJR term's adoption is unaffected. ",
@@ -532,10 +579,24 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # returns the symmetric fit used: Bollerslev-Wooldridge sandwich,
         # residual kurtosis E[z^4] 5.06. The likelihood ratio stays
         # beside it because it is the evidence the term is there at all.
-        "estimate": 0.1556,
-        # Was 0.0180 under the expected-information bread; see the
-        # `sandwich_bread` note on this entry.
-        "standard_error": 0.0236,
+        # THE JOINT t FIT'S VALUE AND BAR, adopted 2026-09-16.
+        "estimate": 0.1826,
+        "standard_error": 0.0135,
+        "superseded": SUPERSEDED_BY_JOINT_T + " This dial read 0.1556 with "
+                      "a corrected Bollerslev-Wooldridge sandwich bar of "
+                      "0.0236 (0.0180 under the withdrawn "
+                      "expected-information bread) from the Gaussian QMLE "
+                      "GJR fit of garch-derive-design.md 2.4. The "
+                      "likelihood ratio of 305 on one degree of freedom "
+                      "that adopts the leverage TERM at all is measured on "
+                      "the free-omega Gaussian fits on both sides and is "
+                      "untouched; what moves is the SIZE of the response, "
+                      "+1.15 of the new bar, because under a Gaussian "
+                      "likelihood part of the residual tail was priced as "
+                      "symmetric variance in alpha. The `applied_form` and "
+                      "`residual` fields below describe that superseded "
+                      "fit; the variance-targeting gap they record is "
+                      "structural and still applies. Halves: 0.108 / 0.259.",
         # THE FITTED MODEL IS NOT THE APPLIED MODEL, recorded 2026-09-14
         # (defect-16, programme/results/ceiling-and-omega.md 7 to 9).
         "applied_form": "FITTED with a FREE omega: `s2 = omega + (alpha + "
@@ -575,7 +636,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                      "corr(gamma, beta) -0.21, "
                                      "corr(alpha, beta) -0.48",
         },
-        "presets": {"pt-v19": 0.1556},
+        "presets": {"pt-v19": 0.1826},
         "identity": "the tape's leverage response, at a LIKELIHOOD RATIO "
                     "of 2 * 152.5 = 305 on one degree of freedom. Same "
                     "tape, same window, same estimator:\n"
@@ -919,10 +980,29 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # down moves through gamma and the symmetric-term alpha is not
         # distinguishable from nothing. That is a property of the tape
         # and is recorded rather than smoothed over.
-        "estimate": 0.0066,
-        # Was 0.0109 under the expected-information bread; OURS WAS THE
-        # WIDER ONE here, 1.33x, so the correction tightens it.
-        "standard_error": 0.0082,
+        # THE JOINT t FIT PUTS IT ON THE BOUNDARY, adopted 2026-09-16,
+        # and it ships NO STANDARD ERROR. That is the measurement rather
+        # than a gap in it: under the t likelihood alpha is 0 at every nu
+        # the residuals support, so the optimum is AT the constraint and a
+        # symmetric bar around it would describe a region half of which the
+        # parameter space does not contain. The `residual` below is the
+        # profile, which is what an estimate at a boundary has instead of a
+        # bar -- and the module's rule is satisfied by it for the reason the
+        # rule exists: the number is not a chosen constant with decimal
+        # places, it is a corner the likelihood walks to from every start.
+        "estimate": 0.0,
+        "residual": {
+            "kind": "profile at a boundary optimum; no symmetric bar exists",
+            "profile": "alpha is 0.0000 at every nu from 5 to 10 on the "
+                       "profile of the joint likelihood",
+            "prior_reading": "the Gaussian fit's own sandwich already put "
+                             "0.0066 at 0.6 standard errors from zero",
+            "halves": "0.000 on 1990-2007 and 0.000 on 2008-2025",
+            "reading": "the tape's index variance responds to down moves "
+                       "through gamma and to up moves not at all; the "
+                       "symmetric term was the Gaussian likelihood pricing "
+                       "the residual tail as variance",
+        },
         # THE FITTED MODEL IS NOT THE APPLIED MODEL, recorded 2026-09-14
         # (defect-16, programme/results/ceiling-and-omega.md 7 to 9).
         "applied_form": "FITTED with a FREE omega: `s2 = omega + (alpha + "
@@ -959,7 +1039,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                         "target would put it, and nothing checks the two "
                         "against each other",
         "presets": {"pt-v16": 0.28035004, "pt-v18": 0.28035004,
-                    "pt-v19": 0.0066},
+                    "pt-v19": 0.0},
+        "superseded": SUPERSEDED_BY_JOINT_T + " This dial read 0.0066 with "
+                      "a corrected sandwich bar of 0.0109 from the Gaussian "
+                      "QMLE GJR fit, itself replacing pt-v14's searched "
+                      "0.28035004 which carried no bar at all. The "
+                      "`applied_form` field below describes that superseded "
+                      "fit; its variance-targeting gap is structural and "
+                      "still applies.",
         "identity": "GJR(1,1) by Gaussian QMLE on the tape's index over "
                     "the whole span: omega 0.0202, alpha 0.0066 "
                     "(sandwich se 0.0082), gamma 0.1556 (0.0236), beta "
@@ -995,12 +1082,21 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "script": "the estimator module reproduced whole in "
                   "programme/garch-derive-design.md Appendix B, in its "
                   "GJR form; numpy-only Gaussian QMLE, no scipy",
-        # As `market_vol_alpha`: the GJR fit's own bar for the GJR value.
-        "estimate": 0.8946,
-        # Was 0.0085 under the expected-information bread. This is the
-        # 2.1x one and the corner where the information-matrix equality
-        # fails, which is why it is the largest of the four.
-        "standard_error": 0.0181,
+        # THE JOINT t FIT'S VALUE AND BAR, adopted 2026-09-16.
+        "estimate": 0.8950,
+        "standard_error": 0.0069,
+        "superseded": SUPERSEDED_BY_JOINT_T + " This dial read 0.8946 with "
+                      "a corrected sandwich bar of 0.0181 -- the corner "
+                      "where the information-matrix equality fails, and the "
+                      "largest of the four -- from the Gaussian QMLE GJR "
+                      "fit. IT MOVES 0.0004, 0.06 of the new bar: beta is "
+                      "the one number of the triple the shock distribution "
+                      "barely touches, and what moves in its place is "
+                      "PERSISTENCE, `alpha + gamma/2 + beta` 0.9790 to "
+                      "0.9863, a fast half-life of 50 sessions against 33. "
+                      "The `applied_form` field below describes the "
+                      "superseded fit; its variance-targeting gap is "
+                      "structural and still applies. Halves: 0.938 / 0.857.",
         # THE FITTED MODEL IS NOT THE APPLIED MODEL, recorded 2026-09-14
         # (defect-16, programme/results/ceiling-and-omega.md 7 to 9).
         "applied_form": "FITTED with a FREE omega: `s2 = omega + (alpha + "
@@ -1034,7 +1130,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                         "is the reason this is recorded rather than "
                         "adopted",
         "presets": {"pt-v16": 0.69244622, "pt-v18": 0.69244622,
-                    "pt-v19": 0.8946},
+                    "pt-v19": 0.8950},
         "identity": "the same fit as `market_vol_alpha`: beta = 0.8946, "
                     "sandwich se 0.0181, corr(beta, omega) -0.91. The "
                     "GJR persistence `alpha + gamma/2 + beta` is 0.9790; "
@@ -2497,58 +2593,90 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "252, and every recording sat five per cent low in "
                 "volatility until it was",
     },
-    "market_vol_level_sigma": {
+    "market_vol_shock_dof": {
         "kind": "measured",
-        "presets": {"pt-v19": 0.085},
-        "source": "the sigma that reproduces the tape's window log-variance "
-                  "dispersion, READ OFF THE ENGINE'S OWN OUTPUT rather than "
-                  "solved. sd(log var) across 120 rosters goes 0.3964, "
-                  "0.4606, 0.5123, 0.5956, 0.7145 at 252 as sigma goes 0, "
-                  "0.035, 0.047, 0.064, 0.090, against a tape of 0.723 "
-                  "+/- 0.072 on 1950-2026 and 0.766 +/- 0.104 on 1990-2025, "
-                  "and fits sd^2 = 0.1624 + 43.82 sigma^2 on five monotone "
-                  "points. The sigma that reaches the tape is 0.091 at 252 "
-                  "and 0.078 at 504; 0.085 is the midpoint (level-phi.md "
-                  "section 6). Because the number comes off the index the "
-                  "engine produced, the VIX loop, the clamps and the "
-                  "factor's share of index variance are all inside it and "
-                  "none of them has to be assumed",
-        "date": "2026-09-13 (levelsec1, the five-point fit); 2026-09-14 "
-                "(levsec3, the arm at 0.085)",
-        "script": "programme/results/whole-tape/scripts/score_wt.py and "
-                  "levsec_analyse.py on the levelsec1 and levsec3 "
-                  "recordings; the fit is level-phi.md section 6",
-        "residual": "CONFIRMED BY THE ARM IT PREDICTED. At 0.085 the model "
-                    "reads sd(log var) 0.693 at 252 and 0.771 at 504, inside "
-                    "the tape's 0.723 +/- 0.072 and 0.766 +/- 0.104 at both "
-                    "horizons, from a base of 0.394 and 0.355. It does not "
-                    "move across the vix_mean_reversion sweep, 0.6923 to "
-                    "0.6942 at 252, so the calibration belongs to this dial "
-                    "and not to the VIX's. A single sigma cannot centre both "
-                    "horizons -- 0.091 against 0.078 -- and that gap is the "
-                    "same 252/504 asymmetry the tail and fourth-moment rows "
-                    "show; the shorter half-life of level-phi.md section 2 "
-                    "is what would close it and has not been run",
-        "estimator": "the sd across rosters of the log of each roster's own "
-                     "session-return variance; jackknife over rosters on the "
-                     "model side and over non-overlapping windows on the tape",
-        "note": "cascade-fourth-moment.md 4.3 derived 0.047 and it is WRONG "
-                "by about a factor of two, for a reason that is now "
-                "measured: it set the LEVEL's window-mean dispersion equal "
-                "to the INDEX's deficit, and the level drives the FACTOR, "
-                "which is about half the index. The transmission is 0.50 at "
-                "252 and 0.69 at 504, flat in the dose across four settings "
-                "(level-phi.md section 7), and 0.047 / 0.50 is 0.094. What "
-                "this buys: index_tail_dn3_pct 0.608 to 1.023 against a tape "
-                "of 1.213, excess_kurtosis 8.56 to 12.21 against 11.06, "
-                "corr_persistence_acf1 from below zero to 0.1224 against "
-                "0.2288. What it costs: vix_ar1_debiased 0.9402 to 0.9646 "
-                "against a tape of 0.9299 +/- 0.0144, the VIX reading the "
-                "index's implied level back with the level's own memory. "
-                "levsec3 swept vix_mean_reversion and found a setting that "
-                "puts that row exactly on the tape and costs five others -- "
-                "the objective goes 23.1 to 106.9 across the sweep -- so the "
-                "miss is carried rather than traded for",
+        "presets": {"pt-v19": 7.0},
+        "estimate": 6.89,
+        "standard_error": 0.48,
+        "date": "2026-09-16",
+        "estimator": "the fourth parameter of the same symmetric t-GJR "
+                     "maximum likelihood fit that produced "
+                     "`market_vol_alpha`, `market_vol_beta` and "
+                     "`market_vol_gamma`; observed-information standard "
+                     "error by central differences at the optimum, and a "
+                     "95 per cent PROFILE interval [6.2, 7.8] beside it "
+                     "because a symmetric bar on a degrees-of-freedom "
+                     "parameter is the less honest of the two",
+        "script": "programme/scripts/joint-t-adoption-desk.py sections A, B "
+                  "and E (design repository), logged at "
+                  "programme/results/fattail/joint-t-adoption-desk.txt; the "
+                  "residual diagnostics are fattail-shock.py",
+        "source": "programme/joint-t-fit-adoption.md sections 0, 1.2 and "
+                  "3.2, design repository, on the derivation in "
+                  "programme/fat-tail-shock-derivation.md section 0",
+        "identity": "the standardised GJR residuals of ^GSPC are t with "
+                    "6.89 degrees of freedom, excess kurtosis 2.05 +/- "
+                    "0.42, with no ARCH left in them. The dial SHIPS 7, a "
+                    "rounding inside the bar at a log-likelihood cost of "
+                    "0.02: the profile refitted at nu 7.0 gives alpha 0, "
+                    "gamma 0.1820 and persistence 0.9860 against the "
+                    "adopted 0.0000 / 0.1826 / 0.9863, so the triple is "
+                    "taken at the unrounded optimum rather than re-rounded "
+                    "with it. The engine applies it as `W = (nu - 2) / "
+                    "sum of nu squared normals` on the session's tick "
+                    "sigma, which is the CONSTRUCTION of a t(nu) at integer "
+                    "nu rather than an approximation of one -- E[W] = 1, "
+                    "E[W^2] = (nu - 2) / (nu - 4), daily shock kurtosis "
+                    "3 (nu - 2) / (nu - 4) = 5.0 at 7. nu is the whole of "
+                    "its shape and there is no second parameter to set",
+        "residual": {
+            "kind": "profile interval, plus the estimator's recovery on "
+                    "the engine's own form",
+            "profile_95": [6.2, 7.8],
+            "halves": "8.3 on 1990-2007 and 6.5 on 2008-2025, two bars "
+                      "apart, which fat-tail-shock-derivation.md 8 records "
+                      "as the thing this tape cannot pin",
+            "recovery": "data generated by the SHIPPED form -- t(7) by "
+                        "seven squared normals -- and refit by the "
+                        "estimator that produced this number reads nu 7.17 "
+                        "+/- 0.56, beta 0.8967, gamma 0.1719. The form "
+                        "transfers without a map, which is why it was "
+                        "chosen over a lognormal: a lognormal multiplier "
+                        "matched on KURTOSIS (log-sd 0.725) is read by the "
+                        "same estimator as nu 5.77 +/- 0.21, 2.3 bars away, "
+                        "because its shoulder past three sigma is heavier "
+                        "(1.10 against 0.95 per cent). The rulers cannot "
+                        "tell the two apart -- sd(log RV) 0.305 against "
+                        "0.295 -- and the estimator can",
+            "not_adopted": "the SKEW. A Hansen skew-t GJR on the same tape "
+                           "reads lambda -0.1147 +/- 0.0138, +34.8 "
+                           "log-likelihood on one degree of freedom, and "
+                           "moves none of the four by a fifth of a bar, so "
+                           "it is separable and deferred. The form the "
+                           "draw contract admits takes the return tail "
+                           "index to 2.15-2.44 against the tape's 2.92 +/- "
+                           "0.14, where the symmetric fit reads 2.94, and "
+                           "on a t at nu 7 it has no fourth moment at all",
+        },
+        "note": "WHAT IT COSTS THE MOMENT CONDITION, recorded rather than "
+                "hidden: at the joint triple the GJR fourth-moment "
+                "coefficient reads 1.014 with ANY shock and the 0.65/0.35 "
+                "mixture's operator reads rho(T) 1.0104 with t(7), against "
+                "0.9840 at the superseded triple. The fast component has no "
+                "unconditional fourth moment by adoption, `clamp_variance` "
+                "is what bounds it (binding on 0.0001 per cent of "
+                "sessions), and `market_vol_alpha_excursion` becomes "
+                "permanently inert because `alpha_beta_at` refuses every "
+                "rotation over 0.999. THE TAPE HAS NO FOURTH MOMENT EITHER "
+                "(fat-tail-shock-derivation.md 4.1): the process is "
+                "strictly stationary at Lyapunov -0.033 with a return tail "
+                "index of 2.94 against the tape's 2.92 +/- 0.14, so this "
+                "moves the engine INTO the class the tape is in. The "
+                "finite-fourth-moment budget of cascade-fourth-moment.md is "
+                "a constraint the engine set itself and the tape does not "
+                "meet -- and it is the constraint `market_vol_level_sigma` "
+                "was built outside of, which is why that dial returns to 0 "
+                "in the same change",
     },
     "sector_loading": {
         # THE ENTRY DESCRIBED 0.8 AND THE PRESET SHIPS 0.60. Until

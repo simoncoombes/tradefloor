@@ -426,3 +426,56 @@ def test_a_mid_day_checkpoint_is_exact_because_it_replays():
     engine.close_market()
     resumed.close_market()
     assert resumed.column("garch_variance") == engine.column("garch_variance")
+
+
+def test_a_short_snapshot_restores_the_stream_it_names_not_the_last_one():
+    """A nine-stream checkpoint must restore the LEVEL generator to the
+    position it recorded, not to this engine's seed-derived one.
+
+    THE DEFECT THIS PINS. Until 2026-09-16 the restore path located the
+    level as `COUNT - 1` -- "the last stream, whatever that is" -- and
+    gated it on `rng.len() >= 3 * COUNT`. Both were correct only because
+    the stream added most recently was INERT: a snapshot short by one
+    restored a generator nothing read. `stream::SHOCK_SCALE` made that
+    false. At `COUNT` 10 a twenty-seven-word checkpoint fails the `>= 30`
+    test, and the old code would have put the LIVE level generator back on
+    its seed-derived position, reported success, and continued a different
+    volatility path -- `defect-22-closed-states-carried` recurring.
+
+    So: a snapshot truncated to nine streams restores the level where it
+    was recorded, and the tenth falls back, which is the rule for a stream
+    the snapshot genuinely predates. Asserted through the state hash rather
+    than through a getter, because the hash is what a ledger leaf compares
+    and a getter could agree while the leaf did not.
+    """
+    engine, _ = mark(days=2)
+    full = engine.state_snapshot()
+
+    truncated = dict(full)
+    truncated["rng"] = list(full["rng"])[: 3 * 9]
+    truncated["draw_counts"] = list(full["draw_counts"])[: 2 * 9]
+
+    # A DIFFERENT engine, so "kept its own position" is a claim with a
+    # visible alternative: this one has run one day where the snapshot's
+    # came from two, and its tenth stream is therefore somewhere the
+    # snapshot has never been.
+    restored, _ = mark(days=1, seed=5)
+    before = list(restored.state_snapshot()["rng"])
+    restored.restore_state(truncated)
+    back = restored.state_snapshot()
+
+    # Compared as BITS, because the Box-Muller spare rides in this array as
+    # NaN when there is none and NaN is not equal to itself. A word-for-word
+    # claim about a generator state is a claim about sixty-four bits.
+    def bits(values):
+        return [struct.pack("<d", v) for v in values]
+
+    # The nine streams the snapshot carries come back word for word.
+    assert bits(back["rng"][: 3 * 9]) == bits(full["rng"][: 3 * 9])
+    assert list(back["draw_counts"])[: 2 * 9] == list(full["draw_counts"])[: 2 * 9]
+    # And the tenth is left exactly where this engine already had it, which
+    # is the only choice that leaves such a snapshot replaying as it did
+    # before the stream existed -- a zeroed generator would be a different
+    # sequence wearing the same seed.
+    assert bits(back["rng"][3 * 9:]) == bits(before[3 * 9:])
+    assert bits(back["rng"][3 * 9:]) != bits(full["rng"][3 * 9:])

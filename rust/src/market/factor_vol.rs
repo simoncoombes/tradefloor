@@ -388,7 +388,15 @@ fn vix_response(params: &crate::params::ModelParams, vix_ratio: f64) -> f64 {
 /// moves. `delta` is clamped by the GJR fourth-moment coefficient
 /// `3a^2 + 3ag + 1.5g^2 + 2ab + bg + b^2`, held at 0.999 and solved here from
 /// `beta` and `gamma` rather than written down, so a preset that moves either
-/// cannot lose the finite fourth moment silently.
+/// cannot lose a finite fourth moment silently.
+///
+/// It cannot RESTORE one either, and since the joint t-GJR fit
+/// (`joint-t-fit-adoption.md` 1.4) pt-v19 has none to lose: `m4(0.0)` reads
+/// 1.014 at the adopted triple, the guard below returns early, and this
+/// function hands back the dialled pair for every excursion at every setting
+/// of the dial. That is the guard working, not failing -- what bounds the
+/// moment at that triple is `clamp_variance`, which is what this module's
+/// header says it was for at PT_V1. See `ModelParams::market_vol_shock_dof`.
 ///
 /// Returns the dialled pair unchanged at `market_vol_alpha_excursion == 0.0`,
 /// which is the bit-identity branch every preset before 0.8.0 takes.

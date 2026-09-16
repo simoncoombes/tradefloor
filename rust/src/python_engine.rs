@@ -787,6 +787,7 @@ fn stream_name(id: u32) -> &'static str {
         crate::rng::stream::VOLUME_IDIO => "volume_idio",
         crate::rng::stream::OVERNIGHT => "overnight",
         crate::rng::stream::MARKET_VOL_LEVEL => "market_vol_level",
+        crate::rng::stream::SHOCK_SCALE => "shock_scale",
         _ => "unknown",
     }
 }
@@ -802,9 +803,10 @@ fn stream_id(name: &str) -> PyResult<u32> {
         "volume_idio" => crate::rng::stream::VOLUME_IDIO,
         "overnight" => crate::rng::stream::OVERNIGHT,
         "market_vol_level" => crate::rng::stream::MARKET_VOL_LEVEL,
+        "shock_scale" => crate::rng::stream::SHOCK_SCALE,
         other => {
             return Err(ValidationError::new_err(format!(
-                "unknown stream {other:?}; one of market, economy, external, jumps, volume, news, volume_idio, overnight, market_vol_level"
+                "unknown stream {other:?}; one of market, economy, external, jumps, volume, news, volume_idio, overnight, market_vol_level, shock_scale"
             )))
         }
     })
@@ -2701,7 +2703,8 @@ impl PyEngine {
         // unmistakable at a glance and on restore.
         let mut rng_out = Vec::with_capacity(3 * crate::rng::stream::COUNT);
         for s in [rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
-                  rng.news, rng.volume_idio, rng.overnight, rng.market_vol_level] {
+                  rng.news, rng.volume_idio, rng.overnight, rng.market_vol_level,
+                  rng.shock_scale] {
             rng_out.push(f64::from_bits(s.state));
             rng_out.push(f64::from_bits(s.increment));
             rng_out.push(s.spare.unwrap_or(f64::NAN));
@@ -2778,6 +2781,15 @@ impl PyEngine {
         // every run recorded while `market_vol_level_sigma` shipped 0.0
         // actually carried.
         out.set_item("market_vol_log_level", self.inner.market_vol_log_level())?;
+        // The DAY's fat-tail scale multiplier. Its own key beside the line
+        // above, and the reason is not the same one: the level is advancing
+        // state and this is per-DAY state drawn at the open, so a snapshot
+        // taken MID-SESSION has to carry it or the restored engine closes
+        // the day at a different sigma than the morning traded at. A
+        // snapshot without the key restores to 1.0, which is what every run
+        // recorded while `market_vol_shock_dof` shipped 0.0 actually
+        // carried, to the bit.
+        out.set_item("market_shock_scale", self.inner.market_shock_scale())?;
         // Nominal output when the run opened, the base of the growth
         // term's ratio. A constant of the run rather than advancing state,
         // and carried for the reason the two above are: an engine restored
@@ -2982,19 +2994,21 @@ impl PyEngine {
                  version that wrote it, or re-simulate from the seed.",
             ));
         }
-        // Three words per stream, and the count has grown three times:
+        // Three words per stream, and the count has grown five times:
         // 9 predates the jump stream, 12 carries it, 15 adds volume, 18 adds
-        // endogenous news. Every length still restores, and a short snapshot
-        // keeps this engine's own seed-derived position for the streams it
-        // does not carry -- see the bindings below. That is what lets a
-        // checkpoint written before a mechanism existed replay exactly as it
-        // did then, rather than against a zeroed generator wearing its seed.
+        // endogenous news, 21 per-name volume, 24 overnight, 27 the slow
+        // variance level and 30 the daily fat-tail scale. Every length still
+        // restores, and a short snapshot keeps this engine's own
+        // seed-derived position for the streams it does not carry -- see the
+        // bindings below, and READ THE WARNING THERE, because that choice
+        // stopped being free the day a live stream was added.
         if rng.len() < 9 || rng.len() % 3 != 0 || rng.len() > 3 * crate::rng::stream::COUNT {
             return Err(ValidationError::new_err(format!(
                 "rng must be 9 numbers (market, economy, external), 12 \
                  (plus jumps), 15 (plus volume), 18 (plus news), 21 \
-                 (plus per-name volume) or 24 (plus overnight), as \
-                 (state, increment, spare) triples, got {}",
+                 (plus per-name volume), 24 (plus overnight), 27 (plus the \
+                 slow variance level) or 30 (plus the daily fat-tail \
+                 scale), as (state, increment, spare) triples, got {}",
                 rng.len()
             )));
         }
@@ -3002,13 +3016,32 @@ impl PyEngine {
             Some(v) => v.extract()?,
             None => vec![0.0; 2 * crate::rng::stream::COUNT],
         };
-        // Fourteen numbers predate the overnight stream. That stream keeps
-        // the position this engine holds, as its generator does below, so a
-        // snapshot from before the stream restores exactly as it did then.
-        if counts.len() == 2 * (crate::rng::stream::COUNT - 1) {
-            let (uniforms, normals) = self.inner.stream_positions()[crate::rng::stream::COUNT - 1];
-            counts.push(uniforms as f64);
-            counts.push(normals as f64);
+        // EVERY missing TRAILING stream is padded from this engine's own
+        // positions, one at a time, rather than the last one being special.
+        //
+        // This used to read `if counts.len() == 2 * (COUNT - 1)`, which pads
+        // exactly one. That was correct while exactly one stream had been
+        // added since the last checkpoint format anyone held, and it stops
+        // being correct the moment two have: at `COUNT` 10 it would pad an
+        // 18-count (pre-scale) snapshot and REJECT a 16-count (pre-level)
+        // one with "draw_counts must be 20 numbers", which is a refusal
+        // wearing the shape of a corrupt file rather than an old one.
+        //
+        // The loop has no such edge. A snapshot short by k streams gets k
+        // pairs, each the position this engine derived from its seed, which
+        // is the same rule the generator bindings below apply and for the
+        // same reason.
+        //
+        // It pads from SIX and no lower. Three streams is the oldest count
+        // that ever shipped; a `draw_counts` shorter than that is not an
+        // old snapshot, it is a damaged one, and it keeps falling through
+        // to the refusal below rather than being silently completed.
+        if counts.len() >= 6 && counts.len() % 2 == 0 {
+            while counts.len() < 2 * crate::rng::stream::COUNT {
+                let (uniforms, normals) = self.inner.stream_positions()[counts.len() / 2];
+                counts.push(uniforms as f64);
+                counts.push(normals as f64);
+            }
         }
         if counts.len() != 2 * crate::rng::stream::COUNT {
             return Err(ValidationError::new_err(format!(
@@ -3038,17 +3071,36 @@ impl PyEngine {
         // that leaves such a snapshot restoring exactly as it did before the
         // stream existed. A zeroed generator would be a different sequence
         // wearing the same seed.
+        //
+        // EXPLICIT OFFSETS, NOT `COUNT - 1`. The level and the scale below
+        // used to be one line reading
+        // `if rng.len() >= 3 * COUNT { stream(3 * (COUNT - 1)) }`, which
+        // means "the last stream, whatever that is". That is correct only
+        // while the most recently added stream is INERT, and it was:
+        // a snapshot short by one restored a generator nothing read.
+        //
+        // `stream::SHOCK_SCALE` is pt-v19's LIVE daily multiplier. Left as
+        // it was, a nine-stream (v22-era) checkpoint would have failed the
+        // `>= 3 * COUNT` test, restored the LEVEL generator to this
+        // engine's seed-derived position instead of the recorded one, and
+        // REPORTED SUCCESS -- silently continuing a different volatility
+        // path. That is `defect-22-closed-states-carried` recurring, and it
+        // is the defect `EngineRngState`'s own docstring warns about: a
+        // stream left out of a checkpoint restores to a different sequence
+        // while looking correct.
+        //
+        // So every stream names the offset it lives at. A number written
+        // here is wrong loudly; a number derived from `COUNT` is wrong
+        // quietly, one stream at a time, on whichever stream happens to be
+        // last when someone adds the next one.
         let current = self.inner.rng_state();
         let jumps = if rng.len() >= 12 { stream(9) } else { current.jumps };
         let volume = if rng.len() >= 15 { stream(12) } else { current.volume };
         let news = if rng.len() >= 18 { stream(15) } else { current.news };
         let volume_idio = if rng.len() >= 21 { stream(18) } else { current.volume_idio };
         let overnight = if rng.len() >= 24 { stream(21) } else { current.overnight };
-        let market_vol_level = if rng.len() >= 3 * crate::rng::stream::COUNT {
-            stream(3 * (crate::rng::stream::COUNT - 1))
-        } else {
-            current.market_vol_level
-        };
+        let market_vol_level = if rng.len() >= 27 { stream(24) } else { current.market_vol_level };
+        let shock_scale = if rng.len() >= 30 { stream(27) } else { current.shock_scale };
         self.inner.set_rng_state(crate::engine::EngineRngState {
             market: stream(0),
             economy: stream(3),
@@ -3059,6 +3111,7 @@ impl PyEngine {
             volume_idio,
             overnight,
             market_vol_level,
+            shock_scale,
         });
         if let Some(raw) = snapshot.get_item("draw_overlay")? {
             let entries: Vec<(u32, u8, u64, f64)> = raw.extract()?;
@@ -3218,6 +3271,14 @@ impl PyEngine {
         }
         // Absent means a snapshot from a build without the slow level,
         // whose runs all carried a multiplier of exactly 1.0.
+        if let Some(raw) = snapshot.get_item("market_shock_scale")? {
+            self.inner.set_market_shock_scale(raw.extract()?);
+        } else {
+            // A snapshot from before the key. Every such run drew at the
+            // variance state's own sigma, which is a multiplier of exactly
+            // 1.0 -- not 0.0, which would be a market that cannot move.
+            self.inner.set_market_shock_scale(1.0);
+        }
         if let Some(raw) = snapshot.get_item("market_vol_log_level")? {
             self.inner.set_market_vol_log_level(raw.extract()?);
         }

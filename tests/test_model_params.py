@@ -236,13 +236,25 @@ PERTURBATIONS = [
     # built for -- the `alphax2` box refuted that -- and the two are
     # different questions, which is why one is a test and the other was a
     # box.
-    ("market_vol_alpha_excursion", 0.20, True),
-    # The slow variance LEVEL's two dials, added at 0.8.0 and turned ON in
-    # pt-v19 on 2026-09-14. BOTH read True now, and persistence reads True
-    # only BECAUSE the default ships `market_vol_level_sigma` 0.085.
     #
-    # It read False until the adoption and the reason is worth keeping:
-    # SIGMA is the switch. The close branches on
+    # AND IT READS False AGAIN SINCE 2026-09-16, permanently. `alpha_beta_at`
+    # refuses every rotation once the GJR fourth-moment coefficient at the
+    # dialled triple is past 0.999, and at pt-v19's joint t-GJR triple
+    # `m4(0.0)` reads 1.014. So the guard returns the dialled pair at every
+    # setting of this dial and the probe sees nothing -- on the DEFAULT,
+    # which is what this table measures. It is inert for the opposite
+    # reason it was inert before 0.8.0: not because nobody had turned it
+    # on, but because the coefficients it protects no longer have the
+    # property it protects. See `ModelParams::market_vol_shock_dof`.
+    ("market_vol_alpha_excursion", 0.20, False),
+    # The slow variance LEVEL's two dials, added at 0.8.0, turned ON in
+    # pt-v19 on 2026-09-14 and turned back OFF on 2026-09-16. SIGMA reads
+    # True at every default because perturbing it turns the mechanism on;
+    # PERSISTENCE has now read True and False under the same code, twice,
+    # and both readings were right about the DEFAULT they measured.
+    #
+    # It read False before the adoption and the reason is why it reads
+    # False again: SIGMA is the switch. The close branches on
     # `market_vol_level_sigma == 0.0` and never enters the recursion, so on
     # any preset shipping the level off, persistence cannot reach the
     # variance at all. This row therefore measures the DEFAULT and not the
@@ -259,8 +271,35 @@ PERTURBATIONS = [
     # session on `stream::MARKET_VOL_LEVEL`, unconditionally, whatever the
     # dials read. A dial that gated its own draw would put the schedule on
     # a settable, which is the thing the draw-schedule rule forbids.
-    ("market_vol_level_persistence", 0.99, True),
+    # AND PERSISTENCE FLIPPED BACK ON 2026-09-16, when the joint t-GJR fit
+    # took `market_vol_level_sigma` to 0.0 again. It reads False for
+    # exactly the reason its paragraph above gives -- sigma is the switch
+    # and the default no longer carries it -- which is this row measuring
+    # the DEFAULT doing its job in both directions. SIGMA itself still
+    # reads True, because perturbing it to 0.05 turns the mechanism ON.
+    ("market_vol_level_persistence", 0.99, False),
     ("market_vol_level_sigma", 0.05, True),
+    # THE DAILY FAT-TAIL SCALE, added 2026-09-16 and turned ON in pt-v19 in
+    # the same change (`joint-t-fit-adoption.md`). Perturbed to 0.0 -- OFF
+    # -- rather than up, because 0 is the only setting that is a different
+    # OBJECT rather than a different nu, and because the default now ships
+    # 7: a row that perturbed to 8 would be measuring how much a degree of
+    # freedom is worth over three sessions, which is a size question and
+    # not the inertness question this table asks.
+    #
+    # True on the first tick and not on some later gate: the multiplier
+    # scales the market factor's tick SIGMA, so the very first factor draw
+    # of the very first session is drawn at a different scale. That is what
+    # distinguishes it from the level, which reaches the market through the
+    # close's variance target and therefore not until session two.
+    #
+    # It moves no draw on any stream, and the reason is the level's exactly:
+    # twelve normals are taken once a session on `stream::SHOCK_SCALE`,
+    # unconditionally, whatever the dial reads -- twelve being the top of
+    # the dial's live range so no setting can need a thirteenth. A dial
+    # that gated its own draw would put the schedule on a settable, which
+    # is what the draw-schedule rule forbids.
+    ("market_vol_shock_dof", 0.0, True),
     # The market-side warm-up, added 2026-09-14 and shipping at 0.0 on
     # every preset. MEASURED True on the probe below, and the reason it
     # can be is the same reason `market_vol_level_persistence` reads True:
@@ -276,7 +315,14 @@ PERTURBATIONS = [
     # like the level's own normal: it takes no draw at all. The warm-up is
     # a deterministic function of the level draw the close already makes,
     # which is what let it land without declaring a stream.
-    ("market_burn_in_sessions", 504.0, True),
+    #
+    # False again since 2026-09-16, and the paragraph above is why: the
+    # warm-up's branch is INSIDE the level's stationary-opening arm, the
+    # default no longer enters that arm, and a dial behind a gate the
+    # default does not open cannot move a market. The mechanism is
+    # unchanged; the default moved, twice, and this row followed it both
+    # times.
+    ("market_burn_in_sessions", 504.0, False),
     ("market_vol_ceiling_multiple", 0.5, True),
     ("market_vol_floor_multiple", 2.0, True),
     ("market_vol_vix_coupling", 0.0, True),

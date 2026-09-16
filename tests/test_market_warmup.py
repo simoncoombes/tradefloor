@@ -132,10 +132,30 @@ def test_it_is_inert_without_the_level_it_exists_to_warm():
 EQUILIBRATED_ENVELOPE = 0.78
 
 
+#: The sigma every arm below runs at, and it has to be written down.
+#:
+#: `level-sigma-horizon.md` 2.1 measured this mechanism at
+#: `market_vol_level_sigma` 0.085, and until 2026-09-16 pt-v19 shipped it,
+#: so the arms here inherited it from the DEFAULT and nobody had to name
+#: it. The joint t-GJR fit returned the dial to 0.0 and every slope below
+#: became 0/0 -- a whole module measuring a mechanism it had stopped
+#: turning on, and reporting `ZeroDivisionError` rather than a wrong
+#: number, which is the one mercy in it.
+#:
+#: So it is named. These tests are about `market_burn_in_sessions`, whose
+#: scope is "the state the LEVEL acts through" (see
+#: `test_it_is_inert_without_the_level_it_exists_to_warm`, which pins the
+#: OTHER side of that scope and asserts the off arm explicitly). A test of
+#: what the warm-up does has to dial the level it warms towards, at the
+#: value the measurement it reproduces was taken at.
+LEVEL_SIGMA = 0.085
+
+
 def _opening_state(seed: int, **overrides) -> tuple[float, float, float, float]:
     """`(log level, log(fast/base), log(slow/base), log(mixture/base))`
     after the first close -- the earliest the state can be read, because
     the level the warm-up needs is drawn at that close."""
+    overrides.setdefault("market_vol_level_sigma", LEVEL_SIGMA)
     engine, _ = _engine(seed, 10, **overrides)
     engine.run_days(1)
     snap = engine.state_snapshot()

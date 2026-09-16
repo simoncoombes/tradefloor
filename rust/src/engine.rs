@@ -80,6 +80,18 @@ use crate::rng::{stream, DrawKind, DrawOverlay, DrawRecord, GameRng, Rng, RngSta
 /// `GameRng::new(seed, MAIN_STREAM)`, exactly as before.
 pub const MAIN_STREAM: u32 = 99;
 
+/// How many normals [`stream::SHOCK_SCALE`] takes at every open.
+///
+/// A SCHEDULE CONSTANT, and deliberately larger than the multiplier uses.
+/// `market_vol_shock_dof` consumes the first `dof` of these and pt-v19
+/// reads 7; the count is twelve because twelve is the top of that dial's
+/// live range, so no admissible setting can move the draw schedule. The
+/// draw-schedule rule forbids a settable deciding how many draws are
+/// taken, and the cheapest way to obey it is to take the maximum always.
+///
+/// `joint-t-fit-adoption.md` section 2.1 (design repository).
+pub const SHOCK_SCALE_DRAWS: usize = 12;
+
 /// The exact position of all three engine streams — the checkpoint half
 /// that cannot be reconstructed from the columns.
 ///
@@ -110,6 +122,11 @@ pub struct EngineRngState {
     pub overnight: RngState,
     /// The market factor's slow-level stream, carried for the same reason.
     pub market_vol_level: RngState,
+    /// The daily fat-tail scale stream, carried for the same reason -- and
+    /// this one is the case the docstring above describes rather than
+    /// warns about. It is LIVE on pt-v19, so a checkpoint that dropped it
+    /// would resume a different volatility path while looking correct.
+    pub shock_scale: RngState,
 }
 
 /// Cumulative draws per stream. Diagnostic, per D-R1: the single most
@@ -252,6 +269,7 @@ pub struct Engine {
     news_rng: GameRng,
     overnight_rng: GameRng,
     market_vol_level_rng: GameRng,
+    shock_scale_rng: GameRng,
     /// The move each name's `s` took at the last open under the overnight
     /// process, in roster order, 0.0 where nothing moved. Per-day state
     /// like the attribution: the tape books it onto the day's first row.
@@ -349,6 +367,19 @@ pub struct Engine {
     /// multiplier of exactly 1.0, which is every preset through pt-v19;
     /// see `ModelParams::market_vol_level_sigma`.
     market_vol_log_level: f64,
+    /// THE DAY'S FAT-TAIL SCALE MULTIPLIER, `W`, drawn once at the open.
+    ///
+    /// 1.0 means the session's ticks drew at the variance state's own
+    /// sigma, which is every preset shipping `market_vol_shock_dof` 0 and
+    /// every session before this field existed. Per-DAY state, not
+    /// advancing state: `open_market` overwrites it and the session's
+    /// ticks read it. It is carried in the snapshot and hashed into the
+    /// leaf because a mid-day fork has to close the day at the sigma the
+    /// morning already traded at.
+    ///
+    /// DERIVED, `joint-t-fit-adoption.md` section 2.1; see
+    /// `ModelParams::market_vol_shock_dof` for the fit it comes from.
+    market_shock_scale: f64,
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
     volume_state: f64,
@@ -798,6 +829,7 @@ impl Engine {
             news_rng: GameRng::substream(seed, stream::NEWS),
             overnight_rng: GameRng::substream(seed, stream::OVERNIGHT),
             market_vol_level_rng: GameRng::substream(seed, stream::MARKET_VOL_LEVEL),
+            shock_scale_rng: GameRng::substream(seed, stream::SHOCK_SCALE),
             overnight_moves: vec![0.0; companies_len],
             companies,
             economy,
@@ -824,6 +856,9 @@ impl Engine {
             volume_state: 0.0,
             forced_flow_spent: 0.0,
             market_vol_log_level: 0.0,
+            // 1.0, not 0.0: an engine that has not opened a day has taken
+            // no scale draw, and the neutral scale is a multiplier of one.
+            market_shock_scale: 1.0,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             sector_variance: vec![0.0; sector_keys.len()],
@@ -1431,6 +1466,7 @@ impl Engine {
             news: self.news_rng.snapshot(),
             overnight: self.overnight_rng.snapshot(),
             market_vol_level: self.market_vol_level_rng.snapshot(),
+            shock_scale: self.shock_scale_rng.snapshot(),
         }
     }
 
@@ -1451,6 +1487,7 @@ impl Engine {
         self.news_rng = GameRng::restore(state.news);
         self.overnight_rng = GameRng::restore(state.overnight);
         self.market_vol_level_rng = GameRng::restore(state.market_vol_level);
+        self.shock_scale_rng = GameRng::restore(state.shock_scale);
     }
 
     /// Cumulative draws across all three streams. The per-stream split is
@@ -1479,6 +1516,7 @@ impl Engine {
             stream::VOLUME_IDIO => &self.volume_idio_rng,
             stream::OVERNIGHT => &self.overnight_rng,
             stream::MARKET_VOL_LEVEL => &self.market_vol_level_rng,
+            stream::SHOCK_SCALE => &self.shock_scale_rng,
             _ => panic!("unknown stream {id}"),
         }
     }
@@ -1494,6 +1532,7 @@ impl Engine {
             stream::VOLUME_IDIO => &mut self.volume_idio_rng,
             stream::OVERNIGHT => &mut self.overnight_rng,
             stream::MARKET_VOL_LEVEL => &mut self.market_vol_level_rng,
+            stream::SHOCK_SCALE => &mut self.shock_scale_rng,
             _ => panic!("unknown stream {id}"),
         }
     }
@@ -1748,8 +1787,42 @@ impl Engine {
         // drew the factor at constant sigma. Replaying a tape through
         // today's variance state would price recorded draws under dynamics
         // the recording never had.
+        //
+        // THE DAY'S FAT-TAIL SCALE RIDES HERE, on `FourAlways` only. The
+        // replay era drew the factor at a constant sigma and must keep
+        // doing so, so `FourOrZero` cannot see `W` any more than it sees
+        // the variance state.
+        //
+        // `sqrt(W)` on the SIGMA rather than `W` on the variance, and a
+        // BRANCH at exactly 1.0 so the off arm is the same call it was
+        // before this existed. Three things follow from scaling the tick's
+        // sigma rather than the day's sum, and all three are the point
+        // (`joint-t-fit-adoption.md` 2.1):
+        //
+        // - `market_sigma_tick` (`tick.rs`) carries `sqrt(W)`, so the crash
+        //   amplifier's threshold keeps its CONDITIONAL-sigma meaning and
+        //   `E[z^2 A^2]` stays a constant of the dials -- the stability
+        //   property `crash_amplifier_conditional_sigma` was bought for.
+        // - `day_factor` accumulates the scaled ticks, so the close's
+        //   recursion sees `v_t W_d z^2`, which is the recursion the joint
+        //   fit was a fit OF.
+        // - `variance_volume_multiplier` reads `market_sigma_daily` and so
+        //   WILL see `W`. That is a fat day trading fat volume; it is a
+        //   predicted row move (`volume_abs_return_corr`), not a leak.
+        //
+        // The read-back (`Engine::index_variance_terms`,
+        // `market_vol.variance()`) does NOT carry `W`: a forecast cannot
+        // see the day's draw, and `E[W] = 1` leaves the unconditional
+        // identity exactly where it was.
         let market_sigma_daily = match settle_draws {
-            SettleDrawPolicy::FourAlways => self.market_vol.sigma_daily(),
+            SettleDrawPolicy::FourAlways => {
+                let sigma = self.market_vol.sigma_daily();
+                if self.market_shock_scale == 1.0 {
+                    sigma
+                } else {
+                    sigma * crate::mathx::sqrt(self.market_shock_scale)
+                }
+            }
             SettleDrawPolicy::FourOrZero => crate::market::tick::MARKET_FACTOR_SIGMA,
         };
 
@@ -2214,6 +2287,65 @@ impl Engine {
         // The night, before the day's marks are set, so the session band
         // anchors on the post-gap open and the gap sits outside it.
         self.apply_overnight();
+
+        // THE DAY'S FAT-TAIL SCALE, twelve normals on a stream of its own.
+        //
+        // DERIVED, `joint-t-fit-adoption.md` sections 2.1 and 3.2 (design
+        // repository). The tape's standardised GJR residuals are `t(6.89)`
+        // [6.2, 7.8]; the engine's innovation is a Box-Muller normal, and
+        // the shipped alpha/beta/gamma are that same tape's fit under a
+        // GAUSSIAN likelihood, 195 log-likelihood units worse than the
+        // joint fit. The joint fit is adopted with a scale multiplier
+        // `W = (nu - 2) / sum_{i < nu} z_i^2` on the session's tick sigma,
+        // which is exactly a `t(nu)` innovation at integer `nu` -- the one
+        // construction `mathx` can build, since it has no inverse
+        // incomplete gamma and a t-by-quantile is therefore out.
+        //
+        // DAILY, NOT PER TICK, and that is the whole reason it is here
+        // rather than in `tick_body`. Excess kurtosis added to each of 390
+        // independent tick innovations washes out of the day's sum as
+        // `(kappa - 3) / 390`; the fit is of a DAILY recursion and the
+        // multiplier has to be a property of the day.
+        //
+        // AT THE OPEN, after `apply_overnight` and before
+        // `reset_daily_prices`, because `open_market` is the one point
+        // every spelling of a day passes through exactly once -- the same
+        // property that let the news generation move here (§117) -- and
+        // because every tick of the session has to read the same `W`.
+        //
+        // TWELVE DRAWS, UNCONDITIONALLY, whatever the dial reads. Twelve is
+        // the top of `market_vol_shock_dof`'s live range, so no admissible
+        // `nu` can change the count and the schedule stays off the
+        // settables, which is the draw-schedule rule as `check.py` states
+        // it and as `MARKET_VOL_LEVEL`'s own draw applies it. The cost is
+        // the unread tail of the twelve on a stream nothing else reads:
+        // five a session at pt-v19's seven, all twelve at the off setting.
+        //
+        // A BRANCH at `dof` 0, not arithmetic on 1.0, for the reason
+        // `close_day_scaled` gives: `x * 1.0` being exact is a property of
+        // IEEE-754 a reader has to know to trust, and the off arm of this
+        // mechanism is a CONTROL. At 0 the tick's sigma is the same call
+        // it was before this existed, to the bit.
+        let mut shock_z = [0.0_f64; SHOCK_SCALE_DRAWS];
+        for (i, z) in shock_z.iter_mut().enumerate() {
+            self.shock_scale_rng.site(Site::ShockScaleZ, i as u32);
+            *z = self.shock_scale_rng.next_normal();
+        }
+        let dof = self.params.market_vol_shock_dof;
+        self.market_shock_scale = if dof == 0.0 {
+            1.0
+        } else {
+            let nu = dof as usize;
+            let sum_sq: f64 = shock_z[..nu].iter().map(|z| z * z).sum();
+            // `sum_sq` is a sum of `nu >= 5` squared normals and is zero
+            // only if every one of them is exactly 0.0, which Box-Muller
+            // cannot produce (`r` is `sqrt(-2 ln u)` with `u` substituted
+            // to 1e-10 at zero, so `r` is never 0 and both outputs vanish
+            // only where sin and cos do). Guarded anyway rather than
+            // divided by: a NaN scale would reach every price in the
+            // session and be diagnosed three thousand sessions later.
+            if sum_sq > 0.0 { (dof - 2.0) / sum_sq } else { 1.0 }
+        };
 
         reset_daily_prices(&mut self.companies);
     }
@@ -3116,6 +3248,15 @@ impl Engine {
         self.market_vol_log_level = level;
     }
 
+    /// Read/write the day's fat-tail scale, for checkpoints. See the field.
+    pub fn market_shock_scale(&self) -> f64 {
+        self.market_shock_scale
+    }
+
+    pub fn set_market_shock_scale(&mut self, scale: f64) {
+        self.market_shock_scale = scale;
+    }
+
     pub fn forced_flow_spent(&self) -> f64 {
         self.forced_flow_spent
     }
@@ -3812,12 +3953,13 @@ impl Engine {
             }
         }
 
-        // The eight generator states, in the order the snapshot's flat `rng`
+        // The ten generator states, in the order the snapshot's flat `rng`
         // array carries them. Raw bit patterns, per the encoding note above.
         let rng = self.rng_state();
         for state in [
             rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
             rng.news, rng.volume_idio, rng.overnight, rng.market_vol_level,
+            rng.shock_scale,
         ] {
             hash_u64(&mut buf, state.state);
             hash_u64(&mut buf, state.increment);
@@ -3895,6 +4037,14 @@ impl Engine {
         hash_f64(&mut buf, self.universe_stress);
         hash_f64(&mut buf, self.forced_flow_spent);
         hash_f64(&mut buf, self.market_vol_log_level);
+        // The DAY's fat-tail scale, hashed beside the level above and for a
+        // reason the level does not have: `W` is drawn at the OPEN and read
+        // by every tick of the session, so a mid-day checkpoint has to
+        // replay the rest of the day at the sigma its ticks already drew
+        // at. Two engines alike in every column and holding different `W`
+        // are not the same state -- `test_sampled_verification` found
+        // exactly that shape of miss on the sector states.
+        hash_f64(&mut buf, self.market_shock_scale);
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where
         // every per-slot array above always follows the roster. An empty

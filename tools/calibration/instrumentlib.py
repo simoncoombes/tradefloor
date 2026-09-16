@@ -487,6 +487,18 @@ PARAM_SPECS: dict[str, dict] = {
                                      "hard_range": (0.0, 0.9995)},
     "market_vol_level_sigma":   {"kind": "abs", "step_unit": 0.02,
                                  "hard_range": (0.0, 0.15)},
+    # A step of 1 because the dial is an INTEGER: a perturbation of half a
+    # degree of freedom is not a setting this build accepts, and
+    # `with_override` refuses it by name rather than truncating.
+    #
+    # The range spans 0 because 0 is what every preset through pt-v18
+    # SHIPS, and a hard range excluding it would report the shipped vector
+    # as out of bounds. It is not a continuous range: the domain is {0}
+    # union [5, 12] and (1, 5) is a HOLE two bounds cannot express.
+    # `with_override` enforces the hole, so a perturbation landing in it is
+    # refused loudly rather than surveyed. See `atlas_survey`'s entry.
+    "market_vol_shock_dof":     {"kind": "abs", "step_unit": 1.0,
+                                 "hard_range": (0.0, 12.0)},
     # The market-side warm-up, in SESSIONS, so the step unit is a step in
     # sessions and not a fraction: 63 is one quarter, the block the
     # transient was traced in (`level-sigma-horizon.md` 2.2), and anything

@@ -209,6 +209,11 @@ pub enum Site {
     /// The market factor's slow variance level, one normal per day at the
     /// close on [`stream::MARKET_VOL_LEVEL`].
     MarketVolLevelZ = 21,
+    /// The daily fat-tail scale multiplier, TWELVE normals per day at the
+    /// open on [`stream::SHOCK_SCALE`]. Twelve whatever
+    /// `market_vol_shock_dof` reads: the schedule is a constant and the
+    /// dial selects how many of the twelve the multiplier consumes.
+    ShockScaleZ = 22,
 }
 
 impl Site {
@@ -236,6 +241,7 @@ impl Site {
             Site::OvernightSectorZ => "overnight_sector_z",
             Site::OvernightIdioZ => "overnight_idio_z",
             Site::MarketVolLevelZ => "market_vol_level_z",
+            Site::ShockScaleZ => "shock_scale_z",
         }
     }
 }
@@ -433,12 +439,54 @@ pub mod stream {
     /// unmoved.
     pub const MARKET_VOL_LEVEL: u32 = 8;
 
+    /// The market factor's DAILY fat-tail scale multiplier, drawn once per
+    /// session at the open, twelve normals at a time.
+    ///
+    /// DERIVED, `joint-t-fit-adoption.md` sections 2.1 and 3.1 (design
+    /// repository). The tape's standardised GJR residuals are `t(6.89)`
+    /// [6.2, 7.8] and the engine's innovation is a Box-Muller normal, so
+    /// the session's tick sigma carries a scale
+    /// `W = (nu - 2) / sum_{i < nu} z_i^2` -- the construction of a
+    /// `t(nu)` at integer `nu`, which is why `nu` rounds to 7 and why the
+    /// form needs no inverse incomplete gamma that [`crate::mathx`] does
+    /// not have.
+    ///
+    /// Its own stream for the reason every stream after [`MARKET`] has
+    /// one, and for the sharper reason [`MARKET_VOL_LEVEL`] has: the
+    /// mechanism's whole purpose is to be compared against itself at
+    /// `market_vol_shock_dof` 0. Off `MARKET`, the off arm and the live
+    /// arm would differ by a reshuffle of every subsequent tick draw as
+    /// well as by the multiplier, and the two could not be told apart on
+    /// one seed.
+    ///
+    /// TWELVE normals, UNCONDITIONALLY, whatever the dial reads -- the
+    /// schedule cannot depend on a settable, and twelve is the top of the
+    /// dial's live range so no `nu` inside it can move the count. At
+    /// `dof` 0 the twelve draws are taken, the multiplier is exactly 1.0
+    /// through a BRANCH (not arithmetic on 1.0), and the tick's sigma is
+    /// the same call it was before this stream existed. Every preset that
+    /// ships the dial off -- pt-v1 through pt-v18 -- reproduces bit for
+    /// bit: MEASURED over seventeen presets and five seeds, 85 of 85, the
+    /// check every stream boundary since 0.8.0 has run. pt-v19 ships 7, so
+    /// its own trajectory and the known-answer digest move with it.
+    pub const SHOCK_SCALE: u32 = 9;
+
     /// How many streams there are. Every array indexed by stream id, the
     /// snapshot's generator and count vectors, the day mark's positions
     /// and the loops that enable, clear or stamp every stream are sized
     /// from this rather than written out: the eighth stream was met in
     /// four places that had written seven, each found by a box.
-    pub const COUNT: usize = 9;
+    ///
+    /// TWO SITES DELIBERATELY DO NOT READ IT ANY MORE. `python_engine`'s
+    /// checkpoint restore used to locate the last stream as `COUNT - 1`,
+    /// which was correct only because the stream added at the time was
+    /// INERT: a snapshot short by one restored that generator to its
+    /// seed-derived position and nothing read it. [`SHOCK_SCALE`] is
+    /// pt-v19's LIVE multiplier, so the same code would silently continue
+    /// a different volatility path while reporting success -- which is
+    /// `defect-22-closed-states-carried` recurring. Those two sites carry
+    /// explicit per-stream offsets; see `joint-t-fit-adoption.md` 2.3.
+    pub const COUNT: usize = 10;
 
     /// Derived streams live at `256 + id`. See the module docs for why the
     /// offset exists.

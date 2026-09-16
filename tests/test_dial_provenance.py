@@ -599,17 +599,32 @@ def test_a_bar_beside_two_shipped_values_has_to_say_which_one_it_is_for():
     in `presets`, one bar, nothing tying the bar to either. The presence
     check passed it and the paste check passed it. This is the rule that
     would have refused it, driven by the artefact itself.
+
+    THE ARTEFACT MOVED, and the test follows it rather than being frozen
+    against a dial. On 2026-09-16 the joint t-GJR fit put
+    `market_vol_alpha` on the boundary at 0.0, where no symmetric bar
+    exists and the entry carries a profile instead, so that entry no longer
+    HAS the shape this rule is about -- and a fixture that still named it
+    would be asserting the rule against an entry the rule cannot reach,
+    which is a guard reporting green on an empty subject. `market_vol_beta`
+    carries the shape now: two shipped values (pt-v16's 0.69244622 and
+    pt-v19's 0.8950), one bar, and an `estimate` naming which. The
+    counter-example below is the OLD dial's own history, which is still
+    the clearest one.
     """
-    good = pv.DIAL_PROVENANCE["market_vol_alpha"]
-    assert not pv.validate_entry("market_vol_alpha", good)
+    good = pv.DIAL_PROVENANCE["market_vol_beta"]
+    assert not pv.validate_entry("market_vol_beta", good)
+    assert len({v for v in good["presets"].values()}) > 1, (
+        "this test needs an entry with two shipped values and one bar; "
+        "market_vol_beta stopped being one")
 
     unnamed = dict(good)
     unnamed.pop("estimate")
-    problems = pv.validate_entry("market_vol_alpha", unnamed)
+    problems = pv.validate_entry("market_vol_beta", unnamed)
     assert any("does not say which one" in p for p in problems), problems
 
-    other_fit = dict(good, estimate=0.1059)
-    problems = pv.validate_entry("market_vol_alpha", other_fit)
+    other_fit = dict(good, estimate=0.8787)
+    problems = pv.validate_entry("market_vol_beta", other_fit)
     assert any("in no shipped preset" in p for p in problems), problems
 
     # One shipped value needs no `estimate`: the bar can only be for it.
