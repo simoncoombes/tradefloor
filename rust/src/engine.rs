@@ -423,6 +423,16 @@ pub struct Engine {
     /// day — until its own next day advances. That is the price of
     /// staying out of the hash, and it is stated rather than hidden.
     last_index_variance: Option<crate::market::index_var::IndexVarianceTerms>,
+    /// The ONE-DAY total the same update computed, in fraction² per
+    /// session, beside the thirty-day terms above.
+    ///
+    /// The two are different quantities now and both are read: the VIX's
+    /// level is the thirty-day identity, and `vix_index_sigma_pct` — which
+    /// normalises THE SESSION'S OWN RETURN for the zero-mean fear
+    /// correction — is the one-day one. Kept so a measurement can see both
+    /// without re-deriving either, and a pure diagnostic on the same terms
+    /// as the field above: out of `state_snapshot`, out of the hash.
+    last_index_variance_one_day: Option<f64>,
     /// The variance targets the last close reverted toward, `(fast, slow)`.
     /// Diagnostic only, like `last_index_variance`, and kept OUT of
     /// `state_snapshot` and the state hash for the same reason.
@@ -841,6 +851,7 @@ impl Engine {
             vix_anchor: 0.0,
             // No day has closed, so no VIX update has read a variance.
             last_index_variance: None,
+            last_index_variance_one_day: None,
             last_market_targets: None,
         };
         engine.vix_anchor = engine.derive_vix_anchor();
@@ -1155,6 +1166,110 @@ impl Engine {
         )
     }
 
+    /// The index's variance over the next [`VIX_HORIZON_SESSIONS`]
+    /// sessions, from the same states [`Engine::index_conditional_variance_terms_now`]
+    /// reads — **the quantity a VIX actually prices**.
+    ///
+    /// The VIX's definition is the expected variance over the next thirty
+    /// calendar days, which is 21 sessions, and the identity this engine
+    /// read back until now priced ONE day. The difference is not a level
+    /// error that a premium absorbs: it is the smoothing of every fast
+    /// block over its own decay, which is where the tape's monthly
+    /// persistence lives. `persistence-derivation.md` 4.1 and
+    /// `programme/vix-horizon-implementation.md`, design repository.
+    ///
+    /// Every read here is the sibling's, with three additions, and each of
+    /// the three is a HELD quantity made explicit rather than a new one:
+    ///
+    /// - the factor's two TARGETS, now state on `MarketVarianceState`
+    ///   because the recursion decays toward them and they are not
+    ///   recoverable from the component levels;
+    /// - the sector variance RATIOS rather than the sigmas they imply, so
+    ///   the ratio can be averaged while its VIX-coupled target is held;
+    /// - each name's clamp reference, `sector_base_variances_for` through
+    ///   `garch::garch_clamp_base` — the close's own expression, called
+    ///   rather than restated, so the read-back cannot clamp against a band
+    ///   the close does not.
+    ///
+    /// [`VIX_HORIZON_SESSIONS`]:
+    ///     crate::market::index_var::VIX_HORIZON_SESSIONS
+    fn index_horizon_variance_terms_now(
+        &self,
+    ) -> crate::market::index_var::IndexVarianceTerms {
+        let names = self.index_variance_names();
+        let sector_sigma = crate::market::tick::sector_sigma_at(
+            &self.params, &self.economy, self.vix_anchor);
+        let ratio = self.economy.vix / self.vix_anchor;
+        let rate_scale = if self.params.jump_vix_coupling == 0.0 {
+            1.0
+        } else {
+            (1.0 - self.params.jump_vix_coupling)
+                + ((self.params.jump_vix_coupling * ratio) * ratio)
+        };
+        let crisis_spike = crate::market::tick::crisis_spike_for(
+            &self.params, self.economy.vix, self.universe_stress);
+        // One RATIO per sector key. `1.0` where the state is off or
+        // unseeded, which is `sector_sigmas_now`'s own reading of an
+        // unseeded sector written one level up: the recursion then holds
+        // the ratio at exactly 1.0 for all 21 sessions and the sigma it
+        // hands the identity is `target * sqrt(1.0)`, the target's bits.
+        let sector_states: Vec<f64> = if self.sector_state_on() {
+            self.sector_variance
+                .iter()
+                .map(|s| if *s > 0.0 { *s } else { 1.0 })
+                .collect()
+        } else {
+            vec![1.0; self.sector_keys.len()]
+        };
+        let excitations = self.index_variance_excitations();
+        // The per-name clamp band, HELD at today's VIX across the horizon
+        // for the same reason the jump rate and the sector target are held:
+        // it is a function of the VIX path, which is the thing this
+        // quantity is an input to.
+        let clamp_bases: Vec<f64> = self
+            .sector_base_variances_for(&names)
+            .iter()
+            .map(|base| {
+                crate::market::garch::garch_clamp_base(
+                    &self.params, *base, self.economy.vix, self.vix_anchor)
+            })
+            .collect();
+        // `lambda_i` at today's rate scale, from the identity's own
+        // spelling of the coupling branch, so the excitation's rest point
+        // is the one `apply_jumps` reverts toward.
+        let (_, idio_rate) =
+            crate::market::index_var::jump_intensities(&self.params, rate_scale);
+        let (fast, slow) = (self.market_vol.fast_variance(), self.market_vol.slow_variance());
+        let (fast_target, slow_target) = self.market_vol.targets();
+        let horizon = crate::market::index_var::horizon_mean_states(
+            &self.params,
+            &names,
+            &clamp_bases,
+            (fast, slow, fast_target, slow_target),
+            &sector_states,
+            sector_sigma,
+            &excitations,
+            idio_rate,
+            crate::market::index_var::intraday_variance_factor(),
+        );
+        crate::market::index_var::index_horizon_variance_terms(
+            &self.params,
+            &horizon,
+            self.sector_keys.len(),
+            rate_scale,
+            crisis_spike,
+            // THE LAGGED TRANSMISSION WIRE, held at today's face for all 21
+            // sessions exactly as the one-day read holds it. It is a fair
+            // coin from the second session on and the honest thirty-day
+            // expectation would average its two faces there, as
+            // `index_unconditional_variance` does for the anchor; held here
+            // because the derivation holds it and because averaging would
+            // cost the bit-exact rest identity on a lagged session. Filed,
+            // not forgotten: design note section 9.
+            self.market_vol.prev_day_down(),
+        )
+    }
+
     /// The terms of the index variance the last VIX update read, or `None`
     /// if no day has advanced under the identity. See
     /// [`Engine::last_index_variance`] for why it is remembered rather
@@ -1163,6 +1278,12 @@ impl Engine {
         &self,
     ) -> Option<crate::market::index_var::IndexVarianceTerms> {
         self.last_index_variance
+    }
+
+    /// The ONE-DAY total the same VIX update computed, or `None` if no day
+    /// has advanced under the identity. See the field.
+    pub fn last_index_variance_one_day(&self) -> Option<f64> {
+        self.last_index_variance_one_day
     }
 
     /// The variance targets the last close reverted toward: `(fast, slow)`.
@@ -2095,7 +2216,7 @@ impl Engine {
     /// close its first day on a truncated innovation — pricing differently
     /// from the parent it forked from, the exact failure class
     /// [`Engine::restore_day_state`] exists for.
-    pub fn market_variance_state(&self) -> (f64, f64, f64, f64, f64, f64) {
+    pub fn market_variance_state(&self) -> (f64, f64, f64, f64, f64, f64, f64, f64) {
         self.market_vol.snapshot()
     }
 
@@ -2115,10 +2236,12 @@ impl Engine {
         slow_variance: f64,
         prev_day_factor: f64,
         smoothed_vix: f64,
+        fast_target: f64,
+        slow_target: f64,
     ) {
         self.market_vol = MarketVarianceState::restore_with_components(
             variance, day_factor, fast_variance, slow_variance,
-            prev_day_factor, smoothed_vix);
+            prev_day_factor, smoothed_vix, fast_target, slow_target);
     }
 
     /// One attribution column across all companies, by index 0..7.
@@ -2416,12 +2539,24 @@ impl Engine {
         //
         // See `ModelParams::market_vol_vix_excursion` for why the ratio's
         // denominator is the whole mechanism.
+        //
+        // IT IS THE THIRTY-DAY READ, and it has to be, because it is the
+        // SECOND reader of the identity and not an independent quantity.
+        // What this denominator measures the VIX against is the level the
+        // identity says the VIX ought to be; if the VIX target moved to the
+        // thirty-day form and this stayed one-day, the ratio would read
+        // about 0.92 on a 20x factor excursion, its square 0.85, and the
+        // factor's variance target would be pulled below its own level in
+        // every high-variance regime -- a new standing bias, opposite in
+        // sign to the double count this excursion dial was introduced to
+        // remove. Both reads of the identity move together or neither
+        // should. See `programme/vix-horizon-implementation.md` section 0.
         let vix_ratio_denominator = if self.params.market_vol_vix_excursion == 0.0 {
             self.vix_anchor
         } else {
             let implied = crate::market::index_var::vix_from_variance(
                 self.params.vix_variance_premium,
-                self.index_conditional_variance_terms_now().total(),
+                self.index_horizon_variance_terms_now().total(),
             );
             // A read-back of zero or worse is not reachable — the factor
             // variance is floored at `market_vol_floor_multiple` times base
@@ -2826,13 +2961,29 @@ impl Engine {
         // at the `None` it was built with -- `params` is fixed for the
         // engine's life, so that branch has nothing to clear -- and
         // nothing here changes WHEN anything is computed.
-        let index_variance = if self.params.vix_level_identity == 0.0 {
-            0.0
-        } else {
-            let terms = self.index_conditional_variance_terms_now();
-            self.last_index_variance = Some(terms);
-            terms.total()
-        };
+        //
+        // TWO READS, and they are different quantities. The VIX's LEVEL is
+        // the thirty-day identity -- the expected variance over the next 21
+        // sessions, which is what the instrument is defined as. The
+        // zero-mean fear correction below normalises THE SESSION'S OWN
+        // RETURN, which is a one-day object, so it keeps the one-day total.
+        // Reading one number for both would put a 21-session average in the
+        // denominator of a single session's move.
+        //
+        // `last_index_variance` remembers the THIRTY-DAY terms, because its
+        // docstring promises "the number the update read" and that is now
+        // this one; the one-day total is remembered beside it rather than
+        // thrown away.
+        let (index_variance, index_variance_one_day) =
+            if self.params.vix_level_identity == 0.0 {
+                (0.0, 0.0)
+            } else {
+                let terms = self.index_horizon_variance_terms_now();
+                self.last_index_variance = Some(terms);
+                let one_day = self.index_conditional_variance_terms_now().total();
+                self.last_index_variance_one_day = Some(one_day);
+                (terms.total(), one_day)
+            };
 
         rng.site(Site::EconomyDaily, 0);
         self.economy = update_economy_daily(
@@ -2890,7 +3041,11 @@ impl Engine {
                 vix_index_sigma_pct: if self.params.vix_level_identity == 0.0 {
                     0.0
                 } else {
-                    100.0 * crate::mathx::sqrt(index_variance)
+                    // THE ONE-DAY TOTAL, not the thirty-day one. This
+                    // divides the session's own return; a thirty-day
+                    // average here would normalise one session by the
+                    // volatility of a month.
+                    100.0 * crate::mathx::sqrt(index_variance_one_day)
                 },
                 vix_level_identity: self.params.vix_level_identity,
                 vix_return_gain_up: self.params.vix_return_gain_up,
@@ -3855,10 +4010,17 @@ impl Engine {
         hash_bool(&mut buf, market_open);
 
         // The engine-level dials.
+        // The two TARGETS are in here by construction: this hashes the
+        // tuple `snapshot` gives it, and the thirty-day read-back made them
+        // state. Two engines alike in every column and holding different
+        // factor targets decay toward different levels over the read-back's
+        // 21 sessions and price tonight's VIX differently -- the same
+        // failure `sector_variance` below was added to the hash for.
         let (variance, day_factor, fast_variance, slow_variance,
-             prev_day_factor, smoothed_vix) = self.market_variance_state();
+             prev_day_factor, smoothed_vix, fast_target, slow_target) =
+            self.market_variance_state();
         for value in [variance, day_factor, fast_variance, slow_variance,
-                      prev_day_factor, smoothed_vix] {
+                      prev_day_factor, smoothed_vix, fast_target, slow_target] {
             hash_f64(&mut buf, value);
         }
         hash_f64(&mut buf, self.volume_state);

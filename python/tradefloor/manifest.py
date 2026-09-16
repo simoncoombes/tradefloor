@@ -488,10 +488,17 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _flag(buf, bool(snapshot["market_open"]))
 
     variance = list(snapshot["market_variance"])
-    if len(variance) != 6:
+    # Eight since the thirty-day read-back: the six that were here plus the
+    # two TARGETS the last close reverted toward. They are state rather than
+    # a diagnostic now, because the read-back decays the two components
+    # toward them over 21 sessions and cannot recover them from the
+    # component levels -- so two engines alike in every column and holding
+    # different targets price tonight's VIX differently, which is what the
+    # hash exists to refuse.
+    if len(variance) != 8:
         raise ValidationError(
             f"market_variance carries {len(variance)} numbers and the state "
-            "hash covers six."
+            "hash covers eight."
         )
     for value in variance:
         _f64(buf, value)

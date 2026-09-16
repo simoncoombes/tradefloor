@@ -399,6 +399,37 @@ pub fn update_garch_variance_with(
     )
 }
 
+/// The clamp reference a name's GARCH is held between, at a given VIX.
+///
+/// The band inside [`update_garch_variance_for`] is a multiple of a STATIC
+/// per-sector variance, and `garch_vix_coupling` moves that reference with
+/// the regime: without it a name's variance hovers near a constant whatever
+/// the market is doing while the market factor's tracks the VIX squared.
+///
+/// Spelled ONCE, here, because it has two readers now. `market/daily.rs`
+/// forms it at the close, and `index_var::horizon_mean_states` forms it to
+/// hold the clamp reference across the thirty-day read-back's 21 steps. A
+/// read-back that clamped against a different band from the one the close
+/// clamps against would be the same class of defect as one that priced the
+/// wrong process.
+///
+/// A BRANCH at zero coupling, so every preset that leaves the dial unset
+/// gets the sector base back as the same double.
+pub fn garch_clamp_base(
+    params: &crate::params::ModelParams,
+    sector_base_daily_variance: f64,
+    vix: f64,
+    vix_anchor: f64,
+) -> f64 {
+    if params.garch_vix_coupling == 0.0 {
+        sector_base_daily_variance
+    } else {
+        let ratio = vix / vix_anchor;
+        let c = params.garch_vix_coupling;
+        sector_base_daily_variance * (1.0 - c + c * ratio * ratio)
+    }
+}
+
 /// [`update_garch_variance_with`] under an explicit per-name `beta`.
 ///
 /// The seam heterogeneous persistence needs. Passing `params.garch_beta`

@@ -1860,6 +1860,16 @@ impl PyEngine {
         out.set_item("k", terms.k)?;
         let total = terms.total();
         out.set_item("total", total)?;
+        // THE ONE-DAY TOTAL the same update computed, beside the thirty-day
+        // one the terms above are. `total` is the expected variance over
+        // the next 21 sessions -- the VIX's own definition -- and `implied`
+        // is the identity on it; this key is the single-session variance
+        // the zero-mean fear correction normalises the day's return by.
+        // Absent before any day has advanced under the identity, like the
+        // terms themselves.
+        if let Some(one_day) = self.inner.last_index_variance_one_day() {
+            out.set_item("total_one_day", one_day)?;
+        }
         out.set_item(
             "implied",
             crate::market::index_var::vix_from_variance(
@@ -2760,13 +2770,19 @@ impl PyEngine {
         // fork that lost it would re-open at the baseline factor sigma
         // mid-regime and diverge from its parent at the next close.
         let (market_variance, market_day_factor, market_fast_variance,
-             market_slow_variance, market_prev_day_factor, market_smoothed_vix) =
+             market_slow_variance, market_prev_day_factor, market_smoothed_vix,
+             market_fast_target, market_slow_target) =
             self.inner.market_variance_state();
         out.set_item(
             "market_variance",
             vec![market_variance, market_day_factor, market_fast_variance,
                  market_slow_variance, market_prev_day_factor,
-                 market_smoothed_vix],
+                 market_smoothed_vix,
+                 // The two TARGETS the last close reverted toward. State
+                 // since the thirty-day read-back, which decays the
+                 // components toward them and cannot recover them from the
+                 // component levels.
+                 market_fast_target, market_slow_target],
         )?;
         // The forced-flow segment's spent budget (round 143). Its own key:
         // a snapshot without it restores to 0.0, which is bit-exact for
@@ -3230,31 +3246,49 @@ impl PyEngine {
             let vals: Vec<f64> = raw.extract()?;
             // Two values is a checkpoint written before the slow component
             // existed; three is one written after; four adds the mixture
-            // components; five carries the lagged-wire memory. All replay.
-            if vals.len() < 2 || vals.len() > 6 {
+            // components; five carries the lagged-wire memory; six the
+            // smoothed fear; eight the two reversion TARGETS the thirty-day
+            // read-back made state. All replay.
+            if vals.len() < 2 || vals.len() > 8 || vals.len() == 7 {
                 return Err(ValidationError::new_err(format!(
                     "market_variance must be [variance, day_factor], optionally \
-                     plus the component levels and the lagged-wire memory, \
+                     plus the component levels, the lagged-wire memory, the \
+                     smoothed fear and the two reversion targets, \
                      got {} values",
                     vals.len()
                 )));
             }
             match vals.len() {
-                // Five carries the lagged-wire memory. Four is a pt-v4
-                // checkpoint (no lag memory; the wire skips one session,
-                // which is what that era did anyway). Three predates the
-                // mixture and carried an additive slow level; adopting it
-                // as both components is the only reading that leaves a
-                // legacy preset replaying identically, where neither is
-                // read.
+                // Eight carries the two reversion targets. Every shorter
+                // length predates the thirty-day read-back and SEEDS them
+                // from the component levels -- zero deviation, which reads
+                // as the one-day identity on the first restored close and
+                // is the only reading that leaves a pre-horizon checkpoint
+                // honest: it cannot know what its close reverted toward,
+                // and inventing a target would invent an excursion.
+                //
+                // Six carries the smoothed fear. Five carries the
+                // lagged-wire memory. Four is a pt-v4 checkpoint (no lag
+                // memory; the wire skips one session, which is what that
+                // era did anyway). Three predates the mixture and carried
+                // an additive slow level; adopting it as both components is
+                // the only reading that leaves a legacy preset replaying
+                // identically, where neither is read.
+                8 => self.inner.set_market_variance_state_with_components(
+                    vals[0], vals[1], vals[2], vals[3], vals[4], vals[5],
+                    vals[6], vals[7]),
                 6 => self.inner.set_market_variance_state_with_components(
-                    vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]),
+                    vals[0], vals[1], vals[2], vals[3], vals[4], vals[5],
+                    vals[2], vals[3]),
                 5 => self.inner.set_market_variance_state_with_components(
-                    vals[0], vals[1], vals[2], vals[3], vals[4], -1.0),
+                    vals[0], vals[1], vals[2], vals[3], vals[4], -1.0,
+                    vals[2], vals[3]),
                 4 => self.inner.set_market_variance_state_with_components(
-                    vals[0], vals[1], vals[2], vals[3], 0.0, -1.0),
+                    vals[0], vals[1], vals[2], vals[3], 0.0, -1.0,
+                    vals[2], vals[3]),
                 3 => self.inner.set_market_variance_state_with_components(
-                    vals[0], vals[1], vals[0], vals[2], 0.0, -1.0),
+                    vals[0], vals[1], vals[0], vals[2], 0.0, -1.0,
+                    vals[0], vals[2]),
                 _ => self.inner.set_market_variance_state(vals[0], vals[1]),
             }
         }

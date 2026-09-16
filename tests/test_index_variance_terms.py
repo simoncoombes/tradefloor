@@ -341,3 +341,49 @@ def test_a_fork_carries_the_reading_and_a_restore_does_not():
     run(fresh, 1)
     assert fresh.index_variance_terms() is not None, (
         "a restored engine never picked the reading up again")
+
+
+def test_the_reported_total_is_the_thirty_day_read_and_the_one_day_sits_beside_it():
+    """The horizon, which is the thing the identity now prices.
+
+    `vix_from_variance` used to be handed `V_t`, the index's one-day-ahead
+    conditional variance. The VIX's own definition is the expected variance
+    over the next thirty calendar days -- 21 sessions -- so `total` is that
+    average and `implied` is the identity on it, while `total_one_day` is
+    the single-session variance the same update computed for the zero-mean
+    fear correction, which normalises the session's own return and is a
+    one-day object. See `programme/persistence-derivation.md` 4.1 and
+    `programme/vix-horizon-implementation.md` in the design repository.
+
+    Three claims, and each fails for its own reason. That both keys are
+    reported at all: a read that quietly returned the one-day total under
+    the `total` name would pass every other test in this file. That they
+    DIFFER on a live session: two keys carrying one number is what a
+    horizon wired to nothing looks like. And that `implied` is the identity
+    on `total` and NOT on `total_one_day`: which of the two reaches the VIX
+    is the whole change, and it is the one thing a reader cannot check by
+    looking at the keys.
+    """
+    engine = pt.Engine(seed=SEED, universe=universe(),
+                       model=model(vix_level_identity=1.0))
+    premium = engine.model_params["vix_variance_premium"]
+    differed = 0
+    rows = run(engine)
+    for before, after, t in rows:
+        assert "total_one_day" in t, "the one-day total is not reported"
+        assert t["total_one_day"] > 0.0, "an index with no one-day variance"
+        want = (1.0 + premium) * 100.0 * math.sqrt(252.0 * t["total"])
+        assert bits(t["implied"]) == bits(want), (
+            f'implied {t["implied"]} is not the identity on the thirty-day '
+            f'total {t["total"]}')
+        one_day_implied = (1.0 + premium) * 100.0 * math.sqrt(
+            252.0 * t["total_one_day"])
+        if bits(t["total"]) != bits(t["total_one_day"]):
+            differed += 1
+            assert bits(t["implied"]) != bits(one_day_implied), (
+                "the two totals differ and the implied matches the one-day "
+                "one: the horizon is not reaching the VIX")
+    assert differed == len(rows), (
+        f"{len(rows) - differed} of {len(rows)} sessions read the same number "
+        "for both horizons; a live run is never at rest, so the horizon "
+        "recursion is inert")

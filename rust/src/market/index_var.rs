@@ -573,7 +573,7 @@ fn name_noise_variance(
 /// The jump arrival rates at a given rate scale, in the spelling
 /// `Engine::apply_jumps` uses — the branch at zero coupling included, so
 /// the two cannot drift apart.
-fn jump_intensities(p: &ModelParams, rate_scale: f64) -> (f64, f64) {
+pub(crate) fn jump_intensities(p: &ModelParams, rate_scale: f64) -> (f64, f64) {
     if p.jump_vix_coupling == 0.0 {
         (p.jump_intensity_market, p.jump_intensity_idio)
     } else if p.jump_idio_vix_decoupled != 0.0 {
@@ -1092,6 +1092,326 @@ pub fn resting_garch_variances(
     v
 }
 
+/// **Thirty calendar days is 21 trading sessions**, which is the VIX's own
+/// definition and the whole of the horizon this module prices over.
+///
+/// Not a dial and deliberately not one. `persistence-derivation.md` 4.1
+/// (design repository) asks what the identity's horizon should be and
+/// answers it from the instrument's definition rather than from a fit; a
+/// dial here would be a free parameter standing where a definition
+/// belongs, and the derivation's own claim is that the change is
+/// parameter-free.
+pub const VIX_HORIZON_SESSIONS: usize = 21;
+
+/// The identity's inputs, each averaged over [`VIX_HORIZON_SESSIONS`]
+/// forward sessions — what [`index_horizon_variance_terms`] reads in place
+/// of today's states.
+///
+/// Every field is in the units and the order the one-day identity already
+/// takes, because the horizon form IS the one-day identity: nothing in
+/// `index_conditional_variance_terms_with_states` moves, and the only
+/// difference between a one-day read and a thirty-day one is what it is
+/// handed. That is not a tidiness argument — it is what makes the rest
+/// identity checkable, since at rest the horizon states are the today
+/// states and the two totals agree on bits.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HorizonStates {
+    /// `v_f_bar`, the factor mixture averaged over the horizon.
+    pub factor_variance: f64,
+    /// The roster with each name's `garch_variance` replaced by `u_bar_i`,
+    /// the horizon mean of its own GARCH path through the tick's floor.
+    /// Every other field is the name's own and untouched.
+    pub names: Vec<NameVariance>,
+    /// One daily sigma per sector key: `target * sqrt(s_bar_k)`, the
+    /// target held and only the RATIO averaged.
+    pub sector_sigmas: Vec<f64>,
+    /// `h_bar_i` per name, in `names`' order; empty when the excitation
+    /// state is off.
+    pub excitations: Vec<f64>,
+    /// The intraday curve's second moment, carried rather than recomputed
+    /// for the reason [`IndexVarianceTerms`] carries it: the total is not
+    /// reconstructible from the terms without it.
+    pub k: f64,
+}
+
+/// Every state the identity reads, stepped forward under its OWN mean
+/// recursion and averaged over [`VIX_HORIZON_SESSIONS`] sessions.
+///
+/// # What this is for
+///
+/// `vix_from_variance` used to be handed `V_t`, the index's one-day-ahead
+/// conditional variance. A real VIX prices the expected variance over the
+/// next thirty calendar days:
+///
+/// ```text
+/// implied_30 = (1 + pi) * 100 * sqrt(252 * (1/21) * sum_{h=1..21} E_t[V_{t+h}])
+/// ```
+///
+/// `V` is LINEAR in every state it reads once the VIX-coupled quantities
+/// are held — the factor mixture, each sector's variance ratio, each
+/// name's GARCH level, each name's jump excitation — so the sum above is
+/// one evaluation of the SAME identity on horizon-averaged states, not a
+/// second identity. That linearity is why this function exists and why
+/// [`index_horizon_variance_terms`] is four lines.
+///
+/// See `persistence-derivation.md` 4.1 and
+/// `programme/vix-horizon-implementation.md` (design repository). It is
+/// parameter-free: 21 is the instrument's definition and every persistence
+/// below is a dial that already exists.
+///
+/// # What is averaged and what is HELD
+///
+/// Averaged: the four states with a persistence of their own. Held at
+/// today's face, exactly as the one-day identity already holds them: the
+/// factor's two TARGETS, the sector's target sigma, the jump rate scale,
+/// the per-name clamp reference, the crisis spike and the lag bit. Every
+/// one of those is a function of the VIX path, and the VIX path is what
+/// this quantity is an input to — holding them is the approximation the
+/// one-day read already makes and this change does not enlarge it.
+///
+/// The lag bit is the one held quantity worth naming twice. It is a fair
+/// coin from `h = 2` onward and the honest thirty-day expectation would
+/// average its two faces there, as [`index_unconditional_variance`] does
+/// for the anchor. Held here because the derivation holds it, and because
+/// averaging would cost the bit-exact rest identity on a lagged session.
+/// Filed in the design note's section 9, not forgotten.
+///
+/// # The four recursions
+///
+/// - **Factor**: the 2x2 mixture, [`crate::market::factor_vol::factor_horizon_path`].
+///   Its per-session path is needed here and not merely its average,
+///   because the mixture is the FORCING of every per-name GARCH below.
+/// - **Sector ratio**: `s' = (1 - a - b) + a z^2 + b s` with `E[z^2] = s`
+///   (the day's sector factor is drawn at `target * s`), so
+///   `E[s_{t+h}] = 1 + (a + b)^h (s_t - 1)`. Written in deviation
+///   coordinates about 1.0, which is the rest point, so a resting sector
+///   returns exactly 1.0 and `target * sqrt(1.0)` is the target's own bits.
+/// - **Per name**: `garch.rs`'s update in expectation, with the innovation's
+///   variance from [`name_noise_variance`] — the same object
+///   [`resting_garch_variances`] solves against, so the rest point of that
+///   solve is a fixed point of this recursion. The memory is
+///   `beta_i + q_i K c_i^2` and NOT `alpha + beta + gamma/2`: the GARCH
+///   innovation is the name's whole daily noise, so the factor and sector
+///   blocks enter as FORCING and only the idiosyncratic share is memory.
+///   At pt-v19 the two readings are 0.8336 and 0.9416, which average to
+///   0.233 and 0.55 of a deviation over the horizon — a factor of two, and
+///   the wrong one is the one that looks like a GARCH persistence.
+/// - **Excitation**: `rate = lambda_i (1 + h)` and `h' = d h + e 1{jump}`,
+///   so `E[h'] = e lambda_i + (d + e lambda_i) h`, resting at
+///   `e lambda_i / (1 - d - e lambda_i)`.
+///
+/// # The per-name floor, stated because it bounds what this buys
+///
+/// What the identity receives per name is
+/// `u_bar_i = (1/21) sum_h max(E[v_{t+h}], idio_sigma_floor)` — the floor
+/// inside the average, so [`idio_sigma_daily`]'s own `max` is idempotent
+/// on it and the MEAN PATH is priced rather than the max of the mean. On
+/// the shipped preset nearly every name rests UNDER that floor, so the
+/// floor truncates the path and the horizon buys less per-name smoothing
+/// than 0.233 suggests. That is a property of the preset, not of this
+/// recursion.
+///
+/// # Arguments
+///
+/// `factor` is `(fast, slow, fast_target, slow_target)` from
+/// [`crate::market::factor_vol::MarketVarianceState`]. `garch_clamp_bases`
+/// is one base variance per name, ALREADY VIX-scaled by the caller through
+/// [`crate::market::garch::garch_clamp_base`], because the clamp reference
+/// is held and the scaling is the close's own. `sector_states` is one
+/// variance RATIO per sector key — `1.0` for a sector whose state is off
+/// or unseeded, which the caller expands, exactly as the one-day read-back
+/// expands the shared sigma. `idio_jump_rate` is `lambda_i` at today's rate
+/// scale.
+pub fn horizon_mean_states(
+    p: &ModelParams,
+    names: &[NameVariance],
+    garch_clamp_bases: &[f64],
+    factor: (f64, f64, f64, f64),
+    sector_states: &[f64],
+    sector_target_sigma: f64,
+    excitations: &[f64],
+    idio_jump_rate: f64,
+    k: f64,
+) -> HorizonStates {
+    let sessions = VIX_HORIZON_SESSIONS;
+    let (fast, slow, fast_target, slow_target) = factor;
+
+    // ── The factor, and its whole path ────────────────────────────────────
+    //
+    // Entry `h - 1` is the mixture in force on forward session `h`, which
+    // is the variance the day-`h` draws are made at — so it is the forcing
+    // both the factor's own step and every name's step reads on that
+    // session. The average is what the identity is handed.
+    let mut mixture_path = Vec::with_capacity(sessions);
+    let (_, _, factor_variance) = crate::market::factor_vol::factor_horizon_path(
+        p, fast, slow, fast_target, slow_target, sessions, &mut mixture_path);
+
+    // ── The sector ratios, in deviation coordinates about their rest ──────
+    //
+    // A ratio at or below zero is an UNSEEDED sector, which
+    // `Engine::sector_sigmas_now` reads as the target itself; 1.0 is that
+    // same reading here.
+    let sector_persistence = p.sector_vol_alpha + p.sector_vol_beta;
+    let mut sector_dev: Vec<f64> = sector_states
+        .iter()
+        .map(|s| if *s > 0.0 { *s - 1.0 } else { 0.0 })
+        .collect();
+    let mut sector_sum = vec![0.0; sector_dev.len()];
+
+    // ── The per-name GARCH states ─────────────────────────────────────────
+    let shock_share = p.garch_alpha + p.garch_gamma / 2.0;
+    let mut name_var: Vec<f64> = names.iter().map(|n| n.garch_variance).collect();
+    // Each name's path is summed as a DEVIATION from the level it starts
+    // at, for the reason every other block here is: a name whose recursion
+    // does not move must come back as the same double, and `21 * x / 21` is
+    // not `x` for a general double. A name held by its clamps, or one whose
+    // whole path sits on the tick's floor -- which on the shipped preset is
+    // nearly every name -- returns its own bits, and the rest identity is
+    // then a statement about the recursion rather than about rounding.
+    let name_seed: Vec<f64> = names
+        .iter()
+        .map(|n| mathx::max(n.garch_variance, p.idio_sigma_floor))
+        .collect();
+    let mut name_sum = vec![0.0; names.len()];
+
+    // ── The excitation, in deviation coordinates about its own rest ───────
+    let excite = p.jump_idio_excitation;
+    let excite_persistence = p.jump_idio_excitation_decay + excite * idio_jump_rate;
+    // A persistence at or above one has no rest point to revert to. The
+    // honest answer there is to hold the state — the process is explosive
+    // in mean and an average of a divergent path is not a variance anybody
+    // should price — and no shipped preset reaches it (0.7338 at pt-v19).
+    let excite_rest = if excite_persistence < 1.0 {
+        excite * idio_jump_rate / (1.0 - excite_persistence)
+    } else {
+        f64::NAN
+    };
+    let mut excite_dev: Vec<f64> = excitations
+        .iter()
+        .map(|h| if excite_persistence < 1.0 { *h - excite_rest } else { 0.0 })
+        .collect();
+    let mut excite_sum = vec![0.0; excite_dev.len()];
+
+    for step in 0..sessions {
+        // The two forcings IN FORCE on this session: the factor mixture and
+        // each sector's sigma, both read BEFORE this session's closes move
+        // them, which is the alignment a GARCH innovation has.
+        let session_factor = mixture_path[step];
+
+        for (i, name) in names.iter().enumerate() {
+            let beta_i = crate::market::garch::garch_beta_for(p, name.market_cap);
+            if !(beta_i < 1.0) {
+                // `resting_garch_variances` skips such a name rather than
+                // dividing by a non-positive `1 - beta`; so does this, and
+                // the name's level is held for the whole horizon.
+                name_sum[i] += mathx::max(name_var[i], p.idio_sigma_floor) - name_seed[i];
+                continue;
+            }
+            let sector_ratio = 1.0 + sector_dev.get(name.sector).copied().unwrap_or(0.0);
+            let sector_sigma = sector_target_sigma * mathx::sqrt(sector_ratio);
+            let probe = NameVariance { garch_variance: name_var[i], ..*name };
+            let r2 = name_noise_variance(p, &probe, session_factor, sector_sigma, k);
+            // `garch::update_garch_variance_for` in expectation: `E[r^2]` is
+            // `r2` and `E[1{r<0} r^2]` is half of it for a symmetric
+            // innovation, so `alpha` and `gamma` enter as `shock_share`.
+            // `garch_omega` rather than the sector-scaled identity, because
+            // that is the spelling `resting_garch_variances` solves against
+            // and the rest point of that solve has to be a fixed point of
+            // this step. `garch_omega_sector_scaled` is 0.0 on every shipped
+            // preset, where the two spellings are the same number.
+            let raw = p.garch_omega + shock_share * r2 + beta_i * name_var[i];
+            let base = garch_clamp_bases.get(i).copied().unwrap_or(name_var[i]);
+            name_var[i] = mathx::max(
+                mathx::min(raw, base * p.garch_ceiling_multiple),
+                base * p.garch_floor_multiple,
+            );
+            // The floor INSIDE the average: `idio_sigma_daily` takes the
+            // same `max`, so applying it here makes that one idempotent and
+            // the identity prices the mean of the floored path rather than
+            // the floor of the mean path.
+            name_sum[i] += mathx::max(name_var[i], p.idio_sigma_floor) - name_seed[i];
+        }
+
+        for (key, dev) in sector_dev.iter_mut().enumerate() {
+            let stepped = sector_persistence * *dev;
+            // The close's own clamp, on the LEVEL and carried back to the
+            // deviation so a resting sector stays at exactly 1.0.
+            *dev = mathx::max(
+                mathx::min(1.0 + stepped, p.garch_ceiling_multiple),
+                p.garch_floor_multiple,
+            ) - 1.0;
+            sector_sum[key] += *dev;
+        }
+
+        for (i, dev) in excite_dev.iter_mut().enumerate() {
+            if excite_persistence < 1.0 {
+                *dev = excite_persistence * *dev;
+            }
+            excite_sum[i] += *dev;
+        }
+    }
+
+    let n = sessions as f64;
+    let horizon_names: Vec<NameVariance> = names
+        .iter()
+        .enumerate()
+        .map(|(i, name)| NameVariance {
+            garch_variance: name_seed[i] + name_sum[i] / n,
+            ..*name
+        })
+        .collect();
+    let sector_sigmas: Vec<f64> = sector_sum
+        .iter()
+        .map(|sum| sector_target_sigma * mathx::sqrt(1.0 + sum / n))
+        .collect();
+    let horizon_excitations: Vec<f64> = if excite_persistence < 1.0 {
+        excite_sum.iter().map(|sum| excite_rest + sum / n).collect()
+    } else {
+        excitations.to_vec()
+    };
+
+    HorizonStates {
+        factor_variance,
+        names: horizon_names,
+        sector_sigmas,
+        excitations: horizon_excitations,
+        k,
+    }
+}
+
+/// [`index_conditional_variance_terms_with_states`] on horizon-averaged
+/// states — the thirty-day read of the SAME identity.
+///
+/// Same identity, same order of operations, same function. The only
+/// difference is what it is handed, which is the whole design: nothing in
+/// the identity moves, so no term can be priced two ways and the rest
+/// identity is a statement about the states rather than about the
+/// arithmetic.
+///
+/// `jump_rate_scale`, `crisis_spike` and `prev_day_down` are HELD at
+/// today's face — see [`horizon_mean_states`] for why each one is.
+pub fn index_horizon_variance_terms(
+    p: &ModelParams,
+    h: &HorizonStates,
+    sector_count: usize,
+    jump_rate_scale: f64,
+    crisis_spike: f64,
+    prev_day_down: bool,
+) -> IndexVarianceTerms {
+    index_conditional_variance_terms_with_states(
+        p,
+        &h.names,
+        sector_count,
+        h.factor_variance,
+        &h.sector_sigmas,
+        &h.excitations,
+        jump_rate_scale,
+        crisis_spike,
+        prev_day_down,
+        h.k,
+    )
+}
+
 /// The index's variance at the point every VIX coupling reads ONE — the
 /// unconditional form of the identity, and therefore the definition of
 /// `market_vol_vix_anchor`.
@@ -1193,7 +1513,7 @@ pub fn vix_from_variance(premium: f64, variance: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::params::PT_V18;
+    use crate::params::{PT_V18, PT_V19};
 
     fn roster() -> Vec<NameVariance> {
         (0..8)
@@ -2492,5 +2812,470 @@ mod tests {
         assert!((vix_from_variance(0.0, v) - 100.0 * mathx::sqrt(252.0) * 0.01).abs() < 1e-12);
         // The premium is multiplicative on the whole level.
         assert!((vix_from_variance(0.25, v) - 1.25 * vix_from_variance(0.0, v)).abs() < 1e-12);
+    }
+
+    // ── THE THIRTY-DAY HORIZON ────────────────────────────────────────────
+    //
+    // `persistence-derivation.md` 4.1 and
+    // `programme/vix-horizon-implementation.md` (design repository). The
+    // identity prices the expected variance over the next 21 sessions, not
+    // over the next one. Four properties are worth pinning and they are
+    // pinned separately, because each one fails for its own reason: the
+    // rest identity (which protects the derived anchor and the premium's
+    // meaning), each of the two recursions whose exact rate the derivation
+    // got wrong, and the ordering that says the horizon is an average
+    // between where the state is and where it is going.
+
+    /// The factor's two targets and both component levels at a given
+    /// variance, as the four-tuple `horizon_mean_states` takes.
+    fn factor_at_rest(p: &ModelParams) -> (f64, f64, f64, f64) {
+        let base = p.market_factor_sigma * p.market_factor_sigma;
+        (base, base, base, base)
+    }
+
+    /// The factor variance the identity reads when both components sit on a
+    /// shared target — the mixture, spelled exactly as `close_day_scaled`
+    /// spells it, because the claim below is about bits.
+    fn resting_mixture(p: &ModelParams) -> f64 {
+        let base = p.market_factor_sigma * p.market_factor_sigma;
+        let w = p.market_vol_slow_weight;
+        if w == 0.0 { base } else { (1.0 - w) * base + w * base }
+    }
+
+    /// The horizon average of a scalar deviation decaying at `phi`:
+    /// `A(phi) = (1/21) sum_{h=1..21} phi^h`. The closed form, kept here
+    /// and not in the engine — the engine iterates, so that the parity
+    /// surface gains no `pow`, and this is what it is checked against.
+    fn horizon_average(phi: f64) -> f64 {
+        phi * (1.0 - mathx::pow(phi, VIX_HORIZON_SESSIONS as f64))
+            / (VIX_HORIZON_SESSIONS as f64 * (1.0 - phi))
+    }
+
+    /// THE REST IDENTITY, and it is the load-bearing one: it is what keeps
+    /// `derive_vix_anchor` bit-identical and what keeps
+    /// `vix_variance_premium` meaning what it was measured to mean.
+    ///
+    /// At the unconditional point every state sits on its own target, so
+    /// the expected variance 21 sessions out is the expected variance one
+    /// session out, and the thirty-day read-back must return the one-day
+    /// read-back's own DOUBLE rather than a number near it. Near it would
+    /// be enough for a test and not enough for the claim: `implied over
+    /// realised is `1 + pi` at the unconditional point` is an equality, and
+    /// a read-back that moved the resting VIX by a part in 10^15 would make
+    /// the premium a measurement of the rounding.
+    ///
+    /// First half, every block exactly static, asserted ON BITS. Second
+    /// half, the shipped per-name process seeded at the level its own
+    /// contraction solves: `resting_garch_variances` converges to a part in
+    /// 10^12 rather than to the bit (`RESTING_VARIANCE_PASSES` is a fixed
+    /// count, by design), so its fixed point is a fixed point of this
+    /// recursion to the same tolerance and no better. The two halves
+    /// separate "the recursion is the identity" from "the seed is the
+    /// fixed point".
+    #[test]
+    fn the_horizon_at_rest_is_the_one_day_read_back_on_bits() {
+        let names = roster();
+        let k = intraday_variance_factor();
+
+        // ── Every block static ────────────────────────────────────────────
+        let mut p = PT_V19;
+        // The per-name band pinned to a POINT at each name's own level, so
+        // the GARCH step returns that level whatever the dials do. This is
+        // "static" in the only sense that owes nothing to float luck: the
+        // clamp is an equality, not an approximation.
+        p.garch_floor_multiple = 1.0;
+        p.garch_ceiling_multiple = 1.0;
+        // No excitation state, so the jump block is the stateless one.
+        p.jump_idio_excitation = 0.0;
+        let bases: Vec<f64> = names.iter().map(|n| n.garch_variance).collect();
+        let sector_sigma = p.sector_factor_sigma;
+        // One sector ratio per key, all at the rest the ratio recursion
+        // reverts to.
+        let sector_states = vec![1.0; 3];
+        let v_f = resting_mixture(&p);
+
+        let horizon = horizon_mean_states(
+            &p, &names, &bases, factor_at_rest(&p), &sector_states, sector_sigma,
+            &[], 0.0, k);
+        assert_eq!(
+            horizon.factor_variance.to_bits(), v_f.to_bits(),
+            "the factor's horizon mean at rest is not the mixture's own double"
+        );
+        for (i, name) in horizon.names.iter().enumerate() {
+            assert_eq!(
+                name.garch_variance.to_bits(), names[i].garch_variance.to_bits(),
+                "name {i}'s horizon mean moved a static level"
+            );
+        }
+        for sigma in horizon.sector_sigmas.iter() {
+            assert_eq!(
+                sigma.to_bits(), sector_sigma.to_bits(),
+                "a resting sector's horizon sigma is not the target's own double"
+            );
+        }
+
+        let one_day = index_conditional_variance_terms_with_states(
+            &p, &names, 3, v_f, &vec![sector_sigma; 3], &[], 1.0, 0.0, false, k);
+        let thirty = index_horizon_variance_terms(&p, &horizon, 3, 1.0, 0.0, false);
+        assert_eq!(
+            thirty.total().to_bits(), one_day.total().to_bits(),
+            "the horizon read-back at rest is {} against the one-day {}",
+            thirty.total(), one_day.total()
+        );
+
+        // ── The shipped per-name process, at its own rest ─────────────────
+        let p = PT_V19;
+        let bases: Vec<f64> = names.iter().map(|n| n.garch_variance).collect();
+        let resting = resting_garch_variances(&p, &names, &bases, v_f, sector_sigma, k);
+        let at_rest: Vec<NameVariance> = names
+            .iter()
+            .enumerate()
+            .map(|(i, n)| NameVariance { garch_variance: resting[i], ..*n })
+            .collect();
+        let horizon = horizon_mean_states(
+            &p, &at_rest, &bases, factor_at_rest(&p), &sector_states, sector_sigma,
+            &[], 0.0, k);
+        let one_day = index_conditional_variance_terms_with_states(
+            &p, &at_rest, 3, v_f, &vec![sector_sigma; 3], &[], 1.0, 0.0, false, k);
+        let thirty = index_horizon_variance_terms(&p, &horizon, 3, 1.0, 0.0, false);
+        let relative = (thirty.total() - one_day.total()).abs() / one_day.total();
+        assert!(
+            relative < 1e-9,
+            "the horizon read-back at the solved per-name rest is {} against the \
+             one-day {}, a relative gap of {relative}",
+            thirty.total(), one_day.total()
+        );
+    }
+
+    /// THE FACTOR'S RECURSION IS THE 2x2 AND NOT TWO INDEPENDENT DECAYS,
+    /// and this test exists because the derivation said otherwise.
+    ///
+    /// `persistence-derivation.md` 4.1 quotes 0.90 of the one-day value on a
+    /// 20x factor excursion, from a single persistence of 0.979 averaging
+    /// 16.2x over 21 sessions. That is the arithmetic of a preset with NO
+    /// SLOW COMPONENT. At pt-v19 the tick draws the day factor at the
+    /// mixture's variance, so each component's expectation is forced by the
+    /// other, the map is the 2x2 in `factor_vol::factor_horizon_path`, and
+    /// its eigenvalues are 0.9230 and 0.9855 rather than 0.979 and 0.9913.
+    /// The excursion reads 0.921 of the one-day implied, not 0.899.
+    ///
+    /// Both readings are asserted, because the difference between them is
+    /// the whole content of the correction: the second half switches the
+    /// slow component off and recovers the derivation's own figure exactly,
+    /// which is what says the two are the same recursion under different
+    /// dials rather than two different claims.
+    #[test]
+    fn a_factor_excursion_reads_the_horizons_average_of_its_own_decay() {
+        let names = roster();
+        let k = intraday_variance_factor();
+        let mut p = PT_V19;
+        p.garch_floor_multiple = 1.0;
+        p.garch_ceiling_multiple = 1.0;
+        p.jump_idio_excitation = 0.0;
+        let bases: Vec<f64> = names.iter().map(|n| n.garch_variance).collect();
+        let sector_sigma = p.sector_factor_sigma;
+        let sector_states = vec![1.0; 3];
+        let base = p.market_factor_sigma * p.market_factor_sigma;
+
+        // Both components 20x their shared target, which is the excursion
+        // the derivation measures and is inside the ceiling multiple.
+        let excursion = 20.0;
+        let displaced = (excursion * base, excursion * base, base, base);
+
+        let horizon = horizon_mean_states(
+            &p, &names, &bases, displaced, &sector_states, sector_sigma, &[], 0.0, k);
+        let multiple = horizon.factor_variance / base;
+        assert!(
+            (multiple - 16.98).abs() < 1e-2,
+            "the two-component horizon mean of a 20x excursion is {multiple}x base, \
+             not the 16.98x the 2x2 recursion gives"
+        );
+        // The IMPLIED ratio, which is what the VIX actually moves by: the
+        // identity is a square root, so a 0.849 variance ratio is a 0.921
+        // level ratio.
+        let implied_ratio = mathx::sqrt(multiple / excursion);
+        assert!(
+            (implied_ratio - 0.921).abs() < 1e-3,
+            "a 20x two-component excursion reads {implied_ratio} of the one-day \
+             implied, not 0.921"
+        );
+        assert!(
+            (implied_ratio - 0.899).abs() > 0.015,
+            "the two-component reading has collapsed onto the single-component \
+             0.899; the cross-feeding term is not reaching the recursion"
+        );
+        // And it is the AVERAGE of the mixture's own decay and nothing else:
+        // the block the identity builds from it moves by exactly the same
+        // ratio, because `factor_raw` is linear in `v_f`.
+        let one_day = index_conditional_variance_terms_with_states(
+            &p, &names, 3, excursion * base, &vec![sector_sigma; 3], &[], 1.0, 0.0,
+            false, k);
+        let thirty = index_horizon_variance_terms(&p, &horizon, 3, 1.0, 0.0, false);
+        let block_ratio = thirty.factor_raw / one_day.factor_raw;
+        assert!(
+            (block_ratio - multiple / excursion).abs() < 1e-12,
+            "the factor block is not linear in the variance it is handed"
+        );
+
+        // ── The single-component case: the derivation's own figure ────────
+        let mut p1 = p;
+        p1.market_vol_slow_weight = 0.0;
+        let horizon1 = horizon_mean_states(
+            &p1, &names, &bases, displaced, &sector_states, sector_sigma, &[], 0.0, k);
+        let multiple1 = horizon1.factor_variance / base;
+        assert!(
+            (multiple1 - 16.17).abs() < 1e-2,
+            "the single-component horizon mean of a 20x excursion is {multiple1}x \
+             base, not the 16.17x that `A(0.979)` gives"
+        );
+        let implied1 = mathx::sqrt(multiple1 / excursion);
+        assert!(
+            (implied1 - 0.899).abs() < 1e-3,
+            "the single-component excursion reads {implied1}, not the \
+             derivation's 0.899"
+        );
+        // The closed form, as the check on the iteration: with one
+        // component the deviation decays at `alpha + beta + gamma/2`.
+        let p_fast = p1.market_vol_alpha + p1.market_vol_beta + 0.5 * p1.market_vol_gamma;
+        let closed = 1.0 + horizon_average(p_fast) * (excursion - 1.0);
+        assert!(
+            (multiple1 - closed).abs() < 1e-9,
+            "the iterated single-component mean {multiple1} is not the closed form \
+             {closed}"
+        );
+    }
+
+    /// THE PER-NAME MEMORY IS `beta_i + q_i K c_i^2` AND NOT
+    /// `alpha + beta + gamma/2`, and the difference is a factor of two in
+    /// what the horizon buys.
+    ///
+    /// The naive reading treats the GARCH's persistence as the memory of
+    /// its own variance. It is not, because the innovation this process is
+    /// fed is the name's WHOLE DAILY NOISE (`market/daily.rs`: "the
+    /// innovation is the day's NOISE, not its return"), and that noise
+    /// carries the market factor and the sector factor as well as the
+    /// name's own draw. Under the expectation the factor and sector blocks
+    /// are FORCING — they do not depend on this name's variance at all —
+    /// and only the idiosyncratic share `q_i K c_i^2` comes back as memory.
+    ///
+    /// At pt-v19 the two readings are 0.8336 and 0.9416, which average to
+    /// 0.233 and 0.55 of a deviation over 21 sessions. The test asserts the
+    /// first AND refuses the second, because a bug that put the naive rate
+    /// in would still produce a number between zero and one that decayed in
+    /// the right direction.
+    #[test]
+    fn a_per_name_excursion_reads_the_horizons_average_of_the_names_decay() {
+        let names = roster();
+        let k = intraday_variance_factor();
+        let mut p = PT_V19;
+        // Neither bound may bind: this is a test of the recursion's RATE,
+        // and a clamped path has the clamp's rate instead.
+        p.idio_sigma_floor = 0.0;
+        p.garch_floor_multiple = 0.0;
+        p.garch_ceiling_multiple = 1.0e6;
+        p.jump_idio_excitation = 0.0;
+        let bases: Vec<f64> = names.iter().map(|n| n.garch_variance).collect();
+        let sector_sigma = p.sector_factor_sigma;
+        let sector_states = vec![1.0; 3];
+        let v_f = resting_mixture(&p);
+
+        // Every name at its own rest, then ONE of them displaced. The rest
+        // point is the fixed point of the same map, so the deviation of the
+        // displaced name is the only thing moving.
+        let resting = resting_garch_variances(&p, &names, &bases, v_f, sector_sigma, k);
+        let mut at_rest: Vec<NameVariance> = names
+            .iter()
+            .enumerate()
+            .map(|(i, n)| NameVariance { garch_variance: resting[i], ..*n })
+            .collect();
+        let target = 0usize;
+        let displaced_level = 4.0 * resting[target];
+        at_rest[target].garch_variance = displaced_level;
+
+        let horizon = horizon_mean_states(
+            &p, &at_rest, &bases, factor_at_rest(&p), &sector_states, sector_sigma,
+            &[], 0.0, k);
+        let u_bar = horizon.names[target].garch_variance;
+        let carried = (u_bar - resting[target]) / (displaced_level - resting[target]);
+
+        // The rate the derivation names, built from the dials rather than
+        // written down: `q_i` is the GJR shock share, `c_i` the name's
+        // idiosyncratic scale through both of `factors.rs`'s multipliers,
+        // and `K` the intraday curve — the three factors `name_noise_variance`
+        // puts on the idiosyncratic term and nothing else.
+        let name = &names[target];
+        let q_i = p.garch_alpha + p.garch_gamma / 2.0;
+        let c_i = crate::market::factors::idio_scale_for(&p, name.beta)
+            * crate::market::factors::cap_size_multiplier_with(&p, name.market_cap);
+        let beta_i = crate::market::garch::garch_beta_for(&p, name.market_cap);
+        let exact = beta_i + q_i * k * c_i * c_i;
+        let expected = horizon_average(exact);
+        assert!(
+            (carried - expected).abs() < 2e-3,
+            "a per-name excursion carries {carried} of its deviation over the \
+             horizon, not the {expected} that `A({exact})` gives"
+        );
+
+        // AND IT IS NOT THE NAIVE FIGURE. `alpha + beta + gamma/2` is the
+        // persistence of a GARCH fed its own return; this process is fed
+        // the whole day's noise and the factor block is forcing.
+        let naive = p.garch_alpha + beta_i + p.garch_gamma / 2.0;
+        let naive_average = horizon_average(naive);
+        assert!(
+            naive_average - expected > 0.25,
+            "the naive rate {naive} and the exact {exact} no longer differ enough \
+             for this test to distinguish them ({naive_average} against {expected}); \
+             a recalibration has moved the preset and this test needs rereading"
+        );
+        assert!(
+            (carried - naive_average).abs() > 0.25,
+            "the per-name horizon is carrying {carried}, which is the NAIVE \
+             {naive_average}: the factor and sector blocks are being treated as \
+             memory rather than as forcing"
+        );
+    }
+
+
+    /// THE HORIZON IS AN AVERAGE, which is an ordering claim and not an
+    /// arithmetic one: for every state that carries a persistence, the
+    /// thirty-day total must move the same way the state does, and must sit
+    /// between the one-day total (where the path starts) and the resting
+    /// total (where it is going).
+    ///
+    /// This is the property a sign error, a swapped target or an off-by-one
+    /// in the horizon length breaks while every closed form above still
+    /// passes at its own point. Five rungs each side of rest for each
+    /// state, so a state that had come unwired would fail the monotonicity
+    /// half rather than pass the betweenness half by doing nothing.
+    ///
+    /// # THE SLOW COMPONENT IS THE EXCEPTION, and it is a finding
+    ///
+    /// Betweenness is a theorem for a scalar decay and it is NOT one for
+    /// the factor's 2x2. Displace the slow component alone and the horizon
+    /// mean lands on the FAR side of the one-day read from rest: the slow
+    /// component barely moves over 21 sessions (eigenvalue 0.9855) while
+    /// the fast component, forced by the mixture the tick draws at, is
+    /// dragged TOWARD the displaced slow level — so the mixture moves
+    /// further from rest before it ever comes back. Measured here at 0.87
+    /// per cent of the mixture on a 0.4x slow displacement.
+    ///
+    /// That is `vix-horizon-implementation.md`'s own finding 2 read in the
+    /// other direction, and it falsifies that note's section 7 test 4,
+    /// which asks for betweenness on all five states. The claim is
+    /// narrowed rather than dropped, and the violation is ASSERTED rather
+    /// than excluded, so the cross-feeding is pinned here as well as in
+    /// `factor_vol.rs`'s Monte Carlo.
+    #[test]
+    fn the_horizon_lies_between_the_state_and_its_rest_and_is_monotone() {
+        let names = roster();
+        let k = intraday_variance_factor();
+        let mut p = PT_V19;
+        p.idio_sigma_floor = 0.0;
+        p.garch_floor_multiple = 0.05;
+        p.garch_ceiling_multiple = 1.0e6;
+        let bases: Vec<f64> = names.iter().map(|n| n.garch_variance).collect();
+        let sector_sigma = p.sector_factor_sigma;
+        let base = p.market_factor_sigma * p.market_factor_sigma;
+        let w = p.market_vol_slow_weight;
+        let v_f = resting_mixture(&p);
+        let resting = resting_garch_variances(&p, &names, &bases, v_f, sector_sigma, k);
+        let at_rest: Vec<NameVariance> = names
+            .iter()
+            .enumerate()
+            .map(|(i, n)| NameVariance { garch_variance: resting[i], ..*n })
+            .collect();
+        let excite_rest = p.jump_idio_excitation * p.jump_intensity_idio
+            / (1.0 - p.jump_idio_excitation_decay
+                 - p.jump_idio_excitation * p.jump_intensity_idio);
+        let rest_excitations = vec![excite_rest; names.len()];
+        let rest_sectors = vec![1.0; 3];
+
+        // The total at rest, which every displaced total is measured
+        // against. Every state on its own target, so the horizon read and
+        // the one-day read are the same number by the test above.
+        let rest_total = index_horizon_variance_terms(
+            &p,
+            &horizon_mean_states(
+                &p, &at_rest, &bases, factor_at_rest(&p), &rest_sectors, sector_sigma,
+                &rest_excitations, p.jump_intensity_idio, k),
+            3, 1.0, 0.0, false,
+        ).total();
+
+        for state in ["factor", "fast", "slow", "sector", "excitation", "name"] {
+            let mut previous: Option<f64> = None;
+            for step in 0..10 {
+                // 0.4x to 4.0x of rest, monotonically increasing and
+                // skipping 1.0, so every rung is a genuine displacement.
+                let scale = if step < 5 {
+                    0.4 + 0.12 * step as f64
+                } else {
+                    1.2 + 0.7 * (step - 5) as f64
+                };
+                let mut factor = factor_at_rest(&p);
+                let mut sectors = rest_sectors.clone();
+                let mut excitations = rest_excitations.clone();
+                let mut roster_now = at_rest.clone();
+                match state {
+                    // The whole mixture displaced, which is what a regime
+                    // does to the factor and what section 2.1's 20x figure
+                    // is measured on.
+                    "factor" => { factor.0 = scale * base; factor.1 = scale * base; }
+                    "fast" => factor.0 = scale * base,
+                    "slow" => factor.1 = scale * base,
+                    "sector" => sectors[0] = scale,
+                    "excitation" => excitations[0] = scale * excite_rest,
+                    _ => {
+                        for (i, n) in roster_now.iter_mut().enumerate() {
+                            n.garch_variance = scale * resting[i];
+                        }
+                    }
+                }
+                let horizon = horizon_mean_states(
+                    &p, &roster_now, &bases, factor, &sectors, sector_sigma,
+                    &excitations, p.jump_intensity_idio, k);
+                let thirty =
+                    index_horizon_variance_terms(&p, &horizon, 3, 1.0, 0.0, false).total();
+                let one_day = index_conditional_variance_terms_with_states(
+                    &p, &roster_now, 3,
+                    if w == 0.0 { factor.0 } else { (1.0 - w) * factor.0 + w * factor.1 },
+                    &sectors.iter().map(|s| sector_sigma * mathx::sqrt(*s)).collect::<Vec<f64>>(),
+                    &excitations, 1.0, 0.0, false, k,
+                ).total();
+
+                if state == "slow" {
+                    // The exception, asserted in the direction it fails:
+                    // the horizon sits FURTHER from rest than the one-day
+                    // read does. See the docstring.
+                    assert!(
+                        (thirty - rest_total).abs() > (one_day - rest_total).abs(),
+                        "slow at {scale}x rest: the horizon total {thirty} is no \
+                         further from rest {rest_total} than the one-day {one_day}; \
+                         the fast component is not being dragged by the mixture"
+                    );
+                } else {
+                    let (lo, hi) = if one_day < rest_total {
+                        (one_day, rest_total)
+                    } else {
+                        (rest_total, one_day)
+                    };
+                    assert!(
+                        thirty >= lo * (1.0 - 1e-9) && thirty <= hi * (1.0 + 1e-9),
+                        "{state} at {scale}x rest: the horizon total {thirty} is \
+                         outside [{lo}, {hi}] — the one-day total and the resting \
+                         total"
+                    );
+                }
+                // MONOTONICITY in the state itself, for every state
+                // including the slow component.
+                if let Some(prev) = previous {
+                    assert!(
+                        thirty > prev,
+                        "{state} at {scale}x rest: the horizon total {thirty} did not \
+                         rise above {prev}; the state is not reaching the read-back"
+                    );
+                }
+                previous = Some(thirty);
+            }
+        }
     }
 }

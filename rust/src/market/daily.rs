@@ -190,13 +190,17 @@ pub fn close_day_with(
     // name's variance hovers near a constant whatever the market is doing
     // while the market factor's tracks the VIX squared. At coupling zero the
     // branch is not taken and every preset is bit-identical. See §78.
-    let base_variance = if params.garch_vix_coupling == 0.0 {
-        inputs.sector_base_daily_variance
-    } else {
-        let ratio = inputs.vix / inputs.vix_anchor;
-        let c = params.garch_vix_coupling;
-        inputs.sector_base_daily_variance * (1.0 - c + c * ratio * ratio)
-    };
+    //
+    // The expression lives in `garch::garch_clamp_base` rather than here:
+    // the thirty-day read-back holds this same band across its 21 steps,
+    // and two spellings of one band is how the read-back and the close get
+    // to disagree about what a name's variance may be.
+    let base_variance = super::garch::garch_clamp_base(
+        params,
+        inputs.sector_base_daily_variance,
+        inputs.vix,
+        inputs.vix_anchor,
+    );
     // The cascade, when a preset asks for one, otherwise the single-component
     // process bit for bit. Branch rather than a blend at zero: `pt-v12` and
     // everything before it must not owe a trajectory to an argument about how

@@ -268,7 +268,9 @@ def test_the_hash_moves_when_any_snapshot_field_moves():
         return sum(1 for label in labels if label.startswith(prefix))
 
     assert slots("rng[") == 3 * len(tf.noise.STREAMS)
-    assert slots("market_variance[") == 6
+    # Eight since the thirty-day read-back: the six that were here plus the
+    # two reversion targets it made state.
+    assert slots("market_variance[") == 8
     assert slots("economy.gdp_trend[") == 4
     assert slots("tickers[") == len(UNIVERSE)
     assert slots("columns.price[") == 2

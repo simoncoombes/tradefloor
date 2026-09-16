@@ -365,6 +365,193 @@ fn clamp_variance(params: &crate::params::ModelParams, v: f64) -> f64 {
 }
 
 
+
+/// The factor's MEAN path over a forward horizon, in the form the
+/// thirty-day read-back needs: the mixture variance in force on each of
+/// `sessions` forward sessions, and the horizon average of each component
+/// and of the mixture.
+///
+/// # Why this exists, and why it is not `warm_to_level`
+///
+/// `vix_from_variance` priced `V_t`, the index's ONE-day-ahead conditional
+/// variance. The VIX's own definition is the expected variance over the
+/// next thirty calendar days — 21 sessions — so the identity the engine
+/// reads back is
+///
+/// ```text
+/// implied_30 = (1 + pi) * 100 * sqrt(252 * (1/21) * sum_{h=1..21} E_t[V_{t+h}])
+/// ```
+///
+/// and every block of `V` that carries a persistence has to be averaged
+/// over its own decay. See `programme/persistence-derivation.md` 4.1 and
+/// `programme/vix-horizon-implementation.md` (design repository) for the
+/// derivation and for what it is worth on the tape's monthly persistence.
+/// It is PARAMETER-FREE: the horizon is the VIX's definition and every
+/// persistence below is a dial that already exists.
+///
+/// [`MarketVarianceState::warm_to_level`] also walks a mean recursion and
+/// **it is the wrong one for this**, which is the single most important
+/// thing on this page. That function decays each component at its own
+/// persistence toward its own target — a DIAGONAL map — and that is exact
+/// for what it does, because the level it is chasing moves under it and
+/// the cross term is second order there. The forward recursion cannot make
+/// that simplification: `component_step` loads the squared DAY FACTOR, and
+/// the tick draws the day factor at the MIXTURE's variance
+/// (`sigma_daily`), so the fast component's expectation depends on the
+/// slow component's level and the slow component's on the fast one. The
+/// map is a 2x2 with off-diagonal entries and its eigenvalues are 0.9230
+/// and 0.9855 at pt-v19, not the 0.979 and 0.9913 the two components
+/// carry alone. `the_two_by_two_recursion_is_the_mean_of_the_close` pins
+/// the difference against a Monte Carlo of the close itself, and asserts
+/// that the diagonal step FAILS the same comparison.
+///
+/// # The recursion
+///
+/// With `E[F^2] = v_mix`, `E[1{F<0} F^2] = v_mix / 2`, `q = alpha +
+/// gamma/2`, `(s_a, s_b) = slow_alpha_beta`:
+///
+/// ```text
+/// E[f'] = (1 - p_f) T_f + q v_mix + b f          p_f = alpha + beta + gamma/2
+/// E[s'] = (1 - rho) T_s + s_a v_mix + s_b s      rho = s_a + s_b
+/// ```
+///
+/// which in deviation coordinates `d = (f - T_f, s - T_s)` is `d' = M d + c`
+/// with
+///
+/// ```text
+/// M = | b + q (1-w)     q w          |     rows summing to p_f and rho
+///     | s_a (1-w)       s_b + s_a w  |
+/// c = ( q w (T_s - T_f),  s_a (1-w) (T_f - T_s) )
+/// ```
+///
+/// **The deviation form is not a convenience; it is what makes the rest
+/// identity hold ON BITS.** At rest `d = 0` and `T_f == T_s`, so `c` is
+/// two products with an exact zero factor and `M d` is four of them: the
+/// deviation stays exactly `0.0` for all 21 steps by induction, the
+/// averages return the targets as the same doubles, and the mixture is the
+/// expression `close_day_scaled` wrote into `variance`. Evaluating the
+/// same recursion in LEVEL coordinates would not do that — `(1 - p) T +
+/// q T + b T` is not bit-equal to `T` — and a read-back that moved the VIX
+/// on a resting engine would move the derived anchor's meaning with it.
+///
+/// It is ITERATED rather than summed in closed form (`sum M^h = M (I -
+/// M^21) (I - M)^{-1}`) because iteration is plain multiply-add: no `pow`,
+/// no matrix inverse, and therefore no growth in the cross-platform parity
+/// surface. The closed form is in the tests, where it belongs.
+///
+/// # `alpha_beta_at`'s rotation, which is NOT invariant here
+///
+/// `warm_to_level` can ignore the rotation exactly, because it reads only
+/// `p_fast = alpha + beta + gamma/2` and the rotation preserves
+/// `alpha + beta` by construction. **That argument does not carry to `M`.**
+/// Under `alpha -> alpha + d`, `beta -> beta - d` the rows of `M` still sum
+/// to `p_f` and `rho`, but the entries move: `M00` by `-d w` and `M01` by
+/// `+d w`. The rotation redistributes the fast component's memory between
+/// its own level and the slow one's, and only at `w = 0` does that vanish.
+///
+/// This reads the DIALLED pair, so the recursion is a fixed linear map
+/// rather than one that depends on the state it is evaluated at.
+/// `market_vol_alpha_excursion` is 0.0 in the shipped constructor and no
+/// preset has ever set it — the `alphax1` box measured six settings and got
+/// six bit-identical trajectories — so the two readings are the same
+/// numbers everywhere this runs. On a preset that set the dial, this mean
+/// path would read the unrotated split and be wrong by `d w` per step in
+/// the off-diagonal. Stated rather than absorbed, on the same footing as
+/// the residual list in `index_var`'s module docs.
+///
+/// # The clamps
+///
+/// Both components and the mixture are clamped on every step, exactly as
+/// the close clamps them, so a horizon mean cannot report a variance the
+/// process could not reach. Clamping is done on the LEVEL and carried back
+/// to the deviation, which leaves the `d = 0` induction intact because
+/// `clamp(T + 0.0)` is `T` for any `T` inside the band.
+///
+/// # What it returns
+///
+/// `mixture_path` is cleared and filled with `sessions` entries: entry
+/// `h - 1` is the mixture variance in force on forward session `h`, which
+/// is the variance the day-`h` draws are made at and therefore the forcing
+/// every PER-NAME GARCH state sees on that session. `index_var` needs the
+/// whole path and not its average, which is why the path is handed out
+/// rather than summarised.
+///
+/// The returned triple is `(f_bar, s_bar, v_f_bar)`: the two components
+/// averaged over `h = 1..=sessions` of their POST-step levels, and the
+/// mixture of those two averages through the same clamp. The mixture of
+/// the averages rather than the average of the mixtures, because the
+/// identity reads one factor variance and the mixture is linear in the
+/// pair — and because only this spelling reproduces `variance`'s bits at
+/// rest.
+pub fn factor_horizon_path(
+    params: &crate::params::ModelParams,
+    fast: f64,
+    slow: f64,
+    fast_target: f64,
+    slow_target: f64,
+    sessions: usize,
+    mixture_path: &mut Vec<f64>,
+) -> (f64, f64, f64) {
+    mixture_path.clear();
+    let w = params.market_vol_slow_weight;
+    // The mixture as the close spells it, so a zero-weight preset lands on
+    // the fast component itself and not on `1.0 * f + 0.0 * s`.
+    let mix = |f: f64, s: f64| if w == 0.0 { f } else { (1.0 - w) * f + w * s };
+    if sessions == 0 {
+        // No horizon is the one-day read: the states as they stand.
+        return (fast, slow, clamp_variance(params, mix(fast, slow)));
+    }
+    let q = params.market_vol_alpha + 0.5 * params.market_vol_gamma;
+    let b = params.market_vol_beta;
+    let (s_a, s_b) = slow_alpha_beta(params);
+    // The gap between the two targets. It is the whole content of `c`
+    // above, and it is exactly `0.0` whenever `market_vol_slow_vix_damp`
+    // is inert or the VIX sits at the denominator — which is the rest
+    // point, and which is why the induction below closes.
+    let target_gap = slow_target - fast_target;
+    let mut fast_dev = fast - fast_target;
+    let mut slow_dev = slow - slow_target;
+    let mut fast_sum = 0.0;
+    let mut slow_sum = 0.0;
+    for _ in 0..sessions {
+        // The mixture in force this session, carried as a deviation from
+        // the FAST target so that the `d = 0` induction survives the
+        // clamp: at rest this is `(1-w) * 0.0 + w * (0.0 + 0.0)`.
+        let mut mix_dev = if w == 0.0 {
+            fast_dev
+        } else {
+            (1.0 - w) * fast_dev + w * (slow_dev + target_gap)
+        };
+        let mix_level = clamp_variance(params, fast_target + mix_dev);
+        mix_dev = mix_level - fast_target;
+        mixture_path.push(mix_level);
+        // `d' = M d + c`, written as the two scalar rows rather than as a
+        // matrix so the reader can see `b` and `s_b` carrying the
+        // component's own memory and `q`, `s_a` carrying the shared
+        // forcing.
+        let fast_next = b * fast_dev + q * mix_dev;
+        let slow_next = if w == 0.0 {
+            slow_dev
+        } else {
+            s_b * slow_dev + s_a * (mix_dev - target_gap)
+        };
+        fast_dev = clamp_variance(params, fast_target + fast_next) - fast_target;
+        slow_dev = if w == 0.0 {
+            // The close never steps the slow component on this branch, so
+            // neither does this. Its level is inert and unread.
+            slow_next
+        } else {
+            clamp_variance(params, slow_target + slow_next) - slow_target
+        };
+        fast_sum += fast_dev;
+        slow_sum += slow_dev;
+    }
+    let n = sessions as f64;
+    let fast_bar = fast_target + fast_sum / n;
+    let slow_bar = slow_target + slow_sum / n;
+    (fast_bar, slow_bar, clamp_variance(params, mix(fast_bar, slow_bar)))
+}
+
 /// The VIX ratio raised to the response exponent. At exactly 2.0 -- every
 /// preset before the dial -- this is the literal `r * r` the shipped
 /// update has always computed, bit for bit; `powf` never runs there.
@@ -512,6 +699,31 @@ pub struct MarketVarianceState {
     /// lagged transmission wire. Purely observational: nothing in the
     /// variance process reads it.
     prev_day_factor: f64,
+    /// The FAST component's target at the last close, and the SLOW one's.
+    ///
+    /// **State, not a diagnostic.** `Engine::market_variance_target` has
+    /// reported the same pair since pt-v4 and is deliberately outside the
+    /// snapshot, because nothing read it back. The thirty-day read-back
+    /// does read it back: [`Self::horizon_mean`] needs the level each
+    /// component is decaying TOWARD to say where it will be in 21
+    /// sessions, and a target is not recoverable from the two component
+    /// levels. So these two are in the snapshot and therefore in the
+    /// state hash, and a fork or a restore carries them — which is the
+    /// whole of what makes a resumed day price the same way.
+    ///
+    /// Seeded at the baseline by [`Self::new_with`], which is the zero-
+    /// deviation reading and therefore the one-day identity: before any
+    /// close there is no excursion to average over.
+    ///
+    /// On the single-component branch (`market_vol_slow_weight == 0.0`)
+    /// both hold THE target. That is not the `None` the close returns:
+    /// the close reports what it computed and there is no slow target on
+    /// that branch, whereas this is a state a recursion reads, and the
+    /// recursion's slow arm is switched off by the same dial — so the
+    /// value it would read is never used and the honest seeding is the
+    /// one that leaves the mixture at its own level.
+    fast_target: f64,
+    slow_target: f64,
 }
 
 impl Default for MarketVarianceState {
@@ -542,6 +754,11 @@ impl MarketVarianceState {
             slow_variance: base,
             smoothed_vix: None,
             prev_day_factor: 0.0,
+            // Zero deviation at the baseline: both components sit ON the
+            // level they revert to, so the horizon read-back of a fresh
+            // state is its one-day read-back, on bits.
+            fast_target: base,
+            slow_target: base,
         }
     }
 
@@ -722,6 +939,16 @@ impl MarketVarianceState {
             self.fast_variance = self.variance;
             self.prev_day_factor = self.day_factor;
             self.day_factor = 0.0;
+            // The horizon read-back's two state fields. BOTH take `target`
+            // here: there is no slow component on this branch, so the slow
+            // arm of `horizon_mean` is switched off by the same dial and
+            // the value it would read is never used. Writing `target` into
+            // both keeps the pair meaning "the level the mixture reverts
+            // to", which is what the recursion asks of them. See the
+            // fields' own doc; this is NOT the `None` returned below, which
+            // reports what this close COMPUTED.
+            self.fast_target = target;
+            self.slow_target = target;
             // No slow component exists on this branch. See the docstring.
             return (target, None);
         }
@@ -787,6 +1014,12 @@ impl MarketVarianceState {
         self.variance = clamp_variance(params, (1.0 - w) * fast + w * slow);
         self.prev_day_factor = self.day_factor;
         self.day_factor = 0.0;
+        // The two levels the horizon read-back decays toward. Recorded at
+        // the close that reverted toward them, so tomorrow's read-back
+        // holds the pair THIS close used rather than re-deriving it from a
+        // VIX that has since moved.
+        self.fast_target = target;
+        self.slow_target = slow_target;
         (target, Some(slow_target))
     }
 
@@ -897,6 +1130,21 @@ impl MarketVarianceState {
             }
         }
         self.fast_variance = fast;
+        // THE TARGETS THE LAST WARM-UP SESSION REVERTED TOWARD, by the same
+        // rule the paragraph below states in the other direction: the close
+        // writes these fields, so a warm-up that left them at `new_with`'s
+        // unscaled baseline would hand session one a state no close could
+        // have produced -- components displaced by the level, targets
+        // claiming they are not. The horizon read-back reads exactly that
+        // displacement, so the cost would be a spurious 21-session
+        // excursion on the first session of every run.
+        //
+        // `base` is the last loop iteration's, which is the level the close
+        // is about to read; `coupled` and `damped` are the same two blends
+        // `close_day_scaled` forms from the held VIX.
+        let base_last = base0 * mathx::exp(log_level - 0.25 * stationary_var);
+        self.fast_target = base_last * coupled;
+        self.slow_target = if w == 0.0 { base_last * coupled } else { base_last * damped };
         // The single-component branch of `close_day_scaled` carries no slow
         // component at all, so there is none to warm and the mixture IS the
         // fast state. `slow_variance` is left exactly where the close would
@@ -912,13 +1160,57 @@ impl MarketVarianceState {
     }
 
     /// The state numbers, for checkpoints: `(variance, day_factor,
-    /// fast_variance, slow_variance, prev_day_factor, smoothed_vix)`.
+    /// fast_variance, slow_variance, prev_day_factor, smoothed_vix,
+    /// fast_target, slow_target)`.
     /// `smoothed_vix` is a VIX-scale positive number while primed;
     /// a negative value is the None sentinel (JSON carries no NaN).
-    pub fn snapshot(&self) -> (f64, f64, f64, f64, f64, f64) {
+    ///
+    /// The two targets are last because every earlier length has to keep
+    /// replaying: a six-value snapshot is one written before the thirty-day
+    /// read-back existed, and `restore_with_components` seeds its targets
+    /// from the component levels, which is zero deviation and therefore the
+    /// one-day identity on the first restored close. That is the only
+    /// reading that leaves a pre-horizon checkpoint honest -- it cannot
+    /// know what the close it was taken after reverted toward, and
+    /// inventing a target would invent an excursion.
+    pub fn snapshot(&self) -> (f64, f64, f64, f64, f64, f64, f64, f64) {
         (self.variance, self.day_factor, self.fast_variance,
          self.slow_variance, self.prev_day_factor,
-         self.smoothed_vix.unwrap_or(-1.0))
+         self.smoothed_vix.unwrap_or(-1.0),
+         self.fast_target, self.slow_target)
+    }
+
+    /// The factor's horizon mean over `sessions` forward sessions:
+    /// `(f_bar, s_bar, v_f_bar)`. A thin caller of
+    /// [`factor_horizon_path`], which is where the recursion and its
+    /// derivation live; the mixture path is dropped, because a caller that
+    /// wants the per-name forcing calls the free function directly.
+    pub fn horizon_mean(
+        &self, params: &crate::params::ModelParams, sessions: usize,
+    ) -> (f64, f64, f64) {
+        let mut path = Vec::with_capacity(sessions);
+        factor_horizon_path(
+            params, self.fast_variance, self.slow_variance,
+            self.fast_target, self.slow_target, sessions, &mut path)
+    }
+
+    /// The FAST component's own level, and the SLOW one's. Beside
+    /// [`Self::variance`], which is the clamped mixture of the two and is
+    /// what the tick draws against; these are what the horizon recursion
+    /// steps, because the mixture is not a state.
+    pub fn fast_variance(&self) -> f64 {
+        self.fast_variance
+    }
+
+    /// See [`Self::fast_variance`].
+    pub fn slow_variance(&self) -> f64 {
+        self.slow_variance
+    }
+
+    /// The two targets the last close reverted toward, `(fast, slow)`.
+    /// What [`Self::horizon_mean`] decays toward; see the fields.
+    pub fn targets(&self) -> (f64, f64) {
+        (self.fast_target, self.slow_target)
     }
 
     /// Restore from a checkpoint. Values are adopted verbatim, like every
@@ -938,6 +1230,12 @@ impl MarketVarianceState {
             // re-seeds from the first smoothed close after restore.
             smoothed_vix: None,
             prev_day_factor: 0.0,
+            // Zero deviation: see `snapshot`. A two-value checkpoint
+            // cannot say what its close reverted toward, and a target
+            // taken from the level itself is the reading that invents no
+            // excursion.
+            fast_target: variance,
+            slow_target: variance,
         }
     }
 
@@ -949,6 +1247,8 @@ impl MarketVarianceState {
         slow_variance: f64,
         prev_day_factor: f64,
         smoothed_vix: f64,
+        fast_target: f64,
+        slow_target: f64,
     ) -> Self {
         // A checkpoint from before the lagged wire carries no
         // prev_day_factor; the caller passes 0.0 and the wire simply does
@@ -961,6 +1261,8 @@ impl MarketVarianceState {
             variance, day_factor, fast_variance, slow_variance,
             smoothed_vix: if smoothed_vix < 0.0 { None } else { Some(smoothed_vix) },
             prev_day_factor,
+            fast_target,
+            slow_target,
         }
     }
 }
@@ -1210,8 +1512,9 @@ mod tests {
         state.accumulate(0.007);
         state.close_day(22.0);
         state.accumulate(-0.003);
-        let (v, df, fast, slow, pdf, sv) = state.snapshot();
-        let restored = MarketVarianceState::restore_with_components(v, df, fast, slow, pdf, sv);
+        let (v, df, fast, slow, pdf, sv, ft, st) = state.snapshot();
+        let restored =
+            MarketVarianceState::restore_with_components(v, df, fast, slow, pdf, sv, ft, st);
         assert_eq!(state, restored);
     }
 
@@ -1232,7 +1535,7 @@ mod tests {
         original.close_day_with(params, 31.0);
         original.accumulate(-0.004);
 
-        let (v, df, _fast, _slow, _pdf, _sv) = original.snapshot();
+        let (v, df, _fast, _slow, _pdf, _sv, _ft, _st) = original.snapshot();
         let mut restored = MarketVarianceState::restore(v, df);
 
         for day in 0..12 {
@@ -1264,6 +1567,155 @@ mod tests {
             variance = update_market_variance_with(params, variance, innovation, vix);
             assert_eq!(composed.sigma_daily(), mathx::sqrt(variance), "day {day}");
         }
+    }
+    /// THE MEAN RECURSION THE THIRTY-DAY READ-BACK USES IS THE CLOSE'S OWN,
+    /// measured against the close rather than argued from it.
+    ///
+    /// [`factor_horizon_path`] steps a 2x2 map. The claim that this map is
+    /// `E[close_day_scaled]` is the whole foundation of the horizon
+    /// read-back, and it is exactly the kind of claim that is easy to state
+    /// and easy to get wrong by one term — as the derivation this
+    /// implements did, and as `warm_to_level` does for its own (different,
+    /// and correct for what it does) purpose.
+    ///
+    /// So: displace both components, draw the day factor 200,000 times at
+    /// the mixture's variance — the variance `sigma_daily` hands the tick —
+    /// run the real close on each draw, and compare the sample mean of
+    /// `(fast_variance, slow_variance)` to ONE step of the map. Within four
+    /// standard errors, which at this sample size is a tight band and not a
+    /// courtesy.
+    ///
+    /// **Then the same comparison against the DIAGONAL step**, which must
+    /// FAIL by more than that band. Without the second half this test would
+    /// pass for both recursions on a quiet enough displacement and would
+    /// pin nothing: the point is not that the 2x2 is close to the close,
+    /// it is that the diagonal step is not. The gap is the cross-feeding —
+    /// `component_step` loads the squared day factor, and the tick draws
+    /// that factor at the MIXTURE's variance, so each component's
+    /// expectation carries a `q w` (resp. `s_a (1-w)`) share of the other
+    /// component's level.
+    ///
+    /// The generator is a fixed-seed [`crate::rng::GameRng`] built here and
+    /// used nowhere else: nothing in this test touches an engine stream, so
+    /// no draw schedule can move.
+    #[test]
+    fn the_two_by_two_recursion_is_the_mean_of_the_close() {
+        let params = &crate::params::PT_V19;
+        let base = params.market_factor_sigma * params.market_factor_sigma;
+        let w = params.market_vol_slow_weight;
+        assert!(w != 0.0, "this test is about the mixture; a zero weight has none");
+
+        // A denominator and a VIX that differ, so the two targets differ
+        // too and the map's constant vector `c` is not zero. `c` is the
+        // half of the recursion a test at a shared target cannot see.
+        let denominator = params.market_vol_vix_anchor;
+        let vix = 1.4 * denominator;
+        // Displaced in OPPOSITE directions, which is the state that
+        // separates the 2x2 from the diagonal by the most: the cross terms
+        // pull each component toward the other.
+        let fast0 = 3.0 * base;
+        let slow0 = 0.6 * base;
+        let seed = MarketVarianceState::restore_with_components(
+            clamp_variance(params, (1.0 - w) * fast0 + w * slow0),
+            0.0, fast0, slow0, 0.0, -1.0, base, base);
+        let v_mix = seed.variance();
+        let sigma = mathx::sqrt(v_mix);
+
+        let draws = 200_000;
+        let mut rng = crate::rng::GameRng::new(20260915, 7);
+        let mut fast_sum = 0.0;
+        let mut slow_sum = 0.0;
+        let mut fast_sq = 0.0;
+        let mut slow_sq = 0.0;
+        for _ in 0..draws {
+            let mut state = seed;
+            state.accumulate(sigma * rng.next_normal());
+            state.close_day_scaled(params, denominator, vix, 1.0);
+            let (f, s) = (state.fast_variance(), state.slow_variance());
+            fast_sum += f;
+            slow_sum += s;
+            fast_sq += f * f;
+            slow_sq += s * s;
+        }
+        let n = draws as f64;
+        let fast_mean = fast_sum / n;
+        let slow_mean = slow_sum / n;
+        // Four standard errors of the sample mean, from the sample's own
+        // second moment. A fixed tolerance would be a number chosen to
+        // pass; this one is the band the sample itself supports.
+        let fast_se = mathx::sqrt((fast_sq / n - fast_mean * fast_mean) / n);
+        let slow_se = mathx::sqrt((slow_sq / n - slow_mean * slow_mean) / n);
+
+        // The two targets the close reverted toward, taken from the close
+        // itself rather than rebuilt here, so the map is compared against
+        // the levels the process really used.
+        let mut probe = seed;
+        let (fast_target, slow_target) = probe.close_day_scaled(params, denominator, vix, 1.0);
+        let slow_target = slow_target.expect("a two-component preset has a slow target");
+        assert!(
+            (fast_target - slow_target).abs() > 1e-9 * base,
+            "the two targets coincide, so the map's constant vector is zero and \
+             this test cannot see it"
+        );
+
+        // ── One step of the 2x2, through the function under test ──────────
+        let mut path = Vec::new();
+        let (fast_one, slow_one, _) = factor_horizon_path(
+            params, fast0, slow0, fast_target, slow_target, 1, &mut path);
+        assert_eq!(path.len(), 1);
+        assert_eq!(
+            path[0].to_bits(), v_mix.to_bits(),
+            "the first session's forcing is not the variance the tick draws at"
+        );
+        assert!(
+            (fast_one - fast_mean).abs() < 4.0 * fast_se,
+            "the 2x2's fast step is {fast_one} against the close's sample mean \
+             {fast_mean} +/- {fast_se}"
+        );
+        assert!(
+            (slow_one - slow_mean).abs() < 4.0 * slow_se,
+            "the 2x2's slow step is {slow_one} against the close's sample mean \
+             {slow_mean} +/- {slow_se}"
+        );
+
+        // ── The DIAGONAL step, which must miss ────────────────────────────
+        //
+        // `warm_to_level`'s recursion, spelled exactly as that function
+        // spells it: each component decayed at its own persistence toward
+        // its own target, with no forcing from the other.
+        let p_fast =
+            params.market_vol_alpha + params.market_vol_beta + 0.5 * params.market_vol_gamma;
+        let (sa, sb) = slow_alpha_beta(params);
+        let p_slow = sa + sb;
+        let fast_diagonal =
+            clamp_variance(params, (1.0 - p_fast) * fast_target + p_fast * fast0);
+        let slow_diagonal =
+            clamp_variance(params, (1.0 - p_slow) * slow_target + p_slow * slow0);
+        assert!(
+            (fast_diagonal - fast_mean).abs() > 4.0 * fast_se,
+            "the diagonal step's fast component is {fast_diagonal} and the close's \
+             mean is {fast_mean} +/- {fast_se}: the two recursions have stopped \
+             disagreeing, so either the mixture weight or `component_step`'s \
+             innovation has changed and the 2x2 needs rederiving"
+        );
+        assert!(
+            (slow_diagonal - slow_mean).abs() > 4.0 * slow_se,
+            "the diagonal step's slow component is {slow_diagonal} and the close's \
+             mean is {slow_mean} +/- {slow_se}: see the fast assertion"
+        );
+
+        // And the size of the disagreement, so the failure message above is
+        // read as "this much" and not "some": the cross terms are worth
+        // `q w` of the fast component's step and `s_a (1-w)` of the slow
+        // component's.
+        let q = params.market_vol_alpha + 0.5 * params.market_vol_gamma;
+        let fast_cross = q * w * (slow0 - fast0);
+        assert!(
+            ((fast_one - fast_diagonal) - fast_cross).abs() < 1e-9 * base,
+            "the gap between the 2x2 and the diagonal fast step is \
+             {} where `q w (slow - fast)` is {fast_cross}",
+            fast_one - fast_diagonal
+        );
     }
 }
 
