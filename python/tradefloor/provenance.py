@@ -1416,6 +1416,99 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "source": "programme/RESUME.md, ws-b's leverage-effect solve",
         "no_admissible_derived_value": True,
     },
+    "garch_beta": {
+        # THE INVERSE DEFECT: a derivation the record HAS and the guard
+        # could not see. 15.4 derives this value and the module did not
+        # carry it, so the dial sat in `UNPROVENANCED` as an admitted gap
+        # that was not a gap. The audit that found it also found the
+        # reverse case beside it -- see `vix_mean_reversion` -- which is the
+        # argument for reading the record and the table against each other
+        # rather than either alone.
+        "kind": "derived",
+        "presets": {"pt-v19": 0.7905},
+        "identity": "`beta = rho - alpha - gamma / 2`: the GJR first-moment "
+                    "persistence identity solved for beta at the SHIPPED "
+                    "alpha and gamma, with rho the tape's own per-name "
+                    "decay rate. 0.9416 - 0.059507211981547736 - "
+                    "0.18318536187800277 / 2 = 0.7905 to four places. The "
+                    "half in front of gamma is the asymmetry term's "
+                    "unconditional share: the indicator is on for half the "
+                    "shocks, so it contributes gamma/2 to persistence",
+        "terms": {
+            "rho": "0.9416, the six-window MEAN of the per-name |r| "
+                   "autocorrelation decay rate, sd 0.024, half-life 11.5 "
+                   "sessions [6.6, 20.6]; per window 0.9005, 0.9554, "
+                   "0.9590, 0.9384 (the 2019-21 crisis window), 0.9669, "
+                   "0.9293 (vix-dynamics.md 15.2)",
+            "alpha": "`garch_alpha` 0.059507211981547736, which pt-v19 does "
+                     "not move",
+            "gamma": "`garch_gamma` 0.18318536187800277, which pt-v19 does "
+                     "not move and which is itself `undetermined` above. "
+                     "This derivation takes the shipped asymmetry as GIVEN "
+                     "and solves only for the memory; it is not a claim "
+                     "about gamma",
+        },
+        "source": "programme/results/vix-dynamics.md section 15.4, on the "
+                  "tape curve measured in section 15.2",
+        "date": "2026-09-12",
+        "script": "decay-curve-504.json (design repo): the reference "
+                  "roster's per-name |r| autocorrelation, median across 40 "
+                  "names, per 504 window, fitted over lags 2 to 60",
+        "why_one_exponential": "MEASURED, and it is what makes a single "
+                               "beta the right form. Over lags 2 to 60 the "
+                               "non-crisis median curve is ONE exponential, "
+                               "0.0727 x 0.9468^k (SSE 0.00028), against a "
+                               "power law 0.106 k^-0.50 (0.00064) and a "
+                               "two-exponential fit whose second component "
+                               "lands at a half-life of 0.2 sessions -- "
+                               "that is, a lag-one excess of 0.038 on top "
+                               "of the exponential, not a second timescale. "
+                               "So at the horizons the panel grades, the "
+                               "tape's per-name memory is a single "
+                               "timescale of 11-13 sessions, and the "
+                               "\"hyperbolic\" reading of the decay-shape "
+                               "gap is the log-log slope's weighting of "
+                               "that one lag-one point",
+        "bar": "ONE-SIDED ABOVE, and the bound is a moment condition rather "
+               "than an estimator. The median curve gives 0.7957 and -1 sd "
+               "gives 0.7661; the +1 sd value, 0.9660, has a GJR "
+               "fourth-moment coefficient of 1.004 and is REFUSED. At the "
+               "shipped point the coefficient is 0.957 (0.967 at the median "
+               "curve) -- under one, and the fragile row is watched",
+        "registered_predictions_falsified": "AND THE VALUE SURVIVES THEM, "
+                    "which is the distinction this field exists to keep. "
+                    "`vixdyn6` ran the three candidates on the composed "
+                    "blend-off vector against four predictions registered "
+                    "in 15.4 before the run. Prediction 1 FALSIFIED: held "
+                    "`abs_return_acf20` at 252 read 0.0076 against a "
+                    "registered [0.012, 0.035] and a falsification line at "
+                    "0.010, and `abs_return_acf1` missed below [0.06, 0.11] "
+                    "at 0.053. Prediction 2 FALSIFIED IN THE WRONG "
+                    "DIRECTION: `corr_persistence_acf1` at 504 fell to "
+                    "0.069 from 0.128. Prediction 3 missed on size "
+                    "(volatility +3 per cent against a registered +8 to "
+                    "+12) and held on the kurtosis (7.96 to 7.46; tape 13.2 "
+                    "+/- 1.3, in band). Prediction 4 HELD: every VIX row "
+                    "stayed inside `mr27g0`'s IQR to the third digit, so "
+                    "the two subsystems are not coupled through this dial. "
+                    "What was refuted is the claim that putting the tape's "
+                    "per-name memory into the engine would move the monthly "
+                    "rows. The VALUE is that memory and the step to it is "
+                    "arithmetic, and section 17.6 later traces the "
+                    "surviving miss to the index's COMPOSITION -- a roster "
+                    "of 40 with 5.3 effective names, carrying a non-factor "
+                    "variance share a 500-name index does not have -- which "
+                    "is not a dial",
+        "note": "the cascade in `garch.rs` keeps alpha and gamma and raises "
+                "beta per component, so this dial is the base memory and "
+                "not the whole of it. 15.3 records that at pt-v19's "
+                "per-name dials the cascade's fourth-moment coefficient "
+                "passes one from its third component on (0.770, 0.959, "
+                "1.032, 1.058, 1.066, 1.069) and its joint second-moment "
+                "spectral radius is 1.010; that is FLAGGED there against "
+                "`garch.rs` and is not a claim this entry makes about this "
+                "value, which is admissible on its own",
+    },
     "vix_return_gain_up": {
         # THE DOCSTRING'S 2:1 IS REFUTED AND THE SHIPPED PAIR IS SYMMETRIC.
         # The claim that the real up response is about half the down one
@@ -1455,6 +1548,103 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                    "rather than deriving it; 0.05 is a "
                                    "round number with no series behind it",
         "source": "programme/RESUME.md, ws-b's withdrawal",
+    },
+    "market_vol_slow_persistence": {
+        # The factor's slow pole: the second derivation the record had and
+        # this table could not see. Found by the same audit as `garch_beta`
+        # above and added on the same day.
+        "kind": "derived",
+        "presets": {"pt-v19": 0.9913},
+        "identity": "the SLOW POLE of the tape's own variance impulse "
+                    "response, read off a two-component fit and carried "
+                    "into the mixture as its persistence. One exponential "
+                    "is REFUSED (SSE 0.079 against 0.005): the tape is fast "
+                    "0.55 at 0.918 (half-life 8 sessions) plus slow 0.45 at "
+                    "0.9924 (half-life 91), and the window bootstrap puts "
+                    "the slow rho at 0.9913 [0.975, 1.000]. The VIX-side "
+                    "measurement of section 10 -- slow 0.64 at 0.990 "
+                    "[0.975, 0.994] -- is the same component seen through "
+                    "the VIX and sits inside that bar, which is the check "
+                    "that the two estimators are reading one thing",
+        "terms": {
+            "estimator": "the coefficient of `log RV_{t+k+1..t+k+21}` on "
+                         "`r_t` with `V0` controlled, pooled within the 35 "
+                         "windows and taken relative to k = 0. Tape "
+                         "retention 0.95 / 0.89 / 0.85 / 0.78 / 0.66 / 0.53 "
+                         "/ 0.42 / 0.33 / 0.26 / 0.27 at k = 1, 2, 3, 5, "
+                         "10, 20, 30, 40, 60, 80",
+            "why not a likelihood": "a two-component QMLE of the engine's "
+                                    "own recursion on the tape is NOT "
+                                    "IDENTIFIED: every start runs the slow "
+                                    "pole to the unit root (NLL 3475-3498 "
+                                    "against the single GJR's 3536, all on "
+                                    "the boundary), which is the known "
+                                    "weakness of maximum likelihood for "
+                                    "near-unit-root variance components. "
+                                    "The impulse response is the estimator "
+                                    "here BECAUSE the likelihood is not one",
+            "market_vol_slow_weight": "0.35, UNMOVED, and this entry claims "
+                                      "nothing about it. 17.4 derives 0.47 "
+                                      "[0.19, 0.79] for the weight beside "
+                                      "this pole and pt-v19 does not take "
+                                      "it, so the weight stays in "
+                                      "`UNPROVENANCED` where it belongs",
+        },
+        "source": "programme/results/vix-dynamics.md section 17.4, on the "
+                  "tape measurement of section 17.3",
+        "date": "2026-09-12",
+        "script": "`t22`, the estimator of vix-dynamics.md section 10.1 "
+                  "applied to forward realised variance (vix-dynamics.md "
+                  "section 17.3)",
+        "moment_condition": "CHECKED AND NOT BINDING, which is the opposite "
+                            "of `garch_beta`'s case and worth recording as "
+                            "such. The mixture's second-moment spectral "
+                            "radius with the GJR indicator reads 0.9841 at "
+                            "the shipped weight 0.35 and this pole, against "
+                            "0.9740 at pt-v18's 0.98; at the derived pair "
+                            "0.9840. The condition binds only at the bar's "
+                            "upper weight (0.79) and a pole of 0.99932, and "
+                            "the fitted 6-parameter mixture (radius 1.0033) "
+                            "is refused by it as the per-name +1 sd value "
+                            "was. The binding constraint on this derivation "
+                            "is therefore NOT the moment condition but the "
+                            "identification of the slow pole itself, whose "
+                            "bar reaches the unit root",
+        "registered_predictions_falsified": "as for `garch_beta`, and "
+                    "pointing one layer further down. `vixdyn7` ran the "
+                    "pole against the predictions registered in 17.5. The "
+                    "index's forward-RV retention at k = 40 read 0.29 on "
+                    "the pole alone against a registered [0.28, 0.45] "
+                    "(marginal; 0.27 on the pair, 0.22 at weight 0.64, "
+                    "FALSIFIED there). Held `abs_return_acf20` at 252 read "
+                    "0.009 against [0.012, 0.030], FALSIFIED. "
+                    "`corr_persistence_acf1` at 504 rose on every arm but "
+                    "cleared 0.10 only at weight 0.64, so that row is not a "
+                    "factor-memory row either. The VIX's own slow component "
+                    "FELL as the slow weight rose -- falsified in DIRECTION "
+                    "-- because the slow component's target is damped by "
+                    "`market_vol_slow_vix_damp` and carries less of the "
+                    "excursion loop. 17.6 then derives why the dial cannot "
+                    "reach the row: the mixture's closed-form impulse "
+                    "response at the SHIPPED slow dials already reads 0.43 "
+                    "at k = 40 and 0.28 at k = 60, LONGER than the tape's "
+                    "0.33 and 0.26, while the realised index memory reads "
+                    "0.25-0.29. The factor is not short of memory; the "
+                    "INDEX is, because the factor carries about 55 per cent "
+                    "of this roster's index variance and the other 45 per "
+                    "cent is short-memory, so the index reads 0.55 x 0.43 "
+                    "plus a small term. The value is the tape's pole; what "
+                    "is refuted is that moving it buys the monthly rows",
+        "note": "17.7's own read, recorded so the next person does not have "
+                "to find it: on the widened-plus-new tables the vector "
+                "carrying this pole scores 40.8 at 252 and 46.5 at 504 "
+                "against pt-v18's 39.5 and 43.0, the release bar of ahead "
+                "at both horizons is NOT met, and the note does not propose "
+                "its composed vector. pt-v19 ships the pole regardless. "
+                "That is a derived value adopted against the score, which "
+                "is the opposite direction from the compensator pattern in "
+                "the module note above, and it is stated here rather than "
+                "left for a reader to assume the score agreed",
     },
     "vix_variance_premium": {
         # The one MEASURED entry in the table, and the schema was built
@@ -1873,52 +2063,210 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "thirty-seed one-dial arm and not either of them",
     },
     "vix_mean_reversion": {
-        "kind": "measured",
+        # THE SECTION 7 PATTERN, NAMED, and the dial that found the hole in
+        # this module's own guard. Until 2026-09-15 it was listed in
+        # `UNPROVENANCED` WHILE carrying this entry: 45 entries plus 69
+        # declared names, against 113 dials in scope, collapsing to a union
+        # of 113. `audit()` computes `missing` from that union, so the
+        # arithmetic balanced, every completeness assertion passed, and the
+        # table was asserting two contradictory things about one dial with
+        # nothing able to say so. `audit()["in_both"]` now refuses it by
+        # name.
+        #
+        # WHY THIS IS `undetermined` AND NOT `measured`. Everything that was
+        # supposed to derive 0.27 has been withdrawn or falsified:
+        #
+        #   R13, the 2026-09-07 ruling of 0.10 off the arm D frontier, is
+        #   WITHDRAWN in place (`stalemark-r13-withdrawn-in-place`), and the
+        #   frontier it ruled on -- 0.10, 0.12, 0.15 -- never contained the
+        #   shipped value at all.
+        #
+        #   `vix-dynamics.md` 10.3 derived [0.27, 0.37] from three tape
+        #   constraints and two are falsified on standing entries
+        #   (`stalemark-vix-dynamics-derivation-of-0.27`). Constraint 1, the
+        #   fast decay, by V4: the slow weight reads 0.5472 at 0.27 and
+        #   0.4739 at 0.10, both inside the tape's [0.47, 0.82] and 0.073
+        #   apart against a half-width of 0.175, so the tape cannot separate
+        #   the two rates at its own resolution. Constraint 2, the slow
+        #   share, by V9: the read-back constant c_d is not arm-invariant --
+        #   6.83 at 0.27 against about 7.95 at 0.10, an across-arm sd of
+        #   0.574 where the derivation assumed 0.05 -- so every `mr x 5.07`
+        #   in that item, including the figure that excluded 0.10, is
+        #   computed at a constant that MOVES WITH THE RATE BEING EXCLUDED.
+        #   Constraint 3, the up side's sign, is untouched.
+        #
+        #   `persistence-derivation.md`'s sentence "the rate stays at 0.10"
+        #   is withdrawn (`stalemark-persistence-derivation-basis`); what
+        #   survives it is a FORM finding -- no value of the rate carries
+        #   the clustering row.
+        #
+        # What is left is a score and a z, and the standing ruling says so
+        # in its own words: "0.27 now stands on the SCORE and the z, not on
+        # its derivation ... The dial is right and its argument needs
+        # re-solving jointly." A score is why a value SHIPS; it is not a
+        # derivation of the dial and it is not a tape reading of it. Filing
+        # it `measured` would let the score stand in for the argument, which
+        # is exactly the substitution the module note opens with, and it
+        # would do so under a kind whose whole promise is a tape figure with
+        # a bar. `undetermined` is a PASSING state so that this can be said
+        # without anyone having to claim a derivation to go green.
+        #
+        # NOT CLAIMED: that 0.27 is wrong, or that 0.10 should come back.
+        # sigmamr1 asked that question and answered it, the ruling stands,
+        # and the readings are in `ruling` below. The gap is in the
+        # ARGUMENT, not in the choice.
+        "kind": "undetermined",
         "presets": {"pt-v16": 0.06, "pt-v18": 0.10, "pt-v19": 0.27},
-        "source": "the same nineteen-row objective and the same thirty-seed "
-                  "arm, with `market_beta_down_asym_lag` pinned at 0.375",
-        "date": "2026-09-07",
-        "script": "programme/scripts/armboth.py via ptv19armd-jobs.sh "
-                  "(design repo), arm D; registered at 92463f9 before the "
-                  "run and recorded at 3175a4c",
-        "residual": "THE OBJECTIVE DOES NOT PICK THIS VALUE. Three points "
-                    "are non-dominated on the pair (`S_252`, `S_504`): 0.10 "
-                    "at 28.69/29.78, 0.12 at 25.65/32.84 and 0.15 at "
-                    "23.87/42.79. The spread across that frontier is 4.8 "
-                    "points at 252 and 13.0 at 504, and it is a partial "
-                    "order rather than an error bar",
-        "estimator": "median across thirty seeds per row, the model error "
-                     "each row's own across-seed spread, `df_model` 29",
-        "chosen_from_a_frontier": "RULED by Simon on 2026-09-07 under R6, "
-                                  "which both forbids a combined number "
-                                  "that would pick one of the three and "
-                                  "hide the rest and, in its third bullet, "
-                                  "leaves the choice among non-dominated "
-                                  "points to a human. Earlier text here "
-                                  "cited R10; R10 asks only whether "
-                                  "`cmaes.py` may collapse the two horizons "
-                                  "to rank a generation and was never "
-                                  "answered. The ruling was filed as R13 on "
-                                  "2026-09-08 and WITHDRAWN on 2026-09-15, "
-                                  "box `sigmamr1` having measured 0.10 "
-                                  "against 0.27 with 0.27 ahead at both "
-                                  "horizons, which is why pt-v19 above "
-                                  "reads 0.27. The 0.10 records what pt-v18 "
-                                  "was released with. The ruling behind it "
-                                  "no longer stands, and this field exists "
-                                  "so no reader mistakes the value for one "
-                                  "the objective determined",
-        "note": "what the ruling was made on: 0.10 is the only one of the "
-                "three holding `vix_ar1_debiased` inside two standard errors "
-                "of its ruler at both horizons (+0.7 and -2.0, against -2.7 "
-                "and -6.8 at 0.15), and the only one where the two horizons "
-                "score alike rather than one being bought at the other's "
-                "expense. The shipped 0.06 is DOMINATED -- 0.12 beats it at "
-                "both horizons -- so it was not going to stay whatever the "
-                "ruling. Before the persistence row joined the rule the "
-                "eighteen-row objective wanted 0.15 at 252 and 0.20 at 504; "
-                "adding the row did not close that disagreement, it reversed "
-                "which end was which",
+        "what_would_determine_it": "a JOINT re-solve of the three "
+                                   "constraints of `vix-dynamics.md` 10.3 "
+                                   "with the read-back constant c_d "
+                                   "MEASURED at each rate instead of "
+                                   "assumed invariant, so that "
+                                   "`gain = g_tape/mr - c_d(mr)` is solved "
+                                   "as the fixed point it is. V9 is both "
+                                   "the measurement that showed c_d moves "
+                                   "(6.83 at 0.27 against about 7.95 at "
+                                   "0.10) and the estimator for the "
+                                   "re-solve. Until it is done neither this "
+                                   "dial nor its partner `vix_return_gain` "
+                                   "has a derivation, and neither can be "
+                                   "determined alone: section 11.1's own "
+                                   "finding is that the pair (0.10, 17) and "
+                                   "the pair (0.27, 8.83) are two points on "
+                                   "ONE curve",
+        "source": "programme/results/verdict-ledger.json (design repo), "
+                  "entries `ruling-vix-mean-reversion-stays-at-0.27`, "
+                  "`stalemark-vix-dynamics-derivation-of-0.27` and "
+                  "`stalemark-r13-withdrawn-in-place`, all standing at "
+                  "2026-09-15; programme/results/vix-dynamics.md sections "
+                  "10.3 and 11.1",
+        "ruling": "RULED 2026-09-15 on box sigmamr1 (12 arms, 120 varying "
+                  "rosters plus the 30 held, both horizons): the dial STAYS "
+                  "at 0.27 and the suspension is withdrawn outright rather "
+                  "than left standing. The ruling's readings, on the whole "
+                  "objective against arm W0: MR10A and MR10C -2.23 at 252 "
+                  "and -4.19 at 504, MR10B -2.52 and -4.57; on z, 0.27 sits "
+                  "nearer the tape at +2.18 / +1.54 against 0.10's +3.30 / "
+                  "+2.72, the ruler being `facts.REAL_VIX_AR1`'s centre "
+                  "with its bootstrap median se of 0.0120, meaned across "
+                  "rosters. THE CAVEAT TRAVELS WITH THE VALUE and is why "
+                  "this entry is `undetermined` rather than `measured`",
+        "ruling_evidence_in_this_tree": "programme/results/sigmamr1/ (design "
+                                        "repo) retains "
+                                        "`per-seed-panels.json.gz` for 120 "
+                                        "seeds across the twelve arms, plus "
+                                        "`RETAINED.json`, "
+                                        "`dials-present.txt`, "
+                                        "`kat-verdict.txt`, "
+                                        "`known-answer.txt` and the per-arm "
+                                        "held and varying directories, so "
+                                        "the figures above are recomputable "
+                                        "here. The box's registration and "
+                                        "result NOTES are in neither "
+                                        "repository, so the prose around "
+                                        "them is not, and nothing in this "
+                                        "entry is cited to them",
+        "superseded": "this entry was `measured` until 2026-09-15 and its "
+                      "source, date, script and residual were the arm D "
+                      "frontier of 2026-09-07: three non-dominated points "
+                      "on the pair (S_252, S_504) -- 0.10 at 28.69 / 29.78, "
+                      "0.12 at 25.65 / 32.84, 0.15 at 23.87 / 42.79 -- "
+                      "spread 4.8 points at 252 and 13.0 at 504, a partial "
+                      "order rather than an error bar, measured by "
+                      "programme/scripts/armboth.py via ptv19armd-jobs.sh "
+                      "(design repo) arm D, registered at 92463f9 before "
+                      "the run and recorded at 3175a4c, median across "
+                      "thirty seeds per row with "
+                      "`market_beta_down_asym_lag` pinned at 0.375, the "
+                      "model error each row's own across-seed spread at "
+                      "`df_model` 29. THAT "
+                      "RECORD IS TRUE AND IT IS EVIDENCE ABOUT OTHER "
+                      "VALUES: 0.27 was not on that frontier. It is kept "
+                      "here as history and is no longer what the entry "
+                      "rests on -- the same defect `sector_loading` had "
+                      "below, found by the same audit",
+        "history": "what the withdrawn ruling was made on, kept because it "
+                   "says what the objective can and cannot see: 0.10 was "
+                   "the only one of the three holding `vix_ar1_debiased` "
+                   "inside two standard errors of its ruler at both "
+                   "horizons (+0.7 and -2.0, against -2.7 and -6.8 at "
+                   "0.15), and the only one where the two horizons scored "
+                   "alike rather than one being bought at the other's "
+                   "expense. pt-v16's 0.06 is DOMINATED -- 0.12 beats it at "
+                   "both horizons -- so it was not going to survive "
+                   "whatever the ruling said. Before the persistence row "
+                   "joined the rule the eighteen-row objective wanted 0.15 "
+                   "at 252 and 0.20 at 504; adding the row did not close "
+                   "that disagreement, it reversed which end was which. "
+                   "R13's three registered reasons to re-measure are NOT "
+                   "withdrawn: they are what forced sigmamr1",
+    },
+    "vix_return_gain": {
+        # THE PARTNER OF 0.27, AND IT SHARES ITS FATE. `vix-dynamics.md`
+        # 11.1 prints DERIVED over this value and the sentence that made it
+        # one is withdrawn: `stalemark-fear-response-shape-solved` marks
+        # `fear-response-shape.md` section 1.1's claim that 8.83 is the pair
+        # SOLVED at the tape's memory and withdraws the word "solved". V9
+        # measured the read-back constant c_d at 6.83 at mr 0.27 against
+        # about 7.95 at 0.10. The law is `gain = g_tape/mr - c_d`, so its
+        # constant is IMPLICIT in the dial it is solved for, and what looked
+        # like a derivation is a fixed point solved at one arm.
+        #
+        # WHAT IS NOT WITHDRAWN is the measurement of what the shipped pair
+        # DOES; it is untouched by the mark, it is why the value ships, and
+        # it is in `measured_at_the_pair` below. It is a reading of the
+        # RESPONSE, jointly, at one point. It confirms the pair and it does
+        # not locate this dial -- 11.1's own finding is that
+        # `vix_return_gain` "was never independent of `vix_mean_reversion`,
+        # and the pair (0.10, 17) was one point on the curve
+        # `gain x mr = same-day response - read-back share` at the wrong
+        # memory".
+        #
+        # So `undetermined`, for the same reason and by the same argument as
+        # its partner. A derivation claimed from a confirmation at one point
+        # on a curve is the defect in the module note's first paragraph with
+        # the paragraph already written.
+        "kind": "undetermined",
+        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 8.83},
+        "what_would_determine_it": "the same joint re-solve "
+                                   "`vix_mean_reversion` names -- this dial "
+                                   "is the other unknown in it. A tape "
+                                   "measurement of c_d(mr) turns the pair "
+                                   "from a fixed point solved at one arm "
+                                   "into a solved curve, and then either "
+                                   "determines 8.83 or moves it. NOT a "
+                                   "further score comparison: the arms "
+                                   "already prefer this value and that is "
+                                   "not the missing thing",
+        "source": "programme/results/vix-dynamics.md section 11.1 "
+                  "(vixdyn3); programme/results/verdict-ledger.json entry "
+                  "`stalemark-fear-response-shape-solved` (standing "
+                  "2026-09-15), which marks "
+                  "programme/results/fear-response-shape.md section 1.1",
+        "measured_at_the_pair": "MEASURED, and explicitly untouched by the "
+                                "mark. At `vix_mean_reversion` 0.27 with "
+                                "this dial at 8.83 the realised same-day "
+                                "response is the tape's: down slope -1.48 "
+                                "[-1.69, -1.32] against the tape's -1.39 "
+                                "[-1.66, -1.16]; conditional medians by "
+                                "level in the 1-2 per cent bin 1.91 / 1.71 "
+                                "/ 1.38 at V 17 / 20 / 29 against the "
+                                "tape's 1.63 / 1.44 / 1.40, and in the 2-3 "
+                                "bin 3.41 / 3.09 / 2.74 against 3.29 / 2.48 "
+                                "/ 2.17; the up-side scale fitted on the "
+                                "model reads 0.040 against the tape's "
+                                "0.048. The dial that shipped at 17 is 8.8 "
+                                "when the memory it was compensating for is "
+                                "the tape's, and the response in points "
+                                "does not move. That is a confirmation of "
+                                "the PAIR at one arm, not a derivation of "
+                                "this dial, and the difference is the whole "
+                                "reason this entry is not `measured`",
+        "partners": "`vix_mean_reversion` above is the other unknown. "
+                    "`vix_target_shock_cap` 158.8524 is the image of the "
+                    "clamp at this gain: its arithmetic stands and is "
+                    "CONDITIONAL on 8.83, so a re-solve that moves this "
+                    "dial moves that one with it",
     },
 
     # ---- the four dials pt-v19 moves off pt-v18, composed 2026-09-10 ------
@@ -2203,75 +2551,157 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "miss is carried rather than traded for",
     },
     "sector_loading": {
+        # THE ENTRY DESCRIBED 0.8 AND THE PRESET SHIPS 0.60. Until
+        # 2026-09-15 every measured field here was about a value pt-v19
+        # stopped shipping on 2026-09-14: the source, the date, the script
+        # and a residual that was the five-point grid around 0.8. `presets`
+        # was correct, so `audit()` found no mismatch; the 0.60 story lived
+        # in `superseded`, which no schema reads; and the entry passed with
+        # its evidence pointing at another value. `vix_mean_reversion`
+        # above is the same defect in the other direction -- both were
+        # found by one read of the record against the table, and neither is
+        # reachable by a schema rule (see the note in `validate_entry`).
+        #
+        # The VALUE is sound and that is the second half of the finding.
+        # After R1 the derivation's target and the grading band are on ONE
+        # basis, and the value was then measured directly on the composed
+        # base rather than transferred. A stale entry over a sound value is
+        # a documentation defect; it is recorded as loudly as a model one
+        # because at read time the two are indistinguishable, which is the
+        # sentence this module opens with.
         "kind": "measured",
         "presets": {"pt-v16": 0.58821442, "pt-v18": 0.58821442, "pt-v19": 0.60},
-        "source": "pt-v16 and pt-v18 ship 0.58821442, set by an earlier "
-                  "preset without provenance; what the record says of it is "
-                  "the sectorcomp cell in pt-v18's own regime (identity "
-                  "off, decay 0.6, thirty seeds): S_19 32.5 / 34.2 at "
-                  "0.588 against 32.9 / 31.8 at 0.7 and 43.6 / 42.5 at 0.8, "
-                  "flat between 0.588 and 0.7 and worse at 0.5 and 0.85, so "
-                  "on pt-v18 the value sits on a plateau whose floor is "
-                  "somewhere in 0.6-0.75 and was not located "
-                  "(sector-corr-result.md section 6). For pt-v19: "
-                  "`sector_excess_corr` on the nineteen-row rule: the "
-                  "identity and the decay ratio take the row from -3.5 to "
-                  "-6.7 tape se at 252 (0.1330 -> 0.1040), and the loading "
-                  "puts it back on centre. Chosen as the third level of the "
-                  "2 x 2 x 3 composition (sectorcomp, thirty seeds, held "
-                  "roster 111) and located on a five-point grid on the "
-                  "four-dial base (crosscorr screen, thirty seeds); "
-                  "confirmed at 120 seeds as part of the three-dial cell "
-                  "and on the varying roster at cert4b",
-        "date": "2026-09-09 (sectorcomp, resolve120); 2026-09-10 (crosscorr, "
-                "cert4b)",
-        "script": "programme/scripts/atlas16-jobs.sh with AXES_SET=sectorcomp "
-                  "on the factorial runner (run sectorcomp, engine pin "
-                  "d84367a on feat/atlas-factor-axes; its cells reproduce "
-                  "on release/0.7.1 @ 3d6462a to the digit, "
-                  "volume-acf-result.md section 0), cells and effects by "
-                  "factorial-cells.py (sector-corr-result.md section 3); "
-                  "crosscorr-jobs.sh and crosscorr-analyse.py "
-                  "(crosscorr-result.md section 3.3, prediction X5); "
-                  "resolve120-jobs.sh arm C",
-        "residual": "Located to +/- 0.05 on a grid of 0.7, 0.75, 0.8, 0.85, "
-                    "0.9 (thirty seeds, four-dial base): S_19 at 0.75 reads "
-                    "-1.0 / +2.3 from 0.8 and at 0.85 +0.4 / +2.3, inside "
-                    "one bootstrap sd (5-8 per cell); 0.7 and 0.9 are +4 to "
-                    "+7 worse. So the surface is FLAT across 0.75-0.85 and "
-                    "0.8 is the centre of a plateau, not a resolved optimum. "
-                    "The trade it makes is resolved: -0.0105 of "
-                    "`cross_sectional_corr` per +0.027 of "
-                    "`sector_excess_corr` per 0.1 of loading at 504 (tape se "
-                    "0.00965 and 0.01169), so it buys 2.3 tape se of the "
-                    "sector row per 1.0 of the cross-sectional row. Where "
-                    "the sector row lands: 0.1641 against centre 0.1640 at "
-                    "252 on the held roster (thirty seeds); at 120 seeds "
-                    "0.1672 (+0.0309 +/- 0.0011 over pt-v18, +3.45 tape "
-                    "se); on the varying roster 0.1792, z_tape +1.70 at 252 "
-                    "and 0.1746, +1.12 at 504 (cert4b, in band both). The "
-                    "one-dial cost it carries: switched back to 0.588 alone "
-                    "on the four-dial base the cross-sectional row gains "
-                    "+0.0216 / +0.0213 (+0.7 / +2.2 tape se) and the sector "
-                    "row loses 4.6 tape se at 504 (crosscorr-result.md "
-                    "section 2)",
-        "superseded": "pt-v19 shipped 0.8 until 2026-09-14 and now ships "
-                      "0.60. Everything above is the record of the 0.8 "
-                      "choice and it was honest: it centred the row on the "
-                      "2015-2025 forty-name centre of 0.1640. The whole-tape "
-                      "re-centring moved that centre to 0.1178 and the value "
-                      "with it. 0.60 is DERIVED in sector-loading.md 6.3 "
-                      "from a response exponent measured on the pt-v18 base, "
-                      "and MEASURED on the composed base by the levelsec1 "
-                      "sweep, which puts the centring loading at 0.596 at "
-                      "252 and 0.609 at 504 -- the derivation right to 0.004 "
-                      "on a transfer that was itself refuted, since the "
-                      "fitted exponent is 1.44 against a registered [1.5, "
-                      "2.0]. The row goes from a term of 2.67 to 0.00 at "
-                      "both horizons",
-        "estimator": "as `vix_level_identity`; the sector row's tape error "
-                     "is `facts.rule_row`'s 0.008954 at 252 (median of nine "
-                     "non-crisis windows)",
+        "source": "MEASURED ON THE COMPOSED BASE. transmit1 varied the "
+                  "level and the loading in ONE box for the first time: two "
+                  "ladders over `sector_loading` 0.55, 0.60, 0.65 and 0.70, "
+                  "one at `market_vol_level_sigma` 0.0 and one at the "
+                  "shipped 0.085, on 120 varying rosters (seeds 101-220) "
+                  "plus the 30 held, both horizons, one 1260-session "
+                  "recording per arm so the windows are windows of one "
+                  "path. F3's rule returns the centring loading L* = 0.6168 "
+                  "at 252 and 0.6271 at 504 with the level ON, against "
+                  "0.5958 and 0.6056 with it off. THE TARGET AND THE RULER "
+                  "ARE ONE BASIS after R1: the target is the whole-tape "
+                  "centre of `sector_excess_corr`, 0.1178 "
+                  "(whole-tape.md's resolved table), and "
+                  "`facts.RULED_BY_HORIZON` is `REAL_MARKETS_RULED`, whose "
+                  "`sector_excess_corr` band is built by the same rule over "
+                  "the same 1987-2025 32-name windows that centre is. The "
+                  "objection that the dial was derived against one basis "
+                  "and graded against another is answered by R1 and not by "
+                  "this entry. pt-v16 and pt-v18 ship 0.58821442, set by an "
+                  "earlier preset without provenance",
+        "date": "2026-09-14 (transmit1, the measurement this entry rests "
+                "on); 2026-09-13 (sector-loading.md section 6.3, the "
+                "derivation it agrees with)",
+        "script": "programme/results/whole-tape/scripts/transmit1_analyse.py "
+                  "(design repo), applying F3's rule unchanged from "
+                  "levelsec1_analyse.py; whole-tape/scripts/score_wt.py for "
+                  "the objective, through `facts.aggregate_value` "
+                  "(transmit1-result.md section 3)",
+        "residual": "THE COMPOSITION CORRECTION, AND IT IS A TENTH OF WHAT "
+                    "THE TAPE CAN SEE. Turning the level on moves L* by "
+                    "+0.0210 at 252 and +0.0215 at 504 on the varying "
+                    "median, +0.0080 and +0.0114 on the varying mean, "
+                    "+0.0385 and +0.0402 on the held median. The tape's "
+                    "centre for this row is 0.1178 +/- 0.0367, a 31 per "
+                    "cent bar, which at a response exponent near 1.45 is a "
+                    "loading known to about +/- 0.213. So the correction is "
+                    "a tenth of the bar and 0.6168 is inside the band the "
+                    "derivation already had. `defect-28` records that the "
+                    "tape bar does NOT shrink by running more rosters, so "
+                    "this is the answer rather than an interim one. The "
+                    "objective agrees: on the whole-tape nineteen C065 "
+                    "reads 13.2 at 252 and 9.7 at 504 against C060's 13.0 "
+                    "and 9.2, so 0.60 is at the minimum of the ladder",
+        "estimator": "median across rosters, which is the estimator "
+                     "`score_wt.py` applies through `facts.aggregate_value`; "
+                     "errors on the transmission statistic are a "
+                     "delete-one-roster jackknife paired across windows. "
+                     "The sector row's tape error is `facts.rule_row`'s "
+                     "0.008954 at 252 (median of nine non-crisis windows)",
+        "not_adopted": "0.6168, the measured centring loading itself. "
+                       "Adopting it would move `sector_excess_corr` by "
+                       "about 0.004, which is not a movement the tape can "
+                       "resolve, and transmit1's own recommendation is that "
+                       "0.60 STANDS and the record carry +0.021 as the "
+                       "measured composition correction so nobody re-runs "
+                       "the box to find out it is small. Whether to adopt "
+                       "0.62 is a question THE TAPE CANNOT ANSWER, and this "
+                       "field is where that is recorded rather than being "
+                       "left to look like an oversight",
+        "derivation_it_agrees_with": "sector-loading.md section 6.3 inverts "
+                                     "`odds(E) = c L^p` onto the whole-tape "
+                                     "centre from the reading the shipping "
+                                     "arm produces at L = 0.8, giving L* = "
+                                     "0.599 at 252 and 0.611 at 504, each "
+                                     "+/- 0.12 from the target's error "
+                                     "alone, judged as one number for both "
+                                     "horizons at 0.60. Across three anchor "
+                                     "bases the span is 0.565 to 0.678, "
+                                     "which is smaller than the target's "
+                                     "own bar. THE TRANSFER IT USED WAS "
+                                     "REFUTED -- the fitted response "
+                                     "exponent is 1.44 against a registered "
+                                     "[1.5, 2.0] -- and transmit1 bypasses "
+                                     "the transfer by measuring L* directly "
+                                     "on the composed base, landing 0.6168 "
+                                     "against the 0.6156 the registration "
+                                     "derived beforehand, four thousandths "
+                                     "apart. So the value is MEASURED and "
+                                     "not transferred, and the derivation "
+                                     "is what it agrees with rather than "
+                                     "what it rests on",
+        "what_the_move_from_0.8_cost": "it did not cost the weak row, it "
+                                       "helped it. The exchange rate is "
+                                       "-0.0105 of `cross_sectional_corr` "
+                                       "per +0.1 of loading at 504, so "
+                                       "moving 0.8 to 0.60 raised that row "
+                                       "by about +0.021. This dial is not "
+                                       "why `cross_sectional_corr` is low",
+        "superseded": "pt-v19 SHIPPED 0.8 UNTIL 2026-09-14 and this whole "
+                      "entry described that choice until 2026-09-15. The "
+                      "0.8 record, kept because it was honest and because "
+                      "it says what the surface looks like: chosen as the "
+                      "third level of the 2 x 2 x 3 composition "
+                      "(sectorcomp, thirty seeds, held roster 111, "
+                      "2026-09-09) and located on a five-point grid of 0.7, "
+                      "0.75, 0.8, 0.85, 0.9 on the four-dial base "
+                      "(crosscorr screen, thirty seeds, 2026-09-10), where "
+                      "S_19 at 0.75 reads -1.0 / +2.3 from 0.8 and at 0.85 "
+                      "+0.4 / +2.3, inside one bootstrap sd of 5-8 per "
+                      "cell, and 0.7 and 0.9 are +4 to +7 worse -- so the "
+                      "surface is FLAT across 0.75-0.85 and 0.8 was the "
+                      "centre of a plateau, not a resolved optimum. It "
+                      "centred the row on the 2015-2025 forty-name centre "
+                      "of 0.1640, and it was the whole-tape re-centring of "
+                      "that target to 0.1178 that moved the value, not a "
+                      "defect in the measurement. Scripts: "
+                      "programme/scripts/atlas16-jobs.sh with "
+                      "AXES_SET=sectorcomp on the factorial runner, cells "
+                      "and effects by factorial-cells.py "
+                      "(sector-corr-result.md section 3); crosscorr-jobs.sh "
+                      "and crosscorr-analyse.py (crosscorr-result.md "
+                      "section 3.3, prediction X5); resolve120-jobs.sh arm "
+                      "C. What the record says of pt-v16 and pt-v18's "
+                      "0.58821442 is the sectorcomp cell in pt-v18's own "
+                      "regime (identity off, decay 0.6, thirty seeds): S_19 "
+                      "32.5 / 34.2 at 0.588 against 32.9 / 31.8 at 0.7 and "
+                      "43.6 / 42.5 at 0.8, flat between 0.588 and 0.7 and "
+                      "worse at 0.5 and 0.85, so on pt-v18 that value sits "
+                      "on a plateau whose floor is somewhere in 0.6-0.75 "
+                      "and was not located (sector-corr-result.md section "
+                      "6). Also on the old basis, and kept for the "
+                      "mechanism rather than the figure: on the composed "
+                      "base the identity and the decay ratio take "
+                      "`sector_excess_corr` from -3.5 to -6.7 tape se at "
+                      "252 (0.1330 to 0.1040) and the loading is what puts "
+                      "the row back on centre, which is why this dial is "
+                      "moved at all. The se there is against the 2015-2025 "
+                      "forty-name centre of 0.1640; against the whole-tape "
+                      "0.1178 the same readings are a different number of "
+                      "bars, so the SIZES do not transfer and the direction "
+                      "does",
         "note": "mechanism: `L_i = sector_loading * (1 + slope * (beta_i - "
                 "1))` loads a name onto its sector factor (market/factors.rs); "
                 "`L^2 V_s / sigma^2` is the sector row and enters every "
@@ -2861,7 +3291,6 @@ UNPROVENANCED = (
     "endogenous_news_intensity",
     "endogenous_news_sigma",
     "garch_alpha",
-    "garch_beta",
     "garch_ceiling_multiple",
     "garch_floor_multiple",
     "garch_omega",
@@ -2882,7 +3311,6 @@ UNPROVENANCED = (
     "market_factor_sigma",
     "market_vol_ceiling_multiple",
     "market_vol_floor_multiple",
-    "market_vol_slow_persistence",
     "market_vol_slow_vix_damp",
     "market_vol_slow_weight",
     "market_vol_vix_anchor",
@@ -2904,10 +3332,8 @@ UNPROVENANCED = (
     "sector_vix_coupling",
     "usd_crisis_vix_threshold",
     "vix_cycle_amplitude",
-    "vix_mean_reversion",
     "vix_realised_vol_weight",
     "vix_return_clamp",
-    "vix_return_gain",
     "vix_return_source",
     "volume_innovation_sigma",
     "volume_move_cap",
@@ -3041,6 +3467,40 @@ def partition() -> dict[str, Any]:
     }
 
 
+# WHAT THIS DOES NOT READ, AND WHY: `superseded`.
+#
+# `sector_loading` passed every rule below for a day while its source, its
+# date, its script and its residual all described 0.8 and `presets` shipped
+# 0.60. The only field telling the truth was `superseded`. The obvious
+# repair -- teach the schema to read it -- was considered on 2026-09-15 and
+# REFUSED, twice over.
+#
+# First, it inverts the rule. `superseded` is where an entry puts a record
+# it has itself declared no longer current. A schema that accepted it as
+# evidence would let an entry satisfy `source`, `date`, `script` or its
+# error bar out of a record the entry says does not apply, which is a
+# strictly worse state than the one being fixed: today the stale evidence
+# at least sits in a field named for history.
+#
+# Second, it would not have caught this. The check that would is "do the
+# measured fields describe the value in `presets`", and that is a human
+# read. The fields are prose; `date` is free text ("2026-09-09 (sectorcomp,
+# resolve120); 2026-09-10 (crosscorr, cert4b)"); and the `standard_error`
+# note inside this function says why residual shapes are not enumerable
+# here. A rule that could only approximate the question would have gone
+# green on the entry it was written for -- a guard reporting green because
+# its subject sits outside what it can ask, which is the failure the module
+# note names one level up. `standard_error` IS checked, because a bar has a
+# SHAPE that can be wrong; a stale narrative does not.
+#
+# So the repair is in the entries and in the audit, not here: history goes
+# in `superseded`, the required fields describe what ships, and
+# `audit()["in_both"]` closes the guard hole the same audit found. If a
+# mechanical form of this is ever wanted, the honest one is a `describes`
+# field carrying the value each measured field is about, checked against
+# `presets` -- a new obligation on every entry, not a reading of an old
+# field. Nobody has paid for that yet, and saying so is cheaper than a rule
+# that reports green.
 def validate_entry(dial: str, entry: Any) -> list[str]:
     """Everything wrong with one entry, as a list; empty means valid."""
     problems: list[str] = []
@@ -3157,8 +3617,10 @@ def audit() -> dict[str, Any]:
     `stale_unprovenanced` are names listed there that no longer need one;
     `invalid` are entries that fail the schema; `mismatched` are entries
     whose recorded value is not what the preset ships, which is exactly how
-    a record goes stale when a dial moves under it; `post_baseline` are
-    faults in the declared list itself; `unclassified` are settable dials
+    a record goes stale when a dial moves under it; `in_both` are
+    dials claiming an entry and an admitted gap at once, which the union
+    above cannot see; `post_baseline` are faults in the declared list
+    itself; `unclassified` are settable dials
     in no bucket of the partition at all, which is what a newly added dial
     looks like before anyone has decided about it.
     """
@@ -3166,6 +3628,33 @@ def audit() -> dict[str, Any]:
     moved = moved_dials()
     required = required_dials()
     covered = set(DIAL_PROVENANCE) | set(UNPROVENANCED)
+
+    # THE UNION IS WHERE A DOUBLE BOOKING HIDES, and it hid one until an
+    # audit read the record against the table rather than either alone.
+    # `missing` is computed from this union, so a dial listed in BOTH
+    # sets is counted once here and twice in the two lengths `report()`
+    # prints. On 2026-09-15 that dial was `vix_mean_reversion`: 45 entries
+    # plus 69 declared names, 113 dials in scope, union 113. Every
+    # completeness assertion balanced, `check()` was green, and the table
+    # was asserting two contradictory things about one dial.
+    #
+    # The two sets answer opposite questions -- "where did this value come
+    # from" and "nobody has said" -- so a name in both is not a redundancy
+    # to be tidied, it is a claim the table is making against itself. It is
+    # refused BY NAME rather than left to arithmetic, because the
+    # arithmetic is what could not see it: a union has no arity. The suite
+    # pins this in `test_a_dial_cannot_be_both_provenanced_and_declared_
+    # unprovenanced`, and the older "in both" test next to it is about
+    # `MOVED` and `OUT_OF_SCOPE`, a different pair, which is exactly why it
+    # never fired here.
+    in_both = [
+        f"{dial}: carries a DIAL_PROVENANCE entry AND is declared in "
+        "UNPROVENANCED. Those are opposite claims about the same dial, and "
+        "the union `missing` is computed from cannot see the second one. "
+        "Decide which it is: an entry (`undetermined` is a passing kind and "
+        "costs no derivation) or an admitted gap"
+        for dial in sorted(set(DIAL_PROVENANCE) & set(UNPROVENANCED))
+    ]
 
     post_baseline: list[str] = []
     for dial in sorted(POST_BASELINE):
@@ -3238,6 +3727,7 @@ def audit() -> dict[str, Any]:
         "provenanced": sorted(DIAL_PROVENANCE),
         "missing": sorted(set(required) - covered),
         "unprovenanced": sorted(set(required) & set(UNPROVENANCED)),
+        "in_both": in_both,
         "stale_unprovenanced": sorted(set(UNPROVENANCED) - set(required)),
         "invalid": invalid,
         "mismatched": mismatched,
@@ -3266,8 +3756,8 @@ def report() -> str:
         f"  {len(a['unprovenanced'])} declared unprovenanced",
         f"  {len(a['missing'])} with neither",
     ]
-    for label in ("missing", "invalid", "mismatched", "stale_unprovenanced",
-                  "post_baseline", "unclassified"):
+    for label in ("missing", "invalid", "mismatched", "in_both",
+                  "stale_unprovenanced", "post_baseline", "unclassified"):
         for item in a[label]:
             lines.append(f"  {label.upper()}: {item}")
     return "\n".join(lines)
@@ -3278,7 +3768,7 @@ def check() -> None:
     a = audit()
     faults = (
         [f"no provenance and not declared unprovenanced: {d}" for d in a["missing"]]
-        + a["invalid"] + a["mismatched"] + a["post_baseline"]
+        + a["invalid"] + a["mismatched"] + a["in_both"] + a["post_baseline"]
         + [f"settable and in no bucket of the partition -- decide whether it "
            f"is a choice needing provenance or record why it is not: {d}"
            for d in a["unclassified"]]

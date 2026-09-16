@@ -177,6 +177,120 @@ def test_a_dial_in_two_buckets_is_refused():
         pv.OUT_OF_SCOPE = real
 
 
+def test_a_dial_cannot_be_both_provenanced_and_declared_unprovenanced():
+    """The other pair of buckets, and this one had a name sitting in it.
+
+    The test above is about `MOVED` and `OUT_OF_SCOPE`. `DIAL_PROVENANCE`
+    and `UNPROVENANCED` are a second pair asking opposite questions --
+    "where did this value come from" and "nobody has said" -- and nothing
+    asserted they were disjoint.
+
+    So on 2026-09-15 `vix_mean_reversion` was in both. `audit()` computes
+    `missing` from their UNION, so 45 entries plus 69 declared names
+    collapsed to 113 against 113 dials in scope; the set assertion in
+    `test_every_choice_is_either_derived_measured_or_declared_unknown`
+    balanced, `check()` was green, and a dial was claiming a derivation and
+    an admitted gap at the same time. A union has no arity, which is why
+    the overlap has to be refused by name.
+    """
+    both = set(pv.DIAL_PROVENANCE) & set(pv.UNPROVENANCED)
+    assert not both, (
+        "dials claiming a DIAL_PROVENANCE entry and an admitted gap at "
+        f"once: {sorted(both)}"
+    )
+    assert not pv.audit()["in_both"]
+
+    # The counts the union hid: they add up only because the two sets are
+    # disjoint, and this is the arithmetic that was quietly wrong.
+    a = pv.audit()
+    assert (len(a["provenanced"]) + len(a["unprovenanced"])
+            == len(a["required"])), a
+
+    # And it FIRES. A membership rule nothing can violate is not a rule.
+    dial = sorted(pv.DIAL_PROVENANCE)[0]
+    faults = _audit_with(pv.DIAL_PROVENANCE, pv.UNPROVENANCED + (dial,))
+    assert any(dial in f for f in faults["in_both"]), faults["in_both"]
+    assert not faults["missing"], (
+        "the union still reports nothing missing, which is exactly why "
+        "`missing` could not see this"
+    )
+
+    real = pv.UNPROVENANCED
+    pv.UNPROVENANCED = real + (dial,)
+    try:
+        with pytest.raises(tradefloor.ValidationError,
+                           match="declared in\\s+UNPROVENANCED"):
+            pv.check()
+    finally:
+        pv.UNPROVENANCED = real
+
+
+def test_the_two_dials_whose_entries_were_evidence_about_other_values():
+    """The stale-entry defect, pinned on the two entries that carried it.
+
+    `sector_loading` was `measured` with a source, a date, a script and a
+    residual that all described 0.8 while `presets` shipped 0.60; the 0.60
+    story lived in `superseded`, which no schema reads.
+    `vix_mean_reversion` was `measured` off the arm D frontier of 0.10 /
+    0.12 / 0.15, a frontier its shipped 0.27 was never on.
+
+    Neither is reachable by a schema rule -- the fields are prose -- so
+    what is asserted here is the shape of the repair: history lives in
+    `superseded`, and the kind each entry claims is one its own evidence
+    can support. `vix_mean_reversion` is `undetermined` because a score is
+    why a value ships and not a measurement of the dial.
+    """
+    sl = pv.DIAL_PROVENANCE["sector_loading"]
+    assert sl["kind"] == "measured"
+    assert "0.6168" in sl["source"] and "transmit1" in sl["script"]
+    assert "0.8" in sl["superseded"], (
+        "the 0.8 record is the history and it is kept, not deleted")
+    assert not pv.validate_entry("sector_loading", sl)
+
+    mr = pv.DIAL_PROVENANCE["vix_mean_reversion"]
+    assert mr["kind"] == "undetermined", (
+        "0.27 stands on the score and the z, and the standing ruling says "
+        "so in its own words. `measured` would let the score stand in for "
+        "the argument, which is the substitution this module exists for")
+    assert "frontier" in mr["superseded"]
+    assert not pv.validate_entry("vix_mean_reversion", mr)
+
+    # And its partner, which cannot be determined separately from it.
+    gain = pv.DIAL_PROVENANCE["vix_return_gain"]
+    assert gain["kind"] == "undetermined"
+    assert "vix_mean_reversion" in gain["what_would_determine_it"]
+
+
+def test_a_derivation_the_record_holds_is_carried_by_the_table():
+    """The inverse defect: a derivation the record has and the guard cannot see.
+
+    `garch_beta` 0.7905 and `market_vol_slow_persistence` 0.9913 are both
+    derived in `vix-dynamics.md` -- sections 15.4 and 17.4 -- and both sat
+    in `UNPROVENANCED` as admitted gaps that were not gaps. An entry that
+    is missing while its derivation exists is the same blindness as an
+    entry that survives while its derivation falls, read from the other
+    side.
+    """
+    for dial, value in (("garch_beta", 0.7905),
+                        ("market_vol_slow_persistence", 0.9913)):
+        entry = pv.DIAL_PROVENANCE[dial]
+        assert entry["kind"] == "derived", dial
+        assert entry["presets"]["pt-v19"] == value, dial
+        assert "vix-dynamics.md" in entry["source"], dial
+        assert dial not in pv.UNPROVENANCED, dial
+        assert not pv.validate_entry(dial, entry), dial
+
+    # `garch_beta` is the identity solved at the shipped alpha and gamma,
+    # so it goes stale if either partner moves. Recomputed here rather than
+    # quoted, because a quoted arithmetic check checks nothing.
+    shipped = tradefloor.ModelParams.from_preset("pt-v19").to_dict()
+    rho = 0.9416
+    assert abs(rho - shipped["garch_alpha"] - shipped["garch_gamma"] / 2
+               - shipped["garch_beta"]) < 5e-5, (
+        "`garch_beta` is `rho - alpha - gamma / 2` at the tape's per-name "
+        "decay rate, and one of the three has moved under the entry")
+
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 #: Dials whose setter writes a field other than their own, so the value
