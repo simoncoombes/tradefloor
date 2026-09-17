@@ -1148,7 +1148,8 @@ pub struct ModelParams {
     pub market_vol_vix_exponent: f64,
     /// Downside transmission asymmetry: on a down tick of the market
     /// factor, every name receives `beta * factor * (1 + this)`. 0.0 --
-    /// every shipped preset -- is bit-identical. The direct wire for
+    /// pt-v1 through pt-v15 -- is bit-identical; pt-v16 onward ship
+    /// 0.025. The direct wire for
     /// correlation asymmetry: names co-moving harder on the way down IS
     /// the exceedance correlation real markets show and the panel's
     /// corr_asymmetry statistic measures. Raises down-day co-movement and
@@ -1157,7 +1158,9 @@ pub struct ModelParams {
     pub market_beta_down_asym: f64,
     /// The LAGGED downside transmission: on the session after a down day,
     /// every name receives `beta * factor * (1 + this)` whatever the
-    /// tick's own sign. 0.0 -- every shipped preset -- is bit-identical.
+    /// tick's own sign. 0.0 -- pt-v1 through pt-v16 -- is bit-identical;
+    /// pt-v18 and pt-v19 ship 0.375, which `provenance.py` records as an
+    /// S-argmin on a seven-point grid rather than as anything derived.
     /// Block 1201's deep-trim signature (the wire landing a day late on
     /// its structure) is the measured motivation: real down-moves
     /// continue, and the contemporaneous wire alone cannot express that.
