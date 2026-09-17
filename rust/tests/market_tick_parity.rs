@@ -272,6 +272,9 @@ fn check_scenario(file: &str) {
                 // asymmetry branches on this flag and its gain defaults
                 // to 0.0, so false is bit-identical here.
                 prev_day_down: false,
+                // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
+                prev_day_factor: 0.0,
+                day_factor: 0.0,
             forced_flow_eff: 1.0,
                 universe_stress: 0.0,
                 volume_state: 0.0,

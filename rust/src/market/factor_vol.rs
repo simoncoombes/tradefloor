@@ -551,6 +551,25 @@ impl MarketVarianceState {
         self.prev_day_factor < 0.0
     }
 
+    /// Yesterday's whole-session accumulated market factor, the signed
+    /// quantity `prev_day_down` thresholds. Exposed beside the boolean for
+    /// `market_beta_down_asym_lag_live`, which needs the MAGNITUDE to
+    /// decay yesterday's tail across today's session. Already in
+    /// `snapshot()`; this is an accessor, not new state.
+    pub fn prev_day_factor(&self) -> f64 {
+        self.prev_day_factor
+    }
+
+    /// TODAY's running accumulated market factor, as it stands right now.
+    /// Read by `market_beta_down_asym_lag_live` BEFORE the current tick's
+    /// own factor is accumulated (`engine.rs` accumulates after the tick
+    /// returns), which is what makes that wire a function of strictly
+    /// earlier draws and therefore mean-preserving. Already in
+    /// `snapshot()`; this is an accessor, not new state.
+    pub fn day_factor(&self) -> f64 {
+        self.day_factor
+    }
+
     /// Today's factor sigma at DAILY scale — what the tick multiplies by
     /// `1/√390` to draw at per-tick scale.
     pub fn sigma_daily(&self) -> f64 {

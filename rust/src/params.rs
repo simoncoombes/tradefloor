@@ -1711,6 +1711,53 @@ pub struct ModelParams {
     /// its structure) is the measured motivation: real down-moves
     /// continue, and the contemporaneous wire alone cannot express that.
     pub market_beta_down_asym_lag: f64,
+    /// WHERE the lagged wire's condition is SAMPLED. A form dial with no
+    /// number to derive: it does not change what the boost is, only which
+    /// state the boolean is read off. 0.0 -- every shipped preset through
+    /// pt-v19 -- is bit-identical, because the branch below returns
+    /// `inputs.prev_day_down` unchanged.
+    ///
+    /// # The three values
+    ///
+    /// - **0.0, as shipped.** The condition is `prev_day_factor < 0`,
+    ///   sampled once at the open and held for the whole session. Exact at
+    ///   the bell and a day stale by the close.
+    /// - **1.0, live.** At tick `k` of 390 the condition is
+    ///   `prev_day_factor * (1 - k/390) + day_factor_so_far < 0`, which is
+    ///   `E[sum of the last 390 tick factors | prev_day_factor, day_factor]`
+    ///   under exchangeable within-day draws: yesterday's remaining tail
+    ///   decays linearly across the session while today's own running sum
+    ///   takes over. At `k = 0` it IS `prev_day_down`; at `k = 390` it is
+    ///   today's own sign.
+    /// - **2.0, the sign control.** The same quantity with the comparison
+    ///   REVERSED (`c_k > 0`). A diagnostic arm only, registered as F4 in
+    ///   `corr-asymmetry-repair.md` section 8: a live sample that moves
+    ///   `corr_asymmetry` the same way under both signs is adding variance,
+    ///   not re-timing a signed response. Never a shipping value.
+    ///
+    /// # Why this injects no first moment
+    ///
+    /// The multiplier `m_t = 1 + lag * 1{c_t < 0}` is a function of draws
+    /// strictly BEFORE tick `t` -- `day_factor_so_far` is the accumulator
+    /// as it stands when the tick is called, and `engine.rs` accumulates
+    /// this tick's factor only AFTER `simulate_market_tick` returns. The
+    /// tick's own factor `f_t` is an independent zero-mean draw, so
+    /// `E[m_t f_t] = E[m_t] E[f_t] = 0` tick by tick and the day's
+    /// delivered factor has mean zero. That is the sharp contrast with
+    /// `market_beta_down_asym`, which scales the draw WHOSE OWN SIGN IT
+    /// BRANCHES ON and therefore needs `market_beta_down_asym_recentre`
+    /// beside it. There is no recentring dial here and no `return_acf1`
+    /// channel: `E[F_d F_{d+1}] = 0` by the same independence. The shipped
+    /// keying has this property too, so it is PRESERVED, not gained.
+    ///
+    /// # No draw
+    ///
+    /// A branch on state the snapshot already holds
+    /// (`MarketVarianceState::prev_day_factor` and `::day_factor`). The
+    /// draw schedule is a pure function of market status, active set and
+    /// sector count and this touches none of them, so no stream is added
+    /// and no restore offset moves.
+    pub market_beta_down_asym_lag_live: f64,
     /// How much of the first moment `market_beta_down_asym` injects is
     /// given back. 0.0 -- every preset before pt-v18 -- is bit-identical.
     /// 1.0 returns the whole of it.
@@ -4261,6 +4308,7 @@ impl ModelParams {
             market_vol_vix_exponent: 2.0,
             market_beta_down_asym: 0.0,
             market_beta_down_asym_lag: 0.0,
+            market_beta_down_asym_lag_live: 0.0,
             market_beta_down_asym_recentre: 0.0,
             market_idio_down_suppress: 0.0,
             oil_supply_response: 0.0,
@@ -6253,6 +6301,7 @@ impl ModelParams {
             "market_vol_vix_exponent" => self.market_vol_vix_exponent,
             "market_beta_down_asym" => self.market_beta_down_asym,
             "market_beta_down_asym_lag" => self.market_beta_down_asym_lag,
+            "market_beta_down_asym_lag_live" => self.market_beta_down_asym_lag_live,
             "market_beta_down_asym_recentre" => self.market_beta_down_asym_recentre,
             "market_idio_down_suppress" => self.market_idio_down_suppress,
             "oil_supply_response" => self.oil_supply_response,
@@ -6450,6 +6499,7 @@ impl ModelParams {
             "market_vol_vix_exponent" => out.market_vol_vix_exponent = value,
             "market_beta_down_asym" => out.market_beta_down_asym = value,
             "market_beta_down_asym_lag" => out.market_beta_down_asym_lag = value,
+            "market_beta_down_asym_lag_live" => out.market_beta_down_asym_lag_live = value,
             "market_beta_down_asym_recentre" => out.market_beta_down_asym_recentre = value,
             "market_idio_down_suppress" => out.market_idio_down_suppress = value,
             "oil_supply_response" => out.oil_supply_response = value,
@@ -7055,6 +7105,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_vix_exponent",
         "market_beta_down_asym",
         "market_beta_down_asym_lag",
+        "market_beta_down_asym_lag_live",
         "market_beta_down_asym_recentre",
         "market_idio_down_suppress",
         "oil_opec_symmetry",
