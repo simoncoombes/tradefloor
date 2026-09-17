@@ -502,18 +502,32 @@ def main() -> None:
     # A pool, and therefore a __main__ guard at the bottom of this file:
     # macOS spawns rather than forks, so a module-level pool re-imports the
     # module in every worker and forks bombs. Trap 5 of the runbook.
-    collected: dict[tuple[str, str], list[dict]] = {}
+    # KEYED BY SEED, not appended in completion order. imap_unordered yields
+    # as workers finish, so a bare append makes per_seed_* row order a race:
+    # two runs of the SAME build put the held-out rows in different orders
+    # (measured 2026-09-16, 18 of 30 rows at the same position over six
+    # adjacent swaps), and anything pairing two artefacts BY POSITION is then
+    # pairing different seeds. The medians this file reports never cared --
+    # a median is order-invariant -- which is why it went unnoticed.
+    collected_by_seed: dict[tuple[str, str], dict[int, dict]] = {}
     done = 0
     with mp.Pool(args.workers) as pool:
         for key, preset, seed, panel in pool.imap_unordered(_job, specs,
                                                             chunksize=1):
-            collected.setdefault((key, preset), []).append(panel)
+            collected_by_seed.setdefault((key, preset), {})[seed] = panel
             done += 1
             if done % 100 == 0:
                 rate = done / max(time.time() - started, 1e-9)
                 print(f"  {done}/{len(specs)}  {rate:.1f}/s  "
                       f"eta {(len(specs) - done) / max(rate, 1e-9) / 60:.1f}m",
                       flush=True)
+
+    # Sorted by seed, so the row order is a property of the run's seed list
+    # and not of how the pool happened to schedule it.
+    collected: dict[tuple[str, str], list[dict]] = {
+        key: [panel for _, panel in sorted(by_seed.items())]
+        for key, by_seed in collected_by_seed.items()
+    }
 
     results = {}
     for preset in names:
