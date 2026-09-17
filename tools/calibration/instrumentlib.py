@@ -145,6 +145,14 @@ PARAM_SPECS: dict[str, dict] = {
     "market_vol_vix_exponent": {"kind": "abs", "step_unit": 0.05, "hard_range": (1.0, 4.0)},
     "market_beta_down_asym": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
     "market_beta_down_asym_lag": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
+    # WHERE the lagged wire's condition is sampled. A SWITCH, not a share:
+    # the condition is read at the open or read live, and there is no half
+    # sampling, so the step is the whole interval and a search either takes
+    # the form or leaves it. The range stops at 1.0 on purpose -- 2.0 is the
+    # registered SIGN CONTROL of `corr-asymmetry-repair.md` F4, a diagnostic
+    # arm and never a shipping value, so no search may land on it.
+    "market_beta_down_asym_lag_live": {"kind": "abs", "step_unit": 1.0,
+                                       "hard_range": (0.0, 1.0)},
     # A SHARE of the injected first moment, so its range is [0, 1] and
     # not an open coefficient: above 1.0 it would inject an upward
     # drift of its own, which is the defect inverted rather than a

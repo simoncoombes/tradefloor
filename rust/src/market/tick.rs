@@ -513,6 +513,14 @@ pub struct TickInputs<'a> {
     /// (`market_beta_down_asym_lag`); false everywhere that dial is 0.0,
     /// including every recorded reference stream.
     pub prev_day_down: bool,
+    /// Yesterday's whole-session accumulated market factor -- the signed
+    /// quantity `prev_day_down` is the sign of. Read ONLY when
+    /// `market_beta_down_asym_lag_live` is nonzero; at 0.0 nothing looks
+    /// at it and every shipped preset is bit-identical whatever it holds.
+    pub prev_day_factor: f64,
+    /// TODAY's running accumulated market factor BEFORE this tick's own
+    /// draw. Read ONLY when `market_beta_down_asym_lag_live` is nonzero.
+    pub day_factor: f64,
     /// Fraction of the forced-flow segment's budget remaining, 1.0 when
     /// the reservoir dial is off. See `ModelParams::forced_flow_reservoir`.
     pub forced_flow_eff: f64,
@@ -823,11 +831,39 @@ pub fn simulate_market_tick(
         };
         sector_factors.push((sector.clone(), kept));
     }
+    // THE LAGGED WIRE'S CONDITION, and WHERE it is sampled is the dial.
+    //
+    // At `market_beta_down_asym_lag_live` 0.0 this is exactly the bit the
+    // engine read at the open and nothing below runs -- the same boolean,
+    // by the same comparison, so every preset through pt-v19 is
+    // bit-identical. At 1.0 the SAME condition ("the market has fallen
+    // over the last session") is evaluated against the state as it stands
+    // at this tick: yesterday's total decayed by the fraction of the
+    // session already elapsed, plus today's own running sum. That is
+    // `E[sum of the last 390 tick factors]` given the two numbers the
+    // variance state already holds, and it needs no new state and no draw.
+    //
+    // `inputs.day_factor` is the accumulator BEFORE this tick's factor
+    // lands (the engine accumulates after `simulate_market_tick` returns),
+    // so the multiplier is a function of strictly earlier draws and the
+    // day's delivered factor keeps its zero mean. See
+    // `ModelParams::market_beta_down_asym_lag_live`.
+    let lag_condition = if p.market_beta_down_asym_lag_live == 0.0 {
+        inputs.prev_day_down
+    } else {
+        let c = inputs.prev_day_factor * (1.0 - inputs.intraday_t) + inputs.day_factor;
+        // 2.0 is the registered SIGN CONTROL (F4), not a shipping value.
+        if p.market_beta_down_asym_lag_live >= 2.0 {
+            c > 0.0
+        } else {
+            c < 0.0
+        }
+    };
     let shared = SharedFactors {
         market_factor,
         sector_factors,
         crisis_spike: vix_correlation_spike,
-        prev_day_down: inputs.prev_day_down,
+        prev_day_down: lag_condition,
         // The same expression the draw above multiplied the normal by, so
         // the recentring reads the sigma that was actually used rather
         // than one recomputed from the constant.

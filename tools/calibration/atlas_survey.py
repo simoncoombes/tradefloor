@@ -167,6 +167,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the box the way ramp=50 does above: strong-to-implausible.
     "market_beta_down_asym": (0.0, 0.1),
     "market_beta_down_asym_lag": (0.0, 0.1),
+    # A SWITCH over the two admissible values, for the reason the box gives:
+    # the lagged wire's condition is sampled at the open or sampled live and
+    # the interior has no reading. Stops at 1.0; the sign control at 2.0 is a
+    # diagnostic arm, not a point of the search surface.
+    "market_beta_down_asym_lag_live": (0.0, 1.0),
     # The variance-neutral down-tick reallocation (`corr-asymmetry.md` §10,
     # design repository): the idiosyncratic shock is suppressed by `1 - c`
     # on a down tick of the factor and inflated by `sqrt(2 - (1 - c)^2)` on

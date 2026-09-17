@@ -557,6 +557,11 @@ PERTURBATIONS = [
     # The lagged twin, on the session AFTER a down day. Ships at 0.0 and the
     # probe runs three days, which is enough to carry one across.
     ("market_beta_down_asym_lag", 0.05, True),
+    # WHERE that twin's condition is sampled. The default preset ships the
+    # wire itself at 0.375, so flipping the sampling re-times a live boost
+    # and the trajectory moves. It takes no draw at any value, so it is not
+    # an economy-stream mover and `draws_market` must not budge.
+    ("market_beta_down_asym_lag_live", 1.0, True),
     # Gives back the first moment the contemporaneous tilt injects. It is
     # gated on that tilt being nonzero, and pt-v16 ships it at 0.025, so
     # the probe's market moves. On a preset with the tilt at 0.0 this dial

@@ -1764,6 +1764,12 @@ impl Engine {
             &TickInputs {
                 economy: &self.economy,
                 prev_day_down: self.market_vol.prev_day_down(),
+                // Read only by `market_beta_down_asym_lag_live`; at its 0.0
+                // the tick never looks at either and the tape is unchanged.
+                // `day_factor()` is today's accumulator BEFORE the
+                // `accumulate` below, which is the point.
+                prev_day_factor: self.market_vol.prev_day_factor(),
+                day_factor: self.market_vol.day_factor(),
                 forced_flow_eff: if self.params.forced_flow_reservoir > 0.0 {
                     crate::mathx::max(
                         0.0,

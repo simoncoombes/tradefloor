@@ -401,6 +401,20 @@ OUT_OF_SCOPE = {
         "REFUTED as a mechanism by the `alphax2` box, which found the "
         "clustering response flat from 0.0 to 0.40; it stays in the tree at "
         "zero with the refutation beside it",
+    "market_beta_down_asym_lag_live":
+        "inert at 0.0: market/tick.rs branches on `== 0.0` and hands the "
+        "lagged wire the same `prev_day_down` bit the engine read at the "
+        "open, so every shipped preset -- including pt-v18 and pt-v19, "
+        "which run the wire itself at 0.375 -- is bit-identical. It takes "
+        "NO draw at any value: it re-reads two numbers "
+        "`MarketVarianceState::snapshot` already holds and the draw "
+        "schedule is a pure function of market status, active set and "
+        "sector count. It is a FORM dial with two admissible values and no "
+        "number to derive. Registered unrun: "
+        "`programme/results/corr-asymmetry-repair.md` (design repository) "
+        "section 8 is the diagnostic that would rule on the form, and "
+        "until that rules the 0.0 is the absence of a ruling rather than "
+        "the result of one",
     "market_idio_down_suppress":
         "inert at 0.0: market/factors.rs branches on `== 0.0` after the "
         "draw and neither scale is applied, so no preset that predates the "
