@@ -430,6 +430,7 @@ PERTURBATIONS = [
     # does not land on pt-v18, which differs in three further dials.
     # Measured: the derived anchor goes 20.8139 to 15.9843 and the VIX 22.02
     # to 15.40, nine columns and 2.3e-1 of a price at the widest name.
+    # PAIRED with `market_vol_vix_excursion` -> 0.0; see `COMPANIONS` below.
     ("vix_level_identity", 0.0, True),
     # LIVE UNDER THE IDENTITY, and the old reason -- "the branch that reads
     # it is not taken" -- is now the exact opposite of the truth. The premium
@@ -991,6 +992,25 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
         sorted(tradefloor.ModelParams.settable())
 
 
+#: A SECOND dial a row has to move with the first, because the pair is a
+#: universal invariant rather than a per-preset claim and therefore has no
+#: hatch. Exactly one entry, and it is kept OUT of `PERTURBATIONS` so that
+#: table stays uniform 3-tuples: `test_earnings_nominal_growth.py` unpacks it.
+COMPANIONS: dict[str, dict[str, float]] = {
+    # `market_vol_vix_excursion` reads the VIX's distance above the level the
+    # index's own variance implies, and off `vix_level_identity` there is no
+    # such level, so `ModelParams.from_preset` refuses the pair -- with no
+    # hatch, because no reading taken on that configuration means anything
+    # (see `ModelParams::invariants`). The default runs the excursion, so
+    # turning the identity off ALONE is the refused configuration and that row
+    # can no longer be single-dial. It turns both off, which is the consistent
+    # arm; the sectorbisect run measured the two within 0.0008 of each other
+    # on `sector_excess_corr` with overlapping intervals, so the pairing costs
+    # this probe nothing it was reading.
+    "vix_level_identity": {"market_vol_vix_excursion": 0.0},
+}
+
+
 @pytest.mark.parametrize("name,value,moves", PERTURBATIONS,
                          ids=[p[0] for p in PERTURBATIONS])
 def test_each_settable_parameter_moves_the_market_or_names_why_not(
@@ -1006,7 +1026,21 @@ def test_each_settable_parameter_moves_the_market_or_names_why_not(
     # parameter effect. That is what happened at the pt-v3 era boundary --
     # six parameters documented as inert "failed" because the baseline had
     # moved underneath them.
-    custom = tradefloor.ModelParams.from_preset(**{name: value})
+    #
+    # `from_preset_unchecked`, and this is the case the hatch exists for.
+    # Nine rows of this table move a dial pt-v19 DERIVES -- the cap off its
+    # image, the level exponent off `p - 1`, `garch_beta` off the tape's
+    # persistence identity, and the five dials those identities read -- so
+    # `from_preset` refuses them, correctly: each is a vector whose cap or
+    # memory follows from nothing. What this test reads is not the model, it
+    # is whether the dial REACHES the runtime at all, and for that a vector
+    # off its identity is exactly the right probe. The waiver is here, in the
+    # open, which is what the hatch asks for.
+    #
+    # The universal invariant is NOT waived and cannot be; the one row that
+    # would have tripped it carries its companion dial instead.
+    custom = tradefloor.ModelParams.from_preset_unchecked(
+        **{name: value}, **COMPANIONS.get(name, {}))
     assert custom.fingerprint.startswith("custom-")
     perturbed = market_state(run_market(custom))
 

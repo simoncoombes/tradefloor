@@ -219,7 +219,7 @@ PARAM_SPECS: dict[str, dict] = {
     # because it ships at 0.04 rather than at zero and the calibration
     # convention's own [1/4x, 4x] gives 0.01 to 0.16. Both ends are outside
     # anything the economy reaches, so the box is wide rather than chosen.
-    "neutral_discount_rate": {"kind": "log"},
+    "neutral_discount_rate": {"kind": "log", "derived": True},
     # Days the economy is advanced alone before day zero. A COUNT, so an
     # absolute box, and its top is the horizon the burn-in that measured it
     # ran to: the transient table reaches 1095 days and the last field the
@@ -279,13 +279,16 @@ PARAM_SPECS: dict[str, dict] = {
     # fractions of the level per session (0.033, 0.018 per per cent); the
     # jump scale is in innovation-scale units (1.7) and the return-driven
     # rate in events a year per per cent of down session (6.2).
-    "vix_return_level_exponent": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.5)},
+    "vix_return_level_exponent": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.5),
+                                  "derived": True},
     "vix_return_exponent_up": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.2, 1.5)},
-    "vix_return_level_exponent_up": {"kind": "abs", "step_unit": 0.05, "hard_range": (-2.0, 0.5)},
+    "vix_return_level_exponent_up": {"kind": "abs", "step_unit": 0.05, "hard_range": (-2.0, 0.5),
+                                     "derived": True},
     "vix_innovation_sigma": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.1)},
     "vix_innovation_return_sigma": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.06)},
     "vix_jump_level_scale": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 5.0)},
-    "vix_jump_return_intensity": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 24.0)},
+    "vix_jump_return_intensity": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 24.0),
+                                  "derived": True},
     # The per-component states (vix-dynamics.md 19): measured on the
     # reference panel with their bars, so the boxes are the measurements'
     # neighbourhoods, not search ranges.
@@ -327,7 +330,30 @@ PARAM_SPECS: dict[str, dict] = {
                           "hard_range": (0.0, 1.0)},
     "vix_cycle_amplitude": {"kind": "abs", "step_unit": 0.1,
                             "hard_range": (0.0, 2.0)},
-    "vix_return_gain_up": {"kind": "log", "hard_range": (1.0, 250.0)},
+    # UNDETERMINED, so it stays searchable -- and its box was simply WRONG.
+    # (1, 250) was drawn when the up gain was 17.0 under a level-blind law.
+    # On pt-v19 the up law is the RATIO form (`vix_return_level_exponent_up`
+    # -1) and the gain's units changed with it: the dial ships at 0.049, over
+    # an order below the old box's floor, so `feasibility_violation` refused
+    # the SHIPPED pt-v19 vector on this line before anything else.
+    #
+    # The floor is the log convention's own 1/4x of 0.049. The TOP is left at
+    # the old 250 rather than moved to 4x, for the reason `vix_return_clamp`
+    # two entries down already carries: the dial's UNITS follow the law, one
+    # box has to hold both laws, and pt-v1 (10.0), pt-v16 and pt-v18 (17.0)
+    # are shipped presets the gate must keep accepting. A box of [0.012,
+    # 0.196] -- the convention applied at both ends -- reads the pt-v19
+    # neighbourhood correctly and makes three shipped presets infeasible,
+    # which is a worse defect than the one it fixes. So: log-scaled, spanning
+    # both eras, and the search's step is multiplicative so the width costs
+    # nothing at either end.
+    #
+    # `vix-dynamics.md` 2.3 does NOT supply a bar for this. Its `gain_u`
+    # column (0.0365 to 0.0683 per era) is the TAPE's up gain; the dial is
+    # that net of the read-back at `vix_mean_reversion`, and the same note's
+    # memory table runs the dial from 0.008 to 0.450 across the plausible
+    # memory range. Neither is an error bar on the dial at a fixed memory.
+    "vix_return_gain_up": {"kind": "log", "hard_range": (0.012, 250.0)},
     # The exponent is a SHAPE and its plausible span is narrow: the tape
     # puts it at 1.200 with a 95 per cent interval of 1.112 to 1.287 and a
     # count-weighted reading of 1.132. The hard range is opened to 1.0
@@ -347,7 +373,18 @@ PARAM_SPECS: dict[str, dict] = {
     # so a search can reach values that truncate the 2020 peak and values
     # that are inert on that tape, and the difference between them is
     # something it can measure rather than something the box decided.
-    "vix_ceiling": {"kind": "abs", "step_unit": 1.0, "hard_range": (60.0, 100.0)},
+    #
+    # DERIVED, and off the search surface (2026-09-17). The box above is the
+    # level-blind era's and it is not corrected, because correcting it would
+    # not make the column mean anything. Inside (60, 100) the secant measures
+    # CLIPPING: the record's measured maximum VIX is 60.59 at 504 days over
+    # twelve rosters and 73.9 in the b4fix9 census, so every point in the box
+    # truncates paths the shipped 181.3295 does not. Widening it to hold
+    # 181.3295 makes the column zero by construction, which is the ceiling
+    # entry's own B3 argument. Either way the secant measures clipping or
+    # nothing, and sweeping the ceiling is a census experiment on a pin ladder.
+    "vix_ceiling": {"kind": "abs", "step_unit": 1.0, "hard_range": (60.0, 100.0),
+                    "derived": True},
     # Ships at 0.0, so the multiplicative default cannot serve it and the
     # range has to be explicit. It cancels a standing POSITIVE excursion an
     # asymmetric return gain puts on the target, so the useful side is
@@ -361,7 +398,16 @@ PARAM_SPECS: dict[str, dict] = {
     # when it reads the day (pt-v9 uses 15.0). One box has to hold both, so
     # it is log-scaled and spans three orders of magnitude.
     "vix_return_clamp": {"kind": "log", "hard_range": (0.005, 30.0)},
-    "vix_target_shock_cap": {"kind": "log", "hard_range": (1.0, 70.0)},
+    #
+    # DERIVED, and off the search surface (2026-09-17). On pt-v19 the cap IS
+    # the down spike's supremum, `gain * clamp**p * 10**-g` = 158.85236, so a
+    # column for it measures the panel's response to a cap sitting OFF its
+    # supremum -- which is the response to re-introducing a shape parameter,
+    # and any nonzero secant there measures the level-blind defect rather
+    # than the model. The (1, 70) box does not even contain the shipped
+    # value, and it is left alone for the same reason as the ceiling's.
+    "vix_target_shock_cap": {"kind": "log", "hard_range": (1.0, 70.0),
+                             "derived": True},
     "inflation_reversion": {"kind": "abs", "step_unit": 0.05},
     "inflation_ceiling": {"kind": "log"},
     # Negative-valued, so the multiplicative default box inverts. Real CPI
@@ -440,7 +486,12 @@ PARAM_SPECS: dict[str, dict] = {
     "price_hard_cap":           {"kind": "log"},
     # -- bounded shares (absolute deviation, step_unit 0.1) ---------------
     "garch_alpha":              {"kind": "abs", "step_unit": 0.1},
-    "garch_beta":               {"kind": "abs", "step_unit": 0.1},
+    # DERIVED on pt-v19: `rho - alpha - gamma/2` at the tape's per-name decay
+    # rate 0.9416. A search can move it, but a moved value is a value that
+    # follows from nothing. `SEARCHED_9` below still lists it, because that
+    # set is pt-v1's and stays as history; a pt-v19 search must not inherit it.
+    "garch_beta":               {"kind": "abs", "step_unit": 0.1,
+                                 "derived": True},
     "garch_gamma":              {"kind": "abs", "step_unit": 0.1},
     "momentum_theta":           {"kind": "abs", "step_unit": 0.1},
     "market_vol_alpha":         {"kind": "abs", "step_unit": 0.1},
@@ -484,7 +535,10 @@ PARAM_SPECS: dict[str, dict] = {
     # sessions, where the level is no longer slower than the fast component
     # it sits under.
     "market_vol_level_persistence": {"kind": "abs", "step_unit": 0.01,
-                                     "hard_range": (0.0, 0.9995)},
+                                     "hard_range": (0.0, 0.9995),
+                                     # DERIVED: the tape's window-to-window
+                                     # autocorrelation, inverted by bisection.
+                                     "derived": True},
     "market_vol_level_sigma":   {"kind": "abs", "step_unit": 0.02,
                                  "hard_range": (0.0, 0.15)},
     # The market-side warm-up, in SESSIONS, so the step unit is a step in
@@ -499,7 +553,10 @@ PARAM_SPECS: dict[str, dict] = {
     # multiplicative [1/4x, 4x] box collapses on them and the hard range is
     # what a search actually gets -- see `calibration_box`.
     "market_vol_slow_persistence": {"kind": "abs", "step_unit": 0.1,
-                                    "hard_range": (0.0, 0.999)},
+                                    "hard_range": (0.0, 0.999),
+                                    # DERIVED: the two-exponential fit to the
+                                    # tape's variance impulse response.
+                                    "derived": True},
     "market_vol_slow_gain":     {"kind": "abs", "step_unit": 0.05,
                                  "hard_range": (0.0, 0.5)},
     "market_vol_slow_weight":   {"kind": "abs", "step_unit": 0.1,
@@ -727,6 +784,22 @@ LEGACY_OVERRIDES: dict[str, float] = {
 }
 
 
+#: The dials `provenance.py` marks `derived` AND that are closed forms or
+#: rule-derivations over something the vector carries -- design note
+#: `derived-dial-enforcement.md` classes A and B. They come off the search
+#: surface: a Jacobian column for one of them measures the response to
+#: BREAKING an identity, which is a reading of the break rather than of the
+#: model. The eleven class-C switches stay, because a switch has no identity
+#: to break beyond the excursion/identity pairing the engine now refuses.
+DERIVED_DIALS = tuple(sorted(
+    name for name, spec in PARAM_SPECS.items() if spec.get("derived")))
+
+
+def searchable(names) -> list[str]:
+    """`names` with the derived dials dropped, in order."""
+    return [n for n in names if n not in DERIVED_DIALS]
+
+
 def shipped_values() -> dict[str, float]:
     """The pt-v1 values of every settable parameter, read from the wheel."""
     import tradefloor
@@ -828,6 +901,15 @@ def feasibility_violation(vector: dict[str, float],
     if val("market_vol_ceiling_multiple") <= val("market_vol_floor_multiple"):
         return "market_vol ceiling must exceed floor"
     for name, spec in PARAM_SPECS.items():
+        if spec.get("derived"):
+            # A derived dial's hard range is not a constraint on the model,
+            # it is a leftover box from whichever era drew it, and on pt-v19
+            # two of them do not contain the shipped value. Its value follows
+            # from the identity `provenance.py` records; the engine checks the
+            # two that are closed forms (`ModelParams.from_preset` refuses a
+            # pt-v19 vector whose cap is off its image), and this gate has
+            # nothing to add. Skipped rather than corrected -- see the specs.
+            continue
         rng = spec.get("hard_range")
         if rng and not rng[0] <= val(name) <= rng[1]:
             return f"{name} must lie in [{rng[0]}, {rng[1]}]"
