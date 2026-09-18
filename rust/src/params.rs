@@ -6363,10 +6363,24 @@ mod tests {
 
         // `A2retdn`: the down law reverted to the level-blind form and the
         // cap left where pt-v19 put it. The image is then 255.0 and the
-        // shipped 158.8524 is 96 points UNDER the supremum, so it truncates
-        // sessions the clamp admits -- a shape parameter the arm did not
-        // declare. The level-exponent claim still holds (g = p - 1 = 0), so
-        // the cap is the only thing wrong and the check says so.
+        // shipped 158.8524 is 96.15 points UNDER the supremum, so it
+        // truncates sessions the clamp admits -- 9.3443 per cent and up,
+        // against a clamp of 15 -- and the arm declared no such parameter.
+        // The level-exponent claim still holds (g = p - 1 = 0), so the cap
+        // is the only thing wrong and the check says so.
+        //
+        // WHETHER IT BOUND is a separate question from whether it was
+        // declared, and it did NOT. MEASURED 2026-09-17 on the arm's own 30
+        // seeds: that vector and the same vector with the cap at 255.0 give
+        // BIT-EQUAL panels on all 30 and a bit-equal VIX probe, so the
+        // recorded +0.0046 on `sector_excess_corr` is a reading of the down
+        // law alone. The cap is live on this vector -- at 50 it moves 2 of 6
+        // seeds and at 20 it moves 6 of 6 -- but the driving return never
+        // reaches the 9.34 per cent this one needed. That is the same
+        // finding `A5caps` already carried at 0.0000 on all 30 seeds with a
+        // cap that truncates at 6.28. So this check refuses an UNDECLARED
+        // shape parameter, which is what it is for; it is not refusing a
+        // reading that was wrong.
         let retdn = base
             .with_override("vix_return_gain", 17.0)
             .expect("settable")
