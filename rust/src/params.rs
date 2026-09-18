@@ -110,10 +110,13 @@ pub struct ModelParams {
     /// Daily sigma of each shared sector factor, loaded at 0.5 by every
     /// member of the sector (`market/factors.rs`).
     ///
-    /// Shipped at 0.002 in every preset, which is about a quarter of one
-    /// percent of a name's daily variance: in practice the model has had a
-    /// market factor and nothing else, and residual correlation after it has
-    /// been diagonal. Nothing measured that until 2026-08-25, when
+    /// 0.002 -- pt-v1 through pt-v6, which this paragraph called "every
+    /// preset" until 2026-09-17 -- is about a quarter of one percent of a
+    /// name's daily variance: at that value the model had a market factor
+    /// and nothing else, and residual correlation after it was diagonal.
+    /// pt-v7 onward carry the larger sigma this entry argues for, and
+    /// pt-v16 to pt-v19 ship 0.008583053614. Nothing measured that until
+    /// 2026-08-25, when
     /// `sector_excess_corr` (same-sector minus cross-sector mean pairwise
     /// correlation) joined the panel and read 0.004 on the shipped preset
     /// against a real band of 0.11 to 0.23, fifteen seed-sd out. The pt-v1
@@ -341,9 +344,12 @@ pub struct ModelParams {
     /// standard deviation of that news's price impact. Both zero on every
     /// preset before this dial, bit-identically (§101).
     ///
-    /// The news machinery has always existed and has never fired. News is
-    /// caller-supplied: `SessionRequest.news` is a slice the engine never
-    /// filled, and the only populated path is `tradefloor.replay`, which feeds
+    /// The news machinery existed and never fired before this dial, which
+    /// is the state the rest of this paragraph describes; pt-v11 onward
+    /// ship 0.05 here, with a sigma of 0.03 falling to 0.01751004376 at
+    /// pt-v16. News is caller-supplied: `SessionRequest.news` is a slice
+    /// the engine never filled, and the only populated path is
+    /// `tradefloor.replay`, which feeds
     /// a recorded log's news back in. So `company_news` contributed exactly
     /// zero in every simulation the panel measures, 0 nonzero day-cells out
     /// of 30240 at every pinned VIX (§85), and `news_sector_weight`,
@@ -355,7 +361,8 @@ pub struct ModelParams {
     /// A jump lands on one name and reaches no other. Real earnings
     /// surprises transfer: one cloud company's miss moves its peers.
     /// Switching this on gives sector co-movement an ENDOGENOUS contagion
-    /// route, where today it is entirely exogenous, a per-tick sector draw
+    /// route, where before pt-v11 it was entirely exogenous, a per-tick
+    /// sector draw
     /// plus market beta and nothing that travels between members.
     pub endogenous_news_intensity: f64,
     /// Standard deviation of an endogenous news event's price impact, in the
@@ -726,8 +733,12 @@ pub struct ModelParams {
     /// How much a NAME's own variance follows the VIX, on the market
     /// factor's own target shape.
     ///
-    /// Shipped 0.0, bit-identical there by branch, and the last piece of the
-    /// variance model that does not know what regime it is in. The per-name
+    /// 0.0 -- pt-v1 through pt-v9 -- is bit-identical by branch. It is no
+    /// longer the shipped value, where this line said "Shipped 0.0" until
+    /// 2026-09-17: pt-v10 to pt-v12 carry 0.3, pt-v13 0.0269 and pt-v14
+    /// onward 0.14219611. What follows is the variance model at zero, which
+    /// is where it stood when this dial arrived and the last piece of it
+    /// that did not know what regime it was in. The per-name
     /// GJR-GARCH reads no macro state at all: its clamps are multiples of a
     /// static per-sector variance, and its own unconditional level sits far
     /// below the floor those clamps impose (5.6% annualised against a floor
@@ -801,7 +812,9 @@ pub struct ModelParams {
     /// LOAD-BEARING
     ///
     /// `alpha + beta + gamma / 2 < 1` makes the process revert to its target
-    /// in expectation; pt-v13's 0.28035 and 0.69245 give 0.9728 and pass it.
+    /// in expectation; 0.28035 and 0.69245 -- pt-v14 through pt-v18, which
+    /// this line attributed to pt-v13 until 2026-09-17 -- give 0.9728 and
+    /// pass it.
     /// The fourth-moment condition `3 alpha^2 + 2 alpha beta + beta^2 < 1`
     /// reads **1.1035** for this FAST COMPONENT ALONE and fails — but the
     /// shipped process is a 0.65/0.35 mixture with `market_vol_slow_weight`,
@@ -809,7 +822,14 @@ pub struct ModelParams {
     /// reads **0.9870**. The shipped factor variance has a finite fourth
     /// moment. Both figures are the design repository's
     /// `garch-derive-design.md`, which derived them before this note, and
-    /// every dial they depend on is identical from pt-v16 to pt-v19.
+    /// both are computed on the pt-v16/pt-v18 triple. Until 2026-09-17 this
+    /// entry added that every dial they depend on is identical from pt-v16
+    /// to pt-v19, and it is not: pt-v19 moves all three -- alpha 0.28035004
+    /// to 0.0066, beta 0.69244622 to 0.8946, gamma 0.0 to 0.1556 -- and
+    /// `market_vol_slow_persistence` with them, 0.98 to 0.9913. The GJR
+    /// fourth-moment coefficient at pt-v19's triple reads 0.9908, recorded
+    /// under [`ModelParams::market_vol_alpha_excursion`]; the mixture's 4x4
+    /// spectral radius has not been recomputed at the pt-v19 vector here.
     ///
     /// What the process has is heavy, finite dispersion: variance-of-variance
     /// 3.4 times its mean squared, implied factor kurtosis 13 against the
@@ -843,8 +863,10 @@ pub struct ModelParams {
     /// omega compensates by `gamma/2` so the unconditional level stays on
     /// target: the dial redistributes variance between down and up states
     /// rather than adding any. The per-name asymmetry (`garch_gamma`) has
-    /// existed since pt-v2; the COMMON factor has run symmetric forever,
-    /// which is why the model cannot produce correlation asymmetry --
+    /// existed since pt-v2; the COMMON factor ran symmetric from pt-v1 to
+    /// pt-v18, where this line said "forever" until 2026-09-17, and pt-v19
+    /// ships 0.1556. Through pt-v18 that is why the model could not
+    /// produce correlation asymmetry --
     /// correlations that rise in falling markets are the common factor's
     /// leverage effect, and this model's corr_asymmetry sits at -0.016
     /// against a real +0.015 with nothing measured able to move it
@@ -955,21 +977,32 @@ pub struct ModelParams {
     /// log realised-variance autocorrelation over a RANGE of lags rather
     /// than from a single window lag.
     ///
-    /// Ships at 0.0, which with `market_vol_level_sigma` 0.0 is a
-    /// multiplier of exactly 1.0 and bit-identical.
+    /// 0.0 -- pt-v1 through pt-v18 -- is, with `market_vol_level_sigma`
+    /// 0.0, a multiplier of exactly 1.0 and bit-identical. It stopped being
+    /// the shipped value at pt-v19, which carries the 0.9977 derived above
+    /// beside a sigma of 0.085; this paragraph read "Ships at 0.0" until
+    /// 2026-09-17.
     pub market_vol_level_persistence: f64,
 
     /// The per-session innovation of the slow variance level, in log
-    /// units. 0.0 -- every preset through pt-v19 -- pins the level at
+    /// units. 0.0 -- pt-v1 through pt-v18 -- pins the level at
     /// exactly 1.0 and leaves the target arithmetic that predates this
-    /// dial untouched, to the bit.
+    /// dial untouched, to the bit. pt-v19 ships 0.085; this line said
+    /// "every preset through pt-v19" until 2026-09-17.
     ///
     /// **0.047 [0.035, 0.064]** DERIVED, section 4.3, equivalently a
     /// stationary `sd(log L)` of **0.69 [0.56, 0.87]**: the dispersion of
     /// window log-variance the tape has and the model does not,
     /// `sqrt(tape^2 - model^2)`, carried through the AR(1) shrinkage
     /// factor at the persistence above. The bar is the propagated
-    /// jackknife error on the two tape sds.
+    /// jackknife error on the two tape sds. That is not the shipped number
+    /// and `provenance.py` records why: 4.3 set the LEVEL's window-mean
+    /// dispersion equal to the INDEX's deficit, and the level drives the
+    /// factor, which is about half the index, so 0.047 is low by about a
+    /// factor of two. The entry records this dial `measured` at pt-v19's
+    /// 0.085, read off the engine's own output rather than solved
+    /// (level-phi.md section 6), and the arm at 0.085 puts sd(log var)
+    /// inside the tape's band at both horizons.
     ///
     /// # Three things it costs
     ///
@@ -1589,7 +1622,8 @@ pub struct ModelParams {
     ///
     /// So the binding constraint is the reversion rate against the phase
     /// length, not the declared range, and the repair the evidence points
-    /// at is the -0.5 entry shock at `daily.rs:247`: the only phase after
+    /// at is the -0.5 entry shock at `daily.rs:568`, which this line placed
+    /// at `:247` until 2026-09-17: the only phase after
     /// a contraction that still pushes growth DOWN on entry is the one
     /// named for the turn.
     ///
@@ -1820,8 +1854,11 @@ pub struct ModelParams {
     /// and a drawn age past two days skips both, cancelling the two
     /// construction draws exactly. Measured over six seeds at 1, 2, 3, 5,
     /// 10 and 30 days the difference runs 0, +1, +2, +4 and +30, which is
-    /// why `DRAW_SCHEDULE_MOVERS` carries this dial for the mechanism
-    /// rather than on the probe's evidence.
+    /// why `ECONOMY_STREAM_MOVERS` in `tests/test_model_params.py` carries
+    /// this dial for the mechanism rather than on the probe's evidence.
+    /// That set was called `DRAW_SCHEDULE_MOVERS`, as this line did until
+    /// 2026-09-17, and was renamed when the sweep found no dial that moves
+    /// the market stream.
     pub cycle_stationary_opening: f64,
     /// The share of earnings a company returns as net buybacks. 0.0 --
     /// every preset before pt-v18 -- is bit-identical.
@@ -2187,8 +2224,10 @@ pub struct ModelParams {
     /// Where the volume response to a move SATURATES, in units of one
     /// percent.
     ///
-    /// At the shipped 4.0 a name that falls twelve percent trades exactly
-    /// as much as one that falls four. Real markets do not do that: volume
+    /// At 4.0 -- pt-v1 through pt-v11, and what this line called the
+    /// shipped value until 2026-09-17; pt-v12 onward ship 12.0 -- a name
+    /// that falls twelve percent trades exactly as much as one that falls
+    /// four. Real markets do not do that: volume
     /// on a limit-down day is a multiple of a bad-Tuesday day, and the
     /// relationship keeps rising well past four percent. The cap is the
     /// reason `volume_abs_return_corr` sits where it does and the reason it
@@ -2283,10 +2322,12 @@ pub struct ModelParams {
     /// the fast component's persistence, while the slow component's VIX
     /// coupling contributes GAIN, not lag. Removing it removes gain.
     ///
-    /// Kept, inert, because a measured negative is worth keeping and a
-    /// search may still find a use for it in a region this grid did not
-    /// cover. But nothing should set it above zero on the strength of the
-    /// argument that produced it.
+    /// Kept, because a measured negative is worth keeping and a search may
+    /// still find a use for it in a region this grid did not cover. But
+    /// nothing should set it above zero on the strength of the argument
+    /// that produced it. It did not stay inert, which this paragraph said
+    /// until 2026-09-17: 0.0 is pt-v1 through pt-v14 and pt-v15 onward ship
+    /// 0.374.
     ///
     /// What DID restore the transient was the fast component's persistence:
     /// 0.95 gives shock 1.228 and lever 4.446 where 0.97 gives 1.170 and
@@ -2455,8 +2496,10 @@ pub struct ModelParams {
     /// fattening the tail and adding continuation are the same act.
     ///
     /// This splits them. At `1.0` the jump feeds herding exactly as before,
-    /// which is what every shipped preset does and why they reproduce bit
-    /// for bit. Below `1.0` the jump moves the momentum reference point with
+    /// which is what pt-v1 through pt-v4 do and why they reproduce bit for
+    /// bit; pt-v5 onward ship 0.0, where this sentence said "every shipped
+    /// preset" until 2026-09-17. Below `1.0` the jump moves the momentum
+    /// reference point with
     /// it, so herding sees the post-jump level as the new baseline rather
     /// than as a change to continue. At `0.0` the jump is invisible to
     /// momentum: it decays on `s_phi` alone, giving a fat tail with no
@@ -2580,7 +2623,8 @@ pub struct ModelParams {
     /// ```
     ///
     /// (calendar-year block bootstrap, 300 draws). The level-blind form
-    /// every preset runs -- `g = 0` on both sides -- is refused at F(2,
+    /// pt-v1 through pt-v18 run -- `g = 0` on both sides, which this line
+    /// called "every preset" until 2026-09-17 -- is refused at F(2,
     /// 8951) = 118, and the multiplicative "ratio" form `dVIX/VIX ~ r` is
     /// refused harder still (F = 588): on the down side the response in
     /// points FALLS with the level, as `VIX^(-0.49)`, and the level
@@ -2740,7 +2784,9 @@ pub struct ModelParams {
     pub jump_idio_excitation_decay: f64,
     /// Takes the VIX-squared scaling (`jump_vix_coupling`) off the
     /// IDIOSYNCRATIC arrival rate, leaving it on the market jump. 0.0 --
-    /// every preset -- keeps the shipped arithmetic; non-zero is a switch.
+    /// pt-v1 through pt-v18, which this line called "every preset" until
+    /// 2026-09-17 -- keeps the arithmetic that predates the dial; pt-v19
+    /// ships 1.0. Non-zero is a switch.
     ///
     /// MEASURED (vix-dynamics.md 19.1): the panel's idiosyncratic jump rate,
     /// in units of the name's own trailing sd, reads `var^-0.20` against the
@@ -2784,23 +2830,11 @@ pub struct ModelParams {
     /// Fraction of spent budget recovered per below-threshold day
     /// (deleveraging capacity rebuilds in calm). 0.0: never.
     pub forced_flow_replenish: f64,
-    /// VIX points added to its target per unit of a DOWN day's index
-    /// return, before the clamp and cap below.
-    ///
-    /// Shipped 25.0, a literal in the VIX update. MEASURED against real
-    /// markets (FRED VIXCLS and SP500, 2,511 common days to 2026-08): a
-    /// session at -3% or worse moves the VIX a median of +6.03 points, and
-    /// -2% to -1% moves it +1.95. The shipped gain with the shipped clamp
-    /// adds at most 0.75 points to the TARGET, of which the day traverses
-    /// `vix_mean_reversion`, about 0.09 points. The consequence is
-    /// measurable in the panel: over 252 days the endogenous VIX has sd 1.5
-    /// against a real within-year median of 4.0 and crosses its own crisis
-    /// threshold on 0.0% of days against a real 12.5%, so a one-year run
-    /// contains no volatility episode and lag-5 clustering sits on its band
-    /// floor. Calibration record §68.
     /// How much of the VIX's target is the market's own volatility.
     ///
-    /// Shipped 0.0, and bit-identical there by branch. At zero the VIX is a
+    /// 0.0 -- pt-v1 through pt-v15 -- is bit-identical by branch, and this
+    /// line said "Shipped 0.0" until 2026-09-17; pt-v16 onward ship 0.3.
+    /// At zero the VIX is a
     /// function of the business cycle phase, a one-day return spike that
     /// decays with a 5.4-day half-life, and noise: the market's own realised
     /// volatility is not an input to it. MEASURED consequence (§68): real
@@ -2815,12 +2849,15 @@ pub struct ModelParams {
     /// same anchor the forward coupling uses: `market_vol_vix_anchor *
     /// sigma_today / market_factor_sigma`. Using the forward map's own
     /// inverse means the loop is consistent at equilibrium and introduces no
-    /// second calibration constant. The VIX clamp of 10 to 80 and the
-    /// factor's ceiling multiple bound the feedback.
+    /// second calibration constant. The VIX clamp -- 10 to `vix_ceiling`,
+    /// which is 80 through pt-v18 and 181.3295 on pt-v19, where this line
+    /// said "10 to 80" until 2026-09-17 -- and the factor's ceiling
+    /// multiple bound the feedback.
     pub vix_realised_vol_weight: f64,
     /// The VIX's LEVEL comes from the index's own conditional variance, not
-    /// from a table of constants. 0.0 ships and is every shipped preset,
-    /// bit for bit.
+    /// from a table of constants. 0.0 -- pt-v1 through pt-v18 -- is the
+    /// table, bit for bit; pt-v19 ships 1.0. This line read "0.0 ships and
+    /// is every shipped preset" until 2026-09-17.
     ///
     /// # What the level was made of
     ///
@@ -2951,8 +2988,9 @@ pub struct ModelParams {
     /// state-dependent premium is not supported by this measurement and is
     /// not fitted here.
     pub vix_variance_premium: f64,
-    /// Which return the VIX reacts to: the last TICK's (0.0, shipped) or the
-    /// day's (1.0), blended in between.
+    /// Which return the VIX reacts to: the last TICK's (0.0, pt-v1 through
+    /// pt-v8) or the day's (1.0, pt-v9 onward), blended in between. This
+    /// line called 0.0 the shipped value until 2026-09-17.
     ///
     /// The VIX's return channel reads `market_return_pct`, which the engine
     /// builds from `previous_tick_price`: the cap-weighted move over the
@@ -2982,7 +3020,10 @@ pub struct ModelParams {
     /// 0.10 at two: their clustering comes from episodes lasting weeks, not
     /// from the cycle.
     ///
-    /// At 1.0, shipped, the five constants are used as they are. At `a` each
+    /// At 1.0 the five constants are used as they are -- pt-v1 through
+    /// pt-v8, which this line called "shipped" until 2026-09-17. The shipped
+    /// value since is 0.6 at pt-v9, 0.0 from pt-v10 to pt-v15 and 0.85 from
+    /// pt-v16 on. At `a` each
     /// is pulled toward their mean of 19.0: `19.0 + a * (phase - 19.0)`, so
     /// 0.0 makes the cycle contribute nothing to the VIX and any episodes
     /// have to come from the market. Combines with `vix_return_source`, which
@@ -2991,17 +3032,23 @@ pub struct ModelParams {
     /// VIX points added to its target per unit of a DOWN day's index
     /// return, before the clamp and cap below.
     ///
-    /// Shipped 25.0, a literal in the VIX update. MEASURED against real
+    /// 25.0, a literal in the VIX update, is pt-v1 through pt-v8 and what
+    /// this paragraph called "shipped" until 2026-09-17; pt-v9 to pt-v18
+    /// carry 17.0 and pt-v19 8.83, the scale of the power law
+    /// `vix_return_exponent` makes of it. MEASURED against real
     /// markets (FRED VIXCLS and SP500, 2,511 common days to 2026-08): a
     /// session at -3% or worse moves the VIX a median of +6.03 points, and
-    /// -2% to -1% moves it +1.95. The shipped gain with the shipped clamp
-    /// adds at most 0.75 points to the TARGET, of which the day traverses
+    /// -2% to -1% moves it +1.95. The 25.0 gain with the 0.03 clamp beside
+    /// it added at most 0.75 points to the TARGET, of which the day traverses
     /// `vix_mean_reversion`, about 0.09 points. Raising it to the real slope
     /// is NOT the lever, measured: it moves the within-year VIX sd from 1.54
     /// to 1.79 against a real 4.0 and leaves lag-5 clustering where it was
     /// (§68). What was missing is the feedback above, not the gain.
     pub vix_return_gain: f64,
-    /// The same for an UP day. Shipped 10.0.
+    /// The same for an UP day. 10.0 -- pt-v1 through pt-v8, and what this
+    /// line called shipped until 2026-09-17; pt-v9 to pt-v18 ship 17.0 and
+    /// pt-v19 0.049 under the ratio form
+    /// ([`ModelParams::vix_return_level_exponent_up`] -1.0).
     ///
     /// # The "about half" this used to claim has no provenance, and is wrong
     ///
@@ -3036,8 +3083,10 @@ pub struct ModelParams {
     /// the residual variation left over is the up side's own exponent,
     /// which this data cannot resolve.
     pub vix_return_gain_up: f64,
-    /// The EXPONENT of the return-to-fear response. 1.0 ships and is the
-    /// linear form, bit-identical to the arithmetic that stood here.
+    /// The EXPONENT of the return-to-fear response. 1.0 -- pt-v1 through
+    /// pt-v18 -- is the linear form, bit-identical to the arithmetic that
+    /// stood here; pt-v19 ships 1.4483, and this line read "1.0 ships"
+    /// until 2026-09-17.
     ///
     /// # Why a linear gain cannot be calibrated
     ///
@@ -3152,12 +3201,17 @@ pub struct ModelParams {
     pub vix_return_exponent: f64,
     /// The index return is clamped to +/- this before it drives the VIX.
     ///
-    /// Shipped 0.03, so a -10% day and a -3% day produce identical fear. A
-    /// crash is exactly where that assumption is worst.
+    /// 0.03 -- pt-v1 through pt-v8 -- makes a -10% day and a -3% day
+    /// produce identical fear, and a crash is exactly where that assumption
+    /// is worst. It is not the shipped value, where this line said "Shipped
+    /// 0.03" until 2026-09-17: pt-v9 onward ship 15.0, in the percentage
+    /// points the day-return source (`vix_return_source` 1.0) works in.
     pub vix_return_clamp: f64,
     /// Ceiling on the VIX target's whole excursion, in points: the return
-    /// spike plus the inflation and shock adjustments. Shipped 12.0, which
-    /// binds long before a real crisis does.
+    /// spike plus the inflation and shock adjustments. 12.0 -- pt-v1
+    /// through pt-v8, and what this line called shipped until 2026-09-17 --
+    /// binds long before a real crisis does; pt-v9 to pt-v18 ship 45.0 and
+    /// pt-v19 158.8524, both of which the section below accounts for.
     ///
     /// # It was a shape parameter, and pt-v19 retires it
     ///
@@ -3265,7 +3319,9 @@ pub struct ModelParams {
     pub usd_crisis_vix_threshold: f64,
     /// Re-assert the credit spread floors on every daily step, scaled.
     ///
-    /// INERT at 0.0, which every shipped preset sets. `update_economy_daily`
+    /// INERT at 0.0, which pt-v1 through pt-v14 set; pt-v15 onward ship
+    /// 1.0, and this line said "every shipped preset" until 2026-09-17.
+    /// `update_economy_daily`
     /// moves the 10y treasury daily and never writes the credit yields, so
     /// between periodic meetings the corporate spread drifts below its 0.8
     /// floor -- measured to 0.4216, first breaching on day 121, which is an
