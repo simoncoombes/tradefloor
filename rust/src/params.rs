@@ -3208,9 +3208,16 @@ pub struct ModelParams {
     pub vix_target_shock_cap: f64,
     /// Upper bound on the VIX state itself, in points.
     ///
-    /// A CHOSEN constant and not a derived one, declared here so a reader can
-    /// disagree with it. The shipped 80.0 reproduces the literal this dial
-    /// replaces, so at the default nothing moves.
+    /// NOT a chosen constant on pt-v19, and this entry said otherwise until
+    /// 2026-09-17. `provenance.py` records it `derived`: a LOWER BOUND solved
+    /// on a simulated pin ladder at tolerance 8.64, not a closed form over the
+    /// vector -- so it cannot be recomputed from the other dials the way
+    /// `vix_target_shock_cap` above can. pt-v19 ships 181.3295; the 80.0 this
+    /// paragraph used to call "the shipped value" is pt-v18's, and it
+    /// reproduced the literal the dial replaced.
+    ///
+    /// Declared here so a reader can disagree with it, which is still the
+    /// point -- but disagreeing now means disputing the ladder, not a taste.
     ///
     /// Two facts decide what it may be set to. The real index closed at 82.69
     /// on 2020-03-16, so any bound below that makes a peak target derived
