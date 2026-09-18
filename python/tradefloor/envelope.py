@@ -1901,6 +1901,204 @@ def certification_record(result: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def mechanism_bar(fresh: Mapping[str, Any] | None,
+                  recorded: Mapping[str, Any] | None,
+                  *, label: str = "mechanism",
+                  horizon_days: int = CERTIFIED_HORIZON_DAYS) -> dict[str, Any]:
+    """One certificate against the one a preset committed: the SUBSET rule.
+
+    `certify` has published `mechanism_shown` on every record since the gate
+    was built and NOTHING HAS EVER REFUSED ON IT. This is the refusal. It is
+    a function rather than an assertion inside a test so that the rule has
+    ONE definition and the two things that enforce it -- `record.py`, which
+    refuses to overwrite a certificate that shows less, and the `ship_bar`
+    test, which refuses the release -- read the same object. The failure to
+    avoid is the `vixlaw-ruling` shape: rows that justified a decision and
+    then existed in no scorer.
+
+    THE RULE, in one sentence. A preset's `not_shown` must be a SUBSET of
+    the `not_shown` its own committed record carries: it may show more
+    mechanisms than its record, never fewer, and never a DIFFERENT one at
+    the same count.
+
+    WHY A SET AND NOT A COUNT, which is the whole of the choice. Every fixed
+    count is either unreachable or arbitrary -- ten of ten fails every
+    preset ever shipped, the best of the eighteen being nine, and any
+    threshold under it is a number picked because it clears. Non-regression
+    on the COUNT is reachable and still blind to the failure worth catching:
+    a model that loses `leverage_effect` and gains `corr_asymmetry` reads
+    nine of ten on both sides of the change, and a count cannot tell that
+    swap from no change at all. The set can, so the bar names rows.
+
+    EACH PRESET AGAINST ITSELF, never against another preset and never
+    against a fixed roster. The eighteen committed records read six shown
+    through nine, measured on different builds across three eras; one rule
+    over all of them would be a rule about the history of the programme. The
+    subset form asks only that a model not LOSE what it was recorded doing,
+    which is what a regression is.
+
+    THREE REFUSALS, each with its own reason string, because a bare count in
+    a failure message would waste the change:
+
+      lost        a row the record shows and this certificate does not,
+                  whether it now reads NOT SHOWN or REVERSED.
+      reversed    named separately where a lost row went backwards rather
+                  than quiet, since `certify` distinguishes them and a sign
+                  flip is the louder failure.
+      absent      a row in none of the certificate's four lists. It has left
+                  the gate rather than failed it, which a subset test on
+                  `not_shown` alone reads as a PASS -- `not_shown` shrinks
+                  when a row vanishes.
+
+    NO RECORD IS A REFUSAL, not a vacuous pass. Subset is defined against a
+    committed set and a preset that has laid none down has nothing to be
+    read against; a bar that passed it would be reporting an absence as a
+    result. You lay down a record before you ship against it. The tool that
+    WRITES the first record is the exception and says so at its own call
+    site, because a first measurement cannot regress against itself.
+
+    `fresh` and `recorded` are blocks from `certification_record`, or a
+    `certify` result, which carries the same four lists. Both must be the
+    same PANEL as well as the same horizon -- 252 against 252, held-out
+    against held-out -- and `record_bar` is what pairs them.
+    """
+    from . import facts as _facts
+
+    def lists(block: Mapping[str, Any]) -> tuple[set[str], set[str], set[str],
+                                                 set[str]]:
+        return (set(block.get("shown") or ()),
+                set(block.get("not_shown") or ()),
+                set(block.get("reversed") or ()),
+                set(block.get("diagnostic") or ()))
+
+    def refuse(reason: str, **extra: Any) -> dict[str, Any]:
+        out = {"label": label, "horizon_days": horizon_days, "passed": False,
+               "shown": [], "recorded_shown": [], "lost": [], "reversed": [],
+               "absent": [], "gained": [], "reason": reason}
+        out.update(extra)
+        return out
+
+    if recorded is None:
+        return refuse(
+            f"{label}: no committed certificate to read against. The bar is "
+            "a subset rule and a preset with no record has laid down no set "
+            "to be a subset of; lay the record down before shipping against "
+            "it")
+    if fresh is None:
+        return refuse(
+            f"{label}: the record carries a certificate and this run "
+            "produced none, which is a mechanism gate that stopped being "
+            "run rather than a preset that passed it")
+
+    for name, block in (("this run", fresh), ("the record", recorded)):
+        days = block.get("horizon_days")
+        if days is not None and int(days) != int(horizon_days):
+            # Refused rather than read, for `score`'s reason: the rows a
+            # horizon GRADES are not the rows another one grades, so a
+            # subset taken across two horizons compares sets built from
+            # different denominators and means nothing.
+            return refuse(
+                f"{label}: {name} was certified at {days} days and the bar "
+                f"reads {horizon_days}; the rows a horizon counts are set by "
+                f"facts.MECHANISM_DIAGNOSTIC and differ between them")
+
+    shown, not_shown, backwards, reported = lists(fresh)
+    was_shown, was_not_shown, _, _ = lists(recorded)
+    accounted = shown | not_shown | backwards | reported
+    absent = sorted(set(_facts.MECHANISM) - accounted)
+
+    # THE SUBSET, TAKEN ON THE SHOWN SIDE and not on `not_shown`, because
+    # the two are equivalent only while the roster holds. A row deleted from
+    # the certificate leaves `not_shown` SMALLER, so `not_shown <= recorded`
+    # passes on exactly the change that removed the row from the gate. Read
+    # on the shown side a vanished row is lost, which is what it is.
+    lost = sorted(r for r in was_shown if r not in shown and r not in absent)
+    lost_backwards = sorted(r for r in lost if r in backwards)
+    gained = sorted(r for r in shown if r not in was_shown)
+
+    reasons = []
+    if absent:
+        reasons.append(
+            f"{label}: the certificate does not answer "
+            + ", ".join(absent)
+            + " -- a mechanism row in none of shown, not_shown, reversed or "
+              "diagnostic has left the gate rather than failed it")
+    if lost:
+        reasons.append(
+            f"{label}: the record shows " + ", ".join(lost)
+            + " and this certificate does not"
+            + (" (" + ", ".join(lost_backwards) + " read REVERSED, which is "
+               "a sign flip and not a quiet row)" if lost_backwards else ""))
+
+    return {
+        "label": label,
+        "horizon_days": horizon_days,
+        "passed": not reasons,
+        "shown": sorted(shown),
+        "recorded_shown": sorted(was_shown),
+        "lost": lost,
+        "reversed": lost_backwards,
+        "absent": absent,
+        "gained": gained,
+        "reason": "; ".join(reasons) if reasons else (
+            f"{label}: every one of the {len(was_shown)} mechanism(s) the "
+            f"record shows is shown again"
+            + (f", and {len(gained)} more (" + ", ".join(gained) + ")"
+               if gained else "")),
+    }
+
+
+#: The two certificates a preset record carries, and the field each is read
+#: from. BOTH ARE READ AND EITHER FAILING IS A FAILURE.
+#:
+#: Not the 252 panel alone: the held-out seeds exist to catch a mechanism
+#: visible only on the thirty seeds the preset was measured against, and a
+#: bar that read the measured panel only would spend exactly that
+#: protection. Not the held-out panel alone either, since 252 is the panel
+#: the certificate is published and quoted on.
+#:
+#: AND EACH AGAINST ITS OWN COUNTERPART, never crossed. The two panels are
+#: different seed sets and the committed records disagree between them
+#: routinely -- pt-v16 records `corr_asymmetry_lagged` not shown at 252 and
+#: shown on the held-out seeds -- so a row shown on one panel is no evidence
+#: at all about the other. Crossing them would manufacture both a false
+#: refusal and a false pass on the same file.
+MECHANISM_BAR_PANELS = ("mechanism_252", "mechanism_heldout_seeds")
+
+
+def record_bar(fresh: Mapping[str, Any],
+               recorded: Mapping[str, Any] | None,
+               *, horizon_days: int = CERTIFIED_HORIZON_DAYS) -> dict[str, Any]:
+    """`mechanism_bar` on both of a record's certificates, as one verdict.
+
+    Takes two preset RECORDS -- the one this run would write and the one
+    committed -- and pairs `MECHANISM_BAR_PANELS` by name. The verdict
+    passes only if both panels pass, and its `reason` names every row that
+    went missing and the panel it went missing on.
+    """
+    panels = {}
+    for field in MECHANISM_BAR_PANELS:
+        panels[field] = mechanism_bar(
+            fresh.get(field), (recorded or {}).get(field),
+            label=field, horizon_days=horizon_days)
+    failed = [v for v in panels.values() if not v["passed"]]
+    return {
+        "horizon_days": horizon_days,
+        "passed": not failed,
+        "panels": panels,
+        "lost": sorted({r for v in panels.values() for r in v["lost"]}),
+        "absent": sorted({r for v in panels.values() for r in v["absent"]}),
+        "reason": "; ".join(v["reason"] for v in (failed or panels.values())),
+    }
+
+
+def mechanism_bar_line(verdict: Mapping[str, Any]) -> str:
+    """The bar's verdict as one line, to sit beside the three counts."""
+    return (f"  mechanism bar    {'PASS' if verdict['passed'] else 'REFUSED'}"
+            f"     no mechanism the record shows may go unshown -- "
+            + verdict["reason"])
+
+
 def certification_report(result: Mapping[str, Any]) -> str:
     """`certify`'s three counts as text, each saying what it answers.
 

@@ -59,6 +59,22 @@ MARKED = {
          "test_all_fourteen_are_in_band_at_the_certified_horizon"),
         ("test_preset_records.py",
          "test_the_envelope_and_the_record_agree_on_the_band_count"),
+        # THE MECHANISM HALF OF THE SAME BAR, and the first entry here that
+        # is GREEN. That is not an oversight and this file already says so
+        # above: a `ship_bar` test passing is the outcome the project works
+        # toward, and the rule against asserting that a listed entry fails
+        # is stated in WHAT IS DELIBERATELY NOT ASSERTED.
+        #
+        # Why it carries the marker at all. It reads the SHIPPED preset's
+        # committed certificate and refuses a release that shows fewer
+        # mechanisms than that record does, on either the 252 panel or the
+        # held-out seeds. A red here is therefore a fact about the preset --
+        # a model that lost a mechanism -- and not about the tree, which is
+        # exactly what the marker means. A box gate must deselect it for the
+        # same reason it deselects the band count: the box is being asked
+        # whether the tree runs, not whether this preset may ship.
+        ("test_mechanism_gate.py",
+         "test_the_shipped_preset_clears_the_mechanism_bar_on_both_panels"),
     },
     "needs_live_model": {
         # Both replay `tests/fixtures/openai_agents/five-days.json` and both

@@ -220,6 +220,26 @@ def carry_level_protocol(record: dict, path: pathlib.Path) -> str:
                if added else ""))
 
 
+def mechanism_bar(fresh: dict, committed: dict | None) -> dict:
+    """`envelope.record_bar`, with the FIRST LAY-DOWN named as its own case.
+
+    The bar is a SUBSET rule -- no mechanism a record shows may go unshown --
+    and a preset with no committed record has laid down no set to be a subset
+    of. `envelope.mechanism_bar` refuses that, correctly, because a ship bar
+    that passed an absence would be reporting one as a result. The tool that
+    WRITES the first record is the one place where it is not a refusal, and
+    it is separated here rather than inside the library so that the exception
+    sits where it applies and cannot be inherited by a reader of the rule.
+    """
+    from tradefloor import envelope
+
+    if committed is None:
+        return {"passed": True, "first": True, "lost": [], "absent": [],
+                "reason": "no committed record: this run LAYS ONE DOWN, and "
+                          "a first measurement cannot regress against itself"}
+    return dict(envelope.record_bar(fresh, committed), first=False)
+
+
 def count_block_gradings(block: dict) -> dict[str, dict]:
     """One count block's published count, recomputed at every basis.
 
@@ -496,6 +516,17 @@ def main() -> int:
                 drift.append(f"{path.name} is missing")
             else:
                 have = json.loads(path.read_text(encoding="utf-8"))
+                # THE SUBSET BAR, BEFORE THE FIELD DIFF AND NOT INSTEAD OF
+                # IT. A `differs` line says the block moved and says nothing
+                # about WHICH WAY: a preset that gained a mechanism and one
+                # that lost `leverage_effect` read the same there, and at an
+                # unchanged count of nine of ten the field diff is the only
+                # thing that fires at all. `envelope.record_bar` names the
+                # rows and the panel, so a loss cannot be read as drift.
+                bar = mechanism_bar(record, have)
+                if not bar["passed"]:
+                    drift.append(f"{path.name}: MECHANISM LOST -- "
+                                 + bar["reason"])
                 # The measurement block carries a commit and a wall time, so
                 # comparing it would report drift on every re-run. What has
                 # to agree is the SCIENCE.
@@ -513,6 +544,22 @@ def main() -> int:
                     if have.get(field) != record.get(field):
                         drift.append(f"{path.name}: {field} differs")
         else:
+            # THE SAME BAR ON THE WRITE SIDE, because `--check` is advisory
+            # and this is the path that overwrites a measurement. A record
+            # is the only place a preset's mechanism set is written down, so
+            # a run that loses `leverage_effect` and writes anyway destroys
+            # the evidence that it did.
+            bar = mechanism_bar(record, json.loads(path.read_text(
+                encoding="utf-8")) if path.exists() else None)
+            if not bar["passed"]:
+                print(f"REFUSED: {path.name} would overwrite its mechanism "
+                      f"certificate with one that shows less. " + bar["reason"]
+                      + ". A preset may show MORE mechanisms than its record "
+                        "and never fewer; if the loss is intended, the record "
+                        "it is measured against has to be retired on purpose",
+                      file=sys.stderr)
+                drift.append(f"{path.name}: MECHANISM LOST -- " + bar["reason"])
+                continue
             # THE LAST GATE BEFORE TWO COUNTS GO INTO ONE FILE. A record's
             # top-level `in_band` is regraded here at the panel's basis while
             # `level_protocol` is carried forward from a run at whichever
@@ -622,6 +669,7 @@ def write_mechanism_gate(panel_path: str) -> int:
         "method": panel["method"],
     }
     written = 0
+    refused = 0
     for name in sorted(panel["presets"]):
         path = OUT / f"{name}.json"
         if not path.exists():
@@ -629,6 +677,20 @@ def write_mechanism_gate(panel_path: str) -> int:
             continue
         record = json.loads(path.read_text(encoding="utf-8"))
         p = panel["presets"][name]
+        # THE BAR, READ BEFORE THE BLOCKS ARE REPLACED. This mode's whole job
+        # is to write a fresh certificate over a committed one, so it is the
+        # shortest path in the tool from a lost mechanism to a record that
+        # says the mechanism was never there. Refused per preset, never per
+        # run: one preset that regressed is not a reason to leave the other
+        # seventeen carrying a stale certificate.
+        bar = mechanism_bar(p, record)
+        if not bar["passed"]:
+            print(f"  REFUSED {name}: " + bar["reason"]
+                  + ". The certificate on disk shows a mechanism this panel "
+                    "does not, and writing would erase the comparison",
+                  file=sys.stderr)
+            refused += 1
+            continue
         for field in ("mechanism_252", "mechanism_heldout_seeds"):
             block = dict(p[field])
             block["measured"] = measured
@@ -650,7 +712,19 @@ def write_mechanism_gate(panel_path: str) -> int:
               f"{counts['mechanism_shown']} of {counts['mechanism_of']}"
               + (f", REVERSED {record['mechanism_252']['reversed']}"
                  if record["mechanism_252"]["reversed"] else ""))
+        # The bar's own verdict beside the count it is taken on, so a run
+        # that PASSED says so in the same place a run that refused says why.
+        # A gate that is only visible when it fires is a gate a reader has
+        # no reason to believe is running.
+        from tradefloor import envelope
+        print("  " + envelope.mechanism_bar_line(bar).strip())
         written += 1
+    # A refusal must not exit 0, and it must not be reported as "nothing to
+    # write" either: the two are the same integer and opposite facts.
+    if refused:
+        print(f"  {refused} preset(s) REFUSED: a committed certificate shows "
+              f"a mechanism this panel does not", file=sys.stderr)
+        return 1
     return 0 if written else 1
 
 
