@@ -1006,13 +1006,21 @@ pub struct ModelParams {
     ///
     /// # Three things it costs
     ///
-    /// 1. **The level would fall if `E[L]` were normalised.** With
-    ///    `sd(log L)` 0.69 and `E[L] = 1`, `E[sqrt(L)]` is
-    ///    `exp(-sd^2/8)` = 0.942 and median annualised volatility drops
-    ///    six per cent -- and `annualised_vol_pct` is a graded row. So the
-    ///    normalisation here is `E[sqrt(L)] = 1`, which subtracts
-    ///    `sd^2/4` from the log level. A constant of the construction,
-    ///    not a free dial.
+    /// 1. **The level would fall if `E[L]` were normalised.** At the
+    ///    shipped 0.085, with `market_vol_level_persistence` 0.9977, the
+    ///    stationary `sd(log L)` is `0.085 / sqrt(1 - 0.9977^2)` =
+    ///    **1.254**; so with `E[L] = 1` the mean root `E[sqrt(L)]` is
+    ///    `exp(-sd^2/8)` = 0.822 and median annualised volatility would
+    ///    drop EIGHTEEN per cent -- and `annualised_vol_pct` is a graded
+    ///    row. The derived 0.047 gives `sd(log L)` 0.69, `E[sqrt(L)]`
+    ///    0.942 and six per cent instead, and this paragraph quoted only
+    ///    that second triple until 2026-09-18 -- a derived cost standing
+    ///    where the shipped one belongs, and the only self-refuting number
+    ///    in this entry: 0.69 solves back to a sigma of 0.047, not to the
+    ///    0.085 four paragraphs above it. So the normalisation here is
+    ///    `E[sqrt(L)] = 1`, which subtracts `sd^2/4` from the log level. A
+    ///    constant of the construction, not a free dial, and it is applied
+    ///    at whatever sigma the preset carries.
     /// 2. **A draw.** One normal per session, on
     ///    [`crate::rng::stream::MARKET_VOL_LEVEL`] and not on `MARKET`, so
     ///    the schedule does not move and nothing else reshuffles. See that
@@ -6763,6 +6771,94 @@ mod tests {
     /// dials. Nothing here reads the built engine.
     const PARAMS_SOURCE: &str = include_str!("params.rs");
 
+    /// The other files in this crate that make claims about dial values.
+    ///
+    /// The 2026-09-17 audit read `params.rs` and the guard below reads
+    /// `params.rs`, which is where a dial's OWN entry lives. It is not
+    /// where every claim about a dial's value lives: a call site explains
+    /// why its branch is inert by naming the dial and the presets that
+    /// leave it at zero, and such a sentence goes stale exactly as a
+    /// docstring does. Measured 2026-09-18 over `rust/src`: five files
+    /// besides `params.rs` carry a comment naming a settable dial beside a
+    /// value and a preset scope. These are those five. Every other file in
+    /// the crate has none -- `market_maker.rs`, `microstructure.rs`,
+    /// `order_book.rs`, `mispricing.rs`, `mathx.rs`, `sectors.rs`,
+    /// `units.rs`, `universe.rs`, `wasm.rs`, `lib.rs`, `types.rs` and the
+    /// four other `python_*.rs` files do not name a settable dial beside a
+    /// number at all.
+    ///
+    /// Same `include_str!` discipline and for the same reason: ONE TREE.
+    /// The text is what the compiler read beside this file and the values
+    /// are what it compiled into `ModelParams::preset`. Nothing here opens
+    /// a built extension, a JSON preset on disk or anything else that
+    /// could be a different branch.
+    const OTHER_SOURCES: &[(&str, &str)] = &[
+        ("engine.rs", include_str!("engine.rs")),
+        ("rng.rs", include_str!("rng.rs")),
+        ("fair_value.rs", include_str!("fair_value.rs")),
+        ("python_engine.rs", include_str!("python_engine.rs")),
+        ("python_params.rs", include_str!("python_params.rs")),
+    ];
+
+    /// Contiguous runs of `//`, `///` and `//!` lines, joined into one
+    /// paragraph each, with the line the run starts on.
+    ///
+    /// Outside `params.rs` a claim has no `pub <name>: f64,` under it to
+    /// say whose value it is, so the run itself is the unit and the dial
+    /// is read out of the prose.
+    fn comment_blocks(src: &str) -> Vec<(usize, String)> {
+        let mut out: Vec<(usize, String)> = Vec::new();
+        let mut block = String::new();
+        let mut start = 0usize;
+        for (n, line) in src.lines().enumerate() {
+            let s = line.trim();
+            if let Some(rest) = s.strip_prefix("//") {
+                let rest = rest.strip_prefix('/').unwrap_or(rest);
+                let rest = rest.strip_prefix('!').unwrap_or(rest);
+                if block.is_empty() {
+                    start = n + 1;
+                } else {
+                    block.push(' ');
+                }
+                block.push_str(rest.trim());
+                continue;
+            }
+            if !block.is_empty() {
+                out.push((start, std::mem::take(&mut block)));
+            }
+        }
+        if !block.is_empty() {
+            out.push((start, block));
+        }
+        out
+    }
+
+    /// Every settable dial a block names, in backticks or through a
+    /// `ModelParams::` path -- the two forms this file uses to point at a
+    /// dial, and the two `names_another_dial` already reads.
+    fn dials_named(text: &str) -> Vec<String> {
+        let names = settable_names();
+        let mut out: Vec<String> = Vec::new();
+        let mut push = |token: &str| {
+            if names.contains(&token) && !out.iter().any(|s| s == token) {
+                out.push(token.to_string());
+            }
+        };
+        for chunk in text.split('`').skip(1).step_by(2) {
+            push(chunk);
+        }
+        let mut rest = text;
+        while let Some(at) = rest.find("ModelParams::") {
+            let tail = &rest[at + "ModelParams::".len()..];
+            let end = tail
+                .find(|c: char| !(c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'))
+                .unwrap_or(tail.len());
+            push(&tail[..end]);
+            rest = &tail[end..];
+        }
+        out
+    }
+
     /// One `///` block and the `pub <name>: f64,` it sits above.
     fn dial_doc_blocks(src: &str) -> Vec<(String, String)> {
         let mut out = Vec::new();
@@ -7080,13 +7176,45 @@ mod tests {
         }
     }
 
+    /// What can sit between a value and the preset scope it is claimed
+    /// over. Ordered longest-first so ", which is" wins over ",".
+    ///
+    /// MEASURED, and the measurement is why the list is this short. Two
+    /// wider forms were tried on 2026-09-18 and both were dropped:
+    ///
+    ///   * " on" -- six refutations on this tree, all the same misreading.
+    ///     "+0.0483 on pt-v18", "-0.933 on pt-v6", "+0.275 on pt-v3" are
+    ///     statistics MEASURED ON a preset, not the dial's value under it.
+    ///     " in", " under" and " across" read the same way: a scope after a
+    ///     bare preposition names a RUN, not a setting.
+    ///   * ", which is" -- it reattaches the scope to whatever number ends
+    ///     the clause, and that number is often not the dial's.
+    ///     `engine.rs`'s "0.0 means a multiplier of exactly 1.0, which is
+    ///     every preset through pt-v18" would read 1.0 as the LEVEL SIGMA
+    ///     and refute on seventeen presets, on a sentence that is true.
+    ///
+    /// A claim this parser cannot reach is a claim a reader has to check,
+    /// which is the honest outcome; a claim it reaches WRONGLY is a build
+    /// failure on correct prose, which is not.
+    const LEADS: &[&str] = &[
+        "--", "\u{2014}", ", which", " is what", " ships and is", " is", ",",
+    ];
+
     const VERBS: &[&str] = &[
         "ships ", "ship ", "carries ", "carry ", "sets ", "set ", "uses ", "use ", "runs ",
         "run ",
     ];
 
     /// Every claim this parser is willing to judge, for one dial.
-    fn claims_in(dial: &str, doc: &str) -> Vec<Claim> {
+    ///
+    /// `own_entry` says whether `doc` is the dial's OWN docstring. Inside
+    /// `params.rs` it is, and an unattributed subject ("Shipped at 0.4",
+    /// "the shipped 0.025") therefore belongs to the dial the block sits
+    /// above. In a comment anywhere else there is no such attachment and an
+    /// unattributed subject could be anybody's, so those forms are off and
+    /// only the SCOPE-PAIRED forms -- which carry their own subject in the
+    /// sentence -- are read.
+    fn claims_in(dial: &str, doc: &str, own_entry: bool) -> Vec<Claim> {
         let default_idx = preset_index(DEFAULT_PRESET_NAME).expect("the default is a shipped preset");
         let mut out = Vec::new();
         for sentence in sentences(doc) {
@@ -7106,43 +7234,46 @@ mod tests {
 
             // --- Subject forms. The subject of a sentence that OPENS with
             // a value in this dial's own entry is this dial, so a later
-            // mention of another dial cannot re-point it.
+            // mention of another dial cannot re-point it. Only in its own
+            // entry: see `own_entry`.
             let head = s.trim_start();
-            let mut done = false;
-            for lead in ["Shipped at ", "SHIPPED at ", "Ships at ", "Shipped ", "SHIPPED ", "Ships "] {
-                if let Some(k) = head.strip_prefix(lead) {
-                    let off = head.len() - k.len();
-                    if let Some((v, t)) = number_at(head, off) {
-                        push(v, t, vec![default_idx], &head[..off + t.len()]);
-                        done = true;
-                    }
-                    break;
-                }
-            }
-            if !done {
-                if let Some((v, t)) = number_at(head, 0) {
-                    if head[t.len()..].starts_with(" ships") {
-                        push(v, t, vec![default_idx], &head[..t.len() + 6]);
+            if own_entry {
+                let mut done = false;
+                for lead in ["Shipped at ", "SHIPPED at ", "Ships at ", "Shipped ", "SHIPPED ", "Ships "] {
+                    if let Some(k) = head.strip_prefix(lead) {
+                        let off = head.len() - k.len();
+                        if let Some((v, t)) = number_at(head, off) {
+                            push(v, t, vec![default_idx], &head[..off + t.len()]);
+                            done = true;
+                        }
+                        break;
                     }
                 }
-                if let Some(rest) = head.strip_prefix("At ") {
-                    if let Some((v, t)) = number_at(head, 3) {
-                        if rest[t.len()..].starts_with(", shipped,") {
-                            push(v, t, vec![default_idx], &head[..3 + t.len() + 10]);
+                if !done {
+                    if let Some((v, t)) = number_at(head, 0) {
+                        if head[t.len()..].starts_with(" ships") {
+                            push(v, t, vec![default_idx], &head[..t.len() + 6]);
+                        }
+                    }
+                    if let Some(rest) = head.strip_prefix("At ") {
+                        if let Some((v, t)) = number_at(head, 3) {
+                            if rest[t.len()..].starts_with(", shipped,") {
+                                push(v, t, vec![default_idx], &head[..3 + t.len() + 10]);
+                            }
                         }
                     }
                 }
-            }
-            // "(0.0, shipped)" -- the switch-summary form.
-            let mut at = 0usize;
-            while let Some(p) = s[at..].find('(') {
-                let i = at + p + 1;
-                if let Some((v, t)) = number_at(&s, i) {
-                    if s[i + t.len()..].starts_with(", shipped)") {
-                        push(v, t, vec![default_idx], &s[i - 1..i + t.len() + 10]);
+                // "(0.0, shipped)" -- the switch-summary form.
+                let mut at = 0usize;
+                while let Some(p) = s[at..].find('(') {
+                    let i = at + p + 1;
+                    if let Some((v, t)) = number_at(&s, i) {
+                        if s[i + t.len()..].starts_with(", shipped)") {
+                            push(v, t, vec![default_idx], &s[i - 1..i + t.len() + 10]);
+                        }
                     }
+                    at = i;
                 }
-                at = i;
             }
 
             // --- Scope-paired forms, declined where the sentence could be
@@ -7150,14 +7281,23 @@ mod tests {
             if names_another_dial(sentence, dial) {
                 continue;
             }
+            // A scope phrase is consumed whole. "every preset before
+            // pt-v18" contains "pt-v18", and reading the inner token as a
+            // scope of its own pairs the sentence's value with the ONE
+            // preset the phrase excludes -- which is how
+            // `engine.rs:375`'s true "inert under every preset before
+            // pt-v18, where `earnings_nominal_growth` is 0.0" came out as
+            // a claim that pt-v18 is 0.0, refuted by pt-v18 = 1.0.
+            let mut consumed_to = 0usize;
             for i in 0..s.len() {
-                if !s.is_char_boundary(i) {
+                if i < consumed_to || !s.is_char_boundary(i) {
                     continue;
                 }
                 let (end, scope) = match scope_at(&s, i) {
                     Some(x) => x,
                     None => continue,
                 };
+                consumed_to = end;
                 let presets = match scope {
                     Scope::Presets(p) => p,
                     Scope::Undecidable => continue,
@@ -7167,12 +7307,12 @@ mod tests {
 
                 // <value> -- <scope> -- | <value>, which <scope> | (<value>, <scope>)
                 // | <value> is <scope> | shipped <value> in <scope>
-                for lead in ["--", "\u{2014}", ", which", " is what", " ships and is", " is", ","] {
+                for lead in LEADS {
                     let stem = match before.strip_suffix(lead) {
                         Some(x) => x.trim_end(),
                         None => continue,
                     };
-                    let stem = stem.strip_suffix('(').unwrap_or(stem).trim_end();
+                    let stem = stem.trim_end_matches(['`', '(']).trim_end();
                     let num_start = stem.len() - stem.chars().rev()
                         .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == '-' || *c == 'e' || *c == 'E')
                         .map(|c| c.len_utf8()).sum::<usize>();
@@ -7180,6 +7320,31 @@ mod tests {
                         if num_start + t.len() == stem.len() {
                             push(v, t, presets.clone(), &s[num_start..end]);
                             break;
+                        }
+                    }
+                }
+                // "<scope>, where `<dial>` is <value>" and "<scope>, where
+                // `<a>` and `<b>` are both <value>" -- the call-site form,
+                // where the dial is named AFTER the scope rather than
+                // before it. The dial has to be the one being judged.
+                if let Some(w) = after.find("where ") {
+                    let clause = &after[w + 6..];
+                    let stop = clause.find(". ").unwrap_or(clause.len());
+                    let clause = &clause[..stop];
+                    if clause.contains(&format!("`{dial}`")) {
+                        for verb in [" is ", " are ", " are both ", " is still ", " is exactly "] {
+                            if let Some(k) = clause.find(verb) {
+                                let mut j = k + verb.len();
+                                for skip in ["both ", "exactly ", "still "] {
+                                    if clause[j..].starts_with(skip) {
+                                        j += skip.len();
+                                    }
+                                }
+                                if let Some((v, t)) = number_at(clause, j) {
+                                    push(v, t, presets.clone(), &format!("where {dial} {} {t}", verb.trim()));
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
@@ -7229,7 +7394,10 @@ mod tests {
                 }
             }
             // "the shipped <value>" -- this dial's, the sentence naming no
-            // other.
+            // other. A subject form, so its own entry only.
+            if !own_entry {
+                continue;
+            }
             let mut at = 0usize;
             while at < s.len() {
                 let hit = ["the shipped ", "The shipped "]
@@ -7327,7 +7495,7 @@ mod tests {
             if !settable.contains(&dial.as_str()) {
                 continue;
             }
-            let claims = claims_in(&dial, &doc);
+            let claims = claims_in(&dial, &doc, true);
             if !claims.is_empty() {
                 judged_dials += 1;
             }
@@ -7382,6 +7550,128 @@ mod tests {
             "{} dial docstring claim(s) contradict the constructors in this file. Every \
              one is the 2026-09-17 defect: a claim true when written and overtaken by a \
              later preset. Fix the PROSE -- no dial value moves for this.{}",
+            failures.len(),
+            failures.join("")
+        );
+    }
+
+    /// The same claims, in the OTHER files that make them.
+    ///
+    /// # Why this exists beside the test above
+    ///
+    /// The guard above reads `params.rs`, where a dial's own entry lives.
+    /// A dial's value is also asserted at its CALL SITES, where a comment
+    /// explains that a branch is inert because every preset so far leaves
+    /// the dial at zero. That sentence is the same kind of claim, goes
+    /// stale the same way, and nothing was reading it: `engine.rs:2465`
+    /// said `market_vol_level_sigma` was 0.0 "through pt-v19" for as long
+    /// as pt-v19 has shipped 0.085.
+    ///
+    /// # How the subject is decided, since there is no field underneath
+    ///
+    /// A run of comment lines is the unit. If it names exactly ONE settable
+    /// dial, the whole run is read as being about that dial. If it names
+    /// several, only the sentences naming that one dial and no other are
+    /// read for it. Either way the SUBJECT FORMS are off (see
+    /// `claims_in`'s `own_entry`): "the shipped 0.4" in a free comment has
+    /// no field under it to belong to, so this guard judges only the
+    /// scope-paired forms, which carry their subject in the sentence.
+    ///
+    /// Same one-tree property as above, and it is the whole point: the
+    /// prose comes from `include_str!` on the files beside this one and the
+    /// values from `ModelParams::preset` compiled out of this one.
+    #[test]
+    fn every_shipped_value_claim_outside_params_holds_against_the_preset_table() {
+        let names = ModelParams::preset_names();
+        let mut failures: Vec<String> = Vec::new();
+        let mut judged_blocks = 0usize;
+
+        for &(file, src) in OTHER_SOURCES {
+            let mut judged = 0usize;
+            for (line, block) in comment_blocks(src) {
+                let dials = dials_named(&block);
+                if dials.is_empty() {
+                    continue;
+                }
+                let mut judged_here = false;
+                for dial in &dials {
+                    // OUTSIDE a dial's own entry, only a sentence that
+                    // NAMES the dial is read for it. Measured: without
+                    // this, `engine.rs:3177`'s "Exactly 1.0 under every
+                    // preset before pt-v18" -- a claim about the nominal
+                    // SCALE, in a block that happens to mention
+                    // `earnings_nominal_growth` six sentences earlier --
+                    // reads as a claim about the dial and refutes on
+                    // sixteen presets. A comment paragraph is not one
+                    // dial's entry and must not be read as one.
+                    let doc: String = sentences(&block)
+                        .into_iter()
+                        .filter(|s| {
+                            let d = dials_named(s);
+                            d.len() == 1 && &d[0] == dial
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    for claim in claims_in(dial, &doc, false) {
+                        judged_here = true;
+                        let mut refuting: Vec<String> = Vec::new();
+                        for &i in &claim.presets {
+                            let actual = ModelParams::preset(names[i])
+                                .expect("a name from preset_names resolves")
+                                .get(dial)
+                                .expect("a settable name reads back");
+                            if !claim_holds(claim.value, actual, &claim.text) {
+                                refuting.push(format!("{} = {actual:?}", names[i]));
+                            }
+                        }
+                        if refuting.is_empty() {
+                            continue;
+                        }
+                        failures.push(format!(
+                            "\n  {file}:{line} on `{dial}`: the comment claims {} over {}, \
+                             and the preset table refutes it.\n    claim    : \"{}\"\n    \
+                             sentence : \"{}\"\n    refuted by: {}",
+                            claim.text,
+                            if claim.presets.len() == 1 {
+                                names[claim.presets[0]].to_string()
+                            } else {
+                                format!(
+                                    "{} .. {} ({} presets)",
+                                    names[claim.presets[0]],
+                                    names[*claim.presets.last().unwrap()],
+                                    claim.presets.len()
+                                )
+                            },
+                            claim.fragment,
+                            claim.sentence,
+                            refuting.join(", "),
+                        ));
+                    }
+                }
+                if judged_here {
+                    judged += 1;
+                }
+            }
+            judged_blocks += judged;
+        }
+
+        // The same anti-rot floor the entry above carries, for the same
+        // reason: a parser that stops matching passes everything. FIVE
+        // comment blocks outside `params.rs` carry a claim this grammar
+        // judges -- four in `engine.rs`, one in `rng.rs` -- and seven
+        // claims between them, over 86 preset readings. The floor is four,
+        // one block of headroom for a rewording.
+        assert!(
+            judged_blocks >= 4,
+            "the comment-claim parser judged only {judged_blocks} blocks outside \
+             params.rs, against 5 when this was written. Either the wording moved out \
+             of the grammar or the parser broke."
+        );
+
+        assert!(
+            failures.is_empty(),
+            "{} comment(s) outside params.rs claim a dial value the constructors in \
+             this file refute. Fix the PROSE -- no dial value moves for this.{}",
             failures.len(),
             failures.join("")
         );

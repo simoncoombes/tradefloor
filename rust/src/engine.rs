@@ -346,8 +346,12 @@ pub struct Engine {
     /// reservoir dial ships 0.0; see `ModelParams::forced_flow_reservoir`.
     forced_flow_spent: f64,
     /// The market factor's slow variance level, in logs. 0.0 means a
-    /// multiplier of exactly 1.0, which is every preset through pt-v19;
-    /// see `ModelParams::market_vol_level_sigma`.
+    /// multiplier of exactly 1.0, which is every preset through pt-v18,
+    /// where `market_vol_level_sigma` is 0.0. pt-v19, where
+    /// `market_vol_level_sigma` is 0.085, moves this field every session.
+    /// This line said "every preset through pt-v19" until 2026-09-18, and
+    /// stopped being true when pt-v19 took the dial off zero. See
+    /// `ModelParams::market_vol_level_sigma`.
     market_vol_log_level: f64,
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
@@ -2462,10 +2466,15 @@ impl Engine {
         // `rng::stream::MARKET_VOL_LEVEL` for why that distinction is what
         // makes the comparison a measurement.
         //
-        // At `market_vol_level_sigma` 0.0 -- every preset through pt-v19 --
-        // the draw is taken, `market_vol_log_level` stays exactly 0.0, the
-        // multiplier is exactly 1.0 and `close_day_scaled` calls the very
-        // function the close called before this existed.
+        // At `market_vol_level_sigma` 0.0 -- every preset through pt-v18,
+        // where the dial is zero -- the draw is taken,
+        // `market_vol_log_level` stays exactly 0.0, the multiplier is
+        // exactly 1.0 and `close_day_scaled` calls the very function the
+        // close called before this existed. pt-v19, where
+        // `market_vol_level_sigma` is 0.085, takes the other branch: the
+        // level is live and the multiplier is not 1.0. This line said
+        // "every preset through pt-v19" until 2026-09-18, and stopped
+        // being true when pt-v19 took the dial off zero.
         self.market_vol_level_rng.site(Site::MarketVolLevelZ, 0);
         let level_z = self.market_vol_level_rng.next_normal();
         let market_vol_level = if self.params.market_vol_level_sigma == 0.0 {
