@@ -1028,14 +1028,27 @@ def test_each_settable_parameter_moves_the_market_or_names_why_not(
     # moved underneath them.
     #
     # `from_preset_unchecked`, and this is the case the hatch exists for.
-    # Nine rows of this table move a dial pt-v19 DERIVES -- the cap off its
+    # EIGHT rows of this table move a dial pt-v19 DERIVES -- the cap off its
     # image, the level exponent off `p - 1`, `garch_beta` off the tape's
     # persistence identity, and the five dials those identities read -- so
     # `from_preset` refuses them, correctly: each is a vector whose cap or
-    # memory follows from nothing. What this test reads is not the model, it
-    # is whether the dial REACHES the runtime at all, and for that a vector
-    # off its identity is exactly the right probe. The waiver is here, in the
-    # open, which is what the hatch asks for.
+    # memory follows from nothing. This comment and the `168ac8e` merge
+    # message both said NINE until 2026-09-18, while enumerating 3 + 5; the
+    # enumeration was right and the total was not. MEASURED at 38f2c43 by
+    # calling `from_preset` on all 148 rows: garch_alpha, garch_beta,
+    # garch_gamma, vix_return_gain, vix_return_exponent, vix_return_clamp,
+    # vix_target_shock_cap, vix_return_level_exponent. The ninth would be
+    # `vix_level_identity`, which the paragraph below accounts for
+    # separately: it is refused on the UNIVERSAL invariant and not on a
+    # pt-v19 claim, and carrying its `COMPANIONS` entry it breaks nothing.
+    # The count is prose and is asserted nowhere executable -- the only
+    # executable figure near it is `params.rs`'s
+    # `assert_eq!(claims_of("pt-v19").len(), 3)`, which counts CLAIMS and is
+    # correct -- so nothing here re-checks it and a reader should not treat
+    # it as checked. What this test reads is not the model, it is whether
+    # the dial REACHES the runtime at all, and for that a vector off its
+    # identity is exactly the right probe. The waiver is here, in the open,
+    # which is what the hatch asks for.
     #
     # The universal invariant is NOT waived and cannot be; the one row that
     # would have tripped it carries its companion dial instead.
