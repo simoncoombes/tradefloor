@@ -5315,10 +5315,27 @@ RULED_UNREADABLE: dict[int, dict[str, str]] = {
             "band. REAL_MARKETS_PROVENANCE[...]['section14'] carries the "
             "measurement at both anchors and the ground for not adopting it",
         VIX_AR1_ROW:
-            "the band is DERIVED and NOT ADOPTED: vix-ar1-band-derivation.md "
-            "section 9 holds [0.82, 1.04] at 252 and [0.90, 1.01] at 504 and "
-            "names three rulings that have to be made before it lands. "
-            "Blocker vix-ar1-band-not-adopted",
+            "NO BAND TABLE IN THIS LIBRARY CARRIES THE ROW, and that alone "
+            "is what holds it here: REAL_MARKETS, REAL_MARKETS_UNIVERSAL "
+            "and REAL_MARKETS_RULED all lack it at both horizons. The "
+            "adoption is RULED AND NOT LANDED, which is the opposite of "
+            "what this entry said until 2026-09-18: a band of [0.82, 1.04] "
+            "at 252 and [0.90, 1.01] at 504 was derived off-library and "
+            "Simon ruled it this row's ruled band on 2026-09-15 "
+            "(design-repo verdict-ledger.json, ruling-vix-ar1-band-adopted, "
+            "which also publishes the row FLOOR-ONLY under "
+            "ruling-dead-edges-are-not-counted). The blocker this entry "
+            "used to name, vix-ar1-band-not-adopted, was closed the same "
+            "day by closes-vix-ar1-band-not-adopted and must not be quoted "
+            "as live. What is outstanding is the table entry, tracked as "
+            "the standing open dn3derive-the-ruling-names-a-vix-ar1-ruler-"
+            "the-library-does-not-carry. NO BAND IS INVENTED HERE AND NONE "
+            "IS READ: until the entry lands, the row is ungraded. "
+            "CITATION CORRECTED: this entry cited "
+            "vix-ar1-band-derivation.md section 9, and that note was never "
+            "written -- it appears in no commit of either repository. The "
+            "derivation's terms survive in the ledger instead, under "
+            "ruling-prep-vix-ar1-separately-derived-band",
     },
     504: {
         "corr_persistence_acf1":
@@ -5397,14 +5414,20 @@ _resolve_as_at_252()
 #: away, which the row's own instrument cannot resolve. So IF the row is
 #: graded, it is graded on its floor alone.
 #:
-#: But its band comes from `vix-ar1-band-derivation.md` and not from the
-#: universal panel, because ^VIX is not in the 32-name equity set, and
-#: section 9 there names three rulings that have to be made before it is
-#: adopted. Until they are, `RULED_UNREADABLE` holds the row and it is not
-#: graded at all. A row cannot be both floor-only and unreadable, so the
-#: entry below carries `class: "open"` and `edge_liveness_counts` reports
-#: it under whichever of the two states `RULED_UNREADABLE` puts it in.
-#: Changing that is one line, in `RULED_UNREADABLE`, once the ruling lands.
+#: Its band was derived OFF-LIBRARY and not from the universal panel,
+#: because ^VIX is not in the 32-name equity set. This block cited that
+#: derivation as `vix-ar1-band-derivation.md` section 9 until 2026-09-18;
+#: no such note was ever written, in either repository, and the surviving
+#: record of the derivation is the design repo's ledger entry
+#: `ruling-prep-vix-ar1-separately-derived-band`. The ruling the old text
+#: said was pending has LANDED -- `ruling-vix-ar1-band-adopted`,
+#: 2026-09-15, which adopts the band and publishes the row floor-only --
+#: but the table entry has not, so `RULED_UNREADABLE` still holds the row
+#: and it is not graded at all. A row cannot be both floor-only and
+#: unreadable, so the entry below carries `class: "open"` and
+#: `edge_liveness_counts` reports it under whichever of the two states
+#: `RULED_UNREADABLE` puts it in. Changing that is one line, in
+#: `RULED_UNREADABLE`, once the band lands in the tables.
 #:
 #: WHAT THE PUBLISHED FORM NEEDS. "17 of 17 two-sided, 1 of 1 floor-only,
 #: 1 of 1 roster-limited" needs all nineteen rows readable: the two fear

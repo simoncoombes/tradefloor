@@ -1475,10 +1475,11 @@ def score(panel: Mapping[str, float], *,
     # cases the reason has nothing to do with whether the row has a band.
     #
     # Admitting it moves NO count and NO verdict: the row still has no
-    # adopted band, so it falls through to the UNREADABLE branch below and
-    # reports the reason `facts.RULED_UNREADABLE` already records for it --
-    # the derivation in `vix-ar1-band-derivation.md` section 9 and the three
-    # rulings that have to land before it is adopted. What changes is that
+    # band in any table here, so it falls through to the UNREADABLE branch
+    # below and reports the reason `facts.RULED_UNREADABLE` already records
+    # for it. That reason cited `vix-ar1-band-derivation.md` section 9 until
+    # 2026-09-18, a note that exists in no commit of either repository, and
+    # it now names the ledger entries that do exist. What changes is that
     # adopting that band becomes a table entry on its own, instead of a
     # table entry plus this line, and that the row is now named as
     # unreadable rather than refused as unknown. Absent with a stated reason

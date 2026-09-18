@@ -128,10 +128,13 @@ REPORTED = (facts.VIX_AR1_ROW,)
 #: than left for a reader to infer from an absent field.
 #:
 #: `vix_ar1_debiased` is UNGRADED here and it is ungraded in the library
-#: too: `facts.RULED_UNREADABLE` holds it at both horizons with the reason
-#: that its band is DERIVED AND NOT ADOPTED -- `vix-ar1-band-derivation.md`
-#: section 9 names three rulings that have to land first -- and no band
-#: table this tool can grade against carries the row at all.
+#: too: `facts.RULED_UNREADABLE` holds it at both horizons, and no band
+#: table this tool can grade against carries the row at all. That reason
+#: is reproduced from the library rather than restated, so this block
+#: carries whatever `facts` says and cannot drift from it -- which is why
+#: the dead citation it used to repeat (`vix-ar1-band-derivation.md`
+#: section 9, a note written in neither repository) had to be corrected in
+#: `facts.py` and not here.
 #:
 #: `facts.BAND_EDGE_LIVENESS` records, separately, that the row's CEILING is
 #: dead: `debias_ar1` is bounded above by `1 + 4/n`, so at 252 no reading
@@ -150,10 +153,11 @@ REPORTED_NOT_GRADED = (
     "preset record. No band table this tool grades against carries the row "
     "-- facts.REAL_MARKETS, facts.REAL_MARKETS_UNIVERSAL and "
     "facts.REAL_MARKETS_RULED all lack it at both horizons -- and "
-    "facts.RULED_UNREADABLE records why: the band is derived and not "
-    "adopted, pending the three rulings named in "
-    "vix-ar1-band-derivation.md section 9. THERE IS NO BAND FOR THIS ROW "
-    "AND NONE IS INVENTED HERE. The block carries the real tape's windowed "
+    "facts.RULED_UNREADABLE records why. That reason is READ FROM THE "
+    "LIBRARY as this block is written, into band.reason beside the null, "
+    "and is not restated here -- so it cannot go stale against facts.py "
+    "the way a copied sentence would. THERE IS NO BAND FOR THIS ROW AND "
+    "NONE IS INVENTED HERE. The block carries the real tape's windowed "
     "readings (facts.REAL_VIX_AR1_WINDOWS) so the model's reading can be "
     "compared by eye, and the row's edge liveness "
     "(facts.BAND_EDGE_LIVENESS), which records that the ceiling is dead by "

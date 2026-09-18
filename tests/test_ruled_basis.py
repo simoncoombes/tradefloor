@@ -47,19 +47,29 @@ GRADED = (tuple(facts.SHAPE) + tuple(facts.LEVEL) + tuple(facts.CRISIS)
 #: The two horizons the bar reads. 19 rows by 2 horizons is the 38 cells.
 HORIZONS = (facts.CERTIFIED_HORIZON_DAYS, 504)
 
-#: The seven cells with no ruled band, each with the blocker that holds it.
+#: The seven cells with no ruled band, each with the entry that holds it.
 #: Written out rather than read from `RULED_UNREADABLE`, because a test that
 #: reads the table it is checking passes whatever the table says. When a
 #: ruling lands this tuple is edited in the same commit as the table, and the
 #: edit is the record that the count moved on purpose.
+#:
+#: THE TWO `vix_ar1_debiased` CELLS NAMED A CLOSED BLOCKER until 2026-09-18.
+#: `vix-ar1-band-not-adopted` was closed on 2026-09-15 by the design repo's
+#: `closes-vix-ar1-band-not-adopted`, on Simon's `ruling-vix-ar1-band-adopted`.
+#: The CELLS did not move, because the ruling adopted a band that never landed
+#: in these tables, so the count below is unchanged and the row count is still
+#: seven. What changed is only which entry is honestly named: a closed blocker
+#: quoted as live reads as a decision still owed to Simon, and it is not -- the
+#: work owed is the table entry. The row count moving is what the comment above
+#: is about; this edit does not move it.
 SEVEN = (
     (252, "fear_gauge_dn1", "four-level-rows-unbanded"),
     (252, "fear_gauge_dn3", "four-level-rows-unbanded"),
-    (252, "vix_ar1_debiased", "vix-ar1-band-not-adopted"),
+    (252, "vix_ar1_debiased", "vix-ar1-ruled-band-not-in-the-tables"),
     (504, "corr_persistence_acf1", "corr-persistence-504-unbanded"),
     (504, "fear_gauge_dn1", "four-level-rows-unbanded"),
     (504, "fear_gauge_dn3", "four-level-rows-unbanded"),
-    (504, "vix_ar1_debiased", "vix-ar1-band-not-adopted"),
+    (504, "vix_ar1_debiased", "vix-ar1-ruled-band-not-in-the-tables"),
 )
 
 
