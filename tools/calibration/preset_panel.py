@@ -90,6 +90,76 @@ HELDOUT_SEEDS = tuple(range(1, 31))
 #: a fifteenth statistic joins this table by being added to the envelope.
 PANEL = tuple(envelope.CERTIFIED)
 
+#: Rows this tool MEASURES AND REPORTS WITHOUT GRADING, carried BESIDE the
+#: panel and never inside it.
+#:
+#: `facts.measure` computes `vix_ar1_debiased` on every seed of every run --
+#: `persistence_statistics` at `facts.py:3925`, which is
+#: `debias_ar1(level_ar1(vix_levels(macro_table())), days)` -- and this
+#: collector threw it away, because `_job` trimmed every panel to `PANEL`.
+#: The row was already paid for in engine time and discarded at the seam.
+#:
+#: WHY IT IS NOT IN `PANEL`, and this was checked rather than assumed.
+#: `PANEL` is `envelope.CERTIFIED` and three separate things hold it there:
+#:
+#:   1. `tests/test_preset_records.py` asserts `sorted(preset_panel.PANEL)
+#:      == sorted(envelope.CERTIFIED)` outright. Widening `PANEL` fails that
+#:      test, which is the project saying the panel IS the certified roster.
+#:   2. `_count_in_band` iterates `PANEL`, and this row has NO band on any
+#:      of the three bases -- `shipped`, `universal` and `ruled` all lack it
+#:      (`facts.REAL_MARKETS`, `facts.REAL_MARKETS_UNIVERSAL`,
+#:      `facts.REAL_MARKETS_RULED` and their 504 partners). It would land in
+#:      `unreadable_252`, `unreadable_504`, `unreadable_heldout_universe`
+#:      and `unreadable_heldout_seeds` on every preset and every basis, so
+#:      four graded list fields per preset would change value.
+#:   3. `record.py` copies `panel_252` and `panel_504` verbatim into the
+#:      committed record, and `test_preset_records.py` asserts
+#:      `set(record["panel_252"]) == set(envelope.CERTIFIED)`. A fifteenth
+#:      key in the median panel makes all eighteen records need regenerating
+#:      to stay green, which is a restamp and a different change.
+#:
+#: So the row is carried in its own `reported` block. Nothing here is read
+#: by `_count_in_band`, by `envelope.certify` (which selects
+#: `facts.SHAPE`), by `_median_panel`, or by `record.py`. It is additive at
+#: every seam.
+REPORTED = (facts.VIX_AR1_ROW,)
+
+#: WHY THE REPORTED ROW CARRIES NO BAND COUNT, said in the artefact rather
+#: than left for a reader to infer from an absent field.
+#:
+#: `vix_ar1_debiased` is UNGRADED here and it is ungraded in the library
+#: too: `facts.RULED_UNREADABLE` holds it at both horizons with the reason
+#: that its band is DERIVED AND NOT ADOPTED -- `vix-ar1-band-derivation.md`
+#: section 9 names three rulings that have to land first -- and no band
+#: table this tool can grade against carries the row at all.
+#:
+#: `facts.BAND_EDGE_LIVENESS` records, separately, that the row's CEILING is
+#: dead: `debias_ar1` is bounded above by `1 + 4/n`, so at 252 no reading
+#: can reach the derived ceiling. That is the library's statement and it is
+#: reproduced into the artefact from `facts.edge_liveness`, not restated
+#: here, because a band and a one-sided rule are rulings and not fields.
+#:
+#: What the row DOES have is a tape ruler: `facts.REAL_VIX_AR1_WINDOWS`,
+#: the real windowed readings at each horizon. Those are carried beside the
+#: model's readings so a reader can compare, and no verdict is computed
+#: from the comparison.
+REPORTED_NOT_GRADED = (
+    "vix_ar1_debiased is MEASURED AND REPORTED HERE, NOT GRADED. It is not "
+    "in envelope.CERTIFIED, so it is not in PANEL, so it is in no in_band "
+    "count, no misses list, no unreadable list, no mechanism block and no "
+    "preset record. No band table this tool grades against carries the row "
+    "-- facts.REAL_MARKETS, facts.REAL_MARKETS_UNIVERSAL and "
+    "facts.REAL_MARKETS_RULED all lack it at both horizons -- and "
+    "facts.RULED_UNREADABLE records why: the band is derived and not "
+    "adopted, pending the three rulings named in "
+    "vix-ar1-band-derivation.md section 9. THERE IS NO BAND FOR THIS ROW "
+    "AND NONE IS INVENTED HERE. The block carries the real tape's windowed "
+    "readings (facts.REAL_VIX_AR1_WINDOWS) so the model's reading can be "
+    "compared by eye, and the row's edge liveness "
+    "(facts.BAND_EDGE_LIVENESS), which records that the ceiling is dead by "
+    "debias_ar1's own 1 + 4/n bound. Neither is a verdict."
+)
+
 #: WHY THIS TOOL EMITS NO INDEX TAIL FIGURE, deliberately and by ruling.
 #:
 #: `index_tail_dn3_pct` is certified on `facts.LEVEL_PROTOCOL`, where the
@@ -218,7 +288,14 @@ def _job(spec):
     # the rows were read over, and they travel with every panel because a
     # row without its window is not comparable with the same row measured
     # over a different one. See `crisis_lever_burn` below.
+    # `PANEL` is the certified row list and `REPORTED` the measured-but-
+    # ungraded one, kept apart on purpose: everything that grades, counts or
+    # records reads `PANEL`, so a reported row cannot reach a verdict by
+    # being in the same dict. `.get` on the reported rows, because a row the
+    # engine did not emit on this run must arrive as None rather than as a
+    # KeyError that kills a 190-worker pool.
     return key, preset, seed, {k: p[k] for k in PANEL} | {
+        k: p.get(k) for k in REPORTED} | {
         "days": p["days"], "burn": p["burn"]}
 
 
@@ -230,6 +307,62 @@ def _median_panel(rows: list[dict]) -> dict:
     # The WINDOW is reported separately by `_window_of`.
     return {k: facts.aggregate_value(k, [r[k] for r in rows if r.get(k) is not None])
             for k in PANEL if any(r.get(k) is not None for r in rows)}
+
+
+def _reported_panel(rows: list[dict]) -> dict:
+    """The median of the REPORTED rows for one cell, by the row's own estimator.
+
+    Deliberately a second function rather than a wider `_median_panel`.
+    `_median_panel` builds `panel_252` and `panel_504`, which `record.py`
+    copies verbatim into a committed record and `test_preset_records.py`
+    checks key-for-key against `envelope.CERTIFIED`; widening it by one key
+    would make all eighteen committed records need regenerating. This
+    output goes to a field of its own that nothing grades.
+    """
+    return {k: facts.aggregate_value(k, [r[k] for r in rows
+                                         if r.get(k) is not None])
+            for k in REPORTED if any(r.get(k) is not None for r in rows)}
+
+
+def _reported_block(cells: dict[str, list[dict]], tables: dict[int, dict]) -> dict:
+    """The ungraded rows, their real-tape ruler, and the fact that they have
+    no band, in ONE field that no count reads.
+
+    `tables` is the `{252: t252, 504: t504}` this run grades against, and it
+    is consulted so the artefact ASSERTS the absence rather than assuming
+    it: if a basis ever does carry a band for a reported row, the block says
+    so instead of silently claiming there is none.
+    """
+    out: dict = {
+        "rows": list(REPORTED),
+        "not_graded": REPORTED_NOT_GRADED,
+        "cells": {name: _reported_panel(rows) for name, rows in cells.items()},
+        "per_seed": "carried in per_seed_252 and per_seed_heldout_seeds, "
+                    "under the row's own key, beside the certified rows",
+        "band": {},
+        "real_tape": {},
+        "edge_liveness": {},
+    }
+    for row in REPORTED:
+        # THE ABSENCE, PER HORIZON, READ FROM THE TABLES THIS RUN USED.
+        out["band"][row] = {
+            str(days): (list(t[row]) if row in t else None)
+            for days, t in sorted(tables.items())
+        }
+        out["band"][row]["reason"] = {
+            str(days): facts.RULED_UNREADABLE.get(days, {}).get(row)
+            for days in sorted(tables)
+        }
+        windows = facts.REAL_VIX_AR1_WINDOWS if row == facts.VIX_AR1_ROW else {}
+        out["real_tape"][row] = {
+            str(days): {
+                "n_windows": len(vals),
+                "median": statistics.median(vals),
+                "min": min(vals), "max": max(vals),
+            } for days, vals in sorted(windows.items())
+        }
+        out["edge_liveness"][row] = facts.edge_liveness(row)
+    return out
 
 
 def _window_of(rows: list[dict]) -> tuple[int, int]:
@@ -383,6 +516,11 @@ def rescore(artefact: str, basis: str, out: str, records_dir: str) -> int:
             cell["panel_504"] = dict(rec["panel_504"])
             cell["per_seed_252"] = None
             cell["per_seed_heldout_seeds"] = None
+            # Same status as the per-seed rows: the reported block is this
+            # ARTEFACT's measurement of a preset the record was not built
+            # from, so it is dropped rather than carried under a record it
+            # does not belong to.
+            cell["reported"] = None
             cell["panel_source"] = (
                 f"the committed record {rec_path.name}, not {artefact}: no "
                 f"retained preset-panel artefact carries the measurement this "
@@ -559,6 +697,16 @@ def main() -> None:
         certhos = envelope.certify(collected[("heldout_seeds", preset)],
                                    stationary_opening=stationary)
 
+        # The measured-but-ungraded rows, from the same per-seed panels the
+        # graded ones come from. Built BEFORE the band counts and used by
+        # none of them: nothing below this line reads `reported`.
+        reported = _reported_block({
+            "panel_252": collected[("panel_252", preset)],
+            "panel_504": collected[("panel_504", preset)],
+            "heldout_universe": collected[("heldout_universe", preset)],
+            "heldout_seeds": collected[("heldout_seeds", preset)],
+        }, {252: t252, 504: t504})
+
         n252, miss252, unr252 = _count_in_band(p252, t252)
         n504, miss504, unr504 = _count_in_band(p504, t504)
         nhou, misshou, unrhou = _count_in_band(phou, t252)
@@ -591,6 +739,14 @@ def main() -> None:
             "unreadable_heldout_seeds": unrhos,
             "mechanism_252": envelope.certification_record(cert252),
             "mechanism_heldout_seeds": envelope.certification_record(certhos),
+            # MEASURED AND REPORTED, NOT GRADED. `facts.measure` computes
+            # `vix_ar1_debiased` on every seed of every run and this
+            # collector used to trim it away at `_job`. It is retained here
+            # and per seed. It is in no count, no miss list, no unreadable
+            # list, no mechanism block and no preset record; the block
+            # states in its own text that the row has no band, and does not
+            # supply one. See `REPORTED` and `REPORTED_NOT_GRADED`.
+            "reported": reported,
             # Kept so the certificate above is re-derivable from this
             # artefact alone: a count without the readings under it is an
             # assertion, and this is the file a committed record is built
@@ -625,6 +781,11 @@ def main() -> None:
               f"lever:{r['crisis_lever']:.2f}x  "
               f"mech:{mc['mechanism_shown']:2d}/{mc['mechanism_of']}  "
               f"centre:{mc['at_centre']:2d}/{mc['at_centre_of']}"
+              # Printed with an explicit UNGRADED marker, so an operator
+              # reading the console cannot take it for a panel row.
+              + "  vixar1(ungraded):"
+              + "/".join(f"{r['reported']['cells'][c].get(facts.VIX_AR1_ROW, float('nan')):.4f}"
+                         for c in ("panel_252", "panel_504"))
               + (f"  REVERSED:{','.join(r['mechanism_252']['reversed'])}"
                  if r["mechanism_252"]["reversed"] else ""), flush=True)
 
@@ -654,6 +815,7 @@ def main() -> None:
             # The basis, not only the name. See `_tables`.
             **band_stamp,
             "index_tail_not_measured": TAIL_NOT_MEASURED,
+            "reported_not_graded": REPORTED_NOT_GRADED,
             "crisis_lever": (
                 f"annualised vol at held VIX {LEVER_HI:.0f} over held VIX "
                 f"{LEVER_LO:.0f}, certified roster, 252 days, thirty seeds, "
