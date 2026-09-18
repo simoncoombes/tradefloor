@@ -430,18 +430,8 @@ PERTURBATIONS = [
     # does not land on pt-v18, which differs in three further dials.
     # Measured: the derived anchor goes 20.8139 to 15.9843 and the VIX 22.02
     # to 15.40, nine columns and 2.3e-1 of a price at the widest name.
-    # PAIRED, and it has to be. `market_vol_vix_excursion` reads the VIX's
-    # distance above the level the index's own variance implies, and off the
-    # identity there is no such level, so the pair is a universal invariant
-    # that `ModelParams.from_preset` now refuses -- with no hatch, because no
-    # reading taken on that configuration means anything (see
-    # `ModelParams::invariants`). The default runs the excursion, so turning
-    # the identity off ALONE is the refused configuration and this row could
-    # no longer be single-dial. It turns both off, which is the consistent
-    # arm; the sectorbisect run measured the two within 0.0008 of each other
-    # on `sector_excess_corr` with overlapping intervals, so the pairing
-    # costs this probe nothing it was reading.
-    ("vix_level_identity", 0.0, True, {"market_vol_vix_excursion": 0.0}),
+    # PAIRED with `market_vol_vix_excursion` -> 0.0; see `COMPANIONS` below.
+    ("vix_level_identity", 0.0, True),
     # LIVE UNDER THE IDENTITY, and the old reason -- "the branch that reads
     # it is not taken" -- is now the exact opposite of the truth. The premium
     # is read at BOTH identity sites, the anchor derived at construction and
@@ -998,21 +988,33 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
     # maintains, and reported the mismatch as a MISSING PARAMETER -- a
     # different and much more alarming fact than the one that was true.
     # This test is about coverage, so it compares sets in a stable order.
-    assert sorted(row[0] for row in PERTURBATIONS) == \
+    assert sorted(name for name, _, _ in PERTURBATIONS) == \
         sorted(tradefloor.ModelParams.settable())
 
 
-#: `(name, value, moves)` normalised to `(name, value, moves, companions)`.
-#: A companion is a SECOND dial the row must move with the first, and there
-#: is exactly one: the excursion/identity pair, which is a universal
-#: invariant rather than a per-preset claim and therefore has no hatch.
-_PERTURBATIONS = [(row + ({},))[:4] for row in PERTURBATIONS]
+#: A SECOND dial a row has to move with the first, because the pair is a
+#: universal invariant rather than a per-preset claim and therefore has no
+#: hatch. Exactly one entry, and it is kept OUT of `PERTURBATIONS` so that
+#: table stays uniform 3-tuples: `test_earnings_nominal_growth.py` unpacks it.
+COMPANIONS: dict[str, dict[str, float]] = {
+    # `market_vol_vix_excursion` reads the VIX's distance above the level the
+    # index's own variance implies, and off `vix_level_identity` there is no
+    # such level, so `ModelParams.from_preset` refuses the pair -- with no
+    # hatch, because no reading taken on that configuration means anything
+    # (see `ModelParams::invariants`). The default runs the excursion, so
+    # turning the identity off ALONE is the refused configuration and that row
+    # can no longer be single-dial. It turns both off, which is the consistent
+    # arm; the sectorbisect run measured the two within 0.0008 of each other
+    # on `sector_excess_corr` with overlapping intervals, so the pairing costs
+    # this probe nothing it was reading.
+    "vix_level_identity": {"market_vol_vix_excursion": 0.0},
+}
 
 
-@pytest.mark.parametrize("name,value,moves,companions", _PERTURBATIONS,
+@pytest.mark.parametrize("name,value,moves", PERTURBATIONS,
                          ids=[p[0] for p in PERTURBATIONS])
 def test_each_settable_parameter_moves_the_market_or_names_why_not(
-        name, value, moves, companions):
+        name, value, moves):
     """The stale-wheel counterproof, per parameter — and the CRN guard: the
     trajectory moves (or is inert for the documented reason) while the draw
     count NEVER does. A parameter that changed `draws_consumed` would have
@@ -1038,7 +1040,7 @@ def test_each_settable_parameter_moves_the_market_or_names_why_not(
     # The universal invariant is NOT waived and cannot be; the one row that
     # would have tripped it carries its companion dial instead.
     custom = tradefloor.ModelParams.from_preset_unchecked(
-        **{name: value}, **companions)
+        **{name: value}, **COMPANIONS.get(name, {}))
     assert custom.fingerprint.startswith("custom-")
     perturbed = market_state(run_market(custom))
 
