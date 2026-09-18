@@ -67,15 +67,28 @@ def main() -> None:
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
+    # `all` and `searched9` are SETS, and a set that contains a derived dial
+    # contains a column that measures an identity being broken. They are
+    # filtered; an explicit comma list is not, because a caller naming a dial
+    # has said which dial they mean -- the engine's own refusal is what stops
+    # them building an inconsistent vector by accident.
     if args.params == "all":
-        params = list(lib.PARAM_SPECS)
+        params = lib.searchable(lib.PARAM_SPECS)
     elif args.params == "searched9":
-        params = list(lib.SEARCHED_9)
+        params = lib.searchable(lib.SEARCHED_9)
     else:
         params = [p for p in args.params.split(",") if p]
         unknown = [p for p in params if p not in lib.PARAM_SPECS]
         if unknown:
             raise SystemExit(f"not settable parameters: {unknown}")
+    dropped = [p for p in (list(lib.PARAM_SPECS) if args.params == "all"
+                           else list(lib.SEARCHED_9) if args.params == "searched9"
+                           else [])
+               if p in lib.DERIVED_DIALS]
+    if dropped:
+        print(f"skipping {len(dropped)} derived dials: {', '.join(dropped)}. "
+              f"Their values follow from an identity (provenance.py), so a "
+              f"secant on one measures the identity breaking.", flush=True)
 
     seeds = parse_seeds(args.seeds)
     base = dict(lib.LEGACY_OVERRIDES) if args.base == "legacy" else {}

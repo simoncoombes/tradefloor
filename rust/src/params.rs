@@ -5787,6 +5787,221 @@ impl ModelParams {
         }
         format!("custom-{}", &digest[..8])
     }
+
+    // ── The identities the vector states and nothing checked ──────────────
+    //
+    // `provenance.py` marks twenty dials `derived`. Exactly two of them are
+    // CLOSED FORMS over other fields of this struct -- `vix_target_shock_cap`
+    // and `vix_return_level_exponent` -- so exactly two can be checked by
+    // arithmetic on a `ModelParams` alone. Seven more are derived by a rule
+    // from something the vector does not carry (a tape constant, a fit, a
+    // burn-in path, a simulated pin ladder; `vix_ceiling` is one of THOSE and
+    // is a lower bound solved at tolerance 8.64, not a closed form). Eleven
+    // are switches whose identity is the value.
+    //
+    // Two things are enforced here and they are different in kind:
+    //
+    //  - `invariants` is UNIVERSAL. It holds on all eighteen shipped presets
+    //    today and a vector that breaks it is refused with no hatch, because
+    //    no reading taken on such a vector means anything.
+    //  - `claimed_inconsistencies` is PER PRESET. The cap identity is a
+    //    property of pt-v19 and not of the type: pt-v1 to pt-v8 ship a cap of
+    //    12.0 against an image of 0.75 and pt-v9 to pt-v18 ship 45.0 against
+    //    255.0, because those presets carried the cap as a DECLARED shape
+    //    parameter. An unconditional assertion would refuse seventeen shipped
+    //    presets, so the claim is owned by the preset that makes it.
+    //
+    // Neither recomputes anything. The cap's literal 158.8524 is a rounding
+    // UP of 158.85236 and the rounding direction is what makes the cap
+    // strictly inert; a recomputed field would carry 158.852360999924 and
+    // every pt-v19 digest would move. Nothing below touches a field, so
+    // `to_pairs`, `digest` and `fingerprint` are untouched by construction.
+
+    /// The invariants EVERY vector must satisfy, whatever preset it came
+    /// from. `Ok(())`, or the reason it is refused.
+    ///
+    /// One member today. `market_vol_vix_excursion` is an excursion above the
+    /// level the index's own conditional variance implies, and off
+    /// `vix_level_identity` there IS no such level: `engine.rs`'s branch at
+    /// nonzero excursion divides by `vix_from_variance(premium, index
+    /// variance)` whether or not the identity is on, while `derive_vix_anchor`
+    /// returns the dial `market_vol_vix_anchor` when the identity is off. The
+    /// pair then runs a ratio whose numerator is anchored to one scale and
+    /// whose denominator is a read-back on another, silently.
+    ///
+    /// Pure; allocates only on the failure path.
+    pub fn invariants(&self) -> Result<(), String> {
+        if self.market_vol_vix_excursion != 0.0 && self.vix_level_identity == 0.0 {
+            return Err(format!(
+                "market_vol_vix_excursion is {} but vix_level_identity is 0. The \
+                 excursion reads the VIX's distance ABOVE the level the index's own \
+                 conditional variance implies, and off the identity there is no such \
+                 level: the ratio's denominator is the variance read-back while its \
+                 numerator is anchored to `market_vol_vix_anchor`, so the ratio means \
+                 something else and no band would catch it. Set vix_level_identity to \
+                 1.0, or set market_vol_vix_excursion to 0.0. There is no override for \
+                 this one.",
+                self.market_vol_vix_excursion
+            ));
+        }
+        Ok(())
+    }
+
+    /// The claims in `claims` evaluated on THIS vector: the ones that fail,
+    /// in the order given. Empty is consistent.
+    ///
+    /// Pure, and `Vec::new()` does not allocate, so the success path is two
+    /// or three `f64` comparisons and nothing else.
+    pub fn claimed_inconsistencies(&self, claims: &[Claim]) -> Vec<Inconsistency> {
+        let mut out: Vec<Inconsistency> = Vec::new();
+        for claim in claims {
+            let expected = (claim.expected)(self);
+            let actual = self.get(claim.dial).unwrap_or(f64::NAN);
+            if !((actual - expected).abs() <= claim.tolerance) {
+                out.push(Inconsistency {
+                    dial: claim.dial,
+                    identity: claim.identity,
+                    expected,
+                    actual,
+                    tolerance: claim.tolerance,
+                    claimed_by: claim.claimed_by,
+                });
+            }
+        }
+        out
+    }
+}
+
+/// The VIX state floor, the lower arm of the `clamp` in
+/// `update_economy_daily` (`economy/daily.rs`, the `new_state.vix = clamp(..,
+/// 10.0, inputs.vix_ceiling)` call). The down spike falls with the level, so
+/// its supremum over the domain the update admits is attained HERE, and the
+/// cap's identity is evaluated at this level. A literal in both places; the
+/// `economy::daily` test `the_default_cap_is_the_clamps_own_image` pins it
+/// against the update itself rather than against either comment.
+pub const VIX_STATE_FLOOR: f64 = 10.0;
+
+/// An identity a named preset claims about one of its own dials, evaluable
+/// on a `ModelParams` and on nothing else.
+///
+/// `expected` is a plain `fn` rather than a closure so the claim tables can
+/// be `'static`. It reads only fields of the vector handed to it.
+pub struct Claim {
+    /// The dial the identity determines.
+    pub dial: &'static str,
+    /// The identity in words, for the refusal message and for the arm record.
+    pub identity: &'static str,
+    /// Absolute tolerance on `|actual - expected|`.
+    pub tolerance: f64,
+    /// The preset that makes this claim.
+    pub claimed_by: &'static str,
+    /// The identity, evaluated.
+    pub expected: fn(&ModelParams) -> f64,
+}
+
+/// One claim that did not hold, with both sides of it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Inconsistency {
+    pub dial: &'static str,
+    pub identity: &'static str,
+    pub expected: f64,
+    pub actual: f64,
+    pub tolerance: f64,
+    pub claimed_by: &'static str,
+}
+
+impl std::fmt::Display for Inconsistency {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} is {} where {} claims {} ({}), a gap of {} against a tolerance of {}",
+            self.dial,
+            self.actual,
+            self.claimed_by,
+            self.expected,
+            self.identity,
+            (self.actual - self.expected).abs(),
+            self.tolerance
+        )
+    }
+}
+
+/// The down spike's supremum: `gain * clamp^p * floor^-g`, evaluated at the
+/// VIX state floor. `mathx::pow`, so the arithmetic is the engine's own.
+fn cap_image(p: &ModelParams) -> f64 {
+    p.vix_return_gain
+        * crate::mathx::pow(p.vix_return_clamp, p.vix_return_exponent)
+        * crate::mathx::pow(VIX_STATE_FLOOR, -p.vix_return_level_exponent)
+}
+
+/// `p - 1`: the standardised down law's level exponent is not free.
+fn level_exponent_image(p: &ModelParams) -> f64 {
+    p.vix_return_exponent - 1.0
+}
+
+/// The tape's per-name |r| autocorrelation decay rate, the six-window mean
+/// measured in `vix-dynamics.md` 15.2 (sd 0.024). It is not a field of
+/// `ModelParams` and cannot be, so the claim carries it as the constant it
+/// is -- which is the whole reason `garch_beta` needs a claim table rather
+/// than a universal assertion.
+const PER_NAME_DECAY_RHO: f64 = 0.9416;
+
+/// `rho - alpha - gamma/2`: the GJR first-moment persistence identity solved
+/// for beta at the shipped alpha and gamma. The half in front of gamma is the
+/// indicator's unconditional share.
+fn garch_beta_image(p: &ModelParams) -> f64 {
+    PER_NAME_DECAY_RHO - p.garch_alpha - p.garch_gamma / 2.0
+}
+
+/// pt-v19's claims. Three: the two closed forms, plus `garch_beta` with the
+/// tape constant recorded beside it.
+///
+/// Tolerances. The cap's 1e-3 is the one
+/// `economy::daily::tests::the_default_cap_is_the_clamps_own_image` already
+/// uses, and the shipped gap is 3.9e-5 -- the literal's own rounding. The
+/// level exponent's 1e-9 is far outside the shipped gap of 5.6e-17 and far
+/// inside any move a search would make. `garch_beta`'s 1e-4 holds the
+/// four-place rounding whose gap is 1.07e-7.
+static PT_V19_CLAIMS: &[Claim] = &[
+    Claim {
+        dial: "vix_target_shock_cap",
+        identity: "vix_return_gain * vix_return_clamp ** vix_return_exponent \
+                   * 10 ** -vix_return_level_exponent, the down spike's supremum \
+                   at the VIX state floor",
+        tolerance: 1e-3,
+        claimed_by: "pt-v19",
+        expected: cap_image,
+    },
+    Claim {
+        dial: "vix_return_level_exponent",
+        identity: "vix_return_exponent - 1, the standardised down law",
+        tolerance: 1e-9,
+        claimed_by: "pt-v19",
+        expected: level_exponent_image,
+    },
+    Claim {
+        dial: "garch_beta",
+        identity: "0.9416 - garch_alpha - garch_gamma / 2, the GJR persistence \
+                   identity at the tape's per-name decay rate",
+        tolerance: 1e-4,
+        claimed_by: "pt-v19",
+        expected: garch_beta_image,
+    },
+];
+
+/// Nothing is claimed by the other seventeen. pt-v1 to pt-v8 ship the cap at
+/// 12.0 against an image of 0.75 and pt-v9 to pt-v18 at 45.0 against 255.0;
+/// they carried it as a declared shape parameter and are not wrong, they are
+/// a different model. `garch_beta` moved with the tape only at pt-v19.
+static NO_CLAIMS: &[Claim] = &[];
+
+/// The identities `preset` claims about its own dials. Empty for a name that
+/// claims nothing, including an unknown one.
+pub fn claims_of(preset: &str) -> &'static [Claim] {
+    match preset {
+        "pt-v19" => PT_V19_CLAIMS,
+        _ => NO_CLAIMS,
+    }
 }
 
 /// The settable names, sorted. A function rather than the const above so
@@ -6086,19 +6301,125 @@ mod tests {
     ///
     /// Asserted over every shipped preset rather than over pt-v19 alone,
     /// because the mistake this prevents is a FUTURE preset's.
+    ///
+    /// It asks `ModelParams::invariants` rather than spelling the condition
+    /// again, so the eighteen constants and every vector Python constructs
+    /// are judged by ONE predicate. The test used to carry its own copy, and
+    /// a copy is how the runtime and the test suite come to disagree.
     #[test]
     fn the_excursion_switch_requires_the_identity() {
         for name in ModelParams::preset_names() {
             let p = ModelParams::preset(name).expect("a name from preset_names resolves");
-            if p.market_vol_vix_excursion != 0.0 {
-                assert!(
-                    p.vix_level_identity != 0.0,
-                    "{name} reads the VIX's EXCURSION into the factor's variance target \
-                     but does not run `vix_level_identity`, so there is no read-back for \
-                     the excursion to be above. See \
-                     `ModelParams::market_vol_vix_excursion`."
-                );
-            }
+            assert!(
+                p.invariants().is_ok(),
+                "{name}: {}",
+                p.invariants().unwrap_err()
+            );
+        }
+        // And the predicate is not vacuous: the configuration it exists to
+        // refuse is refused.
+        let broken = ModelParams::preset("pt-v19")
+            .expect("shipped")
+            .with_override("vix_level_identity", 0.0)
+            .expect("settable");
+        assert!(broken.invariants().is_err());
+    }
+
+    /// Every shipped preset satisfies the identities IT claims. pt-v19 is
+    /// the only one that claims any; the other seventeen claim nothing, and
+    /// that is the point -- pt-v9 through pt-v18 ship the cap at 45.0
+    /// against an image of 255.0, so an unconditional assertion would refuse
+    /// them.
+    #[test]
+    fn every_preset_satisfies_the_identities_it_claims() {
+        for name in ModelParams::preset_names() {
+            let p = ModelParams::preset(name).expect("a name from preset_names resolves");
+            let bad = p.claimed_inconsistencies(claims_of(name));
+            assert!(
+                bad.is_empty(),
+                "{name} breaks its own claim: {}",
+                bad.iter().map(|i| i.to_string()).collect::<Vec<_>>().join("; ")
+            );
+        }
+        // pt-v19 claims three and they are the three this note derives.
+        assert_eq!(claims_of("pt-v19").len(), 3);
+        assert_eq!(claims_of("pt-v18").len(), 0);
+        assert_eq!(claims_of("no-such-preset").len(), 0);
+    }
+
+    /// The claims are not vacuous either, and the two closed forms catch the
+    /// two mistakes the record actually contains.
+    #[test]
+    fn a_cap_off_its_image_is_an_undeclared_shape_parameter() {
+        let base = ModelParams::preset("pt-v19").expect("shipped");
+
+        // `A5caps` and `A7noident`: the cap set to the round number pt-v18
+        // carried, under pt-v19's law.
+        let cap45 = base.with_override("vix_target_shock_cap", 45.0).expect("settable");
+        let bad = cap45.claimed_inconsistencies(claims_of("pt-v19"));
+        assert_eq!(bad.len(), 1);
+        assert_eq!(bad[0].dial, "vix_target_shock_cap");
+        assert_eq!(bad[0].actual, 45.0);
+
+        // `A2retdn`: the down law reverted to the level-blind form and the
+        // cap left where pt-v19 put it. The image is then 255.0 and the
+        // shipped 158.8524 is 96 points UNDER the supremum, so it truncates
+        // sessions the clamp admits -- a shape parameter the arm did not
+        // declare. The level-exponent claim still holds (g = p - 1 = 0), so
+        // the cap is the only thing wrong and the check says so.
+        let retdn = base
+            .with_override("vix_return_gain", 17.0)
+            .expect("settable")
+            .with_override("vix_return_exponent", 1.0)
+            .expect("settable")
+            .with_override("vix_return_level_exponent", 0.0)
+            .expect("settable");
+        let bad = retdn.claimed_inconsistencies(claims_of("pt-v19"));
+        assert_eq!(bad.len(), 1);
+        assert_eq!(bad[0].dial, "vix_target_shock_cap");
+        assert!((bad[0].expected - 255.0).abs() < 1e-9, "image is {}", bad[0].expected);
+        assert_eq!(bad[0].actual, 158.8524);
+
+        // The exponent claim on its own: a search that moved `p` alone off a
+        // level-blind base, which is what the wsa16-era arms did.
+        let p_alone = base.with_override("vix_return_exponent", 1.2).expect("settable");
+        let dials: Vec<&str> = p_alone
+            .claimed_inconsistencies(claims_of("pt-v19"))
+            .iter()
+            .map(|i| i.dial)
+            .collect();
+        assert!(dials.contains(&"vix_return_level_exponent"), "{dials:?}");
+
+        // And `garch_beta`, the class-B dial with its tape constant recorded
+        // in the claim rather than pretended to be a field.
+        let gb = base.with_override("garch_beta", 0.7).expect("settable");
+        let dials: Vec<&str> = gb
+            .claimed_inconsistencies(claims_of("pt-v19"))
+            .iter()
+            .map(|i| i.dial)
+            .collect();
+        assert_eq!(dials, vec!["garch_beta"]);
+        // ... and the same override on pt-v1, which claims nothing, is fine.
+        // `tests/test_model_params.py` does exactly this.
+        let v1 = ModelParams::preset("pt-v1")
+            .expect("shipped")
+            .with_override("garch_beta", 0.7)
+            .expect("settable");
+        assert!(v1.claimed_inconsistencies(claims_of("pt-v1")).is_empty());
+    }
+
+    /// Nothing above writes a field. The proof that the shipped line cannot
+    /// move is that the digest of every preset is the same before and after
+    /// the predicates run on it.
+    #[test]
+    fn checking_a_vector_does_not_change_it() {
+        for name in ModelParams::preset_names() {
+            let p = ModelParams::preset(name).expect("shipped");
+            let before = p.digest();
+            let _ = p.invariants();
+            let _ = p.claimed_inconsistencies(claims_of(name));
+            assert_eq!(p.digest(), before);
+            assert_eq!(p.fingerprint(), name.to_string());
         }
     }
 
