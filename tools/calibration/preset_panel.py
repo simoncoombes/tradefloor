@@ -672,6 +672,10 @@ def main() -> None:
     }
 
     results = {}
+    # The realised vector of every preset measured, filled in the loop below
+    # off the build that ran and written into the header. See `model_vectors`
+    # where `out` is assembled.
+    vectors: dict[str, dict] = {}
     for preset in names:
         p252 = _median_panel(collected[("panel_252", preset)])
         p504 = _median_panel(collected[("panel_504", preset)])
@@ -694,8 +698,9 @@ def main() -> None:
         # back None (`TAIL_NOT_MEASURED`); it is passed so that the day this
         # tool grows a level-protocol arm, the block it produces is counted
         # or not counted on the run's own opening rather than on a default.
-        stationary = bool(tradefloor.ModelParams.from_preset(preset)
-                          .to_dict().get("cycle_stationary_opening", 0.0))
+        vector = tradefloor.ModelParams.from_preset(preset).to_dict()
+        vectors[preset] = vector
+        stationary = bool(vector.get("cycle_stationary_opening", 0.0))
         cert252 = envelope.certify(collected[("panel_252", preset)],
                                    stationary_opening=stationary)
         certhos = envelope.certify(collected[("heldout_seeds", preset)],
@@ -808,6 +813,27 @@ def main() -> None:
         # preset the envelope still described rather than the one measured.
         "default_preset": tradefloor.model_preset()["name"],
         "envelope_preset": envelope.PRESET,
+        # THE VECTOR of every preset measured, not only its name. A preset
+        # name identifies a model only within one build:
+        # `ModelParams.fingerprint` returns a shipped preset's name whenever
+        # the vector is bit-equal to THIS BUILD's preset of that name, so two
+        # artefacts both headed "pt-v19" can be two models and the two fields
+        # above cannot tell a reader so. Neither can `commit`: a dial arm is
+        # routinely a committed base plus an uncommitted edit to `params.rs`,
+        # and five such arms have shared one stamp while being five models.
+        #
+        # The PAIRS and not a digest. 178 keys, 6,231 bytes of this file's
+        # JSON per preset (MEASURED, pt-v19 at `--seeds 2`, 17 per cent of
+        # the artefact and falling as seeds rise). A digest says only
+        # "different", and a dial arm is MEANT to differ -- only the pairs
+        # say WHICH dial, which is what a reader needs before quoting a
+        # number out of a cell.
+        #
+        # Read off `ModelParams.from_preset` on the build this process
+        # loaded, and the same object the run read `cycle_stationary_opening`
+        # from, for HARNESS-NOTES.md item 2's reason: a header field that is
+        # stamped rather than measured misattributes its own build.
+        "model_vectors": vectors,
         "wall_s": time.time() - started,
         "workers": args.workers,
         "panel": list(PANEL),

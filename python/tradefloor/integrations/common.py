@@ -1203,6 +1203,17 @@ def stamp_artefact(meta: dict[str, Any]) -> None:
     Set only if absent, so re-saving a loaded transcript keeps the time it
     was RECORDED rather than the time it was last written.
 
+    NO VECTOR HERE, although :data:`PRESET_VECTOR_KEY` is what actually
+    separates two models sharing a name. The name written here is a GUESS --
+    the paragraph below says so -- and a guess costs one word. A 178-key
+    vector is not a guess-shaped thing: written here it would say "this
+    recording ran these values" of a transcript that met no engine, and a
+    re-saved pre-0.8.0 fixture would then carry today's vector as if it had
+    run it and PASS :func:`_refuse_a_moved_vector` on the next era boundary.
+    That is worse than the honest gap. The vector is stamped by
+    :func:`stamp_preset`, off the engine the observation carries, which is
+    the only writer in this package that knows.
+
     WHICH MARKET, for the same reason and with the same rule. A replay key
     is a digest of the exact observation the model was sent, and every
     price in that observation comes out of the preset -- so a recording
@@ -1233,6 +1244,109 @@ def stamp_artefact(meta: dict[str, Any]) -> None:
         datetime.datetime.now(datetime.timezone.utc)
         .replace(microsecond=0).isoformat())
     meta.setdefault("model_preset", ModelParams.from_preset().fingerprint)
+
+
+#: Where a recording keeps the realised parameter vector, beside the name.
+#:
+#: A name is not a model. :meth:`ModelParams.fingerprint` returns a shipped
+#: preset's name whenever the vector is bit-equal to THIS BUILD's preset of
+#: that name, so it is self-referential: the five fixtures recorded at
+#: ``d8e0709`` and a run today both say ``"pt-v19"`` across 131 settable
+#: dials and 148 (MEASURED). The vector is the only field that separates
+#: them.
+#:
+#: The PAIRS and not a digest. ``to_dict()`` as it stands: the 177 pairs
+#: ``digest()`` hashes plus ``name``, 178 keys and 5,656 bytes of JSON
+#: (MEASURED, pt-v19). The name rides along as a label and is never part of
+#: the comparison, exactly as ``digest()`` leaves it out. A digest can only
+#: say "different", and a recording made to exercise a moved dial is MEANT
+#: to differ; only the pairs say WHICH dial moved, which is the whole of
+#: what a reader needs at step 0.
+PRESET_VECTOR_KEY = "model_preset_vector"
+
+#: The frozen preset against which a key nobody set is judged inert.
+#:
+#: ``pt-v1`` is frozen at ``params.rs:5315`` and every era boundary
+#: re-measures pt-v1 through pt-v18 for bit-identity, so its value for a
+#: dial IS what that dial means when a recording never mentioned it. That
+#: makes it the one definition of inert this engine already tests, rather
+#: than a second table somebody would have to keep true.
+INERT_PRESET = "pt-v1"
+
+
+def vector_of(obs: Any) -> dict[str, Any] | None:
+    """The realised parameter vector of ``obs``'s market, or None.
+
+    Off the engine the observation carries, for the reason
+    :func:`preset_of` reads the fingerprint there: an adapter is built
+    before any market exists and is handed one observation at a time, so
+    the observation is the only object in the replay path that knows.
+
+    None where :func:`preset_of` is None, and for the same reason and with
+    the same consequence: "cannot know", never "mismatch".
+    """
+    params = getattr(getattr(obs, "engine", None), "model_params", None)
+    if params is None:
+        return None
+    try:
+        return {str(key): value for key, value in dict(params).items()}
+    except (TypeError, ValueError):
+        return None
+
+
+def moved_dials(recorded: dict[str, Any],
+                running: dict[str, Any],
+                inert: dict[str, Any] | None = None,
+                ) -> tuple[list[str], list[str], list[str]]:
+    """Which dials separate two vectors: the era rule plus the one test.
+
+    ``RunManifest._check_era`` compares the INTERSECTION, so a key only one
+    side carries is bookkeeping. That is right for the case it was written
+    for -- an old manifest holding the legacy nine-coefficient dict -- and
+    wrong for the case that actually happened, where a build GAINS dials and
+    every one of them is waved through. Seventeen settable dials arrived
+    between ``d8e0709`` and ``38f2c43``, 131 to 148 (MEASURED), and under the
+    intersection rule a recording made before them cannot notice any of them.
+
+    So a key the build carries and the record does not is bookkeeping IFF the
+    build's value for it equals ``pt-v1``'s. A dial that was added switched
+    off is genuinely absent from the recorded model; a dial that was added
+    carrying a value is a model the recording never ran. Measured on those
+    seventeen at ``pt-v19``: four are inert and THIRTEEN are live, among them
+    ``market_vol_level_sigma`` 0.085 and ``jump_idio_excitation`` 2.0.
+
+    A key the RECORD carries and the build does not is returned separately
+    and never refused. The build cannot evaluate it -- ``pt-v1`` does not
+    carry it either, so there is no inert value to compare against -- and a
+    refusal on a fact this side cannot test is the guard-on-absence-of-
+    evidence shape :func:`refuse_a_changed_preset` already declines to take.
+    It is named instead, because an undeclared key is exactly what the six
+    joint-t arms carry (``market_vol_shock_dof`` 7.0) and a reader who is
+    told can go and look.
+
+    ``inert`` absent or unreadable means the test cannot run, and then every
+    missing key falls back to bookkeeping -- the behaviour that shipped. A
+    check that cannot run must not refuse. The same holds for a key ``pt-v1``
+    itself does not carry, which cannot arise on the call site here (both
+    sides come off one build and every preset on a build carries one keyset,
+    MEASURED: pt-v1 and pt-v19 carry the same 178 keys) and does arise for a
+    caller comparing two builds.
+
+    :returns: ``(disagreeing, live, undeclared)``, each sorted.
+    """
+    if inert is None:
+        try:
+            inert = ModelParams.from_preset(INERT_PRESET).to_dict()
+        except ValidationError:          # pragma: no cover - frozen preset
+            inert = {}
+    recorded = {k: v for k, v in recorded.items() if k != "name"}
+    running = {k: v for k, v in running.items() if k != "name"}
+    disagreeing = sorted(key for key in set(recorded) & set(running)
+                         if recorded[key] != running[key])
+    live = sorted(key for key in set(running) - set(recorded)
+                  if key in inert and running[key] != inert[key])
+    undeclared = sorted(set(recorded) - set(running))
+    return disagreeing, live, undeclared
 
 
 def preset_of(obs: Any) -> str | None:
@@ -1280,6 +1394,14 @@ def stamp_preset(recorder: "Transcript | None", obs: Any) -> None:
     preset = preset_of(obs)
     if preset:
         recorder.meta.setdefault("model_preset", preset)
+    # The vector beside the name, under the same `setdefault` and for a
+    # stronger version of the same reason. The name is what the engine
+    # thinks this vector is CALLED on the build that ran it, and that name
+    # is a function of the build; the vector is the model. Both, because a
+    # reader wants to be told "pt-v19" and a check wants the pairs.
+    vector = vector_of(obs)
+    if vector:
+        recorder.meta.setdefault(PRESET_VECTOR_KEY, vector)
 
 
 def refuse_a_changed_preset(transcript: "Transcript | None",
@@ -1310,6 +1432,11 @@ def refuse_a_changed_preset(transcript: "Transcript | None",
     carry on -- turning a replay against the wrong market into an agent that
     refused every decision, completed, and published that. ``ReplayMiss``
     exists for precisely that distinction and World re-raises it.
+
+    The name is half of "same market" and the weaker half; the other half
+    is :func:`_refuse_a_moved_vector` below, which runs from here once the
+    names agree and compares the recorded parameter vector against the one
+    this build cuts under that name. That is the half that fired.
 
     A transcript with NO ``model_preset`` is warned about and allowed
     through. Every recording made before 0.8.0 is in that state, and
@@ -1344,6 +1471,89 @@ def refuse_a_changed_preset(transcript: "Transcript | None",
             f"{recorded} -- World(..., model={recorded!r}) or "
             f"evaluate(..., model={recorded!r}) -- or re-record the run "
             "live against the market you are running now.")
+    _refuse_a_moved_vector(transcript, preset)
+
+
+def _refuse_a_moved_vector(transcript: "Transcript", preset: str) -> None:
+    """Refuse a replay whose preset kept its NAME and moved its values.
+
+    The half of "same market" that the name cannot check, and the half that
+    actually fired. Moving the default from pt-v18 to pt-v19 was caught by
+    the name; re-cutting pt-v19 itself was not, because
+    :meth:`ModelParams.fingerprint` returns a shipped preset's name whenever
+    the vector is bit-equal to THIS BUILD's preset of that name. The five
+    fixtures recorded at ``d8e0709`` and a run at ``38f2c43`` both call
+    themselves ``pt-v19`` over a vector that moved ``vix_ceiling`` 108.63 to
+    181.3295 and gained seventeen settable dials, so the check above compares
+    a string to itself and passes.
+
+    Only ever reached with a RECORDED vector, which is what keeps this at
+    zero refusals of pt-v1 through pt-v18. A shipped preset is not a
+    recording and records nothing by itself; every fixture written before
+    this field existed carries no vector and is not checked here at all --
+    the same call the name check makes for a recording that carries no
+    preset. Nothing in the tree can be refused by adding the field; only a
+    recording made after it can, and only when its own values moved.
+
+    The BUILD side is reconstructed from the name rather than passed in, so
+    no adapter call site changes. That is exactly as strong: the name is
+    checked bit-for-bit above, so by the time this runs the two sides agree
+    on it, and a custom preset -- whose name IS the first eight hex of its
+    own digest -- has already been separated by that check. A name this
+    build does not ship cannot be reconstructed and is not guessed at.
+    """
+    recorded_vector = (transcript.meta or {}).get(PRESET_VECTOR_KEY)
+    if not isinstance(recorded_vector, dict) or not recorded_vector:
+        return
+    try:
+        running_vector = ModelParams.from_preset(preset).to_dict()
+    except ValidationError:
+        # A custom preset, or one this build does not ship. `custom-XXXXXXXX`
+        # is eight hex of the vector's own digest, so a moved vector has
+        # already moved the name and been refused above.
+        return
+    disagreeing, live, undeclared = moved_dials(recorded_vector,
+                                                running_vector)
+    if not disagreeing and not live:
+        if undeclared:
+            warnings.warn(
+                f"this transcript's recorded {preset} carries "
+                f"{len(undeclared)} parameter(s) this build does not: "
+                f"{', '.join(undeclared)}. The build has no value to compare "
+                "them against -- pt-v1 does not carry them either -- so this "
+                "cannot be checked and the replay is going ahead. A retired "
+                "dial that was doing work in the recording would look "
+                "exactly like this.", stacklevel=3)
+        return
+
+    def _detail(keys: Sequence[str]) -> str:
+        return "; ".join(
+            f"{key}: recorded {recorded_vector.get(key)!r}, "
+            f"build {running_vector.get(key)!r}" for key in keys)
+
+    parts = []
+    if disagreeing:
+        parts.append(f"{len(disagreeing)} moved -- {_detail(disagreeing)}")
+    if live:
+        parts.append(
+            f"{len(live)} added carrying a value this recording never ran, "
+            "each of them different from pt-v1's and so not bookkeeping -- "
+            + "; ".join(f"{key}: build {running_vector.get(key)!r}"
+                        for key in live))
+    if undeclared:
+        parts.append(
+            f"{len(undeclared)} recorded but unknown to this build -- "
+            f"{', '.join(undeclared)} (not checkable here, reported)")
+    raise ReplayMiss(
+        f"this transcript was recorded against a different {preset} from the "
+        f"one this build ships: {'; '.join(parts)}. Same name, different "
+        "model -- a preset name identifies a model only within one build, so "
+        "the name check above cannot see this. Every price the model was "
+        "sent descends from these values, so every recorded key would miss "
+        "and the run would refuse at step 0 naming a digest rather than "
+        "these dials. Re-record the run live against the market you are "
+        "running now, or replay on the build that cut this vector."
+    )
 
 
 def replay_response(transcript: Transcript, key: str, *, step: int,
