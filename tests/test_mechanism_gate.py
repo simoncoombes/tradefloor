@@ -30,7 +30,9 @@ re-derivation at a different draw count and seed, not to themselves.
 
 from __future__ import annotations
 
+import json
 import math
+import pathlib
 import random
 import statistics
 
@@ -837,3 +839,325 @@ def test_a_panel_without_the_counts_gets_no_tail_block_rather_than_a_guess():
     assert envelope.certification_record(result)["tail"] is None
     # And the certificate still renders.
     assert "certification:" in envelope.certification_report(result)
+
+
+# --------------------------------------------------------------------------
+# THE SHIP BAR. The count has been published on every record since the gate
+# was built and NOTHING REFUSED ON IT: `certify` computed it, `record.py`
+# wrote it, `preset_panel.py` printed it, and the release bar read the
+# in-band count alone. That is the `vixlaw-ruling` shape one storey down --
+# a measurement that justified a decision and then existed in no scorer.
+#
+# `envelope.mechanism_bar` is the refusal, and the rule is Simon's: SUBSET
+# FORM. A preset's `not_shown` must be a subset of the set its own committed
+# record carries -- more mechanisms than the record, never fewer, and never a
+# DIFFERENT one at the same count. Every test below constructs the input that
+# should fail it, which is what `DECISIONS` requires of a gate.
+# --------------------------------------------------------------------------
+
+RECORDS = (pathlib.Path(__file__).resolve().parent.parent
+           / "python" / "tradefloor" / "presets")
+
+
+def record(name: str) -> dict:
+    return json.loads((RECORDS / f"{name}.json").read_text(encoding="utf-8"))
+
+
+def block(shown, not_shown=(), reversed_rows=(), *, horizon_days=252):
+    """A certificate block with the four lists and nothing else.
+
+    `mechanism_bar` reads exactly those four and the horizon, so a block
+    built here is the shape of both a `certification_record` block and a
+    `certify` result as far as the bar is concerned.
+    """
+    named = set(shown) | set(not_shown) | set(reversed_rows)
+    return {
+        "horizon_days": horizon_days,
+        "seeds": SEEDS,
+        "shown": sorted(shown),
+        "not_shown": sorted(not_shown),
+        "reversed": sorted(reversed_rows),
+        # Every mechanism row the three lists do not name, so a block built
+        # here accounts for the whole roster unless a test takes one away
+        # on purpose.
+        "diagnostic": sorted(set(MECHANISM) - named),
+    }
+
+
+def test_the_bar_refuses_a_preset_that_loses_a_mechanism():
+    """The test that proves the change does anything at all.
+
+    pt-v19's own certificate with `leverage_effect` moved from shown to not
+    shown, which is a model that stopped producing the leverage effect. The
+    bar names the row.
+    """
+    committed = record("pt-v19")["mechanism_252"]
+    lost = dict(committed,
+                shown=[r for r in committed["shown"] if r != "leverage_effect"],
+                not_shown=sorted(committed["not_shown"] + ["leverage_effect"]))
+    verdict = envelope.mechanism_bar(lost, committed)
+    assert verdict["passed"] is False
+    assert verdict["lost"] == ["leverage_effect"]
+    assert "leverage_effect" in verdict["reason"]
+    # And the same certificate against itself is the pass, so the refusal
+    # above is the loss and not the comparison.
+    assert envelope.mechanism_bar(committed, committed)["passed"] is True
+
+
+def test_the_bar_refuses_a_swap_the_count_cannot_see():
+    """WHY A SET AND NOT A COUNT, as a constructed failure.
+
+    A model that loses `leverage_effect` and gains `corr_asymmetry` reads
+    NINE OF TEN on both sides of the change. Non-regression on the count
+    passes it; the subset refuses it and says which row went.
+
+    `market_vol_gamma` is the dial this is drawn from. pt-v18 carries it at
+    0.0 and is SHOWN on `leverage_effect` regardless, because `garch_gamma`
+    and `market_beta_down_asym` are identical on both shipped presets -- so
+    a second leverage mechanism can be switched off with the row's verdict
+    unmoved, and a count is the wrong instrument for that whole family of
+    change.
+    """
+    committed = record("pt-v19")["mechanism_252"]
+    assert committed["counts"]["mechanism_shown"] == 9
+    assert committed["not_shown"] == ["corr_asymmetry"]
+
+    swapped = block(
+        shown=[r for r in committed["shown"] if r != "leverage_effect"]
+              + ["corr_asymmetry"],
+        not_shown=["leverage_effect"])
+    # The count a reader would quote is IDENTICAL on both sides.
+    assert len(swapped["shown"]) == committed["counts"]["mechanism_shown"] == 9
+
+    verdict = envelope.mechanism_bar(swapped, committed)
+    assert verdict["passed"] is False
+    assert verdict["lost"] == ["leverage_effect"]
+    assert verdict["gained"] == ["corr_asymmetry"]
+
+
+def test_a_row_that_leaves_the_certificate_is_a_loss_and_not_a_shorter_list():
+    """The subset is taken on the SHOWN side, and this is why.
+
+    Delete a row from the certificate entirely and `not_shown` gets SMALLER,
+    so `not_shown <= recorded_not_shown` passes on exactly the change that
+    removed the row from the gate. Read on the shown side it is what it is.
+    """
+    committed = record("pt-v19")["mechanism_252"]
+    gone = {"horizon_days": 252,
+            "shown": [r for r in committed["shown"] if r != "leverage_effect"],
+            "not_shown": [], "reversed": [],
+            "diagnostic": list(committed["diagnostic"])}
+    # The naive subset test passes, and says so here rather than in prose.
+    assert set(gone["not_shown"]) <= set(committed["not_shown"])
+    verdict = envelope.mechanism_bar(gone, committed)
+    assert verdict["passed"] is False
+    assert "corr_asymmetry" in verdict["absent"]
+    assert "leverage_effect" in verdict["absent"]
+    assert "has left the gate rather than failed it" in verdict["reason"]
+
+
+def test_a_lost_row_that_went_backwards_is_named_as_reversed():
+    """REVERSED is the louder failure and the bar does not flatten it."""
+    committed = record("pt-v19")["mechanism_252"]
+    flipped = block(
+        shown=[r for r in committed["shown"] if r != "corr_asymmetry_lagged"],
+        not_shown=["corr_asymmetry"], reversed_rows=["corr_asymmetry_lagged"])
+    verdict = envelope.mechanism_bar(flipped, committed)
+    assert verdict["passed"] is False
+    assert verdict["lost"] == ["corr_asymmetry_lagged"]
+    assert verdict["reversed"] == ["corr_asymmetry_lagged"]
+    assert "REVERSED" in verdict["reason"]
+
+
+def test_showing_more_than_the_record_passes_and_is_named():
+    """The direction that is NOT a regression, asserted rather than assumed.
+
+    pt-v19 does not show `corr_asymmetry`. A build that starts showing it
+    clears the bar, and the row is named in the reason so the gain is
+    visible rather than silent.
+    """
+    committed = record("pt-v19")["mechanism_252"]
+    better = block(shown=sorted(committed["shown"] + ["corr_asymmetry"]))
+    verdict = envelope.mechanism_bar(better, committed)
+    assert verdict["passed"] is True
+    assert verdict["gained"] == ["corr_asymmetry"]
+    assert "corr_asymmetry" in verdict["reason"]
+
+
+def test_a_preset_with_no_committed_record_is_refused_and_not_passed():
+    """Subset against nothing is an absence, and an absence is not a result.
+
+    You lay down a record before you ship against it. The one exception is
+    the tool that WRITES the first record, and it is written at that call
+    site rather than here.
+    """
+    committed = record("pt-v19")["mechanism_252"]
+    verdict = envelope.mechanism_bar(committed, None)
+    assert verdict["passed"] is False
+    assert "no committed certificate" in verdict["reason"]
+    # And the mirror: a record that HAS a certificate against a run that
+    # produced none is a gate that stopped being run.
+    stopped = envelope.mechanism_bar(None, committed)
+    assert stopped["passed"] is False
+    assert "stopped being run" in stopped["reason"]
+
+
+def test_the_bar_refuses_a_certificate_read_at_another_horizon():
+    """The rows a horizon counts are set by `MECHANISM_DIAGNOSTIC`.
+
+    252 grades ten of the eleven and 504 grades all eleven, so a subset
+    taken across the two compares sets with different denominators.
+    """
+    committed = record("pt-v19")["mechanism_252"]
+    elsewhere = dict(committed, horizon_days=504)
+    verdict = envelope.mechanism_bar(elsewhere, committed, horizon_days=252)
+    assert verdict["passed"] is False
+    assert "504" in verdict["reason"]
+    assert sorted(MECHANISM_DIAGNOSTIC.get(252, {})) == ["abs_return_acf20"]
+    assert sorted(MECHANISM_DIAGNOSTIC.get(504, {})) == []
+
+
+def test_the_bar_reads_both_panels_and_either_one_failing_is_a_failure():
+    """BOTH, and the disagreement rule.
+
+    The held-out seeds exist to catch a mechanism visible only on the thirty
+    seeds a preset was measured against, so a bar reading the 252 panel
+    alone would spend exactly that protection. Constructed here: the 252
+    panel is untouched and the held-out one loses a row.
+    """
+    assert envelope.MECHANISM_BAR_PANELS == ("mechanism_252",
+                                             "mechanism_heldout_seeds")
+    committed = record("pt-v19")
+    fresh = json.loads(json.dumps(committed))
+    ho = fresh["mechanism_heldout_seeds"]
+    ho["shown"] = [r for r in ho["shown"] if r != "cross_sectional_corr"]
+    ho["not_shown"] = sorted(ho["not_shown"] + ["cross_sectional_corr"])
+
+    verdict = envelope.record_bar(fresh, committed)
+    assert verdict["passed"] is False
+    assert verdict["lost"] == ["cross_sectional_corr"]
+    assert verdict["panels"]["mechanism_252"]["passed"] is True
+    assert verdict["panels"]["mechanism_heldout_seeds"]["passed"] is False
+    # The panel is named, not just the row: a reader has to know which of
+    # the two seed sets stopped showing it.
+    assert "mechanism_heldout_seeds" in verdict["reason"]
+
+
+def test_the_two_panels_are_never_crossed():
+    """Each against its own counterpart, and pt-v16 is why.
+
+    MEASURED from the committed file: pt-v16 shows EIGHT at 252 with
+    `corr_asymmetry` and `corr_asymmetry_lagged` not shown, and NINE on the
+    held-out seeds, where `corr_asymmetry` is shown and
+    `corr_asymmetry_lagged` reads REVERSED. EIGHT of the eighteen committed
+    records carry a different SHOWN set on their two panels, so the
+    disagreement is ordinary and crossing the panels would manufacture a
+    refusal out of it.
+    """
+    rec = record("pt-v16")
+    at_252 = rec["mechanism_252"]
+    heldout = rec["mechanism_heldout_seeds"]
+    assert at_252["not_shown"] == ["corr_asymmetry", "corr_asymmetry_lagged"]
+    assert heldout["not_shown"] == [] and heldout["reversed"] == [
+        "corr_asymmetry_lagged"]
+    # Each against itself: both pass, which is the file as committed.
+    assert envelope.record_bar(rec, rec)["passed"] is True
+    # Crossed: the 252 panel read against the held-out record loses a row
+    # it never had, which is the false refusal the pairing rule prevents.
+    crossed = envelope.mechanism_bar(at_252, heldout)
+    assert crossed["passed"] is False
+    assert crossed["lost"] == ["corr_asymmetry"]
+
+
+@pytest.mark.parametrize("path", sorted(RECORDS.glob("*.json")),
+                         ids=lambda p: p.stem)
+def test_every_committed_record_clears_the_bar_against_itself(path):
+    """All eighteen, in the suite rather than in a report.
+
+    The records were written at different times against different builds and
+    read six shown through nine, so "a preset is trivially a subset of
+    itself" is an argument and this is the measurement. It is also what
+    makes the change free: nothing that ships today newly fails.
+    """
+    rec = json.loads(path.read_text(encoding="utf-8"))
+    verdict = envelope.record_bar(rec, rec)
+    assert verdict["passed"] is True, verdict["reason"]
+    assert verdict["lost"] == [] and verdict["absent"] == []
+
+
+@pytest.mark.ship_bar
+def test_the_shipped_preset_clears_the_mechanism_bar_on_both_panels():
+    """THE MECHANISM GATE, IN THE SHIP BAR, BY NAME.
+
+    `test_the_envelope_and_the_record_agree_on_the_band_count` is the bar's
+    fidelity half and has been the whole of it. This is the mechanism half:
+    the shipped preset must still show every mechanism its own committed
+    record shows, on the 252 panel and on the held-out seeds.
+
+    It is green today and that is the point of the change rather than a
+    weakness of it -- `test_gate_selection` says in its own words that a
+    `ship_bar` test passing is the outcome the project is working toward.
+    What it refuses is a FUTURE shipped preset that loses a mechanism, which
+    nothing in this repository refused before.
+    """
+    rec = record(envelope.PRESET)
+    verdict = envelope.record_bar(rec, rec)
+    assert verdict["passed"] is True, verdict["reason"]
+    assert rec["mechanism_252"]["counts"]["mechanism_shown"] == 9
+    assert rec["mechanism_heldout_seeds"]["counts"]["mechanism_shown"] == 9
+    # And the line a reader sees, which is the other half of "by name".
+    line = envelope.mechanism_bar_line(verdict)
+    assert "mechanism bar" in line and "PASS" in line
+
+
+def test_a_record_missing_ONE_of_the_two_panels_is_refused_on_that_panel():
+    """The asymmetric case, which `both panels` makes reachable.
+
+    A record carrying a 252 certificate and no held-out one is not half a
+    pass. The panel with nothing to be a subset of is refused, by name, and
+    the panel that has a record is still read -- so the message says which
+    of the two is missing rather than failing the preset as a whole with no
+    reason a reader can act on.
+    """
+    rec = record("pt-v19")
+    half = {k: v for k, v in rec.items() if k != "mechanism_heldout_seeds"}
+    verdict = envelope.record_bar(rec, half)
+    assert verdict["passed"] is False
+    assert verdict["panels"]["mechanism_252"]["passed"] is True
+    assert verdict["panels"]["mechanism_heldout_seeds"]["passed"] is False
+    assert "mechanism_heldout_seeds: no committed certificate" \
+        in verdict["reason"]
+    # Neither panel committed is the same refusal twice, not a pass.
+    nothing = envelope.record_bar(rec, {})
+    assert nothing["passed"] is False
+    assert all(not v["passed"] for v in nothing["panels"].values())
+
+
+def test_the_record_tool_treats_a_first_lay_down_as_the_one_exception():
+    """The exception lives at the call site that needs it and nowhere else.
+
+    `record.py --panel` on a preset with no file is LAYING THE RECORD DOWN,
+    and a first measurement cannot regress against itself. The library rule
+    is unchanged -- `envelope.mechanism_bar(block, None)` still refuses --
+    which is what keeps the exception from being inherited by a reader of
+    the rule.
+    """
+    import sys
+
+    sys.path.insert(0, str(RECORDS.parent.parent.parent / "tools" / "presets"))
+    record_tool = pytest.importorskip("record")
+
+    rec = record("pt-v19")
+    first = record_tool.mechanism_bar(rec, None)
+    assert first["passed"] is True and first["first"] is True
+    assert "LAYS ONE DOWN" in first["reason"]
+    # And against a committed record it is the library rule, unmodified.
+    assert record_tool.mechanism_bar(rec, rec)["passed"] is True
+    lost = json.loads(json.dumps(rec))
+    b = lost["mechanism_252"]
+    b["shown"] = [r for r in b["shown"] if r != "excess_kurtosis"]
+    b["not_shown"] = sorted(b["not_shown"] + ["excess_kurtosis"])
+    refused = record_tool.mechanism_bar(lost, rec)
+    assert refused["passed"] is False and refused["first"] is False
+    assert refused["lost"] == ["excess_kurtosis"]
+    assert "mechanism_252" in refused["reason"]
