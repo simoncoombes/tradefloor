@@ -6409,4 +6409,646 @@ mod tests {
         assert_eq!(wider.breaker_up, 1.5);
         assert_eq!(wider.breaker_down, 0.5);
     }
+
+    // =====================================================================
+    // The docstring-claim guard.
+    //
+    // `provenance.py` catches a dial whose VALUE drifts from its
+    // justification. Nothing caught a dial whose DOCUMENTATION drifts from
+    // its value, and on 2026-09-17 an audit of all 148 entries found 25 such
+    // claims -- every one true when written and silently overtaken by a
+    // later preset. This is that missing check.
+    // =====================================================================
+
+    /// The text of this file, as the compiler read it. `include_str!`
+    /// resolves beside the source, so the docstrings parsed here and the
+    /// constructors checked against them can never come from different
+    /// trees -- which matters, because the venv's built extension is a
+    /// `wip/joint-t-fit` build that disagrees with this tree on five pt-v19
+    /// dials. Nothing here reads the built engine.
+    const PARAMS_SOURCE: &str = include_str!("params.rs");
+
+    /// One `///` block and the `pub <name>: f64,` it sits above.
+    fn dial_doc_blocks(src: &str) -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        let mut block = String::new();
+        for line in src.lines() {
+            let s = line.trim();
+            if let Some(rest) = s.strip_prefix("///") {
+                if !block.is_empty() {
+                    block.push(' ');
+                }
+                block.push_str(rest.trim());
+                continue;
+            }
+            if let Some(name) = s
+                .strip_prefix("pub ")
+                .and_then(|r| r.strip_suffix(": f64,"))
+            {
+                if !block.is_empty()
+                    && !name.is_empty()
+                    && name
+                        .bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+                {
+                    out.push((name.to_string(), block.clone()));
+                }
+            }
+            if !s.starts_with("#[") {
+                block.clear();
+            }
+        }
+        out
+    }
+
+    /// Sentences, split after `.` or `;`. A `;` separates a stale clause
+    /// from the correction beside it throughout this file, so it has to
+    /// break a sentence or the correction never gets read on its own.
+    fn sentences(text: &str) -> Vec<&str> {
+        let bytes = text.as_bytes();
+        let mut out = Vec::new();
+        let mut start = 0usize;
+        for i in 0..bytes.len() {
+            if (bytes[i] == b'.' || bytes[i] == b';')
+                && i + 1 < bytes.len()
+                && bytes[i + 1] == b' '
+            {
+                out.push(text[start..=i].trim());
+                start = i + 1;
+            }
+        }
+        if start < text.len() {
+            out.push(text[start..].trim());
+        }
+        out.into_iter().filter(|s| !s.is_empty()).collect()
+    }
+
+    /// A sentence that reports what the entry USED to claim. The audit's
+    /// corrections all carry one ("this line said X until 2026-09-17"), and
+    /// reading the retracted wording as a live claim would fail the very
+    /// tree that fixed it.
+    fn is_historical(sentence: &str) -> bool {
+        let lower = sentence.to_lowercase();
+        const MARKERS: &[&str] = &[
+            "until 20",
+            "this line",
+            "this paragraph",
+            "this docstring",
+            "this entry",
+            "this sentence",
+            "used to call",
+            "used to claim",
+            "used to read",
+            "used to say",
+            "no longer the shipped",
+            "stopped being the shipped",
+            "did not stay",
+        ];
+        MARKERS.iter().any(|m| lower.contains(m))
+    }
+
+    /// A sentence naming some OTHER settable dial may be reporting that
+    /// dial's value, not this one's -- `market_idio_down_suppress` quotes
+    /// "the shipped 0.025", which is `market_beta_down_asym`'s. Decline
+    /// rather than guess.
+    fn names_another_dial(sentence: &str, dial: &str) -> bool {
+        let names = settable_names();
+        let mut found = false;
+        let mut scan = |token: &str| {
+            if token != dial && names.contains(&token) {
+                found = true;
+            }
+        };
+        for chunk in sentence.split('`').skip(1).step_by(2) {
+            scan(chunk);
+        }
+        let mut rest = sentence;
+        while let Some(at) = rest.find("ModelParams::") {
+            let tail = &rest[at + "ModelParams::".len()..];
+            let end = tail
+                .find(|c: char| !(c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'))
+                .unwrap_or(tail.len());
+            scan(&tail[..end]);
+            rest = &tail[end..];
+        }
+        found
+    }
+
+    /// `-?\d+(\.\d+)?([eE]-?\d+)?` at `i`, with a word boundary each side.
+    fn number_at(s: &str, i: usize) -> Option<(f64, &str)> {
+        let b = s.as_bytes();
+        if i > 0 {
+            let prev = b[i - 1];
+            if prev.is_ascii_alphanumeric() || prev == b'.' || prev == b'-' {
+                return None;
+            }
+        }
+        let mut j = i;
+        if j < b.len() && b[j] == b'-' {
+            j += 1;
+        }
+        let digits = j;
+        while j < b.len() && b[j].is_ascii_digit() {
+            j += 1;
+        }
+        if j == digits {
+            return None;
+        }
+        if j + 1 < b.len() && b[j] == b'.' && b[j + 1].is_ascii_digit() {
+            j += 1;
+            while j < b.len() && b[j].is_ascii_digit() {
+                j += 1;
+            }
+        }
+        if j < b.len() && (b[j] == b'e' || b[j] == b'E') {
+            let mut k = j + 1;
+            if k < b.len() && (b[k] == b'-' || b[k] == b'+') {
+                k += 1;
+            }
+            let d = k;
+            while k < b.len() && b[k].is_ascii_digit() {
+                k += 1;
+            }
+            if k > d {
+                j = k;
+            }
+        }
+        // A trailing `.` ends the sentence unless a digit follows it, in
+        // which case the token is a version string ("0.8.0"), not a value.
+        if j < b.len()
+            && (b[j].is_ascii_alphanumeric()
+                || (b[j] == b'.' && j + 1 < b.len() && b[j + 1].is_ascii_digit()))
+        {
+            return None;
+        }
+        let text = &s[i..j];
+        text.parse::<f64>().ok().map(|v| (v, text))
+    }
+
+    /// Is a claim of `claimed`, written as `text`, borne out by `actual`?
+    /// The entries round -- "158.8524" for 158.85236... -- so the test is
+    /// equality at the precision the author wrote, not at the bit.
+    fn claim_holds(claimed: f64, actual: f64, text: &str) -> bool {
+        if text.contains('e') || text.contains('E') {
+            return (actual - claimed).abs() <= claimed.abs() * 1e-9;
+        }
+        let dp = text.split('.').nth(1).map_or(0, |f| f.len()) as i32;
+        let scale = 10f64.powi(dp);
+        ((actual * scale).round() / scale - claimed).abs() <= 0.5 * 10f64.powi(-dp - 6)
+    }
+
+    fn preset_index(name: &str) -> Option<usize> {
+        ModelParams::preset_names().iter().position(|n| *n == name)
+    }
+
+    /// `pt-v<digits>` at `i`, returning the name's end and its index.
+    fn preset_token_at(s: &str, i: usize) -> Option<(usize, usize)> {
+        let rest = &s[i..];
+        if !rest.starts_with("pt-v") {
+            return None;
+        }
+        let tail = &rest[4..];
+        let d = tail
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(tail.len());
+        if d == 0 {
+            return None;
+        }
+        let name = &rest[..4 + d];
+        preset_index(name).map(|idx| (i + 4 + d, idx))
+    }
+
+    fn word_at(s: &str, i: usize, word: &str) -> Option<usize> {
+        if s.len() >= i + word.len() && s[i..].as_bytes()[..word.len()].eq_ignore_ascii_case(word.as_bytes()) {
+            Some(i + word.len())
+        } else {
+            None
+        }
+    }
+
+    /// The outcome of reading a preset-scope phrase.
+    enum Scope {
+        /// Presets the phrase names, by index into `preset_names()`.
+        Presets(Vec<usize>),
+        /// A phrase that IS a scope but whose boundary this parser will not
+        /// guess: "every preset up to pt-v19" (the audit left it ambiguous
+        /// because the file reads "up to" exclusively elsewhere), "every
+        /// preset before this dial", "every preset before the fear era".
+        /// Declining is the point -- an ambiguous claim must not become a
+        /// build failure.
+        Undecidable,
+    }
+
+    /// Read a preset-scope phrase starting at `i`. Returns where it ends.
+    fn scope_at(s: &str, i: usize) -> Option<(usize, Scope)> {
+        let last = ModelParams::preset_names().len() - 1;
+        // "every [single ][shipped |existing ]preset[ <qualifier>]"
+        if let Some(mut j) = word_at(s, i, "every ") {
+            for opt in ["single ", "shipped ", "existing ", "SHIPPED "] {
+                if let Some(k) = word_at(s, j, opt) {
+                    j = k;
+                }
+            }
+            if let Some(mut j) = word_at(s, j, "preset") {
+                if let Some(k) = word_at(s, j, "s") {
+                    j = k;
+                }
+                if let Some(k) = word_at(s, j, " before ") {
+                    if let Some((e, idx)) = preset_token_at(s, k) {
+                        return Some((e, Scope::Presets((0..idx).collect())));
+                    }
+                    return Some((k, Scope::Undecidable));
+                }
+                if let Some(k) = word_at(s, j, " through ") {
+                    if let Some((e, idx)) = preset_token_at(s, k) {
+                        return Some((e, Scope::Presets((0..=idx).collect())));
+                    }
+                    return Some((k, Scope::Undecidable));
+                }
+                if let Some(k) = word_at(s, j, " from ") {
+                    if let Some((e, a)) = preset_token_at(s, k) {
+                        if let Some(m) = word_at(s, e, " to ") {
+                            if let Some((e2, b)) = preset_token_at(s, m) {
+                                if a <= b {
+                                    return Some((e2, Scope::Presets((a..=b).collect())));
+                                }
+                            }
+                        }
+                    }
+                    return Some((k, Scope::Undecidable));
+                }
+                if word_at(s, j, " up to ").is_some() || word_at(s, j, " when ").is_some() {
+                    return Some((j, Scope::Undecidable));
+                }
+                return Some((j, Scope::Presets((0..=last).collect())));
+            }
+        }
+        // "pt-vA through pt-vB" | "pt-vA to pt-vB" | "pt-vN onward" | "pt-vN"
+        if let Some((e, a)) = preset_token_at(s, i) {
+            for sep in [" through ", " to "] {
+                if let Some(k) = word_at(s, e, sep) {
+                    if let Some((e2, b)) = preset_token_at(s, k) {
+                        if a <= b {
+                            return Some((e2, Scope::Presets((a..=b).collect())));
+                        }
+                        return Some((e2, Scope::Undecidable));
+                    }
+                }
+            }
+            for tail in [" onwards", " onward", " on "] {
+                if let Some(k) = word_at(s, e, tail) {
+                    return Some((k, Scope::Presets((a..=last).collect())));
+                }
+            }
+            return Some((e, Scope::Presets(vec![a])));
+        }
+        None
+    }
+
+    /// One checkable assertion lifted out of a docstring.
+    struct Claim {
+        value: f64,
+        text: String,
+        presets: Vec<usize>,
+        fragment: String,
+        sentence: String,
+    }
+
+    /// Standalone "zero"/"Zero" reads as the value 0.0 throughout the file.
+    fn normalise_zero(sentence: &str) -> String {
+        let mut out = String::with_capacity(sentence.len());
+        let mut rest = sentence;
+        loop {
+            let hit = rest
+                .match_indices("ero")
+                .map(|(i, _)| i)
+                .find(|&i| {
+                    i >= 1
+                        && (rest.as_bytes()[i - 1] == b'Z' || rest.as_bytes()[i - 1] == b'z')
+                        && (i == 1 || !rest.as_bytes()[i - 2].is_ascii_alphanumeric())
+                        && rest[i + 3..]
+                            .chars()
+                            .next()
+                            .map_or(true, |c| !c.is_ascii_alphanumeric())
+                });
+            match hit {
+                Some(i) => {
+                    out.push_str(&rest[..i - 1]);
+                    out.push_str("0.0");
+                    rest = &rest[i + 3..];
+                }
+                None => {
+                    out.push_str(rest);
+                    return out;
+                }
+            }
+        }
+    }
+
+    const VERBS: &[&str] = &[
+        "ships ", "ship ", "carries ", "carry ", "sets ", "set ", "uses ", "use ", "runs ",
+        "run ",
+    ];
+
+    /// Every claim this parser is willing to judge, for one dial.
+    fn claims_in(dial: &str, doc: &str) -> Vec<Claim> {
+        let default_idx = preset_index(DEFAULT_PRESET_NAME).expect("the default is a shipped preset");
+        let mut out = Vec::new();
+        for sentence in sentences(doc) {
+            if is_historical(sentence) {
+                continue;
+            }
+            let s = normalise_zero(sentence);
+            let mut push = |value: f64, text: &str, presets: Vec<usize>, fragment: &str| {
+                out.push(Claim {
+                    value,
+                    text: text.to_string(),
+                    presets,
+                    fragment: fragment.trim().to_string(),
+                    sentence: sentence.to_string(),
+                });
+            };
+
+            // --- Subject forms. The subject of a sentence that OPENS with
+            // a value in this dial's own entry is this dial, so a later
+            // mention of another dial cannot re-point it.
+            let head = s.trim_start();
+            let mut done = false;
+            for lead in ["Shipped at ", "SHIPPED at ", "Ships at ", "Shipped ", "SHIPPED ", "Ships "] {
+                if let Some(k) = head.strip_prefix(lead) {
+                    let off = head.len() - k.len();
+                    if let Some((v, t)) = number_at(head, off) {
+                        push(v, t, vec![default_idx], &head[..off + t.len()]);
+                        done = true;
+                    }
+                    break;
+                }
+            }
+            if !done {
+                if let Some((v, t)) = number_at(head, 0) {
+                    if head[t.len()..].starts_with(" ships") {
+                        push(v, t, vec![default_idx], &head[..t.len() + 6]);
+                    }
+                }
+                if let Some(rest) = head.strip_prefix("At ") {
+                    if let Some((v, t)) = number_at(head, 3) {
+                        if rest[t.len()..].starts_with(", shipped,") {
+                            push(v, t, vec![default_idx], &head[..3 + t.len() + 10]);
+                        }
+                    }
+                }
+            }
+            // "(0.0, shipped)" -- the switch-summary form.
+            let mut at = 0usize;
+            while let Some(p) = s[at..].find('(') {
+                let i = at + p + 1;
+                if let Some((v, t)) = number_at(&s, i) {
+                    if s[i + t.len()..].starts_with(", shipped)") {
+                        push(v, t, vec![default_idx], &s[i - 1..i + t.len() + 10]);
+                    }
+                }
+                at = i;
+            }
+
+            // --- Scope-paired forms, declined where the sentence could be
+            // reporting another dial's value.
+            if names_another_dial(sentence, dial) {
+                continue;
+            }
+            for i in 0..s.len() {
+                if !s.is_char_boundary(i) {
+                    continue;
+                }
+                let (end, scope) = match scope_at(&s, i) {
+                    Some(x) => x,
+                    None => continue,
+                };
+                let presets = match scope {
+                    Scope::Presets(p) => p,
+                    Scope::Undecidable => continue,
+                };
+                let before = s[..i].trim_end();
+                let after = &s[end..];
+
+                // <value> -- <scope> -- | <value>, which <scope> | (<value>, <scope>)
+                // | <value> is <scope> | shipped <value> in <scope>
+                for lead in ["--", "\u{2014}", ", which", " is what", " ships and is", " is", ","] {
+                    let stem = match before.strip_suffix(lead) {
+                        Some(x) => x.trim_end(),
+                        None => continue,
+                    };
+                    let stem = stem.strip_suffix('(').unwrap_or(stem).trim_end();
+                    let num_start = stem.len() - stem.chars().rev()
+                        .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == '-' || *c == 'e' || *c == 'E')
+                        .map(|c| c.len_utf8()).sum::<usize>();
+                    if let Some((v, t)) = number_at(stem, num_start) {
+                        if num_start + t.len() == stem.len() {
+                            push(v, t, presets.clone(), &s[num_start..end]);
+                            break;
+                        }
+                    }
+                }
+                // "Shipped at <value> in <scope>"
+                if let Some(stem) = before.strip_suffix(" in") {
+                    let stem = stem.trim_end();
+                    let num_start = stem.len() - stem.chars().rev()
+                        .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == '-' || *c == 'e' || *c == 'E')
+                        .map(|c| c.len_utf8()).sum::<usize>();
+                    if let Some((v, t)) = number_at(stem, num_start) {
+                        if num_start + t.len() == stem.len()
+                            && stem[..num_start].to_lowercase().contains("shipped")
+                        {
+                            push(v, t, presets.clone(), &s[num_start..end]);
+                        }
+                    }
+                }
+                // <scope> ships <value>
+                let after_trim = after.trim_start();
+                let skipped = after.len() - after_trim.len();
+                for verb in VERBS {
+                    if let Some(k) = word_at(after, skipped, verb) {
+                        let k = match word_at(after, k, "at ") {
+                            Some(m) => m,
+                            None => k,
+                        };
+                        if let Some((v, t)) = number_at(after, k) {
+                            push(v, t, presets.clone(), &s[i..end + k + t.len()]);
+                        }
+                        break;
+                    }
+                }
+                // "At `1.0` ... which is what <scope> does" -- indicative,
+                // unlike "at X every preset is bit-identical", which is a
+                // counterfactual about a value no preset need set.
+                if after_trim.starts_with("does")
+                    || after_trim.starts_with("do ")
+                    || after_trim.starts_with("did")
+                {
+                    if s[..i].trim_end().ends_with("what") {
+                        let opener = head.strip_prefix("At ").unwrap_or("");
+                        let opener = opener.strip_prefix('`').unwrap_or(opener);
+                        if let Some((v, t)) = number_at(opener, 0) {
+                            push(v, t, presets.clone(), &format!("At {t} ... what {}", &s[i..end]));
+                        }
+                    }
+                }
+            }
+            // "the shipped <value>" -- this dial's, the sentence naming no
+            // other.
+            let mut at = 0usize;
+            while at < s.len() {
+                let hit = ["the shipped ", "The shipped "]
+                    .iter()
+                    .filter_map(|m| s[at..].find(m).map(|p| (p, m.len())))
+                    .min();
+                let (p, len) = match hit {
+                    Some(x) => x,
+                    None => break,
+                };
+                let i = at + p + len;
+                if let Some((v, t)) = number_at(&s, i) {
+                    push(v, t, vec![default_idx], &s[at + p..i + t.len()]);
+                }
+                at = i;
+            }
+        }
+        out
+    }
+
+    /// Every "shipped X" and "every preset X" claim in a dial docstring,
+    /// read against the constructors in this file.
+    ///
+    /// # What it checks
+    ///
+    /// For each of the 148 settable dials, the `///` block above the field
+    /// is split into sentences and each sentence searched for a value
+    /// asserted over a preset scope:
+    ///
+    ///   * a SHIPPED-VALUE claim -- "Shipped X", "Ships at X", "X ships",
+    ///     "(X, shipped)", "At X, shipped,", "the shipped X", which name
+    ///     `DEFAULT_PRESET_NAME`;
+    ///   * a SCOPED claim -- "X -- every shipped preset --", "X, which
+    ///     every preset carries", "pt-v15 onward ship X", "X -- pt-v1
+    ///     through pt-v8 --", "Shipped at X in every preset", "at X ...
+    ///     which is what every shipped preset does";
+    ///
+    /// and the value is compared against `ModelParams::preset(name).get()`
+    /// for every preset the scope names, at the precision the author wrote.
+    /// An inertness claim ("INERT at X, which every shipped preset sets")
+    /// is checked through its scope, which is the only part of it the
+    /// preset table can refute.
+    ///
+    /// Both sides come from THIS tree: the values from the constructors the
+    /// compiler just read, the text from `include_str!` on this same file.
+    /// Nothing reads the built extension, which is a different branch.
+    ///
+    /// # What it declines to judge, deliberately
+    ///
+    /// A sentence reporting a RETRACTED claim ("this line said X until
+    /// 2026-09-17"), a sentence naming another settable dial (it may be
+    /// quoting that dial's value), and a scope whose boundary is not
+    /// mechanical: "every preset up to pt-v19" (read exclusively elsewhere
+    /// in this file), "every preset before this dial", "every preset before
+    /// the fear era". `crisis_vix_threshold`'s "25.5 is the P94",
+    /// `usd_crisis_vix_threshold`'s count of overriding presets and
+    /// `jump_intensity_market`'s counterfactual "at intensity 0 ... every
+    /// shipped preset reproduces exactly" are all outside the grammar and
+    /// stay outside it: the audit judged those four ambiguous rather than
+    /// false, and an ambiguous claim must not become a build failure.
+    ///
+    /// # Coverage, and the residue it does NOT cover
+    ///
+    /// The 2026-09-17 audit read 102 of the 148 entries as claim-bearing
+    /// and found 25 false. Replayed against the docstrings as they stood at
+    /// `b9a151c`, this guard fires on 18 of those 25, over 45 dials that
+    /// carry at least one claim it will judge. A GREEN RUN IS NOT "EVERY
+    /// CLAIM VERIFIED". Four of the seven it misses are claims no
+    /// preset-table rule can reach, and the audit said so:
+    ///
+    ///   1. `market_vol_alpha` attributed two values to pt-v13 that are
+    ///      pt-v14's -- a claim about WHICH preset, in prose.
+    ///   2. `market_vol_level_sigma` presented a derived 0.047 where
+    ///      `provenance.py` records the dial measured at 0.085 -- a
+    ///      derived-against-measured mismatch, not a preset value.
+    ///   3. `trough_growth_floor` cited `daily.rs:247` for a shock that is
+    ///      at `:568` -- a stale line reference.
+    ///   4. `cycle_stationary_opening` named `DRAW_SCHEDULE_MOVERS`, renamed
+    ///      `ECONOMY_STREAM_MOVERS` and absent from the tree.
+    ///
+    /// The other three are prose with no parseable value: `market_vol_gamma`'s
+    /// "symmetric forever", `endogenous_news_intensity`'s "has never fired",
+    /// `market_vol_slow_vix_damp`'s "Kept, inert", plus
+    /// `vix_return_level_exponent`'s "`g = 0` on both sides", where the
+    /// value is an equation rather than a number. A reader who wants those
+    /// checked has to read them.
+    #[test]
+    fn every_shipped_value_claim_in_a_dial_docstring_holds_against_the_preset_table() {
+        let names = ModelParams::preset_names();
+        let settable = settable_names();
+        let mut failures: Vec<String> = Vec::new();
+        let mut judged_dials = 0usize;
+
+        for (dial, doc) in dial_doc_blocks(PARAMS_SOURCE) {
+            if !settable.contains(&dial.as_str()) {
+                continue;
+            }
+            let claims = claims_in(&dial, &doc);
+            if !claims.is_empty() {
+                judged_dials += 1;
+            }
+            for claim in claims {
+                let mut refuting: Vec<String> = Vec::new();
+                for &p in &claim.presets {
+                    let actual = ModelParams::preset(names[p])
+                        .expect("a name from preset_names resolves")
+                        .get(&dial)
+                        .expect("a settable name reads back");
+                    if !claim_holds(claim.value, actual, &claim.text) {
+                        refuting.push(format!("{} = {actual:?}", names[p]));
+                    }
+                }
+                if !refuting.is_empty() {
+                    failures.push(format!(
+                        "\n  {dial}: the docstring claims {} over {}, and the preset table \
+                         refutes it.\n    claim    : \"{}\"\n    sentence : \"{}\"\n    refuted by: {}",
+                        claim.text,
+                        if claim.presets.len() == 1 {
+                            names[claim.presets[0]].to_string()
+                        } else {
+                            format!(
+                                "{} .. {} ({} presets)",
+                                names[claim.presets[0]],
+                                names[*claim.presets.last().unwrap()],
+                                claim.presets.len()
+                            )
+                        },
+                        claim.fragment,
+                        claim.sentence,
+                        refuting.join(", "),
+                    ));
+                }
+            }
+        }
+
+        // A parser that has gone blind passes trivially, which is the one
+        // way this guard could rot without anyone noticing. 45 dials carry
+        // a judged claim at 5c5c8c9; a floor of 40 leaves room for an entry
+        // to be reworded without leaving room for the grammar to stop
+        // matching.
+        assert!(
+            judged_dials >= 40,
+            "the docstring-claim parser judged only {judged_dials} dials, against 45 at
+             5c5c8c9. Either the claim wording moved out of the grammar or the parser \
+             broke; a guard that reads nothing passes everything."
+        );
+
+        assert!(
+            failures.is_empty(),
+            "{} dial docstring claim(s) contradict the constructors in this file. Every \
+             one is the 2026-09-17 defect: a claim true when written and overtaken by a \
+             later preset. Fix the PROSE -- no dial value moves for this.{}",
+            failures.len(),
+            failures.join("")
+        );
+    }
 }
