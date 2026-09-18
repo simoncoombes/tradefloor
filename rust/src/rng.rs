@@ -428,9 +428,12 @@ pub mod stream {
     /// be told apart on one seed. On a stream of its own the normal is
     /// drawn UNCONDITIONALLY, whatever the dial reads, so the schedule
     /// cannot depend on a settable; at sigma 0.0 the draw is taken, the
-    /// log-level stays exactly 0.0, the multiplier is exactly 1.0 and
-    /// every preset reproduces bit for bit with its known-answer digest
-    /// unmoved.
+    /// log-level stays exactly 0.0, the multiplier is exactly 1.0 and a
+    /// preset that leaves the dial there reproduces bit for bit with its
+    /// known-answer digest unmoved -- every preset through pt-v18, where
+    /// `market_vol_level_sigma` is 0.0. pt-v19 is not one of them and its
+    /// digest is the live level's; this sentence read "every preset"
+    /// without that qualifier until 2026-09-18.
     pub const MARKET_VOL_LEVEL: u32 = 8;
 
     /// How many streams there are. Every array indexed by stream id, the
