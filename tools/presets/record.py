@@ -101,6 +101,89 @@ def git(*args: str) -> str:
     return out.stdout.strip() if out.returncode == 0 else ""
 
 
+def structure_measured(panel: dict) -> dict:
+    """The provenance a structural block carries, in ONE spelling.
+
+    `build` and `write_structure_rows` both produce this block, so both
+    stamp it from here. Two spellings would make `record.py --check` report
+    drift on every record against the very artefact the block was written
+    from -- a field diff that fires on no change at all, which is the
+    opposite of what the check is for.
+    """
+    return {
+        "tradefloor_version": panel["pretium_version"],
+        # The PANEL's commit first, for `build`'s reason: `git rev-parse
+        # HEAD` here names the checkout writing the file, which is the
+        # measuring one only when the record is written on the box.
+        "commit": panel.get("commit") or git("rev-parse", "HEAD") or None,
+        "method": panel["method"],
+    }
+
+
+def structure_blocks(panel: dict, name: str) -> dict:
+    """The two STRUCTURAL certificates, from the per-seed rows the panel kept.
+
+    NOT A MEASUREMENT. `facts.measure` computes `vix_ar1_debiased` on every
+    seed of every run and `preset_panel.py` has retained it per seed, under
+    the row's own key beside the certified rows, since the retain repair.
+    This reads what is already there and signs it against the tape; the
+    engine is not called and no draw schedule is touched.
+
+    EMPTY WHEN THE ARTEFACT DOES NOT CARRY THE ROWS, rather than a block
+    built from nothing. Two artefacts cannot: one written before the retain
+    repair, and a `--rescore` cell whose per-seed rows were nulled because
+    its panel was not the one the committed record was built from. Both are
+    honest absences and `carry_structure` keeps the committed block over
+    them rather than letting a rebuild delete a measurement -- which is
+    defect-26 and the reason `carry_level_protocol` exists one field up.
+    """
+    from tradefloor import envelope
+
+    cell = panel["presets"][name]
+    out = {}
+    for field, source in zip(envelope.STRUCTURE_BAR_PANELS,
+                             ("per_seed_252", "per_seed_heldout_seeds")):
+        rows = cell.get(source)
+        if not rows:
+            return {}
+        out[field] = dict(envelope.certify_structure(rows),
+                          measured=structure_measured(panel))
+    return out
+
+
+def carry_structure(record: dict, path: pathlib.Path) -> str:
+    """Keep a committed structural block the panel could not rebuild.
+
+    `carry_level_protocol`'s rule on the fourth block. A record is the only
+    place a preset's structural verdict is written down, and a rebuild from
+    an artefact that does not retain the per-seed rows would delete it in
+    silence -- the same shape as the `--panel` regenerations that emptied
+    `envelope.CERTIFIED_LEVEL`.
+
+    Carried UNCHECKED against the coefficients, deliberately, and the note
+    says so. `level_protocol` can be checked because it stamps the vector it
+    ran on; these blocks do not, so what is carried is a verdict measured on
+    a build this run cannot identify. That is worth saying out loud and is
+    still better than deleting it.
+    """
+    from tradefloor import envelope
+
+    if all(record.get(f) for f in envelope.STRUCTURE_BAR_PANELS):
+        return ""
+    if not path.exists():
+        return ""
+    was = json.loads(path.read_text(encoding="utf-8"))
+    carried = [f for f in envelope.STRUCTURE_BAR_PANELS if was.get(f)]
+    if not carried:
+        return ""
+    for field in carried:
+        record[field] = was[field]
+    return ("carried %d structural block(s) forward UNCHECKED: this panel "
+            "retains no per-seed rows to rebuild them from, and they name "
+            "no vector, so nothing here can tell whether the preset has "
+            "moved under them" % len(carried))
+
+
 def build(name: str, panel: dict, values: dict[str, float]) -> dict:
     """One preset's record, from the panel that measured it."""
     p = panel["presets"][name]
@@ -135,6 +218,17 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
         # written before this field existed keeps working.
         "mechanism_252": p["mechanism_252"],
         "mechanism_heldout_seeds": p["mechanism_heldout_seeds"],
+        # THE SECOND GATE, BESIDE THE FIRST AND MIXED INTO NONE OF IT.
+        # `envelope.CERTIFIED_STRUCTURE`'s row has no band, is in no
+        # `in_band` count and in no mechanism count, and is graded here
+        # against the real tape's centre by an exact sign test. Simon's
+        # ruling is that a structural row goes in a gate of its own rather
+        # than into the panel, so it reaches the record under its own two
+        # fields. Additive, so schema 1 stays 1, and `**` rather than two
+        # literals because an artefact that does not retain the per-seed
+        # rows produces NO block here and `carry_structure` keeps the
+        # committed one instead of writing a hole.
+        **structure_blocks(panel, name),
         "in_band": {
             "252": p["in_band_252"],
             "504": p["in_band_504"],
@@ -238,6 +332,34 @@ def mechanism_bar(fresh: dict, committed: dict | None) -> dict:
                 "reason": "no committed record: this run LAYS ONE DOWN, and "
                           "a first measurement cannot regress against itself"}
     return dict(envelope.record_bar(fresh, committed), first=False)
+
+
+def structure_bar(fresh: dict, committed: dict | None) -> dict:
+    """`envelope.structure_record_bar`, with the FIRST LAY-DOWN named.
+
+    `mechanism_bar`'s exception, on the fourth block and for the same
+    reason. The bar is a SUBSET rule -- no structural row a record passes
+    may go refused -- and a preset with no committed structural certificate
+    has laid down no set to be a subset of. `envelope.structure_bar` refuses
+    that, correctly. The tool that WRITES the first record is the one place
+    where it is not a refusal, and it is separated here rather than inside
+    the library so the exception sits where it applies.
+
+    THIS EXCEPTION IS DOING REAL WORK TODAY AND WILL NOT BE AGAIN. No
+    preset has ever carried a structural certificate, so the first
+    `--structure-rows` run takes this branch on all eighteen -- including
+    pt-v19, which lays down REFUSED on both panels and ships. Every run
+    after that is read against what was laid down.
+    """
+    from tradefloor import envelope
+
+    if committed is None or not any(
+            committed.get(f) for f in envelope.STRUCTURE_BAR_PANELS):
+        return {"passed": True, "first": True, "lost": [], "absent": [],
+                "reason": "no committed structural certificate: this run "
+                          "LAYS ONE DOWN, and a first measurement cannot "
+                          "regress against itself"}
+    return dict(envelope.structure_record_bar(fresh, committed), first=False)
 
 
 def count_block_gradings(block: dict) -> dict[str, dict]:
@@ -464,6 +586,16 @@ def main() -> int:
                          "from a fresh run at the same time would silently "
                          "fold in every model and roster change since the "
                          "record was written")
+    ap.add_argument("--structure-rows", metavar="PANEL",
+                    help="write ONLY the two CERTIFIED_STRUCTURE blocks onto "
+                         "the committed records the given preset_panel.py "
+                         "artefact names, leaving every other field -- "
+                         "panel_252 included -- byte for byte as it is. The "
+                         "structural row has no band and is graded against "
+                         "the real tape's centre by an exact sign test, so "
+                         "it reaches a record through here or not at all. "
+                         "Nothing is measured: the per-seed readings are "
+                         "already retained in the artefact")
     ap.add_argument("--level-rows", metavar="ROWS",
                     help="write ONLY the LEVEL_PROTOCOL block onto the record "
                          "the given level_rows.py artefact names. "
@@ -483,6 +615,8 @@ def main() -> int:
     args = ap.parse_args()
     if args.mechanism_gate:
         return write_mechanism_gate(args.mechanism_gate)
+    if args.structure_rows:
+        return write_structure_rows(args.structure_rows)
     if args.level_rows:
         return write_level_protocol(args.level_rows)
     if args.default_since:
@@ -505,6 +639,7 @@ def main() -> int:
         record = build(name, panel, values)
         path = OUT / f"{name}.json"
         note = carry_level_protocol(record, path)
+        note += carry_structure(record, path)
         # After the carry, whichever way the carry went: a block carried
         # UNCHECKED needs the ruler named just as much as a checked one, and
         # more, since nothing else about it has been verified.
@@ -527,6 +662,14 @@ def main() -> int:
                 if not bar["passed"]:
                     drift.append(f"{path.name}: MECHANISM LOST -- "
                                  + bar["reason"])
+                # AND THE SECOND GATE, read the same way and reported
+                # apart. A structural row is not in the mechanism count and
+                # its loss is not a mechanism loss, so it gets its own line
+                # naming the row and the panel it went on.
+                sbar = structure_bar(record, have)
+                if not sbar["passed"]:
+                    drift.append(f"{path.name}: STRUCTURAL ROW LOST -- "
+                                 + sbar["reason"])
                 # The measurement block carries a commit and a wall time, so
                 # comparing it would report drift on every re-run. What has
                 # to agree is the SCIENCE.
@@ -537,6 +680,14 @@ def main() -> int:
                               # `unreadable` and another beside a named row.
                               "unreadable",
                               "mechanism_252", "mechanism_heldout_seeds",
+                              # THE FOURTH BLOCK, NAMED HERE OR UNAUDITED.
+                              # A field absent from this list is a field
+                              # `--check` reports nothing about: it could
+                              # move, or go, on every record and the tool
+                              # would print "0 differences". The mechanism
+                              # blocks were named here the day they landed
+                              # and these are named here the day they land.
+                              "structure_252", "structure_heldout_seeds",
                               # A block this run would DROP is drift and the
                               # loudest kind: it is a measurement about to be
                               # deleted by a tool that cannot remake it.
@@ -559,6 +710,23 @@ def main() -> int:
                         "it is measured against has to be retired on purpose",
                       file=sys.stderr)
                 drift.append(f"{path.name}: MECHANISM LOST -- " + bar["reason"])
+                continue
+            # THE SAME ON THE SECOND GATE. `--panel` rebuilds both blocks
+            # from the artefact's per-seed rows, so this path is the one
+            # that can overwrite a PASS with a REFUSED and leave no trace
+            # that it did.
+            sbar = structure_bar(record, json.loads(path.read_text(
+                encoding="utf-8")) if path.exists() else None)
+            if not sbar["passed"]:
+                print(f"REFUSED: {path.name} would overwrite its structural "
+                      f"certificate with one that passes less. "
+                      + sbar["reason"]
+                      + ". A preset may pass MORE structural rows than its "
+                        "record and never fewer; if the loss is intended, "
+                        "the record it is measured against has to be "
+                        "retired on purpose", file=sys.stderr)
+                drift.append(f"{path.name}: STRUCTURAL ROW LOST -- "
+                             + sbar["reason"])
                 continue
             # THE LAST GATE BEFORE TWO COUNTS GO INTO ONE FILE. A record's
             # top-level `in_band` is regraded here at the panel's basis while
@@ -725,6 +893,95 @@ def write_mechanism_gate(panel_path: str) -> int:
         print(f"  {refused} preset(s) REFUSED: a committed certificate shows "
               f"a mechanism this panel does not", file=sys.stderr)
         return 1
+    return 0 if written else 1
+
+
+def write_structure_rows(panel_path: str) -> int:
+    """Set the two structural certificates on every record the panel names.
+
+    Two fields and nothing else, for `write_mechanism_gate`'s reason word
+    for word: a preset's `panel_252` was measured on the build and the
+    roster generator of its own day, and this certificate is measured today.
+    Writing both from one run would move the published band figures for a
+    reason that has nothing to do with the structural question. So the
+    blocks carry their OWN provenance and a reader can see the two were
+    taken on different builds because each says which.
+
+    THE ROW IS NOT MEASURED HERE AND NOT MEASURED ANYWHERE FOR THIS.
+    `vix_ar1_debiased` is computed on every seed of every run and retained
+    per seed in the artefact; `structure_blocks` reads those readings and
+    signs them against `facts.REAL_VIX_AR1`. The engine is not called.
+
+    THE BAR, READ BEFORE THE BLOCKS ARE REPLACED, and refused per preset
+    rather than per run -- one preset that regressed is not a reason to
+    leave the other seventeen carrying a stale certificate. On the first run
+    of this mode every preset takes the first-lay-down branch, because none
+    has ever carried the block.
+    """
+    panel = json.loads(pathlib.Path(panel_path).read_text(encoding="utf-8"))
+    from tradefloor import envelope
+
+    written = 0
+    refused = 0
+    skipped = 0
+    for name in sorted(panel["presets"]):
+        path = OUT / f"{name}.json"
+        if not path.exists():
+            print(f"  skipped {name}: no committed record to write onto")
+            continue
+        record = json.loads(path.read_text(encoding="utf-8"))
+        blocks = structure_blocks(panel, name)
+        if not blocks:
+            # Stated, never guessed, and never written as an empty block: an
+            # artefact that does not retain the per-seed rows cannot produce
+            # this certificate, and a record left without one is refused by
+            # the bar rather than passed by it.
+            print(f"  skipped {name}: this artefact retains no per-seed rows "
+                  f"for {', '.join(envelope.CERTIFIED_STRUCTURE)}, so there "
+                  f"is nothing to sign against the tape")
+            skipped += 1
+            continue
+        bar = structure_bar(blocks, record)
+        if not bar["passed"]:
+            print(f"  REFUSED {name}: " + bar["reason"]
+                  + ". The certificate on disk passes a structural row this "
+                    "panel refuses, and writing would erase the comparison",
+                  file=sys.stderr)
+            refused += 1
+            continue
+        record.update(blocks)
+        ordered = {}
+        for key, value in record.items():
+            if key in envelope.STRUCTURE_BAR_PANELS:
+                continue
+            ordered[key] = value
+            if key == "mechanism_heldout_seeds":
+                for field in envelope.STRUCTURE_BAR_PANELS:
+                    ordered[field] = record[field]
+        ordered = place_level_protocol(ordered)
+        path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8", newline="\n")
+        for field in envelope.STRUCTURE_BAR_PANELS:
+            b = record[field]
+            for row, v in b["rows"].items():
+                print(f"  wrote {path.relative_to(ROOT)}  {field}  {row}  "
+                      f"{v['verdict'].upper()}"
+                      + (f" ({v['side']} the tape centre)" if v["side"] else "")
+                      + f"  k {v['k']} of {v['n']}, cut {v['cut']}, median "
+                        f"{v['median']:.6f}, offset {v['offset']:+.4f}"
+                      + ("  AT THE CUT" if v["at_the_cut"] else ""))
+        # The bar's own verdict beside the verdicts it is taken on, so a run
+        # that PASSED says so where a run that refused says why.
+        print("  " + envelope.structure_bar_line(bar).strip()
+              if not bar.get("first") else
+              "  structure bar    FIRST     " + bar["reason"])
+        written += 1
+    if refused:
+        print(f"  {refused} preset(s) REFUSED: a committed certificate "
+              f"passes a structural row this panel refuses", file=sys.stderr)
+        return 1
+    if skipped:
+        print(f"  {skipped} preset(s) skipped: no per-seed rows retained")
     return 0 if written else 1
 
 

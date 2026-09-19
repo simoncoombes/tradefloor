@@ -6451,6 +6451,139 @@ def mechanism_verdict(values: Sequence[float], key: str, *,
     }
 
 
+#: The rows the STRUCTURAL gate grades, and today it is one row.
+#:
+#: A structural row is one a fidelity band cannot judge because it HAS NO
+#: BAND -- `RULED_UNREADABLE` holds `vix_ar1_debiased` at both horizons and
+#: no band table in this library carries it -- while its tape ruler is on
+#: the record in full: `REAL_VIX_AR1_WINDOWS` is 35 per-window readings at
+#: 252 and 17 at 504. A row with a centre, an error and no width is exactly
+#: the shape a sign test reads, and `structure_verdict` is that test.
+#:
+#: WHY IT IS A SEPARATE ROSTER AND NOT AN ELEVENTH MECHANISM ROW. Simon's
+#: ruling, `ruling-structural-rows-go-in-a-second-gate-beside-the-panel-not-
+#: mixed-into-it`: a second gate BESIDE the panel, with no structural row
+#: mixed into it. The two gates ask different questions and their nulls are
+#: different objects -- `MECHANISM`'s null is the model WITHOUT the
+#: mechanism (`NULLS`), and this one's reference is the TAPE ITSELF -- so a
+#: count that added them would be a count of two things.
+#:
+#: WHAT THE GATE COSTS, stated where the roster is declared rather than left
+#: for a reader to find out by failing it. The sign test has no width, and
+#: the width has not gone: it has become the assumption that the tape's
+#: centre is exact. At 30 seeds the test's own 50-per-cent-power offset is
+#: 0.4713 per-seed sd, and this row's tape se is 0.010997 -- 1.29 times that
+#: resolution, so the centre's error is NOT small against what the gate can
+#: see, and the gate's false-alarm rate rises with seed count while the
+#: tape's error stays put. `programme/widthless-design.md` derives both
+#: numbers and refuses this form as a SOUNDNESS test on three other
+#: candidate rows for exactly that reason. It is admitted here on the one
+#: row whose per-window tape distribution exists, as a NON-REGRESSION gate
+#: and not as a soundness certificate: what it protects is a reading a
+#: preset once had and must not lose, which is a comparison between two
+#: models on one ruler and does not need the ruler to be exact.
+STRUCTURE: tuple[str, ...] = (VIX_AR1_ROW,)
+
+
+def structure_verdict(values: Sequence[float], key: str, *,
+                      horizon_days: int = TRADING_DAYS_PER_YEAR
+                      ) -> dict[str, Any]:
+    """Do these per-seed readings straddle the real tape's centre?
+
+    THE WIDTHLESS FORM. `mechanism_verdict` signs the readings against the
+    row's mechanism-absent null and asks whether the model is on the tape's
+    SIDE of it. This asks the other question, the one a band would answer if
+    the row had one: is the model's reading centred on the tape at all. The
+    reference is `real_centre(key)` itself, the test is the same exact,
+    distribution-free sign test at the same tolerance `BAND_RULE` carries,
+    and it is TWO-SIDED because a model above the tape and a model below it
+    are both off it.
+
+      k          per-seed readings strictly ABOVE the tape centre
+      cut        `sign_cut(n, tolerance)` -- 21 at n = 30, tolerance 0.06486
+      REFUSED    `k >= cut` (the model sits high) or `k <= n - cut` (low)
+      PASS       between them: the readings straddle the centre and the run
+                 is not distinguishable from one centred on the tape
+
+    A PASS IS NOT A CERTIFICATE THAT THE MODEL IS NEAR THE TAPE, and the
+    asymmetry is the whole limit of the form. Three tape standard errors
+    past the centre and thirty seeds read the same `k`; the test says the
+    model sits on one side of a POINT more often than chance, never that it
+    sits close to it. `STRUCTURE` records what that costs in full.
+
+    `side` names which way a refusal went, because "high" and "low" are
+    different repairs and a bare REFUSED would waste the reading. `at_the_
+    cut` marks `k` exactly on either boundary, where one seed decides the
+    verdict -- the shipped default sits there at 252 and a reader must be
+    able to see that without recomputing the test.
+
+    `se_real` is carried beside the verdict and is NOT a gate: it is the
+    tape centre's own standard error, and the gap between it and the test's
+    resolution is what `STRUCTURE` warns about. A reader comparing a
+    refusal's `offset` with `se_real` can see whether the model is off the
+    tape by more than the tape is known to.
+    """
+    if key not in STRUCTURE:
+        raise ValidationError(
+            f"{key!r} is not a structural row, so a sign test against the "
+            f"tape's centre is not the test this library runs on it. "
+            f"Structural rows are {sorted(STRUCTURE)}; a graded row is "
+            f"scored by `envelope.score` against its band and, where it "
+            f"certifies a mechanism, by `mechanism_verdict` against its null")
+    values = [v for v in values if v is not None]
+    if len(values) < 2:
+        raise ValidationError(
+            f"a sign test on {key} needs at least two per-seed readings, got "
+            f"{len(values)}")
+
+    centre = real_centre(key, horizon_days=horizon_days)
+    if centre is None:
+        raise ValidationError(
+            f"{key}'s real centre is undetermined at {horizon_days} days, so "
+            f"there is no point to sign the readings against. The horizons "
+            f"with a per-window tape record are {sorted(REAL_VIX_AR1_WINDOWS)}")
+
+    n = len(values)
+    # The row's own band-window count and the tolerance that count carries,
+    # by the same route `mechanism_verdict` takes, so the two gates are as
+    # tolerant of a correct model as each other and as the band is. Nothing
+    # is chosen here: nine windows at 252 give 0.06486 and a cut of 21 at
+    # thirty seeds.
+    windows = band_windows(key, horizon_days)
+    tolerance = band_rule_tolerance(windows)
+    cut = sign_cut(n, tolerance)
+    k = sum(1 for v in values if v > centre)
+    if k >= cut:
+        verdict, side = "refused", "above"
+    elif k <= n - cut:
+        verdict, side = "refused", "below"
+    else:
+        verdict, side = "pass", None
+
+    median = statistics.median(values)
+    return {
+        "row": key,
+        "n": n,
+        "horizon_days": horizon_days,
+        "real_centre": centre,
+        "se_real": real_centre_se(key, horizon_days=horizon_days),
+        "tape_windows": len(REAL_VIX_AR1_WINDOWS.get(horizon_days, ())),
+        "k": k,
+        "cut": cut,
+        "tolerance": tolerance,
+        "band_windows": windows,
+        "p": binomial_two_sided(n, k),
+        "verdict": verdict,
+        "side": side,
+        "at_the_cut": k == cut or k == n - cut,
+        "median": median,
+        # Effect size, never the gate, and signed so a reader can see which
+        # way a refusal went without re-reading `side`.
+        "offset": median - centre,
+        "se_normal": median_se(values),
+    }
+
+
 def centre_distance(values: Sequence[float], key: str, *,
                     horizon_days: int = TRADING_DAYS_PER_YEAR) -> dict[str, Any]:
     """How far the graded median sits from the real centre, in both errors.

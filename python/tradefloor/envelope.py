@@ -287,6 +287,45 @@ CERTIFIED_CRISIS: dict[str, float] = {
     "index_tail_dn3_pct": 0.6906,
 }
 
+#: THE STRUCTURAL ROWS: the fourth certification block, and the only one
+#: whose rows have no band at all.
+#:
+#: `CERTIFIED` is the fourteen shape rows, `CERTIFIED_LEVEL` and
+#: `CERTIFIED_CRISIS` the rows certified on `facts.LEVEL_PROTOCOL`. All
+#: three are graded against a WIDTH: a band that says what a real year could
+#: read. This one is not, because its row has no band in this library and
+#: `facts.RULED_UNREADABLE` says so at both horizons -- the adoption is
+#: ruled and the table entry has never landed.
+#:
+#: What the row does have is the tape itself: `facts.REAL_VIX_AR1_WINDOWS`
+#: is 35 per-window readings at 252 days, median 0.929939 after
+#: `debias_ar1`, on a standard error of 0.010997. A centre, an error, and no
+#: width is the shape an exact sign test reads, and
+#: `facts.structure_verdict` is that test. `certify_structure` runs it on
+#: the per-seed panels a certification run already produces.
+#:
+#: A SECOND GATE BESIDE THE PANEL, NOT A FIFTEENTH PANEL ROW, and that is
+#: Simon's ruling and not a convenience. The row enters no `in_band` count,
+#: no `misses` list and no mechanism count; it is scored on its own, written
+#: onto a record under its own field, and read by a bar of its own.
+#: `tools/calibration/preset_panel.py` has measured and reported it,
+#: ungraded, since the retain repair, and nothing about that changes: what
+#: is new is that a verdict is now taken on it and refused on.
+#:
+#: THE VALUE IS THE DEFAULT PRESET'S READING, like the three tables above,
+#: and this default is REFUSED on it. pt-v19 reads 0.959419 as the median of
+#: thirty seeds at 252 days, 0.0295 above the tape's centre, with k = 21 of
+#: 30 seeds above the centre against a cut of 21 -- EXACTLY at the cut, so
+#: one seed decides the verdict -- and 28 of 30 on the held-out seeds. The
+#: outgoing pt-v18 PASSES on both panels, at k = 20 and k = 18. The block is
+#: laid down carrying that refusal rather than withheld until it is green:
+#: the gate is a non-regression bar, a preset with no prior record has
+#: nothing to regress from, and a row nobody can see is a row nobody fixes.
+#: A model that repairs it locks the PASS in for every model after it.
+CERTIFIED_STRUCTURE: dict[str, float] = {
+    "vix_ar1_debiased": 0.959419,
+}
+
 #: Bands re-derived at a 504-day window, from the same reference roster and
 #: estimators as `facts.REAL_MARKETS`. Scoring a 504-day measurement against
 #: the 252-day bands is the wrong ruler, and it flatters the model on
@@ -1710,6 +1749,59 @@ def tail_block(panels: Sequence[Mapping[str, Any]], *,
     }
 
 
+def certify_structure(panels: Sequence[Mapping[str, float]], *,
+                      horizon_days: int = CERTIFIED_HORIZON_DAYS
+                      ) -> dict[str, Any]:
+    """The STRUCTURAL certificate: `facts.STRUCTURE`, signed against the tape.
+
+    The second gate, beside the panel and mixed into none of it. `certify`'s
+    three counts grade the fourteen shape rows against bands; this grades
+    the rows that HAVE no band against the tape's own centre, by
+    `facts.structure_verdict`. It is called from `certify` so one run
+    produces both and they cannot be measured on two different panels, and
+    it is a function of its own so `record.py --structure-rows` can build
+    the block from a retained artefact's per-seed rows without re-measuring
+    anything.
+
+    THE BLOCK IS ALREADY RECORD-SHAPED. `certification_record` exists
+    because `certify`'s mechanism answer carries objects a JSON record
+    cannot hold; every field here is JSON-safe, so there is no second shape
+    to drift from and no trimming function to keep in step.
+
+    A row the panels do not carry is ABSENT rather than passed. The
+    per-seed panels of a run that stopped measuring `vix_ar1_debiased` would
+    otherwise produce an empty `refused` list, which reads as a clean
+    certificate -- the `not_shown`-shrinks failure one gate over, in its own
+    spelling. `structure_bar` refuses on `absent` for that reason.
+    """
+    from . import facts as _facts
+
+    rows: dict[str, Any] = {}
+    absent: list[str] = []
+    for row in _facts.STRUCTURE:
+        values = [p[row] for p in panels if p.get(row) is not None]
+        if len(values) < 2:
+            absent.append(row)
+            continue
+        rows[row] = _facts.structure_verdict(values, row,
+                                             horizon_days=horizon_days)
+    passed = sorted(r for r, v in rows.items() if v["verdict"] == "pass")
+    refused = sorted(r for r, v in rows.items() if v["verdict"] == "refused")
+    return {
+        "horizon_days": horizon_days,
+        "seeds": len(panels),
+        "counts": {
+            "structure_pass": len(passed),
+            "structure_of": len(rows),
+        },
+        "passed": passed,
+        "refused": refused,
+        "absent": sorted(absent),
+        "at_the_cut": sorted(r for r, v in rows.items() if v["at_the_cut"]),
+        "rows": rows,
+    }
+
+
 def certify(panels: Sequence[Mapping[str, float]], *,
              horizon_days: int = CERTIFIED_HORIZON_DAYS,
              stationary_opening: bool | None = None) -> dict[str, Any]:
@@ -1808,6 +1900,22 @@ def certify(panels: Sequence[Mapping[str, float]], *,
         "fidelity": fidelity,
         "bar": bar,
         "mechanism": mechanism,
+        # THE SECOND GATE, BESIDE THE THREE COUNTS AND IN NONE OF THEM.
+        # `facts.STRUCTURE`'s rows have no band, so they are in `fidelity`,
+        # in `counts` and in `mechanism` nowhere at all; the ruling is that
+        # a structural row goes in a gate of its own rather than into the
+        # panel. It is computed here so that one run produces both
+        # certificates off ONE set of per-seed panels -- the failure to
+        # avoid is a bar reading a structural verdict from a different run
+        # than the mechanism verdict beside it.
+        #
+        # `certification_record` does NOT carry this and must not: the
+        # mechanism block is written onto every committed record and folding
+        # a structural row into it is the mixing the ruling forbids. It
+        # reaches a record through `record.py --structure-rows`, under its
+        # own field, exactly as `CERTIFIED_LEVEL` reaches one through
+        # `--level-rows`.
+        "structure": certify_structure(panels, horizon_days=horizon_days),
         "centre": centre,
         # The index tail row, which is neither a shape row nor a mechanism
         # row: it counts events rather than reading a shape, so it has its
@@ -2096,6 +2204,182 @@ def mechanism_bar_line(verdict: Mapping[str, Any]) -> str:
     """The bar's verdict as one line, to sit beside the three counts."""
     return (f"  mechanism bar    {'PASS' if verdict['passed'] else 'REFUSED'}"
             f"     no mechanism the record shows may go unshown -- "
+            + verdict["reason"])
+
+
+def structure_bar(fresh: Mapping[str, Any] | None,
+                  recorded: Mapping[str, Any] | None,
+                  *, label: str = "structure",
+                  horizon_days: int = CERTIFIED_HORIZON_DAYS) -> dict[str, Any]:
+    """The structural certificate against the one a preset committed.
+
+    THE SAME RULE AS `mechanism_bar`, IN THE SAME FORM, on Simon's ruling:
+    subset, both panels. A preset must not read REFUSED on a structural row
+    its own committed record reads PASS. It may pass MORE rows than its
+    record, never fewer, and a row that leaves the certificate is a loss and
+    not a shorter list.
+
+    WHAT THIS DOES AND DOES NOT DO TODAY, said here because the block is
+    being laid down RED and a reader will otherwise expect it to be
+    blocking. pt-v19 reads REFUSED on `vix_ar1_debiased` on both panels and
+    it SHIPS, because there is no earlier record to regress from and the bar
+    is a non-regression rule rather than a fidelity threshold. What the
+    block buys today is visibility -- the row is on every record, by name,
+    with its `k`, its cut and its side -- and what it buys tomorrow is the
+    ratchet: the first model that repairs the row lays down a PASS, and from
+    that record on no model may lose it again.
+
+    WHY NOT A HARD FAIL ON REFUSED, which is the obvious alternative and the
+    one the row's own evidence argues for. Two reasons, and the first is
+    Simon's ruling and settles it. The second is the form's: the sign test
+    has no width, its separation is bought by treating the tape's centre as
+    exact, and at thirty seeds the tape's standard error is 1.29 times the
+    test's own resolution (`facts.STRUCTURE`, `programme/widthless-design.md`).
+    A gate that REFUSED a release on that would be ruling a 0.03 offset a
+    ship-stopper on a ruler known to be softer than the offset it is
+    measuring. Non-regression asks a question the form can answer: it
+    compares two models on one ruler, and an exact ruler is not needed to
+    say that one model moved off a point the other sat on.
+
+    THREE REFUSALS, each named, exactly as the mechanism bar names its own:
+
+      lost      a row the record passes and this certificate refuses.
+      absent    a row in neither list -- it has left the gate rather than
+                failed it, which a subset on `refused` alone reads as a
+                PASS because `refused` shrinks when a row vanishes.
+      no record a preset that has laid none down. Subset against nothing is
+                an absence and an absence is not a result. The tool that
+                WRITES the first record is the exception, and it says so at
+                its own call site rather than here.
+
+    `fresh` and `recorded` are `certify_structure` blocks. Both must be the
+    same PANEL as well as the same horizon; `structure_record_bar` pairs
+    them by name.
+    """
+    from . import facts as _facts
+
+    def lists(b: Mapping[str, Any]) -> tuple[set[str], set[str]]:
+        return set(b.get("passed") or ()), set(b.get("refused") or ())
+
+    def refuse(reason: str, **extra: Any) -> dict[str, Any]:
+        out = {"label": label, "horizon_days": horizon_days, "passed": False,
+               "rows_passed": [], "recorded_passed": [], "lost": [],
+               "absent": [], "gained": [], "reason": reason}
+        out.update(extra)
+        return out
+
+    if recorded is None:
+        return refuse(
+            f"{label}: no committed structural certificate to read against. "
+            f"The bar is a subset rule and a preset with no record has laid "
+            f"down no set to be a subset of; lay the record down with "
+            f"`record.py --structure-rows` before shipping against it")
+    if fresh is None:
+        return refuse(
+            f"{label}: the record carries a structural certificate and this "
+            f"run produced none, which is a gate that stopped being run "
+            f"rather than a preset that passed it")
+
+    for name, b in (("this run", fresh), ("the record", recorded)):
+        days = b.get("horizon_days")
+        if days is not None and int(days) != int(horizon_days):
+            return refuse(
+                f"{label}: {name} was certified at {days} days and the bar "
+                f"reads {horizon_days}; a structural row's tape centre is "
+                f"per horizon (facts.REAL_VIX_AR1_WINDOWS) and a subset "
+                f"taken across two of them signs against two different points")
+
+    now_pass, now_refused = lists(fresh)
+    was_pass, _ = lists(recorded)
+    accounted = now_pass | now_refused
+    absent = sorted(set(_facts.STRUCTURE) - accounted)
+
+    # THE SUBSET, TAKEN ON THE PASSING SIDE, for `mechanism_bar`'s reason
+    # one row over: a row deleted from the certificate leaves `refused`
+    # SMALLER, so `refused <= recorded` passes on exactly the change that
+    # removed the row from the gate.
+    lost = sorted(r for r in was_pass if r not in now_pass and r not in absent)
+    gained = sorted(r for r in now_pass if r not in was_pass)
+
+    reasons = []
+    if absent:
+        reasons.append(
+            f"{label}: the certificate does not answer "
+            + ", ".join(absent)
+            + " -- a structural row in neither passed nor refused has left "
+              "the gate rather than failed it")
+    if lost:
+        reasons.append(
+            f"{label}: the record PASSES " + ", ".join(lost)
+            + " and this certificate REFUSES "
+            + ", ".join(
+                f"{r} (k {fresh['rows'][r]['k']} of {fresh['rows'][r]['n']} "
+                f"{fresh['rows'][r]['side']} the tape centre "
+                f"{fresh['rows'][r]['real_centre']:.6f}, cut "
+                f"{fresh['rows'][r]['cut']})"
+                if (fresh.get("rows") or {}).get(r) else r
+                for r in lost))
+
+    return {
+        "label": label,
+        "horizon_days": horizon_days,
+        "passed": not reasons,
+        "rows_passed": sorted(now_pass),
+        "recorded_passed": sorted(was_pass),
+        "lost": lost,
+        "absent": absent,
+        "gained": gained,
+        "reason": "; ".join(reasons) if reasons else (
+            f"{label}: every one of the {len(was_pass)} structural row(s) "
+            f"the record passes passes again"
+            + (f", and {len(gained)} more (" + ", ".join(gained) + ")"
+               if gained else "")),
+    }
+
+
+#: The two structural certificates a preset record carries, and the field
+#: each is read from. BOTH ARE READ AND EITHER FAILING IS A FAILURE, for
+#: `MECHANISM_BAR_PANELS`' reasons exactly: the two panels are different
+#: seed sets, the held-out seeds exist to catch what the measured thirty
+#: cannot, and the shipped default already reads k = 21 of 30 at 252 and
+#: k = 28 of 30 held-out -- one at the cut and one nowhere near it, on the
+#: same preset and the same build. A bar reading either panel alone would
+#: spend exactly the protection the second panel is there to give.
+STRUCTURE_BAR_PANELS = ("structure_252", "structure_heldout_seeds")
+
+
+def structure_record_bar(fresh: Mapping[str, Any],
+                         recorded: Mapping[str, Any] | None,
+                         *, horizon_days: int = CERTIFIED_HORIZON_DAYS
+                         ) -> dict[str, Any]:
+    """`structure_bar` on both of a record's structural certificates.
+
+    Takes two preset RECORDS and pairs `STRUCTURE_BAR_PANELS` by name. The
+    verdict passes only if both panels pass, and its `reason` names every
+    row that was lost AND the panel it was lost on -- which is why the
+    per-panel bar is labelled with the field rather than with the word
+    "structure".
+    """
+    panels = {}
+    for field in STRUCTURE_BAR_PANELS:
+        panels[field] = structure_bar(
+            fresh.get(field), (recorded or {}).get(field),
+            label=field, horizon_days=horizon_days)
+    failed = [v for v in panels.values() if not v["passed"]]
+    return {
+        "horizon_days": horizon_days,
+        "passed": not failed,
+        "panels": panels,
+        "lost": sorted({r for v in panels.values() for r in v["lost"]}),
+        "absent": sorted({r for v in panels.values() for r in v["absent"]}),
+        "reason": "; ".join(v["reason"] for v in (failed or panels.values())),
+    }
+
+
+def structure_bar_line(verdict: Mapping[str, Any]) -> str:
+    """The structural bar's verdict as one line, beside the mechanism's."""
+    return (f"  structure bar    {'PASS' if verdict['passed'] else 'REFUSED'}"
+            f"     no structural row the record passes may go refused -- "
             + verdict["reason"])
 
 

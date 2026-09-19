@@ -75,6 +75,22 @@ MARKED = {
         # whether the tree runs, not whether this preset may ship.
         ("test_mechanism_gate.py",
          "test_the_shipped_preset_clears_the_mechanism_bar_on_both_panels"),
+        # THE SECOND GATE'S HALF, and the entry a reader is most likely to
+        # misread, so the reading is written down here. The test is GREEN
+        # and the preset it reads is REFUSED, at the same time and on
+        # purpose: pt-v19 reads REFUSED on `vix_ar1_debiased` on both
+        # panels, and the bar it clears is NON-REGRESSION -- no structural
+        # row a record passes may go refused -- which pt-v19 clears because
+        # it has no earlier structural record to regress from.
+        #
+        # Why it carries the marker. The day a preset lays down a PASS on
+        # the row, a red here is a fact about the preset: a model that lost
+        # a structural reading an earlier one held. That is what the marker
+        # means, and a box gate must deselect it for the reason it
+        # deselects the other two -- the box is being asked whether the
+        # tree runs, not whether this preset may ship.
+        ("test_structure_gate.py",
+         "test_the_shipped_preset_holds_its_structural_certificate_on_both_panels"),
     },
     "needs_live_model": {
         # Both replay `tests/fixtures/openai_agents/five-days.json` and both
