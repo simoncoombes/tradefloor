@@ -27,6 +27,29 @@ corrected on 2026-09-14 are below the marker.
 
 <!-- release-note-ends -->
 
+**The two fear rows enter the ruled band, and the bar's table is whole
+but for one row.** `facts.REAL_MARKETS_RULED` and `REAL_MARKETS_RULED_504`
+now carry `fear_gauge_dn1` at its whole-tape band, (0.39, 3.03) and
+(0.59, 2.73), as `facts.RULED_FEAR_DN1_BAND`, read from the row's own
+provenance block rather than typed; and `fear_gauge_dn3` at its shipped
+whole-record ruler, (2.60, 9.58) at both horizons, as
+`facts.RULED_FEAR_DN3_BAND`. The first was ruled on 2026-09-15
+(`ruling-nineteen-rows-with-dn3-re-derived`, design-repo verdict ledger)
+and had sat in `RULED_UNREADABLE` since, waiting for a ruling already
+made. The second was ruled on 2026-09-19 on the ruler's own construction
+and power: over 173 retained arm readings the shipped band rejects 8, the
+one section 14 form valid at the project's own window anchor rejects 5,
+and the tighter front-anchored form rejects 12 but is cut where the rule
+does not cut; and the choice is neutral on every verdict on the record,
+since both shipped presets are in under every variant measured. The ruled
+band reaches 35 of the bar's 38 cells, from 31; the three cells still
+without one are `vix_ar1_debiased` at both horizons, whose adopted band is
+owed a table entry, and `corr_persistence_acf1` at 504, behind the
+row-definition ruling. No band value moves and no verdict on any committed
+record moves: pt-v19 reads 1.7719 / 1.8082 and 6.3920 / 6.1676 on the two
+rows, inside both bands at both horizons, as `envelope.certified` already
+reported them against the shipped fallback.
+
 **A slow stochastic level on the market factor's variance target, and the
 determinism baseline that had gone stale under it.** `market_vol_level_
 persistence` 0.9977 and `market_vol_level_sigma` 0.085, both defaulting to

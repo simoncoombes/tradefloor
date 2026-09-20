@@ -5253,13 +5253,58 @@ def drift_leg_band(cap_weighted: str, premium: str = "rsp") -> tuple[float, floa
 #: closed.
 RULED_DRIFT_BAND: tuple[float, float] = (1.1, 10.3)
 
+#: `fear_gauge_dn1`'s ruled band, per horizon. RULED on 2026-09-15 by
+#: `ruling-nineteen-rows-with-dn3-re-derived` (design-repo verdict ledger),
+#: in terms: "fear_gauge_dn1 on its new whole-tape band, [0.39, 3.03] at
+#: 252 and [0.59, 2.73] at 504". Landed in the composed table on
+#: 2026-09-19; until then the row sat in `RULED_UNREADABLE` waiting for a
+#: ruling that had already been made.
+#:
+#: READ FROM THE ROW'S OWN PROVENANCE BLOCK rather than typed, so the band
+#: the bar grades against is the one `FEAR_DN1_WINDOWS` derives and
+#: `test_reference_windows.py` re-derives: ^VIX close change paired with
+#: the same session's ^GSPC return, 1990-01-03 to 2025-07-31, the whole
+#: tape the row's data supports under `ruling-longest-tape-per-row`, on the
+#: `fixed` rule at t(33) and t(15). The 32-name equity panel of section 14
+#: cannot carry this row, which is why it is composed in here beside the
+#: two index rows and is not in `REAL_MARKETS_UNIVERSAL`.
+RULED_FEAR_DN1_BAND: dict[int, tuple[float, float]] = {
+    h: tuple(REAL_MARKETS_PROVENANCE["fear_gauge_dn1"]["band"]
+             ["horizons"][h]["band"])
+    for h in (CERTIFIED_HORIZON_DAYS, 504)
+}
+
+#: `fear_gauge_dn3`'s ruled band, the same at both horizons: the SHIPPED
+#: whole-record ruler, the spread rule over the 1990-01-03 to 2026-09-02
+#: windows holding five or more qualifying sessions
+#: (`REAL_MARKETS_PROVENANCE['fear_gauge_dn3']['ruler']`).
+#:
+#: RULED on 2026-09-19. Simon's words, on being asked which of four rulers
+#: the row keeps: "whatever is needed to ensure this measures as the best.
+#: I want the model to dictate the performance, not alter the measurement
+#: to make it appear working." Applied on the desk's own measurement
+#: (`dn3derive-the-corrected-derivation-is-a-weaker-ruler-and-should-not-
+#: be-adopted`, design-repo verdict ledger): over 173 retained arm readings
+#: this band rejects 8; the one section 14 form that is valid at the
+#: project's own last-bar anchor, [0.91, 10.83] and [0.85, 10.36], rejects
+#: 5; the tighter front-anchored [2.16, 7.38] rejects 12 but is cut at an
+#: anchor the rule does not use, which is the growing-series failure
+#: `INDEX_TAIL_WINDOWS` names. So the shipped ruler is the strongest one
+#: with a sound construction, and it is NEUTRAL ON THE COUNT: pt-v19 and
+#: pt-v18 are in under every variant measured, so no choice here could
+#: have made a preset appear to work. The 2026-09-15 section 14
+#: re-derivation stays recorded under `['section14']` and is not adopted.
+RULED_FEAR_DN3_BAND: tuple[float, float] = tuple(REAL_MARKETS["fear_gauge_dn3"])
+
 #: The composed ruled band at the certified horizon: the fourteen shape
-#: rows on the universal table, plus the two level and crisis rows that
+#: rows on the universal table, plus the four level and crisis rows that
 #: have a whole-tape band of their own.
 REAL_MARKETS_RULED: dict[str, tuple[float, float]] = dict(
     REAL_MARKETS_UNIVERSAL,
     index_drift_pct=RULED_DRIFT_BAND,
     index_tail_dn3_pct=RULED_TAIL_BAND,
+    fear_gauge_dn1=RULED_FEAR_DN1_BAND[CERTIFIED_HORIZON_DAYS],
+    fear_gauge_dn3=RULED_FEAR_DN3_BAND,
 )
 
 #: The composed ruled band at 504 bars. `corr_persistence_acf1` is HELD OUT
@@ -5275,6 +5320,8 @@ REAL_MARKETS_RULED_504: dict[str, tuple[float, float]] = {
 }
 REAL_MARKETS_RULED_504["index_drift_pct"] = RULED_DRIFT_BAND
 REAL_MARKETS_RULED_504["index_tail_dn3_pct"] = RULED_TAIL_BAND
+REAL_MARKETS_RULED_504["fear_gauge_dn1"] = RULED_FEAR_DN1_BAND[504]
+REAL_MARKETS_RULED_504["fear_gauge_dn3"] = RULED_FEAR_DN3_BAND
 
 #: Every graded row with NO ruled band, per horizon, and what would give it
 #: one. A consumer reads this instead of inferring absence from a missing
@@ -5290,30 +5337,6 @@ AS_AT_252 = "as at 252"
 
 RULED_UNREADABLE: dict[int, dict[str, str]] = {
     CERTIFIED_HORIZON_DAYS: {
-        "fear_gauge_dn1":
-            "no universal band at either horizon: the 32-name panel carries "
-            "equities and this row is read off ^VIX against ^GSPC. Blocker "
-            "four-level-rows-unbanded, waiting on one ruling on "
-            "fiverows-recommendation-nineteen-rows-with-the-ruler-named-per-row. "
-            "WHAT THE SHIPPED FALLBACK IS HAS CHANGED AND THIS ROW STAYING "
-            "HERE DOES NOT SAY OTHERWISE: on 2026-09-15 facts.REAL_MARKETS "
-            "and envelope.BANDS_504 stopped carrying the 2015-2025 decade "
-            "band for this row and started carrying its whole-tape band, "
-            "(0.39, 3.03) and (0.59, 2.73), under ruling-longest-tape-per-row. "
-            "That ruling is Simon's and stands; the one named above, which "
-            "decides how the BAR composes its ruled table row by row, is not "
-            "made, so the row is still absent from REAL_MARKETS_RULED. "
-            "Putting it there would be making that ruling rather than "
-            "waiting for it",
-        "fear_gauge_dn3":
-            "as fear_gauge_dn1. The section 14 re-derivation is RULED ON AND "
-            "DONE (ruling-nineteen-rows-with-dn3-re-derived, 2026-09-15) and "
-            "it did not replace this row's ruler: the 7.38 ceiling it was "
-            "made on is cut from windows anchored at the FIRST paired "
-            "session, and at the last-bar anchor the rule uses the "
-            "five-session condition leaves three non-crisis windows and no "
-            "band. REAL_MARKETS_PROVENANCE[...]['section14'] carries the "
-            "measurement at both anchors and the ground for not adopting it",
         VIX_AR1_ROW:
             "NO BAND TABLE IN THIS LIBRARY CARRIES THE ROW, and that alone "
             "is what holds it here: REAL_MARKETS, REAL_MARKETS_UNIVERSAL "
@@ -5364,8 +5387,6 @@ RULED_UNREADABLE: dict[int, dict[str, str]] = {
             "ground above is the recorded one and holds on its own. "
             "Blocker corr-persistence-504-unbanded, waiting on the "
             "row-definition ruling",
-        "fear_gauge_dn1": AS_AT_252,
-        "fear_gauge_dn3": AS_AT_252,
         VIX_AR1_ROW: AS_AT_252,
     },
 }
@@ -5515,9 +5536,11 @@ RULED_BY_HORIZON: dict[int, dict[str, tuple[float, float]]] = {
 
 BAND_BASIS["facts.REAL_MARKETS_RULED"] = {
     "era": "1987-06..2025-07 on the fourteen shape rows, 1928-2025 on "
-           "index_drift_pct and index_tail_dn3_pct",
+           "index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on "
+           "fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
     "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP "
-              "on the two whole-record rows",
+              "on the two whole-record rows; ^VIX against ^GSPC on the "
+              "two fear rows",
     "n_windows": 35,
     "rule": "fixed",
     "tolerance": BAND_RULE_FIXED_TOLERANCE,
@@ -5530,6 +5553,15 @@ BAND_BASIS["facts.REAL_MARKETS_RULED"] = {
         "index_tail_dn3_pct": "facts.RULED_TAIL_BAND, 97 non-overlapping "
                               "252-return windows from 1928-04-09 with a "
                               "block-3 bootstrap error",
+        "fear_gauge_dn1": "facts.RULED_FEAR_DN1_BAND[252], 33 non-crisis "
+                          "252-session windows of ^VIX against ^GSPC from "
+                          "1990-01-03, fixed rule at t(33), read from "
+                          "REAL_MARKETS_PROVENANCE['fear_gauge_dn1']['band']",
+        "fear_gauge_dn3": "facts.RULED_FEAR_DN3_BAND, the shipped "
+                          "whole-record ruler: the spread rule over the ten "
+                          "1990-2026 windows holding five or more qualifying "
+                          "sessions, ruled 2026-09-19 on its power against "
+                          "173 retained readings",
     },
     "adjustments": "clamp #1 and clamp #2 re-applied on the shape rows; the "
                    "Campbell ceiling retired as redundant. The tail row's "
@@ -5539,15 +5571,17 @@ BAND_BASIS["facts.REAL_MARKETS_RULED"] = {
                    "counts read +0.5952",
     "unreadable": sorted(RULED_UNREADABLE[CERTIFIED_HORIZON_DAYS]),
     "note": "the composed band each row is graded against under "
-            "ruling-longest-tape-per-row. Three graded rows have no ruled "
-            "band and are absent rather than filled from the decade table",
+            "ruling-longest-tape-per-row. One graded row has no ruled "
+            "band and is absent rather than filled from the decade table",
 }
 
 BAND_BASIS["facts.REAL_MARKETS_RULED_504"] = {
     "era": "1987-06..2025-07 on the thirteen shape rows carried, 1928-2025 "
-           "on index_drift_pct and index_tail_dn3_pct",
+           "on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on "
+           "fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
     "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP "
-              "on the two whole-record rows",
+              "on the two whole-record rows; ^VIX against ^GSPC on the "
+              "two fear rows",
     "n_windows": 16,
     "rule": "fixed",
     "tolerance": BAND_RULE_FIXED_TOLERANCE,
@@ -5556,7 +5590,16 @@ BAND_BASIS["facts.REAL_MARKETS_RULED_504"] = {
     "composed": {
         **{k: "facts.REAL_MARKETS_UNIVERSAL_504"
            for k in REAL_MARKETS_RULED_504
-           if k not in ("index_drift_pct", "index_tail_dn3_pct")},
+           if k not in ("index_drift_pct", "index_tail_dn3_pct",
+                        "fear_gauge_dn1", "fear_gauge_dn3")},
+        "fear_gauge_dn3": "facts.RULED_FEAR_DN3_BAND, the same band at both "
+                          "horizons: the row is pooled over sessions and "
+                          "its ruler is the shipped whole-record one, ruled "
+                          "2026-09-19",
+        "fear_gauge_dn1": "facts.RULED_FEAR_DN1_BAND[504], 15 non-crisis "
+                          "504-session windows of ^VIX against ^GSPC from "
+                          "1990-01-03, fixed rule at t(15), read from "
+                          "REAL_MARKETS_PROVENANCE['fear_gauge_dn1']['band']",
         "index_drift_pct": "facts.RULED_DRIFT_BAND, the same band at both "
                            "horizons: its width is the centre's own "
                            "uncertainty and the centre's resolution does "

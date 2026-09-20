@@ -47,7 +47,7 @@ GRADED = (tuple(facts.SHAPE) + tuple(facts.LEVEL) + tuple(facts.CRISIS)
 #: The two horizons the bar reads. 19 rows by 2 horizons is the 38 cells.
 HORIZONS = (facts.CERTIFIED_HORIZON_DAYS, 504)
 
-#: The seven cells with no ruled band, each with the entry that holds it.
+#: The three cells with no ruled band, each with the entry that holds it.
 #: Written out rather than read from `RULED_UNREADABLE`, because a test that
 #: reads the table it is checking passes whatever the table says. When a
 #: ruling lands this tuple is edited in the same commit as the table, and the
@@ -62,13 +62,21 @@ HORIZONS = (facts.CERTIFIED_HORIZON_DAYS, 504)
 #: quoted as live reads as a decision still owed to Simon, and it is not -- the
 #: work owed is the table entry. The row count moving is what the comment above
 #: is about; this edit does not move it.
-SEVEN = (
-    (252, "fear_gauge_dn1", "four-level-rows-unbanded"),
-    (252, "fear_gauge_dn3", "four-level-rows-unbanded"),
+#:
+#: SEVEN BECAME FIVE ON 2026-09-19. `fear_gauge_dn1`'s two cells left this
+#: tuple when its whole-tape band, ruled on 2026-09-15 by
+#: `ruling-nineteen-rows-with-dn3-re-derived`, was composed into
+#: `REAL_MARKETS_RULED` and `_504` as `facts.RULED_FEAR_DN1_BAND`. That is
+#: the row count moving on purpose, in the same commit as the table.
+#:
+#: FIVE BECAME THREE the same day. `fear_gauge_dn3` kept its shipped
+#: whole-record ruler on Simon's ruling of 2026-09-19 ("the model dictates
+#: the performance, not the measurement") and it was composed in as
+#: `facts.RULED_FEAR_DN3_BAND`. The blocker four-level-rows-unbanded holds
+#: no cell any more; the three left are each behind a table entry owed.
+THREE = (
     (252, "vix_ar1_debiased", "vix-ar1-ruled-band-not-in-the-tables"),
     (504, "corr_persistence_acf1", "corr-persistence-504-unbanded"),
-    (504, "fear_gauge_dn1", "four-level-rows-unbanded"),
-    (504, "fear_gauge_dn3", "four-level-rows-unbanded"),
     (504, "vix_ar1_debiased", "vix-ar1-ruled-band-not-in-the-tables"),
 )
 
@@ -77,7 +85,7 @@ def mid_band_panel(days: int) -> dict[str, float]:
     """A reading for all nineteen rows, mid-band on whichever ruler has one.
 
     Built from the DECADE table where the ruled table has no band, so the
-    seven unreadable cells carry a value that the decade ruler would grade as
+    three unreadable cells carry a value that the decade ruler would grade as
     IN. A fallback from the ruled basis to the decade one therefore shows up
     here as a verdict rather than as an error, which is the failure mode the
     absent-band tests below are written against.
@@ -246,28 +254,28 @@ def test_reach_is_band_for_band_and_not_key_for_key():
 
 
 # --------------------------------------------------------------------------
-# 2. Thirty-one of thirty-eight, and the seven by name
+# 2. Thirty-five of thirty-eight, and the three by name
 # --------------------------------------------------------------------------
 
-def test_the_ruled_band_reaches_thirty_one_of_the_thirty_eight_cells():
+def test_the_ruled_band_reaches_thirty_five_of_the_thirty_eight_cells():
     """The count the blocker turns on, walked through the library."""
     readable = [(d, r) for d in HORIZONS for r in GRADED
                 if facts.ruled_band(r, d) is not None]
     unreadable = [(d, r) for d in HORIZONS for r in GRADED
                   if facts.ruled_band(r, d) is None]
     assert len(readable) + len(unreadable) == 38
-    assert len(readable) == 31, (
-        f"the ruled band reaches {len(readable)} of 38 cells, not 31. If a "
-        f"ruling landed, the SEVEN tuple in this file moves in the same "
+    assert len(readable) == 35, (
+        f"the ruled band reaches {len(readable)} of 38 cells, not 35. If a "
+        f"ruling landed, the THREE tuple in this file moves in the same "
         f"commit; unreadable today: {sorted(unreadable)}")
 
 
-@pytest.mark.parametrize("days,row,blocker", SEVEN)
+@pytest.mark.parametrize("days,row,blocker", THREE)
 def test_each_unreachable_cell_is_named_with_a_reason(days, row, blocker):
     """Absence with a reason, not a missing key a reader has to infer."""
     assert facts.ruled_band(row, days) is None, (
         f"{row} at {days}d now has a ruled band. The blocker {blocker} has "
-        f"moved and this file's SEVEN tuple has not")
+        f"moved and this file's THREE tuple has not")
     reason = facts.RULED_UNREADABLE.get(days, {}).get(row)
     assert reason, (
         f"{row} at {days}d has no ruled band and RULED_UNREADABLE[{days}] "
@@ -315,12 +323,12 @@ def test_score_grades_against_the_ruled_table_when_asked_for_it(days):
             f"is {want}")
 
 
-@pytest.mark.parametrize("days,row,blocker", SEVEN)
+@pytest.mark.parametrize("days,row,blocker", THREE)
 def test_an_unreadable_cell_is_never_filled_from_the_decade_table(
         days, row, blocker):
     """The fallback that would make a blocker disappear without a ruling.
 
-    Five of the seven cells HAVE a decade band, so a producer that fell back
+    One of the three cells HAS a decade band, so a producer that fell back
     would print a verdict rather than raise, and the ship blocker would read
     as cleared. The cell has to come back with no band, no verdict and the
     reason attached.
@@ -341,7 +349,7 @@ def test_the_unreadable_cells_are_named_and_never_folded_into_the_total(days):
     """`of` counts what was graded. `unreadable_of` counts what was not."""
     scored = envelope.score(mid_band_panel(days), horizon_days=days,
                             basis="ruled")
-    expected = sorted(r for d, r, _ in SEVEN if d == days)
+    expected = sorted(r for d, r, _ in THREE if d == days)
     assert sorted(scored["unreadable"]) == expected
     assert scored["unreadable_of"] == len(expected)
     assert scored["of"] == len(GRADED) - len(expected), (
@@ -487,14 +495,29 @@ def test_the_composed_table_carries_the_universal_bands_band_for_band():
                 f"band was edited under an unchanged name")
 
 
-def test_the_rows_the_composition_adds_are_the_two_whole_record_rows():
-    """The only rows the composed table adds over its universal component."""
+def test_the_rows_the_composition_adds_are_the_four_off_panel_rows():
+    """The only rows the composed table adds over its universal component.
+
+    Two whole-record index rows and, since 2026-09-19, the two fear rows,
+    whose ^VIX series the 32-name equity panel cannot carry.
+    """
     added_252 = set(facts.REAL_MARKETS_RULED) - set(
         facts.REAL_MARKETS_UNIVERSAL)
     added_504 = set(facts.REAL_MARKETS_RULED_504) - set(
         facts.REAL_MARKETS_UNIVERSAL_504)
-    assert added_252 == {"index_drift_pct", "index_tail_dn3_pct"}
-    assert added_504 == {"index_drift_pct", "index_tail_dn3_pct"}
+    four = {"index_drift_pct", "index_tail_dn3_pct", "fear_gauge_dn1",
+            "fear_gauge_dn3"}
+    assert added_252 == four
+    assert added_504 == four
+    assert facts.REAL_MARKETS_RULED["fear_gauge_dn1"] == (0.39, 3.03)
+    assert facts.REAL_MARKETS_RULED_504["fear_gauge_dn1"] == (0.59, 2.73)
+    # The -3 per cent row keeps its shipped ruler at both horizons, and
+    # the ruled table reads the same object the shipped tables do.
+    assert facts.REAL_MARKETS_RULED["fear_gauge_dn3"] == (2.60, 9.58)
+    assert facts.REAL_MARKETS_RULED_504["fear_gauge_dn3"] == (2.60, 9.58)
+    assert (facts.REAL_MARKETS_RULED["fear_gauge_dn3"]
+            == tuple(facts.REAL_MARKETS["fear_gauge_dn3"])
+            == tuple(envelope.BANDS_504["fear_gauge_dn3"]))
 
 
 def test_every_ruled_table_states_what_it_is():

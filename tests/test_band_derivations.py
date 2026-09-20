@@ -487,23 +487,31 @@ def test_the_two_registries_are_the_whole_of_what_is_not_rebuilt():
     assert not set(SUMMARY_DERIVED) & set(UNDERIVED)
 
 
-def test_the_ruled_table_is_the_universal_one_plus_the_two_whole_record_rows():
+def test_the_ruled_table_is_the_universal_one_plus_the_four_off_panel_rows():
     """What the RELEASE BAR's own band table is made of, counted.
 
     `envelope.BAR_BAND_BASIS` is "ruled", so `REAL_MARKETS_RULED` is the
-    table the bar is read on. Fourteen of its sixteen rows at 252 are the
+    table the bar is read on. Fourteen of its eighteen rows at 252 are the
     universal bands this file rebuilds from `UNIVERSAL_WINDOWS`; the tail row
     comes from `RULED_TAIL_WINDOWS` and the drift row from `DRIFT_LEGS`, one
-    of them readings and one of them a summary.
+    of them readings and one of them a summary; and since 2026-09-19 the -1
+    per cent fear row comes from `FEAR_DN1_WINDOWS` through the row's own
+    provenance block, which `test_reference_windows.py` re-derives, and the
+    -3 per cent row keeps the shipped whole-record ruler `UNDERIVED` above
+    already names as the one band this file cannot rebuild.
     """
     assert envelope.BAR_BAND_BASIS == "ruled"
     ruled = facts.REAL_MARKETS_RULED
     from_universal = [k for k in ruled if k in REAL_MARKETS_UNIVERSAL]
     rest = sorted(set(ruled) - set(from_universal))
     assert len(from_universal) == 14
-    assert rest == ["index_drift_pct", "index_tail_dn3_pct"]
+    assert rest == ["fear_gauge_dn1", "fear_gauge_dn3", "index_drift_pct",
+                    "index_tail_dn3_pct"]
+    assert ruled["fear_gauge_dn3"] == facts.RULED_FEAR_DN3_BAND == (2.60, 9.58)
     assert ruled["index_drift_pct"] == facts.RULED_DRIFT_BAND
     assert ruled["index_tail_dn3_pct"] == facts.RULED_TAIL_BAND
+    assert ruled["fear_gauge_dn1"] == facts.RULED_FEAR_DN1_BAND[252]
+    assert ruled["fear_gauge_dn1"] == facts.REAL_MARKETS["fear_gauge_dn1"]
 
 
 # --------------------------------------------------------------------------

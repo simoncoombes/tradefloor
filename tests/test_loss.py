@@ -810,8 +810,8 @@ def test_the_panel_rows_carry_their_band_distances(facts):
     # to measure to. It is PRESENT and says so, which is the state this loop
     # has to be able to tell from a row that was never measured, so the
     # contract is asserted here rather than the row being filtered out
-    # silently. At the default basis, `ruled`, these are the three rows
-    # `facts.RULED_UNREADABLE[252]` names, each a ship blocker.
+    # silently. At the default basis, `ruled`, this is the one row
+    # `facts.RULED_UNREADABLE[252]` names, behind a table entry that is owed.
     unreadable = [k for k, r in rows.items() if r["matches"] is None]
     for key in unreadable:
         assert rows[key]["verdict"] == "unreadable", key
