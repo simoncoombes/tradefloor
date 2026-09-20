@@ -7,24 +7,20 @@ a run that did not name a preset will not replay against earlier versions.
 Naming a preset still replays exactly, and every preset from pt-v1 on stays
 selectable.
 
-**pt-v19's panel, row by row, recomposed on 2026-09-20.** Every row is in
-its ruled band in all four cells of the record: fourteen of fourteen at
-252 days, thirteen of thirteen readable at 504, fourteen of fourteen on the
-held-out universe and on the held-out seeds, with no misses. On the level
-protocol `index_drift_pct` reads 6.28 against a real 7.37, `fear_gauge_dn1`
-1.94 against 2.66, `fear_gauge_dn3` 6.40 against 5.73 and
-`index_tail_dn3_pct` 1.05 against 1.21, all in band. Nine of the ten
-mechanism rows show their mechanism on the 252 panel and eight on the
-held-out seeds: `corr_persistence_acf1`'s mechanism, which the stochastic
-level carried, is the one the recomposition gave up, on purpose, and the
-2026-09-14 record was retired so this one could be written. Twelve of the
-fourteen shape rows sit at the tape's centre. The two rows this default
-reads furthest from real are unchanged in kind: the crisis lever at 2.42x
-against 6.16, and `sector_excess_corr` at 0.113 against 0.164, in band
-and three tape errors short. VIX persistence is refused on both panels,
-above the tape (k 25 and 22 of 30 against a cut of 21), and it clears the
-second gate under non-regression because the record it is measured
-against is this one.
+**pt-v19's panel, recomposed on 2026-09-20.** Every row is in its ruled
+band in all four cells of the record: fourteen of fourteen at 252 days,
+thirteen of thirteen readable at 504, fourteen of fourteen held out, no
+misses. On the level protocol `index_drift_pct` reads 6.28 against a real
+7.37, `fear_gauge_dn1` 1.94 against 2.66, `fear_gauge_dn3` 6.40 against
+5.73 and `index_tail_dn3_pct` 1.05 against 1.21, all in band. Nine of ten
+mechanism rows show their mechanism at 252 and eight held out:
+`corr_persistence_acf1`'s, which the stochastic level carried, is given up
+on purpose, and the 2026-09-14 record was retired so this one could be
+written. Twelve of fourteen shape rows sit at the tape's centre. Furthest
+from real: the crisis lever at 2.42x against 6.16, and `sector_excess_corr`
+at 0.113 against 0.164, in band and three tape errors short. VIX
+persistence is refused on both panels, above the tape, and clears the
+second gate under non-regression because this record is its reference.
 
 The slow stochastic level that produced this preset, the `KAT_VERSION`
 bump, the checkpoint fix, the nineteenth scored row and the figures
