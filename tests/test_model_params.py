@@ -236,7 +236,10 @@ PERTURBATIONS = [
     # built for -- the `alphax2` box refuted that -- and the two are
     # different questions, which is why one is a test and the other was a
     # box.
-    ("market_vol_alpha_excursion", 0.20, True),
+    # RE-FLAGGED 2026-09-20: unread while the DEFAULT ships
+    # `market_vol_level_sigma` 0.0 again (the recomposition), the same gate
+    # the two level rows below name.
+    ("market_vol_alpha_excursion", 0.20, False),
     # The slow variance LEVEL's two dials, added at 0.8.0 and turned ON in
     # pt-v19 on 2026-09-14. BOTH read True now, and persistence reads True
     # only BECAUSE the default ships `market_vol_level_sigma` 0.085.
@@ -259,7 +262,9 @@ PERTURBATIONS = [
     # session on `stream::MARKET_VOL_LEVEL`, unconditionally, whatever the
     # dials read. A dial that gated its own draw would put the schedule on
     # a settable, which is the thing the draw-schedule rule forbids.
-    ("market_vol_level_persistence", 0.99, True),
+    # RE-FLAGGED 2026-09-20: the recomposed pt-v19 ships the level OFF
+    # again, so persistence is back to unread; sigma alone is still the switch.
+    ("market_vol_level_persistence", 0.99, False),
     ("market_vol_level_sigma", 0.05, True),
     # The market-side warm-up, added 2026-09-14 and shipping at 0.0 on
     # every preset. MEASURED True on the probe below, and the reason it
@@ -276,7 +281,9 @@ PERTURBATIONS = [
     # like the level's own normal: it takes no draw at all. The warm-up is
     # a deterministic function of the level draw the close already makes,
     # which is what let it land without declaring a stream.
-    ("market_burn_in_sessions", 504.0, True),
+    # RE-FLAGGED 2026-09-20: inert again with the level off, exactly as the
+    # comment above predicted for "a preset shipping the level off".
+    ("market_burn_in_sessions", 504.0, False),
     ("market_vol_ceiling_multiple", 0.5, True),
     ("market_vol_floor_multiple", 2.0, True),
     ("market_vol_vix_coupling", 0.0, True),
@@ -811,7 +818,11 @@ PERTURBATIONS = [
     # RE-VALUED at the 0.8.0 vector adoption, NOT re-flagged. pt-v19 now
     # ships 1.0, so the old perturbation of 1.0 was the shipped
     # value itself: a row that perturbs nothing and can never fail. 0.0 moves (it is the switch's off position); 0.5 does not.
-    ("jump_idio_vix_decoupled", 0.0, True),
+    # RE-VALUED AGAIN 2026-09-20: the recomposed pt-v19 ships 0.0, so the
+    # perturbation is 1.0 -- and it MOVES the market with the excitation
+    # block off, which is what puts the dial in provenance.POST_BASELINE
+    # rather than OUT_OF_SCOPE.
+    ("jump_idio_vix_decoupled", 1.0, True),
     # An upper bound on the VIX state, shipped at 80.0. INERT at 40.0 for a
     # reason the probe's own range gives rather than a dead wire: the VIX
     # reads 14.8477, 15.0094 and 15.0644 over the three days, so a bound at

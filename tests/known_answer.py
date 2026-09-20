@@ -319,7 +319,19 @@ import tradefloor
 # to 0.117 against 0.118, and the objective from 30.56 to 23.08 at 252 and
 # 38.08 to 21.82 at 504 against pt-v18's 31.56 and 41.44 -- 5.3 and 7.8
 # paired error bars with every roster resample ahead.
-KAT_VERSION = 22
+#
+# pt-v19 RECOMPOSED (2026-09-20). Nine dials return to pt-v18's values: the
+# GJR triple, the slow pole, the stochastic level and the three
+# idiosyncratic jump dials. The 2^6 factorial over the six families that
+# separate pt-v18 from the 2026-09-14 composition (design repo,
+# programme/results/bestof, 64 cells at 252 and 504 days, registered before
+# it ran) measured the market variance family away from the tape on four
+# rows in 32 of 32 pairs at both horizons and the jump family moving nothing
+# beyond noise. The level's ninth-stream draw is still taken and multiplied
+# by 0.0, so no other preset's trajectory moves; pt-v19's does, and this is
+# its third boundary in six days. `metadataSha256` does NOT move, for the
+# eighth boundary running.
+KAT_VERSION = 23
 
 SEED = 20260820
 DAYS = 250

@@ -27,6 +27,33 @@ corrected on 2026-09-14 are below the marker.
 
 <!-- release-note-ends -->
 
+**pt-v19 is recomposed: nine dials return to pt-v18's values, and every
+seeded pt-v19 trajectory changes a third time.** A 2^6 factorial over the
+six dial families that separate pt-v18 from the 2026-09-14 composition
+(design repository, `programme/results/bestof/RESULT.md` and
+`RESULT-504.md`, registered before it ran, 64 cells at 252 and 504 days,
+both parents reproducing their committed records bit for bit) measured the
+market variance family -- the GJR triple, the slow pole and the stochastic
+level -- away from the tape on volatility level, cross-sectional
+correlation, correlation persistence and the fear rows in 32 of 32 pairs
+at both horizons, against one gain on kurtosis; and the idiosyncratic jump
+family moving nothing beyond noise. Both return to pt-v18. The VIX law
+stays, and only with the two crisis dials: every cell carrying it without
+them runs away over a two-year window. This is cell 101011 of that
+design, S 88.5 at 252 and 45.9 at 504 against pt-v18's 78.4 and 74.4 and
+the previous pt-v19's 122.3 and 105.5, the fear rows on the tape at both
+horizons, the sector row 3.7 to 4.2 tape se short at both, the crisis
+lever 2.4x against a real 6.2x. Simon's ruling, 2026-09-20: no new preset;
+pt-v19 is the vector that certifies. `KAT_VERSION` bumps to 23 and
+`tests/known_answer.json` is regenerated; `metadataSha256` does not move,
+for the eighth boundary running. The six dials that return to 0.0 leave
+`DIAL_PROVENANCE` for `OUT_OF_SCOPE` with the gate each names, except
+`jump_idio_vix_decoupled`, which is live on its own and is recorded as
+`undetermined` in `POST_BASELINE`. The derivations the returned values
+replace stay in the design repository. The record, the envelope tables
+and the level block are regenerated on the certification box, and the
+figures above this marker describe the previous vector until they are.
+
 **The two fear rows enter the ruled band, and the bar's table is whole
 but for one row.** `facts.REAL_MARKETS_RULED` and `REAL_MARKETS_RULED_504`
 now carry `fear_gauge_dn1` at its whole-tape band, (0.39, 3.03) and

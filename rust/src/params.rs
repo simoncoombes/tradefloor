@@ -987,7 +987,8 @@ pub struct ModelParams {
     /// The per-session innovation of the slow variance level, in log
     /// units. 0.0 -- pt-v1 through pt-v18 -- pins the level at
     /// exactly 1.0 and leaves the target arithmetic that predates this
-    /// dial untouched, to the bit. pt-v19 ships 0.085; this line said
+    /// dial untouched, to the bit. pt-v19 ships 0.0 again since the 2026-09-20
+    /// recomposition, having carried 0.085 from 2026-09-14; this line said
     /// "every preset through pt-v19" until 2026-09-17.
     ///
     /// **0.047 [0.035, 0.064]** DERIVED, section 4.3, equivalently a
@@ -2794,7 +2795,8 @@ pub struct ModelParams {
     /// IDIOSYNCRATIC arrival rate, leaving it on the market jump. 0.0 --
     /// pt-v1 through pt-v18, which this line called "every preset" until
     /// 2026-09-17 -- keeps the arithmetic that predates the dial; pt-v19
-    /// ships 1.0. Non-zero is a switch.
+    /// ships 0.0 again since the 2026-09-20 recomposition, having carried
+    /// 1.0 from 2026-09-14. Non-zero is a switch.
     ///
     /// MEASURED (vix-dynamics.md 19.1): the panel's idiosyncratic jump rate,
     /// in units of the name's own trailing sd, reads `var^-0.20` against the
@@ -5117,8 +5119,24 @@ impl ModelParams {
         // evidence, so variance targeting is the only transport of these
         // three that does not require inventing a level. The gap is
         // recorded, not closed.
-        p.market_vol_alpha = 0.0066;
-        p.market_vol_beta = 0.8946;
+        // RECOMPOSED 2026-09-20, Simon's ruling: no new preset, pt-v19 IS the
+        // vector that certifies. The 2^6 factorial over the six dial families
+        // that separate pt-v18 from the 2026-09-14 composition (design repo,
+        // programme/results/bestof/RESULT.md and RESULT-504.md, registered
+        // first, both parents reproducing their records bit for bit) found
+        // the market variance family -- the GJR triple, the slow pole and
+        // the stochastic level -- away from the tape on volatility level,
+        // cross-sectional correlation, correlation persistence and the fear
+        // rows in 32 of 32 pairs at both horizons, against one gain on
+        // kurtosis; and the idiosyncratic jump family moving nothing beyond
+        // noise. Both return to pt-v18's values below. The VIX law stays,
+        // and only WITH the two crisis dials: without them every cell runs
+        // away over a two-year window. The derivations the returned values
+        // replace stay recorded in the design repository; the comments that
+        // argued them are kept above each line as the record of why they
+        // were tried.
+        p.market_vol_alpha = 0.28035004;   // pt-v18's; 0.0066 until 2026-09-20
+        p.market_vol_beta = 0.69244622;    // pt-v18's; 0.8946 until 2026-09-20
         // THE LEVERAGE RESPONSE, at a likelihood ratio of 305 on one degree
         // of freedom. `garch-derive-design.md` §2.4 fitted both forms to the
         // same tape and the same window:
@@ -5156,7 +5174,7 @@ impl ModelParams {
         // the dial redistributes variance between the two states rather
         // than adding any -- and it passes 0.0 for the SLOW component,
         // which is where §2.4's fit does not reach.
-        p.market_vol_gamma = 0.1556;
+        p.market_vol_gamma = 0.0;   // pt-v18's; 0.1556 until 2026-09-20 (recomposed, see above)
 
         // ==================================================================
         // THE COMPOSED VECTOR, adopted 2026-09-13 (`wtcomp1-result.md`).
@@ -5261,7 +5279,7 @@ impl ModelParams {
         // tape's forward-21-session realised-variance impulse response:
         // 0.9913 in [0.975, 1.0]. It replaces a 0.98 that was never read off
         // anything, and it is what carries the 504-day horizon.
-        p.market_vol_slow_persistence = 0.9913;
+        p.market_vol_slow_persistence = 0.98;   // pt-v18's; 0.9913 until 2026-09-20 (recomposed)
 
         // THE TWO PER-NAME STATES (vix-dynamics.md sections 19.5 and 19.7),
         // in the RATIO form: a GARCH(1,1) on the sector factor standardised
@@ -5273,9 +5291,12 @@ impl ModelParams {
         // section 8), which is why the ratio form is what ships.
         p.sector_vol_alpha = 0.067;
         p.sector_vol_beta = 0.837;
-        p.jump_idio_excitation = 2.0;
-        p.jump_idio_excitation_decay = 0.72;
-        p.jump_idio_vix_decoupled = 1.0;
+        // The idiosyncratic jump family returns to pt-v18 (recomposed
+        // 2026-09-20): 2.0 / 0.72 / 1.0 moved no row beyond noise in
+        // either 32-pair contrast of the factorial.
+        p.jump_idio_excitation = 0.0;
+        p.jump_idio_excitation_decay = 0.0;
+        p.jump_idio_vix_decoupled = 0.0;
         // THE SLOW VARIANCE LEVEL AND THE SECTOR LOADING, adopted 2026-09-14
         // from `levsec3` (`levsec3-result.md`) after `levelsec1`, `levsec2`
         // and `levsec3` measured them on 22 arms and 120 rosters at both
@@ -5306,8 +5327,12 @@ impl ModelParams {
         // estimator -- 127 to 249 sessions against 295 -- and the two tape
         // spans disagree by more than their own error, so the revision is
         // recorded and NOT taken: no arm has run at it.
-        p.market_vol_level_persistence = 0.9977;
-        p.market_vol_level_sigma = 0.085;
+        // Recomposed 2026-09-20: the level returns to OFF. Derived against
+        // the index tail row alone (`cascade-fourth-moment.md` 4.2), and
+        // measured by `ar1lever`, `levelscan` and the factorial to carry
+        // three to four other rows the wrong way. 0.9977 / 0.085 until then.
+        p.market_vol_level_persistence = 0.0;
+        p.market_vol_level_sigma = 0.0;
         // The loading was derived against a centre the record then replaced.
         // `params.rs` recorded 0.8 as the value that "puts it back on centre
         // (0.1641 against 0.1640 at 252)", and 0.1640 was the 2015-2025

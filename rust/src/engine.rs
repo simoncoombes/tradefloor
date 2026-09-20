@@ -347,8 +347,10 @@ pub struct Engine {
     forced_flow_spent: f64,
     /// The market factor's slow variance level, in logs. 0.0 means a
     /// multiplier of exactly 1.0, which is every preset through pt-v18,
-    /// where `market_vol_level_sigma` is 0.0. pt-v19, where
-    /// `market_vol_level_sigma` is 0.085, moves this field every session.
+    /// where `market_vol_level_sigma` is 0.0, and every shipped preset
+    /// since the 2026-09-20 recomposition. A preset with a positive sigma
+    /// moves this field every session; pt-v19 did from 2026-09-14 until
+    /// that recomposition, when the level went back to 0.0.
     /// This line said "every preset through pt-v19" until 2026-09-18, and
     /// stopped being true when pt-v19 took the dial off zero. See
     /// `ModelParams::market_vol_level_sigma`.
@@ -2470,9 +2472,10 @@ impl Engine {
         // where the dial is zero -- the draw is taken,
         // `market_vol_log_level` stays exactly 0.0, the multiplier is
         // exactly 1.0 and `close_day_scaled` calls the very function the
-        // close called before this existed. pt-v19, where
-        // `market_vol_level_sigma` is 0.085, takes the other branch: the
-        // level is live and the multiplier is not 1.0. This line said
+        // close called before this existed. A preset with a positive sigma
+        // takes the other branch, the level live and the multiplier not
+        // 1.0; pt-v19 did from 2026-09-14 until the 2026-09-20 recomposition
+        // returned the level to 0.0, and no shipped preset does now. This line said
         // "every preset through pt-v19" until 2026-09-18, and stopped
         // being true when pt-v19 took the dial off zero.
         self.market_vol_level_rng.site(Site::MarketVolLevelZ, 0);

@@ -271,8 +271,12 @@ def test_a_derivation_the_record_holds_is_carried_by_the_table():
     entry that survives while its derivation falls, read from the other
     side.
     """
+    # `market_vol_slow_persistence`'s 0.9913 shipped from 2026-09-14 to
+    # 2026-09-20 and was returned to pt-v18's 0.98 on the factorial; the
+    # entry keeps the derivation and says so in `recomposed`, and its
+    # `presets` map records what ships, which is what the audit reads.
     for dial, value in (("garch_beta", 0.7905),
-                        ("market_vol_slow_persistence", 0.9913)):
+                        ("market_vol_slow_persistence", 0.98)):
         entry = pv.DIAL_PROVENANCE[dial]
         assert entry["kind"] == "derived", dial
         assert entry["presets"]["pt-v19"] == value, dial
@@ -600,7 +604,13 @@ def test_a_bar_beside_two_shipped_values_has_to_say_which_one_it_is_for():
     check passed it and the paste check passed it. This is the rule that
     would have refused it, driven by the artefact itself.
     """
-    good = pv.DIAL_PROVENANCE["market_vol_alpha"]
+    # The live `market_vol_alpha` entry carried two shipped values until
+    # the 2026-09-20 recomposition returned pt-v19 to pt-v18's 0.28035004;
+    # the shape that drove this rule is rebuilt here from that entry so the
+    # rule is still exercised on the artefact that produced it.
+    good = dict(pv.DIAL_PROVENANCE["market_vol_alpha"],
+                presets={"pt-v16": 0.28035004, "pt-v18": 0.28035004,
+                         "pt-v19": 0.0066}, estimate=0.0066)
     assert not pv.validate_entry("market_vol_alpha", good)
 
     unnamed = dict(good)

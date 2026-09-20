@@ -41,9 +41,22 @@ SLOW = bool(os.environ.get("TRADEFLOOR_SLOW_TESTS")
 WARM = 504.0
 
 
+#: The market variance process the warm-up was built for and MEASURED on:
+#: the 2026-09-14 pt-v19 vector's GJR triple, slow pole and stochastic
+#: level. The 2026-09-20 recomposition returned all of these to pt-v18's
+#: values, so the shipped default no longer enters the level's
+#: stationary-opening arm at all; the mechanism is unchanged and every
+#: figure below was measured on it, so this file switches it on explicitly
+#: rather than re-deriving the shares on a vector that never runs it.
+LEVEL_ON = dict(market_vol_alpha=0.0066, market_vol_beta=0.8946,
+                market_vol_gamma=0.1556, market_vol_slow_persistence=0.9913,
+                market_vol_level_persistence=0.9977,
+                market_vol_level_sigma=0.085)
+
+
 def _engine(seed: int, names: int, **overrides):
     universe = _core.random_instruments(names, seed=seed)
-    model = tradefloor.ModelParams.from_preset("pt-v19", **overrides)
+    model = tradefloor.ModelParams.from_preset("pt-v19", **{**LEVEL_ON, **overrides})
     return _core.Engine(seed=seed, universe=universe, model=model), universe
 
 
