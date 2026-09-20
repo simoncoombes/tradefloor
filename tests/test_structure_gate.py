@@ -171,7 +171,8 @@ def test_the_bar_refuses_a_preset_whose_structural_row_went_PASS_to_REFUSED():
     assert verdict["lost"] == [VIX_AR1_ROW]
     assert VIX_AR1_ROW in verdict["reason"]
     assert "structure_252" in verdict["reason"]
-    assert "k 21 of 30" in verdict["reason"]
+    # k 25 since the 2026-09-20 recomposition (k 21, at the cut, before it).
+    assert "k 25 of 30" in verdict["reason"]
     # And each against itself is the pass, so the refusal above is the
     # regression and not the comparison.
     assert envelope.structure_bar(was, was)["passed"] is True
@@ -328,12 +329,14 @@ def test_the_shipped_preset_holds_its_structural_certificate_on_both_panels():
     assert verdict["passed"] is True, verdict["reason"]
 
     # The reading the release carries, asserted so it cannot change in
-    # silence: REFUSED on both panels, above the tape, one panel at the cut.
-    for field, k in (("structure_252", 21), ("structure_heldout_seeds", 28)):
+    # silence: REFUSED on both panels, above the tape. Re-pinned at the
+    # 2026-09-20 recomposition: k 25 and 22 where the 2026-09-14 vector read
+    # 21 (at the cut) and 28. Neither panel sits at the cut now.
+    for field, k in (("structure_252", 25), ("structure_heldout_seeds", 22)):
         row = rec[field]["rows"][VIX_AR1_ROW]
         assert rec[field]["refused"] == [VIX_AR1_ROW]
         assert (row["k"], row["cut"], row["side"]) == (k, 21, "above")
-    assert rec["structure_252"]["at_the_cut"] == [VIX_AR1_ROW]
+    assert rec["structure_252"]["at_the_cut"] == []
     assert rec["structure_heldout_seeds"]["at_the_cut"] == []
 
     # The published table agrees with the record it is written from.

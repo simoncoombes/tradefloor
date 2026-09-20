@@ -141,32 +141,33 @@ lists every target and what it actually reaches.
 
 `tf.facts.measure()` scores fourteen shape statistics against real-market
 bands, and four more on a protocol that varies the roster with the seed. At
-the default preset, `pt-v19`, one of the fourteen is out, the same one in
-every cell: `sector_excess_corr` reads 0.1011 against a floor of 0.11 at
-one year and 0.10421 against 0.11 at two years, on the certification roster
-and on a held-out one, at thirty seeds each -- 1.39 and 1.22 seed standard
-deviations below the floor, in all four cells. No other row is out anywhere.
-That reading is what `sector_loading` 0.60 was derived to produce: it puts
-the row on the whole-tape centre of 0.1178, and the floor it misses comes
-from 2015-2025 windows that the 0.8.0 scoring rule replaced. The two rulers
-disagree about this row and about no other.
+the default preset, `pt-v19`, every one of the fourteen is in its band in
+all four cells of the record: the certification roster and a held-out one,
+at one year and two, thirty seeds each, with no misses. The row it reads
+furthest from real is still `sector_excess_corr`, 0.113 against a tape
+centre of 0.164, in band and three tape errors short; the other thirteen
+sit inside their bands and twelve of them at the tape's centre.
 
-It holds the other four: the index level returns +6.6 per cent a year inside
-a band of 2.9 to 11.9, and the -3 per cent fear row reads 6.4 against a tape
-centre of 5.7, where `pt-v18` read 3.2 against a floor of 2.6.
+It holds the other four: the index level returns +6.3 per cent a year inside
+a band of 1.1 to 10.3, the -1 per cent fear row reads 1.9 against a tape
+centre of 2.7, the -3 per cent fear row 6.4 against 5.7, where `pt-v18`
+read 3.2, and the index tail 1.05 per cent of sessions against a real 1.21.
 
-Three rows read further from real than `pt-v18` does. `annualised_vol_pct`
-and `abs_return_acf5` leave the tape's centre where `pt-v18` sits on it, and
-`sector_excess_corr` is off centre under both. And the crisis lever -- held
-VIX 65 over held VIX 5 -- reads 2.07x against real markets' 6.16x, where
-`pt-v18` read 6.53x.
+Two things read further from real than `pt-v18` does. The crisis lever --
+held VIX 65 over held VIX 5 -- reads 2.42x against real markets' 6.16x,
+where `pt-v18` read 7.06x; and VIX persistence sits above the tape on both
+panels where `pt-v18` sits on it at one year. Both are the VIX law's
+price for the fear response, and both are the open mechanism questions.
 
-Corrected 2026-09-14. This section said `pt-v19` held all fourteen rows and
-all fourteen centres where `pt-v18` held twelve, and gave the level rows as
-+6.5 and 5.8 and the lever as 5.28x. Those are readings of a different
-vector -- `pt-v18` plus four dials, with `sector_loading` 0.8 -- measured
-before the slow variance level and `sector_loading` 0.60 were adopted. On
-the vector that ships, the centre comparison runs the other way.
+Recomposed 2026-09-20. From 2026-09-14 to 2026-09-20 this preset also
+carried a stochastic variance level, the tape's GJR triple and a family of
+idiosyncratic jumps, and this section said one row was out and three read
+further from real than `pt-v18`. A registered factorial over those families
+measured the variance family away from the tape on four rows in every one
+of 32 paired contrasts at both horizons, and the jumps moving nothing; both
+returned to `pt-v18`'s values and the record above was written on the
+result. The earlier record and the figures it carried are in the
+changelog.
 
 Five of the fourteen were calibration targets, and the bands both tuned the
 model and graded it. So this is a stated envelope, not a test against market

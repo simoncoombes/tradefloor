@@ -163,20 +163,20 @@ PRESET = "pt-v19"
 #: failure, and it stays whichever way the verdicts read. A row the default
 #: preset fails is never widened to pass and never folded into this count.
 CERTIFIED: dict[str, float] = {
-    "annualised_vol_pct": 22.5138,
-    "excess_kurtosis": 10.9081,
-    "return_acf1": -0.0074,
-    "abs_return_acf1": 0.0477,
-    "abs_return_acf5": 0.0188,
-    "abs_return_acf20": 0.0017,
-    "cross_sectional_corr": 0.2862,
-    "volume_abs_return_corr": 0.5092,
+    "annualised_vol_pct": 24.3564,
+    "excess_kurtosis": 8.9814,
+    "return_acf1": -0.0014,
+    "abs_return_acf1": 0.0584,
+    "abs_return_acf5": 0.0328,
+    "abs_return_acf20": 0.0037,
+    "cross_sectional_corr": 0.3244,
+    "volume_abs_return_corr": 0.5101,
     "leverage_effect": -0.0446,
-    "volume_change_acf1": -0.2639,
-    "corr_asymmetry": 0.0163,
-    "corr_asymmetry_lagged": 0.1322,
-    "sector_excess_corr": 0.1011,
-    "corr_persistence_acf1": 0.2882,
+    "volume_change_acf1": -0.2751,
+    "corr_asymmetry": 0.0302,
+    "corr_asymmetry_lagged": 0.0872,
+    "sector_excess_corr": 0.1081,
+    "corr_persistence_acf1": 0.0924,
 }
 
 #: The LEVEL rows the default preset reads at the certified horizon,
@@ -217,7 +217,7 @@ CERTIFIED_LEVEL: dict[str, float] = {
     # eras, and this row exists because of that. The seed spread is wide
     # against the band: the thirty-seed standard deviation is 6.52, so a
     # single seed's first year says almost nothing about the row.
-    "index_drift_pct": 6.6238,
+    "index_drift_pct": 6.2819,
 }
 
 #: The CRISIS rows, reserved for the fear gauge and the index tail, measured
@@ -230,8 +230,9 @@ CERTIFIED_LEVEL: dict[str, float] = {
 #: it asserted "held red" here until 0.7.0, which was true of every default
 #: through pt-v16 and would have been a false statement the day one held.
 CERTIFIED_CRISIS: dict[str, float] = {
-    # The -1 per cent row reads 1.7719 in a band of 0.39 to 3.03, at band
-    # position 0.52, 0.06 ABOVE a centre of 1.71. pt-v18 reads 1.5834 at
+    # The -1 per cent row reads 1.9359 in a band of 0.39 to 3.03, at band
+    # position 0.59, 0.23 ABOVE a centre of 1.71 (recomposed 2026-09-20;
+    # 1.7719 at position 0.52 from 2026-09-14). pt-v18 reads 1.5834 at
     # position 0.45 and pt-v16 0.9500 at 0.21.
     #
     # THOSE THREE POSITIONS ARE NEW AND THE ROW'S STORY CHANGED WITH THEM.
@@ -252,21 +253,24 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # errors low on its score at the same time. `facts` carries the split in
     # `REAL_MARKETS_PROVENANCE["fear_gauge_dn1"]`.
     #
-    # The -3 per cent row reads 6.3920, the median of 52 pooled sessions, at
-    # band position 0.54, a little above the centre of 6.09. pt-v18 read
+    # The -3 per cent row reads 6.4046 (recomposed 2026-09-20; 6.3920 on 52
+    # pooled sessions from 2026-09-14), at band position 0.55, a little
+    # above the centre of 6.09. pt-v18 read
     # 3.2473 at position 0.09, close to the floor of 2.60; pt-v16 read
     # 1.9557 and was BELOW it. The VIX level identity and the symmetric
     # fall-rate are what moved it, and this is the row they were composed to
     # move. Read the session count beside the value: 52 sessions is thin,
     # and the same row stood on 118 under the pre-31ef261 vector, so the
     # median moved on fewer and deeper falls rather than on more of them.
-    "fear_gauge_dn1": 1.7719,
-    "fear_gauge_dn3": 6.3920,
-    # The index tail row on the same thirty seeds: 52 sessions at or below
-    # -3 per cent in 7,530, a pooled rate of 0.6906 per cent against a band
+    "fear_gauge_dn1": 1.9359,
+    "fear_gauge_dn3": 6.4046,
+    # The index tail row on the same thirty seeds: 79 sessions at or below
+    # -3 per cent in 7,530, a pooled rate of 1.0491 per cent against a band
     # of 0.47 to 1.96 and a tape centre of 1.2132. IN band, at band position
-    # 0.15, which is 0.22 above the FLOOR on a standard error of 0.34 and
-    # one standard error below the tape's centre. pt-v18 read 1.5803 at
+    # 0.39, 0.4 of a standard error (0.43) below the tape's centre.
+    # Recomposed 2026-09-20: from 2026-09-14 the row read 0.6906 on 52
+    # sessions at position 0.15, one standard error below the centre, and
+    # the stochastic level was what held it down. pt-v18 read 1.5803 at
     # position 0.75 on the same build and seeds, so this preset has roughly
     # a third of pt-v18's crash sessions. The row is the one that says when
     # there are too many crash sessions; at this default the question is
@@ -284,7 +288,7 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # that as data beside the verdict. The 504-day reading is NOT measured
     # on this vector: `levelproto` ran 252 days only, and the year-two
     # figure that stood here (1.2989 per cent) was the pre-31ef261 vector's.
-    "index_tail_dn3_pct": 0.6906,
+    "index_tail_dn3_pct": 1.0491,
 }
 
 #: THE STRUCTURAL ROWS: the fourth certification block, and the only one
@@ -313,17 +317,18 @@ CERTIFIED_CRISIS: dict[str, float] = {
 #: is new is that a verdict is now taken on it and refused on.
 #:
 #: THE VALUE IS THE DEFAULT PRESET'S READING, like the three tables above,
-#: and this default is REFUSED on it. pt-v19 reads 0.959419 as the median of
-#: thirty seeds at 252 days, 0.0295 above the tape's centre, with k = 21 of
-#: 30 seeds above the centre against a cut of 21 -- EXACTLY at the cut, so
-#: one seed decides the verdict -- and 28 of 30 on the held-out seeds. The
-#: outgoing pt-v18 PASSES on both panels, at k = 20 and k = 18. The block is
+#: and this default is REFUSED on it. The recomposed pt-v19 (2026-09-20)
+#: reads 0.954280 as the median of thirty seeds at 252 days, 0.0243 above
+#: the tape's centre, with k = 25 of 30 seeds above the centre against a
+#: cut of 21, and 22 of 30 on the held-out seeds. The 2026-09-14 vector read
+#: 0.959419 with k = 21, exactly at the cut, and 28 held out. The outgoing
+#: pt-v18 PASSES on both panels, at k = 20 and k = 18. The block is
 #: laid down carrying that refusal rather than withheld until it is green:
 #: the gate is a non-regression bar, a preset with no prior record has
 #: nothing to regress from, and a row nobody can see is a row nobody fixes.
 #: A model that repairs it locks the PASS in for every model after it.
 CERTIFIED_STRUCTURE: dict[str, float] = {
-    "vix_ar1_debiased": 0.959419,
+    "vix_ar1_debiased": 0.954280,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -502,20 +507,20 @@ BAR_BAND_BASIS = "ruled"
 #: The count is still MEASURED rather than certified: the certified horizon
 #: is 252 because that is where `CERTIFIED` was measured.
 MEASURED_504: dict[str, float] = {
-    "annualised_vol_pct": 23.3899,
-    "excess_kurtosis": 12.8403,
-    "return_acf1": -0.0090,
-    "abs_return_acf1": 0.0506,
-    "abs_return_acf5": 0.0313,
-    "abs_return_acf20": 0.0182,
-    "cross_sectional_corr": 0.3045,
-    "volume_abs_return_corr": 0.5614,
-    "leverage_effect": -0.0408,
-    "volume_change_acf1": -0.2405,
-    "corr_asymmetry": 0.0222,
-    "corr_asymmetry_lagged": 0.1140,
-    "sector_excess_corr": 0.1042,
-    "corr_persistence_acf1": 0.3293,
+    "annualised_vol_pct": 24.2780,
+    "excess_kurtosis": 9.6482,
+    "return_acf1": -0.0038,
+    "abs_return_acf1": 0.0905,
+    "abs_return_acf5": 0.0465,
+    "abs_return_acf20": 0.0111,
+    "cross_sectional_corr": 0.3322,
+    "volume_abs_return_corr": 0.5376,
+    "leverage_effect": -0.0471,
+    "volume_change_acf1": -0.2520,
+    "corr_asymmetry": 0.0331,
+    "corr_asymmetry_lagged": 0.0864,
+    "sector_excess_corr": 0.1128,
+    "corr_persistence_acf1": 0.1618,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
@@ -693,8 +698,11 @@ GAPS: tuple[Gap, ...] = (
         summary="the certified horizon is 252 days",
         detail=(
             "Against bands re-derived at the matching window, the shipped "
-            "pt-v19 leaves one row out at 504 days: sector_excess_corr, "
-            "0.10421 against a floor of 0.11. No other row is out there. "
+            "pt-v19 holds all thirteen readable rows at 504 days on the "
+            "ruled band; corr_persistence_acf1 is unreadable there, by "
+            "name. RECOMPOSED 2026-09-20 -- from 2026-09-14 this gap read "
+            "'one row out at 504 days: sector_excess_corr, 0.10421 against "
+            "a floor of 0.11', a decade-band verdict on the previous vector. "
             "CORRECTED 2026-09-14 -- this gap read 'the shipped pt-v19 holds "
             "ALL FOURTEEN at 504 days', which was measured on pt-v18 plus "
             "four dials with sector_loading 0.8, before the vector that "
@@ -839,7 +847,8 @@ GAPS: tuple[Gap, ...] = (
             "cent BELOW real'. 5.28x was measured on pt-v18 plus four dials "
             "with sector_loading 0.8, in the ptv19panel run, and does not "
             "describe the composed vector that ships; presets/pt-v19.json "
-            "records 2.0714. Read the size of the shortfall, not just its "
+            "records 2.42 since the 2026-09-20 recomposition (2.0714 from "
+            "2026-09-14). Read the size of the shortfall, not just its "
             "sign: it is more than three times what the withdrawn figure "
             "said. Note also that this lever is read over a window pinned "
             "from day zero with no burn-in, so the numerator and denominator "
