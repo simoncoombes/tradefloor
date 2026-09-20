@@ -76,9 +76,16 @@ def test_impact_is_isolated_to_the_names_actually_traded():
     shifted market and this whole measurement would become an estimate.
     """
     cf = tradefloor.flow_impact(
-        seed=1, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
+        seed=3, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
     )
     assert cf.untouched_moved() == []
+    # Seed 3 since 2026-09-20. TRADED opens at $5.00, where one cent is 20
+    # bps, so a few bps of impact register only when the path crosses a
+    # cent riser: on the recomposed pt-v19 seeds 1, 2 and 8 read exactly
+    # 0.0 on this name and seeds 3 to 7 read +2.1, -6.2, -1.0, +2.0 and
+    # +2.1, while every other name reads 20 to 1,400 bps at seed 1. The
+    # isolation claim holds at any seed; the non-zero claim needs the grid.
+    #
     # And the traded name DID move. Without this the assertion above passes
     # when the two worlds are accidentally identical -- flow silently dropped,
     # say -- because then nothing moved and nothing is untouched-and-moved.
