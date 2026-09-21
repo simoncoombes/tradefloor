@@ -432,9 +432,13 @@ def test_the_record_bar_reads_the_rise_when_the_record_carries_it():
     if rec.get(envelope.STRUCTURE_RISE_FIELD):
         assert verdict["panels"][envelope.STRUCTURE_RISE_FIELD]["passed"] is True
         row = rec[envelope.STRUCTURE_RISE_FIELD]["rows"][VIX_AR1_ROW]
-        # The shipped default rises about a third of the tape: one pole.
+        # The shipped default's PAIRED rise is nil: -0.0024 [-0.0058, +0.0065]
+        # against the tape's +0.0294 on the ptv19rise box. (The difference of
+        # the two medians read +0.007; the median of the per-seed differences
+        # is the registered statistic and it reads zero.) One pole.
         assert row["verdict"] == "below", row
-        assert 0.0 < row["median_rise"] < row["tape_rise"]
+        assert row["median_rise"] < row["tape_rise"]
+        assert row["ci90"][1] < row["tape_rise"]
         assert (round(row["median_rise"], 6)
                 == envelope.CERTIFIED_STRUCTURE_RISE[VIX_AR1_ROW])
     else:

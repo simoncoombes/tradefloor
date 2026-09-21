@@ -336,7 +336,7 @@ CERTIFIED_STRUCTURE: dict[str, float] = {
 #: `facts.structure_rise_verdict`). None until the record carries the block;
 #: `test_structure_gate` binds it to the record once it does.
 CERTIFIED_STRUCTURE_RISE: dict[str, float | None] = {
-    "vix_ar1_debiased": None,
+    "vix_ar1_debiased": -0.002409,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and

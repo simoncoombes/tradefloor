@@ -6632,9 +6632,9 @@ def structure_verdict(values: Sequence[float], key: str, *,
 #: 2026-09-21 (design repo, `ruling-the-second-gate-grades-the-rise-...`).
 #:
 #: WHY A RISE AND NOT TWO CENTRES. The debiased lag-1 autocorrelation of
-#: the real VIX reads 0.9299 on 35 one-year windows and 0.9593 on 17
-#: two-year ones, +0.0294, and the Marriott-Pope term explains none of the
-#: debiased rise. Every shipped vector rises 0.007 to 0.013 between the
+#: the real VIX reads `REAL_VIX_AR1[252]` on 35 one-year windows and
+#: `REAL_VIX_AR1[504]` on 17 two-year ones, about three hundredths higher,
+#: and the Marriott-Pope term explains none of the debiased rise. Every shipped vector rises 0.007 to 0.013 between the
 #: same two windows on the same estimator: a single-pole process has most
 #: of its short-window bias removed by the first-order term and rises
 #: little, while a slow component keeps rising as the window lengthens.
