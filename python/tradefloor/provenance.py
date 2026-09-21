@@ -291,11 +291,6 @@ POST_BASELINE = {
     "market_vol_floor_multiple":
         "0.05, the market factor's variance floor at "
         "market/factor_vol.rs:363",
-    "market_vol_vix_exponent":
-        "2.0, and the branch at market/factor_vol.rs:375 takes the literal "
-        "square at exactly this value. The square is a modelling choice, "
-        "not an inert default -- the docstring records round 100 measuring "
-        "it too convex through mid-VIX",
     "mispricing_cap":
         "0.9, the bound on |s| at market/tick.rs:1338",
     "mispricing_half_life_days":
@@ -482,20 +477,6 @@ OUT_OF_SCOPE = {
         "`level-sigma-horizon.md` section 2 measures the two halves of a "
         "504-session recording disagreeing at sigma 0.085 and agreeing at "
         "sigma 0",
-    "vix_level_loop_gain":
-        "inert at 0.0: engine.rs `vix_level_sigma_applied` branches on "
-        "`== 0.0` and hands back `vix_level_sigma`'s own f64, so the "
-        "level's recursion and its stationary opening read what they read "
-        "before the dial existed. The value it would take is DERIVED and "
-        "is in the field's docstring: the loop's transmission of the slow "
-        "level into the VIX is 1 / (1 - h) with h the read-back's held-VIX "
-        "elasticity, 1.75 at the shipped `market_vol_vix_exponent` 2.0 and "
-        "2.47 at 4.9. It ships at zero because correcting the level is a "
-        "change to the VIX persistence row, and that row is the floor the "
-        "recomposed pt-v19 is held to. MEASURED on 16 seeds: with the gain "
-        "divided out at exponent 4.9 the row reads 0.9492 at 252 and "
-        "0.9592 at 504, against 0.9581 and 0.9752 at that exponent without "
-        "it and 0.9523 and 0.9637 on the shipped vector",
     "market_vol_alpha_excursion":
         "inert at 0.0: market/factor_vol.rs `alpha_beta_at` branches on "
         "`k == 0.0` and returns the dialled pair unchanged. Measured and "
@@ -1100,6 +1081,48 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "1.3280 at 252. The GJR fourth-moment coefficient "
                 "`3a^2 + 3ag + 1.5g^2 + 2ab + bg + b^2` is 0.9908, under "
                 "one, so the finite fourth moment survives the asymmetry",
+    },
+    "market_vol_vix_exponent": {
+        "kind": "derived",
+        "presets": {"pt-v19": 4.9},
+        "identity": "the exponent at which the excursion form's fixed point "
+                    "carries the tape's crisis lever: under `target = base (1 - c "
+                    "+ c (VIX / I)^e)` with the read-back `I ~ sqrt(v)`, a held VIX "
+                    "settles the variance at `v ~ VIX^(e / (1 + e/2))`; the tape's "
+                    "6.16x of volatility for 13x of VIX is `v ~ VIX^1.42`, so `e = "
+                    "2 s / (2 - s)` = 4.9 at s = 1.42",
+        "terms": {"6.16x": "the real crisis lever, annualised volatility above "
+                           "VIX 45 over below VIX 12 on the reference roster "
+                           "(`real_crisis_lever` on every record)",
+                  "13x": "the lever protocol's held VIX 65 over held VIX 5",
+                  "fixed point": "programme/fixes-2026-09-21.md section 0.1 "
+                                 "(design repository), measured on the held-VIX "
+                                 "read-back terms: the read-back rises 3.0x at the "
+                                 "square and 4.6x at 4.9"},
+        "source": "programme/fixes-2026-09-21.md and results/ptv19fix/RESULT.md "
+                  "(design repository); 2.0, the literal square, from pt-v1 to the "
+                  "2026-09-21 composition",
+        "date": "2026-09-21",
+    },
+    "vix_level_loop_gain": {
+        "kind": "derived",
+        "presets": {"pt-v19": 2.4684},
+        "identity": "`1 / (1 - h)`, the loop's transmission of the latent level "
+                    "into the VIX, with `h = ln(ratio) / ln 13` the read-back's "
+                    "held-VIX elasticity: the read-back rises 4.60x for 13x of held "
+                    "VIX at `market_vol_vix_exponent` 4.9, so h = 0.595 and the gain "
+                    "2.4684. The level's spread (`vix_level_sigma`) was measured on "
+                    "the VIX and belongs to the VIX; the engine writes it onto the "
+                    "multiplier the loop amplifies, and the gain divides it out",
+        "terms": {"4.60x": "the held-VIX read-back ratio at exponent 4.9 "
+                           "(results/ptv19refine/leverterms.py; 3.00x at 2.0, "
+                           "gain 1.7486 there)",
+                  "form": "engine.rs `vix_level_sigma_applied`: the innovation "
+                          "and the stationary opening divided by the gain"},
+        "source": "programme/fixes-2026-09-21.md design C and "
+                  "results/ptv19fix/RESULT.md (design repository); built "
+                  "2026-09-21, shipped the same day",
+        "date": "2026-09-21",
     },
     "market_vol_alpha": {
         "composed": "shipped on pt-v19 from 2026-09-14, returned to pt-v18's on 2026-09-20 by the 2^6 factorial (design-repo programme/results/bestof/RESULT-504.md), which measured the market variance family as one block, and returned to pt-v19 on 2026-09-21 when ptv19gjr (design-repo programme/results/ptv19gjr/RESULT.md) measured the block's three parts apart: the cost the factorial saw was the factor level's, and this value with the slow pole and the regime level on the VIX law is the first vector to pass the whole gate",
@@ -3318,7 +3341,6 @@ UNPROVENANCED = (
     "market_vol_slow_weight",
     "market_vol_vix_anchor",
     "market_vol_vix_coupling",
-    "market_vol_vix_exponent",
     "mispricing_cap",
     "mispricing_half_life_days",
     "momentum_theta",

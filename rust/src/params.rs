@@ -5390,6 +5390,32 @@ impl ModelParams {
         // it added within-year variance the tape's calm years do not have.
         p.vix_level_persistence = 0.9979;
         p.vix_level_sigma = 0.0173;
+        // THE THIRD COMPOSITION, 2026-09-21 (design repo,
+        // results/ptv19fix/RESULT.md, registered first, decision rule written
+        // before the numbers). The crisis lever is lost at the excursion
+        // form's FIXED POINT: the target is `base (1 - c + c (VIX / I)^e)`
+        // with `I ~ sqrt(v)`, so a held VIX settles the variance at
+        // `v ~ VIX^(e / (1 + e/2))`, which at the shipped square is `v ~ VIX`
+        // and a lever of sqrt(13) before clamps. The tape's lever, 6.16x of
+        // volatility for 13x of VIX, is `v ~ VIX^1.42`, which the same form
+        // gives at `e = 2s / (2 - s)` = 4.9. DERIVED from that law; the
+        // held-VIX read-back then rises 4.6x for 13x (3.0x at the square).
+        p.market_vol_vix_exponent = 4.9;
+        // And the defect that made every gain in the loop lengthen the VIX's
+        // memory: the regime level's spread (0.267, the tape's yearly
+        // medians of log VIX) is a spread OF THE VIX, and it was written
+        // onto the latent multiplier, which the loop amplifies by
+        // `1 / (1 - h)` with `h` the read-back's held-VIX elasticity
+        // (`ln 4.6 / ln 13` = 0.595 at this exponent). The gain divides
+        // the level's innovation and its stationary opening by that
+        // factor, so the VIX carries the tape's spread and not 2.47 times
+        // it. DERIVED from the same two held-VIX readings. Measured on the
+        // box: the VIX row passes at both horizons (k 19 and 16, rise
+        // +0.007 against the tape's +0.012), the lever reads 3.05x, and
+        // the sum of squared tape errors falls from 116 to 91 at one year
+        // and 82 to 59 at two, the first composition to lower it since the
+        // VIX law arrived.
+        p.vix_level_loop_gain = 2.4684;
         // THE CEILING, WHICH CLAMPS THE STATE AND NOT THE TARGET.
         //
         // `vix_ceiling` bounds the VIX after the reversion step,

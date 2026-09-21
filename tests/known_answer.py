@@ -331,7 +331,7 @@ import tradefloor
 # by 0.0, so no other preset's trajectory moves; pt-v19's does, and this is
 # its third boundary in six days. `metadataSha256` does NOT move, for the
 # eighth boundary running.
-KAT_VERSION = 24
+KAT_VERSION = 25
 
 SEED = 20260820
 DAYS = 250
