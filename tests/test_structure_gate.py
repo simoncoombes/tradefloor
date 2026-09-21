@@ -174,9 +174,10 @@ def test_the_bar_refuses_a_preset_whose_structural_row_went_PASS_to_REFUSED():
     assert verdict["lost"] == [VIX_AR1_ROW]
     assert VIX_AR1_ROW in verdict["reason"]
     assert "structure_heldout_seeds" in verdict["reason"]
-    # k 21, at the cut, since the 2026-09-21 composition (25 and 22 on the
-    # two panels of the 2026-09-20 record; 21 and 28 before that).
-    assert "k 21 of 30" in verdict["reason"]
+    # k 23 since the third composition of 2026-09-21 (21, at the cut, on
+    # the second; 25 and 22 on the two panels of the 2026-09-20 record;
+    # 21 and 28 before that).
+    assert "k 23 of 30" in verdict["reason"]
     # And each against itself is the pass, so the refusal above is the
     # regression and not the comparison.
     assert envelope.structure_bar(was, was)["passed"] is True
@@ -334,18 +335,18 @@ def test_the_shipped_preset_holds_its_structural_certificate_on_both_panels():
     assert verdict["passed"] is True, verdict["reason"]
 
     # The reading the release carries, asserted so it cannot change in
-    # silence. Re-pinned at the 2026-09-21 composition: PASS at 252 with
-    # k 20 of 30 (cut 21), REFUSED AT THE CUT on the held-out seeds with
-    # k 21, where the 2026-09-20 record read 25 and 22 and the 2026-09-14
-    # one 21 and 28. The held-out panel names the row at the cut.
+    # silence. Re-pinned at the third composition of 2026-09-21: PASS at
+    # 252 with k 19 of 30 (cut 21), REFUSED on the held-out seeds with
+    # k 23, where the second composition read 20 and 21 (at the cut), the
+    # 2026-09-20 record 25 and 22 and the 2026-09-14 one 21 and 28.
     row = rec["structure_252"]["rows"][VIX_AR1_ROW]
     assert rec["structure_252"]["passed"] == [VIX_AR1_ROW]
-    assert (row["k"], row["cut"], row["side"]) == (20, 21, None)
+    assert (row["k"], row["cut"], row["side"]) == (19, 21, None)
     assert rec["structure_252"]["at_the_cut"] == []
     row = rec["structure_heldout_seeds"]["rows"][VIX_AR1_ROW]
     assert rec["structure_heldout_seeds"]["refused"] == [VIX_AR1_ROW]
-    assert (row["k"], row["cut"], row["side"]) == (21, 21, "above")
-    assert rec["structure_heldout_seeds"]["at_the_cut"] == [VIX_AR1_ROW]
+    assert (row["k"], row["cut"], row["side"]) == (23, 21, "above")
+    assert rec["structure_heldout_seeds"]["at_the_cut"] == []
 
     # The published table agrees with the record it is written from.
     assert (round(rec["structure_252"]["rows"][VIX_AR1_ROW]["median"], 6)

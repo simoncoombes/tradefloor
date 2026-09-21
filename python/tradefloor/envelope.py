@@ -163,20 +163,20 @@ PRESET = "pt-v19"
 #: failure, and it stays whichever way the verdicts read. A row the default
 #: preset fails is never widened to pass and never folded into this count.
 CERTIFIED: dict[str, float] = {
-    "annualised_vol_pct": 23.5563,
-    "excess_kurtosis": 8.5609,
-    "return_acf1": -0.0062,
-    "abs_return_acf1": 0.0455,
-    "abs_return_acf5": 0.0315,
-    "abs_return_acf20": 0.0029,
-    "cross_sectional_corr": 0.3282,
-    "volume_abs_return_corr": 0.4949,
-    "leverage_effect": -0.0474,
-    "volume_change_acf1": -0.2765,
-    "corr_asymmetry": 0.0119,
-    "corr_asymmetry_lagged": 0.1424,
-    "sector_excess_corr": 0.0956,
-    "corr_persistence_acf1": 0.1248,
+    "annualised_vol_pct": 24.4565,
+    "excess_kurtosis": 7.6803,
+    "return_acf1": -0.0049,
+    "abs_return_acf1": 0.0543,
+    "abs_return_acf5": 0.0308,
+    "abs_return_acf20": 0.0100,
+    "cross_sectional_corr": 0.3334,
+    "volume_abs_return_corr": 0.4933,
+    "leverage_effect": -0.0490,
+    "volume_change_acf1": -0.2777,
+    "corr_asymmetry": 0.0158,
+    "corr_asymmetry_lagged": 0.1421,
+    "sector_excess_corr": 0.1076,
+    "corr_persistence_acf1": 0.1296,
 }
 
 #: The LEVEL rows the default preset reads at the certified horizon,
@@ -217,7 +217,7 @@ CERTIFIED_LEVEL: dict[str, float] = {
     # eras, and this row exists because of that. The seed spread is wide
     # against the band: the thirty-seed standard deviation is 6.52, so a
     # single seed's first year says almost nothing about the row.
-    "index_drift_pct": 6.2972,
+    "index_drift_pct": 6.3201,
 }
 
 #: The CRISIS rows, reserved for the fear gauge and the index tail, measured
@@ -262,8 +262,8 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # move. Read the session count beside the value: 52 sessions is thin,
     # and the same row stood on 118 under the pre-31ef261 vector, so the
     # median moved on fewer and deeper falls rather than on more of them.
-    "fear_gauge_dn1": 1.8249,
-    "fear_gauge_dn3": 5.5230,
+    "fear_gauge_dn1": 1.9320,
+    "fear_gauge_dn3": 6.0023,
     # The index tail row on the same thirty seeds: 79 sessions at or below
     # -3 per cent in 7,530, a pooled rate of 1.0491 per cent against a band
     # of 0.47 to 1.96 and a tape centre of 1.2132. IN band, at band position
@@ -288,7 +288,7 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # that as data beside the verdict. The 504-day reading is NOT measured
     # on this vector: `levelproto` ran 252 days only, and the year-two
     # figure that stood here (1.2989 per cent) was the pre-31ef261 vector's.
-    "index_tail_dn3_pct": 0.6773,
+    "index_tail_dn3_pct": 0.7570,
 }
 
 #: THE STRUCTURAL ROWS: the fourth certification block, and the only one
@@ -328,7 +328,7 @@ CERTIFIED_CRISIS: dict[str, float] = {
 #: nothing to regress from, and a row nobody can see is a row nobody fixes.
 #: A model that repairs it locks the PASS in for every model after it.
 CERTIFIED_STRUCTURE: dict[str, float] = {
-    "vix_ar1_debiased": 0.948344,
+    "vix_ar1_debiased": 0.946849,
 }
 
 #: The default preset's RISE in each structural row from 252 to 504 days,
@@ -336,7 +336,7 @@ CERTIFIED_STRUCTURE: dict[str, float] = {
 #: `facts.structure_rise_verdict`). None until the record carries the block;
 #: `test_structure_gate` binds it to the record once it does.
 CERTIFIED_STRUCTURE_RISE: dict[str, float | None] = {
-    "vix_ar1_debiased": 0.011554,
+    "vix_ar1_debiased": 0.006871,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -515,20 +515,20 @@ BAR_BAND_BASIS = "ruled"
 #: The count is still MEASURED rather than certified: the certified horizon
 #: is 252 because that is where `CERTIFIED` was measured.
 MEASURED_504: dict[str, float] = {
-    "annualised_vol_pct": 23.4833,
-    "excess_kurtosis": 10.0293,
-    "return_acf1": -0.0055,
-    "abs_return_acf1": 0.0532,
-    "abs_return_acf5": 0.0331,
-    "abs_return_acf20": 0.0113,
-    "cross_sectional_corr": 0.3170,
-    "volume_abs_return_corr": 0.5317,
-    "leverage_effect": -0.0448,
-    "volume_change_acf1": -0.2517,
-    "corr_asymmetry": 0.0168,
-    "corr_asymmetry_lagged": 0.1365,
-    "sector_excess_corr": 0.1074,
-    "corr_persistence_acf1": 0.2104,
+    "annualised_vol_pct": 24.3476,
+    "excess_kurtosis": 9.2657,
+    "return_acf1": 0.0010,
+    "abs_return_acf1": 0.0609,
+    "abs_return_acf5": 0.0403,
+    "abs_return_acf20": 0.0203,
+    "cross_sectional_corr": 0.3298,
+    "volume_abs_return_corr": 0.5354,
+    "leverage_effect": -0.0458,
+    "volume_change_acf1": -0.2571,
+    "corr_asymmetry": 0.0083,
+    "corr_asymmetry_lagged": 0.1423,
+    "sector_excess_corr": 0.1129,
+    "corr_persistence_acf1": 0.1896,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.

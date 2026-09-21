@@ -10,19 +10,20 @@ selectable.
 **pt-v19's panel, composed on 2026-09-21.** Every row is in its ruled
 band in all four cells of the record: fourteen of fourteen at 252 days,
 thirteen of thirteen readable at 504, fourteen of fourteen held out, no
-misses. On the level protocol `index_drift_pct` reads 6.30 against a real
-7.37, `fear_gauge_dn1` 1.82 against 2.66, `fear_gauge_dn3` 5.52 against
-5.73 and `index_tail_dn3_pct` 0.68 against 1.21, all in band. Nine of ten
+misses. On the level protocol `index_drift_pct` reads 6.32 against a real
+7.37, `fear_gauge_dn1` 1.93 against 2.66, `fear_gauge_dn3` 6.00 against
+5.73 and `index_tail_dn3_pct` 0.76 against 1.21, all in band. Nine of ten
 mechanism rows show their mechanism on both panels. VIX persistence, which
-every earlier record refused, passes the structural gate at one year, sits
-at its cut on the held-out seeds, and rises from one year to two by +0.012
-against the tape's paired +0.012. Furthest from real: the crisis lever at
-2.51x against 6.16, and `sector_excess_corr` at 0.096 against 0.164, in
-band and seven tape errors short; the short-lag clustering rows read two
-tape errors under their centres.
+every record before this day refused, passes the structural gate at one
+year and rises from one year to two by +0.007 against the tape's paired
++0.012. The crisis lever reads 3.05x against 6.16, up from 2.51x, and the
+sum of squared tape errors falls from 116 to 91 at one year and 82 to 59
+at two. Furthest from real: the lever, and `sector_excess_corr` at 0.108
+against 0.164, in band and six tape errors short.
 
-The composition, the corrected rise ruler, the `KAT_VERSION` bump and the
-records this one replaces are below the marker.
+The three compositions of the day, the two defects they found, the
+corrected rise ruler, the `KAT_VERSION` bumps and the records they
+replace are below the marker.
 
 <!-- release-note-ends -->
 

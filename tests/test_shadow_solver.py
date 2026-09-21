@@ -1068,15 +1068,27 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     # comment rules out. The other cell, seed 16 at -1.50, is 5.7 nats on
     # its narrower side and recovers -0.543, inside that margin.
     #
+    # NINTH SWEEP, 2026-09-21, at the third composition of pt-v19 (the
+    # lever's exponent and the level's loop gain). Re-dealt a ninth time:
+    # seed 15 at -3.50 now reads a plain trial of 12.00 against a no-jump
+    # 32.89, so it finds the jump alone and the premise inverted for the
+    # seventh time in nine. The same seventy cells re-swept on the same
+    # recipe (design repo, programme/results/ptv19fix/shadow-sweep.json):
+    # ONE is decisive, seed 18 at -3.10. The reused Jacobian leaves the
+    # trial at 147.21 against a no-jump 40.72, 106 nats worse, so it is
+    # rejected, and a Jacobian of its own reaches 34.99, 5.7 nats better,
+    # so it is accepted. It recovers a normal of -2.129, clear of the 0.6
+    # of zero the 0.8.0 comment rules out.
+    #
     # The fix is unchanged and still guarded, on a day that still needs it.
     rng = np.random.default_rng(7)
-    fwd, r_obs = _planted_day(15, -3.50, rng)
+    fwd, r_obs = _planted_day(18, -3.10, rng)
     found = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
     assert found["jump_market"] is not None
     # On the SIZE, for the reason the planted-jump test above gives at
     # length: `jump_market` is the recovered normal and the direction lives
     # in `jump_mean_market + jump_sigma_market * z`. Measured here the
-    # normal is -1.309 against a sign change at +3.4645, clear of both that
+    # normal is -2.129 against a sign change at +3.4645, clear of both that
     # and of zero, so this assertion does not rest on a margin the solver can
     # cross.
     assert found["jump_market"] < shadow.upward_threshold(

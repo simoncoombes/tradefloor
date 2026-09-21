@@ -1477,7 +1477,9 @@ pub struct ModelParams {
     /// still reads the print.
     pub market_vol_vix_smooth: f64,
     /// Exponent on the market variance target's VIX ratio. 2.0 -- every
-    /// shipped preset -- is the literal square, bit for bit. Round 100
+    /// preset up to the 2026-09-21 composition of pt-v19, which ships 4.9
+    /// (the tape's lever law at the excursion form's fixed point; see the
+    /// constructor) -- is the literal square, bit for bit. Round 100
     /// measured the square too convex through mid-VIX along real paths;
     /// a lower exponent with the coupling re-fit to hold T(45)/T(5)
     /// flattens the middle while preserving the certified crisis lever's
