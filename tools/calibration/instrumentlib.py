@@ -541,6 +541,13 @@ PARAM_SPECS: dict[str, dict] = {
                                      "derived": True},
     "market_vol_level_sigma":   {"kind": "abs", "step_unit": 0.02,
                                  "hard_range": (0.0, 0.15)},
+    # The VIX's own slow log-level (2026-09-21): a lognormal AR(1) on what
+    # the VIX prices. DERIVED from the two-pole fit to log VIX's ACF
+    # (design repo, vix-level-derivation.txt): 0.9965 and 0.0256.
+    "vix_level_persistence": {"kind": "abs", "step_unit": 0.01,
+                              "hard_range": (0.0, 0.9995), "derived": True},
+    "vix_level_sigma":        {"kind": "abs", "step_unit": 0.005,
+                              "hard_range": (0.0, 0.08), "derived": True},
     # The market-side warm-up, in SESSIONS, so the step unit is a step in
     # sessions and not a fraction: 63 is one quarter, the block the
     # transient was traced in (`level-sigma-horizon.md` 2.2), and anything

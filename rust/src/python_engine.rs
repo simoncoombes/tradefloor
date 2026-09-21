@@ -2778,6 +2778,7 @@ impl PyEngine {
         // every run recorded while `market_vol_level_sigma` shipped 0.0
         // actually carried.
         out.set_item("market_vol_log_level", self.inner.market_vol_log_level())?;
+        out.set_item("vix_log_level", self.inner.vix_log_level())?;
         // Nominal output when the run opened, the base of the growth
         // term's ratio. A constant of the run rather than advancing state,
         // and carried for the reason the two above are: an engine restored
@@ -3220,6 +3221,11 @@ impl PyEngine {
         // whose runs all carried a multiplier of exactly 1.0.
         if let Some(raw) = snapshot.get_item("market_vol_log_level")? {
             self.inner.set_market_vol_log_level(raw.extract()?);
+        }
+        // Absent means a snapshot from a build without the VIX level, whose
+        // runs all carried a multiplier of exactly 1.0.
+        if let Some(raw) = snapshot.get_item("vix_log_level")? {
+            self.inner.set_vix_log_level(raw.extract()?);
         }
         // Restore the growth term's base. Absent means a snapshot from a
         // build without the term, whose preset carries the dial at 0.0.

@@ -1048,6 +1048,51 @@ pub struct ModelParams {
     /// the mechanism is wrong rather than under-dialled.
     pub market_vol_level_sigma: f64,
 
+    /// The persistence of the VIX's own slow log-level: a lognormal AR(1)
+    /// multiplier on what the VIX prices under the identity, riding the
+    /// normal `stream::MARKET_VOL_LEVEL` already draws every close.
+    ///
+    /// # Why it exists
+    ///
+    /// The real VIX's persistence rises from one-year to two-year windows
+    /// (`facts.REAL_VIX_AR1_RISE`): two thirds of its variance is a slow
+    /// regime level with a half-life near two hundred sessions, and a
+    /// single-pole process cannot show that on the gate's estimator. The
+    /// stochastic level on the FACTOR's variance target was the first
+    /// attempt and was returned to 0.0 on 2026-09-20 because a multiplier
+    /// on the variance process moves every row that reads it. This one
+    /// multiplies the VIX target alone -- `vix_implied_from_market`, at the
+    /// one line the engine wires it -- so the factor's variance and the
+    /// fourteen shape rows it drives are untouched at first order, and the
+    /// VIX loop sees the level only through the coupling every preset
+    /// already carries.
+    ///
+    /// # Derivation (design repo, `vix-level-derivation.txt`, 2026-09-21)
+    ///
+    /// A two-pole fit to the ACF of log VIX over 1990-2025 at lags 1 to 504
+    /// reads a fast pole of 0.942 carrying 21 per cent of the variance and
+    /// a SLOW pole of 0.9965 (half-life 198 sessions) carrying 79 per cent:
+    /// stationary sd 0.306 in logs, innovation 0.0256 per session. Those
+    /// are the derived values; they ship at 0.0 until the registered arm
+    /// has measured what they do to every row.
+    ///
+    /// 0.0 -- every preset -- is, with `vix_level_sigma` 0.0, a multiplier
+    /// of exactly 1.0 and bit-identical. Read only while `vix_level_sigma`
+    /// is non-zero.
+    pub vix_level_persistence: f64,
+
+    /// The per-session innovation of the VIX's own slow log-level. 0.0 on
+    /// every preset: the log-level stays exactly 0.0, the multiplier is
+    /// exactly 1.0 by a branch and not by arithmetic, and no draw is
+    /// added or moved -- the normal it would consume is the one the
+    /// factor level already takes unconditionally on its own stream, so a
+    /// preset carrying both levels drives them with one draw and says so.
+    /// Derived 0.0256 at persistence 0.9965; see `vix_level_persistence`.
+    /// Read only under `vix_level_identity`, where the VIX target is what
+    /// the index's own conditional variance implies; off the identity the
+    /// target is the phase table and this multiplier is not applied.
+    pub vix_level_sigma: f64,
+
     /// How many sessions of market-side warm-up the factor's variance
     /// components get before session one. 0.0 -- every preset through
     /// pt-v19 -- runs nothing, touches no state and is bit-identical.
@@ -3542,6 +3587,8 @@ impl ModelParams {
             market_vol_alpha_excursion: 0.0,
             market_vol_level_persistence: 0.0,
             market_vol_level_sigma: 0.0,
+            vix_level_persistence: 0.0,
+            vix_level_sigma: 0.0,
             market_burn_in_sessions: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
@@ -5440,6 +5487,8 @@ impl ModelParams {
             "market_vol_alpha_excursion" => self.market_vol_alpha_excursion,
             "market_vol_level_persistence" => self.market_vol_level_persistence,
             "market_vol_level_sigma" => self.market_vol_level_sigma,
+            "vix_level_persistence" => self.vix_level_persistence,
+            "vix_level_sigma" => self.vix_level_sigma,
             "market_burn_in_sessions" => self.market_burn_in_sessions,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
@@ -5625,6 +5674,8 @@ impl ModelParams {
             "market_vol_alpha_excursion" => out.market_vol_alpha_excursion = value,
             "market_vol_level_persistence" => out.market_vol_level_persistence = value,
             "market_vol_level_sigma" => out.market_vol_level_sigma = value,
+            "vix_level_persistence" => out.vix_level_persistence = value,
+            "vix_level_sigma" => out.vix_level_sigma = value,
             "market_burn_in_sessions" => out.market_burn_in_sessions = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
@@ -5864,6 +5915,22 @@ impl ModelParams {
     ///
     /// Pure; allocates only on the failure path.
     pub fn invariants(&self) -> Result<(), String> {
+        if self.vix_level_sigma != 0.0 && !(self.vix_level_persistence < 1.0 && self.vix_level_persistence >= 0.0) {
+            return Err(format!(
+                "vix_level_sigma is {} but vix_level_persistence is {}. A slow level at \
+                 or past a persistence of one has no stationary dispersion to open from or \
+                 normalise against; it is a random walk on the VIX's own scale. Set the \
+                 persistence inside [0, 1) or the sigma to 0.0.",
+                self.vix_level_sigma, self.vix_level_persistence));
+        }
+        if self.vix_level_sigma != 0.0 && self.vix_level_identity == 0.0 {
+            return Err(format!(
+                "vix_level_sigma is {} but vix_level_identity is 0. The VIX level multiplies \
+                 the target the identity derives from the index's own variance; off the \
+                 identity the target is the phase table and the multiplier is not applied, \
+                 so a non-zero sigma would be a dial that reads as live and does nothing.",
+                self.vix_level_sigma));
+        }
         if self.market_vol_vix_excursion != 0.0 && self.vix_level_identity == 0.0 {
             return Err(format!(
                 "market_vol_vix_excursion is {} but vix_level_identity is 0. The \
@@ -6094,6 +6161,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_alpha_excursion",
         "market_vol_level_persistence",
         "market_vol_level_sigma",
+        "vix_level_persistence",
+        "vix_level_sigma",
         "market_burn_in_sessions",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",

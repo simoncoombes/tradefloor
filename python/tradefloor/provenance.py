@@ -204,6 +204,14 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: entry in `DIAL_PROVENANCE`, which is the transition this list exists
 #: to make visible rather than absorb.
 POST_BASELINE = {
+    "vix_level_persistence":
+        "added 2026-09-21 for the VIX's own slow log-level, on the ruling "
+        "that the second gate grades the rise in persistence from one year "
+        "to two; every shipped preset leaves it at 0.0 until the registered "
+        "arm (vixlevel1) has measured the derived pair on every row",
+    "vix_level_sigma":
+        "added 2026-09-21 with `vix_level_persistence`; 0.0 is the branch "
+        "that keeps the multiplier exactly 1.0 and every preset bit-identical",
     "jump_idio_vix_decoupled":
         "added at 0.8.0 for the idiosyncratic arrival rate under the "
         "identity; pt-v19 carried 1.0 from 2026-09-14 until the 2026-09-20 "
@@ -819,6 +827,28 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "alone, from rest, reaches 34 to 36); and 173.1087, the "
                 "solve of this condition on a 40-session-burn ladder, "
                 "which sat 8 under the settled crossing on the same map",
+    },
+    "vix_level_persistence": {
+        "kind": "undetermined",
+        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0},
+        "what_would_determine_it": "the registered arm vixlevel1 (design "
+                                   "repo, vixlevel1-registration.md): the "
+                                   "derived candidate is 0.9965, the slow "
+                                   "pole of a two-pole fit to log VIX's ACF "
+                                   "over 1990-2025 carrying 79 per cent of "
+                                   "its variance (vix-level-derivation.txt), "
+                                   "and it ships only if the arm shows the "
+                                   "rise it predicts without moving the "
+                                   "fourteen shape rows past their paired "
+                                   "intervals",
+    },
+    "vix_level_sigma": {
+        "kind": "undetermined",
+        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0},
+        "what_would_determine_it": "the same arm; the derived candidate is "
+                                   "0.0256 per session, the innovation that "
+                                   "puts the slow pole's stationary sd at "
+                                   "0.306 in logs, the tape's own",
     },
     "jump_idio_vix_decoupled": {
         "kind": "undetermined",

@@ -355,6 +355,10 @@ pub struct Engine {
     /// stopped being true when pt-v19 took the dial off zero. See
     /// `ModelParams::market_vol_level_sigma`.
     market_vol_log_level: f64,
+    /// The VIX's own slow log-level, in logs; 0.0 means a multiplier of
+    /// exactly 1.0 on what the VIX prices, which is every preset. Driven by
+    /// the same normal `market_vol_log_level` reads, so it adds no draw.
+    vix_log_level: f64,
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
     volume_state: f64,
@@ -830,6 +834,7 @@ impl Engine {
             volume_state: 0.0,
             forced_flow_spent: 0.0,
             market_vol_log_level: 0.0,
+            vix_log_level: 0.0,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             sector_variance: vec![0.0; sector_keys.len()],
@@ -2480,6 +2485,23 @@ impl Engine {
         // being true when pt-v19 took the dial off zero.
         self.market_vol_level_rng.site(Site::MarketVolLevelZ, 0);
         let level_z = self.market_vol_level_rng.next_normal();
+        // THE VIX'S OWN SLOW LEVEL, on the same draw. A branch at sigma 0.0,
+        // which is every shipped preset: no state moves and the multiplier
+        // the close hands the VIX is exactly 1.0. Started from its stationary
+        // distribution for the factor level's reason, with the same 0.0
+        // sentinel; normalised to a mean of one on the LEVEL, since it
+        // multiplies the VIX itself and not a variance whose root is read.
+        if self.params.vix_level_sigma != 0.0 {
+            let phi = self.params.vix_level_persistence;
+            let sigma = self.params.vix_level_sigma;
+            let one_minus = 1.0 - phi * phi;
+            let stationary_var = if one_minus > 0.0 { sigma * sigma / one_minus } else { 0.0 };
+            self.vix_log_level = if self.vix_log_level == 0.0 {
+                crate::mathx::sqrt(stationary_var) * level_z
+            } else {
+                phi * self.vix_log_level + sigma * level_z
+            };
+        }
         let market_vol_level = if self.params.market_vol_level_sigma == 0.0 {
             1.0
         } else {
@@ -2885,10 +2907,16 @@ impl Engine {
                 // `ModelParams::vix_level_identity` and
                 // `market::index_var`.
                 vix_implied_from_market: if self.params.vix_level_identity != 0.0 {
-                    crate::market::index_var::vix_from_variance(
+                    // The slow VIX level multiplies the identity's target here
+                    // and nowhere else: a branch at a multiplier of exactly
+                    // 1.0, so every preset with `vix_level_sigma` 0.0 wires
+                    // the very value it wired before the level existed.
+                    let implied = crate::market::index_var::vix_from_variance(
                         self.params.vix_variance_premium,
                         index_variance,
-                    )
+                    );
+                    let mult = self.vix_level_multiplier();
+                    if mult == 1.0 { implied } else { implied * mult }
                 } else if self.params.vix_realised_vol_weight == 0.0 {
                     0.0
                 } else {
@@ -3122,6 +3150,26 @@ impl Engine {
     /// Read/write the forced-flow segment's spent budget, for checkpoints.
     pub fn market_vol_log_level(&self) -> f64 {
         self.market_vol_log_level
+    }
+
+    pub fn vix_log_level(&self) -> f64 {
+        self.vix_log_level
+    }
+
+    pub fn set_vix_log_level(&mut self, level: f64) {
+        self.vix_log_level = level;
+    }
+
+    /// The multiplier the VIX's slow level applies to what the VIX prices:
+    /// exactly 1.0 at sigma 0.0, mean one otherwise.
+    fn vix_level_multiplier(&self) -> f64 {
+        if self.params.vix_level_sigma == 0.0 || self.vix_log_level == 0.0 {
+            return 1.0;
+        }
+        let phi = self.params.vix_level_persistence;
+        let one_minus = 1.0 - phi * phi;
+        let stationary_var = if one_minus > 0.0 { self.params.vix_level_sigma * self.params.vix_level_sigma / one_minus } else { 0.0 };
+        crate::mathx::exp(self.vix_log_level - 0.5 * stationary_var)
     }
 
     pub fn set_market_vol_log_level(&mut self, level: f64) {
@@ -3907,6 +3955,7 @@ impl Engine {
         hash_f64(&mut buf, self.universe_stress);
         hash_f64(&mut buf, self.forced_flow_spent);
         hash_f64(&mut buf, self.market_vol_log_level);
+        hash_f64(&mut buf, self.vix_log_level);
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where
         // every per-slot array above always follows the roster. An empty

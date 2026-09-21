@@ -266,6 +266,11 @@ PERTURBATIONS = [
     # again, so persistence is back to unread; sigma alone is still the switch.
     ("market_vol_level_persistence", 0.99, False),
     ("market_vol_level_sigma", 0.05, True),
+    # The VIX's own slow log-level (2026-09-21). Sigma is the switch and is
+    # live on its own, riding the draw the factor level already takes;
+    # persistence is unread while sigma is 0.0, exactly as the pair above.
+    ("vix_level_persistence", 0.99, False),
+    ("vix_level_sigma", 0.03, True),
     # The market-side warm-up, added 2026-09-14 and shipping at 0.0 on
     # every preset. MEASURED True on the probe below, and the reason it
     # can be is the same reason `market_vol_level_persistence` reads True:
@@ -1019,6 +1024,13 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # on `sector_excess_corr` with overlapping intervals, so the pairing costs
     # this probe nothing it was reading.
     "vix_level_identity": {"market_vol_vix_excursion": 0.0},
+    # `vix_level_sigma` multiplies `vix_implied_from_market`, which exists
+    # only under the identity, so `ModelParams::invariants` refuses the
+    # sigma with the identity off. The default runs the identity, so the
+    # row above perturbs it alone; a base with the identity off (the
+    # nominal-growth derivation perturbs pt-v18) carries the identity as
+    # the companion, which is the configuration the dial is read on.
+    "vix_level_sigma": {"vix_level_identity": 1.0},
 }
 
 

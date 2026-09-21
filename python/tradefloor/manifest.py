@@ -214,6 +214,7 @@ _SNAPSHOT_KEYS = (
     "attribution", "tick_components", "tick_fundamental", "tick_anchor",
     "market_open", "market_variance", "forced_flow_spent",
     "market_vol_log_level",
+    "vix_log_level",
     "nominal_output_base", "volume_state",
     "universe_stress", "volume_idio", "sector_variance", "jump_excitation",
     "sector_day_factor", "sector_target_day",
@@ -519,6 +520,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # line above and for the same reason: two engines alike in every column
     # and sitting on different levels revert to different targets tonight.
     _f64(buf, snapshot["market_vol_log_level"])
+    # The VIX's own slow log-level, for the same reason.
+    _f64(buf, snapshot.get("vix_log_level", 0.0))
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer

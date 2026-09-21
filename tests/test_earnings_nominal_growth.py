@@ -667,7 +667,8 @@ def test_the_derivation_tracks_every_parameter_that_reaches_the_valuation():
             try:
                 model = tf.ModelParams.from_preset(
                     "pt-v18", **{name: value,
-                                 "buyback_payout_share": share})
+                                 "buyback_payout_share": share},
+                    **params_table.COMPANIONS.get(name, {}))
             except tf.ValidationError:
                 rejected.append(name)
                 continue

@@ -220,6 +220,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # That is strong-to-implausible in the sense the entries above use: the
     # engine's clamps would be doing the modelling long before the top.
     "market_vol_level_sigma": (0.0, 0.15),
+    # The VIX's own slow log-level: persistence up to the same ceiling, and
+    # a sigma box from off to three times the derived 0.0256, which at
+    # 0.9965 is a stationary sd of 0.9 in logs -- a two-sigma level swing
+    # of a factor of six, past which the VIX ceiling does the modelling.
+    "vix_level_persistence": (0.0, 0.9995),
+    "vix_level_sigma": (0.0, 0.08),
     # The market-side warm-up, in SESSIONS. Not a share and not a rate, so
     # its box comes off the thing it has to outlast rather than off a
     # convention: the warm-up converges geometrically at the SLOW variance
