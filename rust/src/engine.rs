@@ -294,6 +294,26 @@ pub struct Engine {
     /// table's components did not reconstruct the move, §74), and the
     /// overnight move, which `apply_overnight` writes to `s` at the open.
     attribution: Vec<[f64; crate::market::factors::COMPONENT_COUNT]>,
+    /// The `random_noise` column split into market, sector and
+    /// idiosyncratic, accumulated across the day beside `attribution` and
+    /// reset with it, plus the day's summed square of the scale the
+    /// idiosyncratic part was drawn at with the name's own sigma divided
+    /// out (`kappa^2`).
+    ///
+    /// `random_noise` is what the close feeds the per-name GJR as the day's
+    /// innovation, and the column alone cannot say how much of that
+    /// innovation is the name's own variance rather than the factor's and
+    /// the sector's. These say it. Reported through `noise_part_column`,
+    /// and read on the price path only while
+    /// `ModelParams::garch_innovation_commensurate` is non-zero -- at 0.0
+    /// nothing reads them and no trajectory owes them anything. They are
+    /// per-DAY accumulators and `state_snapshot` carries them, exactly as
+    /// it carries the attribution they sit beside and for the same reason:
+    /// a fork taken mid-day whose close read them at zero would feed the
+    /// per-name GJR a different innovation and price differently from the
+    /// parent it is meant to be a copy of.
+    noise_parts: Vec<[f64; 3]>,
+    noise_own_scale2: Vec<f64>,
     /// This tick's ground truth, per company slot.
     ///
     /// `attribution` above sums across the day, which is what a scorer wants
@@ -364,6 +384,19 @@ pub struct Engine {
     volume_state: f64,
     /// Per-NAME volume state, one per company (§107).
     volume_idio: Vec<f64>,
+    /// The log jump each name's `s` took at the LAST close, one per
+    /// company, carried across the open for the volume scale to subtract.
+    ///
+    /// Read only while `volume_move_jump_share` is off 1.0, and written
+    /// only then, so every shipped preset leaves it all zeros and pays
+    /// nothing for it. It is per-DAY state that outlives the open, which
+    /// the attribution accumulator it is copied from does not: `apply_jumps`
+    /// books the jump at the close of the day BEFORE the session that
+    /// trades the gap in, and `open_market` clears the accumulator in
+    /// between. Carried by `state_snapshot`, so a restored engine's first
+    /// session reads the gap the copy's does; without it a restore lost one
+    /// session of the mechanism.
+    jump_move: Vec<f64>,
     /// Cumulative draws per stream, including any the embedder took through
     /// [`Engine::draw_uniform`]. The single most useful numbers for
     /// diagnosing a divergence: if these differ between two runs, nothing
@@ -813,6 +846,8 @@ impl Engine {
             economy,
             central_bank,
             attribution: vec![[0.0; crate::market::factors::COMPONENT_COUNT]; companies_len],
+            noise_parts: vec![[0.0; 3]; companies_len],
+            noise_own_scale2: vec![0.0; companies_len],
             tick_components: vec![[0.0; 8]; companies_len],
             // NaN, not zero: a company that has never ticked has no valuation,
             // and zero is a real one that would silently read as "worthless"
@@ -837,6 +872,7 @@ impl Engine {
             vix_log_level: 0.0,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
+            jump_move: vec![0.0; companies_len],
             sector_variance: vec![0.0; sector_keys.len()],
             sector_day_factor: vec![0.0; sector_keys.len()],
             sector_target_day: 0.0,
@@ -1786,6 +1822,7 @@ impl Engine {
                 universe_stress: self.universe_stress,
                 volume_state: self.volume_state,
                 volume_idio: &self.volume_idio,
+                jump_move: &self.jump_move,
                 market_status: status,
                 intraday_t: intraday_fraction(request.time),
                 volatility_multiplier: request.volatility_multiplier,
@@ -1880,6 +1917,22 @@ impl Engine {
                 outcome.s_components.get(n),
             ) {
                 *row = *computed;
+            }
+            // Beside the attribution and on the same guard: a slot the tick
+            // did not fill is left alone rather than zeroed.
+            if let (Some(acc), Some(computed)) = (
+                self.noise_parts.get_mut(*slot),
+                outcome.noise_parts.get(n),
+            ) {
+                for (k, value) in computed.iter().enumerate() {
+                    acc[k] += value;
+                }
+            }
+            if let (Some(acc), Some(computed)) = (
+                self.noise_own_scale2.get_mut(*slot),
+                outcome.noise_own_scale2.get(n),
+            ) {
+                *acc += *computed;
             }
             // Levels, unlike contributions, PERSIST between ticks: a company
             // that did not trade still has the valuation and anchor it last
@@ -2098,6 +2151,68 @@ impl Engine {
         Ok(())
     }
 
+    /// The day's `random_noise` split, per company slot: market, sector,
+    /// idiosyncratic. See [`Engine::noise_part_column`].
+    pub fn noise_parts(&self) -> &[[f64; 3]] {
+        &self.noise_parts
+    }
+
+    /// The day's summed square of the scale each name's idiosyncratic part
+    /// was drawn at. See [`Engine::noise_parts`].
+    pub fn noise_own_scale2(&self) -> &[f64] {
+        &self.noise_own_scale2
+    }
+
+    /// Put the day's noise split back, flattened three values per company
+    /// slot for the parts and one per slot for the scale.
+    ///
+    /// Restored for the reason [`Engine::restore_day_state`] exists: above
+    /// zero on `ModelParams::garch_innovation_commensurate` the close builds
+    /// the per-name GJR innovation out of these, so a mid-day fork that lost
+    /// them closes on a different innovation.
+    pub fn restore_noise_split(&mut self, parts: &[f64], scale2: &[f64]) -> Result<(), String> {
+        let n = self.companies.len();
+        if parts.len() != n * 3 {
+            return Err(format!(
+                "noise_parts has {} values, expected {}",
+                parts.len(),
+                n * 3
+            ));
+        }
+        if scale2.len() != n {
+            return Err(format!(
+                "noise_own_scale2 has {} values, expected {}",
+                scale2.len(),
+                n
+            ));
+        }
+        self.noise_parts = parts.chunks_exact(3).map(|c| [c[0], c[1], c[2]]).collect();
+        self.noise_own_scale2 = scale2.to_vec();
+        Ok(())
+    }
+
+    /// The jump each name booked at the last close, kept across the open for
+    /// the session that trades the gap in. Written and read only off the
+    /// shipped `ModelParams::volume_move_jump_share` of 1.0.
+    pub fn jump_move(&self) -> &[f64] {
+        &self.jump_move
+    }
+
+    /// Put that jump back, one value per company slot. See
+    /// [`Engine::jump_move`].
+    pub fn set_jump_move(&mut self, moves: &[f64]) -> Result<(), String> {
+        let n = self.companies.len();
+        if moves.len() != n {
+            return Err(format!(
+                "jump_move has {} values, expected {}",
+                moves.len(),
+                n
+            ));
+        }
+        self.jump_move = moves.to_vec();
+        Ok(())
+    }
+
     /// The market factor's variance state, for checkpoints:
     /// `(variance, day_factor)`.
     ///
@@ -2140,12 +2255,66 @@ impl Engine {
             .collect()
     }
 
+    /// One part of the day's `random_noise` across all companies, by index
+    /// 0 (market), 1 (sector) or 2 (idiosyncratic). Reporting only; the
+    /// close reads the parts through `daily_innovation_column`.
+    pub fn noise_part_column(&self, part: usize) -> Vec<f64> {
+        self.noise_parts
+            .iter()
+            .map(|a| a.get(part).copied().unwrap_or(f64::NAN))
+            .collect()
+    }
+
+    /// The day's GARCH innovation per company, as `close_market` feeds it.
+    ///
+    /// At `garch_innovation_commensurate` 0.0 this is the `random_noise`
+    /// attribution column and nothing else, returned by branch, so every
+    /// preset before the dial is bit-identical.
+    ///
+    /// Above zero it is the name's OWN noise divided by the `kappa` the
+    /// tick drew it with, which is what puts the innovation back in the
+    /// units the GJR coefficients were fitted in. See
+    /// [`crate::params::ModelParams::garch_innovation_commensurate`] for
+    /// the defect, the arithmetic and the measurements.
+    ///
+    /// A name whose ticks never ran has no scale to divide by, so it keeps
+    /// the whole column: that is the pre-dial value, and a zero divisor is
+    /// not a smaller innovation, it is no statement at all.
+    fn daily_innovation_column(&self) -> Vec<f64> {
+        let whole = self.attribution_column(random_noise_index());
+        let share = self.params.garch_innovation_commensurate;
+        if share == 0.0 {
+            return whole;
+        }
+        whole
+            .iter()
+            .enumerate()
+            .map(|(i, &raw)| {
+                let own = self.noise_parts.get(i).map(|a| a[2]).unwrap_or(f64::NAN);
+                let kappa2 = self.noise_own_scale2.get(i).copied().unwrap_or(0.0);
+                if !(kappa2 > 0.0) || !own.is_finite() {
+                    return raw;
+                }
+                let commensurate = own / crate::mathx::sqrt(kappa2);
+                if share == 1.0 {
+                    commensurate
+                } else {
+                    (1.0 - share) * raw + share * commensurate
+                }
+            })
+            .collect()
+    }
+
     pub fn open_market(&mut self) {
         // Attribution is per DAY. Resetting here rather than at close means a
         // caller can still read yesterday's decomposition after the close has
         // run, which is when they would actually want it.
         self.attribution.clear();
         self.attribution.resize(self.companies.len(), [0.0; crate::market::factors::COMPONENT_COUNT]);
+        self.noise_parts.clear();
+        self.noise_parts.resize(self.companies.len(), [0.0; 3]);
+        self.noise_own_scale2.clear();
+        self.noise_own_scale2.resize(self.companies.len(), 0.0);
         self.tick_components.clear();
         self.tick_components.resize(self.companies.len(), [0.0; 8]);
         self.tick_fundamental.clear();
@@ -2459,6 +2628,23 @@ impl Engine {
                 },
             );
         }
+        // The jumps, HERE and not after the sector close, where they stood
+        // until `jump_market_variance_share` was wired. They have to run
+        // after the per-name closes, because the momentum roll in those
+        // closes sets the reference that `jump_momentum_share` then moves;
+        // and they have to
+        // run before the factor's close below, because that close consumes
+        // `day_factor` and zeros it, so a jump added afterwards would reach
+        // no shock at all -- `open_market` clears the accumulator again
+        // before the next session's ticks.
+        //
+        // The move costs no preset a bit. Nothing between here and where
+        // the call stood reads or writes `mispricing_s`, the attribution
+        // accumulator or the jump excitation, and `apply_jumps` reads only
+        // the params, the VIX and the anchor, none of which the factor,
+        // sector, forced-flow or stress updates touch. The known-answer
+        // digest is the proof rather than this paragraph.
+        self.apply_jumps();
         // The market factor's own close: its variance updates from the
         // day's accumulated factor, beside the per-name GARCH updates
         // above and with the same zero-draw discipline. The VIX read here
@@ -2493,7 +2679,11 @@ impl Engine {
         // multiplies the VIX itself and not a variance whose root is read.
         if self.params.vix_level_sigma != 0.0 {
             let phi = self.params.vix_level_persistence;
-            let sigma = self.params.vix_level_sigma;
+            // The dial IS the switch above, and what the recursion drives
+            // is the dispersion after the loop's own transmission has been
+            // divided out. At `vix_level_loop_gain` 0.0 that is the dial's
+            // own f64 and this line reads as it did.
+            let sigma = self.vix_level_sigma_applied();
             let one_minus = 1.0 - phi * phi;
             let stationary_var = if one_minus > 0.0 { sigma * sigma / one_minus } else { 0.0 };
             self.vix_log_level = if self.vix_log_level == 0.0 {
@@ -2621,7 +2811,8 @@ impl Engine {
             }
         }
         self.update_universe_stress();
-        self.apply_jumps();
+        // The jumps ran above, before the factor's close.
+        self.carry_jump_moves();
         self.update_volume_state();
         self.update_volume_idio();
     }
@@ -2726,6 +2917,56 @@ impl Engine {
             self.jump_excitation = excitation;
         }
         // mechanism:jumps end
+        //
+        // THE JUMP JOINS THE DAY'S FACTOR INNOVATION. `market` is the log
+        // return the jump put into every name's `s`, and `day_factor` is
+        // the sum of the day's per-tick market factors that the factor's
+        // GJR steps on. The tape's index fit was on TOTAL returns, so the
+        // shock the coefficients were fitted to saw crash days; this is
+        // where the model's shock sees one. See
+        // `ModelParams::jump_market_variance_share` for the derivation and
+        // for why this call sits before the factor's own close.
+        //
+        // Read outside the generated region and not inside it, because the
+        // body between the markers is compared to what the emitter writes
+        // and every shipped preset records its digest. `market` is a
+        // top-level binding of that body, so it is still in scope here.
+        //
+        // Guarded on the share AND on the jump, so a day that does not jump
+        // adds nothing at all rather than adding a zero to an accumulator
+        // that may be holding a negative one.
+        if self.params.jump_market_variance_share != 0.0 && market != 0.0 {
+            self.market_vol
+                .accumulate(self.params.jump_market_variance_share * market);
+        }
+    }
+
+    /// Carry the day's jumps over the open, for the volume scale.
+    ///
+    /// `apply_jumps` books each name's clamped jump into the jump slot of
+    /// the attribution accumulator and is the only writer of that slot, so
+    /// after it has run the slot IS the day's jump for that name -- the
+    /// clamped one, which is the move the price will actually take.
+    /// `open_market` clears the accumulator, and the gap does not trade in
+    /// until the session after the close that booked it, so the number has
+    /// to be copied somewhere that survives the open.
+    ///
+    /// Gated on the dial, so at the shipped 1.0 the vector is never
+    /// written, stays all zeros, and the close does no work for a
+    /// mechanism nothing reads.
+    fn carry_jump_moves(&mut self) {
+        if self.params.volume_move_jump_share == 1.0 {
+            return;
+        }
+        if self.jump_move.len() < self.companies.len() {
+            self.jump_move.resize(self.companies.len(), 0.0);
+        }
+        for (index, slot) in self.jump_move.iter_mut().enumerate() {
+            *slot = match self.attribution.get(index) {
+                Some(acc) => acc[crate::market::factors::JUMP_SLOT],
+                None => 0.0,
+            };
+        }
     }
 
     /// The shared persistent volume component, stepped once per day.
@@ -3086,7 +3327,7 @@ impl Engine {
             // elsewhere: median factor 0.82, tenth percentile 0.22, ninetieth
             // 3.20). A parameter that cannot be supplied correctly is a trap,
             // not a feature.
-            let own = self.attribution_column(random_noise_index());
+            let own = self.daily_innovation_column();
             let innovations: Vec<Option<f64>> = request
                 .daily_innovations
                 .iter()
@@ -3160,6 +3401,24 @@ impl Engine {
         self.vix_log_level = level;
     }
 
+    /// The VIX level's per-session innovation AS APPLIED, after the
+    /// variance loop's own transmission has been divided out.
+    ///
+    /// `vix_level_sigma` is the spread of the tape's yearly medians of log
+    /// VIX, which is a spread of the VIX and not of the latent multiplier
+    /// the engine holds; the loop carries the multiplier to the VIX with a
+    /// gain, so the dialled figure has to be divided by that gain before
+    /// the level is driven with it. See
+    /// `ModelParams::vix_level_loop_gain`, which is 0.0 on every preset and
+    /// returns the dial's own f64 here with no arithmetic run at all.
+    fn vix_level_sigma_applied(&self) -> f64 {
+        if self.params.vix_level_loop_gain == 0.0 {
+            self.params.vix_level_sigma
+        } else {
+            self.params.vix_level_sigma / self.params.vix_level_loop_gain
+        }
+    }
+
     /// The multiplier the VIX's slow level applies to what the VIX prices:
     /// exactly 1.0 at sigma 0.0, mean one otherwise.
     fn vix_level_multiplier(&self) -> f64 {
@@ -3168,7 +3427,12 @@ impl Engine {
         }
         let phi = self.params.vix_level_persistence;
         let one_minus = 1.0 - phi * phi;
-        let stationary_var = if one_minus > 0.0 { self.params.vix_level_sigma * self.params.vix_level_sigma / one_minus } else { 0.0 };
+        // The SAME dispersion the recursion runs on, which is the point of
+        // reading it from one place: the log-normal correction below and
+        // the opening draw would otherwise disagree about how wide the
+        // level is the moment the gain is turned on.
+        let sigma = self.vix_level_sigma_applied();
+        let stationary_var = if one_minus > 0.0 { sigma * sigma / one_minus } else { 0.0 };
         crate::mathx::exp(self.vix_log_level - 0.5 * stationary_var)
     }
 
@@ -3198,7 +3462,7 @@ impl Engine {
     }
 
     pub fn close_day(&mut self, game_day: i64) {
-        let noise = self.attribution_column(random_noise_index());
+        let noise = self.daily_innovation_column();
         let innovations: Vec<Option<f64>> = noise.into_iter().map(Some).collect();
         let variances = self.sector_base_variances();
         self.close_market(&DayCloseRequest {
@@ -3387,10 +3651,13 @@ impl Engine {
     pub fn add_company(&mut self, company: TickCompany) -> usize {
         self.companies.push(company);
         self.attribution.push([0.0; crate::market::factors::COMPONENT_COUNT]);
+        self.noise_parts.push([0.0; 3]);
+        self.noise_own_scale2.push(0.0);
         self.tick_components.push([0.0; 8]);
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);
         self.volume_idio.push(0.0);
+        self.jump_move.push(0.0);
         // The per-name jump excitation follows the roster for the reason
         // `volume_idio` above does, and it was left out for the same
         // reason: it landed after this function was written. A name that
@@ -3447,8 +3714,17 @@ impl Engine {
         if index < self.attribution.len() {
             self.attribution.remove(index);
         }
+        if index < self.noise_parts.len() {
+            self.noise_parts.remove(index);
+        }
+        if index < self.noise_own_scale2.len() {
+            self.noise_own_scale2.remove(index);
+        }
         if index < self.volume_idio.len() {
             self.volume_idio.remove(index);
+        }
+        if index < self.jump_move.len() {
+            self.jump_move.remove(index);
         }
         // `Vec::remove` for the reason the line above uses it: the tail
         // shifts down and keeps its relative order, so every remaining
@@ -3910,6 +4186,25 @@ impl Engine {
             hash_f64(&mut buf, *value);
         }
         for value in &self.tick_anchor {
+            hash_f64(&mut buf, *value);
+        }
+        // The day's noise split and the scale its idiosyncratic part was
+        // drawn at, hashed beside the accumulators above and for their
+        // reason: off zero on `garch_innovation_commensurate` they decide
+        // the innovation tonight's close feeds the per-name GJR, so two
+        // engines alike in every column and holding different splits close
+        // the day differently.
+        for row in &self.noise_parts {
+            for value in row {
+                hash_f64(&mut buf, *value);
+            }
+        }
+        for value in &self.noise_own_scale2 {
+            hash_f64(&mut buf, *value);
+        }
+        // The jump waiting to be traded in, which the volume scale reads on
+        // the session after the close that booked it.
+        for value in &self.jump_move {
             hash_f64(&mut buf, *value);
         }
         hash_bool(&mut buf, market_open);

@@ -438,6 +438,11 @@ PARAM_SPECS: dict[str, dict] = {
                           "hard_range": (0.0, 0.08)},
     "jump_sigma_idio": {"kind": "abs", "step_unit": 0.01,
                         "hard_range": (0.0, 0.08)},
+    # How much of the market jump's log return joins the day's factor
+    # innovation. A share of one return, so the unit interval is the whole
+    # mechanism and the derivation says 1.0.
+    "jump_market_variance_share": {"kind": "abs", "step_unit": 0.1,
+                                   "hard_range": (0.0, 1.0)},
     # How much of a jump the herding term continues. 1.0 is every shipped
     # preset and is what couples the 504-day tail to 252-day return
     # autocorrelation; 0.0 lets a jump fatten the tail without being
@@ -548,6 +553,13 @@ PARAM_SPECS: dict[str, dict] = {
                               "hard_range": (0.0, 0.9995), "derived": True},
     "vix_level_sigma":        {"kind": "abs", "step_unit": 0.005,
                               "hard_range": (0.0, 0.08), "derived": True},
+    # The loop's transmission of that level into the VIX, divided out of the
+    # level's dispersion (2026-09-21). DERIVED from the read-back's held-VIX
+    # elasticity, 1.75 at the shipped exponent and 2.47 at 4.9; 0.0 is the
+    # branch not taken and the range opens above one because the loop's own
+    # gain is 1 / (1 - h) and never below it.
+    "vix_level_loop_gain":    {"kind": "abs", "step_unit": 0.1,
+                              "hard_range": (0.0, 6.0), "derived": True},
     # The market-side warm-up, in SESSIONS, so the step unit is a step in
     # sessions and not a fraction: 63 is one quarter, the block the
     # transient was traced in (`level-sigma-horizon.md` 2.2), and anything
@@ -629,6 +641,18 @@ PARAM_SPECS: dict[str, dict] = {
     # optimise its own regulariser.
     "garch_vix_coupling": {"kind": "abs", "step_unit": 0.05,
                           "hard_range": (0.0, 1.0)},
+    # The exponent on the same ratio. Ranged like the market factor's
+    # `market_vol_vix_exponent`, and the range holds both laws the tape
+    # offers: 2.0, which ships, and 1.4176, which is twice the roster's
+    # realised-volatility exponent.
+    "garch_vix_exponent": {"kind": "abs", "step_unit": 0.05,
+                           "hard_range": (1.0, 4.0)},
+    # How much of the GJR's innovation is the name's OWN noise, put back in
+    # the units the coefficients were fitted in. A share between the two
+    # innovations, so the unit interval is the whole mechanism; 0.0 is the
+    # column that ships and the derivation says 1.0.
+    "garch_innovation_commensurate": {"kind": "abs", "step_unit": 0.1,
+                                      "hard_range": (0.0, 1.0)},
     # How much a jump's arrival RATE follows the VIX (§84). A share like the
     # other couplings, so the hard range is the unit interval.
     "jump_vix_coupling": {"kind": "abs", "step_unit": 0.05,
@@ -714,6 +738,11 @@ PARAM_SPECS: dict[str, dict] = {
                           "hard_range": (0.0, 2.0)},
     "volume_move_noise": {"kind": "abs", "step_unit": 0.02,
                           "hard_range": (0.0, 1.0)},
+    # How much of a jump the volume scale counts as an intraday move. A
+    # share, so the unit interval is the whole mechanism; 1.0 ships and
+    # nothing on the tape has yet said where in it the truth is.
+    "volume_move_jump_share": {"kind": "abs", "step_unit": 0.1,
+                               "hard_range": (0.0, 1.0)},
     "volume_move_response": {"kind": "abs", "step_unit": 0.05,
                              "hard_range": (0.0, 2.0)},
     "garch_ceiling_multiple":   {"kind": "log",

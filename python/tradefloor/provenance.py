@@ -219,6 +219,15 @@ POST_BASELINE = {
         "`vix_level_identity` is non-zero, so no preset has had to move it "
         "-- and 0.252 is a measurement, which is exactly the kind of number "
         "that must not be invisible because it arrived as a default",
+    "garch_vix_exponent":
+        "the exponent on the VIX ratio in a name's variance reference, "
+        "which replaced an inline literal 2.0 at the value the literal "
+        "carried. Read on the shipped path -- `garch_vix_coupling` is "
+        "0.14219611 on pt-v16 onward, so `market/daily.rs` evaluates the "
+        "reference every close of every name -- and it is the SHAPE of the "
+        "one channel that carries a regime into a name's variance as a "
+        "level rather than as a shock, so it is a live constant no preset "
+        "has ever chosen",
     "idio_sigma_floor":
         "the per-name sigma floor, which replaced an inline literal at the "
         "value the literal carried. Ships at 1e-4 in every preset and binds "
@@ -282,11 +291,6 @@ POST_BASELINE = {
     "market_vol_floor_multiple":
         "0.05, the market factor's variance floor at "
         "market/factor_vol.rs:363",
-    "market_vol_vix_exponent":
-        "2.0, and the branch at market/factor_vol.rs:375 takes the literal "
-        "square at exactly this value. The square is a modelling choice, "
-        "not an inert default -- the docstring records round 100 measuring "
-        "it too convex through mid-VIX",
     "mispricing_cap":
         "0.9, the bound on |s| at market/tick.rs:1338",
     "mispricing_half_life_days":
@@ -371,6 +375,56 @@ OUT_OF_SCOPE = {
         "since 2026-09-20",
     "jump_idio_excitation_decay":
         "unread while `jump_idio_excitation` is 0.0 (engine.rs:963)",
+    "jump_market_variance_share":
+        "inert at 0.0: engine.rs branches on `!= 0.0` after the jumps "
+        "mechanism's generated body, so nothing is added to the market "
+        "factor's day accumulator and its GJR update is the shipped one. "
+        "DERIVED 1.0 and shipped 0.0: the index GJR the shipped "
+        "coefficients come from was fitted on the tape's TOTAL index "
+        "returns, jumps in, so the whole of a market jump's log return "
+        "belongs in the day's shock "
+        "(programme/results/ptv19refine/jump-derivation.txt, design "
+        "repository). Shipped at 0.0 because a derivation is not a "
+        "measurement of the panel",
+    "garch_innovation_commensurate":
+        "inert at 0.0: engine.rs `daily_innovation_column` branches on "
+        "`== 0.0` and returns the `random_noise` attribution column the "
+        "close has always been fed. DERIVED 1.0 and shipped 0.0. The "
+        "defect it repairs: that column is `market_component * "
+        "crash_amplifier + tilt_recentre + sector_component + "
+        "idiosyncratic_noise`, so a name's GJR is fed three draws that are "
+        "not its variance. Measured on the held roster (40 names, "
+        "`Universe.random(40, seed=111)`, 504 days): of the column's mean "
+        "square of 1.387 h, the market's and sector's draws together are "
+        "0.810 h and the name's own only 0.473 h, because the tick draws "
+        "a name's "
+        "noise at `sqrt(max(h, idio_sigma_floor)) * idio_sigma_scale * "
+        "cap_mult * volatility_multiplier / sqrt(390)` per tick. The shock "
+        "coefficient therefore acts on the name's own variance at "
+        "`(alpha + gamma P(neg)) kappa^2` = 0.0728 instead of 0.1511, the "
+        "self-persistence is 0.863 where the dial vector says 0.9416 and "
+        "the tape's names read 0.938, and the market re-excites the name "
+        "at a gain of 0.72. At 1.0 the innovation is the name's own noise "
+        "divided by the kappa the tick drew it with, which is the units "
+        "the coefficients were fitted in. It ships at 0.0 because it is "
+        "not a dial that can be taken alone: without "
+        "`garch_omega_sector_scaled` 1.0 beside it the level collapses "
+        "onto the clamp floor once the common noise leaves the "
+        "innovation, and that pair is a box on the panel and not a "
+        "derivation. MEASURED on 8 seeds of the held roster at 504 days, "
+        "with the pair: fitted GJR persistence of the model's names "
+        "0.8943 -> 0.9259 against the tape's 0.938, the variance state's "
+        "log AR(1) 0.8770 -> 0.9166, and the innovation the recursion is "
+        "fed 1.28 h -> 1.09 h. The dial alone reads 0.9004 and 0.8673, "
+        "which is the collapse the pair exists to stop",
+    "volume_move_jump_share":
+        "inert at 1.0: market/tick.rs phase 3 branches on `== 1.0` and "
+        "takes the move-from-open expression that stood there, so the "
+        "volume scale reads the day's whole move, jumps included. "
+        "UNDETERMINED rather than derived -- what would settle it is "
+        "volume on jump days read off the tape, the share of a gap day's "
+        "volume that the gap itself explains, and nobody has read it. "
+        "1.0 is the arithmetic that was there and not a choice",
     "crisis_blend_variance_damp":
         "inert at 0.0: market/factors.rs:473 branches on `== 0.0`",
     "fair_value_book_floor":
@@ -851,6 +905,58 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "(design repository)",
         "date": "2026-09-21",
     },
+    "garch_vix_exponent": {
+        "kind": "undetermined",
+        "presets": {"pt-v16": 2.0, "pt-v18": 2.0, "pt-v19": 2.0},
+        "what_would_determine_it": "a box on the PAIR this dial belongs "
+                                   "to, because the shipped 2.0 is the "
+                                   "market factor's exponent borrowed for "
+                                   "the roster and nothing measured it on "
+                                   "the names. What the channel is: a "
+                                   "name's GJR level `garch_omega` is one "
+                                   "constant whose unconditional variance "
+                                   "is 3.42e-5, under the clamp floor for "
+                                   "eight of the twelve sectors and at most "
+                                   "2.2x it for the other four, so the name "
+                                   "rests on the floor and the shock rather "
+                                   "than on the constant. The floor is "
+                                   "`garch_floor_multiple` times "
+                                   "`base * (1 - c + c (vix / anchor)^e)`. "
+                                   "That reference is the only place a "
+                                   "name's variance reads the VIX as a "
+                                   "LEVEL. Everything else it gets from "
+                                   "the regime arrives as a SHOCK: "
+                                   "`close_day_with` feeds the recursion "
+                                   "the day's `random_noise`, which "
+                                   "`market/factors.rs` builds as "
+                                   "`market_component * crash_amplifier + "
+                                   "tilt_recentre + sector_component + "
+                                   "idiosyncratic_noise`, so the market "
+                                   "factor re-excites the name at a gain "
+                                   "of `(alpha + gamma / 2) / (1 - beta)`. "
+                                   "Measured on the held roster at a VIX "
+                                   "of 5 against 65 (40 names, "
+                                   "`Universe.random(40, seed=111)`, "
+                                   "medians over 60 graded days): the "
+                                   "reference moves 2.28x, a name's GARCH "
+                                   "variance 5.41x, the variance the tick "
+                                   "draws with 3.57x, and at coupling 0.0 "
+                                   "the same three read 1.00x, 4.61x and "
+                                   "3.16x. What the tape asks for instead "
+                                   "is a law: its names scale like its "
+                                   "index, realised volatility ~ "
+                                   "`VIX^0.7088`, so a name's variance "
+                                   "reference must go as `VIX^1.4176`. A "
+                                   "blend is a law only at `c = 1`, so the "
+                                   "value is a PAIR -- `garch_vix_coupling` "
+                                   "1.0 with this dial at twice the tape's "
+                                   "exponent -- and a box on that pair, "
+                                   "carrying the VIX row at 252 and 504, "
+                                   "is what would determine it. Nothing "
+                                   "here is fitted to the lever row: "
+                                   "0.7088 is the tape's own exponent",
+    },
+
     "jump_idio_vix_decoupled": {
         "kind": "undetermined",
         "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0},
@@ -975,6 +1081,48 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "1.3280 at 252. The GJR fourth-moment coefficient "
                 "`3a^2 + 3ag + 1.5g^2 + 2ab + bg + b^2` is 0.9908, under "
                 "one, so the finite fourth moment survives the asymmetry",
+    },
+    "market_vol_vix_exponent": {
+        "kind": "derived",
+        "presets": {"pt-v19": 4.9},
+        "identity": "the exponent at which the excursion form's fixed point "
+                    "carries the tape's crisis lever: under `target = base (1 - c "
+                    "+ c (VIX / I)^e)` with the read-back `I ~ sqrt(v)`, a held VIX "
+                    "settles the variance at `v ~ VIX^(e / (1 + e/2))`; the tape's "
+                    "6.16x of volatility for 13x of VIX is `v ~ VIX^1.42`, so `e = "
+                    "2 s / (2 - s)` = 4.9 at s = 1.42",
+        "terms": {"6.16x": "the real crisis lever, annualised volatility above "
+                           "VIX 45 over below VIX 12 on the reference roster "
+                           "(`real_crisis_lever` on every record)",
+                  "13x": "the lever protocol's held VIX 65 over held VIX 5",
+                  "fixed point": "programme/fixes-2026-09-21.md section 0.1 "
+                                 "(design repository), measured on the held-VIX "
+                                 "read-back terms: the read-back rises 3.0x at the "
+                                 "square and 4.6x at 4.9"},
+        "source": "programme/fixes-2026-09-21.md and results/ptv19fix/RESULT.md "
+                  "(design repository); 2.0, the literal square, from pt-v1 to the "
+                  "2026-09-21 composition",
+        "date": "2026-09-21",
+    },
+    "vix_level_loop_gain": {
+        "kind": "derived",
+        "presets": {"pt-v19": 2.4684},
+        "identity": "`1 / (1 - h)`, the loop's transmission of the latent level "
+                    "into the VIX, with `h = ln(ratio) / ln 13` the read-back's "
+                    "held-VIX elasticity: the read-back rises 4.60x for 13x of held "
+                    "VIX at `market_vol_vix_exponent` 4.9, so h = 0.595 and the gain "
+                    "2.4684. The level's spread (`vix_level_sigma`) was measured on "
+                    "the VIX and belongs to the VIX; the engine writes it onto the "
+                    "multiplier the loop amplifies, and the gain divides it out",
+        "terms": {"4.60x": "the held-VIX read-back ratio at exponent 4.9 "
+                           "(results/ptv19refine/leverterms.py; 3.00x at 2.0, "
+                           "gain 1.7486 there)",
+                  "form": "engine.rs `vix_level_sigma_applied`: the innovation "
+                          "and the stationary opening divided by the gain"},
+        "source": "programme/fixes-2026-09-21.md design C and "
+                  "results/ptv19fix/RESULT.md (design repository); built "
+                  "2026-09-21, shipped the same day",
+        "date": "2026-09-21",
     },
     "market_vol_alpha": {
         "composed": "shipped on pt-v19 from 2026-09-14, returned to pt-v18's on 2026-09-20 by the 2^6 factorial (design-repo programme/results/bestof/RESULT-504.md), which measured the market variance family as one block, and returned to pt-v19 on 2026-09-21 when ptv19gjr (design-repo programme/results/ptv19gjr/RESULT.md) measured the block's three parts apart: the cost the factorial saw was the factor level's, and this value with the slow pole and the regime level on the VIX law is the first vector to pass the whole gate",
@@ -3193,7 +3341,6 @@ UNPROVENANCED = (
     "market_vol_slow_weight",
     "market_vol_vix_anchor",
     "market_vol_vix_coupling",
-    "market_vol_vix_exponent",
     "mispricing_cap",
     "mispricing_half_life_days",
     "momentum_theta",

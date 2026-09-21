@@ -740,10 +740,13 @@ pub struct ModelParams {
     /// is where it stood when this dial arrived and the last piece of it
     /// that did not know what regime it was in. The per-name
     /// GJR-GARCH reads no macro state at all: its clamps are multiples of a
-    /// static per-sector variance, and its own unconditional level sits far
+    /// static per-sector variance, and its own unconditional level sits
     /// below the floor those clamps impose (5.6% annualised against a floor
     /// of 19.8% for technology), so a name's variance hovers near that floor
-    /// whatever the market is doing. That is why `garch_ceiling_multiple`
+    /// whatever the market is doing. The 5.6% is the reading at the
+    /// persistence of 0.8364 this line was written at; pt-v19's 0.9416 puts
+    /// the same level at 9.3% annualised, which is still under technology's
+    /// floor and over the 6.4% floor the three lowest-sigma sectors carry. That is why `garch_ceiling_multiple`
     /// was measured not to bind at any value on this preset (§75): the
     /// variance never gets within twenty times of it.
     ///
@@ -756,10 +759,74 @@ pub struct ModelParams {
     /// crisis; here it cannot.
     ///
     /// At `c` the clamp reference becomes `base * (1 - c + c * (vix /
-    /// market_vol_vix_anchor)^2)`, the same map the market factor's target
-    /// uses, so at the anchor the reference is exactly the base at any
-    /// coupling and the two variance processes read the regime the same way.
+    /// market_vol_vix_anchor)^e)`, with `e` the exponent
+    /// [`ModelParams::garch_vix_exponent`] carries, the same map the market
+    /// factor's target uses, so at the anchor the reference is exactly the
+    /// base at any coupling and the two variance processes read the regime
+    /// the same way.
     pub garch_vix_coupling: f64,
+    /// Exponent on the VIX ratio in a NAME's variance reference.
+    ///
+    /// 2.0 -- every preset before this dial -- is the literal square the
+    /// line in `market/daily.rs` has always computed, read BY BRANCH, so
+    /// `mathx::pow` never runs and every preset is bit-identical. Same
+    /// spelling and same discipline as
+    /// [`crate::market::factor_vol`]'s `vix_response` for the market
+    /// factor's own target, which is what makes the two shapes separable:
+    /// the index and the roster can be given different laws instead of
+    /// sharing one because nobody wrote the second one down.
+    ///
+    /// # What the shipped pair reaches, and what it does not
+    ///
+    /// `garch_vix_coupling` is NOT inert on the shipped vector, and the
+    /// reading that says it is stops one line short.
+    /// [`crate::market::garch::update_garch_variance_for`] takes the
+    /// constant `garch_omega` while `garch_omega_sector_scaled` is 0.0, so
+    /// the coupled reference does not reach the process's LEVEL -- but both
+    /// clamps are multiples of that same reference. The recursion's own
+    /// constant level, `garch_omega / (1 - persistence)`, is 3.42e-5 at
+    /// pt-v19's persistence of 0.9416: under the floor for eight of the
+    /// twelve sectors and at most 2.2x it for the other four, so what
+    /// places a name's variance is the reference and the shock rather than
+    /// the constant. Measured on the held roster (`Universe.random(40, seed=111)`,
+    /// the VIX pinned at 5 against 65, medians over 60 graded days after
+    /// 252): the reference moves 2.28x, a name's GARCH variance 5.41x, and
+    /// the variance the tick actually draws with,
+    /// `max(variance, idio_sigma_floor)`, 3.57x. At coupling 0.0 the same
+    /// three read 1.00x, 4.61x and 3.16x. So the coupling buys 1.17x of the
+    /// 5.41x and the rest arrives by another road.
+    ///
+    /// That road is the SHOCK, and it is why this dial is the one the
+    /// roster's law can be written on. `close_day_with` feeds the recursion
+    /// the day's `random_noise` attribution, and
+    /// [`crate::market::factors::calculate_live_factors`] builds it as
+    /// `market_component * crash_amplifier + tilt_recentre +
+    /// sector_component + idiosyncratic_noise`. A name's variance is
+    /// therefore re-excited by the market factor's own VIX-coupled variance
+    /// at a gain of `(alpha + gamma / 2) / (1 - beta)`, which is 0.72 on
+    /// pt-v19. What a name's variance does in a crisis is what the FACTOR
+    /// does, attenuated and floored; nothing in it is a statement about the
+    /// roster.
+    ///
+    /// # The value the roster's own scaling law derives
+    ///
+    /// The tape's names scale like its index: realised volatility ~
+    /// `VIX^0.7088` across the roster, which is the 6.16x lever the record
+    /// grades against a 13x of VIX. A variance is a volatility squared, so
+    /// a name's variance reference must be proportional to `VIX^(2 *
+    /// 0.7088)` = `VIX^1.4176`.
+    ///
+    /// A blend `1 - c + c r^e` is a power law only at `c = 1`; below it the
+    /// `1 - c` term is a floor the low end never leaves, and no exponent
+    /// makes such a map a law. So the law is a PAIR and not a number:
+    /// `garch_vix_coupling` at 1.0 and this dial at 1.4176, where the
+    /// reference moves `13^1.4176` = 37.9x for the 13x of VIX the lever row
+    /// reads. Neither figure is fitted to that row; both come off the
+    /// tape's exponent.
+    ///
+    /// The pair is not adopted here, and 2.0 ships. See
+    /// `provenance.py`'s entry for what would register it.
+    pub garch_vix_exponent: f64,
     /// Floor as a multiple of the sector's long-run variance.
     pub garch_floor_multiple: f64,
     /// Scale `garch_omega` by the SECTOR's base variance instead of using
@@ -786,6 +853,113 @@ pub struct ModelParams {
     /// volatility carries no sector ordering at all against a real corpus
     /// ordered from staples 17.0 per cent to technology 29.4.
     pub garch_omega_sector_scaled: f64,
+    /// Feed the per-name GJR the name's OWN noise, in the units the
+    /// coefficients were fitted in, instead of the whole `random_noise`
+    /// column. 0.0 is the shipped column read BY BRANCH, so every preset
+    /// before this dial is bit-identical; 1.0 is the whole form.
+    ///
+    /// # The defect
+    ///
+    /// `engine.rs` hands `close_day_with` the day's `random_noise`
+    /// attribution as the innovation, and
+    /// [`crate::market::factors::calculate_live_factors`] builds that
+    /// column as `market_component * crash_amplifier + tilt_recentre +
+    /// sector_component + idiosyncratic_noise`. Three of the four terms
+    /// are not the name's variance at all. Measured on the held roster
+    /// (`Universe.random(40, seed=111)`, 504 days, eight seeds, medians
+    /// over 320 names), in multiples of the `h` the recursion carries: the
+    /// whole column's mean square is 1.387 h, of which the market's and
+    /// the sector's draws together are 0.810 h and the name's own is only
+    /// `kappa^2` = 0.473 h.
+    ///
+    /// `kappa^2` is under one because the tick draws the name's own noise
+    /// as `sqrt(max(h, idio_sigma_floor)) * idio_sigma_scale * cap_mult *
+    /// volatility_multiplier / sqrt(390)` per tick, so the session's sum
+    /// carries that factor squared and not `h`. Two consequences, both
+    /// measured:
+    ///
+    /// - the shock coefficient acts on the name's own variance at
+    ///   `(alpha + gamma P(neg)) kappa^2` = 0.0728 rather than the 0.1511
+    ///   the dials say, so the process's self-persistence is 0.863 where
+    ///   the dial vector reads 0.9416 and the tape's names read 0.938. The
+    ///   fitted GJR persistence of the model's names is 0.894, between the
+    ///   two, because the rest arrives from outside;
+    /// - the name is re-excited by the MARKET's own noise at a gain of
+    ///   0.72, so a name's variance memory is partly the factor's memory
+    ///   wearing the name's label.
+    ///
+    /// # The form
+    ///
+    /// The close divides the name's own noise by the scale the tick drew
+    /// it with. `kappa^2` is accumulated in the engine the same way the
+    /// attribution is, as the day's sum of
+    /// `(idio_scale / sqrt(390) * cap_mult * volatility_multiplier *
+    /// suppress * tick_scale)^2`, so it is the scale that ACTUALLY ran and
+    /// not a reconstruction of it, and the innovation is
+    ///
+    /// ```text
+    /// eps = noise_idio_sum / sqrt(kappa2)
+    /// ```
+    ///
+    /// whose mean square is `max(h, idio_sigma_floor)`: the units the
+    /// coefficients were fitted in. The shock then acts at full weight and
+    /// the market's noise no longer reaches the name's variance as a
+    /// shock at all. Between 0.0 and 1.0 the two innovations are blended
+    /// linearly; at 1.0 the commensurate one is taken exactly, because
+    /// `(1 - w) a + w b` at `w = 1` is not bit-equal to `b`.
+    ///
+    /// # It travels with the sector-scaled omega
+    ///
+    /// Taking the common noise out of the innovation takes the level with
+    /// it: the constant `garch_omega` gives an unconditional variance of
+    /// 3.42e-5, under the clamp floor for eight of the twelve sectors, so
+    /// a name that is no longer re-excited by the market simply rests on
+    /// the floor. The companion is therefore
+    /// [`ModelParams::garch_omega_sector_scaled`] at 1.0, which makes the
+    /// recursion's own level the sector's base variance times the coupled
+    /// reference, with [`ModelParams::garch_vix_coupling`] 1.0 and
+    /// [`ModelParams::garch_vix_exponent`] 1.4176 -- the roster's own
+    /// scaling law, `volatility ~ VIX^0.7088`. With the level following the
+    /// reference, the regime reaches a name where it belongs, as a LEVEL,
+    /// and the shock is the name's own.
+    ///
+    /// [`ModelParams::idio_sigma_floor`] is the one constant this form
+    /// cannot put in the right units. It ships at 1e-4 against a median
+    /// name variance of 8.9e-5, so on 59 per cent of name-days the draw
+    /// the innovation is divided by was taken at the floor and not at `h`,
+    /// and `eps^2` then reads the floor: on the shipped level the fed
+    /// innovation would be 1.28 h rather than the 1.00 h the form is
+    /// after. The companion repairs most of it by lifting the level --
+    /// with the sector-scaled omega the median variance is 1.29e-4, the
+    /// floor binds on 31 per cent of name-days, and the fed innovation
+    /// reads 1.09 h. The floor is left at its shipped value here: moving
+    /// it is a separate box, and the residual 0.09 is part of why the form
+    /// lands short of the dialled 0.9416.
+    ///
+    /// # Measured
+    ///
+    /// Eight seeds of the held roster, 504 days, medians over the 320
+    /// per-name GJR fits. Shipped against this dial at 1.0 with
+    /// `garch_omega_sector_scaled` 1.0, `garch_vix_coupling` 1.0 and
+    /// `garch_vix_exponent` 1.4176:
+    ///
+    /// ```text
+    ///                        shipped    form    tape
+    /// fitted persistence      0.8943  0.9259   0.938
+    /// fitted alpha            0.0062  0.0062
+    /// fitted gamma            0.0667  0.0433
+    /// log h AR(1)             0.8770  0.9166
+    /// log h AR(5)             0.5093  0.6435
+    /// fed innovation over h    1.281   1.091
+    /// ```
+    ///
+    /// This dial ALONE, without the sector-scaled omega, is the reading
+    /// that says why the two travel together: the median variance falls to
+    /// 8.19e-5, the floor binds on 64 per cent of name-days, and the log
+    /// AR(1) reads 0.8673 -- below the shipped 0.8770. Taking the common
+    /// noise out of the innovation takes the level with it, and the name
+    /// comes to rest on the clamp floor.
+    pub garch_innovation_commensurate: f64,
     /// The absolute floor under a name's daily sigma in the tick and in the
     /// overnight path, in DAILY VARIANCE units. Ships at 1e-4, which is the
     /// constant both sites carried inline, so every existing preset is
@@ -1093,6 +1267,84 @@ pub struct ModelParams {
     /// target is the phase table and this multiplier is not applied.
     pub vix_level_sigma: f64,
 
+    /// The loop's own transmission of the VIX's slow level into the VIX,
+    /// which the level's innovation is DIVIDED by. 0.0 -- every preset --
+    /// is the branch not taken: the recursion and the multiplier read
+    /// `vix_level_sigma` itself, the same f64, and every preset reproduces
+    /// bit for bit.
+    ///
+    /// # The defect
+    ///
+    /// `vix_level_sigma` is the spread of the tape's yearly medians of log
+    /// VIX written onto the LATENT multiplier, and the two are not the same
+    /// quantity. Under `vix_level_identity` the VIX's target is the
+    /// read-back of the index's own conditional variance times this level,
+    /// and the read-back answers the VIX back: a level a little higher
+    /// raises the factor's variance target, which raises the read-back,
+    /// which raises the VIX again. So the spread the model's VIX shows is
+    /// the level's spread times the loop's gain, and the derivation put a
+    /// spread measured on the OUTPUT onto the INPUT. It is why every gain
+    /// in the variance loop lengthens the VIX's memory: at
+    /// `market_vol_vix_exponent` 4.9 the same level arrives at the VIX half
+    /// again as large, the slow share of the VIX's variance grows with it,
+    /// and `vix_ar1_debiased` rises at both horizons.
+    ///
+    /// # The form, and why it is one number
+    ///
+    /// Hold the VIX and the excursion target's fixed point makes the
+    /// read-back a power of it, `I = A * VIX^h`, which is what the held-VIX
+    /// probe measures. Let the loop run and the level multiplies:
+    /// `VIX = I(VIX) * L`, so `log VIX = h log VIX + log A + log L` and
+    ///
+    /// ```text
+    /// d log VIX / d log L = 1 / (1 - h)
+    /// ```
+    ///
+    /// That is this dial. Dividing the level's innovation by it leaves the
+    /// VIX's own log-level spread at the spread the tape's yearly medians
+    /// carry, whatever the loop's gain is, so the exponent can be moved for
+    /// the crisis lever without the VIX's memory moving with it. It divides
+    /// the STATIONARY opening too, not only the innovation, because the two
+    /// are one dispersion and the opening draw is the level's own
+    /// stationary distribution.
+    ///
+    /// # Derivation
+    ///
+    /// `h` is read off the held-VIX pair the lever probe already runs, VIX
+    /// 5 against VIX 65: the read-back `vix_implied_from_market` rises
+    /// 3.00x at the shipped exponent 2.0 and 4.60x at 4.9, over a VIX that
+    /// rises 13x, so `h` is `ln 3.00 / ln 13` = 0.428 and
+    /// `ln 4.60 / ln 13` = 0.595. The gain is then 1.75 at the shipped
+    /// exponent and 2.47 at 4.9. Both are DERIVED in the sense that matters
+    /// here: nothing was fitted to a graded row, each is a ratio of two
+    /// readings the lever probe takes anyway, and the form above is the
+    /// loop's own algebra.
+    ///
+    /// A gain must be strictly positive: it divides a dispersion, and the
+    /// loop's is `1 / (1 - h)` with `h` in `[0, 1)`, so it is never below
+    /// one. `ModelParams::invariants` refuses a non-positive value and
+    /// refuses the dial while `vix_level_sigma` is 0.0, where there is no
+    /// level for it to correct.
+    ///
+    /// # What it moves, MEASURED on 16 seeds of the held roster
+    ///
+    /// `vix_ar1_debiased` reads 0.9523 at 252 and 0.9637 at 504 on the
+    /// shipped vector. At `market_vol_vix_exponent` 4.9, which is what the
+    /// crisis lever asks for, it reads 0.9581 and 0.9752, and the 504
+    /// reading is refused. With the gain divided out at 4.9 it reads 0.9492
+    /// and 0.9592, under the shipped vector at both horizons, with a rise
+    /// of +0.0100 against the shipped vector's +0.0114, and the lever is
+    /// untouched: the read-back still rises 4.60x and realised index
+    /// volatility 4.85x for a VIX of 5 against 65.
+    ///
+    /// That the LEVEL is where the exponent's whole cost sits is the claim
+    /// the form makes, and it is measurable on its own. With
+    /// `vix_level_sigma` at 0.0 the same exponent change reads 0.9451 and
+    /// 0.9581 at 2.0 against 0.9413 and 0.9569 at 4.9: with no regime level
+    /// in the loop, the loop's own gain does not lengthen the VIX's lag-one
+    /// memory at all.
+    pub vix_level_loop_gain: f64,
+
     /// How many sessions of market-side warm-up the factor's variance
     /// components get before session one. 0.0 -- every preset through
     /// pt-v19 -- runs nothing, touches no state and is bit-identical.
@@ -1225,7 +1477,9 @@ pub struct ModelParams {
     /// still reads the print.
     pub market_vol_vix_smooth: f64,
     /// Exponent on the market variance target's VIX ratio. 2.0 -- every
-    /// shipped preset -- is the literal square, bit for bit. Round 100
+    /// preset up to the 2026-09-21 composition of pt-v19, which ships 4.9
+    /// (the tape's lever law at the excursion form's fixed point; see the
+    /// constructor) -- is the literal square, bit for bit. Round 100
     /// measured the square too convex through mid-VIX along real paths;
     /// a lower exponent with the coupling re-fit to hold T(45)/T(5)
     /// flattens the middle while preserving the certified crisis lever's
@@ -2300,6 +2554,41 @@ pub struct ModelParams {
     /// in whatever a real market's unexplained volume variation represents,
     /// so it is a dial rather than a thing to minimise.
     pub volume_move_noise: f64,
+    /// How much of a jump's share of the day's move the volume scale
+    /// counts. Ships at 1.0, where the arithmetic is the shipped one.
+    ///
+    /// `price_magnitude` in market/tick.rs phase 3 is the day's move from
+    /// the open, `|new_price - open| / open`, and a jump is in it whole. A
+    /// jump lands on `mispricing_s` at the CLOSE and `reset_daily_prices`
+    /// sets the next day's `open` from the price before it, so the gap
+    /// trades in during the following session and the volume scale reads
+    /// it as though the name had moved that far intraday. At
+    /// `overnight_variance_ratio` 0.0, which every shipped preset carries,
+    /// nothing reprices the open, so there is no session in which a jump
+    /// is anything but an intraday move.
+    ///
+    /// That is the coupling §0.4 of the 2026-09-21 design note names: the
+    /// model's idiosyncratic jump is five times the tape's size at a
+    /// fortieth of its rate, and the rare huge private jumps are what hold
+    /// `volume_change_acf1` inside its band. Take them out and the band is
+    /// left; leave them in and the names' excess kurtosis is made by jumps
+    /// the tape does not have. This dial separates the two: it decides
+    /// whether the volume process is allowed to see a jump at all.
+    ///
+    /// At share `q` the day's move is measured from the open the name
+    /// would have had if `(1 - q)` of the jump had gapped overnight:
+    /// `open_eff = open * exp((1 - q) * j)`, with `j` the log jump the
+    /// close booked into `s` -- read back from the jump slot of the
+    /// attribution accumulator, which `apply_jumps` is the only writer of.
+    /// At 0.0 the volume scale reads the DIFFUSION move alone, which is
+    /// what a gap is: volume on a gap day is made at the open, not by the
+    /// name travelling that distance through the book.
+    ///
+    /// UNDETERMINED. What would determine it is volume on jump days read
+    /// off the tape -- the share of a gap day's volume that the gap itself
+    /// explains -- and nobody has read it. 1.0 ships because it is the
+    /// arithmetic that was there, not because it was chosen.
+    pub volume_move_jump_share: f64,
 
     // ── Universe memory (market/tick.rs, engine.rs) ─────────────────────
     /// How slowly the universe's remembered stress decays, per day.
@@ -2421,6 +2710,44 @@ pub struct ModelParams {
     pub jump_intensity_idio: f64,
     /// Standard deviation of the idiosyncratic jump, in log-return units.
     pub jump_sigma_idio: f64,
+    /// How much of the market jump's log return joins the day's factor
+    /// innovation, so the GJR variance update sees a crash day. Ships at
+    /// 0.0, where nothing is added and the update is the shipped one.
+    ///
+    /// The market factor's variance steps on `day_factor`, the sum of the
+    /// day's per-tick market factors (market/factor_vol.rs). A jump is not
+    /// in it: `apply_jumps` writes the jump into each name's
+    /// `mispricing_s` and nowhere else, so the fear channel sees it
+    /// through `market_day_return_pct` and the variance never does. The
+    /// index GJR the shipped coefficients come from was fitted on the
+    /// tape's TOTAL index returns, jumps included, so a model whose
+    /// variance update reads only the diffusion part is running that fit
+    /// on a series it was not fitted to.
+    ///
+    /// At share `s` the day's shock gains `s * market`, `market` being the
+    /// jump's log return -- the same number every name's `s` took. The
+    /// compensator is deliberately NOT in it: `jump_mean_compensated`
+    /// gives back a deterministic drift, the first moment, and a variance
+    /// shock is a second moment. On a day no jump fires `market` is
+    /// exactly 0.0 and nothing is added at all.
+    ///
+    /// DERIVED 1.0 by that argument, and shipped 0.0. The whole of the
+    /// jump's return belongs in the shock because the whole of it was in
+    /// the returns the coefficients were fitted to; a share between the
+    /// two would be claiming the fit saw part of a crash day.
+    ///
+    /// # It has to land in the day the jump moved
+    ///
+    /// `apply_jumps` runs at the close, and `close_market` used to run it
+    /// after the factor's own close had already consumed `day_factor` and
+    /// zeroed it. Adding there would have put the jump in the NEXT day's
+    /// shock, and `open_market` clears the accumulator in between, so it
+    /// would have been thrown away instead. The call therefore sits
+    /// immediately after the per-name closes and before the factor's, so
+    /// the addition lands in the shock the same close computes. Nothing
+    /// between the two reads or writes what `apply_jumps` touches, which
+    /// is why the move costs no preset a bit.
+    pub jump_market_variance_share: f64,
     /// How much a jump's ARRIVAL RATE follows the VIX. Zero is every preset
     /// before this dial and is bit-identical (§84).
     ///
@@ -3578,8 +3905,10 @@ impl ModelParams {
             garch_gamma: garch::GAMMA,
             garch_ceiling_multiple: garch::CEILING_MULTIPLE,
             garch_vix_coupling: 0.0,
+            garch_vix_exponent: 2.0,
             garch_floor_multiple: garch::FLOOR_MULTIPLE,
             garch_omega_sector_scaled: 0.0,
+            garch_innovation_commensurate: 0.0,
             idio_sigma_floor: 0.0001,
             market_vol_alpha: factor_vol::MARKET_VOL_ALPHA,
             market_vol_beta: factor_vol::MARKET_VOL_BETA,
@@ -3589,6 +3918,7 @@ impl ModelParams {
             market_vol_level_sigma: 0.0,
             vix_level_persistence: 0.0,
             vix_level_sigma: 0.0,
+            vix_level_loop_gain: 0.0,
             market_burn_in_sessions: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
@@ -3629,6 +3959,7 @@ impl ModelParams {
             volume_move_response: 0.6,
             volume_move_cap: 4.0,
             volume_move_noise: 0.2,
+            volume_move_jump_share: 1.0,
             volume_variance_gain: 0.0,
             universe_stress_decay: 0.0,
             universe_stress_weight: 0.0,
@@ -3639,6 +3970,7 @@ impl ModelParams {
             jump_sigma_market: 0.0,
             jump_intensity_idio: 0.0,
             jump_sigma_idio: 0.0,
+            jump_market_variance_share: 0.0,
             jump_vix_coupling: 0.0,
             overnight_variance_ratio: 0.0,
             garch_beta_dispersion: 0.0,
@@ -5060,6 +5392,32 @@ impl ModelParams {
         // it added within-year variance the tape's calm years do not have.
         p.vix_level_persistence = 0.9979;
         p.vix_level_sigma = 0.0173;
+        // THE THIRD COMPOSITION, 2026-09-21 (design repo,
+        // results/ptv19fix/RESULT.md, registered first, decision rule written
+        // before the numbers). The crisis lever is lost at the excursion
+        // form's FIXED POINT: the target is `base (1 - c + c (VIX / I)^e)`
+        // with `I ~ sqrt(v)`, so a held VIX settles the variance at
+        // `v ~ VIX^(e / (1 + e/2))`, which at the shipped square is `v ~ VIX`
+        // and a lever of sqrt(13) before clamps. The tape's lever, 6.16x of
+        // volatility for 13x of VIX, is `v ~ VIX^1.42`, which the same form
+        // gives at `e = 2s / (2 - s)` = 4.9. DERIVED from that law; the
+        // held-VIX read-back then rises 4.6x for 13x (3.0x at the square).
+        p.market_vol_vix_exponent = 4.9;
+        // And the defect that made every gain in the loop lengthen the VIX's
+        // memory: the regime level's spread (0.267, the tape's yearly
+        // medians of log VIX) is a spread OF THE VIX, and it was written
+        // onto the latent multiplier, which the loop amplifies by
+        // `1 / (1 - h)` with `h` the read-back's held-VIX elasticity
+        // (`ln 4.6 / ln 13` = 0.595 at this exponent). The gain divides
+        // the level's innovation and its stationary opening by that
+        // factor, so the VIX carries the tape's spread and not 2.47 times
+        // it. DERIVED from the same two held-VIX readings. Measured on the
+        // box: the VIX row passes at both horizons (k 19 and 16, rise
+        // +0.007 against the tape's +0.012), the lever reads 3.05x, and
+        // the sum of squared tape errors falls from 116 to 91 at one year
+        // and 82 to 59 at two, the first composition to lower it since the
+        // VIX law arrived.
+        p.vix_level_loop_gain = 2.4684;
         // THE CEILING, WHICH CLAMPS THE STATE AND NOT THE TARGET.
         //
         // `vix_ceiling` bounds the VIX after the reversion step,
@@ -5517,8 +5875,10 @@ impl ModelParams {
             "garch_gamma" => self.garch_gamma,
             "garch_ceiling_multiple" => self.garch_ceiling_multiple,
             "garch_vix_coupling" => self.garch_vix_coupling,
+            "garch_vix_exponent" => self.garch_vix_exponent,
             "garch_floor_multiple" => self.garch_floor_multiple,
             "garch_omega_sector_scaled" => self.garch_omega_sector_scaled,
+            "garch_innovation_commensurate" => self.garch_innovation_commensurate,
             "idio_sigma_floor" => self.idio_sigma_floor,
             "market_vol_alpha" => self.market_vol_alpha,
             "market_vol_beta" => self.market_vol_beta,
@@ -5528,6 +5888,7 @@ impl ModelParams {
             "market_vol_level_sigma" => self.market_vol_level_sigma,
             "vix_level_persistence" => self.vix_level_persistence,
             "vix_level_sigma" => self.vix_level_sigma,
+            "vix_level_loop_gain" => self.vix_level_loop_gain,
             "market_burn_in_sessions" => self.market_burn_in_sessions,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
@@ -5566,6 +5927,7 @@ impl ModelParams {
             "volume_move_response" => self.volume_move_response,
             "volume_move_cap" => self.volume_move_cap,
             "volume_move_noise" => self.volume_move_noise,
+            "volume_move_jump_share" => self.volume_move_jump_share,
             "volume_variance_gain" => self.volume_variance_gain,
             "universe_stress_decay" => self.universe_stress_decay,
             "universe_stress_weight" => self.universe_stress_weight,
@@ -5576,6 +5938,7 @@ impl ModelParams {
             "jump_sigma_market" => self.jump_sigma_market,
             "jump_intensity_idio" => self.jump_intensity_idio,
             "jump_sigma_idio" => self.jump_sigma_idio,
+            "jump_market_variance_share" => self.jump_market_variance_share,
             "jump_vix_coupling" => self.jump_vix_coupling,
             "overnight_variance_ratio" => self.overnight_variance_ratio,
             "garch_beta_dispersion" => self.garch_beta_dispersion,
@@ -5704,8 +6067,10 @@ impl ModelParams {
             "garch_gamma" => out.garch_gamma = value,
             "garch_ceiling_multiple" => out.garch_ceiling_multiple = value,
             "garch_vix_coupling" => out.garch_vix_coupling = value,
+            "garch_vix_exponent" => out.garch_vix_exponent = value,
             "garch_floor_multiple" => out.garch_floor_multiple = value,
             "garch_omega_sector_scaled" => out.garch_omega_sector_scaled = value,
+            "garch_innovation_commensurate" => out.garch_innovation_commensurate = value,
             "idio_sigma_floor" => out.idio_sigma_floor = value,
             "market_vol_alpha" => out.market_vol_alpha = value,
             "market_vol_beta" => out.market_vol_beta = value,
@@ -5715,6 +6080,7 @@ impl ModelParams {
             "market_vol_level_sigma" => out.market_vol_level_sigma = value,
             "vix_level_persistence" => out.vix_level_persistence = value,
             "vix_level_sigma" => out.vix_level_sigma = value,
+            "vix_level_loop_gain" => out.vix_level_loop_gain = value,
             "market_burn_in_sessions" => out.market_burn_in_sessions = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
@@ -5753,6 +6119,7 @@ impl ModelParams {
             "volume_move_response" => out.volume_move_response = value,
             "volume_move_cap" => out.volume_move_cap = value,
             "volume_move_noise" => out.volume_move_noise = value,
+            "volume_move_jump_share" => out.volume_move_jump_share = value,
             "volume_variance_gain" => out.volume_variance_gain = value,
             "universe_stress_decay" => out.universe_stress_decay = value,
             "universe_stress_weight" => out.universe_stress_weight = value,
@@ -5765,6 +6132,7 @@ impl ModelParams {
             "garch_beta_dispersion" => out.garch_beta_dispersion = value,
             "jump_momentum_share" => out.jump_momentum_share = value,
             "jump_sigma_idio" => out.jump_sigma_idio = value,
+            "jump_market_variance_share" => out.jump_market_variance_share = value,
             "jump_vix_coupling" => out.jump_vix_coupling = value,
             "jump_sigma_market" => out.jump_sigma_market = value,
             "volume_innovation_sigma" => out.volume_innovation_sigma = value,
@@ -5970,6 +6338,24 @@ impl ModelParams {
                  so a non-zero sigma would be a dial that reads as live and does nothing.",
                 self.vix_level_sigma));
         }
+        if self.vix_level_loop_gain != 0.0 && !(self.vix_level_loop_gain > 0.0) {
+            return Err(format!(
+                "vix_level_loop_gain is {}. It divides the VIX level's dispersion and \
+                 the loop's own transmission is 1 / (1 - h) with h the read-back's \
+                 held-VIX elasticity in [0, 1), so it is never below one and never \
+                 negative. A non-positive value would flip the level's sign or divide \
+                 by nothing. Set it above zero or to 0.0, where it is not applied.",
+                self.vix_level_loop_gain));
+        }
+        if self.vix_level_loop_gain != 0.0 && self.vix_level_sigma == 0.0 {
+            return Err(format!(
+                "vix_level_loop_gain is {} but vix_level_sigma is 0. The gain corrects \
+                 the slow level's dispersion for what the variance loop does to it on \
+                 the way to the VIX, and with no level there is nothing to correct, so \
+                 it would read as live and do nothing. Set vix_level_sigma or the gain \
+                 to 0.0.",
+                self.vix_level_loop_gain));
+        }
         if self.market_vol_vix_excursion != 0.0 && self.vix_level_identity == 0.0 {
             return Err(format!(
                 "market_vol_vix_excursion is {} but vix_level_identity is 0. The \
@@ -6157,6 +6543,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "crisis_blend_ramp",
         "crisis_blend_source",
         "garch_omega_sector_scaled",
+        "garch_innovation_commensurate",
         "idio_sigma_floor",
         "crisis_blend_variance_damp",
         "crisis_vix_threshold",
@@ -6179,6 +6566,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "garch_gamma",
         "garch_omega",
         "garch_vix_coupling",
+        "garch_vix_exponent",
         "idio_sigma_beta_exponent",
         "idio_sigma_scale",
         "inflation_ceiling",
@@ -6187,6 +6575,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "informed_flow_fraction",
         "jump_intensity_idio",
         "jump_intensity_market",
+        "jump_market_variance_share",
         "jump_mean_compensated",
         "jump_mean_market",
         "jump_momentum_share",
@@ -6202,6 +6591,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_level_sigma",
         "vix_level_persistence",
         "vix_level_sigma",
+        "vix_level_loop_gain",
         "market_burn_in_sessions",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",
@@ -6293,6 +6683,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "volume_innovation_sigma",
         "volume_move_cap",
         "volume_move_floor",
+        "volume_move_jump_share",
         "volume_move_noise",
         "volume_move_response",
         "volume_persistence",

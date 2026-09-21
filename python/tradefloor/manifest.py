@@ -212,6 +212,13 @@ _CENTRAL_BANK_FIELDS = (
 _SNAPSHOT_KEYS = (
     "columns", "rng", "tickers", "model_fingerprint",
     "attribution", "tick_components", "tick_fundamental", "tick_anchor",
+    # The day's `random_noise` split, the scale its idiosyncratic part was
+    # drawn at, and the jump waiting for the session that trades it in.
+    # Per-day state that reaches a price: off zero on
+    # `garch_innovation_commensurate` the close builds the per-name GJR
+    # innovation out of the first two, and off 1.0 on
+    # `volume_move_jump_share` the volume scale reads the third.
+    "noise_parts", "noise_own_scale2", "jump_move",
     "market_open", "market_variance", "forced_flow_spent",
     "market_vol_log_level",
     "vix_log_level",
@@ -483,7 +490,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
 
     from ._core import Engine  # the attribution width, one slot per factor
     for name, width in (("attribution", len(Engine.FACTORS)), ("tick_components", 8),
-                        ("tick_fundamental", 1), ("tick_anchor", 1)):
+                        ("tick_fundamental", 1), ("tick_anchor", 1),
+                        # The day's noise split, its idiosyncratic scale and
+                        # the pending jump move, hashed here because they sit
+                        # beside the accumulators above in the snapshot and
+                        # are lost the same way.
+                        ("noise_parts", 3), ("noise_own_scale2", 1),
+                        ("jump_move", 1)):
         for value in _column(snapshot[name], n * width, name):
             _f64(buf, value)
     _flag(buf, bool(snapshot["market_open"]))
@@ -733,7 +746,8 @@ LEDGER_SCHEMA = 1
 #: ``tick_fundamental`` or in the ``rng`` array is a value, and JSON's own
 #: float syntax would round-trip it as some other NaN.
 _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
-                   "tick_anchor", "volume_idio",
+                   "tick_anchor", "noise_parts", "noise_own_scale2",
+                   "jump_move", "volume_idio",
                    "sector_variance", "jump_excitation", "sector_day_factor",
                    "pending_jump", "pending_overnight")
 

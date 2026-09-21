@@ -2569,6 +2569,30 @@ impl PyEngine {
         Ok(f64_bytes(py, &self.inner.attribution_column(index)))
     }
 
+    /// The day's `random_noise` column split into the three draws it sums,
+    /// `"market"`, `"sector"` or `"idio"`, as f64 bytes per company.
+    ///
+    /// A window on the innovation the close feeds the per-name GJR. The
+    /// `random_noise` column is that innovation, and it is the sum of the
+    /// factor's transmission, the sector's and the name's own draw; only
+    /// the split says which of the three the name's variance process is
+    /// responding to. Reading it changes nothing: the close reads the same
+    /// accumulator directly, and only while
+    /// `garch_innovation_commensurate` is non-zero.
+    fn noise_split(&self, py: Python<'_>, part: &str) -> PyResult<Py<PyBytes>> {
+        let index = match part {
+            "market" => 0,
+            "sector" => 1,
+            "idio" => 2,
+            other => {
+                return Err(ValidationError::new_err(format!(
+                    "unknown noise part {other:?}. Valid: market, sector, idio"
+                )))
+            }
+        };
+        Ok(f64_bytes(py, &self.inner.noise_part_column(index)))
+    }
+
     /// `count` independent engines at exactly this state.
     ///
     /// A deep copy of the whole engine, so the branches share no memory and
@@ -2754,6 +2778,28 @@ impl PyEngine {
             f64_bytes(py, self.inner.tick_fundamental()),
         )?;
         out.set_item("tick_anchor", f64_bytes(py, self.inner.tick_anchor()))?;
+        // The day's `random_noise` split and the scale its idiosyncratic
+        // part was drawn at, beside the accumulators above because they are
+        // the same per-DAY state and lost the same way: off zero on
+        // `garch_innovation_commensurate` the close builds the per-name GJR
+        // innovation out of them, so a mid-day fork that dropped them closed
+        // on a different innovation and priced differently from its parent.
+        // Their own keys, so a snapshot written before they were carried
+        // restores to the zeros a day that has not started holds -- which is
+        // every run recorded while the dial shipped 0.0.
+        let flat3 = |rows: &[[f64; 3]]| -> Vec<f64> {
+            rows.iter().flat_map(|r| r.iter().copied()).collect()
+        };
+        out.set_item("noise_parts", f64_bytes(py, &flat3(self.inner.noise_parts())))?;
+        out.set_item(
+            "noise_own_scale2",
+            f64_bytes(py, self.inner.noise_own_scale2()),
+        )?;
+        // The jump each name booked at the last close, kept across the open
+        // for the session that trades the gap in. Written and read only off
+        // the shipped `volume_move_jump_share` of 1.0, and carried here so a
+        // restored engine's first session reads the gap a copy's reads.
+        out.set_item("jump_move", f64_bytes(py, self.inner.jump_move()))?;
         out.set_item("market_open", self.market_open)?;
         // The market factor's variance state: (variance, day_factor).
         // Engine-level rather than per-company, so it has no column; a
@@ -3105,6 +3151,23 @@ impl PyEngine {
             let anchor = buffer("tick_anchor")?.unwrap_or_else(|| vec![f64::NAN; n]);
             self.inner
                 .restore_day_state(&attribution, &components, &fundamental, &anchor)
+                .map_err(ValidationError::new_err)?;
+        }
+        // The day's noise split. Absent means a snapshot from a build that
+        // did not carry it, whose day the close read at the whole
+        // `random_noise` column, which is what zeros here reproduce.
+        if let Some(parts) = buffer("noise_parts")? {
+            let scale2 = buffer("noise_own_scale2")?.unwrap_or_else(|| vec![0.0; n]);
+            self.inner
+                .restore_noise_split(&parts, &scale2)
+                .map_err(ValidationError::new_err)?;
+        }
+        // The jump waiting for the session that trades it in. Absent means a
+        // snapshot from a build without it, and every such run shipped
+        // `volume_move_jump_share` at 1.0, where the vector is never written.
+        if let Some(moves) = buffer("jump_move")? {
+            self.inner
+                .set_jump_move(&moves)
                 .map_err(ValidationError::new_err)?;
         }
         if let Some(flag) = snapshot.get_item("market_open")? {

@@ -99,6 +99,37 @@ pub const CEILING_MULTIPLE: f64 = 5.0;
 /// cannot drive volatility to zero and freeze the price.
 pub const FLOOR_MULTIPLE: f64 = 0.25;
 
+/// The coupled VIX term in a name's variance reference: `c * ratio^e`.
+///
+/// At an exponent of exactly 2.0 -- every preset before the dial -- this is
+/// the literal `c * ratio * ratio` the clamp reference in
+/// [`crate::market::daily::close_day_with`] has always computed, bit for
+/// bit, and `mathx::pow` never runs there.
+///
+/// The COUPLING is inside the function and not multiplied outside it, which
+/// is not a convenience. `c * ratio * ratio` associates as
+/// `(c * ratio) * ratio`, and `c * (ratio * ratio)` is a different f64 on
+/// reachable inputs -- the first version of this seam differed in the last
+/// bit at the shipped coupling and the test below caught it. The same
+/// discipline as the guarded `+=` for `GAMMA` in this module: the
+/// evaluation order is the contract.
+///
+/// The twin of [`crate::market::factor_vol`]'s `vix_response`, kept separate
+/// so the roster and the index can carry different laws; see
+/// [`crate::params::ModelParams::garch_vix_exponent`] for which law the tape
+/// gives each.
+pub fn vix_coupled_response(
+    params: &crate::params::ModelParams,
+    coupling: f64,
+    vix_ratio: f64,
+) -> f64 {
+    if params.garch_vix_exponent == 2.0 {
+        coupling * vix_ratio * vix_ratio
+    } else {
+        coupling * mathx::pow(vix_ratio, params.garch_vix_exponent)
+    }
+}
+
 /// The most components a variance cascade may carry.
 ///
 /// Fixed rather than heap-allocated: eight f64 per name is 64 bytes, and a
@@ -516,6 +547,47 @@ mod tests {
                 assert_eq!(with.to_bits(), without.to_bits());
             }
         }
+    }
+
+    /// The per-name VIX response is the literal square at 2.0, bit for bit.
+    ///
+    /// The assertion is on BITS and on the whole clamp reference the close
+    /// builds from it, because that is what a preset predating the dial has
+    /// to owe nothing to. `mathx::pow(r, 2.0)` is not guaranteed to return
+    /// the bits of `r * r` on every platform, and the branch is what makes
+    /// the question not arise.
+    #[test]
+    fn the_per_name_vix_response_is_the_square_at_two() {
+        let ship = ModelParams::pt_v19();
+        assert_eq!(ship.garch_vix_exponent, 2.0, "the dial must ship at the square");
+        let c = ship.garch_vix_coupling;
+        for r in [0.0_f64, 0.2, 0.9, 1.0, 1.5, 2.8, 5.2] {
+            let reference = BASE * (1.0 - c + vix_coupled_response(&ship, c, r));
+            let literal = BASE * (1.0 - c + c * r * r);
+            assert_eq!(reference.to_bits(), literal.to_bits(), "at ratio {r}");
+        }
+    }
+
+    /// Off 2.0 the reference is the power law the exponent names.
+    ///
+    /// At a coupling of one the blend has no `1 - c` term left, so the
+    /// reference IS `base * ratio^e` and its response to a ratio of `k` is
+    /// `k^e` at any base. Asserted as that identity rather than against a
+    /// recorded number, so the test says what the dial means.
+    #[test]
+    fn at_full_coupling_the_reference_is_the_power_law() {
+        let mut p = ModelParams::pt_v19();
+        p.garch_vix_coupling = 1.0;
+        p.garch_vix_exponent = 1.4176;
+        for k in [2.0_f64, 5.0, 13.0] {
+            let lo = 0.4;
+            let hi = vix_coupled_response(&p, 1.0, lo * k);
+            let ratio = hi / vix_coupled_response(&p, 1.0, lo);
+            assert!((ratio - mathx::pow(k, 1.4176)).abs() < 1e-9 * ratio, "{ratio}");
+        }
+        // The anchor still reads one at any exponent, which is what keeps
+        // `index_var::index_unconditional_variance`'s derivation non-circular.
+        assert_eq!(vix_coupled_response(&p, 1.0, 1.0), 1.0);
     }
 
     /// At 1.0 the recursion's unconditional variance IS the sector's base.

@@ -546,6 +546,11 @@ pub struct TickInputs<'a> {
     /// Per-NAME volume state, indexed by company (§107). Empty means the
     /// mechanism is off, which every preset before it is.
     pub volume_idio: &'a [f64],
+    /// The log jump each name's `s` took at the LAST close, indexed by
+    /// company. Empty, or all zeros, means the volume scale reads the
+    /// whole of the day's move, which is every preset: see
+    /// [`crate::params::ModelParams::volume_move_jump_share`].
+    pub jump_move: &'a [f64],
     /// See [`SettleDrawPolicy`]. `FourAlways` unless replaying a recorded
     /// reference stream.
     pub settle_draws: SettleDrawPolicy,
@@ -607,6 +612,17 @@ pub struct TickOutcome {
     /// `Δs` -- so a consumer can verify the label against the outcome rather
     /// than trusting it.
     pub s_components: Vec<[f64; 8]>,
+    /// The `random_noise` slot of `s_components` split into market, sector
+    /// and idiosyncratic, per active company, at the same scale the slot
+    /// carries. The three sum to that slot up to the order the sum above is
+    /// written in, and the slot is still what moved `s`.
+    pub noise_parts: Vec<[f64; 3]>,
+    /// The square of the scale the idiosyncratic part was drawn at, with
+    /// the name's own daily sigma divided out, at the same tick scale. Summed
+    /// over a day this is `kappa^2`: how far the day's own-noise variance
+    /// sits from the `h` the per-name GJR carries. See
+    /// [`crate::params::ModelParams::garch_innovation_commensurate`].
+    pub noise_own_scale2: Vec<f64>,
     /// Volume printed per active company.
     pub volumes: Vec<f64>,
     /// The live factor decomposition per active company, in `active_indices`
@@ -742,6 +758,8 @@ pub fn simulate_market_tick(
             fair_values: Vec::new(),
             fundamental_values: Vec::new(),
             s_components: Vec::new(),
+            noise_parts: Vec::new(),
+            noise_own_scale2: Vec::new(),
             volumes: Vec::new(),
             factors: Vec::new(),
             shared_factors: SharedFactors {
@@ -941,6 +959,8 @@ pub fn simulate_market_tick(
     let mut new_prices = vec![0.0; active_count];
     let mut fundamentals = vec![f64::NAN; active_count];
     let mut s_components = vec![[0.0f64; 8]; active_count];
+    let mut noise_parts = vec![[0.0f64; 3]; active_count];
+    let mut noise_own_scale2 = vec![0.0f64; active_count];
     let mut crowd_leans = vec![0.0; active_count];
 
     // The fundamentals restated in the economy's current price level and
@@ -1047,6 +1067,22 @@ pub fn simulate_market_tick(
             ]
         };
 
+        // The noise slot's three parts and the scale its own part was drawn
+        // at, both at the scale the slot above carries: `all_noises` already
+        // holds the closed tick's 0.15, and the open tick's
+        // `intraday_vol_mult` multiplies once more. Read off `raw` rather
+        // than recomputed, so these cannot drift from the draw. Nothing here
+        // touches `s_val` below; the close reads them, and only when
+        // `garch_innovation_commensurate` is non-zero.
+        let noise_scale = if open { intraday_vol_mult } else { 0.15 };
+        noise_parts[i] = [
+            raw.noise_market * noise_scale,
+            raw.noise_sector * noise_scale,
+            raw.noise_idio * noise_scale,
+        ];
+        let own_scale = raw.noise_idio_unit * noise_scale;
+        noise_own_scale2[i] = own_scale * own_scale;
+
         if open {
             // The crowd reacts to the mispricing it can SEE — the pre-update
             // state — so there is no same-tick feedback loop.
@@ -1141,7 +1177,30 @@ pub fn simulate_market_tick(
         // Zero-guard: a newly listed company before `resetDailyPrices` seeds
         // `open` would divide by zero and propagate NaN into the batch.
         let daily_change = if stock.open > 0.0 {
-            ((new_prices[i] - stock.open) / stock.open).abs()
+            let move_from_open = (new_prices[i] - stock.open) / stock.open;
+            // The whole move, jumps included -- the shipped spelling, and a
+            // BRANCH rather than a multiply by one, so every preset that
+            // leaves the share alone takes the arithmetic that was here.
+            //
+            // Off 1.0 the day is measured from the open the name would have
+            // had if `(1 - share)` of the last close's jump had gapped
+            // overnight instead of trading in through the book. A jump is
+            // booked into `mispricing_s` at the close and `open` is set from
+            // the price before it, so at share 1.0 a gap counts as a day the
+            // name travelled that far. See
+            // `ModelParams::volume_move_jump_share`.
+            if inputs.params.volume_move_jump_share == 1.0 {
+                move_from_open.abs()
+            } else {
+                match inputs.jump_move.get(idx) {
+                    Some(&j) if j != 0.0 => {
+                        let open_eff = stock.open
+                            * mathx::exp((1.0 - inputs.params.volume_move_jump_share) * j);
+                        ((new_prices[i] - open_eff) / open_eff).abs()
+                    }
+                    _ => move_from_open.abs(),
+                }
+            }
         } else {
             0.0
         };
@@ -1353,6 +1412,8 @@ pub fn simulate_market_tick(
         fair_values: new_prices,
         fundamental_values: fundamentals,
         s_components,
+        noise_parts,
+        noise_own_scale2,
         volumes,
         factors: all_factors,
         shared_factors: shared,

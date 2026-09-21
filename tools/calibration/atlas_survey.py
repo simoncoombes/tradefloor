@@ -226,6 +226,19 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # of a factor of six, past which the VIX ceiling does the modelling.
     "vix_level_persistence": (0.0, 0.9995),
     "vix_level_sigma": (0.0, 0.08),
+    # The gain the VIX level's dispersion is divided by, so the spread the
+    # tape reads on the OUTPUT is not put on the INPUT. 0.0 is off, the
+    # shipped vector and the arm every reading is taken against. Above it
+    # the loop's own algebra fixes the gain at 1 / (1 - h), with h the
+    # held-VIX read-back exponent: 1.75 at the shipped
+    # market_vol_vix_exponent and 2.47 at the 4.9 the crisis lever asks
+    # for, so a gain is never below one. 6.0 is h = 0.83, past any exponent
+    # anyone has proposed. The stretch between 0 and 1 multiplies the
+    # dispersion instead of dividing it, which is the correction inverted
+    # rather than a wider search; it is inside the box only because the box
+    # has to contain the shipped 0.0, the same price
+    # market_vol_level_persistence pays above.
+    "vix_level_loop_gain": (0.0, 6.0),
     # The market-side warm-up, in SESSIONS. Not a share and not a rate, so
     # its box comes off the thing it has to outlast rather than off a
     # convention: the warm-up converges geometrically at the SLOW variance
@@ -448,6 +461,15 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "jump_mean_market": (-0.08, 0.0),
     "jump_sigma_market": (0.0, 0.08),
     "jump_sigma_idio": (0.0, 0.08),
+    # How much of a market jump's log return joins the day's factor shock,
+    # so the variance update sees a crash day. A share, so the unit
+    # interval is the whole domain: 0.0 is the shipped update, which reads
+    # the diffusion alone, and 1.0 is the DERIVED value -- the whole of the
+    # jump, because the whole of it was in the index returns the GJR
+    # coefficients were fitted to. Past 1.0 the shock would carry more of
+    # the jump than the jump moved, so the top is where the fit's own
+    # series is rather than where a search stopped.
+    "jump_market_variance_share": (0.0, 1.0),
     # Volatility-persistence spread across names. Ships at zero, so no
     # multiplicative box exists; the range is the headroom to the GJR
     # persistence ceiling.
@@ -465,6 +487,16 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the cascade path's own arithmetic (garch.rs:187). A blend between is
     # meaningful, so the axis is the unit interval.
     "garch_omega_sector_scaled": (0.0, 1.0),
+    # Whether a name's GJR shock is fed the name's own innovation in the
+    # name's own units instead of the whole day's noise. A blend weight, so
+    # the unit interval is the domain: 0.0 is the shipped arithmetic, where
+    # the market's noise reaches a name as a shock, and 1.0 feeds
+    # `noise_idio_sum / sqrt(kappa2)`, whose mean square is the variance
+    # the coefficients were fitted in. The interior reads, because the two
+    # innovations blend linearly, and 1.0 is taken exactly rather than as
+    # the blend's limit. It travels with the entry above: taking the common
+    # noise out of the innovation takes the level with it.
+    "garch_innovation_commensurate": (0.0, 1.0),
     # Whether day zero is drawn from the cycle's stationary law. A SWITCH,
     # not a share: a day-zero state is either drawn from that law or it is
     # not, and there is no half-drawn phase, so the two admissible values

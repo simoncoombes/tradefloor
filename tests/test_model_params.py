@@ -211,7 +211,15 @@ PERTURBATIONS = [
     # ceiling to catch. 0.9 puts the ceiling below that level, which binds
     # on any preset and keeps the parameter's wiring proven rather than
     # excused.
-    ("garch_vix_coupling", 0.8, False),    # scales the clamp reference by (vix/anchor)^2, and the harness runs at the anchor, where that is exactly 1.0 at any coupling
+    ("garch_vix_coupling", 0.8, False),    # scales the clamp reference by (vix/anchor)^e, and the harness runs at the anchor, where that is exactly 1.0 at any coupling
+    # Inert for the reason above it and for one more of its own: the
+    # exponent only ever sees the ratio the coupling multiplies, and at the
+    # anchor that ratio is exactly 1.0, where `mathx::pow(1.0, e)` is
+    # exactly 1.0 at every e. So the probe cannot separate this dial from
+    # its partner and neither can move on it. What it takes to see the dial
+    # is a held VIX away from the anchor, which is a scenario probe and not
+    # a three-session harness.
+    ("garch_vix_exponent", 1.4176, False),
     # LIVE at the 0.8.0 vector adoption. The old reason was measured and was
     # true of pt-v10: at 0.9, 1.05, 2.0 and 20.0 the trimmed idiosyncratic
     # scale kept per-name variance under the clamp's reference, so the ceiling
@@ -221,6 +229,14 @@ PERTURBATIONS = [
     ("garch_ceiling_multiple", 0.9, True),
     ("garch_floor_multiple", 0.99, True),
     ("garch_omega_sector_scaled", 1.0, True),
+    # The innovation the per-name GJR is fed: the name's own noise in the
+    # units the coefficients were fitted in, instead of the whole
+    # `random_noise` column. LIVE on the probe and on the first close it
+    # reaches: `garch_variance` is one of the columns compared, the day's
+    # own-noise sum is a strict part of the column the shipped path feeds,
+    # and the divisor is the scale the ticks actually drew at, so the two
+    # innovations differ on day one for every name that traded.
+    ("garch_innovation_commensurate", 1.0, True),
     ("idio_sigma_floor", 0.0, True),
     ("market_vol_alpha", 0.2, True),
     ("market_vol_beta", 0.7, True),
@@ -276,6 +292,16 @@ PERTURBATIONS = [
     # 0.0173 since the ptv19gjr composition, so persistence is read.
     ("vix_level_persistence", 0.99, True),
     ("vix_level_sigma", 0.03, True),
+    # The loop's transmission of that level into the VIX, divided out of the
+    # level's dispersion (2026-09-21). Ships at 0.0 on every preset, so the
+    # perturbation has to be TO a non-zero value, and the default ships
+    # `vix_level_sigma` 0.0173, so the level it corrects is there to be
+    # corrected and the dial is read. The default ships 2.4684 since the
+    # third composition, so the perturbation is to 1.7486, the gain the
+    # same derivation gives at the square: the level's innovation and its
+    # stationary opening change scale, the opening draw is the same draw at
+    # a different scale, and no draw moves on any stream.
+    ("vix_level_loop_gain", 1.7486, True),
     # The market-side warm-up, added 2026-09-14 and shipping at 0.0 on
     # every preset. MEASURED True on the probe below, and the reason it
     # can be is the same reason `market_vol_level_persistence` reads True:
@@ -531,6 +557,15 @@ PERTURBATIONS = [
     # two, and this comment is where that is on the record.
     ("crisis_vix_threshold", 18.0, False),
     ("jump_vix_coupling", 1.0, True),  # was False; the burn-in reaches it (see above)
+    # Inert on the probe for a reason about the PROBE and not the wiring:
+    # the market jump fires at 0.0566 a day and none of the three sessions
+    # draws one, so `market` is exactly 0.0 and the guard adds nothing. With
+    # `jump_intensity_market` at 1.0 beside it the two builds differ from the
+    # session after the first jump, which is the counterproof this row cannot
+    # take on its own. Not paired in COMPANIONS: the pairing would be a
+    # second dial moved for the probe's convenience, and the inert reason is
+    # the honest reading.
+    ("jump_market_variance_share", 1.0, False),
     ("crisis_blend_gain", 2.0, False),
     # Was inert with reason "sigma ships at 0.0, so alone this generates
     # zero-impact news". True since pt-v11 put sigma at 0.03 and pt-v12 made
@@ -559,6 +594,12 @@ PERTURBATIONS = [
     ("volume_move_floor", 0.9, True),            # every name trades more on every day
     ("volume_move_noise", 0.05, True),           # narrows the return-unrelated part of volume
     ("volume_move_response", 0.9, True),         # steepens volume against the size of the day's move
+    # Takes the jump out of the move the volume scale reads. LIVE on the
+    # probe although no MARKET jump fires in it: an idiosyncratic jump does,
+    # somewhere in ten names over three sessions, so that name's carried
+    # jump is taken out of its day's move, it trades a different volume, and
+    # volume reaches the price through the book.
+    ("volume_move_jump_share", 0.0, True),      # the volume scale stops counting a jump as an intraday move
     ("garch_cascade_components", 6.0, True),     # replaces one variance timescale with six
     # Inert ALONE: both only read inside the cascade, and the cascade only
     # runs when garch_cascade_components >= 1. A PAIR, like the endogenous
@@ -1031,8 +1072,9 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "vix_level_identity": {"market_vol_vix_excursion": 0.0,
                            # ... and the VIX-law level, which the default
                            # carries since 2026-09-21 and which is refused
-                           # off the identity for the same reason.
-                           "vix_level_sigma": 0.0},
+                           # off the identity for the same reason, and
+                           # the loop gain, refused with the sigma at 0.0.
+                           "vix_level_sigma": 0.0, "vix_level_loop_gain": 0.0},
     # `vix_level_sigma` multiplies `vix_implied_from_market`, which exists
     # only under the identity, so `ModelParams::invariants` refuses the
     # sigma with the identity off. The default runs the identity, so the
@@ -1040,6 +1082,15 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # nominal-growth derivation perturbs pt-v18) carries the identity as
     # the companion, which is the configuration the dial is read on.
     "vix_level_sigma": {"vix_level_identity": 1.0},
+    # The loop gain divides the VIX level's dispersion, so it is refused
+    # while `vix_level_sigma` is 0.0 -- there is no level to correct -- and
+    # the sigma is in turn refused off the identity. Both companions are the
+    # DEFAULT's own shipped values, so the row above reads the gain alone on
+    # pt-v19 exactly as it did before this entry existed; they only bite on a
+    # base that ships the level off, which is the nominal-growth derivation's
+    # pt-v18.
+    "vix_level_loop_gain": {"vix_level_identity": 1.0,
+                            "vix_level_sigma": 0.0173},
 }
 
 
