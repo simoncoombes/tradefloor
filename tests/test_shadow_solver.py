@@ -529,6 +529,12 @@ def test_a_day_with_no_jump_fires_none(short_days):
     days the previous vector left quiet. That is a property of this solver
     on this market at forty ticks, so it is asserted as a rate rather than
     hidden by picking four quiet seeds and saying nothing.
+
+    RE-MEASURED 2026-09-21 on the ptv19gjr composition (the tape's GJR
+    triple, the slow pole, the regime level): still two of twenty, now
+    +2.92 at seed 65 and +2.76 at seed 73, both under the threshold, and
+    seeds 62 and 72 quiet again. The four named quiet days move with the
+    vector, as they have at every re-deal; the rate has not.
     """
     rng = np.random.default_rng(7)
     fired = []
@@ -537,7 +543,7 @@ def test_a_day_with_no_jump_fires_none(short_days):
         out = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
         if out["jump_market"] is not None or out["jump_company"] != {}:
             fired.append((seed, out["jump_market"], out["jump_company"]))
-    for seed in (61, 63, 64, 65):
+    for seed in (61, 63, 64, 66):
         assert seed not in [f[0] for f in fired], fired
     assert len(fired) <= 3, f"{len(fired)} of 20 unplanted days fired: {fired}"
 
@@ -1045,15 +1051,32 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     # other cell, seed 13 at -1.50, is 0.4 nats on the plain side and is
     # not a margin to rest on.
     #
+    # EIGHTH SWEEP, 2026-09-21, at the ptv19gjr composition of pt-v19 (the
+    # tape's GJR triple and slow pole return, the regime level on the VIX
+    # law ships). Re-dealt an eighth time: seed 17 at -1.50 now reads a
+    # plain trial of 5.69 against a no-jump 21.69, so it finds the jump
+    # alone and the premise inverted for the sixth time in eight. The same
+    # seventy cells re-swept on the same recipe (design repo,
+    # programme/results/ptv19gjr/shadow-sweep.json): TWO are decisive, as at
+    # the seventh sweep.
+    #
+    # The day chosen is the wider by its narrower side: seed 15, planted
+    # normal -3.50. The reused Jacobian leaves the trial at 66.72 against a
+    # no-jump 31.10 -- 35.6 nats worse, so it is rejected -- and a Jacobian
+    # of its own reaches 13.14, 18.0 nats better, so it is accepted. It
+    # recovers a normal of -1.309, clear of the 0.6 of zero the 0.8.0
+    # comment rules out. The other cell, seed 16 at -1.50, is 5.7 nats on
+    # its narrower side and recovers -0.543, inside that margin.
+    #
     # The fix is unchanged and still guarded, on a day that still needs it.
     rng = np.random.default_rng(7)
-    fwd, r_obs = _planted_day(17, -1.50, rng)
+    fwd, r_obs = _planted_day(15, -3.50, rng)
     found = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
     assert found["jump_market"] is not None
     # On the SIZE, for the reason the planted-jump test above gives at
     # length: `jump_market` is the recovered normal and the direction lives
     # in `jump_mean_market + jump_sigma_market * z`. Measured here the
-    # normal is -0.918 against a sign change at +3.4645, clear of both that
+    # normal is -1.309 against a sign change at +3.4645, clear of both that
     # and of zero, so this assertion does not rest on a margin the solver can
     # cross.
     assert found["jump_market"] < shadow.upward_threshold(

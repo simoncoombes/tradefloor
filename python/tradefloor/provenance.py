@@ -204,14 +204,6 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: entry in `DIAL_PROVENANCE`, which is the transition this list exists
 #: to make visible rather than absorb.
 POST_BASELINE = {
-    "vix_level_persistence":
-        "added 2026-09-21 for the VIX's own slow log-level, on the ruling "
-        "that the second gate grades the rise in persistence from one year "
-        "to two; every shipped preset leaves it at 0.0 until the registered "
-        "arm (vixlevel1) has measured the derived pair on every row",
-    "vix_level_sigma":
-        "added 2026-09-21 with `vix_level_persistence`; 0.0 is the branch "
-        "that keeps the multiplier exactly 1.0 and every preset bit-identical",
     "jump_idio_vix_decoupled":
         "added at 0.8.0 for the idiosyncratic arrival rate under the "
         "identity; pt-v19 carried 1.0 from 2026-09-14 until the 2026-09-20 "
@@ -359,14 +351,12 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
-    # THE SIX THE 2026-09-20 RECOMPOSITION RETURNED TO 0.0. Each shipped a
+    # THE FIVE THE 2026-09-20 RECOMPOSITION RETURNED TO 0.0 (six, until
+    # `market_vol_gamma` returned to pt-v19 on 2026-09-21). Each shipped a
     # non-zero value on pt-v19 for six days, with a derivation the design
     # repository still holds; the factorial (programme/results/bestof)
     # measured the market variance family and the idio jump family away from
     # the tape and every shipped preset now leaves them where pt-v1 did.
-    "market_vol_gamma":
-        "inert at 0.0: market/factor_vol.rs:430 and :466 multiply the down "
-        "indicator by it, and every shipped preset ships 0.0 since 2026-09-20",
     "market_vol_level_sigma":
         "inert at 0.0: market/factor_vol.rs:696 takes the `level == 1.0` "
         "branch, the level's normal (drawn unconditionally on "
@@ -829,26 +819,37 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "which sat 8 under the settled crossing on the same map",
     },
     "vix_level_persistence": {
-        "kind": "undetermined",
-        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0},
-        "what_would_determine_it": "the registered arm vixlevel1 (design "
-                                   "repo, vixlevel1-registration.md): the "
-                                   "derived candidate is 0.9965, the slow "
-                                   "pole of a two-pole fit to log VIX's ACF "
-                                   "over 1990-2025 carrying 79 per cent of "
-                                   "its variance (vix-level-derivation.txt), "
-                                   "and it ships only if the arm shows the "
-                                   "rise it predicts without moving the "
-                                   "fourteen shape rows past their paired "
-                                   "intervals",
+        "kind": "derived",
+        "presets": {"pt-v19": 0.9979},
+        "identity": "the year-to-year persistence of the tape's VIX regime, "
+                    "as a daily AR(1): the lag-one autocorrelation of the 35 "
+                    "yearly medians of log VIX (1990-2024) is 0.590, and "
+                    "0.590^(1/252) = 0.99791 (half-life 331 sessions)",
+        "terms": {"0.590": "lag-one autocorrelation of the yearly medians of "
+                           "log ^VIX, 35 calendar years with over 200 "
+                           "sessions; lag two 0.261",
+                  "yearly median": "what a calm year and a crisis year "
+                                   "differ in; the within-year movement is "
+                                   "the fast pole's and the GJR triple's"},
+        "source": "programme/results/ptv19gjr/regime-level-derivation.txt "
+                  "and RESULT.md (design repository); the two-pole fit's "
+                  "0.9965 (vix-level-derivation.txt) is the whole-span "
+                  "ACF's slow pole with the crisis decay inside it and was "
+                  "measured on vixlevel1 to add within-year variance the "
+                  "tape's calm years do not have",
+        "date": "2026-09-21",
     },
     "vix_level_sigma": {
-        "kind": "undetermined",
-        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0},
-        "what_would_determine_it": "the same arm; the derived candidate is "
-                                   "0.0256 per session, the innovation that "
-                                   "puts the slow pole's stationary sd at "
-                                   "0.306 in logs, the tape's own",
+        "kind": "derived",
+        "presets": {"pt-v19": 0.0173},
+        "identity": "the innovation that gives the level its stationary "
+                    "spread at `vix_level_persistence`: 0.2667 * sqrt(1 - "
+                    "0.99791^2) = 0.01723",
+        "terms": {"0.2667": "sd of the yearly medians of log ^VIX over the "
+                            "same 35 years (variance 0.0711)"},
+        "source": "programme/results/ptv19gjr/regime-level-derivation.txt "
+                  "(design repository)",
+        "date": "2026-09-21",
     },
     "jump_idio_vix_decoupled": {
         "kind": "undetermined",
@@ -865,8 +866,118 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                    "the recomposition took pt-v18's 0.0",
     },
 
+    "market_vol_gamma": {
+        "sandwich_bread": "CORRECTED 2026-09-14, defect-15: these bars were computed with the EXPECTED information in the sandwich's bread where Bollerslev-Wooldridge uses the OBSERVED HESSIAN. `arch` reproduces every point estimate to the sixth decimal and none of these bars; substituting the Hessian into our own sandwich reproduces `arch` to under 2e-6 with every other line unchanged (arch-crosscheck.md). The information-matrix equality that would make the two forms equivalent FAILS here and fails in the beta corner -- fifteen of sixteen elements of H - A within 0.4 se of zero, `(beta, beta)` at -4.44 -- so the expected form loses its justification and the Hessian form keeps its own. The year-block bootstrap agrees in direction. No shipped VALUE moves and the likelihood ratio 305 is untouched, so the GJR term's adoption is unaffected. ",
+        "composed": "shipped on pt-v19 from 2026-09-14, left on 2026-09-20 with the market variance family, returned on 2026-09-21 with `market_vol_alpha` and `market_vol_beta` (ptv19gjr): the three are one fit",
+        "kind": "measured",
+        "date": "2026-09-07",
+        "estimator": "GJR-GARCH(1,1) by Gaussian quasi-maximum "
+                     "likelihood on the tape's index log returns, whole "
+                     "span, fitted beside a symmetric GARCH(1,1) on the "
+                     "same series and window by the same estimator, and "
+                     "compared by likelihood ratio",
+        "script": "the estimator module reproduced whole in "
+                  "programme/garch-derive-design.md Appendix B, extended "
+                  "to the GJR form (the score recursion gains the term "
+                  "`1[r < 0] r^2`); the fit and its sandwich are in "
+                  "programme/results/ceiling-derivation-independent.md "
+                  "of the design repository, section 7",
+        # The GJR fit's OWN sandwich bar. This entry shipped for a day
+        # with its point estimate pasted into the bar field, and then
+        # with no bar at all while the symmetric fit's bars sat on the
+        # other two coefficients of the same triple. The three bars
+        # below are from one fit of the GJR form on the same 8,959
+        # returns the symmetric fit used: Bollerslev-Wooldridge sandwich,
+        # residual kurtosis E[z^4] 5.06. The likelihood ratio stays
+        # beside it because it is the evidence the term is there at all.
+        "estimate": 0.1556,
+        # Was 0.0180 under the expected-information bread; see the
+        # `sandwich_bread` note on this entry.
+        "standard_error": 0.0236,
+        # THE FITTED MODEL IS NOT THE APPLIED MODEL, recorded 2026-09-14
+        # (defect-16, programme/results/ceiling-and-omega.md 7 to 9).
+        "applied_form": "FITTED with a FREE omega: `s2 = omega + (alpha + "
+                        "gamma 1[r<0]) r^2 + beta s2`, four parameters, "
+                        "omega 0.020241. APPLIED VARIANCE-TARGETED: "
+                        "rust/src/market/factor_vol.rs `component_step` "
+                        "sets `omega = (1 - alpha - beta - gamma/2) * "
+                        "target_variance`. The `gamma/2` rebate this "
+                        "entry's `source` already describes is one half of "
+                        "that expression; the other half, unrecorded until "
+                        "now, is that the WHOLE intercept is pinned to the "
+                        "target rather than carried from the fit. THE GAP: "
+                        "the fitted model's unconditional variance is "
+                        "0.965629 against the tape's var(r) = 1.305298, "
+                        "0.7398 of it; targeting sets that to one, an "
+                        "intercept of 0.027361 against 0.020241, +1.461 "
+                        "omega bars. Re-fitting the triple under the "
+                        "constraint gives alpha 0.011047, gamma 0.170056, "
+                        "beta 0.888355 -- this coefficient moves +0.014495, "
+                        "the +0.80 bars the defect recorded against the "
+                        "WITHDRAWN 0.0180 and +0.62 against the corrected "
+                        "0.0236. The restriction is REJECTED (LR 7.058 on 1 "
+                        "df, p 0.0079); the triple's location is not (joint "
+                        "Wald 4.111 on 3 df, p 0.25); the constraint is "
+                        "absorbed in persistence, 0.979038 -> 0.984431, "
+                        "+1.142 of its 0.004724 bar. The likelihood ratio "
+                        "305 on one degree of freedom that adopts the GJR "
+                        "term at all is measured on the FREE-omega fits on "
+                        "both sides and is untouched by any of this",
+        "residual": {
+            "kind": "likelihood ratio against the symmetric GARCH(1,1)",
+            "statistic": 305.0,
+            "degrees_of_freedom": 1,
+            "nll_gjr": 3551.49,
+            "nll_symmetric": 3703.97,
+            "sandwich_correlations": "corr(alpha, gamma) +0.12, "
+                                     "corr(gamma, beta) -0.21, "
+                                     "corr(alpha, beta) -0.48",
+        },
+        "presets": {"pt-v19": 0.1556},
+        "identity": "the tape's leverage response, at a LIKELIHOOD RATIO "
+                    "of 2 * 152.5 = 305 on one degree of freedom. Same "
+                    "tape, same window, same estimator:\n"
+                    "  GARCH(1,1) omega 0.0190 alpha 0.1059 beta 0.8787 "
+                    "NLL 3703.97\n"
+                    "  GJR(1,1)   omega 0.0202 alpha 0.0066 gamma 0.1556 "
+                    "beta 0.8946 NLL 3551.49\n"
+                    "garch-derive-design.md 2.4: 'the real index's "
+                    "variance responds to DOWN moves almost exclusively; "
+                    "the symmetric 0.1059 is the pseudo-true symmetric "
+                    "approximation of that.' This ships the fit rather "
+                    "than the approximation, so `market_vol_alpha` and "
+                    "`market_vol_beta` carry the GJR triple's values and "
+                    "not the symmetric fit's -- the three are ONE "
+                    "measurement and moving any of them alone would ship "
+                    "a vector no fit produced",
+        "source": "programme/garch-derive-design.md 2.4, design "
+                  "repository. The dial is applied at "
+                  "rust/src/market/factor_vol.rs `component_step`, which "
+                  "loads `alpha + gamma` on a down day and `alpha` on an "
+                  "up one and gives back `gamma/2` through omega, so it "
+                  "redistributes variance between the two states rather "
+                  "than adding any; it passes 0.0 for the SLOW "
+                  "component, which is where 2.4's fit does not reach",
+        "note": "WHY IT WAS ADOPTED, having been recorded and declined. "
+                "2.4 left it to Simon because `market_vol_gamma` was "
+                "outside 2.2's dial list. What made it necessary is the "
+                "envelope's SHAPE panel -- the fourteen rows measured on "
+                "the HELD roster, which is the protocol that certifies "
+                "`excess_kurtosis`. With the symmetric fit that row read "
+                "6.7284 at 504 days against a band floor of 7.1, 13 of "
+                "14 in band; with the triple it reads 7.3005 and 14 of "
+                "14 at both horizons. The symmetric approximation spreads "
+                "a one-sided response evenly and discards most of the "
+                "fourth moment with it. MEASURED, b4fix5. The registered "
+                "risk -- that putting variance behind down moves would "
+                "cost `index_tail_dn3_pct`, which counts down moves -- "
+                "did not materialise: the tail improved, 1.8194 to "
+                "1.3280 at 252. The GJR fourth-moment coefficient "
+                "`3a^2 + 3ag + 1.5g^2 + 2ab + bg + b^2` is 0.9908, under "
+                "one, so the finite fourth moment survives the asymmetry",
+    },
     "market_vol_alpha": {
-        "recomposed": "2026-09-20: the value this entry derives shipped on pt-v19 from 2026-09-14 and was returned to pt-v18's on the 2^6 factorial (design-repo programme/results/bestof/RESULT-504.md), which measured the market variance family away from the tape on four rows in 32 of 32 pairs at both horizons. The derivation stands as a derivation; the preset no longer carries it",
+        "composed": "shipped on pt-v19 from 2026-09-14, returned to pt-v18's on 2026-09-20 by the 2^6 factorial (design-repo programme/results/bestof/RESULT-504.md), which measured the market variance family as one block, and returned to pt-v19 on 2026-09-21 when ptv19gjr (design-repo programme/results/ptv19gjr/RESULT.md) measured the block's three parts apart: the cost the factorial saw was the factor level's, and this value with the slow pole and the regime level on the VIX law is the first vector to pass the whole gate",
         "sandwich_bread": "CORRECTED 2026-09-14, defect-15: these bars were computed with the EXPECTED information in the sandwich's bread where Bollerslev-Wooldridge uses the OBSERVED HESSIAN. `arch` reproduces every point estimate to the sixth decimal and none of these bars; substituting the Hessian into our own sandwich reproduces `arch` to under 2e-6 with every other line unchanged (arch-crosscheck.md). The information-matrix equality that would make the two forms equivalent FAILS here and fails in the beta corner -- fifteen of sixteen elements of H - A within 0.4 se of zero, `(beta, beta)` at -4.44 -- so the expected form loses its justification and the Hessian form keeps its own. The year-block bootstrap agrees in direction. No shipped VALUE moves and the likelihood ratio 305 is untouched, so the GJR term's adoption is unaffected. ",
         "kind": "measured",
         "date": "2026-09-07",
@@ -926,7 +1037,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                         "target would put it, and nothing checks the two "
                         "against each other",
         "presets": {"pt-v16": 0.28035004, "pt-v18": 0.28035004,
-                    "pt-v19": 0.28035004},
+                    "pt-v19": 0.0066},
         "identity": "GJR(1,1) by Gaussian QMLE on the tape's index over "
                     "the whole span: omega 0.0202, alpha 0.0066 "
                     "(sandwich se 0.0082), gamma 0.1556 (0.0236), beta "
@@ -951,7 +1062,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "compensating for a mechanism",
     },
     "market_vol_beta": {
-        "recomposed": "2026-09-20: the value this entry derives shipped on pt-v19 from 2026-09-14 and was returned to pt-v18's on the 2^6 factorial (design-repo programme/results/bestof/RESULT-504.md), which measured the market variance family away from the tape on four rows in 32 of 32 pairs at both horizons. The derivation stands as a derivation; the preset no longer carries it",
+        "composed": "shipped on pt-v19 from 2026-09-14, returned to pt-v18's on 2026-09-20 by the 2^6 factorial (design-repo programme/results/bestof/RESULT-504.md), which measured the market variance family as one block, and returned to pt-v19 on 2026-09-21 when ptv19gjr (design-repo programme/results/ptv19gjr/RESULT.md) measured the block's three parts apart: the cost the factorial saw was the factor level's, and this value with the slow pole and the regime level on the VIX law is the first vector to pass the whole gate",
         "sandwich_bread": "CORRECTED 2026-09-14, defect-15: these bars were computed with the EXPECTED information in the sandwich's bread where Bollerslev-Wooldridge uses the OBSERVED HESSIAN. `arch` reproduces every point estimate to the sixth decimal and none of these bars; substituting the Hessian into our own sandwich reproduces `arch` to under 2e-6 with every other line unchanged (arch-crosscheck.md). The information-matrix equality that would make the two forms equivalent FAILS here and fails in the beta corner -- fifteen of sixteen elements of H - A within 0.4 se of zero, `(beta, beta)` at -4.44 -- so the expected form loses its justification and the Hessian form keeps its own. The year-block bootstrap agrees in direction. No shipped VALUE moves and the likelihood ratio 305 is untouched, so the GJR term's adoption is unaffected. ",
         "kind": "measured",
         "date": "2026-09-07",
@@ -1002,7 +1113,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                         "is the reason this is recorded rather than "
                         "adopted",
         "presets": {"pt-v16": 0.69244622, "pt-v18": 0.69244622,
-                    "pt-v19": 0.69244622},
+                    "pt-v19": 0.8946},
         "identity": "the same fit as `market_vol_alpha`: beta = 0.8946, "
                     "sandwich se 0.0181, corr(beta, omega) -0.91. The "
                     "GJR persistence `alpha + gamma/2 + beta` is 0.9790; "
@@ -1518,12 +1629,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "source": "programme/RESUME.md, ws-b's withdrawal",
     },
     "market_vol_slow_persistence": {
-        "recomposed": "2026-09-20: the value this entry derives shipped on pt-v19 from 2026-09-14 and was returned to pt-v18's on the 2^6 factorial (design-repo programme/results/bestof/RESULT-504.md), which measured the market variance family away from the tape on four rows in 32 of 32 pairs at both horizons. The derivation stands as a derivation; the preset no longer carries it",
+        "composed": "shipped on pt-v19 from 2026-09-14, returned to pt-v18's on 2026-09-20 by the 2^6 factorial (design-repo programme/results/bestof/RESULT-504.md), which measured the market variance family as one block, and returned to pt-v19 on 2026-09-21 when ptv19gjr (design-repo programme/results/ptv19gjr/RESULT.md) measured the block's three parts apart: the cost the factorial saw was the factor level's, and this value with the slow pole and the regime level on the VIX law is the first vector to pass the whole gate",
         # The factor's slow pole: the second derivation the record had and
         # this table could not see. Found by the same audit as `garch_beta`
         # above and added on the same day.
         "kind": "derived",
-        "presets": {"pt-v19": 0.98},
+        "presets": {"pt-v19": 0.9913},
         "identity": "the SLOW POLE of the tape's own variance impulse "
                     "response, read off a two-component fit and carried "
                     "into the mixture as its persistence. One exponential "

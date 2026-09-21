@@ -604,10 +604,10 @@ def test_a_bar_beside_two_shipped_values_has_to_say_which_one_it_is_for():
     check passed it and the paste check passed it. This is the rule that
     would have refused it, driven by the artefact itself.
     """
-    # The live `market_vol_alpha` entry carried two shipped values until
-    # the 2026-09-20 recomposition returned pt-v19 to pt-v18's 0.28035004;
-    # the shape that drove this rule is rebuilt here from that entry so the
-    # rule is still exercised on the artefact that produced it.
+    # The live `market_vol_alpha` entry carries two shipped values (pt-v18's
+    # 0.28035004 and pt-v19's 0.0066, since the 2026-09-21 composition); the
+    # shape that drove this rule is rebuilt here explicitly so the rule is
+    # exercised on the artefact that produced it whatever the presets do.
     good = dict(pv.DIAL_PROVENANCE["market_vol_alpha"],
                 presets={"pt-v16": 0.28035004, "pt-v18": 0.28035004,
                          "pt-v19": 0.0066}, estimate=0.0066)

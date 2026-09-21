@@ -5028,6 +5028,38 @@ impl ModelParams {
         // rather than papered over with a lift. Adopted by Simon's ruling
         // of 2026-09-12 (R16), with the row red.
         p.crisis_blend_gain = 0.0;
+        // THE COMPOSITION OF 2026-09-21 (design repo, results/ptv19gjr). The
+        // VIX persistence row's error was located on the desk: the factor's
+        // shock share set the VIX's within-year amplitude at 1.5x the
+        // tape's, and the model had a crisis in fifteen of sixteen
+        // seed-years where the tape has one in twenty of thirty-five. Three
+        // parts, each the tape's own number, measured apart on the box the
+        // 2026-09-20 factorial could not separate them on:
+        //
+        // The GJR triple is the 2026-09-07 fit on the tape's index returns
+        // (`market_vol_alpha`'s provenance entry). It shipped on pt-v19 from
+        // 2026-09-14 and left on 2026-09-20 inside the market variance
+        // family, whose cost the factor level carried. On its own it takes
+        // the one-year persistence from k 25 of 30 above the tape to 19 and
+        // `fear_gauge_dn3` from 6.40 to 5.87 against 5.73, and costs the
+        // short-lag clustering rows and the index tail.
+        // (The triple is set on the lines that carried the recomposition
+        // below, beside the comments that argued it, so the file keeps one
+        // assignment per dial.) The slow pole is the tape's variance impulse
+        // response's (`market_vol_slow_persistence`'s entry): +0.025 and
+        // +0.062 of `corr_persistence_acf1` toward the tape at 252 and 504.
+        // The regime level, on the VIX law and not on the factor's target,
+        // DERIVED from the tape's 35 yearly medians of log VIX: spread
+        // 0.267, year-to-year autocorrelation 0.59, so phi 0.59^(1/252)
+        // and the innovation that gives that spread. It is what makes calm
+        // years: with it the model reaches VIX 30 in about half its
+        // seed-years, as the tape does, and the persistence RISE from one
+        // year to two reads +0.012 [+0.001, +0.027] against the tape's
+        // paired +0.012. The two-pole fit's level (0.9965, 0.02555) is the
+        // whole-span ACF's slow pole with the crisis decay inside it, and
+        // it added within-year variance the tape's calm years do not have.
+        p.vix_level_persistence = 0.9979;
+        p.vix_level_sigma = 0.0173;
         // THE CEILING, WHICH CLAMPS THE STATE AND NOT THE TARGET.
         //
         // `vix_ceiling` bounds the VIX after the reversion step,
@@ -5182,8 +5214,15 @@ impl ModelParams {
         // replace stay recorded in the design repository; the comments that
         // argued them are kept above each line as the record of why they
         // were tried.
-        p.market_vol_alpha = 0.28035004;   // pt-v18's; 0.0066 until 2026-09-20
-        p.market_vol_beta = 0.69244622;    // pt-v18's; 0.8946 until 2026-09-20
+        //
+        // AND RETURNED 2026-09-21 (the composition note above, at
+        // `vix_level_persistence`): the factorial measured the family as one
+        // block, and ptv19gjr measured its three parts apart. The GJR triple
+        // and the slow pole return at the tape's values; the stochastic
+        // level on the factor's target does not, and the regime level on the
+        // VIX law takes its place.
+        p.market_vol_alpha = 0.0066;   // the tape's; pt-v18's 0.28035004 from 2026-09-20 to 2026-09-21
+        p.market_vol_beta = 0.8946;    // the tape's; pt-v18's 0.69244622 from 2026-09-20 to 2026-09-21
         // THE LEVERAGE RESPONSE, at a likelihood ratio of 305 on one degree
         // of freedom. `garch-derive-design.md` §2.4 fitted both forms to the
         // same tape and the same window:
@@ -5221,7 +5260,7 @@ impl ModelParams {
         // the dial redistributes variance between the two states rather
         // than adding any -- and it passes 0.0 for the SLOW component,
         // which is where §2.4's fit does not reach.
-        p.market_vol_gamma = 0.0;   // pt-v18's; 0.1556 until 2026-09-20 (recomposed, see above)
+        p.market_vol_gamma = 0.1556;   // the tape's; pt-v18's 0.0 from 2026-09-20 to 2026-09-21 (see the composition note above)
 
         // ==================================================================
         // THE COMPOSED VECTOR, adopted 2026-09-13 (`wtcomp1-result.md`).
@@ -5326,7 +5365,7 @@ impl ModelParams {
         // tape's forward-21-session realised-variance impulse response:
         // 0.9913 in [0.975, 1.0]. It replaces a 0.98 that was never read off
         // anything, and it is what carries the 504-day horizon.
-        p.market_vol_slow_persistence = 0.98;   // pt-v18's; 0.9913 until 2026-09-20 (recomposed)
+        p.market_vol_slow_persistence = 0.9913;   // the tape's; pt-v18's 0.98 from 2026-09-20 to 2026-09-21
 
         // THE TWO PER-NAME STATES (vix-dynamics.md sections 19.5 and 19.7),
         // in the RATIO form: a GARCH(1,1) on the sector factor standardised
