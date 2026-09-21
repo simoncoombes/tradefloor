@@ -2569,6 +2569,30 @@ impl PyEngine {
         Ok(f64_bytes(py, &self.inner.attribution_column(index)))
     }
 
+    /// The day's `random_noise` column split into the three draws it sums,
+    /// `"market"`, `"sector"` or `"idio"`, as f64 bytes per company.
+    ///
+    /// A window on the innovation the close feeds the per-name GJR. The
+    /// `random_noise` column is that innovation, and it is the sum of the
+    /// factor's transmission, the sector's and the name's own draw; only
+    /// the split says which of the three the name's variance process is
+    /// responding to. Reading it changes nothing: the close reads the same
+    /// accumulator directly, and only while
+    /// `garch_innovation_commensurate` is non-zero.
+    fn noise_split(&self, py: Python<'_>, part: &str) -> PyResult<Py<PyBytes>> {
+        let index = match part {
+            "market" => 0,
+            "sector" => 1,
+            "idio" => 2,
+            other => {
+                return Err(ValidationError::new_err(format!(
+                    "unknown noise part {other:?}. Valid: market, sector, idio"
+                )))
+            }
+        };
+        Ok(f64_bytes(py, &self.inner.noise_part_column(index)))
+    }
+
     /// `count` independent engines at exactly this state.
     ///
     /// A deep copy of the whole engine, so the branches share no memory and

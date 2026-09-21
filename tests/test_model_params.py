@@ -229,6 +229,14 @@ PERTURBATIONS = [
     ("garch_ceiling_multiple", 0.9, True),
     ("garch_floor_multiple", 0.99, True),
     ("garch_omega_sector_scaled", 1.0, True),
+    # The innovation the per-name GJR is fed: the name's own noise in the
+    # units the coefficients were fitted in, instead of the whole
+    # `random_noise` column. LIVE on the probe and on the first close it
+    # reaches: `garch_variance` is one of the columns compared, the day's
+    # own-noise sum is a strict part of the column the shipped path feeds,
+    # and the divisor is the scale the ticks actually drew at, so the two
+    # innovations differ on day one for every name that traded.
+    ("garch_innovation_commensurate", 1.0, True),
     ("idio_sigma_floor", 0.0, True),
     ("market_vol_alpha", 0.2, True),
     ("market_vol_beta", 0.7, True),

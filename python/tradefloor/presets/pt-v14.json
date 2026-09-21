@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v14",
   "fingerprint": "pt-v14",
-  "coefficient_digest": "71263497a10452dabdcc75d2662b885165fabd38da74f85661cd8083aedabff0",
+  "coefficient_digest": "090eda6f9170212f361a305d95b599d8eb06084420ba6a115e6f66eb93a11665",
   "coefficients": {
     "book_levels": 10.0,
     "buyback_payout_share": 0.0,
@@ -44,6 +44,7 @@
     "garch_ceiling_multiple": 5.0,
     "garch_floor_multiple": 0.25,
     "garch_gamma": 0.18318536187800277,
+    "garch_innovation_commensurate": 0.0,
     "garch_omega": 2e-06,
     "garch_omega_sector_scaled": 0.0,
     "garch_vix_coupling": 0.14219611,

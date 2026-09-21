@@ -647,6 +647,12 @@ PARAM_SPECS: dict[str, dict] = {
     # realised-volatility exponent.
     "garch_vix_exponent": {"kind": "abs", "step_unit": 0.05,
                            "hard_range": (1.0, 4.0)},
+    # How much of the GJR's innovation is the name's OWN noise, put back in
+    # the units the coefficients were fitted in. A share between the two
+    # innovations, so the unit interval is the whole mechanism; 0.0 is the
+    # column that ships and the derivation says 1.0.
+    "garch_innovation_commensurate": {"kind": "abs", "step_unit": 0.1,
+                                      "hard_range": (0.0, 1.0)},
     # How much a jump's arrival RATE follows the VIX (§84). A share like the
     # other couplings, so the hard range is the unit interval.
     "jump_vix_coupling": {"kind": "abs", "step_unit": 0.05,

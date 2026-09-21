@@ -270,6 +270,33 @@ pub struct LiveFactors {
     pub order_flow_impact: f64,
     pub short_squeeze_effect: f64,
     pub random_noise: f64,
+    /// `random_noise` split into the three draws it is the sum of. The sum
+    /// above is still the statement that moves `s`; these are written after
+    /// it as a copy of its parts, so no arithmetic on the price path is
+    /// re-associated and every preset is bit-identical.
+    ///
+    /// The attribution's `random_noise` column is what the close feeds the
+    /// per-name GJR as the day's innovation, and the column alone cannot
+    /// say how much of that innovation is the name's OWN variance rather
+    /// than the factor's and the sector's. Only the split says it, which is
+    /// why the split exists: reported through `Engine::noise_part_column`,
+    /// and read on the price path only when
+    /// [`crate::params::ModelParams::garch_innovation_commensurate`] is
+    /// non-zero.
+    pub noise_market: f64,
+    pub noise_sector: f64,
+    pub noise_idio: f64,
+    /// The scale the idiosyncratic draw above was taken at, with the name's
+    /// own daily sigma DIVIDED OUT: `idio_scale / sqrt(390) * cap_mult *
+    /// volatility_multiplier` times the down-tick reallocation's scale.
+    ///
+    /// `noise_idio` is `z * sqrt(max(h, idio_sigma_floor))` times this, so
+    /// squaring it and summing over the day gives `kappa^2`, the factor by
+    /// which the day's own-noise variance differs from the `h` the
+    /// recursion carries. The close needs it to put the innovation back in
+    /// the units the GJR coefficients were fitted in; see
+    /// [`crate::params::ModelParams::garch_innovation_commensurate`].
+    pub noise_idio_unit: f64,
 }
 
 /// Reference capitalisation, in billions, where the continuous size effect
@@ -568,14 +595,29 @@ pub fn calculate_live_factors(
     // count or the order. At 0.0 neither multiply happens, so every preset
     // that predates the dial is bit-identical rather than multiplied by a
     // pair of ones.
-    let idiosyncratic_noise = if params.market_idio_down_suppress == 0.0 {
-        idiosyncratic_noise
+    //
+    // The scale is named before it is applied so the close can read the
+    // scale the draw ACTUALLY took without a second copy of this branch
+    // drifting from it. At 0.0 the scale is exactly 1.0 and the branch
+    // below returns the draw untouched, so no multiply by one happens on
+    // any preset that predates the dial.
+    let idio_down_suppress_scale = if params.market_idio_down_suppress == 0.0 {
+        1.0
     } else {
         let (down, up) = idio_suppress_scales(params.market_idio_down_suppress);
         // `< 0.0`, the convention the tilt above already uses, so an exactly
         // zero factor is an up tick on both wires and the two cannot
         // disagree about what a down tick is.
-        idiosyncratic_noise * if shared.market_factor < 0.0 { down } else { up }
+        if shared.market_factor < 0.0 {
+            down
+        } else {
+            up
+        }
+    };
+    let idiosyncratic_noise = if params.market_idio_down_suppress == 0.0 {
+        idiosyncratic_noise
+    } else {
+        idiosyncratic_noise * idio_down_suppress_scale
     };
 
     // Crash correlation: when the market shock is extreme, everything loads
@@ -664,6 +706,18 @@ pub fn calculate_live_factors(
     };
     let random_noise =
         market_component * crash_amplifier + tilt_recentre + sector_component + idiosyncratic_noise;
+    // The same three terms kept apart, written AFTER the sum so the sum
+    // above is the statement that runs and this is a copy of its parts and
+    // not a re-association of them. `noise_market + noise_sector +
+    // noise_idio` is `random_noise` term for term.
+    let noise_market = market_component * crash_amplifier + tilt_recentre;
+    let noise_sector = sector_component;
+    let noise_idio = idiosyncratic_noise;
+    // The idiosyncratic draw's own scale with `daily_sigma` divided out --
+    // the three multipliers `idiosyncratic_sigma` and the draw site apply
+    // on top of the name's own sigma, plus the reallocation's scale.
+    let noise_idio_unit =
+        idio_scale / mathx::sqrt(390.0) * cap_mult * volatility_multiplier * idio_down_suppress_scale;
 
     // ── Forced flow ───────────────────────────────────────────────────────
     // Squeezes and stop cascades react to a move that ALREADY happened —
@@ -746,6 +800,10 @@ pub fn calculate_live_factors(
         order_flow_impact,
         short_squeeze_effect,
         random_noise,
+        noise_market,
+        noise_sector,
+        noise_idio,
+        noise_idio_unit,
     }
 }
 

@@ -294,6 +294,24 @@ pub struct Engine {
     /// table's components did not reconstruct the move, §74), and the
     /// overnight move, which `apply_overnight` writes to `s` at the open.
     attribution: Vec<[f64; crate::market::factors::COMPONENT_COUNT]>,
+    /// The `random_noise` column split into market, sector and
+    /// idiosyncratic, accumulated across the day beside `attribution` and
+    /// reset with it, plus the day's summed square of the scale the
+    /// idiosyncratic part was drawn at with the name's own sigma divided
+    /// out (`kappa^2`).
+    ///
+    /// `random_noise` is what the close feeds the per-name GJR as the day's
+    /// innovation, and the column alone cannot say how much of that
+    /// innovation is the name's own variance rather than the factor's and
+    /// the sector's. These say it. Reported through `noise_part_column`,
+    /// and read on the price path only while
+    /// `ModelParams::garch_innovation_commensurate` is non-zero -- at 0.0
+    /// nothing reads them and no trajectory owes them anything. They are
+    /// per-DAY accumulators, so they are not part of `state_snapshot`: a
+    /// restored day starts them at zero like the attribution it sits
+    /// beside.
+    noise_parts: Vec<[f64; 3]>,
+    noise_own_scale2: Vec<f64>,
     /// This tick's ground truth, per company slot.
     ///
     /// `attribution` above sums across the day, which is what a scorer wants
@@ -826,6 +844,8 @@ impl Engine {
             economy,
             central_bank,
             attribution: vec![[0.0; crate::market::factors::COMPONENT_COUNT]; companies_len],
+            noise_parts: vec![[0.0; 3]; companies_len],
+            noise_own_scale2: vec![0.0; companies_len],
             tick_components: vec![[0.0; 8]; companies_len],
             // NaN, not zero: a company that has never ticked has no valuation,
             // and zero is a real one that would silently read as "worthless"
@@ -1896,6 +1916,22 @@ impl Engine {
             ) {
                 *row = *computed;
             }
+            // Beside the attribution and on the same guard: a slot the tick
+            // did not fill is left alone rather than zeroed.
+            if let (Some(acc), Some(computed)) = (
+                self.noise_parts.get_mut(*slot),
+                outcome.noise_parts.get(n),
+            ) {
+                for (k, value) in computed.iter().enumerate() {
+                    acc[k] += value;
+                }
+            }
+            if let (Some(acc), Some(computed)) = (
+                self.noise_own_scale2.get_mut(*slot),
+                outcome.noise_own_scale2.get(n),
+            ) {
+                *acc += *computed;
+            }
             // Levels, unlike contributions, PERSIST between ticks: a company
             // that did not trade still has the valuation and anchor it last
             // had, and blanking them would make the columns unusable for
@@ -2155,12 +2191,66 @@ impl Engine {
             .collect()
     }
 
+    /// One part of the day's `random_noise` across all companies, by index
+    /// 0 (market), 1 (sector) or 2 (idiosyncratic). Reporting only; the
+    /// close reads the parts through `daily_innovation_column`.
+    pub fn noise_part_column(&self, part: usize) -> Vec<f64> {
+        self.noise_parts
+            .iter()
+            .map(|a| a.get(part).copied().unwrap_or(f64::NAN))
+            .collect()
+    }
+
+    /// The day's GARCH innovation per company, as `close_market` feeds it.
+    ///
+    /// At `garch_innovation_commensurate` 0.0 this is the `random_noise`
+    /// attribution column and nothing else, returned by branch, so every
+    /// preset before the dial is bit-identical.
+    ///
+    /// Above zero it is the name's OWN noise divided by the `kappa` the
+    /// tick drew it with, which is what puts the innovation back in the
+    /// units the GJR coefficients were fitted in. See
+    /// [`crate::params::ModelParams::garch_innovation_commensurate`] for
+    /// the defect, the arithmetic and the measurements.
+    ///
+    /// A name whose ticks never ran has no scale to divide by, so it keeps
+    /// the whole column: that is the pre-dial value, and a zero divisor is
+    /// not a smaller innovation, it is no statement at all.
+    fn daily_innovation_column(&self) -> Vec<f64> {
+        let whole = self.attribution_column(random_noise_index());
+        let share = self.params.garch_innovation_commensurate;
+        if share == 0.0 {
+            return whole;
+        }
+        whole
+            .iter()
+            .enumerate()
+            .map(|(i, &raw)| {
+                let own = self.noise_parts.get(i).map(|a| a[2]).unwrap_or(f64::NAN);
+                let kappa2 = self.noise_own_scale2.get(i).copied().unwrap_or(0.0);
+                if !(kappa2 > 0.0) || !own.is_finite() {
+                    return raw;
+                }
+                let commensurate = own / crate::mathx::sqrt(kappa2);
+                if share == 1.0 {
+                    commensurate
+                } else {
+                    (1.0 - share) * raw + share * commensurate
+                }
+            })
+            .collect()
+    }
+
     pub fn open_market(&mut self) {
         // Attribution is per DAY. Resetting here rather than at close means a
         // caller can still read yesterday's decomposition after the close has
         // run, which is when they would actually want it.
         self.attribution.clear();
         self.attribution.resize(self.companies.len(), [0.0; crate::market::factors::COMPONENT_COUNT]);
+        self.noise_parts.clear();
+        self.noise_parts.resize(self.companies.len(), [0.0; 3]);
+        self.noise_own_scale2.clear();
+        self.noise_own_scale2.resize(self.companies.len(), 0.0);
         self.tick_components.clear();
         self.tick_components.resize(self.companies.len(), [0.0; 8]);
         self.tick_fundamental.clear();
@@ -3173,7 +3263,7 @@ impl Engine {
             // elsewhere: median factor 0.82, tenth percentile 0.22, ninetieth
             // 3.20). A parameter that cannot be supplied correctly is a trap,
             // not a feature.
-            let own = self.attribution_column(random_noise_index());
+            let own = self.daily_innovation_column();
             let innovations: Vec<Option<f64>> = request
                 .daily_innovations
                 .iter()
@@ -3308,7 +3398,7 @@ impl Engine {
     }
 
     pub fn close_day(&mut self, game_day: i64) {
-        let noise = self.attribution_column(random_noise_index());
+        let noise = self.daily_innovation_column();
         let innovations: Vec<Option<f64>> = noise.into_iter().map(Some).collect();
         let variances = self.sector_base_variances();
         self.close_market(&DayCloseRequest {
@@ -3497,6 +3587,8 @@ impl Engine {
     pub fn add_company(&mut self, company: TickCompany) -> usize {
         self.companies.push(company);
         self.attribution.push([0.0; crate::market::factors::COMPONENT_COUNT]);
+        self.noise_parts.push([0.0; 3]);
+        self.noise_own_scale2.push(0.0);
         self.tick_components.push([0.0; 8]);
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);
@@ -3557,6 +3649,12 @@ impl Engine {
         }
         if index < self.attribution.len() {
             self.attribution.remove(index);
+        }
+        if index < self.noise_parts.len() {
+            self.noise_parts.remove(index);
+        }
+        if index < self.noise_own_scale2.len() {
+            self.noise_own_scale2.remove(index);
         }
         if index < self.volume_idio.len() {
             self.volume_idio.remove(index);

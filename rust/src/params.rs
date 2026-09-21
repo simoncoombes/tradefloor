@@ -853,6 +853,113 @@ pub struct ModelParams {
     /// volatility carries no sector ordering at all against a real corpus
     /// ordered from staples 17.0 per cent to technology 29.4.
     pub garch_omega_sector_scaled: f64,
+    /// Feed the per-name GJR the name's OWN noise, in the units the
+    /// coefficients were fitted in, instead of the whole `random_noise`
+    /// column. 0.0 is the shipped column read BY BRANCH, so every preset
+    /// before this dial is bit-identical; 1.0 is the whole form.
+    ///
+    /// # The defect
+    ///
+    /// `engine.rs` hands `close_day_with` the day's `random_noise`
+    /// attribution as the innovation, and
+    /// [`crate::market::factors::calculate_live_factors`] builds that
+    /// column as `market_component * crash_amplifier + tilt_recentre +
+    /// sector_component + idiosyncratic_noise`. Three of the four terms
+    /// are not the name's variance at all. Measured on the held roster
+    /// (`Universe.random(40, seed=111)`, 504 days, eight seeds, medians
+    /// over 320 names), in multiples of the `h` the recursion carries: the
+    /// whole column's mean square is 1.387 h, of which the market's and
+    /// the sector's draws together are 0.810 h and the name's own is only
+    /// `kappa^2` = 0.473 h.
+    ///
+    /// `kappa^2` is under one because the tick draws the name's own noise
+    /// as `sqrt(max(h, idio_sigma_floor)) * idio_sigma_scale * cap_mult *
+    /// volatility_multiplier / sqrt(390)` per tick, so the session's sum
+    /// carries that factor squared and not `h`. Two consequences, both
+    /// measured:
+    ///
+    /// - the shock coefficient acts on the name's own variance at
+    ///   `(alpha + gamma P(neg)) kappa^2` = 0.0728 rather than the 0.1511
+    ///   the dials say, so the process's self-persistence is 0.863 where
+    ///   the dial vector reads 0.9416 and the tape's names read 0.938. The
+    ///   fitted GJR persistence of the model's names is 0.894, between the
+    ///   two, because the rest arrives from outside;
+    /// - the name is re-excited by the MARKET's own noise at a gain of
+    ///   0.72, so a name's variance memory is partly the factor's memory
+    ///   wearing the name's label.
+    ///
+    /// # The form
+    ///
+    /// The close divides the name's own noise by the scale the tick drew
+    /// it with. `kappa^2` is accumulated in the engine the same way the
+    /// attribution is, as the day's sum of
+    /// `(idio_scale / sqrt(390) * cap_mult * volatility_multiplier *
+    /// suppress * tick_scale)^2`, so it is the scale that ACTUALLY ran and
+    /// not a reconstruction of it, and the innovation is
+    ///
+    /// ```text
+    /// eps = noise_idio_sum / sqrt(kappa2)
+    /// ```
+    ///
+    /// whose mean square is `max(h, idio_sigma_floor)`: the units the
+    /// coefficients were fitted in. The shock then acts at full weight and
+    /// the market's noise no longer reaches the name's variance as a
+    /// shock at all. Between 0.0 and 1.0 the two innovations are blended
+    /// linearly; at 1.0 the commensurate one is taken exactly, because
+    /// `(1 - w) a + w b` at `w = 1` is not bit-equal to `b`.
+    ///
+    /// # It travels with the sector-scaled omega
+    ///
+    /// Taking the common noise out of the innovation takes the level with
+    /// it: the constant `garch_omega` gives an unconditional variance of
+    /// 3.42e-5, under the clamp floor for eight of the twelve sectors, so
+    /// a name that is no longer re-excited by the market simply rests on
+    /// the floor. The companion is therefore
+    /// [`ModelParams::garch_omega_sector_scaled`] at 1.0, which makes the
+    /// recursion's own level the sector's base variance times the coupled
+    /// reference, with [`ModelParams::garch_vix_coupling`] 1.0 and
+    /// [`ModelParams::garch_vix_exponent`] 1.4176 -- the roster's own
+    /// scaling law, `volatility ~ VIX^0.7088`. With the level following the
+    /// reference, the regime reaches a name where it belongs, as a LEVEL,
+    /// and the shock is the name's own.
+    ///
+    /// [`ModelParams::idio_sigma_floor`] is the one constant this form
+    /// cannot put in the right units. It ships at 1e-4 against a median
+    /// name variance of 8.9e-5, so on 59 per cent of name-days the draw
+    /// the innovation is divided by was taken at the floor and not at `h`,
+    /// and `eps^2` then reads the floor: on the shipped level the fed
+    /// innovation would be 1.28 h rather than the 1.00 h the form is
+    /// after. The companion repairs most of it by lifting the level --
+    /// with the sector-scaled omega the median variance is 1.29e-4, the
+    /// floor binds on 31 per cent of name-days, and the fed innovation
+    /// reads 1.09 h. The floor is left at its shipped value here: moving
+    /// it is a separate box, and the residual 0.09 is part of why the form
+    /// lands short of the dialled 0.9416.
+    ///
+    /// # Measured
+    ///
+    /// Eight seeds of the held roster, 504 days, medians over the 320
+    /// per-name GJR fits. Shipped against this dial at 1.0 with
+    /// `garch_omega_sector_scaled` 1.0, `garch_vix_coupling` 1.0 and
+    /// `garch_vix_exponent` 1.4176:
+    ///
+    /// ```text
+    ///                        shipped    form    tape
+    /// fitted persistence      0.8943  0.9259   0.938
+    /// fitted alpha            0.0062  0.0062
+    /// fitted gamma            0.0667  0.0433
+    /// log h AR(1)             0.8770  0.9166
+    /// log h AR(5)             0.5093  0.6435
+    /// fed innovation over h    1.281   1.091
+    /// ```
+    ///
+    /// This dial ALONE, without the sector-scaled omega, is the reading
+    /// that says why the two travel together: the median variance falls to
+    /// 8.19e-5, the floor binds on 64 per cent of name-days, and the log
+    /// AR(1) reads 0.8673 -- below the shipped 0.8770. Taking the common
+    /// noise out of the innovation takes the level with it, and the name
+    /// comes to rest on the clamp floor.
+    pub garch_innovation_commensurate: f64,
     /// The absolute floor under a name's daily sigma in the tick and in the
     /// overnight path, in DAILY VARIANCE units. Ships at 1e-4, which is the
     /// constant both sites carried inline, so every existing preset is
@@ -3799,6 +3906,7 @@ impl ModelParams {
             garch_vix_exponent: 2.0,
             garch_floor_multiple: garch::FLOOR_MULTIPLE,
             garch_omega_sector_scaled: 0.0,
+            garch_innovation_commensurate: 0.0,
             idio_sigma_floor: 0.0001,
             market_vol_alpha: factor_vol::MARKET_VOL_ALPHA,
             market_vol_beta: factor_vol::MARKET_VOL_BETA,
@@ -5742,6 +5850,7 @@ impl ModelParams {
             "garch_vix_exponent" => self.garch_vix_exponent,
             "garch_floor_multiple" => self.garch_floor_multiple,
             "garch_omega_sector_scaled" => self.garch_omega_sector_scaled,
+            "garch_innovation_commensurate" => self.garch_innovation_commensurate,
             "idio_sigma_floor" => self.idio_sigma_floor,
             "market_vol_alpha" => self.market_vol_alpha,
             "market_vol_beta" => self.market_vol_beta,
@@ -5933,6 +6042,7 @@ impl ModelParams {
             "garch_vix_exponent" => out.garch_vix_exponent = value,
             "garch_floor_multiple" => out.garch_floor_multiple = value,
             "garch_omega_sector_scaled" => out.garch_omega_sector_scaled = value,
+            "garch_innovation_commensurate" => out.garch_innovation_commensurate = value,
             "idio_sigma_floor" => out.idio_sigma_floor = value,
             "market_vol_alpha" => out.market_vol_alpha = value,
             "market_vol_beta" => out.market_vol_beta = value,
@@ -6405,6 +6515,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "crisis_blend_ramp",
         "crisis_blend_source",
         "garch_omega_sector_scaled",
+        "garch_innovation_commensurate",
         "idio_sigma_floor",
         "crisis_blend_variance_damp",
         "crisis_vix_threshold",

@@ -612,6 +612,17 @@ pub struct TickOutcome {
     /// `Δs` -- so a consumer can verify the label against the outcome rather
     /// than trusting it.
     pub s_components: Vec<[f64; 8]>,
+    /// The `random_noise` slot of `s_components` split into market, sector
+    /// and idiosyncratic, per active company, at the same scale the slot
+    /// carries. The three sum to that slot up to the order the sum above is
+    /// written in, and the slot is still what moved `s`.
+    pub noise_parts: Vec<[f64; 3]>,
+    /// The square of the scale the idiosyncratic part was drawn at, with
+    /// the name's own daily sigma divided out, at the same tick scale. Summed
+    /// over a day this is `kappa^2`: how far the day's own-noise variance
+    /// sits from the `h` the per-name GJR carries. See
+    /// [`crate::params::ModelParams::garch_innovation_commensurate`].
+    pub noise_own_scale2: Vec<f64>,
     /// Volume printed per active company.
     pub volumes: Vec<f64>,
     /// The live factor decomposition per active company, in `active_indices`
@@ -747,6 +758,8 @@ pub fn simulate_market_tick(
             fair_values: Vec::new(),
             fundamental_values: Vec::new(),
             s_components: Vec::new(),
+            noise_parts: Vec::new(),
+            noise_own_scale2: Vec::new(),
             volumes: Vec::new(),
             factors: Vec::new(),
             shared_factors: SharedFactors {
@@ -946,6 +959,8 @@ pub fn simulate_market_tick(
     let mut new_prices = vec![0.0; active_count];
     let mut fundamentals = vec![f64::NAN; active_count];
     let mut s_components = vec![[0.0f64; 8]; active_count];
+    let mut noise_parts = vec![[0.0f64; 3]; active_count];
+    let mut noise_own_scale2 = vec![0.0f64; active_count];
     let mut crowd_leans = vec![0.0; active_count];
 
     // The fundamentals restated in the economy's current price level and
@@ -1051,6 +1066,22 @@ pub fn simulate_market_tick(
                 0.0,
             ]
         };
+
+        // The noise slot's three parts and the scale its own part was drawn
+        // at, both at the scale the slot above carries: `all_noises` already
+        // holds the closed tick's 0.15, and the open tick's
+        // `intraday_vol_mult` multiplies once more. Read off `raw` rather
+        // than recomputed, so these cannot drift from the draw. Nothing here
+        // touches `s_val` below; the close reads them, and only when
+        // `garch_innovation_commensurate` is non-zero.
+        let noise_scale = if open { intraday_vol_mult } else { 0.15 };
+        noise_parts[i] = [
+            raw.noise_market * noise_scale,
+            raw.noise_sector * noise_scale,
+            raw.noise_idio * noise_scale,
+        ];
+        let own_scale = raw.noise_idio_unit * noise_scale;
+        noise_own_scale2[i] = own_scale * own_scale;
 
         if open {
             // The crowd reacts to the mispricing it can SEE — the pre-update
@@ -1381,6 +1412,8 @@ pub fn simulate_market_tick(
         fair_values: new_prices,
         fundamental_values: fundamentals,
         s_components,
+        noise_parts,
+        noise_own_scale2,
         volumes,
         factors: all_factors,
         shared_factors: shared,
