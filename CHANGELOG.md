@@ -7,24 +7,22 @@ a run that did not name a preset will not replay against earlier versions.
 Naming a preset still replays exactly, and every preset from pt-v1 on stays
 selectable.
 
-**pt-v19's panel, recomposed on 2026-09-20.** Every row is in its ruled
+**pt-v19's panel, composed on 2026-09-21.** Every row is in its ruled
 band in all four cells of the record: fourteen of fourteen at 252 days,
 thirteen of thirteen readable at 504, fourteen of fourteen held out, no
-misses. On the level protocol `index_drift_pct` reads 6.28 against a real
-7.37, `fear_gauge_dn1` 1.94 against 2.66, `fear_gauge_dn3` 6.40 against
-5.73 and `index_tail_dn3_pct` 1.05 against 1.21, all in band. Nine of ten
-mechanism rows show their mechanism at 252 and eight held out:
-`corr_persistence_acf1`'s, which the stochastic level carried, is given up
-on purpose, and the 2026-09-14 record was retired so this one could be
-written. Twelve of fourteen shape rows sit at the tape's centre. Furthest
-from real: the crisis lever at 2.42x against 6.16, and `sector_excess_corr`
-at 0.113 against 0.164, in band and three tape errors short. VIX
-persistence is refused on both panels, above the tape, and clears the
-second gate under non-regression because this record is its reference.
+misses. On the level protocol `index_drift_pct` reads 6.30 against a real
+7.37, `fear_gauge_dn1` 1.82 against 2.66, `fear_gauge_dn3` 5.52 against
+5.73 and `index_tail_dn3_pct` 0.68 against 1.21, all in band. Nine of ten
+mechanism rows show their mechanism on both panels. VIX persistence, which
+every earlier record refused, passes the structural gate at one year, sits
+at its cut on the held-out seeds, and rises from one year to two by +0.012
+against the tape's paired +0.012. Furthest from real: the crisis lever at
+2.51x against 6.16, and `sector_excess_corr` at 0.096 against 0.164, in
+band and seven tape errors short; the short-lag clustering rows read two
+tape errors under their centres.
 
-The slow stochastic level that produced this preset, the `KAT_VERSION`
-bump, the checkpoint fix, the nineteenth scored row and the figures
-corrected on 2026-09-14 are below the marker.
+The composition, the corrected rise ruler, the `KAT_VERSION` bump and the
+records this one replaces are below the marker.
 
 <!-- release-note-ends -->
 

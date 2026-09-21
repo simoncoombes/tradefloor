@@ -1103,14 +1103,13 @@ def test_the_shipped_preset_clears_the_mechanism_bar_on_both_panels():
     rec = record(envelope.PRESET)
     verdict = envelope.record_bar(rec, rec)
     assert verdict["passed"] is True, verdict["reason"]
-    # 9 and 8 since the 2026-09-20 recomposition. The held-out panel lost
-    # `corr_persistence_acf1`'s mechanism, which the stochastic level
-    # carried; the loss was the decision (design repo,
-    # programme/results/bestof/RESULT-504.md), the 2026-09-14 record was
-    # retired on purpose by the certification box, and this record is the
-    # one no future preset may show less than.
+    # 9 and 9 since the 2026-09-21 composition (ptv19gjr): the slow pole
+    # returned `corr_persistence_acf1`'s mechanism to the held-out panel,
+    # which the 2026-09-20 recomposition had given up (9 and 8 then). The
+    # 2026-09-20 record was retired on purpose by the record box, and this
+    # record is the one no future preset may show less than.
     assert rec["mechanism_252"]["counts"]["mechanism_shown"] == 9
-    assert rec["mechanism_heldout_seeds"]["counts"]["mechanism_shown"] == 8
+    assert rec["mechanism_heldout_seeds"]["counts"]["mechanism_shown"] == 9
     # And the line a reader sees, which is the other half of "by name".
     line = envelope.mechanism_bar_line(verdict)
     assert "mechanism bar" in line and "PASS" in line

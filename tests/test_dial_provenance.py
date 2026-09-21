@@ -272,11 +272,12 @@ def test_a_derivation_the_record_holds_is_carried_by_the_table():
     side.
     """
     # `market_vol_slow_persistence`'s 0.9913 shipped from 2026-09-14 to
-    # 2026-09-20 and was returned to pt-v18's 0.98 on the factorial; the
-    # entry keeps the derivation and says so in `recomposed`, and its
-    # `presets` map records what ships, which is what the audit reads.
+    # 2026-09-20, was returned to pt-v18's 0.98 on the factorial, and
+    # returned to 0.9913 on 2026-09-21 (ptv19gjr); the entry says so in
+    # `composed`, and its `presets` map records what ships, which is what
+    # the audit reads.
     for dial, value in (("garch_beta", 0.7905),
-                        ("market_vol_slow_persistence", 0.98)):
+                        ("market_vol_slow_persistence", 0.9913)):
         entry = pv.DIAL_PROVENANCE[dial]
         assert entry["kind"] == "derived", dial
         assert entry["presets"]["pt-v19"] == value, dial

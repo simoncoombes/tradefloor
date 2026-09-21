@@ -155,25 +155,28 @@ def test_a_panel_that_stopped_measuring_the_row_is_absent_not_passed():
 def test_the_bar_refuses_a_preset_whose_structural_row_went_PASS_to_REFUSED():
     """THE TEST THAT PROVES THE CHANGE DOES ANYTHING AT ALL.
 
-    pt-v18's committed certificate PASSES `vix_ar1_debiased` on the 252
-    panel; pt-v19's REFUSES it. Read one against the other and the bar
-    refuses, names the row, names the panel, and quotes the `k` and the cut
-    that decided it. These are the two shipped presets' real readings, not a
-    construction: the regression this gate exists for has already happened
-    once between two adjacent defaults.
+    pt-v18's committed certificate PASSES `vix_ar1_debiased` on the
+    held-out seeds; pt-v19's REFUSES it there, at the cut. Read one against
+    the other and the bar refuses, names the row, names the panel, and
+    quotes the `k` and the cut that decided it. These are the two shipped
+    presets' real readings, not a construction: the regression this gate
+    exists for has already happened once between two adjacent defaults.
+    (Until the 2026-09-21 composition the 252 panel carried this test;
+    pt-v19 passes there now and is refused by one seed held out.)
     """
-    was = record("pt-v18")["structure_252"]
-    now = record("pt-v19")["structure_252"]
+    was = record("pt-v18")["structure_heldout_seeds"]
+    now = record("pt-v19")["structure_heldout_seeds"]
     assert was["passed"] == [VIX_AR1_ROW]
     assert now["refused"] == [VIX_AR1_ROW]
 
-    verdict = envelope.structure_bar(now, was, label="structure_252")
+    verdict = envelope.structure_bar(now, was, label="structure_heldout_seeds")
     assert verdict["passed"] is False
     assert verdict["lost"] == [VIX_AR1_ROW]
     assert VIX_AR1_ROW in verdict["reason"]
-    assert "structure_252" in verdict["reason"]
-    # k 25 since the 2026-09-20 recomposition (k 21, at the cut, before it).
-    assert "k 25 of 30" in verdict["reason"]
+    assert "structure_heldout_seeds" in verdict["reason"]
+    # k 21, at the cut, since the 2026-09-21 composition (25 and 22 on the
+    # two panels of the 2026-09-20 record; 21 and 28 before that).
+    assert "k 21 of 30" in verdict["reason"]
     # And each against itself is the pass, so the refusal above is the
     # regression and not the comparison.
     assert envelope.structure_bar(was, was)["passed"] is True
@@ -200,7 +203,7 @@ def test_passing_more_than_the_record_clears_the_bar_and_is_named():
     """The direction that is NOT a regression. A model that repairs the row
     locks the PASS in for every model after it, so the gain is named rather
     than silent."""
-    was = record("pt-v19")["structure_252"]
+    was = record("pt-v19")["structure_heldout_seeds"]   # refused at the cut
     better = block(passed=[VIX_AR1_ROW])
     verdict = envelope.structure_bar(better, was)
     assert verdict["passed"] is True
@@ -235,10 +238,12 @@ def test_the_bar_refuses_a_certificate_read_at_another_horizon():
 
 
 def test_the_bar_reads_both_panels_and_either_one_failing_is_a_failure():
-    """BOTH, never one. The shipped default reads k = 21 of 30 at 252 and
-    k = 28 of 30 on the held-out seeds -- one exactly at the cut and one
-    nowhere near it, on the same preset and the same build. A bar reading
-    either panel alone would spend the protection the second is there for.
+    """BOTH, never one. The shipped default reads k = 20 of 30 at 252 and
+    k = 21 of 30 on the held-out seeds -- one under the cut and one exactly
+    at it, on the same preset and the same build. Against pt-v18, which
+    passes both, the 252 panel clears and the held-out one does not, and
+    the bar fails. A bar reading either panel alone would spend the
+    protection the second is there for.
     """
     assert envelope.STRUCTURE_BAR_PANELS == ("structure_252",
                                              "structure_heldout_seeds")
@@ -246,10 +251,9 @@ def test_the_bar_reads_both_panels_and_either_one_failing_is_a_failure():
     v18 = record("pt-v18")
     verdict = envelope.structure_record_bar(v19, v18)
     assert verdict["passed"] is False
-    assert verdict["panels"]["structure_252"]["passed"] is False
+    assert verdict["panels"]["structure_252"]["passed"] is True
     assert verdict["panels"]["structure_heldout_seeds"]["passed"] is False
-    for field in envelope.STRUCTURE_BAR_PANELS:
-        assert field in verdict["reason"]
+    assert "structure_heldout_seeds" in verdict["reason"]
 
     # One panel only is refused ON THAT PANEL, by name, and the other is
     # still read -- so the message says which of the two is missing.
@@ -330,15 +334,18 @@ def test_the_shipped_preset_holds_its_structural_certificate_on_both_panels():
     assert verdict["passed"] is True, verdict["reason"]
 
     # The reading the release carries, asserted so it cannot change in
-    # silence: REFUSED on both panels, above the tape. Re-pinned at the
-    # 2026-09-20 recomposition: k 25 and 22 where the 2026-09-14 vector read
-    # 21 (at the cut) and 28. Neither panel sits at the cut now.
-    for field, k in (("structure_252", 25), ("structure_heldout_seeds", 22)):
-        row = rec[field]["rows"][VIX_AR1_ROW]
-        assert rec[field]["refused"] == [VIX_AR1_ROW]
-        assert (row["k"], row["cut"], row["side"]) == (k, 21, "above")
+    # silence. Re-pinned at the 2026-09-21 composition: PASS at 252 with
+    # k 20 of 30 (cut 21), REFUSED AT THE CUT on the held-out seeds with
+    # k 21, where the 2026-09-20 record read 25 and 22 and the 2026-09-14
+    # one 21 and 28. The held-out panel names the row at the cut.
+    row = rec["structure_252"]["rows"][VIX_AR1_ROW]
+    assert rec["structure_252"]["passed"] == [VIX_AR1_ROW]
+    assert (row["k"], row["cut"], row["side"]) == (20, 21, None)
     assert rec["structure_252"]["at_the_cut"] == []
-    assert rec["structure_heldout_seeds"]["at_the_cut"] == []
+    row = rec["structure_heldout_seeds"]["rows"][VIX_AR1_ROW]
+    assert rec["structure_heldout_seeds"]["refused"] == [VIX_AR1_ROW]
+    assert (row["k"], row["cut"], row["side"]) == (21, 21, "above")
+    assert rec["structure_heldout_seeds"]["at_the_cut"] == [VIX_AR1_ROW]
 
     # The published table agrees with the record it is written from.
     assert (round(rec["structure_252"]["rows"][VIX_AR1_ROW]["median"], 6)
@@ -438,14 +445,13 @@ def test_the_record_bar_reads_the_rise_when_the_record_carries_it():
     if rec.get(envelope.STRUCTURE_RISE_FIELD):
         assert verdict["panels"][envelope.STRUCTURE_RISE_FIELD]["passed"] is True
         row = rec[envelope.STRUCTURE_RISE_FIELD]["rows"][VIX_AR1_ROW]
-        # The shipped default's PAIRED rise is nil: -0.0024 [-0.0058, +0.0065]
-        # on the ptv19rise box, against the tape's paired +0.012. (The
-        # difference of the two medians read +0.007; the median of the
-        # per-seed differences is the registered statistic and it reads
-        # zero.) One pole.
-        assert row["verdict"] == "below", row
-        assert row["median_rise"] < row["tape_rise"]
-        assert row["ci90"][1] < row["tape_rise"]
+        # The shipped default's PAIRED rise is the tape's since the
+        # 2026-09-21 composition: +0.0116 [+0.0007, +0.0270] against the
+        # tape's paired +0.0120, on the record box. (The 2026-09-20 record
+        # read -0.0024 [-0.0058, +0.0065]: one pole. The regime level on the
+        # VIX law is what makes calm years and a rise.)
+        assert row["verdict"] == "matches", row
+        assert row["ci90"][0] <= row["tape_rise"] <= row["ci90"][1]
         assert (round(row["median_rise"], 6)
                 == envelope.CERTIFIED_STRUCTURE_RISE[VIX_AR1_ROW])
     else:
