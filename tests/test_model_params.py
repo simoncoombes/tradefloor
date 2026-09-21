@@ -211,7 +211,15 @@ PERTURBATIONS = [
     # ceiling to catch. 0.9 puts the ceiling below that level, which binds
     # on any preset and keeps the parameter's wiring proven rather than
     # excused.
-    ("garch_vix_coupling", 0.8, False),    # scales the clamp reference by (vix/anchor)^2, and the harness runs at the anchor, where that is exactly 1.0 at any coupling
+    ("garch_vix_coupling", 0.8, False),    # scales the clamp reference by (vix/anchor)^e, and the harness runs at the anchor, where that is exactly 1.0 at any coupling
+    # Inert for the reason above it and for one more of its own: the
+    # exponent only ever sees the ratio the coupling multiplies, and at the
+    # anchor that ratio is exactly 1.0, where `mathx::pow(1.0, e)` is
+    # exactly 1.0 at every e. So the probe cannot separate this dial from
+    # its partner and neither can move on it. What it takes to see the dial
+    # is a held VIX away from the anchor, which is a scenario probe and not
+    # a three-session harness.
+    ("garch_vix_exponent", 1.4176, False),
     # LIVE at the 0.8.0 vector adoption. The old reason was measured and was
     # true of pt-v10: at 0.9, 1.05, 2.0 and 20.0 the trimmed idiosyncratic
     # scale kept per-name variance under the clamp's reference, so the ceiling
