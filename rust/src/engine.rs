@@ -307,9 +307,11 @@ pub struct Engine {
     /// and read on the price path only while
     /// `ModelParams::garch_innovation_commensurate` is non-zero -- at 0.0
     /// nothing reads them and no trajectory owes them anything. They are
-    /// per-DAY accumulators, so they are not part of `state_snapshot`: a
-    /// restored day starts them at zero like the attribution it sits
-    /// beside.
+    /// per-DAY accumulators and `state_snapshot` carries them, exactly as
+    /// it carries the attribution they sit beside and for the same reason:
+    /// a fork taken mid-day whose close read them at zero would feed the
+    /// per-name GJR a different innovation and price differently from the
+    /// parent it is meant to be a copy of.
     noise_parts: Vec<[f64; 3]>,
     noise_own_scale2: Vec<f64>,
     /// This tick's ground truth, per company slot.
@@ -391,9 +393,9 @@ pub struct Engine {
     /// the attribution accumulator it is copied from does not: `apply_jumps`
     /// books the jump at the close of the day BEFORE the session that
     /// trades the gap in, and `open_market` clears the accumulator in
-    /// between. A restored engine opens with this at zero, so the first
-    /// session after a restore reads a jump it cannot see -- one session,
-    /// on an arm no preset ships.
+    /// between. Carried by `state_snapshot`, so a restored engine's first
+    /// session reads the gap the copy's does; without it a restore lost one
+    /// session of the mechanism.
     jump_move: Vec<f64>,
     /// Cumulative draws per stream, including any the embedder took through
     /// [`Engine::draw_uniform`]. The single most useful numbers for
@@ -2146,6 +2148,68 @@ impl Engine {
             .collect();
         self.tick_fundamental = fundamental.to_vec();
         self.tick_anchor = anchor.to_vec();
+        Ok(())
+    }
+
+    /// The day's `random_noise` split, per company slot: market, sector,
+    /// idiosyncratic. See [`Engine::noise_part_column`].
+    pub fn noise_parts(&self) -> &[[f64; 3]] {
+        &self.noise_parts
+    }
+
+    /// The day's summed square of the scale each name's idiosyncratic part
+    /// was drawn at. See [`Engine::noise_parts`].
+    pub fn noise_own_scale2(&self) -> &[f64] {
+        &self.noise_own_scale2
+    }
+
+    /// Put the day's noise split back, flattened three values per company
+    /// slot for the parts and one per slot for the scale.
+    ///
+    /// Restored for the reason [`Engine::restore_day_state`] exists: above
+    /// zero on `ModelParams::garch_innovation_commensurate` the close builds
+    /// the per-name GJR innovation out of these, so a mid-day fork that lost
+    /// them closes on a different innovation.
+    pub fn restore_noise_split(&mut self, parts: &[f64], scale2: &[f64]) -> Result<(), String> {
+        let n = self.companies.len();
+        if parts.len() != n * 3 {
+            return Err(format!(
+                "noise_parts has {} values, expected {}",
+                parts.len(),
+                n * 3
+            ));
+        }
+        if scale2.len() != n {
+            return Err(format!(
+                "noise_own_scale2 has {} values, expected {}",
+                scale2.len(),
+                n
+            ));
+        }
+        self.noise_parts = parts.chunks_exact(3).map(|c| [c[0], c[1], c[2]]).collect();
+        self.noise_own_scale2 = scale2.to_vec();
+        Ok(())
+    }
+
+    /// The jump each name booked at the last close, kept across the open for
+    /// the session that trades the gap in. Written and read only off the
+    /// shipped `ModelParams::volume_move_jump_share` of 1.0.
+    pub fn jump_move(&self) -> &[f64] {
+        &self.jump_move
+    }
+
+    /// Put that jump back, one value per company slot. See
+    /// [`Engine::jump_move`].
+    pub fn set_jump_move(&mut self, moves: &[f64]) -> Result<(), String> {
+        let n = self.companies.len();
+        if moves.len() != n {
+            return Err(format!(
+                "jump_move has {} values, expected {}",
+                moves.len(),
+                n
+            ));
+        }
+        self.jump_move = moves.to_vec();
         Ok(())
     }
 
@@ -4122,6 +4186,25 @@ impl Engine {
             hash_f64(&mut buf, *value);
         }
         for value in &self.tick_anchor {
+            hash_f64(&mut buf, *value);
+        }
+        // The day's noise split and the scale its idiosyncratic part was
+        // drawn at, hashed beside the accumulators above and for their
+        // reason: off zero on `garch_innovation_commensurate` they decide
+        // the innovation tonight's close feeds the per-name GJR, so two
+        // engines alike in every column and holding different splits close
+        // the day differently.
+        for row in &self.noise_parts {
+            for value in row {
+                hash_f64(&mut buf, *value);
+            }
+        }
+        for value in &self.noise_own_scale2 {
+            hash_f64(&mut buf, *value);
+        }
+        // The jump waiting to be traded in, which the volume scale reads on
+        // the session after the close that booked it.
+        for value in &self.jump_move {
             hash_f64(&mut buf, *value);
         }
         hash_bool(&mut buf, market_open);

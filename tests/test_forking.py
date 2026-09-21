@@ -983,8 +983,9 @@ def test_a_snapshot_carries_the_dormant_engine_dials():
 #: So the guard below runs on a model where nothing is off, in a market where
 #: nothing is quiet.
 #:
-#: Three deliberate departures from the shipped preset, each because a dial
-#: that never fires is a dial the guard cannot see:
+#: Five deliberate departures from the shipped preset, each because a dial
+#: that never fires -- or one fired at a value that drowns the rest -- is a
+#: dial the guard cannot see:
 #:
 #: - every parameter shipped at zero, at 0.05. Measured to keep prices finite
 #:   and positive over this horizon.
@@ -994,6 +995,17 @@ def test_a_snapshot_carries_the_dormant_engine_dials():
 #: - universe stress with weight and decay, under a crisis VIX, because the
 #:   stress term ratchets on the VIX above a threshold and stays at zero in a
 #:   calm market however large its weight.
+#: - the VIX level's loop gain at 1.75, the value the loop's own algebra
+#:   derives at the shipped exponent, rather than 0.05. The gain DIVIDES the
+#:   level's dispersion, so 0.05 multiplies it twentyfold: the VIX then
+#:   swings far enough to exhaust the forced-flow reservoir on both sides of
+#:   every comparison, and `forced_flow_spent` stops being visible to this
+#:   guard. A blanket 0.05 is the wrong shape for a dial whose domain starts
+#:   at one.
+#: - the volume scale's jump share at 0.05 rather than the shipped 1.0, which
+#:   is the value that switches the mechanism ON: at 1.0 the day's move is
+#:   measured from the raw open, nothing writes the carried jump, and
+#:   `jump_move` is a snapshot field no market here could reach.
 def _nothing_dormant():
     shipped = tf.ModelParams.from_preset().to_dict()
     dormant = {name: 0.05 for name in tf.ModelParams.settable()
@@ -1001,7 +1013,9 @@ def _nothing_dormant():
     assert dormant, "no dial ships at zero; this model is not testing anything"
     dormant.update(endogenous_news_intensity=0.9,
                    universe_stress_weight=0.5,
-                   universe_stress_decay=0.9)
+                   universe_stress_decay=0.9,
+                   vix_level_loop_gain=1.75,
+                   volume_move_jump_share=0.05)
     return tf.ModelParams.from_preset(**dormant)
 
 

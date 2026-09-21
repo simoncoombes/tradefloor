@@ -1079,6 +1079,15 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # nominal-growth derivation perturbs pt-v18) carries the identity as
     # the companion, which is the configuration the dial is read on.
     "vix_level_sigma": {"vix_level_identity": 1.0},
+    # The loop gain divides the VIX level's dispersion, so it is refused
+    # while `vix_level_sigma` is 0.0 -- there is no level to correct -- and
+    # the sigma is in turn refused off the identity. Both companions are the
+    # DEFAULT's own shipped values, so the row above reads the gain alone on
+    # pt-v19 exactly as it did before this entry existed; they only bite on a
+    # base that ships the level off, which is the nominal-growth derivation's
+    # pt-v18.
+    "vix_level_loop_gain": {"vix_level_identity": 1.0,
+                            "vix_level_sigma": 0.0173},
 }
 
 
