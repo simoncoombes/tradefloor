@@ -346,3 +346,97 @@ def test_the_shipped_preset_holds_its_structural_certificate_on_both_panels():
     # And the line a reader sees, which is the other half of "by name".
     line = envelope.structure_bar_line(verdict)
     assert "structure bar" in line and "PASS" in line
+
+
+# -- the rise, since 2026-09-21 ----------------------------------------------
+#
+# Simon's ruling: the second gate grades the RISE in `vix_ar1_debiased`
+# from the one-year window to the two-year one, on the same seeds, against
+# the tape's +0.029, as one verdict. Graded a horizon at a time the row read
+# REFUSED-ABOVE at 252 and REFUSED-BELOW at 504 on one model, which was two
+# verdicts on one fact: the tape's persistence has a slow component and a
+# single-pole process does not rise the way it does.
+
+def _rises(rng, delta, n=30, sd=0.03, jitter=0.005):
+    a = [0.95 + rng.gauss(0, sd) for _ in range(n)]
+    return a, [x + delta + rng.gauss(0, jitter) for x in a]
+
+
+def test_the_tape_rise_is_the_difference_of_the_two_debiased_centres():
+    import math
+    from tradefloor.facts import REAL_VIX_AR1, REAL_VIX_AR1_RISE, real_rise_se
+    assert REAL_VIX_AR1_RISE == pytest.approx(REAL_VIX_AR1[504] - REAL_VIX_AR1[252])
+    assert REAL_VIX_AR1_RISE == pytest.approx(0.0294, abs=0.0005)
+    # the two window sets are disjoint records, so the errors add in quadrature
+    from tradefloor.facts import real_centre_se
+    assert real_rise_se() == pytest.approx(math.hypot(
+        real_centre_se(VIX_AR1_ROW, horizon_days=252),
+        real_centre_se(VIX_AR1_ROW, horizon_days=504)))
+
+
+def test_the_rise_verdict_is_where_the_tape_sits_against_the_seed_interval():
+    import random
+    from tradefloor.facts import structure_rise_verdict, REAL_VIX_AR1_RISE
+    rng = random.Random(1)
+    for delta, want in ((REAL_VIX_AR1_RISE, "matches"), (0.007, "below"), (0.08, "above")):
+        a, b = _rises(rng, delta)
+        v = structure_rise_verdict(a, b)
+        assert v["verdict"] == want, (delta, v)
+        assert v["ci90"][0] <= v["median_rise"] <= v["ci90"][1]
+        assert v["tape_rise"] == REAL_VIX_AR1_RISE
+        assert v["n"] == 30 and v["horizons"] == [252, 504]
+    # the same rows twice give the same interval: the bootstrap is fixed-seed
+    a, b = _rises(random.Random(2), 0.02)
+    assert structure_rise_verdict(a, b) == structure_rise_verdict(a, b)
+    with pytest.raises(ValidationError):
+        structure_rise_verdict(a, b[:-1])
+
+
+def test_the_rise_certificate_is_absent_not_passed_when_a_horizon_lacks_the_row():
+    import random
+    rng = random.Random(3)
+    a, b = _rises(rng, 0.02)
+    p252 = [{VIX_AR1_ROW: x} for x in a]
+    block = envelope.certify_structure_rise(p252, [{VIX_AR1_ROW: y} for y in b])
+    assert block["below"] == [VIX_AR1_ROW] and block["absent"] == []
+    gone = envelope.certify_structure_rise(p252, [{"other": y} for y in b])
+    assert gone["absent"] == [VIX_AR1_ROW]
+    verdict = envelope.structure_rise_bar(gone, block)
+    assert verdict["passed"] is False and verdict["absent"] == [VIX_AR1_ROW]
+
+
+def test_the_rise_bar_refuses_a_row_that_stops_matching_the_tape():
+    import random
+    from tradefloor.facts import REAL_VIX_AR1_RISE
+    rng = random.Random(4)
+    mk = lambda d: envelope.certify_structure_rise(
+        *[[{VIX_AR1_ROW: x} for x in xs] for xs in _rises(rng, d)])
+    matched, low = mk(REAL_VIX_AR1_RISE), mk(0.007)
+    assert envelope.structure_rise_bar(matched, matched)["passed"] is True
+    lost = envelope.structure_rise_bar(low, matched)
+    assert lost["passed"] is False and lost["lost"] == [VIX_AR1_ROW]
+    assert "MATCHES the tape's rise" in lost["reason"]
+    # below on both is the reading and not a regression; matching later is gained
+    assert envelope.structure_rise_bar(low, low)["passed"] is True
+    assert envelope.structure_rise_bar(matched, low)["gained"] == [VIX_AR1_ROW]
+    assert envelope.structure_rise_bar(low, None)["passed"] is False
+    assert envelope.structure_rise_bar(None, low)["passed"] is False
+
+
+def test_the_record_bar_reads_the_rise_when_the_record_carries_it():
+    """A record written before the block existed lays down no rise to
+    regress from, and the record bar says so rather than refusing."""
+    rec = record(envelope.PRESET)
+    verdict = envelope.structure_record_bar(rec, rec)
+    assert verdict["passed"] is True
+    if rec.get(envelope.STRUCTURE_RISE_FIELD):
+        assert verdict["panels"][envelope.STRUCTURE_RISE_FIELD]["passed"] is True
+        row = rec[envelope.STRUCTURE_RISE_FIELD]["rows"][VIX_AR1_ROW]
+        # The shipped default rises about a third of the tape: one pole.
+        assert row["verdict"] == "below", row
+        assert 0.0 < row["median_rise"] < row["tape_rise"]
+        assert (round(row["median_rise"], 6)
+                == envelope.CERTIFIED_STRUCTURE_RISE[VIX_AR1_ROW])
+    else:
+        pytest.skip("the shipped record carries no rise block yet; the "
+                    "certification box lays it down")

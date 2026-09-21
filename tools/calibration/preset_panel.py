@@ -520,6 +520,7 @@ def rescore(artefact: str, basis: str, out: str, records_dir: str) -> int:
             cell["panel_504"] = dict(rec["panel_504"])
             cell["per_seed_252"] = None
             cell["per_seed_heldout_seeds"] = None
+            cell["per_seed_504"] = None
             # Same status as the per-seed rows: the reported block is this
             # ARTEFACT's measurement of a preset the record was not built
             # from, so it is dropped rather than carried under a record it
@@ -762,6 +763,10 @@ def main() -> None:
             # from.
             "per_seed_252": collected[("panel_252", preset)],
             "per_seed_heldout_seeds": collected[("heldout_seeds", preset)],
+            # Retained since 2026-09-21 so the rise certificate can be
+            # rebuilt from the artefact: the same seeds as `per_seed_252`
+            # on the same roster, in seed order, so the two pair by position.
+            "per_seed_504": collected[("panel_504", preset)],
             "annualised_vol_pct": p252["annualised_vol_pct"],
             "vol_at_vix_5": lo["annualised_vol_pct"],
             "vol_at_vix_65": hi["annualised_vol_pct"],

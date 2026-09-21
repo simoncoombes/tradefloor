@@ -148,6 +148,15 @@ def structure_blocks(panel: dict, name: str) -> dict:
             return {}
         out[field] = dict(envelope.certify_structure(rows),
                           measured=structure_measured(panel))
+    # The rise block, since 2026-09-21, when the artefact retains the 504
+    # rows beside the 252 ones. An artefact written before `per_seed_504`
+    # was retained produces no rise block, and `carry_structure` keeps a
+    # committed one over that absence.
+    rows504 = cell.get("per_seed_504")
+    if rows504 and cell.get("per_seed_252"):
+        out[envelope.STRUCTURE_RISE_FIELD] = dict(
+            envelope.certify_structure_rise(cell["per_seed_252"], rows504),
+            measured=structure_measured(panel))
     return out
 
 
@@ -168,12 +177,13 @@ def carry_structure(record: dict, path: pathlib.Path) -> str:
     """
     from tradefloor import envelope
 
-    if all(record.get(f) for f in envelope.STRUCTURE_BAR_PANELS):
+    fields = envelope.STRUCTURE_BAR_PANELS + (envelope.STRUCTURE_RISE_FIELD,)
+    if all(record.get(f) for f in fields):
         return ""
     if not path.exists():
         return ""
     was = json.loads(path.read_text(encoding="utf-8"))
-    carried = [f for f in envelope.STRUCTURE_BAR_PANELS if was.get(f)]
+    carried = [f for f in fields if was.get(f) and not record.get(f)]
     if not carried:
         return ""
     for field in carried:
@@ -688,6 +698,7 @@ def main() -> int:
                               # blocks were named here the day they landed
                               # and these are named here the day they land.
                               "structure_252", "structure_heldout_seeds",
+                              "structure_rise",
                               # A block this run would DROP is drift and the
                               # loudest kind: it is a measurement about to be
                               # deleted by a tool that cannot remake it.

@@ -331,6 +331,14 @@ CERTIFIED_STRUCTURE: dict[str, float] = {
     "vix_ar1_debiased": 0.954280,
 }
 
+#: The default preset's RISE in each structural row from 252 to 504 days,
+#: the second gate's one verdict since 2026-09-21 (`facts.REAL_VIX_AR1_RISE`,
+#: `facts.structure_rise_verdict`). None until the record carries the block;
+#: `test_structure_gate` binds it to the record once it does.
+CERTIFIED_STRUCTURE_RISE: dict[str, float | None] = {
+    "vix_ar1_debiased": None,
+}
+
 #: Bands re-derived at a 504-day window, from the same reference roster and
 #: estimators as `facts.REAL_MARKETS`. Scoring a 504-day measurement against
 #: the 252-day bands is the wrong ruler, and it flatters the model on
@@ -1811,6 +1819,81 @@ def certify_structure(panels: Sequence[Mapping[str, float]], *,
     }
 
 
+#: The rise block's field on a preset record, beside `STRUCTURE_BAR_PANELS`.
+STRUCTURE_RISE_FIELD = "structure_rise"
+
+
+def certify_structure_rise(panels_252: Sequence[Mapping[str, float]],
+                           panels_504: Sequence[Mapping[str, float]]
+                           ) -> dict[str, Any]:
+    """The second gate's ONE verdict: the rise in each structural row from
+    one year to two, on the same seeds, against the tape's rise.
+
+    `certify_structure` at each horizon stays on the record by name; this
+    block is what the bar reads since 2026-09-21. A row missing at either
+    horizon is ABSENT rather than passed, for `certify_structure`'s reason.
+    """
+    from . import facts as _facts
+
+    rows: dict[str, Any] = {}
+    absent: list[str] = []
+    for row in _facts.STRUCTURE:
+        a = [p.get(row) for p in panels_252]
+        b = [p.get(row) for p in panels_504]
+        if len(a) != len(b) or any(v is None for v in a + b) or len(a) < 2:
+            absent.append(row)
+            continue
+        rows[row] = _facts.structure_rise_verdict(a, b, row)
+    return {
+        "horizons": [CERTIFIED_HORIZON_DAYS, 504],
+        "seeds": len(panels_252),
+        "matches": sorted(r for r, v in rows.items() if v["verdict"] == "matches"),
+        "below": sorted(r for r, v in rows.items() if v["verdict"] == "below"),
+        "above": sorted(r for r, v in rows.items() if v["verdict"] == "above"),
+        "absent": sorted(absent),
+        "rows": rows,
+    }
+
+
+def structure_rise_bar(fresh: Mapping[str, Any] | None,
+                       recorded: Mapping[str, Any] | None,
+                       *, label: str = STRUCTURE_RISE_FIELD) -> dict[str, Any]:
+    """Non-regression on the rise: a row whose record MATCHES the tape's
+    rise may not read below or above it again. Same three refusals as
+    `structure_bar`: lost, absent, no record."""
+    from . import facts as _facts
+
+    def refuse(reason: str, **extra: Any) -> dict[str, Any]:
+        out = {"label": label, "passed": False, "rows_matching": [],
+               "recorded_matching": [], "lost": [], "absent": [], "gained": [],
+               "reason": reason}
+        out.update(extra)
+        return out
+
+    if recorded is None:
+        return refuse(f"{label}: no committed rise certificate to read against; lay one down with `record.py --panel` on an artefact that retains per_seed_504")
+    if fresh is None:
+        return refuse(f"{label}: the record carries a rise certificate and this run produced none, which is a gate that stopped being run rather than a preset that passed it")
+    now = set(fresh.get("matches") or ()); was = set(recorded.get("matches") or ())
+    accounted = now | set(fresh.get("below") or ()) | set(fresh.get("above") or ())
+    absent = sorted(set(_facts.STRUCTURE) - accounted)
+    lost = sorted(r for r in was if r not in now and r not in absent)
+    gained = sorted(r for r in now if r not in was)
+    reasons = []
+    if absent:
+        reasons.append(f"{label}: the certificate does not answer " + ", ".join(absent) + " -- the row has left the gate rather than failed it")
+    if lost:
+        reasons.append(f"{label}: the record MATCHES the tape's rise on " + ", ".join(lost) + " and this certificate reads " + ", ".join(
+            f"{r} {fresh['rows'][r]['verdict']} (median rise {fresh['rows'][r]['median_rise']:+.4f} [{fresh['rows'][r]['ci90'][0]:+.4f}, {fresh['rows'][r]['ci90'][1]:+.4f}] against the tape's {fresh['rows'][r]['tape_rise']:+.4f})"
+            if (fresh.get("rows") or {}).get(r) else r for r in lost))
+    return {"label": label, "passed": not reasons, "rows_matching": sorted(now), "recorded_matching": sorted(was),
+            "lost": lost, "absent": absent, "gained": gained,
+            "reason": "; ".join(reasons) if reasons else (
+                f"{label}: every one of the {len(was)} row(s) the record matches the tape's rise on matches again"
+                + (", and " + ", ".join(gained) + " newly matches" if gained else "")
+                + ("" if was or gained else "; nothing matched the tape's rise on the record and nothing does now, which is the reading and not a regression"))}
+
+
 def certify(panels: Sequence[Mapping[str, float]], *,
              horizon_days: int = CERTIFIED_HORIZON_DAYS,
              stationary_opening: bool | None = None) -> dict[str, Any]:
@@ -2374,6 +2457,21 @@ def structure_record_bar(fresh: Mapping[str, Any],
         panels[field] = structure_bar(
             fresh.get(field), (recorded or {}).get(field),
             label=field, horizon_days=horizon_days)
+    # THE RISE, since 2026-09-21, read whenever the record carries it. A
+    # record written before the block existed has laid down no rise to
+    # regress from, and that is said in the verdict rather than refused: the
+    # seventeen presets that will never be re-measured are not thereby
+    # failing a gate that did not exist when they were recorded.
+    if (recorded or {}).get(STRUCTURE_RISE_FIELD) or fresh.get(STRUCTURE_RISE_FIELD):
+        if (recorded or {}).get(STRUCTURE_RISE_FIELD) is None:
+            panels[STRUCTURE_RISE_FIELD] = {
+                "label": STRUCTURE_RISE_FIELD, "passed": True, "first": True,
+                "rows_matching": [], "recorded_matching": [], "lost": [],
+                "absent": [], "gained": [],
+                "reason": f"{STRUCTURE_RISE_FIELD}: the record predates the rise certificate and lays down none to regress from; this run lays one down"}
+        else:
+            panels[STRUCTURE_RISE_FIELD] = structure_rise_bar(
+                fresh.get(STRUCTURE_RISE_FIELD), recorded.get(STRUCTURE_RISE_FIELD))
     failed = [v for v in panels.values() if not v["passed"]]
     return {
         "horizon_days": horizon_days,

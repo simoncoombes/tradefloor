@@ -6627,6 +6627,102 @@ def structure_verdict(values: Sequence[float], key: str, *,
     }
 
 
+#: The tape's RISE in `vix_ar1_debiased` from the one-year window to the
+#: two-year one: the second gate's one verdict since Simon's ruling of
+#: 2026-09-21 (design repo, `ruling-the-second-gate-grades-the-rise-...`).
+#:
+#: WHY A RISE AND NOT TWO CENTRES. The debiased lag-1 autocorrelation of
+#: the real VIX reads 0.9299 on 35 one-year windows and 0.9593 on 17
+#: two-year ones, +0.0294, and the Marriott-Pope term explains none of the
+#: debiased rise. Every shipped vector rises 0.007 to 0.013 between the
+#: same two windows on the same estimator: a single-pole process has most
+#: of its short-window bias removed by the first-order term and rises
+#: little, while a slow component keeps rising as the window lengthens.
+#: Graded one horizon at a time the row read REFUSED-ABOVE at 252 and
+#: REFUSED-BELOW at 504 on the same model, which is two contradictory
+#: verdicts on one fact; graded as the rise it is one measurement, and the
+#: model reads about a third of the tape. `structure_rise_verdict` is that
+#: measurement. The per-horizon readings stay on the record by name.
+REAL_VIX_AR1_RISE: float = REAL_VIX_AR1[504] - REAL_VIX_AR1[TRADING_DAYS_PER_YEAR]
+
+#: The seed bootstrap `structure_rise_verdict` takes its interval from:
+#: fixed so the verdict a record carries is reproducible from its rows.
+STRUCTURE_RISE_DRAWS = 2000
+STRUCTURE_RISE_SEED = 20260921
+
+
+def real_rise_se(key: str = VIX_AR1_ROW) -> float:
+    """The tape rise's own standard error: the two window sets are disjoint
+    records, so their centre errors add in quadrature."""
+    a = real_centre_se(key, horizon_days=TRADING_DAYS_PER_YEAR)
+    b = real_centre_se(key, horizon_days=504)
+    if a is None or b is None:
+        raise ValidationError(f"{key} has no per-window record at both horizons")
+    return math.sqrt(a * a + b * b)
+
+
+def structure_rise_verdict(values_252: Sequence[float],
+                           values_504: Sequence[float],
+                           key: str = VIX_AR1_ROW) -> dict[str, Any]:
+    """Does the model's persistence rise from one year to two the way the
+    tape's does?
+
+    The per-seed readings are PAIRED BY POSITION: both lists are the same
+    seeds on the same roster, emitted in seed order (HARNESS-NOTES 1), so
+    `values_504[i] - values_252[i]` is one seed's own rise and the pairing
+    removes the seed's level from the difference. The statistic is the
+    median rise over seeds, its interval a fixed-seed bootstrap over seeds,
+    and the verdict is where `REAL_VIX_AR1_RISE` sits against that interval:
+
+      matches   the interval contains the tape's rise
+      below     the whole interval is under it -- the model's persistence
+                is one pole where the tape's has a slow component
+      above     the whole interval is over it
+
+    `side` is `below`/`above`/None as the structural sign test spells it.
+    The tape rise's own error is carried beside the verdict and is not a
+    gate, for `structure_verdict`'s reason.
+    """
+    if key not in STRUCTURE:
+        raise ValidationError(f"{key!r} is not a structural row; structural rows are {sorted(STRUCTURE)}")
+    a = [v for v in values_252 if v is not None]
+    b = [v for v in values_504 if v is not None]
+    if len(a) != len(b) or len(a) < 2:
+        raise ValidationError(
+            f"a rise on {key} needs the same seeds at both horizons, at least "
+            f"two of them; got {len(a)} at 252 and {len(b)} at 504")
+    rises = [y - x for x, y in zip(a, b)]
+    median = statistics.median(rises)
+    rng = random.Random(STRUCTURE_RISE_SEED)
+    n = len(rises)
+    draws = sorted(statistics.median([rises[rng.randrange(n)] for _ in range(n)])
+                   for _ in range(STRUCTURE_RISE_DRAWS))
+    lo, hi = draws[int(0.05 * STRUCTURE_RISE_DRAWS)], draws[int(0.95 * STRUCTURE_RISE_DRAWS) - 1]
+    tape = REAL_VIX_AR1_RISE
+    if hi < tape:
+        verdict, side = "below", "below"
+    elif lo > tape:
+        verdict, side = "above", "above"
+    else:
+        verdict, side = "matches", None
+    return {
+        "row": key,
+        "n": n,
+        "horizons": [TRADING_DAYS_PER_YEAR, 504],
+        "tape_rise": tape,
+        "se_real": real_rise_se(key),
+        "median_252": statistics.median(a),
+        "median_504": statistics.median(b),
+        "median_rise": median,
+        "ci90": [lo, hi],
+        "draws": STRUCTURE_RISE_DRAWS,
+        "seed": STRUCTURE_RISE_SEED,
+        "verdict": verdict,
+        "side": side,
+        "share_of_tape": median / tape if tape else None,
+    }
+
+
 def centre_distance(values: Sequence[float], key: str, *,
                     horizon_days: int = TRADING_DAYS_PER_YEAR) -> dict[str, Any]:
     """How far the graded median sits from the real centre, in both errors.
