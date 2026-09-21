@@ -219,6 +219,15 @@ POST_BASELINE = {
         "`vix_level_identity` is non-zero, so no preset has had to move it "
         "-- and 0.252 is a measurement, which is exactly the kind of number "
         "that must not be invisible because it arrived as a default",
+    "garch_vix_exponent":
+        "the exponent on the VIX ratio in a name's variance reference, "
+        "which replaced an inline literal 2.0 at the value the literal "
+        "carried. Read on the shipped path -- `garch_vix_coupling` is "
+        "0.14219611 on pt-v16 onward, so `market/daily.rs` evaluates the "
+        "reference every close of every name -- and it is the SHAPE of the "
+        "one channel that carries a regime into a name's variance as a "
+        "level rather than as a shock, so it is a live constant no preset "
+        "has ever chosen",
     "idio_sigma_floor":
         "the per-name sigma floor, which replaced an inline literal at the "
         "value the literal carried. Ships at 1e-4 in every preset and binds "
@@ -884,6 +893,58 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "(design repository)",
         "date": "2026-09-21",
     },
+    "garch_vix_exponent": {
+        "kind": "undetermined",
+        "presets": {"pt-v16": 2.0, "pt-v18": 2.0, "pt-v19": 2.0},
+        "what_would_determine_it": "a box on the PAIR this dial belongs "
+                                   "to, because the shipped 2.0 is the "
+                                   "market factor's exponent borrowed for "
+                                   "the roster and nothing measured it on "
+                                   "the names. What the channel is: a "
+                                   "name's GJR level `garch_omega` is one "
+                                   "constant whose unconditional variance "
+                                   "is 3.42e-5, under the clamp floor for "
+                                   "eight of the twelve sectors and at most "
+                                   "2.2x it for the other four, so the name "
+                                   "rests on the floor and the shock rather "
+                                   "than on the constant. The floor is "
+                                   "`garch_floor_multiple` times "
+                                   "`base * (1 - c + c (vix / anchor)^e)`. "
+                                   "That reference is the only place a "
+                                   "name's variance reads the VIX as a "
+                                   "LEVEL. Everything else it gets from "
+                                   "the regime arrives as a SHOCK: "
+                                   "`close_day_with` feeds the recursion "
+                                   "the day's `random_noise`, which "
+                                   "`market/factors.rs` builds as "
+                                   "`market_component * crash_amplifier + "
+                                   "tilt_recentre + sector_component + "
+                                   "idiosyncratic_noise`, so the market "
+                                   "factor re-excites the name at a gain "
+                                   "of `(alpha + gamma / 2) / (1 - beta)`. "
+                                   "Measured on the held roster at a VIX "
+                                   "of 5 against 65 (40 names, "
+                                   "`Universe.random(40, seed=111)`, "
+                                   "medians over 60 graded days): the "
+                                   "reference moves 2.28x, a name's GARCH "
+                                   "variance 5.41x, the variance the tick "
+                                   "draws with 3.57x, and at coupling 0.0 "
+                                   "the same three read 1.00x, 4.61x and "
+                                   "3.16x. What the tape asks for instead "
+                                   "is a law: its names scale like its "
+                                   "index, realised volatility ~ "
+                                   "`VIX^0.7088`, so a name's variance "
+                                   "reference must go as `VIX^1.4176`. A "
+                                   "blend is a law only at `c = 1`, so the "
+                                   "value is a PAIR -- `garch_vix_coupling` "
+                                   "1.0 with this dial at twice the tape's "
+                                   "exponent -- and a box on that pair, "
+                                   "carrying the VIX row at 252 and 504, "
+                                   "is what would determine it. Nothing "
+                                   "here is fitted to the lever row: "
+                                   "0.7088 is the tape's own exponent",
+    },
+
     "jump_idio_vix_decoupled": {
         "kind": "undetermined",
         "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0},

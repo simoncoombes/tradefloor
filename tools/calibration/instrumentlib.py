@@ -641,6 +641,12 @@ PARAM_SPECS: dict[str, dict] = {
     # optimise its own regulariser.
     "garch_vix_coupling": {"kind": "abs", "step_unit": 0.05,
                           "hard_range": (0.0, 1.0)},
+    # The exponent on the same ratio. Ranged like the market factor's
+    # `market_vol_vix_exponent`, and the range holds both laws the tape
+    # offers: 2.0, which ships, and 1.4176, which is twice the roster's
+    # realised-volatility exponent.
+    "garch_vix_exponent": {"kind": "abs", "step_unit": 0.05,
+                           "hard_range": (1.0, 4.0)},
     # How much a jump's arrival RATE follows the VIX (§84). A share like the
     # other couplings, so the hard range is the unit interval.
     "jump_vix_coupling": {"kind": "abs", "step_unit": 0.05,

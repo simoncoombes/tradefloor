@@ -740,10 +740,13 @@ pub struct ModelParams {
     /// is where it stood when this dial arrived and the last piece of it
     /// that did not know what regime it was in. The per-name
     /// GJR-GARCH reads no macro state at all: its clamps are multiples of a
-    /// static per-sector variance, and its own unconditional level sits far
+    /// static per-sector variance, and its own unconditional level sits
     /// below the floor those clamps impose (5.6% annualised against a floor
     /// of 19.8% for technology), so a name's variance hovers near that floor
-    /// whatever the market is doing. That is why `garch_ceiling_multiple`
+    /// whatever the market is doing. The 5.6% is the reading at the
+    /// persistence of 0.8364 this line was written at; pt-v19's 0.9416 puts
+    /// the same level at 9.3% annualised, which is still under technology's
+    /// floor and over the 6.4% floor the three lowest-sigma sectors carry. That is why `garch_ceiling_multiple`
     /// was measured not to bind at any value on this preset (§75): the
     /// variance never gets within twenty times of it.
     ///
@@ -756,10 +759,74 @@ pub struct ModelParams {
     /// crisis; here it cannot.
     ///
     /// At `c` the clamp reference becomes `base * (1 - c + c * (vix /
-    /// market_vol_vix_anchor)^2)`, the same map the market factor's target
-    /// uses, so at the anchor the reference is exactly the base at any
-    /// coupling and the two variance processes read the regime the same way.
+    /// market_vol_vix_anchor)^e)`, with `e` the exponent
+    /// [`ModelParams::garch_vix_exponent`] carries, the same map the market
+    /// factor's target uses, so at the anchor the reference is exactly the
+    /// base at any coupling and the two variance processes read the regime
+    /// the same way.
     pub garch_vix_coupling: f64,
+    /// Exponent on the VIX ratio in a NAME's variance reference.
+    ///
+    /// 2.0 -- every preset before this dial -- is the literal square the
+    /// line in `market/daily.rs` has always computed, read BY BRANCH, so
+    /// `mathx::pow` never runs and every preset is bit-identical. Same
+    /// spelling and same discipline as
+    /// [`crate::market::factor_vol`]'s `vix_response` for the market
+    /// factor's own target, which is what makes the two shapes separable:
+    /// the index and the roster can be given different laws instead of
+    /// sharing one because nobody wrote the second one down.
+    ///
+    /// # What the shipped pair reaches, and what it does not
+    ///
+    /// `garch_vix_coupling` is NOT inert on the shipped vector, and the
+    /// reading that says it is stops one line short.
+    /// [`crate::market::garch::update_garch_variance_for`] takes the
+    /// constant `garch_omega` while `garch_omega_sector_scaled` is 0.0, so
+    /// the coupled reference does not reach the process's LEVEL -- but both
+    /// clamps are multiples of that same reference. The recursion's own
+    /// constant level, `garch_omega / (1 - persistence)`, is 3.42e-5 at
+    /// pt-v19's persistence of 0.9416: under the floor for eight of the
+    /// twelve sectors and at most 2.2x it for the other four, so what
+    /// places a name's variance is the reference and the shock rather than
+    /// the constant. Measured on the held roster (`Universe.random(40, seed=111)`,
+    /// the VIX pinned at 5 against 65, medians over 60 graded days after
+    /// 252): the reference moves 2.28x, a name's GARCH variance 5.41x, and
+    /// the variance the tick actually draws with,
+    /// `max(variance, idio_sigma_floor)`, 3.57x. At coupling 0.0 the same
+    /// three read 1.00x, 4.61x and 3.16x. So the coupling buys 1.17x of the
+    /// 5.41x and the rest arrives by another road.
+    ///
+    /// That road is the SHOCK, and it is why this dial is the one the
+    /// roster's law can be written on. `close_day_with` feeds the recursion
+    /// the day's `random_noise` attribution, and
+    /// [`crate::market::factors::calculate_live_factors`] builds it as
+    /// `market_component * crash_amplifier + tilt_recentre +
+    /// sector_component + idiosyncratic_noise`. A name's variance is
+    /// therefore re-excited by the market factor's own VIX-coupled variance
+    /// at a gain of `(alpha + gamma / 2) / (1 - beta)`, which is 0.72 on
+    /// pt-v19. What a name's variance does in a crisis is what the FACTOR
+    /// does, attenuated and floored; nothing in it is a statement about the
+    /// roster.
+    ///
+    /// # The value the roster's own scaling law derives
+    ///
+    /// The tape's names scale like its index: realised volatility ~
+    /// `VIX^0.7088` across the roster, which is the 6.16x lever the record
+    /// grades against a 13x of VIX. A variance is a volatility squared, so
+    /// a name's variance reference must be proportional to `VIX^(2 *
+    /// 0.7088)` = `VIX^1.4176`.
+    ///
+    /// A blend `1 - c + c r^e` is a power law only at `c = 1`; below it the
+    /// `1 - c` term is a floor the low end never leaves, and no exponent
+    /// makes such a map a law. So the law is a PAIR and not a number:
+    /// `garch_vix_coupling` at 1.0 and this dial at 1.4176, where the
+    /// reference moves `13^1.4176` = 37.9x for the 13x of VIX the lever row
+    /// reads. Neither figure is fitted to that row; both come off the
+    /// tape's exponent.
+    ///
+    /// The pair is not adopted here, and 2.0 ships. See
+    /// `provenance.py`'s entry for what would register it.
+    pub garch_vix_exponent: f64,
     /// Floor as a multiple of the sector's long-run variance.
     pub garch_floor_multiple: f64,
     /// Scale `garch_omega` by the SECTOR's base variance instead of using
@@ -3729,6 +3796,7 @@ impl ModelParams {
             garch_gamma: garch::GAMMA,
             garch_ceiling_multiple: garch::CEILING_MULTIPLE,
             garch_vix_coupling: 0.0,
+            garch_vix_exponent: 2.0,
             garch_floor_multiple: garch::FLOOR_MULTIPLE,
             garch_omega_sector_scaled: 0.0,
             idio_sigma_floor: 0.0001,
@@ -5671,6 +5739,7 @@ impl ModelParams {
             "garch_gamma" => self.garch_gamma,
             "garch_ceiling_multiple" => self.garch_ceiling_multiple,
             "garch_vix_coupling" => self.garch_vix_coupling,
+            "garch_vix_exponent" => self.garch_vix_exponent,
             "garch_floor_multiple" => self.garch_floor_multiple,
             "garch_omega_sector_scaled" => self.garch_omega_sector_scaled,
             "idio_sigma_floor" => self.idio_sigma_floor,
@@ -5861,6 +5930,7 @@ impl ModelParams {
             "garch_gamma" => out.garch_gamma = value,
             "garch_ceiling_multiple" => out.garch_ceiling_multiple = value,
             "garch_vix_coupling" => out.garch_vix_coupling = value,
+            "garch_vix_exponent" => out.garch_vix_exponent = value,
             "garch_floor_multiple" => out.garch_floor_multiple = value,
             "garch_omega_sector_scaled" => out.garch_omega_sector_scaled = value,
             "idio_sigma_floor" => out.idio_sigma_floor = value,
@@ -6357,6 +6427,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "garch_gamma",
         "garch_omega",
         "garch_vix_coupling",
+        "garch_vix_exponent",
         "idio_sigma_beta_exponent",
         "idio_sigma_scale",
         "inflation_ceiling",
