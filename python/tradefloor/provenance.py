@@ -371,6 +371,25 @@ OUT_OF_SCOPE = {
         "since 2026-09-20",
     "jump_idio_excitation_decay":
         "unread while `jump_idio_excitation` is 0.0 (engine.rs:963)",
+    "jump_market_variance_share":
+        "inert at 0.0: engine.rs branches on `!= 0.0` after the jumps "
+        "mechanism's generated body, so nothing is added to the market "
+        "factor's day accumulator and its GJR update is the shipped one. "
+        "DERIVED 1.0 and shipped 0.0: the index GJR the shipped "
+        "coefficients come from was fitted on the tape's TOTAL index "
+        "returns, jumps in, so the whole of a market jump's log return "
+        "belongs in the day's shock "
+        "(programme/results/ptv19refine/jump-derivation.txt, design "
+        "repository). Shipped at 0.0 because a derivation is not a "
+        "measurement of the panel",
+    "volume_move_jump_share":
+        "inert at 1.0: market/tick.rs phase 3 branches on `== 1.0` and "
+        "takes the move-from-open expression that stood there, so the "
+        "volume scale reads the day's whole move, jumps included. "
+        "UNDETERMINED rather than derived -- what would settle it is "
+        "volume on jump days read off the tape, the share of a gap day's "
+        "volume that the gap itself explains, and nobody has read it. "
+        "1.0 is the arithmetic that was there and not a choice",
     "crisis_blend_variance_damp":
         "inert at 0.0: market/factors.rs:473 branches on `== 0.0`",
     "fair_value_book_floor":

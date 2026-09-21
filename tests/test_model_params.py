@@ -531,6 +531,15 @@ PERTURBATIONS = [
     # two, and this comment is where that is on the record.
     ("crisis_vix_threshold", 18.0, False),
     ("jump_vix_coupling", 1.0, True),  # was False; the burn-in reaches it (see above)
+    # Inert on the probe for a reason about the PROBE and not the wiring:
+    # the market jump fires at 0.0566 a day and none of the three sessions
+    # draws one, so `market` is exactly 0.0 and the guard adds nothing. With
+    # `jump_intensity_market` at 1.0 beside it the two builds differ from the
+    # session after the first jump, which is the counterproof this row cannot
+    # take on its own. Not paired in COMPANIONS: the pairing would be a
+    # second dial moved for the probe's convenience, and the inert reason is
+    # the honest reading.
+    ("jump_market_variance_share", 1.0, False),
     ("crisis_blend_gain", 2.0, False),
     # Was inert with reason "sigma ships at 0.0, so alone this generates
     # zero-impact news". True since pt-v11 put sigma at 0.03 and pt-v12 made
@@ -559,6 +568,12 @@ PERTURBATIONS = [
     ("volume_move_floor", 0.9, True),            # every name trades more on every day
     ("volume_move_noise", 0.05, True),           # narrows the return-unrelated part of volume
     ("volume_move_response", 0.9, True),         # steepens volume against the size of the day's move
+    # Takes the jump out of the move the volume scale reads. LIVE on the
+    # probe although no MARKET jump fires in it: an idiosyncratic jump does,
+    # somewhere in ten names over three sessions, so that name's carried
+    # jump is taken out of its day's move, it trades a different volume, and
+    # volume reaches the price through the book.
+    ("volume_move_jump_share", 0.0, True),      # the volume scale stops counting a jump as an intraday move
     ("garch_cascade_components", 6.0, True),     # replaces one variance timescale with six
     # Inert ALONE: both only read inside the cascade, and the cascade only
     # runs when garch_cascade_components >= 1. A PAIR, like the endogenous

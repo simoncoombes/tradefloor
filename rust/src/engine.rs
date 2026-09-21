@@ -364,6 +364,19 @@ pub struct Engine {
     volume_state: f64,
     /// Per-NAME volume state, one per company (§107).
     volume_idio: Vec<f64>,
+    /// The log jump each name's `s` took at the LAST close, one per
+    /// company, carried across the open for the volume scale to subtract.
+    ///
+    /// Read only while `volume_move_jump_share` is off 1.0, and written
+    /// only then, so every shipped preset leaves it all zeros and pays
+    /// nothing for it. It is per-DAY state that outlives the open, which
+    /// the attribution accumulator it is copied from does not: `apply_jumps`
+    /// books the jump at the close of the day BEFORE the session that
+    /// trades the gap in, and `open_market` clears the accumulator in
+    /// between. A restored engine opens with this at zero, so the first
+    /// session after a restore reads a jump it cannot see -- one session,
+    /// on an arm no preset ships.
+    jump_move: Vec<f64>,
     /// Cumulative draws per stream, including any the embedder took through
     /// [`Engine::draw_uniform`]. The single most useful numbers for
     /// diagnosing a divergence: if these differ between two runs, nothing
@@ -837,6 +850,7 @@ impl Engine {
             vix_log_level: 0.0,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
+            jump_move: vec![0.0; companies_len],
             sector_variance: vec![0.0; sector_keys.len()],
             sector_day_factor: vec![0.0; sector_keys.len()],
             sector_target_day: 0.0,
@@ -1786,6 +1800,7 @@ impl Engine {
                 universe_stress: self.universe_stress,
                 volume_state: self.volume_state,
                 volume_idio: &self.volume_idio,
+                jump_move: &self.jump_move,
                 market_status: status,
                 intraday_t: intraday_fraction(request.time),
                 volatility_multiplier: request.volatility_multiplier,
@@ -2459,6 +2474,23 @@ impl Engine {
                 },
             );
         }
+        // The jumps, HERE and not after the sector close, where they stood
+        // until `jump_market_variance_share` was wired. They have to run
+        // after the per-name closes, because the momentum roll in those
+        // closes sets the reference that `jump_momentum_share` then moves;
+        // and they have to
+        // run before the factor's close below, because that close consumes
+        // `day_factor` and zeros it, so a jump added afterwards would reach
+        // no shock at all -- `open_market` clears the accumulator again
+        // before the next session's ticks.
+        //
+        // The move costs no preset a bit. Nothing between here and where
+        // the call stood reads or writes `mispricing_s`, the attribution
+        // accumulator or the jump excitation, and `apply_jumps` reads only
+        // the params, the VIX and the anchor, none of which the factor,
+        // sector, forced-flow or stress updates touch. The known-answer
+        // digest is the proof rather than this paragraph.
+        self.apply_jumps();
         // The market factor's own close: its variance updates from the
         // day's accumulated factor, beside the per-name GARCH updates
         // above and with the same zero-draw discipline. The VIX read here
@@ -2621,7 +2653,8 @@ impl Engine {
             }
         }
         self.update_universe_stress();
-        self.apply_jumps();
+        // The jumps ran above, before the factor's close.
+        self.carry_jump_moves();
         self.update_volume_state();
         self.update_volume_idio();
     }
@@ -2726,6 +2759,56 @@ impl Engine {
             self.jump_excitation = excitation;
         }
         // mechanism:jumps end
+        //
+        // THE JUMP JOINS THE DAY'S FACTOR INNOVATION. `market` is the log
+        // return the jump put into every name's `s`, and `day_factor` is
+        // the sum of the day's per-tick market factors that the factor's
+        // GJR steps on. The tape's index fit was on TOTAL returns, so the
+        // shock the coefficients were fitted to saw crash days; this is
+        // where the model's shock sees one. See
+        // `ModelParams::jump_market_variance_share` for the derivation and
+        // for why this call sits before the factor's own close.
+        //
+        // Read outside the generated region and not inside it, because the
+        // body between the markers is compared to what the emitter writes
+        // and every shipped preset records its digest. `market` is a
+        // top-level binding of that body, so it is still in scope here.
+        //
+        // Guarded on the share AND on the jump, so a day that does not jump
+        // adds nothing at all rather than adding a zero to an accumulator
+        // that may be holding a negative one.
+        if self.params.jump_market_variance_share != 0.0 && market != 0.0 {
+            self.market_vol
+                .accumulate(self.params.jump_market_variance_share * market);
+        }
+    }
+
+    /// Carry the day's jumps over the open, for the volume scale.
+    ///
+    /// `apply_jumps` books each name's clamped jump into the jump slot of
+    /// the attribution accumulator and is the only writer of that slot, so
+    /// after it has run the slot IS the day's jump for that name -- the
+    /// clamped one, which is the move the price will actually take.
+    /// `open_market` clears the accumulator, and the gap does not trade in
+    /// until the session after the close that booked it, so the number has
+    /// to be copied somewhere that survives the open.
+    ///
+    /// Gated on the dial, so at the shipped 1.0 the vector is never
+    /// written, stays all zeros, and the close does no work for a
+    /// mechanism nothing reads.
+    fn carry_jump_moves(&mut self) {
+        if self.params.volume_move_jump_share == 1.0 {
+            return;
+        }
+        if self.jump_move.len() < self.companies.len() {
+            self.jump_move.resize(self.companies.len(), 0.0);
+        }
+        for (index, slot) in self.jump_move.iter_mut().enumerate() {
+            *slot = match self.attribution.get(index) {
+                Some(acc) => acc[crate::market::factors::JUMP_SLOT],
+                None => 0.0,
+            };
+        }
     }
 
     /// The shared persistent volume component, stepped once per day.
@@ -3391,6 +3474,7 @@ impl Engine {
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);
         self.volume_idio.push(0.0);
+        self.jump_move.push(0.0);
         // The per-name jump excitation follows the roster for the reason
         // `volume_idio` above does, and it was left out for the same
         // reason: it landed after this function was written. A name that
@@ -3449,6 +3533,9 @@ impl Engine {
         }
         if index < self.volume_idio.len() {
             self.volume_idio.remove(index);
+        }
+        if index < self.jump_move.len() {
+            self.jump_move.remove(index);
         }
         // `Vec::remove` for the reason the line above uses it: the tail
         // shifts down and keeps its relative order, so every remaining
