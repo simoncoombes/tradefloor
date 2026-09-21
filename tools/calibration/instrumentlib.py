@@ -438,6 +438,11 @@ PARAM_SPECS: dict[str, dict] = {
                           "hard_range": (0.0, 0.08)},
     "jump_sigma_idio": {"kind": "abs", "step_unit": 0.01,
                         "hard_range": (0.0, 0.08)},
+    # How much of the market jump's log return joins the day's factor
+    # innovation. A share of one return, so the unit interval is the whole
+    # mechanism and the derivation says 1.0.
+    "jump_market_variance_share": {"kind": "abs", "step_unit": 0.1,
+                                   "hard_range": (0.0, 1.0)},
     # How much of a jump the herding term continues. 1.0 is every shipped
     # preset and is what couples the 504-day tail to 252-day return
     # autocorrelation; 0.0 lets a jump fatten the tail without being
@@ -721,6 +726,11 @@ PARAM_SPECS: dict[str, dict] = {
                           "hard_range": (0.0, 2.0)},
     "volume_move_noise": {"kind": "abs", "step_unit": 0.02,
                           "hard_range": (0.0, 1.0)},
+    # How much of a jump the volume scale counts as an intraday move. A
+    # share, so the unit interval is the whole mechanism; 1.0 ships and
+    # nothing on the tape has yet said where in it the truth is.
+    "volume_move_jump_share": {"kind": "abs", "step_unit": 0.1,
+                               "hard_range": (0.0, 1.0)},
     "volume_move_response": {"kind": "abs", "step_unit": 0.05,
                              "hard_range": (0.0, 2.0)},
     "garch_ceiling_multiple":   {"kind": "log",

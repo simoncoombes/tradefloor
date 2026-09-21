@@ -2378,6 +2378,41 @@ pub struct ModelParams {
     /// in whatever a real market's unexplained volume variation represents,
     /// so it is a dial rather than a thing to minimise.
     pub volume_move_noise: f64,
+    /// How much of a jump's share of the day's move the volume scale
+    /// counts. Ships at 1.0, where the arithmetic is the shipped one.
+    ///
+    /// `price_magnitude` in market/tick.rs phase 3 is the day's move from
+    /// the open, `|new_price - open| / open`, and a jump is in it whole. A
+    /// jump lands on `mispricing_s` at the CLOSE and `reset_daily_prices`
+    /// sets the next day's `open` from the price before it, so the gap
+    /// trades in during the following session and the volume scale reads
+    /// it as though the name had moved that far intraday. At
+    /// `overnight_variance_ratio` 0.0, which every shipped preset carries,
+    /// nothing reprices the open, so there is no session in which a jump
+    /// is anything but an intraday move.
+    ///
+    /// That is the coupling §0.4 of the 2026-09-21 design note names: the
+    /// model's idiosyncratic jump is five times the tape's size at a
+    /// fortieth of its rate, and the rare huge private jumps are what hold
+    /// `volume_change_acf1` inside its band. Take them out and the band is
+    /// left; leave them in and the names' excess kurtosis is made by jumps
+    /// the tape does not have. This dial separates the two: it decides
+    /// whether the volume process is allowed to see a jump at all.
+    ///
+    /// At share `q` the day's move is measured from the open the name
+    /// would have had if `(1 - q)` of the jump had gapped overnight:
+    /// `open_eff = open * exp((1 - q) * j)`, with `j` the log jump the
+    /// close booked into `s` -- read back from the jump slot of the
+    /// attribution accumulator, which `apply_jumps` is the only writer of.
+    /// At 0.0 the volume scale reads the DIFFUSION move alone, which is
+    /// what a gap is: volume on a gap day is made at the open, not by the
+    /// name travelling that distance through the book.
+    ///
+    /// UNDETERMINED. What would determine it is volume on jump days read
+    /// off the tape -- the share of a gap day's volume that the gap itself
+    /// explains -- and nobody has read it. 1.0 ships because it is the
+    /// arithmetic that was there, not because it was chosen.
+    pub volume_move_jump_share: f64,
 
     // ── Universe memory (market/tick.rs, engine.rs) ─────────────────────
     /// How slowly the universe's remembered stress decays, per day.
@@ -2499,6 +2534,44 @@ pub struct ModelParams {
     pub jump_intensity_idio: f64,
     /// Standard deviation of the idiosyncratic jump, in log-return units.
     pub jump_sigma_idio: f64,
+    /// How much of the market jump's log return joins the day's factor
+    /// innovation, so the GJR variance update sees a crash day. Ships at
+    /// 0.0, where nothing is added and the update is the shipped one.
+    ///
+    /// The market factor's variance steps on `day_factor`, the sum of the
+    /// day's per-tick market factors (market/factor_vol.rs). A jump is not
+    /// in it: `apply_jumps` writes the jump into each name's
+    /// `mispricing_s` and nowhere else, so the fear channel sees it
+    /// through `market_day_return_pct` and the variance never does. The
+    /// index GJR the shipped coefficients come from was fitted on the
+    /// tape's TOTAL index returns, jumps included, so a model whose
+    /// variance update reads only the diffusion part is running that fit
+    /// on a series it was not fitted to.
+    ///
+    /// At share `s` the day's shock gains `s * market`, `market` being the
+    /// jump's log return -- the same number every name's `s` took. The
+    /// compensator is deliberately NOT in it: `jump_mean_compensated`
+    /// gives back a deterministic drift, the first moment, and a variance
+    /// shock is a second moment. On a day no jump fires `market` is
+    /// exactly 0.0 and nothing is added at all.
+    ///
+    /// DERIVED 1.0 by that argument, and shipped 0.0. The whole of the
+    /// jump's return belongs in the shock because the whole of it was in
+    /// the returns the coefficients were fitted to; a share between the
+    /// two would be claiming the fit saw part of a crash day.
+    ///
+    /// # It has to land in the day the jump moved
+    ///
+    /// `apply_jumps` runs at the close, and `close_market` used to run it
+    /// after the factor's own close had already consumed `day_factor` and
+    /// zeroed it. Adding there would have put the jump in the NEXT day's
+    /// shock, and `open_market` clears the accumulator in between, so it
+    /// would have been thrown away instead. The call therefore sits
+    /// immediately after the per-name closes and before the factor's, so
+    /// the addition lands in the shock the same close computes. Nothing
+    /// between the two reads or writes what `apply_jumps` touches, which
+    /// is why the move costs no preset a bit.
+    pub jump_market_variance_share: f64,
     /// How much a jump's ARRIVAL RATE follows the VIX. Zero is every preset
     /// before this dial and is bit-identical (§84).
     ///
@@ -3708,6 +3781,7 @@ impl ModelParams {
             volume_move_response: 0.6,
             volume_move_cap: 4.0,
             volume_move_noise: 0.2,
+            volume_move_jump_share: 1.0,
             volume_variance_gain: 0.0,
             universe_stress_decay: 0.0,
             universe_stress_weight: 0.0,
@@ -3718,6 +3792,7 @@ impl ModelParams {
             jump_sigma_market: 0.0,
             jump_intensity_idio: 0.0,
             jump_sigma_idio: 0.0,
+            jump_market_variance_share: 0.0,
             jump_vix_coupling: 0.0,
             overnight_variance_ratio: 0.0,
             garch_beta_dispersion: 0.0,
@@ -5646,6 +5721,7 @@ impl ModelParams {
             "volume_move_response" => self.volume_move_response,
             "volume_move_cap" => self.volume_move_cap,
             "volume_move_noise" => self.volume_move_noise,
+            "volume_move_jump_share" => self.volume_move_jump_share,
             "volume_variance_gain" => self.volume_variance_gain,
             "universe_stress_decay" => self.universe_stress_decay,
             "universe_stress_weight" => self.universe_stress_weight,
@@ -5656,6 +5732,7 @@ impl ModelParams {
             "jump_sigma_market" => self.jump_sigma_market,
             "jump_intensity_idio" => self.jump_intensity_idio,
             "jump_sigma_idio" => self.jump_sigma_idio,
+            "jump_market_variance_share" => self.jump_market_variance_share,
             "jump_vix_coupling" => self.jump_vix_coupling,
             "overnight_variance_ratio" => self.overnight_variance_ratio,
             "garch_beta_dispersion" => self.garch_beta_dispersion,
@@ -5834,6 +5911,7 @@ impl ModelParams {
             "volume_move_response" => out.volume_move_response = value,
             "volume_move_cap" => out.volume_move_cap = value,
             "volume_move_noise" => out.volume_move_noise = value,
+            "volume_move_jump_share" => out.volume_move_jump_share = value,
             "volume_variance_gain" => out.volume_variance_gain = value,
             "universe_stress_decay" => out.universe_stress_decay = value,
             "universe_stress_weight" => out.universe_stress_weight = value,
@@ -5846,6 +5924,7 @@ impl ModelParams {
             "garch_beta_dispersion" => out.garch_beta_dispersion = value,
             "jump_momentum_share" => out.jump_momentum_share = value,
             "jump_sigma_idio" => out.jump_sigma_idio = value,
+            "jump_market_variance_share" => out.jump_market_variance_share = value,
             "jump_vix_coupling" => out.jump_vix_coupling = value,
             "jump_sigma_market" => out.jump_sigma_market = value,
             "volume_innovation_sigma" => out.volume_innovation_sigma = value,
@@ -6286,6 +6365,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "informed_flow_fraction",
         "jump_intensity_idio",
         "jump_intensity_market",
+        "jump_market_variance_share",
         "jump_mean_compensated",
         "jump_mean_market",
         "jump_momentum_share",
@@ -6393,6 +6473,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "volume_innovation_sigma",
         "volume_move_cap",
         "volume_move_floor",
+        "volume_move_jump_share",
         "volume_move_noise",
         "volume_move_response",
         "volume_persistence",

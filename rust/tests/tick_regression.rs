@@ -156,6 +156,7 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
             universe_stress: 0.0,
             volume_state: 0.0,
             volume_idio: &[],
+            jump_move: &[],
             economy: &economy,
             market_status: status,
             intraday_t: 0.5,

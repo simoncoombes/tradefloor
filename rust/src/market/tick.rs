@@ -546,6 +546,11 @@ pub struct TickInputs<'a> {
     /// Per-NAME volume state, indexed by company (§107). Empty means the
     /// mechanism is off, which every preset before it is.
     pub volume_idio: &'a [f64],
+    /// The log jump each name's `s` took at the LAST close, indexed by
+    /// company. Empty, or all zeros, means the volume scale reads the
+    /// whole of the day's move, which is every preset: see
+    /// [`crate::params::ModelParams::volume_move_jump_share`].
+    pub jump_move: &'a [f64],
     /// See [`SettleDrawPolicy`]. `FourAlways` unless replaying a recorded
     /// reference stream.
     pub settle_draws: SettleDrawPolicy,
@@ -1141,7 +1146,30 @@ pub fn simulate_market_tick(
         // Zero-guard: a newly listed company before `resetDailyPrices` seeds
         // `open` would divide by zero and propagate NaN into the batch.
         let daily_change = if stock.open > 0.0 {
-            ((new_prices[i] - stock.open) / stock.open).abs()
+            let move_from_open = (new_prices[i] - stock.open) / stock.open;
+            // The whole move, jumps included -- the shipped spelling, and a
+            // BRANCH rather than a multiply by one, so every preset that
+            // leaves the share alone takes the arithmetic that was here.
+            //
+            // Off 1.0 the day is measured from the open the name would have
+            // had if `(1 - share)` of the last close's jump had gapped
+            // overnight instead of trading in through the book. A jump is
+            // booked into `mispricing_s` at the close and `open` is set from
+            // the price before it, so at share 1.0 a gap counts as a day the
+            // name travelled that far. See
+            // `ModelParams::volume_move_jump_share`.
+            if inputs.params.volume_move_jump_share == 1.0 {
+                move_from_open.abs()
+            } else {
+                match inputs.jump_move.get(idx) {
+                    Some(&j) if j != 0.0 => {
+                        let open_eff = stock.open
+                            * mathx::exp((1.0 - inputs.params.volume_move_jump_share) * j);
+                        ((new_prices[i] - open_eff) / open_eff).abs()
+                    }
+                    _ => move_from_open.abs(),
+                }
+            }
         } else {
             0.0
         };
