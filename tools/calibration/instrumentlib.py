@@ -548,6 +548,13 @@ PARAM_SPECS: dict[str, dict] = {
                               "hard_range": (0.0, 0.9995), "derived": True},
     "vix_level_sigma":        {"kind": "abs", "step_unit": 0.005,
                               "hard_range": (0.0, 0.08), "derived": True},
+    # The loop's transmission of that level into the VIX, divided out of the
+    # level's dispersion (2026-09-21). DERIVED from the read-back's held-VIX
+    # elasticity, 1.75 at the shipped exponent and 2.47 at 4.9; 0.0 is the
+    # branch not taken and the range opens above one because the loop's own
+    # gain is 1 / (1 - h) and never below it.
+    "vix_level_loop_gain":    {"kind": "abs", "step_unit": 0.1,
+                              "hard_range": (0.0, 6.0), "derived": True},
     # The market-side warm-up, in SESSIONS, so the step unit is a step in
     # sessions and not a fraction: 63 is one quarter, the block the
     # transient was traced in (`level-sigma-horizon.md` 2.2), and anything

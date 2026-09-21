@@ -423,6 +423,20 @@ OUT_OF_SCOPE = {
         "`level-sigma-horizon.md` section 2 measures the two halves of a "
         "504-session recording disagreeing at sigma 0.085 and agreeing at "
         "sigma 0",
+    "vix_level_loop_gain":
+        "inert at 0.0: engine.rs `vix_level_sigma_applied` branches on "
+        "`== 0.0` and hands back `vix_level_sigma`'s own f64, so the "
+        "level's recursion and its stationary opening read what they read "
+        "before the dial existed. The value it would take is DERIVED and "
+        "is in the field's docstring: the loop's transmission of the slow "
+        "level into the VIX is 1 / (1 - h) with h the read-back's held-VIX "
+        "elasticity, 1.75 at the shipped `market_vol_vix_exponent` 2.0 and "
+        "2.47 at 4.9. It ships at zero because correcting the level is a "
+        "change to the VIX persistence row, and that row is the floor the "
+        "recomposed pt-v19 is held to. MEASURED on 16 seeds: with the gain "
+        "divided out at exponent 4.9 the row reads 0.9492 at 252 and "
+        "0.9592 at 504, against 0.9581 and 0.9752 at that exponent without "
+        "it and 0.9523 and 0.9637 on the shipped vector",
     "market_vol_alpha_excursion":
         "inert at 0.0: market/factor_vol.rs `alpha_beta_at` branches on "
         "`k == 0.0` and returns the dialled pair unchanged. Measured and "

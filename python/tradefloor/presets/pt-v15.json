@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v15",
   "fingerprint": "pt-v15",
-  "coefficient_digest": "a513ac3d0d90f6698de8c13063139bd5664794b90e895c477044a7a9ca13b137",
+  "coefficient_digest": "5fc223a4966e2cab161c46c6e60a88ee7b265a1d77723a5baa94840fb36a029d",
   "coefficients": {
     "book_levels": 10.0,
     "buyback_payout_share": 0.0,
@@ -159,6 +159,7 @@
     "vix_jump_return_intensity": 0.0,
     "vix_jump_scale": 0.0,
     "vix_level_identity": 0.0,
+    "vix_level_loop_gain": 0.0,
     "vix_level_persistence": 0.0,
     "vix_level_sigma": 0.0,
     "vix_mean_reversion": 0.12,

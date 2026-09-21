@@ -2493,7 +2493,11 @@ impl Engine {
         // multiplies the VIX itself and not a variance whose root is read.
         if self.params.vix_level_sigma != 0.0 {
             let phi = self.params.vix_level_persistence;
-            let sigma = self.params.vix_level_sigma;
+            // The dial IS the switch above, and what the recursion drives
+            // is the dispersion after the loop's own transmission has been
+            // divided out. At `vix_level_loop_gain` 0.0 that is the dial's
+            // own f64 and this line reads as it did.
+            let sigma = self.vix_level_sigma_applied();
             let one_minus = 1.0 - phi * phi;
             let stationary_var = if one_minus > 0.0 { sigma * sigma / one_minus } else { 0.0 };
             self.vix_log_level = if self.vix_log_level == 0.0 {
@@ -3160,6 +3164,24 @@ impl Engine {
         self.vix_log_level = level;
     }
 
+    /// The VIX level's per-session innovation AS APPLIED, after the
+    /// variance loop's own transmission has been divided out.
+    ///
+    /// `vix_level_sigma` is the spread of the tape's yearly medians of log
+    /// VIX, which is a spread of the VIX and not of the latent multiplier
+    /// the engine holds; the loop carries the multiplier to the VIX with a
+    /// gain, so the dialled figure has to be divided by that gain before
+    /// the level is driven with it. See
+    /// `ModelParams::vix_level_loop_gain`, which is 0.0 on every preset and
+    /// returns the dial's own f64 here with no arithmetic run at all.
+    fn vix_level_sigma_applied(&self) -> f64 {
+        if self.params.vix_level_loop_gain == 0.0 {
+            self.params.vix_level_sigma
+        } else {
+            self.params.vix_level_sigma / self.params.vix_level_loop_gain
+        }
+    }
+
     /// The multiplier the VIX's slow level applies to what the VIX prices:
     /// exactly 1.0 at sigma 0.0, mean one otherwise.
     fn vix_level_multiplier(&self) -> f64 {
@@ -3168,7 +3190,12 @@ impl Engine {
         }
         let phi = self.params.vix_level_persistence;
         let one_minus = 1.0 - phi * phi;
-        let stationary_var = if one_minus > 0.0 { self.params.vix_level_sigma * self.params.vix_level_sigma / one_minus } else { 0.0 };
+        // The SAME dispersion the recursion runs on, which is the point of
+        // reading it from one place: the log-normal correction below and
+        // the opening draw would otherwise disagree about how wide the
+        // level is the moment the gain is turned on.
+        let sigma = self.vix_level_sigma_applied();
+        let stationary_var = if one_minus > 0.0 { sigma * sigma / one_minus } else { 0.0 };
         crate::mathx::exp(self.vix_log_level - 0.5 * stationary_var)
     }
 

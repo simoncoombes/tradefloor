@@ -1093,6 +1093,84 @@ pub struct ModelParams {
     /// target is the phase table and this multiplier is not applied.
     pub vix_level_sigma: f64,
 
+    /// The loop's own transmission of the VIX's slow level into the VIX,
+    /// which the level's innovation is DIVIDED by. 0.0 -- every preset --
+    /// is the branch not taken: the recursion and the multiplier read
+    /// `vix_level_sigma` itself, the same f64, and every preset reproduces
+    /// bit for bit.
+    ///
+    /// # The defect
+    ///
+    /// `vix_level_sigma` is the spread of the tape's yearly medians of log
+    /// VIX written onto the LATENT multiplier, and the two are not the same
+    /// quantity. Under `vix_level_identity` the VIX's target is the
+    /// read-back of the index's own conditional variance times this level,
+    /// and the read-back answers the VIX back: a level a little higher
+    /// raises the factor's variance target, which raises the read-back,
+    /// which raises the VIX again. So the spread the model's VIX shows is
+    /// the level's spread times the loop's gain, and the derivation put a
+    /// spread measured on the OUTPUT onto the INPUT. It is why every gain
+    /// in the variance loop lengthens the VIX's memory: at
+    /// `market_vol_vix_exponent` 4.9 the same level arrives at the VIX half
+    /// again as large, the slow share of the VIX's variance grows with it,
+    /// and `vix_ar1_debiased` rises at both horizons.
+    ///
+    /// # The form, and why it is one number
+    ///
+    /// Hold the VIX and the excursion target's fixed point makes the
+    /// read-back a power of it, `I = A * VIX^h`, which is what the held-VIX
+    /// probe measures. Let the loop run and the level multiplies:
+    /// `VIX = I(VIX) * L`, so `log VIX = h log VIX + log A + log L` and
+    ///
+    /// ```text
+    /// d log VIX / d log L = 1 / (1 - h)
+    /// ```
+    ///
+    /// That is this dial. Dividing the level's innovation by it leaves the
+    /// VIX's own log-level spread at the spread the tape's yearly medians
+    /// carry, whatever the loop's gain is, so the exponent can be moved for
+    /// the crisis lever without the VIX's memory moving with it. It divides
+    /// the STATIONARY opening too, not only the innovation, because the two
+    /// are one dispersion and the opening draw is the level's own
+    /// stationary distribution.
+    ///
+    /// # Derivation
+    ///
+    /// `h` is read off the held-VIX pair the lever probe already runs, VIX
+    /// 5 against VIX 65: the read-back `vix_implied_from_market` rises
+    /// 3.00x at the shipped exponent 2.0 and 4.60x at 4.9, over a VIX that
+    /// rises 13x, so `h` is `ln 3.00 / ln 13` = 0.428 and
+    /// `ln 4.60 / ln 13` = 0.595. The gain is then 1.75 at the shipped
+    /// exponent and 2.47 at 4.9. Both are DERIVED in the sense that matters
+    /// here: nothing was fitted to a graded row, each is a ratio of two
+    /// readings the lever probe takes anyway, and the form above is the
+    /// loop's own algebra.
+    ///
+    /// A gain must be strictly positive: it divides a dispersion, and the
+    /// loop's is `1 / (1 - h)` with `h` in `[0, 1)`, so it is never below
+    /// one. `ModelParams::invariants` refuses a non-positive value and
+    /// refuses the dial while `vix_level_sigma` is 0.0, where there is no
+    /// level for it to correct.
+    ///
+    /// # What it moves, MEASURED on 16 seeds of the held roster
+    ///
+    /// `vix_ar1_debiased` reads 0.9523 at 252 and 0.9637 at 504 on the
+    /// shipped vector. At `market_vol_vix_exponent` 4.9, which is what the
+    /// crisis lever asks for, it reads 0.9581 and 0.9752, and the 504
+    /// reading is refused. With the gain divided out at 4.9 it reads 0.9492
+    /// and 0.9592, under the shipped vector at both horizons, with a rise
+    /// of +0.0100 against the shipped vector's +0.0114, and the lever is
+    /// untouched: the read-back still rises 4.60x and realised index
+    /// volatility 4.85x for a VIX of 5 against 65.
+    ///
+    /// That the LEVEL is where the exponent's whole cost sits is the claim
+    /// the form makes, and it is measurable on its own. With
+    /// `vix_level_sigma` at 0.0 the same exponent change reads 0.9451 and
+    /// 0.9581 at 2.0 against 0.9413 and 0.9569 at 4.9: with no regime level
+    /// in the loop, the loop's own gain does not lengthen the VIX's lag-one
+    /// memory at all.
+    pub vix_level_loop_gain: f64,
+
     /// How many sessions of market-side warm-up the factor's variance
     /// components get before session one. 0.0 -- every preset through
     /// pt-v19 -- runs nothing, touches no state and is bit-identical.
@@ -3589,6 +3667,7 @@ impl ModelParams {
             market_vol_level_sigma: 0.0,
             vix_level_persistence: 0.0,
             vix_level_sigma: 0.0,
+            vix_level_loop_gain: 0.0,
             market_burn_in_sessions: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
@@ -5528,6 +5607,7 @@ impl ModelParams {
             "market_vol_level_sigma" => self.market_vol_level_sigma,
             "vix_level_persistence" => self.vix_level_persistence,
             "vix_level_sigma" => self.vix_level_sigma,
+            "vix_level_loop_gain" => self.vix_level_loop_gain,
             "market_burn_in_sessions" => self.market_burn_in_sessions,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
@@ -5715,6 +5795,7 @@ impl ModelParams {
             "market_vol_level_sigma" => out.market_vol_level_sigma = value,
             "vix_level_persistence" => out.vix_level_persistence = value,
             "vix_level_sigma" => out.vix_level_sigma = value,
+            "vix_level_loop_gain" => out.vix_level_loop_gain = value,
             "market_burn_in_sessions" => out.market_burn_in_sessions = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
@@ -5970,6 +6051,24 @@ impl ModelParams {
                  so a non-zero sigma would be a dial that reads as live and does nothing.",
                 self.vix_level_sigma));
         }
+        if self.vix_level_loop_gain != 0.0 && !(self.vix_level_loop_gain > 0.0) {
+            return Err(format!(
+                "vix_level_loop_gain is {}. It divides the VIX level's dispersion and \
+                 the loop's own transmission is 1 / (1 - h) with h the read-back's \
+                 held-VIX elasticity in [0, 1), so it is never below one and never \
+                 negative. A non-positive value would flip the level's sign or divide \
+                 by nothing. Set it above zero or to 0.0, where it is not applied.",
+                self.vix_level_loop_gain));
+        }
+        if self.vix_level_loop_gain != 0.0 && self.vix_level_sigma == 0.0 {
+            return Err(format!(
+                "vix_level_loop_gain is {} but vix_level_sigma is 0. The gain corrects \
+                 the slow level's dispersion for what the variance loop does to it on \
+                 the way to the VIX, and with no level there is nothing to correct, so \
+                 it would read as live and do nothing. Set vix_level_sigma or the gain \
+                 to 0.0.",
+                self.vix_level_loop_gain));
+        }
         if self.market_vol_vix_excursion != 0.0 && self.vix_level_identity == 0.0 {
             return Err(format!(
                 "market_vol_vix_excursion is {} but vix_level_identity is 0. The \
@@ -6202,6 +6301,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_level_sigma",
         "vix_level_persistence",
         "vix_level_sigma",
+        "vix_level_loop_gain",
         "market_burn_in_sessions",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",

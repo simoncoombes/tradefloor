@@ -276,6 +276,14 @@ PERTURBATIONS = [
     # 0.0173 since the ptv19gjr composition, so persistence is read.
     ("vix_level_persistence", 0.99, True),
     ("vix_level_sigma", 0.03, True),
+    # The loop's transmission of that level into the VIX, divided out of the
+    # level's dispersion (2026-09-21). Ships at 0.0 on every preset, so the
+    # perturbation has to be TO a non-zero value, and the default ships
+    # `vix_level_sigma` 0.0173, so the level it corrects is there to be
+    # corrected and the dial is read. At 2.4684 the level's innovation and
+    # its stationary opening are 40 per cent narrower, the opening draw is
+    # the same draw at a different scale, and no draw moves on any stream.
+    ("vix_level_loop_gain", 2.4684, True),
     # The market-side warm-up, added 2026-09-14 and shipping at 0.0 on
     # every preset. MEASURED True on the probe below, and the reason it
     # can be is the same reason `market_vol_level_persistence` reads True:
