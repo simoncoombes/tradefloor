@@ -2633,8 +2633,8 @@ def real_vix_ar1(days: Any, *, what: str = "this measurement") -> float:
     `rulers_for_horizon` raises on: handing back the 252-day figure for a
     504-day run compares a reading against a number computed over a
     different length, which is the defect this ruler exists to end rather
-    than to relocate. The tape's readings at 252 and 504 differ by 0.029,
-    so the substitution is not a small one.
+    than to relocate. The tape's readings at 252 and 504 differ by about
+    three hundredths, so the substitution is not a small one.
     """
     try:
         return REAL_VIX_AR1[int(days)]
@@ -6634,16 +6634,32 @@ def structure_verdict(values: Sequence[float], key: str, *,
 #: WHY A RISE AND NOT TWO CENTRES. The debiased lag-1 autocorrelation of
 #: the real VIX reads `REAL_VIX_AR1[252]` on 35 one-year windows and
 #: `REAL_VIX_AR1[504]` on 17 two-year ones, about three hundredths higher,
-#: and the Marriott-Pope term explains none of the debiased rise. Every shipped vector rises 0.007 to 0.013 between the
-#: same two windows on the same estimator: a single-pole process has most
-#: of its short-window bias removed by the first-order term and rises
-#: little, while a slow component keeps rising as the window lengthens.
-#: Graded one horizon at a time the row read REFUSED-ABOVE at 252 and
+#: and the Marriott-Pope term explains none of the debiased rise. Graded
+#: one horizon at a time the row read REFUSED-ABOVE at 252 and
 #: REFUSED-BELOW at 504 on the same model, which is two contradictory
-#: verdicts on one fact; graded as the rise it is one measurement, and the
-#: model reads about a third of the tape. `structure_rise_verdict` is that
-#: measurement. The per-horizon readings stay on the record by name.
-REAL_VIX_AR1_RISE: float = REAL_VIX_AR1[504] - REAL_VIX_AR1[TRADING_DAYS_PER_YEAR]
+#: verdicts on one fact; graded as the rise it is one measurement.
+#: `structure_rise_verdict` is that measurement. The per-horizon readings
+#: stay on the record by name.
+#:
+#: WHY THE TAPE'S RISE IS THE PAIRED ONE, corrected 2026-09-21 (design
+#: repo, `ptv19gjr-registration.md`). The model's statistic is PAIRED: each
+#: seed's two-year reading minus its own first year, because the 504-day
+#: run contains the 252-day one. The tape target this module first carried
+#: was the difference of two INDEPENDENT window medians, and on the tape's
+#: own 17 two-year blocks the paired estimator reads less than half of
+#: that: a block that is calm in its first year and crises in its second
+#: rises a lot, and most blocks do not. Same estimator both sides, or the
+#: ruler and the row are two quantities again. The 17 paired readings are
+#: derived from the window records already here: every other one-year
+#: window is the first half of a two-year one (both cuts are front-anchored
+#: from the same first close).
+REAL_VIX_AR1_PAIRED_RISES: tuple[float, ...] = tuple(
+    debias_ar1(r504, 504) - debias_ar1(REAL_VIX_AR1_WINDOWS[TRADING_DAYS_PER_YEAR][2 * i], TRADING_DAYS_PER_YEAR)
+    for i, r504 in enumerate(REAL_VIX_AR1_WINDOWS[504])
+)
+assert 2 * len(REAL_VIX_AR1_WINDOWS[504]) <= len(REAL_VIX_AR1_WINDOWS[TRADING_DAYS_PER_YEAR]), (
+    "the paired rise pairs each two-year window with the one-year window it opens with")
+REAL_VIX_AR1_RISE: float = statistics.median(REAL_VIX_AR1_PAIRED_RISES)
 
 #: The seed bootstrap `structure_rise_verdict` takes its interval from:
 #: fixed so the verdict a record carries is reproducible from its rows.
@@ -6652,13 +6668,12 @@ STRUCTURE_RISE_SEED = 20260921
 
 
 def real_rise_se(key: str = VIX_AR1_ROW) -> float:
-    """The tape rise's own standard error: the two window sets are disjoint
-    records, so their centre errors add in quadrature."""
-    a = real_centre_se(key, horizon_days=TRADING_DAYS_PER_YEAR)
-    b = real_centre_se(key, horizon_days=504)
-    if a is None or b is None:
-        raise ValidationError(f"{key} has no per-window record at both horizons")
-    return math.sqrt(a * a + b * b)
+    """The tape's paired rise's own standard error: the median's normal
+    approximation over the 17 paired block readings, the same estimator
+    `real_centre_se` uses for a median centre."""
+    if key != VIX_AR1_ROW:
+        raise ValidationError(f"{key} has no paired rise record; only {VIX_AR1_ROW} does")
+    return median_se(REAL_VIX_AR1_PAIRED_RISES)
 
 
 def structure_rise_verdict(values_252: Sequence[float],

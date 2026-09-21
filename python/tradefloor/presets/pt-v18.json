@@ -1649,8 +1649,8 @@
           252,
           504
         ],
-        "tape_rise": 0.029408974206349137,
-        "se_real": 0.012154140787465111,
+        "tape_rise": 0.011989932539682502,
+        "se_real": 0.008066524430425851,
         "median_252": 0.9365070821183588,
         "median_504": 0.945627378808386,
         "median_rise": 0.0023159178437668904,
@@ -1662,7 +1662,7 @@
         "seed": 20260921,
         "verdict": "below",
         "side": "below",
-        "share_of_tape": 0.07874867812515896
+        "share_of_tape": 0.19315520217499213
       }
     },
     "measured": {
@@ -1699,7 +1699,8 @@
         "real_crisis_lever": 6.16,
         "mechanism": "facts.mechanism_verdict per row on the per-seed panels of the cell: an exact sign test against the row's mechanism-absent reading (facts.NULLS) at the cut the band's own false-alarm rate gives (facts.sign_cut). Three counts, never one: in band, mechanism shown, at real centre"
       }
-    }
+    },
+    "regraded": "2026-09-21: tape_rise, se_real, share_of_tape and the verdict re-read from the block's own medians and interval against the tape's PAIRED rise (facts.REAL_VIX_AR1_PAIRED_RISES); the model readings are the box's and unchanged"
   },
   "in_band": {
     "252": 14,

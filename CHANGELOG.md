@@ -28,6 +28,16 @@ corrected on 2026-09-14 are below the marker.
 
 <!-- release-note-ends -->
 
+**The rise ruler is the tape's paired reading (2026-09-21).** The second
+gate's rise verdict compared each seed's two-year VIX persistence minus
+its own first year with the difference of the tape's two independent
+window medians. On the tape's own seventeen two-year blocks the paired
+estimator reads +0.012, not +0.029; `facts.REAL_VIX_AR1_PAIRED_RISES`
+derives the seventeen readings from the window records already in the
+module and `facts.REAL_VIX_AR1_RISE` is their median. Every record's
+rise block is regraded against it from its own interval; no verdict
+changes, and pt-v19 still reads below.
+
 **pt-v19 is recomposed: nine dials return to pt-v18's values, and every
 seeded pt-v19 trajectory changes a third time.** A 2^6 factorial over the
 six dial families that separate pt-v18 from the 2026-09-14 composition

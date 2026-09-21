@@ -31,6 +31,7 @@ import json
 import pathlib
 
 import pytest
+import statistics
 
 from tradefloor import envelope
 from tradefloor.facts import (
@@ -362,16 +363,21 @@ def _rises(rng, delta, n=30, sd=0.03, jitter=0.005):
     return a, [x + delta + rng.gauss(0, jitter) for x in a]
 
 
-def test_the_tape_rise_is_the_difference_of_the_two_debiased_centres():
-    import math
-    from tradefloor.facts import REAL_VIX_AR1, REAL_VIX_AR1_RISE, real_rise_se
-    assert REAL_VIX_AR1_RISE == pytest.approx(REAL_VIX_AR1[504] - REAL_VIX_AR1[252])
-    assert REAL_VIX_AR1_RISE == pytest.approx(0.0294, abs=0.0005)
-    # the two window sets are disjoint records, so the errors add in quadrature
-    from tradefloor.facts import real_centre_se
-    assert real_rise_se() == pytest.approx(math.hypot(
-        real_centre_se(VIX_AR1_ROW, horizon_days=252),
-        real_centre_se(VIX_AR1_ROW, horizon_days=504)))
+def test_the_tape_rise_is_the_paired_median_over_the_two_year_blocks():
+    """Same estimator both sides: each two-year block's debiased reading
+    minus its own first year's, the median over the 17 blocks. The
+    difference of the two independent centres is about three hundredths
+    and is NOT the target, because the model's statistic is paired."""
+    from tradefloor.facts import (REAL_VIX_AR1, REAL_VIX_AR1_RISE, REAL_VIX_AR1_PAIRED_RISES,
+                                  REAL_VIX_AR1_WINDOWS, debias_ar1, median_se, real_rise_se)
+    assert len(REAL_VIX_AR1_PAIRED_RISES) == len(REAL_VIX_AR1_WINDOWS[504]) == 17
+    for i, rise in enumerate(REAL_VIX_AR1_PAIRED_RISES):
+        assert rise == pytest.approx(debias_ar1(REAL_VIX_AR1_WINDOWS[504][i], 504)
+                                     - debias_ar1(REAL_VIX_AR1_WINDOWS[252][2 * i], 252))
+    assert REAL_VIX_AR1_RISE == pytest.approx(statistics.median(REAL_VIX_AR1_PAIRED_RISES))
+    assert REAL_VIX_AR1_RISE == pytest.approx(0.0120, abs=0.0005)
+    assert REAL_VIX_AR1_RISE < 0.5 * (REAL_VIX_AR1[504] - REAL_VIX_AR1[252])
+    assert real_rise_se() == pytest.approx(median_se(REAL_VIX_AR1_PAIRED_RISES))
 
 
 def test_the_rise_verdict_is_where_the_tape_sits_against_the_seed_interval():
@@ -395,7 +401,7 @@ def test_the_rise_verdict_is_where_the_tape_sits_against_the_seed_interval():
 def test_the_rise_certificate_is_absent_not_passed_when_a_horizon_lacks_the_row():
     import random
     rng = random.Random(3)
-    a, b = _rises(rng, 0.02)
+    a, b = _rises(rng, 0.004)   # under the tape's paired rise, so the row reads below
     p252 = [{VIX_AR1_ROW: x} for x in a]
     block = envelope.certify_structure_rise(p252, [{VIX_AR1_ROW: y} for y in b])
     assert block["below"] == [VIX_AR1_ROW] and block["absent"] == []
@@ -433,9 +439,10 @@ def test_the_record_bar_reads_the_rise_when_the_record_carries_it():
         assert verdict["panels"][envelope.STRUCTURE_RISE_FIELD]["passed"] is True
         row = rec[envelope.STRUCTURE_RISE_FIELD]["rows"][VIX_AR1_ROW]
         # The shipped default's PAIRED rise is nil: -0.0024 [-0.0058, +0.0065]
-        # against the tape's +0.0294 on the ptv19rise box. (The difference of
-        # the two medians read +0.007; the median of the per-seed differences
-        # is the registered statistic and it reads zero.) One pole.
+        # on the ptv19rise box, against the tape's paired +0.012. (The
+        # difference of the two medians read +0.007; the median of the
+        # per-seed differences is the registered statistic and it reads
+        # zero.) One pole.
         assert row["verdict"] == "below", row
         assert row["median_rise"] < row["tape_rise"]
         assert row["ci90"][1] < row["tape_rise"]
