@@ -1074,6 +1074,18 @@ def test_every_recorded_meta_field_still_has_somewhere_to_live():
     stamped.save(scratch)
     housed.update(json.loads(scratch.read_text(encoding="utf-8"))["meta"])
 
+    # And what `stamp_preset` writes off the RUNNING ENGINE at the first
+    # exchange, which the empty save above cannot reach: `model_preset` has
+    # a save-time default and `model_preset_vector` does not, because the
+    # realised parameter vector is read from an observation and an empty
+    # transcript has never seen one. Stamped from a real one-day world
+    # rather than listed, for the same reason the block above is derived --
+    # a field added to the stamp cannot make this fail for a reason that
+    # has nothing to do with FinRobot.
+    probe_world, _probe_agent = one_observation(days=1)
+    _ci.stamp_preset(stamped, _observation(probe_world))
+    housed.update(stamped.meta)
+
     homeless = sorted(k for k in meta if k not in housed)
     assert not homeless, (
         f"the recorded run carries {homeless}, and provenance() has nowhere "

@@ -598,7 +598,7 @@ def test_describe_simulator_serves_the_envelopes_verdicts_by_group():
     """
     d = mcp.describe_simulator()
     from tradefloor import envelope
-    from tradefloor.facts import SHAPE, LEVEL, CRISIS
+    from tradefloor.facts import SHAPE, LEVEL, CRISIS, DISPERSION
     cert = envelope.certified()
     served_out = set(d["certified"]["statistics_out_of_band"])
     served_in = set(d["certified"]["statistics_in_band"])
@@ -622,7 +622,13 @@ def test_describe_simulator_serves_the_envelopes_verdicts_by_group():
     # reader can tell a crisis row in band from the count a gate reads.
     assert set(SHAPE) <= served_in
     assert d["certified"]["groups"]["shape"] == list(SHAPE)
-    assert all(k in LEVEL + CRISIS for k in served_in - set(SHAPE))
+    # DISPERSION since the fourth composition of 2026-09-22: a graded row
+    # measured on a crisis window and carried in its own group, so it is
+    # served like the others and belongs in this partition. The row named
+    # here rather than the group left open, because a row that reaches the
+    # served set without a group is the wiring fault this line catches.
+    assert all(k in LEVEL + CRISIS + DISPERSION
+               for k in served_in - set(SHAPE))
     # The level and crisis rows are served with their OWN verdicts, which is
     # the property that matters and the one that survives an era boundary.
     # This read `assert "index_drift_pct" in served_out` and pinned the
@@ -630,7 +636,7 @@ def test_describe_simulator_serves_the_envelopes_verdicts_by_group():
     # pt-v16 and is green at pt-v18, and a test that pins today's verdict
     # fails on the release that improves the model. What must hold is that
     # each row is served under the verdict the envelope computes for it.
-    for row in LEVEL + CRISIS:
+    for row in LEVEL + CRISIS + DISPERSION:
         if row not in cert["statistics"]:
             continue                       # unmeasured; asserted just below
         # Three states again: an UNREADABLE row is served as neither in nor
