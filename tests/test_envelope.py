@@ -19,15 +19,34 @@ def test_the_certified_panel_covers_every_measured_statistic():
     # A statistic in the panel but absent here would be uncertified and
     # unmentioned, which is the silent kind of gap this module exists to
     # make impossible.
-    from tradefloor.facts import SHAPE, LEVEL, CRISIS
+    from tradefloor.facts import SHAPE, LEVEL, CRISIS, DISPERSION
     # The split: the shape rows fill the certified table, the level and
     # crisis rows have tables of their own, and the 504-day bands cover
     # every graded row while the 504-day measurements cover the shape rows.
-    assert sorted(env.CERTIFIED) == sorted(SHAPE)
+    #
+    # RE-PINNED 2026-09-22, from `SHAPE` to `SHAPE + DISPERSION`.
+    # `crisis_sector_dispersion` is graded (`envelope.score` reports it as
+    # `dispersion_in_band` of `dispersion_of`) and it is measured on the
+    # certification protocol, so it belongs in the measured tables; it is
+    # NOT in `SHAPE`, so it is in the "14 of 14" nowhere. The two tables
+    # gain the key together, because `tools/presets/envelope_tables.py`
+    # writes `CERTIFIED` from `panel_252` and `MEASURED_504` from
+    # `panel_504` and a table that could not hold a row its record carries
+    # would make that tool refuse the next record as a schema change.
+    #
+    # The VALUE of that key is `None` at this preset, which is a
+    # measurement: see `envelope.CERTIFIED`'s note and
+    # `envelope.certified_panel`.
+    assert sorted(env.CERTIFIED) == sorted(SHAPE + DISPERSION)
     assert set(env.CERTIFIED_LEVEL) <= set(LEVEL)
     assert set(env.CERTIFIED_CRISIS) <= set(CRISIS)
     assert sorted(env.BANDS_504) == sorted(REAL_MARKETS)
-    assert sorted(env.MEASURED_504) == sorted(SHAPE)
+    assert sorted(env.MEASURED_504) == sorted(SHAPE + DISPERSION)
+    # And the panel a caller GRADES is the table without the rows that carry
+    # no reading, so nothing downstream has to remember to filter it.
+    assert set(env.certified_panel()) == {
+        k for k, v in env.CERTIFIED.items() if v is not None}
+    assert all(v is not None for v in env.certified_panel().values())
 
 
 @pytest.mark.ship_bar
@@ -46,7 +65,12 @@ def test_all_fourteen_are_in_band_at_the_certified_horizon():
     # count is still a decision -- that decision is R1 and R4.
     bands, _, _ = env.RULERS_BY_BASIS[env.DEFAULT_BAND_BASIS][
         env.CERTIFIED_HORIZON_DAYS]
-    in_band = [k for k, v in env.CERTIFIED.items()
+    # `certified_panel()` and not `CERTIFIED`, since 2026-09-22: the table
+    # carries `crisis_sector_dispersion` against no reading and
+    # `band_distance(None, ...)` raises. The count below is unchanged by
+    # that row either way -- it is not a shape row -- and the assertion
+    # names fourteen on purpose.
+    in_band = [k for k, v in env.certified_panel().items()
                if bands.get(k) is not None
                and band_distance(v, *bands[k]) == 0]
     # Fourteen SHAPE rows. The level row is graded and held red in its own
@@ -171,8 +195,16 @@ def test_the_volume_change_row_is_now_inside_at_both_horizons():
     # strictly stronger -- it catches the stale-sentence defect whether or not
     # any row happens to miss.
     reason = " ".join(far.reasons)
+    # OVER THE ROWS THIS TABLE CAN BE GRADED BY, which is `check`'s own
+    # `graded504` rule and not every key `MEASURED_504` carries. Re-pinned
+    # 2026-09-22: `crisis_sector_dispersion` is in the table, has no reading
+    # at this preset and has no entry in `BANDS_504` -- its 504 band is
+    # `facts.REAL_MARKETS_RULED_504` -- so it is in neither the miss list
+    # nor the denominator, and a `KeyError` here would be this test
+    # disagreeing with the sentence it is checking.
     computed = {k for k, v in env.MEASURED_504.items()
-                if not (env.BANDS_504[k][0] <= v <= env.BANDS_504[k][1])}
+                if v is not None and k in env.BANDS_504
+                and not (env.BANDS_504[k][0] <= v <= env.BANDS_504[k][1])}
     segment = reason.split("missing ", 1)[1].split(". The thin one")[0] if computed else ""
     named = {k: float(v)
              for k, v in re.findall(r"(\w+) at (-?[\d.]+) against \(", segment)}
@@ -209,8 +241,16 @@ def test_the_stale_sentence_assertion_actually_bites():
         "13 of 14 against horizon-matched bands, missing volume_change_acf1 at "
         "-0.2572 against (-0.29, -0.21). The thin one is annualised_vol_pct."
     )
+    # OVER THE ROWS THIS TABLE CAN BE GRADED BY, which is `check`'s own
+    # `graded504` rule and not every key `MEASURED_504` carries. Re-pinned
+    # 2026-09-22: `crisis_sector_dispersion` is in the table, has no reading
+    # at this preset and has no entry in `BANDS_504` -- its 504 band is
+    # `facts.REAL_MARKETS_RULED_504` -- so it is in neither the miss list
+    # nor the denominator, and a `KeyError` here would be this test
+    # disagreeing with the sentence it is checking.
     computed = {k for k, v in env.MEASURED_504.items()
-                if not (env.BANDS_504[k][0] <= v <= env.BANDS_504[k][1])}
+                if v is not None and k in env.BANDS_504
+                and not (env.BANDS_504[k][0] <= v <= env.BANDS_504[k][1])}
     segment = stale.split("missing ", 1)[1].split(". The thin one")[0]
     named = {k: float(v)
              for k, v in re.findall(r"(\w+) at (-?[\d.]+) against \(", segment)}
@@ -252,7 +292,7 @@ def test_intervals_report_the_spread_and_both_containment_tests():
     lo, hi = REAL_MARKETS["annualised_vol_pct"]
     panels = []
     for v in (hi - 1.0, hi + 6.0, hi - 3.0):
-        p = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
+        p = env.certified_panel()
         p["annualised_vol_pct"] = v
         panels.append(p)
     rows = env.intervals(panels)
@@ -325,10 +365,14 @@ def test_the_certified_comment_matches_the_certified_numbers():
     # the test failed on a missing file. Asking the module where it lives
     # cannot go stale the next time the package moves.
     src = Path(env.__file__).read_text(encoding="utf-8")
-    note = src[:src.index("CERTIFIED: dict[str, float] = {")]
+    # The annotation is `float | None` since 2026-09-22, when the table
+    # gained a row the shipped preset could not read. Matched loosely so
+    # this test binds the COMMENT and not the type.
+    note = src[:re.search(r"^CERTIFIED: dict\[str, float(?: \| None)?\] = \{$",
+                          src, re.M).start()]
     note = note[note.rindex("#: Measured at the certified horizon"):]
 
-    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
+    panel = env.certified_panel()
     scored = env.score(panel, horizon_days=env.CERTIFIED_HORIZON_DAYS)
     words = {14: "ALL FOURTEEN", 13: "thirteen of fourteen",
              12: "twelve of fourteen"}
@@ -345,10 +389,21 @@ def test_certified_serialises_for_a_manifest():
     d = env.certified()
     assert d["preset"] == env.PRESET
     assert d["certified_horizon_days"] == env.CERTIFIED_HORIZON_DAYS
-    assert len(d["statistics"]) == (len(env.CERTIFIED) + len(env.CERTIFIED_LEVEL)
+    # RE-PINNED 2026-09-22. A row with no reading is `unmeasured` and not a
+    # statistic, the way a level row measured on no protocol yet already
+    # was: `crisis_sector_dispersion` is in `CERTIFIED` against `None`, so
+    # the statistic count is the readable rows of the three tables.
+    from tradefloor.facts import DISPERSION
+    readable = len(env.certified_panel())
+    assert len(d["statistics"]) == (readable + len(env.CERTIFIED_LEVEL)
                                     + len(env.CERTIFIED_CRISIS))
-    assert set(d["statistics"]) | set(d["unmeasured"]) == set(REAL_MARKETS)
-    assert set(d["groups"]) == {"shape", "level", "crisis"}
+    # The dispersion row is not in `REAL_MARKETS` -- the decade table has no
+    # reading for it, which is why it is not in `SHAPE` -- so the union is
+    # that table plus the row, and the row is on the unmeasured side today.
+    assert set(d["statistics"]) | set(d["unmeasured"]) == (
+        set(REAL_MARKETS) | set(DISPERSION))
+    assert set(DISPERSION) <= set(d["unmeasured"])
+    assert set(d["groups"]) == {"shape", "level", "crisis", "dispersion"}
     assert len(d["gaps"]) == len(env.GAPS)
     assert all(g["forbids"] for g in d["gaps"])
 
@@ -372,7 +427,7 @@ def test_score_reads_a_panel_against_its_own_horizon():
     project; the horizon picks the ruler here so a caller cannot pair one
     with the other by accident.
     """
-    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
+    panel = env.certified_panel()
     panel["excess_kurtosis"] = 5.23
     # PINNED TO `shipped`, since the default moved to `ruled` on 2026-09-15.
     # What this test binds is that the HORIZON picks the ruler, and the row
@@ -417,14 +472,14 @@ def test_score_reads_a_panel_against_its_own_horizon():
 def test_score_reports_room_not_just_membership():
     # A statistic barely inside is one seed away from not being, and the
     # band loss is flat inside a band so it cannot see the difference.
-    rows = env.score({k: env.CERTIFIED[k] for k in env.CERTIFIED})["statistics"]
+    rows = env.score(env.certified_panel())["statistics"]
     for name, row in rows.items():
         if row["in_band"]:
             assert row["room_sd"] is None or row["room_sd"] >= 0, name
 
 
 def test_the_shipped_preset_does_not_regress_itself():
-    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
+    panel = env.certified_panel()
     assert env.regressions(panel) == []
 
 
@@ -437,7 +492,7 @@ def test_a_panel_that_loses_a_statistic_is_named():
     horizon. It was called a win twice before anyone counted the panel
     (CALIBRATION-FOLLOWUPS §33), so this is a function now.
     """
-    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
+    panel = env.certified_panel()
     low, high = REAL_MARKETS["return_acf1"]
     panel["return_acf1"] = high + 0.014      # pt-v4 measures 0.0739 vs 0.06
     assert env.regressions(panel) == ["return_acf1"]
@@ -452,7 +507,7 @@ def test_a_structural_statistic_the_shipped_preset_holds_is_a_regression():
     certified horizon. A candidate that drops one is now giving up something
     that ships, whether or not the objective was pointed at it.
     """
-    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
+    panel = env.certified_panel()
     panel["volume_change_acf1"] = -99.0
     assert env.regressions(panel) == ["volume_change_acf1"]
 
@@ -464,8 +519,11 @@ def test_a_row_the_shipped_preset_does_not_hold_cannot_be_lost():
     which keeps this function from calling every candidate a
     regression the moment a statistic leaves the shipped panel.
     """
-    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
+    panel = env.certified_panel()
     low, _ = REAL_MARKETS["return_acf1"]
+    # Built off `CERTIFIED` and not the graded panel: `regressions` reads
+    # the table itself and skips a row with no reading, so the patched
+    # baseline has to be the same shape as the real one.
     baseline_miss = dict(env.CERTIFIED, return_acf1=low - 1.0)
     with mock.patch.object(env, "CERTIFIED", baseline_miss):
         panel["return_acf1"] = low - 2.0
@@ -475,7 +533,7 @@ def test_a_row_the_shipped_preset_does_not_hold_cannot_be_lost():
 def test_regressions_refuses_a_horizon_it_has_no_baseline_for():
     # CERTIFIED is measured at 252. Comparing a 504-day panel against it
     # would be the wrong-ruler error wearing a different hat.
-    panel = {k: env.CERTIFIED[k] for k in env.CERTIFIED}
+    panel = env.certified_panel()
     with pytest.raises(tradefloor.ValidationError):
         env.regressions(panel, horizon_days=504)
 

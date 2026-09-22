@@ -266,6 +266,32 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
             "heldout_universe": p.get("unreadable_heldout_universe"),
             "heldout_seeds": p.get("unreadable_heldout_seeds"),
         },
+        # THE OTHER HALF OF THE DENOMINATOR, and the other reason a count is
+        # not fifteen. `unreadable` is a row the BASIS carries no band for;
+        # this is a row the RUN did not read. `crisis_sector_dispersion`
+        # needs thirty sessions above the crisis threshold inside its
+        # window and a 252-day run of a calm preset holds single figures, so
+        # the row is absent on the 252 cells of most presets and reads at
+        # 504. Absent is not a miss and not a pass: it is out of the
+        # numerator AND out of the denominator, which is
+        # `facts.aggregate_panels`'s rule for an empty `fear_gauge_dn3`
+        # applied to a row that has a band. Additive, so schema 1 stays 1,
+        # and `.get` so a record rebuilt from an artefact written before the
+        # row carries null rather than failing.
+        "absent": {
+            "252": p.get("absent_252"),
+            "504": p.get("absent_504"),
+            "heldout_universe": p.get("absent_heldout_universe"),
+            "heldout_seeds": p.get("absent_heldout_seeds"),
+        },
+        # AND WHY, PER CELL, because "absent" with no count is
+        # indistinguishable from a run that stopped measuring the row. Per
+        # absence-capable row: how many of the cell's thirty seeds read it,
+        # how many there were, the aggregate over the ones that did (null
+        # when none did), the estimator by name, and the library's own
+        # sentences about the refusals. `preset_panel._absence` builds it
+        # from the same per-seed panels the median comes from.
+        "dispersion": p.get("dispersion"),
         "crisis_lever": {
             "ratio": p["crisis_lever"],
             "vol_at_vix_5": p["vol_at_vix_5"],
@@ -689,6 +715,15 @@ def main() -> int:
                               # count of 13 means one thing beside an empty
                               # `unreadable` and another beside a named row.
                               "unreadable",
+                              # Both new fields are science by the same
+                              # argument: a 14 beside an empty `absent` and
+                              # a 14 beside a named one are different
+                              # claims, and a `dispersion` block that moved
+                              # from "read on 6 of 30 seeds" to "read on 0"
+                              # is the row going quiet. A field absent from
+                              # this list is a field `--check` reports
+                              # nothing about.
+                              "absent", "dispersion",
                               "mechanism_252", "mechanism_heldout_seeds",
                               # THE FOURTH BLOCK, NAMED HERE OR UNAUDITED.
                               # A field absent from this list is a field

@@ -162,7 +162,36 @@ PRESET = "pt-v19"
 #: green at pt-v18 and pt-v19; the split is a statement about PROTOCOL, not about
 #: failure, and it stays whichever way the verdicts read. A row the default
 #: preset fails is never widened to pass and never folded into this count.
-CERTIFIED: dict[str, float] = {
+#: THE FIFTEENTH KEY AND THE FOURTEEN SHAPE ROWS, from 2026-09-22.
+#: `crisis_sector_dispersion` joined the library's graded rows
+#: (`facts.DISPERSION`), it has a ruled band at both horizons, and this
+#: table is what `tools/calibration/preset_panel.py` measures -- `PANEL =
+#: tuple(envelope.CERTIFIED)`, so a row reaches the panel artefact, the
+#: per-seed rows and the committed record by being added here and by no
+#: other route. The count above is still FOURTEEN: the dispersion row is in
+#: `facts.DISPERSION` and not in `facts.SHAPE`, so it is in
+#: `certify`'s three counts nowhere at all, in no mechanism verdict, and in
+#: the "14 of 14" claim nowhere. `score` reports it apart, as
+#: `dispersion_in_band` of `dispersion_of`.
+#:
+#: ITS VALUE IS `None`, WHICH IS A MEASUREMENT AND NOT A GAP. The row needs
+#: `facts.CRISIS_DISPERSION_MIN_SESSIONS` (30) sessions above
+#: `facts.CRISIS_VIX_THRESHOLD` (30.88) inside the window it is read over,
+#: and a 252-day run of this preset on the certified roster does not hold
+#: them: the four seeds measured on 2026-09-22 held 0, 1, 0 and 10. So the
+#: shipped preset has NO certified reading at 252 and the honest entry is
+#: the row's name against nothing, carried here rather than omitted so that
+#: the panel measures it, the record records the absence with the count of
+#: readable seeds beside it, and the day a preset holds enough crisis
+#: sessions the number lands here by `tools/presets/envelope_tables.py`
+#: rather than by somebody noticing. A fabricated 1.0 -- the row's
+#: arithmetic floor -- would read as a model with no sector dispersion at
+#: all, which is a claim nobody measured.
+#:
+#: `envelope.certified_panel()` is CERTIFIED without the absent rows, and it
+#: is what every caller that GRADES this table reads. `band_distance(None,
+#: ...)` is a TypeError, and a row with no reading has no verdict to give.
+CERTIFIED: dict[str, float | None] = {
     "annualised_vol_pct": 24.4565,
     "excess_kurtosis": 7.6803,
     "return_acf1": -0.0049,
@@ -177,7 +206,32 @@ CERTIFIED: dict[str, float] = {
     "corr_asymmetry_lagged": 0.1421,
     "sector_excess_corr": 0.1076,
     "corr_persistence_acf1": 0.1296,
+    # ABSENT AT THIS PRESET, with the reason above. Written by
+    # `envelope_tables.py` from the record's `panel_252`, which carries the
+    # row only when a seed read it; `dispersion_252` on the record carries
+    # how many of the thirty did and why the rest did not.
+    "crisis_sector_dispersion": None,
 }
+
+
+def certified_panel() -> dict[str, float]:
+    """`CERTIFIED` without the rows the shipped preset could not read.
+
+    A graded panel, for the callers that SCORE this table. `CERTIFIED` is
+    allowed to carry `None` for a row the certification run could not read
+    -- `crisis_sector_dispersion` needs thirty crisis sessions in the window
+    and a 252-day run of this preset holds single figures -- and a `None` in
+    a panel is a `TypeError` inside `band_distance`, one frame down from
+    anything that could say what went wrong.
+
+    So the absence is stated once, here, and the callers that grade read
+    this rather than filtering it themselves in four spellings. The ones
+    that REPORT the table -- `mcp._certified_value`, `red_team`,
+    `shapley.certified_column` -- read `CERTIFIED` directly and already
+    carry `None` through as "not measured", which is the right answer for a
+    reader and the wrong one for a band.
+    """
+    return {k: v for k, v in CERTIFIED.items() if v is not None}
 
 #: The LEVEL rows the default preset reads at the certified horizon,
 #: measured as a thirty-seed mean on `facts.LEVEL_PROTOCOL` -- seeds 101 to
@@ -514,7 +568,21 @@ BAR_BAND_BASIS = "ruled"
 #:
 #: The count is still MEASURED rather than certified: the certified horizon
 #: is 252 because that is where `CERTIFIED` was measured.
-MEASURED_504: dict[str, float] = {
+#:
+#: FIFTEEN KEYS SINCE 2026-09-22, for `CERTIFIED`'s reason and with the same
+#: `None`: `record["panel_504"]` is what `envelope_tables.py` writes this
+#: table from, and a table that cannot hold the row the record carries would
+#: make the tool refuse every future record as a schema change. The row
+#: READS more often at 504 than at 252 -- twice the window, so twice the
+#: chance of thirty crisis sessions, and two of four measured seeds read it
+#: on 2026-09-22 against none at 252 -- so this is the entry that is
+#: expected to gain a number first, off the box run that re-measures the
+#: eighteen records.
+#:
+#: The count above stays FOURTEEN and so does the `out` list in `check`: the
+#: dispersion row is graded on `facts.REAL_MARKETS_RULED_504` and is not in
+#: `BANDS_504`, and the count is over the rows this table can be graded by.
+MEASURED_504: dict[str, float | None] = {
     "annualised_vol_pct": 24.3476,
     "excess_kurtosis": 9.2657,
     "return_acf1": 0.0010,
@@ -529,6 +597,9 @@ MEASURED_504: dict[str, float] = {
     "corr_asymmetry_lagged": 0.1423,
     "sector_excess_corr": 0.1129,
     "corr_persistence_acf1": 0.1896,
+    # Absent on the record this table was written from, which predates the
+    # row. See the note above and `CERTIFIED`'s.
+    "crisis_sector_dispersion": None,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
@@ -1265,11 +1336,20 @@ def check(
         # pt-v12 brought that row inside its 504-day band, so `check` was
         # telling callers a statistic missed while quoting a number that is
         # plainly inside the band printed beside it (§114).
-        out = [k for k, v in MEASURED_504.items()
+        # OVER THE ROWS THIS TABLE CAN BE GRADED BY, which since 2026-09-22
+        # is not every row it carries. `crisis_sector_dispersion` has no
+        # entry in `BANDS_504` -- its 504 band is on the ruled basis,
+        # `facts.REAL_MARKETS_RULED_504` -- and it carries no reading at
+        # this preset either. Both are skipped by name rather than by a
+        # `KeyError` or a `TypeError` two frames down, and the denominator
+        # is the rows tested, so "all fourteen" stays a count of fourteen.
+        graded504 = {k: v for k, v in MEASURED_504.items()
+                     if v is not None and k in BANDS_504}
+        out = [k for k, v in graded504.items()
                if not (BANDS_504[k][0] <= v <= BANDS_504[k][1])]
-        held = (f"holds all {len(MEASURED_504)} against horizon-matched bands"
+        held = (f"holds all {len(graded504)} against horizon-matched bands"
                 if not out else
-                f"holds {len(MEASURED_504) - len(out)} of {len(MEASURED_504)} "
+                f"holds {len(graded504) - len(out)} of {len(graded504)} "
                 f"against horizon-matched bands, missing "
                 + ", ".join(f"{k} at {MEASURED_504[k]:.4f} against "
                             f"{BANDS_504[k]}" for k in out))
@@ -2686,7 +2766,11 @@ def regressions(panel: Mapping[str, float], *,
     theirs = score(panel, horizon_days=horizon_days, basis=basis)["statistics"]
     # The shipped preset's own panel, graded by the SAME table, so the
     # comparison is between two readings and not between two rulers.
-    ours = score(CERTIFIED, horizon_days=horizon_days,
+    # `certified_panel()` and not `CERTIFIED`: a row the shipped preset
+    # could not read carries `None` there, and a candidate cannot LOSE a row
+    # the baseline never held. It is dropped before the score rather than
+    # after, because `band_distance(None, ...)` raises.
+    ours = score(certified_panel(), horizon_days=horizon_days,
                  basis=basis)["statistics"]
     lost = []
     for name, row in theirs.items():
@@ -2703,7 +2787,10 @@ def regressions(panel: Mapping[str, float], *,
         # pt-v16 and is not true of pt-v19 -- all four of its level and
         # crisis rows are in band (`CERTIFIED_LEVEL`, `CERTIFIED_CRISIS`).
         # The skip never depended on the verdict, only on the protocol.
-        if name not in CERTIFIED:
+        # `.get(name) is None` and not `not in`, since 2026-09-22: a row
+        # CERTIFIED carries against no reading is as absent from the
+        # baseline as one it does not carry at all.
+        if CERTIFIED.get(name) is None:
             continue
         # `is False` and `is True`, never truthiness: a row this basis
         # cannot read is None on both sides and belongs in neither list.
@@ -2732,7 +2819,7 @@ def certified(basis: str = DEFAULT_BAND_BASIS) -> dict[str, Any]:
     `in_band` as None and is named in ``unreadable``, which is what `score`
     does, rather than raising or borrowing another basis's band.
     """
-    from .facts import SHAPE, LEVEL, CRISIS
+    from .facts import SHAPE, LEVEL, CRISIS, DISPERSION
     from . import facts as _facts
     if basis not in RULERS_BY_BASIS:
         raise ValidationError(
@@ -2749,15 +2836,28 @@ def certified(basis: str = DEFAULT_BAND_BASIS) -> dict[str, Any]:
     for table, group in ((CERTIFIED, "shape"), (CERTIFIED_LEVEL, "level"),
                          (CERTIFIED_CRISIS, "crisis")):
         for k, v in table.items():
+            # The row's OWN group, not the table's, since `CERTIFIED` gained
+            # `crisis_sector_dispersion` on 2026-09-22: the table is the
+            # panel this library measures and `facts.DISPERSION` is where
+            # that row is graded, so a manifest that called it a shape row
+            # would put it inside the "14 of 14" a reader counts.
+            row_group = "dispersion" if k in DISPERSION else group
+            # A row with NO READING is unmeasured, exactly as a level or
+            # crisis row measured on no protocol yet is. It carries no
+            # verdict, so it goes nowhere near a band: `band_distance(None,
+            # ...)` raises, and a row nobody could read has not passed.
+            if v is None:
+                continue
             band = bands.get(k)
             statistics[k] = {
                 "measured": v,
                 "band": list(band) if band is not None else None,
                 "in_band": (band_distance(v, *band) == 0
                             if band is not None else None),
-                "group": group,
+                "group": row_group,
             }
-    unmeasured = [k for k in LEVEL + CRISIS if k not in statistics]
+    unmeasured = [k for k in LEVEL + CRISIS + DISPERSION
+                  if k not in statistics]
     unreadable = sorted(k for k, s in statistics.items()
                         if s["in_band"] is None)
     return {
@@ -2770,7 +2870,12 @@ def certified(basis: str = DEFAULT_BAND_BASIS) -> dict[str, Any]:
         "band_basis_detail": _facts.band_basis(ruler_name),
         "statistics": statistics,
         "unreadable": unreadable,
-        "groups": {"shape": list(SHAPE), "level": list(LEVEL), "crisis": list(CRISIS)},
+        # Four groups since 2026-09-22. `dispersion` is named rather than
+        # folded into `shape`: the row is graded, it is not in the fourteen,
+        # and a manifest that hid it inside them would move a count three
+        # committed records already publish.
+        "groups": {"shape": list(SHAPE), "level": list(LEVEL),
+                   "crisis": list(CRISIS), "dispersion": list(DISPERSION)},
         "unmeasured": unmeasured,
         "gaps": [
             {
