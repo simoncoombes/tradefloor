@@ -2420,7 +2420,17 @@ impl Engine {
     }
 
     /// The sector key the running episode's epicentre was drawn at, or
-    /// `None` -- no episode, the dial off, or the episode drew `none`.
+    /// `None` -- no episode, the dial off, the episode drew `none`, or the
+    /// sector it drew has no name in THIS roster.
+    ///
+    /// That last one is the tick's question rather than the episode's, which
+    /// is why it is answered here and not in `crisis_episode`: the draw
+    /// happened and the state records it either way. But the multiples the
+    /// tick applies move the roster's crisis variance from one sector to the
+    /// others, and with nobody in the epicentre there is nothing to move it
+    /// TO -- every name would be scaled down and the roster would simply go
+    /// quiet in a crisis, which is the one thing this mechanism promises not
+    /// to do. An epicentre nobody is in is not an epicentre.
     ///
     /// `'static`, because it is a key from the sector table rather than a
     /// borrow of this engine, which is what lets the tick's inputs carry it
@@ -2429,9 +2439,14 @@ impl Engine {
         if !self.crisis_in_episode || self.crisis_epicentre < 0 {
             return None;
         }
-        crate::sectors::SECTORS
+        let key = crate::sectors::SECTORS
             .get(self.crisis_epicentre as usize)
-            .map(|s| s.key)
+            .map(|s| s.key)?;
+        if self.companies.iter().any(|c| c.sector == key) {
+            Some(key)
+        } else {
+            None
+        }
     }
 
     /// The episode state: whether one is running, how many consecutive

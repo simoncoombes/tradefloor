@@ -4358,6 +4358,36 @@ pub fn sector_daily_sigma(sector: &str) -> PyResult<f64> {
         })
 }
 
+/// The crisis epicentre's solve at an extra, as the numbers the tick uses.
+///
+/// `market_share` and `sector_share` are the two MEASURED constants
+/// `market::factors::CRISIS_EPICENTRE_MARKET_SHARE` and
+/// `CRISIS_EPICENTRE_SECTOR_SHARE`; `gain_up` and `gain_down` are the
+/// multiples the epicentre sector's names and every other name carry on
+/// their non-market parts while an episode runs; `extra_min` and `extra_max`
+/// are the open interval `ModelParams::invariants` admits.
+///
+/// A window, not a dial: this computes nothing an engine does not compute
+/// for itself, and it exists so a reader (and
+/// `tests/test_crisis_epicentre.py`) can check the solve against its own two
+/// equations with the engine's numbers rather than a transcription of them.
+/// It takes the extra rather than a `ModelParams` because the solve reads
+/// exactly one field and a params argument would suggest otherwise.
+#[pyfunction]
+pub fn crisis_epicentre_solve(py: Python<'_>, extra: f64) -> PyResult<Bound<'_, PyDict>> {
+    let (up, down) = crate::market::factors::crisis_epicentre_gains(extra);
+    let (lo, hi) = crate::market::factors::crisis_epicentre_extra_bounds();
+    let out = PyDict::new_bound(py);
+    out.set_item("extra", extra)?;
+    out.set_item("market_share", crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE)?;
+    out.set_item("sector_share", crate::market::factors::CRISIS_EPICENTRE_SECTOR_SHARE)?;
+    out.set_item("gain_up", up)?;
+    out.set_item("gain_down", down)?;
+    out.set_item("extra_min", lo)?;
+    out.set_item("extra_max", hi)?;
+    Ok(out)
+}
+
 /// Standard deviation of the daily mispricing process at rest.
 ///
 /// A universe priced exactly at fair value starts with zero cross-sectional

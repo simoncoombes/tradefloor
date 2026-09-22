@@ -246,10 +246,13 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # surveying the sample rather than the process. The bottom is 0.0 only
     # because the box has to contain the shipped value, the same price
     # `vix_level_loop_gain` pays above: 0.0 is the branch not taken, not a
-    # small epicentre, and everything between it and sqrt(0.3916) = 0.626 is
-    # refused by `ModelParams::invariants` as an epicentre whose non-market
-    # parts would carry a negative variance. The useful region starts at 1.0,
-    # an epicentre no different from anywhere else.
+    # small epicentre, and everything between it and 0.6052 is refused by
+    # `ModelParams::invariants` as an epicentre whose own non-market parts
+    # would carry a negative variance. The useful region starts at 1.0, an
+    # epicentre no different from anywhere else. The top is inside the OTHER
+    # refusal the redistributing solve has: the mechanism holds the roster's
+    # mean non-market variance, so past 4.0307 it is every other name's
+    # variance that would have to go negative, and 3.0 stops short of it.
     "crisis_epicentre_extra": (0.0, 3.0),
     # The market-side warm-up, in SESSIONS. Not a share and not a rate, so
     # its box comes off the thing it has to outlast rather than off a

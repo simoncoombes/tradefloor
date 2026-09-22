@@ -6,7 +6,9 @@ A crisis EPISODE starts on the session whose VIX is above
 start of each episode one epicentre is drawn from the sector table's
 `crisis_weight`, `none` being the remainder and a draw in its own right. While
 the episode runs, the names in that sector carry an extra multiple on the
-parts of their return that are NOT the market factor.
+parts of their return that are NOT the market factor, and every other name
+carries a multiple below one on the same parts: the mechanism moves the
+roster's crisis variance about rather than adding to it.
 
 The dial ships at 0.0 and the branch is not taken, so this file's first job is
 the bit-identity: at the shipped value nothing runs, no state moves and no
@@ -288,42 +290,170 @@ def _by_sector(e):
     return out
 
 
-def test_only_the_epicentre_sector_moves():
-    """The names of one sector move and every other name is bit-identical.
+def _non_market(e):
+    """One day's accumulated SECTOR plus IDIOSYNCRATIC noise per name.
 
-    The strongest statement the mechanism can make about its own reach, and
-    the one that says the market component was left alone: the market factor
-    and the sector draws are the same numbers in both runs, so a name outside
-    the epicentre sees an unchanged tick.
+    The two parts the epicentre scales and the only two, so this is the
+    engine's own reading of what the mechanism did -- the market part sits
+    beside them in `noise_split` and is untouched.
+    """
+    import struct
+    n = len(UNIVERSE)
+    sec = struct.unpack("<%dd" % n, e.noise_split("sector"))
+    idio = struct.unpack("<%dd" % n, e.noise_split("idio"))
+    return [s + i for s, i in zip(sec, idio)]
+
+
+def _episode_arm(model, target, days):
+    """`days` sessions inside one pinned episode; the non-market parts of
+    each session, per name."""
+    e = engine(model)
+    sc = Scenario().hold(vix=CRISIS_VIX, epicentre=target)
+    out = []
+    for day in range(days):
+        sc.apply(e, day)
+        e.open_market()
+        e.run_session(9, 30, 3, TICKS)
+        e.close_market()
+        out.append(_non_market(e))
+    return out
+
+
+def test_the_epicentre_moves_up_the_others_move_down_and_the_mean_is_held():
+    """The mechanism REDISTRIBUTES the roster's crisis variance.
+
+    Two statements, and the second is the one that separates this form from
+    the additive one it replaced. First, every name moves: the epicentre
+    sector's names by `g_up` above one and every other name by `g_down` below
+    it, on the sector leg and the idiosyncratic draw and nowhere else. Both
+    multiples are read off the engine's own noise split against an arm with
+    the mechanism off, and on the first session of the episode the two arms
+    share every draw, so each ratio is the applied multiple to the bit rather
+    than an estimate of it.
+
+    Second, the roster's mean non-market variance is held. At a given VIX the
+    roster's total crisis variance is the VIX's to set and the epicentre only
+    says who carries it, which is exactly
+    `w g_up^2 + (1 - w) g_down^2 = 1` -- and `w` is the share measured on the
+    REGISTERED 40-name roster, so on this twelve-name one the roster's own
+    share stands a little apart from it and the held mean lands off one by
+    that difference and by nothing else. The additive form, on the same
+    names, would have put the roster's crisis variance up by two fifths.
     """
     sectors = _by_sector(engine(live()))
     target = next(s for s, idx in sectors.items() if idx)
-    sc = Scenario().hold(vix=CRISIS_VIX, epicentre=target)
+    solve = tf.crisis_epicentre_solve(EXTRA)
+    up, down = solve["gain_up"], solve["gain_down"]
+    assert up > 1.0 > down
+
+    days = 10
+    off = _episode_arm(tf.ModelParams.from_preset("pt-v19"), target, days)
+    on = _episode_arm(live(), target, days)
+
+    # 1. Who moved, and by how much: the epicentre's names up, the rest down.
+    epicentre = set(sectors[target])
+    for i in range(len(UNIVERSE)):
+        want = up if i in epicentre else down
+        assert off[0][i] != 0.0
+        assert on[0][i] / off[0][i] == pytest.approx(want, abs=1e-12), i
+
+    # 2. The roster's mean non-market variance, in the base arm's weights.
+    def variance(col):
+        mean = sum(col) / len(col)
+        return sum((x - mean) ** 2 for x in col) / len(col)
+
+    v_off = [variance([d[i] for d in off]) for i in range(len(UNIVERSE))]
+    v_on = [variance([d[i] for d in on]) for i in range(len(UNIVERSE))]
+    held = sum(v_on) / sum(v_off)
+    w_roster = sum(v_off[i] for i in epicentre) / sum(v_off)
+
+    # This roster's own share against the measured one accounts for the whole
+    # of the miss, to four decimals -- so nothing else is moving the roster's
+    # variance over ten sessions: no GARCH feedback, no clamp, no draw.
+    assert held == pytest.approx(
+        w_roster * up * up + (1.0 - w_roster) * down * down, abs=1e-3)
+    assert held == pytest.approx(1.0, abs=0.025)
+    # And what the additive form would have done to the same names with the
+    # same weights: `g^2 = (e^2 - m) / (1 - m)` on the epicentre's names and
+    # one everywhere else. It is the `w = 0` edge of the same solve, and this
+    # is the variance it added to a roster rather than moved within one.
+    m = solve["market_share"]
+    additive = (EXTRA * EXTRA - m) / (1.0 - m)
+    assert w_roster * additive + (1.0 - w_roster) > 1.4
+
+
+def test_an_epicentre_no_name_in_the_roster_is_in_does_nothing():
+    """A drawn sector the roster is not in leaves every name alone.
+
+    The multiples move the roster's crisis variance from one sector to the
+    others. With nobody in the epicentre there is nothing to move it to, and
+    applying `g_down` alone would take a fifth of the roster's crisis
+    variance away and give it to no one -- a market that went QUIETER in a
+    crisis, which is the one thing this mechanism promises not to do. The
+    draw still happened and the episode still reports it; it is the tick that
+    is handed no epicentre.
+    """
+    roster = [u for u in UNIVERSE if u.sector != "financial_services"]
+    assert len(roster) == len(UNIVERSE) - 1
+    sc = Scenario().hold(vix=CRISIS_VIX, epicentre="financial_services")
 
     def go(model):
-        e = engine(model)
+        e = tf.Engine(seed=SEED, universe=list(roster), model=model)
         for day in range(6):
             sc.apply(e, day)
             e.open_market()
             e.run_session(9, 30, 3, TICKS)
             e.close_market()
-        import struct
-        n = len(UNIVERSE)
-        return struct.unpack("<%dd" % n, e.column("price"))
+        return e
 
     off = go(tf.ModelParams.from_preset("pt-v19"))
     on = go(live())
-    moved = {i for i in range(len(UNIVERSE)) if on[i] != off[i]}
-    assert moved == set(sectors[target]), (target, moved, sectors)
+    assert prices(on) == prices(off)
+    # The episode is running and knows what it was pinned to; only the tick
+    # is told there is no epicentre.
+    assert on.crisis_episode == (True, 0, "financial_services")
 
 
-def test_the_multiple_is_the_solve_and_not_the_dial():
-    """`g = sqrt((e^2 - m) / (1 - m))`, with `m` the market factor's measured
-    share. At the derived extra that is 2.3407 and not 1.93.
+def test_the_solved_pair_satisfies_both_equations():
+    """The pair is the answer to the two conditions, to 1e-9.
 
-    Checked through the engine's own arithmetic rather than restated: the
-    extra at which the gain is exactly one is `sqrt(m)`-free, since
-    `e = 1` gives `g^2 = (1 - m) / (1 - m) = 1`.
+    (a) the epicentre's names are `e` times the others in TOTAL volatility,
+    with the market factor's share `m` untouched; (b) the roster's mean
+    non-market variance, the epicentre sector carrying `w` of it, is one.
+    Restating the solve would prove nothing, so this reads the engine's own
+    numbers and puts them back into the two equations they came from.
+    """
+    for extra in (0.61, 1.0, 1.41, EXTRA, 2.43, 3.0, 4.0):
+        s = tf.crisis_epicentre_solve(extra)
+        m, w = s["market_share"], s["sector_share"]
+        up2 = s["gain_up"] ** 2
+        down2 = s["gain_down"] ** 2
+        assert m + (1.0 - m) * up2 == pytest.approx(
+            extra * extra * (m + (1.0 - m) * down2), abs=1e-9), extra
+        assert w * up2 + (1.0 - w) * down2 == pytest.approx(1.0, abs=1e-9), extra
+    # The interval the invariant admits is the interval where both squares
+    # are positive, and at each endpoint one of the two has run out: below,
+    # the epicentre's own non-market variance; above, everyone else's.
+    # Not to the bit: the endpoints are a closed form of their own and the
+    # squares are another, so the two meet at a square rounded to about
+    # 1e-16 and a gain -- its root -- of about 1e-8. Which side of zero that
+    # rounding falls is the only thing separating an admitted endpoint from a
+    # refused one, and a name silenced to 1e-8 is not a value anyone wants
+    # either way: the interval is open, and the invariant refuses everything
+    # past it.
+    ends = tf.crisis_epicentre_solve(EXTRA)
+    assert tf.crisis_epicentre_solve(ends["extra_min"])["gain_up"] < 1e-7
+    assert tf.crisis_epicentre_solve(ends["extra_max"])["gain_down"] < 1e-7
+
+
+def test_the_multiples_are_the_solve_and_not_the_dial():
+    """The pair solves the tape's ratio and the conservation together, so at
+    the derived extra the epicentre's names carry 2.0367 on their non-market
+    parts and every other name 0.8017 -- neither of them 1.93.
+
+    Checked through the engine's own arithmetic rather than restated: an
+    extra of exactly one has to give exactly one BOTH ways, and the solve is
+    spelled so that it does to the bit.
     """
     e = engine(live(crisis_epicentre_extra=1.0))
     sectors = _by_sector(e)
@@ -336,19 +466,28 @@ def test_the_multiple_is_the_solve_and_not_the_dial():
         e.close_market()
     off = run_days(engine(tf.ModelParams.from_preset("pt-v19")),
                    [CRISIS_VIX] * 4)
-    # An extra of exactly 1.0 solves to a gain of exactly 1.0, so the
-    # epicentre's names are multiplied by one -- and the whole market is
-    # bit-identical to the mechanism switched off.
+    # An extra of exactly 1.0 solves to a PAIR of exactly 1.0, so the
+    # epicentre's names and everyone else's are multiplied by one -- and the
+    # whole market is bit-identical to the mechanism switched off.
     assert prices(e) == prices(off)
 
 
-def test_an_extra_under_the_market_share_is_refused():
-    """The market factor carries 0.3916 of a name's variance and is not
-    scaled, so an extra at or below sqrt(0.3916) asks the non-market parts to
-    carry a negative variance. Refused where it is set, not at the tick."""
-    with pytest.raises(Exception) as caught:
-        tf.ModelParams.from_preset("pt-v19", crisis_epicentre_extra=0.5)
-    assert "crisis_epicentre_extra" in str(caught.value)
+def test_an_extra_outside_the_solve_s_interval_is_refused():
+    """Both ends, and there are two ends because the mechanism moves both
+    ways. Under 0.6052 the epicentre's own non-market variance would have to
+    be negative; over 4.0307 everyone else's would, since the roster's mean
+    is held. Refused where it is set, not at the tick."""
+    ends = tf.crisis_epicentre_solve(EXTRA)
+    assert ends["extra_min"] == pytest.approx(0.6052, abs=1e-4)
+    assert ends["extra_max"] == pytest.approx(4.0307, abs=1e-4)
+    for bad in (0.5, 5.0):
+        with pytest.raises(Exception) as caught:
+            tf.ModelParams.from_preset("pt-v19", crisis_epicentre_extra=bad)
+        assert "crisis_epicentre_extra" in str(caught.value)
+    # And the interval is open at both ends but wide enough for everything
+    # the record asks for: the derived 1.93 and the tape's largest episode.
+    for good in (0.61, 1.0, EXTRA, 2.43, 3.0):
+        tf.ModelParams.from_preset("pt-v19", crisis_epicentre_extra=good)
 
 
 # ---------------------------------------------------------------------------

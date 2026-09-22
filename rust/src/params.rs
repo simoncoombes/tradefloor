@@ -3705,11 +3705,34 @@ pub struct ModelParams {
     /// remainder and a draw in its own right, on
     /// [`crate::rng::stream::CRISIS_EPICENTRE`]. While the episode runs,
     /// the names in that sector carry an extra multiple on the parts of
-    /// their return that are NOT the market factor: the sector leg and
+    /// their return that are NOT the market factor -- the sector leg and
     /// their own idiosyncratic noise, both in
-    /// `market::factors::calculate_live_factors`. The market component is
-    /// untouched, so the index, the VIX and the fear rows do not move --
-    /// only who carries the crisis moves.
+    /// `market::factors::calculate_live_factors` -- and every OTHER name
+    /// carries a multiple below one on the same two parts. The market
+    /// component is untouched, so the index, the VIX and the fear rows do
+    /// not move -- only who carries the crisis moves.
+    ///
+    /// # It redistributes rather than adds
+    ///
+    /// The second multiple is what makes this dial a statement about WHO
+    /// carries a crisis and not a statement about how large crises are. At a
+    /// given VIX the roster's total crisis variance is the VIX's to set:
+    /// `crisis_blend_*`, the GARCH and the market factor set it, and this
+    /// dial has no business moving it. So the pair of multiples is solved
+    /// under a conservation condition -- the roster's MEAN non-market
+    /// variance is unchanged -- alongside the tape's ratio.
+    ///
+    /// It was built the other way first, on 2026-09-22: the epicentre's
+    /// names were lifted and no one was lowered. That arm moved the row it
+    /// was built for (`crisis_sector_dispersion` 1.15 to 1.39 against the
+    /// tape's 1.34 at two years) and moved three rows away with it --
+    /// `annualised_vol_pct` 24.3 to 25.5 against 23.7,
+    /// `cross_sectional_corr` 0.330 to 0.314 against 0.353,
+    /// `volume_abs_return_corr` 0.535 to 0.545 -- and the three were one
+    /// cause: a roster whose total crisis variance had risen. It was refused
+    /// (`results/ptv19epi2`, design repository). The additive arm is kept as
+    /// the `w = 0` edge of this solve rather than as a second form; see
+    /// [`crate::market::factors::CRISIS_EPICENTRE_SECTOR_SHARE`].
     ///
     /// # Derivation
     ///
@@ -3725,24 +3748,33 @@ pub struct ModelParams {
     /// have none. The MEDIAN of the three ratios is 1.93, and that is this
     /// dial: nothing was fitted to a graded row.
     ///
-    /// # The multiple the code applies, and why it is not this number
+    /// # The multiples the code applies, and why neither is this number
     ///
     /// This dial is stated on a name's TOTAL volatility, which is what the
     /// tape measures. The code can only scale the non-market parts, so the
-    /// multiple applied to them is solved from the market factor's share of
-    /// a name's variance:
+    /// pair applied to them is solved from two measured shares: `m`, the
+    /// market factor's share of a name's variance, and `w`, the epicentre
+    /// sector's share of the roster's non-market variance.
     ///
     /// ```text
-    /// e^2 = m + (1 - m) g^2        so        g = sqrt((e^2 - m) / (1 - m))
+    /// (a)  m + (1 - m) g_up^2  =  e^2 ( m + (1 - m) g_down^2 )
+    /// (b)  w g_up^2 + (1 - w) g_down^2  =  1
+    ///
+    /// g_down^2 = [ (1 - m) - m w A ] / [ (1 - m) (1 + w A) ]   , A = e^2 - 1
+    /// g_up^2   = m A / (1 - m) + e^2 g_down^2
     /// ```
     ///
-    /// `m` is [`CRISIS_EPICENTRE_MARKET_SHARE`], MEASURED on the composed
-    /// pt-v19 and recorded there with its arithmetic. At `m = 0.3916` and
-    /// `e = 1.93` that is `g^2 = (3.7249 - 0.3916) / 0.6084 = 5.4789`,
-    /// `g = 2.3407`. See
-    /// [`crate::market::factors::crisis_epicentre_gain`], which is where
-    /// the solve lives and where the guard against an `e` below `sqrt(m)`
-    /// sits.
+    /// `m` is [`CRISIS_EPICENTRE_MARKET_SHARE`] and `w` is
+    /// [`CRISIS_EPICENTRE_SECTOR_SHARE`], both MEASURED on the composed
+    /// pt-v19 and recorded there with their recipes. At `m = 0.3916`,
+    /// `w = 0.1019` and `e = 1.93` that is `g_down^2 = 0.4996655 /
+    /// 0.7773328 = 0.642795`, `g_down = 0.801745`, and `g_up^2 = 1.753897 +
+    /// 2.394346 = 4.148243`, `g_up = 2.036724`. See
+    /// [`crate::market::factors::crisis_epicentre_gains`], which is where
+    /// the solve lives, and
+    /// [`crate::market::factors::crisis_epicentre_extra_bounds`], which is
+    /// where the two extras that would ask a name for a negative variance
+    /// sit -- 0.6052 below and 4.0307 above.
     ///
     /// # What it is NOT
     ///
@@ -3752,6 +3784,19 @@ pub struct ModelParams {
     /// internal correlation -- which is what an epicentre is -- and the
     /// idiosyncratic leg is lifted beside it so the split between the two
     /// is the one the name already had.
+    ///
+    /// It is not meant to be a volatility dial either, and that is what the
+    /// conservation condition buys: the roster's mean non-market INNOVATION
+    /// variance is the same at any extra, to the bit. What a long run
+    /// realises is not, because the per-name GARCH is convex in what it is
+    /// fed and gives some of it back;
+    /// [`crate::market::factors::crisis_epicentre_gains`] measures how much
+    /// and says why moving `w` to chase it would be fitting.
+    ///
+    /// An epicentre no name in the roster is in does nothing at all, and
+    /// `Engine::crisis_epicentre_key` is where that is decided: the draw
+    /// still happened and the episode still reports it, but with nobody to
+    /// move the variance TO there is nothing for the tick to do with it.
     pub crisis_epicentre_extra: f64,
     /// How many consecutive sessions under `crisis_vix_threshold` end a
     /// crisis episode. 21 ships, which is a month of sessions.
@@ -6425,20 +6470,31 @@ impl ModelParams {
                  so a non-zero sigma would be a dial that reads as live and does nothing.",
                 self.vix_level_sigma));
         }
-        if self.crisis_epicentre_extra != 0.0
-            && !(self.crisis_epicentre_extra
-                > crate::mathx::sqrt(crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE))
-        {
-            return Err(format!(
-                "crisis_epicentre_extra is {}. It is a multiple on the epicentre names' \
-                 TOTAL volatility, and the market factor already carries {} of a name's \
-                 variance and is not scaled, so an extra at or below sqrt({}) = {} asks \
-                 the non-market parts to carry a negative variance. Set it above that, \
-                 or to 0.0, where the mechanism does not run.",
-                self.crisis_epicentre_extra,
-                crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE,
-                crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE,
-                crate::mathx::sqrt(crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE)));
+        if self.crisis_epicentre_extra != 0.0 {
+            // BOTH squares, because the mechanism now moves both ways: the
+            // epicentre's names up and the rest of the roster down, with the
+            // roster's mean non-market variance held. So there is a floor
+            // AND a ceiling, and asking the solve which one was hit is
+            // better than restating its algebra here and letting the two
+            // drift apart.
+            let (up2, down2) = crate::market::factors::crisis_epicentre_gain_squares(
+                self.crisis_epicentre_extra);
+            let (lo, hi) = crate::market::factors::crisis_epicentre_extra_bounds();
+            if !(up2 > 0.0 && down2 > 0.0) {
+                return Err(format!(
+                    "crisis_epicentre_extra is {}. It is a multiple on the epicentre \
+                     names' TOTAL volatility, the market factor carries {} of a name's \
+                     variance and is not scaled, and the epicentre sector carries {} of \
+                     the roster's non-market variance, whose mean the solve holds -- so \
+                     the solved squares are ({}, {}) and an extra outside ({}, {}) asks \
+                     a name for a negative variance: below it the epicentre's own \
+                     non-market parts, above it every other name's. Set it inside that \
+                     interval, or to 0.0, where the mechanism does not run.",
+                    self.crisis_epicentre_extra,
+                    crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE,
+                    crate::market::factors::CRISIS_EPICENTRE_SECTOR_SHARE,
+                    up2, down2, lo, hi));
+            }
         }
         if self.vix_level_loop_gain != 0.0 && !(self.vix_level_loop_gain > 0.0) {
             return Err(format!(
