@@ -1361,27 +1361,33 @@ def test_the_committed_recording_replays_end_to_end():
     # quietly and only exact numbers catch it.
     #
     # The eras of this fixture, on the same seed, roster and brief: pt-v16
-    # 3 trades, pt-v18 7, pt-v19 7. The market moved under the model each
-    # time and the model answered it differently; none of them is a better
-    # agent than the others.
-    assert card.trades == 7, card.trades
-    assert card.pnl == pytest.approx(14495.0), card.pnl
-    assert card.turnover == pytest.approx(2566815.0), card.turnover
+    # 3 trades, pt-v18 7, pt-v19 as first composed 7, pt-v19 recomposed a
+    # fourth time 8. The market moved under the model each time and the
+    # model answered it differently; none of them is a better agent than
+    # the others.
+    #
+    # The values replaced by the fourth composition, kept beside the new
+    # ones so a future move can be recognised as the next one and not as
+    # the first: trades 7, pnl 14495.0, turnover 2566815.0.
+    assert card.trades == 8, card.trades
+    assert card.pnl == pytest.approx(24410.0), card.pnl
+    assert card.turnover == pytest.approx(2611910.0), card.turnover
 
-    # AND THE REFUSAL IS BACK, once, which is a fact about this market and
+    # AND THE REFUSAL IS GONE AGAIN, which is a fact about this market and
     # not a bug. gpt-5.2 sized inside the limits on pt-v18's market and the
-    # pt-v18 recording had nothing to refuse; on pt-v19 it asked for 2.06x
-    # against a 2.00x cap on day 4, and the MARKET refused that leg. That
-    # is the environment doing its job on a decision the agent made, not a
-    # replay failure.
+    # pt-v18 recording had nothing to refuse; on pt-v19 as first composed it
+    # asked for 2.06x against a 2.00x cap on day 4 and the MARKET refused
+    # that leg; on the recomposed pt-v19 it stayed inside the cap every day
+    # and there is nothing to refuse. Each of those is the environment doing
+    # its job on a decision the agent made, not a replay failure.
     #
     # Pinned exactly rather than bounded, and the reason both lines exist:
     # a replay failure lands in this same list, so counting the refusals is
-    # not enough -- the second assertion says every entry is a leverage
-    # refusal, which a missing-digest error is not.
-    assert card.rejected == 1, card.errors
-    assert len(card.errors) == 1 and all(
-        "leverage" in e for e in card.errors), card.errors
+    # not enough -- the second assertion says the list is EMPTY, which a
+    # missing-digest error would not leave it. Previously: rejected 1, one
+    # leverage refusal.
+    assert card.rejected == 0, card.errors
+    assert card.errors == [], card.errors
 
 
 @needs_fixture

@@ -60,15 +60,17 @@ two adapters:
 
 | example | trades | return | impact |
 |---|---|---|---|
-| [`callable/five_days.py`](callable/five_days.py) | 3 | +1.47% | +0.47 bps |
-| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 3 | +1.47% | +0.47 bps |
-| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 3 | +5.78% | +1.55 bps |
-| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 1 | +0.62% | +18.99 bps |
+| [`callable/five_days.py`](callable/five_days.py) | 2 | +1.20% | +0.47 bps |
+| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 2 | +1.20% | +0.47 bps |
+| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 2 | +4.77% | -0.27 bps |
+| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 1 | +0.63% | +25.71 bps |
 
 Re-measured at 0.8.0, where the default preset moved to pt-v19 and every
-price in these markets moved with it -- and measured again when pt-v19
-itself was recomposed, adopting the slow variance level and a new sector
-loading. Nothing else about these examples changed: the rule, the rosters,
+price in these markets moved with it -- and measured again each time pt-v19
+was recomposed, most recently at the fourth composition and its conserving
+crisis epicentre. The rows replaced there were callable and openai_agents
+3 trades +1.47%, pydantic_ai 3 trades +5.78% +1.55 bps, and langgraph
++0.62% +18.99 bps. Nothing else about these examples changed: the rule, the rosters,
 the seed and the horizons are the ones 0.7.0 shipped, so every difference
 in the table above is the market and not the demonstration.
 
@@ -77,9 +79,9 @@ choice 0.7.0 made and this release keeps. They share one mean-reversion
 rule that acts on a five-day move past two per cent, and on a five-day run
 it gets a single usable reading -- which was enough on pt-v16's market and
 was not on pt-v18's, whose worst five-day fall over this roster is 1.85 per
-cent. Measured again on the recomposed pt-v19: five days trades not at
-all, ten days three times, so ten still gives the rule the readings five
-does not. The rule is
+cent. Measured again on the fourth composition of pt-v19: five days
+trades not at all, ten days twice, so ten still gives the rule the
+readings five does not. The rule is
 untouched, because lowering its trigger until this market tripped it would
 be fitting the demonstration to the market, and the trigger is the thing
 being demonstrated. The two recorded MODEL runs still use five days: a

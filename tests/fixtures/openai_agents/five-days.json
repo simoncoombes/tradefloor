@@ -23,14 +23,203 @@
     "max_participation": 0.02,
     "renderer": "json",
     "model_preset": "pt-v19",
-    "recorded_utc": "2026-09-12T18:51:22+00:00"
+    "model_preset_vector": {
+      "name": "pt-v19",
+      "book_levels": 10.0,
+      "buyback_payout_share": 0.3333333333333333,
+      "cascade_symmetry": 1.0,
+      "crash_amplifier_conditional_sigma": 1.0,
+      "crash_amplifier_slope": 0.2,
+      "crash_amplifier_threshold": 2.0,
+      "crisis_blend_cap": 0.98,
+      "crisis_blend_gain": 0.0,
+      "crisis_blend_ramp": 1.4,
+      "crisis_blend_source": 1.0,
+      "crisis_blend_variance_damp": 0.0,
+      "crisis_epicentre_end_sessions": 21.0,
+      "crisis_epicentre_extra": 1.93,
+      "crisis_vix_threshold": 30.88325108,
+      "crowd_lean_cap": 0.02,
+      "crowd_momentum_gain": 0.02,
+      "crowd_valuation_gain": 0.006,
+      "cycle_hazard_per_month": 1.0,
+      "cycle_stationary_opening": 0.0,
+      "daily_credit_floor_gain": 1.0,
+      "daily_shock_cap": 0.15,
+      "default_sector_anchor_pe": 18.0,
+      "earnings_nominal_growth": 1.0,
+      "endogenous_news_intensity": 0.05,
+      "endogenous_news_sigma": 0.01751004376,
+      "fair_value_book_floor": 0.0,
+      "fair_value_floor": 0.01,
+      "fiscal_multiplier": 0.3,
+      "forced_flow_beta_exponent": 0.0,
+      "forced_flow_gain": 0.0,
+      "forced_flow_replenish": 0.0,
+      "forced_flow_reservoir": 0.0,
+      "forced_flow_threshold": 40.0,
+      "garch_alpha": 0.059507211981547736,
+      "garch_beta": 0.7905,
+      "garch_beta_dispersion": 0.0,
+      "garch_cascade_components": 0.0,
+      "garch_cascade_ratio": 3.0,
+      "garch_cascade_weight": 1.0,
+      "garch_ceiling_multiple": 5.0,
+      "garch_floor_multiple": 0.25,
+      "garch_gamma": 0.18318536187800277,
+      "garch_innovation_commensurate": 0.0,
+      "garch_omega": 2e-06,
+      "garch_omega_sector_scaled": 0.0,
+      "garch_vix_coupling": 0.14219611,
+      "garch_vix_exponent": 2.0,
+      "gold_equilibrium_base": 2200.0,
+      "gold_mean_reversion": 0.002,
+      "growth_duration_scale": 2.0,
+      "idio_sigma_beta_exponent": 0.0,
+      "idio_sigma_floor": 0.0001,
+      "idio_sigma_scale": 0.5125981926,
+      "inflation_ceiling": 6.0,
+      "inflation_floor": -1.0,
+      "inflation_reversion": 0.55,
+      "inflation_target": 2.0,
+      "informed_flow_fraction": 0.35,
+      "inventory_limit_levels": 12.0,
+      "jump_idio_excitation": 0.0,
+      "jump_idio_excitation_decay": 0.0,
+      "jump_idio_vix_decoupled": 0.0,
+      "jump_intensity_idio": 0.0068895346,
+      "jump_intensity_market": 0.0565753337,
+      "jump_market_variance_share": 0.0,
+      "jump_mean_compensated": 1.0,
+      "jump_mean_market": -0.008521833617959641,
+      "jump_momentum_share": 0.0,
+      "jump_sigma_idio": 0.0752080062,
+      "jump_sigma_market": 0.0024597567320385947,
+      "jump_vix_coupling": 0.2626,
+      "loss_making_price_to_book": 1.2,
+      "macro_burn_in_days": 755.0,
+      "market_beta_down_asym": 0.025,
+      "market_beta_down_asym_lag": 0.375,
+      "market_beta_down_asym_recentre": 1.0,
+      "market_burn_in_sessions": 0.0,
+      "market_factor_sigma": 0.007593024924589399,
+      "market_idio_down_suppress": 0.0,
+      "market_vol_alpha": 0.0066,
+      "market_vol_alpha_excursion": 0.0,
+      "market_vol_beta": 0.8946,
+      "market_vol_ceiling_multiple": 32.0,
+      "market_vol_floor_multiple": 0.05,
+      "market_vol_gamma": 0.1556,
+      "market_vol_level_persistence": 0.0,
+      "market_vol_level_sigma": 0.0,
+      "market_vol_slow_gain": 0.05,
+      "market_vol_slow_persistence": 0.9913,
+      "market_vol_slow_vix_damp": 0.374,
+      "market_vol_slow_weight": 0.35,
+      "market_vol_vix_anchor": 15.98426471,
+      "market_vol_vix_coupling": 0.9540498202999739,
+      "market_vol_vix_excursion": 1.0,
+      "market_vol_vix_exponent": 4.9,
+      "market_vol_vix_smooth": 0.0,
+      "mispricing_cap": 0.9,
+      "mispricing_half_life_days": 60.0,
+      "mispricing_phi": 0.9885140203528962,
+      "momentum_theta": 0.018551562499999993,
+      "neutral_discount_rate": 0.0482,
+      "news_market_weight": 0.3,
+      "news_peer_vix_coupling": 8.0,
+      "news_peer_weight": 0.05,
+      "news_peer_weight_down": 0.05,
+      "news_sector_weight": 0.5,
+      "oil_baseline": 75.0,
+      "oil_opec_symmetry": 1.0,
+      "oil_seasonality_target": 1.0,
+      "oil_supply_response": 1.0,
+      "order_flow_coefficient": 50.0,
+      "order_flow_impact_law": 0.0,
+      "overnight_variance_ratio": 0.0,
+      "phase_target_range_draw": 0.0,
+      "phillips_curve_coeff": 0.2,
+      "price_breaker_fraction": 0.25,
+      "price_hard_cap": 50000.0,
+      "qe_pe_gain": 0.0,
+      "qe_pe_stock_gain": 0.0,
+      "rate_adjustment_floor": 0.5,
+      "rate_pe_sensitivity": 1.5,
+      "regime_stress_points": 0.0,
+      "s_phi_tick": 0.9999703787643346,
+      "sector_daily_sigma_consumer_discretionary": 0.018,
+      "sector_daily_sigma_consumer_staples": 0.008,
+      "sector_daily_sigma_energy": 0.015,
+      "sector_daily_sigma_financial_services": 0.015,
+      "sector_daily_sigma_healthcare": 0.018,
+      "sector_daily_sigma_industrials": 0.015,
+      "sector_daily_sigma_materials": 0.015,
+      "sector_daily_sigma_real_estate": 0.008,
+      "sector_daily_sigma_technology": 0.025,
+      "sector_daily_sigma_telecommunications": 0.01,
+      "sector_daily_sigma_transportation": 0.015,
+      "sector_daily_sigma_utilities": 0.008,
+      "sector_factor_sigma": 0.008583053614,
+      "sector_loading": 0.6,
+      "sector_loading_beta_slope": 0.7,
+      "sector_vix_coupling": 1.0,
+      "sector_vol_alpha": 0.067,
+      "sector_vol_beta": 0.837,
+      "size_effect_exponent": 0.15,
+      "size_effect_smoothness": 0.0,
+      "spread_size_exponent": 0.455,
+      "spread_size_smoothness": 0.0,
+      "trough_growth_floor": 0.0,
+      "universe_stress_decay": 0.0,
+      "universe_stress_weight": 0.0,
+      "usd_crisis_vix_threshold": 25.5,
+      "vix_ceiling": 181.3295,
+      "vix_cycle_amplitude": 0.85,
+      "vix_decay_ratio": 1.0,
+      "vix_innovation_return_sigma": 0.0175,
+      "vix_innovation_sigma": 0.0,
+      "vix_jump_intensity": 0.0,
+      "vix_jump_level_scale": 1.7,
+      "vix_jump_return_intensity": 6.199,
+      "vix_jump_scale": 0.0,
+      "vix_level_identity": 1.0,
+      "vix_level_loop_gain": 2.4684,
+      "vix_level_persistence": 0.9979,
+      "vix_level_sigma": 0.0173,
+      "vix_mean_reversion": 0.27,
+      "vix_realised_vol_weight": 0.3,
+      "vix_return_clamp": 15.0,
+      "vix_return_exponent": 1.4483,
+      "vix_return_exponent_up": 0.5433,
+      "vix_return_gain": 8.83,
+      "vix_return_gain_up": 0.049,
+      "vix_return_level_exponent": 0.4483,
+      "vix_return_level_exponent_up": -1.0,
+      "vix_return_source": 1.0,
+      "vix_target_offset": 0.0,
+      "vix_target_shock_cap": 158.8524,
+      "vix_variance_premium": 0.252,
+      "volume_idio_persistence": 0.0,
+      "volume_idio_sigma": 0.0,
+      "volume_idio_variance_gain": 0.2,
+      "volume_innovation_sigma": 0.21,
+      "volume_move_cap": 12.0,
+      "volume_move_floor": 0.6,
+      "volume_move_jump_share": 1.0,
+      "volume_move_noise": 0.2,
+      "volume_move_response": 1.0,
+      "volume_persistence": 0.7,
+      "volume_variance_gain": 0.028403829887593345
+    },
+    "recorded_utc": "2026-09-22T14:24:02+00:00"
   },
   "entries": [
     {
       "arm": "live",
       "step": 0,
       "day": 0,
-      "digest": "7aef12ad6ffd62b4",
+      "digest": "32c522c4ae3fca8f",
       "prompt": [
         {
           "role": "user",
@@ -38,16 +227,16 @@
         },
         {
           "role": "user",
-          "content": "{\n  \"assets\": [\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 140.03,\n      \"best_bid\": 139.97,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 140.0,\n      \"return_1d\": null,\n      \"return_5d\": null,\n      \"symbol\": \"TECH_A\",\n      \"volatility\": null\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 95.03,\n      \"best_bid\": 94.97,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 95.0,\n      \"return_1d\": null,\n      \"return_5d\": null,\n      \"symbol\": \"TECH_B\",\n      \"volatility\": null\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 60.02,\n      \"best_bid\": 59.98,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 60.0,\n      \"return_1d\": null,\n      \"return_5d\": null,\n      \"symbol\": \"BANK_A\",\n      \"volatility\": null\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 48.01,\n      \"best_bid\": 47.99,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 48.0,\n      \"return_1d\": null,\n      \"return_5d\": null,\n      \"symbol\": \"STAPLE_A\",\n      \"volatility\": null\n    }\n  ],\n  \"day\": 0,\n  \"macro\": {\n    \"corporate_bond_yield\": 0.055289698668993935,\n    \"cycle\": \"expansion\",\n    \"federal_funds_rate\": 0.03,\n    \"inflation_rate\": 0.028221465682935133,\n    \"vix\": 24.327631773317236\n  },\n  \"portfolio\": {\n    \"buying_power\": 2000000.0,\n    \"cash\": 1000000.0,\n    \"gross_exposure\": 0.0,\n    \"max_leverage\": 2.0,\n    \"net_worth\": 1000000.0\n  },\n  \"step\": 0,\n  \"steps_per_day\": 6\n}"
+          "content": "{\n  \"assets\": [\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 140.03,\n      \"best_bid\": 139.97,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 140.0,\n      \"return_1d\": null,\n      \"return_5d\": null,\n      \"symbol\": \"TECH_A\",\n      \"volatility\": null\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 95.03,\n      \"best_bid\": 94.97,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 95.0,\n      \"return_1d\": null,\n      \"return_5d\": null,\n      \"symbol\": \"TECH_B\",\n      \"volatility\": null\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 60.02,\n      \"best_bid\": 59.98,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 60.0,\n      \"return_1d\": null,\n      \"return_5d\": null,\n      \"symbol\": \"BANK_A\",\n      \"volatility\": null\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 48.01,\n      \"best_bid\": 47.99,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 48.0,\n      \"return_1d\": null,\n      \"return_5d\": null,\n      \"symbol\": \"STAPLE_A\",\n      \"volatility\": null\n    }\n  ],\n  \"day\": 0,\n  \"macro\": {\n    \"corporate_bond_yield\": 0.04926270037160317,\n    \"cycle\": \"expansion\",\n    \"federal_funds_rate\": 0.025,\n    \"inflation_rate\": 0.028094267190621164,\n    \"vix\": 22.501518578342424\n  },\n  \"portfolio\": {\n    \"buying_power\": 2000000.0,\n    \"cash\": 1000000.0,\n    \"gross_exposure\": 0.0,\n    \"max_leverage\": 2.0,\n    \"net_worth\": 1000000.0\n  },\n  \"step\": 0,\n  \"steps_per_day\": 6\n}"
         }
       ],
-      "response": "{\"actions\":[],\"rationale\":\"No return/volatility history yet and no fundamentals signals; with elevated macro uncertainty (higher VIX) it\u2019s better to wait for initial price/return data rather than force exposure on day 0.\"}"
+      "response": "{\"actions\":[],\"rationale\":\"Day 0 provides no returns, volatility, or fundamentals to form an edge, so taking risk would be arbitrary. With VIX moderate and ample buying power, I\u2019ll wait for price/return data to buy weakness or trim strength with better risk control.\"}"
     },
     {
       "arm": "live",
       "step": 6,
       "day": 1,
-      "digest": "c1096bf2281eb936",
+      "digest": "cfce0ff5f700ff0c",
       "prompt": [
         {
           "role": "user",
@@ -55,16 +244,16 @@
         },
         {
           "role": "user",
-          "content": "{\n  \"assets\": [\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 142.6,\n      \"best_bid\": 142.54,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 142.56,\n      \"return_1d\": 0.01828571428571424,\n      \"return_5d\": 0.01828571428571424,\n      \"symbol\": \"TECH_A\",\n      \"volatility\": 0.007165005149403689\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 93.48,\n      \"best_bid\": 93.41,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 93.46,\n      \"return_1d\": -0.016210526315789564,\n      \"return_5d\": -0.016210526315789564,\n      \"symbol\": \"TECH_B\",\n      \"volatility\": 0.005257327748517795\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 59.62,\n      \"best_bid\": 59.58,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 59.59,\n      \"return_1d\": -0.006833333333333247,\n      \"return_5d\": -0.006833333333333247,\n      \"symbol\": \"BANK_A\",\n      \"volatility\": 0.0035391774221138626\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 48.37,\n      \"best_bid\": 48.34,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 48.35,\n      \"return_1d\": 0.007291666666666696,\n      \"return_5d\": 0.007291666666666696,\n      \"symbol\": \"STAPLE_A\",\n      \"volatility\": 0.008924161067750506\n    }\n  ],\n  \"day\": 1,\n  \"macro\": {\n    \"corporate_bond_yield\": 0.055289698668993935,\n    \"cycle\": \"expansion\",\n    \"federal_funds_rate\": 0.03,\n    \"inflation_rate\": 0.028221465682935133,\n    \"vix\": 23.516460411334347\n  },\n  \"portfolio\": {\n    \"buying_power\": 2000000.0,\n    \"cash\": 1000000.0,\n    \"gross_exposure\": 0.0,\n    \"max_leverage\": 2.0,\n    \"net_worth\": 1000000.0\n  },\n  \"step\": 6,\n  \"steps_per_day\": 6\n}"
+          "content": "{\n  \"assets\": [\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 142.28,\n      \"best_bid\": 142.23,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 142.24,\n      \"return_1d\": 0.016000000000000014,\n      \"return_5d\": 0.016000000000000014,\n      \"symbol\": \"TECH_A\",\n      \"volatility\": 0.006719222443484074\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 93.33,\n      \"best_bid\": 93.26,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 93.31,\n      \"return_1d\": -0.017789473684210466,\n      \"return_5d\": -0.017789473684210466,\n      \"symbol\": \"TECH_B\",\n      \"volatility\": 0.005071120411928403\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 59.59,\n      \"best_bid\": 59.55,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 59.56,\n      \"return_1d\": -0.007333333333333303,\n      \"return_5d\": -0.007333333333333303,\n      \"symbol\": \"BANK_A\",\n      \"volatility\": 0.00386647813231323\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 48.35,\n      \"best_bid\": 48.32,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 48.33,\n      \"return_1d\": 0.0068749999999999645,\n      \"return_5d\": 0.0068749999999999645,\n      \"symbol\": \"STAPLE_A\",\n      \"volatility\": 0.00805860937080303\n    }\n  ],\n  \"day\": 1,\n  \"macro\": {\n    \"corporate_bond_yield\": 0.04926270037160317,\n    \"cycle\": \"expansion\",\n    \"federal_funds_rate\": 0.025,\n    \"inflation_rate\": 0.028094267190621164,\n    \"vix\": 22.4488766005297\n  },\n  \"portfolio\": {\n    \"buying_power\": 2000000.0,\n    \"cash\": 1000000.0,\n    \"gross_exposure\": 0.0,\n    \"max_leverage\": 2.0,\n    \"net_worth\": 1000000.0\n  },\n  \"step\": 6,\n  \"steps_per_day\": 6\n}"
         }
       ],
-      "response": "{\"actions\":[{\"symbol\":\"TECH_A\",\"side\":\"SELL\",\"quantity\":0.0},{\"symbol\":\"TECH_B\",\"side\":\"BUY\",\"quantity\":10000.0},{\"symbol\":\"BANK_A\",\"side\":\"BUY\",\"quantity\":12000.0},{\"symbol\":\"STAPLE_A\",\"side\":\"SELL\",\"quantity\":0.0}],\"rationale\":\"Buy weakness in TECH_B and BANK_A given negative 1d/5d returns and relatively low vol, while avoiding chasing TECH_A strength; sizes stay well within max_order_shares and available buying power.\"}"
+      "response": "{\"actions\":[{\"symbol\":\"TECH_B\",\"side\":\"BUY\",\"quantity\":8000.0},{\"symbol\":\"BANK_A\",\"side\":\"BUY\",\"quantity\":12000.0}],\"rationale\":\"Buy weakness in the two decliners with relatively lower volatility, keeping sizing modest to control downside and well within both max_order_shares and available buying power.\"}"
     },
     {
       "arm": "live",
       "step": 12,
       "day": 2,
-      "digest": "09cc547d2b76d2ce",
+      "digest": "5e100120ac3c42c3",
       "prompt": [
         {
           "role": "user",
@@ -72,16 +261,16 @@
         },
         {
           "role": "user",
-          "content": "{\n  \"assets\": [\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 141.49,\n      \"best_bid\": 141.43,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 141.47,\n      \"return_1d\": -0.007645903479236882,\n      \"return_5d\": 0.010499999999999954,\n      \"symbol\": \"TECH_A\",\n      \"volatility\": 0.007912049291248103\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 94.5,\n      \"best_bid\": 94.44,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 10000.0,\n      \"price\": 94.47,\n      \"return_1d\": 0.01080676225123045,\n      \"return_5d\": -0.005578947368421017,\n      \"symbol\": \"TECH_B\",\n      \"volatility\": 0.005366797079028182\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 59.55,\n      \"best_bid\": 59.51,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 12000.0,\n      \"price\": 59.54,\n      \"return_1d\": -0.0008390669575433218,\n      \"return_5d\": -0.0076666666666667105,\n      \"symbol\": \"BANK_A\",\n      \"volatility\": 0.004891486664923031\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 48.54,\n      \"best_bid\": 48.51,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 48.53,\n      \"return_1d\": 0.0037228541882110555,\n      \"return_5d\": 0.011041666666666616,\n      \"symbol\": \"STAPLE_A\",\n      \"volatility\": 0.007347990430995655\n    }\n  ],\n  \"day\": 2,\n  \"macro\": {\n    \"corporate_bond_yield\": 0.055289698668993935,\n    \"cycle\": \"expansion\",\n    \"federal_funds_rate\": 0.03,\n    \"inflation_rate\": 0.028221465682935133,\n    \"vix\": 23.288020691265523\n  },\n  \"portfolio\": {\n    \"buying_power\": 358700.0,\n    \"cash\": -650240.0,\n    \"gross_exposure\": 1.6444783634309275,\n    \"max_leverage\": 2.0,\n    \"net_worth\": 1008940.0\n  },\n  \"step\": 12,\n  \"steps_per_day\": 6\n}"
+          "content": "{\n  \"assets\": [\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 141.82,\n      \"best_bid\": 141.77,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 141.8,\n      \"return_1d\": -0.003093363329583765,\n      \"return_5d\": 0.0128571428571429,\n      \"symbol\": \"TECH_A\",\n      \"volatility\": 0.007362694468241807\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 94.66,\n      \"best_bid\": 94.6,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 8000.0,\n      \"price\": 94.63,\n      \"return_1d\": 0.014146393741292451,\n      \"return_5d\": -0.003894736842105284,\n      \"symbol\": \"TECH_B\",\n      \"volatility\": 0.005567566793128367\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 59.61,\n      \"best_bid\": 59.57,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 12000.0,\n      \"price\": 59.6,\n      \"return_1d\": 0.000671591672263272,\n      \"return_5d\": -0.006666666666666599,\n      \"symbol\": \"BANK_A\",\n      \"volatility\": 0.004792120651402518\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 48.56,\n      \"best_bid\": 48.53,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 48.55,\n      \"return_1d\": 0.004552038071591102,\n      \"return_5d\": 0.011458333333333348,\n      \"symbol\": \"STAPLE_A\",\n      \"volatility\": 0.006813284841753346\n    }\n  ],\n  \"day\": 2,\n  \"macro\": {\n    \"corporate_bond_yield\": 0.04926270037160317,\n    \"cycle\": \"expansion\",\n    \"federal_funds_rate\": 0.025,\n    \"inflation_rate\": 0.028094267190621164,\n    \"vix\": 22.129817506311102\n  },\n  \"portfolio\": {\n    \"buying_power\": 548800.0,\n    \"cash\": -461720.0,\n    \"gross_exposure\": 1.456913272374619,\n    \"max_leverage\": 2.0,\n    \"net_worth\": 1010520.0\n  },\n  \"step\": 12,\n  \"steps_per_day\": 6\n}"
         }
       ],
-      "response": "{\"actions\":[{\"symbol\":\"TECH_B\",\"side\":\"SELL\",\"quantity\":2000.0},{\"symbol\":\"BANK_A\",\"side\":\"BUY\",\"quantity\":3000.0},{\"symbol\":\"TECH_A\",\"side\":\"BUY\",\"quantity\":500.0},{\"symbol\":\"STAPLE_A\",\"side\":\"HOLD\",\"quantity\":0.0}],\"rationale\":\"Trim TECH_B into strength to reduce concentration and free buying power; add modestly to BANK_A (and a small starter in TECH_A) on relative weakness while keeping leverage comfortably below the cap.\"}"
+      "response": "{\"actions\":[{\"symbol\":\"TECH_B\",\"side\":\"SELL\",\"quantity\":2000.0},{\"symbol\":\"BANK_A\",\"side\":\"HOLD\",\"quantity\":0.0},{\"symbol\":\"TECH_A\",\"side\":\"HOLD\",\"quantity\":0.0},{\"symbol\":\"STAPLE_A\",\"side\":\"HOLD\",\"quantity\":0.0}],\"rationale\":\"Trim TECH_B into strength (+1.4% 1d) to control downside and free buying power. No compelling weakness signal elsewhere to add risk today.\"}"
     },
     {
       "arm": "live",
       "step": 18,
       "day": 3,
-      "digest": "3eb25563bf0a2f7d",
+      "digest": "b1751822ee3e4d70",
       "prompt": [
         {
           "role": "user",
@@ -89,16 +278,16 @@
         },
         {
           "role": "user",
-          "content": "{\n  \"assets\": [\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 142.59,\n      \"best_bid\": 142.54,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 500.0,\n      \"price\": 142.54,\n      \"return_1d\": 0.007563441012228722,\n      \"return_5d\": 0.018142857142857016,\n      \"symbol\": \"TECH_A\",\n      \"volatility\": 0.007673624070185257\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 94.97,\n      \"best_bid\": 94.91,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 8000.0,\n      \"price\": 94.93,\n      \"return_1d\": 0.004869270667936965,\n      \"return_5d\": -0.0007368421052630358,\n      \"symbol\": \"TECH_B\",\n      \"volatility\": 0.005509301344529241\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 60.99,\n      \"best_bid\": 60.95,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 15000.0,\n      \"price\": 60.96,\n      \"return_1d\": 0.023849512932482497,\n      \"return_5d\": 0.016000000000000014,\n      \"symbol\": \"BANK_A\",\n      \"volatility\": 0.00665629990353699\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 49.44,\n      \"best_bid\": 49.41,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 49.42,\n      \"return_1d\": 0.018339171646404306,\n      \"return_5d\": 0.029583333333333295,\n      \"symbol\": \"STAPLE_A\",\n      \"volatility\": 0.006782887326845605\n    }\n  ],\n  \"day\": 3,\n  \"macro\": {\n    \"corporate_bond_yield\": 0.055289698668993935,\n    \"cycle\": \"expansion\",\n    \"federal_funds_rate\": 0.03,\n    \"inflation_rate\": 0.028221465682935133,\n    \"vix\": 21.16113890316682\n  },\n  \"portfolio\": {\n    \"buying_power\": 323600.0,\n    \"cash\": -710755.0,\n    \"gross_exposure\": 1.6871480294483034,\n    \"max_leverage\": 2.0,\n    \"net_worth\": 1034355.0\n  },\n  \"step\": 18,\n  \"steps_per_day\": 6\n}"
+          "content": "{\n  \"assets\": [\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 142.91,\n      \"best_bid\": 142.86,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 142.86,\n      \"return_1d\": 0.007475317348377919,\n      \"return_5d\": 0.020428571428571463,\n      \"symbol\": \"TECH_A\",\n      \"volatility\": 0.007400383829850597\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 95.09,\n      \"best_bid\": 95.03,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 6000.0,\n      \"price\": 95.05,\n      \"return_1d\": 0.004438338793194552,\n      \"return_5d\": 0.000526315789473708,\n      \"symbol\": \"TECH_B\",\n      \"volatility\": 0.006052512366078227\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 61.15,\n      \"best_bid\": 61.11,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 12000.0,\n      \"price\": 61.12,\n      \"return_1d\": 0.025503355704697972,\n      \"return_5d\": 0.01866666666666661,\n      \"symbol\": \"BANK_A\",\n      \"volatility\": 0.006219374167502422\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 49.46,\n      \"best_bid\": 49.43,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 49.44,\n      \"return_1d\": 0.018331616889804447,\n      \"return_5d\": 0.030000000000000027,\n      \"symbol\": \"STAPLE_A\",\n      \"volatility\": 0.006277550532514311\n    }\n  ],\n  \"day\": 3,\n  \"macro\": {\n    \"corporate_bond_yield\": 0.04926270037160317,\n    \"cycle\": \"expansion\",\n    \"federal_funds_rate\": 0.025,\n    \"inflation_rate\": 0.028094267190621164,\n    \"vix\": 22.330955109556157\n  },\n  \"portfolio\": {\n    \"buying_power\": 758700.0,\n    \"cash\": -272520.0,\n    \"gross_exposure\": 1.2642695060219933,\n    \"max_leverage\": 2.0,\n    \"net_worth\": 1031220.0\n  },\n  \"step\": 18,\n  \"steps_per_day\": 6\n}"
         }
       ],
-      "response": "{\"actions\":[{\"symbol\":\"BANK_A\",\"side\":\"SELL\",\"quantity\":3000.0},{\"symbol\":\"TECH_A\",\"side\":\"HOLD\",\"quantity\":0.0},{\"symbol\":\"TECH_B\",\"side\":\"HOLD\",\"quantity\":0.0},{\"symbol\":\"STAPLE_A\",\"side\":\"HOLD\",\"quantity\":0.0}],\"rationale\":\"Trim BANK_A after a strong 1d move to reduce downside and free buying power while staying within leverage; no clear weakness elsewhere to buy without forcing a trade.\"}"
+      "response": "{\"actions\":[{\"symbol\":\"BANK_A\",\"side\":\"SELL\",\"quantity\":2000.0},{\"symbol\":\"TECH_B\",\"side\":\"BUY\",\"quantity\":2000.0},{\"symbol\":\"TECH_A\",\"side\":\"HOLD\",\"quantity\":0.0},{\"symbol\":\"STAPLE_A\",\"side\":\"HOLD\",\"quantity\":0.0}],\"rationale\":\"Trim BANK_A after strong short-term strength and redeploy into TECH_B, which is comparatively weaker/flat on 5d with similar volatility. Keep cash use modest and stay well within max_order_shares and available buying power.\"}"
     },
     {
       "arm": "live",
       "step": 24,
       "day": 4,
-      "digest": "fee9cf3a35b2d7e1",
+      "digest": "14d8f4a63a4e4943",
       "prompt": [
         {
           "role": "user",
@@ -106,10 +295,10 @@
         },
         {
           "role": "user",
-          "content": "{\n  \"assets\": [\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 140.92,\n      \"best_bid\": 140.87,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 500.0,\n      \"price\": 140.91,\n      \"return_1d\": -0.011435386558159122,\n      \"return_5d\": 0.00649999999999995,\n      \"symbol\": \"TECH_A\",\n      \"volatility\": 0.00830310790993348\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 93.68,\n      \"best_bid\": 93.62,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 8000.0,\n      \"price\": 93.66,\n      \"return_1d\": -0.013378278731697169,\n      \"return_5d\": -0.014105263157894732,\n      \"symbol\": \"TECH_B\",\n      \"volatility\": 0.00595087688454968\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 59.09,\n      \"best_bid\": 59.05,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 12000.0,\n      \"price\": 59.07,\n      \"return_1d\": -0.03100393700787407,\n      \"return_5d\": -0.015499999999999958,\n      \"symbol\": \"BANK_A\",\n      \"volatility\": 0.006502207136807095\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 49.58,\n      \"best_bid\": 49.55,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 49.57,\n      \"return_1d\": 0.003035208417644597,\n      \"return_5d\": 0.03270833333333334,\n      \"symbol\": \"STAPLE_A\",\n      \"volatility\": 0.006310939504524773\n    }\n  ],\n  \"day\": 4,\n  \"macro\": {\n    \"corporate_bond_yield\": 0.055289698668993935,\n    \"cycle\": \"expansion\",\n    \"federal_funds_rate\": 0.03,\n    \"inflation_rate\": 0.028221465682935133,\n    \"vix\": 23.707203283412287\n  },\n  \"portfolio\": {\n    \"buying_power\": 472765.0,\n    \"cash\": -527905.0,\n    \"gross_exposure\": 1.5275515404678865,\n    \"max_leverage\": 2.0,\n    \"net_worth\": 1000670.0\n  },\n  \"step\": 24,\n  \"steps_per_day\": 6\n}"
+          "content": "{\n  \"assets\": [\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 141.43,\n      \"best_bid\": 141.37,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 141.41,\n      \"return_1d\": -0.010149797004060046,\n      \"return_5d\": 0.010071428571428509,\n      \"symbol\": \"TECH_A\",\n      \"volatility\": 0.008016537189883028\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 93.84,\n      \"best_bid\": 93.77,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 8000.0,\n      \"price\": 93.81,\n      \"return_1d\": -0.013045765386638597,\n      \"return_5d\": -0.012526315789473608,\n      \"symbol\": \"TECH_B\",\n      \"volatility\": 0.006187033804767426\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 59.35,\n      \"best_bid\": 59.31,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 10000.0,\n      \"price\": 59.33,\n      \"return_1d\": -0.02928664921465962,\n      \"return_5d\": -0.011166666666666658,\n      \"symbol\": \"BANK_A\",\n      \"volatility\": 0.006147257036619497\n    },\n    {\n      \"avg_daily_volume\": 5000000.0,\n      \"best_ask\": 49.59,\n      \"best_bid\": 49.56,\n      \"fundamentals\": {},\n      \"max_order_shares\": 100000.0,\n      \"position\": 0.0,\n      \"price\": 49.58,\n      \"return_1d\": 0.0028317152103560783,\n      \"return_5d\": 0.032916666666666705,\n      \"symbol\": \"STAPLE_A\",\n      \"volatility\": 0.005856895745648168\n    }\n  ],\n  \"day\": 4,\n  \"macro\": {\n    \"corporate_bond_yield\": 0.04926270037160317,\n    \"cycle\": \"expansion\",\n    \"federal_funds_rate\": 0.025,\n    \"inflation_rate\": 0.028094267190621164,\n    \"vix\": 24.49189418326838\n  },\n  \"portfolio\": {\n    \"buying_power\": 662820.0,\n    \"cash\": -340480.0,\n    \"gross_exposure\": 1.3393601116316156,\n    \"max_leverage\": 2.0,\n    \"net_worth\": 1003300.0\n  },\n  \"step\": 24,\n  \"steps_per_day\": 6\n}"
         }
       ],
-      "response": "{\"actions\":[{\"symbol\":\"BANK_A\",\"side\":\"BUY\",\"quantity\":5000.0},{\"symbol\":\"TECH_B\",\"side\":\"BUY\",\"quantity\":2500.0},{\"symbol\":\"TECH_A\",\"side\":\"HOLD\",\"quantity\":0.0},{\"symbol\":\"STAPLE_A\",\"side\":\"HOLD\",\"quantity\":0.0}],\"rationale\":\"Add on weakness in BANK_A and TECH_B after sharp recent drawdowns while keeping added gross notional well within buying power and order-size limits; avoid chasing STAPLE_A strength and leave TECH_A unchanged.\"}"
+      "response": "{\"actions\":[{\"symbol\":\"TECH_A\",\"side\":\"BUY\",\"quantity\":2000.0},{\"symbol\":\"TECH_B\",\"side\":\"BUY\",\"quantity\":2000.0},{\"symbol\":\"BANK_A\",\"side\":\"BUY\",\"quantity\":3000.0},{\"symbol\":\"STAPLE_A\",\"side\":\"HOLD\",\"quantity\":0.0}],\"rationale\":\"Add to names showing short-term weakness (TECH_A/TECH_B/BANK_A) within buying power and order-size limits. Avoid adding STAPLE_A after strong 5d strength to reduce chasing and keep downside risk controlled.\"}"
     }
   ]
 }
