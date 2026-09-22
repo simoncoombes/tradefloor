@@ -317,7 +317,10 @@ PERTURBATIONS = [
     # What DOES measure them is in tests/test_crisis_epicentre.py, which
     # holds the VIX above the threshold and reads the episode, the draw, the
     # multiple and the bit-identity at 0.0 directly.
-    ("crisis_epicentre_extra", 1.93, False),
+    # The default ships 1.93 since the fourth composition, so the
+    # perturbation is to 1.41, the tape's 2020 reading; still inert on this
+    # harness for the reason above.
+    ("crisis_epicentre_extra", 1.41, False),
     # Inert twice over: the gate above, and its own gate. The counter is
     # read only inside a running episode, and no episode is entered while
     # `crisis_epicentre_extra` is 0.0 -- which is the default.

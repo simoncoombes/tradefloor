@@ -3691,7 +3691,8 @@ pub struct ModelParams {
     /// question and now an answerable one.
     pub crisis_vix_threshold: f64,
     /// How much more volatile the crisis EPICENTRE's names are than the
-    /// other sectors' at the same VIX. 0.0 ships and the branch is not
+    /// other sectors' at the same VIX. 0.0 -- every preset before pt-v19's
+    /// fourth composition of 2026-09-22, which ships 1.93 -- takes the branch not
     /// taken: no episode is tracked, no epicentre is drawn, no draw is
     /// taken on any stream and every preset is bit-identical. DERIVED 1.93.
     ///
@@ -5546,6 +5547,21 @@ impl ModelParams {
         // and 82 to 59 at two, the first composition to lower it since the
         // VIX law arrived.
         p.vix_level_loop_gain = 2.4684;
+        // THE FOURTH COMPOSITION, 2026-09-22 (design repo, results/ptv19epi3/
+        // RESULT.md, registered first; Simon's ruling that ties in the row
+        // tally are settled by distance). The crisis epicentre: at each
+        // crisis episode one sector is drawn to carry the crisis, on its own
+        // stream, from the sector table's weights (financial_services 0.6,
+        // none 0.4, the tape's five episodes); its names carry the extra on
+        // the parts of their return that are not the market factor and every
+        // other name carries a multiple under one, so the roster's crisis
+        // variance is redistributed and not added to. DERIVED 1.93, the
+        // median of the tape's three epicentre episodes. Measured on the box:
+        // the crisis_sector_dispersion row from 1.15 to 1.36 against the
+        // tape's 1.34 at two years; the VIX row, the rise, the tail and the
+        // fear rows unchanged; sector_excess_corr half a tape error further.
+        // The scenario pins it: `Scenario().hold(epicentre="financial_services")`.
+        p.crisis_epicentre_extra = 1.93;
         // THE CEILING, WHICH CLAMPS THE STATE AND NOT THE TARGET.
         //
         // `vix_ceiling` bounds the VIX after the reversion step,

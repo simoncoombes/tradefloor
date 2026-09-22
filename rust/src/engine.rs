@@ -2366,7 +2366,8 @@ impl Engine {
     ///
     /// # Draw discipline
     ///
-    /// A BRANCH at `crisis_epicentre_extra` 0.0 -- every shipped preset:
+    /// A BRANCH at `crisis_epicentre_extra` 0.0 -- every preset before pt-v19's
+    /// fourth composition of 2026-09-22:
     /// nothing runs, no state moves and no draw is taken, here or anywhere.
     /// When the dial is live the one uniform is taken on
     /// `stream::CRISIS_EPICENTRE` and nowhere else, so `MARKET`, `ECONOMY`,
@@ -2503,7 +2504,8 @@ impl Engine {
 
     pub fn open_market(&mut self) {
         // THE CRISIS EPISODE, stepped before anything else the session does.
-        // At `crisis_epicentre_extra` 0.0 -- every shipped preset -- this
+        // At `crisis_epicentre_extra` 0.0 -- every preset before pt-v19's fourth
+        // composition of 2026-09-22 -- this
         // returns without touching state or taking a draw.
         self.update_crisis_episode();
         // Attribution is per DAY. Resetting here rather than at close means a

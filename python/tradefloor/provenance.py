@@ -386,62 +386,6 @@ OUT_OF_SCOPE = {
         "(programme/results/ptv19refine/jump-derivation.txt, design "
         "repository). Shipped at 0.0 because a derivation is not a "
         "measurement of the panel",
-    "crisis_epicentre_extra":
-        "inert at 0.0: engine.rs `update_crisis_episode` returns on `== 0.0` "
-        "before touching any state, so no crisis EPISODE is entered, no "
-        "epicentre is drawn (the one uniform sits on its own "
-        "stream::CRISIS_EPICENTRE and is taken only inside that branch), "
-        "`SharedFactors::crisis_epicentre` is None on every tick and "
-        "market/factors.rs takes the `None` arm of all three matches -- so "
-        "the sector leg and the idiosyncratic draw are the expressions that "
-        "stood there before the mechanism existed, not those expressions "
-        "times one. "
-        "DERIVED 1.93 and shipped 0.0. What it is: while an episode runs, the "
-        "names of the drawn epicentre sector carry an extra multiple on the "
-        "parts of their return that are NOT the market factor, and every "
-        "other name carries a multiple BELOW one on the same parts, so the "
-        "mechanism redistributes the roster's crisis variance rather than "
-        "adding to it -- at a given VIX the total is the VIX's to set and the "
-        "epicentre only says who carries it. The value is "
-        "the MEDIAN of the three epicentre episodes the tape has -- 2.43 in "
-        "2008-09, 1.93 in 2011, 1.41 in 2020 -- each the ratio of the "
-        "epicentre sector's episode volatility to the median sector's in the "
-        "same episode, per-sector volatility being the median over the 39 real "
-        "names of the roster of each name's episode volatility over its own "
-        "calm-day volatility (VIX under 12). The rule was stated before the "
-        "numbers were read: the epicentre is the sector furthest above the "
-        "episode's median if it is 1.3x or more above it. 2000-02 and 2022 "
-        "have none, which is why `none` carries 0.4 of the draw and is a draw "
-        "rather than the absence of one "
-        "(programme/epicentre-design-2026-09-22.md and "
-        "results/ptv19refine/epicentre-derivation.json, design repository). "
-        "THE APPLIED MULTIPLES ARE NOT THIS NUMBER: the dial is stated on a "
-        "name's TOTAL volatility and the market component is untouched, so "
-        "market/factors.rs `crisis_epicentre_gains` solves the pair "
-        "`m + (1 - m) g_up^2 = e^2 (m + (1 - m) g_down^2)` -- the tape's "
-        "ratio -- together with `w g_up^2 + (1 - w) g_down^2 = 1` -- the "
-        "roster's mean non-market variance held -- giving, with `A = e^2 - 1`, "
-        "`g_down^2 = ((1 - m) - m w A) / ((1 - m)(1 + w A))` and "
-        "`g_up^2 = m A / (1 - m) + e^2 g_down^2`. Both shares are MEASURED on "
-        "the composed pt-v19 on the registered 40-name roster, three seeds, "
-        "252 recorded sessions after a 60-session warm-up, under a held VIX of "
-        "65: `m` the market factor's share of a name's daily return variance "
-        "(numerator the day's accumulated market part of `random_noise`, "
-        "denominator the realised daily log return) 0.3916, and 0.3225 "
-        "free-running; `w` the epicentre sector's share of the roster's names' "
-        "SECTOR plus IDIOSYNCRATIC variance, the variance the mechanism "
-        "scales, 0.1019, and 0.0883 free-running. At `e` 1.93 that is "
-        "`g_down^2 = 0.4996655 / 0.7773328 = 0.642795`, `g_down = 0.801745`, "
-        "and `g_up^2 = 1.753897 + 2.394346 = 4.148243`, `g_up = 2.036724`. "
-        "The mechanism was built ADDITIVE first -- `g = sqrt((e^2 - m) / "
-        "(1 - m))` = 2.3407 on the epicentre and nothing on anyone else, the "
-        "`w = 0` edge of the same solve -- and that arm was measured at "
-        "results/ptv19epi2 (design repository) and refused: it moved "
-        "`crisis_sector_dispersion` toward the tape and moved "
-        "`annualised_vol_pct`, `cross_sectional_corr` and "
-        "`volume_abs_return_corr` away with it, all three because the "
-        "roster's total crisis variance had risen. Shipped at "
-        "0.0 because a derivation is not a measurement of the panel",
     "crisis_epicentre_end_sessions":
         "unread while `crisis_epicentre_extra` is 0.0: with no episode ever "
         "entered there is no counter to end. 21 sessions is a month and is a "
@@ -1191,6 +1135,40 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "results/ptv19fix/RESULT.md (design repository); built "
                   "2026-09-21, shipped the same day",
         "date": "2026-09-21",
+    },
+    "crisis_epicentre_extra": {
+        "kind": "derived",
+        "presets": {"pt-v19": 1.93},
+        "identity": "the median of the tape's three epicentre episodes: the "
+                    "epicentre sector's episode volatility over the median "
+                    "sector's, per-sector volatility being the median over the "
+                    "roster's 39 real names of each name's episode volatility "
+                    "over its own calm-day volatility (VIX under 12); 2.43 in "
+                    "2008-09, 1.93 in 2011, 1.41 in 2020. The epicentre is the "
+                    "sector furthest above the episode's median if 1.3x or more "
+                    "above it, a rule stated before the numbers were read; "
+                    "2000-02 and 2022 have none, so `none` carries 0.4 of the "
+                    "draw and financial_services 0.6",
+        "terms": {"episodes": "2000-09..2002-10, 2008-09..2009-04, 2011-08..2011-11, "
+                              "2020-02..2020-05, 2022-01..2022-12 on ^VIX and the "
+                              "roster's names via tools/shadow/data.py",
+                  "applied multiples": "the dial is on a name's TOTAL volatility; "
+                                       "the market component is untouched, so the "
+                                       "pair on the non-market parts is solved from "
+                                       "the tape's ratio and conservation of the "
+                                       "roster's non-market variance: g_up 2.037 on "
+                                       "the epicentre, g_down 0.802 on the rest, at "
+                                       "the measured market share 0.3916 and "
+                                       "financials' share 0.1019 (`crisis_epicentre_solve`)",
+                  "weights": "`Sector::crisis_weight` in rust/src/sectors.rs; the "
+                             "four engine sectors with no name on the tape carry "
+                             "0.0 as undetermined"},
+        "source": "programme/epicentre-design-2026-09-22.md, "
+                  "results/ptv19refine/epicentre-derivation.json and "
+                  "results/ptv19epi3/RESULT.md (design repository); shipped "
+                  "0.0 from the build on 2026-09-22 until the fourth "
+                  "composition the same day",
+        "date": "2026-09-22",
     },
     "market_vol_alpha": {
         "composed": "shipped on pt-v19 from 2026-09-14, returned to pt-v18's on 2026-09-20 by the 2^6 factorial (design-repo programme/results/bestof/RESULT-504.md), which measured the market variance family as one block, and returned to pt-v19 on 2026-09-21 when ptv19gjr (design-repo programme/results/ptv19gjr/RESULT.md) measured the block's three parts apart: the cost the factorial saw was the factor level's, and this value with the slow pole and the regime level on the VIX law is the first vector to pass the whole gate",

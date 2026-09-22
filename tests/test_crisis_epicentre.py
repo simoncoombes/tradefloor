@@ -85,12 +85,15 @@ def test_the_shipped_value_is_bit_identical_and_takes_no_draw():
     crisis for every one of them.
     """
     vixes = [CRISIS_VIX] * 30
-    base = run_days(engine(tf.ModelParams.from_preset("pt-v19")), vixes)
-    # The same preset spelled through a dial that is already at its shipped
-    # value. If `from_preset` and `from_preset(dial=shipped)` differed, this
-    # test would be measuring the spelling.
+    # pt-v19 ships the epicentre since the fourth composition of 2026-09-22,
+    # so the preset that stands for "before the mechanism existed" is
+    # pt-v18, which ships 0.0. The same preset spelled through a dial that
+    # is already at its shipped value: if `from_preset` and
+    # `from_preset(dial=shipped)` differed, this test would be measuring
+    # the spelling.
+    base = run_days(engine(tf.ModelParams.from_preset("pt-v18")), vixes)
     same = run_days(engine(tf.ModelParams.from_preset(
-        "pt-v19", crisis_epicentre_extra=0.0)), vixes)
+        "pt-v18", crisis_epicentre_extra=0.0)), vixes)
 
     assert prices(same) == prices(base)
     assert same.state_snapshot()["columns"] == base.state_snapshot()["columns"]
@@ -139,9 +142,10 @@ def test_the_draw_happens_only_on_the_new_stream():
     # starts, which is the 26th (0-based 25).
     assert [entry[2] for entry in log] == [0, 25]
 
-    # And the schedule everywhere else is the schedule the shipped preset
-    # runs, draw for draw.
-    base = engine(tf.ModelParams.from_preset("pt-v19"))
+    # And the schedule everywhere else is the schedule the mechanism-off
+    # vector runs, draw for draw (pt-v19 ships the epicentre since the
+    # fourth composition, so "off" is spelled explicitly).
+    base = engine(tf.ModelParams.from_preset("pt-v19", crisis_epicentre_extra=0.0))
     for stream in noise.STREAMS:
         base.trace_draws(stream, -1000, 1000)
     run_days(base, [CRISIS_VIX] * 3 + [CALM_VIX] * 22 + [CRISIS_VIX] * 3)
@@ -347,7 +351,7 @@ def test_the_epicentre_moves_up_the_others_move_down_and_the_mean_is_held():
     assert up > 1.0 > down
 
     days = 10
-    off = _episode_arm(tf.ModelParams.from_preset("pt-v19"), target, days)
+    off = _episode_arm(tf.ModelParams.from_preset("pt-v19", crisis_epicentre_extra=0.0), target, days)
     on = _episode_arm(live(), target, days)
 
     # 1. Who moved, and by how much: the epicentre's names up, the rest down.
