@@ -201,10 +201,15 @@ def test_the_ruler_swap_changes_a_verdict_and_not_only_a_label():
     # basis to keep asserting what it was written to assert. The ruled arm
     # below is the same property on `corr_asymmetry`, which the ruled tables
     # do separate on.
-    near = envelope.score(dict(envelope.CERTIFIED,
+    # `certified_panel()` and not `CERTIFIED` since 2026-09-22: the table
+    # carries `crisis_sector_dispersion` against no reading at this preset,
+    # and a `None` inside a panel is a `TypeError` in `band_distance`. What
+    # this test binds is the RULER SWAP, which the row has nothing to do
+    # with.
+    near = envelope.score(dict(envelope.certified_panel(),
                                excess_kurtosis=KURTOSIS_PASSES_252_FAILS_504),
                           horizon_days=252, basis="shipped")
-    far = envelope.score({k: v for k, v in envelope.CERTIFIED.items()
+    far = envelope.score({k: v for k, v in envelope.certified_panel().items()
                           if k in envelope.BANDS_504}
                          | {"excess_kurtosis": KURTOSIS_PASSES_252_FAILS_504},
                          horizon_days=504, basis="shipped")
@@ -213,9 +218,9 @@ def test_the_ruler_swap_changes_a_verdict_and_not_only_a_label():
     assert near["statistics"]["excess_kurtosis"]["band"] != (
         far["statistics"]["excess_kurtosis"]["band"])
 
-    near_r = envelope.score(dict(envelope.CERTIFIED, corr_asymmetry=0.22),
+    near_r = envelope.score(dict(envelope.certified_panel(), corr_asymmetry=0.22),
                             horizon_days=252, basis="ruled")
-    far_r = envelope.score({k: v for k, v in envelope.CERTIFIED.items()
+    far_r = envelope.score({k: v for k, v in envelope.certified_panel().items()
                             if k in facts.REAL_MARKETS_RULED_504}
                            | {"corr_asymmetry": 0.22},
                            horizon_days=504, basis="ruled")
@@ -344,7 +349,10 @@ def test_envelope_score_refuses_a_horizon_with_no_band_set():
     252 to the 504-day bands, and every horizon below it to the 252-day ones.
     The settling study runs 1,008 days; `long_horizon.py` runs 2,520.
     """
-    panel = {k: v for k, v in envelope.CERTIFIED.items()}
+    # The GRADED table: a row with no reading has no verdict at any horizon
+    # and would raise inside the band lookup rather than at the horizon
+    # check this test is about. See `envelope.certified_panel`.
+    panel = envelope.certified_panel()
     for days in (60, 253, 756, 1008, 2520):
         with pytest.raises(ValidationError) as exc:
             envelope.score(panel, horizon_days=days)

@@ -24,8 +24,12 @@ decade band, and counting that as reach would call the defect its own repair.
 WHAT THIS FILE DOES NOT DO. It asserts no band EDGE. Every number it reads
 comes out of the tables themselves, so a band that is re-derived moves here
 without an edit and a band that is edited under an unchanged name does not
-pass as unchanged. The one count it does assert is 31 of 38 cells, which is
-the claim under review and which changes only when a ruling lands.
+pass as unchanged. The one count it does assert is 37 of 40 cells, which is
+the claim under review and which changes only when a ruling lands. It read
+35 of 38 until 2026-09-22, when `crisis_sector_dispersion` landed with a
+ruled band at both horizons: two more cells, both readable. The module
+docstring said 31 for longer than that and was simply stale against its own
+test.
 """
 
 import sys
@@ -40,11 +44,14 @@ import tradefloor.envelope as envelope  # noqa: E402
 import tradefloor.facts as facts  # noqa: E402
 from tradefloor import ValidationError  # noqa: E402
 
-#: The nineteen rows the ruling names, in the partition the library grades.
+#: The twenty rows the ruling names, in the partition the library grades.
+#: `facts.DISPERSION` joined on 2026-09-22 with `crisis_sector_dispersion`,
+#: which sits outside the `REAL_MARKETS` partition for the reason that tuple
+#: gives and is graded on the ruled basis like any other row.
 GRADED = (tuple(facts.SHAPE) + tuple(facts.LEVEL) + tuple(facts.CRISIS)
-          + tuple(facts.PERSISTENCE))
+          + tuple(facts.PERSISTENCE) + tuple(facts.DISPERSION))
 
-#: The two horizons the bar reads. 19 rows by 2 horizons is the 38 cells.
+#: The two horizons the bar reads. 20 rows by 2 horizons is the 40 cells.
 HORIZONS = (facts.CERTIFIED_HORIZON_DAYS, 504)
 
 #: The three cells with no ruled band, each with the entry that holds it.
@@ -254,18 +261,24 @@ def test_reach_is_band_for_band_and_not_key_for_key():
 
 
 # --------------------------------------------------------------------------
-# 2. Thirty-five of thirty-eight, and the three by name
+# 2. Thirty-seven of forty, and the three by name
 # --------------------------------------------------------------------------
 
-def test_the_ruled_band_reaches_thirty_five_of_the_thirty_eight_cells():
-    """The count the blocker turns on, walked through the library."""
+def test_the_ruled_band_reaches_thirty_seven_of_the_forty_cells():
+    """The count the blocker turns on, walked through the library.
+
+    35 OF 38 UNTIL 2026-09-22. `crisis_sector_dispersion` landed with its
+    own whole-tape window table and a band derived from it at both
+    horizons, so the row set is twenty and both of its cells are readable.
+    The THREE tuple does not move: the row added no unreadable cell.
+    """
     readable = [(d, r) for d in HORIZONS for r in GRADED
                 if facts.ruled_band(r, d) is not None]
     unreadable = [(d, r) for d in HORIZONS for r in GRADED
                   if facts.ruled_band(r, d) is None]
-    assert len(readable) + len(unreadable) == 38
-    assert len(readable) == 35, (
-        f"the ruled band reaches {len(readable)} of 38 cells, not 35. If a "
+    assert len(readable) + len(unreadable) == 40
+    assert len(readable) == 37, (
+        f"the ruled band reaches {len(readable)} of 40 cells, not 37. If a "
         f"ruling landed, the THREE tuple in this file moves in the same "
         f"commit; unreadable today: {sorted(unreadable)}")
 
@@ -495,20 +508,22 @@ def test_the_composed_table_carries_the_universal_bands_band_for_band():
                 f"band was edited under an unchanged name")
 
 
-def test_the_rows_the_composition_adds_are_the_four_off_panel_rows():
+def test_the_rows_the_composition_adds_are_the_five_off_panel_rows():
     """The only rows the composed table adds over its universal component.
 
-    Two whole-record index rows and, since 2026-09-19, the two fear rows,
-    whose ^VIX series the 32-name equity panel cannot carry.
+    Two whole-record index rows, since 2026-09-19 the two fear rows, whose
+    ^VIX series the 32-name equity panel cannot carry, and since 2026-09-22
+    `crisis_sector_dispersion`, whose ruler is ^VIX against those same 32
+    names and which therefore cannot be on the equity panel either.
     """
     added_252 = set(facts.REAL_MARKETS_RULED) - set(
         facts.REAL_MARKETS_UNIVERSAL)
     added_504 = set(facts.REAL_MARKETS_RULED_504) - set(
         facts.REAL_MARKETS_UNIVERSAL_504)
-    four = {"index_drift_pct", "index_tail_dn3_pct", "fear_gauge_dn1",
-            "fear_gauge_dn3"}
-    assert added_252 == four
-    assert added_504 == four
+    five = {"index_drift_pct", "index_tail_dn3_pct", "fear_gauge_dn1",
+            "fear_gauge_dn3", "crisis_sector_dispersion"}
+    assert added_252 == five
+    assert added_504 == five
     assert facts.REAL_MARKETS_RULED["fear_gauge_dn1"] == (0.39, 3.03)
     assert facts.REAL_MARKETS_RULED_504["fear_gauge_dn1"] == (0.59, 2.73)
     # The -3 per cent row keeps its shipped ruler at both horizons, and

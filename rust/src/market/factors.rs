@@ -140,6 +140,244 @@ pub fn idio_scale_for(params: &crate::params::ModelParams, beta: f64) -> f64 {
 /// difference because `sqrt(2.0)` squared rounds to `2.0000000000000004`,
 /// so the clamp's own endpoint would otherwise hand `sqrt` a negative
 /// number and put a NaN into a price.
+/// The market factor's share of a name's DAILY RETURN variance, MEASURED on
+/// the composed pt-v19 at `510c65e`.
+///
+/// # What was measured, and how
+///
+/// Three seeds of the held roster (`Universe.random(40, seed=111)`), 252
+/// recorded sessions after a 60-session warm-up, under a held VIX of 65 --
+/// the condition the epicentre mechanism actually runs in. The numerator is
+/// the day's accumulated MARKET part of `random_noise` (`noise_split`
+/// "market": the factor's transmission through beta times the crash
+/// amplifier, plus the tilt recentring). The denominator is the name's
+/// realised daily log return, drift, news, order flow, jumps, mean
+/// reversion and the overnight gap included, because that is the variance
+/// [`crate::params::ModelParams::crisis_epicentre_extra`] is stated on.
+/// Share per name, median over 120 name-seeds:
+///
+/// ```text
+/// held VIX 65     0.3916      (mean 0.3946)
+/// free-running    0.3225      (mean 0.3259)
+/// ```
+///
+/// The crisis reading is the one taken, because the multiple is applied in
+/// crises and nowhere else. The design note carried 0.35 from an earlier
+/// reading; this is the same quantity measured on the composed vector, and
+/// the two readings bracket it.
+///
+/// # What it is not
+///
+/// It is not a dial. It is a property of the composed model, and a model
+/// whose factor share moved would want it re-measured rather than re-tuned
+/// -- which is why the measurement is written down here beside the number
+/// instead of being folded into a shipped multiple.
+///
+/// It is also an APPROXIMATION in one respect worth naming. The solve treats
+/// everything that is not the market factor as scaled, and the code scales
+/// only the sector leg and the idiosyncratic draw: news, order flow, jumps
+/// and mean reversion are not scaled, and on the same measurement they are
+/// `1 - 0.3916 - 0.3982 = 0.21` of the variance. So the realised extra comes
+/// in UNDER the dial's nominal value, and the epicentre probe measures what
+/// it actually is rather than assuming the algebra.
+pub const CRISIS_EPICENTRE_MARKET_SHARE: f64 = 0.3916;
+
+/// The EPICENTRE SECTOR's share of the roster's non-market variance,
+/// MEASURED on the composed pt-v19 at `510c65e` on the registered roster.
+///
+/// # What was measured, and how
+///
+/// The same run and the same recipe as [`CRISIS_EPICENTRE_MARKET_SHARE`],
+/// read off the other two parts: three seeds of the held roster
+/// (`Universe.random(40, seed=111)`, the roster every registration reads),
+/// 252 recorded sessions after a 60-session warm-up, under a held VIX of 65.
+/// Per name the variance over days of the day's accumulated SECTOR plus
+/// IDIOSYNCRATIC parts of `random_noise` (`noise_split` "sector" and
+/// "idio") -- which is exactly the variance this mechanism scales -- and the
+/// share is the epicentre sector's names' summed variance over the whole
+/// roster's. Financial services carries the whole of the draw weight in
+/// `crate::sectors::SECTORS`, so it is the sector measured:
+///
+/// ```text
+/// held VIX 65     0.1019      (per seed 0.1019, 0.0953, 0.1030)
+/// free-running    0.0883      (per seed 0.0883, 0.0845, 0.1088)
+/// ```
+///
+/// The crisis reading is the one taken, for the reason the market share's
+/// is: the multiple is applied in crises and nowhere else.
+///
+/// # Measured rather than computed from the sector table, and why
+///
+/// The other way to get this number is the roster's arithmetic: four of the
+/// forty names are financials, so a count share is 0.1000. The two agree to
+/// two per cent here, and the measurement is still the one taken, because
+/// the agreement is a coincidence of this roster rather than an identity. A
+/// name's non-market variance is `sector_loading_for(beta)^2` times a sector
+/// factor sigma that is COMMON to every sector, plus its own GARCH variance
+/// times `idio_scale_for(beta)^2` and `cap_size_multiplier_with(cap)^2`. So
+/// the sector table's `daily_sigma` reaches the price through one of the two
+/// legs and through a clamp band -- `market::garch` records that its 3.1x
+/// spread arrives as about 1.4x -- while beta and cap disperse names WITHIN
+/// a sector by more than the table disperses the sectors. A count-times-
+/// table computation would be a different quantity that happens to land
+/// nearby.
+///
+/// # What it is not
+///
+/// It is not a dial, for [`CRISIS_EPICENTRE_MARKET_SHARE`]'s reasons. It is
+/// also a property of the REGISTERED ROSTER as much as of the model: a
+/// roster with twice the financial weight would conserve the roster's mean
+/// non-market variance only approximately under these gains. That is the
+/// price of a two-number solve, and the alternative -- recomputing the share
+/// from the live roster's GARCH states at every episode -- would make one
+/// name's variance move every other name's gain, which is a feedback path
+/// the mechanism does not need to do its job.
+///
+/// The limit worth knowing: at `w = 0` the pair below collapses to
+/// `g_down = 1` and `g_up^2 = (e^2 - m) / (1 - m)`, which is exactly the
+/// ADDITIVE form this mechanism shipped with on 2026-09-22 (measured at
+/// `results/ptv19epi2`, design repository, where it was refused for adding
+/// variance to the roster rather than moving it). The additive arm is the
+/// `w = 0` edge of the same solve and not a second mechanism.
+pub const CRISIS_EPICENTRE_SECTOR_SHARE: f64 = 0.1019;
+
+/// The two multiples an epicentre episode puts on its names' NON-MARKET
+/// parts: `(g_up, g_down)`, the epicentre sector's and everyone else's.
+///
+/// # The two equations
+///
+/// [`crate::params::ModelParams::crisis_epicentre_extra`] is stated on a
+/// name's TOTAL volatility and the market factor is untouched, so with `m`
+/// [`CRISIS_EPICENTRE_MARKET_SHARE`] a name's total variance reads
+/// `m + (1 - m) g^2` in units of the variance it would have had. The
+/// epicentre REDISTRIBUTES: at a given VIX the roster's total crisis
+/// variance is the VIX's to set and the epicentre only says who carries it.
+/// That is two conditions, with `w` [`CRISIS_EPICENTRE_SECTOR_SHARE`]:
+///
+/// ```text
+/// (a)  m + (1 - m) g_up^2  =  e^2 ( m + (1 - m) g_down^2 )
+/// (b)  w g_up^2 + (1 - w) g_down^2  =  1
+/// ```
+///
+/// (a) is the tape's ratio: the epicentre's names are `e` times the others
+/// in total volatility, which is the row the mechanism exists to move. (b)
+/// is conservation: the roster's mean non-market variance is what it was.
+///
+/// # The solve
+///
+/// Write `A = e^2 - 1`. Substituting (b) into (a) and collecting `g_down^2`:
+///
+/// ```text
+/// g_down^2 = [ (1 - m) - m w A ] / [ (1 - m) (1 + w A) ]
+/// g_up^2   = m A / (1 - m) + e^2 g_down^2
+/// ```
+///
+/// The second line is (a) rearranged rather than (b), because it is EXACT at
+/// `e = 1`: both squares are then 1.0 to the bit, so an extra of exactly one
+/// is an epicentre no different from anywhere else and prices identically.
+/// Reading it back through (b) is the check
+/// `w g_up^2 + (1 - w) g_down^2 = w m A / (1 - m) + g_down^2 (1 + w A) = 1`.
+///
+/// At the DERIVED extra of 1.93, `m = 0.3916` and `w = 0.1019`:
+///
+/// ```text
+/// A        = 3.7249 - 1      = 2.7249
+/// g_down^2 = (0.6084 - 0.3916 * 0.1019 * 2.7249)
+///            / (0.6084 * (1 + 0.1019 * 2.7249))
+///          = 0.4996655 / 0.7773328 = 0.642795     g_down = 0.801745
+/// g_up^2   = 0.3916 * 2.7249 / 0.6084 + 3.7249 * 0.642795
+///          = 1.753897 + 2.394346 = 4.148243       g_up   = 2.036724
+/// ```
+///
+/// The epicentre's names carry 2.0367 on their non-market parts where the
+/// additive form carried 2.3407, and every other name carries 0.8017 where
+/// the additive form carried one. Both readings of the tape's ratio are the
+/// same 1.93.
+///
+/// # What is conserved, and what the GARCH gives back
+///
+/// (b) holds the variance of the INNOVATION -- the sector leg and the
+/// idiosyncratic draw, the two things this multiplies -- and it holds it
+/// exactly: the tick's non-market parts come out `g_up` and `g_down` times
+/// what they would have been, to the bit, and a roster whose epicentre share
+/// is `w` reads the same mean non-market variance either way.
+///
+/// It does NOT hold the REALISED variance of a long run, because the per-name
+/// GARCH is convex in the innovation it is fed: `h` mean-reverts to a level
+/// built from a fixed `garch_omega`, so multiplying a name's innovation by
+/// `g > 1` raises its stationary variance by more than `g^2` while `g < 1`
+/// lowers it by less. MEASURED on the registered roster, three seeds, 252
+/// sessions under a held VIX of 65 with financials pinned -- a crisis that
+/// never ends, which is the worst case this can be put in -- the roster's
+/// realised mean non-market variance comes in 1.21 to 1.31 times the base
+/// arm's where the innovation-level prediction is 0.98 to 1.01, and the
+/// roster's pooled return volatility 1.03 to 1.06 times. Over a free-running
+/// panel, where episodes are a minority of sessions, that arrives as
+/// `annualised_vol_pct` 24.35 to 24.77 at two years against the additive
+/// form's 25.60 (16 seeds; the paired per-seed move is +0.37 against +1.19).
+///
+/// The number this leaves on the table is not taken back by moving `w`.
+/// Solving (b) against a `w` chosen to land a graded row would be fitting
+/// the mechanism to the panel it is measured on, and `w` is a measurement.
+/// What would take it back is conserving on the GARCH's stationary variance
+/// rather than on the innovation, which is a different and larger mechanism
+/// than a pair of multiples.
+///
+/// # The domain
+///
+/// Both squares are floored at zero under the square root, and
+/// `ModelParams::invariants` refuses the extras that would reach the floor,
+/// so the floor is for a caller who built params without going through the
+/// check rather than for a supported value. The endpoints are
+/// [`crisis_epicentre_extra_bounds`].
+pub fn crisis_epicentre_gains(extra: f64) -> (f64, f64) {
+    let (up2, down2) = crisis_epicentre_gain_squares(extra);
+    (
+        mathx::sqrt(mathx::max(0.0, up2)),
+        mathx::sqrt(mathx::max(0.0, down2)),
+    )
+}
+
+/// The solve itself, `(g_up^2, g_down^2)`, UNFLOORED so the invariant can
+/// see a negative square rather than a zero that reads like a silenced name.
+pub fn crisis_epicentre_gain_squares(extra: f64) -> (f64, f64) {
+    let e2 = extra * extra;
+    let m = CRISIS_EPICENTRE_MARKET_SHARE;
+    let w = CRISIS_EPICENTRE_SECTOR_SHARE;
+    let a = e2 - 1.0;
+    let down2 = ((1.0 - m) - m * w * a) / ((1.0 - m) * (1.0 + w * a));
+    let up2 = m * a / (1.0 - m) + e2 * down2;
+    (up2, down2)
+}
+
+/// The open interval of extras the redistributing solve has an answer in,
+/// `(lo, hi)`, both ENDPOINTS EXCLUDED.
+///
+/// Below `lo` the epicentre is so much quieter than the rest of the roster
+/// that its own non-market variance would have to be negative; above `hi` it
+/// is so much louder that, with the roster's mean held, everyone else's
+/// would have to be. At `m = 0.3916` and `w = 0.1019`:
+///
+/// ```text
+/// lo = sqrt( m (1 - w) / (1 - m w) )      = 0.605238
+/// hi = sqrt( 1 + (1 - m) / (m w) )        = 4.030704
+/// ```
+///
+/// `lo` is where the additive form's `sqrt(m) = 0.6258` went: conserving
+/// moves it down a little, because the rest of the roster is lifted to make
+/// room. `hi` is new and is the whole of what conservation costs at the top
+/// -- it sits above `atlas_survey`'s box for the dial (0.0 to 3.0) and well
+/// above the largest epicentre the tape has (2.43 in 2008-09), so nothing
+/// the record asks for is out of reach.
+pub fn crisis_epicentre_extra_bounds() -> (f64, f64) {
+    let m = CRISIS_EPICENTRE_MARKET_SHARE;
+    let w = CRISIS_EPICENTRE_SECTOR_SHARE;
+    (
+        mathx::sqrt(m * (1.0 - w) / (1.0 - m * w)),
+        mathx::sqrt(1.0 + (1.0 - m) / (m * w)),
+    )
+}
+
 pub fn idio_suppress_scales(suppress: f64) -> (f64, f64) {
     let down = mathx::clamp(1.0 - suppress, 0.0, mathx::sqrt(2.0));
     (down, mathx::sqrt(mathx::max(2.0 - down * down, 0.0)))
@@ -223,6 +461,17 @@ pub struct SharedFactors {
     /// gained a normaliser switch — by `crash_amplifier_conditional_sigma`
     /// as well, which is the same quantity for the same reason.
     pub market_sigma_tick: f64,
+    /// The sector at the epicentre of the crisis episode this session is
+    /// inside, if there is one.
+    ///
+    /// `None` on every shipped preset, and `None` in three further cases
+    /// that mean different things and read the same here on purpose: the
+    /// dial [`crate::params::ModelParams::crisis_epicentre_extra`] is 0.0,
+    /// no episode is running, or the episode drew `none` as its epicentre --
+    /// which is two of the tape's five episodes and is a DRAW rather than
+    /// the absence of one. In all four the tick does exactly what it did
+    /// before this field existed.
+    pub crisis_epicentre: Option<String>,
 }
 
 impl SharedFactors {
@@ -552,6 +801,35 @@ pub fn calculate_live_factors(
     let sector_loading = sector_loading_for(params, beta);
     let sector_component = sector_loading * shared.sector(&company.sector);
 
+    // THE CRISIS EPICENTRE. While an episode with an epicentre is running,
+    // EVERY name's non-market parts carry a multiple: this sector leg and
+    // the idiosyncratic draw below. The epicentre sector's names carry
+    // `g_up`, above one, and every other name carries `g_down`, below it, so
+    // the mechanism REDISTRIBUTES the roster's crisis variance rather than
+    // adding to it -- at a given VIX the total is the VIX's to set and the
+    // epicentre only says who carries it. The market component is untouched
+    // either way, which is the other half of the point: the index, the VIX
+    // and the fear rows do not move, only who carries the crisis does.
+    // `crisis_epicentre_gains` is where the pair is solved.
+    //
+    // `Some` only while `crisis_epicentre_extra` is non-zero AND an episode
+    // is running AND that episode drew a sector rather than `none`. `None`
+    // otherwise, and `None` is not a multiply by one: the branches below
+    // leave the arithmetic exactly as it was written before this existed, so
+    // every preset is bit-identical rather than multiplied by a pair of
+    // ones.
+    let epicentre_gain: Option<f64> = match shared.crisis_epicentre.as_deref() {
+        Some(key) => {
+            let (up, down) = crisis_epicentre_gains(params.crisis_epicentre_extra);
+            Some(if key == company.sector.as_str() { up } else { down })
+        }
+        None => None,
+    };
+    let sector_component = match epicentre_gain {
+        None => sector_component,
+        Some(g) => sector_component * g,
+    };
+
     // `garchVariance` is in DAILY units; the tick needs per-tick sigma.
     // `IDIO_SIGMA_SCALE` is the funding side of the market-factor variance
     // reallocation: the factor's variance share was raised out of THIS
@@ -618,6 +896,16 @@ pub fn calculate_live_factors(
         idiosyncratic_noise
     } else {
         idiosyncratic_noise * idio_down_suppress_scale
+    };
+    // The epicentre's other half, applied AFTER the draw for the reason the
+    // reallocation above is: this reshapes a shock the tick has already
+    // taken, so no branch here can move the draw count or the order. The
+    // scale reaches `noise_idio_unit` below as well, so `noise_idio` is
+    // still `z * sqrt(h)` times that unit term for term and the close's
+    // commensurate innovation reads the scale the draw ACTUALLY took.
+    let idiosyncratic_noise = match epicentre_gain {
+        None => idiosyncratic_noise,
+        Some(g) => idiosyncratic_noise * g,
     };
 
     // Crash correlation: when the market shock is extreme, everything loads
@@ -718,6 +1006,10 @@ pub fn calculate_live_factors(
     // on top of the name's own sigma, plus the reallocation's scale.
     let noise_idio_unit =
         idio_scale / mathx::sqrt(390.0) * cap_mult * volatility_multiplier * idio_down_suppress_scale;
+    let noise_idio_unit = match epicentre_gain {
+        None => noise_idio_unit,
+        Some(g) => noise_idio_unit * g,
+    };
 
     // ── Forced flow ───────────────────────────────────────────────────────
     // Squeezes and stop cascades react to a move that ALREADY happened —
@@ -973,6 +1265,7 @@ mod tests {
             prev_day_down: false,
             market_sigma_tick: crate::params::PT_V1.market_factor_sigma
                 / crate::mathx::sqrt(390.0),
+            crisis_epicentre: None,
         }
     }
 
@@ -1245,6 +1538,7 @@ mod tests {
                     crisis_spike: 0.0,
                     prev_day_down: false,
                     market_sigma_tick: sigma_tick,
+                    crisis_epicentre: None,
                 };
                 total += w * factors_with(p, &company, &[], 0.0, &s).random_noise;
                 weight_sum += w;
@@ -1332,6 +1626,7 @@ mod tests {
             crisis_spike: 0.0,
             prev_day_down: false,
             market_sigma_tick: sigma_tick,
+            crisis_epicentre: None,
         }
     }
 

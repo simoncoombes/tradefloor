@@ -57,6 +57,11 @@ pub enum LogEntry {
     PinMacro {
         fields: Vec<(String, f64)>,
         cycle: Option<String>,
+        /// The pinned crisis epicentre: a sector key, or `"none"`. Carried
+        /// for the reason `cycle` is -- it is an input to the run, and a
+        /// replay that dropped it would draw its own epicentre and call the
+        /// result the same experiment.
+        epicentre: Option<String>,
     },
     /// The whole `avg_volume` column, one value per instrument.
     ///
@@ -171,7 +176,7 @@ impl LogEntry {
                 d.set_item("news", news_to_py(py, news)?)?;
                 d.set_item("order_flow", flow_to_py(py, flow)?)?;
             }
-            LogEntry::PinMacro { fields, cycle } => {
+            LogEntry::PinMacro { fields, cycle, epicentre } => {
                 d.set_item("op", "pin_macro")?;
                 let f = PyDict::new_bound(py);
                 for (name, value) in fields {
@@ -179,6 +184,9 @@ impl LogEntry {
                 }
                 if let Some(c) = cycle {
                     f.set_item("cycle", c)?;
+                }
+                if let Some(x) = epicentre {
+                    f.set_item("epicentre", x)?;
                 }
                 d.set_item("fields", f)?;
             }

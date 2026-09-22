@@ -157,6 +157,9 @@ fn run_world(policy: SettleDrawPolicy, trader_flow: f64) -> (Vec<f64>, usize) {
                 // Trading days closed. The buyback factor is off on
                 // every preset these tests pin, so it is read
                 // nowhere; 0 is what a single-tick caller opens at.
+                // No crisis episode: the mechanism is off on every preset
+                // these tests pin, and a single-tick caller has none.
+                crisis_epicentre: None,
                 elapsed_days: 0,
                 params: &tradefloor::params::PT_V1,
             },

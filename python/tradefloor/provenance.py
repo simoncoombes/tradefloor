@@ -386,6 +386,18 @@ OUT_OF_SCOPE = {
         "(programme/results/ptv19refine/jump-derivation.txt, design "
         "repository). Shipped at 0.0 because a derivation is not a "
         "measurement of the panel",
+    "crisis_epicentre_end_sessions":
+        "unread while `crisis_epicentre_extra` is 0.0: with no episode ever "
+        "entered there is no counter to end. 21 sessions is a month and is a "
+        "CONVENTION rather than a measurement -- the tape's five episode "
+        "windows are dated to the month, so the record fixes the order of "
+        "magnitude and not the number; what would determine it is the "
+        "distribution of gaps back under `crisis_vix_threshold` WITHIN those "
+        "episodes at daily resolution, which the derivation does not carry. "
+        "The hysteresis is what makes one crisis one episode: the tape's "
+        "episodes are months long and the VIX crosses back under the threshold "
+        "repeatedly inside each of them, so a shorter counter would redraw the "
+        "epicentre mid-crisis and average three sectors across one episode",
     "garch_innovation_commensurate":
         "inert at 0.0: engine.rs `daily_innovation_column` branches on "
         "`== 0.0` and returns the `random_noise` attribution column the "
@@ -1123,6 +1135,40 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "results/ptv19fix/RESULT.md (design repository); built "
                   "2026-09-21, shipped the same day",
         "date": "2026-09-21",
+    },
+    "crisis_epicentre_extra": {
+        "kind": "derived",
+        "presets": {"pt-v19": 1.93},
+        "identity": "the median of the tape's three epicentre episodes: the "
+                    "epicentre sector's episode volatility over the median "
+                    "sector's, per-sector volatility being the median over the "
+                    "roster's 39 real names of each name's episode volatility "
+                    "over its own calm-day volatility (VIX under 12); 2.43 in "
+                    "2008-09, 1.93 in 2011, 1.41 in 2020. The epicentre is the "
+                    "sector furthest above the episode's median if 1.3x or more "
+                    "above it, a rule stated before the numbers were read; "
+                    "2000-02 and 2022 have none, so `none` carries 0.4 of the "
+                    "draw and financial_services 0.6",
+        "terms": {"episodes": "2000-09..2002-10, 2008-09..2009-04, 2011-08..2011-11, "
+                              "2020-02..2020-05, 2022-01..2022-12 on ^VIX and the "
+                              "roster's names via tools/shadow/data.py",
+                  "applied multiples": "the dial is on a name's TOTAL volatility; "
+                                       "the market component is untouched, so the "
+                                       "pair on the non-market parts is solved from "
+                                       "the tape's ratio and conservation of the "
+                                       "roster's non-market variance: g_up 2.037 on "
+                                       "the epicentre, g_down 0.802 on the rest, at "
+                                       "the measured market share 0.3916 and "
+                                       "financials' share 0.1019 (`crisis_epicentre_solve`)",
+                  "weights": "`Sector::crisis_weight` in rust/src/sectors.rs; the "
+                             "four engine sectors with no name on the tape carry "
+                             "0.0 as undetermined"},
+        "source": "programme/epicentre-design-2026-09-22.md, "
+                  "results/ptv19refine/epicentre-derivation.json and "
+                  "results/ptv19epi3/RESULT.md (design repository); shipped "
+                  "0.0 from the build on 2026-09-22 until the fourth "
+                  "composition the same day",
+        "date": "2026-09-22",
     },
     "market_vol_alpha": {
         "composed": "shipped on pt-v19 from 2026-09-14, returned to pt-v18's on 2026-09-20 by the 2^6 factorial (design-repo programme/results/bestof/RESULT-504.md), which measured the market variance family as one block, and returned to pt-v19 on 2026-09-21 when ptv19gjr (design-repo programme/results/ptv19gjr/RESULT.md) measured the block's three parts apart: the cost the factorial saw was the factor level's, and this value with the slow pole and the regime level on the VIX law is the first vector to pass the whole gate",

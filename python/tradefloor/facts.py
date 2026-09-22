@@ -66,6 +66,17 @@ engine is additive in log returns and keeps that convention instead, and
 the two differ by half the cross-sectional variance. See
 `_index_drift_pct`.
 
+A TWENTIETH GRADED ROW landed on 2026-09-22, `crisis_sector_dispersion`:
+in a crisis, how much more the hardest-hit sector moves than the typical
+one. It is in `DISPERSION` and in neither `SHAPE` nor `REAL_MARKETS`,
+because its ruler is the whole tape and the decade panel carries no
+reading for it -- so the fourteen above are untouched and the RULED basis
+now grades twenty rows at two horizons, forty cells. `crisis_dispersion`
+is the estimator, run by the same code on the tape
+(`REAL_CRISIS_DISPERSION_WINDOWS`) and on the model
+(`crisis_statistics`), and a window holding fewer than thirty crisis
+sessions reports the row ABSENT with its reason rather than a number.
+
 Every figure below: `Universe.random(40, seed=111)` (fingerprint
 5d8de78b55aad752), 252 days, `measure()` per sim seed, median over seeds 1
 to 6 -- re-measured at known-answer v8 (era digest 1ee64998...), where the
@@ -1018,6 +1029,74 @@ REAL_MARKETS_PROVENANCE = {
             "window 3.08 over 39 sessions; pooled over 1,124 sessions since "
             "1990 the median is +1.85",
         ),
+    },
+    # Added 2026-09-22 with the row itself, under the design note
+    # `crisis-dispersion-row-design-2026-09-22.md` section 2. Every number
+    # in this entry is DERIVED at import from
+    # `REAL_CRISIS_DISPERSION_WINDOWS`; nothing here is a literal edge, and
+    # the readings the derivation runs on are in that table.
+    "crisis_sector_dispersion": {
+        "kind": "derived",
+        "claim": "in a crisis, how much more the hardest-hit sector moves "
+                 "than the typical sector: the maximum over sectors of the "
+                 "sector's median crisis-to-calm volatility ratio, divided "
+                 "by the median of those sector ratios, over a window "
+                 "holding at least 30 sessions with ^VIX above the engine's "
+                 "crisis_vix_threshold",
+        "estimator": "facts.crisis_dispersion, the SAME function "
+                     "facts.crisis_statistics runs on the model, per window, "
+                     "then the median across readable windows",
+        "series": "^VIX daily close 1990-01-02..2025-07-30, 8,960 bars, "
+                  "against the adjusted daily closes of the 32 "
+                  "reference-panel names carrying ^GSPC's whole "
+                  "1987-06-01..2025-07-31 history, via tools/shadow/data.py "
+                  "(Yahoo v8 chart API; vendor data is not committed, so "
+                  "tools/calibration/crisis_dispersion_row.py re-derives "
+                  "and this module records the windows). "
+                  "data.PANEL_SECTOR through data.ENGINE_SECTOR gives the "
+                  "engine's own sector keys: 8 sectors over 32 names, "
+                  "healthcare 6, consumer_staples 5, industrials 5, "
+                  "financial_services 4, telecommunications 4, energy 3, "
+                  "consumer_discretionary 3, technology 2",
+        "window": "front-anchored non-overlapping blocks of `days` aligned "
+                  "closes from ^VIX's first bar, the incomplete tail "
+                  "dropped: 35 blocks at 252 of which 9 are readable, 17 at "
+                  "504 of which 7 are. A block is readable when it holds 30 "
+                  "crisis sessions; the rest are ABSENT, which is the same "
+                  "state the model's row reports on a calm run",
+        "band": "facts.RULED_CRISIS_DISPERSION_BAND, derived at import by "
+                "facts.crisis_dispersion_band: the fixed rule, median +/- "
+                "t(n) * trimmed_sd at the READABLE count, each edge rounded "
+                "outward. (0.79, 1.74) at 252 on t(9) and (1.03, 1.66) at "
+                "504 on t(7), the latter solved 2026-09-22 and recorded in "
+                "BAND_RULE_FIXED_MULTIPLIER with its residual",
+        "centre_estimator": "the median of the readable windows' values, "
+                            "which is what the model's row is: a per-run "
+                            "reading aggregated as the median across seeds",
+        "sector_count": "THE ONE MISMATCH, named rather than adjusted away. "
+                        "The tape's 32 names fall in 8 engine sectors and "
+                        "the held roster's 40 fall in 12, and the row is a "
+                        "maximum over sectors, which is biased upward by "
+                        "the count: more sectors is more draws for the "
+                        "maximum to be taken over, and a thinly populated "
+                        "sector's median is noisier. So the model's reading "
+                        "on the held roster sits above what the same market "
+                        "would read on the tape's eight, and no correction "
+                        "is applied here because none is derived. What "
+                        "would close it: the same 8-sector grouping on the "
+                        "model side, or a null for the estimator at each "
+                        "sector count, and either is a derivation and a "
+                        "ruling rather than a line here",
+        "not_the_ruler": "the crisis LEVER (real_crisis_lever, 6.16x) is a "
+                         "different quantity and is not this row: the lever "
+                         "is how much more the whole roster moves at a high "
+                         "VIX than a low one, and this row is how unevenly "
+                         "that is spread across sectors. A model can hold "
+                         "the lever and read 1.0 here",
+        "source": "tradefloor-design/programme/"
+                  "crisis-dispersion-row-design-2026-09-22.md section 2, "
+                  "ruled 2026-09-22; derived by "
+                  "tools/calibration/crisis_dispersion_row.py",
     },
     "fear_gauge_dn3": {
         # THE ROW'S RULER, NAMED, which is what it was missing rather than a
@@ -2649,6 +2728,100 @@ def real_vix_ar1(days: Any, *, what: str = "this measurement") -> float:
         ) from None
 
 
+#: The volatility-index level above which a session is a CRISIS session.
+#:
+#: THE ENGINE'S OWN DIAL, not a cut chosen for this row: `crisis_vix_threshold`
+#: ships at 30.88325108 on pt-v18 and pt-v19 alike, and it is where the
+#: engine's crisis blend switches on. The tape and the model are cut at the
+#: same number, so "a crisis session" is one definition in this project
+#: rather than two.
+#:
+#: WHY IT IS A CONSTANT HERE AND NOT READ OFF THE RUN'S `ModelParams`. The
+#: tape has no `ModelParams`. A row whose real side is cut at 30.88 and
+#: whose model side moved with a candidate's dial would be two statistics
+#: under one name, which is the wrong-ruler shape this module exists to
+#: refuse: a search could then pass the row by moving the cut. So a
+#: candidate that moves `crisis_vix_threshold` moves the MODEL's crisis
+#: blend and not this row's sessions, and the row grades it on the tape's
+#: cut.
+CRISIS_VIX_THRESHOLD: float = 30.88325108
+
+#: How many crisis sessions a window needs before the row is readable.
+#:
+#: Under it the row is ABSENT WITH A REASON -- the way
+#: `vix_ar1_debiased_blind` is absent -- and never defaulted to 1.0: a ratio
+#: of two standard deviations with a handful of sessions under the numerator
+#: is a number about the sample. The design note fixes the count at thirty,
+#: on the argument `fear_gauge_dn3`'s five-session condition is made on: a
+#: window with nothing in the bucket has nothing to say about the bucket.
+CRISIS_DISPERSION_MIN_SESSIONS: int = 30
+
+#: The MODEL row the ruler below grades, spelled once, for the reason
+#: `VIX_AR1_ROW` is spelled once.
+CRISIS_DISPERSION_ROW = "crisis_sector_dispersion"
+
+
+#: The tape's own crisis sector dispersion, per readable window, per horizon:
+#: what `tools/calibration/crisis_dispersion_row.py` cuts out of ^VIX and 32
+#: real names, recorded here so the ruler below is a DERIVATION rather than a
+#: literal. Beside `REAL_VIX_AR1_WINDOWS` because it is the same kind of
+#: object and answers to the same three readers (`real_windows`,
+#: `real_centre`, `real_centre_se`).
+#:
+#: THE SERIES. ^VIX daily closes 1990-01-02..2025-07-30, 8,960 bars, against
+#: the adjusted daily closes of the 32 reference-panel names that carry
+#: ^GSPC's whole 1987-06-01..2025-07-31 history -- the same 32-name set
+#: `UNIVERSAL_WINDOWS` is measured on, for the same reason: a name that
+#: starts in 2004 would leave and rejoin the cross-section inside a window.
+#: `tools/shadow/data.py` fetches both (vendor data is not committed, so the
+#: tool re-derives and this module records). `data.PANEL_SECTOR` is mapped
+#: through `data.ENGINE_SECTOR` onto the engine's own sector keys, so the
+#: word "sector" means the same thing on the tape and in the model.
+#:
+#: THE WINDOWS START WHERE ^VIX STARTS, 1990-01-02, and the 2,900-odd earlier
+#: sessions the names and the index do carry are DROPPED. A session with no
+#: volatility index is neither a crisis session nor a calm one, so it cannot
+#: enter a row whose whole definition is that split. Front-anchored
+#: non-overlapping blocks of `days` aligned closes with the incomplete tail
+#: dropped -- `REAL_VIX_AR1_WINDOWS`'s cut, and its argument: the tape's own
+#: start is the one anchor nobody chooses. 35 blocks at 252 (to 2025-01-06)
+#: and 17 at 504 (to 2024-01-04).
+#:
+#: MOST BLOCKS ARE ABSENT AND THAT IS THE ROW, not a defect in it. 642 of the
+#: 8,960 sessions are crisis sessions and they arrive in a handful of
+#: episodes, so nine of the 35 blocks at 252 and seven of the 17 at 504 hold
+#: the thirty the row needs. The readable ones, in order, are
+#:
+#:   252: 1997-12..1998-12 (52 crisis sessions), 2000-12..2001-12 (43),
+#:        2001-12..2002-12 (75), 2002-12..2003-12 (32), 2007-12..2008-12 (75),
+#:        2008-12..2009-12 (104), 2010-12..2011-12 (69), 2020-01..2020-12 (77),
+#:        2022-01..2023-01 (34)
+#:   504: 1997-12..1999-12 (57), 1999-12..2001-12 (45), 2001-12..2003-12 (107),
+#:        2007-12..2009-12 (180), 2009-12..2011-12 (88), 2020-01..2021-12 (80),
+#:        2022-01..2024-01 (34)
+#:
+#: so the 2008 window reads 1.888 at 252, far above the rest, and 2009-2011
+#: reads 1.193 -- the crisis whose dispersion is smallest of the three big
+#: ones. The design note expected 2008 AND 2011 far above and 2011 is not:
+#: recorded here because an expectation that did not hold is worth as much
+#: as one that did.
+#:
+#: NO CRISIS EXCLUSION, and there could not be one: every window here IS a
+#: crisis window. That is the opposite of the fourteen shape rows, whose
+#: bands drop the crisis window, and it is why `rule_row`'s estimator string
+#: for this row does not say "non-crisis".
+REAL_CRISIS_DISPERSION_WINDOWS: dict[int, tuple[float, ...]] = {
+    252: (
+        1.348580, 1.174766, 1.444843, 1.115060, 1.263002, 1.888202,
+        1.192788, 1.586180, 1.207433,
+    ),
+    504: (
+        1.416641, 1.426831, 1.342707, 1.291854, 1.162946, 1.380493,
+        1.190374,
+    ),
+}
+
+
 # --------------------------------------------------------------------------
 # Which ruler belongs to which horizon
 #
@@ -2914,6 +3087,32 @@ CRISIS = ("fear_gauge_dn1", "fear_gauge_dn3", "index_tail_dn3_pct")
 #: section 1.3's defect exactly: the row that could not fail was the row
 #: that was not there.
 PERSISTENCE = (VIX_AR1_ROW,)
+#: BANDED ON THE RULED BASIS AND ON NO OTHER, which is the second group
+#: outside the `REAL_MARKETS` partition and the first one with a band.
+#:
+#: `crisis_sector_dispersion` is a SHAPE statistic by every test `SHAPE`'s
+#: own docstring applies -- a ratio of two standard deviations is exactly
+#: invariant to a drift -- and it is NOT in `SHAPE`, for one reason: `SHAPE
+#: + LEVEL + CRISIS` is an exact partition of `REAL_MARKETS`, the decade
+#: table, and the decade panel carries no reading for this row. Its ruler is
+#: the whole tape and the whole tape only (`REAL_CRISIS_DISPERSION_WINDOWS`,
+#: 1990-2025), so it has a ruled band at both horizons and no decade band at
+#: either. Putting it in `SHAPE` would either break that partition or
+#: require a decade band nobody measured.
+#:
+#: WHAT THAT COSTS, said here rather than discovered: `envelope.certify`
+#: grades `aggregate_panels(panels, keys=facts.SHAPE)`, so the certificate's
+#: "14 of 14" is unchanged by this row and does not cover it. The row is
+#: graded by `envelope.score` on the RULED basis, where it is the
+#: twentieth row and the fortieth cell. Folding it into the shape count is a
+#: ruling, and it would restamp every committed preset record.
+#:
+#: It is also outside `loss.rule_table`'s default row set for the same kind
+#: of reason: a twentieth term in `S` makes every score on the record an
+#: incomparable number, and which rows `S` sums is a ruling rather than a
+#: consequence of adding a row. `rule_row` answers for it today, so the
+#: ruling costs one argument when it lands.
+DISPERSION = (CRISIS_DISPERSION_ROW,)
 
 #: How a row is read across seeds. The shape rows are medians over the
 #: certification seeds, which is what every recorded panel and band was
@@ -3140,6 +3339,9 @@ LABELS = {
     "index_tail_dn3_pct": "sessions <= -3%, %",
     "index_tail_up3_pct": "sessions >= +3%, %",
     "index_excess_kurtosis": "index excess kurtosis",
+    # Abbreviated to fit the 22-column field `report` prints labels in;
+    # "crisis sector dispersion" is 24 and would push the column.
+    "crisis_sector_dispersion": "crisis sector disp.",
 }
 
 
@@ -3923,6 +4125,13 @@ def measure(
     # row missing from a record as blind, and a fabricated 0.0 inside a
     # median across seeds would move it without announcing itself.
     facts.update(persistence_statistics(engine.macro_table(), days=days))
+
+    # The crisis sector dispersion row. It reads the bars, the macro table's
+    # VIX and the roster's sectors -- all three already recorded above -- so
+    # it costs no extra simulation either, and it is ABSENT with its reason
+    # on a run that held no crisis. See `crisis_statistics`.
+    facts.update(crisis_statistics(engine.bars(grain="day"),
+                                   engine.macro_table(), universe))
     return facts
 
 
@@ -4097,6 +4306,170 @@ def _excess_kurtosis(values: Sequence[float]) -> float | None:
         return None
     standard = [(x - mean) / sd for x in values]
     return sum(x ** 4 for x in standard) / len(standard) - 3.0
+
+
+def crisis_dispersion(
+    returns: Mapping[Any, Sequence[float]],
+    vix: Sequence[float],
+    sectors: Mapping[Any, str],
+    *,
+    threshold: float = CRISIS_VIX_THRESHOLD,
+    min_crisis_sessions: int = CRISIS_DISPERSION_MIN_SESSIONS,
+) -> float:
+    """In a crisis, how much more the hardest-hit sector moves than the typical one.
+
+    ONE ESTIMATOR, RUN BY THE SAME CODE ON THE TAPE AND ON THE MODEL, which
+    is the whole point of writing it here rather than in either harness:
+    `tools/calibration/crisis_dispersion_row.py` hands it 32 real names over
+    a window of the tape and `crisis_statistics` hands it the run's own
+    names, and neither gets to spell the arithmetic its own way. That is the
+    defect `real_windows`'s neighbours record on the VIX AR1 row -- a ruler
+    and a row that turned out to be two different quantities -- closed here
+    before the row ships instead of afterwards.
+
+    `returns` is one daily log-return series per name, `vix` is the level
+    the session traded under, one per return and in the same order, and
+    `sectors` says which sector each name belongs to. Then:
+
+        crisis sessions = the sessions with `vix` strictly above `threshold`
+        per name   ratio = sd(its returns on crisis sessions)
+                           / sd(its returns on the rest)
+        per sector       = the median ratio over the sector's names
+        the row          = max over sectors of (sector ratio / the median
+                           of the sector ratios)
+
+    The sample sd on both legs, because the two legs are two samples of
+    unequal size and a population sd would divide them by different
+    denominators than the estimate they are a ratio of.
+
+    THE ROW IS AT LEAST 1.0 BY ARITHMETIC. The maximum of a set is at least
+    its median, so `max(s) / median(s) >= 1` whatever the sectors read, and
+    a band edge below 1.0 is a dead edge -- which is what
+    `BAND_EDGE_LIVENESS` records for it rather than leaving to be
+    rediscovered by a reader of a band that cannot reject.
+
+    REFUSES rather than returning a number it cannot stand behind: a window
+    under `min_crisis_sessions` crisis sessions, fewer than two sessions on
+    either leg, a name with no sector, a name whose calm leg does not move,
+    or fewer than two sectors, which is a median of one thing. Every caller
+    turns the refusal into an ABSENT row with the reason attached.
+    """
+    sessions = len(vix)
+    if not returns:
+        raise ValidationError(
+            f"{CRISIS_DISPERSION_ROW} needs at least one name's returns")
+    for key, series in returns.items():
+        if len(series) != sessions:
+            raise ValidationError(
+                f"{CRISIS_DISPERSION_ROW} reads one return per session: "
+                f"{key!r} carries {len(series)} against {sessions} volatility "
+                f"index levels. A row measured on two different session sets "
+                f"is not this row")
+    crisis = [i for i, level in enumerate(vix) if level > threshold]
+    calm = [i for i, level in enumerate(vix) if not level > threshold]
+    if len(crisis) < min_crisis_sessions:
+        raise ValidationError(
+            f"{CRISIS_DISPERSION_ROW} is ABSENT for this window: it holds "
+            f"{len(crisis)} sessions with the volatility index above "
+            f"{threshold} and the row needs {min_crisis_sessions}. A crisis "
+            f"dispersion read off fewer is a property of the sample")
+    if len(calm) < 2:
+        raise ValidationError(
+            f"{CRISIS_DISPERSION_ROW} is ABSENT for this window: it holds "
+            f"{len(calm)} sessions below the crisis threshold, and the row "
+            f"is a ratio against them")
+    by_sector: dict[str, list[float]] = {}
+    for key, series in returns.items():
+        sector = sectors.get(key)
+        if sector is None:
+            raise ValidationError(
+                f"{CRISIS_DISPERSION_ROW} groups names by sector and {key!r} "
+                f"has none; a name with no sector would silently leave the "
+                f"maximum it might have set")
+        hot = statistics.stdev([series[i] for i in crisis])
+        cool = statistics.stdev([series[i] for i in calm])
+        if not cool > 0.0:
+            raise ValidationError(
+                f"{CRISIS_DISPERSION_ROW} is ABSENT for this window: {key!r} "
+                f"does not move on the non-crisis sessions, so its ratio has "
+                f"no denominator")
+        by_sector.setdefault(sector, []).append(hot / cool)
+    if len(by_sector) < 2:
+        raise ValidationError(
+            f"{CRISIS_DISPERSION_ROW} compares a sector with the typical "
+            f"sector and this window holds {len(by_sector)}; the row needs "
+            f"at least two")
+    ratios = {sector: statistics.median(values)
+              for sector, values in by_sector.items()}
+    centre = statistics.median(list(ratios.values()))
+    if not centre > 0.0:
+        raise ValidationError(
+            f"{CRISIS_DISPERSION_ROW} is ABSENT for this window: the median "
+            f"sector ratio is {centre}, so there is nothing to scale by")
+    return max(value / centre for value in ratios.values())
+
+
+def crisis_statistics(
+    bars: Any,
+    macro: Any,
+    universe: Sequence[Instrument],
+    *,
+    threshold: float = CRISIS_VIX_THRESHOLD,
+    min_crisis_sessions: int = CRISIS_DISPERSION_MIN_SESSIONS,
+) -> dict[str, Any]:
+    """The crisis sector dispersion row of a recorded run: one row.
+
+    THE FOURTH PART, beside `panel_statistics`, `fear_statistics` and
+    `persistence_statistics`, and it is a function for the reason those are:
+    a row `measure` reports and no caller can compute on its own is a row no
+    test can check without running a market.
+
+    The run's own daily close-to-close log returns per name, the level the
+    session traded under from the macro table's `vix` column -- the series
+    `vix_levels` reads, the one `measure` records before the close so the
+    macro row carries what the day traded under -- and the sector each
+    instrument was drawn with. Sessions are the days EVERY name and the
+    macro table carry, so one name with a gap moves no other name's return
+    onto a different day.
+
+    ABSENT WITH ITS REASON under `<row>_blind`, exactly as
+    `persistence_statistics` reports a VIX with no lag-one pair. A run of
+    252 sessions at a calm VIX holds no crisis sessions at all, and that is
+    a true statement about the run rather than a failure of it; a
+    fabricated 1.0 inside a median across seeds would move the row without
+    announcing itself.
+    """
+    try:
+        import pyarrow as pa
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError(
+            "tradefloor.facts.crisis_statistics reads Arrow tables and needs "
+            "pyarrow. Install it with: pip install tradefloor[arrow]") from exc
+
+    b = pa.table(bars).to_pydict()
+    m = pa.table(macro).to_pydict()
+    levels = {int(day): float(value)
+              for day, value in zip(m["day"], m["vix"]) if value is not None}
+    closes: dict[int, dict[int, float]] = {}
+    for day, ident, close in zip(b["day"], b["instrument_id"], b["close"]):
+        if close is None or float(close) <= 0.0:
+            continue
+        closes.setdefault(int(ident), {})[int(day)] = float(close)
+    sectors = {i: inst.sector for i, inst in enumerate(universe)}
+    names = sorted(i for i in closes if i in sectors)
+    days: list[int] = []
+    if names:
+        days = sorted(set(levels).intersection(*(set(closes[i]) for i in names)))
+    returns = {i: [math.log(closes[i][day] / closes[i][prev])
+                   for prev, day in zip(days, days[1:])]
+               for i in names}
+    try:
+        value = crisis_dispersion(
+            returns, [levels[day] for day in days[1:]], sectors,
+            threshold=threshold, min_crisis_sessions=min_crisis_sessions)
+    except ValidationError as exc:
+        return {CRISIS_DISPERSION_ROW + "_blind": str(exc)}
+    return {CRISIS_DISPERSION_ROW: value}
 
 
 def panel_statistics(
@@ -4282,8 +4655,15 @@ BAND_RULE_FIXED_TOLERANCE: float = 0.06486
 #: not the 252-day test: reaching the 252-day rate on five windows takes
 #: five standard deviations, because a five-window trimmed sd is a scale
 #: estimate on three kept points.
+#:
+#: t(7) = 3.483891 was solved on 2026-09-22 for `crisis_sector_dispersion`,
+#: whose 504-bar ruler rests on seven readable windows. It is the same
+#: solve at the same draws and the same seed, and it is here rather than
+#: interpolated between t(5) and t(9) because `band_rule_tolerance` refuses
+#: an unsolved count by name and says so.
 BAND_RULE_FIXED_MULTIPLIER: dict[int, float] = {
     5: 5.039474,
+    7: 3.483891,
     9: 2.982334,
     16: 2.417688,
     35: 2.111347,
@@ -4307,7 +4687,9 @@ BAND_RULE_FIXED_MULTIPLIER_PROVENANCE = {
                 "0.06512 at n=35, and at seed 20260906 they are 0.06451, "
                 "0.06522 and 0.06494 -- every one inside 1.1 standard "
                 "errors of the target, on two fresh seeds derived "
-                "independently",
+                "independently. t(7), added 2026-09-22, reads 0.06487 at "
+                "its own seed 20260905, 0.06453 at 20260914 and 0.06407 at "
+                "20260906, the furthest 1.4 standard errors low",
     "instrument_check": "the same harness re-measures the spread rule at 4, "
                         "5, 7 and 9 windows and reproduces "
                         "BAND_RULE_TOLERANCE at a worst residual of 1e-05, "
@@ -5296,6 +5678,58 @@ RULED_FEAR_DN1_BAND: dict[int, tuple[float, float]] = {
 #: re-derivation stays recorded under `['section14']` and is not adopted.
 RULED_FEAR_DN3_BAND: tuple[float, float] = tuple(REAL_MARKETS["fear_gauge_dn3"])
 
+#: `crisis_sector_dispersion`'s ruled band, per horizon.
+#:
+#: DERIVED AT IMPORT from `REAL_CRISIS_DISPERSION_WINDOWS` by the same two
+#: functions every other fixed-rule band goes through, so the band and the
+#: readings it comes from cannot drift apart and there is no edge written
+#: down anywhere to copy. The rule is the fear rows' and the universal
+#: panel's: `median +/- t(n) * trimmed_sd`, each edge rounded outward, with
+#: `t(n)` taken from `BAND_RULE_FIXED_MULTIPLIER` at the READABLE window
+#: count and not at the block count -- nine at 252 and seven at 504 -- because
+#: a window with no crisis in it supplies no reading for the median to be
+#: over. The rate is `BAND_RULE_FIXED_TOLERANCE` at both, which is what the
+#: fixed rule's solved multiplier buys.
+#:
+#: What it comes out at, so a reader of this block knows what to look for
+#: without running the derivation: (0.79, 1.74) at 252 on a centre of 1.263,
+#: and (1.03, 1.66) at 504 on a centre of 1.343. The 252 FLOOR IS DEAD, by
+#: the row's own arithmetic rather than by any property of the tape -- the row
+#: is a maximum over a set divided by that set's median, so it is at least
+#: 1.0 always -- and `BAND_EDGE_LIVENESS` carries that. The 504 floor at 1.03
+#: is live by three hundredths.
+#:
+#: THE ROUNDING IS THE RULE'S AND THE `round` IS NOT. `round_outward` works
+#: in quanta of 0.01 for this row, so every edge it returns is an exact
+#: multiple of one hundredth and the trailing `round(edge, 2)` only clears
+#: the binary dust a float multiplication leaves (1.6600000000000001 for
+#: 1.66). It never moves an edge inward: there is no edge for it to move.
+def crisis_dispersion_band(horizon_days: int) -> tuple[float, float]:
+    """`crisis_sector_dispersion`'s band at one horizon, from its windows."""
+    windows = REAL_CRISIS_DISPERSION_WINDOWS.get(int(horizon_days))
+    if windows is None:
+        raise ValidationError(
+            f"no crisis dispersion windows are recorded at {horizon_days} "
+            f"days; the horizons with them are "
+            f"{sorted(REAL_CRISIS_DISPERSION_WINDOWS)}. Cut the tape at that "
+            f"length with tools/calibration/crisis_dispersion_row.py rather "
+            f"than rescaling a band from another horizon")
+    n = len(windows)
+    if n not in BAND_RULE_FIXED_MULTIPLIER:
+        raise ValidationError(
+            f"the fixed rule's multiplier at {n} windows is not solved, so "
+            f"{CRISIS_DISPERSION_ROW} has no band at {horizon_days} days. "
+            f"Solve it with facts.band_rule_fixed_false_alarm and record it "
+            f"in BAND_RULE_FIXED_MULTIPLIER with its residual")
+    low, high = band_from_windows_fixed(
+        CRISIS_DISPERSION_ROW, windows, BAND_RULE_FIXED_MULTIPLIER[n])
+    return (round(low, 2), round(high, 2))
+
+
+RULED_CRISIS_DISPERSION_BAND: dict[int, tuple[float, float]] = {
+    h: crisis_dispersion_band(h) for h in (CERTIFIED_HORIZON_DAYS, 504)
+}
+
 #: The composed ruled band at the certified horizon: the fourteen shape
 #: rows on the universal table, plus the four level and crisis rows that
 #: have a whole-tape band of their own.
@@ -5306,6 +5740,14 @@ REAL_MARKETS_RULED: dict[str, tuple[float, float]] = dict(
     fear_gauge_dn1=RULED_FEAR_DN1_BAND[CERTIFIED_HORIZON_DAYS],
     fear_gauge_dn3=RULED_FEAR_DN3_BAND,
 )
+# The nineteenth banded row, added 2026-09-22 with the row itself. It is
+# composed in here and NOT in `REAL_MARKETS`: the decade panel has no
+# reading for it and inventing one would be a band nobody measured. That is
+# what puts the row in its own group, `DISPERSION`, rather than in `CRISIS`
+# -- `SHAPE + LEVEL + CRISIS` is an exact partition of `REAL_MARKETS` and
+# this row is not in that table.
+REAL_MARKETS_RULED[CRISIS_DISPERSION_ROW] = (
+    RULED_CRISIS_DISPERSION_BAND[CERTIFIED_HORIZON_DAYS])
 
 #: The composed ruled band at 504 bars. `corr_persistence_acf1` is HELD OUT
 #: here and not carried: `BAND_BASIS` records that its universal 504 band
@@ -5322,6 +5764,8 @@ REAL_MARKETS_RULED_504["index_drift_pct"] = RULED_DRIFT_BAND
 REAL_MARKETS_RULED_504["index_tail_dn3_pct"] = RULED_TAIL_BAND
 REAL_MARKETS_RULED_504["fear_gauge_dn1"] = RULED_FEAR_DN1_BAND[504]
 REAL_MARKETS_RULED_504["fear_gauge_dn3"] = RULED_FEAR_DN3_BAND
+REAL_MARKETS_RULED_504[CRISIS_DISPERSION_ROW] = (
+    RULED_CRISIS_DISPERSION_BAND[504])
 
 #: Every graded row with NO ruled band, per horizon, and what would give it
 #: one. A consumer reads this instead of inferring absence from a missing
@@ -5461,6 +5905,19 @@ BAND_EDGE_LIVENESS: dict[str, dict[str, Any]] = {
                   "floor is below it, so no reading can fall outside; the "
                   "band is roster-limited rather than era-limited",
     },
+    CRISIS_DISPERSION_ROW: {
+        "low": False, "high": True, "class": "ceiling-only",
+        "reason": "the row is a maximum over the sector ratios divided by "
+                  "their own median, so it is at least 1.0 by arithmetic "
+                  "and no reading can fall below the 252-bar floor of 0.79. "
+                  "THE 504 FLOOR IS LIVE and this entry understates it: "
+                  "1.03 sits three hundredths above the arithmetic bound, "
+                  "so a model with no crisis dispersion at all fails there "
+                  "and passes at 252. This table is keyed by ROW and not by "
+                  "horizon, so the published class is the weaker of the "
+                  "two rather than a claim of a floor test that cannot "
+                  "reject at 252",
+    },
     VIX_AR1_ROW: {
         "low": True, "high": False, "class": "open",
         "would_be": "floor-only",
@@ -5537,13 +5994,17 @@ RULED_BY_HORIZON: dict[int, dict[str, tuple[float, float]]] = {
 BAND_BASIS["facts.REAL_MARKETS_RULED"] = {
     "era": "1987-06..2025-07 on the fourteen shape rows, 1928-2025 on "
            "index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on "
-           "fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
+           "fear_gauge_dn1 and on crisis_sector_dispersion, "
+           "1990-01..2026-09 on fear_gauge_dn3",
     "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP "
               "on the two whole-record rows; ^VIX against ^GSPC on the "
               "two fear rows",
     "n_windows": 35,
     "rule": "fixed",
     "tolerance": BAND_RULE_FIXED_TOLERANCE,
+    # The universal shape rows' t(35). crisis_sector_dispersion is
+    # built at t(9) on its own nine readable windows and the four
+    # composed rows each carry their own, which `composed` names.
     "multiplier": 2.111347,
     "rows": len(REAL_MARKETS_RULED),
     "composed": {
@@ -5562,6 +6023,11 @@ BAND_BASIS["facts.REAL_MARKETS_RULED"] = {
                           "1990-2026 windows holding five or more qualifying "
                           "sessions, ruled 2026-09-19 on its power against "
                           "173 retained readings",
+        CRISIS_DISPERSION_ROW:
+            "facts.RULED_CRISIS_DISPERSION_BAND[252], the 9 of 35 "
+            "252-close windows of ^VIX against 32 names from 1990-01-02 "
+            "that hold 30 crisis sessions, fixed rule at t(9), derived at "
+            "import from facts.REAL_CRISIS_DISPERSION_WINDOWS",
     },
     "adjustments": "clamp #1 and clamp #2 re-applied on the shape rows; the "
                    "Campbell ceiling retired as redundant. The tail row's "
@@ -5578,20 +6044,29 @@ BAND_BASIS["facts.REAL_MARKETS_RULED"] = {
 BAND_BASIS["facts.REAL_MARKETS_RULED_504"] = {
     "era": "1987-06..2025-07 on the thirteen shape rows carried, 1928-2025 "
            "on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on "
-           "fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
+           "fear_gauge_dn1 and on crisis_sector_dispersion, "
+           "1990-01..2026-09 on fear_gauge_dn3",
     "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP "
               "on the two whole-record rows; ^VIX against ^GSPC on the "
               "two fear rows",
     "n_windows": 16,
     "rule": "fixed",
     "tolerance": BAND_RULE_FIXED_TOLERANCE,
+    # The universal shape rows' t(16); crisis_sector_dispersion is
+    # built at t(7), and the composed rows carry their own.
     "multiplier": 2.417688,
     "rows": len(REAL_MARKETS_RULED_504),
     "composed": {
         **{k: "facts.REAL_MARKETS_UNIVERSAL_504"
            for k in REAL_MARKETS_RULED_504
            if k not in ("index_drift_pct", "index_tail_dn3_pct",
-                        "fear_gauge_dn1", "fear_gauge_dn3")},
+                        "fear_gauge_dn1", "fear_gauge_dn3",
+                        CRISIS_DISPERSION_ROW)},
+        CRISIS_DISPERSION_ROW:
+            "facts.RULED_CRISIS_DISPERSION_BAND[504], the 7 of 17 "
+            "504-close windows of ^VIX against 32 names from 1990-01-02 "
+            "that hold 30 crisis sessions, fixed rule at t(7), derived at "
+            "import from facts.REAL_CRISIS_DISPERSION_WINDOWS",
         "fear_gauge_dn3": "facts.RULED_FEAR_DN3_BAND, the same band at both "
                           "horizons: the row is pooled over sessions and "
                           "its ruler is the shipped whole-record one, ruled "
@@ -5633,7 +6108,12 @@ BAND_WINDOWS: dict[int, int] = {252: 9, 504: 5}
 #: The one 504-bar band built on a different window count, and it is
 #: recorded in `REAL_MARKETS_504` beside the band itself.
 BAND_WINDOWS_EXCEPTIONS: dict[int, dict[str, int]] = {
-    504: {"corr_persistence_acf1": 4},
+    # And the crisis dispersion row, whose 504-bar band rests on the SEVEN
+    # windows that held thirty crisis sessions rather than on the five the
+    # shape rows' non-crisis rule leaves. At 252 its nine is the default and
+    # needs no entry, which is a coincidence of the two counts and not a
+    # shared derivation.
+    504: {"corr_persistence_acf1": 4, CRISIS_DISPERSION_ROW: 7},
 }
 
 #: The sampling sd of a median over the mean's, for a large sample from a
@@ -6087,6 +6567,13 @@ def real_windows(key: str, *,
         if raws is None:
             return None
         return tuple(debias_ar1(r, int(horizon_days)) for r in raws)
+    if key == CRISIS_DISPERSION_ROW:
+        # EVERY WINDOW HERE IS A CRISIS WINDOW, so there is no crisis
+        # exclusion to apply and none is applied: a window with fewer than
+        # thirty crisis sessions produced no reading at all and is not in
+        # the table. The count is therefore the READABLE count, nine at 252
+        # and seven at 504, which is the n the band's own t(n) is read at.
+        return REAL_CRISIS_DISPERSION_WINDOWS.get(int(horizon_days))
     if int(horizon_days) not in WINDOW_HORIZONS:
         raise ValidationError(
             f"no per-window real record for {key!r} at {horizon_days} days; "
@@ -6301,12 +6788,23 @@ def rule_row(key: str, *, horizon_days: int = TRADING_DAYS_PER_YEAR,
                 f"MEDIAN_SE_FACTOR * trimmed_sd / sqrt({len(windows)}) as "
                 f"its error"
                 if key == VIX_AR1_ROW else
+                # Not "non-crisis": every window this row has a reading on
+                # is a crisis window, and the ones with no crisis in them
+                # are the ones it has no reading on.
+                f"median of the {len(windows)} readable "
+                f"{int(horizon_days)}-day windows, each holding at least "
+                f"{CRISIS_DISPERSION_MIN_SESSIONS} crisis sessions, with "
+                f"MEDIAN_SE_FACTOR * trimmed_sd / sqrt({len(windows)}) as "
+                f"its error"
+                if key == CRISIS_DISPERSION_ROW else
                 f"{'mean' if rate else 'median'} of the {len(windows)} "
                 f"non-crisis {int(horizon_days)}-day windows, with "
                 f"{'sd' if rate else 'MEDIAN_SE_FACTOR * trimmed_sd'}"
                 f" / sqrt({len(windows)}) as its error"),
             "source": ("facts.REAL_VIX_AR1_WINDOWS"
                        if key == VIX_AR1_ROW else
+                       "facts.REAL_CRISIS_DISPERSION_WINDOWS"
+                       if key == CRISIS_DISPERSION_ROW else
                        "facts.INDEX_TAIL_WINDOWS"
                        if key in INDEX_TAIL_WINDOWS["rows"] else
                        "facts.REAL_MARKETS_WINDOWS"
@@ -7094,6 +7592,16 @@ def report(facts: dict[str, Any], *,
         lines += ["", "crisis: how often a large down day, and the fear "
                       "gauge's answer to one"]
         lines += [row(key) for key in CRISIS]
+    if DISPERSION:
+        # Its own section for the reason it has its own group: the row is
+        # banded on the ruled basis and on no other, so printing it among
+        # the shape rows would put a row the decade table cannot grade
+        # inside the count "fourteen of fourteen" is taken over. `row`
+        # prints "n/a" where the run reported it ABSENT, which is what a
+        # calm 252-session run does.
+        lines += ["", "crisis dispersion: how unevenly the crisis lands "
+                      "across sectors"]
+        lines += [row(key) for key in DISPERSION]
 
     # The ungraded rows, derived from the ruler in use rather than listed, so
     # a row can never be printed as graded because a list went stale -- and so

@@ -1,10 +1,10 @@
 {
   "bytes": 16920,
   "days": 250,
-  "katVersion": 25,
+  "katVersion": 26,
   "kind": "pretium.known-answer",
   "metadataSha256": "8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165",
-  "note": "Re-based 2026-09-21 for the third composition of pt-v19 (ptv19fix): the lever's exponent 4.9 and the level's loop gain 2.4684, both derived (design repo, programme/results/ptv19fix/RESULT.md). Every seeded pt-v19 trajectory changes; named presets before it replay exactly.",
+  "note": "Re-based 2026-09-22 for the fourth composition of pt-v19: the conserving crisis epicentre at the derived 1.93 (design repo, programme/results/ptv19epi3/RESULT.md). The known-answer path itself never crosses the crisis threshold, so its sim digest is the third composition's; the version moves because every seeded pt-v19 trajectory that enters a crisis changes. Named presets before it replay exactly.",
   "seed": 20260820,
   "sha256": "42fe2716dd9d059d3549e96c284cb33ce9dcb9eb282fc1acf92add7e26c47da7",
   "simulationSha256": "f05e769f5deecc84615a6be1d9811d055f06b83eed9e7920b36b64f0a1df3a2a"

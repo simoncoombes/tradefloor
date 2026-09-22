@@ -302,6 +302,29 @@ PERTURBATIONS = [
     # stationary opening change scale, the opening draw is the same draw at
     # a different scale, and no draw moves on any stream.
     ("vix_level_loop_gain", 1.7486, True),
+    # The crisis epicentre (2026-09-22), and both rows are INERT here for
+    # the reason `crisis_blend_source`, `crisis_blend_ramp` and
+    # `crisis_blend_cap` are: the mechanism is gated on the VIX being above
+    # `crisis_vix_threshold` (30.88 on the default), the harness starts at
+    # the default 15 and three sessions do not reach it, so no crisis
+    # EPISODE is ever entered. Nothing COMPANIONS can do fixes that without
+    # confounding the reading: the only dial that would let an episode start
+    # in three sessions is the threshold itself, and moving it in the
+    # perturbed arm alone turns on the crisis blend, the universe stress
+    # memory and the economy's crisis premium in the same breath, so the row
+    # would pass on three other mechanisms.
+    #
+    # What DOES measure them is in tests/test_crisis_epicentre.py, which
+    # holds the VIX above the threshold and reads the episode, the draw, the
+    # multiple and the bit-identity at 0.0 directly.
+    # The default ships 1.93 since the fourth composition, so the
+    # perturbation is to 1.41, the tape's 2020 reading; still inert on this
+    # harness for the reason above.
+    ("crisis_epicentre_extra", 1.41, False),
+    # Inert twice over: the gate above, and its own gate. The counter is
+    # read only inside a running episode, and no episode is entered while
+    # `crisis_epicentre_extra` is 0.0 -- which is the default.
+    ("crisis_epicentre_end_sessions", 5.0, False),
     # The market-side warm-up, added 2026-09-14 and shipping at 0.0 on
     # every preset. MEASURED True on the probe below, and the reason it
     # can be is the same reason `market_vol_level_persistence` reads True:

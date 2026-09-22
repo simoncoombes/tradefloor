@@ -3690,6 +3690,131 @@ pub struct ModelParams {
     /// reachable at all; whether it is the RIGHT point is a different
     /// question and now an answerable one.
     pub crisis_vix_threshold: f64,
+    /// How much more volatile the crisis EPICENTRE's names are than the
+    /// other sectors' at the same VIX. 0.0 -- every preset before pt-v19's
+    /// fourth composition of 2026-09-22, which ships 1.93 -- takes the branch not
+    /// taken: no episode is tracked, no epicentre is drawn, no draw is
+    /// taken on any stream and every preset is bit-identical. DERIVED 1.93.
+    ///
+    /// # What it is
+    ///
+    /// A crisis EPISODE starts on the session whose VIX is above
+    /// `crisis_vix_threshold` with no episode running, and ends after
+    /// `crisis_epicentre_end_sessions` consecutive sessions back under it.
+    /// At the start of each episode one epicentre is drawn from the sector
+    /// table's [`crate::sectors::Sector::crisis_weight`], `none` being the
+    /// remainder and a draw in its own right, on
+    /// [`crate::rng::stream::CRISIS_EPICENTRE`]. While the episode runs,
+    /// the names in that sector carry an extra multiple on the parts of
+    /// their return that are NOT the market factor -- the sector leg and
+    /// their own idiosyncratic noise, both in
+    /// `market::factors::calculate_live_factors` -- and every OTHER name
+    /// carries a multiple below one on the same two parts. The market
+    /// component is untouched, so the index, the VIX and the fear rows do
+    /// not move -- only who carries the crisis moves.
+    ///
+    /// # It redistributes rather than adds
+    ///
+    /// The second multiple is what makes this dial a statement about WHO
+    /// carries a crisis and not a statement about how large crises are. At a
+    /// given VIX the roster's total crisis variance is the VIX's to set:
+    /// `crisis_blend_*`, the GARCH and the market factor set it, and this
+    /// dial has no business moving it. So the pair of multiples is solved
+    /// under a conservation condition -- the roster's MEAN non-market
+    /// variance is unchanged -- alongside the tape's ratio.
+    ///
+    /// It was built the other way first, on 2026-09-22: the epicentre's
+    /// names were lifted and no one was lowered. That arm moved the row it
+    /// was built for (`crisis_sector_dispersion` 1.15 to 1.39 against the
+    /// tape's 1.34 at two years) and moved three rows away with it --
+    /// `annualised_vol_pct` 24.3 to 25.5 against 23.7,
+    /// `cross_sectional_corr` 0.330 to 0.314 against 0.353,
+    /// `volume_abs_return_corr` 0.535 to 0.545 -- and the three were one
+    /// cause: a roster whose total crisis variance had risen. It was refused
+    /// (`results/ptv19epi2`, design repository). The additive arm is kept as
+    /// the `w = 0` edge of this solve rather than as a second form; see
+    /// [`crate::market::factors::CRISIS_EPICENTRE_SECTOR_SHARE`].
+    ///
+    /// # Derivation
+    ///
+    /// Five crisis episodes on the tape, 39 real names of the roster mapped
+    /// to the engine's sector keys, each sector's median episode volatility
+    /// over each name's own calm-day volatility (VIX under 12), then each
+    /// sector relative to the median sector of that episode
+    /// (`results/ptv19refine/epicentre-derivation.json`, design repository).
+    /// The rule was stated before the numbers were read: the epicentre is
+    /// the sector furthest above the episode's median if it is 1.3x or more
+    /// above it. 2008-09 gives financial services at 2.43, 2011 financial
+    /// services at 1.93, 2020 financial services at 1.41; 2000-02 and 2022
+    /// have none. The MEDIAN of the three ratios is 1.93, and that is this
+    /// dial: nothing was fitted to a graded row.
+    ///
+    /// # The multiples the code applies, and why neither is this number
+    ///
+    /// This dial is stated on a name's TOTAL volatility, which is what the
+    /// tape measures. The code can only scale the non-market parts, so the
+    /// pair applied to them is solved from two measured shares: `m`, the
+    /// market factor's share of a name's variance, and `w`, the epicentre
+    /// sector's share of the roster's non-market variance.
+    ///
+    /// ```text
+    /// (a)  m + (1 - m) g_up^2  =  e^2 ( m + (1 - m) g_down^2 )
+    /// (b)  w g_up^2 + (1 - w) g_down^2  =  1
+    ///
+    /// g_down^2 = [ (1 - m) - m w A ] / [ (1 - m) (1 + w A) ]   , A = e^2 - 1
+    /// g_up^2   = m A / (1 - m) + e^2 g_down^2
+    /// ```
+    ///
+    /// `m` is [`CRISIS_EPICENTRE_MARKET_SHARE`] and `w` is
+    /// [`CRISIS_EPICENTRE_SECTOR_SHARE`], both MEASURED on the composed
+    /// pt-v19 and recorded there with their recipes. At `m = 0.3916`,
+    /// `w = 0.1019` and `e = 1.93` that is `g_down^2 = 0.4996655 /
+    /// 0.7773328 = 0.642795`, `g_down = 0.801745`, and `g_up^2 = 1.753897 +
+    /// 2.394346 = 4.148243`, `g_up = 2.036724`. See
+    /// [`crate::market::factors::crisis_epicentre_gains`], which is where
+    /// the solve lives, and
+    /// [`crate::market::factors::crisis_epicentre_extra_bounds`], which is
+    /// where the two extras that would ask a name for a negative variance
+    /// sit -- 0.6052 below and 4.0307 above.
+    ///
+    /// # What it is NOT
+    ///
+    /// It is not a correlation dial and not a second crisis blend. The
+    /// sector leg it multiplies is the one every member of the sector
+    /// shares, so lifting it lifts both the epicentre's volatility and its
+    /// internal correlation -- which is what an epicentre is -- and the
+    /// idiosyncratic leg is lifted beside it so the split between the two
+    /// is the one the name already had.
+    ///
+    /// It is not meant to be a volatility dial either, and that is what the
+    /// conservation condition buys: the roster's mean non-market INNOVATION
+    /// variance is the same at any extra, to the bit. What a long run
+    /// realises is not, because the per-name GARCH is convex in what it is
+    /// fed and gives some of it back;
+    /// [`crate::market::factors::crisis_epicentre_gains`] measures how much
+    /// and says why moving `w` to chase it would be fitting.
+    ///
+    /// An epicentre no name in the roster is in does nothing at all, and
+    /// `Engine::crisis_epicentre_key` is where that is decided: the draw
+    /// still happened and the episode still reports it, but with nobody to
+    /// move the variance TO there is nothing for the tick to do with it.
+    pub crisis_epicentre_extra: f64,
+    /// How many consecutive sessions under `crisis_vix_threshold` end a
+    /// crisis episode. 21 ships, which is a month of sessions.
+    ///
+    /// The hysteresis, and it is what makes an episode an episode rather
+    /// than a run of scattered days: the tape's five episodes are months
+    /// long (the shortest, 2011, is four months) and the VIX crosses back
+    /// under the threshold repeatedly inside each of them. Without the
+    /// counter an epicentre would be redrawn on every re-crossing, which
+    /// would average three sectors across one crisis and show none of them.
+    ///
+    /// Read only while `crisis_epicentre_extra` is non-zero, so it is inert
+    /// on every shipped preset whatever it reads. A value at or below zero
+    /// ends an episode on the first session back under the threshold, which
+    /// `ModelParams::invariants` allows: it is a degenerate hysteresis, not
+    /// an incoherent one.
+    pub crisis_epicentre_end_sessions: f64,
     /// The VIX above which the dollar catches a safe-haven bid.
     ///
     /// Defaults to the same constant as `crisis_vix_threshold` and is a
@@ -4031,6 +4156,10 @@ impl ModelParams {
             vix_ceiling: 80.0,
             vix_target_offset: 0.0,
             crisis_vix_threshold: crate::economy::CRISIS_VIX_THRESHOLD,
+            // Inert: the branch is not taken, no episode is tracked and no
+            // draw is taken on any stream, so every preset is bit-identical.
+            crisis_epicentre_extra: 0.0,
+            crisis_epicentre_end_sessions: 21.0,
             usd_crisis_vix_threshold: crate::economy::CRISIS_VIX_THRESHOLD,
             daily_credit_floor_gain: 0.0,
             news_peer_weight: 0.0,
@@ -5418,6 +5547,21 @@ impl ModelParams {
         // and 82 to 59 at two, the first composition to lower it since the
         // VIX law arrived.
         p.vix_level_loop_gain = 2.4684;
+        // THE FOURTH COMPOSITION, 2026-09-22 (design repo, results/ptv19epi3/
+        // RESULT.md, registered first; Simon's ruling that ties in the row
+        // tally are settled by distance). The crisis epicentre: at each
+        // crisis episode one sector is drawn to carry the crisis, on its own
+        // stream, from the sector table's weights (financial_services 0.6,
+        // none 0.4, the tape's five episodes); its names carry the extra on
+        // the parts of their return that are not the market factor and every
+        // other name carries a multiple under one, so the roster's crisis
+        // variance is redistributed and not added to. DERIVED 1.93, the
+        // median of the tape's three epicentre episodes. Measured on the box:
+        // the crisis_sector_dispersion row from 1.15 to 1.36 against the
+        // tape's 1.34 at two years; the VIX row, the rise, the tail and the
+        // fear rows unchanged; sector_excess_corr half a tape error further.
+        // The scenario pins it: `Scenario().hold(epicentre="financial_services")`.
+        p.crisis_epicentre_extra = 1.93;
         // THE CEILING, WHICH CLAMPS THE STATE AND NOT THE TARGET.
         //
         // `vix_ceiling` bounds the VIX after the reversion step,
@@ -5983,6 +6127,8 @@ impl ModelParams {
             "vix_ceiling" => self.vix_ceiling,
             "vix_target_offset" => self.vix_target_offset,
             "crisis_vix_threshold" => self.crisis_vix_threshold,
+            "crisis_epicentre_extra" => self.crisis_epicentre_extra,
+            "crisis_epicentre_end_sessions" => self.crisis_epicentre_end_sessions,
             "usd_crisis_vix_threshold" => self.usd_crisis_vix_threshold,
             "daily_credit_floor_gain" => self.daily_credit_floor_gain,
             "news_peer_weight" => self.news_peer_weight,
@@ -6175,6 +6321,8 @@ impl ModelParams {
             "vix_ceiling" => out.vix_ceiling = value,
             "vix_target_offset" => out.vix_target_offset = value,
             "crisis_vix_threshold" => out.crisis_vix_threshold = value,
+            "crisis_epicentre_extra" => out.crisis_epicentre_extra = value,
+            "crisis_epicentre_end_sessions" => out.crisis_epicentre_end_sessions = value,
             "usd_crisis_vix_threshold" => out.usd_crisis_vix_threshold = value,
             "daily_credit_floor_gain" => out.daily_credit_floor_gain = value,
             "news_peer_weight" => out.news_peer_weight = value,
@@ -6337,6 +6485,32 @@ impl ModelParams {
                  identity the target is the phase table and the multiplier is not applied, \
                  so a non-zero sigma would be a dial that reads as live and does nothing.",
                 self.vix_level_sigma));
+        }
+        if self.crisis_epicentre_extra != 0.0 {
+            // BOTH squares, because the mechanism now moves both ways: the
+            // epicentre's names up and the rest of the roster down, with the
+            // roster's mean non-market variance held. So there is a floor
+            // AND a ceiling, and asking the solve which one was hit is
+            // better than restating its algebra here and letting the two
+            // drift apart.
+            let (up2, down2) = crate::market::factors::crisis_epicentre_gain_squares(
+                self.crisis_epicentre_extra);
+            let (lo, hi) = crate::market::factors::crisis_epicentre_extra_bounds();
+            if !(up2 > 0.0 && down2 > 0.0) {
+                return Err(format!(
+                    "crisis_epicentre_extra is {}. It is a multiple on the epicentre \
+                     names' TOTAL volatility, the market factor carries {} of a name's \
+                     variance and is not scaled, and the epicentre sector carries {} of \
+                     the roster's non-market variance, whose mean the solve holds -- so \
+                     the solved squares are ({}, {}) and an extra outside ({}, {}) asks \
+                     a name for a negative variance: below it the epicentre's own \
+                     non-market parts, above it every other name's. Set it inside that \
+                     interval, or to 0.0, where the mechanism does not run.",
+                    self.crisis_epicentre_extra,
+                    crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE,
+                    crate::market::factors::CRISIS_EPICENTRE_SECTOR_SHARE,
+                    up2, down2, lo, hi));
+            }
         }
         if self.vix_level_loop_gain != 0.0 && !(self.vix_level_loop_gain > 0.0) {
             return Err(format!(
@@ -6547,6 +6721,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "idio_sigma_floor",
         "crisis_blend_variance_damp",
         "crisis_vix_threshold",
+        "crisis_epicentre_extra",
+        "crisis_epicentre_end_sessions",
         "crowd_lean_cap",
         "crowd_momentum_gain",
         "crowd_valuation_gain",

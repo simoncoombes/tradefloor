@@ -110,6 +110,12 @@ pub struct EngineRngState {
     pub overnight: RngState,
     /// The market factor's slow-level stream, carried for the same reason.
     pub market_vol_level: RngState,
+    /// The crisis epicentre's stream, carried for the same reason. It draws
+    /// only on the session an unpinned episode starts, so a restore that
+    /// dropped it would give the NEXT crisis a different epicentre from the
+    /// one the parent would have drawn -- invisible while
+    /// `crisis_epicentre_extra` is 0.0 and silently wrong the day it is not.
+    pub crisis_epicentre: RngState,
 }
 
 /// Cumulative draws per stream. Diagnostic, per D-R1: the single most
@@ -252,6 +258,7 @@ pub struct Engine {
     news_rng: GameRng,
     overnight_rng: GameRng,
     market_vol_level_rng: GameRng,
+    crisis_epicentre_rng: GameRng,
     /// The move each name's `s` took at the last open under the overnight
     /// process, in roster order, 0.0 where nothing moved. Per-day state
     /// like the attribution: the tape books it onto the day's first row.
@@ -379,6 +386,36 @@ pub struct Engine {
     /// exactly 1.0 on what the VIX prices, which is every preset. Driven by
     /// the same normal `market_vol_log_level` reads, so it adds no draw.
     vix_log_level: f64,
+    /// Whether a crisis EPISODE is running. The episode starts at the open
+    /// of the first session whose VIX is above `crisis_vix_threshold` with
+    /// no episode running, and ends after `crisis_epicentre_end_sessions`
+    /// consecutive sessions back under it.
+    ///
+    /// False on every shipped preset and on every session of one: the whole
+    /// block is gated on `crisis_epicentre_extra`, which ships 0.0. See
+    /// `ModelParams::crisis_epicentre_extra`.
+    crisis_in_episode: bool,
+    /// Consecutive sessions the running episode has spent under the
+    /// threshold. Reset to zero by any session back above it, which is what
+    /// makes one crisis one episode rather than a run of scattered days.
+    crisis_sessions_under: i64,
+    /// The sector index in `crate::sectors::SECTORS` this episode's
+    /// epicentre was drawn at, or `-1` for `none` -- a crisis with no
+    /// epicentre, which is two of the tape's five episodes and is a DRAW
+    /// rather than the absence of one. Meaningless while
+    /// `crisis_in_episode` is false, and written to `-1` when an episode
+    /// ends so a snapshot carries no stale sector.
+    crisis_epicentre: i32,
+    /// The epicentre a scenario has PINNED, if any: `-1` for `none`, else a
+    /// sector index. `Some` overrides the draw for every episode that
+    /// starts while it is set, and a pinned episode takes NO draw, so a
+    /// pinned run consumes nothing on `stream::CRISIS_EPICENTRE`.
+    ///
+    /// Not part of the episode state: it is an input to the run, written by
+    /// `pin_macro` and carried by the snapshot for the same reason the
+    /// pinned macro fields are -- a fork that dropped it would resume
+    /// drawing its own epicentre part-way through a pinned experiment.
+    crisis_epicentre_pin: Option<i32>,
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
     volume_state: f64,
@@ -841,6 +878,7 @@ impl Engine {
             news_rng: GameRng::substream(seed, stream::NEWS),
             overnight_rng: GameRng::substream(seed, stream::OVERNIGHT),
             market_vol_level_rng: GameRng::substream(seed, stream::MARKET_VOL_LEVEL),
+            crisis_epicentre_rng: GameRng::substream(seed, stream::CRISIS_EPICENTRE),
             overnight_moves: vec![0.0; companies_len],
             companies,
             economy,
@@ -870,6 +908,10 @@ impl Engine {
             forced_flow_spent: 0.0,
             market_vol_log_level: 0.0,
             vix_log_level: 0.0,
+            crisis_in_episode: false,
+            crisis_sessions_under: 0,
+            crisis_epicentre: -1,
+            crisis_epicentre_pin: None,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             jump_move: vec![0.0; companies_len],
@@ -1478,6 +1520,7 @@ impl Engine {
             news: self.news_rng.snapshot(),
             overnight: self.overnight_rng.snapshot(),
             market_vol_level: self.market_vol_level_rng.snapshot(),
+            crisis_epicentre: self.crisis_epicentre_rng.snapshot(),
         }
     }
 
@@ -1498,6 +1541,7 @@ impl Engine {
         self.news_rng = GameRng::restore(state.news);
         self.overnight_rng = GameRng::restore(state.overnight);
         self.market_vol_level_rng = GameRng::restore(state.market_vol_level);
+        self.crisis_epicentre_rng = GameRng::restore(state.crisis_epicentre);
     }
 
     /// Cumulative draws across all three streams. The per-stream split is
@@ -1526,6 +1570,7 @@ impl Engine {
             stream::VOLUME_IDIO => &self.volume_idio_rng,
             stream::OVERNIGHT => &self.overnight_rng,
             stream::MARKET_VOL_LEVEL => &self.market_vol_level_rng,
+            stream::CRISIS_EPICENTRE => &self.crisis_epicentre_rng,
             _ => panic!("unknown stream {id}"),
         }
     }
@@ -1541,6 +1586,7 @@ impl Engine {
             stream::VOLUME_IDIO => &mut self.volume_idio_rng,
             stream::OVERNIGHT => &mut self.overnight_rng,
             stream::MARKET_VOL_LEVEL => &mut self.market_vol_level_rng,
+            stream::CRISIS_EPICENTRE => &mut self.crisis_epicentre_rng,
             _ => panic!("unknown stream {id}"),
         }
     }
@@ -1802,6 +1848,9 @@ impl Engine {
 
         // The per-sector sigmas from the state, or empty (the stateless draw).
         let sector_sigmas = self.sector_sigmas_now();
+        // `'static`, so it does not borrow `self` while the tick takes it
+        // mutably. `None` on every shipped preset.
+        let epicentre = self.crisis_epicentre_key();
         if !sector_sigmas.is_empty() {
             let t = crate::market::tick::sector_sigma_at(&self.params, &self.economy, self.vix_anchor);
             self.sector_target_day = t * t;
@@ -1836,6 +1885,9 @@ impl Engine {
                 settle_draws,
                 settle_depth_counterfactual: self.settle_depth_counterfactual,
                 nominal_output_base: self.nominal_output_base,
+                // Resolved at this session's `open_market` and fixed for
+                // the day; `None` on every shipped preset.
+                crisis_epicentre: epicentre,
                 elapsed_days: self.current_day,
                 params: &self.params,
             },
@@ -2305,7 +2357,157 @@ impl Engine {
             .collect()
     }
 
+    /// Step the crisis episode and, on the session one starts, draw its
+    /// epicentre.
+    ///
+    /// Called once per session from `open_market`, which is the one point
+    /// every spelling of a day passes through exactly once, and BEFORE the
+    /// session's ticks, so the epicentre is fixed for the whole day.
+    ///
+    /// # Draw discipline
+    ///
+    /// A BRANCH at `crisis_epicentre_extra` 0.0 -- every preset before pt-v19's
+    /// fourth composition of 2026-09-22:
+    /// nothing runs, no state moves and no draw is taken, here or anywhere.
+    /// When the dial is live the one uniform is taken on
+    /// `stream::CRISIS_EPICENTRE` and nowhere else, so `MARKET`, `ECONOMY`,
+    /// `EXTERNAL` and the six mechanism streams keep the positions they
+    /// would have had and every recorded trajectory replays exactly. That
+    /// the draw is CONDITIONAL -- once per episode, and not at all under a
+    /// pin -- is allowed here for the reason the stream's own docs give:
+    /// the only schedule it can move is its own, and nothing else reads it.
+    fn update_crisis_episode(&mut self) {
+        if self.params.crisis_epicentre_extra == 0.0 {
+            return;
+        }
+        let above = self.economy.vix > self.params.crisis_vix_threshold;
+        if !self.crisis_in_episode {
+            // "Crossing from below" needs no previous VIX: an episode
+            // cannot be running, so the last session either was under the
+            // threshold or was before the run began.
+            if above {
+                self.crisis_in_episode = true;
+                self.crisis_sessions_under = 0;
+                self.crisis_epicentre = match self.crisis_epicentre_pin {
+                    // PINNED: no draw. The stream's position is where the
+                    // last episode left it, so a pinned run and an unpinned
+                    // one are not the same random world on this stream --
+                    // which is correct, since the pin replaces the draw
+                    // rather than overriding its result.
+                    Some(pin) => pin,
+                    None => {
+                        self.crisis_epicentre_rng
+                            .site(Site::CrisisEpicentreU, 0);
+                        let u = self.crisis_epicentre_rng.next_f64();
+                        match crate::sectors::draw_crisis_epicentre(u) {
+                            Some(i) => i as i32,
+                            None => -1,
+                        }
+                    }
+                };
+            }
+        } else if above {
+            self.crisis_sessions_under = 0;
+        } else {
+            self.crisis_sessions_under += 1;
+            // `>=`, so a value at or below zero ends the episode on the
+            // first session back under the threshold rather than never.
+            if (self.crisis_sessions_under as f64) >= self.params.crisis_epicentre_end_sessions {
+                self.crisis_in_episode = false;
+                self.crisis_sessions_under = 0;
+                self.crisis_epicentre = -1;
+            }
+        }
+    }
+
+    /// The sector key the running episode's epicentre was drawn at, or
+    /// `None` -- no episode, the dial off, the episode drew `none`, or the
+    /// sector it drew has no name in THIS roster.
+    ///
+    /// That last one is the tick's question rather than the episode's, which
+    /// is why it is answered here and not in `crisis_episode`: the draw
+    /// happened and the state records it either way. But the multiples the
+    /// tick applies move the roster's crisis variance from one sector to the
+    /// others, and with nobody in the epicentre there is nothing to move it
+    /// TO -- every name would be scaled down and the roster would simply go
+    /// quiet in a crisis, which is the one thing this mechanism promises not
+    /// to do. An epicentre nobody is in is not an epicentre.
+    ///
+    /// `'static`, because it is a key from the sector table rather than a
+    /// borrow of this engine, which is what lets the tick's inputs carry it
+    /// while the rest of the engine is borrowed mutably.
+    pub fn crisis_epicentre_key(&self) -> Option<&'static str> {
+        if !self.crisis_in_episode || self.crisis_epicentre < 0 {
+            return None;
+        }
+        let key = crate::sectors::SECTORS
+            .get(self.crisis_epicentre as usize)
+            .map(|s| s.key)?;
+        if self.companies.iter().any(|c| c.sector == key) {
+            Some(key)
+        } else {
+            None
+        }
+    }
+
+    /// The episode state: whether one is running, how many consecutive
+    /// sessions it has spent under the threshold, and its epicentre as the
+    /// sector key or the string `"none"`.
+    ///
+    /// The epicentre reads `None` only when no episode is running, so a
+    /// caller can tell "no crisis" from "a crisis with no epicentre", which
+    /// the tick deliberately cannot.
+    pub fn crisis_episode(&self) -> (bool, i64, Option<&'static str>) {
+        let who = if !self.crisis_in_episode {
+            None
+        } else if self.crisis_epicentre < 0 {
+            Some("none")
+        } else {
+            crate::sectors::SECTORS
+                .get(self.crisis_epicentre as usize)
+                .map(|s| s.key)
+        };
+        (self.crisis_in_episode, self.crisis_sessions_under, who)
+    }
+
+    /// The raw episode state, for the snapshot.
+    pub fn crisis_episode_raw(&self) -> (bool, i64, i32, Option<i32>) {
+        (
+            self.crisis_in_episode,
+            self.crisis_sessions_under,
+            self.crisis_epicentre,
+            self.crisis_epicentre_pin,
+        )
+    }
+
+    /// Restore the episode state, for a snapshot.
+    pub fn set_crisis_episode_raw(
+        &mut self,
+        in_episode: bool,
+        sessions_under: i64,
+        epicentre: i32,
+        pin: Option<i32>,
+    ) {
+        self.crisis_in_episode = in_episode;
+        self.crisis_sessions_under = sessions_under;
+        self.crisis_epicentre = epicentre;
+        self.crisis_epicentre_pin = pin;
+    }
+
+    /// Pin the epicentre, or clear the pin.
+    ///
+    /// `Some(-1)` pins `none`, a crisis with no epicentre; `None` clears the
+    /// pin and hands the next episode back to the draw.
+    pub fn set_crisis_epicentre_pin(&mut self, pin: Option<i32>) {
+        self.crisis_epicentre_pin = pin;
+    }
+
     pub fn open_market(&mut self) {
+        // THE CRISIS EPISODE, stepped before anything else the session does.
+        // At `crisis_epicentre_extra` 0.0 -- every preset before pt-v19's fourth
+        // composition of 2026-09-22 -- this
+        // returns without touching state or taking a draw.
+        self.update_crisis_episode();
         // Attribution is per DAY. Resetting here rather than at close means a
         // caller can still read yesterday's decomposition after the close has
         // run, which is when they would actually want it.
@@ -4148,12 +4350,13 @@ impl Engine {
             }
         }
 
-        // The eight generator states, in the order the snapshot's flat `rng`
+        // The ten generator states, in the order the snapshot's flat `rng`
         // array carries them. Raw bit patterns, per the encoding note above.
         let rng = self.rng_state();
         for state in [
             rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
             rng.news, rng.volume_idio, rng.overnight, rng.market_vol_level,
+            rng.crisis_epicentre,
         ] {
             hash_u64(&mut buf, state.state);
             hash_u64(&mut buf, state.increment);
@@ -4251,6 +4454,18 @@ impl Engine {
         hash_f64(&mut buf, self.forced_flow_spent);
         hash_f64(&mut buf, self.market_vol_log_level);
         hash_f64(&mut buf, self.vix_log_level);
+        // The crisis episode. Hashed for the reason every field here is:
+        // two engines alike in every column, one of them three sessions
+        // into a financial-services episode and the other not in an episode
+        // at all, price tomorrow differently. The pin goes in beside the
+        // state because it is what the NEXT episode will be drawn -- or not
+        // drawn -- from, which is the same class of divergence one session
+        // later. `-2` for an absent pin, which is no sector index and not
+        // the `-1` that means `none`.
+        hash_bool(&mut buf, self.crisis_in_episode);
+        hash_f64(&mut buf, self.crisis_sessions_under as f64);
+        hash_f64(&mut buf, self.crisis_epicentre as f64);
+        hash_f64(&mut buf, self.crisis_epicentre_pin.unwrap_or(-2) as f64);
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where
         // every per-slot array above always follows the roster. An empty

@@ -56,7 +56,40 @@ TABLES = (
     ("CERTIFIED_CRISIS", ("level_protocol", "certified_crisis")),
 )
 
-ROW = re.compile(r'^(\s*)"([A-Za-z0-9_]+)": (-?[0-9]+\.[0-9]+),\s*$')
+#: A value line inside one of those literals. `None` as well as a float
+#: since 2026-09-22: `envelope.CERTIFIED` carries a row against no reading
+#: when the certification run could not read it, and this tool is what
+#: writes that state -- and what writes a number into it the day a preset
+#: holds enough crisis sessions for `crisis_sector_dispersion` to read.
+ROW = re.compile(r'^(\s*)"([A-Za-z0-9_]+)": (-?[0-9]+\.[0-9]+|None),\s*$')
+
+#: The type annotation on a table literal. Two spellings, because a table
+#: that may carry an absent row is `float | None` and the other three are
+#: `float`; matched rather than assumed, so the tool refuses a table it
+#: cannot parse instead of silently finding no rows in it.
+HEAD = r"^{name}: dict\[str, float(?: \| None)?\] = \{{$"
+
+
+def may_be_absent() -> frozenset[str]:
+    """Rows a record is allowed not to carry, read from the library.
+
+    `facts.DISPERSION`: `crisis_sector_dispersion` is graded, it has a band
+    at both horizons, and a window with fewer than
+    `facts.CRISIS_DISPERSION_MIN_SESSIONS` crisis sessions produces no
+    reading at all. A record measured on such a run omits the row from
+    `panel_252`, exactly as an all-empty `fear_gauge_dn3` is omitted from an
+    aggregate, and the table is then written `None` rather than refused as a
+    schema change or filled with the row's arithmetic floor.
+
+    Every OTHER missing row is still a schema change and still refused. The
+    difference is the library's, not this tool's opinion.
+    """
+    try:
+        from tradefloor import facts
+    except ImportError:
+        sys.path.insert(0, str(ROOT / "python"))
+        from tradefloor import facts
+    return frozenset(facts.DISPERSION)
 
 
 def dig(record: dict, path: tuple[str, ...]) -> dict:
@@ -70,32 +103,50 @@ def rewrite(text: str, name: str, values: dict[str, float]) -> tuple[str, list]:
     """Replace the value lines of one `NAME: dict[str, float] = {` literal.
 
     Returns the new text and a list of (row, old, new) for every row whose
-    printed value moved. Refuses a table whose row set differs from the
+    printed value moved, with `None` on either side for a row that gained or
+    lost its reading. Refuses a table whose row set differs from the
     record's: a row added to or dropped from the panel is a schema change,
     not a re-measurement, and needs a hand.
+
+    ONE EXCEPTION, AND IT IS THE LIBRARY'S: a row in `may_be_absent()` that
+    the record does not carry is written `None` rather than refused. That
+    row's absence is a measurement -- the run could not read it -- and the
+    table is where the module says so. Leaving it at its previous value
+    instead would republish the reading of a different run, which is the
+    stale-constant defect this whole tool exists to close.
     """
-    head = re.compile(rf"^{re.escape(name)}: dict\[str, float\] = \{{$", re.M)
+    head = re.compile(HEAD.format(name=re.escape(name)), re.M)
     m = head.search(text)
     if m is None:
         raise SystemExit(f"REFUSED: no `{name}: dict[str, float] = {{` in {ENVELOPE}")
     start = m.end()
     end = text.index("\n}", start)
     body = text[start:end]
+    absent_ok = may_be_absent()
     seen, moved, out = [], [], []
     for line in body.split("\n"):
         r = ROW.match(line)
         if not r:
             out.append(line)
             continue
-        indent, row, old = r.group(1), r.group(2), float(r.group(3))
-        if row not in values:
+        indent, row = r.group(1), r.group(2)
+        old = None if r.group(3) == "None" else float(r.group(3))
+        if row not in values and row not in absent_ok:
             raise SystemExit(f"REFUSED: {name} has a row `{row}` the record does not; "
                              f"that is a schema change, not a re-measurement")
         seen.append(row)
-        new = round(values[row], PLACES)
+        # A ROW THE RECORD DOES NOT CARRY IS WRITTEN `None`, not skipped and
+        # not left at its previous value. Left alone, the module would go on
+        # publishing the reading of a run that could read the row while the
+        # record says the current run could not, which is the stale-constant
+        # failure this tool exists for, in the one shape the tool used to be
+        # unable to express.
+        raw = values.get(row)
+        new = None if raw is None else round(raw, PLACES)
         if new != old:
             moved.append((row, old, new))
-        out.append(f'{indent}"{row}": {new:.{PLACES}f},')
+        out.append(f'{indent}"{row}": '
+                   + ("None," if new is None else f"{new:.{PLACES}f},"))
     missing = [k for k in values if k not in seen]
     if missing:
         raise SystemExit(f"REFUSED: the record has rows {missing} that {name} does not; "
@@ -185,6 +236,15 @@ def main() -> int:
         total += len(moved)
         print(f"{name}: {len(moved)} row(s) moved")
         for row, old, new in moved:
+            # ABSENT ON EITHER SIDE PRINTS AS ABSENT. A row that gained a
+            # reading, or lost one, has no delta to quote, and a formatter
+            # that crashed on it would make the tool unable to report the
+            # one move a reader most needs to see.
+            if old is None or new is None:
+                print(f"  {row:<22} "
+                      f"{'ABSENT' if old is None else f'{old:9.4f}'} -> "
+                      f"{'ABSENT' if new is None else f'{new:9.4f}'}")
+                continue
             print(f"  {row:<22} {old:9.4f} -> {new:9.4f}  ({new - old:+.4f})")
 
     print("figures the prose quotes, from the record:")

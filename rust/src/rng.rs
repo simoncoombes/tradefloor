@@ -209,6 +209,11 @@ pub enum Site {
     /// The market factor's slow variance level, one normal per day at the
     /// close on [`stream::MARKET_VOL_LEVEL`].
     MarketVolLevelZ = 21,
+    /// The crisis epicentre's one uniform, taken at the open of the session
+    /// that STARTS a crisis episode, on [`stream::CRISIS_EPICENTRE`]. One
+    /// draw per episode, not per session, and none at all when the scenario
+    /// has pinned the epicentre.
+    CrisisEpicentreU = 22,
 }
 
 impl Site {
@@ -236,6 +241,7 @@ impl Site {
             Site::OvernightSectorZ => "overnight_sector_z",
             Site::OvernightIdioZ => "overnight_idio_z",
             Site::MarketVolLevelZ => "market_vol_level_z",
+            Site::CrisisEpicentreU => "crisis_epicentre_u",
         }
     }
 }
@@ -436,12 +442,31 @@ pub mod stream {
     /// without that qualifier until 2026-09-18.
     pub const MARKET_VOL_LEVEL: u32 = 8;
 
+    /// The crisis epicentre: which sector carries a crisis, one uniform per
+    /// EPISODE, taken at the open of the session the episode starts on.
+    ///
+    /// Its own stream for the reason every stream after [`MARKET`] has one,
+    /// and with one difference worth stating because it is the opposite of
+    /// [`MARKET_VOL_LEVEL`]'s discipline. This draw is CONDITIONAL: it
+    /// happens only when `crisis_epicentre_extra` is non-zero, only on the
+    /// session an episode begins, and not at all when the scenario has
+    /// pinned the epicentre. A conditional draw is normally forbidden
+    /// because a settable would move the schedule -- but the schedule it
+    /// could move is this stream's own, and nothing else reads it. `MARKET`,
+    /// `ECONOMY`, `EXTERNAL` and the six mechanism streams are untouched at
+    /// every setting, so every shipped preset reproduces bit for bit and the
+    /// known-answer digest does not move. The alternative, a uniform drawn
+    /// every session whether an episode starts or not, would buy nothing
+    /// here: there is no zero-arm comparison to protect, because the zero
+    /// arm takes no draw on any stream a price reads.
+    pub const CRISIS_EPICENTRE: u32 = 9;
+
     /// How many streams there are. Every array indexed by stream id, the
     /// snapshot's generator and count vectors, the day mark's positions
     /// and the loops that enable, clear or stamp every stream are sized
     /// from this rather than written out: the eighth stream was met in
     /// four places that had written seven, each found by a box.
-    pub const COUNT: usize = 9;
+    pub const COUNT: usize = 10;
 
     /// Derived streams live at `256 + id`. See the module docs for why the
     /// offset exists.

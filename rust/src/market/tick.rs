@@ -580,6 +580,14 @@ pub struct TickInputs<'a> {
     /// `buyback_payout_share` is nonzero, which is pt-v18 and no preset
     /// before it. A single-tick caller passes 0, which makes the factor
     /// 1.0 and the valuation the one every earlier preset computes.
+    /// The sector at the epicentre of the crisis episode this session is
+    /// inside, or `None`.
+    ///
+    /// The engine's episode state, resolved at `open_market` and fixed for
+    /// the whole session. `None` on every shipped preset -- see
+    /// [`crate::params::ModelParams::crisis_epicentre_extra`] and
+    /// `SharedFactors::crisis_epicentre`, which this is copied onto.
+    pub crisis_epicentre: Option<&'a str>,
     pub elapsed_days: i64,
     /// The model coefficients (the runtime seam, CALIBRATION.md §5). The
     /// engine passes its own; a caller building `TickInputs` directly
@@ -771,6 +779,8 @@ pub fn simulate_market_tick(
                 // the constant: a reader of a closed market's factors
                 // should not find a plausible sigma there.
                 market_sigma_tick: 0.0,
+                // No tick ran, so nothing carried the epicentre either.
+                crisis_epicentre: None,
             },
             shock: Vec::new(),
             absorbed: Vec::new(),
@@ -850,6 +860,11 @@ pub fn simulate_market_tick(
         // the recentring reads the sigma that was actually used rather
         // than one recomputed from the constant.
         market_sigma_tick: inputs.market_sigma_daily * tick_scale,
+        // Resolved once at `open_market` and carried, not recomputed: the
+        // episode's epicentre is a property of the SESSION, and a tick that
+        // re-read the engine's state mid-day would let an episode start
+        // between two ticks of one day.
+        crisis_epicentre: inputs.crisis_epicentre.map(|s| s.to_string()),
     };
 
     let intraday_vol_mult = intraday_vol(inputs.intraday_t);

@@ -12,6 +12,13 @@ This measures all twelve on the fourteen-statistic panel, at thirty seeds,
 on the certified roster, at both horizons, on a universe none of them was
 tuned on, and under a held crisis. One method, one ruler, one run.
 
+FIFTEEN KEYS SINCE 2026-09-22 and still a fourteen-row count.
+`crisis_sector_dispersion` joined `envelope.CERTIFIED` and therefore this
+panel; it is graded apart from the fourteen shape rows, it is ABSENT on a
+cell whose seeds held too few crisis sessions, and an absent row is out of
+the denominator rather than counted either way. See `ABSENT_OK` and
+`ABSENT_IS_NOT_A_MISS`.
+
 Every number the ranking table publishes comes from here. Nothing is carried
 forward from a calibration record, because that is how the current
 table drifted.
@@ -86,9 +93,41 @@ HELDOUT_N, HELDOUT_SEED = 60, 909
 TRAIN_SEEDS = tuple(range(101, 131))
 HELDOUT_SEEDS = tuple(range(1, 31))
 
-#: The fourteen. Taken from `envelope.CERTIFIED` rather than written out, so
-#: a fifteenth statistic joins this table by being added to the envelope.
+#: The fourteen shape rows and, since 2026-09-22, `crisis_sector_dispersion`
+#: beside them: fifteen keys. Taken from `envelope.CERTIFIED` rather than
+#: written out, so a statistic joins this table by being added to the
+#: envelope and by no other route, which is the promise this line has always
+#: made and the one the dispersion row was added through.
+#:
+#: FIFTEEN KEYS, FOURTEEN SHAPE ROWS. `envelope.certify` grades
+#: `aggregate_panels(panels, keys=facts.SHAPE)`, so the mechanism block, the
+#: "14 of 14" and the three counts on every committed record are untouched
+#: by the fifteenth key. What moves is the band count below, and it moves
+#: honestly: see `ABSENT_OK`.
 PANEL = tuple(envelope.CERTIFIED)
+
+#: Panel rows a correct run can honestly FAIL TO READ, and the only rows
+#: `_job` is allowed to fetch with `.get`.
+#:
+#: Every shape row is a property of the returns and reads on every run. The
+#: dispersion row is a property of the returns ON THE CRISIS SESSIONS, and a
+#: 252-day run that held no crisis has none: `facts.crisis_dispersion`
+#: refuses a window under `facts.CRISIS_DISPERSION_MIN_SESSIONS` sessions
+#: above `facts.CRISIS_VIX_THRESHOLD`, and `facts.crisis_statistics` turns
+#: the refusal into `<row>_blind` with the reason and no value. Measured on
+#: pt-v19, the certified roster and seeds 101-104: 0, 1, 0 and 10 crisis
+#: sessions at 252 days against the thirty the row needs, and two of the
+#: four seeds reading at 504.
+#:
+#: So the row is absent on most seeds of most 252-day cells, and absence
+#: here is a reading rather than a fault. A `KeyError` in `_job` would kill
+#: a 190-worker pool; a fabricated value would put a number the run did not
+#: measure inside a median; and a row silently dropped would leave the count
+#: a row short with nothing saying why. The seed keeps its reading or its
+#: absence WITH THE REASON, `_median_panel` takes the median over the seeds
+#: that read, and `_count_in_band` names the row ABSENT and takes it out of
+#: the denominator, so "14 of 14" stays a count of fourteen tested cells.
+ABSENT_OK = tuple(facts.DISPERSION)
 
 #: Rows this tool MEASURES AND REPORTS WITHOUT GRADING, carried BESIDE the
 #: panel and never inside it.
@@ -117,6 +156,15 @@ PANEL = tuple(envelope.CERTIFIED)
 #:      `set(record["panel_252"]) == set(envelope.CERTIFIED)`. A fifteenth
 #:      key in the median panel makes all eighteen records need regenerating
 #:      to stay green, which is a restamp and a different change.
+#:
+#: WHAT CHANGED ON 2026-09-22, said here because reason 2 above is the part
+#: that turns: `crisis_sector_dispersion` DOES have a band, on the ruled
+#: basis at both horizons, so it does not land in `unreadable_*` on every
+#: preset. It went into `envelope.CERTIFIED` and therefore into `PANEL`, and
+#: reason 3 is what it costs: the eighteen committed records predate the row
+#: and `record.py --check` reports `panel_252 differs` on every one of them
+#: until the box re-measures. `vix_ar1_debiased` stays out, on reason 2,
+#: which is unchanged for it.
 #:
 #: So the row is carried in its own `reported` block. Nothing here is read
 #: by `_count_in_band`, by `envelope.certify` (which selects
@@ -199,6 +247,25 @@ TAIL_NOT_MEASURED = (
     "with the certified one, so none is emitted. What would fill it: a "
     "level-protocol arm in this tool, which is a box job and a Phase 1 "
     "follow-on rather than part of the row's own branch."
+)
+
+#: WHAT AN ABSENT ROW MEANS IN THIS ARTEFACT, carried in the `method` block
+#: so a reader of a record learns it from the record rather than from here.
+ABSENT_IS_NOT_A_MISS = (
+    "A row in an absent_* list was MEASURED AND NOT READ: every seed of "
+    "that cell refused it, with the reason facts recorded per seed. It is "
+    "not a miss and not a pass. It is taken OUT of the in_band denominator, "
+    "exactly as a row in an unreadable_* list is, and the two lists are "
+    "kept apart because an unreadable row is a ruler with no band for it "
+    "and an absent row is a run that could not read it. The rows that can "
+    "be absent are preset_panel.ABSENT_OK, which is facts.DISPERSION: "
+    "crisis_sector_dispersion needs facts.CRISIS_DISPERSION_MIN_SESSIONS "
+    "sessions above facts.CRISIS_VIX_THRESHOLD inside its window, and a "
+    "252-day run of a calm preset holds fewer. The per-cell `dispersion` "
+    "block carries how many of the cell's seeds read the row, the "
+    "estimator the aggregate used over them, and the library's own "
+    "sentences about the seeds that did not. A shape row is never absent: "
+    "_job fetches it with p[k] and a run that dropped one fails there."
 )
 
 #: The crisis lever's two endpoints, and the real-market figure it is read
@@ -298,7 +365,17 @@ def _job(spec):
     # being in the same dict. `.get` on the reported rows, because a row the
     # engine did not emit on this run must arrive as None rather than as a
     # KeyError that kills a 190-worker pool.
-    return key, preset, seed, {k: p[k] for k in PANEL} | {
+    #
+    # `ABSENT_OK` rows the same way, and their REASON beside them. A shape
+    # row is still fetched with `p[k]`, because a shape row the engine did
+    # not emit is a defect and not a reading; the dispersion row is fetched
+    # with `.get` and carries `<row>_blind` -- the sentence
+    # `facts.crisis_statistics` wrote when it refused -- so the seed's
+    # absence travels with the reason for it rather than as a bare None
+    # somebody downstream has to explain.
+    return key, preset, seed, {
+        k: (p.get(k) if k in ABSENT_OK else p[k]) for k in PANEL} | {
+        k + "_blind": p.get(k + "_blind") for k in ABSENT_OK} | {
         k: p.get(k) for k in REPORTED} | {
         "days": p["days"], "burn": p["burn"]}
 
@@ -309,8 +386,49 @@ def _median_panel(rows: list[dict]) -> dict:
     # Only the certified rows, so the shape of a `panel_252` block in a
     # committed record is exactly the shape `record.py` has always read.
     # The WINDOW is reported separately by `_window_of`.
+    #
+    # A ROW NO SEED READ IS OMITTED, NOT NONE, and that is `facts.
+    # aggregate_panels`'s rule for `fear_gauge_dn3` copied rather than
+    # reinvented: a pooled fear row with no qualifying session on any seed
+    # does not appear in the aggregate at all, so it reaches no band, no
+    # numerator and no denominator, and the count of seeds behind it is
+    # reported beside the aggregate instead of inside it. `_absence` is that
+    # count here. A `None` in the panel would be a value-shaped hole that
+    # every consumer has to remember to test.
     return {k: facts.aggregate_value(k, [r[k] for r in rows if r.get(k) is not None])
             for k in PANEL if any(r.get(k) is not None for r in rows)}
+
+
+def _absence(rows: list[dict]) -> dict:
+    """Per `ABSENT_OK` row of one cell: how many seeds read it, and why not.
+
+    THE COUNT AND THE REASON, never one without the other. A record that
+    says `crisis_sector_dispersion` is absent and does not say on how many
+    seeds cannot be told from a record written by a run that stopped
+    measuring the row, which is the `not_shown`-shrinks failure in its
+    fifth spelling. The reasons are the sentences
+    `facts.crisis_statistics` wrote, deduplicated and in order, so the
+    record carries the library's own words about its own refusal.
+    """
+    out = {}
+    for key in ABSENT_OK:
+        read = [r[key] for r in rows if r.get(key) is not None]
+        reasons: list[str] = []
+        for r in rows:
+            why = r.get(key + "_blind")
+            if why and why not in reasons:
+                reasons.append(why)
+        out[key] = {
+            "read": len(read),
+            "seeds": len(rows),
+            "value": (facts.aggregate_value(key, read) if read else None),
+            # The estimator by name, so a reader of the record does not have
+            # to know `facts.AGGREGATE`'s default to know what the number is.
+            "estimator": facts.AGGREGATE.get(key, "median")
+                         + " over the seeds that read",
+            "reasons": reasons,
+        }
+    return out
 
 
 def _reported_panel(rows: list[dict]) -> dict:
@@ -386,28 +504,54 @@ def _window_of(rows: list[dict]) -> tuple[int, int]:
     return windows.pop()
 
 
-def _count_in_band(panel: dict, bands: dict) -> tuple[int, list[str], list[str]]:
-    """How many sit inside their band, which do not, and which have none.
+def _count_in_band(panel: dict, bands: dict
+                   ) -> tuple[int, list[str], list[str], list[str]]:
+    """How many sit inside their band, which do not, which have none, and
+    which were not read.
 
     THE THIRD LIST IS THE ONE THAT MATTERS AND IT USED TO BE A `KeyError`.
     A basis does not carry every row: `facts.REAL_MARKETS_RULED_504` holds
-    thirteen of `PANEL`'s fourteen, because `corr_persistence_acf1` is held
-    out of the ruled band at 504 on two recorded grounds
+    thirteen of `PANEL`'s fourteen shape rows, because `corr_persistence_acf1`
+    is held out of the ruled band at 504 on two recorded grounds
     (`facts.RULED_UNREADABLE[504]`). A row the basis cannot read is named
     here and taken OUT of the denominator, so `in_band` plus `misses` plus
     `unreadable` is the panel and a count of "13" is never printed against a
     fourteen that was not tested.
+
+    THE FOURTH LIST IS THE SAME IDEA ABOUT THE OTHER SIDE OF THE COMPARISON,
+    and it landed with `crisis_sector_dispersion` on 2026-09-22. `unreadable`
+    is a row the RULER cannot grade; `absent` is a row the RUN did not
+    measure. A 252-day cell whose thirty seeds all held fewer than thirty
+    crisis sessions has no dispersion reading at all, and that is a true
+    statement about the runs rather than a miss or a pass. It is taken out of
+    the denominator for the same reason and named for the same reason, so
+    fourteen of fourteen stays fourteen tested cells and the fifteenth key
+    is accounted for by name.
+
+    The two are kept APART rather than merged into one "not counted" list:
+    an unreadable row is fixed by adopting a band and an absent row is fixed
+    by a run that holds a crisis, and a reader who cannot tell them apart
+    cannot tell which.
     """
-    misses, unreadable = [], []
+    misses, unreadable, absent = [], [], []
     for k in PANEL:
         band = bands.get(k)
         if band is None:
             unreadable.append(k)
             continue
+        value = panel.get(k)
+        if value is None:
+            # `_median_panel` omits a row no seed read, the way
+            # `facts.aggregate_panels` omits an empty pooled row. `.get`
+            # rather than `[k]`, so the omission arrives here as a fact to
+            # report instead of a KeyError in a 190-worker pool.
+            absent.append(k)
+            continue
         lo, hi = band
-        if not (lo <= panel[k] <= hi):
+        if not (lo <= value <= hi):
             misses.append(k)
-    return len(PANEL) - len(misses) - len(unreadable), misses, unreadable
+    return (len(PANEL) - len(misses) - len(unreadable) - len(absent),
+            misses, unreadable, absent)
 
 
 #: The band tables this tool will grade against, by basis name. The seam is
@@ -496,9 +640,14 @@ def rescore(artefact: str, basis: str, out: str, records_dir: str) -> int:
             refused.append(f"{name}: no committed record at {rec_path}")
             continue
         rec = json.loads(rec_path.read_text(encoding="utf-8"))
+        # `.get` on all four, since 2026-09-22. A row a cell or a record
+        # does not carry is a difference like any other -- the eighteen
+        # committed records predate `crisis_sector_dispersion` and none of
+        # them holds it -- and a `KeyError` here would refuse the whole
+        # re-score with a traceback instead of naming the row that moved.
         drift = [k for k in PANEL
-                 if cell["panel_252"][k] != rec["panel_252"][k]
-                 or cell["panel_504"][k] != rec["panel_504"][k]]
+                 if cell["panel_252"].get(k) != rec["panel_252"].get(k)
+                 or cell["panel_504"].get(k) != rec["panel_504"].get(k)]
         if drift:
             # The artefact is a DIFFERENT measurement of this preset's name.
             # Its panels are refused; the record's own retained panel blocks
@@ -510,8 +659,14 @@ def rescore(artefact: str, basis: str, out: str, records_dir: str) -> int:
                 f"{name}: this artefact's panel is not the one the committed "
                 f"record was built from -- {len(drift)} of {len(PANEL)} rows "
                 f"differ, worst "
+                # The worst row by absolute distance, over the rows BOTH
+                # sides carry. A row one side is missing has no distance;
+                # it is named in the count above and cannot be subtracted.
                 + max(((abs(cell['panel_252'][k] - rec['panel_252'][k]), k)
-                       for k in drift))[1]
+                       for k in drift
+                       if cell['panel_252'].get(k) is not None
+                       and rec['panel_252'].get(k) is not None),
+                      default=(0.0, "a row one side does not carry"))[1]
                 + ". The record's own panel blocks were used for 252 and 504; "
                   "the held-out cells have no retained per-seed rows on this "
                   "preset's own measurement and are left unscored")
@@ -526,6 +681,12 @@ def rescore(artefact: str, basis: str, out: str, records_dir: str) -> int:
             # from, so it is dropped rather than carried under a record it
             # does not belong to.
             cell["reported"] = None
+            # And the absence block with it, for the same reason and one
+            # more: it counts the seeds of THIS artefact's per-seed panels,
+            # and those have just been replaced by the record's medians. A
+            # "read on 6 of 30 seeds" carried under a record measured from
+            # other seeds is a count of a run this cell no longer holds.
+            cell["dispersion"] = None
             cell["panel_source"] = (
                 f"the committed record {rec_path.name}, not {artefact}: no "
                 f"retained preset-panel artefact carries the measurement this "
@@ -534,17 +695,26 @@ def rescore(artefact: str, basis: str, out: str, records_dir: str) -> int:
         hos = (_median_panel(cell["per_seed_heldout_seeds"])
                if cell.get("per_seed_heldout_seeds") else None)
         hou = cell.get("panel_heldout_universe")
+        # A FOURTH LIST OUT OF EVERY CALL. `absent_*` is a row this cell did
+        # not read, beside `unreadable_*`, which is a row the basis cannot
+        # grade. A re-score of an artefact written before the dispersion row
+        # names it absent on every cell, which is the honest reading of a
+        # measurement taken before the row existed.
         (cell["in_band_252"], cell["misses_252"],
-         cell["unreadable_252"]) = _count_in_band(cell["panel_252"], t252)
+         cell["unreadable_252"],
+         cell["absent_252"]) = _count_in_band(cell["panel_252"], t252)
         (cell["in_band_504"], cell["misses_504"],
-         cell["unreadable_504"]) = _count_in_band(cell["panel_504"], t504)
+         cell["unreadable_504"],
+         cell["absent_504"]) = _count_in_band(cell["panel_504"], t504)
         if hos is None:
             cell["in_band_heldout_seeds"] = None
             cell["misses_heldout_seeds"] = None
             cell["unreadable_heldout_seeds"] = None
+            cell["absent_heldout_seeds"] = None
         else:
             (cell["in_band_heldout_seeds"], cell["misses_heldout_seeds"],
-             cell["unreadable_heldout_seeds"]) = _count_in_band(hos, t252)
+             cell["unreadable_heldout_seeds"],
+             cell["absent_heldout_seeds"]) = _count_in_band(hos, t252)
         if hou is None:
             # The measuring run kept the count and threw the panel away, so
             # this cell cannot be re-scored and must not be carried forward
@@ -552,6 +722,7 @@ def rescore(artefact: str, basis: str, out: str, records_dir: str) -> int:
             cell["in_band_heldout_universe"] = None
             cell["misses_heldout_universe"] = None
             cell["unreadable_heldout_universe"] = None
+            cell["absent_heldout_universe"] = None
             cell["heldout_universe_not_rescorable"] = (
                 "the retained artefact carries this cell's COUNT and not its "
                 "panel, so a re-score has nothing to read. What would fix it: "
@@ -559,7 +730,8 @@ def rescore(artefact: str, basis: str, out: str, records_dir: str) -> int:
         else:
             (cell["in_band_heldout_universe"],
              cell["misses_heldout_universe"],
-             cell["unreadable_heldout_universe"]) = _count_in_band(hou, t252)
+             cell["unreadable_heldout_universe"],
+             cell["absent_heldout_universe"]) = _count_in_band(hou, t252)
         done.append(name)
     doc["method"] = dict(doc.get("method", {})) | stamp
     doc["rescored_from"] = {
@@ -717,10 +889,10 @@ def main() -> None:
             "heldout_seeds": collected[("heldout_seeds", preset)],
         }, {252: t252, 504: t504})
 
-        n252, miss252, unr252 = _count_in_band(p252, t252)
-        n504, miss504, unr504 = _count_in_band(p504, t504)
-        nhou, misshou, unrhou = _count_in_band(phou, t252)
-        nhos, misshos, unrhos = _count_in_band(phos, t252)
+        n252, miss252, unr252, abs252 = _count_in_band(p252, t252)
+        n504, miss504, unr504, abs504 = _count_in_band(p504, t504)
+        nhou, misshou, unrhou, abshou = _count_in_band(phou, t252)
+        nhos, misshos, unrhos, abshos = _count_in_band(phos, t252)
 
         results[preset] = {
             "panel_252": p252,
@@ -747,6 +919,26 @@ def main() -> None:
             "unreadable_252": unr252, "unreadable_504": unr504,
             "unreadable_heldout_universe": unrhou,
             "unreadable_heldout_seeds": unrhos,
+            # The rows this RUN did not read, beside the rows the RULER
+            # cannot grade. Both are out of the denominator and neither is a
+            # miss; they are separate fields because they are fixed by
+            # different things. See `_count_in_band`.
+            "absent_252": abs252, "absent_504": abs504,
+            "absent_heldout_universe": abshou,
+            "absent_heldout_seeds": abshos,
+            # And WHY, per cell: how many of the cell's seeds read each
+            # absence-capable row, the estimator behind the aggregate, and
+            # the library's own sentences about the seeds that did not. A
+            # count of zero readable seeds and a count nobody kept are the
+            # same empty list without this block.
+            "dispersion": {
+                "panel_252": _absence(collected[("panel_252", preset)]),
+                "panel_504": _absence(collected[("panel_504", preset)]),
+                "heldout_universe": _absence(
+                    collected[("heldout_universe", preset)]),
+                "heldout_seeds": _absence(
+                    collected[("heldout_seeds", preset)]),
+            },
             "mechanism_252": envelope.certification_record(cert252),
             "mechanism_heldout_seeds": envelope.certification_record(certhos),
             # MEASURED AND REPORTED, NOT GRADED. `facts.measure` computes
@@ -784,13 +976,16 @@ def main() -> None:
         }
         r = results[preset]
         mc = r["mechanism_252"]["counts"]
-        # The denominator is what the basis could READ, not the panel's
-        # length. Printing "13/14" when the fourteenth row has no band on
-        # this basis is the miss that a reader cannot tell from a failure.
-        print(f"{preset:8s} 252:{n252:2d}/{len(PANEL) - len(unr252):<2d} "
-              f"504:{n504:2d}/{len(PANEL) - len(unr504):<2d} "
-              f"hoU:{nhou:2d}/{len(PANEL) - len(unrhou):<2d} "
-              f"hoS:{nhos:2d}/{len(PANEL) - len(unrhos):<2d} "
+        # The denominator is what the basis could READ AND THE RUN DID read,
+        # not the panel's length. Printing "13/14" when the fourteenth row
+        # has no band on this basis is the miss that a reader cannot tell
+        # from a failure, and printing "14/15" when the fifteenth row was
+        # absent from every seed is the same miss on the other side.
+        print(f"{preset:8s} "
+              f"252:{n252:2d}/{len(PANEL) - len(unr252) - len(abs252):<2d} "
+              f"504:{n504:2d}/{len(PANEL) - len(unr504) - len(abs504):<2d} "
+              f"hoU:{nhou:2d}/{len(PANEL) - len(unrhou) - len(abshou):<2d} "
+              f"hoS:{nhos:2d}/{len(PANEL) - len(unrhos) - len(abshos):<2d} "
               f"vol:{r['annualised_vol_pct']:5.1f}%  "
               f"lever:{r['crisis_lever']:.2f}x  "
               f"mech:{mc['mechanism_shown']:2d}/{mc['mechanism_of']}  "
@@ -800,6 +995,16 @@ def main() -> None:
               + "  vixar1(ungraded):"
               + "/".join(f"{r['reported']['cells'][c].get(facts.VIX_AR1_ROW, float('nan')):.4f}"
                          for c in ("panel_252", "panel_504"))
+              # The dispersion row's READABLE SEED COUNT at both horizons,
+              # printed because a row that reads on two seeds of thirty and
+              # one that reads on all thirty give the operator the same
+              # number otherwise, and only the second is a measurement of
+              # the preset rather than of its luckiest years.
+              + "  disp(read):"
+              + "/".join(
+                  "%d of %d" % (r["dispersion"][c][row]["read"],
+                                r["dispersion"][c][row]["seeds"])
+                  for c in ("panel_252", "panel_504") for row in ABSENT_OK)
               + (f"  REVERSED:{','.join(r['mechanism_252']['reversed'])}"
                  if r["mechanism_252"]["reversed"] else ""), flush=True)
 
@@ -851,6 +1056,7 @@ def main() -> None:
             **band_stamp,
             "index_tail_not_measured": TAIL_NOT_MEASURED,
             "reported_not_graded": REPORTED_NOT_GRADED,
+            "absent_rows": ABSENT_IS_NOT_A_MISS,
             "crisis_lever": (
                 f"annualised vol at held VIX {LEVER_HI:.0f} over held VIX "
                 f"{LEVER_LO:.0f}, certified roster, 252 days, thirty seeds, "

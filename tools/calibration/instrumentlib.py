@@ -560,6 +560,18 @@ PARAM_SPECS: dict[str, dict] = {
     # gain is 1 / (1 - h) and never below it.
     "vix_level_loop_gain":    {"kind": "abs", "step_unit": 0.1,
                               "hard_range": (0.0, 6.0), "derived": True},
+    # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
+    # the tape's three epicentre episodes (2.43, 1.93, 1.41). 0.0 is the
+    # branch not taken; the range opens at zero to hold it and stops at 3.0,
+    # above the largest episode the record has and below the 4.0307 where
+    # the solve runs out of the rest of the roster's variance to move.
+    "crisis_epicentre_extra": {"kind": "abs", "step_unit": 0.05,
+                              "hard_range": (0.0, 3.0), "derived": True},
+    # The hysteresis, in SESSIONS, so the step unit is a step in sessions
+    # and not a fraction. 5 is a trading week, which is the resolution the
+    # tape's episode windows are dated at; anything finer is below it.
+    "crisis_epicentre_end_sessions": {"kind": "abs", "step_unit": 5.0,
+                                      "hard_range": (0.0, 63.0)},
     # The market-side warm-up, in SESSIONS, so the step unit is a step in
     # sessions and not a fraction: 63 is one quarter, the block the
     # transient was traced in (`level-sigma-horizon.md` 2.2), and anything

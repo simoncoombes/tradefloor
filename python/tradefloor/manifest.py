@@ -222,6 +222,14 @@ _SNAPSHOT_KEYS = (
     "market_open", "market_variance", "forced_flow_spent",
     "market_vol_log_level",
     "vix_log_level",
+    # The crisis episode: whether one is running, how many consecutive
+    # sessions it has spent under `crisis_vix_threshold`, the sector index
+    # its epicentre was drawn at (-1 for `none`, a crisis with no
+    # epicentre) and the pin a scenario set (-2 for no pin). All four are
+    # the state a run with `crisis_epicentre_extra` off zero carries, and
+    # all four read their defaults on every shipped preset.
+    "crisis_in_episode", "crisis_sessions_under",
+    "crisis_epicentre", "crisis_epicentre_pin",
     "nominal_output_base", "volume_state",
     "universe_stress", "volume_idio", "sector_variance", "jump_excitation",
     "sector_day_factor", "sector_target_day",
@@ -535,6 +543,16 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _f64(buf, snapshot["market_vol_log_level"])
     # The VIX's own slow log-level, for the same reason.
     _f64(buf, snapshot.get("vix_log_level", 0.0))
+    # The crisis episode, hashed for the reason the levels above are: two
+    # engines alike in every column, one three sessions into a
+    # financial-services episode and the other outside one, price the
+    # epicentre's names differently tomorrow. `.get` with the default a
+    # snapshot from before the mechanism carries, which is every recorded
+    # one.
+    _flag(buf, bool(snapshot.get("crisis_in_episode", False)))
+    _f64(buf, float(snapshot.get("crisis_sessions_under", 0)))
+    _f64(buf, float(snapshot.get("crisis_epicentre", -1)))
+    _f64(buf, float(snapshot.get("crisis_epicentre_pin", -2)))
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer
