@@ -51,7 +51,7 @@ from typing import Any, Callable, NamedTuple, Sequence
 from ._core import Engine
 
 STREAMS = ("market", "economy", "external", "jumps", "volume", "news",
-           "volume_idio", "overnight", "market_vol_level")
+           "volume_idio", "overnight", "market_vol_level", "crisis_epicentre")
 KINDS = ("uniform", "normal")
 
 #: The call sites, in the order each stream meets them. The market
@@ -72,6 +72,10 @@ SITES = {
     "economy": ("economy_daily", "economy_cycle", "central_bank"),
     "external": ("external",),
     "market_vol_level": ("market_vol_level_z",),
+    # One uniform per crisis EPISODE, not per session: taken at the open of
+    # the session an episode starts, and not at all when the scenario has
+    # pinned the epicentre. See `ModelParams::crisis_epicentre_extra`.
+    "crisis_epicentre": ("crisis_epicentre_u",),
 }
 
 

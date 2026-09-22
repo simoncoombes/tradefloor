@@ -1980,6 +1980,7 @@ mod tests {
                                 crisis_spike: spike,
                                 prev_day_down: lagged,
                                 market_sigma_tick: sigma_tick,
+                                crisis_epicentre: None,
                             };
                             let out = crate::market::factors::calculate_live_factors(
                                 &company, &[], 0.0, 1.0, &shared, &p, &mut NoNoise);
@@ -2140,6 +2141,7 @@ mod tests {
                                 // this a check of the branch rather than of
                                 // a coincidence.
                                 market_sigma_tick: sigma_tick,
+                                crisis_epicentre: None,
                             };
                             let out = crate::market::factors::calculate_live_factors(
                                 &company, &[], 0.0, 1.0, &shared, &p, &mut NoNoise);
@@ -2312,6 +2314,7 @@ mod tests {
                         crisis_spike: spike,
                         prev_day_down: true,
                         market_sigma_tick: sigma_tick,
+                        crisis_epicentre: None,
                     };
                     let out = crate::market::factors::calculate_live_factors(
                         &company, &[], 0.0, 1.0, &shared, &p, &mut NoNoise);

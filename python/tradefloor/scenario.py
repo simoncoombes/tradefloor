@@ -256,6 +256,7 @@ import warnings
 from typing import Any, Callable, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
+from ._core import sectors as _sectors
 from . import yaml_subset
 from .interventions import (
     SCENARIO_SCHEMA,
@@ -288,6 +289,18 @@ FIELDS = (
     "tariff_rate",
     "oil_price",
     "cycle",
+    # Not a macro level but a pin all the same: which sector carries the
+    # next crisis episode. It sits here because it reaches the engine the
+    # way the eleven above do -- through ``Engine.pin_macro`` -- and because
+    # a scenario that holds VIX at 65 and wants the crisis to be a banking
+    # crisis says so in the same breath:
+    # ``Scenario().hold(vix=65.0, epicentre="financial_services")``.
+    #
+    # A pinned epicentre takes NO draw, so a pinned run and an unpinned one
+    # are not the same random world on the epicentre's stream. See
+    # ``ModelParams.crisis_epicentre_extra``; the pin does nothing at all
+    # while that dial is 0.0, which is every shipped preset.
+    "epicentre",
 )
 
 #: Fields the engine validates as fractions in [-0.05, 0.50]. Listed so a
@@ -305,12 +318,34 @@ RATE_MIN, RATE_MAX = -0.05, 0.50
 #: the run, which is the wrong end for a caller reading a traceback.
 CYCLES = ("expansion", "peak", "contraction", "trough", "recovery")
 
+#: What ``epicentre`` may be pinned to: any sector key, or ``"none"`` -- a
+#: crisis with no epicentre, which is two of the tape's five episodes and is
+#: a value in its own right rather than the absence of one. Read off the
+#: engine's own table so the two cannot drift apart, with ``"none"`` in
+#: front because it is not a sector.
+EPICENTRES = ("none",) + tuple(_sectors())
+
 
 def _check(field: str, value: Any) -> None:
     if field not in FIELDS:
         raise ValidationError(
             f"unknown macro field {field!r}. Valid: {', '.join(FIELDS)}"
         )
+    if field == "epicentre":
+        if not isinstance(value, str):
+            raise ValidationError(
+                f"epicentre = {value!r} is not a sector. It names which "
+                "sector carries the crisis, as a key, or 'none' for a "
+                "crisis with no epicentre."
+            )
+        if value not in EPICENTRES:
+            raise ValidationError(
+                f"unknown epicentre {value!r}. Valid: "
+                f"{', '.join(EPICENTRES)}. A misspelt sector is the same "
+                "failure a misspelt FIELD would be, so it is refused where "
+                "it is written rather than on the first day of the run."
+            )
+        return
     if field == "cycle":
         if isinstance(value, str) and value not in CYCLES:
             raise ValidationError(

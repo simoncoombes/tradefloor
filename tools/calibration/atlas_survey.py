@@ -239,6 +239,18 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # has to contain the shipped 0.0, the same price
     # market_vol_level_persistence pays above.
     "vix_level_loop_gain": (0.0, 6.0),
+    # How much more volatile the crisis epicentre's names are than the other
+    # sectors' at the same VIX. The top is 3.0, above the tape's largest
+    # episode ratio (2.43, 2008-09) with room for one worse: five episodes is
+    # the whole record, so a box that stopped at the largest seen would be
+    # surveying the sample rather than the process. The bottom is 0.0 only
+    # because the box has to contain the shipped value, the same price
+    # `vix_level_loop_gain` pays above: 0.0 is the branch not taken, not a
+    # small epicentre, and everything between it and sqrt(0.3916) = 0.626 is
+    # refused by `ModelParams::invariants` as an epicentre whose non-market
+    # parts would carry a negative variance. The useful region starts at 1.0,
+    # an epicentre no different from anywhere else.
+    "crisis_epicentre_extra": (0.0, 3.0),
     # The market-side warm-up, in SESSIONS. Not a share and not a rate, so
     # its box comes off the thing it has to outlast rather than off a
     # convention: the warm-up converges geometrically at the SLOW variance
@@ -574,6 +586,13 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
 #: header. Both known-good values (ramp 6.0, cap 0.98) are asserted inside
 #: these ranges at plan time.
 EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
+    # The crisis epicentre's hysteresis, in SESSIONS, shipped at 21. 1 is an
+    # episode that ends on the first session back under the threshold, which
+    # is the mechanism with no memory at all; 63 is a quarter, half again the
+    # longest gap the tape's five episodes contain inside one crisis. Past
+    # that the counter stops ending episodes at all within a registered year
+    # and the map goes flat.
+    "crisis_epicentre_end_sessions": (1.0, 63.0),
     # The sector draw's sigma. Shipped 0.002 gives a [1/4x, 4x] box topping
     # out at 0.008, and §59 measured the band reached at 0.012 and overshot
     # at 0.020, so the box is the range that can see the answer.

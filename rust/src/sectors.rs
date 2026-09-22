@@ -49,6 +49,32 @@ pub struct Sector {
     /// Squared, it is the long-run variance the GARCH floor and ceiling scale
     /// from, and what a fresh company seeds `garch_variance` with.
     pub daily_sigma: f64,
+    /// The probability this sector is drawn as the EPICENTRE of a crisis
+    /// episode. The weights sum to at most one and the remainder is `none`,
+    /// a crisis with no epicentre.
+    ///
+    /// DERIVED from five crisis episodes on the tape
+    /// (`results/ptv19refine/epicentre-derivation.json` in the design
+    /// repository): per-sector volatility in each episode over each name's
+    /// own calm-day volatility, median over the 39 real names of the
+    /// roster, each sector taken relative to the median sector of that
+    /// episode. The rule, stated before the numbers were read: the
+    /// epicentre is the sector furthest above the episode's median if it is
+    /// 1.3x or more above it. 2008-09 gives financial services at 2.43,
+    /// 2011 financial services at 1.93, 2020 financial services at 1.41;
+    /// 2000-02 and 2022 have no sector that far out. Three of five, all
+    /// three the same sector, so `financial_services` carries 0.6 and
+    /// `none` the remaining 0.4.
+    ///
+    /// The other eleven carry 0.0, and the four with no name on the tape --
+    /// materials, real estate, utilities, transportation -- carry it as
+    /// UNDETERMINED rather than as a measurement. Five episodes is the
+    /// whole record and it says so; a sixth episode centred on energy
+    /// would move these numbers and nothing here pretends otherwise.
+    ///
+    /// Read only when [`crate::params::ModelParams::crisis_epicentre_extra`]
+    /// is non-zero, which no shipped preset sets.
+    pub crisis_weight: f64,
 }
 
 impl Sector {
@@ -64,18 +90,18 @@ impl Sector {
 
 /// The twelve sectors, in contractual declaration order.
 pub const SECTORS: [Sector; 12] = [
-    Sector { key: "technology",             display_name: "Technology",             avg_pe: 32.0, volatility: 1.2 , daily_sigma: 0.025 },
-    Sector { key: "financial_services",     display_name: "Financial Services",     avg_pe: 12.0, volatility: 1.1 , daily_sigma: 0.015 },
-    Sector { key: "healthcare",             display_name: "Healthcare",             avg_pe: 24.0, volatility: 0.9 , daily_sigma: 0.018 },
-    Sector { key: "energy",                 display_name: "Energy",                 avg_pe: 10.0, volatility: 1.3 , daily_sigma: 0.015 },
-    Sector { key: "consumer_discretionary", display_name: "Consumer Discretionary", avg_pe: 20.0, volatility: 1.0 , daily_sigma: 0.018 },
-    Sector { key: "consumer_staples",       display_name: "Consumer Staples",       avg_pe: 20.0, volatility: 0.7 , daily_sigma: 0.008 },
-    Sector { key: "industrials",            display_name: "Industrials",            avg_pe: 17.0, volatility: 1.0 , daily_sigma: 0.015 },
-    Sector { key: "materials",              display_name: "Materials",              avg_pe: 14.0, volatility: 1.2 , daily_sigma: 0.015 },
-    Sector { key: "real_estate",            display_name: "Real Estate",            avg_pe: 35.0, volatility: 0.9 , daily_sigma: 0.008 },
-    Sector { key: "utilities",              display_name: "Utilities",              avg_pe: 16.0, volatility: 0.6 , daily_sigma: 0.008 },
-    Sector { key: "telecommunications",     display_name: "Telecommunications",     avg_pe: 14.0, volatility: 0.8 , daily_sigma: 0.01 },
-    Sector { key: "transportation",         display_name: "Transportation",         avg_pe: 15.0, volatility: 1.1 , daily_sigma: 0.015 },
+    Sector { key: "technology",             display_name: "Technology",             avg_pe: 32.0, volatility: 1.2 , daily_sigma: 0.025, crisis_weight: 0.0 },
+    Sector { key: "financial_services",     display_name: "Financial Services",     avg_pe: 12.0, volatility: 1.1 , daily_sigma: 0.015, crisis_weight: 0.6 },
+    Sector { key: "healthcare",             display_name: "Healthcare",             avg_pe: 24.0, volatility: 0.9 , daily_sigma: 0.018, crisis_weight: 0.0 },
+    Sector { key: "energy",                 display_name: "Energy",                 avg_pe: 10.0, volatility: 1.3 , daily_sigma: 0.015, crisis_weight: 0.0 },
+    Sector { key: "consumer_discretionary", display_name: "Consumer Discretionary", avg_pe: 20.0, volatility: 1.0 , daily_sigma: 0.018, crisis_weight: 0.0 },
+    Sector { key: "consumer_staples",       display_name: "Consumer Staples",       avg_pe: 20.0, volatility: 0.7 , daily_sigma: 0.008, crisis_weight: 0.0 },
+    Sector { key: "industrials",            display_name: "Industrials",            avg_pe: 17.0, volatility: 1.0 , daily_sigma: 0.015, crisis_weight: 0.0 },
+    Sector { key: "materials",              display_name: "Materials",              avg_pe: 14.0, volatility: 1.2 , daily_sigma: 0.015, crisis_weight: 0.0 },
+    Sector { key: "real_estate",            display_name: "Real Estate",            avg_pe: 35.0, volatility: 0.9 , daily_sigma: 0.008, crisis_weight: 0.0 },
+    Sector { key: "utilities",              display_name: "Utilities",              avg_pe: 16.0, volatility: 0.6 , daily_sigma: 0.008, crisis_weight: 0.0 },
+    Sector { key: "telecommunications",     display_name: "Telecommunications",     avg_pe: 14.0, volatility: 0.8 , daily_sigma: 0.01, crisis_weight: 0.0 },
+    Sector { key: "transportation",         display_name: "Transportation",         avg_pe: 15.0, volatility: 1.1 , daily_sigma: 0.015, crisis_weight: 0.0 },
 ];
 
 /// Look up a sector by key.
@@ -86,6 +112,40 @@ pub const SECTORS: [Sector; 12] = [
 /// multiple and report nothing — a wrong number that looks like a right one.
 pub fn by_key(key: &str) -> Option<&'static Sector> {
     SECTORS.iter().find(|s| s.key == key)
+}
+
+/// The `none` weight: one minus the sum of the table's, floored at zero.
+///
+/// `none` is a crisis with no epicentre, which is two of the tape's five
+/// episodes and is therefore a DRAW rather than the absence of one. It has
+/// no row in the table because it is not a sector; it is the remainder, so
+/// the table cannot be edited into a set of weights that does not sum to
+/// one.
+pub fn crisis_none_weight() -> f64 {
+    let sum: f64 = SECTORS.iter().map(|s| s.crisis_weight).sum();
+    if sum >= 1.0 {
+        0.0
+    } else {
+        1.0 - sum
+    }
+}
+
+/// Draw an epicentre from the table's weights given one uniform in [0, 1).
+///
+/// Returns the index of the drawn sector, or `None` for the remainder --
+/// `none`, a crisis with no epicentre. Walks the table in declaration order,
+/// which is the same order every other draw schedule reads it in, so the
+/// mapping from a uniform to a sector is fixed by the table rather than by
+/// a hash iteration.
+pub fn draw_crisis_epicentre(u: f64) -> Option<usize> {
+    let mut acc = 0.0;
+    for (i, s) in SECTORS.iter().enumerate() {
+        acc += s.crisis_weight;
+        if u < acc {
+            return Some(i);
+        }
+    }
+    None
 }
 
 /// Every sector key, in declaration order.

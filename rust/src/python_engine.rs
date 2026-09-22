@@ -787,6 +787,7 @@ fn stream_name(id: u32) -> &'static str {
         crate::rng::stream::VOLUME_IDIO => "volume_idio",
         crate::rng::stream::OVERNIGHT => "overnight",
         crate::rng::stream::MARKET_VOL_LEVEL => "market_vol_level",
+        crate::rng::stream::CRISIS_EPICENTRE => "crisis_epicentre",
         _ => "unknown",
     }
 }
@@ -802,9 +803,10 @@ fn stream_id(name: &str) -> PyResult<u32> {
         "volume_idio" => crate::rng::stream::VOLUME_IDIO,
         "overnight" => crate::rng::stream::OVERNIGHT,
         "market_vol_level" => crate::rng::stream::MARKET_VOL_LEVEL,
+        "crisis_epicentre" => crate::rng::stream::CRISIS_EPICENTRE,
         other => {
             return Err(ValidationError::new_err(format!(
-                "unknown stream {other:?}; one of market, economy, external, jumps, volume, news, volume_idio, overnight, market_vol_level"
+                "unknown stream {other:?}; one of market, economy, external, jumps, volume, news, volume_idio, overnight, market_vol_level, crisis_epicentre"
             )))
         }
     })
@@ -2280,7 +2282,7 @@ impl PyEngine {
         *, vix = None, federal_funds_rate = None, corporate_bond_yield = None,
         inflation_rate = None, qe_pe_boost = None, qe_assets_ratio = None, fear_greed_index = None,
         gdp_growth = None, unemployment_rate = None, tariff_rate = None,
-        oil_price = None, cycle = None
+        oil_price = None, cycle = None, epicentre = None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn pin_macro(
@@ -2297,6 +2299,7 @@ impl PyEngine {
         tariff_rate: Option<f64>,
         oil_price: Option<f64>,
         cycle: Option<String>,
+        epicentre: Option<String>,
     ) -> PyResult<()> {
         // Validate EVERYTHING before writing ANYTHING. A pin that applied the
         // first three fields and then rejected the fourth would leave the
@@ -2341,6 +2344,31 @@ impl PyEngine {
                 )));
             }
         }
+        // THE CRISIS EPICENTRE, a pin rather than a macro field: it names
+        // which sector carries the next crisis episode instead of setting a
+        // level the chain then evolves. `"none"` is a value in its own
+        // right -- a crisis with no epicentre, which is two of the tape's
+        // five episodes -- and is why this is a string and not a sector key
+        // or nothing. Validated here, where it is written, against the
+        // engine's own table, so a misspelt sector is refused rather than
+        // silently pinning nothing.
+        //
+        // It PERSISTS once written, like the macro pins beside it: a
+        // scenario's `hold` writes it every day it covers, and an episode
+        // that starts while it is set takes no draw.
+        let epicentre_pin = match epicentre.as_deref() {
+            None => None,
+            Some("none") => Some(-1_i32),
+            Some(key) => match crate::sectors::SECTORS.iter().position(|s| s.key == key) {
+                Some(i) => Some(i as i32),
+                None => {
+                    return Err(ValidationError::new_err(format!(
+                        "unknown epicentre {key:?}. Valid: none, {}",
+                        crate::sectors::keys().join(", ")
+                    )))
+                }
+            },
+        };
         let phase = match cycle.as_deref() {
             Some(name) => Some(CyclePhase::from_name(name).ok_or_else(|| {
                 ValidationError::new_err(format!(
@@ -2371,6 +2399,7 @@ impl PyEngine {
         self.log.push(crate::python_log::LogEntry::PinMacro {
             fields: logged,
             cycle: cycle.clone(),
+            epicentre: epicentre.clone(),
         });
 
         let e = self.inner.economy_mut();
@@ -2410,7 +2439,22 @@ impl PyEngine {
         if let Some(p) = phase {
             e.cycle_phase = p;
         }
+        if let Some(pin) = epicentre_pin {
+            self.inner.set_crisis_epicentre_pin(Some(pin));
+        }
         Ok(())
+    }
+
+    /// The crisis episode: `(in_episode, sessions_under, epicentre)`.
+    ///
+    /// `epicentre` is the sector key, or `"none"` for a crisis with no
+    /// epicentre, or `None` when no episode is running -- so a caller can
+    /// tell "no crisis" from "a crisis nobody is at the centre of", which
+    /// the tick deliberately cannot. Always `(False, 0, None)` while
+    /// `crisis_epicentre_extra` is 0.0, which is every shipped preset.
+    #[getter]
+    fn crisis_episode(&self) -> (bool, i64, Option<&'static str>) {
+        self.inner.crisis_episode()
     }
 
     /// Every field [`PyEngine::pin_macro`] can write, as it can write it.
@@ -2725,7 +2769,8 @@ impl PyEngine {
         // unmistakable at a glance and on restore.
         let mut rng_out = Vec::with_capacity(3 * crate::rng::stream::COUNT);
         for s in [rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
-                  rng.news, rng.volume_idio, rng.overnight, rng.market_vol_level] {
+                  rng.news, rng.volume_idio, rng.overnight, rng.market_vol_level,
+                  rng.crisis_epicentre] {
             rng_out.push(f64::from_bits(s.state));
             rng_out.push(f64::from_bits(s.increment));
             rng_out.push(s.spare.unwrap_or(f64::NAN));
@@ -2825,6 +2870,24 @@ impl PyEngine {
         // actually carried.
         out.set_item("market_vol_log_level", self.inner.market_vol_log_level())?;
         out.set_item("vix_log_level", self.inner.vix_log_level())?;
+        // THE CRISIS EPISODE: whether one is running, how many consecutive
+        // sessions it has spent under the threshold, the sector index its
+        // epicentre was drawn at (`-1` for `none`, a crisis with no
+        // epicentre) and the pin a scenario has set (`-2` for no pin, which
+        // is no sector index and not the `-1` that means `none`).
+        //
+        // Four keys of their own, for the reason the two levels above have
+        // theirs: a snapshot written before they existed restores to the
+        // state a run with `crisis_epicentre_extra` at 0.0 carries, which is
+        // every run ever recorded. A fork that dropped them would resume
+        // outside the episode its parent is three sessions into, price the
+        // epicentre's names without the multiple, and redraw a fresh
+        // epicentre on the next crossing.
+        let (in_episode, sessions_under, epicentre, pin) = self.inner.crisis_episode_raw();
+        out.set_item("crisis_in_episode", in_episode)?;
+        out.set_item("crisis_sessions_under", sessions_under)?;
+        out.set_item("crisis_epicentre", epicentre)?;
+        out.set_item("crisis_epicentre_pin", pin.unwrap_or(-2))?;
         // Nominal output when the run opened, the base of the growth
         // term's ratio. A constant of the run rather than advancing state,
         // and carried for the reason the two above are: an engine restored
@@ -3040,7 +3103,8 @@ impl PyEngine {
             return Err(ValidationError::new_err(format!(
                 "rng must be 9 numbers (market, economy, external), 12 \
                  (plus jumps), 15 (plus volume), 18 (plus news), 21 \
-                 (plus per-name volume) or 24 (plus overnight), as \
+                 (plus per-name volume), 24 (plus overnight), 27 (plus the \
+                 slow level) or 30 (plus the crisis epicentre), as \
                  (state, increment, spare) triples, got {}",
                 rng.len()
             )));
@@ -3091,11 +3155,16 @@ impl PyEngine {
         let news = if rng.len() >= 18 { stream(15) } else { current.news };
         let volume_idio = if rng.len() >= 21 { stream(18) } else { current.volume_idio };
         let overnight = if rng.len() >= 24 { stream(21) } else { current.overnight };
-        let market_vol_level = if rng.len() >= 3 * crate::rng::stream::COUNT {
-            stream(3 * (crate::rng::stream::COUNT - 1))
-        } else {
-            current.market_vol_level
-        };
+        // LITERAL OFFSETS, not `3 * COUNT`. This read `>= 3 * COUNT` and
+        // `stream(3 * (COUNT - 1))` while `market_vol_level` happened to be
+        // the last stream, and the day a tenth stream was added those two
+        // expressions moved together: a 27-number snapshot stopped restoring
+        // the slow level at all and kept the fresh engine's seed-derived
+        // position, which diverged the market a day later and nothing here
+        // said so. Each stream's offset is its own position in the flat
+        // array and is fixed forever once written.
+        let market_vol_level = if rng.len() >= 27 { stream(24) } else { current.market_vol_level };
+        let crisis_epicentre = if rng.len() >= 30 { stream(27) } else { current.crisis_epicentre };
         self.inner.set_rng_state(crate::engine::EngineRngState {
             market: stream(0),
             economy: stream(3),
@@ -3106,6 +3175,7 @@ impl PyEngine {
             volume_idio,
             overnight,
             market_vol_level,
+            crisis_epicentre,
         });
         if let Some(raw) = snapshot.get_item("draw_overlay")? {
             let entries: Vec<(u32, u8, u64, f64)> = raw.extract()?;
@@ -3289,6 +3359,32 @@ impl PyEngine {
         // runs all carried a multiplier of exactly 1.0.
         if let Some(raw) = snapshot.get_item("vix_log_level")? {
             self.inner.set_vix_log_level(raw.extract()?);
+        }
+        // The crisis episode. Absent means a snapshot from a build without
+        // it, and every such run shipped `crisis_epicentre_extra` at 0.0,
+        // where no episode is ever entered -- which is what the defaults
+        // here reproduce. Read as one group so a half-written snapshot
+        // cannot restore an episode with no epicentre index behind it.
+        if let Some(raw) = snapshot.get_item("crisis_in_episode")? {
+            let in_episode: bool = raw.extract()?;
+            let sessions_under: i64 = match snapshot.get_item("crisis_sessions_under")? {
+                Some(v) => v.extract()?,
+                None => 0,
+            };
+            let epicentre: i32 = match snapshot.get_item("crisis_epicentre")? {
+                Some(v) => v.extract()?,
+                None => -1,
+            };
+            let pin: i32 = match snapshot.get_item("crisis_epicentre_pin")? {
+                Some(v) => v.extract()?,
+                None => -2,
+            };
+            self.inner.set_crisis_episode_raw(
+                in_episode,
+                sessions_under,
+                epicentre,
+                if pin <= -2 { None } else { Some(pin) },
+            );
         }
         // Restore the growth term's base. Absent means a snapshot from a
         // build without the term, whose preset carries the dial at 0.0.

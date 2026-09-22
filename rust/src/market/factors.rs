@@ -140,6 +140,72 @@ pub fn idio_scale_for(params: &crate::params::ModelParams, beta: f64) -> f64 {
 /// difference because `sqrt(2.0)` squared rounds to `2.0000000000000004`,
 /// so the clamp's own endpoint would otherwise hand `sqrt` a negative
 /// number and put a NaN into a price.
+/// The market factor's share of a name's DAILY RETURN variance, MEASURED on
+/// the composed pt-v19 at `510c65e`.
+///
+/// # What was measured, and how
+///
+/// Three seeds of the held roster (`Universe.random(40, seed=111)`), 252
+/// recorded sessions after a 60-session warm-up, under a held VIX of 65 --
+/// the condition the epicentre mechanism actually runs in. The numerator is
+/// the day's accumulated MARKET part of `random_noise` (`noise_split`
+/// "market": the factor's transmission through beta times the crash
+/// amplifier, plus the tilt recentring). The denominator is the name's
+/// realised daily log return, drift, news, order flow, jumps, mean
+/// reversion and the overnight gap included, because that is the variance
+/// [`crate::params::ModelParams::crisis_epicentre_extra`] is stated on.
+/// Share per name, median over 120 name-seeds:
+///
+/// ```text
+/// held VIX 65     0.3916      (mean 0.3946)
+/// free-running    0.3225      (mean 0.3259)
+/// ```
+///
+/// The crisis reading is the one taken, because the multiple is applied in
+/// crises and nowhere else. The design note carried 0.35 from an earlier
+/// reading; this is the same quantity measured on the composed vector, and
+/// the two readings bracket it.
+///
+/// # What it is not
+///
+/// It is not a dial. It is a property of the composed model, and a model
+/// whose factor share moved would want it re-measured rather than re-tuned
+/// -- which is why the measurement is written down here beside the number
+/// instead of being folded into a shipped multiple.
+///
+/// It is also an APPROXIMATION in one respect worth naming. The solve treats
+/// everything that is not the market factor as scaled, and the code scales
+/// only the sector leg and the idiosyncratic draw: news, order flow, jumps
+/// and mean reversion are not scaled, and on the same measurement they are
+/// `1 - 0.3916 - 0.3982 = 0.21` of the variance. So the realised extra comes
+/// in UNDER the dial's nominal value, and the epicentre probe measures what
+/// it actually is rather than assuming the algebra.
+pub const CRISIS_EPICENTRE_MARKET_SHARE: f64 = 0.3916;
+
+/// The multiple the epicentre's names carry on their NON-MARKET parts.
+///
+/// [`crate::params::ModelParams::crisis_epicentre_extra`] is stated on a
+/// name's total volatility; the market factor is untouched, so the multiple
+/// the sector leg and the idiosyncratic draw carry is the solve
+///
+/// ```text
+/// e^2 = m + (1 - m) g^2        g = sqrt((e^2 - m) / (1 - m))
+/// ```
+///
+/// with `m` [`CRISIS_EPICENTRE_MARKET_SHARE`]. At the DERIVED extra of 1.93
+/// and the measured share of 0.3916 that is
+/// `g^2 = (3.7249 - 0.3916) / 0.6084 = 5.4789`, `g = 2.3407`.
+///
+/// Floored at zero under the square root: `ModelParams::invariants` refuses
+/// an extra at or below `sqrt(m)`, and this floor is what keeps a caller who
+/// built params without going through the check from taking the root of a
+/// negative number rather than being told.
+pub fn crisis_epicentre_gain(params: &crate::params::ModelParams) -> f64 {
+    let e = params.crisis_epicentre_extra;
+    let m = CRISIS_EPICENTRE_MARKET_SHARE;
+    mathx::sqrt(mathx::max(0.0, (e * e - m) / (1.0 - m)))
+}
+
 pub fn idio_suppress_scales(suppress: f64) -> (f64, f64) {
     let down = mathx::clamp(1.0 - suppress, 0.0, mathx::sqrt(2.0));
     (down, mathx::sqrt(mathx::max(2.0 - down * down, 0.0)))
@@ -223,6 +289,17 @@ pub struct SharedFactors {
     /// gained a normaliser switch — by `crash_amplifier_conditional_sigma`
     /// as well, which is the same quantity for the same reason.
     pub market_sigma_tick: f64,
+    /// The sector at the epicentre of the crisis episode this session is
+    /// inside, if there is one.
+    ///
+    /// `None` on every shipped preset, and `None` in three further cases
+    /// that mean different things and read the same here on purpose: the
+    /// dial [`crate::params::ModelParams::crisis_epicentre_extra`] is 0.0,
+    /// no episode is running, or the episode drew `none` as its epicentre --
+    /// which is two of the tape's five episodes and is a DRAW rather than
+    /// the absence of one. In all four the tick does exactly what it did
+    /// before this field existed.
+    pub crisis_epicentre: Option<String>,
 }
 
 impl SharedFactors {
@@ -552,6 +629,28 @@ pub fn calculate_live_factors(
     let sector_loading = sector_loading_for(params, beta);
     let sector_component = sector_loading * shared.sector(&company.sector);
 
+    // THE CRISIS EPICENTRE. While an episode is running with this name's
+    // sector at its centre, the parts of the name's return that are NOT the
+    // market factor carry an extra multiple: this sector leg and the
+    // idiosyncratic draw below. The market component is untouched, which is
+    // the whole point -- the index, the VIX and the fear rows do not move,
+    // only who carries the crisis does.
+    //
+    // `Some` only while `crisis_epicentre_extra` is non-zero AND an episode
+    // is running AND its drawn epicentre is this name's sector. `None`
+    // otherwise, and `None` is not a multiply by one: the branches below
+    // leave the arithmetic exactly as it was written before this existed, so
+    // every preset is bit-identical rather than multiplied by a pair of
+    // ones.
+    let epicentre_gain: Option<f64> = match shared.crisis_epicentre.as_deref() {
+        Some(key) if key == company.sector.as_str() => Some(crisis_epicentre_gain(params)),
+        _ => None,
+    };
+    let sector_component = match epicentre_gain {
+        None => sector_component,
+        Some(g) => sector_component * g,
+    };
+
     // `garchVariance` is in DAILY units; the tick needs per-tick sigma.
     // `IDIO_SIGMA_SCALE` is the funding side of the market-factor variance
     // reallocation: the factor's variance share was raised out of THIS
@@ -618,6 +717,16 @@ pub fn calculate_live_factors(
         idiosyncratic_noise
     } else {
         idiosyncratic_noise * idio_down_suppress_scale
+    };
+    // The epicentre's other half, applied AFTER the draw for the reason the
+    // reallocation above is: this reshapes a shock the tick has already
+    // taken, so no branch here can move the draw count or the order. The
+    // scale reaches `noise_idio_unit` below as well, so `noise_idio` is
+    // still `z * sqrt(h)` times that unit term for term and the close's
+    // commensurate innovation reads the scale the draw ACTUALLY took.
+    let idiosyncratic_noise = match epicentre_gain {
+        None => idiosyncratic_noise,
+        Some(g) => idiosyncratic_noise * g,
     };
 
     // Crash correlation: when the market shock is extreme, everything loads
@@ -718,6 +827,10 @@ pub fn calculate_live_factors(
     // on top of the name's own sigma, plus the reallocation's scale.
     let noise_idio_unit =
         idio_scale / mathx::sqrt(390.0) * cap_mult * volatility_multiplier * idio_down_suppress_scale;
+    let noise_idio_unit = match epicentre_gain {
+        None => noise_idio_unit,
+        Some(g) => noise_idio_unit * g,
+    };
 
     // ── Forced flow ───────────────────────────────────────────────────────
     // Squeezes and stop cascades react to a move that ALREADY happened —
@@ -973,6 +1086,7 @@ mod tests {
             prev_day_down: false,
             market_sigma_tick: crate::params::PT_V1.market_factor_sigma
                 / crate::mathx::sqrt(390.0),
+            crisis_epicentre: None,
         }
     }
 
@@ -1245,6 +1359,7 @@ mod tests {
                     crisis_spike: 0.0,
                     prev_day_down: false,
                     market_sigma_tick: sigma_tick,
+                    crisis_epicentre: None,
                 };
                 total += w * factors_with(p, &company, &[], 0.0, &s).random_noise;
                 weight_sum += w;
@@ -1332,6 +1447,7 @@ mod tests {
             crisis_spike: 0.0,
             prev_day_down: false,
             market_sigma_tick: sigma_tick,
+            crisis_epicentre: None,
         }
     }
 

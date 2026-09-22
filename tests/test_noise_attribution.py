@@ -115,11 +115,12 @@ def test_arms_share_every_other_draw():
     assert set(control.engine.stream_positions()) == set(noise.STREAMS)
     assert len(control.engine.draws_by_stream()) == 3
     blind = set(noise.STREAMS) - set(control.engine.draws_by_stream())
-    # `market_vol_level` joined at 0.8.0 and is blind for the reason the
-    # five before it are: `draws_by_stream` counts the three streams an
-    # embedder can reach, and a mechanism stream is not one of them.
+    # `market_vol_level` joined at 0.8.0 and `crisis_epicentre` on
+    # 2026-09-22, and both are blind for the reason the five before them
+    # are: `draws_by_stream` counts the three streams an embedder can reach,
+    # and a mechanism stream is not one of them.
     assert blind == {"jumps", "news", "volume", "volume_idio", "overnight",
-                     "market_vol_level"}
+                     "market_vol_level", "crisis_epicentre"}
 
     attribution = noise.attribute(root, (1, 1), noise.column("price", 2),
                                   "event", streams=["news", "jumps"])

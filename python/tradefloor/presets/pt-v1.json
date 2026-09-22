@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v1",
   "fingerprint": "pt-v1",
-  "coefficient_digest": "9632b8d4b9080344f0724d945fd2c0f3a7fa5318ab4787c0cdaccd533e69cfe3",
+  "coefficient_digest": "e521bfba1cd4e19d571a27403824f14a132c690e08551431067583e1cbc95edb",
   "coefficients": {
     "book_levels": 10.0,
     "buyback_payout_share": 0.0,
@@ -15,6 +15,8 @@
     "crisis_blend_ramp": 1.4,
     "crisis_blend_source": 0.0,
     "crisis_blend_variance_damp": 0.0,
+    "crisis_epicentre_end_sessions": 21.0,
+    "crisis_epicentre_extra": 0.0,
     "crisis_vix_threshold": 25.5,
     "crowd_lean_cap": 0.02,
     "crowd_momentum_gain": 0.02,

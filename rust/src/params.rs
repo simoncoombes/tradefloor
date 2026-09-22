@@ -3690,6 +3690,85 @@ pub struct ModelParams {
     /// reachable at all; whether it is the RIGHT point is a different
     /// question and now an answerable one.
     pub crisis_vix_threshold: f64,
+    /// How much more volatile the crisis EPICENTRE's names are than the
+    /// other sectors' at the same VIX. 0.0 ships and the branch is not
+    /// taken: no episode is tracked, no epicentre is drawn, no draw is
+    /// taken on any stream and every preset is bit-identical. DERIVED 1.93.
+    ///
+    /// # What it is
+    ///
+    /// A crisis EPISODE starts on the session whose VIX is above
+    /// `crisis_vix_threshold` with no episode running, and ends after
+    /// `crisis_epicentre_end_sessions` consecutive sessions back under it.
+    /// At the start of each episode one epicentre is drawn from the sector
+    /// table's [`crate::sectors::Sector::crisis_weight`], `none` being the
+    /// remainder and a draw in its own right, on
+    /// [`crate::rng::stream::CRISIS_EPICENTRE`]. While the episode runs,
+    /// the names in that sector carry an extra multiple on the parts of
+    /// their return that are NOT the market factor: the sector leg and
+    /// their own idiosyncratic noise, both in
+    /// `market::factors::calculate_live_factors`. The market component is
+    /// untouched, so the index, the VIX and the fear rows do not move --
+    /// only who carries the crisis moves.
+    ///
+    /// # Derivation
+    ///
+    /// Five crisis episodes on the tape, 39 real names of the roster mapped
+    /// to the engine's sector keys, each sector's median episode volatility
+    /// over each name's own calm-day volatility (VIX under 12), then each
+    /// sector relative to the median sector of that episode
+    /// (`results/ptv19refine/epicentre-derivation.json`, design repository).
+    /// The rule was stated before the numbers were read: the epicentre is
+    /// the sector furthest above the episode's median if it is 1.3x or more
+    /// above it. 2008-09 gives financial services at 2.43, 2011 financial
+    /// services at 1.93, 2020 financial services at 1.41; 2000-02 and 2022
+    /// have none. The MEDIAN of the three ratios is 1.93, and that is this
+    /// dial: nothing was fitted to a graded row.
+    ///
+    /// # The multiple the code applies, and why it is not this number
+    ///
+    /// This dial is stated on a name's TOTAL volatility, which is what the
+    /// tape measures. The code can only scale the non-market parts, so the
+    /// multiple applied to them is solved from the market factor's share of
+    /// a name's variance:
+    ///
+    /// ```text
+    /// e^2 = m + (1 - m) g^2        so        g = sqrt((e^2 - m) / (1 - m))
+    /// ```
+    ///
+    /// `m` is [`CRISIS_EPICENTRE_MARKET_SHARE`], MEASURED on the composed
+    /// pt-v19 and recorded there with its arithmetic. At `m = 0.3916` and
+    /// `e = 1.93` that is `g^2 = (3.7249 - 0.3916) / 0.6084 = 5.4789`,
+    /// `g = 2.3407`. See
+    /// [`crate::market::factors::crisis_epicentre_gain`], which is where
+    /// the solve lives and where the guard against an `e` below `sqrt(m)`
+    /// sits.
+    ///
+    /// # What it is NOT
+    ///
+    /// It is not a correlation dial and not a second crisis blend. The
+    /// sector leg it multiplies is the one every member of the sector
+    /// shares, so lifting it lifts both the epicentre's volatility and its
+    /// internal correlation -- which is what an epicentre is -- and the
+    /// idiosyncratic leg is lifted beside it so the split between the two
+    /// is the one the name already had.
+    pub crisis_epicentre_extra: f64,
+    /// How many consecutive sessions under `crisis_vix_threshold` end a
+    /// crisis episode. 21 ships, which is a month of sessions.
+    ///
+    /// The hysteresis, and it is what makes an episode an episode rather
+    /// than a run of scattered days: the tape's five episodes are months
+    /// long (the shortest, 2011, is four months) and the VIX crosses back
+    /// under the threshold repeatedly inside each of them. Without the
+    /// counter an epicentre would be redrawn on every re-crossing, which
+    /// would average three sectors across one crisis and show none of them.
+    ///
+    /// Read only while `crisis_epicentre_extra` is non-zero, so it is inert
+    /// on every shipped preset whatever it reads. A value at or below zero
+    /// ends an episode on the first session back under the threshold, which
+    /// `ModelParams::invariants` allows: it is a degenerate hysteresis, not
+    /// an incoherent one.
+    pub crisis_epicentre_end_sessions: f64,
     /// The VIX above which the dollar catches a safe-haven bid.
     ///
     /// Defaults to the same constant as `crisis_vix_threshold` and is a
@@ -4031,6 +4110,10 @@ impl ModelParams {
             vix_ceiling: 80.0,
             vix_target_offset: 0.0,
             crisis_vix_threshold: crate::economy::CRISIS_VIX_THRESHOLD,
+            // Inert: the branch is not taken, no episode is tracked and no
+            // draw is taken on any stream, so every preset is bit-identical.
+            crisis_epicentre_extra: 0.0,
+            crisis_epicentre_end_sessions: 21.0,
             usd_crisis_vix_threshold: crate::economy::CRISIS_VIX_THRESHOLD,
             daily_credit_floor_gain: 0.0,
             news_peer_weight: 0.0,
@@ -5983,6 +6066,8 @@ impl ModelParams {
             "vix_ceiling" => self.vix_ceiling,
             "vix_target_offset" => self.vix_target_offset,
             "crisis_vix_threshold" => self.crisis_vix_threshold,
+            "crisis_epicentre_extra" => self.crisis_epicentre_extra,
+            "crisis_epicentre_end_sessions" => self.crisis_epicentre_end_sessions,
             "usd_crisis_vix_threshold" => self.usd_crisis_vix_threshold,
             "daily_credit_floor_gain" => self.daily_credit_floor_gain,
             "news_peer_weight" => self.news_peer_weight,
@@ -6175,6 +6260,8 @@ impl ModelParams {
             "vix_ceiling" => out.vix_ceiling = value,
             "vix_target_offset" => out.vix_target_offset = value,
             "crisis_vix_threshold" => out.crisis_vix_threshold = value,
+            "crisis_epicentre_extra" => out.crisis_epicentre_extra = value,
+            "crisis_epicentre_end_sessions" => out.crisis_epicentre_end_sessions = value,
             "usd_crisis_vix_threshold" => out.usd_crisis_vix_threshold = value,
             "daily_credit_floor_gain" => out.daily_credit_floor_gain = value,
             "news_peer_weight" => out.news_peer_weight = value,
@@ -6337,6 +6424,21 @@ impl ModelParams {
                  identity the target is the phase table and the multiplier is not applied, \
                  so a non-zero sigma would be a dial that reads as live and does nothing.",
                 self.vix_level_sigma));
+        }
+        if self.crisis_epicentre_extra != 0.0
+            && !(self.crisis_epicentre_extra
+                > crate::mathx::sqrt(crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE))
+        {
+            return Err(format!(
+                "crisis_epicentre_extra is {}. It is a multiple on the epicentre names' \
+                 TOTAL volatility, and the market factor already carries {} of a name's \
+                 variance and is not scaled, so an extra at or below sqrt({}) = {} asks \
+                 the non-market parts to carry a negative variance. Set it above that, \
+                 or to 0.0, where the mechanism does not run.",
+                self.crisis_epicentre_extra,
+                crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE,
+                crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE,
+                crate::mathx::sqrt(crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE)));
         }
         if self.vix_level_loop_gain != 0.0 && !(self.vix_level_loop_gain > 0.0) {
             return Err(format!(
@@ -6547,6 +6649,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "idio_sigma_floor",
         "crisis_blend_variance_damp",
         "crisis_vix_threshold",
+        "crisis_epicentre_extra",
+        "crisis_epicentre_end_sessions",
         "crowd_lean_cap",
         "crowd_momentum_gain",
         "crowd_valuation_gain",
