@@ -70,12 +70,18 @@ def test_all_fourteen_are_in_band_at_the_certified_horizon():
     # `band_distance(None, ...)` raises. The count below is unchanged by
     # that row either way -- it is not a shape row -- and the assertion
     # names fourteen on purpose.
+    from tradefloor.facts import SHAPE, DISPERSION
     in_band = [k for k, v in env.certified_panel().items()
                if bands.get(k) is not None
                and band_distance(v, *bands[k]) == 0]
     # Fourteen SHAPE rows. The level row is graded and held red in its own
-    # table, and it never joins this count.
-    assert len(in_band) == 14, sorted(set(env.CERTIFIED) - set(in_band))
+    # table, and it never joins this count; the dispersion row (since the
+    # fourth composition of 2026-09-22 the shipped preset reads it) is
+    # counted apart, so the fourteen stay fourteen.
+    assert len([k for k in in_band if k in SHAPE]) == 14, sorted(set(SHAPE) - set(in_band))
+    for row in DISPERSION:
+        if env.CERTIFIED.get(row) is not None:
+            assert row in in_band, row
     from tradefloor.facts import LEVEL, CRISIS
     # Which of the new rows the default preset is EXPECTED to fail, named
     # rather than assumed of all of them.
@@ -376,10 +382,12 @@ def test_the_certified_comment_matches_the_certified_numbers():
     scored = env.score(panel, horizon_days=env.CERTIFIED_HORIZON_DAYS)
     words = {14: "ALL FOURTEEN", 13: "thirteen of fourteen",
              12: "twelve of fourteen"}
-    expected = words.get(scored["in_band"])
+    # The SHAPE count: the dispersion row is scored apart (`dispersion_in_band`)
+    # and the note's wording is about the fourteen.
+    expected = words.get(scored["shape_in_band"])
     assert expected is not None, (
-        f"{scored['in_band']} of {scored['of']} in band and this test has no "
-        "wording for it; add one rather than deleting the assertion")
+        f"{scored['shape_in_band']} of {scored['shape_of']} in band and this "
+        "test has no wording for it; add one rather than deleting the assertion")
     assert expected in note, (
         f"the note above CERTIFIED does not say {expected!r}, but the panel "
         f"holds {scored['in_band']} of {scored['of']}:\n{note}")
@@ -402,7 +410,10 @@ def test_certified_serialises_for_a_manifest():
     # that table plus the row, and the row is on the unmeasured side today.
     assert set(d["statistics"]) | set(d["unmeasured"]) == (
         set(REAL_MARKETS) | set(DISPERSION))
-    assert set(DISPERSION) <= set(d["unmeasured"])
+    # Measured once the shipped preset's record carries a reading (the
+    # fourth composition of 2026-09-22 does at 252); unmeasured before.
+    for row in DISPERSION:
+        assert row in (d["unmeasured"] if env.CERTIFIED.get(row) is None else d["statistics"]), row
     assert set(d["groups"]) == {"shape", "level", "crisis", "dispersion"}
     assert len(d["gaps"]) == len(env.GAPS)
     assert all(g["forbids"] for g in d["gaps"])
