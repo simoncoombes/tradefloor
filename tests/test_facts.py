@@ -780,8 +780,17 @@ def test_the_index_drift_row_is_reported_and_never_graded():
 
     # Every ungraded row carries a reason. A row with neither a band nor a
     # recorded reason is the defect this pairing exists to prevent.
+    #
+    # UNGRADED IS NOT "ABSENT FROM REAL_MARKETS" ANY MORE. It was, while
+    # every banded row was on the decade table. `crisis_sector_dispersion`
+    # landed on 2026-09-22 with a ruled band at both horizons and no decade
+    # band at either -- its ruler is the whole tape and the decade panel
+    # carries no reading for it -- so a row is ungraded here when NO table
+    # bands it, which is what `ruled_band` answers.
     for key in tradefloor.facts.LABELS:
-        if key not in REAL_MARKETS:
+        if (key not in REAL_MARKETS
+                and tradefloor.facts.ruled_band(key, 252) is None
+                and tradefloor.facts.ruled_band(key, 504) is None):
             assert key in REPORTING_ONLY, key
 
 

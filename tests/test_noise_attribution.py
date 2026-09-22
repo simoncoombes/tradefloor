@@ -167,8 +167,15 @@ def test_facts_panel_statistics_is_what_measure_reports():
     key set: the fear rows read the macro table, which `panel_statistics`
     never sees, so they and their session diagnostics come from
     `fear_statistics`, the VIX's persistence from `persistence_statistics`,
-    and a key `measure` reports that none of the four parts produced fails
-    here by name.
+    the crisis sector dispersion from `crisis_statistics` -- which reads the
+    bars, the macro table AND the roster's sectors, so it is a part of its
+    own and not a line in any of the other three -- and a key `measure`
+    reports that none of the five parts produced fails here by name.
+
+    `crisis_statistics` joined on 2026-09-22 with the row. On a 40-session
+    run at a calm VIX it reports the row ABSENT under
+    `crisis_sector_dispersion_blind`, which is a reading of the part and
+    not a gap in it, so the rebuild below carries the same key.
 
     THE POINT IS THAT `measure` INVENTS NOTHING. A row computed inline
     there would be the one row with no independent caller and no
@@ -195,6 +202,8 @@ def test_facts_panel_statistics_is_what_measure_reports():
                 "model_fingerprint": engine.model_fingerprint, "days": 40,
                 "burn": 0}
     persistence = facts.persistence_statistics(engine.macro_table(), days=40)
+    crisis = facts.crisis_statistics(engine.bars(grain="day"),
+                                     engine.macro_table(), universe)
     assert set(stats) <= set(measured)
     assert all(measured[k] == v for k, v in stats.items())
     assert set(stats).isdisjoint(fear)
@@ -202,7 +211,11 @@ def test_facts_panel_statistics_is_what_measure_reports():
     assert set(persistence).isdisjoint(stats)
     assert set(persistence).isdisjoint(fear)
     assert all(measured[k] == v for k, v in persistence.items())
-    assert measured == {**identity, **stats, **fear, **persistence}
+    assert set(crisis).isdisjoint(stats)
+    assert set(crisis).isdisjoint(fear)
+    assert set(crisis).isdisjoint(persistence)
+    assert all(measured[k] == v for k, v in crisis.items())
+    assert measured == {**identity, **stats, **fear, **persistence, **crisis}
     # The graded rows outside the shape set are the fear part's, and the
     # noise module's statistic target reads the panel part alone, so a
     # crisis row is refused there by name rather than read as absent.

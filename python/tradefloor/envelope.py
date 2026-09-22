@@ -1511,7 +1511,7 @@ def score(panel: Mapping[str, float], *,
 
     bands, noise, ruler_name = RULERS_BY_BASIS[basis][horizon_days]
 
-    from .facts import SHAPE, LEVEL, CRISIS, PERSISTENCE
+    from .facts import SHAPE, LEVEL, CRISIS, PERSISTENCE, DISPERSION
 
     # THE GATE IS THE LIBRARY'S GRADED ROWS, NOT ONE BAND TABLE'S KEYS.
     #
@@ -1540,12 +1540,19 @@ def score(panel: Mapping[str, float], *,
     # table entry plus this line, and that the row is now named as
     # unreadable rather than refused as unknown. Absent with a stated reason
     # is a different fact from rejected as a typo.
-    graded_rows = frozenset(SHAPE + LEVEL + CRISIS + PERSISTENCE)
+    #
+    # `facts.DISPERSION` joined the gate on 2026-09-22 for the same reason
+    # and with the opposite effect on the counts: `crisis_sector_dispersion`
+    # sits outside the `REAL_MARKETS` partition too, because the decade
+    # panel has no reading for it, and it DOES have a ruled band at both
+    # horizons. So it is graded here, it is the twentieth row, and the
+    # ruled basis reads 40 cells where it read 38.
+    graded_rows = frozenset(SHAPE + LEVEL + CRISIS + PERSISTENCE + DISPERSION)
     unknown = sorted(set(panel) - graded_rows)
     if unknown:
         raise ValidationError(
             f"unknown statistics {unknown}; the rows this library grades "
-            f"are facts.SHAPE + LEVEL + CRISIS + PERSISTENCE: "
+            f"are facts.SHAPE + LEVEL + CRISIS + PERSISTENCE + DISPERSION: "
             f"{sorted(graded_rows)}")
 
     unreadable_reasons = _facts.RULED_UNREADABLE.get(horizon_days, {})
@@ -1591,10 +1598,17 @@ def score(panel: Mapping[str, float], *,
     # before the band does: a group with no key is how a row goes missing
     # from a nineteen-row claim without anything disagreeing.
     persistence_in, persistence_of = count(PERSISTENCE)
+    # 1 of 1 on the ruled basis and 0 of 0 on the decade and universal ones,
+    # which carry no band for the row. Reported rather than folded into the
+    # crisis count: the row is not on `facts.CRISIS` and adding it to that
+    # total would move a number three records already carry.
+    dispersion_in, dispersion_of = count(DISPERSION)
     for name in rows:
         rows[name]["group"] = ("shape" if name in SHAPE else
                                "level" if name in LEVEL else
-                               "crisis" if name in CRISIS else "persistence")
+                               "crisis" if name in CRISIS else
+                               "dispersion" if name in DISPERSION else
+                               "persistence")
     unreadable = sorted(n for n in rows if rows[n]["in_band"] is None)
     return {
         "horizon_days": horizon_days,
@@ -1635,6 +1649,7 @@ def score(panel: Mapping[str, float], *,
         "level_in_band": level_in, "level_of": level_of,
         "crisis_in_band": crisis_in, "crisis_of": crisis_of,
         "persistence_in_band": persistence_in, "persistence_of": persistence_of,
+        "dispersion_in_band": dispersion_in, "dispersion_of": dispersion_of,
     }
 
 

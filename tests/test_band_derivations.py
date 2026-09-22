@@ -487,7 +487,7 @@ def test_the_two_registries_are_the_whole_of_what_is_not_rebuilt():
     assert not set(SUMMARY_DERIVED) & set(UNDERIVED)
 
 
-def test_the_ruled_table_is_the_universal_one_plus_the_four_off_panel_rows():
+def test_the_ruled_table_is_the_universal_one_plus_the_five_off_panel_rows():
     """What the RELEASE BAR's own band table is made of, counted.
 
     `envelope.BAR_BAND_BASIS` is "ruled", so `REAL_MARKETS_RULED` is the
@@ -505,7 +505,12 @@ def test_the_ruled_table_is_the_universal_one_plus_the_four_off_panel_rows():
     from_universal = [k for k in ruled if k in REAL_MARKETS_UNIVERSAL]
     rest = sorted(set(ruled) - set(from_universal))
     assert len(from_universal) == 14
-    assert rest == ["fear_gauge_dn1", "fear_gauge_dn3", "index_drift_pct",
+    # `crisis_sector_dispersion` joined on 2026-09-22. Its ruler is ^VIX
+    # against the same 32 names the universal panel is measured on, so it
+    # is composed in here rather than carried there, exactly as the two
+    # fear rows are.
+    assert rest == ["crisis_sector_dispersion", "fear_gauge_dn1",
+                    "fear_gauge_dn3", "index_drift_pct",
                     "index_tail_dn3_pct"]
     assert ruled["fear_gauge_dn3"] == facts.RULED_FEAR_DN3_BAND == (2.60, 9.58)
     assert ruled["index_drift_pct"] == facts.RULED_DRIFT_BAND
