@@ -1031,7 +1031,9 @@ def _nothing_dormant():
                    # derived 1.76 (vix-law-levels, design repository).
                    vix_anchor_weight_level_cap=1.76,
                    # ... and its below-knee switch is 0.0 or 1.0.
-                   vix_anchor_weight_level_below=1.0)
+                   vix_anchor_weight_level_below=1.0,
+                   # ... and so is its knee's fixed-level switch.
+                   vix_anchor_weight_level_knee_fixed=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

@@ -1617,6 +1617,25 @@ pub struct ModelParams {
     /// only with the level law on.
     pub vix_anchor_weight_level_below: f64,
 
+    /// Nonzero, the level law's knee does not read the slow regime level:
+    /// `K = anchor exp(-k)` instead of `K = L anchor exp(-k)`. 0.0 -- every
+    /// preset -- is the knee as it was. A switch, 0.0 or 1.0, read only with
+    /// the level law on.
+    ///
+    /// # Why
+    ///
+    /// The knee is DERIVED from the held-VIX map: it is where the read-back's
+    /// elasticity `g(x)` to a held VIX reaches `G* / (1 - a)`, and `g` is a
+    /// property of the VIX's absolute level (the index variance's floor and
+    /// coupling), which the slow regime level `L`
+    /// ([`ModelParams::vix_level_sigma`]) does not move. With the knee on
+    /// `L anchor`, a turbulent era (`L > 1`) lifts the knee, leaving the band
+    /// from `anchor exp(-k)` to `L anchor exp(-k)` at the constant weight,
+    /// where `(1 - a) g(x)` exceeds the gain the law holds -- toward the fear
+    /// trap the law exists to remove -- and a calm era lowers it. The centre
+    /// and the read-back keep `L`: that is the era.
+    pub vix_anchor_weight_level_knee_fixed: f64,
+
     /// How many sessions of market-side warm-up the factor's variance
     /// components get before session one. 0.0 -- every preset through
     /// pt-v19 -- runs nothing, touches no state and is bit-identical.
@@ -4372,6 +4391,7 @@ impl ModelParams {
             vix_anchor_weight_level_cap: 0.0,
             vix_anchor_weight_level_knee: 0.0,
             vix_anchor_weight_level_below: 0.0,
+            vix_anchor_weight_level_knee_fixed: 0.0,
             market_burn_in_sessions: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
@@ -6371,6 +6391,7 @@ impl ModelParams {
             "vix_anchor_weight_level_cap" => self.vix_anchor_weight_level_cap,
             "vix_anchor_weight_level_knee" => self.vix_anchor_weight_level_knee,
             "vix_anchor_weight_level_below" => self.vix_anchor_weight_level_below,
+            "vix_anchor_weight_level_knee_fixed" => self.vix_anchor_weight_level_knee_fixed,
             "market_burn_in_sessions" => self.market_burn_in_sessions,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
@@ -6575,6 +6596,7 @@ impl ModelParams {
             "vix_anchor_weight_level_cap" => out.vix_anchor_weight_level_cap = value,
             "vix_anchor_weight_level_knee" => out.vix_anchor_weight_level_knee = value,
             "vix_anchor_weight_level_below" => out.vix_anchor_weight_level_below = value,
+            "vix_anchor_weight_level_knee_fixed" => out.vix_anchor_weight_level_knee_fixed = value,
             "market_burn_in_sessions" => out.market_burn_in_sessions = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
@@ -6958,7 +6980,8 @@ impl ModelParams {
                  or above one, or 0.0 for no cap.", self.vix_anchor_weight_level_cap));
         }
         for (name, v) in [("vix_anchor_weight_level_knee", self.vix_anchor_weight_level_knee),
-                          ("vix_anchor_weight_level_below", self.vix_anchor_weight_level_below)] {
+                          ("vix_anchor_weight_level_below", self.vix_anchor_weight_level_below),
+                          ("vix_anchor_weight_level_knee_fixed", self.vix_anchor_weight_level_knee_fixed)] {
             if v != 0.0 && self.vix_anchor_weight_level == 0.0 {
                 return Err(format!(
                     "{} is {} but vix_anchor_weight_level is 0: it shapes the level \
@@ -6974,6 +6997,11 @@ impl ModelParams {
             return Err(format!(
                 "vix_anchor_weight_level_below is {}. It is a switch, 0.0 or 1.0.",
                 self.vix_anchor_weight_level_below));
+        }
+        if !(self.vix_anchor_weight_level_knee_fixed == 0.0 || self.vix_anchor_weight_level_knee_fixed == 1.0) {
+            return Err(format!(
+                "vix_anchor_weight_level_knee_fixed is {}. It is a switch, 0.0 or 1.0.",
+                self.vix_anchor_weight_level_knee_fixed));
         }
         if self.vix_anchor_weight_level_cap != 0.0 && self.vix_anchor_weight_level == 0.0 {
             return Err(format!(
@@ -7243,6 +7271,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_anchor_weight_level_cap",
         "vix_anchor_weight_level_knee",
         "vix_anchor_weight_level_below",
+        "vix_anchor_weight_level_knee_fixed",
         "market_burn_in_sessions",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",

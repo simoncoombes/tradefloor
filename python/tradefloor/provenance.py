@@ -448,6 +448,11 @@ OUT_OF_SCOPE = {
         "unread while `vix_anchor_weight_level` is 0.0; at 0.0 the weight is "
         "the dial below the knee. 1.0 runs the level law below it too. A "
         "probe, not adopted",
+    "vix_anchor_weight_level_knee_fixed":
+        "inert at 0.0, and unread while `vix_anchor_weight_level` is 0.0: the "
+        "knee reads `L * anchor` as it always has. 1.0 takes the slow regime "
+        "level out of the knee, which the held map places at an absolute VIX "
+        "(vix-slow-regime, design repository). A probe, not adopted",
     "crisis_epicentre_end_sessions":
         "unread while `crisis_epicentre_extra` is 0.0: with no episode ever "
         "entered there is no counter to end. 21 sessions is a month and is a "

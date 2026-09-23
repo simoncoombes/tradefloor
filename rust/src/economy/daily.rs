@@ -137,6 +137,13 @@ pub struct DailyInputs<'a> {
     pub vix_anchor_weight_level_knee: f64,
     /// See [`crate::params::ModelParams::vix_anchor_weight_level_below`].
     pub vix_anchor_weight_level_below: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_weight_level_knee_fixed`].
+    /// 0.0 puts the knee on `vix_anchor_level` as it always was.
+    pub vix_anchor_weight_level_knee_fixed: f64,
+    /// The identity's derived anchor WITHOUT the slow regime level's
+    /// multiplier (`Engine::vix_anchor`). Read only by the knee, and only
+    /// with `vix_anchor_weight_level_knee_fixed` nonzero.
+    pub vix_anchor_level_fixed: f64,
     /// The anchor's slow memory of the read-back's log deviation, already
     /// advanced to today by the engine.
     pub vix_anchor_slow: f64,
@@ -287,6 +294,8 @@ impl<'a> Default for DailyInputs<'a> {
             vix_anchor_weight_level_cap: 0.0,
             vix_anchor_weight_level_knee: 0.0,
             vix_anchor_weight_level_below: 0.0,
+            vix_anchor_weight_level_knee_fixed: 0.0,
+            vix_anchor_level_fixed: 0.0,
             vix_anchor_slow: 0.0,
             vix_jump_intensity: 0.0,
             vix_jump_scale: 0.0,
@@ -1198,10 +1207,19 @@ pub fn update_economy_daily(
             inputs.vix_anchor_level
         };
         let weight = if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_weight_level != 0.0 {
-            let knee = if inputs.vix_anchor_weight_level_knee != 0.0 {
-                inputs.vix_anchor_level * mathx::exp(-inputs.vix_anchor_weight_level_knee)
+            // The knee is where the held read-back's elasticity reaches the
+            // level the law holds, a property of the VIX's ABSOLUTE level; the
+            // switch takes the slow regime level out of it. Guarded, so at
+            // 0.0 the knee reads `vix_anchor_level` exactly as it did.
+            let knee_base = if inputs.vix_anchor_weight_level_knee_fixed != 0.0 {
+                inputs.vix_anchor_level_fixed
             } else {
                 inputs.vix_anchor_level
+            };
+            let knee = if inputs.vix_anchor_weight_level_knee != 0.0 {
+                knee_base * mathx::exp(-inputs.vix_anchor_weight_level_knee)
+            } else {
+                knee_base
             };
             anchor_weight_at_level(
                 inputs.vix_anchor_weight,
