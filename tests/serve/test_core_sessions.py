@@ -343,14 +343,19 @@ def test_caveats_are_computed():
     assert "Leverage is unbounded" in text
     assert "A 4-name roster" in text
     assert "0 of 0 fills" in text
-    # Made true, the caveat goes: it is computed from the table, not typed.
-    saved = core.LONG_RUN_CHECK["measured"]["pt-v19"]
+    # Made true, the caveat turns: it is computed from the preset's record,
+    # not typed.
+    real = core.long_run_verdict
     try:
-        core.LONG_RUN_CHECK["measured"]["pt-v19"] = {
-            k: real for k, (_, real) in core.LONG_RUN_CHECK["measures"].items()}
-        assert "long-run" not in " | ".join(svc.caveats(OWNER, sid))
+        core.long_run_verdict = lambda preset: {
+            "verdict": "pass", "passed": 15, "of": 15, "criteria": "test",
+            "rows": [{"id": "A1", "words": "w", "value": 1, "real": 1,
+                      "rule": "r", "pass": True}]}
+        text2 = " | ".join(svc.caveats(OWNER, sid))
+        assert "FAILS the long-run check" not in text2
+        assert "passes the long-run check" in text2
     finally:
-        core.LONG_RUN_CHECK["measured"]["pt-v19"] = saved
+        core.long_run_verdict = real
     assert core.long_run_failures("pt-v19")        # and it is true today
 
 
@@ -358,7 +363,7 @@ def test_caveats_for_an_unchecked_preset():
     svc = LocalSessionService(MemoryStore())
     sid = svc.open(OWNER, SessionConfig(preset="pt-v18", universe_size=30)).session_id
     text = " | ".join(svc.close(OWNER, sid).caveats)
-    assert "has not been through the long-run crash check" in text
+    assert "has not been through the long-run check" in text
     assert f"not the certified default ({envelope.PRESET})" in text
     assert "-name roster" not in text
 

@@ -367,7 +367,10 @@ session. `orders(status=...)` takes the five statuses plus `"open"`,
 - insolvency, when net worth is at or below zero, with leverage reported as
   null.
 
-`core.LONG_RUN_CHECK` holds the free-running crash check from tradefloor-design
+The long-run verdict is read from the preset's own record (block `long_run` in
+`python/tradefloor/presets/<name>.json`, written by `record.py --long-run` from
+the design repo's `programme/longrun/criteria.py`), so a recomposed preset never
+inherits its predecessor's verdict. It was formerly `core.LONG_RUN_CHECK`, the free-running crash check from tradefloor-design
 `programme/results/crashcheck/` (2026-09-23): 30 histories of 20 years per
 preset against the S&P 500 and VIX from 1990 to 2025. A preset fails when any
 measure is more than twice or less than half the real figure. pt-v19 fails 4

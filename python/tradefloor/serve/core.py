@@ -88,7 +88,7 @@ from tradefloor.serve.types import (
 )
 
 __all__ = ["LocalSessionService", "MACRO_FIELDS", "CYCLE_PHASES",
-           "TICKS_PER_SESSION", "LONG_RUN_CHECK", "STEP_BAR_SESSIONS"]
+           "TICKS_PER_SESSION", "LONG_RUN_BLOCK", "STEP_BAR_SESSIONS"]
 
 TICKS_PER_SESSION = 390
 #: The session opens at 09:30 on a fixed weekday, as `TradingEnv` and the
@@ -128,64 +128,46 @@ _STATUSES = ("accepted", "filled", "cancelled", "expired", "rejected")
 
 # -- the long-run check ----------------------------------------------------------
 #
-#: Free-running crash check: 30 histories x 20 years per preset on
-#: `Universe.random(40, seed=111)`, first year discarded, against the S&P 500
-#: and the VIX from 1990 to 2025. Source: tradefloor-design
-#: `programme/results/crashcheck/` (`freerun-summary.json`, `compare.txt`),
-#: 2026-09-23. A preset that is not in `measured` has not been checked, and
-#: its report says so. When the check moves into `tradefloor.envelope`, this
-#: table should be read from there instead.
-LONG_RUN_CHECK: dict[str, Any] = {
-    "source": "tradefloor-design programme/results/crashcheck/ (2026-09-23)",
-    "years": 20,
-    # A measure more than this factor from the real figure, either way, fails.
-    "tolerance": 2.0,
-    "measures": {
-        # name: (plain words, real S&P/VIX 1990-2025)
-        "bear_markets_per_decade": ("20% bear markets per decade", 1.1244),
-        "bear_recovery_sessions": ("sessions from a bear market's trough "
-                                   "back to its peak", 669.5),
-        "bear_worst_month_vol_pct": ("worst month's volatility in a bear "
-                                     "market, %", 63.88),
-        "sessions_under_5pct_per_decade": ("sessions down more than 5% per "
-                                           "decade", 6.184),
-        "vix_share_above_40": ("share of sessions with the VIX above 40",
-                               0.0231),
-        "index_annual_vol_pct": ("index annual volatility, %", 18.11),
-    },
-    "measured": {
-        "pt-v19": {
-            "bear_markets_per_decade": 2.1838,
-            "bear_recovery_sessions": 186.0,
-            "bear_worst_month_vol_pct": 29.91,
-            "sessions_under_5pct_per_decade": 1.800,
-            "vix_share_above_40": 0.0604,
-            "index_annual_vol_pct": 17.75,
-        },
-    },
-}
+#: The long-run check's verdict lives in the preset's OWN RECORD
+#: (python/tradefloor/presets/<name>.json, block "long_run"), written by
+#: `tools/presets/record.py --long-run` from tradefloor-design
+#: `programme/longrun/criteria.py`: 30 histories x 21 years free running plus
+#: the 2008 and 2020 replays, against the S&P 500 and the VIX 1990-2025, graded
+#: on the owner's adopted criteria (`programme/longrun/CRITERIA.md`). Reading it
+#: from the record rather than a table here means a recomposed preset cannot
+#: inherit its predecessor's verdict: the record is re-measured with the
+#: composition, and `tests/test_preset_records.py` guards it against drift.
+LONG_RUN_BLOCK = "long_run"
+
+
+def long_run_verdict(preset: str) -> dict[str, Any] | None:
+    """The preset record's long-run block, or None if it has none."""
+    try:
+        from tradefloor import records as _records
+        rec = _records.preset_record(preset)
+    except Exception:
+        return None
+    blk = rec.get(LONG_RUN_BLOCK) if isinstance(rec, dict) else None
+    return blk if isinstance(blk, dict) and "verdict" in blk else None
+
+
+def _fmt(v: Any) -> str:
+    if isinstance(v, (list, tuple)):
+        return " / ".join(_fmt(x) for x in v)
+    if isinstance(v, float):
+        return f"{v:.3g}"
+    return str(v)
 
 
 def long_run_failures(preset: str) -> list[str] | None:
-    """The long-run measures `preset` misses, as sentences; None if unchecked.
-
-    Computed from `LONG_RUN_CHECK` on every call, so the verdict and the
-    report move together when the table does.
-    """
-    measured = LONG_RUN_CHECK["measured"].get(preset)
-    if measured is None:
+    """The long-run criteria `preset` fails, as sentences; [] if it passes
+    them all; None if it has not been checked. Computed from the record on
+    every call."""
+    blk = long_run_verdict(preset)
+    if blk is None:
         return None
-    tol = float(LONG_RUN_CHECK["tolerance"])
-    out = []
-    for name, (words, real) in LONG_RUN_CHECK["measures"].items():
-        value = measured.get(name)
-        if value is None or real <= 0 or value <= 0:
-            continue
-        ratio = value / real
-        if ratio > tol or ratio < 1.0 / tol:
-            out.append(f"{words} {value:.4g} against {real:.4g} real "
-                       f"({ratio:.2g}x)")
-    return out
+    return [f"{r['id']} {r['words']}: {_fmt(r['value'])} against {_fmt(r['real'])} "
+            f"real ({r['rule']})" for r in blk.get("rows", []) if not r.get("pass")]
 
 
 # -- small helpers -----------------------------------------------------------------
@@ -1483,24 +1465,34 @@ class LocalSessionService:
                        f"this session.")
 
         failures = long_run_failures(cfg.preset)
-        years = LONG_RUN_CHECK["years"]
+        blk = long_run_verdict(cfg.preset)
         if failures is None:
             out.append(f"Preset {cfg.preset} has not been through the long-run "
-                       f"crash check ({years}-year free runs against the S&P "
-                       f"500 and VIX), so how its crashes and volatility "
-                       f"regimes compare with real markets over multi-year "
-                       f"sessions is unknown.")
+                       f"check (21-year free runs and the 2008 and 2020 "
+                       f"replays against the S&P 500 and VIX), so how its "
+                       f"crashes and volatility regimes compare with real "
+                       f"markets over multi-year sessions is unknown.")
         elif failures:
             out.append(
-                f"Preset {cfg.preset} FAILS the long-run check: over "
+                f"Preset {cfg.preset} FAILS the long-run check on "
+                f"{len(failures)} of {blk.get('of', '?')} criteria: over "
                 f"multi-year sessions its volatility regimes and crash "
-                f"frequency drift from real markets. Free-running {years} "
-                f"years against the S&P 500 and VIX 1990-2025: "
+                f"frequency drift from real markets. "
                 + "; ".join(failures)
-                + f" ({LONG_RUN_CHECK['source']}). This session has run "
-                f"{days} trading day{'s' if days != 1 else ''}; the "
-                f"certification below covers at most "
+                + f" ({blk.get('criteria', 'long-run criteria')}). This "
+                f"session has run {days} trading day{'s' if days != 1 else ''}; "
+                f"the certification below covers at most "
                 f"{_envelope.CERTIFIED_HORIZON_DAYS}.")
+        else:
+            out.append(
+                f"Preset {cfg.preset} passes the long-run check "
+                f"({blk.get('passed')} of {blk.get('of')} criteria, "
+                f"{blk.get('criteria', '')}): over 20 simulated years its "
+                f"crash frequency, fear spells, volatility and returns sit "
+                f"within the tolerances a user would notice, and the 2008 "
+                f"and 2020 replays land within them. That is realism to a "
+                f"degree, not a forecast: the tolerances are ratios such as "
+                f"half to double the real rate.")
 
         verdict = _envelope.check(horizon_days=days)
         if not verdict.inside:

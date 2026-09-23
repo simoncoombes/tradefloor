@@ -1886,5 +1886,159 @@
     "vol_at_vix_5": 17.18490992687427,
     "vol_at_vix_65": 53.48190167469083,
     "real": 6.16
+  },
+  "long_run": {
+    "criteria": "programme/longrun/CRITERIA.md (adopted 2026-09-23)",
+    "verdict": "fail",
+    "passed": 7,
+    "of": 15,
+    "rows": [
+      {
+        "id": "A1",
+        "words": "worst month's volatility in the 2008 and 2020 replays within 30% of real",
+        "value": [
+          46.0,
+          38.5
+        ],
+        "real": [
+          84.3,
+          94.5
+        ],
+        "rule": "within 30%",
+        "pass": false
+      },
+      {
+        "id": "A2",
+        "words": "maximum drawdown in the 2008 and 2020 replays within 30% of real",
+        "value": [
+          0.279,
+          0.247
+        ],
+        "real": [
+          0.568,
+          0.339
+        ],
+        "rule": "within 30%",
+        "pass": false
+      },
+      {
+        "id": "A3",
+        "words": "peak stock correlation in the 2008 and 2020 replays within 0.15 of real",
+        "value": [
+          0.656,
+          0.63
+        ],
+        "real": [
+          0.748,
+          0.872
+        ],
+        "rule": "within 0.15",
+        "pass": false
+      },
+      {
+        "id": "B1",
+        "words": "share of sessions with the VIX above 30",
+        "value": 0.194,
+        "real": 0.082,
+        "rule": "1/2x to 2x",
+        "pass": false
+      },
+      {
+        "id": "B2",
+        "words": "mean length of a fear spell above VIX 30, sessions",
+        "value": 42,
+        "real": 22,
+        "rule": "1/2x to 2x",
+        "pass": true
+      },
+      {
+        "id": "B3",
+        "words": "20% bear markets per decade",
+        "value": 2.18,
+        "real": 1.12,
+        "rule": "1/2x to 2x",
+        "pass": true
+      },
+      {
+        "id": "B4",
+        "words": "10% corrections per decade",
+        "value": 7.15,
+        "real": 3.65,
+        "rule": "1/2x to 2x",
+        "pass": true
+      },
+      {
+        "id": "B5",
+        "words": "sessions down more than 5% per decade",
+        "value": 1.8,
+        "real": 6.2,
+        "rule": "1/2x to 2x",
+        "pass": false
+      },
+      {
+        "id": "B6",
+        "words": "share of sessions with the VIX under 15",
+        "value": 0.173,
+        "real": 0.326,
+        "rule": "1/2x to 2x",
+        "pass": true
+      },
+      {
+        "id": "B7",
+        "words": "index annual volatility, %",
+        "value": 17.7,
+        "real": 18.1,
+        "rule": "within 20%",
+        "pass": true
+      },
+      {
+        "id": "B8",
+        "words": "long-run index return, % a year",
+        "value": 3.8,
+        "real": 6.25,
+        "rule": "within 2 points of the honest target",
+        "pass": false
+      },
+      {
+        "id": "C1",
+        "words": "crash rate in years 3-21 against years 1-2",
+        "value": 0.86,
+        "real": 1.0,
+        "rule": "2/3x to 1.5x",
+        "pass": true
+      },
+      {
+        "id": "C2",
+        "words": "histories touching the VIX ceiling, of 30",
+        "value": 2,
+        "real": 0,
+        "rule": "at most 1",
+        "pass": false
+      },
+      {
+        "id": "C3",
+        "words": "edge from reading a headline 5 ticks late, bp",
+        "value": 136,
+        "real": 0,
+        "rule": "under 20 bp",
+        "pass": false
+      },
+      {
+        "id": "D1",
+        "words": "ruled bands of the one-year realism table in, on all four cells",
+        "value": "all",
+        "real": "all",
+        "rule": "every band in",
+        "pass": true
+      }
+    ],
+    "measured": {
+      "engine_commit": "fed06b3",
+      "seeds": 30,
+      "years": 21,
+      "box": "calm4 (tradefloor-design programme/results/calm-regime/box-calm4)",
+      "date": "2026-09-23",
+      "note": "hand-scored in programme/longrun/CRITERIA.md; the composition's criteria.py replaces this block"
+    }
   }
 }
