@@ -192,25 +192,25 @@ PRESET = "pt-v19"
 #: is what every caller that GRADES this table reads. `band_distance(None,
 #: ...)` is a TypeError, and a row with no reading has no verdict to give.
 CERTIFIED: dict[str, float | None] = {
-    "annualised_vol_pct": 24.7481,
-    "excess_kurtosis": 7.9385,
-    "return_acf1": -0.0022,
-    "abs_return_acf1": 0.0495,
-    "abs_return_acf5": 0.0287,
-    "abs_return_acf20": 0.0098,
-    "cross_sectional_corr": 0.3305,
-    "volume_abs_return_corr": 0.5012,
-    "leverage_effect": -0.0513,
-    "volume_change_acf1": -0.2736,
-    "corr_asymmetry": 0.0070,
-    "corr_asymmetry_lagged": 0.1441,
-    "sector_excess_corr": 0.1034,
-    "corr_persistence_acf1": 0.1787,
+    "annualised_vol_pct": 22.7591,
+    "excess_kurtosis": 9.8423,
+    "return_acf1": -0.0129,
+    "abs_return_acf1": 0.0486,
+    "abs_return_acf5": 0.0237,
+    "abs_return_acf20": 0.0085,
+    "cross_sectional_corr": 0.3063,
+    "volume_abs_return_corr": 0.5497,
+    "leverage_effect": -0.0281,
+    "volume_change_acf1": -0.2789,
+    "corr_asymmetry": 0.0527,
+    "corr_asymmetry_lagged": 0.0790,
+    "sector_excess_corr": 0.0904,
+    "corr_persistence_acf1": 0.2960,
     # ABSENT AT THIS PRESET, with the reason above. Written by
     # `envelope_tables.py` from the record's `panel_252`, which carries the
     # row only when a seed read it; `dispersion_252` on the record carries
     # how many of the thirty did and why the rest did not.
-    "crisis_sector_dispersion": 1.3587,
+    "crisis_sector_dispersion": 1.2029,
 }
 
 
@@ -271,7 +271,7 @@ CERTIFIED_LEVEL: dict[str, float] = {
     # eras, and this row exists because of that. The seed spread is wide
     # against the band: the thirty-seed standard deviation is 6.52, so a
     # single seed's first year says almost nothing about the row.
-    "index_drift_pct": 6.3635,
+    "index_drift_pct": 7.6462,
 }
 
 #: The CRISIS rows, reserved for the fear gauge and the index tail, measured
@@ -316,8 +316,8 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # move. Read the session count beside the value: 52 sessions is thin,
     # and the same row stood on 118 under the pre-31ef261 vector, so the
     # median moved on fewer and deeper falls rather than on more of them.
-    "fear_gauge_dn1": 1.9136,
-    "fear_gauge_dn3": 5.8788,
+    "fear_gauge_dn1": 1.9427,
+    "fear_gauge_dn3": 5.4237,
     # The index tail row on the same thirty seeds: 79 sessions at or below
     # -3 per cent in 7,530, a pooled rate of 1.0491 per cent against a band
     # of 0.47 to 1.96 and a tape centre of 1.2132. IN band, at band position
@@ -342,7 +342,7 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # that as data beside the verdict. The 504-day reading is NOT measured
     # on this vector: `levelproto` ran 252 days only, and the year-two
     # figure that stood here (1.2989 per cent) was the pre-31ef261 vector's.
-    "index_tail_dn3_pct": 0.7835,
+    "index_tail_dn3_pct": 1.1421,
 }
 
 #: THE STRUCTURAL ROWS: the fourth certification block, and the only one
@@ -583,23 +583,23 @@ BAR_BAND_BASIS = "ruled"
 #: dispersion row is graded on `facts.REAL_MARKETS_RULED_504` and is not in
 #: `BANDS_504`, and the count is over the rows this table can be graded by.
 MEASURED_504: dict[str, float | None] = {
-    "annualised_vol_pct": 24.7721,
-    "excess_kurtosis": 9.2433,
-    "return_acf1": 0.0013,
-    "abs_return_acf1": 0.0602,
-    "abs_return_acf5": 0.0383,
-    "abs_return_acf20": 0.0179,
-    "cross_sectional_corr": 0.3268,
-    "volume_abs_return_corr": 0.5437,
-    "leverage_effect": -0.0463,
-    "volume_change_acf1": -0.2543,
-    "corr_asymmetry": 0.0151,
-    "corr_asymmetry_lagged": 0.1324,
-    "sector_excess_corr": 0.1080,
-    "corr_persistence_acf1": 0.2294,
+    "annualised_vol_pct": 22.5804,
+    "excess_kurtosis": 11.7059,
+    "return_acf1": -0.0153,
+    "abs_return_acf1": 0.0605,
+    "abs_return_acf5": 0.0360,
+    "abs_return_acf20": 0.0178,
+    "cross_sectional_corr": 0.2966,
+    "volume_abs_return_corr": 0.5861,
+    "leverage_effect": -0.0317,
+    "volume_change_acf1": -0.2598,
+    "corr_asymmetry": 0.0522,
+    "corr_asymmetry_lagged": 0.0678,
+    "sector_excess_corr": 0.0906,
+    "corr_persistence_acf1": 0.4088,
     # Absent on the record this table was written from, which predates the
     # row. See the note above and `CERTIFIED`'s.
-    "crisis_sector_dispersion": 1.3597,
+    "crisis_sector_dispersion": 1.3462,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
