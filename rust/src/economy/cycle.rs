@@ -52,11 +52,35 @@ pub fn weibull_hazard(months: f64, shape: f64, scale: f64) -> f64 {
 /// conversion belongs here rather than inside [`weibull_hazard`] or before
 /// the clamp.
 #[inline]
-fn per_day(monthly: f64, per_month: f64) -> f64 {
+fn per_day(monthly: f64, spec: &CycleSpec) -> f64 {
+    let per_month = spec.per_month;
     if per_month == 0.0 {
         monthly
     } else {
-        monthly * (30.0 - 29.0 * per_month) / 30.0
+        // `m - (m - 1.0)` with `m` = 30.0 is `30.0 - 29.0`, the literal
+        // that stood here, operation for operation.
+        let m = spec.month_days;
+        monthly * (m - (m - 1.0) * per_month) / m
+    }
+}
+
+/// The clock and the table the cycle reads.
+///
+/// `per_month` is `cycle_hazard_per_month`; `month_days` is the macro
+/// month in economy steps (30.0 as shipped, see `MacroCalendar`); `us` is
+/// `cycle_us_calibration != 0.0`, the phase table derived from NBER and BEA
+/// (see [`phase_characteristics_for`]). [`CycleSpec::shipped`] is what every
+/// preset reads, and the functions that take `per_month` alone take it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CycleSpec {
+    pub per_month: f64,
+    pub month_days: f64,
+    pub us: bool,
+}
+
+impl CycleSpec {
+    pub const fn shipped(per_month: f64) -> Self {
+        CycleSpec { per_month, month_days: 30.0, us: false }
     }
 }
 
@@ -64,6 +88,15 @@ fn per_day(monthly: f64, per_month: f64) -> f64 {
 ///
 /// Every scale is in MONTHS. See this module's own note on the clock.
 pub fn cycle_hazard_params(phase: CyclePhase) -> (f64, f64) {
+    cycle_hazard_params_for(phase, false)
+}
+
+/// [`cycle_hazard_params`], or the NBER-derived table when `us` is set. See
+/// [`phase_characteristics_for`] for the derivation.
+pub fn cycle_hazard_params_for(phase: CyclePhase, us: bool) -> (f64, f64) {
+    if us {
+        return us_cycle_hazard_params(phase);
+    }
     match phase {
         // Long expansions get increasingly fragile.
         CyclePhase::Expansion => (1.8, 36.0),
@@ -88,16 +121,31 @@ pub fn get_cycle_transition_probability(
     economy: &EconomyState,
     per_month: f64,
 ) -> (f64, CyclePhase) {
-    let phase = phase_characteristics(economy.cycle_phase);
+    get_cycle_transition_probability_for(economy, &CycleSpec::shipped(per_month))
+}
+
+/// [`get_cycle_transition_probability`] on a given clock and table.
+pub fn get_cycle_transition_probability_for(
+    economy: &EconomyState,
+    spec: &CycleSpec,
+) -> (f64, CyclePhase) {
+    let phase = phase_characteristics_for(economy.cycle_phase, spec.us);
     let months = economy.months_in_current_phase;
     if months < phase.min_months {
         return (0.0, phase.next_phase);
     }
 
-    let (shape, scale) = cycle_hazard_params(economy.cycle_phase);
+    let (shape, scale) = cycle_hazard_params_for(economy.cycle_phase, spec.us);
     let p = adjust_transition_probability(economy, weibull_hazard(months, shape, scale));
 
-    (per_day(clamp(p, 0.0, 0.3), per_month), phase.next_phase)
+    (per_day(clamp(p, 0.0, hazard_cap(spec.us)), spec), phase.next_phase)
+}
+
+/// The cap on the monthly hazard: 0.3 as shipped. The US table raises it,
+/// see [`phase_characteristics_for`].
+#[inline]
+pub fn hazard_cap(us: bool) -> f64 {
+    if us { US_HAZARD_CAP } else { 0.3 }
 }
 
 /// The condition ladder shared, in the original, by both entry points.
@@ -178,14 +226,23 @@ pub fn check_cycle_transition(
     rng: &mut impl Rng,
     per_month: f64,
 ) -> EconomyState {
-    let phase = phase_characteristics(economy.cycle_phase);
+    check_cycle_transition_for(economy, rng, &CycleSpec::shipped(per_month))
+}
+
+/// [`check_cycle_transition`] on a given clock and table.
+pub fn check_cycle_transition_for(
+    economy: &EconomyState,
+    rng: &mut impl Rng,
+    spec: &CycleSpec,
+) -> EconomyState {
+    let phase = phase_characteristics_for(economy.cycle_phase, spec.us);
     let months = economy.months_in_current_phase;
 
     if months < phase.min_months {
         return economy.clone();
     }
 
-    let (shape, scale) = cycle_hazard_params(economy.cycle_phase);
+    let (shape, scale) = cycle_hazard_params_for(economy.cycle_phase, spec.us);
     let p = adjust_transition_probability(economy, weibull_hazard(months, shape, scale));
     // The cap on the hazard, at 0.3 of whatever unit the hazard carries.
     // Under the reference implementation's reading that is a 30 per cent
@@ -195,7 +252,7 @@ pub fn check_cycle_transition(
     // under either reading a trough with its own ladder saturates it on the
     // first eligible roll. See `ModelParams::cycle_hazard_per_month` for
     // the counts.
-    let transition_probability = per_day(clamp(p, 0.0, 0.3), per_month);
+    let transition_probability = per_day(clamp(p, 0.0, hazard_cap(spec.us)), spec);
 
     if rng.next_f64() < transition_probability {
         let mut next = economy.clone();
@@ -255,13 +312,13 @@ pub fn phase_cycle() -> [CyclePhase; 5] {
 /// (`economy/daily.rs`) and `check_cycle_transition` reads it AFTER that
 /// advance, so the `d`-th day of a phase is checked at `d / 30` months and
 /// the first check of a fresh phase is at `1/30`.
-fn hazard_only_transition_probability(phase: CyclePhase, days: i64, per_month: f64) -> f64 {
-    let months = days as f64 / 30.0;
-    if months < phase_characteristics(phase).min_months {
+fn hazard_only_transition_probability(phase: CyclePhase, days: i64, spec: &CycleSpec) -> f64 {
+    let months = days as f64 / spec.month_days;
+    if months < phase_characteristics_for(phase, spec.us).min_months {
         return 0.0;
     }
-    let (shape, scale) = cycle_hazard_params(phase);
-    per_day(clamp(weibull_hazard(months, shape, scale), 0.0, 0.3), per_month)
+    let (shape, scale) = cycle_hazard_params_for(phase, spec.us);
+    per_day(clamp(weibull_hazard(months, shape, scale), 0.0, hazard_cap(spec.us)), spec)
 }
 
 /// Walk a phase's hazard-only survival in days, and return the sum of it.
@@ -292,7 +349,7 @@ fn hazard_only_transition_probability(phase: CyclePhase, days: i64, per_month: f
 /// truncations that happen to agree.
 fn walk_survival(
     phase: CyclePhase,
-    per_month: f64,
+    spec: &CycleSpec,
     mut visit: impl FnMut(i64, f64) -> bool,
 ) -> f64 {
     let (mut s, mut acc, mut a) = (1.0, 0.0, 0i64);
@@ -305,7 +362,7 @@ fn walk_survival(
         if !visit(a, acc) {
             return acc;
         }
-        s *= 1.0 - hazard_only_transition_probability(phase, a + 1, per_month);
+        s *= 1.0 - hazard_only_transition_probability(phase, a + 1, spec);
         a += 1;
     }
 }
@@ -315,7 +372,12 @@ fn walk_survival(
 /// `sum_{d>=1} S(d)`, which is the mean of a non-negative integer sojourn
 /// written as the sum of its survival function.
 pub fn mean_sojourn_days(phase: CyclePhase, per_month: f64) -> f64 {
-    walk_survival(phase, per_month, |_, _| true)
+    mean_sojourn_days_for(phase, &CycleSpec::shipped(per_month))
+}
+
+/// [`mean_sojourn_days`] on a given clock and table.
+pub fn mean_sojourn_days_for(phase: CyclePhase, spec: &CycleSpec) -> f64 {
+    walk_survival(phase, spec, |_, _| true)
 }
 
 /// The stationary share of DAYS the chain spends in each phase, in
@@ -331,10 +393,15 @@ pub fn mean_sojourn_days(phase: CyclePhase, per_month: f64) -> f64 {
 /// the chain is cyclic is [`phase_cycle`]'s own assertion, not an
 /// assumption made here.
 pub fn stationary_phase_shares(per_month: f64) -> ([f64; 5], f64) {
+    stationary_phase_shares_for(&CycleSpec::shipped(per_month))
+}
+
+/// [`stationary_phase_shares`] on a given clock and table.
+pub fn stationary_phase_shares_for(spec: &CycleSpec) -> ([f64; 5], f64) {
     let mut mean = [0.0; 5];
     let mut cycle = 0.0;
     for (k, &phase) in phase_cycle().iter().enumerate() {
-        mean[k] = mean_sojourn_days(phase, per_month);
+        mean[k] = mean_sojourn_days_for(phase, spec);
         cycle += mean[k];
     }
     (mean, cycle)
@@ -372,8 +439,14 @@ pub fn stationary_phase_shares(per_month: f64) -> ([f64; 5], f64) {
 /// uniform. The last phase absorbs a uniform that rounds past the final
 /// cumulative share, which is a rounding fallback and not a sixth branch.
 pub fn stationary_opening(per_month: f64, u_phase: f64, u_age: f64) -> (CyclePhase, f64) {
+    stationary_opening_for(&CycleSpec::shipped(per_month), u_phase, u_age)
+}
+
+/// [`stationary_opening`] on a given clock and table; the age comes back in
+/// that clock's months.
+pub fn stationary_opening_for(spec: &CycleSpec, u_phase: f64, u_age: f64) -> (CyclePhase, f64) {
     let phases = phase_cycle();
-    let (mean, cycle) = stationary_phase_shares(per_month);
+    let (mean, cycle) = stationary_phase_shares_for(spec);
 
     let mut cumulative = 0.0;
     let mut pick = phases.len() - 1;
@@ -387,11 +460,11 @@ pub fn stationary_opening(per_month: f64, u_phase: f64, u_age: f64) -> (CyclePha
 
     let phase = phases[pick];
     let mut age = 0;
-    walk_survival(phase, per_month, |a, cdf| {
+    walk_survival(phase, spec, |a, cdf| {
         age = a;
         cdf / mean[pick] < u_age
     });
-    (phase, age as f64 / 30.0)
+    (phase, age as f64 / spec.month_days)
 }
 
 #[cfg(test)]
@@ -428,7 +501,7 @@ mod stationary_law {
                     let mut e = ladder_free_economy();
                     e.cycle_phase = phase;
                     e.months_in_current_phase = days as f64 / 30.0;
-                    let p = hazard_only_transition_probability(phase, days, per_month);
+                    let p = hazard_only_transition_probability(phase, days, &CycleSpec::shipped(per_month));
                     let (engine_p, _) = get_cycle_transition_probability(&e, per_month);
                     assert_eq!(p, engine_p, "{phase:?} at {days} days, clock {per_month}");
                 }
@@ -446,14 +519,14 @@ mod stationary_law {
             for phase in phase_cycle() {
                 let sum = mean_sojourn_days(phase, per_month);
                 let mut horizon = 0;
-                walk_survival(phase, per_month, |a, _| {
+                walk_survival(phase, &CycleSpec::shipped(per_month), |a, _| {
                     horizon = a;
                     true
                 });
                 let mut survival = 1.0;
                 let mut mean = 0.0;
                 for j in 1..=(horizon + 1) {
-                    let p = hazard_only_transition_probability(phase, j, per_month);
+                    let p = hazard_only_transition_probability(phase, j, &CycleSpec::shipped(per_month));
                     mean += j as f64 * survival * p;
                     survival *= 1.0 - p;
                 }
@@ -475,7 +548,7 @@ mod stationary_law {
                 let min_days = (phase_characteristics(phase).min_months * 30.0) as i64;
                 let mean = mean_sojourn_days(phase, per_month);
                 let mut below = 0.0;
-                walk_survival(phase, per_month, |a, cdf| {
+                walk_survival(phase, &CycleSpec::shipped(per_month), |a, cdf| {
                     if a == min_days - 1 {
                         below = cdf / mean;
                         return false;
@@ -499,7 +572,7 @@ mod stationary_law {
             assert!((total - 1.0).abs() < 1e-12, "shares sum to {total}");
             for (k, &phase) in phase_cycle().iter().enumerate() {
                 let mut last = 0.0;
-                walk_survival(phase, per_month, |_, cdf| {
+                walk_survival(phase, &CycleSpec::shipped(per_month), |_, cdf| {
                     last = cdf / mean[k];
                     true
                 });
@@ -552,7 +625,7 @@ mod stationary_law {
             let (mean, cycle) = stationary_phase_shares(per_month);
             for (k, &phase) in phase_cycle().iter().enumerate() {
                 let mut cdf = Vec::new();
-                walk_survival(phase, per_month, |_, c| {
+                walk_survival(phase, &CycleSpec::shipped(per_month), |_, c| {
                     cdf.push(c / mean[k]);
                     true
                 });

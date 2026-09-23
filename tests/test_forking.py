@@ -1031,7 +1031,25 @@ def _nothing_dormant():
                    # derived 1.76 (vix-law-levels, design repository).
                    vix_anchor_weight_level_cap=1.76,
                    # ... and its below-knee switch is 0.0 or 1.0.
-                   vix_anchor_weight_level_below=1.0)
+                   vix_anchor_weight_level_below=1.0,
+                   # The macro-cycle switches are 0.0 or 1.0.
+                   cycle_us_calibration=1.0,
+                   fed_liftoff_rule=1.0,
+                   market_pe_buybacks=1.0,
+                   # ... and so is its knee's fixed-level switch.
+                   vix_anchor_weight_level_knee_fixed=1.0,
+                   # The news re-quote is a switch too (news-speed), and the
+                   # absorption profile carries its derived values: at a
+                   # blanket 0.05 both of its parts have a twentieth-of-a-
+                   # tick half-life, every event is priced whole on its
+                   # first tick, and a snapshot that dropped the day's news
+                   # later in the day would move nothing, so the guard below
+                   # could not see `session_news`. The 42-tick drift keeps
+                   # the news priced all day.
+                   news_quote_revision=1.0,
+                   news_absorption_half_life=0.6,
+                   news_absorption_drift_share=0.12,
+                   news_absorption_drift_half_life=42.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

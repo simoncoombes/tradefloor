@@ -591,6 +591,18 @@ PARAM_SPECS: dict[str, dict] = {
     # economy actually steps through, where 365 was written. Derived, not fitted.
     "macro_compound_days_per_year": {"kind": "abs", "step_unit": 1.0,
                               "hard_range": (252.0, 365.0), "derived": True},
+    # The rest of the macro calendar on the session clock (2026-09-23,
+    # macro-cycle): 252 steps to the macro year. Derived, not fitted.
+    "macro_calendar_days_per_year": {"kind": "abs", "step_unit": 1.0,
+                              "hard_range": (252.0, 365.0), "derived": True},
+    # Switches, 0 shipped and 1 on (2026-09-23, macro-cycle): the NBER/BEA
+    # cycle table, the Fed's lift-off branch, buybacks in market_pe.
+    "cycle_us_calibration":   {"kind": "abs", "step_unit": 1.0,
+                              "hard_range": (0.0, 1.0), "derived": True},
+    "fed_liftoff_rule":       {"kind": "abs", "step_unit": 1.0,
+                              "hard_range": (0.0, 1.0), "derived": True},
+    "market_pe_buybacks":     {"kind": "abs", "step_unit": 1.0,
+                              "hard_range": (0.0, 1.0), "derived": True},
     # The anchor's centre below the derived anchor, in logs, and the weight's
     # level law and its cap (2026-09-23, vix-law-levels). Probe dials.
     "vix_anchor_centre":      {"kind": "abs", "step_unit": 0.01,
@@ -605,6 +617,20 @@ PARAM_SPECS: dict[str, dict] = {
                                      "hard_range": (0.0, 5.0), "derived": False},
     "vix_anchor_weight_level_below": {"kind": "abs", "step_unit": 1.0,
                                      "hard_range": (0.0, 1.0), "derived": False},
+    "vix_anchor_weight_level_knee_fixed": {"kind": "abs", "step_unit": 1.0,
+                                          "hard_range": (0.0, 1.0), "derived": False},
+    # How fast an endogenous news event's move is priced (2026-09-23,
+    # news-speed). Derived from intraday event studies (design repository,
+    # programme/results/news-speed/): 0.6-tick half-life, 12% drift at a
+    # 42-tick half-life, the maker re-quoting on news.
+    "news_absorption_half_life": {"kind": "abs", "step_unit": 0.05,
+                                  "hard_range": (0.0, 5.0), "derived": True},
+    "news_absorption_drift_share": {"kind": "abs", "step_unit": 0.01,
+                                    "hard_range": (0.0, 0.5), "derived": True},
+    "news_absorption_drift_half_life": {"kind": "abs", "step_unit": 1.0,
+                                        "hard_range": (0.0, 120.0), "derived": True},
+    "news_quote_revision": {"kind": "abs", "step_unit": 1.0,
+                            "hard_range": (0.0, 1.0), "derived": True},
     # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
     # the tape's three epicentre episodes (2.43, 1.93, 1.41). 0.0 is the
     # branch not taken; the range opens at zero to hold it and stops at 3.0,

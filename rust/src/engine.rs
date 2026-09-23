@@ -57,7 +57,7 @@
 
 use crate::economy::{
     Decision,
-    check_cycle_transition, update_central_bank, update_economy_daily, CentralBankState,
+    check_cycle_transition_for, update_central_bank_with, update_economy_daily, CentralBankState,
     DailyInputs, EconomicShock, EconomyState,
 };
 use crate::market::{
@@ -937,6 +937,16 @@ impl Engine {
             last_market_targets: None,
         };
         engine.vix_anchor = engine.derive_vix_anchor();
+        // The opening meeting interval, 45 calendar days, onto the macro
+        // calendar's steps. Only a fresh schedule is moved, and never on
+        // the shipped calendar, where `scale_days` is the literal anyway.
+        {
+            let cal = engine.macro_calendar();
+            let cb = &mut engine.central_bank;
+            if !cal.is_shipped() && cb.next_meeting_date - cb.last_meeting_date == 45 * 24 * 60 {
+                cb.next_meeting_date = cb.last_meeting_date + cal.scale_days(45) * 24 * 60;
+            }
+        }
         if settle_opening {
             engine.burn_in_economy();
         }
@@ -1320,8 +1330,8 @@ impl Engine {
         self.economy_rng = rng;
         self.draws.economy += consumed;
 
-        let (phase, months) = crate::economy::stationary_opening(
-            self.params.cycle_hazard_per_month,
+        let (phase, months) = crate::economy::stationary_opening_for(
+            &self.cycle_spec(),
             u_phase,
             u_age,
         );
@@ -1413,7 +1423,8 @@ impl Engine {
             });
             if !drawn && self.economy.cycle_phase != phase {
                 self.economy.cycle_phase = phase;
-                self.economy.months_in_current_phase = months_before + 1.0 / 30.0;
+                self.economy.months_in_current_phase =
+                    months_before + 1.0 / self.macro_calendar().month_f64();
             }
         }
         if !drawn {
@@ -1466,6 +1477,20 @@ impl Engine {
     /// whole run rather than the moment someone asked.
     pub fn params(&self) -> &ModelParams {
         &self.params
+    }
+
+    /// The macro calendar `macro_calendar_days_per_year` selects.
+    pub fn macro_calendar(&self) -> crate::economy::MacroCalendar {
+        crate::economy::MacroCalendar::from_days_per_year(self.params.macro_calendar_days_per_year)
+    }
+
+    /// The clock and phase table the business cycle reads.
+    pub fn cycle_spec(&self) -> crate::economy::CycleSpec {
+        crate::economy::CycleSpec {
+            per_month: self.params.cycle_hazard_per_month,
+            month_days: self.macro_calendar().month_f64(),
+            us: self.params.cycle_us_calibration != 0.0,
+        }
     }
 
     /// The VIX at which every variance coupling reads one. See the field.
@@ -1815,7 +1840,27 @@ impl Engine {
             // and exclusive, so order decides which branch an event takes.
             let mut v = Vec::with_capacity(request.news.len() + day_news.len());
             v.extend_from_slice(request.news);
-            v.extend(day_news.iter().cloned());
+            // WHEN the day's move lands. At `news_absorption_half_life` 0.0,
+            // every preset, each tick carries the event whole and the tick
+            // divides it by 390, so the move lands in a straight line over
+            // the session: this branch is the code that always stood. Off
+            // zero, each event is carried at this minute's share of the
+            // absorption profile, `390 * (A(m + 1) - A(m))`, and the same
+            // division prices `A(m + 1) - A(m)` of it. The weight is the
+            // same for every event, so the sign, the peer transfer and the
+            // day's total are unchanged. Caller-supplied news is not
+            // touched: it has no release time the profile could start from.
+            if self.params.news_absorption_half_life == 0.0 {
+                v.extend(day_news.iter().cloned());
+            } else {
+                let minutes = (request.time.hour - 9) * 60 + (request.time.minute - 30);
+                let w = crate::market::factors::news_absorption_weight(&self.params, minutes);
+                v.extend(day_news.iter().map(|e| NewsEvent {
+                    company_id: e.company_id.clone(),
+                    sector: e.sector.clone(),
+                    price_impact: e.price_impact.map(|x| x * w),
+                }));
+            }
             v
         };
         let request = &TickRequest {
@@ -3361,11 +3406,15 @@ impl Engine {
                 vix_anchor_weight: self.params.vix_anchor_weight,
                 vix_anchor_memory: self.params.vix_anchor_memory,
                 macro_compound_days_per_year: self.params.macro_compound_days_per_year,
+                macro_calendar: self.macro_calendar(),
+                cycle_us_calibration: self.params.cycle_us_calibration,
                 vix_anchor_centre: self.params.vix_anchor_centre,
                 vix_anchor_weight_level: self.params.vix_anchor_weight_level,
                 vix_anchor_weight_level_cap: self.params.vix_anchor_weight_level_cap,
                 vix_anchor_weight_level_knee: self.params.vix_anchor_weight_level_knee,
                 vix_anchor_weight_level_below: self.params.vix_anchor_weight_level_below,
+                vix_anchor_weight_level_knee_fixed: self.params.vix_anchor_weight_level_knee_fixed,
+                vix_anchor_level_fixed: self.vix_anchor,
                 vix_anchor_slow: self.vix_anchor_slow,
                 vix_jump_intensity: self.params.vix_jump_intensity,
                 vix_jump_scale: self.params.vix_jump_scale,
@@ -3451,13 +3500,18 @@ impl Engine {
             rng,
         );
         rng.site(Site::EconomyCycle, 0);
-        self.economy =
-            check_cycle_transition(&self.economy, rng, self.params.cycle_hazard_per_month);
+        let spec = self.cycle_spec();
+        self.economy = check_cycle_transition_for(&self.economy, rng, &spec);
 
+        let policy = crate::economy::PolicyOptions {
+            calendar: self.macro_calendar(),
+            liftoff: self.params.fed_liftoff_rule,
+        };
         let meeting =
             {
                 rng.site(Site::CentralBank, 0);
-                update_central_bank(&self.central_bank, &self.economy, request.timestamp, rng)
+                update_central_bank_with(
+                    &self.central_bank, &self.economy, request.timestamp, rng, &policy)
             };
         let meeting_held = meeting.decision.is_some();
         let decision = meeting.decision;
@@ -3786,6 +3840,16 @@ impl Engine {
                     // A branch, as at the valuation, so the arithmetic
                     // before pt-v18 is the arithmetic it always was.
                     let earnings = if nominal == 1.0 { eps } else { eps * nominal };
+                    // `market_pe_buybacks`: the earnings the valuation holds
+                    // also carry the buyback term (`market::tick`), so a
+                    // multiple read without it rises by the buyback yield
+                    // every year. A branch, so 0.0 is the line that stood.
+                    let earnings = if self.params.market_pe_buybacks != 0.0 {
+                        earnings * crate::market::tick::buyback_scale(
+                            &self.params, Some(earnings), c.stock.price, self.current_day)
+                    } else {
+                        earnings
+                    };
                     let pe = c.stock.price / earnings;
                     if pe > 0.0 && pe < 200.0 {
                         total_mcap += c.stock.market_cap;

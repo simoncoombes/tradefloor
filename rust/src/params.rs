@@ -422,6 +422,77 @@ pub struct ModelParams {
     /// information contagion works this way: when one bank misses, the
     /// market re-reads every other bank, and it does that harder in a panic.
     pub news_peer_vix_coupling: f64,
+    /// How fast the market prices an endogenous news event, as the
+    /// half-life in ticks (minutes) of the fast part of its move. 0.0 --
+    /// every preset -- is the straight line that has always stood.
+    ///
+    /// # The defect
+    ///
+    /// An event drawn at `open_market` adds `price_impact / 390` on every
+    /// tick of its day, so its move lands in a straight line across the
+    /// session: 5% of it by tick 30, half by lunch, all of it by the close.
+    /// An agent that reads the headline at tick 30 and trades its direction
+    /// earned about +120bp an event on pt-v19, 82% of the time
+    /// (docs/serve/HEADLINES.md). Real prices take in firm news in minutes,
+    /// so that is an edge a bot would learn here and lose with money.
+    ///
+    /// # The profile
+    ///
+    /// Off zero, the share of the move priced after `n` ticks is
+    /// `A(n) = (1 - d) * F(n; h) + d * F(n; h_d)`, where `F(n; h) = (1 -
+    /// 2^(-n/h)) / (1 - 2^(-390/h))`, `h` is this dial, and `d` and `h_d`
+    /// are `news_absorption_drift_share` and
+    /// `news_absorption_drift_half_life`. Each part is rescaled to be
+    /// complete at the close, so the day's total move is the same at every
+    /// setting; only its timing changes. Tick `m` of the session prices
+    /// `A(m + 1) - A(m)` of the event, and its sector peers the same share
+    /// of their transfer. See `market::factors::news_absorbed_share`.
+    ///
+    /// Caller-supplied news (`tick(news=...)`, `run_session(news=...)`) is
+    /// not reshaped. Off the regular session the profile prices nothing.
+    ///
+    /// # The derived values (not adopted by any preset)
+    ///
+    /// Half-life 0.6 ticks, drift share 0.12, drift half-life 42 ticks,
+    /// with `news_quote_revision` 1.0. Christensen, Timmermann and Veliyev
+    /// ("Warp speed price moves: jumps after earnings announcements",
+    /// arXiv 2601.08962, Table 7, liquid US stocks 2008-2020) buy on the
+    /// surprise at the first trade after the release: 0.74% by 30 seconds,
+    /// 1.05% by one minute, 1.58% by five and 1.80% by 6:30pm, so 58% of
+    /// the move is in after one minute and 88% after five. The half-life
+    /// puts `A(1)` at 0.60, the 12% after five minutes is the drift share,
+    /// and its 42-tick half-life (a 60-minute mean life) lands it over the
+    /// next hours, as Patell and Wolfson (1984, JFE) find return serial
+    /// correlation disturbed "for several hours" after the bulk of the
+    /// reaction is over within five to ten minutes. Kim, Lin and Slovin
+    /// (1997, JFQA) find news released before the open priced within the
+    /// first five minutes of NYSE trading; Busse and Green (2002, JFE) find
+    /// good news priced within a minute and bad news over fifteen. The
+    /// 2016-2020 half of the sample gives the same one-minute share (68%)
+    /// and nothing after five minutes, so the drift share is the slower of
+    /// the two readings. No drift past the close: post-earnings drift in
+    /// large caps has been nil since 2006 (Martineau 2022, CFR), and the
+    /// engine's momentum already carries about 5% of a news day's move into
+    /// the next (design repository, programme/results/news-speed/).
+    pub news_absorption_half_life: f64,
+    /// The share of an endogenous news event's move that arrives as
+    /// post-news drift, after the fast part: `d` in
+    /// [`ModelParams::news_absorption_half_life`]'s profile. 0.0 -- every
+    /// preset -- is no drift part; read only with that dial off zero.
+    pub news_absorption_drift_share: f64,
+    /// The half-life in ticks of the post-news drift part, `h_d` in
+    /// [`ModelParams::news_absorption_half_life`]'s profile. 0.0 lands the
+    /// drift share in a straight line over the session; read only with
+    /// `news_absorption_drift_share` off zero.
+    pub news_absorption_drift_half_life: f64,
+    /// Whether the market maker re-quotes on public news. 0.0 -- every
+    /// preset -- quotes the book around the last print, so a news move in
+    /// the model price reaches the tape only as fast as the tick's flow can
+    /// walk the book. 1.0 quotes it around the last print moved by the
+    /// tick's news term (`company_news / 390` as applied), the way dealers
+    /// revise quotes on a public announcement without waiting for a trade.
+    /// A switch. See `market::tick`, the settlement phase.
+    pub news_quote_revision: f64,
     /// Market-shock magnitude, in baseline sigmas, above which the crash
     /// amplifier fires (§5.4 promotion).
     pub crash_amplifier_threshold: f64,
@@ -1567,6 +1638,52 @@ pub struct ModelParams {
     /// calendar (30-session months) is not moved by this dial.
     pub macro_compound_days_per_year: f64,
 
+    /// How many economy steps make a macro YEAR on the rest of the macro
+    /// calendar. 365.0 -- every preset -- is the calendar that has always
+    /// stood: 30-step months (`DAYS_PER_MONTH`), 90-step quarters, a 90-step
+    /// OPEC interval, a 365-step seasonal year, a 30-step month on the
+    /// cycle's phase clock and its per-day hazard, a 30-step market-return
+    /// memory, and central-bank meetings every 42-55 (crisis 21-30) steps.
+    ///
+    /// # The defect
+    ///
+    /// The economy steps once per trading session, so a macro year was 365
+    /// sessions, 1.45 trading years: every business-cycle phase, release
+    /// and meeting interval ran 1.45 times slow in market time. At 252.0 --
+    /// the session clock, DERIVED from the session count and not fitted --
+    /// a month is 21 sessions, a quarter 63, the year 252, and calendar-day
+    /// intervals (meetings, the seasonal valley) are scaled by 252/365 and
+    /// rounded. A monthly rate stays a monthly rate; per-step processes are
+    /// not touched. Pair it with `macro_compound_days_per_year` 252.0.
+    /// Measured in the design repository, results/macro-cycle/.
+    pub macro_calendar_days_per_year: f64,
+
+    /// Selects the business-cycle phase table derived from NBER and BEA
+    /// (`economy::state::us_phase_characteristics`). 0.0 -- every preset --
+    /// reads the shipped table; any other value reads the US table. Its
+    /// durations are months of the macro calendar, so they mean real months
+    /// only with `macro_calendar_days_per_year` 252.0. See the table's own
+    /// docstring for each number's derivation.
+    pub cycle_us_calibration: f64,
+
+    /// Adds a lift-off branch to the central bank's ladder. 0.0 -- every
+    /// preset -- is the shipped ladder, in which every hike needs inflation
+    /// at least a point above target, so after the first recession the
+    /// rate sits at zero for the rest of a run. At any other value the
+    /// bank also hikes 25bp when its own Taylor rate is 50bp above the
+    /// policy rate, unemployment is not more than a point over target, and
+    /// the cycle is not in contraction or trough: the ladder's own cut
+    /// branch mirrored. See `economy::central_bank`.
+    pub fed_liftoff_rule: f64,
+
+    /// Reads buybacks into `market_pe`. 0.0 -- every preset -- divides price
+    /// by `eps * nominal` without the buyback term the valuation applies,
+    /// so the multiple rises by about the buyback yield a year (22.6 to 28.0
+    /// over 21 years on pt-v19) and slowly raises the expansion hazard,
+    /// which adds above a multiple of 28. At any other value the earnings
+    /// carry `market::tick::buyback_scale`, as the valuation's do.
+    pub market_pe_buybacks: f64,
+
     /// Where the anchor's weight pulls TO, as a log offset below the
     /// identity's derived anchor: the blend (and the memory's reference) use
     /// `L * anchor * exp(-c)`. 0.0 -- every preset -- is the branch not
@@ -1616,6 +1733,25 @@ pub struct ModelParams {
     /// weight toward zero. 0.0 -- the default -- holds the dial there. Read
     /// only with the level law on.
     pub vix_anchor_weight_level_below: f64,
+
+    /// Nonzero, the level law's knee does not read the slow regime level:
+    /// `K = anchor exp(-k)` instead of `K = L anchor exp(-k)`. 0.0 -- every
+    /// preset -- is the knee as it was. A switch, 0.0 or 1.0, read only with
+    /// the level law on.
+    ///
+    /// # Why
+    ///
+    /// The knee is DERIVED from the held-VIX map: it is where the read-back's
+    /// elasticity `g(x)` to a held VIX reaches `G* / (1 - a)`, and `g` is a
+    /// property of the VIX's absolute level (the index variance's floor and
+    /// coupling), which the slow regime level `L`
+    /// ([`ModelParams::vix_level_sigma`]) does not move. With the knee on
+    /// `L anchor`, a turbulent era (`L > 1`) lifts the knee, leaving the band
+    /// from `anchor exp(-k)` to `L anchor exp(-k)` at the constant weight,
+    /// where `(1 - a) g(x)` exceeds the gain the law holds -- toward the fear
+    /// trap the law exists to remove -- and a calm era lowers it. The centre
+    /// and the read-back keep `L`: that is the era.
+    pub vix_anchor_weight_level_knee_fixed: f64,
 
     /// How many sessions of market-side warm-up the factor's variance
     /// components get before session one. 0.0 -- every preset through
@@ -4383,11 +4519,16 @@ impl ModelParams {
             vix_anchor_weight: 0.0,
             vix_anchor_memory: 0.0,
             macro_compound_days_per_year: 365.0,
+            macro_calendar_days_per_year: 365.0,
+            cycle_us_calibration: 0.0,
+            fed_liftoff_rule: 0.0,
+            market_pe_buybacks: 0.0,
             vix_anchor_centre: 0.0,
             vix_anchor_weight_level: 0.0,
             vix_anchor_weight_level_cap: 0.0,
             vix_anchor_weight_level_knee: 0.0,
             vix_anchor_weight_level_below: 0.0,
+            vix_anchor_weight_level_knee_fixed: 0.0,
             market_burn_in_sessions: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
@@ -4511,6 +4652,10 @@ impl ModelParams {
             news_peer_weight: 0.0,
             news_peer_weight_down: 0.0,
             news_peer_vix_coupling: 0.0,
+            news_absorption_half_life: 0.0,
+            news_absorption_drift_share: 0.0,
+            news_absorption_drift_half_life: 0.0,
+            news_quote_revision: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -6383,11 +6528,16 @@ impl ModelParams {
             "vix_anchor_weight" => self.vix_anchor_weight,
             "vix_anchor_memory" => self.vix_anchor_memory,
             "macro_compound_days_per_year" => self.macro_compound_days_per_year,
+            "macro_calendar_days_per_year" => self.macro_calendar_days_per_year,
+            "cycle_us_calibration" => self.cycle_us_calibration,
+            "fed_liftoff_rule" => self.fed_liftoff_rule,
+            "market_pe_buybacks" => self.market_pe_buybacks,
             "vix_anchor_centre" => self.vix_anchor_centre,
             "vix_anchor_weight_level" => self.vix_anchor_weight_level,
             "vix_anchor_weight_level_cap" => self.vix_anchor_weight_level_cap,
             "vix_anchor_weight_level_knee" => self.vix_anchor_weight_level_knee,
             "vix_anchor_weight_level_below" => self.vix_anchor_weight_level_below,
+            "vix_anchor_weight_level_knee_fixed" => self.vix_anchor_weight_level_knee_fixed,
             "market_burn_in_sessions" => self.market_burn_in_sessions,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
@@ -6491,6 +6641,10 @@ impl ModelParams {
             "news_peer_weight" => self.news_peer_weight,
             "news_peer_weight_down" => self.news_peer_weight_down,
             "news_peer_vix_coupling" => self.news_peer_vix_coupling,
+            "news_absorption_half_life" => self.news_absorption_half_life,
+            "news_absorption_drift_share" => self.news_absorption_drift_share,
+            "news_absorption_drift_half_life" => self.news_absorption_drift_half_life,
+            "news_quote_revision" => self.news_quote_revision,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -6588,11 +6742,16 @@ impl ModelParams {
             "vix_anchor_weight" => out.vix_anchor_weight = value,
             "vix_anchor_memory" => out.vix_anchor_memory = value,
             "macro_compound_days_per_year" => out.macro_compound_days_per_year = value,
+            "macro_calendar_days_per_year" => out.macro_calendar_days_per_year = value,
+            "cycle_us_calibration" => out.cycle_us_calibration = value,
+            "fed_liftoff_rule" => out.fed_liftoff_rule = value,
+            "market_pe_buybacks" => out.market_pe_buybacks = value,
             "vix_anchor_centre" => out.vix_anchor_centre = value,
             "vix_anchor_weight_level" => out.vix_anchor_weight_level = value,
             "vix_anchor_weight_level_cap" => out.vix_anchor_weight_level_cap = value,
             "vix_anchor_weight_level_knee" => out.vix_anchor_weight_level_knee = value,
             "vix_anchor_weight_level_below" => out.vix_anchor_weight_level_below = value,
+            "vix_anchor_weight_level_knee_fixed" => out.vix_anchor_weight_level_knee_fixed = value,
             "market_burn_in_sessions" => out.market_burn_in_sessions = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
@@ -6696,6 +6855,10 @@ impl ModelParams {
             "news_peer_weight" => out.news_peer_weight = value,
             "news_peer_weight_down" => out.news_peer_weight_down = value,
             "news_peer_vix_coupling" => out.news_peer_vix_coupling = value,
+            "news_absorption_half_life" => out.news_absorption_half_life = value,
+            "news_absorption_drift_share" => out.news_absorption_drift_share = value,
+            "news_absorption_drift_half_life" => out.news_absorption_drift_half_life = value,
+            "news_quote_revision" => out.news_quote_revision = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -6949,6 +7112,51 @@ impl ModelParams {
                  market_vol_vix_exponent on both sides.",
                 self.market_vol_vix_exponent_below));
         }
+        if !(self.macro_calendar_days_per_year >= 24.0
+            && self.macro_calendar_days_per_year <= 365.0
+            && self.macro_calendar_days_per_year.fract() == 0.0)
+        {
+            return Err(format!(
+                "macro_calendar_days_per_year is {}. It is the number of economy steps in a \
+                 macro year: 365.0 as shipped, 252.0 on the session calendar. Set a whole \
+                 number inside [24, 365].",
+                self.macro_calendar_days_per_year));
+        }
+        for (name, v) in [("cycle_us_calibration", self.cycle_us_calibration),
+                          ("fed_liftoff_rule", self.fed_liftoff_rule),
+                          ("market_pe_buybacks", self.market_pe_buybacks),
+                          ("news_quote_revision", self.news_quote_revision)] {
+            if !(v == 0.0 || v == 1.0) {
+                return Err(format!(
+                    "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
+            }
+        }
+        for (name, v) in [("news_absorption_half_life", self.news_absorption_half_life),
+                          ("news_absorption_drift_half_life",
+                           self.news_absorption_drift_half_life)] {
+            if !(v >= 0.0 && v <= 390.0) {
+                return Err(format!(
+                    "{name} is {v}. It is a half-life in ticks inside the 390-tick \
+                     session, in [0, 390]; 0.0 is the straight-line spread."));
+            }
+        }
+        if !(self.news_absorption_drift_share >= 0.0 && self.news_absorption_drift_share <= 1.0) {
+            return Err(format!(
+                "news_absorption_drift_share is {}. It is a share of the move, in [0, 1].",
+                self.news_absorption_drift_share));
+        }
+        if self.news_absorption_drift_share != 0.0 && self.news_absorption_half_life == 0.0 {
+            return Err(format!(
+                "news_absorption_drift_share is {} but news_absorption_half_life is 0: \
+                 it splits the fast profile and is read by nothing without it.",
+                self.news_absorption_drift_share));
+        }
+        if self.news_absorption_drift_half_life != 0.0 && self.news_absorption_drift_share == 0.0 {
+            return Err(format!(
+                "news_absorption_drift_half_life is {} but news_absorption_drift_share \
+                 is 0: it shapes the drift part and is read by nothing without it.",
+                self.news_absorption_drift_half_life));
+        }
         if self.vix_anchor_memory != 0.0
             && !(self.vix_anchor_memory > 0.0 && self.vix_anchor_memory <= 1.0)
         {
@@ -6987,7 +7195,8 @@ impl ModelParams {
                  or above one, or 0.0 for no cap.", self.vix_anchor_weight_level_cap));
         }
         for (name, v) in [("vix_anchor_weight_level_knee", self.vix_anchor_weight_level_knee),
-                          ("vix_anchor_weight_level_below", self.vix_anchor_weight_level_below)] {
+                          ("vix_anchor_weight_level_below", self.vix_anchor_weight_level_below),
+                          ("vix_anchor_weight_level_knee_fixed", self.vix_anchor_weight_level_knee_fixed)] {
             if v != 0.0 && self.vix_anchor_weight_level == 0.0 {
                 return Err(format!(
                     "{} is {} but vix_anchor_weight_level is 0: it shapes the level \
@@ -7003,6 +7212,11 @@ impl ModelParams {
             return Err(format!(
                 "vix_anchor_weight_level_below is {}. It is a switch, 0.0 or 1.0.",
                 self.vix_anchor_weight_level_below));
+        }
+        if !(self.vix_anchor_weight_level_knee_fixed == 0.0 || self.vix_anchor_weight_level_knee_fixed == 1.0) {
+            return Err(format!(
+                "vix_anchor_weight_level_knee_fixed is {}. It is a switch, 0.0 or 1.0.",
+                self.vix_anchor_weight_level_knee_fixed));
         }
         if self.vix_anchor_weight_level_cap != 0.0 && self.vix_anchor_weight_level == 0.0 {
             return Err(format!(
@@ -7267,11 +7481,16 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_anchor_weight",
         "vix_anchor_memory",
         "macro_compound_days_per_year",
+        "macro_calendar_days_per_year",
+        "cycle_us_calibration",
+        "fed_liftoff_rule",
+        "market_pe_buybacks",
         "vix_anchor_centre",
         "vix_anchor_weight_level",
         "vix_anchor_weight_level_cap",
         "vix_anchor_weight_level_knee",
         "vix_anchor_weight_level_below",
+        "vix_anchor_weight_level_knee_fixed",
         "market_burn_in_sessions",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",
@@ -7303,6 +7522,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "mispricing_half_life_days",
         "momentum_theta",
         "news_market_weight",
+        "news_absorption_half_life",
+        "news_absorption_drift_share",
+        "news_absorption_drift_half_life",
+        "news_quote_revision",
         "news_peer_vix_coupling",
         "news_peer_weight",
         "news_peer_weight_down",

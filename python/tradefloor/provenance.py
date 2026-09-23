@@ -204,6 +204,12 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: entry in `DIAL_PROVENANCE`, which is the transition this list exists
 #: to make visible rather than absorb.
 POST_BASELINE = {
+    "macro_calendar_days_per_year":
+        "added 2026-09-23; every shipped preset carries 365.0, the calendar that has always stood (30-step months, 90-step quarters, a 365-step year), and it is LIVE there. "
+        "The economy steps once per session, so a macro year was 1.45 "
+        "trading years; 252.0 is the session calendar (21-step months), "
+        "DERIVED from the session count and not fitted "
+        "(programme/results/macro-cycle/, design repository). Not adopted",
     "macro_compound_days_per_year":
         "added 2026-09-23; every shipped preset carries 365.0, the division that has always stood, and it is LIVE there (it IS the compounding). The economy "
         "steps once per trading session, 252 to a year, so 365 gives a "
@@ -455,6 +461,49 @@ OUT_OF_SCOPE = {
         "unread while `vix_anchor_weight_level` is 0.0; at 0.0 the weight is "
         "the dial below the knee. 1.0 runs the level law below it too. A "
         "probe, not adopted",
+    "cycle_us_calibration":
+        "inert at 0.0 as shipped: a branch that reads the reference "
+        "implementation's phase table. 1.0 "
+        "reads the table derived from NBER recession dates and BEA real GDP "
+        "(programme/results/macro-cycle/, design repository). Not adopted",
+    "fed_liftoff_rule":
+        "inert at 0.0 as shipped: a branch not taken, leaving the reference "
+        "ladder, whose every hike needs "
+        "inflation a point over target. 1.0 adds the ladder's own cut "
+        "branch mirrored, so the rate lifts off zero on its Taylor rule "
+        "(programme/results/macro-cycle/, design repository). Not adopted",
+    "news_absorption_half_life":
+        "inert at 0.0 as shipped: a branch not taken, so every tick carries "
+        "an endogenous news event whole and the move lands in a straight "
+        "line over the session. Off zero it is the half-life in ticks of the "
+        "fast part of the move; 0.6 is derived from intraday event studies "
+        "(programme/results/news-speed/, design repository). Not adopted",
+    "news_absorption_drift_share":
+        "inert at 0.0 as shipped, and unread while "
+        "`news_absorption_half_life` is 0.0: the share of the move that "
+        "arrives as post-news drift. 0.12 is derived "
+        "(programme/results/news-speed/, design repository). Not adopted",
+    "news_absorption_drift_half_life":
+        "inert at 0.0 as shipped, and unread while "
+        "`news_absorption_drift_share` is 0.0: the drift part's half-life in "
+        "ticks. 42 is derived (programme/results/news-speed/, design "
+        "repository). Not adopted",
+    "news_quote_revision":
+        "inert at 0.0 as shipped: a branch not taken, so the maker quotes "
+        "around the last print and a news move reaches the tape only as "
+        "fast as the flow walks the book. 1.0 re-quotes by the tick's news "
+        "term (programme/results/news-speed/, design repository). Not adopted",
+    "market_pe_buybacks":
+        "inert at 0.0 as shipped: a branch not taken, so market_pe leaves "
+        "out the buyback term the "
+        "valuation applies, so it rises by the buyback yield a year. 1.0 "
+        "reads it in (programme/results/macro-cycle/, design repository). "
+        "Not adopted",
+    "vix_anchor_weight_level_knee_fixed":
+        "inert at 0.0, and unread while `vix_anchor_weight_level` is 0.0: the "
+        "knee reads `L * anchor` as it always has. 1.0 takes the slow regime "
+        "level out of the knee, which the held map places at an absolute VIX "
+        "(vix-slow-regime, design repository). A probe, not adopted",
     "crisis_epicentre_end_sessions":
         "unread while `crisis_epicentre_extra` is 0.0: with no episode ever "
         "entered there is no counter to end. 21 sessions is a month and is a "
@@ -3432,6 +3481,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: what the record measured about that value (the paired control; a
 #: plateau) rather than leaving it here.
 UNPROVENANCED = (
+    # 365.0: a calendar year of steps, wrong for an economy that steps once
+    # per session. The derived value is 252.0, not yet adopted.
+    "macro_calendar_days_per_year",
     # 365.0: written as a calendar year, and wrong for an economy that steps
     # once per trading session. The derived value is 252.0 and is not yet
     # adopted, so the shipped constant is admitted here rather than hidden.

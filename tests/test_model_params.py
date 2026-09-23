@@ -321,6 +321,21 @@ PERTURBATIONS = [
     # The macro compounding clock (2026-09-23). 252.0 compounds a year's GDP
     # and CPI over the year's sessions; no draw is added or moved.
     ("macro_compound_days_per_year", 252.0, True),
+    # The macro calendar, the US cycle table, the Fed lift-off branch and
+    # buybacks in `market_pe` (2026-09-23, macro-cycle). None adds a draw
+    # site; each changes which state-dependent macro sites fire.
+    # The calendar moves the release days, the phase clock and the meeting
+    # schedule, so it moves the market and which macro draw sites fire
+    # (ECONOMY_STREAM_MOVERS). The lift-off branch fires at a meeting in the
+    # burn-in and moves the rate the valuation reads.
+    ("macro_calendar_days_per_year", 252.0, True),
+    ("fed_liftoff_rule", 1.0, True),
+    # INERT on this probe, measured: the US table changes only phase
+    # durations, and no transition falls inside three sessions of a phase
+    # the burn-in holds; market_pe is read only by the expansion hazard
+    # above a multiple of 28, which a three-session opening does not reach.
+    ("cycle_us_calibration", 1.0, False),
+    ("market_pe_buybacks", 1.0, False),
     # The anchor's centre and its level law (2026-09-23, vix-law-levels).
     # Read only with a weight, which COMPANIONS carries; no draw is added.
     ("vix_anchor_centre", 0.27, True),
@@ -332,6 +347,9 @@ PERTURBATIONS = [
     # calm-regime). The default's VIX sits under its anchor, so the branch is
     # read; no draw is added or moved.
     ("market_vol_vix_exponent_below", 2.0, True),
+    # Moves on the default, which ships the slow regime level live
+    # (`vix_level_sigma` 0.0173), so the knee it takes `L` out of differs.
+    ("vix_anchor_weight_level_knee_fixed", 1.0, True),
     # The crisis epicentre (2026-09-22), and both rows are INERT here for
     # the reason `crisis_blend_source`, `crisis_blend_ramp` and
     # `crisis_blend_cap` are: the mechanism is gated on the VIX being above
@@ -636,6 +654,16 @@ PERTURBATIONS = [
     # this entry used to describe.
     ("endogenous_news_sigma", 0.05, True),
     ("news_peer_vix_coupling", 4.0, False),      # multiplies a peer weight that is zero on every preset, and a crisis spike the harness never reaches
+    # How fast endogenous news is priced (2026-09-23, news-speed). INERT on
+    # this probe for the reason `endogenous_news_sigma` gives above: the
+    # probe's news uniforms deliver no event, so there is no move to time
+    # and no news term to re-quote on. `test_news_absorption.py` moves them
+    # on days that have news. None takes a draw. The companions below carry
+    # the half-life the two drift dials are refused without.
+    ("news_absorption_half_life", 0.6, False),
+    ("news_absorption_drift_share", 0.12, False),
+    ("news_absorption_drift_half_life", 42.0, False),
+    ("news_quote_revision", 1.0, False),
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
     ("volume_idio_variance_gain", 1.0, True),    # couples volume to the name's own variance, which is non-trivial from the first tick
@@ -1097,6 +1125,9 @@ ECONOMY_STREAM_MOVERS = frozenset({
     "market_factor_sigma", "usd_crisis_vix_threshold", "price_hard_cap",
     "jump_intensity_idio", "jump_mean_market", "jump_sigma_market",
     "vix_return_gain_up", "oil_supply_response", "oil_seasonality_target",
+    # The macro calendar (2026-09-23): it moves which days are release,
+    # quarter and meeting days, so which state-dependent sites fire.
+    "macro_calendar_days_per_year",
 })
 
 
@@ -1143,7 +1174,8 @@ COMPANIONS: dict[str, dict[str, float]] = {
                            "vix_anchor_weight_level": 0.0,
                            "vix_anchor_weight_level_cap": 0.0,
                            "vix_anchor_weight_level_knee": 0.0,
-                           "vix_anchor_weight_level_below": 0.0},
+                           "vix_anchor_weight_level_below": 0.0,
+                           "vix_anchor_weight_level_knee_fixed": 0.0},
     # `vix_level_sigma` multiplies `vix_implied_from_market`, which exists
     # only under the identity, so `ModelParams::invariants` refuses the
     # sigma with the identity off. The default runs the identity, so the
@@ -1181,6 +1213,13 @@ COMPANIONS: dict[str, dict[str, float]] = {
                                      "vix_anchor_weight_level": 1.0},
     "vix_anchor_weight_level_below": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45,
                                       "vix_anchor_weight_level": 1.0},
+    "vix_anchor_weight_level_knee_fixed": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45,
+                                           "vix_anchor_weight_level": 1.0},
+    # The post-news drift splits the fast absorption profile, so each of its
+    # two dials is refused without the profile's half-life (news-speed).
+    "news_absorption_drift_share": {"news_absorption_half_life": 0.6},
+    "news_absorption_drift_half_life": {"news_absorption_half_life": 0.6,
+                                        "news_absorption_drift_share": 0.12},
 }
 
 

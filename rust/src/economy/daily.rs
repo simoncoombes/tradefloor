@@ -125,6 +125,12 @@ pub struct DailyInputs<'a> {
     /// See [`crate::params::ModelParams::macro_compound_days_per_year`].
     /// 365.0 is the shipped division exactly.
     pub macro_compound_days_per_year: f64,
+    /// See [`crate::params::ModelParams::macro_calendar_days_per_year`].
+    /// [`MacroCalendar::shipped`] is every literal that stood exactly.
+    pub macro_calendar: MacroCalendar,
+    /// See [`crate::params::ModelParams::cycle_us_calibration`]. 0.0 reads
+    /// the shipped phase table.
+    pub cycle_us_calibration: f64,
     /// See [`crate::params::ModelParams::vix_anchor_centre`]. 0.0 leaves the
     /// reference at `vix_anchor_level` exactly.
     pub vix_anchor_centre: f64,
@@ -137,6 +143,13 @@ pub struct DailyInputs<'a> {
     pub vix_anchor_weight_level_knee: f64,
     /// See [`crate::params::ModelParams::vix_anchor_weight_level_below`].
     pub vix_anchor_weight_level_below: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_weight_level_knee_fixed`].
+    /// 0.0 puts the knee on `vix_anchor_level` as it always was.
+    pub vix_anchor_weight_level_knee_fixed: f64,
+    /// The identity's derived anchor WITHOUT the slow regime level's
+    /// multiplier (`Engine::vix_anchor`). Read only by the knee, and only
+    /// with `vix_anchor_weight_level_knee_fixed` nonzero.
+    pub vix_anchor_level_fixed: f64,
     /// The anchor's slow memory of the read-back's log deviation, already
     /// advanced to today by the engine.
     pub vix_anchor_slow: f64,
@@ -282,11 +295,15 @@ impl<'a> Default for DailyInputs<'a> {
             vix_anchor_weight: 0.0,
             vix_anchor_memory: 0.0,
             macro_compound_days_per_year: 365.0,
+            macro_calendar: MacroCalendar::shipped(),
+            cycle_us_calibration: 0.0,
             vix_anchor_centre: 0.0,
             vix_anchor_weight_level: 0.0,
             vix_anchor_weight_level_cap: 0.0,
             vix_anchor_weight_level_knee: 0.0,
             vix_anchor_weight_level_below: 0.0,
+            vix_anchor_weight_level_knee_fixed: 0.0,
+            vix_anchor_level_fixed: 0.0,
             vix_anchor_slow: 0.0,
             vix_jump_intensity: 0.0,
             vix_jump_scale: 0.0,
@@ -579,11 +596,12 @@ pub fn update_economy_daily(
 ) -> EconomyState {
     let volatility = inputs.volatility;
     let mut new_state = economy.clone();
-    let phase = phase_characteristics(economy.cycle_phase);
+    let phase = phase_characteristics_for(economy.cycle_phase, inputs.cycle_us_calibration != 0.0);
     let day = inputs.game_day;
 
-    let is_month_start = day % DAYS_PER_MONTH == 0;
-    let is_quarter_start = day % DAYS_PER_QUARTER == 0;
+    let cal = inputs.macro_calendar;
+    let is_month_start = day % cal.days_per_month == 0;
+    let is_quarter_start = day % cal.days_per_quarter() == 0;
 
     // ── Shock aggregation ─────────────────────────────────────────────────
     let mut shock_gdp_impact = 0.0;
@@ -607,7 +625,7 @@ pub fn update_economy_daily(
     // The `+ 0.001` is a tolerance on a float accumulated by repeated
     // `+= 1/30`, not a spare margin: `months_in_current_phase` is never
     // exactly 1/30 after the first increment.
-    if economy.months_in_current_phase < 1.0 / 30.0 + 0.001 {
+    if economy.months_in_current_phase < 1.0 / cal.month_f64() + 0.001 {
         // DRAW SITE (uniform) — on EVERY phase-change day, in every phase.
         //
         // The original builds a `Record<EconomicCyclePhase, number>` object
@@ -994,9 +1012,14 @@ pub fn update_economy_daily(
     // day compounds: the product of these factors is 5.119 over the 252
     // game-days a certified year passes and 0.921 over a full 365, so a
     // window shorter than the period reads a near-neutral shape as a trend.
-    let day_of_year = ((day - 1) % 365) + 1;
-    let oil_seasonal_amplitude =
-        0.03 * mathx::sin(2.0 * std::f64::consts::PI * (day_of_year as f64 - 90.0) / 365.0);
+    //
+    // On the macro calendar: the period is the calendar's year and the
+    // valley its day 90, which are 365 and 90 as shipped.
+    let year = cal.days_per_year;
+    let day_of_year = ((day - 1) % year) + 1;
+    let oil_seasonal_amplitude = 0.03
+        * mathx::sin(2.0 * std::f64::consts::PI
+            * (day_of_year as f64 - cal.scale_days(90) as f64) / year as f64);
 
     let oil_usd_drag = -(economy.usd_index - 100.0) * 0.08;
 
@@ -1004,7 +1027,7 @@ pub fn update_economy_daily(
     // A state-dependent draw site: 0 draws on an ordinary day, 1 to 3 on a
     // decision day depending on which branch the price difference selects.
     let mut opec_impact = 0.0;
-    if day - oil_last_opec >= OIL_OPEC_INTERVAL {
+    if day - oil_last_opec >= cal.opec_interval() {
         new_state.oil_last_opec_day = day;
         let oil_price = economy.oil_price;
         let opec_target = 80.0;
@@ -1198,10 +1221,19 @@ pub fn update_economy_daily(
             inputs.vix_anchor_level
         };
         let weight = if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_weight_level != 0.0 {
-            let knee = if inputs.vix_anchor_weight_level_knee != 0.0 {
-                inputs.vix_anchor_level * mathx::exp(-inputs.vix_anchor_weight_level_knee)
+            // The knee is where the held read-back's elasticity reaches the
+            // level the law holds, a property of the VIX's ABSOLUTE level; the
+            // switch takes the slow regime level out of it. Guarded, so at
+            // 0.0 the knee reads `vix_anchor_level` exactly as it did.
+            let knee_base = if inputs.vix_anchor_weight_level_knee_fixed != 0.0 {
+                inputs.vix_anchor_level_fixed
             } else {
                 inputs.vix_anchor_level
+            };
+            let knee = if inputs.vix_anchor_weight_level_knee != 0.0 {
+                knee_base * mathx::exp(-inputs.vix_anchor_weight_level_knee)
+            } else {
+                knee_base
             };
             anchor_weight_at_level(
                 inputs.vix_anchor_weight,
@@ -1290,9 +1322,10 @@ pub fn update_economy_daily(
     //
     // Not read under the identity: half a point on the first half of a
     // month is a level constant, and the level is the variance now.
-    let earnings_month_vix = (((day_of_year - 1) % 365) as f64 / 30.44).floor() + 1.0;
-    let day_of_month_vix = day_of_year as f64 - ((earnings_month_vix - 1.0) * 30.44).floor();
-    if !identity_level && day_of_month_vix <= 15.0 {
+    let month_len = cal.mean_month_len();
+    let earnings_month_vix = (((day_of_year - 1) % year) as f64 / month_len).floor() + 1.0;
+    let day_of_month_vix = day_of_year as f64 - ((earnings_month_vix - 1.0) * month_len).floor();
+    if !identity_level && day_of_month_vix <= cal.scale_days(15) as f64 {
         target_vix += 0.5;
     }
 
@@ -1481,11 +1514,13 @@ pub fn update_economy_daily(
         0.95,
     );
 
-    new_state.months_in_current_phase = economy.months_in_current_phase + 1.0 / 30.0;
+    new_state.months_in_current_phase = economy.months_in_current_phase + 1.0 / cal.month_f64();
     new_state.previous_day_market_return = inputs.market_return_pct;
 
     let prev_30d = economy.rolling_market_return_30d;
-    new_state.rolling_market_return_30d = prev_30d + (inputs.market_return_pct - prev_30d) / 30.0;
+    // A month's memory: 30 steps as shipped.
+    new_state.rolling_market_return_30d =
+        prev_30d + (inputs.market_return_pct - prev_30d) / cal.month_f64();
 
     // `newState.derived = computeDerivedIndicators(newState)` sits here in
     // the original. Deliberately not ported — out of scope per the surface audit §0,
