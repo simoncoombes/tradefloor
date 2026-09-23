@@ -1509,6 +1509,34 @@ pub struct ModelParams {
     /// the level moves slowly and the excursion form's target did not.
     pub vix_anchor_reversion: f64,
 
+    /// The share of the VIX's TARGET taken by the identity's anchor, in
+    /// logs. 0.0 -- every preset through pt-v19 -- is the branch not taken:
+    /// the target is the read-back exactly and every preset is BIT-IDENTICAL.
+    ///
+    /// The same job as [`ModelParams::vix_anchor_reversion`] done in the
+    /// other place. That dial adds a second reversion RATE beside
+    /// `vix_mean_reversion`, so the VIX reverts `mr + kappa` of the way each
+    /// session and its lag-one persistence collapses with the loop's fast
+    /// pole. This one leaves the rate at `mr` and moves the TARGET instead:
+    ///
+    /// ```text
+    /// target = implied^(1 - a) * (L * anchor)^a
+    /// ```
+    ///
+    /// Linearised, `y' = (1 - mr) y + mr (1 - a) f / 2`. The static gain is
+    /// `p (1 - a) / 2`, the same as the rate form's at `1 - a = w`, and the
+    /// trace of the loop matrix is `rho + 1 - mr` whatever `a` is. So pinning
+    /// the slow pole pins the fast pole too: at the tape's 0.9965 the fast
+    /// pole is 0.717 at every exponent, where the rate form's runs from 0.671
+    /// down to 0.146. DERIVED in closed form from the characteristic equation,
+    /// `1 - a = (rho - l)(1 - mr - l) / ((1 - rho) p mr / 2)`: 0.6099 at
+    /// `market_vol_vix_exponent` 4.0. Geometric rather than arithmetic
+    /// because on the anchor form the held read-back rises about as
+    /// `VIX^(p / 2)`, so an arithmetic blend keeps a tail that grows faster
+    /// than the VIX, and the geometric one grows as `VIX^((1 - a) p / 2)`,
+    /// under one at the derived weight.
+    pub vix_anchor_weight: f64,
+
     /// How many sessions of market-side warm-up the factor's variance
     /// components get before session one. 0.0 -- every preset through
     /// pt-v19 -- runs nothing, touches no state and is bit-identical.
@@ -4209,6 +4237,7 @@ impl ModelParams {
             vix_level_sigma: 0.0,
             vix_level_loop_gain: 0.0,
             vix_anchor_reversion: 0.0,
+            vix_anchor_weight: 0.0,
             market_burn_in_sessions: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
@@ -6199,6 +6228,7 @@ impl ModelParams {
             "vix_level_sigma" => self.vix_level_sigma,
             "vix_level_loop_gain" => self.vix_level_loop_gain,
             "vix_anchor_reversion" => self.vix_anchor_reversion,
+            "vix_anchor_weight" => self.vix_anchor_weight,
             "market_burn_in_sessions" => self.market_burn_in_sessions,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
@@ -6394,6 +6424,7 @@ impl ModelParams {
             "vix_level_sigma" => out.vix_level_sigma = value,
             "vix_level_loop_gain" => out.vix_level_loop_gain = value,
             "vix_anchor_reversion" => out.vix_anchor_reversion = value,
+            "vix_anchor_weight" => out.vix_anchor_weight = value,
             "market_burn_in_sessions" => out.market_burn_in_sessions = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
@@ -6722,6 +6753,23 @@ impl ModelParams {
                  vix_anchor_reversion to 0.0.",
                 self.vix_anchor_reversion));
         }
+        if self.vix_anchor_weight != 0.0
+            && !(self.vix_anchor_weight > 0.0 && self.vix_anchor_weight < 1.0)
+        {
+            return Err(format!(
+                "vix_anchor_weight is {}. It is the anchor's share of the VIX's \
+                 target in logs, so it lives in [0, 1): at one the VIX ignores the \
+                 index's variance altogether. Set it inside [0, 1), or to 0.0.",
+                self.vix_anchor_weight));
+        }
+        if self.vix_anchor_weight != 0.0 && self.vix_level_identity == 0.0 {
+            return Err(format!(
+                "vix_anchor_weight is {} but vix_level_identity is 0. The blend is \
+                 between the identity's read-back and its derived anchor, and off \
+                 the identity there is neither. Set vix_level_identity to 1.0, or \
+                 vix_anchor_weight to 0.0.",
+                self.vix_anchor_weight));
+        }
         if self.market_vol_vix_excursion != 0.0 && self.vix_level_identity == 0.0 {
             return Err(format!(
                 "market_vol_vix_excursion is {} but vix_level_identity is 0. The \
@@ -6961,6 +7009,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_level_sigma",
         "vix_level_loop_gain",
         "vix_anchor_reversion",
+        "vix_anchor_weight",
         "market_burn_in_sessions",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",

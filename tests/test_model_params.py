@@ -311,6 +311,10 @@ PERTURBATIONS = [
     # invariants refuse it off the identity, which COMPANIONS carries. No
     # draw is added or moved: the term is arithmetic on the day's own state.
     ("vix_anchor_reversion", 0.046081, True),
+    # The anchor in the VIX's TARGET rather than its rate (2026-09-23).
+    # Ships at 0.0; 0.609944 is the DERIVED weight at exponent 4.0. Read on
+    # the identity, which the default runs; no draw is added or moved.
+    ("vix_anchor_weight", 0.609944, True),
     # The crisis epicentre (2026-09-22), and both rows are INERT here for
     # the reason `crisis_blend_source`, `crisis_blend_ramp` and
     # `crisis_blend_cap` are: the mechanism is gated on the VIX being above
@@ -1110,7 +1114,8 @@ COMPANIONS: dict[str, dict[str, float]] = {
                            # ... and the VIX's own anchor reversion, refused
                            # off the identity for the same reason: there is no
                            # derived anchor to revert to.
-                           "vix_anchor_reversion": 0.0},
+                           "vix_anchor_reversion": 0.0,
+                           "vix_anchor_weight": 0.0},
     # `vix_level_sigma` multiplies `vix_implied_from_market`, which exists
     # only under the identity, so `ModelParams::invariants` refuses the
     # sigma with the identity off. The default runs the identity, so the
@@ -1133,6 +1138,9 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # default runs the identity, so the row above reads the dial alone on
     # pt-v19; the companion only bites on a base that ships the identity off.
     "vix_anchor_reversion": {"vix_level_identity": 1.0},
+    # The anchor weight blends the read-back with the derived anchor, and
+    # both exist only under the identity.
+    "vix_anchor_weight": {"vix_level_identity": 1.0},
 }
 
 

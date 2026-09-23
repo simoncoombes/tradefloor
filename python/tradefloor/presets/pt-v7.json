@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v7",
   "fingerprint": "pt-v7",
-  "coefficient_digest": "9977588fd93a07820093793b4b60a492df24e6b46c688a265572c0fb4ea9c922",
+  "coefficient_digest": "e8271091f6a6c5556007c2c48427d4ce50c621037a5b6ecaceb357d3ae70a154",
   "coefficients": {
     "book_levels": 10.0,
     "buyback_payout_share": 0.0,
@@ -155,6 +155,7 @@
     "universe_stress_weight": 0.0,
     "usd_crisis_vix_threshold": 25.5,
     "vix_anchor_reversion": 0.0,
+    "vix_anchor_weight": 0.0,
     "vix_ceiling": 80.0,
     "vix_cycle_amplitude": 1.0,
     "vix_decay_ratio": 1.0,

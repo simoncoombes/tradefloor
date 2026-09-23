@@ -248,6 +248,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # so the survey can put more weight on the anchor than on the read-back
     # and see what that costs.
     "vix_anchor_reversion": (0.0, 0.5),
+    # The anchor's share of the VIX's target, in logs. 0.0 is the branch not
+    # taken; DERIVED 0.61 at market_vol_vix_exponent 4.0. The box stops at
+    # 0.9, under the invariant's refusal at 1.0 where the VIX ignores the
+    # index's variance altogether.
+    "vix_anchor_weight": (0.0, 0.9),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is

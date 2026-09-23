@@ -116,6 +116,9 @@ pub struct DailyInputs<'a> {
     /// bit. See [`crate::params::ModelParams::vix_anchor_reversion`].
     pub vix_anchor_reversion: f64,
     pub vix_anchor_level: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_weight`]. 0.0 leaves the
+    /// target the read-back exactly.
+    pub vix_anchor_weight: f64,
     /// See [`crate::params::ModelParams::vix_jump_intensity`]. 0.0 takes
     /// no draws and reproduces the shipped schedule exactly.
     pub vix_jump_intensity: f64,
@@ -255,6 +258,7 @@ impl<'a> Default for DailyInputs<'a> {
             vix_decay_ratio: 1.0,
             vix_anchor_reversion: 0.0,
             vix_anchor_level: 0.0,
+            vix_anchor_weight: 0.0,
             vix_jump_intensity: 0.0,
             vix_jump_scale: 0.0,
             vix_return_gain: VIX_RETURN_GAIN,
@@ -1138,7 +1142,18 @@ pub fn update_economy_daily(
     // this is the shipped arithmetic exactly. See §71.
     let identity_level = inputs.vix_level_identity != 0.0;
     let mut target_vix = if identity_level {
-        inputs.vix_implied_from_market
+        // THE ANCHOR IN THE TARGET, not in the rate: a geometric blend of the
+        // read-back and `L * anchor`. The VIX still reverts at `mr`, so its
+        // lag-one persistence is the loop's and not `mr + kappa`'s. Guarded,
+        // so at 0.0 the target is the read-back bit for bit. See
+        // `ModelParams::vix_anchor_weight`.
+        if inputs.vix_anchor_weight != 0.0 {
+            let a = inputs.vix_anchor_weight;
+            mathx::exp((1.0 - a) * mathx::log(inputs.vix_implied_from_market)
+                + a * mathx::log(inputs.vix_anchor_level))
+        } else {
+            inputs.vix_implied_from_market
+        }
     } else if inputs.vix_cycle_amplitude == 1.0 {
         phase_vix
     } else {
@@ -2860,6 +2875,75 @@ mod fear_response_shape {
                     assert_eq!(with.to_bits(), base.to_bits(),
                                "at the anchor the term is exactly zero");
                 }
+            }
+        }
+    }
+
+    /// The step with the anchor in the TARGET rather than in the rate.
+    fn vix_step_with_weight(weight: f64, anchor_level: f64, vix: f64, implied: f64) -> f64 {
+        let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+            .expect("the default preset resolves");
+        use crate::economy::state::{create_initial_economy_state, InitialEconomyOptions};
+        let mut economy = create_initial_economy_state(&InitialEconomyOptions::default());
+        economy.vix = vix;
+        economy.inflation_rate = 2.0;
+        let inputs = DailyInputs {
+            vix_level_identity: p.vix_level_identity,
+            vix_implied_from_market: implied,
+            vix_index_sigma_pct: 1.0,
+            market_day_return_pct: 0.0,
+            vix_mean_reversion: p.vix_mean_reversion,
+            vix_decay_ratio: 1.0,
+            vix_return_gain: p.vix_return_gain,
+            vix_return_gain_up: p.vix_return_gain_up,
+            vix_return_exponent: p.vix_return_exponent,
+            vix_return_exponent_up: p.vix_return_exponent_up,
+            vix_return_level_exponent: p.vix_return_level_exponent,
+            vix_return_level_exponent_up: p.vix_return_level_exponent_up,
+            vix_return_clamp: p.vix_return_clamp,
+            vix_target_shock_cap: p.vix_target_shock_cap,
+            vix_ceiling: p.vix_ceiling,
+            vix_return_source: p.vix_return_source,
+            vix_anchor_weight: weight,
+            vix_anchor_level: anchor_level,
+            game_day: 40,
+            ..Default::default()
+        };
+        update_economy_daily(&economy, &inputs, &mut Silent).vix
+    }
+
+    /// **AT 0.0 THE TARGET IS THE READ-BACK**, bit for bit, whatever anchor
+    /// is threaded beside it.
+    #[test]
+    fn the_anchor_weight_at_zero_is_the_step_that_stood_before_it() {
+        for &vix in &[10.5, 15.0, 23.25, 40.0, 90.0] {
+            for &implied in &[12.0, 21.0, 60.0] {
+                let with = vix_step_with_weight(0.0, 23.249857144842903, vix, implied);
+                let without = vix_step_with_weight(0.0, 0.0, vix, implied);
+                assert_eq!(with.to_bits(), without.to_bits(),
+                           "the weight at 0.0 moved the step at VIX {vix}, read-back {implied}");
+            }
+        }
+    }
+
+    /// **THE WEIGHT MOVES THE TARGET, NOT THE RATE.** The step's change is
+    /// `mr` times the move in the target, where the target becomes
+    /// `implied^(1 - a) * anchor^a`, and at the anchor itself nothing moves.
+    #[test]
+    fn the_anchor_weight_blends_the_target_geometrically_at_the_shipped_rate() {
+        let mr = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+            .expect("the default preset resolves")
+            .vix_mean_reversion;
+        let anchor = 23.249857144842903;
+        let a = 0.609944;
+        for &vix in &[12.0, 23.249857144842903, 55.0] {
+            for &implied in &[12.0, 23.249857144842903, 60.0] {
+                let base = vix_step_with_weight(0.0, anchor, vix, implied);
+                let with = vix_step_with_weight(a, anchor, vix, implied);
+                let blended = implied.powf(1.0 - a) * anchor.powf(a);
+                let want = mr * (blended - implied);
+                assert!((with - base - want).abs() < 1e-9,
+                        "VIX {vix}, read-back {implied}: moved {} against {want}", with - base);
             }
         }
     }

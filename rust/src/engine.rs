@@ -3327,6 +3327,7 @@ impl Engine {
                 // level. See `ModelParams::vix_anchor_reversion`.
                 vix_anchor_reversion: self.params.vix_anchor_reversion,
                 vix_anchor_level: self.vix_anchor * self.vix_level_multiplier(),
+                vix_anchor_weight: self.params.vix_anchor_weight,
                 vix_jump_intensity: self.params.vix_jump_intensity,
                 vix_jump_scale: self.params.vix_jump_scale,
                 vix_return_level_exponent: self.params.vix_return_level_exponent,

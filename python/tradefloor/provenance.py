@@ -401,6 +401,16 @@ OUT_OF_SCOPE = {
         "design's own falsifier of 7x, below the shipped form's 4.90x. The "
         "derivation and the measurements are in "
         "`ModelParams::vix_anchor_reversion`",
+    "vix_anchor_weight":
+        "inert at 0.0: economy/daily.rs branches on `!= 0.0` and the VIX's "
+        "target is the read-back exactly. The anchor of "
+        "`vix_anchor_reversion` moved from the step's RATE into its TARGET, "
+        "as a geometric blend of the read-back and the derived anchor, so "
+        "the VIX reverts at `vix_mean_reversion` alone. DERIVED 0.609944 at "
+        "`market_vol_vix_exponent` 4.0 as the weight at which the linearised "
+        "loop's slow pole equals the tape's 0.9965 "
+        "(programme/results/route1-blend/looppoles.py, design repository). "
+        "Shipped at 0.0: a probe of route 1, not an adoption",
     "crisis_epicentre_end_sessions":
         "unread while `crisis_epicentre_extra` is 0.0: with no episode ever "
         "entered there is no counter to end. 21 sessions is a month and is a "
