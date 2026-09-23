@@ -442,6 +442,12 @@ OUT_OF_SCOPE = {
         "unread while `vix_anchor_weight_level` is 0.0; at 0.0 the weight is "
         "the dial below the knee. 1.0 runs the level law below it too. A "
         "probe, not adopted",
+    "macro_compound_days_per_year":
+        "365.0 as shipped, the division that has always stood. The economy "
+        "steps once per trading session, 252 to a year, so 365 gives a "
+        "trading year 252/365 of its annual GDP and CPI growth; 252.0 is the "
+        "session clock, DERIVED from that count and not fitted "
+        "(programme/results/longrun-drift/, design repository). Not adopted",
     "crisis_epicentre_end_sessions":
         "unread while `crisis_epicentre_extra` is 0.0: with no episode ever "
         "entered there is no counter to end. 21 sessions is a month and is a "

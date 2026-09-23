@@ -122,6 +122,9 @@ pub struct DailyInputs<'a> {
     /// See [`crate::params::ModelParams::vix_anchor_memory`]. 0.0 is the
     /// instantaneous form and `vix_anchor_slow` is then not read.
     pub vix_anchor_memory: f64,
+    /// See [`crate::params::ModelParams::macro_compound_days_per_year`].
+    /// 365.0 is the shipped division exactly.
+    pub macro_compound_days_per_year: f64,
     /// See [`crate::params::ModelParams::vix_anchor_centre`]. 0.0 leaves the
     /// reference at `vix_anchor_level` exactly.
     pub vix_anchor_centre: f64,
@@ -278,6 +281,7 @@ impl<'a> Default for DailyInputs<'a> {
             vix_anchor_level: 0.0,
             vix_anchor_weight: 0.0,
             vix_anchor_memory: 0.0,
+            macro_compound_days_per_year: 365.0,
             vix_anchor_centre: 0.0,
             vix_anchor_weight_level: 0.0,
             vix_anchor_weight_level_cap: 0.0,
@@ -661,7 +665,7 @@ pub fn update_economy_daily(
     }
 
     // GDP level compounds daily from the CURRENT growth rate.
-    new_state.gdp = economy.gdp * (1.0 + new_state.gdp_growth / 100.0 / 365.0);
+    new_state.gdp = economy.gdp * (1.0 + new_state.gdp_growth / 100.0 / inputs.macro_compound_days_per_year);
 
     // ── Monthly releases ──────────────────────────────────────────────────
     if is_month_start {
@@ -944,7 +948,7 @@ pub fn update_economy_daily(
     }
 
     // CPI compounds daily whether or not a release happened.
-    new_state.cpi = economy.cpi * (1.0 + new_state.inflation_rate / 100.0 / 365.0);
+    new_state.cpi = economy.cpi * (1.0 + new_state.inflation_rate / 100.0 / inputs.macro_compound_days_per_year);
 
     // ── Oil ───────────────────────────────────────────────────────────────
     let oil_inventory = economy.oil_inventory_level;

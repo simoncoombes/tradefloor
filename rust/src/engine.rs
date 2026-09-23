@@ -3360,6 +3360,7 @@ impl Engine {
                 vix_anchor_level: self.vix_anchor * self.vix_level_multiplier(),
                 vix_anchor_weight: self.params.vix_anchor_weight,
                 vix_anchor_memory: self.params.vix_anchor_memory,
+                macro_compound_days_per_year: self.params.macro_compound_days_per_year,
                 vix_anchor_centre: self.params.vix_anchor_centre,
                 vix_anchor_weight_level: self.params.vix_anchor_weight_level,
                 vix_anchor_weight_level_cap: self.params.vix_anchor_weight_level_cap,

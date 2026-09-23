@@ -587,6 +587,10 @@ PARAM_SPECS: dict[str, dict] = {
     # 0.0 is the instantaneous form. A probe dial, not derived.
     "vix_anchor_memory":      {"kind": "abs", "step_unit": 0.01,
                               "hard_range": (0.0, 1.0), "derived": False},
+    # The macro compounding clock (2026-09-23): 252 sessions to the year the
+    # economy actually steps through, where 365 was written. Derived, not fitted.
+    "macro_compound_days_per_year": {"kind": "abs", "step_unit": 1.0,
+                              "hard_range": (252.0, 365.0), "derived": True},
     # The anchor's centre below the derived anchor, in logs, and the weight's
     # level law and its cap (2026-09-23, vix-law-levels). Probe dials.
     "vix_anchor_centre":      {"kind": "abs", "step_unit": 0.01,

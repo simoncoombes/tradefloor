@@ -1550,6 +1550,23 @@ pub struct ModelParams {
     /// h = 1 it is the instantaneous form less one session's lag.
     pub vix_anchor_memory: f64,
 
+    /// How many economy steps the macro model compounds a year's GDP and
+    /// CPI growth over. 365.0 -- every preset -- is the arithmetic that has
+    /// always stood, and the step at 365.0 is the same f64 division.
+    ///
+    /// # The defect
+    ///
+    /// The economy steps once per trading SESSION, 252 to a year, and
+    /// compounded `rate / 365` each step, so a trading year received
+    /// 252/365 of its annual growth: nominal output, and with it every
+    /// name's earnings and book (`earnings_nominal_growth`), grew about 1.1
+    /// points a year too slowly. Measured on 30 seeds x 21 years of pt-v19:
+    /// the index's long-run return 3.83 -> 4.92 per cent with only the two
+    /// divisors changed (design repository, results/longrun-drift/). 252.0
+    /// puts the compounding on the session clock. The rest of the macro
+    /// calendar (30-session months) is not moved by this dial.
+    pub macro_compound_days_per_year: f64,
+
     /// Where the anchor's weight pulls TO, as a log offset below the
     /// identity's derived anchor: the blend (and the memory's reference) use
     /// `L * anchor * exp(-c)`. 0.0 -- every preset -- is the branch not
@@ -4349,6 +4366,7 @@ impl ModelParams {
             vix_anchor_reversion: 0.0,
             vix_anchor_weight: 0.0,
             vix_anchor_memory: 0.0,
+            macro_compound_days_per_year: 365.0,
             vix_anchor_centre: 0.0,
             vix_anchor_weight_level: 0.0,
             vix_anchor_weight_level_cap: 0.0,
@@ -6347,6 +6365,7 @@ impl ModelParams {
             "vix_anchor_reversion" => self.vix_anchor_reversion,
             "vix_anchor_weight" => self.vix_anchor_weight,
             "vix_anchor_memory" => self.vix_anchor_memory,
+            "macro_compound_days_per_year" => self.macro_compound_days_per_year,
             "vix_anchor_centre" => self.vix_anchor_centre,
             "vix_anchor_weight_level" => self.vix_anchor_weight_level,
             "vix_anchor_weight_level_cap" => self.vix_anchor_weight_level_cap,
@@ -6550,6 +6569,7 @@ impl ModelParams {
             "vix_anchor_reversion" => out.vix_anchor_reversion = value,
             "vix_anchor_weight" => out.vix_anchor_weight = value,
             "vix_anchor_memory" => out.vix_anchor_memory = value,
+            "macro_compound_days_per_year" => out.macro_compound_days_per_year = value,
             "vix_anchor_centre" => out.vix_anchor_centre = value,
             "vix_anchor_weight_level" => out.vix_anchor_weight_level = value,
             "vix_anchor_weight_level_cap" => out.vix_anchor_weight_level_cap = value,
@@ -6893,6 +6913,13 @@ impl ModelParams {
                  index's variance altogether. Set it inside [0, 1), or to 0.0.",
                 self.vix_anchor_weight));
         }
+        if !(self.macro_compound_days_per_year >= 1.0 && self.macro_compound_days_per_year <= 366.0) {
+            return Err(format!(
+                "macro_compound_days_per_year is {}. It is the number of economy steps a \
+                 year's GDP and CPI growth is compounded over: 365.0 as shipped, 252.0 on \
+                 the session clock. Set it inside [1, 366].",
+                self.macro_compound_days_per_year));
+        }
         if self.vix_anchor_memory != 0.0
             && !(self.vix_anchor_memory > 0.0 && self.vix_anchor_memory <= 1.0)
         {
@@ -7210,6 +7237,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_anchor_reversion",
         "vix_anchor_weight",
         "vix_anchor_memory",
+        "macro_compound_days_per_year",
         "vix_anchor_centre",
         "vix_anchor_weight_level",
         "vix_anchor_weight_level_cap",

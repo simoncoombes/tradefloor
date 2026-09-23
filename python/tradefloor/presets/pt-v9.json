@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v9",
   "fingerprint": "pt-v9",
-  "coefficient_digest": "8ded9659545986742e3305653031480b035fd47eab79dbc4d2c86f8d33ad9492",
+  "coefficient_digest": "8d7fe21f1c13a5bd4f54630378fa8b67c18e3c4c6ecfce0761ea78fc83c27aa0",
   "coefficients": {
     "book_levels": 10.0,
     "buyback_payout_share": 0.0,
@@ -77,6 +77,7 @@
     "jump_vix_coupling": 0.0,
     "loss_making_price_to_book": 1.2,
     "macro_burn_in_days": 0.0,
+    "macro_compound_days_per_year": 365.0,
     "market_beta_down_asym": 0.0,
     "market_beta_down_asym_lag": 0.0,
     "market_beta_down_asym_lag_live": 0.0,

@@ -318,6 +318,9 @@ PERTURBATIONS = [
     # The anchor's slow memory. Read only with a weight, which COMPANIONS
     # carries; no draw is added or moved.
     ("vix_anchor_memory", 0.05, True),
+    # The macro compounding clock (2026-09-23). 252.0 compounds a year's GDP
+    # and CPI over the year's sessions; no draw is added or moved.
+    ("macro_compound_days_per_year", 252.0, True),
     # The anchor's centre and its level law (2026-09-23, vix-law-levels).
     # Read only with a weight, which COMPANIONS carries; no draw is added.
     ("vix_anchor_centre", 0.27, True),
