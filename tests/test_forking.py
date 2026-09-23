@@ -1025,7 +1025,13 @@ def _nothing_dormant():
                    universe_stress_decay=0.9,
                    vix_level_loop_gain=1.75,
                    crisis_epicentre_extra=1.93,
-                   volume_move_jump_share=0.05)
+                   volume_move_jump_share=0.05,
+                   # The anchor weight's cap is a multiple of the centre at or
+                   # above one, so a blanket 0.05 is outside its domain; the
+                   # derived 1.76 (vix-law-levels, design repository).
+                   vix_anchor_weight_level_cap=1.76,
+                   # ... and its below-knee switch is 0.0 or 1.0.
+                   vix_anchor_weight_level_below=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

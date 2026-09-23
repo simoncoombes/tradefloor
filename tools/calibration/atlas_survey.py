@@ -260,8 +260,6 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_anchor_weight": (0.0, 0.9),
     # The anchor's memory rate per session; 0.0 is the instantaneous form.
     "vix_anchor_memory": (0.0, 1.0),
-    # Economy steps a year compounds over: 365 shipped, 252 the session clock.
-    "macro_compound_days_per_year": (252.0, 365.0),
     # The anchor's centre (log offset), the weight's level exponent and cap.
     "vix_anchor_centre": (0.0, 1.0),
     "vix_anchor_weight_level": (0.0, 2.0),
@@ -618,6 +616,9 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
 #: header. Both known-good values (ramp 6.0, cap 0.98) are asserted inside
 #: these ranges at plan time.
 EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
+    # The economy steps a year's GDP and CPI growth compounds over: 365 as
+    # shipped, 252 the session clock (the economy steps once per session).
+    "macro_compound_days_per_year": (252.0, 365.0),
     # The crisis epicentre's hysteresis, in SESSIONS, shipped at 21. 1 is an
     # episode that ends on the first session back under the threshold, which
     # is the mechanism with no memory at all; 63 is a quarter, half again the
