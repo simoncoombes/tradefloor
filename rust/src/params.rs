@@ -1567,6 +1567,52 @@ pub struct ModelParams {
     /// calendar (30-session months) is not moved by this dial.
     pub macro_compound_days_per_year: f64,
 
+    /// How many economy steps make a macro YEAR on the rest of the macro
+    /// calendar. 365.0 -- every preset -- is the calendar that has always
+    /// stood: 30-step months (`DAYS_PER_MONTH`), 90-step quarters, a 90-step
+    /// OPEC interval, a 365-step seasonal year, a 30-step month on the
+    /// cycle's phase clock and its per-day hazard, a 30-step market-return
+    /// memory, and central-bank meetings every 42-55 (crisis 21-30) steps.
+    ///
+    /// # The defect
+    ///
+    /// The economy steps once per trading session, so a macro year was 365
+    /// sessions, 1.45 trading years: every business-cycle phase, release
+    /// and meeting interval ran 1.45 times slow in market time. At 252.0 --
+    /// the session clock, DERIVED from the session count and not fitted --
+    /// a month is 21 sessions, a quarter 63, the year 252, and calendar-day
+    /// intervals (meetings, the seasonal valley) are scaled by 252/365 and
+    /// rounded. A monthly rate stays a monthly rate; per-step processes are
+    /// not touched. Pair it with `macro_compound_days_per_year` 252.0.
+    /// Measured in the design repository, results/macro-cycle/.
+    pub macro_calendar_days_per_year: f64,
+
+    /// Selects the business-cycle phase table derived from NBER and BEA
+    /// (`economy::state::us_phase_characteristics`). 0.0 -- every preset --
+    /// reads the shipped table; any other value reads the US table. Its
+    /// durations are months of the macro calendar, so they mean real months
+    /// only with `macro_calendar_days_per_year` 252.0. See the table's own
+    /// docstring for each number's derivation.
+    pub cycle_us_calibration: f64,
+
+    /// Adds a lift-off branch to the central bank's ladder. 0.0 -- every
+    /// preset -- is the shipped ladder, in which every hike needs inflation
+    /// at least a point above target, so after the first recession the
+    /// rate sits at zero for the rest of a run. At any other value the
+    /// bank also hikes 25bp when its own Taylor rate is 50bp above the
+    /// policy rate, unemployment is not more than a point over target, and
+    /// the cycle is not in contraction or trough: the ladder's own cut
+    /// branch mirrored. See `economy::central_bank`.
+    pub fed_liftoff_rule: f64,
+
+    /// Reads buybacks into `market_pe`. 0.0 -- every preset -- divides price
+    /// by `eps * nominal` without the buyback term the valuation applies,
+    /// so the multiple rises by about the buyback yield a year (22.6 to 28.0
+    /// over 21 years on pt-v19) and slowly raises the expansion hazard,
+    /// which adds above a multiple of 28. At any other value the earnings
+    /// carry `market::tick::buyback_scale`, as the valuation's do.
+    pub market_pe_buybacks: f64,
+
     /// Where the anchor's weight pulls TO, as a log offset below the
     /// identity's derived anchor: the blend (and the memory's reference) use
     /// `L * anchor * exp(-c)`. 0.0 -- every preset -- is the branch not
@@ -4367,6 +4413,10 @@ impl ModelParams {
             vix_anchor_weight: 0.0,
             vix_anchor_memory: 0.0,
             macro_compound_days_per_year: 365.0,
+            macro_calendar_days_per_year: 365.0,
+            cycle_us_calibration: 0.0,
+            fed_liftoff_rule: 0.0,
+            market_pe_buybacks: 0.0,
             vix_anchor_centre: 0.0,
             vix_anchor_weight_level: 0.0,
             vix_anchor_weight_level_cap: 0.0,
@@ -6366,6 +6416,10 @@ impl ModelParams {
             "vix_anchor_weight" => self.vix_anchor_weight,
             "vix_anchor_memory" => self.vix_anchor_memory,
             "macro_compound_days_per_year" => self.macro_compound_days_per_year,
+            "macro_calendar_days_per_year" => self.macro_calendar_days_per_year,
+            "cycle_us_calibration" => self.cycle_us_calibration,
+            "fed_liftoff_rule" => self.fed_liftoff_rule,
+            "market_pe_buybacks" => self.market_pe_buybacks,
             "vix_anchor_centre" => self.vix_anchor_centre,
             "vix_anchor_weight_level" => self.vix_anchor_weight_level,
             "vix_anchor_weight_level_cap" => self.vix_anchor_weight_level_cap,
@@ -6570,6 +6624,10 @@ impl ModelParams {
             "vix_anchor_weight" => out.vix_anchor_weight = value,
             "vix_anchor_memory" => out.vix_anchor_memory = value,
             "macro_compound_days_per_year" => out.macro_compound_days_per_year = value,
+            "macro_calendar_days_per_year" => out.macro_calendar_days_per_year = value,
+            "cycle_us_calibration" => out.cycle_us_calibration = value,
+            "fed_liftoff_rule" => out.fed_liftoff_rule = value,
+            "market_pe_buybacks" => out.market_pe_buybacks = value,
             "vix_anchor_centre" => out.vix_anchor_centre = value,
             "vix_anchor_weight_level" => out.vix_anchor_weight_level = value,
             "vix_anchor_weight_level_cap" => out.vix_anchor_weight_level_cap = value,
@@ -6920,6 +6978,24 @@ impl ModelParams {
                  the session clock. Set it inside [1, 366].",
                 self.macro_compound_days_per_year));
         }
+        if !(self.macro_calendar_days_per_year >= 24.0
+            && self.macro_calendar_days_per_year <= 365.0
+            && self.macro_calendar_days_per_year.fract() == 0.0)
+        {
+            return Err(format!(
+                "macro_calendar_days_per_year is {}. It is the number of economy steps in a \
+                 macro year: 365.0 as shipped, 252.0 on the session calendar. Set a whole \
+                 number inside [24, 365].",
+                self.macro_calendar_days_per_year));
+        }
+        for (name, v) in [("cycle_us_calibration", self.cycle_us_calibration),
+                          ("fed_liftoff_rule", self.fed_liftoff_rule),
+                          ("market_pe_buybacks", self.market_pe_buybacks)] {
+            if !(v == 0.0 || v == 1.0) {
+                return Err(format!(
+                    "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
+            }
+        }
         if self.vix_anchor_memory != 0.0
             && !(self.vix_anchor_memory > 0.0 && self.vix_anchor_memory <= 1.0)
         {
@@ -7238,6 +7314,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_anchor_weight",
         "vix_anchor_memory",
         "macro_compound_days_per_year",
+        "macro_calendar_days_per_year",
+        "cycle_us_calibration",
+        "fed_liftoff_rule",
+        "market_pe_buybacks",
         "vix_anchor_centre",
         "vix_anchor_weight_level",
         "vix_anchor_weight_level_cap",

@@ -321,6 +321,21 @@ PERTURBATIONS = [
     # The macro compounding clock (2026-09-23). 252.0 compounds a year's GDP
     # and CPI over the year's sessions; no draw is added or moved.
     ("macro_compound_days_per_year", 252.0, True),
+    # The macro calendar, the US cycle table, the Fed lift-off branch and
+    # buybacks in `market_pe` (2026-09-23, macro-cycle). None adds a draw
+    # site; each changes which state-dependent macro sites fire.
+    # The calendar moves the release days, the phase clock and the meeting
+    # schedule, so it moves the market and which macro draw sites fire
+    # (ECONOMY_STREAM_MOVERS). The lift-off branch fires at a meeting in the
+    # burn-in and moves the rate the valuation reads.
+    ("macro_calendar_days_per_year", 252.0, True),
+    ("fed_liftoff_rule", 1.0, True),
+    # INERT on this probe, measured: the US table changes only phase
+    # durations, and no transition falls inside three sessions of a phase
+    # the burn-in holds; market_pe is read only by the expansion hazard
+    # above a multiple of 28, which a three-session opening does not reach.
+    ("cycle_us_calibration", 1.0, False),
+    ("market_pe_buybacks", 1.0, False),
     # The anchor's centre and its level law (2026-09-23, vix-law-levels).
     # Read only with a weight, which COMPANIONS carries; no draw is added.
     ("vix_anchor_centre", 0.27, True),
@@ -1093,6 +1108,9 @@ ECONOMY_STREAM_MOVERS = frozenset({
     "market_factor_sigma", "usd_crisis_vix_threshold", "price_hard_cap",
     "jump_intensity_idio", "jump_mean_market", "jump_sigma_market",
     "vix_return_gain_up", "oil_supply_response", "oil_seasonality_target",
+    # The macro calendar (2026-09-23): it moves which days are release,
+    # quarter and meeting days, so which state-dependent sites fire.
+    "macro_calendar_days_per_year",
 })
 
 

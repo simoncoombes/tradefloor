@@ -591,6 +591,18 @@ PARAM_SPECS: dict[str, dict] = {
     # economy actually steps through, where 365 was written. Derived, not fitted.
     "macro_compound_days_per_year": {"kind": "abs", "step_unit": 1.0,
                               "hard_range": (252.0, 365.0), "derived": True},
+    # The rest of the macro calendar on the session clock (2026-09-23,
+    # macro-cycle): 252 steps to the macro year. Derived, not fitted.
+    "macro_calendar_days_per_year": {"kind": "abs", "step_unit": 1.0,
+                              "hard_range": (252.0, 365.0), "derived": True},
+    # Switches, 0 shipped and 1 on (2026-09-23, macro-cycle): the NBER/BEA
+    # cycle table, the Fed's lift-off branch, buybacks in market_pe.
+    "cycle_us_calibration":   {"kind": "abs", "step_unit": 1.0,
+                              "hard_range": (0.0, 1.0), "derived": True},
+    "fed_liftoff_rule":       {"kind": "abs", "step_unit": 1.0,
+                              "hard_range": (0.0, 1.0), "derived": True},
+    "market_pe_buybacks":     {"kind": "abs", "step_unit": 1.0,
+                              "hard_range": (0.0, 1.0), "derived": True},
     # The anchor's centre below the derived anchor, in logs, and the weight's
     # level law and its cap (2026-09-23, vix-law-levels). Probe dials.
     "vix_anchor_centre":      {"kind": "abs", "step_unit": 0.01,
