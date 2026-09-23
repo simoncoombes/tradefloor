@@ -12,6 +12,8 @@ key revoked from the CLI stops working on the next request, without a restart.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import re
 import threading
@@ -75,6 +77,7 @@ class Accounts:
         self._sig: tuple | None = None
         self._owners: dict[str, OwnerRecord] = {}
         self._keys: dict[str, KeyRecord] = {}
+        self._pepper_check: str | None = None
         self._load()
 
     # -- persistence -------------------------------------------------------
@@ -90,15 +93,31 @@ class Accounts:
         raw = read_json(self.path, {"version": 1, "owners": {}, "keys": {}})
         self._owners = {o: OwnerRecord(**r) for o, r in raw.get("owners", {}).items()}
         self._keys = {k: KeyRecord(**r) for k, r in raw.get("keys", {}).items()}
+        self._pepper_check = raw.get("pepper_check")
         self._sig = self._stat_sig()
+
+    def _pepper_fingerprint(self) -> str:
+        return hmac.new(self.pepper, b"tradefloor-hosted-pepper-check", hashlib.sha256).hexdigest()[:16]
+
+    def pepper_matches(self) -> bool:
+        """False when this file's keys were hashed under a DIFFERENT pepper, the
+        mistake that makes every key fail: the server and the admin CLI must be
+        given the same secret. The stored fingerprint is an HMAC of a constant,
+        which says nothing about the pepper itself."""
+        with self._lock:
+            self._maybe_reload()
+            return self._pepper_check in (None, self._pepper_fingerprint())
 
     def _maybe_reload(self) -> None:
         if self._stat_sig() != self._sig:
             self._load()
 
     def _save(self) -> None:
+        if self._pepper_check is None and self._keys:
+            self._pepper_check = self._pepper_fingerprint()
         atomic_write_json(self.path, {
             "version": 1,
+            "pepper_check": self._pepper_check,
             "owners": {o: asdict(r) for o, r in self._owners.items()},
             "keys": {k: asdict(r) for k, r in self._keys.items()},
         })
@@ -192,6 +211,9 @@ class Accounts:
         """A new key for `owner` (created if new, on `plan` or the default).
         Returns the record and the PLAINTEXT key, which exists only in this
         return value: show it once and drop it."""
+        if not self.pepper_matches():
+            raise ValueError("this accounts file was written with a different pepper "
+                             "(TRADEFLOOR_HOSTED_PEPPER); a key made now would never verify")
         self.ensure_owner(owner, plan)
         secret = _keys.new_secret()
 

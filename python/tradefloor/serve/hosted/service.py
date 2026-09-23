@@ -467,25 +467,37 @@ class HostedService:
 
     # -- reporting ------------------------------------------------------------------------------
 
+    def usage(self, owner: str) -> dict[str, Any]:
+        """The caller's own plan and usage (`GET /v1/usage`): authorised and
+        rate limited like any call, so it cannot be used to probe others."""
+        with self._call(owner, "usage") as c:
+            return usage_report(self.accounts, self.quotas, c.owner, self.storage_meter)
+
     def usage_report(self, owner: str) -> dict[str, Any]:
-        """The plan, today's usage against it, and the owner's sessions: what
-        `GET /v1/usage` returns and the admin CLI prints."""
-        plan = self.accounts.plan_of(owner)
-        u = self.quotas.usage(owner)
-        sessions = self.quotas.sessions_of(owner)
-        open_n = sum(1 for a in sessions.values() if a.status == "open")
-        report: dict[str, Any] = {
-            "owner": owner,
-            "plan": plan.to_dict(),
-            "today": {"utc_day": u.day, "calls": u.calls, "steps": u.steps,
-                      "sim_days": round(u.sim_days, 3), "compute_seconds": round(u.compute_s, 3),
-                      "refused": u.refused},
-            "remaining_today": {
-                "sim_days": round(max(0.0, plan.sim_days_per_day - u.sim_days), 3),
-                "compute_seconds": round(max(0.0, plan.compute_seconds_per_day - u.compute_s), 3)},
-            "total": dict(u.total),
-            "sessions": {"open": open_n, "tracked": len(sessions)},
-        }
-        if self.storage_meter is not None:
-            report["storage_bytes"] = self.storage_meter(owner, list(sessions))
-        return report
+        return usage_report(self.accounts, self.quotas, owner, self.storage_meter)
+
+
+def usage_report(accounts: Accounts, quotas: Quotas, owner: str,
+                 storage_meter: StorageMeter | None = None) -> dict[str, Any]:
+    """The plan, today's usage against it, and the owner's sessions: what
+    `GET /v1/usage` returns and the admin CLI prints. Needs no inner service,
+    so the CLI can print it from the files alone."""
+    plan = accounts.plan_of(owner)
+    u = quotas.usage(owner)
+    sessions = quotas.sessions_of(owner)
+    open_n = sum(1 for a in sessions.values() if a.status == "open")
+    report: dict[str, Any] = {
+        "owner": owner,
+        "plan": plan.to_dict(),
+        "today": {"utc_day": u.day, "calls": u.calls, "steps": u.steps,
+                  "sim_days": round(u.sim_days, 3), "compute_seconds": round(u.compute_s, 3),
+                  "refused": u.refused},
+        "remaining_today": {
+            "sim_days": round(max(0.0, plan.sim_days_per_day - u.sim_days), 3),
+            "compute_seconds": round(max(0.0, plan.compute_seconds_per_day - u.compute_s), 3)},
+        "total": dict(u.total),
+        "sessions": {"open": open_n, "tracked": len(sessions)},
+    }
+    if storage_meter is not None:
+        report["storage_bytes"] = storage_meter(owner, list(sessions))
+    return report
