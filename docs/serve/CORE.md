@@ -3,9 +3,10 @@ MILESTONE 1 pushed aa6eabf
 # The session core
 
 `tradefloor.serve.core.LocalSessionService` is the one real implementation of
-`SessionService` (docs/serve/CONTRACT.md). `tradefloor.serve.store` holds the
-`SessionStore` protocol and two stores, `FileStore` and `MemoryStore`. Both
-modules import only the standard library and `tradefloor`.
+`SessionService` (docs/serve/CONTRACT.md, contract 0.3). `tradefloor.serve.store`
+holds two implementations of the contract's `SessionStore` protocol,
+`FileStore` and `MemoryStore`. Both modules import only the standard library
+and `tradefloor`.
 
 ```python
 from tradefloor.serve.core import LocalSessionService
@@ -28,9 +29,10 @@ headlines=None, cache_size=64)`:
 - `max_universe` caps `universe_size`; `max_advance_sessions` caps one
   `advance` call at that many sessions of ticks. The hosted layer can pass
   lower values.
-- `headlines(engine, clock) -> list[Headline]`, if given, fills every
-  observation's `news`. It has to be a pure function of the engine state or
-  replay stops being deterministic.
+- `news` comes from `tradefloor.headlines.headlines_for` unless you pass
+  `headlines(engine, clock) -> list[Headline]`, which replaces it. Either has
+  to be a pure function of the engine state or replay stops being
+  deterministic.
 - `cache_size` is how many sessions stay live in memory. Others are rebuilt
   from the store on their next call.
 
@@ -72,8 +74,10 @@ run, and more than `max_advance_sessions` x 390 (7,800 by default) is
 2. Queued orders fill against the live book, in submission order.
 3. `run_session(hour, minute, 3, ticks, order_flow=portfolio.pending_flow())`,
    then `clear_flow()`, as `TradingEnv.step` does.
-4. Resting limit orders are checked against the prints of the step just run.
-5. At tick 390, `close_market()`, and day orders still resting expire.
+4. The step's bar is recorded for every name.
+5. Resting limit orders are checked against the prints of the step just run.
+6. At tick 390, `close_market()`, the day bar is recorded, and day orders
+   still resting expire.
 
 A session nobody trades in prices exactly as a bare engine stepped with
 `harness.session_clock`. `test_untraded_session_steps_as_trading_env` checks
@@ -137,6 +141,14 @@ rejected. `cancel_order` works on any accepted order; on a finished one it is
 Order ids are `ord-000001`, `ord-000002` and so on, per session. A fork
 continues its parent's count.
 
+`Order.updated_at` is the clock of the order's last status change: the
+submission for an accepted order, the start of the step for a taker fill or
+a rejection there, the end of the step for a resting fill or a rejection
+there, the clock after the close (tick 390, market closed) for an expiry, and
+the clock of the call for a cancel. `close` cancels every open order with
+reason "session closed" and `updated_at` the closing clock, so a closed
+session has no live orders.
+
 `client_order_id` is unique within a session. The same id with the same body
 (ticker, side, quantity, type, limit price, time in force) returns the
 original order as it stands now and creates nothing. A different body is
@@ -144,16 +156,25 @@ original order as it stands now and creates nothing. A different body is
 
 ### Leverage
 
-With `max_leverage` set, a fill that would take gross exposure over net worth
-above it is refused, by `Portfolio`'s own arithmetic.
+With `max_leverage` set, a fill is refused only when its projected leverage
+(gross exposure over net worth, by `Portfolio._projected_leverage`) is above
+the cap and also above the account's leverage now (contract 0.2). A trade
+that lowers leverage always passes, so an account the market has pushed over
+its cap can trade back down. `Portfolio`'s own rule refuses any fill
+projected over the cap, so the core applies its rule first and then runs
+`Portfolio.execute` with the cap lifted for that one call. `Portfolio` is
+unchanged.
+
+An insolvent account (net worth at or below zero) has no leverage to compare
+with. There a fill passes only if it does not add gross exposure.
 
 At submission the core projects the order on a copy of the account, after the
 orders already queued ahead of it, at the book's current sweep price (market)
-or its limit (limit). Over the cap raises `insufficient_buying_power` and no
-order is created. Resting limits do not use up buying power at submission,
-because they may never fill. The check runs again at the fill. A market order
-refused there, or a resting limit whose fill would breach the cap, ends
-`rejected` with the reason.
+or its limit (limit), and compares with that copy's leverage. A refusal
+raises `insufficient_buying_power` and no order is created. Resting limits do
+not use up buying power at submission, because they may never fill. The rule
+runs again at the fill. A market order refused there, or a resting limit
+whose fill the rule refuses, ends `rejected` with the reason.
 
 ## Observations
 
@@ -163,17 +184,44 @@ refused there, or a resting limit whose fill would breach the cap, ends
   day's high and low include its opening price. `bid` and `ask` are the
   book's best levels. After a close they describe the day that closed, and
   the next open resets them.
+  `step_volume` is the volume of the last step in the current session, and
+  None before the session's first step (at the open, and after
+  `until="next_open"`). After a close it is the closing step's volume.
 - `vix`, the economy's VIX.
 - `macro`, in the engine's percent units from `state_snapshot()["economy"]`:
   `federal_funds_rate`, `treasury_yield_10y`, `inflation_rate`, `gdp_growth`,
   `unemployment_rate`, and `cycle_phase` as 0 expansion, 1 peak,
   2 contraction, 3 trough, 4 recovery (`core.MACRO_FIELDS`,
   `core.CYCLE_PHASES`).
-- `account`, from `Portfolio`. `leverage` is infinite when net worth is at or
-  below zero.
+- `account`, from `Portfolio`. When net worth is at or below zero,
+  `leverage` is None and `insolvent` is true (contract 4a).
 - `positions`, non-zero holdings in roster order.
 - `open_orders`, accepted orders in submission order.
-- `news`, from the `headlines` callable, otherwise empty.
+- `news`, `headlines_for(state_snapshot, day=clock.day, tick=clock.tick,
+  tickers=roster)`: the current news day's headlines once the clock reaches
+  tick 1 of that day. There are none at tick 0 of a new day, and the list
+  stays through the close. It is a pure function of the engine state, so
+  resume and fork give the same headlines.
+
+## Bars
+
+`bars(owner, session_id, ticker, resolution="day", since_day=0, limit=None)`
+returns `Bar`s oldest first.
+
+A step bar is the step's prints for that name: `open` the first tick's
+print, `high` and `low` the extremes, `close` the last print, and `volume`
+the day's volume column after the step minus before it. `step` is the index
+of the step in its day. Step bars cover the last 20 sessions, the session in
+progress included (`core.STEP_BAR_SESSIONS`); older ones are dropped.
+
+A day bar has `step=None` and the engine's `open`, `high`, `low` and
+`volume` columns with the price after `close_market` as `close`, so it
+matches the closing quote. Day bars cover every session. The session in
+progress gets a day bar once it has run a step, built from the live quote.
+
+`since_day` drops bars from earlier days, and `limit` keeps the most recent
+`limit`. An unknown ticker, an unknown resolution, a negative or non-integer
+`since_day`, or a `limit` below 1 is `invalid_request`.
 
 ### state_hash
 
@@ -193,9 +241,14 @@ commits before it returns. A commit is one record plus entries appended to
 three streams:
 
 - the record holds the engine's `state_snapshot()` and `state_hash()`, the
-  portfolio, the clock, open orders, counters and the session info. It is
-  about 15 KB at 20 names and does not grow with history.
+  portfolio, the clock, open orders, counters, the session info and the
+  20-session window of step bars, packed as base64 f64. It does not grow
+  with history. At 20 names and `ticks_per_step=30` it is about 15 KB plus
+  the window, 230 KB once the window is full. The window's size scales with
+  steps per session, so at `ticks_per_step=1` it would be about 6 MB (see
+  the change requests).
 - `fills` gets every fill.
+- `day_bars` gets each finished session's day bars, one packed row.
 - `orders` gets each order once it is finished (filled, cancelled, expired or
   rejected).
 - `calls` is the call log, one entry per mutating call: `seq`, `op`, `args`,
@@ -229,24 +282,29 @@ after a real SIGKILL.
 would produce. The child's streams start with the parent's whole history, and
 both call logs record the fork.
 
-One process writes a store root at a time; there is no cross-process lock in
-0.1. A second service on the same root sees the first one's commits, because
-each call compares the store's version with its cached copy. That is enough
-to hand a root from one process to the next, and not enough for two writers.
+Within a process the service is thread-safe (contract 4d). Each session has
+its own lock, so calls on one session run one at a time and calls on
+different sessions run concurrently. The tests run four sessions on four
+threads against a small cache and check every result against a serial run.
+
+One process writes a store root at a time; there is no cross-process lock. A
+second service on the same root sees the first one's commits, because each
+call compares the store's version with its cached copy. That is enough to
+hand a root from one process to the next, and not enough for two writers.
 
 ## Refusals
 
 | code | when |
 |---|---|
-| `invalid_request` | bad config (unnamed preset, `universe_size` outside 1 to `max_universe`, negative seed, cash not finite and positive, `max_leverage` not positive, `ticks_per_step` outside 1 to 390); owner not a non-empty string; bad `side`, `type`, `time_in_force` or `client_order_id`; unknown field in a dict request; `advance` with steps below 1 or an unknown `until`, or over the tick cap; unknown `status` filter; negative `since_day`; cancelling a finished order |
+| `invalid_request` | bad config (unnamed preset, `universe_size` outside 1 to `max_universe`, negative seed, cash not finite and positive, `max_leverage` not positive, `ticks_per_step` outside 1 to 390); owner not a non-empty string; bad `side`, `type`, `time_in_force` or `client_order_id`; unknown field in a dict request; `advance` with steps below 1 or an unknown `until`, or over the tick cap; unknown `status` filter; negative `since_day`; cancelling a finished order; `bars` with an unknown ticker, resolution or a bad `since_day` or `limit` |
 | `not_found` | no such session, a malformed id, another owner's session (same message as a missing one), no such order |
 | `invalid_order` | unknown ticker; quantity not finite and positive, or above 1e12; limit without a price; price not finite and positive, or above 1e9; market order with a price |
-| `insufficient_buying_power` | the order's projected fill would breach `max_leverage` |
+| `insufficient_buying_power` | the order's projected fill is above `max_leverage` and above the account's leverage (or, insolvent, adds gross exposure) |
 | `session_closed` | place, cancel, advance, fork or close on a closed session |
 | `conflict` | `client_order_id` reused with a different body |
 | `internal` | a bug, or the store refused a commit; the call is not applied |
 
-Reads (`info`, `observe`, `orders`, `fills`, `calls`) still work on a closed
+Reads (`info`, `observe`, `orders`, `fills`, `bars`, `calls`) still work on a closed
 session. `orders(status=...)` takes the five statuses plus `"open"`,
 `"closed"` and `"all"`.
 
@@ -260,12 +318,19 @@ session. `orders(status=...)` takes the five statuses plus `"open"`,
 - `envelope.check(horizon_days=days)` reasons once a session passes the
   certified 252 days, and a SHORT WINDOW caveat under 63 days;
 - resting fills do not move the market, with this session's count;
+- news timing, while the preset has news on: computed from the preset's
+  `endogenous_news_intensity` and `endogenous_news_sigma` and the session's
+  `ticks_per_step`. The engine adds 1/390 of an event's impact every tick,
+  a headline is released at tick 1, and an agent first sees it at the end of
+  its first step. For pt-v19 at 30-tick steps the caveat says 92% of the move
+  is still to come, about 129bp an event (HEADLINES.md measured +120bp);
 - limit fills see one print per tick and have no queue position or partials;
 - other agents are not in the book;
 - unbounded leverage when `max_leverage` is None;
 - rosters under 30 names;
 - `Universe.random` rosters are sector-balanced;
-- insolvency, when net worth is at or below zero.
+- insolvency, when net worth is at or below zero, with leverage reported as
+  null.
 
 `core.LONG_RUN_CHECK` holds the free-running crash check from tradefloor-design
 `programme/results/crashcheck/` (2026-09-23): 30 histories of 20 years per
@@ -287,25 +352,30 @@ The test sets pt-v19's row to the real figures and sees the caveat go.
 
 ## Performance
 
-Measured on 2026-09-23 on the shared Apple silicon Mac with other agents'
-jobs running, so read these as plus or minus a quarter. 20 names, pt-v19,
-`ticks_per_step=30` (13 steps a session).
+Measured on 2026-09-23 on the shared 10-core Apple silicon Mac, at a load
+average of 11 from other agents' jobs. The bare engine ran at half the speed
+it had earlier the same day (76 sessions a second against 153), so read the
+service against the bare engine in the same run rather than as absolute
+numbers. 20 names, pt-v19, `ticks_per_step=30` (13 steps a session), with the
+20-session step-bar window already full.
 
 | | FileStore | MemoryStore |
 |---|---|---|
-| `advance(1)`, calls a second (one 30-tick step each) | 358 | 624 |
-| `place_order` then `advance(1)`, pairs a second | 306 | 511 |
-| `advance(until="close")`, sessions a second | 117 | 115 |
-| `advance(20, until="close")`, sessions a second | 115 | 150 |
-| `observe`, calls a second | 9,300 | 11,300 |
+| `advance(1)`, calls a second (one 30-tick step each) | 149 | 217 |
+| `place_order` then `advance(1)`, pairs a second | 109 | 177 |
+| `advance(until="close")`, sessions a second | 45 | 59 |
+| `advance(20, until="close")`, sessions a second | 59 | 65 |
+| `observe`, calls a second | 3,970 | 5,160 |
+| bare engine, 13 `run_session` calls, sessions a second | 76 | |
 
-For comparison the bare engine ran 153 sessions a second as 13 `run_session`
-calls and 116 as one 390-tick call. Whole sessions through the service run
-near the bare engine's speed, because the commit happens once per call. A
-one-step call costs about 2.8 ms with `FileStore`, of which `run_session` is
-about 0.5 ms; the rest is the commit (snapshot, hash, JSON, two renames) and
-the observation `advance` returns. Rebuilding a session from disk and
-observing it took 13 ms with 200 fills of history, and a fork 17 ms.
+Whole sessions through the service run at 60% to 80% of the bare engine,
+because the commit happens once per call. A one-step call spends about a
+sixth of its time in `run_session`. The rest is the commit (engine snapshot
+and hash, JSON of a 230 KB record, two renames) and the observation that
+`advance` returns. Before the step-bar window existed, and with the machine
+less loaded, the same one-step call ran at 358 a second with `FileStore`.
+Rebuilding a session from disk and observing it, with 200 fills of history,
+ran 33 times a second, and a fork 19 times.
 
 The benchmark:
 
@@ -317,6 +387,7 @@ from tradefloor.serve.types import SessionConfig
 
 svc = LocalSessionService(FileStore("/tmp/bench"))
 sid = svc.open("local", SessionConfig(universe_size=20)).session_id
+svc.advance("local", sid, 20, until="close")
 t, n = time.perf_counter(), 0
 while time.perf_counter() - t < 3:
     svc.advance("local", sid, 1)
@@ -326,16 +397,18 @@ print(n / (time.perf_counter() - t), "steps a second")
 
 ## Known limits
 
-- The leverage cap can trap an account. Once prices carry leverage above
-  `max_leverage`, `Portfolio` refuses every trade that leaves it above the
-  cap, including trades that reduce it, so a bot caught in a sell-off cannot
-  cut its position until prices recover. See the first change request.
 - Limit fills are coarse: one print per tick, no price improvement, no queue
   position, no partial fills, and no effect on the market.
 - Market orders bigger than the ten-level book fill partially.
 - For a limit placed while the market is closed, the marketable test uses the
   book at the close. The next open can differ. The fill test at the step's
   start still applies, so a limit never fills worse than its price.
+- `news` is the current news day only. An `advance` that crosses several days
+  shows the last day's headlines, and earlier days' headlines are not
+  available afterwards.
+- The step-bar window is rewritten on every commit. That costs about 230 KB a
+  commit at 20 names and 30-tick steps, and grows with names and with steps
+  per session.
 - One weekday, no calendar, and `day` counts sessions.
 - One writer per store root.
 - The engine's own `order_log` lives only in memory, and a rebuilt engine
@@ -348,43 +421,39 @@ print(n / (time.perf_counter() - t), "steps a second")
 
 ## Contract change requests
 
-1. Let risk-reducing trades through the leverage cap. Proposed rule: refuse a
-   fill only when its projected leverage is above the cap and above the
-   account's current leverage. The core could do this without changing
-   `Portfolio`, by skipping its check for such trades. This is a policy
-   choice, so the core keeps `Portfolio`'s rule until integration decides.
-2. Say what `steps` means with `until="close"` and `until="next_open"`. The
-   core reads it as a count of closes or opens, under the same tick cap.
-3. Add to section 3 that several market orders on one side of one name in one
-   step sweep the book cumulatively, and that a market order bigger than the
-   book fills partially with status `filled`, `filled_quantity` below
-   `quantity` and a "partial" reason. There is no `partially_filled` status
-   in 0.1.
-4. `Account.leverage` is infinite when net worth is at or below zero, and
-   strict JSON cannot carry infinity. The transports need a rule: `null`, or
-   a documented sentinel.
-5. `types._Data.from_dict` does not rebuild nested dataclasses:
-   `Order.from_dict` leaves `submitted_at` a dict, and `Observation`,
-   `SessionInfo`, `AdvanceResult` and `SessionReport` have the same problem.
-   The core has private helpers; the transports and the hosted layer will hit
-   it when they read JSON back.
-6. Put the `SessionStore` protocol in the contract, since the hosted layer
-   implements it: `commit(session_id, record, appends)`, `load`,
-   `read_stream`, `version` and `heads(owner)`, as documented in `store.py`.
-7. Move the long-run check into `tradefloor.envelope`, so `tradefloor.mcp` and
-   the serve reports read one table.
-8. Write down the points the contract leaves open and the core has decided:
-   cancelling a finished order is `invalid_request`; fork or close on a
-   closed session is `session_closed`; reads work on a closed session;
-   `orders` also takes `open`, `closed` and `all`; a day order placed while
-   the market is closed belongs to the next session; `SessionReport.days` is
-   the number of trading days the session has opened (`day + 1`).
-9. For integration with the headlines layer: the core calls
-   `headlines(engine, clock)` and puts the returned list in `news`.
+Decided in contract 0.2: risk-reducing trades pass the leverage cap (done),
+`steps` counts closes or opens with `until`, cumulative sweeps and partial
+market fills are written down, `leverage` is null with `insolvent` true,
+`from_dict` rebuilds nested types, `SessionStore` is in `types.py` (store.py
+imports it), the open edge cases are decided, and `observe` uses
+`headlines_for`. Moving the long-run table into `tradefloor.envelope` is
+deferred, so it stays in `core.LONG_RUN_CHECK`.
+
+Open:
+
+1. Insolvent accounts under the cap. The 0.2 rule compares projected
+   leverage with the account's leverage now, which is undefined at net worth
+   zero or below. Read literally, nothing is "above" an infinite leverage, so
+   an insolvent account could add any exposure. The core instead lets an
+   insolvent account's fill through only if it does not add gross exposure.
+   The contract should say which it means.
+2. The step-bar window and small steps. Keeping the window bounded inside the
+   record means rewriting it on every commit: 230 KB at 20 names and 30-tick
+   steps, about 6 MB at 20 names and 1-tick steps. Two ways out: an optional
+   store method that trims a stream to its last n entries (the window would
+   then be appended once per session and never rewritten), or a cap on step
+   bars by count rather than by sessions.
+3. A news feed. `headlines_for` returns one day, so an agent that advances
+   past a day with news never sees it. HEADLINES.md suggests the core keep a
+   log of released headlines and return those since the agent's previous
+   observation. That needs a place for the cursor (per session is enough in
+   0.3, since one agent drives a session) and a line in the contract.
 
 ## Tests
 
-`tests/serve/test_core_determinism.py`, `test_core_orders.py`,
-`test_core_sessions.py`, `test_core_crash.py` and `test_store_files.py`: 139
-tests, about 2 seconds with `pytest -n 2`. `python tests/known_answer.py`
-still gives `sim f05e769f...3a2a`.
+In `tests/serve/`: `test_core_determinism.py`, `test_core_orders.py`,
+`test_core_sessions.py`, `test_core_crash.py`, `test_core_leverage.py`,
+`test_core_bars.py`, `test_core_contract03.py` and `test_store_files.py`, 172
+tests in about 7 seconds with `pytest -n 2` on the loaded machine. The 17
+headlines tests pass beside them, and `python tests/known_answer.py` still
+gives `sim f05e769f...3a2a`.

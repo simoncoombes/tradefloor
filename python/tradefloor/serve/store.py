@@ -58,7 +58,9 @@ import struct
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any, Mapping, Protocol, Sequence, runtime_checkable
+from typing import Any, Mapping, Sequence
+
+from tradefloor.serve.types import SessionStore
 
 __all__ = ["SessionStore", "FileStore", "MemoryStore", "encode", "decode",
            "default_root"]
@@ -132,17 +134,9 @@ def _check_stream(name: str) -> str:
 
 
 # -- the protocol ----------------------------------------------------------------
-
-@runtime_checkable
-class SessionStore(Protocol):
-    """Persistence for `LocalSessionService`. See the module docstring."""
-
-    def commit(self, session_id: str, record: dict[str, Any],
-               appends: Mapping[str, Sequence[dict[str, Any]]]) -> None: ...
-    def load(self, session_id: str) -> dict[str, Any] | None: ...
-    def read_stream(self, session_id: str, name: str) -> list[dict[str, Any]]: ...
-    def version(self, session_id: str) -> int | None: ...
-    def heads(self, owner: str) -> list[dict[str, Any]]: ...
+#
+# `SessionStore` is part of the contract (0.2) and lives in
+# `tradefloor.serve.types`; it is re-exported here for existing imports.
 
 
 # -- in memory -------------------------------------------------------------------

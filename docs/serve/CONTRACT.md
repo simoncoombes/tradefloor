@@ -1,4 +1,4 @@
-# The trading session server: contract 0.3
+# The trading session server: contract 0.4
 
 What it is for: a long-running agent (a bot) rehearses in a simulated market
 before it touches money, and is re-tested every time it changes. It opens a
@@ -129,12 +129,23 @@ JSON cannot carry infinity.
   the crash, bit for bit, including `state_hash`. `FileStore(root)` is the
   default (`~/.tradefloor/sessions` for self-run); the hosted layer may supply
   another store (e.g. S3) through the same protocol.
+- (0.4) `SessionStore.trim_stream(session_id, name, keep_last)` drops all but
+  the last `keep_last` entries of a stream, atomically with respect to readers.
+  The core keeps bounded windows (the 20-session step bars) as streams and
+  trims them at session boundaries instead of rewriting them on every commit.
 - The store protocol is `SessionStore` in `types.py` (0.2): `commit(session_id,
   record, appends)` is the atomic commit point, then `load`, `read_stream`,
   `version`, `heads(owner)`. FileStore and MemoryStore implement it; a hosted
   store must keep the same atomicity.
 - `fork` copies a session's full state into a new session (same owner,
   `parent_session_id` set). Forks evolve independently and deterministically.
+
+## 4a2. Insolvency (0.4)
+
+An insolvent account (net worth at or below zero) may only make trades that
+do not increase its gross exposure: it can reduce or close positions, never
+add. Its orders that would add exposure are rejected with the reason
+"insolvent".
 
 ## 4b. History (0.3)
 
@@ -144,6 +155,15 @@ session has traded, step bars for the last 20 sessions (older step bars are
 not kept). The current, unfinished session's bars are included up to the
 current step. `limit` keeps the most recent `limit` bars. An unknown ticker is
 `invalid_request`. `Quote.step_volume` is the volume of the last step.
+
+## 4b2. News history (0.4)
+
+Every headline is kept in a per-session news log. `advance` returns, in
+`AdvanceResult.news`, every headline released during that advance, however
+many sessions it spans; `observe().news` stays the headlines visible in the
+current session. `news(owner, session_id, since_day=0, since_tick=0,
+limit=None)` returns the log from a clock point, oldest first. The log is
+persisted, so resume and fork carry it.
 
 ## 4c. Orders over time (0.3)
 
