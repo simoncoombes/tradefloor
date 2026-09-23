@@ -45,6 +45,7 @@ from tradefloor.serve.types import (
     AdvanceResult,
     Bar,
     Fill,
+    Headline,
     Observation,
     Order,
     OrderRequest,
@@ -318,19 +319,37 @@ class HostedService:
             c.detail["status"] = order.status
             return order
 
+    # History reads return lists whose length the caller chooses (a whole
+    # session's step bars, every headline since day 0). Each costs one call per
+    # started `plan.items_per_call` items, charged after it runs (see
+    # Quotas.charge_items), so a bot paging in small reads and a bot taking it
+    # all at once spend the same allowance.
+
+    def _read(self, c: _Ctx, fn: Callable[..., Any], *args: Any) -> Any:
+        out = c.timed(fn, c.owner, *args)
+        assert c.plan is not None
+        extra = self.quotas.charge_items(c.owner, c.plan, len(out))
+        c.detail = {"items": len(out), **({"extra_calls": extra} if extra else {})}
+        return out
+
     def orders(self, owner: str, session_id: str, status: str | None = None) -> list[Order]:
         with self._call(owner, "orders", session_id) as c:
-            return c.timed(self.inner.orders, c.owner, session_id, status)
+            return self._read(c, self.inner.orders, session_id, status)
 
     def fills(self, owner: str, session_id: str, since_day: int = 0) -> list[Fill]:
         with self._call(owner, "fills", session_id) as c:
-            return c.timed(self.inner.fills, c.owner, session_id, since_day)
+            return self._read(c, self.inner.fills, session_id, since_day)
 
     def bars(self, owner: str, session_id: str, ticker: str, resolution: str = "day",
              since_day: int = 0, limit: int | None = None) -> list[Bar]:
         with self._call(owner, "bars", session_id) as c:
-            return c.timed(self.inner.bars, c.owner, session_id, ticker, resolution,
-                           since_day, limit)
+            return self._read(c, self.inner.bars, session_id, ticker, resolution,
+                              since_day, limit)
+
+    def news(self, owner: str, session_id: str, since_day: int = 0, since_tick: int = 0,
+             limit: int | None = None) -> list[Headline]:
+        with self._call(owner, "news", session_id) as c:
+            return self._read(c, self.inner.news, session_id, since_day, since_tick, limit)
 
     def advance(self, owner: str, session_id: str, steps: int = 1,
                 until: str = "steps") -> AdvanceResult:

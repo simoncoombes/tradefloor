@@ -207,6 +207,25 @@ class Quotas:
                 self._key_last_used[key_id] = now
             self._dirty = True
 
+    def charge_items(self, owner: str, plan: Plan, items: int) -> int:
+        """Charge a history read that returned `items` items: one call per
+        started `plan.items_per_call`, the first already taken on admission.
+        Taken as debt (the bucket may go negative), so the read that is
+        already done is never refused; the calls after it wait. Returns the
+        extra calls charged."""
+        extra = max(0, -(-items // plan.items_per_call) - 1)
+        with self._lock:
+            u = self.usage(owner)
+            u.total["read_items"] = u.total.get("read_items", 0) + items
+            if extra:
+                b = self._bucket(self._call_buckets, owner, plan.calls_per_minute)
+                b._refill(self.clock())
+                b.tokens -= extra
+                u.calls += extra
+                u.total["calls"] += extra
+            self._dirty = True
+        return extra
+
     def check_daily(self, owner: str, plan: Plan, *, sim_ticks: int = 0,
                     compute: bool = False) -> None:
         """Refuse up front if this call would take `owner` past a daily quota.

@@ -123,7 +123,7 @@ def test_a_fresh_process_reads_what_was_committed():
     assert sum(1 for _, k in fake.objects if "/record-" in k) == 1
 
 
-@pytest.mark.parametrize("crash_on", ["/stream-fills-000000000002-", "/record-000000000002-",
+@pytest.mark.parametrize("crash_on", ["/chunk-000000000002-", "/record-000000000002-",
                                       "/head.json"])
 def test_a_crash_at_any_put_leaves_the_last_commit_whole(crash_on):
     s, fake = store()
@@ -136,6 +136,9 @@ def test_a_crash_at_any_put_leaves_the_last_commit_whole(crash_on):
         assert reader.version("s1") == 1
         assert "marker" not in reader.load("s1")
         assert reader.read_stream("s1", "fills") == [{"a": 1}]
+    orphans = {"/head.json": 2, "/record-000000000002-": 1, "/chunk-000000000002-": 0}[crash_on]
+    assert store(fake)[0].gc("s1") == orphans     # what the dead commit wrote, and only that
+    assert store(fake)[0].read_stream("s1", "fills") == [{"a": 1}]
     # the retried commit lands whole, and the orphan entries never appear
     s.commit("s1", rec(2, marker="new"), {"fills": [{"a": 2}]})
     fresh = store(fake)[0]
@@ -170,8 +173,8 @@ def test_compaction_keeps_reads_short_and_gc_tidies():
     fresh, _ = store(fake)
     before = fake.counts["get"]
     assert [e["i"] for e in fresh.read_stream("s1", "calls")] == list(range(1, 11))
-    assert fake.counts["get"] - before <= 1 + 1 + 4     # head, base, < compact_every chunks
-    assert fresh.gc("s1") > 0
+    assert fake.counts["get"] - before <= 1 + 1 + 3     # head, base, < compact_every chunks
+    assert fresh.gc("s1") == 0          # superseded objects were deleted as the heads moved on
     assert [e["i"] for e in store(fake)[0].read_stream("s1", "calls")] == list(range(1, 11))
 
 
@@ -216,6 +219,128 @@ def test_the_core_service_runs_on_s3store_and_resumes_bit_for_bit():
     assert resumed.list("bob") == []
 
 
+def test_one_commit_is_three_puts_whatever_it_appends():
+    s, fake = store()
+    s.commit("s1", rec(1), {})
+    before = fake.counts["put"]
+    s.commit("s1", rec(2), {"calls": [{"c": 1}], "fills": [{"f": 1}], "step_bars": [{"b": 1}] * 20})
+    assert fake.counts["put"] - before == 3        # chunk, record, head
+    fresh = store(fake)[0]
+    assert fresh.read_stream("s1", "step_bars") == [{"b": 1}] * 20
+    assert fresh.read_stream("s1", "fills") == [{"f": 1}]
+
+
+def test_trim_stream_semantics():
+    s, fake = store()
+    for i in range(1, 6):                          # five commits of three entries each
+        s.commit("s1", rec(i), {"w": [{"i": i, "j": j} for j in range(3)], "calls": [{"i": i}]})
+    full = [{"i": i, "j": j} for i in range(1, 6) for j in range(3)]
+    before = fake.counts["put"]
+    s.trim_stream("s1", "w", 7)                    # cuts inside a segment
+    assert fake.counts["put"] - before == 1        # the head alone; no data copied
+    for reader in (s, store(fake)[0]):
+        assert reader.read_stream("s1", "w") == full[-7:]
+        assert [e["i"] for e in reader.read_stream("s1", "calls")] == [1, 2, 3, 4, 5]
+        assert reader.version("s1") == 5 and reader.load("s1")["seq"] == 5
+    s.trim_stream("s1", "w", 7)                    # already that short: nothing written
+    s.trim_stream("s1", "w", 100)
+    s.trim_stream("s1", "nosuch", 1)
+    s.trim_stream("nosuch", "w", 1)
+    assert fake.counts["put"] - before == 1
+    s.commit("s1", rec(6), {"w": [{"i": 6, "j": 0}]})
+    assert store(fake)[0].read_stream("s1", "w") == full[-7:] + [{"i": 6, "j": 0}]
+    s.trim_stream("s1", "w", 0)
+    assert store(fake)[0].read_stream("s1", "w") == []
+    s.commit("s1", rec(7), {"w": [{"i": 7, "j": 0}]})
+    assert store(fake)[0].read_stream("s1", "w") == [{"i": 7, "j": 0}]
+    for bad in (-1, 1.5, True, "3"):
+        with pytest.raises(ValueError):
+            s.trim_stream("s1", "w", bad)
+    with pytest.raises(ValueError):
+        s.trim_stream("s1", "Bad-Name", 1)
+
+
+def test_trim_keeps_storage_bounded():
+    """The core's pattern: a step-bar window appended every commit and trimmed
+    at each session boundary. The objects stored stay bounded, not growing
+    with the length of the session."""
+    s, fake = store(compact_every=8)
+    counts = []
+    for i in range(1, 401):
+        s.commit("s1", rec(i), {"step_bars": [{"i": i}], "calls": [{"i": i}]})
+        if i % 13 == 0:                           # a session boundary: keep 5 sessions
+            s.trim_stream("s1", "step_bars", 5 * 13)
+        counts.append(sum(1 for _, k in fake.objects if "/sessions/s1/" in k))
+    assert max(counts[200:]) <= max(counts[:200]) + 2 <= 25
+    got = store(fake)[0].read_stream("s1", "step_bars")
+    assert [e["i"] for e in got] == list(range(400 - len(got) + 1, 401))
+    assert 5 * 13 <= len(got) <= 6 * 13
+    assert [e["i"] for e in store(fake)[0].read_stream("s1", "calls")] == list(range(1, 401))
+    assert s.gc("s1") == 0                         # nothing was left behind
+
+
+def test_a_crash_during_trim_leaves_the_stream_whole():
+    s, fake = store()
+    s.commit("s1", rec(1), {"w": [{"a": 1}, {"a": 2}, {"a": 3}]})
+    fake.fail_put = lambda key: key.endswith("/head.json")
+    with pytest.raises(ConnectionError):
+        s.trim_stream("s1", "w", 1)
+    fake.fail_put = None
+    for reader in (s, store(fake)[0]):
+        assert reader.read_stream("s1", "w") == [{"a": 1}, {"a": 2}, {"a": 3}]
+    s.trim_stream("s1", "w", 1)
+    assert store(fake)[0].read_stream("s1", "w") == [{"a": 3}]
+
+
+def test_trim_refuses_after_another_writer_and_readers_retry():
+    fake = FakeS3()
+    a, _ = store(fake)
+    b, _ = store(fake)
+    a.commit("s1", rec(1), {"w": [{"a": 1}]})
+    a.commit("s1", rec(2), {"w": [{"a": 2}]})
+    assert b.read_stream("s1", "w") == [{"a": 1}, {"a": 2}]   # b caches this head
+    b.commit("s1", rec(3), {"w": [{"a": 3}]})
+    with pytest.raises(StoreConflict):
+        a.trim_stream("s1", "w", 1)                            # a's head is stale
+    assert store(fake)[0].read_stream("s1", "w") == [{"a": 1}, {"a": 2}, {"a": 3}]
+    # b trims and deletes the dropped chunks; a still holds an older cached
+    # head naming them, finds one gone, re-reads the head and gets the truth
+    a._read_head("s1", fresh=True)
+    b.trim_stream("s1", "w", 1)
+    a._heads["s1"] = (a._heads["s1"][0], {**a._heads["s1"][1]})
+    assert a.read_stream("s1", "w") == [{"a": 3}]
+
+
+def test_commits_and_trims_match_a_reference_model():
+    import random
+    rng = random.Random(7)
+    s, fake = store(compact_every=4)
+    model: dict[str, list] = {}
+    seq = 0
+    for _ in range(300):
+        if rng.random() < 0.75 or not model:
+            seq += 1
+            appends = {n: [{"n": n, "seq": seq, "k": k} for k in range(rng.randint(0, 4))]
+                       for n in rng.sample(["a", "b", "c"], rng.randint(0, 3))}
+            s.commit("s1", rec(seq), appends)
+            for n, e in appends.items():
+                if e:
+                    model.setdefault(n, []).extend(e)
+        else:
+            n = rng.choice(sorted(model))
+            keep = rng.randint(0, len(model[n]) + 2)
+            s.trim_stream("s1", n, keep)
+            model[n] = model[n][-keep:] if keep else []
+        if rng.random() < 0.1:
+            fresh = store(fake)[0]
+            for n in ("a", "b", "c"):
+                assert fresh.read_stream("s1", n) == model.get(n, [])
+    fresh = store(fake)[0]
+    for n in ("a", "b", "c"):
+        assert fresh.read_stream("s1", n) == model.get(n, [])
+    assert fresh.gc("s1") == 0
+
+
 def test_against_moto_with_a_real_botocore_client(monkeypatch):
     """The same guarantees through boto3 and botocore's real error shapes,
     against moto's local S3 (still never real S3)."""
@@ -241,3 +366,11 @@ def test_against_moto_with_a_real_botocore_client(monkeypatch):
         assert [bits(x) for x in fresh.load("s1")["floats"]] == [bits(x) for x in rec(2)["floats"]]
         assert fresh.load("missing") is None and fresh.version("missing") is None
         assert [h["owner"] for h in fresh.heads("alice")] == ["alice"]
+        a.commit("s1", rec(3), {"fills": [{"a": 3}]})
+        a.trim_stream("s1", "fills", 2)
+        assert S3Store("tradefloor-test", "hosted", client=client).read_stream("s1", "fills") == \
+            [{"a": 2}, {"a": 3}]
+        assert b.read_stream("s1", "fills") == [{"a": 2}, {"a": 3}]     # b caches this head
+        a.commit("s1", rec(4), {"fills": [{"a": 4}]})
+        with pytest.raises(StoreConflict):
+            b.trim_stream("s1", "fills", 1)                              # b's head is stale

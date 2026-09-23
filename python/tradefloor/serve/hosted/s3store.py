@@ -1,44 +1,54 @@
 """S3Store: the SessionStore protocol on Amazon S3, with FileStore's guarantees.
 
-S3 has no append and no rename, so the commit protocol is built from the two
-things it does guarantee: a PUT is atomic (a reader sees the whole old object
-or the whole new one), reads after a write are strongly consistent (since
-December 2020), and a PUT can be made conditional on the current ETag
-(`If-Match`, November 2024) or on the object not existing (`If-None-Match: *`,
-August 2024).
+S3 has no append and no rename, so the commit protocol is built from what it
+does guarantee: a PUT is atomic (a reader sees the whole old object or the
+whole new one), reads after a write are strongly consistent (since December
+2020), and a PUT can be conditional on the current ETag (`If-Match`, November
+2024) or on the object not existing (`If-None-Match: *`, August 2024).
 
 Layout under `s3://<bucket>/<prefix>`:
 
-    sessions/<sid>/head.json                        THE COMMIT POINT
-    sessions/<sid>/record-<seq>-<nonce>.json        the record at that seq
-    sessions/<sid>/stream-<name>-<seq>-<nonce>.jsonl        entries one commit appended
-    sessions/<sid>/stream-<name>-base-<seq>-<nonce>.jsonl   a compaction of older chunks
-    owners/<owner>/<sid>.json                       an empty marker: which sessions an owner has
+    sessions/<sid>/head.json                       THE COMMIT POINT
+    sessions/<sid>/record-<seq>-<nonce>.json       the record at that seq
+    sessions/<sid>/chunk-<seq>-<nonce>.jsonl       every stream entry one commit appended
+    sessions/<sid>/base-<name>-<seq>-<nonce>.jsonl one stream, compacted
+    owners/<owner>/<sid>.json                      an empty marker: which sessions an owner has
 
-`head.json` names the committed seq, the record object, and for each stream
-its base and the chunks after it. A commit PUTs the stream chunks and the
-record first (new keys, nothing references them yet), then PUTs `head.json`
+`head.json` names the committed seq, the record object, and for each stream a
+list of SEGMENTS `[object, first_line, n_lines]` whose lines, in order, are
+the stream. A commit PUTs one chunk object holding all of its appends (the
+lines of each stream contiguous, so each stream gets one segment) and the
+record, both under fresh names nothing references yet, then PUTs `head.json`
 conditionally on the ETag it last saw. So:
 
-- a reader sees a commit whole or not at all: it reads `head.json` and then
-  only objects that head names, all written before it;
+- a reader sees a commit whole or not at all: it reads `head.json`, then only
+  objects that head names, all written before it;
 - a process that dies mid-commit leaves objects no head names; they are
-  invisible, and the next commit's keys overwrite or ignore them;
+  invisible, and `gc` removes them;
 - a second process committing the same session gets 412 on `head.json` and a
-  `StoreConflict`, instead of silently interleaving (FileStore does not detect
-  this; the contract says one writer per session, and here it is enforced).
-  Every object a commit writes has a fresh nonce in its name, so the loser's
-  objects never overwrite the winner's; they are garbage for `gc`.
+  `StoreConflict` instead of silently interleaving. Every object has a fresh
+  nonce in its name, so the loser never overwrites anything the winner's
+  head names. (FileStore does not detect a second writer; the contract says
+  one writer per session, and here it is enforced.)
 
-Streams are compacted into one base object every `compact_every` chunks, so
-reading a long session's history stays a handful of GETs.
+`trim_stream` (contract 0.4) is a rewrite of `head.json` alone: it drops the
+leading segments and narrows the first one it keeps. No stream data is copied,
+so trimming the core's 20-session step-bar window at a session boundary costs
+one PUT. It is atomic the same way a commit is: readers see the head before
+or after the trim.
 
-Cost, which decides where this store belongs (HOSTED.md, "Storage"): a commit
-is 2 PUTs plus one per stream it appends to, about 3 in practice, and a PUT
-costs $0.005 per 1,000 in us-east-1. At one mutating call per bot every 5 s,
-50 bots make about 2.6 million PUTs a day, roughly $13 a day, several times
-what the same writes cost on EFS. S3 suits low call rates, archives and
-backups; the launch default is FileStore on EFS.
+After a new head lands, objects the old head named and the new one does not
+(the previous record, trimmed-away chunks, chunks a compaction replaced) are
+deleted. A reader in another thread that read the old head a moment earlier
+may find one gone; it re-reads the head once and retries. (Within one
+process the core serialises calls on a session anyway.) A stream is compacted
+into one base object when it reaches `compact_every` segments, so reading a
+long history stays a handful of GETs.
+
+Cost (HOSTED.md, "Storage"): a commit is 3 PUTs (chunk, record, head), 2 when
+it appends nothing, plus one per compaction; a trim is 1. S3 charges per
+request, not per byte, so record size does not matter here the way it does
+on EFS.
 
 The encoding is `tradefloor.serve.store.encode` / `decode`, so floats come
 back bit for bit (NaN payloads, infinities, -0.0), exactly as from FileStore.
@@ -58,7 +68,11 @@ _STREAM = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 
 
 class StoreConflict(RuntimeError):
-    """Another writer committed this session since this process last read it."""
+    """Another writer changed this session since this process last read it."""
+
+
+class _Missing(RuntimeError):
+    """An object the head names is gone (a newer head superseded it)."""
 
 
 def _codec():
@@ -79,6 +93,20 @@ def _missing(e: Exception) -> bool:
 
 def _precondition(e: Exception) -> bool:
     return _err_code(e) in ("PreconditionFailed", "412", "ConditionalRequestConflict")
+
+
+def _check_stream(name: Any) -> str:
+    if not isinstance(name, str) or not _STREAM.match(name):
+        raise ValueError(f"bad stream name {name!r}")
+    return name
+
+
+def _live(head: dict[str, Any]) -> set[str]:
+    """The object names (within the session) a head depends on."""
+    keys = {"head.json", head["record"]}
+    for st in head["streams"].values():
+        keys |= {seg[0] for seg in st["segments"]}
+    return keys
 
 
 class S3Store:
@@ -132,17 +160,17 @@ class S3Store:
             if not _missing(e):
                 raise
 
-    def _list(self, prefix: str) -> list[str]:
-        keys: list[str] = []
+    def _list_objects(self, prefix: str) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
         token = None
         while True:
             kw = {"Bucket": self.bucket, "Prefix": prefix}
             if token:
                 kw["ContinuationToken"] = token
             r = self.s3.list_objects_v2(**kw)
-            keys += [o["Key"] for o in r.get("Contents", [])]
+            out += r.get("Contents", [])
             if not r.get("IsTruncated"):
-                return keys
+                return out
             token = r.get("NextContinuationToken")
 
     def _dumps(self, value: Any) -> str:
@@ -161,11 +189,59 @@ class S3Store:
                 return got
         raw = self._get(self._k("sessions", sid, "head.json"))
         if raw is None:
+            with self._lock:
+                self._heads.pop(sid, None)
             return None
         got = (raw[1], json.loads(raw[0]))
         with self._lock:
             self._heads[sid] = got
         return got
+
+    def _write_head(self, sid: str, etag: str | None, old: dict[str, Any] | None,
+                    new: dict[str, Any], written: set[str] = frozenset()) -> None:
+        """The commit point: PUT head.json if nobody else has since `etag`,
+        then delete what only the old head named, and anything this commit
+        wrote that the new head does not name (a chunk compacted at once)."""
+        cond = {"IfMatch": etag} if etag else {"IfNoneMatch": "*"}
+        try:
+            new_etag = self._put(self._k("sessions", sid, "head.json"),
+                                 json.dumps(new, separators=(",", ":"), allow_nan=False), **cond)
+        except Exception as e:
+            if _precondition(e):
+                with self._lock:
+                    self._heads.pop(sid, None)
+                raise StoreConflict(f"session {sid}: another writer changed it first; "
+                                    "one process per session (see HOSTED.md)") from e
+            raise
+        with self._lock:
+            self._heads[sid] = (new_etag, new)
+        dead = (_live(old) if old is not None else set()) | set(written)
+        for key in sorted(dead - _live(new)):
+            self._delete(self._k("sessions", sid, key))
+
+    def _reading(self, sid: str, fn):
+        """Run `fn(head)` on the current head; if an object it names has just
+        been superseded and deleted, re-read the head once and retry."""
+        for attempt in (0, 1):
+            got = self._read_head(sid, fresh=attempt > 0 or not self.trust_cache)
+            if got is None:
+                return None
+            try:
+                return fn(got[1])
+            except _Missing:
+                if attempt:
+                    raise RuntimeError(f"session {sid}: an object named by the head is "
+                                       "missing; the store is damaged") from None
+
+    def _lines(self, sid: str, segments: list[list[Any]]) -> list[str]:
+        out: list[str] = []
+        for key, first, n in segments:
+            raw = self._get(self._k("sessions", sid, key))
+            if raw is None:
+                raise _Missing(key)
+            lines = raw[0].decode("utf-8").split("\n")
+            out += lines[first:first + n]
+        return out
 
     # -- the SessionStore protocol ------------------------------------------------------
 
@@ -173,103 +249,110 @@ class S3Store:
                appends: Mapping[str, Sequence[dict[str, Any]]]) -> None:
         sid = self._sid(session_id)
         seq = int(record["seq"])
+        for name in appends:
+            _check_stream(name)
         prev = self._read_head(sid)
-        etag, head = prev if prev is not None else (None, {"seq": None, "streams": {}})
-        # Every object this attempt writes gets a fresh name, so a writer that
-        # is about to lose the conditional PUT below can never overwrite an
-        # object the winning head names.
+        etag, old = prev if prev is not None else (None, None)
+        streams = {n: {"segments": [list(s) for s in st["segments"]], "count": st["count"]}
+                   for n, st in (old["streams"] if old else {}).items()}
+        # Every object this attempt writes gets a fresh name, so a writer about
+        # to lose the conditional PUT below never overwrites what the winner's
+        # head names.
         tag = f"{seq:012d}-{secrets.token_hex(4)}"
-        streams = {n: {"base": s.get("base"), "chunks": [list(c) for c in s["chunks"]],
-                       "count": s["count"]} for n, s in head["streams"].items()}
 
+        written: set[str] = set()
+        chunk_lines: list[str] = []
+        spans: dict[str, tuple[int, int]] = {}
         for name, entries in appends.items():
-            if not isinstance(name, str) or not _STREAM.match(name):
-                raise ValueError(f"bad stream name {name!r}")
-            if not entries:
-                continue
-            st = streams.setdefault(name, {"base": None, "chunks": [], "count": 0})
-            body = "".join(self._dumps(e) + "\n" for e in entries)
-            chunk_key = f"stream-{name}-{tag}.jsonl"
-            self._put(self._k("sessions", sid, chunk_key), body)
-            st["chunks"].append([chunk_key, len(entries)])
-            st["count"] += len(entries)
-            if len(st["chunks"]) >= self.compact_every:
-                self._compact(sid, name, st, tag)
+            if entries:
+                spans[name] = (len(chunk_lines), len(entries))
+                chunk_lines += [self._dumps(e) for e in entries]
+        if chunk_lines:
+            chunk_key = f"chunk-{tag}.jsonl"
+            self._put(self._k("sessions", sid, chunk_key), "\n".join(chunk_lines) + "\n")
+            written.add(chunk_key)
+            for name, (first, n) in spans.items():
+                st = streams.setdefault(name, {"segments": [], "count": 0})
+                st["segments"].append([chunk_key, first, n])
+                st["count"] += n
+                if len(st["segments"]) >= self.compact_every:
+                    written.add(self._compact(sid, name, st, tag))
 
         record_key = f"record-{tag}.json"
         self._put(self._k("sessions", sid, record_key), self._dumps(record))
         owner = str(record["head"].get("owner", ""))
-        if prev is None and owner:
-            # The owner index names the session BEFORE its first head exists,
-            # so a crash in between leaves an entry `heads` skips, never a
-            # committed session `heads` cannot find.
+        if old is None and owner:
+            # The owner marker is written BEFORE the first head exists, so a
+            # crash in between leaves a marker `heads` skips, never a committed
+            # session `heads` cannot find.
             self._put(self._k("owners", owner, f"{sid}.json"), "{}")
-        new_head = {"seq": seq, "record": record_key, "head": self._encode(record["head"]),
-                    "streams": streams}
-        cond = {"IfMatch": etag} if etag else {"IfNoneMatch": "*"}
+        new = {"seq": seq, "record": record_key, "head": self._encode(record["head"]),
+               "streams": streams}
+        self._write_head(sid, etag, old, new, written)
+
+    def _compact(self, sid: str, name: str, st: dict[str, Any], tag: str) -> str:
+        lines = self._lines(sid, st["segments"])
+        base_key = f"base-{name}-{tag}.jsonl"
+        self._put(self._k("sessions", sid, base_key), "".join(line + "\n" for line in lines))
+        st["segments"] = [[base_key, 0, len(lines)]]
+        return base_key
+
+    def trim_stream(self, session_id: str, name: str, keep_last: int) -> None:
+        """Keep only the last `keep_last` entries of stream `name` (contract
+        0.4). One conditional PUT of the head; no data is copied."""
+        _check_stream(name)
+        if isinstance(keep_last, bool) or not isinstance(keep_last, int) or keep_last < 0:
+            raise ValueError(f"keep_last must be a non-negative integer, got {keep_last!r}")
         try:
-            new_etag = self._put(self._k("sessions", sid, "head.json"),
-                                 json.dumps(new_head, separators=(",", ":"), allow_nan=False), **cond)
-        except Exception as e:
-            if _precondition(e):
-                with self._lock:
-                    self._heads.pop(sid, None)
-                raise StoreConflict(f"session {sid}: another writer committed first; "
-                                    "one process per session (see HOSTED.md)") from e
-            raise
-        with self._lock:
-            self._heads[sid] = (new_etag, new_head)
-
-        if head.get("record") and head["record"] != record_key:
-            self._delete(self._k("sessions", sid, head["record"]))
-
-    def _compact(self, sid: str, name: str, st: dict[str, Any], tag: str) -> None:
-        entries = self._stream_lines(sid, name, st)
-        base_key = f"stream-{name}-base-{tag}.jsonl"
-        self._put(self._k("sessions", sid, base_key), "".join(line + "\n" for line in entries))
-        st["base"] = [base_key, len(entries)]
-        st["chunks"] = []
-        # The superseded chunks stay until `gc`; the head that names them may
-        # still be the committed one if this commit does not complete.
-
-    def _stream_lines(self, sid: str, name: str, st: dict[str, Any]) -> list[str]:
-        keys = []
-        if st.get("base"):
-            keys.append((st["base"][0], st["base"][1]))
-        keys += [(key, n) for key, n in st["chunks"]]
-        out: list[str] = []
-        for key, n in keys:
-            raw = self._get(self._k("sessions", sid, key))
-            if raw is None:
-                raise RuntimeError(f"session {sid}: stream object {key} named by the head is missing")
-            lines = [line for line in raw[0].decode("utf-8").split("\n") if line]
-            out += lines[:n]
-        return out
+            sid = self._sid(session_id)
+        except KeyError:
+            return
+        prev = self._read_head(sid)
+        if prev is None:
+            return
+        etag, old = prev
+        st = old["streams"].get(name)
+        if st is None or st["count"] <= keep_last:
+            return
+        kept: list[list[Any]] = []
+        need = keep_last
+        for key, first, n in reversed(st["segments"]):
+            if need <= 0:
+                break
+            take = min(n, need)
+            kept.append([key, first + n - take, take])
+            need -= take
+        kept.reverse()
+        streams = dict(old["streams"])
+        streams[name] = {"segments": kept, "count": keep_last}
+        self._write_head(sid, etag, old, {**old, "streams": streams})
 
     def load(self, session_id: str) -> dict[str, Any] | None:
         try:
             sid = self._sid(session_id)
         except KeyError:
             return None
-        got = self._read_head(sid, fresh=not self.trust_cache)
-        if got is None:
-            return None
-        raw = self._get(self._k("sessions", sid, got[1]["record"]))
-        if raw is None:
-            raise RuntimeError(f"session {sid}: record {got[1]['record']} named by the head is missing")
-        return self._loads(raw[0])
+
+        def read(head: dict[str, Any]) -> dict[str, Any]:
+            raw = self._get(self._k("sessions", sid, head["record"]))
+            if raw is None:
+                raise _Missing(head["record"])
+            return self._loads(raw[0])
+        return self._reading(sid, read)
 
     def read_stream(self, session_id: str, name: str) -> list[dict[str, Any]]:
-        if not isinstance(name, str) or not _STREAM.match(name):
-            raise ValueError(f"bad stream name {name!r}")
+        _check_stream(name)
         try:
             sid = self._sid(session_id)
         except KeyError:
             return []
-        got = self._read_head(sid, fresh=not self.trust_cache)
-        if got is None or name not in got[1]["streams"]:
-            return []
-        return [self._loads(line) for line in self._stream_lines(sid, name, got[1]["streams"][name])]
+
+        def read(head: dict[str, Any]) -> list[dict[str, Any]]:
+            st = head["streams"].get(name)
+            if st is None:
+                return []
+            return [self._loads(line) for line in self._lines(sid, st["segments"])]
+        return self._reading(sid, read) or []
 
     def version(self, session_id: str) -> int | None:
         try:
@@ -282,8 +365,9 @@ class S3Store:
     def heads(self, owner: str) -> list[dict[str, Any]]:
         """Every session's head for `owner`: the owner index gives the ids, and
         each session's own head.json (the commit point) gives the head."""
-        sids = sorted(k.rsplit("/", 1)[-1][:-5] for k in self._list(self._k("owners", owner) + "/")
-                      if k.endswith(".json"))
+        sids = sorted(o["Key"].rsplit("/", 1)[-1][:-5]
+                      for o in self._list_objects(self._k("owners", owner) + "/")
+                      if o["Key"].endswith(".json"))
 
         def fetch(sid: str) -> dict[str, Any] | None:
             got = self._read_head(sid, fresh=not self.trust_cache) if _ID.match(sid) else None
@@ -296,37 +380,21 @@ class S3Store:
 
     def gc(self, session_id: str) -> int:
         """Delete this session's objects the committed head does not name:
-        leftovers of interrupted commits and compacted chunks. Returns the
-        number deleted. Safe while no commit to this session is in flight."""
+        leftovers of interrupted commits. Returns the number deleted. Safe
+        while no commit to this session is in flight."""
         sid = self._sid(session_id)
         got = self._read_head(sid, fresh=True)
         if got is None:
             return 0
-        head = got[1]
-        live = {"head.json", head["record"]}
-        for name, st in head["streams"].items():
-            if st.get("base"):
-                live.add(st["base"][0])
-            live |= {key for key, _ in st["chunks"]}
+        live = _live(got[1])
         n = 0
-        for key in self._list(self._k("sessions", sid) + "/"):
-            if key.rsplit("/", 1)[-1] not in live:
-                self._delete(key)
+        for o in self._list_objects(self._k("sessions", sid) + "/"):
+            if o["Key"].rsplit("/", 1)[-1] not in live:
+                self._delete(o["Key"])
                 n += 1
         return n
 
     def size_of(self, session_ids: Sequence[str]) -> int:
         """Bytes stored for these sessions (a storage meter for the hosted layer)."""
-        total = 0
-        for sid in session_ids:
-            token = None
-            while True:
-                kw = {"Bucket": self.bucket, "Prefix": self._k("sessions", self._sid(sid)) + "/"}
-                if token:
-                    kw["ContinuationToken"] = token
-                r = self.s3.list_objects_v2(**kw)
-                total += sum(int(o.get("Size", 0)) for o in r.get("Contents", []))
-                if not r.get("IsTruncated"):
-                    break
-                token = r.get("NextContinuationToken")
-        return total
+        return sum(int(o.get("Size", 0)) for sid in session_ids
+                   for o in self._list_objects(self._k("sessions", self._sid(sid)) + "/"))

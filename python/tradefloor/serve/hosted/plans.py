@@ -15,6 +15,10 @@ What each limit protects:
     max_advance_ticks        the longest a single call may hold a worker
     max_open_orders          resting orders are checked every step
     calls_per_minute         request rate, all calls (token bucket)
+    items_per_call           a history read (bars, news, fills, orders) costs one
+                             call per started `items_per_call` items it returns,
+                             so a large read spends the call bucket like many
+                             small ones (response size is what it costs us)
     steps_per_minute         simulation rate (token bucket, charged per step)
     sim_days_per_day         simulated trading days per UTC day
     compute_seconds_per_day  wall seconds spent inside the service per UTC day
@@ -48,6 +52,7 @@ class Plan:
     sim_days_per_day: float
     compute_seconds_per_day: float
     idle_expiry_seconds: int
+    items_per_call: int = 100
 
     def __post_init__(self) -> None:
         for f in fields(self):

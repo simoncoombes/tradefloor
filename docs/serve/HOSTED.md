@@ -12,8 +12,8 @@ run. `deploy/aws/deploy.sh` refuses to start without an explicit confirmation
 phrase, and it should only be given after the owner approves.
 
 Code: `python/tradefloor/serve/hosted/`. Deployment: `deploy/`. Tests:
-`tests/serve/test_hosted_*.py`. The contract: `docs/serve/CONTRACT.md` (0.3),
-sections 1, 4d, 5, 6 and 7.
+`tests/serve/test_hosted_*.py`. The contract: `docs/serve/CONTRACT.md` (0.4),
+sections 1, 4b, 4b2, 4d, 5, 6 and 7.
 
 ## 1. What the hosted layer is
 
@@ -119,6 +119,7 @@ placeholders until the owner sets the plans and prices (section 13).
 | ticks per `advance` call | 390 (1 session) | 1,950 (5) | 7,800 (20) | invalid_request |
 | open orders per session | 50 | 200 | 1000 | quota_exceeded |
 | calls per minute | 60 | 300 | 1200 | rate_limited |
+| items per call (history reads) | 100 | 100 | 100 | (charged as calls) |
 | steps per minute | 60 | 300 | 3000 | rate_limited |
 | simulated days per UTC day | 100 | 1000 | 20000 | quota_exceeded |
 | compute seconds per UTC day | 300 | 1800 | 21600 | quota_exceeded |
@@ -162,6 +163,16 @@ How the meter works:
 - Buckets live in memory, so a restart refills them, which does no harm.
   Daily counters and per-session activity live in `usage.json`, which is
   written at most once a second. A crash loses at most a second of metering.
+- History reads (`bars`, `news`, `fills`, `orders`) return as many items as
+  the caller asks for: a whole session's step bars, every headline since day
+  0. Each costs one call per started 100 items it returns (the plan's
+  `items_per_call`), charged after the read as debt on the call bucket. The
+  read itself is never refused for its size, but the calls after it wait, so
+  a bot taking everything at once spends the same allowance as one paging
+  through it. That bounds the response bytes one owner can pull, which is
+  what large reads cost us (data out and CPU). They do not count against the
+  daily quotas, which meter simulation. `total.read_items` in `/v1/usage`
+  counts them.
 - `GET /v1/usage` shows an owner their plan, today's usage and what is left.
 
 ## 5. Idle sessions
@@ -189,7 +200,9 @@ to stdout, which is how the lines reach CloudWatch.
  "outcome":"ok","owner":"acme","session_id":"9b1e...","ts":"2026-09-23T14:02:11.482Z"}
 ```
 
-`outcome` is `ok` or the error code, and `error` holds the message. Failed
+`outcome` is `ok` or the error code, and `error` holds the message. With
+`audit_reads=True`, reads are logged too, and a history read's line carries
+`items` and any `extra_calls` it was charged. Failed
 authentications are folded: at most one line per key id (or source address)
 every 10 s, with a count of the ones it stands for, so a flood of bad keys
 cannot fill the disk through the log. Reads are metered but not logged. Set
@@ -236,33 +249,64 @@ The data directory holds everything:
 
 **Launch default: FileStore on EFS.** FileStore commits by renaming a file
 into place, and a rename on one NFS client is atomic, so the core's crash
-guarantees carry over. The storage meter adds up each session directory. A
-mutating call rewrites the session's record, which holds the engine snapshot:
-about 15 KiB at 20 names and 24 KiB at 40 (measured). A session directory is
-about 120 KiB after a few days of trading.
+guarantees carry over. The storage meter adds up each session directory.
+
+What a commit writes decides the storage bill, so it was measured (20 names,
+30-tick steps, 25 trading days, one order every four steps). Every mutating
+call rewrites the session's record, which holds the engine snapshot (about
+31 KiB at 20 names, 58 KiB at 40). Under the 0.3 core the record also carried
+the 20-session step-bar window, 271 KiB at 20 names, so each commit wrote
+about **300 KB** (580 KB at 40 names). Contract 0.4 moves that window into a
+stream that is appended once per step (about 1 KiB at 20 names) and trimmed
+at session boundaries, so a commit should write about **35 KB** (about 62 KB
+at 40 names): the record, the step's appends and a small head. That figure is
+the 0.3 measurement minus the window; measure it again when the core's 0.4
+work lands.
 
 **S3Store** (`hosted/s3store.py`) implements the `SessionStore` protocol
-(`types.py`, since contract 0.2) on S3, with FileStore's atomicity. S3 has no
-append and no rename, so a commit PUTs the stream chunks and the record under
-fresh names (sequence number plus a random nonce), then PUTs `head.json`
-conditionally (`If-Match` on the ETag
-it last saw, or `If-None-Match: *` for the first commit). `head.json` is the
-commit point: a reader sees a whole commit or none of it, a commit cut off
-halfway leaves only objects no head names, and a second writer gets a 412
-and a `StoreConflict` instead of silently interleaving. Streams are compacted
-every 32 chunks, so a long history stays a few GETs. `gc(session_id)` deletes
-leftovers. It passes the same bit-exact float round trip as FileStore, and the
-core runs on it and resumes bit for bit after a restart. Tests use an
-in-memory fake of S3 and moto, never real S3.
+(`types.py`, 0.4, including `trim_stream`) on S3, with FileStore's atomicity.
+S3 has no append and no rename. A commit PUTs one chunk object holding every
+stream entry it appends and the record, both under fresh names (sequence
+number plus a random nonce), then PUTs `head.json` conditionally (`If-Match`
+on the ETag it last saw, or `If-None-Match: *` for the first commit).
+`head.json` is the commit point, and it lists each stream as segments
+`[object, first line, count]`. So a reader sees a whole commit or none of it,
+a commit cut off halfway leaves only objects no head names, and a second
+writer gets a 412 and a `StoreConflict` instead of silently interleaving.
+`trim_stream` rewrites only the head: it drops the leading segments and
+narrows the first one kept, copying no data, so trimming the step-bar window
+is one PUT, atomic for readers in the same way. Objects the new head no longer
+names are deleted as soon as it lands, so storage stays bounded (a test runs
+400 commits with a trim every 13 and checks the object count stays flat). A
+reader that loses a race with that deletion re-reads the head once. Streams
+are compacted every 32 segments, so a long history stays a few GETs.
+`gc(session_id)` removes what an interrupted commit left. S3Store passes the
+same bit-exact float round trip as FileStore, a randomised test checks 300
+commits and trims against a reference model, and the core runs on it and
+resumes bit for bit. Tests use an in-memory fake of S3 and moto, never real
+S3.
 
-S3 is the wrong place for per-call commits at launch, and the reason is cost.
-Each commit is about three PUTs at $0.005 per thousand. At the launch
-workload in section 11 (1.1 million mutating calls a day) that is about 3.2
-million PUTs a day, roughly $490 a month, against about $49 of EFS writes for
-the same traffic. Use S3Store for low-traffic deployments, or later as an
-archive for closed sessions.
+**S3 against EFS, re-estimated for 0.4.** S3 charges per request ($0.005 per
+thousand PUTs) and not per byte; EFS Elastic charges per byte written ($0.06
+per GB) and not per request; EFS Provisioned charges a flat $6 per MiB/s per
+month. A commit on S3Store is three PUTs (chunk, record, head), and a trim is
+one more per session per trading day. So S3 costs $15 per million commits
+whatever their size, and EFS Elastic costs the same at about 250 KB a commit.
+At the launch workload in section 11 (32 million commits a month):
 
-**Deleting sessions.** Nothing in the contract (0.3) deletes a session, so a user
+| Store | 0.3 core (300 KB/commit) | 0.4 core (about 35 KB/commit) |
+|---|---|---|
+| S3Store | about $490 | about $490 |
+| EFS Elastic | about $580 | about $70 |
+| EFS Provisioned (1 MiB/s for 0.4, 4 MiB/s for 0.3) | about $24 | about $6 |
+
+The 0.3 core's large commits were past the break-even point, so S3 would have
+cost less than EFS Elastic, but EFS Provisioned was cheaper still. The 0.4
+trimmed window takes commits well under the break-even point, and EFS wins
+in every mode. EFS stays the launch default. S3Store suits low call rates,
+or an archive for closed sessions.
+
+**Deleting sessions.** Nothing in the contract (0.4) deletes a session, so a user
 who reaches `max_stored_sessions` or the storage cap cannot free space
 themselves. For now the operator deletes old closed sessions by hand while
 the server is stopped (`rm -r <data>/sessions/<id>`). See the contract change
@@ -372,41 +416,50 @@ exits unless `TRADEFLOOR_DEPLOY_CONFIRM=owner-approved-public-launch` is set.
 ### Cost for a small launch
 
 Prices are us-east-1 on-demand list prices from 2025; London (eu-west-2) is
-roughly 10 to 15% higher. Check them against the AWS pricing
-pages before deciding. The workload assumed: **50 bots active around the
-clock, each making a call every 2 s on average, half of them mutating.** That
-is 2.2 million calls a day, 1.1 million of them writing about 25 KB each, with
-responses of about 5 KB.
+roughly 10 to 15% higher. Check them against the AWS pricing pages before
+deciding. The workload assumed: **50 bots active around the clock, each
+making a call every 2 s on average, half of them mutating.** That is 2.2
+million calls a day. The 1.1 million mutating calls write about 35 KB each on
+the 0.4 core (section 8), and responses average about 5 KB.
 
 | Item | Basis | $/month |
 |---|---|---|
 | Fargate task | 1 vCPU + 2 GB ARM, 730 h | 29 |
 | ALB | hourly charge + about 1 LCU | 22 |
 | Public IPv4 | 2 for the ALB + 1 for the task | 11 |
-| EFS writes (Elastic) | 810 GB at $0.06 | 49 |
+| EFS writes (Elastic) | 1,130 GB at $0.06 | 68 |
 | EFS reads (Elastic) | about 260 GB at $0.03 | 8 |
 | EFS storage + backup | about 5 GB | 2 |
 | CloudWatch Logs | about 11 GB of audit lines + app logs | 7 |
 | Data out | 324 GB, less the 100 GB free tier | 20 |
 | Secrets Manager, Route 53 zone, ECR, alarms | | 2 |
-| **Total** | | **about $150** |
+| **Total** | | **about $170** |
 
-- With EFS in Bursting mode instead of Elastic, the throughput charges go
-  away: **about $95**. Whether the baseline is enough depends on how much is
-  stored, so it has to be checked at launch. New file systems start with a
-  large burst credit.
+- **With EFS Provisioned at 1 MiB/s** instead of Elastic, the $76 of
+  throughput charges become about $6: **about $100**. This load averages
+  about 0.45 MB/s of writes, so 1 MiB/s leaves room, and 2 MiB/s ($12) leaves
+  more. Elastic is the template's default because it never throttles; switch
+  once the launch load test (section 13) shows the real rate.
+  (`EfsThroughputMode=provisioned`, `EfsProvisionedMibps=1`.)
+- On the 0.3 core, with its 300 KB commits, the same workload would have cost
+  about $690 on EFS Elastic. The 0.4 trimmed window is worth about $500 a
+  month at this load.
 - With lighter use, one call every 10 s per bot (typical of LLM-driven
-  bots), the total is **about $75**. The fixed part (task, ALB, IPs) is about
-  $60 a month with no traffic at all.
+  bots), the total is **about $85** on Elastic, or $75 on Provisioned. The
+  fixed part (task, ALB, IPs) is about $60 a month with no traffic at all.
 - WAF, if turned on, adds about $7 a month plus $0.60 per million requests,
   **about $46** at this traffic. The template defaults it off, which leaves
   floods to the app-level limits and the failed-auth throttle; it can be
   turned on with one parameter if the service is attacked.
-- The marginal cost is about **$3 per million mutating calls** (EFS writes,
-  logs, data out). A bot running flat out at the trial limit costs about
-  $4 a month on top of the fixed part. A bot at the standard limit costs
-  about $20 a month, and on local-disk timings uses about 1% of the task's
-  CPU (more on EFS; measure it). That is the number pricing has to cover.
+- The marginal cost is about **$3 per million mutating calls** on Elastic (EFS
+  writes, logs, data out), and about $1 on Provisioned until the provisioned
+  rate is used up (roughly a dozen bots at the standard plan's limit fill
+  1 MiB/s). A bot running flat out at the trial limit costs about $4 a month
+  on top of the fixed part, and a bot at the standard limit about $20. That is
+  the number pricing has to cover.
+- History reads (bars, news) are charged against the call bucket by size
+  (section 4), which caps what one bot's reads can add to the data-out line:
+  about $2 a month at the trial limit.
 - A cheaper route, not templated: one t4g.small EC2 instance with a gp3 EBS
   volume and Caddy terminating TLS comes to about $40 to $45 a month at the
   same load. It gives up managed TLS, automatic task replacement, multi-AZ
@@ -472,9 +525,9 @@ responses of about 5 KB.
    or elsewhere (then create the certificate by hand).
 4. **Terms of use and privacy notice**, from the points in section 12, and
    who answers abuse reports and where to write to them.
-5. **EFS throughput mode** (Elastic, about $150 a month, or Bursting, about
-   $95, at the assumed load) and **WAF** on or off (about $46 a month at that
-   load).
+5. **EFS throughput mode** (Elastic, about $170 a month at the assumed load,
+   or Provisioned at 1 MiB/s, about $100) and **WAF** on or off (about $46 a
+   month at that load).
 6. **Retention.** How long closed sessions, audit files and CloudWatch logs
    are kept.
 7. **Who holds operator access**, meaning the AWS account and who may run
@@ -531,16 +584,21 @@ responses of about 5 KB.
   steps per minute with refunds, simulated days with the UTC reset, compute
   seconds, open orders with idempotent replay), idle expiry both swept and
   lazy, the audit log's completeness and order, failed-auth folding, the
-  ledger surviving a restart, reconcile, and plan changes.
+  ledger surviving a restart, reconcile, plan changes, history reads charged
+  by size, and reads audited with their size.
 - `test_hosted_with_core.py`, over LocalSessionService on FileStore:
   metering against the core's clock in every `until` mode, the FileStore
   storage meter, expiry of a real session, resume after a restart through
   the hosted layer, owner isolation, and six owners on six threads at once.
 - `test_hosted_s3store.py`: the round trip with bit-exact floats, a fresh
-  process reading committed state, a crash at each PUT, a second writer
-  refused, compaction and gc, heads by owner with a half-created session,
-  the core running and resuming on S3Store, and the same checks through
-  boto3 against moto.
+  process reading committed state, a crash at each PUT (and gc removing
+  exactly what the dead commit wrote), a second writer refused, three PUTs
+  per commit, `trim_stream` (semantics, one PUT, bounded storage over 400
+  commits, a crash mid-trim, a stale writer refused, a reader retrying after
+  a trim deleted what its old head named), 300 random commits and trims
+  against a reference model, compaction, heads by owner with a half-created
+  session, the core running and resuming on S3Store, and the same checks
+  through boto3 against moto.
 - `test_hosted_admin.py`: every CLI command, the pepper guard, and
   `sessions`/`expire-idle` through a running admin listener with its token.
 - `test_hosted_http.py`, through the transport's HTTP app over the real core:

@@ -136,3 +136,20 @@ def test_concurrent_owners_through_one_hosted_service(world):
     for p in principals:
         assert hosted.quotas.usage(p).steps == 10
         assert hosted.quotas.usage(p).sim_ticks == 300
+
+
+def test_history_reads_through_the_real_core(world):
+    hosted, p, _ = world
+    s = hosted.open(p, SessionConfig(universe_size=3, ticks_per_step=10))
+    hosted.advance(p, s.session_id, steps=39 * 3)                   # three days of 39 steps
+    before = hosted.quotas.usage(p).calls
+    day = hosted.bars(p, s.session_id, s.tickers[0], "day")
+    step = hosted.bars(p, s.session_id, s.tickers[0], "step")
+    assert len(day) == 3 and len(step) == 117
+    assert hosted.quotas.usage(p).calls - before == 1 + 2          # 3 bars = 1 call, 117 = 2
+    if hasattr(hosted.inner, "news"):                               # contract 0.4
+        assert isinstance(hosted.news(p, s.session_id), list)
+    _, other = hosted.accounts.create_key("other2", plan="standard")
+    with pytest.raises(ServeError) as e:
+        hosted.bars(hosted.authenticate(other), s.session_id, s.tickers[0])
+    assert e.value.code == "not_found"

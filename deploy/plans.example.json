@@ -11,7 +11,8 @@
     "steps_per_minute": 60,
     "sim_days_per_day": 100,
     "compute_seconds_per_day": 300,
-    "idle_expiry_seconds": 86400
+    "idle_expiry_seconds": 86400,
+    "items_per_call": 100
   },
   "standard": {
     "max_open_sessions": 5,
@@ -25,7 +26,8 @@
     "steps_per_minute": 300,
     "sim_days_per_day": 1000,
     "compute_seconds_per_day": 1800,
-    "idle_expiry_seconds": 604800
+    "idle_expiry_seconds": 604800,
+    "items_per_call": 100
   },
   "research": {
     "max_open_sessions": 20,
@@ -39,6 +41,7 @@
     "steps_per_minute": 3000,
     "sim_days_per_day": 20000,
     "compute_seconds_per_day": 21600,
-    "idle_expiry_seconds": 2592000
+    "idle_expiry_seconds": 2592000,
+    "items_per_call": 100
   }
 }

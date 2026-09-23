@@ -88,6 +88,7 @@ def test_owner_isolation(tmp_path):
     s = hosted.open(alice, cfg())
     for call, args in [("observe", ()), ("info", ()), ("advance", ()), ("close", ()),
                        ("fork", ()), ("orders", ()), ("fills", ()), ("bars", ("T00",)),
+                       ("news", ()),
                        ("place_order", (OrderRequest("T00", "buy", 1),)),
                        ("cancel_order", ("x",))]:
         assert code_of(getattr(hosted, call), bob, s.session_id, *args).code == "not_found", call
@@ -305,3 +306,40 @@ def test_plan_change_takes_effect(tmp_path):
     assert code_of(hosted.open, alice, cfg(universe_size=30)).code == "invalid_request"
     hosted.accounts.set_plan("alice", "standard")
     hosted.open(alice, cfg(universe_size=30))
+
+
+def test_large_history_reads_spend_the_call_bucket_by_size(tmp_path):
+    """bars/news/fills/orders cost one call per started 100 items returned,
+    charged after the read, so one huge read waits like many small ones."""
+    hosted, alice, bob, clock = make(tmp_path, calls_per_minute=60, steps_per_minute=10_000,
+                                     max_advance_ticks=7800, sim_days_per_day=10_000)
+    s = hosted.open(alice, cfg(ticks_per_step=10))                  # 39 steps a day
+    hosted.advance(alice, s.session_id, steps=39 * 10)              # ten days
+    small = hosted.bars(alice, s.session_id, "T00", "day")
+    assert len(small) == 10                                         # days 0..9
+    before = hosted.quotas.usage(alice).calls
+    big = hosted.bars(alice, s.session_id, "T00", "step")
+    assert len(big) == 390                                          # four calls' worth
+    assert hosted.quotas.usage(alice).calls - before == 4
+    assert len(hosted.news(alice, s.session_id)) == 10
+    # open 1 + advance 1 + reads 1 + 4 + 1 = 8 of 60; thirteen more 390-bar
+    # reads at 4 calls each take the other 52, and then calls wait
+    for _ in range(13):
+        hosted.bars(alice, s.session_id, "T00", "step")
+    e = code_of(hosted.observe, alice, s.session_id)
+    assert e.code == "rate_limited"
+    hosted.observe(bob, hosted.open(bob, cfg()).session_id)         # bob is unaffected
+    clock.tick(e.retry_after)
+    hosted.observe(alice, s.session_id)
+    assert hosted.usage_report(alice)["total"]["read_items"] == 10 + 390 * 14 + 10
+
+
+def test_reads_are_audited_with_their_size_when_asked(tmp_path):
+    hosted, alice, *_ = make(tmp_path)
+    hosted.audit_reads = True
+    s = hosted.open(alice, cfg())
+    hosted.news(alice, s.session_id)
+    hosted.bars(alice, s.session_id, "T01", "day", 0, 1)
+    got = [(e["call"], e["detail"]["items"]) for e in hosted.audit.read() if e["call"] in ("news", "bars")]
+    assert got == [("news", 1), ("bars", 1)]
+    assert code_of(hosted.bars, alice, s.session_id, "NOPE").code == "invalid_request"

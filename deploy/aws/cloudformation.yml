@@ -32,8 +32,14 @@ Parameters:
   EfsThroughputMode:
     Type: String
     Default: elastic
-    AllowedValues: [elastic, bursting]
-    Description: elastic bills per GB moved; bursting is free up to a baseline tied to stored size (HOSTED.md, "Cost").
+    AllowedValues: [elastic, provisioned, bursting]
+    Description: elastic bills per GB moved and never throttles; provisioned bills a flat rate per MiB/s (cheaper at a steady load); bursting is free up to a baseline tied to stored size (HOSTED.md, "Cost").
+  EfsProvisionedMibps:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 64
+    Description: Throughput to provision when EfsThroughputMode is provisioned ($6 per MiB/s-month in us-east-1).
   EnableWaf:
     Type: String
     Default: "false"
@@ -57,6 +63,7 @@ Conditions:
   HasZone: !Not [!Equals [!Ref HostedZoneId, ""]]
   UseWaf: !Equals [!Ref EnableWaf, "true"]
   HasEmail: !Not [!Equals [!Ref AlertEmail, ""]]
+  EfsProvisioned: !Equals [!Ref EfsThroughputMode, provisioned]
 
 Resources:
   # ------------------------------------------------------------- network ----
@@ -141,6 +148,7 @@ Resources:
       Encrypted: true
       PerformanceMode: generalPurpose
       ThroughputMode: !Ref EfsThroughputMode
+      ProvisionedThroughputInMibps: !If [EfsProvisioned, !Ref EfsProvisionedMibps, !Ref AWS::NoValue]
       BackupPolicy: {Status: ENABLED}
       LifecyclePolicies:
         - TransitionToIA: AFTER_30_DAYS

@@ -20,8 +20,10 @@ import uuid
 from tradefloor.serve.types import (
     Account,
     AdvanceResult,
+    Bar,
     Clock,
     Fill,
+    Headline,
     Observation,
     Order,
     OrderRequest,
@@ -128,11 +130,32 @@ class FakeSessionService:
 
     def bars(self, owner: str, session_id: str, ticker: str, resolution: str = "day",
              since_day: int = 0, limit: int | None = None) -> list:
+        """One flat bar per step taken (day bars: one per day), all at 100."""
         self.calls.append(("bars", owner))
         s = self._get(owner, session_id)
         if ticker not in s["info"].tickers:
             raise ServeError("invalid_request", f"unknown ticker {ticker!r}")
-        return []
+        c = s["info"].clock
+        tps = s["info"].config.ticks_per_step
+        if resolution == "day":
+            out = [Bar(ticker, d, None, 100.0, 100.0, 100.0, 100.0, 0.0)
+                   for d in range(since_day, c.day + 1)]
+        else:
+            per_day = -(-TICKS // tps)
+            out = [Bar(ticker, d, k, 100.0, 100.0, 100.0, 100.0, 0.0)
+                   for d in range(max(since_day, c.day - 19), c.day + 1)
+                   for k in range(per_day if d < c.day else c.step)]
+        return out[-limit:] if limit else out
+
+    def news(self, owner: str, session_id: str, since_day: int = 0, since_tick: int = 0,
+             limit: int | None = None) -> list:
+        """One headline per trading day opened, on the first ticker."""
+        self.calls.append(("news", owner))
+        s = self._get(owner, session_id)
+        info = s["info"]
+        out = [Headline(d, 0, [info.tickers[0]], f"day {d} headline", "fake")
+               for d in range(since_day, info.clock.day + 1)]
+        return out[-limit:] if limit else out
 
     def advance(self, owner: str, session_id: str, steps: int = 1, until: str = "steps") -> AdvanceResult:
         self.calls.append(("advance", owner))
