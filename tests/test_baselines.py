@@ -192,7 +192,21 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # concentrated behind the down moves, which is where momentum's
     # continuation signal lives and where mean-reversion's snap-back does
     # not. The oracle has still never moved, in eleven swaps.
-    assert ranked == ["oracle", "momentum", "mean_reversion",
+    #
+    # Re-measured again at pt-v19's fifth composition (2026-09-23: the
+    # anchor form of the VIX law, the live down-day wire at 0.46, the macro
+    # session clock and US cycle with the drawn opening, news priced within
+    # minutes): oracle +7.664%, mean_reversion +2.663%, momentum +2.156%,
+    # buy_and_hold +0.317%, random -1.124%. Momentum and mean-reversion
+    # swapped for the TWELFTH time, 0.507 points apart; until this
+    # re-measurement the pin read oracle, momentum, mean_reversion,
+    # buy_and_hold, random. No one group of the composition does it alone:
+    # each of the four groups added by itself to the fourth composition
+    # leaves momentum ahead, and taking the lag wire, the macro group or the
+    # news group back out of the fifth puts momentum ahead again. The
+    # bottom pair held, buy_and_hold now just above flat, and the oracle has
+    # still never moved, in twelve swaps.
+    assert ranked == ["oracle", "mean_reversion", "momentum",
                       "buy_and_hold", "random"]
 
 
