@@ -1362,24 +1362,27 @@ def test_the_committed_recording_replays_end_to_end():
     #
     # The eras of this fixture, on the same seed, roster and brief: pt-v16
     # 3 trades, pt-v18 7, pt-v19 as first composed 7, pt-v19 recomposed a
-    # fourth time 8. The market moved under the model each time and the
-    # model answered it differently; none of them is a better agent than
-    # the others.
+    # fourth time 8, and a fifth time 7. The market moved under the model
+    # each time and the model answered it differently; none of them is a
+    # better agent than the others.
     #
-    # The values replaced by the fourth composition, kept beside the new
+    # The values replaced by the fifth composition, kept beside the new
     # ones so a future move can be recognised as the next one and not as
-    # the first: trades 7, pnl 14495.0, turnover 2566815.0.
-    assert card.trades == 8, card.trades
-    assert card.pnl == pytest.approx(24410.0), card.pnl
-    assert card.turnover == pytest.approx(2611910.0), card.turnover
+    # the first: trades 8, pnl 24410.0, turnover 2611910.0. And the ones
+    # the fourth composition replaced before them: trades 7, pnl 14495.0,
+    # turnover 2566815.0.
+    assert card.trades == 7, card.trades
+    assert card.pnl == pytest.approx(22490.0), card.pnl
+    assert card.turnover == pytest.approx(1939890.0), card.turnover
 
-    # AND THE REFUSAL IS GONE AGAIN, which is a fact about this market and
+    # AND THE REFUSAL STAYS GONE, which is a fact about this market and
     # not a bug. gpt-5.2 sized inside the limits on pt-v18's market and the
     # pt-v18 recording had nothing to refuse; on pt-v19 as first composed it
     # asked for 2.06x against a 2.00x cap on day 4 and the MARKET refused
-    # that leg; on the recomposed pt-v19 it stayed inside the cap every day
-    # and there is nothing to refuse. Each of those is the environment doing
-    # its job on a decision the agent made, not a replay failure.
+    # that leg; on the fourth and fifth compositions it stayed inside the
+    # cap every day and there is nothing to refuse. Each of those is the
+    # environment doing its job on a decision the agent made, not a replay
+    # failure.
     #
     # Pinned exactly rather than bounded, and the reason both lines exist:
     # a replay failure lands in this same list, so counting the refusals is
