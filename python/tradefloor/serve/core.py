@@ -182,7 +182,7 @@ def _is_num(x: Any) -> bool:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
 
 def _bad(message: str) -> ServeError:
@@ -245,6 +245,28 @@ class _Session:
         # streams by the next commit.
         self.new_fills: list[Fill] = []
         self.new_done: list[Order] = []
+        # The engine's hash and snapshot, cached until the engine next runs.
+        # Only open_market, run_session and close_market change engine state
+        # (a book sweep prices against the book and leaves it as it was), and
+        # each of those calls `touch`.
+        self._engine_hash: str | None = None
+        self._snapshot: dict[str, Any] | None = None
+
+    def touch(self) -> None:
+        self._engine_hash = None
+        self._snapshot = None
+
+    def engine_hash(self) -> str:
+        assert self.engine is not None
+        if self._engine_hash is None:
+            self._engine_hash = self.engine.state_hash()
+        return self._engine_hash
+
+    def snapshot(self) -> dict[str, Any]:
+        assert self.engine is not None
+        if self._snapshot is None:
+            self._snapshot = self.engine.state_snapshot()
+        return self._snapshot
 
     # -- views --
 
@@ -285,7 +307,7 @@ class _Session:
         queued = set(self.queue)
         payload = {
             "contract": CONTRACT_VERSION,
-            "engine": self.engine.state_hash(),
+            "engine": self.engine_hash(),
             "config": [self.config.preset, self.config.ticks_per_step,
                        _hx(self.config.max_leverage)],
             "cash": _hx(pf.cash),
@@ -316,8 +338,8 @@ class _Session:
             "schema": RECORD_SCHEMA,
             "seq": self.seq,
             "head": self.info().to_dict(),
-            "engine": self.engine.state_snapshot(),
-            "engine_hash": self.engine.state_hash(),
+            "engine": self.snapshot(),
+            "engine_hash": self.engine_hash(),
             "portfolio": {
                 "cash": pf.cash,
                 "starting_cash": pf.starting_cash,
@@ -365,6 +387,7 @@ class _Session:
                              "restored from the store does not hash to what "
                              "was saved; report this with the session files")
         s.engine = engine
+        s._engine_hash = record["engine_hash"]
 
         p = record["portfolio"]
         pf = Portfolio(cash=p["starting_cash"], max_leverage=p["max_leverage"])
@@ -486,10 +509,8 @@ class LocalSessionService:
             try:
                 return fn(s)
             except ServeError:
-                if mutate:
-                    # Refusals are raised before anything changes, but a
-                    # reload is cheap insurance that none half-applied.
-                    self._evict(s.session_id)
+                # Every refusal inside a call is raised before the session is
+                # touched; the one raised after (a failed commit) evicts it.
                 raise
             except Exception as exc:
                 self._evict(s.session_id)
@@ -674,7 +695,7 @@ class LocalSessionService:
                                 day_high=highs[i], day_low=lows[i],
                                 prev_close=prev[i], volume=volume[i],
                                 bid=book.best_bid, ask=book.best_ask))
-        economy = engine.state_snapshot()["economy"]
+        economy = s.snapshot()["economy"]
         macro = {k: float(economy[k]) for k in MACRO_FIELDS[:-1]}
         phase = economy.get("cycle_phase")
         macro["cycle_phase"] = float(CYCLE_PHASES.index(phase)
@@ -923,6 +944,7 @@ class LocalSessionService:
     def _open_day(s: _Session) -> None:
         assert s.engine is not None and not s.market_open
         s.engine.open_market()
+        s.touch()
         s.day += 1
         s.tick = 0
         s.step = 0
@@ -940,6 +962,7 @@ class LocalSessionService:
         hour, minute = divmod(OPEN_MINUTE + s.tick, 60)
         engine.run_session(hour, minute, DAY_OF_WEEK, ticks,
                            order_flow=pf.pending_flow())
+        s.touch()
         pf.clear_flow()
         s.tick += ticks
         s.step += 1
@@ -949,6 +972,7 @@ class LocalSessionService:
             self._match_resting(s, fills)
         if s.tick >= TICKS_PER_SESSION:
             engine.close_market()
+            s.touch()
             s.market_open = False
             keep = []
             for oid in s.resting:
