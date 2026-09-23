@@ -147,7 +147,8 @@ def describe_payload() -> dict[str, Any]:
             "(09:30 to 16:00). One step is `ticks_per_step` ticks (a session setting). "
             "advance(steps=n) runs n steps, crossing the close and the next open as "
             "needed; until='close' runs to the end of the current session; "
-            "until='next_open' runs to the first step of the next one."
+            "until='next_open' runs to the first step of the next one; with either, "
+            "steps=n does it n times."
         ),
         "orders": {
             "market": ("Queued, then filled at the START of the next step, before the "
@@ -279,6 +280,7 @@ def _default_resolver(owner: str) -> OwnerResolver:
 
 def create_app(service: SessionService, *, owner_resolver: Optional[OwnerResolver] = None,
                middleware: Sequence[Any] = (), serialize: bool = True,
+               describe: Optional[Callable[[], dict[str, Any]]] = None,
                title: str = "tradefloor trading session server") -> Any:
     """Build the FastAPI app over `service`.
 
@@ -291,6 +293,9 @@ def create_app(service: SessionService, *, owner_resolver: Optional[OwnerResolve
     serialize: hold one lock around every service call. On by default because
         contract 0.1 does not say a SessionService is thread-safe and FastAPI
         runs sync routes on a thread pool.
+    describe: what `GET /v1/describe` serves (default `describe_payload`). A
+        wrapper that caps limits lower passes its own, so clients read the
+        limits that actually apply.
 
     The service, the lock and the resolver are on `app.state` for a wrapper.
     """
@@ -353,8 +358,10 @@ def create_app(service: SessionService, *, owner_resolver: Optional[OwnerResolve
 
     from starlette.concurrency import run_in_threadpool
 
-    is_async = inspect.iscoroutinefunction(resolver) or inspect.iscoroutinefunction(
-        getattr(resolver, "__call__", None))
+    # A coroutine function is awaited here; anything else runs on the thread
+    # pool (it may block on a key lookup), and an awaitable it returns (an
+    # object with an async __call__) is awaited after.
+    is_async = inspect.iscoroutinefunction(resolver)
 
     from fastapi import Request
 
@@ -374,7 +381,7 @@ def create_app(service: SessionService, *, owner_resolver: Optional[OwnerResolve
         with lock:
             return getattr(service, method)(*args, **kwargs)
 
-    app.include_router(_native_router(call, owner_dep))
+    app.include_router(_native_router(call, owner_dep, describe or describe_payload))
     app.include_router(_broker_router(call, owner_dep), prefix="/broker/{session_id}/v2")
     return app
 
@@ -382,7 +389,8 @@ def create_app(service: SessionService, *, owner_resolver: Optional[OwnerResolve
 # -- native routes -------------------------------------------------------------
 
 
-def _native_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> Any:
+def _native_router(call: Callable[..., Any], owner_dep: Callable[..., Any],
+                   describe_fn: Callable[[], dict[str, Any]]) -> Any:
     from fastapi import APIRouter, Body, Depends, Path as PathParam, Query
 
     SessionConfigBody = _body_model(SessionConfig, "SessionConfigBody")
@@ -393,9 +401,9 @@ def _native_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> A
     class AdvanceBody(BaseModel):
         model_config = ConfigDict(extra="forbid")
         steps: int = Field(1, ge=1, description=(
-            "Steps to run when until='steps'. One step is the session's ticks_per_step "
-            f"ticks; one call may run at most {MAX_TICKS_PER_ADVANCE} ticks "
-            f"({MAX_SESSIONS_PER_ADVANCE} sessions)."))
+            "How many times: steps of the session's ticks_per_step ticks when "
+            "until='steps', or closes / next opens to run to otherwise. One call may run "
+            f"at most {MAX_TICKS_PER_ADVANCE} ticks ({MAX_SESSIONS_PER_ADVANCE} sessions)."))
         until: Literal["steps", "close", "next_open"] = Field("steps", description=(
             "'steps' runs `steps` steps; 'close' runs to the end of the current session; "
             "'next_open' runs to the first step of the next session."))
@@ -421,7 +429,7 @@ def _native_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> A
     @r.get("/v1/describe", tags=["server"],
            summary="What this server is, its limits and its caveats")
     def describe() -> dict[str, Any]:
-        return describe_payload()
+        return describe_fn()
 
     @r.post("/v1/sessions", tags=["sessions"], status_code=201, response_model=SessionInfo,
             summary="Open a session",

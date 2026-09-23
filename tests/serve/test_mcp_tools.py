@@ -254,3 +254,8 @@ def test_every_tool_over_stdio(kind, tmp_path):
         assert is_error is False, (name, body)
         assert isinstance(body, dict), name
     assert error == (True, error[1]) and error[1]["code"] == "session_closed"
+
+
+def test_a_wrapper_can_replace_describe():
+    server = create_server(FakeSessionService(), describe=lambda: {"limits": "lower"})
+    assert ok(server, "describe") == {"limits": "lower"}

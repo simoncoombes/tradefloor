@@ -80,8 +80,12 @@ def _load_factory(spec: str) -> Callable[[], SessionService]:
 
 
 def create_server(service: SessionService, owner: str = LOCAL_OWNER, *,
-                  name: str = "tradefloor-trading") -> Any:
+                  name: str = "tradefloor-trading",
+                  describe: Optional[Callable[[], dict[str, Any]]] = None) -> Any:
     """An MCP server exposing `service` to one owner.
+
+    `describe` replaces what the `describe` tool returns (default
+    `tradefloor.serve.http.describe_payload`), for a wrapper whose limits differ.
 
     Returns an `mcp.server.MCPServer`; call `.run("stdio")` on it, or drive it
     in-process with `await server.call_tool(name, arguments)`.
@@ -102,6 +106,7 @@ def create_server(service: SessionService, owner: str = LOCAL_OWNER, *,
 
     lock = threading.Lock()
     defaults = SessionConfig()
+    describe_fn = describe or describe_payload
 
     def error_result(exc: ServeError) -> Any:
         body = exc.to_dict()
@@ -153,7 +158,7 @@ def create_server(service: SessionService, owner: str = LOCAL_OWNER, *,
         "the error codes, and caveats read from the simulator's realism envelope at call "
         "time. Call this first."))
     def describe() -> dict[str, Any]:
-        return run(describe_payload)
+        return run(describe_fn)
 
     @server.tool(annotations=WRITE, description=(
         "Open a new simulated market session with its own cash account. Returns "
@@ -267,11 +272,13 @@ def create_server(service: SessionService, owner: str = LOCAL_OWNER, *,
         "until='steps' runs `steps` steps of ticks_per_step minutes each, crossing the "
         "close into the next trading day as needed. until='close' runs to the end of "
         "the current session. until='next_open' runs to the start of the next session, "
-        "so you can place orders before it trades. "
+        "so you can place orders before it trades. With until='close' or 'next_open', "
+        "steps says how many times (steps=5, until='next_open' skips five days). "
         f"At most 20 sessions ({MAX_TICKS_PER_ADVANCE} ticks) per call. Returns the new "
         "clock, the fills and expiries this call produced, and a fresh observation."))
     def advance(session_id: SessionId,
-                steps: Annotated[int, Field(ge=1, description="Steps to run when until='steps'.")] = 1,
+                steps: Annotated[int, Field(ge=1, description=(
+                    "Steps to run, or with until='close'/'next_open' how many times."))] = 1,
                 until: Annotated[Literal["steps", "close", "next_open"], Field(
                     description="steps, close or next_open.")] = "steps",
                 ) -> dict[str, Any]:

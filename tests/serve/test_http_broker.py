@@ -169,7 +169,7 @@ def test_a_market_order_round_trip(setup):
     got = b.ok(b.get(f"/orders/{o['id']}"))
     assert got["status"] == "filled" and got["filled_qty"] == "10.0"
     assert float(got["filled_avg_price"]) > 0 and got["filled_at"]
-    assert b.ok(b.get(f"/orders:by_client_order_id", client_order_id=o["client_order_id"]))["id"] == o["id"]
+    assert b.ok(b.get("/orders:by_client_order_id", client_order_id=o["client_order_id"]))["id"] == o["id"]
 
 
 def test_client_order_id_round_trips_and_is_idempotent(setup):
@@ -237,7 +237,7 @@ def test_listing_orders_filters_like_alpaca(setup):
 def test_cancel_all_is_multi_status(setup):
     client, info, b = setup
     last = client.get(f"/v1/sessions/{info['session_id']}/observation").json()["quotes"][0]["last"]
-    for i in range(2):
+    for _ in range(2):
         b.ok(b.post("/orders", {"symbol": info["tickers"][0], "qty": 1, "side": "buy",
                                 "type": "limit", "limit_price": round(last * 0.5, 2),
                                 "time_in_force": "gtc"}))

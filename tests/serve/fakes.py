@@ -10,6 +10,8 @@ layers above it are tested against (docs/serve/CONTRACT.md):
 - sessions: named presets only, `universe_size` 1..40, a uuid4-hex id;
 - time moves only in `advance`: `steps`, `until="close"`, `until="next_open"`,
   crossing session boundaries, at most 20 sessions (7,800 ticks) per call;
+  with `until="close"` or `"next_open"`, `steps` says how many times (as the
+  core does);
 - market orders queue and fill at the START of the next step, before the
   market moves, and their flow moves the price;
 - limit orders rest server-side and fill in full at the limit when the step's
@@ -25,17 +27,19 @@ layers above it are tested against (docs/serve/CONTRACT.md):
 - `fork` copies the full state; `state_hash` changes with every mutation and
   is identical for identical call sequences.
 
-Where the contract is silent the fake makes a choice and says so here, so a
-test that leans on one of these is visibly leaning on the fake:
+Where the contract is silent the fake does what the core
+(`tradefloor.serve.core`, milestone 1) does, and says so here, so a test that
+leans on one of these is visibly leaning on a choice:
 
 - cancelling an order that is not `accepted` is `invalid_request`;
 - `until="close"` with the market already closed runs the NEXT session to
   its close; `until="next_open"` with the market closed just opens it;
 - an order placed while the market is closed belongs to the next session
   (a `day` order placed after the close expires at the next close);
-- closing a session cancels its accepted orders with reason "session closed";
+- closing a session leaves its orders as they are (accepted stays accepted);
 - `fork` of a closed session is `session_closed`;
-- a market order carrying a `limit_price` is `invalid_order`.
+- a market order carrying a `limit_price` is `invalid_order`;
+- `macro` uses the engine's field names in percent, `cycle_phase` an index.
 """
 
 from __future__ import annotations
@@ -77,12 +81,12 @@ _HALF_SPREAD = 0.0002     # bid/ask around last
 _IMPACT_PER_SHARE = 2e-6  # fractional price move per share of market flow
 _MAX_IMPACT = 0.02
 
-_MACRO = {
-    "fed_funds_rate": 0.05,
-    "ten_year_yield": 0.042,
-    "inflation": 0.025,
-    "gdp_growth": 0.02,
-    "unemployment": 0.04,
+_MACRO = {  # the core's MACRO_FIELDS, in the engine's percent units
+    "federal_funds_rate": 5.0,
+    "treasury_yield_10y": 4.2,
+    "inflation_rate": 2.5,
+    "gdp_growth": 2.0,
+    "unemployment_rate": 4.0,
     "cycle_phase": 0.0,
 }
 
@@ -247,11 +251,6 @@ class FakeSessionService:
         with self._lock:
             self._log("close", owner, session_id)
             s = self._open_session(owner, session_id)
-            for o in s.orders:
-                if o.status == "accepted":
-                    o.status, o.reason = "cancelled", "session closed"
-            s.queued.clear()
-            s.resting.clear()
             s.closed = True
             s.info.status = "closed"
             days = s.info.clock.day + 1
@@ -453,31 +452,52 @@ class FakeSessionService:
             if until not in ("steps", "close", "next_open"):
                 raise ServeError("invalid_request",
                                  f"until must be steps, close or next_open, got {until!r}")
-            if until == "steps":
-                if isinstance(steps, bool) or not isinstance(steps, int) or steps < 1:
-                    raise ServeError("invalid_request", f"steps must be an integer >= 1, got {steps!r}")
-                if steps * tps > MAX_TICKS_PER_ADVANCE:
-                    raise ServeError("invalid_request",
-                                     f"{steps} steps of {tps} ticks is {steps * tps} ticks; one advance "
-                                     f"may run at most {MAX_SESSIONS_PER_ADVANCE} sessions "
-                                     f"({MAX_TICKS_PER_ADVANCE} ticks)")
+            if isinstance(steps, bool) or not isinstance(steps, int) or steps < 1:
+                raise ServeError("invalid_request", f"steps must be an integer >= 1, got {steps!r}")
+            self._plan(s, steps, until, tps)
             fills: list[Fill] = []
             expired: list[Order] = []
-            clk = s.info.clock
-            if until == "steps":
-                for _ in range(steps):
+            for _ in range(steps):
+                if until == "steps":
                     self._step(s, fills, expired)
-            elif until == "close":
-                if not clk.market_open:
+                elif until == "close":
+                    if not s.info.clock.market_open:
+                        self._open_market(s)
+                    while s.info.clock.market_open:
+                        self._step(s, fills, expired)
+                else:  # next_open
+                    while s.info.clock.market_open:
+                        self._step(s, fills, expired)
                     self._open_market(s)
-                while s.info.clock.market_open:
-                    self._step(s, fills, expired)
-            else:  # next_open
-                while s.info.clock.market_open:
-                    self._step(s, fills, expired)
-                self._open_market(s)
             return AdvanceResult(clock=copy.deepcopy(s.info.clock), fills=copy.deepcopy(fills),
                                  expired=copy.deepcopy(expired), observation=self._observe(s))
+
+    @staticmethod
+    def _plan(s: _Session, steps: int, until: str, tps: int) -> None:
+        """Refuse an advance that would run past the cap, before running it."""
+        tick, open_ = s.info.clock.tick, s.info.clock.market_open
+        total = 0
+        for _ in range(steps):
+            if until == "steps":
+                if not open_:
+                    tick, open_ = 0, True
+                run = min(tps, TICKS_PER_SESSION - tick)
+                tick, total = tick + run, total + run
+                if tick >= TICKS_PER_SESSION:
+                    open_ = False
+            elif until == "close":
+                if not open_:
+                    tick, open_ = 0, True
+                total += TICKS_PER_SESSION - tick
+                tick, open_ = TICKS_PER_SESSION, False
+            else:
+                if open_:
+                    total += TICKS_PER_SESSION - tick
+                tick, open_ = 0, True
+            if total > MAX_TICKS_PER_ADVANCE:
+                raise ServeError("invalid_request",
+                                 f"advance would run more than {MAX_SESSIONS_PER_ADVANCE} sessions "
+                                 f"({MAX_TICKS_PER_ADVANCE} ticks) in one call; split it")
 
     def _open_market(self, s: _Session) -> None:
         clk = s.info.clock

@@ -493,3 +493,93 @@ def test_the_transports_do_not_load_their_dependencies_on_import():
             "print(loaded); sys.exit(1 if loaded else 0)")
     r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+# -- the fake agrees with the core --------------------------------------------------
+
+
+def _script(client):
+    """Calls whose outcomes (not prices) the contract, or the core's reading of
+    it, fixes. Returns what happened, price-free, for comparison."""
+    out = []
+
+    def rec(tag, r, *keys):
+        body = r.json() if r.content else None
+        row = [tag, r.status_code]
+        if isinstance(body, dict) and "code" in body and set(body) == {"code", "message"}:
+            row.append(body["code"])
+        for k in keys:
+            row.append(k(body))
+        out.append(tuple(row))
+        return body
+
+    clock = lambda b: tuple(b["clock"][k] for k in ("day", "tick", "step", "market_open"))  # noqa: E731
+    info = rec("open", client.post("/v1/sessions", json=SMALL), clock)
+    sid, (t0, t1) = info["session_id"], info["tickers"][:2]
+    obs = client.get(f"/v1/sessions/{sid}/observation").json()
+    far = round(obs["quotes"][1]["last"] * 0.5, 2)
+    orders = f"/v1/sessions/{sid}/orders"
+    status = lambda b: b["status"]  # noqa: E731
+    rec("market", client.post(orders, json={"ticker": t0, "side": "buy", "quantity": 10}), status)
+    gtc = rec("gtc", client.post(orders, json={"ticker": t1, "side": "buy", "quantity": 1, "type": "limit",
+                                               "limit_price": far, "time_in_force": "gtc"}), status)
+    rec("day", client.post(orders, json={"ticker": t1, "side": "buy", "quantity": 1, "type": "limit",
+                                         "limit_price": far}), status)
+    rec("market-with-price", client.post(orders, json={"ticker": t0, "side": "buy", "quantity": 1,
+                                                       "limit_price": 5}))
+    adv = f"/v1/sessions/{sid}/advance"
+    fills = lambda b: [(f["side"], f["quantity"], f["liquidity"]) for f in b["fills"]]  # noqa: E731
+    expired = lambda b: [o["status"] for o in b["expired"]]  # noqa: E731
+    rec("step", client.post(adv, json={"steps": 1}), clock, fills)
+    body = {"ticker": t0, "side": "sell", "quantity": 2, "client_order_id": "k"}
+    a = rec("cid", client.post(orders, json=body), status)
+    b = rec("cid-again", client.post(orders, json=body), status)
+    out.append(("cid-same", a["order_id"] == b["order_id"]))
+    rec("cid-conflict", client.post(orders, json={**body, "quantity": 3}))
+    rec("bad-ticker", client.post(orders, json={**body, "ticker": "NOPE", "client_order_id": None}))
+    rec("cancel", client.delete(f"{orders}/{gtc['order_id']}"), status)
+    rec("cancel-again", client.delete(f"{orders}/{gtc['order_id']}"))
+    rec("close", client.post(adv, json={"until": "close"}), clock, fills, expired)
+    rec("after-close", client.post(orders, json={"ticker": t1, "side": "buy", "quantity": 1,
+                                                 "type": "limit", "limit_price": far}), status)
+    rec("next-open", client.post(adv, json={"until": "next_open"}), clock, expired)
+    rec("close-2", client.post(adv, json={"until": "close"}), clock, expired)
+    rec("two-opens", client.post(adv, json={"steps": 2, "until": "next_open"}), clock)
+    rec("close-from-open", client.post(adv, json={"until": "close"}), clock)
+    rec("close-from-closed", client.post(adv, json={"until": "close"}), clock)
+    rec("too-far", client.post(adv, json={"steps": 21, "until": "close"}))
+    rec("list-accepted", client.get(orders, params={"status": "accepted"}),
+        lambda b: [o["ticker"] for o in b])
+    fork = rec("fork", client.post(f"/v1/sessions/{sid}/fork", json={"label": "f"}),
+               lambda b: b["parent_session_id"] == sid, lambda b: b["config"]["label"])
+    rec("fork-orders", client.get(f"/v1/sessions/{fork['session_id']}/orders"),
+        lambda b: [(o["order_id"], o["status"]) for o in b])
+    rec("close-session", client.post(f"/v1/sessions/{sid}/close"), lambda b: b["days"])
+    rec("orders-after-close", client.get(orders), lambda b: [o["status"] for o in b])
+    rec("observe-closed", client.get(f"/v1/sessions/{sid}/observation"))
+    rec("order-closed", client.post(orders, json={"ticker": t0, "side": "buy", "quantity": 1}))
+    rec("fork-closed", client.post(f"/v1/sessions/{sid}/fork", json={}))
+    rec("cancel-closed", client.delete(f"{orders}/ord-000001"))
+    return out
+
+
+@CORE
+def test_the_fake_does_what_the_core_does(tmp_path):
+    fake = _script(TestClient(create_app(FakeSessionService())))
+    core = _script(TestClient(create_app(make_service("core", tmp_path / "sessions"))))
+    assert len(fake) == len(core)
+    for f, c in zip(fake, core):
+        assert f == c, (f, c)
+
+
+def test_a_wrapper_can_replace_describe(fake):
+    client = TestClient(create_app(fake, describe=lambda: {"limits": {"universe_size": [1, 10]}}))
+    assert client.get("/v1/describe").json() == {"limits": {"universe_size": [1, 10]}}
+
+
+def test_a_callable_object_with_an_async_call_is_awaited(fake):
+    class Resolver:
+        async def __call__(self, request):
+            return "object-owner"
+    client = TestClient(create_app(fake, owner_resolver=Resolver()))
+    assert client.post("/v1/sessions", json=SMALL).json()["owner"] == "object-owner"
