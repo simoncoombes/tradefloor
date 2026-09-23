@@ -33,8 +33,8 @@ conditionally on the ETag it last saw. So:
 
 `trim_stream` (contract 0.4) is a rewrite of `head.json` alone: it drops the
 leading segments and narrows the first one it keeps. No stream data is copied,
-so trimming the core's 20-session step-bar window at a session boundary costs
-one PUT. It is atomic the same way a commit is: readers see the head before
+so the core's trim of its step-bar window (40 sessions back to 20) costs one
+PUT. It is atomic the same way a commit is: readers see the head before
 or after the trim.
 
 After a new head lands, objects the old head named and the new one does not

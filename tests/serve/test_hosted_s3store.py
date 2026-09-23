@@ -341,6 +341,30 @@ def test_commits_and_trims_match_a_reference_model():
     assert fresh.gc("s1") == 0
 
 
+def _core_store_tests():
+    """The core's store-protocol tests (tests/serve/test_store_files.py), loaded
+    by path so pytest does not collect them twice here."""
+    import importlib.util
+    from pathlib import Path
+    path = Path(__file__).with_name("test_store_files.py")
+    if not path.exists():
+        pytest.skip("the core's store tests are not in this tree")
+    spec = importlib.util.spec_from_file_location("_core_store_tests", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@pytest.mark.parametrize("name", ["test_store_protocol", "test_loaded_records_do_not_alias",
+                                  "test_bad_stream_names_are_refused",
+                                  "test_trim_stream_keeps_the_last_entries"])
+def test_s3store_passes_the_cores_own_store_tests(name):
+    fn = getattr(_core_store_tests(), name, None)
+    if fn is None:
+        pytest.skip(f"{name} is not in the core's store tests")
+    fn(store()[0])
+
+
 def test_against_moto_with_a_real_botocore_client(monkeypatch):
     """The same guarantees through boto3 and botocore's real error shapes,
     against moto's local S3 (still never real S3)."""
@@ -374,3 +398,34 @@ def test_against_moto_with_a_real_botocore_client(monkeypatch):
         a.commit("s1", rec(4), {"fills": [{"a": 4}]})
         with pytest.raises(StoreConflict):
             b.trim_stream("s1", "fills", 1)                              # b's head is stale
+
+
+def test_the_core_trims_its_step_bar_window_on_s3store_and_resumes():
+    """45 sessions: past the core's trim point (40 back to 20), so the core
+    calls trim_stream on S3Store; bars and state match a MemoryStore run, and
+    a fresh process resumes the same."""
+    core = pytest.importorskip("tradefloor.serve.core")
+    from tradefloor.serve.store import MemoryStore
+    from tradefloor.serve.types import SessionConfig
+
+    fake = FakeS3(page=1000)
+    s3 = S3Store("b", "p", client=fake)
+    trims = []
+    real_trim = s3.trim_stream
+    s3.trim_stream = lambda *a: (trims.append(a), real_trim(*a))[1]
+    runs = []
+    for store_ in (s3, MemoryStore()):
+        svc = core.LocalSessionService(store_)
+        info = svc.open("alice", SessionConfig(universe_size=3, ticks_per_step=65))
+        for n in (20, 20, 5):
+            svc.advance("alice", info.session_id, steps=n, until="close")
+        runs.append((svc, info))
+    (svc, info), (mem, minfo) = runs
+    assert trims and trims[0][1] == "step_bars"
+    t = info.tickers[0]
+    assert svc.bars("alice", info.session_id, t, "step") == mem.bars("alice", minfo.session_id, t, "step")
+    assert svc.observe("alice", info.session_id).state_hash == mem.observe("alice", minfo.session_id).state_hash
+    resumed = core.LocalSessionService(S3Store("b", "p", client=fake))
+    assert resumed.observe("alice", info.session_id).to_dict() == svc.observe("alice", info.session_id).to_dict()
+    assert resumed.bars("alice", info.session_id, t, "step") == svc.bars("alice", info.session_id, t, "step")
+    assert S3Store("b", "p", client=fake).gc(info.session_id) == 0

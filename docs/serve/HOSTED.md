@@ -251,17 +251,16 @@ The data directory holds everything:
 into place, and a rename on one NFS client is atomic, so the core's crash
 guarantees carry over. The storage meter adds up each session directory.
 
-What a commit writes decides the storage bill, so it was measured (20 names,
-30-tick steps, 25 trading days, one order every four steps). Every mutating
-call rewrites the session's record, which holds the engine snapshot (about
-31 KiB at 20 names, 58 KiB at 40). Under the 0.3 core the record also carried
-the 20-session step-bar window, 271 KiB at 20 names, so each commit wrote
-about **300 KB** (580 KB at 40 names). Contract 0.4 moves that window into a
-stream that is appended once per step (about 1 KiB at 20 names) and trimmed
-at session boundaries, so a commit should write about **35 KB** (about 62 KB
-at 40 names): the record, the step's appends and a small head. That figure is
-the 0.3 measurement minus the window; measure it again when the core's 0.4
-work lands.
+What a commit writes decides the storage bill, so it was measured on both
+cores (20 names, 30-tick steps, 25 trading days, one order every four steps,
+counting every byte FileStore writes per commit). Every mutating call
+rewrites the session's record. Under the 0.3 core the record carried the
+20-session step-bar window, 271 KiB at 20 names, so each commit wrote about
+**300 KB** (580 KB at 40 names). The 0.4 core keeps finished sessions' step
+bars in a `step_bars` stream (one entry per session close, trimmed from 40
+sessions back to 20), and a commit writes about **24 KiB** on average (31 KiB
+at most) at 20 names, and 41 KiB (56 KiB at most) at 40: the record, the
+call's appends and the head.
 
 **S3Store** (`hosted/s3store.py`) implements the `SessionStore` protocol
 (`types.py`, 0.4, including `trim_stream`) on S3, with FileStore's atomicity.
@@ -294,16 +293,18 @@ one more per session per trading day. So S3 costs $15 per million commits
 whatever their size, and EFS Elastic costs the same at about 250 KB a commit.
 At the launch workload in section 11 (32 million commits a month):
 
-| Store | 0.3 core (300 KB/commit) | 0.4 core (about 35 KB/commit) |
+| Store | 0.3 core (300 KB/commit) | 0.4 core (24 KiB/commit, measured) |
 |---|---|---|
 | S3Store | about $490 | about $490 |
-| EFS Elastic | about $580 | about $70 |
+| EFS Elastic | about $580 | about $47 |
 | EFS Provisioned (1 MiB/s for 0.4, 4 MiB/s for 0.3) | about $24 | about $6 |
 
 The 0.3 core's large commits were past the break-even point, so S3 would have
 cost less than EFS Elastic, but EFS Provisioned was cheaper still. The 0.4
-trimmed window takes commits well under the break-even point, and EFS wins
-in every mode. EFS stays the launch default. S3Store suits low call rates,
+trimmed window takes commits to a tenth of the break-even size, and EFS wins
+in every mode. (On S3Store the core's trim is one PUT per 20 sessions of
+trading, which is nothing.) The core's own store tests (protocol, aliasing,
+bad names, `trim_stream`) run against S3Store too. EFS stays the launch default. S3Store suits low call rates,
 or an archive for closed sessions.
 
 **Deleting sessions.** Nothing in the contract (0.4) deletes a session, so a user
@@ -419,44 +420,44 @@ Prices are us-east-1 on-demand list prices from 2025; London (eu-west-2) is
 roughly 10 to 15% higher. Check them against the AWS pricing pages before
 deciding. The workload assumed: **50 bots active around the clock, each
 making a call every 2 s on average, half of them mutating.** That is 2.2
-million calls a day. The 1.1 million mutating calls write about 35 KB each on
-the 0.4 core (section 8), and responses average about 5 KB.
+million calls a day. The 1.1 million mutating calls write about 24 KiB each on
+the 0.4 core (measured, section 8), and responses average about 5 KB.
 
 | Item | Basis | $/month |
 |---|---|---|
 | Fargate task | 1 vCPU + 2 GB ARM, 730 h | 29 |
 | ALB | hourly charge + about 1 LCU | 22 |
 | Public IPv4 | 2 for the ALB + 1 for the task | 11 |
-| EFS writes (Elastic) | 1,130 GB at $0.06 | 68 |
+| EFS writes (Elastic) | 790 GB at $0.06 | 47 |
 | EFS reads (Elastic) | about 260 GB at $0.03 | 8 |
 | EFS storage + backup | about 5 GB | 2 |
 | CloudWatch Logs | about 11 GB of audit lines + app logs | 7 |
 | Data out | 324 GB, less the 100 GB free tier | 20 |
 | Secrets Manager, Route 53 zone, ECR, alarms | | 2 |
-| **Total** | | **about $170** |
+| **Total** | | **about $150** |
 
-- **With EFS Provisioned at 1 MiB/s** instead of Elastic, the $76 of
+- **With EFS Provisioned at 1 MiB/s** instead of Elastic, the $55 of
   throughput charges become about $6: **about $100**. This load averages
-  about 0.45 MB/s of writes, so 1 MiB/s leaves room, and 2 MiB/s ($12) leaves
+  about 0.3 MB/s of writes, so 1 MiB/s leaves room, and 2 MiB/s ($12) leaves
   more. Elastic is the template's default because it never throttles; switch
   once the launch load test (section 13) shows the real rate.
   (`EfsThroughputMode=provisioned`, `EfsProvisionedMibps=1`.)
 - On the 0.3 core, with its 300 KB commits, the same workload would have cost
-  about $690 on EFS Elastic. The 0.4 trimmed window is worth about $500 a
+  about $690 on EFS Elastic. The 0.4 trimmed window is worth about $540 a
   month at this load.
 - With lighter use, one call every 10 s per bot (typical of LLM-driven
-  bots), the total is **about $85** on Elastic, or $75 on Provisioned. The
+  bots), the total is **about $80** on Elastic, or $75 on Provisioned. The
   fixed part (task, ALB, IPs) is about $60 a month with no traffic at all.
 - WAF, if turned on, adds about $7 a month plus $0.60 per million requests,
   **about $46** at this traffic. The template defaults it off, which leaves
   floods to the app-level limits and the failed-auth throttle; it can be
   turned on with one parameter if the service is attacked.
-- The marginal cost is about **$3 per million mutating calls** on Elastic (EFS
-  writes, logs, data out), and about $1 on Provisioned until the provisioned
-  rate is used up (roughly a dozen bots at the standard plan's limit fill
-  1 MiB/s). A bot running flat out at the trial limit costs about $4 a month
-  on top of the fixed part, and a bot at the standard limit about $20. That is
-  the number pricing has to cover.
+- The marginal cost is about **$2.50 per million mutating calls** on Elastic
+  (EFS writes, logs, data out), and about $1 on Provisioned until the
+  provisioned rate is used up (about 17 bots at the standard plan's limit
+  fill 1 MiB/s). A bot running flat out at the trial limit costs about $3 a
+  month on top of the fixed part, and a bot at the standard limit about $16.
+  That is the number pricing has to cover.
 - History reads (bars, news) are charged against the call bucket by size
   (section 4), which caps what one bot's reads can add to the data-out line:
   about $2 a month at the trial limit.
@@ -525,7 +526,7 @@ the 0.4 core (section 8), and responses average about 5 KB.
    or elsewhere (then create the certificate by hand).
 4. **Terms of use and privacy notice**, from the points in section 12, and
    who answers abuse reports and where to write to them.
-5. **EFS throughput mode** (Elastic, about $170 a month at the assumed load,
+5. **EFS throughput mode** (Elastic, about $150 a month at the assumed load,
    or Provisioned at 1 MiB/s, about $100) and **WAF** on or off (about $46 a
    month at that load).
 6. **Retention.** How long closed sessions, audit files and CloudWatch logs
@@ -597,8 +598,8 @@ the 0.4 core (section 8), and responses average about 5 KB.
   commits, a crash mid-trim, a stale writer refused, a reader retrying after
   a trim deleted what its old head named), 300 random commits and trims
   against a reference model, compaction, heads by owner with a half-created
-  session, the core running and resuming on S3Store, and the same checks
-  through boto3 against moto.
+  session, the core's own store tests, the core running and resuming on
+  S3Store, and the same checks through boto3 against moto.
 - `test_hosted_admin.py`: every CLI command, the pepper guard, and
   `sessions`/`expire-idle` through a running admin listener with its token.
 - `test_hosted_http.py`, through the transport's HTTP app over the real core:
