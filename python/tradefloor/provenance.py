@@ -204,6 +204,12 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: entry in `DIAL_PROVENANCE`, which is the transition this list exists
 #: to make visible rather than absorb.
 POST_BASELINE = {
+    "macro_compound_days_per_year":
+        "added 2026-09-23; every shipped preset carries 365.0, the division that has always stood, and it is LIVE there (it IS the compounding). The economy "
+        "steps once per trading session, 252 to a year, so 365 gives a "
+        "trading year 252/365 of its annual GDP and CPI growth; 252.0 is the "
+        "session clock, DERIVED from that count and not fitted "
+        "(programme/results/longrun-drift/, design repository). Not adopted",
     "jump_idio_vix_decoupled":
         "added at 0.8.0 for the idiosyncratic arrival rate under the "
         "identity; pt-v19 carried 1.0 from 2026-09-14 until the 2026-09-20 "
@@ -442,12 +448,6 @@ OUT_OF_SCOPE = {
         "unread while `vix_anchor_weight_level` is 0.0; at 0.0 the weight is "
         "the dial below the knee. 1.0 runs the level law below it too. A "
         "probe, not adopted",
-    "macro_compound_days_per_year":
-        "365.0 as shipped, the division that has always stood. The economy "
-        "steps once per trading session, 252 to a year, so 365 gives a "
-        "trading year 252/365 of its annual GDP and CPI growth; 252.0 is the "
-        "session clock, DERIVED from that count and not fitted "
-        "(programme/results/longrun-drift/, design repository). Not adopted",
     "crisis_epicentre_end_sessions":
         "unread while `crisis_epicentre_extra` is 0.0: with no episode ever "
         "entered there is no counter to end. 21 sessions is a month and is a "
@@ -3425,6 +3425,10 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: what the record measured about that value (the paired control; a
 #: plateau) rather than leaving it here.
 UNPROVENANCED = (
+    # 365.0: written as a calendar year, and wrong for an economy that steps
+    # once per trading session. The derived value is 252.0 and is not yet
+    # adopted, so the shipped constant is admitted here rather than hidden.
+    "macro_compound_days_per_year",
     "crash_amplifier_slope",
     "crash_amplifier_threshold",
     "crisis_blend_cap",
