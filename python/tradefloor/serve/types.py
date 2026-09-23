@@ -26,30 +26,65 @@ third (the store) persists it.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, fields
-from typing import Any, Literal, Protocol, runtime_checkable
+import sys
+import types as _pytypes
+import typing
+from typing import Any, Literal, Mapping, Protocol, Sequence, runtime_checkable
 
-CONTRACT_VERSION = "0.1"
+CONTRACT_VERSION = "0.3"
 
 Side = Literal["buy", "sell"]
 OrderType = Literal["market", "limit"]
 TimeInForce = Literal["day", "gtc"]
 OrderStatus = Literal["accepted", "filled", "cancelled", "expired", "rejected"]
 AdvanceUnit = Literal["steps", "close", "next_open"]
+BarResolution = Literal["day", "step"]
+
+
+def _decode(hint: Any, value: Any) -> Any:
+    """Rebuild `value` (plain JSON) as `hint` describes: nested dataclasses,
+    lists of them, and optionals. Anything else passes through unchanged."""
+    if value is None:
+        return None
+    origin = typing.get_origin(hint)
+    if origin in (typing.Union, _pytypes.UnionType):
+        for arg in typing.get_args(hint):
+            if arg is type(None):
+                continue
+            if isinstance(arg, type) and issubclass(arg, _Data) and isinstance(value, dict):
+                return arg.from_dict(value)
+            if typing.get_origin(arg) is list and isinstance(value, list):
+                return _decode(arg, value)
+        return value
+    if origin is list:
+        (inner,) = typing.get_args(hint) or (Any,)
+        return [_decode(inner, v) for v in value]
+    if isinstance(hint, type) and issubclass(hint, _Data) and isinstance(value, dict):
+        return hint.from_dict(value)
+    return value
 
 
 class _Data:
-    """JSON round-trip for the dataclasses below."""
+    """JSON round-trip for the dataclasses below. `from_dict` rebuilds nested
+    types (contract 0.2), so a transport or store that reads JSON back gets the
+    same object graph the service returned."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)  # type: ignore[call-overload]
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]):
+        if not isinstance(d, dict):
+            raise ServeError("invalid_request", f"{cls.__name__}: expected an object, got {type(d).__name__}")
         names = {f.name for f in fields(cls)}  # type: ignore[arg-type]
         unknown = set(d) - names
         if unknown:
             raise ServeError("invalid_request", f"{cls.__name__}: unknown fields {sorted(unknown)}")
-        return cls(**d)  # type: ignore[call-arg]
+        hints = typing.get_type_hints(cls, globalns=vars(sys.modules[cls.__module__]))
+        try:
+            return cls(**{k: _decode(hints.get(k, Any), v) for k, v in d.items()})  # type: ignore[call-arg]
+        except TypeError as e:
+            raise ServeError("invalid_request", f"{cls.__name__}: {e}") from None
 
 
 # -- errors ------------------------------------------------------------------
@@ -71,15 +106,21 @@ ERROR_CODES = (
 class ServeError(Exception):
     """Every refusal the service makes. `code` is one of ERROR_CODES."""
 
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(self, code: str, message: str, *, retry_after: float | None = None) -> None:
         if code not in ERROR_CODES:
             code = "internal"
         super().__init__(f"{code}: {message}")
         self.code = code
         self.message = message
+        # Seconds until a rate_limited / quota_exceeded refusal would succeed,
+        # when known (contract 0.3). HTTP sends it as Retry-After.
+        self.retry_after = retry_after
 
-    def to_dict(self) -> dict[str, str]:
-        return {"code": self.code, "message": self.message}
+    def to_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {"code": self.code, "message": self.message}
+        if self.retry_after is not None:
+            d["retry_after"] = self.retry_after
+        return d
 
 
 # -- configuration -----------------------------------------------------------
@@ -120,8 +161,9 @@ class Quote(_Data):
     day_low: float
     prev_close: float
     volume: float                     # shares traded so far today
-    bid: float | None = None          # optional in contract 0.1
+    bid: float | None = None          # optional
     ask: float | None = None
+    step_volume: float | None = None  # shares traded in the last step (0.3)
 
 
 @dataclass
@@ -151,10 +193,11 @@ class Account(_Data):
     cash: float
     net_worth: float
     gross_exposure: float
-    leverage: float
+    leverage: float | None            # None when insolvent (net worth <= 0): JSON has no infinity
     realised_pnl: float
     unrealised_pnl: float
     starting_cash: float
+    insolvent: bool = False
 
 
 @dataclass
@@ -198,7 +241,8 @@ class Order(_Data):
     submitted_at: Clock
     filled_quantity: float = 0.0
     avg_fill_price: float | None = None
-    reason: str | None = None         # why rejected / expired
+    reason: str | None = None         # why rejected / expired / cancelled
+    updated_at: Clock | None = None   # clock of the last status change (0.3)
 
 
 @dataclass
@@ -210,6 +254,20 @@ class Fill(_Data):
     price: float
     at: Clock
     liquidity: Literal["taker", "resting"] = "taker"
+
+
+@dataclass
+class Bar(_Data):
+    """One OHLCV bar (0.3). `step` is None for a day bar."""
+
+    ticker: str
+    day: int
+    step: int | None
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
 
 
 # -- results -----------------------------------------------------------------------
@@ -245,6 +303,23 @@ class SessionReport(_Data):
     state_hash: str
 
 
+# -- persistence (contract 0.2) -------------------------------------------------------
+
+@runtime_checkable
+class SessionStore(Protocol):
+    """Persistence behind LocalSessionService, implemented by FileStore and
+    MemoryStore (tradefloor.serve.store) and by any hosted store. `commit` is
+    the atomic commit point: after it returns, `load` sees `record` and every
+    stream has `appends` appended, or (on a crash mid-commit) neither."""
+
+    def commit(self, session_id: str, record: dict[str, Any],
+               appends: Mapping[str, Sequence[dict[str, Any]]]) -> None: ...
+    def load(self, session_id: str) -> dict[str, Any] | None: ...
+    def read_stream(self, session_id: str, name: str) -> list[dict[str, Any]]: ...
+    def version(self, session_id: str) -> int | None: ...
+    def heads(self, owner: str) -> list[dict[str, Any]]: ...
+
+
 # -- the service ---------------------------------------------------------------------
 
 @runtime_checkable
@@ -261,7 +336,11 @@ class SessionService(Protocol):
     def place_order(self, owner: str, session_id: str, request: OrderRequest) -> Order: ...
     def cancel_order(self, owner: str, session_id: str, order_id: str) -> Order: ...
     def orders(self, owner: str, session_id: str, status: str | None = None) -> list[Order]: ...
+    # status: None or "all" (every order), "open", "closed", or one OrderStatus
     def fills(self, owner: str, session_id: str, since_day: int = 0) -> list[Fill]: ...
+    def bars(self, owner: str, session_id: str, ticker: str,
+             resolution: BarResolution = "day", since_day: int = 0,
+             limit: int | None = None) -> list[Bar]: ...
     def advance(self, owner: str, session_id: str, steps: int = 1,
                 until: AdvanceUnit = "steps") -> AdvanceResult: ...
     def fork(self, owner: str, session_id: str, label: str = "") -> SessionInfo: ...
