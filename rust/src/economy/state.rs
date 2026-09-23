@@ -58,9 +58,12 @@ impl MacroCalendar {
             return Self::shipped();
         }
         let y = days.round() as i64;
+        // Integer arithmetic, and no `.max`: the determinism lint keeps
+        // float min/max inside `mathx` and does not tell the two apart.
+        let m = (days / 12.0).round() as i64;
         MacroCalendar {
             days_per_year: y,
-            days_per_month: ((days / 12.0).round() as i64).max(1),
+            days_per_month: if m < 1 { 1 } else { m },
             shipped: false,
         }
     }
