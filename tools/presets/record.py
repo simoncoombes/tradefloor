@@ -350,6 +350,31 @@ def carry_level_protocol(record: dict, path: pathlib.Path) -> str:
                if added else ""))
 
 
+def carry_long_run(record: dict, path: pathlib.Path) -> str:
+    """Carry an existing `long_run` block onto a rebuilt record.
+
+    `carry_level_protocol`'s rule on the long-run verdict, which `--panel`
+    cannot rebuild either: it comes from thirty 21-year histories, the 2008
+    and 2020 replays and the headline edge, graded by the design
+    repository's `programme/longrun/criteria.py`, and it reaches a record
+    through `--long-run` or not at all. Carried while the preset's
+    coefficient VALUES have not moved since the verdict was written (a name
+    added inert does not invalidate it); dropped loudly when they have.
+    """
+    if not path.exists():
+        return ""
+    was = json.loads(path.read_text(encoding="utf-8")).get("long_run")
+    if not was:
+        return ""
+    changed = moved_values(was.get("coefficients") or {}, record["coefficients"])
+    if changed:
+        return ("; DROPPED long_run: %d coefficient(s) moved since the verdict "
+                "(%s). Re-run the long-run instrument and criteria.py, then "
+                "record.py --long-run." % (len(changed), ", ".join(changed[:6])))
+    record["long_run"] = was
+    return "; carried long_run forward"
+
+
 def mechanism_bar(fresh: dict, committed: dict | None) -> dict:
     """`envelope.record_bar`, with the FIRST LAY-DOWN named as its own case.
 
@@ -638,6 +663,15 @@ def main() -> int:
                          "envelope.CERTIFIED_LEVEL and CERTIFIED_CRISIS are "
                          "certified on a protocol no panel measures, so they "
                          "reach a record through here or not at all")
+    ap.add_argument("--long-run", metavar="VERDICT",
+                    help="write ONLY the long_run block onto the record the "
+                         "verdict names: the adopted long-run pass bar "
+                         "(design repo programme/longrun/CRITERIA.md) as "
+                         "graded by programme/longrun/criteria.py --verdict "
+                         "on thirty 21-year histories, the 2008 and 2020 "
+                         "replays, the headline edge and the one-year "
+                         "table. Refused unless the long run measured the "
+                         "preset BY NAME")
     ap.add_argument("--default-since", action="store_true",
                     help="rewrite only `default_since` on every committed "
                          "record from the DEFAULT_SINCE table; no panel "
@@ -655,6 +689,8 @@ def main() -> int:
         return write_structure_rows(args.structure_rows)
     if args.level_rows:
         return write_level_protocol(args.level_rows)
+    if args.long_run:
+        return write_long_run(args.long_run)
     if args.default_since:
         return write_default_since()
     if args.mechanisms:
@@ -676,6 +712,7 @@ def main() -> int:
         path = OUT / f"{name}.json"
         note = carry_level_protocol(record, path)
         note += carry_structure(record, path)
+        note += carry_long_run(record, path)
         # After the carry, whichever way the carry went: a block carried
         # UNCHECKED needs the ruler named just as much as a checked one, and
         # more, since nothing else about it has been verified.
@@ -737,7 +774,10 @@ def main() -> int:
                               # A block this run would DROP is drift and the
                               # loudest kind: it is a measurement about to be
                               # deleted by a tool that cannot remake it.
-                              "level_protocol"):
+                              "level_protocol",
+                              # The long-run verdict: carried, never rebuilt
+                              # here, so a run that would drop it is drift.
+                              "long_run"):
                     if have.get(field) != record.get(field):
                         drift.append(f"{path.name}: {field} differs")
         else:
@@ -1136,6 +1176,68 @@ def write_level_protocol(rows_path: str) -> int:
     rows.update(doc["certified_crisis"])
     print(f"  wrote {path.relative_to(ROOT)}  level_protocol: "
           + ", ".join(f"{k}={v:.4f}" for k, v in rows.items()))
+    return 0
+
+
+def write_long_run(verdict_path: str) -> int:
+    """Set the `long_run` block on the record the verdict names.
+
+    The owner's adopted pass bar for a preset is the design repository's
+    `programme/longrun/CRITERIA.md`: what a user would notice over thirty
+    21-year histories, the 2008 and 2020 replays with the real VIX imposed,
+    the edge a headline read five ticks late is worth, and the one-year
+    table. `programme/longrun/criteria.py --verdict` grades it by code; this
+    writes that verdict, as it is, under `long_run`, where the trading
+    server reads whether the preset passes.
+
+    REFUSES a verdict whose long run did not measure the preset BY NAME: its
+    `measured.fingerprint` must be the record's preset, the rule
+    `level_panel.py` applies for the same reason (a measurement relabelled
+    onto a record by hand is the failure this path exists to stop). REFUSES
+    a verdict whose own counts do not add up. Stamps the record's coefficient
+    vector into the block, so `--panel` can carry it while the values stand
+    and drop it when they move; that stamp assumes the named preset had these
+    values on the measuring build, which is true when the verdict and the
+    record come from the same box, and the note names both commits otherwise.
+    """
+    doc = json.loads(pathlib.Path(verdict_path).read_text(encoding="utf-8"))
+    measured = doc.get("measured") or {}
+    name = measured.get("fingerprint")
+    rows = doc.get("rows") or []
+    passed = sum(1 for r in rows if r.get("pass") is True)
+    problems = []
+    if not name or name.startswith("custom-"):
+        problems.append(f"the long run ran fingerprint {name!r}, not a named "
+                        "preset, so there is no record it describes")
+    if not rows or doc.get("of") != len(rows) or doc.get("passed") != passed:
+        problems.append(f"the counts do not add up: of {doc.get('of')!r} and "
+                        f"passed {doc.get('passed')!r} against {len(rows)} rows "
+                        f"of which {passed} pass")
+    if any(r.get("pass") not in (True, False) for r in rows):
+        problems.append("a row carries no verdict")
+    want = "pass" if rows and passed == len(rows) else "fail"
+    if doc.get("verdict") != want:
+        problems.append(f"verdict {doc.get('verdict')!r} where the rows say {want!r}")
+    path = OUT / f"{name}.json"
+    if not problems and not path.exists():
+        problems.append(f"no committed record at {path} to write the block onto")
+    if problems:
+        for p in problems:
+            print(f"REFUSED: {p}", file=sys.stderr)
+        return 1
+    record = json.loads(path.read_text(encoding="utf-8"))
+    block = dict(doc)
+    block["coefficients"] = dict(sorted(record["coefficients"].items()))
+    record["long_run"] = block
+    path.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8", newline="\n")
+    rec_commit = (record.get("measured") or {}).get("commit")
+    note = ("" if rec_commit == measured.get("engine_commit") else
+            f"  (NOTE: the long run was measured on {measured.get('engine_commit')}, "
+            f"the record's panel on {rec_commit})")
+    shown = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+    print(f"  wrote {shown}  long_run: {doc['verdict']} "
+          f"{passed} of {len(rows)}" + note)
     return 0
 
 
