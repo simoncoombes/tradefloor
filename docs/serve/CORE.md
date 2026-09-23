@@ -3,7 +3,7 @@ MILESTONE 1 pushed aa6eabf
 # The session core
 
 `tradefloor.serve.core.LocalSessionService` is the one real implementation of
-`SessionService` (docs/serve/CONTRACT.md, contract 0.3). `tradefloor.serve.store`
+`SessionService` (docs/serve/CONTRACT.md, contract 0.4). `tradefloor.serve.store`
 holds two implementations of the contract's `SessionStore` protocol,
 `FileStore` and `MemoryStore`. Both modules import only the standard library
 and `tradefloor`.
@@ -36,7 +36,7 @@ headlines=None, cache_size=64)`:
 - `cache_size` is how many sessions stay live in memory. Others are rebuilt
   from the store on their next call.
 
-Beyond the protocol there are two read-only methods: `calls(owner,
+Beyond the protocol there are two more read-only methods: `calls(owner,
 session_id)` returns the call log and `caveats(owner, session_id)` the caveats
 a report would carry now.
 
@@ -165,8 +165,13 @@ projected over the cap, so the core applies its rule first and then runs
 `Portfolio.execute` with the cap lifted for that one call. `Portfolio` is
 unchanged.
 
-An insolvent account (net worth at or below zero) has no leverage to compare
-with. There a fill passes only if it does not add gross exposure.
+An insolvent account (net worth at or below zero) may only make trades that
+do not add gross exposure, whether or not the session has a cap (contract
+0.4). It can cut or close a position, or flip it to a smaller one on the
+other side, but not add to it or open another. At submission such an order
+raises `insufficient_buying_power` with a message beginning "insolvent". An
+order accepted while the account was solvent and reaching the book after it
+went insolvent ends `rejected` with reason `"insolvent"`.
 
 At submission the core projects the order on a copy of the account, after the
 orders already queued ahead of it, at the book's current sweep price (market)
@@ -203,6 +208,23 @@ whose fill the rule refuses, ends `rejected` with the reason.
   stays through the close. It is a pure function of the engine state, so
   resume and fork give the same headlines.
 
+## News log
+
+Every headline the session releases is kept in a per-session log, persisted
+as the `news` stream (contract 0.4). `advance` returns in
+`AdvanceResult.news` every headline released during that call, however many
+sessions it runs, so an agent that advances by 20 sessions misses nothing.
+`news(owner, session_id, since_day=0, since_tick=0, limit=None)` returns the
+log from the clock point `(since_day, since_tick)`, oldest first, and `limit`
+keeps the most recent `limit`, as in `bars`.
+
+With `headlines_for`, a day's headlines are all released at tick 1, so the
+core asks for them once a day, after the day's first step. A `headlines`
+callable can release at any tick, so it is asked after every step, and the
+log drops a headline it already holds (same day, tick, tickers, text and
+category). Resume and fork carry the log, and a session resumed mid-day
+releases nothing twice.
+
 ## Bars
 
 `bars(owner, session_id, ticker, resolution="day", since_day=0, limit=None)`
@@ -212,7 +234,12 @@ A step bar is the step's prints for that name: `open` the first tick's
 print, `high` and `low` the extremes, `close` the last print, and `volume`
 the day's volume column after the step minus before it. `step` is the index
 of the step in its day. Step bars cover the last 20 sessions, the session in
-progress included (`core.STEP_BAR_SESSIONS`); older ones are dropped.
+progress included (`core.STEP_BAR_SESSIONS`); older ones are dropped. The
+session in progress keeps its step bars in the record; each finished session's
+go to the `step_bars` stream at its close, as one entry. When that stream
+reaches 40 entries (`core.STEP_BAR_TRIM_AT`) the service trims it back to 20
+with `trim_stream`, so the disk holds at most 40 sessions of step bars and a
+trim rewrites 20 of them once every 20 sessions.
 
 A day bar has `step=None` and the engine's `open`, `high`, `low` and
 `volume` columns with the price after `close_market` as `close`, so it
@@ -242,25 +269,33 @@ three streams:
 
 - the record holds the engine's `state_snapshot()` and `state_hash()`, the
   portfolio, the clock, open orders, counters, the session info and the
-  20-session window of step bars, packed as base64 f64. It does not grow
-  with history. At 20 names and `ticks_per_step=30` it is about 15 KB plus
-  the window, 230 KB once the window is full. The window's size scales with
-  steps per session, so at `ticks_per_step=1` it would be about 6 MB (see
-  the change requests).
+  step bars of the session in progress, packed as f64. It does not grow with
+  history: about 15 KB at 20 names.
 - `fills` gets every fill.
 - `day_bars` gets each finished session's day bars, one packed row.
+- `step_bars` gets each finished session's step bars at its close, and is
+  trimmed at session boundaries (see Bars).
+- `news` gets each headline as it is released.
 - `orders` gets each order once it is finished (filled, cancelled, expired or
   rejected).
 - `calls` is the call log, one entry per mutating call: `seq`, `op`, `args`,
   the `state_hash` after it, the clock and the wall time.
 
 `FileStore(root, fsync=False)` keeps one directory per session:
-`head.json`, `record-<seq>.json` and `<stream>.jsonl`. A commit truncates each
-stream to its committed size, appends, writes the new record file, and then
-replaces `head.json` by writing a temp file and renaming it. The rename is the
-commit point. A process killed before it leaves the previous commit readable;
-lines appended by the unfinished commit are ignored and overwritten by the
-next one. `fsync=True` also flushes to the device, for power loss.
+`head.json`, `record-<seq>.json` and `<stream>.jsonl` (`<stream>.<g>.jsonl`
+after a stream's g-th trim). A commit truncates each stream to its committed
+size, appends, writes the new record file, and then replaces `head.json` by
+writing a temp file and renaming it. The rename is the commit point. A
+process killed before it leaves the previous commit readable; lines appended
+by the unfinished commit are ignored and overwritten by the next one.
+`fsync=True` also flushes to the device, for power loss.
+
+`trim_stream(session_id, name, keep_last)` writes the kept entries to the
+stream's next generation file and then replaces `head.json` to point at it,
+so the same rename is its commit point and a reader sees the stream whole,
+before or after. The old generation is deleted afterwards; a reader in
+another process that finds it gone reads `head.json` again. `MemoryStore`
+trims under its lock.
 
 The store keeps floats bit for bit. The engine's snapshot carries its
 generator position as f64 values, and several of them are NaN bit patterns.
@@ -296,15 +331,15 @@ hand a root from one process to the next, and not enough for two writers.
 
 | code | when |
 |---|---|
-| `invalid_request` | bad config (unnamed preset, `universe_size` outside 1 to `max_universe`, negative seed, cash not finite and positive, `max_leverage` not positive, `ticks_per_step` outside 1 to 390); owner not a non-empty string; bad `side`, `type`, `time_in_force` or `client_order_id`; unknown field in a dict request; `advance` with steps below 1 or an unknown `until`, or over the tick cap; unknown `status` filter; negative `since_day`; cancelling a finished order; `bars` with an unknown ticker, resolution or a bad `since_day` or `limit` |
+| `invalid_request` | bad config (unnamed preset, `universe_size` outside 1 to `max_universe`, negative seed, cash not finite and positive, `max_leverage` not positive, `ticks_per_step` outside 1 to 390); owner not a non-empty string; bad `side`, `type`, `time_in_force` or `client_order_id`; unknown field in a dict request; `advance` with steps below 1 or an unknown `until`, or over the tick cap; unknown `status` filter; negative `since_day`; cancelling a finished order; `bars` with an unknown ticker, resolution or a bad `since_day` or `limit`; `news` with a negative `since_day` or `since_tick` or a bad `limit` |
 | `not_found` | no such session, a malformed id, another owner's session (same message as a missing one), no such order |
 | `invalid_order` | unknown ticker; quantity not finite and positive, or above 1e12; limit without a price; price not finite and positive, or above 1e9; market order with a price |
-| `insufficient_buying_power` | the order's projected fill is above `max_leverage` and above the account's leverage (or, insolvent, adds gross exposure) |
+| `insufficient_buying_power` | the order's projected fill is above `max_leverage` and above the account's leverage, or the account is insolvent and the order adds gross exposure (message begins "insolvent") |
 | `session_closed` | place, cancel, advance, fork or close on a closed session |
 | `conflict` | `client_order_id` reused with a different body |
 | `internal` | a bug, or the store refused a commit; the call is not applied |
 
-Reads (`info`, `observe`, `orders`, `fills`, `bars`, `calls`) still work on a closed
+Reads (`info`, `observe`, `orders`, `fills`, `bars`, `news`, `calls`) still work on a closed
 session. `orders(status=...)` takes the five statuses plus `"open"`,
 `"closed"` and `"all"`.
 
@@ -352,30 +387,38 @@ The test sets pt-v19's row to the real figures and sees the caveat go.
 
 ## Performance
 
-Measured on 2026-09-23 on the shared 10-core Apple silicon Mac, at a load
-average of 11 from other agents' jobs. The bare engine ran at half the speed
-it had earlier the same day (76 sessions a second against 153), so read the
-service against the bare engine in the same run rather than as absolute
-numbers. 20 names, pt-v19, `ticks_per_step=30` (13 steps a session), with the
-20-session step-bar window already full.
+Measured on 2026-09-23 on the shared 10-core Apple silicon Mac at a load
+average of 9 to 11 from other agents' jobs, so the absolute numbers move by a
+quarter from run to run. 20 names, pt-v19, `ticks_per_step=30` (13 steps a
+session), with 40 sessions already run so the step-bar window is full.
 
-| | FileStore | MemoryStore |
+Bytes written per one-step `advance` commit with `FileStore`, averaged over
+390 commits (30 sessions, trims included):
+
+| core | record | bytes written per commit |
 |---|---|---|
-| `advance(1)`, calls a second (one 30-tick step each) | 149 | 217 |
-| `place_order` then `advance(1)`, pairs a second | 109 | 177 |
-| `advance(until="close")`, sessions a second | 45 | 59 |
-| `advance(20, until="close")`, sessions a second | 59 | 65 |
-| `observe`, calls a second | 3,970 | 5,160 |
-| bare engine, 13 `run_session` calls, sessions a second | 76 | |
+| contract 0.3 (window in the record) | 229 KB | about 230 KB |
+| contract 0.4 (window in a trimmed stream) | 15 KB | 24 KB |
 
-Whole sessions through the service run at 60% to 80% of the bare engine,
-because the commit happens once per call. A one-step call spends about a
-sixth of its time in `run_session`. The rest is the commit (engine snapshot
-and hash, JSON of a 230 KB record, two renames) and the observation that
-`advance` returns. Before the step-bar window existed, and with the machine
-less loaded, the same one-step call ran at 358 a second with `FileStore`.
-Rebuilding a session from disk and observing it, with 200 fills of history,
-ran 33 times a second, and a fork 19 times.
+The 24 KB is the record, `head.json`, the call log line, the fills, and each
+close's step-bar entry and every 20th session's trim, spread over the
+session's commits.
+
+One-step `advance` calls a second with `FileStore`, the two cores run
+alternately three times each on the same machine (median, range):
+
+| core | calls a second |
+|---|---|
+| contract 0.3 | 144 (135 to 177) |
+| contract 0.4 | 183 (158 to 218) |
+
+In the same session `MemoryStore` ran 314 one-step calls a second.
+`advance(until="close")` ran 41 sessions a second against 63 for the bare
+engine stepping the same 13 steps, so whole sessions through the service run
+at about two thirds of the engine. A one-step call spends about a sixth of its
+time in `run_session`. Most of the rest is the commit: engine snapshot and
+hash, JSON of the record, two renames. Earlier in the day, on a quieter
+machine and before bars existed, the one-step call ran at 358 a second.
 
 The benchmark:
 
@@ -387,6 +430,7 @@ from tradefloor.serve.types import SessionConfig
 
 svc = LocalSessionService(FileStore("/tmp/bench"))
 sid = svc.open("local", SessionConfig(universe_size=20)).session_id
+svc.advance("local", sid, 20, until="close")
 svc.advance("local", sid, 20, until="close")
 t, n = time.perf_counter(), 0
 while time.perf_counter() - t < 3:
@@ -403,12 +447,11 @@ print(n / (time.perf_counter() - t), "steps a second")
 - For a limit placed while the market is closed, the marketable test uses the
   book at the close. The next open can differ. The fill test at the step's
   start still applies, so a limit never fills worse than its price.
-- `news` is the current news day only. An `advance` that crosses several days
-  shows the last day's headlines, and earlier days' headlines are not
-  available afterwards.
-- The step-bar window is rewritten on every commit. That costs about 230 KB a
-  commit at 20 names and 30-tick steps, and grows with names and with steps
-  per session.
+- The `step_bars` stream holds up to 40 sessions on disk for a 20-session
+  window. The `day_bars`, `fills`, `orders`, `news` and `calls` streams grow
+  with the session, by design.
+- A `headlines` callable is asked after every step, which costs an engine
+  snapshot per step if it reads one; the default source is asked once a day.
 - One weekday, no calendar, and `day` counts sessions.
 - One writer per store root.
 - The engine's own `order_log` lives only in memory, and a rebuilt engine
@@ -421,39 +464,25 @@ print(n / (time.perf_counter() - t), "steps a second")
 
 ## Contract change requests
 
-Decided in contract 0.2: risk-reducing trades pass the leverage cap (done),
-`steps` counts closes or opens with `until`, cumulative sweeps and partial
-market fills are written down, `leverage` is null with `insolvent` true,
-`from_dict` rebuilds nested types, `SessionStore` is in `types.py` (store.py
-imports it), the open edge cases are decided, and `observe` uses
-`headlines_for`. Moving the long-run table into `tradefloor.envelope` is
-deferred, so it stays in `core.LONG_RUN_CHECK`.
+Everything the core asked for is decided. Contract 0.2 took the leverage
+rule, `steps` with `until`, cumulative sweeps and partial fills, null leverage
+with `insolvent`, nested `from_dict`, `SessionStore` in `types.py`, the edge
+cases, and `headlines_for` in `observe`. Contract 0.4 took the insolvency
+rule (trades that do not add gross exposure, reason "insolvent"),
+`SessionStore.trim_stream`, and the news log. Moving the long-run table into
+`tradefloor.envelope` is deferred, so it stays in `core.LONG_RUN_CHECK`.
 
-Open:
-
-1. Insolvent accounts under the cap. The 0.2 rule compares projected
-   leverage with the account's leverage now, which is undefined at net worth
-   zero or below. Read literally, nothing is "above" an infinite leverage, so
-   an insolvent account could add any exposure. The core instead lets an
-   insolvent account's fill through only if it does not add gross exposure.
-   The contract should say which it means.
-2. The step-bar window and small steps. Keeping the window bounded inside the
-   record means rewriting it on every commit: 230 KB at 20 names and 30-tick
-   steps, about 6 MB at 20 names and 1-tick steps. Two ways out: an optional
-   store method that trims a stream to its last n entries (the window would
-   then be appended once per session and never rewritten), or a cap on step
-   bars by count rather than by sessions.
-3. A news feed. `headlines_for` returns one day, so an agent that advances
-   past a day with news never sees it. HEADLINES.md suggests the core keep a
-   log of released headlines and return those since the agent's previous
-   observation. That needs a place for the cursor (per session is enough in
-   0.3, since one agent drives a session) and a line in the contract.
+One point the contract leaves open, decided here: `news(limit=n)` keeps the
+most recent n entries at or after the clock point, the way `bars(limit=n)`
+does. A client paging forward through the log should pass `since_day` and
+`since_tick` and no limit.
 
 ## Tests
 
 In `tests/serve/`: `test_core_determinism.py`, `test_core_orders.py`,
 `test_core_sessions.py`, `test_core_crash.py`, `test_core_leverage.py`,
-`test_core_bars.py`, `test_core_contract03.py` and `test_store_files.py`, 172
-tests in about 7 seconds with `pytest -n 2` on the loaded machine. The 17
+`test_core_bars.py`, `test_core_contract03.py`, `test_core_contract04.py` and
+`test_store_files.py`, 184 tests in about 10 seconds with `pytest -n 2` on the
+loaded machine. The 17
 headlines tests pass beside them, and `python tests/known_answer.py` still
 gives `sim f05e769f...3a2a`.
