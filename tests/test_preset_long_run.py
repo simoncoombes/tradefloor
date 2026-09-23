@@ -54,6 +54,12 @@ def _write(tmp_path, doc):
 
 def test_the_verdict_lands_on_the_record_it_names_and_nothing_else_moves(out):
     before = json.loads((out / "pt-v19.json").read_text())
+    # The committed record may already carry a block -- pt-v19's has since
+    # 209cbd1 (the fourth composition's hand-scored 7 of 15), and every
+    # record written by `--long-run` will -- and the write REPLACES it. So
+    # "nothing else moves" is everything but that block; the assertions on
+    # `block` below are what say the new verdict landed.
+    before.pop("long_run", None)
     assert rec_tool.write_long_run(_write(out, verdict())) == 0
     after = json.loads((out / "pt-v19.json").read_text())
     block = after.pop("long_run")
