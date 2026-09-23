@@ -24,7 +24,7 @@ pytest.importorskip("fastapi", reason="the HTTP server is an opt-in extra")
 from fastapi.testclient import TestClient  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 
-from fakes import FakeSessionService, core_available, make_service  # noqa: E402
+from fakes import FakeSessionService, core_available, core_has, make_service  # noqa: E402
 from tradefloor.serve import types as T  # noqa: E402
 from tradefloor.serve.http import (  # noqa: E402
     STATUS_BY_CODE,
@@ -35,6 +35,9 @@ from tradefloor.serve.http import (  # noqa: E402
 from tradefloor.serve.types import ERROR_CODES, ServeError  # noqa: E402
 
 CORE = pytest.mark.skipif(not core_available(), reason="tradefloor.serve.core has not landed")
+#: The core's contract 0.3 items (bars, updated_at, close cancels, step
+#: volume) land on feat/serve-core after the contract; `bars` marks them.
+CORE03 = pytest.mark.skipif(not core_has("bars"), reason="the core has not landed contract 0.3")
 SMALL = {"universe_size": 4, "ticks_per_step": 30}
 
 
@@ -71,7 +74,7 @@ def _advance(client, sid, **body):
 def _err(r, status, code):
     assert r.status_code == status, (r.status_code, r.text)
     body = r.json()
-    assert set(body) == {"code", "message"}, body
+    assert set(body) - {"retry_after"} == {"code", "message"}, body
     assert body["code"] == code, body
     assert body["message"]
     return body
@@ -83,6 +86,7 @@ def _err(r, status, code):
 def test_open_returns_a_session_info(client):
     info = _open(client, label="first")
     assert set(info) == _keys(T.SessionInfo)
+    assert T.SessionInfo.from_dict(info).to_dict() == info
     assert set(info["config"]) == _keys(T.SessionConfig)
     assert len(info["session_id"]) == 32 and int(info["session_id"], 16) >= 0
     assert info["owner"] == "local"
@@ -111,6 +115,8 @@ def test_observe_shape(client):
     info = _open(client)
     obs = client.get(f"/v1/sessions/{info['session_id']}/observation").json()
     assert set(obs) == _keys(T.Observation)
+    assert T.Observation.from_dict(obs).to_dict() == obs
+    assert obs["account"]["insolvent"] is False and obs["account"]["leverage"] == 0
     assert [q["ticker"] for q in obs["quotes"]] == info["tickers"]
     assert set(obs["quotes"][0]) == _keys(T.Quote)
     assert set(obs["account"]) == _keys(T.Account)
@@ -129,6 +135,7 @@ def test_a_market_order_fills_at_the_next_step(client):
     assert order["status"] == "accepted"            # NOT filled when placed
     res = _advance(client, sid, steps=1)
     assert set(res) == _keys(T.AdvanceResult)
+    assert T.AdvanceResult.from_dict(res).to_dict() == res
     assert [f["order_id"] for f in res["fills"]] == [order["order_id"]]
     assert set(res["fills"][0]) == _keys(T.Fill)
     assert res["fills"][0]["liquidity"] == "taker"
@@ -231,6 +238,7 @@ def test_a_closed_session_reports_and_refuses(client):
     assert r.status_code == 200, r.text
     report = r.json()
     assert set(report) == _keys(T.SessionReport)
+    assert T.SessionReport.from_dict(report).to_dict() == report
     assert report["caveats"] and all(isinstance(c, str) and c for c in report["caveats"])
     assert client.get(f"/v1/sessions/{sid}").json()["status"] == "closed"
     _err(_order(client, sid, ticker=ticker, side="buy", quantity=1), 409, "session_closed")
@@ -322,12 +330,15 @@ def test_a_resolver_that_refuses_is_401_with_a_challenge(fake):
 
 def test_rate_limits_are_429_with_retry_after(fake):
     def resolver(request):
-        exc = ServeError("rate_limited", "slow down")
-        exc.retry_after = 2.5
-        raise exc
+        raise ServeError("rate_limited", "slow down", retry_after=2.5)
     r = TestClient(create_app(fake, owner_resolver=resolver)).get("/v1/sessions")
-    _err(r, 429, "rate_limited")
+    assert _err(r, 429, "rate_limited")["retry_after"] == 2.5
     assert r.headers["retry-after"] == "3"
+    def quota(request):
+        raise ServeError("quota_exceeded", "no more today")
+    r = TestClient(create_app(fake, owner_resolver=quota)).get("/v1/sessions")
+    assert _err(r, 429, "quota_exceeded") == {"code": "quota_exceeded", "message": "no more today"}
+    assert "retry-after" not in r.headers
 
 
 def test_a_resolver_returning_no_owner_is_internal(fake):
@@ -377,7 +388,7 @@ def test_schema_failures_are_invalid_request_naming_the_field(fake):
     _err(_order(client, sid, side="buy", quantity=1), 400, "invalid_request")     # no ticker
     _err(client.post(f"/v1/sessions/{sid}/advance", json={"steps": 0}), 400, "invalid_request")
     _err(client.post(f"/v1/sessions/{sid}/advance", json={"until": "tomorrow"}), 400, "invalid_request")
-    _err(client.get(f"/v1/sessions/{sid}/orders", params={"status": "open"}), 400, "invalid_request")
+    _err(client.get(f"/v1/sessions/{sid}/orders", params={"status": "working"}), 400, "invalid_request")
     _err(client.get(f"/v1/sessions/{sid}/fills", params={"since_day": -1}), 400, "invalid_request")
     r = client.post("/v1/sessions", content=b"{not json", headers={"content-type": "application/json"})
     _err(r, 400, "invalid_request")
@@ -475,13 +486,14 @@ def test_the_openapi_document_covers_every_route(fake):
         ("/v1/sessions/{session_id}/orders/{order_id}", "get"),
         ("/v1/sessions/{session_id}/orders/{order_id}", "delete"),
         ("/v1/sessions/{session_id}/fills", "get"), ("/v1/sessions/{session_id}/advance", "post"),
+        ("/v1/sessions/{session_id}/bars/{ticker}", "get"),
         ("/v1/sessions/{session_id}/fork", "post"), ("/v1/sessions/{session_id}/close", "post"),
         ("/v1/describe", "get"), ("/v1/health", "get"),
         ("/broker/{session_id}/v2/account", "get"), ("/broker/{session_id}/v2/orders", "post"),
     ]:
         assert method in paths.get(path, {}), (method, path)
     schemas = doc["components"]["schemas"]
-    for name in ("SessionInfo", "Observation", "Order", "Fill", "AdvanceResult", "SessionReport",
+    for name in ("SessionInfo", "Observation", "Order", "Fill", "AdvanceResult", "SessionReport", "Bar",
                  "SessionConfigBody", "OrderRequestBody"):
         assert name in schemas, name
     assert schemas["OrderRequestBody"]["additionalProperties"] is False
@@ -550,6 +562,23 @@ def _script(client):
     rec("too-far", client.post(adv, json={"steps": 21, "until": "close"}))
     rec("list-accepted", client.get(orders, params={"status": "accepted"}),
         lambda b: [o["ticker"] for o in b])
+    for status in ("all", "open", "closed", "filled", "expired"):
+        rec(f"list-{status}", client.get(orders, params={"status": status}),
+            lambda b: [o["order_id"] for o in b])
+    rec("updated", client.get(orders), lambda b: [(o["status"], o["updated_at"]["day"],
+                                                   o["updated_at"]["tick"]) for o in b])
+    rec("still-open", client.post(orders, json={"ticker": t1, "side": "buy", "quantity": 1,
+                                                "type": "limit", "limit_price": far,
+                                                "time_in_force": "gtc"}), status)
+    bars = f"/v1/sessions/{sid}/bars/{t0}"
+    rec("day-bars", client.get(bars), lambda b: [(x["day"], x["step"]) for x in b])
+    rec("step-bars", client.get(bars, params={"resolution": "step"}),
+        lambda b: [(x["day"], x["step"]) for x in b])
+    rec("bars-limit", client.get(bars, params={"resolution": "step", "limit": 3, "since_day": 1}),
+        lambda b: [(x["day"], x["step"]) for x in b])
+    rec("bars-unknown", client.get(f"/v1/sessions/{sid}/bars/NOPE"))
+    rec("step-volume", client.get(f"/v1/sessions/{sid}/observation"),
+        lambda b: all(q["step_volume"] is not None and q["step_volume"] > 0 for q in b["quotes"]))
     fork = rec("fork", client.post(f"/v1/sessions/{sid}/fork", json={"label": "f"}),
                lambda b: b["parent_session_id"] == sid, lambda b: b["config"]["label"])
     rec("fork-orders", client.get(f"/v1/sessions/{fork['session_id']}/orders"),
@@ -563,7 +592,7 @@ def _script(client):
     return out
 
 
-@CORE
+@CORE03
 def test_the_fake_does_what_the_core_does(tmp_path):
     fake = _script(TestClient(create_app(FakeSessionService())))
     core = _script(TestClient(create_app(make_service("core", tmp_path / "sessions"))))
@@ -583,3 +612,113 @@ def test_a_callable_object_with_an_async_call_is_awaited(fake):
             return "object-owner"
     client = TestClient(create_app(fake, owner_resolver=Resolver()))
     assert client.post("/v1/sessions", json=SMALL).json()["owner"] == "object-owner"
+
+
+# -- contract 0.2 and 0.3 -----------------------------------------------------------
+
+
+@pytest.fixture(params=["fake", pytest.param("core", marks=[CORE, CORE03])])
+def service03(request, tmp_path):
+    return make_service(request.param, tmp_path / "sessions")
+
+
+def test_orders_filter_by_all_open_closed_and_status(service03):
+    client = TestClient(create_app(service03))
+    info = _open(client)
+    sid, t0 = info["session_id"], info["tickers"][0]
+    last = client.get(f"/v1/sessions/{sid}/observation").json()["quotes"][0]["last"]
+    filled = _order(client, sid, ticker=t0, side="buy", quantity=1).json()["order_id"]
+    resting = _order(client, sid, ticker=t0, side="buy", quantity=1, type="limit",
+                     limit_price=round(last * 0.5, 2), time_in_force="gtc").json()["order_id"]
+    _advance(client, sid, steps=1)
+    ids = lambda status: [o["order_id"] for o in client.get(  # noqa: E731
+        f"/v1/sessions/{sid}/orders", params={"status": status} if status else {}).json()]
+    assert ids(None) == ids("all") == [filled, resting]
+    assert ids("open") == ids("accepted") == [resting]
+    assert ids("closed") == ids("filled") == [filled]
+
+
+def test_orders_carry_updated_at(service03):
+    client = TestClient(create_app(service03))
+    info = _open(client)
+    sid, t0 = info["session_id"], info["tickers"][0]
+    o = _order(client, sid, ticker=t0, side="buy", quantity=1).json()
+    assert o["updated_at"] == o["submitted_at"]
+    _advance(client, sid, steps=2)
+    got = client.get(f"/v1/sessions/{sid}/orders/{o['order_id']}").json()
+    assert got["status"] == "filled" and got["updated_at"]["step"] == 0 and got["updated_at"]["tick"] == 0
+
+
+def test_closing_a_session_cancels_its_open_orders(service03):
+    client = TestClient(create_app(service03))
+    info = _open(client)
+    sid, t0 = info["session_id"], info["tickers"][0]
+    last = client.get(f"/v1/sessions/{sid}/observation").json()["quotes"][0]["last"]
+    o = _order(client, sid, ticker=t0, side="buy", quantity=1, type="limit",
+               limit_price=round(last * 0.5, 2), time_in_force="gtc").json()
+    _advance(client, sid, steps=1)
+    client.post(f"/v1/sessions/{sid}/close")
+    got = client.get(f"/v1/sessions/{sid}/orders/{o['order_id']}").json()
+    assert got["status"] == "cancelled" and got["reason"] == "session closed"
+    assert got["updated_at"]["step"] == 1
+    assert client.get(f"/v1/sessions/{sid}/orders", params={"status": "open"}).json() == []
+
+
+def test_bars(service03):
+    client = TestClient(create_app(service03))
+    info = _open(client)
+    sid, t0 = info["session_id"], info["tickers"][0]
+    base = f"/v1/sessions/{sid}/bars/{t0}"
+    assert client.get(base, params={"resolution": "step"}).json() == []
+    _advance(client, sid, until="close")
+    _advance(client, sid, steps=2)
+    days = client.get(base).json()
+    assert [(b["day"], b["step"]) for b in days] == [(0, None), (1, None)]
+    assert {tuple(sorted(b)) for b in days} == {tuple(sorted(_keys(T.Bar)))}
+    assert all(T.Bar.from_dict(b).to_dict() == b for b in days)
+    steps = client.get(base, params={"resolution": "step"}).json()
+    assert len(steps) == 13 + 2
+    assert [b["step"] for b in steps[-2:]] == [1, 2] and steps[-1]["day"] == 1
+    for b in steps:
+        assert b["low"] <= min(b["open"], b["close"]) and b["high"] >= max(b["open"], b["close"])
+    obs = client.get(f"/v1/sessions/{sid}/observation").json()
+    q = next(x for x in obs["quotes"] if x["ticker"] == t0)
+    assert steps[-1]["close"] == q["last"] and days[-1]["close"] == q["last"]
+    assert days[-1]["volume"] == q["volume"] and steps[-1]["volume"] == q["step_volume"]
+    assert days[0]["close"] == steps[12]["close"]
+    assert client.get(base, params={"since_day": 1}).json() == days[1:]
+    assert client.get(base, params={"resolution": "step", "limit": 3}).json() == steps[-3:]
+    _err(client.get(f"/v1/sessions/{sid}/bars/NOPE"), 400, "invalid_request")
+    _err(client.get(base, params={"resolution": "minute"}), 400, "invalid_request")
+    _err(client.get(base, params={"limit": 0}), 400, "invalid_request")
+
+
+def test_a_partial_fill_passes_through(fake):
+    client = TestClient(create_app(fake))
+    info = _open(client, cash=1e9, max_leverage=None)
+    sid, t0 = info["session_id"], info["tickers"][0]
+    o = _order(client, sid, ticker=t0, side="buy", quantity=300_000).json()
+    _advance(client, sid, steps=1)
+    got = client.get(f"/v1/sessions/{sid}/orders/{o['order_id']}").json()
+    assert got["status"] == "filled" and got["filled_quantity"] == 200_000
+    assert got["reason"].startswith("partial")
+
+
+def test_an_insolvent_account_has_null_leverage(fake):
+    class Insolvent(FakeSessionService):
+        def _account(self, s):
+            a = super()._account(s)
+            a.net_worth, a.leverage, a.insolvent, a.gross_exposure = -5.0, None, True, 100.0
+            return a
+    client = TestClient(create_app(Insolvent()))
+    sid = _open(client)["session_id"]
+    account = client.get(f"/v1/sessions/{sid}/observation").json()["account"]
+    assert account["leverage"] is None and account["insolvent"] is True
+    assert client.post(f"/v1/sessions/{sid}/close").json()["account"]["leverage"] is None
+
+
+def test_calls_are_not_serialised_by_default(fake):
+    import contextlib
+    assert isinstance(create_app(fake).state.service_lock, contextlib.nullcontext)
+    assert not isinstance(create_app(fake, serialize=True).state.service_lock,
+                          contextlib.nullcontext)

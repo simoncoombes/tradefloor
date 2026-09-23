@@ -19,8 +19,8 @@ import pytest
 httpx = pytest.importorskip("httpx")
 pytest.importorskip("uvicorn", reason="the HTTP server is an opt-in extra")
 
-from fakes import core_available  # noqa: E402
-from tradefloor.serve.__main__ import _is_loopback  # noqa: E402
+from fakes import core_available, core_has  # noqa: E402
+from tradefloor.serve.http import is_loopback as _is_loopback  # noqa: E402
 
 CORE = pytest.mark.skipif(not core_available(), reason="tradefloor.serve.core has not landed")
 HERE = Path(__file__).resolve().parent
@@ -87,8 +87,44 @@ def test_the_module_serves_http():
         assert server.http.get(f"/broker/{info['session_id']}/v2/clock").json()["is_open"] is True
         assert server.http.get("/openapi.json").status_code == 200
         assert server.http.get("/docs").status_code == 200
+        # MCP is served beside the API.
+        init = {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                "params": {"protocolVersion": "2025-06-18", "capabilities": {},
+                           "clientInfo": {"name": "t", "version": "0"}}}
+        r = server.http.post("/mcp", json=init,
+                             headers={"Accept": "application/json, text/event-stream"})
+        assert r.status_code == 200 and r.json()["result"]["serverInfo"]["name"] == "tradefloor-trading"
+        # A page that rebinds a hostname to 127.0.0.1 sends its own Host header.
+        assert server.http.get("/v1/health", headers={"Host": "evil.example"}).status_code == 400
+        assert server.http.post("/mcp", json=init, headers={
+            "Host": "evil.example", "Accept": "application/json, text/event-stream"}).status_code == 400
     finally:
         server.stop()
+
+
+def test_the_mcp_module_serves_streamable_http():
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(HERE), os.environ.get("PYTHONPATH", "")]))
+    port = _free_port()
+    proc = subprocess.Popen([sys.executable, "-m", "tradefloor.serve.mcp", "--http", "--port",
+                             str(port), "--service", "fakes:FakeSessionService"],
+                            env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        init = {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                "params": {"protocolVersion": "2025-06-18", "capabilities": {},
+                           "clientInfo": {"name": "t", "version": "0"}}}
+        deadline = time.time() + 60
+        while True:
+            try:
+                r = httpx.post(f"http://127.0.0.1:{port}/mcp", json=init, timeout=5,
+                               headers={"Accept": "application/json, text/event-stream"})
+                break
+            except httpx.HTTPError:
+                assert proc.poll() is None and time.time() < deadline, proc.stderr.read()
+                time.sleep(0.1)
+        assert r.status_code == 200 and r.json()["result"]["serverInfo"]["name"] == "tradefloor-trading"
+    finally:
+        proc.terminate()
+        proc.wait(10)
 
 
 def test_the_module_hands_mcp_to_the_mcp_server():
@@ -124,7 +160,7 @@ def _after(http, sid, tickers):
     return res["observation"]["state_hash"]
 
 
-def _snapshot(http, sid):
+def _snapshot(http, sid, tickers):
     b = f"/broker/{sid}/v2"
     return {
         "info": http.get(f"/v1/sessions/{sid}").json(),
@@ -135,6 +171,12 @@ def _snapshot(http, sid):
         "positions": http.get(f"{b}/positions").json(),
         "broker_orders": http.get(f"{b}/orders", params={"status": "all"}).json(),
         "clock": http.get(f"{b}/clock").json(),
+        **({"day_bars": http.get(f"{b}/stocks/bars", params={"symbols": ",".join(tickers),
+                                                              "timeframe": "1Day",
+                                                              "start": "2000-01-01"}).json(),
+            "step_bars": [http.get(f"/v1/sessions/{sid}/bars/{t}",
+                                   params={"resolution": "step"}).json() for t in tickers]}
+           if core_has("bars") else {}),
     }
 
 
@@ -146,13 +188,13 @@ def test_a_server_killed_mid_session_resumes_bit_for_bit(tmp_path):
         info = first.http.post("/v1/sessions", json=SMALL).json()
         sid = info["session_id"]
         _calls(first.http, sid, info["tickers"])
-        before = _snapshot(first.http, sid)
+        before = _snapshot(first.http, sid, info["tickers"])
     finally:
         first.kill()
 
     second = Server("--store", str(store))
     try:
-        after = _snapshot(second.http, sid)
+        after = _snapshot(second.http, sid, info["tickers"])
         for key in before:
             assert after[key] == before[key], key
         resumed = _after(second.http, sid, info["tickers"])

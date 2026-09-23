@@ -44,6 +44,7 @@ from typing import Any, Callable, Iterable, Literal, Optional, Sequence
 from tradefloor.serve.types import (
     CONTRACT_VERSION,
     AdvanceResult,
+    Bar,
     Clock,
     Fill,
     Observation,
@@ -68,6 +69,8 @@ TICKS_PER_SESSION = 390
 MAX_UNIVERSE = 40
 MAX_SESSIONS_PER_ADVANCE = 20
 MAX_TICKS_PER_ADVANCE = MAX_SESSIONS_PER_ADVANCE * TICKS_PER_SESSION
+STEP_BAR_SESSIONS = 20
+ORDER_STATUSES = ("accepted", "filled", "cancelled", "expired", "rejected")
 
 #: HTTP status by error code (CONTRACT.md section 6).
 STATUS_BY_CODE = {
@@ -148,12 +151,16 @@ def describe_payload() -> dict[str, Any]:
             "advance(steps=n) runs n steps, crossing the close and the next open as "
             "needed; until='close' runs to the end of the current session; "
             "until='next_open' runs to the first step of the next one; with either, "
-            "steps=n does it n times."
+            "steps=n counts closes or opens."
         ),
         "orders": {
             "market": ("Queued, then filled at the START of the next step, before the "
                        "market moves, at the impact-aware price the book gives. Market "
-                       "orders move the market."),
+                       "orders move the market. Several on one side of one name in one "
+                       "step sweep the book cumulatively, so splitting an order does not "
+                       "buy a better price. An order larger than the book can absorb fills "
+                       "partially: status 'filled', filled_quantity below quantity, and a "
+                       "reason beginning 'partial'. The rest is dropped, not left resting."),
             "limit": ("Rest on the server. After each step a resting buy fills in full "
                       "at its limit if the step's low reached it, a sell if the step's "
                       "high did. No partial fills. Resting fills do NOT move the market. "
@@ -164,8 +171,21 @@ def describe_payload() -> dict[str, Any]:
                                 "order with the same id returns the original; a "
                                 "different order under the same id is a conflict."),
             "shorting": "Allowed within max_leverage.",
-            "leverage": "Gross exposure divided by net worth, capped by max_leverage.",
+            "leverage": ("Gross exposure divided by net worth, capped by max_leverage. A "
+                         "fill is refused only when it would take leverage above the cap "
+                         "AND above where it is now, so a trade that reduces risk always "
+                         "passes. leverage is null, and insolvent true, when net worth is "
+                         "at or below zero."),
         },
+        "history": (
+            "bars(ticker, resolution) returns OHLCV bars oldest first: 'day' bars for "
+            f"every session traded, 'step' bars for the last {STEP_BAR_SESSIONS} sessions. "
+            "Today's bar is included up to the current step. Quote.step_volume is the "
+            "shares traded in the last step."),
+        "headlines": (
+            "observe returns the current day's headlines once the news reaches the "
+            "market. A headline says which company has news and its direction, never "
+            "its size."),
         "units": {
             "quantity": "shares",
             "prices": "currency units per share",
@@ -218,6 +238,60 @@ def request_api_key(request: Any) -> Optional[str]:
     return None
 
 
+async def resolve_owner(resolver: Callable[[Any], Any], request: Any) -> str:
+    """Run an owner resolver (sync or async) for `request`. A sync resolver
+    runs on the thread pool, since it may block on a key lookup. Raises
+    ServeError as the resolver does, or `internal` when it returns no owner."""
+    if inspect.iscoroutinefunction(resolver):
+        owner = await resolver(request)
+    else:
+        from starlette.concurrency import run_in_threadpool
+        owner = await run_in_threadpool(resolver, request)
+        if inspect.isawaitable(owner):
+            owner = await owner
+    if not isinstance(owner, str) or not owner:
+        raise ServeError("internal", "the owner resolver returned no owner")
+    return owner
+
+
+def middleware_stack(middleware: Sequence[Any]) -> list[Any]:
+    """Starlette `Middleware` entries from `Middleware(...)`, `(cls, options)`
+    pairs or bare classes, outermost first."""
+    from starlette.middleware import Middleware
+
+    stack = []
+    for m in middleware:
+        if isinstance(m, Middleware):
+            stack.append(m)
+        elif isinstance(m, tuple):
+            cls, opts = m
+            stack.append(Middleware(cls, **(opts or {})))
+        else:
+            stack.append(Middleware(m))
+    return stack
+
+
+def is_loopback(host: str) -> bool:
+    if host == "localhost":
+        return True
+    import ipaddress
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def loopback_guard(host: str) -> list[Any]:
+    """For a server bound to 127.0.0.1 or localhost: refuse requests whose Host
+    header is not one of those, so a web page cannot reach the server through
+    DNS rebinding. Self-run only; a hosted server checks hosts at its edge."""
+    if host not in ("127.0.0.1", "localhost"):
+        return []
+    from starlette.middleware import Middleware
+    from starlette.middleware.trustedhost import TrustedHostMiddleware
+    return [Middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])]
+
+
 def error_response(exc: ServeError) -> Any:
     """The JSON response for a ServeError, for middleware that refuses a
     request itself (an exception raised inside middleware does not reach the
@@ -227,7 +301,7 @@ def error_response(exc: ServeError) -> Any:
     headers: dict[str, str] = {}
     if exc.code == "unauthorized":
         headers["WWW-Authenticate"] = "Bearer"
-    retry_after = getattr(exc, "retry_after", None)
+    retry_after = exc.retry_after
     if retry_after is not None and exc.code in ("rate_limited", "quota_exceeded"):
         headers["Retry-After"] = str(max(0, math.ceil(float(retry_after))))
     return JSONResponse(exc.to_dict(), status_code=http_status(exc.code), headers=headers)
@@ -279,23 +353,31 @@ def _default_resolver(owner: str) -> OwnerResolver:
 
 
 def create_app(service: SessionService, *, owner_resolver: Optional[OwnerResolver] = None,
-               middleware: Sequence[Any] = (), serialize: bool = True,
+               middleware: Sequence[Any] = (), serialize: bool = False,
                describe: Optional[Callable[[], dict[str, Any]]] = None,
+               mcp_path: Optional[str] = None,
                title: str = "tradefloor trading session server") -> Any:
     """Build the FastAPI app over `service`.
 
     owner_resolver: `(request) -> owner`, sync or async. Default: every request
         is owner "local". Raise `ServeError("unauthorized", ...)` to refuse a
         request (401), or `ServeError("rate_limited" | "quota_exceeded", ...)`
-        for 429; a `retry_after` attribute on the error becomes `Retry-After`.
+        for 429; the error's `retry_after` (seconds) becomes `Retry-After`.
     middleware: Starlette `Middleware(...)` entries, `(cls, options)` pairs, or
         bare middleware classes, applied outermost first.
-    serialize: hold one lock around every service call. On by default because
-        contract 0.1 does not say a SessionService is thread-safe and FastAPI
-        runs sync routes on a thread pool.
+    serialize: hold one lock around every service call. Off by default:
+        contract 0.3 (section 4d) requires a SessionService to be safe across
+        threads, serialising calls on one session itself, and FastAPI runs sync
+        routes on a thread pool. Turn it on for a service that is not.
     describe: what `GET /v1/describe` serves (default `describe_payload`). A
         wrapper that caps limits lower passes its own, so clients read the
         limits that actually apply.
+    mcp_path: also serve the MCP server over streamable HTTP at this path
+        (e.g. "/mcp"), each request's owner resolved by `owner_resolver`, so a
+        remote agent gets MCP from the same app and the same keys. The app's
+        lifespan runs the MCP session manager: uvicorn runs it; a wrapper that
+        mounts this app inside another must enter
+        `app.state.mcp_session_manager.run()` in its own lifespan.
 
     The service, the lock and the resolver are on `app.state` for a wrapper.
     """
@@ -303,20 +385,25 @@ def create_app(service: SessionService, *, owner_resolver: Optional[OwnerResolve
     from fastapi.exceptions import RequestValidationError
     from fastapi.responses import JSONResponse
     from starlette.exceptions import HTTPException as StarletteHTTPException
-    from starlette.middleware import Middleware
 
     resolver = owner_resolver or _default_resolver(LOCAL_OWNER)
     lock: Any = threading.Lock() if serialize else contextlib.nullcontext()
+    stack = middleware_stack(middleware)
 
-    stack = []
-    for m in middleware:
-        if isinstance(m, Middleware):
-            stack.append(m)
-        elif isinstance(m, tuple):
-            cls, opts = m
-            stack.append(Middleware(cls, **(opts or {})))
+    mcp_endpoint = mcp_manager = None
+    if mcp_path is not None:
+        from tradefloor.serve.mcp import create_mcp_endpoint
+        mcp_endpoint, mcp_manager = create_mcp_endpoint(
+            service, owner_resolver=resolver, path=mcp_path, describe=describe,
+            serialize=serialize)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(app: Any) -> Any:
+        if mcp_manager is None:
+            yield
         else:
-            stack.append(Middleware(m))
+            async with mcp_manager.run():
+                yield
 
     app = FastAPI(
         title=title,
@@ -328,8 +415,10 @@ def create_app(service: SessionService, *, owner_resolver: Optional[OwnerResolve
             "`{\"code\", \"message\"}`. See `GET /v1/describe` for the semantics "
             "and caveats."),
         middleware=stack,
+        lifespan=lifespan,
     )
     app.state.service = service
+    app.state.mcp_session_manager = mcp_manager
     app.state.service_lock = lock
     app.state.owner_resolver = resolver
 
@@ -356,24 +445,10 @@ def create_app(service: SessionService, *, owner_resolver: Optional[OwnerResolve
             "internal", f"unexpected {type(exc).__name__}: {exc}. This is a bug in the "
                         "server; report it with the request that caused it."))
 
-    from starlette.concurrency import run_in_threadpool
-
-    # A coroutine function is awaited here; anything else runs on the thread
-    # pool (it may block on a key lookup), and an awaitable it returns (an
-    # object with an async __call__) is awaited after.
-    is_async = inspect.iscoroutinefunction(resolver)
-
     from fastapi import Request
 
     async def owner_dep(request: Request) -> str:
-        if is_async:
-            owner = await resolver(request)
-        else:
-            owner = await run_in_threadpool(resolver, request)
-            if inspect.isawaitable(owner):
-                owner = await owner
-        if not isinstance(owner, str) or not owner:
-            raise ServeError("internal", "the owner resolver returned no owner")
+        owner = await resolve_owner(resolver, request)
         request.state.owner = owner
         return owner
 
@@ -383,6 +458,10 @@ def create_app(service: SessionService, *, owner_resolver: Optional[OwnerResolve
 
     app.include_router(_native_router(call, owner_dep, describe or describe_payload))
     app.include_router(_broker_router(call, owner_dep), prefix="/broker/{session_id}/v2")
+    app.include_router(_news_router(call, owner_dep), prefix="/broker/{session_id}/v1beta1")
+    if mcp_endpoint is not None:
+        app.add_route(mcp_path, mcp_endpoint, methods=["GET", "POST", "DELETE"],
+                      include_in_schema=False)
     return app
 
 
@@ -468,8 +547,10 @@ def _native_router(call: Callable[..., Any], owner_dep: Callable[..., Any],
     @r.get("/v1/sessions/{session_id}/orders", tags=["orders"], response_model=list[Order],
            summary="List orders")
     def list_orders(session_id: str = SID, owner: str = Owner,
-                    status: Optional[Literal["accepted", "filled", "cancelled", "expired", "rejected"]]
-                    = Query(None, description="Only orders with this status.")) -> Any:
+                    status: Optional[Literal["all", "open", "closed", "accepted", "filled",
+                                             "cancelled", "expired", "rejected"]]
+                    = Query(None, description="all (default), open (accepted), closed "
+                                              "(everything else), or one status.")) -> Any:
         return [o.to_dict() for o in call("orders", owner, session_id, status)]
 
     @r.get("/v1/sessions/{session_id}/orders/{order_id}", tags=["orders"], response_model=Order,
@@ -490,6 +571,17 @@ def _native_router(call: Callable[..., Any], owner_dep: Callable[..., Any],
     def list_fills(session_id: str = SID, owner: str = Owner,
                    since_day: int = Query(0, ge=0, description="Only fills on this day or later.")) -> Any:
         return [f.to_dict() for f in call("fills", owner, session_id, since_day)]
+
+    @r.get("/v1/sessions/{session_id}/bars/{ticker}", tags=["market"], response_model=list[Bar],
+           summary="OHLCV bars for one ticker, oldest first",
+           description=f"'day' bars cover every session traded; 'step' bars the last "
+                       f"{STEP_BAR_SESSIONS} sessions. Today's bar is included up to the "
+                       "current step. An unknown ticker is invalid_request.")
+    def bars(ticker: str, session_id: str = SID, owner: str = Owner,
+             resolution: Literal["day", "step"] = Query("day"),
+             since_day: int = Query(0, ge=0, description="Only bars on this day or later."),
+             limit: Optional[int] = Query(None, ge=1, description="Keep the most recent bars.")) -> Any:
+        return [b.to_dict() for b in call("bars", owner, session_id, ticker, resolution, since_day, limit)]
 
     @r.post("/v1/sessions/{session_id}/advance", tags=["time"], response_model=AdvanceResult,
             summary="Move time forward",
@@ -538,7 +630,6 @@ _ID_NS = uuid.UUID("6f1c0b52-7d0a-4bb0-9a0e-2f3c7e1d9a11")
 
 _ORDER_STATUS = {"accepted": "new", "filled": "filled", "cancelled": "canceled",
                  "expired": "expired", "rejected": "rejected"}
-_OPEN = {"accepted"}
 
 
 def sim_date(day: int) -> date:
@@ -621,14 +712,36 @@ def _session_day(o: Order) -> int:
     return at.day if at.market_open else at.day + 1
 
 
+def is_partial(o: Order) -> bool:
+    """A market order the book could only part fill (contract 0.2): status
+    `filled` with `filled_quantity` below `quantity`. The rest is dropped."""
+    return o.status == "filled" and o.filled_quantity < o.quantity
+
+
+def alpaca_status(o: Order) -> str:
+    """Alpaca's status for an order. A partial fill is `canceled` with a
+    non-zero `filled_qty`, which is how Alpaca reports an order whose unfilled
+    rest will never trade (an IOC order that part filled). `partially_filled`
+    would say the rest is still working, and a bot would wait for it."""
+    if is_partial(o):
+        return "canceled"
+    return _ORDER_STATUS.get(o.status, o.status)
+
+
 def alpaca_order(session_id: str, o: Order, fills: Sequence[Fill] = ()) -> dict[str, Any]:
     """An Order in Alpaca's shape. `fills` are this order's fills, if known."""
     oid = order_uuid(session_id, o.order_id)
     submitted = sim_datetime(o.submitted_at.day, o.submitted_at.tick)
     close = sim_datetime(_session_day(o), TICKS_PER_SESSION)
     filled = sim_datetime(fills[-1].at.day, fills[-1].at.tick) if fills else None
-    expired = close if o.status == "expired" else None
-    updated = max(t for t in (submitted, filled, expired) if t is not None)
+    if o.updated_at is not None:
+        changed = sim_datetime(o.updated_at.day, o.updated_at.tick)
+    else:  # a 0.1 service: the last change is the fill, the close, or the submission
+        changed = filled or (close if o.status == "expired" else submitted)
+    if filled is None and o.status == "filled":
+        filled = changed
+    status = alpaca_status(o)
+    updated = max(t for t in (submitted, filled, changed) if t is not None)
     return {
         "id": oid,
         "client_order_id": o.client_order_id or oid,
@@ -636,10 +749,10 @@ def alpaca_order(session_id: str, o: Order, fills: Sequence[Fill] = ()) -> dict[
         "updated_at": _z(updated),
         "submitted_at": _z(submitted),
         "filled_at": _z(filled) if filled else None,
-        "expired_at": _z(expired) if expired else None,
+        "expired_at": _z(changed) if o.status == "expired" else None,
         "expires_at": _z(close) if o.time_in_force == "day" else None,
-        "canceled_at": None,
-        "failed_at": None,
+        "canceled_at": _z(changed) if status == "canceled" else None,
+        "failed_at": _z(changed) if o.status == "rejected" else None,
         "replaced_at": None,
         "replaced_by": None,
         "replaces": None,
@@ -657,7 +770,7 @@ def alpaca_order(session_id: str, o: Order, fills: Sequence[Fill] = ()) -> dict[
         "time_in_force": o.time_in_force,
         "limit_price": _opt_num(o.limit_price),
         "stop_price": None,
-        "status": _ORDER_STATUS.get(o.status, o.status),
+        "status": status,
         "extended_hours": False,
         "legs": None,
         "trail_percent": None,
@@ -849,7 +962,10 @@ def order_request_from_alpaca(body: dict[str, Any]) -> OrderRequest:
 
 
 def _latest_trade(q: Any, now: datetime) -> dict[str, Any]:
-    return {"t": _z(now), "p": q.last, "s": 0, "x": "", "i": 0, "c": [], "z": ""}
+    # `s` is the last STEP's volume (Quote.step_volume), the closest thing the
+    # service has to a trade size; 0 before the day's first step.
+    size = q.step_volume if getattr(q, "step_volume", None) is not None else 0
+    return {"t": _z(now), "p": q.last, "s": size, "x": "", "i": 0, "c": [], "z": ""}
 
 
 def _latest_quote(q: Any, now: datetime) -> dict[str, Any]:
@@ -862,13 +978,53 @@ def _daily_bar(q: Any, day: int) -> dict[str, Any]:
     d = sim_date(day)
     midnight = datetime(d.year, d.month, d.day, tzinfo=SIM_TZ)
     return {"t": _z(midnight), "o": q.day_open, "h": q.day_high, "l": q.day_low, "c": q.last,
-            "v": q.volume, "n": 0, "vw": None}
+            "v": q.volume, "n": None, "vw": None}
 
 
-def _snapshot(q: Any, clock: Clock) -> dict[str, Any]:
+def step_start_tick(step: int, ticks_per_step: int) -> int:
+    """The tick a step bar starts at. `Bar.step` is the clock's step after the
+    step ran (1 for the day's first step)."""
+    return min(TICKS_PER_SESSION, max(0, (step - 1) * ticks_per_step))
+
+
+def bar_time(bar: Bar, ticks_per_step: int) -> datetime:
+    """A bar's Alpaca timestamp: its start. A day bar starts at midnight."""
+    if bar.step is None:
+        d = sim_date(bar.day)
+        return datetime(d.year, d.month, d.day, tzinfo=SIM_TZ)
+    return sim_datetime(bar.day, step_start_tick(bar.step, ticks_per_step))
+
+
+def alpaca_bar(bar: Bar, ticks_per_step: int) -> dict[str, Any]:
+    return {"t": _z(bar_time(bar, ticks_per_step)), "o": bar.open, "h": bar.high, "l": bar.low,
+            "c": bar.close, "v": bar.volume, "n": None, "vw": None}
+
+
+def bar_resolution(timeframe: Optional[str], ticks_per_step: int) -> str:
+    """Alpaca's timeframe as a service resolution: "1Day" is day bars, and
+    "<ticks_per_step>Min" is step bars (a tick is a minute). Anything else is
+    refused, naming the two this session has."""
+    tf = (timeframe or "").strip()
+    unit_minutes = {"min": 1, "t": 1, "minute": 1, "hour": 60, "h": 60}
+    low = tf.lower()
+    if low in ("1day", "1d", "day"):
+        return "day"
+    digits = "".join(ch for ch in low if ch.isdigit())
+    unit = low[len(digits):]
+    if digits and unit in unit_minutes and int(digits) * unit_minutes[unit] == ticks_per_step:
+        return "step"
+    raise ServeError("invalid_request",
+                     f"timeframe {timeframe!r} is not available: this session has 1Day bars and "
+                     f"{ticks_per_step}Min bars (one bar per step of {ticks_per_step} ticks)")
+
+
+def _snapshot(q: Any, clock: Clock, prev: Optional[Bar] = None) -> dict[str, Any]:
     now = sim_datetime(clock.day, clock.tick)
-    return {"latestTrade": _latest_trade(q, now), "latestQuote": _latest_quote(q, now),
-            "dailyBar": _daily_bar(q, clock.day)}
+    out = {"latestTrade": _latest_trade(q, now), "latestQuote": _latest_quote(q, now),
+           "dailyBar": _daily_bar(q, clock.day)}
+    if prev is not None:
+        out["prevDailyBar"] = alpaca_bar(prev, 1)
+    return out
 
 
 def _broker_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> Any:
@@ -878,8 +1034,9 @@ def _broker_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> A
     Owner = Depends(owner_dep)
     r = APIRouter(tags=["broker facade (Alpaca v2 subset)"])
 
-    def _orders_with_fills(session_id: str, owner: str) -> tuple[list[Order], dict[str, list[Fill]]]:
-        orders = call("orders", owner, session_id)
+    def _orders_with_fills(session_id: str, owner: str, status: Optional[str] = None
+                           ) -> tuple[list[Order], dict[str, list[Fill]]]:
+        orders = call("orders", owner, session_id, status)
         by_order: dict[str, list[Fill]] = {}
         for f in call("fills", owner, session_id):
             by_order.setdefault(f.order_id, []).append(f)
@@ -1041,12 +1198,9 @@ def _broker_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> A
             raise ServeError("invalid_request", f"direction must be asc or desc, got {direction!r}")
         lo, hi = _parse_time(after, "after"), _parse_time(until, "until")
         wanted = {s.strip() for s in symbols.split(",") if s.strip()} if symbols else None
-        orders, fills = _orders_with_fills(session_id, owner)
+        orders, fills = _orders_with_fills(session_id, owner, status)
         rows = []
         for i, o in enumerate(orders):
-            is_open = o.status in _OPEN
-            if (status == "open" and not is_open) or (status == "closed" and is_open):
-                continue
             if wanted is not None and o.ticker not in wanted:
                 continue
             if side is not None and o.side != side:
@@ -1161,11 +1315,18 @@ def _broker_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> A
         now = sim_datetime(clk.day, clk.tick)
         return {"quotes": {s: _latest_quote(quotes[s], now) for s in _symbols(symbols, quotes)}}
 
+    def _prev_day(session_id: str, owner: str, symbol: str, clk: Clock) -> Optional[Bar]:
+        if clk.day == 0:
+            return None
+        bars = call("bars", owner, session_id, symbol, "day", clk.day - 1, None)
+        return next((b for b in bars if b.day == clk.day - 1), None)
+
     @r.get("/stocks/snapshots", summary="Snapshots per symbol (Alpaca data API)")
     def snapshots(session_id: str, owner: str = Owner, symbols: Optional[str] = Query(None),
                   feed: Optional[str] = Query(None)) -> Any:
         quotes, clk = _quotes(session_id, owner)
-        return {s: _snapshot(quotes[s], clk) for s in _symbols(symbols, quotes)}
+        return {s: _snapshot(quotes[s], clk, _prev_day(session_id, owner, s, clk))
+                for s in _symbols(symbols, quotes)}
 
     def _one_quote(session_id: str, owner: str, symbol: str) -> tuple[Any, Clock]:
         quotes, clk = _quotes(session_id, owner)
@@ -1189,7 +1350,65 @@ def _broker_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> A
     def snapshot(session_id: str, symbol: str, owner: str = Owner,
                  feed: Optional[str] = Query(None)) -> Any:
         q, clk = _one_quote(session_id, owner, symbol)
-        return {"symbol": symbol, **_snapshot(q, clk)}
+        return {"symbol": symbol, **_snapshot(q, clk, _prev_day(session_id, owner, symbol, clk))}
+
+    def _bars(session_id: str, owner: str, symbols: list[str], timeframe: Optional[str],
+              start: Optional[str], end: Optional[str], limit: int, sort: str,
+              page_token: Optional[str]) -> tuple[dict[str, list[dict[str, Any]]], Optional[str]]:
+        info = call("info", owner, session_id)
+        clk = call("observe", owner, session_id).clock
+        tps = info.config.ticks_per_step
+        resolution = bar_resolution(timeframe, tps)
+        if sort not in ("asc", "desc"):
+            raise ServeError("invalid_request", f"sort must be asc or desc, got {sort!r}")
+        # Alpaca's defaults: from the start of the current day to now.
+        today = sim_date(clk.day)
+        lo = _parse_time(start, "start") or datetime(today.year, today.month, today.day, tzinfo=SIM_TZ)
+        hi = _parse_time(end, "end") or sim_datetime(clk.day, clk.tick)
+        since = max(0, _day_of(lo.astimezone(SIM_TZ).date()))
+        rows: list[tuple[str, dict[str, Any]]] = []
+        for sym in symbols:
+            got = [b for b in call("bars", owner, session_id, sym, resolution, since, None)
+                   if lo <= bar_time(b, tps) <= hi]
+            if sort == "desc":
+                got.reverse()
+            rows.extend((sym, alpaca_bar(b, tps)) for b in got)
+        try:
+            offset = int(page_token) if page_token else 0
+        except ValueError:
+            raise ServeError("invalid_request", f"unknown page_token {page_token!r}") from None
+        page = rows[offset:offset + limit]
+        token = str(offset + limit) if offset + limit < len(rows) else None
+        out: dict[str, list[dict[str, Any]]] = {}
+        for sym, bar in page:
+            out.setdefault(sym, []).append(bar)
+        return out, token
+
+    @r.get("/stocks/bars", summary="Historical bars (Alpaca data API): 1Day, or one bar per step")
+    def bars(session_id: str, owner: str = Owner, symbols: Optional[str] = Query(None),
+             timeframe: Optional[str] = Query(None, description="1Day, or <ticks_per_step>Min."),
+             start: Optional[str] = Query(None), end: Optional[str] = Query(None),
+             limit: int = Query(1000, ge=1, le=10000), sort: str = Query("asc"),
+             page_token: Optional[str] = Query(None), feed: Optional[str] = Query(None),
+             adjustment: Optional[str] = Query(None), asof: Optional[str] = Query(None),
+             currency: Optional[str] = Query(None)) -> Any:
+        known = {t: t for t in _tickers(session_id, owner)}
+        got, token = _bars(session_id, owner, _symbols(symbols, known), timeframe, start, end,
+                           limit, sort, page_token)
+        return {"bars": got, "next_page_token": token}
+
+    @r.get("/stocks/{symbol}/bars", summary="Historical bars for one symbol (Alpaca data API)")
+    def bars_one(session_id: str, symbol: str, owner: str = Owner,
+                 timeframe: Optional[str] = Query(None, description="1Day, or <ticks_per_step>Min."),
+                 start: Optional[str] = Query(None), end: Optional[str] = Query(None),
+                 limit: int = Query(1000, ge=1, le=10000), sort: str = Query("asc"),
+                 page_token: Optional[str] = Query(None), feed: Optional[str] = Query(None),
+                 adjustment: Optional[str] = Query(None), asof: Optional[str] = Query(None),
+                 currency: Optional[str] = Query(None)) -> Any:
+        if symbol not in _tickers(session_id, owner):
+            raise ServeError("not_found", f"symbol {symbol} not found")
+        got, token = _bars(session_id, owner, [symbol], timeframe, start, end, limit, sort, page_token)
+        return {"symbol": symbol, "bars": got.get(symbol, []), "next_page_token": token}
 
     # -- the one thing a broker does not have: moving time --
 
@@ -1218,5 +1437,50 @@ def _broker_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> A
                 "fills": activities,
                 "expired": [alpaca_order(session_id, o) for o in res.expired],
                 "state_hash": res.observation.state_hash}
+
+    return r
+
+
+def alpaca_news(session_id: str, h: Any, index: int) -> dict[str, Any]:
+    """A Headline in the shape of Alpaca's news API. The id is an integer, as
+    Alpaca's is, derived from the session and the headline."""
+    when = _z(sim_datetime(h.day, h.tick))
+    digest = uuid.uuid5(_ID_NS, f"news/{session_id}/{h.day}/{h.tick}/{index}/{h.text}")
+    return {"id": digest.int % 2**53, "headline": h.text, "author": "tradefloor",
+            "created_at": when, "updated_at": when, "summary": "", "content": "", "url": None,
+            "images": [], "symbols": list(h.tickers), "source": "tradefloor"}
+
+
+def _news_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> Any:
+    """Alpaca's news API (`/v1beta1/news`), served from the headlines the
+    session's observation carries: the current day's, from the tick the news
+    reaches the market. There is no older news to page through."""
+    from fastapi import APIRouter, Depends, Query
+
+    r = APIRouter(tags=["broker facade (Alpaca v2 subset)"])
+
+    @r.get("/news", summary="Headlines (Alpaca news API): the current day's only")
+    def news(session_id: str, owner: str = Depends(owner_dep),
+             symbols: Optional[str] = Query(None), start: Optional[str] = Query(None),
+             end: Optional[str] = Query(None), limit: int = Query(10, ge=1, le=50),
+             sort: str = Query("desc"), include_content: Optional[bool] = Query(None),
+             exclude_contentless: Optional[bool] = Query(None),
+             page_token: Optional[str] = Query(None)) -> Any:
+        if sort not in ("asc", "desc"):
+            raise ServeError("invalid_request", f"sort must be asc or desc, got {sort!r}")
+        obs = call("observe", owner, session_id)
+        wanted = {x.strip() for x in symbols.split(",") if x.strip()} if symbols else None
+        lo, hi = _parse_time(start, "start"), _parse_time(end, "end")
+        rows = []
+        for i, h in enumerate(obs.news):
+            when = sim_datetime(h.day, h.tick)
+            if wanted is not None and not wanted & set(h.tickers):
+                continue
+            if (lo is not None and when < lo) or (hi is not None and when > hi):
+                continue
+            rows.append(alpaca_news(session_id, h, i))
+        if sort == "desc":
+            rows.reverse()
+        return {"news": rows[:limit], "next_page_token": None}
 
     return r

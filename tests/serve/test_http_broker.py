@@ -25,10 +25,11 @@ pytest.importorskip("fastapi", reason="the HTTP server is an opt-in extra")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from fakes import FakeSessionService, core_available, make_service  # noqa: E402
+from fakes import FakeSessionService, core_available, core_has, make_service  # noqa: E402
 from tradefloor.serve.http import create_app, sim_date, sim_datetime  # noqa: E402
 
 CORE = pytest.mark.skipif(not core_available(), reason="tradefloor.serve.core has not landed")
+CORE03 = pytest.mark.skipif(not core_has("bars"), reason="the core has not landed contract 0.3")
 SMALL = {"universe_size": 4, "ticks_per_step": 30}
 
 
@@ -194,7 +195,9 @@ def test_limit_orders_rest_and_cancel(setup):
     assert [x["id"] for x in b.ok(b.get("/orders"))] == [o["id"]]           # default: open
     r = b.delete(f"/orders/{o['id']}")
     assert r.status_code == 204 and r.content == b""
-    assert b.ok(b.get(f"/orders/{o['id']}"))["status"] == "canceled"
+    canceled = b.ok(b.get(f"/orders/{o['id']}"))
+    assert canceled["status"] == "canceled"
+    assert canceled["canceled_at"] == canceled["updated_at"] == "2000-01-03T15:30:00Z"
     assert b.ok(b.get("/orders")) == []
     assert [x["status"] for x in b.ok(b.get("/orders", status="closed"))] == ["canceled"]
     _err(b.get(f"/orders/{uuid.uuid4()}"), 404, "not_found")
@@ -210,6 +213,7 @@ def test_a_day_order_shows_its_expiry(setup):
     assert [x["id"] for x in adv["expired"]] == [o["id"]]
     got = b.ok(b.get(f"/orders/{o['id']}"))
     assert got["status"] == "expired" and got["expired_at"] == "2000-01-03T21:00:00Z"
+    assert got["updated_at"] == got["expired_at"] and got["canceled_at"] is None
 
 
 def test_listing_orders_filters_like_alpaca(setup):
@@ -468,12 +472,19 @@ def _live(app):
         sock.close()
 
 
-@pytest.mark.parametrize("kind", ["fake", pytest.param("core", marks=CORE)])
+@pytest.mark.parametrize("kind", ["fake", pytest.param("core", marks=[CORE, CORE03])])
 def test_the_alpaca_sdk_drives_a_session_by_changing_its_base_url(kind, tmp_path):
     pytest.importorskip("alpaca", reason="alpaca-py is not installed")
     from alpaca.common.exceptions import APIError
-    from alpaca.data.historical import StockHistoricalDataClient
-    from alpaca.data.requests import StockLatestQuoteRequest, StockLatestTradeRequest, StockSnapshotRequest
+    from alpaca.data.historical import NewsClient, StockHistoricalDataClient
+    from alpaca.data.requests import (
+        NewsRequest,
+        StockBarsRequest,
+        StockLatestQuoteRequest,
+        StockLatestTradeRequest,
+        StockSnapshotRequest,
+    )
+    from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
     from alpaca.trading.client import TradingClient
     from alpaca.trading.enums import OrderSide, OrderStatus, QueryOrderStatus, TimeInForce
     from alpaca.trading.requests import (
@@ -546,3 +557,155 @@ def test_the_alpaca_sdk_drives_a_session_by_changing_its_base_url(kind, tmp_path
             tc.submit_order(MarketOrderRequest(symbol=t0, qty=1, side=OrderSide.BUY,
                                                time_in_force=TimeInForce.IOC))
         assert "ioc" in unsupported.value.message
+
+        # History and news: bars by day and by step, after a day has closed.
+        tc.post("/tradefloor/advance", {"until": "next_open"})
+        tc.post("/tradefloor/advance", {"steps": 2})
+        daily = data.get_stock_bars(StockBarsRequest(
+            symbol_or_symbols=[t0, t1], timeframe=TimeFrame.Day, start=datetime(2000, 1, 1)))
+        assert [b.timestamp.date().isoformat() for b in daily[t0]] == ["2000-01-03", "2000-01-04"]
+        assert daily[t1][-1].close == data.get_stock_latest_trade(
+            StockLatestTradeRequest(symbol_or_symbols=t1))[t1].price
+        steps = data.get_stock_bars(StockBarsRequest(
+            symbol_or_symbols=t0, timeframe=TimeFrame(30, TimeFrameUnit.Minute)))
+        assert [b.timestamp.isoformat() for b in steps[t0]] == [
+            "2000-01-04T14:30:00+00:00", "2000-01-04T15:00:00+00:00"]    # today only, by default
+        snap = data.get_stock_snapshot(StockSnapshotRequest(symbol_or_symbols=t0))[t0]
+        assert snap.previous_daily_bar.close == daily[t0][0].close
+        with pytest.raises(APIError):
+            data.get_stock_bars(StockBarsRequest(symbol_or_symbols=t0,
+                                                 timeframe=TimeFrame(5, TimeFrameUnit.Minute)))
+        news = NewsClient("any-key", "any-secret", url_override=url).get_news(NewsRequest())
+        headlines = TestClient(app).get(f"/v1/sessions/{sid}/observation").json()["news"]
+        assert [item.headline for item in news.data["news"]] == [h["text"] for h in headlines]
+        if kind == "fake":
+            assert headlines
+
+
+# -- contract 0.2 and 0.3 in the facade ---------------------------------------------------
+
+
+def test_a_partial_fill_is_a_canceled_order_with_its_filled_quantity(fake):
+    client = TestClient(create_app(fake))
+    info = _session(client, cash=1e9, max_leverage=None)
+    b = Broker(client, info["session_id"])
+    o = b.ok(b.post("/orders", {"symbol": info["tickers"][0], "qty": "300000", "side": "buy",
+                                "type": "market", "time_in_force": "day"}))
+    adv = b.ok(b.post("/tradefloor/advance", {"steps": 1}))
+    got = b.ok(b.get(f"/orders/{o['id']}"))
+    assert (got["status"], got["qty"], got["filled_qty"]) == ("canceled", "300000.0", "200000.0")
+    assert got["filled_at"] == got["canceled_at"] == "2000-01-03T14:30:00Z"
+    assert got in b.ok(b.get("/orders", status="closed")) and b.ok(b.get("/orders")) == []
+    fill = adv["fills"][0]
+    assert (fill["type"], fill["qty"], fill["leaves_qty"], fill["order_status"]) == (
+        "partial_fill", "200000.0", "100000.0", "partially_filled")
+    assert b.ok(b.get("/account/activities/FILL")) == [fill]
+    assert b.ok(b.get(f"/positions/{info['tickers'][0]}"))["qty"] == "200000.0"
+
+
+def test_a_rejected_order_has_failed_at(fake):
+    class Rejecting(FakeSessionService):
+        def _within_leverage(self, s, ticker, side, qty, price):
+            return not s.queued  # accept at submission, refuse at fill
+    client = TestClient(create_app(Rejecting()))
+    info = _session(client)
+    b = Broker(client, info["session_id"])
+    o = b.ok(b.post("/orders", {"symbol": info["tickers"][0], "qty": "1", "side": "buy",
+                                "time_in_force": "day"}))
+    b.ok(b.post("/tradefloor/advance", {"steps": 1}))
+    got = b.ok(b.get(f"/orders/{o['id']}"))
+    assert got["status"] == "rejected" and got["failed_at"] == got["updated_at"]
+    assert got["filled_at"] is None and got["canceled_at"] is None
+
+
+def test_an_insolvent_account_has_no_buying_power(fake):
+    class Insolvent(FakeSessionService):
+        def _account(self, s):
+            a = super()._account(s)
+            a.cash, a.net_worth, a.leverage, a.insolvent, a.gross_exposure = -5.0, -5.0, None, True, 0.0
+            return a
+    client = TestClient(create_app(Insolvent()))
+    info = _session(client)
+    acct = Broker(client, info["session_id"]).ok(Broker(client, info["session_id"]).get("/account"))
+    assert acct["equity"] == "-5.0" and acct["buying_power"] == "0.0"
+
+
+def test_latest_trade_size_is_the_last_step_volume(setup):
+    client, info, b = setup
+    t0 = info["tickers"][0]
+    assert b.ok(b.get(f"/stocks/{t0}/trades/latest"))["trade"]["s"] == 0    # no step yet today
+    b.ok(b.post("/tradefloor/advance", {"steps": 1}))
+    q = next(x for x in client.get(f"/v1/sessions/{info['session_id']}/observation").json()["quotes"]
+             if x["ticker"] == t0)
+    assert b.ok(b.get(f"/stocks/{t0}/trades/latest"))["trade"]["s"] == q["step_volume"] > 0
+
+
+def test_bars_by_day_and_by_step(setup):
+    client, info, b = setup
+    t0, t1 = info["tickers"][:2]
+    b.ok(b.post("/tradefloor/advance", {"until": "next_open"}))
+    b.ok(b.post("/tradefloor/advance", {"steps": 3}))
+    native_days = client.get(f"/v1/sessions/{info['session_id']}/bars/{t0}").json()
+    days = b.ok(b.get("/stocks/bars", symbols=f"{t0},{t1},NOPE", timeframe="1Day", start="2000-01-01"))
+    assert days["next_page_token"] is None and set(days["bars"]) == {t0, t1}
+    assert [(x["t"], x["o"], x["h"], x["l"], x["c"], x["v"]) for x in days["bars"][t0]] == [
+        ("2000-01-03T05:00:00Z", n["open"], n["high"], n["low"], n["close"], n["volume"])
+        if n["day"] == 0 else
+        ("2000-01-04T05:00:00Z", n["open"], n["high"], n["low"], n["close"], n["volume"])
+        for n in native_days]
+    # Alpaca's default window is the current day.
+    assert [x["t"] for x in b.ok(b.get("/stocks/bars", symbols=t0, timeframe="1Day"))["bars"][t0]] == [
+        "2000-01-04T05:00:00Z"]
+    steps = b.ok(b.get(f"/stocks/{t0}/bars", timeframe="30Min"))
+    assert steps["symbol"] == t0
+    assert [x["t"] for x in steps["bars"]] == [
+        "2000-01-04T14:30:00Z", "2000-01-04T15:00:00Z", "2000-01-04T15:30:00Z"]
+    assert b.ok(b.get(f"/stocks/{t0}/bars", timeframe="30T"))["bars"] == steps["bars"]
+    every = b.ok(b.get(f"/stocks/{t0}/bars", timeframe="30Min", start="2000-01-03"))["bars"]
+    assert len(every) == 13 + 3
+    desc = b.ok(b.get(f"/stocks/{t0}/bars", timeframe="30Min", start="2000-01-03", sort="desc"))["bars"]
+    assert desc == every[::-1]
+    window = b.ok(b.get(f"/stocks/{t0}/bars", timeframe="30Min", start="2000-01-03T15:00:00Z",
+                        end="2000-01-03T16:00:00Z"))["bars"]
+    assert [x["t"] for x in window] == ["2000-01-03T15:00:00Z", "2000-01-03T15:30:00Z",
+                                        "2000-01-03T16:00:00Z"]
+    page1 = b.ok(b.get(f"/stocks/{t0}/bars", timeframe="30Min", start="2000-01-03", limit=10))
+    assert page1["bars"] == every[:10] and page1["next_page_token"]
+    page2 = b.ok(b.get(f"/stocks/{t0}/bars", timeframe="30Min", start="2000-01-03", limit=10,
+                       page_token=page1["next_page_token"]))
+    assert page2["bars"] == every[10:] and page2["next_page_token"] is None
+    for tf in ("1Min", "1Hour", "5Min", "1Week"):
+        assert "30Min" in _err(b.get(f"/stocks/{t0}/bars", timeframe=tf), 400, "invalid_request")
+    _err(b.get("/stocks/NOPE/bars", timeframe="1Day"), 404, "not_found")
+    _err(b.get(f"/stocks/{t0}/bars", timeframe="1Day", sort="up"), 400, "invalid_request")
+
+
+def test_snapshots_carry_the_previous_day(setup):
+    client, info, b = setup
+    t0 = info["tickers"][0]
+    assert "prevDailyBar" not in b.ok(b.get(f"/stocks/{t0}/snapshot"))       # day 0 has none
+    b.ok(b.post("/tradefloor/advance", {"until": "next_open"}))
+    prev = client.get(f"/v1/sessions/{info['session_id']}/bars/{t0}").json()[0]
+    snap = b.ok(b.get("/stocks/snapshots", symbols=t0))[t0]
+    assert snap["prevDailyBar"]["c"] == prev["close"] and snap["prevDailyBar"]["t"] == "2000-01-03T05:00:00Z"
+    assert snap["dailyBar"]["o"] == prev["close"]
+
+
+def test_news_is_the_days_headlines():
+    client = TestClient(create_app(FakeSessionService(headlines=True)))
+    info = _session(client)
+    sid = info["session_id"]
+    b = Broker(client, sid)
+    url = f"/broker/{sid}/v1beta1/news"
+    assert client.get(url).json() == {"news": [], "next_page_token": None}     # tick 0: not out yet
+    b.ok(b.post("/tradefloor/advance", {"steps": 1}))
+    headline = client.get(f"/v1/sessions/{sid}/observation").json()["news"][0]
+    news = client.get(url).json()["news"]
+    assert len(news) == 1
+    item = news[0]
+    assert item["headline"] == headline["text"] and item["symbols"] == headline["tickers"]
+    assert item["created_at"] == "2000-01-03T14:31:00Z" and isinstance(item["id"], int)
+    assert client.get(url, params={"symbols": headline["tickers"][0]}).json()["news"] == news
+    other = next(t for t in info["tickers"] if t not in headline["tickers"])
+    assert client.get(url, params={"symbols": other}).json()["news"] == []
+    assert client.get(url, params={"start": "2000-01-03T15:00:00Z"}).json()["news"] == []
