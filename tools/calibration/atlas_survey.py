@@ -270,6 +270,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_anchor_weight_level_cap": (0.0, 4.0),
     "vix_anchor_weight_level_knee": (0.0, 1.0),
     "vix_anchor_weight_level_below": (0.0, 1.0),
+    # Whether the level law's knee reads the slow regime level: a switch.
+    "vix_anchor_weight_level_knee_fixed": (0.0, 1.0),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is
