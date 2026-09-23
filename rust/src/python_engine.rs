@@ -2870,6 +2870,11 @@ impl PyEngine {
         // actually carried.
         out.set_item("market_vol_log_level", self.inner.market_vol_log_level())?;
         out.set_item("vix_log_level", self.inner.vix_log_level())?;
+        // Only where the hash covers it: the memory moves, and is hashed,
+        // only with `vix_anchor_memory` nonzero.
+        if self.inner.params().vix_anchor_memory != 0.0 {
+            out.set_item("vix_anchor_slow", self.inner.vix_anchor_slow())?;
+        }
         // THE CRISIS EPISODE: whether one is running, how many consecutive
         // sessions it has spent under the threshold, the sector index its
         // epicentre was drawn at (`-1` for `none`, a crisis with no
@@ -3359,6 +3364,10 @@ impl PyEngine {
         // runs all carried a multiplier of exactly 1.0.
         if let Some(raw) = snapshot.get_item("vix_log_level")? {
             self.inner.set_vix_log_level(raw.extract()?);
+        }
+        // Absent means a build without the anchor's memory, where it was 0.0.
+        if let Some(raw) = snapshot.get_item("vix_anchor_slow")? {
+            self.inner.set_vix_anchor_slow(raw.extract()?);
         }
         // The crisis episode. Absent means a snapshot from a build without
         // it, and every such run shipped `crisis_epicentre_extra` at 0.0,

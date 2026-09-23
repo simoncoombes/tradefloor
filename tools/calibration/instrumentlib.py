@@ -575,6 +575,10 @@ PARAM_SPECS: dict[str, dict] = {
     # pole then stays at 0.717 whatever the exponent.
     "vix_anchor_weight":      {"kind": "abs", "step_unit": 0.01,
                               "hard_range": (0.0, 0.9), "derived": True},
+    # The rate of the anchor's slow memory of the read-back (2026-09-23).
+    # 0.0 is the instantaneous form. A probe dial, not derived.
+    "vix_anchor_memory":      {"kind": "abs", "step_unit": 0.01,
+                              "hard_range": (0.0, 1.0), "derived": False},
     # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
     # the tape's three epicentre episodes (2.43, 1.93, 1.41). 0.0 is the
     # branch not taken; the range opens at zero to hold it and stops at 3.0,

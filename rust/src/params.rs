@@ -1537,6 +1537,19 @@ pub struct ModelParams {
     /// under one at the derived weight.
     pub vix_anchor_weight: f64,
 
+    /// How fast the anchor's view of the read-back moves, per session.
+    /// 0.0 -- every preset -- is the instantaneous form: the target is
+    /// `implied^(1 - a) (L anchor)^a`, today's read-back against the anchor.
+    ///
+    /// Nonzero, the anchor pulls against a SLOW memory of the read-back's
+    /// log deviation instead, `s' = (1 - h) s + h log(implied / L anchor)`,
+    /// and the target is `implied * exp(-a s)`. Today's move in the
+    /// variance then reaches the VIX in full, which is the same-day fear
+    /// response and the range the instantaneous form damps by `1 - a`,
+    /// while a deviation that persists is pulled back at weight `a`. At
+    /// h = 1 it is the instantaneous form less one session's lag.
+    pub vix_anchor_memory: f64,
+
     /// How many sessions of market-side warm-up the factor's variance
     /// components get before session one. 0.0 -- every preset through
     /// pt-v19 -- runs nothing, touches no state and is bit-identical.
@@ -4238,6 +4251,7 @@ impl ModelParams {
             vix_level_loop_gain: 0.0,
             vix_anchor_reversion: 0.0,
             vix_anchor_weight: 0.0,
+            vix_anchor_memory: 0.0,
             market_burn_in_sessions: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
@@ -6229,6 +6243,7 @@ impl ModelParams {
             "vix_level_loop_gain" => self.vix_level_loop_gain,
             "vix_anchor_reversion" => self.vix_anchor_reversion,
             "vix_anchor_weight" => self.vix_anchor_weight,
+            "vix_anchor_memory" => self.vix_anchor_memory,
             "market_burn_in_sessions" => self.market_burn_in_sessions,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
@@ -6425,6 +6440,7 @@ impl ModelParams {
             "vix_level_loop_gain" => out.vix_level_loop_gain = value,
             "vix_anchor_reversion" => out.vix_anchor_reversion = value,
             "vix_anchor_weight" => out.vix_anchor_weight = value,
+            "vix_anchor_memory" => out.vix_anchor_memory = value,
             "market_burn_in_sessions" => out.market_burn_in_sessions = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
@@ -6762,6 +6778,22 @@ impl ModelParams {
                  index's variance altogether. Set it inside [0, 1), or to 0.0.",
                 self.vix_anchor_weight));
         }
+        if self.vix_anchor_memory != 0.0
+            && !(self.vix_anchor_memory > 0.0 && self.vix_anchor_memory <= 1.0)
+        {
+            return Err(format!(
+                "vix_anchor_memory is {}. It is the share of today's deviation the \
+                 anchor's memory takes in one session, so it lives in (0, 1], or \
+                 0.0 for the instantaneous form.",
+                self.vix_anchor_memory));
+        }
+        if self.vix_anchor_memory != 0.0 && self.vix_anchor_weight == 0.0 {
+            return Err(format!(
+                "vix_anchor_memory is {} but vix_anchor_weight is 0. The memory is \
+                 what the anchor weight pulls against, and with no weight it is read \
+                 by nothing. Set vix_anchor_weight, or vix_anchor_memory to 0.0.",
+                self.vix_anchor_memory));
+        }
         if self.vix_anchor_weight != 0.0 && self.vix_level_identity == 0.0 {
             return Err(format!(
                 "vix_anchor_weight is {} but vix_level_identity is 0. The blend is \
@@ -7010,6 +7042,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_level_loop_gain",
         "vix_anchor_reversion",
         "vix_anchor_weight",
+        "vix_anchor_memory",
         "market_burn_in_sessions",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",

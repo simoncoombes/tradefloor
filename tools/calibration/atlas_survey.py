@@ -253,6 +253,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # 0.9, under the invariant's refusal at 1.0 where the VIX ignores the
     # index's variance altogether.
     "vix_anchor_weight": (0.0, 0.9),
+    # The anchor's memory rate per session; 0.0 is the instantaneous form.
+    "vix_anchor_memory": (0.0, 1.0),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is

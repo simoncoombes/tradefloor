@@ -411,6 +411,13 @@ OUT_OF_SCOPE = {
         "loop's slow pole equals the tape's 0.9965 "
         "(programme/results/route1-blend/looppoles.py, design repository). "
         "Shipped at 0.0: a probe of route 1, not an adoption",
+    "vix_anchor_memory":
+        "inert at 0.0: the anchor weight reads today's read-back and the "
+        "engine never advances the memory. Nonzero, the weight pulls "
+        "against a slow memory of the read-back's log deviation, so the "
+        "day's variance move reaches the VIX in full. A probe of route 1 "
+        "(programme/results/route1-blend/, design repository), not derived "
+        "and not adopted",
     "crisis_epicentre_end_sessions":
         "unread while `crisis_epicentre_extra` is 0.0: with no episode ever "
         "entered there is no counter to end. 21 sessions is a month and is a "

@@ -386,6 +386,9 @@ pub struct Engine {
     /// exactly 1.0 on what the VIX prices, which is every preset. Driven by
     /// the same normal `market_vol_log_level` reads, so it adds no draw.
     vix_log_level: f64,
+    /// The anchor's slow memory of the read-back's log deviation. Moves only
+    /// with `vix_anchor_memory` nonzero. See `ModelParams::vix_anchor_memory`.
+    vix_anchor_slow: f64,
     /// Whether a crisis EPISODE is running. The episode starts at the open
     /// of the first session whose VIX is above `crisis_vix_threshold` with
     /// no episode running, and ends after `crisis_epicentre_end_sessions`
@@ -908,6 +911,7 @@ impl Engine {
             forced_flow_spent: 0.0,
             market_vol_log_level: 0.0,
             vix_log_level: 0.0,
+            vix_anchor_slow: 0.0,
             crisis_in_episode: false,
             crisis_sessions_under: 0,
             crisis_epicentre: -1,
@@ -3311,6 +3315,20 @@ impl Engine {
             terms.total()
         };
 
+        // The anchor's slow memory, advanced to today BEFORE the step reads
+        // it. Arithmetic on the day's own state, no draw, and not run at all
+        // with the dial at 0.0.
+        if self.params.vix_anchor_memory != 0.0 && self.params.vix_level_identity != 0.0 {
+            let mult = self.vix_level_multiplier();
+            let implied = crate::market::index_var::vix_from_variance(
+                self.params.vix_variance_premium, index_variance) * mult;
+            let anchor = self.vix_anchor * mult;
+            if implied > 0.0 && anchor > 0.0 {
+                let h = self.params.vix_anchor_memory;
+                self.vix_anchor_slow = (1.0 - h) * self.vix_anchor_slow
+                    + h * crate::mathx::log(implied / anchor);
+            }
+        }
         rng.site(Site::EconomyDaily, 0);
         self.economy = update_economy_daily(
             &self.economy,
@@ -3328,6 +3346,8 @@ impl Engine {
                 vix_anchor_reversion: self.params.vix_anchor_reversion,
                 vix_anchor_level: self.vix_anchor * self.vix_level_multiplier(),
                 vix_anchor_weight: self.params.vix_anchor_weight,
+                vix_anchor_memory: self.params.vix_anchor_memory,
+                vix_anchor_slow: self.vix_anchor_slow,
                 vix_jump_intensity: self.params.vix_jump_intensity,
                 vix_jump_scale: self.params.vix_jump_scale,
                 vix_return_level_exponent: self.params.vix_return_level_exponent,
@@ -3612,6 +3632,14 @@ impl Engine {
 
     pub fn set_vix_log_level(&mut self, level: f64) {
         self.vix_log_level = level;
+    }
+
+    pub fn vix_anchor_slow(&self) -> f64 {
+        self.vix_anchor_slow
+    }
+
+    pub fn set_vix_anchor_slow(&mut self, value: f64) {
+        self.vix_anchor_slow = value;
     }
 
     /// The VIX level's per-session innovation AS APPLIED, after the
@@ -4465,6 +4493,11 @@ impl Engine {
         hash_f64(&mut buf, self.forced_flow_spent);
         hash_f64(&mut buf, self.market_vol_log_level);
         hash_f64(&mut buf, self.vix_log_level);
+        // Only when it can move, so every preset's state hash is the one it
+        // was before the field existed.
+        if self.params.vix_anchor_memory != 0.0 {
+            hash_f64(&mut buf, self.vix_anchor_slow);
+        }
         // The crisis episode. Hashed for the reason every field here is:
         // two engines alike in every column, one of them three sessions
         // into a financial-services episode and the other not in an episode

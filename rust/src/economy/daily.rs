@@ -119,6 +119,12 @@ pub struct DailyInputs<'a> {
     /// See [`crate::params::ModelParams::vix_anchor_weight`]. 0.0 leaves the
     /// target the read-back exactly.
     pub vix_anchor_weight: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_memory`]. 0.0 is the
+    /// instantaneous form and `vix_anchor_slow` is then not read.
+    pub vix_anchor_memory: f64,
+    /// The anchor's slow memory of the read-back's log deviation, already
+    /// advanced to today by the engine.
+    pub vix_anchor_slow: f64,
     /// See [`crate::params::ModelParams::vix_jump_intensity`]. 0.0 takes
     /// no draws and reproduces the shipped schedule exactly.
     pub vix_jump_intensity: f64,
@@ -259,6 +265,8 @@ impl<'a> Default for DailyInputs<'a> {
             vix_anchor_reversion: 0.0,
             vix_anchor_level: 0.0,
             vix_anchor_weight: 0.0,
+            vix_anchor_memory: 0.0,
+            vix_anchor_slow: 0.0,
             vix_jump_intensity: 0.0,
             vix_jump_scale: 0.0,
             vix_return_gain: VIX_RETURN_GAIN,
@@ -1147,7 +1155,11 @@ pub fn update_economy_daily(
         // lag-one persistence is the loop's and not `mr + kappa`'s. Guarded,
         // so at 0.0 the target is the read-back bit for bit. See
         // `ModelParams::vix_anchor_weight`.
-        if inputs.vix_anchor_weight != 0.0 {
+        if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_memory != 0.0 {
+            // Against the slow memory: today's move passes in full.
+            inputs.vix_implied_from_market
+                * mathx::exp(-inputs.vix_anchor_weight * inputs.vix_anchor_slow)
+        } else if inputs.vix_anchor_weight != 0.0 {
             let a = inputs.vix_anchor_weight;
             mathx::exp((1.0 - a) * mathx::log(inputs.vix_implied_from_market)
                 + a * mathx::log(inputs.vix_anchor_level))
