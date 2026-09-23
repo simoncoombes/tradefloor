@@ -45,7 +45,8 @@ def test_metering_follows_the_core_clock(world):
     hosted, p, _ = world
     s = hosted.open(p, SessionConfig(universe_size=5, ticks_per_step=100))
     runs = [dict(steps=1), dict(until="close"), dict(steps=1), dict(until="next_open"),
-            dict(until="next_open"), dict(until="close"), dict(steps=5)]
+            dict(until="next_open"), dict(until="close"), dict(steps=5),
+            dict(steps=3, until="close"), dict(steps=2, until="next_open")]
     ticks = []
     before = hosted.info(p, s.session_id).clock
     for kw in runs:
@@ -54,7 +55,7 @@ def test_metering_follows_the_core_clock(world):
         before = r.clock
     audited = [e["detail"].get("sim_ticks", 0) for e in hosted.audit.read(call="advance")]
     assert audited == ticks
-    assert ticks == [100, 290, 100, 290, 390, 390, 490]
+    assert ticks == [100, 290, 100, 290, 390, 390, 490, 1070, 390]
     assert hosted.usage_report(p)["today"]["sim_days"] == pytest.approx(sum(ticks) / 390, abs=1e-3)
 
 

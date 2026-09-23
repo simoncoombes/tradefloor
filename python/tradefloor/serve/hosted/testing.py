@@ -4,7 +4,8 @@ It keeps the parts of the contract the hosted layer depends on: owner
 isolation (`not_found` for another owner's session), the clock arithmetic of
 `advance` as `LocalSessionService` does it (`until="next_open"` finishes the
 current session and opens the next without stepping it; `until="close"` with
-the market closed runs the next session), `session_closed` after `close`, the
+the market closed runs the next session; with either, `steps` counts closes or
+opens, as contract 0.2 says), `session_closed` after `close`, the
 20-session cap on one advance, and `client_order_id` idempotency. It simulates
 no market: every quote is 100.
 """
@@ -130,7 +131,7 @@ class FakeSessionService:
         s = self._get(owner, session_id, open_only=True)
         if until not in ("steps", "close", "next_open"):
             raise ServeError("invalid_request", f"until must be steps, close or next_open, got {until!r}")
-        if until == "steps" and (not isinstance(steps, int) or steps < 1):
+        if not isinstance(steps, int) or steps < 1:
             raise ServeError("invalid_request", "steps must be a positive integer")
         c: Clock = s["info"].clock
         tps = s["info"].config.ticks_per_step
@@ -152,14 +153,20 @@ class FakeSessionService:
                 raise ServeError("invalid_request", "one call may not run more than 20 sessions")
             for _ in range(steps):
                 one_step()
-        elif until == "close":
-            one_step()
-            while c.market_open:
+        elif until == "close":      # steps counts closes (contract 0.2)
+            if steps > 20:
+                raise ServeError("invalid_request", "one call may not run more than 20 sessions")
+            for _ in range(steps):
                 one_step()
-        else:   # next_open: finish this session (if open), then open the next one
-            while c.market_open:
-                one_step()
-            open_next()
+                while c.market_open:
+                    one_step()
+        else:   # next_open: finish this session (if open), then open the next; steps counts opens
+            if steps > 20:
+                raise ServeError("invalid_request", "one call may not run more than 20 sessions")
+            for _ in range(steps):
+                while c.market_open:
+                    one_step()
+                open_next()
         if self.sleep_per_tick:
             import time
             time.sleep(self.sleep_per_tick * (c.day * TICKS + c.tick - start_ticks))

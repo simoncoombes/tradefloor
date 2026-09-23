@@ -12,8 +12,8 @@ run. `deploy/aws/deploy.sh` refuses to start without an explicit confirmation
 phrase, and it should only be given after the owner approves.
 
 Code: `python/tradefloor/serve/hosted/`. Deployment: `deploy/`. Tests:
-`tests/serve/test_hosted_*.py`. The contract: `docs/serve/CONTRACT.md`,
-sections 1, 6 and 7.
+`tests/serve/test_hosted_*.py`. The contract: `docs/serve/CONTRACT.md` (0.2),
+sections 1, 5, 6 and 7.
 
 ## 1. What the hosted layer is
 
@@ -111,7 +111,7 @@ placeholders until the owner sets the plans and prices (section 12).
 | storage | 100 MiB | 1 GiB | 10 GiB | quota_exceeded |
 | universe size | 20 | 40 | 40 | invalid_request |
 | min ticks per step | 10 | 5 | 1 | invalid_request |
-| ticks per `advance(steps=n)` | 390 (1 session) | 1,950 (5) | 7,800 (20) | invalid_request |
+| ticks per `advance` call | 390 (1 session) | 1,950 (5) | 7,800 (20) | invalid_request |
 | open orders per session | 50 | 200 | 1000 | quota_exceeded |
 | calls per minute | 60 | 300 | 1200 | rate_limited |
 | steps per minute | 60 | 300 | 3000 | rate_limited |
@@ -144,8 +144,10 @@ How the meter works:
 - Both buckets are token buckets that refill continuously. An `advance` asks
   the step bucket for an upper bound on its steps before it runs (from the
   clock and the core's rules for `until`), then refunds whatever it did not
-  use. `until="close"` and `until="next_open"` are always allowed, whatever
-  the advance-length cap.
+  use. The advance-length cap applies to every mode: under contract 0.2,
+  `steps=k` with `until="close"` or `"next_open"` counts k closes or opens,
+  so it can run k sessions. A single close or open always fits, because
+  every plan allows at least one session per call.
 - Simulated time is charged from the clock itself: the ticks between the
   clock before and after the call, 390 ticks to a day. A test checks this
   against the real core for every `until` mode.
@@ -234,8 +236,8 @@ mutating call rewrites the session's record, which holds the engine snapshot:
 about 15 KiB at 20 names and 24 KiB at 40 (measured). A session directory is
 about 120 KiB after a few days of trading.
 
-**S3Store** (`hosted/s3store.py`) implements the same `SessionStore` protocol
-on S3, with the same guarantees. S3 has no append and no rename, so a commit
+**S3Store** (`hosted/s3store.py`) implements the `SessionStore` protocol
+(`types.py`, contract 0.2) on S3, with FileStore's atomicity. S3 has no append and no rename, so a commit
 PUTs the stream chunks and the record under fresh names (sequence number plus
 a random nonce), then PUTs `head.json` conditionally (`If-Match` on the ETag
 it last saw, or `If-None-Match: *` for the first commit). `head.json` is the
@@ -248,10 +250,11 @@ core runs on it and resumes bit for bit after a restart. Tests use an
 in-memory fake of S3 and moto, never real S3.
 
 S3 is the wrong place for per-call commits at launch, and the reason is cost.
-Each commit is about three PUTs at $0.005 per thousand. At one mutating call
-per bot every 2 s, 50 bots would spend about $600 a month on PUT requests,
-against about $50 of EFS writes for the same traffic. Use S3Store for
-low-traffic deployments, or later as an archive for closed sessions.
+Each commit is about three PUTs at $0.005 per thousand. At the launch
+workload in section 11 (1.1 million mutating calls a day) that is about 3.2
+million PUTs a day, roughly $490 a month, against about $49 of EFS writes for
+the same traffic. Use S3Store for low-traffic deployments, or later as an
+archive for closed sessions.
 
 **Deleting sessions.** Nothing in contract 0.1 deletes a session, so a user
 who reaches `max_stored_sessions` or the storage cap cannot free space

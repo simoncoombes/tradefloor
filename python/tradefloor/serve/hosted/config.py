@@ -129,8 +129,13 @@ def build_hosted(s: Settings, *, inner: Any = None, audit_stream: Any = None,
     if inner is None:
         from tradefloor.serve.core import LocalSessionService
         store, meter = build_store(s)
-        max_universe = max(p.max_universe_size for p in accounts.plans.values())
-        inner = LocalSessionService(store, max_universe=max_universe, cache_size=cache_size)
+        plans = accounts.plans.values()
+        # The core's own caps, set to the largest any plan allows; each plan's
+        # lower caps are the hosted layer's to enforce.
+        max_universe = max(p.max_universe_size for p in plans)
+        max_sessions = -(-max(p.max_advance_ticks for p in plans) // 390)
+        inner = LocalSessionService(store, max_universe=max_universe,
+                                    max_advance_sessions=max_sessions, cache_size=cache_size)
     quotas = Quotas(s.data / "usage.json")
     audit = AuditLog(s.data / "audit", stream=audit_stream)
     return HostedService(inner, accounts, quotas, audit, storage_meter=meter)

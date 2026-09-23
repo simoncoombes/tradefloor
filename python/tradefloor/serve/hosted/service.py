@@ -339,11 +339,13 @@ class HostedService:
                 return c.timed(self.inner.advance, c.owner, session_id, steps, until)
             tps = before.config.ticks_per_step
             est = estimate_advance_ticks(before.clock.tick, before.clock.market_open, tps, steps, until)
-            if until == "steps" and est > plan.max_advance_ticks:
+            if est > plan.max_advance_ticks:
+                asked = (f"{steps} steps x {tps} ticks = {est} ticks" if until == "steps"
+                         else f"until={until!r} x {steps} = up to {est} ticks")
                 raise ServeError("invalid_request",
-                                 f"advance of {steps} steps x {tps} ticks = {est} ticks is above the "
-                                 f"{plan.max_advance_ticks} ticks ({plan.max_advance_ticks / 390:g} "
-                                 f"sessions) one call may run on plan {plan.name!r}; split it")
+                                 f"advance of {asked} is above the {plan.max_advance_ticks} ticks "
+                                 f"({plan.max_advance_ticks / 390:g} sessions) one call may run on "
+                                 f"plan {plan.name!r}; split it")
             self.quotas.check_daily(c.owner, plan, sim_ticks=est)
             est_steps = steps_for(est, tps)
             self.quotas.admit_steps(c.owner, plan, est_steps)

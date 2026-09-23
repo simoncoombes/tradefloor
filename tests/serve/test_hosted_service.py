@@ -139,8 +139,10 @@ def test_max_advance_length(tmp_path):
     e = code_of(hosted.advance, alice, s.session_id, steps=14)
     assert e.code == "invalid_request" and "390 ticks" in e.message
     hosted.advance(alice, s.session_id, steps=13)
-    hosted.advance(alice, s.session_id, until="next_open")   # always allowed
+    hosted.advance(alice, s.session_id, until="next_open")   # one open or close always fits
     hosted.advance(alice, s.session_id, until="close")
+    e = code_of(hosted.advance, alice, s.session_id, steps=2, until="close")  # two sessions
+    assert e.code == "invalid_request" and "until='close' x 2" in e.message
 
 
 def test_calls_per_minute_rate_limit(tmp_path):

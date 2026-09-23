@@ -93,6 +93,11 @@ def store(fake=None, **kw):
     return S3Store("bucket", "tf/prod", client=fake, **kw), fake
 
 
+def test_it_is_a_session_store():
+    from tradefloor.serve.types import SessionStore
+    assert isinstance(store()[0], SessionStore)
+
+
 def test_round_trip_is_bit_exact():
     s, _ = store()
     s.commit("s1", rec(1), {"fills": [{"px": 1.5}], "calls": [{"c": "open"}]})

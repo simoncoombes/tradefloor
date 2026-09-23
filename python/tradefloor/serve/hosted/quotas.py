@@ -315,15 +315,18 @@ class Quotas:
 def estimate_advance_ticks(tick: int, market_open: bool, ticks_per_step: int,
                            steps: int, until: str) -> int:
     """An upper bound on the ticks one `advance` call will simulate, by the
-    core's clock rules: `close` runs to the end of this session (the next one
-    if the market is closed); `next_open` finishes this session and opens the
-    next without stepping it (nothing, if the market is already closed)."""
+    core's clock rules (contract 0.2): `close` runs to the end of this session
+    (the next one if the market is closed); `next_open` finishes this session
+    and opens the next without stepping it (nothing, if the market is already
+    closed); with either, `steps` counts closes or opens, each further one a
+    whole session."""
     if until == "steps":
         return max(0, int(steps)) * ticks_per_step
     remaining = max(TICKS_PER_SESSION - tick, 0) if market_open else 0
+    more = (max(1, int(steps)) - 1) * TICKS_PER_SESSION
     if until == "close":
-        return remaining if remaining else TICKS_PER_SESSION
-    return remaining
+        return (remaining if remaining else TICKS_PER_SESSION) + more
+    return remaining + more
 
 
 def ticks_between(before_day: int, before_tick: int, after_day: int, after_tick: int) -> int:
