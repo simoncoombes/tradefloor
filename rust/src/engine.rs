@@ -1866,7 +1866,7 @@ impl Engine {
             let mut v = Vec::with_capacity(request.news.len() + day_news.len());
             v.extend_from_slice(request.news);
             // WHEN the day's move lands. At `news_absorption_half_life` 0.0,
-            // every preset, each tick carries the event whole and the tick
+            // every preset through pt-v18, each tick carries the event whole and the tick
             // divides it by 390, so the move lands in a straight line over
             // the session: this branch is the code that always stood. Off
             // zero, each event is carried at this minute's share of the
@@ -3832,8 +3832,9 @@ impl Engine {
     /// the engine holds; the loop carries the multiplier to the VIX with a
     /// gain, so the dialled figure has to be divided by that gain before
     /// the level is driven with it. See
-    /// `ModelParams::vix_level_loop_gain`, which is 0.0 on every preset and
-    /// returns the dial's own f64 here with no arithmetic run at all.
+    /// `ModelParams::vix_level_loop_gain`, which is 0.0 on every preset
+    /// through pt-v18 and returns the dial's own f64 here with no arithmetic
+    /// run at all.
     fn vix_level_sigma_applied(&self) -> f64 {
         if self.params.vix_level_loop_gain == 0.0 {
             self.params.vix_level_sigma

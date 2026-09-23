@@ -424,7 +424,8 @@ pub struct ModelParams {
     pub news_peer_vix_coupling: f64,
     /// How fast the market prices an endogenous news event, as the
     /// half-life in ticks (minutes) of the fast part of its move. 0.0 --
-    /// every preset -- is the straight line that has always stood.
+    /// every preset through pt-v18 -- is the straight line that has always
+    /// stood. pt-v19 ships 0.6 since its fifth composition (2026-09-23).
     ///
     /// # The defect
     ///
@@ -478,7 +479,8 @@ pub struct ModelParams {
     /// The share of an endogenous news event's move that arrives as
     /// post-news drift, after the fast part: `d` in
     /// [`ModelParams::news_absorption_half_life`]'s profile. 0.0 -- every
-    /// preset -- is no drift part; read only with that dial off zero.
+    /// preset through pt-v18 -- is no drift part; read only with that dial
+    /// off zero. pt-v19 ships 0.12 since its fifth composition.
     pub news_absorption_drift_share: f64,
     /// The half-life in ticks of the post-news drift part, `h_d` in
     /// [`ModelParams::news_absorption_half_life`]'s profile. 0.0 lands the
@@ -486,7 +488,8 @@ pub struct ModelParams {
     /// `news_absorption_drift_share` off zero.
     pub news_absorption_drift_half_life: f64,
     /// Whether the market maker re-quotes on public news. 0.0 -- every
-    /// preset -- quotes the book around the last print, so a news move in
+    /// preset through pt-v18 -- quotes the book around the last print (pt-v19
+    /// re-quotes, 1.0, since its fifth composition), so a news move in
     /// the model price reaches the tape only as fast as the tick's flow can
     /// walk the book. 1.0 quotes it around the last print moved by the
     /// tick's news term (`company_news / 390` as applied), the way dealers
@@ -1321,13 +1324,16 @@ pub struct ModelParams {
     /// are the derived values; they ship at 0.0 until the registered arm
     /// has measured what they do to every row.
     ///
-    /// 0.0 -- every preset -- is, with `vix_level_sigma` 0.0, a multiplier
-    /// of exactly 1.0 and bit-identical. Read only while `vix_level_sigma`
-    /// is non-zero.
+    /// 0.0 -- every preset through pt-v18 -- is, with `vix_level_sigma` 0.0,
+    /// a multiplier of exactly 1.0 and bit-identical. Read only while
+    /// `vix_level_sigma` is non-zero, which it is on pt-v19 since the
+    /// 2026-09-21 composition.
     pub vix_level_persistence: f64,
 
     /// The per-session innovation of the VIX's own slow log-level. 0.0 on
-    /// every preset: the log-level stays exactly 0.0, the multiplier is
+    /// every preset through pt-v18 (pt-v19 ships it since the 2026-09-21
+    /// composition; `provenance.py` carries the value it ships and its
+    /// derivation): the log-level stays exactly 0.0, the multiplier is
     /// exactly 1.0 by a branch and not by arithmetic, and no draw is
     /// added or moved -- the normal it would consume is the one the
     /// factor level already takes unconditionally on its own stream, so a
@@ -1339,10 +1345,12 @@ pub struct ModelParams {
     pub vix_level_sigma: f64,
 
     /// The loop's own transmission of the VIX's slow level into the VIX,
-    /// which the level's innovation is DIVIDED by. 0.0 -- every preset --
-    /// is the branch not taken: the recursion and the multiplier read
-    /// `vix_level_sigma` itself, the same f64, and every preset reproduces
-    /// bit for bit.
+    /// which the level's innovation is DIVIDED by. 0.0 -- every preset
+    /// through pt-v18 -- is the branch not taken: the recursion and the
+    /// multiplier read `vix_level_sigma` itself, the same f64, and those
+    /// presets reproduce bit for bit. pt-v19 ships it since the 2026-09-21
+    /// composition; `provenance.py` carries the value it ships and its
+    /// derivation, which the defect below predates.
     ///
     /// # The defect
     ///
@@ -1581,8 +1589,12 @@ pub struct ModelParams {
     pub vix_anchor_reversion: f64,
 
     /// The share of the VIX's TARGET taken by the identity's anchor, in
-    /// logs. 0.0 -- every preset through pt-v19 -- is the branch not taken:
-    /// the target is the read-back exactly and every preset is BIT-IDENTICAL.
+    /// logs. 0.0 -- every preset through pt-v18 -- is the branch not taken:
+    /// the target is the read-back exactly and those presets are
+    /// BIT-IDENTICAL. pt-v19 ships 0.375 since its fifth composition, the
+    /// calm weight the tape's VIX-to-realised-volatility elasticity gives
+    /// through `theta = (1 - a) k` (`provenance.py`), which is a different
+    /// identity from the slow-pole weight derived below.
     ///
     /// The same job as [`ModelParams::vix_anchor_reversion`] done in the
     /// other place. That dial adds a second reversion RATE beside
@@ -1609,7 +1621,8 @@ pub struct ModelParams {
     pub vix_anchor_weight: f64,
 
     /// How fast the anchor's view of the read-back moves, per session.
-    /// 0.0 -- every preset -- is the instantaneous form: the target is
+    /// 0.0 -- every preset through pt-v18 -- is the instantaneous form (pt-v19
+    /// ships a memory of one eighteenth since its fifth composition): the target is
     /// `implied^(1 - a) (L anchor)^a`, today's read-back against the anchor.
     ///
     /// Nonzero, the anchor pulls against a SLOW memory of the read-back's
@@ -1622,8 +1635,9 @@ pub struct ModelParams {
     pub vix_anchor_memory: f64,
 
     /// How many economy steps the macro model compounds a year's GDP and
-    /// CPI growth over. 365.0 -- every preset -- is the arithmetic that has
-    /// always stood, and the step at 365.0 is the same f64 division.
+    /// CPI growth over. 365.0 -- every preset through pt-v18 -- is the
+    /// arithmetic that has always stood, and the step at 365.0 is the same
+    /// f64 division. pt-v19 ships 252.0 since its fifth composition.
     ///
     /// # The defect
     ///
@@ -1639,8 +1653,9 @@ pub struct ModelParams {
     pub macro_compound_days_per_year: f64,
 
     /// How many economy steps make a macro YEAR on the rest of the macro
-    /// calendar. 365.0 -- every preset -- is the calendar that has always
-    /// stood: 30-step months (`DAYS_PER_MONTH`), 90-step quarters, a 90-step
+    /// calendar. 365.0 -- every preset through pt-v18 -- is the calendar
+    /// that has always stood (pt-v19 ships 252.0 since its fifth
+    /// composition): 30-step months (`DAYS_PER_MONTH`), 90-step quarters, a 90-step
     /// OPEC interval, a 365-step seasonal year, a 30-step month on the
     /// cycle's phase clock and its per-day hazard, a 30-step market-return
     /// memory, and central-bank meetings every 42-55 (crisis 21-30) steps.
@@ -1659,15 +1674,17 @@ pub struct ModelParams {
     pub macro_calendar_days_per_year: f64,
 
     /// Selects the business-cycle phase table derived from NBER and BEA
-    /// (`economy::state::us_phase_characteristics`). 0.0 -- every preset --
-    /// reads the shipped table; any other value reads the US table. Its
+    /// (`economy::state::us_phase_characteristics`). 0.0 -- every preset
+    /// through pt-v18 -- reads the shipped table; any other value reads the
+    /// US table, which pt-v19 does since its fifth composition. Its
     /// durations are months of the macro calendar, so they mean real months
     /// only with `macro_calendar_days_per_year` 252.0. See the table's own
     /// docstring for each number's derivation.
     pub cycle_us_calibration: f64,
 
     /// Adds a lift-off branch to the central bank's ladder. 0.0 -- every
-    /// preset -- is the shipped ladder, in which every hike needs inflation
+    /// preset through pt-v18 -- is the ladder that stood (pt-v19 adds the
+    /// branch, 1.0, since its fifth composition), in which every hike needs inflation
     /// at least a point above target, so after the first recession the
     /// rate sits at zero for the rest of a run. At any other value the
     /// bank also hikes 25bp when its own Taylor rate is 50bp above the
@@ -1676,18 +1693,20 @@ pub struct ModelParams {
     /// branch mirrored. See `economy::central_bank`.
     pub fed_liftoff_rule: f64,
 
-    /// Reads buybacks into `market_pe`. 0.0 -- every preset -- divides price
-    /// by `eps * nominal` without the buyback term the valuation applies,
-    /// so the multiple rises by about the buyback yield a year (22.6 to 28.0
-    /// over 21 years on pt-v19) and slowly raises the expansion hazard,
+    /// Reads buybacks into `market_pe`. 0.0 -- every preset through pt-v18
+    /// -- divides price by `eps * nominal` without the buyback term the
+    /// valuation applies, so the multiple rises by about the buyback yield a
+    /// year (22.6 to 28.0 over 21 years on pt-v19's fourth composition; the
+    /// fifth reads the buybacks in, 1.0) and slowly raises the expansion hazard,
     /// which adds above a multiple of 28. At any other value the earnings
     /// carry `market::tick::buyback_scale`, as the valuation's do.
     pub market_pe_buybacks: f64,
 
     /// Where the anchor's weight pulls TO, as a log offset below the
     /// identity's derived anchor: the blend (and the memory's reference) use
-    /// `L * anchor * exp(-c)`. 0.0 -- every preset -- is the branch not
-    /// taken and the reference is `L * anchor` exactly. The forward map's
+    /// `L * anchor * exp(-c)`. 0.0 -- every preset through pt-v18 -- is the
+    /// branch not taken and the reference is `L * anchor` exactly (pt-v19
+    /// ships 0.1515, ln(1.252 / 1.076), since its fifth composition). The forward map's
     /// denominator (`vix_ratio_denominator`) is NOT moved, so a held VIX
     /// drives the same variance it did.
     ///
@@ -1701,7 +1720,8 @@ pub struct ModelParams {
     pub vix_anchor_centre: f64,
 
     /// The anchor weight as a function of the VIX's level. 0.0 -- every
-    /// preset -- is the constant weight `vix_anchor_weight`. Nonzero,
+    /// preset through pt-v18 -- is the constant weight `vix_anchor_weight`
+    /// (pt-v19 ships 1.0 since its fifth composition). Nonzero,
     ///
     /// ```text
     /// 1 - a(x) = (1 - a) * (K / clamp(x, K, r K))^eta
@@ -1885,9 +1905,12 @@ pub struct ModelParams {
     /// still reads the print.
     pub market_vol_vix_smooth: f64,
     /// Exponent on the market variance target's VIX ratio. 2.0 -- every
-    /// preset up to the 2026-09-21 composition of pt-v19, which ships 4.9
+    /// preset up to the 2026-09-21 composition of pt-v19, which shipped 4.9
     /// (the tape's lever law at the excursion form's fixed point; see the
-    /// constructor) -- is the literal square, bit for bit. Round 100
+    /// constructor) until its fifth composition, which ships 4.0 on the
+    /// anchor form, above the anchor only (see
+    /// `market_vol_vix_exponent_below`) -- is the literal square, bit for
+    /// bit. Round 100
     /// measured the square too convex through mid-VIX along real paths;
     /// a lower exponent with the coupling re-fit to hold T(45)/T(5)
     /// flattens the middle while preserving the certified crisis lever's
@@ -1898,8 +1921,9 @@ pub struct ModelParams {
     /// Exponent on the market variance target's VIX ratio BELOW one, i.e.
     /// where the VIX sits under the ratio's denominator (the derived anchor
     /// under the level form, the read-back under the excursion form).
-    /// 0.0 -- every preset -- reads `market_vol_vix_exponent` on both sides
-    /// and never branches, bit for bit.
+    /// 0.0 -- every preset through pt-v18 -- reads `market_vol_vix_exponent`
+    /// on both sides and never branches, bit for bit. pt-v19 ships 2.5 since
+    /// its fifth composition.
     ///
     /// Nonzero, the response is `r^below` for `r < 1` and
     /// `r^market_vol_vix_exponent` at and above one: continuous at the
@@ -1924,8 +1948,11 @@ pub struct ModelParams {
     /// The LAGGED downside transmission: on the session after a down day,
     /// every name receives `beta * factor * (1 + this)` whatever the
     /// tick's own sign. 0.0 -- pt-v1 through pt-v16 -- is bit-identical;
-    /// pt-v18 and pt-v19 ship 0.375, which `provenance.py` records as an
-    /// S-argmin on a seven-point grid rather than as anything derived.
+    /// pt-v18 ships 0.375, which `provenance.py` records as an S-argmin on a
+    /// seven-point grid rather than as anything derived. pt-v19 shipped it
+    /// too until its fifth composition, which ships 0.46 with the wire
+    /// sampled on the live session: FITTED, against the lagged asymmetry
+    /// row's held-out count, and recorded as fitted.
     /// Block 1201's deep-trim signature (the wire landing a day late on
     /// its structure) is the measured motivation: real down-moves
     /// continue, and the contemporaneous wire alone cannot express that.
@@ -1933,8 +1960,9 @@ pub struct ModelParams {
     /// WHERE the lagged wire's condition is SAMPLED. A form dial with no
     /// number to derive: it does not change what the boost is, only which
     /// state the boolean is read off. 0.0 -- every shipped preset through
-    /// pt-v19 -- is bit-identical, because the branch below returns
-    /// `inputs.prev_day_down` unchanged.
+    /// pt-v18 -- is bit-identical, because the branch below returns
+    /// `inputs.prev_day_down` unchanged. pt-v19 samples on the live session,
+    /// 1.0, since its fifth composition.
     ///
     /// # The three values
     ///
@@ -2530,8 +2558,10 @@ pub struct ModelParams {
     pub macro_burn_in_days: f64,
     /// Draw the day-zero cycle phase AND its age from the cycle's own
     /// stationary law, instead of opening every run at the same point.
-    /// 0.0, which every shipped preset carries, draws nothing and leaves
-    /// construction as it was, to the bit.
+    /// 0.0, which every preset through pt-v18 carries, draws nothing and
+    /// leaves construction as it was, to the bit. pt-v19 carries 1.0 since
+    /// its fifth composition, by the owner's ruling of 2026-09-23 that
+    /// certification runs open at a random point in the business cycle.
     ///
     /// # A cohort, not a transient
     ///

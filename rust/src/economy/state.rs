@@ -46,7 +46,9 @@ pub struct MacroCalendar {
 }
 
 impl MacroCalendar {
-    /// The calendar every preset runs: 365-step years, 30-step months.
+    /// The calendar every preset through pt-v18 runs: 365-step years,
+    /// 30-step months. pt-v19 runs the session calendar (252) since its
+    /// fifth composition.
     pub const fn shipped() -> Self {
         MacroCalendar { days_per_year: 365, days_per_month: DAYS_PER_MONTH, shipped: true }
     }
