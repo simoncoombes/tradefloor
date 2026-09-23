@@ -1029,7 +1029,7 @@ class LocalSessionService:
                                       else (o.quantity if o.side == "buy" else -o.quantity))
                     got, price = abs(fill["quantity"]), fill["price"]
                 else:
-                    self._take_marginal(s, o.ticker, signed, price, cost.worst_price)
+                    self._take_marginal(s, o.ticker, signed, price)
             except (OrderError, ValidationError) as exc:
                 s.finish(o, "rejected", str(exc))
                 continue
@@ -1051,8 +1051,8 @@ class LocalSessionService:
         pf.fills.clear()
 
     @staticmethod
-    def _take_marginal(s: _Session, ticker: str, signed: float, price: float,
-                       worst: float) -> None:
+    def _take_marginal(s: _Session, ticker: str, signed: float,
+                       price: float) -> None:
         """`Portfolio.execute` for the second and later order on one side of
         one book in a step: same leverage check, same accounting, same flow,
         at the marginal price of the levels the earlier orders left."""
