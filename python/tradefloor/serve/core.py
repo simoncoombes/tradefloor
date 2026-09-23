@@ -16,10 +16,18 @@ rules, limits and measured speed are docs/serve/CORE.md.
 3. `run_session(hour, minute, 3, ticks, order_flow=pending_flow())`, then
    `clear_flow`, exactly as `TradingEnv.step` does. So market orders move
    the market.
-4. Resting limit orders are checked against the step's traded high and low,
-   read from `Engine.session_prices()` (one print per name per tick of the
-   step just run). They fill in full at the limit and do NOT feed order flow.
-5. At tick 390, `close_market`, and day orders expire.
+4. The step's bars are recorded from `Engine.session_prices()` (one print
+   per name per tick of the step just run) and the day's volume column.
+5. Resting limit orders are checked against the step's traded high and low.
+   They fill in full at the limit and do NOT feed order flow.
+6. At tick 390, `close_market`, the day bar is recorded, and day orders
+   expire.
+
+The leverage cap refuses a fill only when it would leave leverage above the
+cap AND above where the account stands now (contract 0.2), so a trade that
+reduces risk always passes. `Portfolio`'s own rule refuses any fill projected
+over the cap; the core runs `Portfolio.execute` with the cap lifted for that
+one call after applying its own rule.
 
 Several market orders for the same name and side in one step sweep the book
 CUMULATIVELY: the second is priced at the levels the first did not take, so
@@ -38,6 +46,7 @@ sessions given the same calls return the same bytes apart from their ids.
 
 from __future__ import annotations
 
+import base64
 import copy
 import hashlib
 import json
@@ -46,20 +55,23 @@ import re
 import struct
 import threading
 import uuid
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from datetime import datetime, timezone
 from typing import Any, Callable
 
 import tradefloor as _tf
 from tradefloor import envelope as _envelope
 from tradefloor._core import Engine, OrderError, ValidationError
+from tradefloor.headlines import headlines_for
 from tradefloor.portfolio import Portfolio
 from tradefloor.portfolio import Position as _Holding
-from tradefloor.serve.store import FileStore, SessionStore
+from tradefloor.serve.store import FileStore
+from tradefloor.serve.types import SessionStore
 from tradefloor.serve.types import (
     CONTRACT_VERSION,
     Account,
     AdvanceResult,
+    Bar,
     Clock,
     Fill,
     Headline,
@@ -75,7 +87,7 @@ from tradefloor.serve.types import (
 )
 
 __all__ = ["LocalSessionService", "MACRO_FIELDS", "CYCLE_PHASES",
-           "TICKS_PER_SESSION", "LONG_RUN_CHECK"]
+           "TICKS_PER_SESSION", "LONG_RUN_CHECK", "STEP_BAR_SESSIONS"]
 
 TICKS_PER_SESSION = 390
 #: The session opens at 09:30 on a fixed weekday, as `TradingEnv` and the
@@ -95,7 +107,12 @@ MAX_QUANTITY = 1e12
 MAX_PRICE = 1e9
 MAX_CASH = 1e15
 
-RECORD_SCHEMA = 1
+#: Step bars are kept for this many sessions, the current one included.
+STEP_BAR_SESSIONS = 20
+#: The fields of a bar, packed per name as little-endian f64.
+_BAR_FIELDS = ("open", "high", "low", "close", "volume")
+
+RECORD_SCHEMA = 2
 _SESSION_ID = re.compile(r"^[0-9a-f]{32}$")
 _UNTIL = ("steps", "close", "next_open")
 _STATUSES = ("accepted", "filled", "cancelled", "expired", "rejected")
@@ -190,8 +207,12 @@ def _bad(message: str) -> ServeError:
 
 
 def _order_from(d: dict[str, Any]) -> Order:
+    # Built by hand rather than with Order.from_dict: a resume reads every
+    # finished order, and from_dict resolves type hints on each call.
     d = dict(d)
     d["submitted_at"] = Clock(**d["submitted_at"])
+    if d.get("updated_at") is not None:
+        d["updated_at"] = Clock(**d["updated_at"])
     return Order(**d)
 
 
@@ -210,6 +231,67 @@ def _info_from(d: dict[str, Any]) -> SessionInfo:
 
 def _order_no(order_id: str) -> int:
     return int(order_id.rsplit("-", 1)[-1])
+
+
+def _pack(values: list[float]) -> bytes:
+    return struct.pack("<%dd" % len(values), *values)
+
+
+def _bar_of(blob: bytes, j: int) -> tuple[float, ...]:
+    """Name j's (open, high, low, close, volume) from a packed row of bars."""
+    width = len(_BAR_FIELDS)
+    return struct.unpack_from("<%dd" % width, blob, 8 * width * j)
+
+
+def _cap_refusal(pf: Portfolio, engine: Engine, ticker: str, signed: float,
+                 price: float) -> str | None:
+    """Why the leverage cap refuses this fill, or None if it passes.
+
+    Contract 0.2: refused only when the projected leverage is above the cap
+    AND above the account's leverage now, so a trade that lowers leverage
+    always passes. `Portfolio._projected_leverage` does the projection. An
+    insolvent account has no leverage to compare with, so there a fill
+    passes when it does not add gross exposure.
+    """
+    cap = pf.max_leverage
+    if cap is None:
+        return None
+    projected = pf._projected_leverage(engine, ticker, signed, price, signed * price)
+    if projected <= cap:
+        return None
+    current = pf.leverage(engine)
+    if math.isinf(current):
+        marks = pf.marks(engine)
+        gross = sum(abs(h.quantity + (signed if h.ticker == ticker else 0.0))
+                    * marks.get(h.ticker, h.avg_cost) for h in pf.positions.values())
+        if ticker not in pf.positions:
+            gross += abs(signed) * price
+        if gross <= pf.gross_exposure(engine):
+            return None
+        return (f"the account is insolvent and this trade would add gross "
+                f"exposure; over the {cap:.2f}x limit only trades that reduce "
+                f"exposure pass")
+    if projected <= current:
+        return None
+    shown = "insolvency" if math.isinf(projected) else f"{projected:.2f}x"
+    return (f"trade would take leverage to {shown}, above the {cap:.2f}x "
+            f"limit and above the account's {current:.2f}x now")
+
+
+class _Uncapped:
+    """`Portfolio.execute` with its own leverage check lifted for one call,
+    after `_cap_refusal` has applied the contract's rule."""
+
+    def __init__(self, pf: Portfolio) -> None:
+        self.pf = pf
+        self.cap = pf.max_leverage
+
+    def __enter__(self) -> Portfolio:
+        self.pf.max_leverage = None
+        return self.pf
+
+    def __exit__(self, *exc: Any) -> None:
+        self.pf.max_leverage = self.cap
 
 
 # -- one session's live state --------------------------------------------------------
@@ -245,6 +327,20 @@ class _Session:
         # streams by the next commit.
         self.new_fills: list[Fill] = []
         self.new_done: list[Order] = []
+        self.new_day_bars: list[tuple[int, bytes]] = []
+        # Bars. A day bar is one packed row (every name's open, high, low,
+        # close, volume) per finished session; all are kept, and they go to
+        # the store's `day_bars` stream. Step bars are one packed row per
+        # step: `today` for the session in progress, `step_window` for the
+        # finished sessions before it, trimmed so that the two together span
+        # STEP_BAR_SESSIONS sessions. Both live in the record, so the store
+        # holds a bounded window of them.
+        self.day_bars: list[tuple[int, bytes]] = []
+        self.step_window: deque[tuple[int, list[bytes]]] = deque()
+        self.today: list[bytes] = []
+        # A finished day's step bars never change, so each is base64-encoded
+        # once and the record reuses the text on every later commit.
+        self._window_text: dict[int, str] = {}
         # The engine's hash and snapshot, cached until the engine next runs.
         # Only open_market, run_session and close_market change engine state
         # (a book sweep prices against the book and leaves it as it was), and
@@ -288,11 +384,35 @@ class _Session:
         return [self.orders[i] for i in sorted(self.queue + self.resting,
                                                 key=_order_no)]
 
-    def finish(self, order: Order, status: str, reason: str | None = None) -> None:
+    def finish(self, order: Order, status: str, at: Clock,
+               reason: str | None = None) -> None:
         order.status = status  # type: ignore[assignment]
+        order.updated_at = copy.deepcopy(at)
         if reason is not None:
             order.reason = reason
         self.new_done.append(order)
+
+    def end_day_steps(self) -> None:
+        """Move today's step bars into the window at the close."""
+        if self.today:
+            self.step_window.append((self.day, self.today))
+            self.today = []
+        while len(self.step_window) > STEP_BAR_SESSIONS:
+            day, _ = self.step_window.popleft()
+            self._window_text.pop(day, None)
+
+    def window_text(self, day: int, rows: list[bytes]) -> str:
+        text = self._window_text.get(day)
+        if text is None:
+            text = self._window_text[day] = base64.b64encode(b"".join(rows)).decode("ascii")
+        return text
+
+    def step_sessions(self) -> list[tuple[int, list[bytes]]]:
+        """Step bars for the last STEP_BAR_SESSIONS sessions, oldest first."""
+        days = list(self.step_window)
+        if self.today:
+            days.append((self.day, self.today))
+        return days[-STEP_BAR_SESSIONS:]
 
     def state_hash(self) -> str:
         """`Engine.state_hash()` with the portfolio, open orders and clock.
@@ -355,14 +475,18 @@ class _Session:
             "queue": list(self.queue),
             "resting": list(self.resting),
             "next_order": self.next_order,
+            "step_bars": {"window": [[d, self.window_text(d, rows)]
+                                     for d, rows in self.step_window],
+                          "today": b"".join(self.today)},
             "counts": {"fills": len(self.fills),
-                       "orders": len(self.orders) - len(self.open_orders())},
+                       "orders": len(self.orders) - len(self.open_orders()),
+                       "day_bars": len(self.day_bars)},
         }
 
     @classmethod
-    def from_record(cls, record: dict[str, Any], fills: list[dict[str, Any]],
-                    done: list[dict[str, Any]]) -> "_Session":
-        if record.get("schema") != RECORD_SCHEMA:
+    def from_record(cls, record: dict[str, Any],
+                    streams: dict[str, list[dict[str, Any]]]) -> "_Session":
+        if record.get("schema") not in (1, RECORD_SCHEMA):
             raise ServeError("internal", f"session record schema "
                              f"{record.get('schema')!r} is not {RECORD_SCHEMA}")
         s = cls()
@@ -404,7 +528,7 @@ class _Session:
         s.market_open, s.total_steps = c["market_open"], c["total_steps"]
 
         counts = record["counts"]
-        orders = [_order_from(d) for d in done[:counts["orders"]]]
+        orders = [_order_from(d) for d in streams["orders"][:counts["orders"]]]
         orders += [_order_from(d) for d in record["open_orders"]]
         orders.sort(key=lambda o: _order_no(o.order_id))
         s.orders = {o.order_id: o for o in orders}
@@ -413,8 +537,28 @@ class _Session:
         s.queue = list(record["queue"])
         s.resting = list(record["resting"])
         s.next_order = int(record["next_order"])
-        s.fills = [_fill_from(d) for d in fills[:counts["fills"]]]
+        s.fills = [_fill_from(d) for d in streams["fills"][:counts["fills"]]]
+        s.day_bars = [(int(e["day"]), e["bars"])
+                      for e in streams.get("day_bars", [])[:counts.get("day_bars", 0)]]
+        bars = record.get("step_bars", {"window": [], "today": b""})
+        width = 8 * len(_BAR_FIELDS) * len(s.tickers)
+
+        def split(blob: bytes) -> list[bytes]:
+            return [blob[i:i + width] for i in range(0, len(blob), width)]
+
+        for day, text in bars["window"]:
+            s.step_window.append((int(day), split(base64.b64decode(text))))
+            s._window_text[int(day)] = text
+        s.today = split(bars["today"])
         return s
+
+    def streams(self) -> dict[str, list[dict[str, Any]]]:
+        """The whole history as the store's streams hold it."""
+        return {"fills": [f.to_dict() for f in self.fills],
+                "orders": sorted((o.to_dict() for o in self.orders.values()
+                                  if o.status != "accepted"),
+                                 key=lambda d: _order_no(d["order_id"])),
+                "day_bars": [{"day": d, "bars": b} for d, b in self.day_bars]}
 
 
 # -- the service -----------------------------------------------------------------------
@@ -424,9 +568,10 @@ class LocalSessionService:
 
     `max_universe` caps `universe_size` (the hosted layer may pass lower);
     `max_advance_sessions` caps one `advance` at that many sessions of ticks.
-    `headlines`, when given, is called as `headlines(engine, clock)` on every
-    observation and its list is the observation's `news`; it must be a pure
-    function of the engine state for replay to stay deterministic.
+    `news` is `tradefloor.headlines.headlines_for` at the observation's
+    clock unless `headlines` is given, in which case it is called as
+    `headlines(engine, clock)`; either must be a pure function of the engine
+    state for replay to stay deterministic.
     `cache_size` is how many sessions stay live in memory; the rest are
     reloaded from the store on their next call.
     """
@@ -489,9 +634,9 @@ class LocalSessionService:
                 # Checked before rebuilding the engine: another owner's
                 # session costs nothing to refuse and says nothing.
                 raise missing
-            s = _Session.from_record(record,
-                                     self.store.read_stream(session_id, "fills"),
-                                     self.store.read_stream(session_id, "orders"))
+            s = _Session.from_record(record, {
+                name: self.store.read_stream(session_id, name)
+                for name in ("fills", "orders", "day_bars")})
         if s.owner != owner:
             raise missing
         self._remember(s)
@@ -528,6 +673,7 @@ class LocalSessionService:
             call.update(extra)
         appends = {"fills": [f.to_dict() for f in s.new_fills],
                    "orders": [o.to_dict() for o in s.new_done],
+                   "day_bars": [{"day": d, "bars": b} for d, b in s.new_day_bars],
                    "calls": [call]}
         try:
             self.store.commit(s.session_id, s.to_record(), appends)
@@ -537,6 +683,7 @@ class LocalSessionService:
                              f"{type(exc).__name__}: {exc}") from exc
         s.new_fills.clear()
         s.new_done.clear()
+        s.new_day_bars.clear()
         return state_hash
 
     # -- SessionService ------------------------------------------------------------
@@ -611,6 +758,18 @@ class LocalSessionService:
             raise _bad(f"since_day must be a non-negative integer, got {since_day!r}")
         return self._call(owner, session_id, lambda s: [
             copy.deepcopy(f) for f in s.fills if f.at.day >= since_day])
+
+    def bars(self, owner: str, session_id: str, ticker: str,
+             resolution: str = "day", since_day: int = 0,
+             limit: int | None = None) -> list[Bar]:
+        if resolution not in ("day", "step"):
+            raise _bad(f"resolution must be 'day' or 'step', got {resolution!r}")
+        if not _is_int(since_day) or since_day < 0:
+            raise _bad(f"since_day must be a non-negative integer, got {since_day!r}")
+        if limit is not None and (not _is_int(limit) or limit < 1):
+            raise _bad(f"limit must be a positive integer or None, got {limit!r}")
+        return self._call(owner, session_id, lambda s: self._bars(
+            s, ticker, resolution, since_day, limit))
 
     def advance(self, owner: str, session_id: str, steps: int = 1,
                 until: str = "steps") -> AdvanceResult:
@@ -688,13 +847,19 @@ class LocalSessionService:
         lows = _f64(engine.column("low"))
         prev = _f64(engine.column("previous_close"))
         volume = _f64(engine.column("volume"))
+        # The last step's volume: None until a step has run in this session.
+        last_step = s.today[-1] if s.market_open and s.today else (
+            s.step_window[-1][1][-1] if not s.market_open and s.step_window
+            and s.step_window[-1][0] == s.day else None)
         quotes = []
         for i, t in enumerate(s.tickers):
             book = engine.book(t)
             quotes.append(Quote(ticker=t, last=last[i], day_open=opens[i],
                                 day_high=highs[i], day_low=lows[i],
                                 prev_close=prev[i], volume=volume[i],
-                                bid=book.best_bid, ask=book.best_ask))
+                                bid=book.best_bid, ask=book.best_ask,
+                                step_volume=(None if last_step is None
+                                             else _bar_of(last_step, i)[4])))
         economy = s.snapshot()["economy"]
         macro = {k: float(economy[k]) for k in MACRO_FIELDS[:-1]}
         phase = economy.get("cycle_phase")
@@ -710,7 +875,11 @@ class LocalSessionService:
                 market_value=h.quantity * last[i],
                 unrealised_pnl=(last[i] - h.avg_cost) * h.quantity))
         clock = s.clock()
-        news = list(self.headlines(engine, clock)) if self.headlines else []
+        if self.headlines is not None:
+            news = list(self.headlines(engine, clock))
+        else:
+            news = headlines_for(s.snapshot(), day=clock.day, tick=clock.tick,
+                                 tickers=s.tickers)
         return Observation(
             session_id=s.session_id, clock=clock, quotes=quotes,
             vix=float(economy["vix"]), macro=macro, account=self._account(s),
@@ -722,12 +891,15 @@ class LocalSessionService:
     def _account(s: _Session) -> Account:
         engine, pf = s.engine, s.portfolio
         assert engine is not None and pf is not None
-        return Account(cash=float(pf.cash), net_worth=float(pf.net_worth(engine)),
+        net_worth = float(pf.net_worth(engine))
+        insolvent = net_worth <= 0
+        return Account(cash=float(pf.cash), net_worth=net_worth,
                        gross_exposure=float(pf.gross_exposure(engine)),
-                       leverage=float(pf.leverage(engine)),
+                       leverage=None if insolvent else float(pf.leverage(engine)),
                        realised_pnl=float(pf.realised()),
                        unrealised_pnl=float(pf.unrealised(engine)),
-                       starting_cash=float(pf.starting_cash))
+                       starting_cash=float(pf.starting_cash),
+                       insolvent=insolvent)
 
     # -- orders --------------------------------------------------------------------------
 
@@ -796,7 +968,8 @@ class LocalSessionService:
                       client_order_id=r.client_order_id, ticker=r.ticker,
                       side=r.side, quantity=r.quantity, type=r.type,
                       limit_price=r.limit_price, time_in_force=r.time_in_force,
-                      status="accepted", submitted_at=s.clock())
+                      status="accepted", submitted_at=s.clock(),
+                      updated_at=s.clock())
         s.next_order += 1
         s.orders[order.order_id] = order
         if order.client_order_id is not None:
@@ -826,15 +999,15 @@ class LocalSessionService:
         """Refuse at submission what the leverage cap would already refuse.
 
         Projected with `Portfolio`'s own arithmetic on a copy of the account,
-        after the market orders already queued ahead of this one, at the
-        current book's sweep price (market) or the limit (limit). The fill
-        itself is checked again when it happens; this only refuses what is
-        already known."""
+        after the orders already queued ahead of this one, at the current
+        book's sweep price (market) or the limit (limit), under the
+        contract's rule (`_cap_refusal`). The fill is checked again when it
+        happens; this only refuses what is already known."""
         pf, engine = s.portfolio, s.engine
         assert pf is not None and engine is not None
         if pf.max_leverage is None:
             return
-        trial = Portfolio(cash=pf.starting_cash, max_leverage=None)
+        trial = Portfolio(cash=pf.starting_cash, max_leverage=pf.max_leverage)
         trial.cash = pf.cash
         for t, h in pf.positions.items():
             c = _Holding(t)
@@ -848,14 +1021,11 @@ class LocalSessionService:
             Portfolio._apply(holding, signed, price)
             trial.cash -= signed * price
         signed, price = self._estimate(s, r.ticker, r.side, r.quantity, r.limit_price)
-        projected = trial._projected_leverage(engine, r.ticker, signed, price,
-                                              signed * price)
-        if projected > pf.max_leverage:
-            raise ServeError(
-                "insufficient_buying_power",
-                f"order would take leverage to {projected:.2f}x, above the "
-                f"{pf.max_leverage:.2f}x limit (projected at "
-                f"{price:.4f} on current holdings and queued orders)")
+        why = _cap_refusal(trial, engine, r.ticker, signed, price)
+        if why is not None:
+            raise ServeError("insufficient_buying_power",
+                             f"{why} (projected at {price:.4f} on current "
+                             f"holdings and the orders queued ahead)")
 
     @staticmethod
     def _estimate(s: _Session, ticker: str, side: str, quantity: float,
@@ -879,7 +1049,7 @@ class LocalSessionService:
             s.queue.remove(order_id)
         if order_id in s.resting:
             s.resting.remove(order_id)
-        s.finish(order, "cancelled", "cancelled by the owner")
+        s.finish(order, "cancelled", s.clock(), "cancelled by the owner")
         self._commit(s, "cancel_order", {"order_id": order_id})
         return copy.deepcopy(order)
 
@@ -960,6 +1130,7 @@ class LocalSessionService:
 
         ticks = min(s.config.ticks_per_step, TICKS_PER_SESSION - s.tick)
         hour, minute = divmod(OPEN_MINUTE + s.tick, 60)
+        volume_before = _f64(engine.column("volume"))
         engine.run_session(hour, minute, DAY_OF_WEEK, ticks,
                            order_flow=pf.pending_flow())
         s.touch()
@@ -968,18 +1139,38 @@ class LocalSessionService:
         s.step += 1
         s.total_steps += 1
 
+        n = len(s.tickers)
+        prints = _f64(engine.session_prices())
+        volume_after = _f64(engine.column("volume"))
+        row: list[float] = []
+        for j in range(n):
+            series = prints[j::n]
+            row += [series[0], max(series), min(series), series[-1],
+                    volume_after[j] - volume_before[j]]
+        s.today.append(_pack(row))
+
         if s.resting:
-            self._match_resting(s, fills)
+            self._match_resting(s, fills, prints)
         if s.tick >= TICKS_PER_SESSION:
             engine.close_market()
             s.touch()
             s.market_open = False
+            day_row: list[float] = []
+            closes = _f64(engine.prices())
+            cols = [_f64(engine.column(c)) for c in ("open", "high", "low")]
+            for j in range(n):
+                day_row += [cols[0][j], cols[1][j], cols[2][j], closes[j],
+                            volume_after[j]]
+            s.day_bars.append((s.day, _pack(day_row)))
+            s.new_day_bars.append(s.day_bars[-1])
+            s.end_day_steps()
+            closed = s.clock()
             keep = []
             for oid in s.resting:
                 o = s.orders[oid]
                 if o.time_in_force == "day":
-                    s.finish(o, "expired", f"day order unfilled at the close "
-                             f"of day {s.day}")
+                    s.finish(o, "expired", closed, f"day order unfilled at the "
+                             f"close of day {s.day}")
                     expired.append(o)
                 else:
                     keep.append(oid)
@@ -1003,8 +1194,8 @@ class LocalSessionService:
                 if o.type == "limit":
                     s.resting.append(oid)
                 else:
-                    s.finish(o, "rejected", f"the book for {o.ticker} could not "
-                             f"fill any of {o.quantity:g} shares")
+                    s.finish(o, "rejected", at, f"the book for {o.ticker} could "
+                             f"not fill any of {o.quantity:g} shares")
                 continue
             assert cost is not None
             if before > 0:
@@ -1023,15 +1214,21 @@ class LocalSessionService:
                     s.resting.append(oid)
                     continue
             signed = got if o.side == "buy" else -got
+            why = _cap_refusal(pf, engine, o.ticker, signed, price)
+            if why is not None:
+                s.finish(o, "rejected", at, why)
+                continue
             try:
                 if before == 0:
-                    fill = pf.execute(engine, o.ticker, signed if o.type == "limit"
-                                      else (o.quantity if o.side == "buy" else -o.quantity))
+                    with _Uncapped(pf):
+                        fill = pf.execute(engine, o.ticker, signed if o.type == "limit"
+                                          else (o.quantity if o.side == "buy"
+                                                else -o.quantity))
                     got, price = abs(fill["quantity"]), fill["price"]
                 else:
                     self._take_marginal(s, o.ticker, signed, price)
             except (OrderError, ValidationError) as exc:
-                s.finish(o, "rejected", str(exc))
+                s.finish(o, "rejected", at, str(exc))
                 continue
             taken[key] = before + got
             o.filled_quantity = got
@@ -1040,7 +1237,7 @@ class LocalSessionService:
             if got < o.quantity:
                 reason = (f"partial: the book held {got:g} of {o.quantity:g} "
                           f"shares; the rest is cancelled")
-            s.finish(o, "filled", reason)
+            s.finish(o, "filled", at, reason)
             f = Fill(order_id=oid, ticker=o.ticker, side=o.side, quantity=got,
                      price=price, at=copy.deepcopy(at), liquidity="taker")
             s.fills.append(f)
@@ -1054,29 +1251,24 @@ class LocalSessionService:
     def _take_marginal(s: _Session, ticker: str, signed: float,
                        price: float) -> None:
         """`Portfolio.execute` for the second and later order on one side of
-        one book in a step: same leverage check, same accounting, same flow,
-        at the marginal price of the levels the earlier orders left."""
+        one book in a step: same accounting, same flow, at the marginal price
+        of the levels the earlier orders left. The caller has applied the
+        leverage rule."""
         engine, pf = s.engine, s.portfolio
         assert engine is not None and pf is not None
         notional = signed * price
-        if pf.max_leverage is not None:
-            projected = pf._projected_leverage(engine, ticker, signed, price, notional)
-            if projected > pf.max_leverage:
-                raise OrderError(
-                    f"trade would take leverage to {projected:.2f}x, above the "
-                    f"{pf.max_leverage:.2f}x limit")
         holding = pf.positions.setdefault(ticker, _Holding(ticker))
         Portfolio._apply(holding, signed, price)
         pf.cash -= notional
         flow = pf._flow.setdefault(ticker, [0.0, 0.0])
         flow[0 if signed > 0 else 1] += abs(signed)
 
-    def _match_resting(self, s: _Session, fills: list[Fill]) -> None:
+    def _match_resting(self, s: _Session, fills: list[Fill],
+                       prints: list[float]) -> None:
         """Fill resting limits against the step's traded range, at the limit."""
         engine, pf = s.engine, s.portfolio
         assert engine is not None and pf is not None
         n = len(s.tickers)
-        prints = _f64(engine.session_prices())
         at = s.clock()
         at.market_open = True
         keep = []
@@ -1096,20 +1288,16 @@ class LocalSessionService:
             signed = o.quantity if o.side == "buy" else -o.quantity
             price = o.limit_price
             notional = signed * price
-            if pf.max_leverage is not None:
-                projected = pf._projected_leverage(engine, o.ticker, signed,
-                                                   price, notional)
-                if projected > pf.max_leverage:
-                    s.finish(o, "rejected", f"fill would take leverage to "
-                             f"{projected:.2f}x, above the "
-                             f"{pf.max_leverage:.2f}x limit")
-                    continue
+            why = _cap_refusal(pf, engine, o.ticker, signed, price)
+            if why is not None:
+                s.finish(o, "rejected", at, why)
+                continue
             holding = pf.positions.setdefault(o.ticker, _Holding(o.ticker))
             Portfolio._apply(holding, signed, price)
             pf.cash -= notional
             o.filled_quantity = o.quantity
             o.avg_fill_price = price
-            s.finish(o, "filled")
+            s.finish(o, "filled", at)
             f = Fill(order_id=oid, ticker=o.ticker, side=o.side,
                      quantity=o.quantity, price=price, at=copy.deepcopy(at),
                      liquidity="resting")
@@ -1118,14 +1306,42 @@ class LocalSessionService:
             fills.append(f)
         s.resting = keep
 
+    # -- bars ------------------------------------------------------------------------------------
+
+    @staticmethod
+    def _bars(s: _Session, ticker: Any, resolution: str, since_day: int,
+              limit: int | None) -> list[Bar]:
+        if not isinstance(ticker, str) or ticker not in s.index:
+            raise _bad(f"unknown ticker {ticker!r}; this session trades "
+                       f"{', '.join(s.tickers)}")
+        j = s.index[ticker]
+        out: list[Bar] = []
+        if resolution == "day":
+            for day, blob in s.day_bars:
+                if day >= since_day:
+                    out.append(Bar(ticker, day, None, *_bar_of(blob, j)))
+            if s.market_open and s.tick > 0 and s.day >= since_day:
+                # The session in progress, up to the current step.
+                engine = s.engine
+                assert engine is not None
+                live = [_f64(engine.column(c))[j] for c in ("open", "high", "low")]
+                out.append(Bar(ticker, s.day, None, *live,
+                               _f64(engine.prices())[j],
+                               _f64(engine.column("volume"))[j]))
+        else:
+            for day, rows in s.step_sessions():
+                if day < since_day:
+                    continue
+                for k, blob in enumerate(rows):
+                    out.append(Bar(ticker, day, k, *_bar_of(blob, j)))
+        return out[-limit:] if limit is not None else out
+
     # -- fork and close ----------------------------------------------------------------------
 
     def _fork(self, s: _Session, label: str) -> SessionInfo:
         # The fork is built the way a restart builds a session, from the
         # record and the history, so it is exactly what a resume would give.
-        record = s.to_record()
-        done = [o.to_dict() for o in s.orders.values() if o.status != "accepted"]
-        child = _Session.from_record(record, [f.to_dict() for f in s.fills], done)
+        child = _Session.from_record(s.to_record(), s.streams())
         child.session_id = uuid.uuid4().hex
         child.parent = s.session_id
         child.created_at = _now()
@@ -1137,6 +1353,7 @@ class LocalSessionService:
         child.new_done = sorted((o for o in child.orders.values()
                                  if o.status != "accepted"),
                                 key=lambda o: _order_no(o.order_id))
+        child.new_day_bars = list(child.day_bars)
         with self._session_lock(child.session_id):
             self._commit(child, "fork_of", {"parent_session_id": s.session_id,
                                             "parent_seq": s.seq})
@@ -1146,6 +1363,10 @@ class LocalSessionService:
         return child.info()
 
     def _close(self, s: _Session) -> SessionReport:
+        at = s.clock()
+        for o in s.open_orders():
+            s.finish(o, "cancelled", at, "session closed")
+        s.queue, s.resting = [], []
         s.status = "closed"
         state_hash = self._commit(s, "close", {})
         return SessionReport(session_id=s.session_id, account=self._account(s),
@@ -1214,6 +1435,9 @@ class LocalSessionService:
             f"(and limits marketable when placed) fill at the start of the "
             f"next step at the book's impact-aware price, and their flow does "
             f"move the market.")
+        news = self._news_caveat(s)
+        if news:
+            out.append(news)
         out.append(
             "Limit fills see one print per name per tick: a price that "
             "crossed the limit inside a tick and came back is not seen, and "
@@ -1235,6 +1459,38 @@ class LocalSessionService:
         assert s.engine is not None and s.portfolio is not None
         if s.portfolio.net_worth(s.engine) <= 0:
             out.append("The account is insolvent: net worth is at or below "
-                       "zero, so leverage reads as infinite.")
+                       "zero, so leverage is reported as null.")
         return out
+
+    @staticmethod
+    def _news_caveat(s: _Session) -> str | None:
+        """How much of a news move is left when its headline is first seen,
+        from the preset's own news parameters and this session's step size.
+
+        The engine adds `price_impact / 390` to the announcer's price on every
+        tick of the news day (docs/serve/HEADLINES.md), and a headline is
+        released at tick 1, so an agent first sees it at the end of its first
+        step with the rest of the move still to come.
+        """
+        assert s.engine is not None
+        params = s.engine.model_params
+        intensity = float(params.get("endogenous_news_intensity", 0.0) or 0.0)
+        sigma = float(params.get("endogenous_news_sigma", 0.0) or 0.0)
+        if intensity <= 0 or sigma <= 0:
+            return None
+        seen = min(s.config.ticks_per_step, TICKS_PER_SESSION)
+        left = (TICKS_PER_SESSION - seen) / TICKS_PER_SESSION
+        mean_abs = sigma * math.sqrt(2.0 / math.pi)
+        per_day = intensity * s.config.universe_size
+        return (
+            f"News in {s.config.preset} is priced in a straight line across the "
+            f"whole session: the engine adds 1/{TICKS_PER_SESSION} of a news "
+            f"event's price impact on every tick from the open to the close. "
+            f"With news on {intensity:.0%} of names a day (about {per_day:.2g} "
+            f"events a day on this roster) and a mean absolute impact of "
+            f"{mean_abs:.2%}, a headline first seen at tick {seen} still has "
+            f"about {left:.0%} of its move to come, worth about "
+            f"{mean_abs * left * 1e4:.0f}bp an event to an agent that trades "
+            f"its direction at once. Real markets price news in minutes, so "
+            f"that edge does not carry over to money.")
 

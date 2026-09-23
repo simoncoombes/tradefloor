@@ -211,26 +211,34 @@ def test_heads_ignore_stray_files(tmp_path):
     assert [h["n"] for h in fs.heads("o")] == [1]
 
 
-def test_history_goes_to_streams_so_the_record_stays_flat(tmp_path):
-    """A long session's commit is the size of the market, not of its past."""
-    from tradefloor.serve.core import LocalSessionService
+def test_history_goes_to_streams_so_the_record_stays_bounded(tmp_path):
+    """A long session's commit is the size of the market plus the 20-session
+    step-bar window, not the size of its past: fills, finished orders and day
+    bars go to streams."""
+    from tradefloor.serve.core import STEP_BAR_SESSIONS, LocalSessionService
     from tradefloor.serve.types import OrderRequest, SessionConfig
 
     svc = LocalSessionService(FileStore(tmp_path))
-    sid = svc.open("o", SessionConfig(seed=2, universe_size=6)).session_id
+    sid = svc.open("o", SessionConfig(seed=2, universe_size=6,
+                                      ticks_per_step=130)).session_id
     t = svc.info("o", sid).tickers[0]
 
     def record_size():
         (rec,) = [p for p in (tmp_path / sid).iterdir() if p.name.startswith("record-")]
         return rec.stat().st_size
 
-    svc.advance("o", sid)
-    base = record_size()
-    for k in range(60):
-        svc.place_order("o", sid, OrderRequest(ticker=t, side="buy" if k % 2 else "sell",
-                                               quantity=10))
-        svc.advance("o", sid)
-    assert len(svc.fills("o", sid)) == 60
-    assert record_size() < base * 1.2
-    fills = (tmp_path / sid / "fills.jsonl").read_text().splitlines()
-    assert len(fills) == 60
+    def trade_days(n):
+        for k in range(n):
+            svc.place_order("o", sid, OrderRequest(ticker=t, side="buy" if k % 2 else "sell",
+                                                   quantity=10))
+            svc.advance("o", sid, until="close")
+
+    trade_days(STEP_BAR_SESSIONS + 1)
+    full = record_size()
+    trade_days(15)
+    assert record_size() <= full * 1.02
+    assert len(svc.fills("o", sid)) == STEP_BAR_SESSIONS + 16
+    lines = (tmp_path / sid / "fills.jsonl").read_text().splitlines()
+    assert len(lines) == STEP_BAR_SESSIONS + 16
+    days = (tmp_path / sid / "day_bars.jsonl").read_text().splitlines()
+    assert len(days) == STEP_BAR_SESSIONS + 16
