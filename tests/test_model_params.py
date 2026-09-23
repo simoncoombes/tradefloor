@@ -128,17 +128,21 @@ PERTURBATIONS = [
     # silent -- so the two builds differ on the first session that draws a
     # two-sigma market factor.
     ("crash_amplifier_conditional_sigma", 0.0, True),
-    # Which VIX the factor's variance target reads. Perturbed DOWNWARD,
-    # because the default now carries it: pt-v19 sets it to 1.0, so the
-    # perturbation that says something is the one back to the anchor form.
-    # It moves on a three-session probe because the default runs
-    # `vix_level_identity`, so the VIX leaves the derived anchor on day one
-    # and the read-back the ratio is measured against is a different number
-    # from the anchor from the first close onward. On a preset without the
-    # identity the two forms would be incomparable, which is what
-    # `params.rs::the_excursion_switch_requires_the_identity` refuses to let
-    # ship.
-    ("market_vol_vix_excursion", 0.0, True),
+    # Which VIX the factor's variance target reads. Perturbed UP to 1.0, the
+    # excursion form, because the default is back on the anchor form: pt-v19
+    # carried 1.0 from its third composition (2026-09-21) until the fifth
+    # (2026-09-23) returned it to 0.0 for the anchor form of the VIX law, so
+    # the 0.0 that stood here became the default's own value and the row
+    # stopped being a perturbation. It moves on a three-session probe because
+    # the default runs `vix_level_identity`, so the VIX leaves the derived
+    # anchor on day one and the read-back the ratio is measured against is a
+    # different number from the anchor from the first close onward. On a
+    # preset without the identity the two forms would be incomparable, which
+    # is what `params.rs::the_excursion_switch_requires_the_identity` refuses
+    # to let ship, so COMPANIONS carries the identity for a base that ships it
+    # off (the nominal-growth derivation's pt-v18); on the default it is a
+    # no-op.
+    ("market_vol_vix_excursion", 1.0, True),
     ("crisis_blend_ramp", 0.7, False),         # needs VIX > 25.5; macro
     ("crisis_blend_cap", 0.4, False),          # starts at the default 15
     # The crisis blend's source only acts above the crisis threshold, which a
@@ -289,18 +293,21 @@ PERTURBATIONS = [
     # The VIX's own slow log-level (2026-09-21). Sigma is the switch and is
     # live on its own, riding the draw the factor level already takes;
     # persistence is unread while sigma is 0.0. The default ships sigma
-    # 0.0173 since the ptv19gjr composition, so persistence is read.
+    # 0.0173 since the ptv19gjr composition (0.0181 since the fifth), so
+    # persistence is read.
     ("vix_level_persistence", 0.99, True),
     ("vix_level_sigma", 0.03, True),
     # The loop's transmission of that level into the VIX, divided out of the
-    # level's dispersion (2026-09-21). Ships at 0.0 on every preset, so the
-    # perturbation has to be TO a non-zero value, and the default ships
-    # `vix_level_sigma` 0.0173, so the level it corrects is there to be
-    # corrected and the dial is read. The default ships 2.4684 since the
-    # third composition, so the perturbation is to 1.7486, the gain the
-    # same derivation gives at the square: the level's innovation and its
-    # stationary opening change scale, the opening draw is the same draw at
-    # a different scale, and no draw moves on any stream.
+    # level's dispersion (2026-09-21). Ships at 0.0 on every preset before
+    # pt-v19, so the perturbation had to be TO a non-zero value, and the
+    # default ships `vix_level_sigma` 0.0181, so the level it corrects is
+    # there to be corrected and the dial is read. The default shipped 2.4684
+    # from the third composition and ships 1.79 since the fifth, so the
+    # perturbation is to 1.7486, the gain the third composition's derivation
+    # gives at the square and a value no preset ships: the level's
+    # innovation and its stationary opening change scale, the opening draw
+    # is the same draw at a different scale, and no draw moves on any
+    # stream.
     ("vix_level_loop_gain", 1.7486, True),
     # The VIX's own slow reversion toward the identity's anchor (2026-09-22).
     # Ships at 0.0 on every preset -- the term is not added at all there -- so
@@ -312,43 +319,91 @@ PERTURBATIONS = [
     # draw is added or moved: the term is arithmetic on the day's own state.
     ("vix_anchor_reversion", 0.046081, True),
     # The anchor in the VIX's TARGET rather than its rate (2026-09-23).
-    # Ships at 0.0; 0.609944 is the DERIVED weight at exponent 4.0. Read on
-    # the identity, which the default runs; no draw is added or moved.
+    # Shipped at 0.0 until the fifth composition, which ships the calm
+    # weight 0.375; 0.609944 is the slow-pole weight at exponent 4.0, a
+    # different identity no preset ships. Read on the identity, which the
+    # default runs; no draw is added or moved.
     ("vix_anchor_weight", 0.609944, True),
-    # The anchor's slow memory. Read only with a weight, which COMPANIONS
-    # carries; no draw is added or moved.
+    # The anchor's slow memory. Read only with a weight, which the default
+    # ships (COMPANIONS carries it for a base without one); 0.05 against the
+    # default's 1/18. No draw is added or moved.
     ("vix_anchor_memory", 0.05, True),
-    # The macro compounding clock (2026-09-23). 252.0 compounds a year's GDP
-    # and CPI over the year's sessions; no draw is added or moved.
-    ("macro_compound_days_per_year", 252.0, True),
+    # The macro compounding clock (2026-09-23). Perturbed back to 365.0, the
+    # calendar-year division every preset through pt-v18 ships, because the
+    # default compounds over the year's 252 sessions since the fifth
+    # composition and 252.0 here had become the default's own value. It
+    # moves the market (every name is valued against an economy compounded
+    # through the 755-day burn-in) and no draw is added or moved.
+    ("macro_compound_days_per_year", 365.0, True),
     # The macro calendar, the US cycle table, the Fed lift-off branch and
-    # buybacks in `market_pe` (2026-09-23, macro-cycle). None adds a draw
-    # site; each changes which state-dependent macro sites fire.
+    # buybacks in `market_pe` (2026-09-23, macro-cycle), all four ON in the
+    # default since the fifth composition, so each row is perturbed back to
+    # the value every preset through pt-v18 ships; the values that stood
+    # here (252.0, 1.0, 1.0, 1.0) had become the default's own. None adds a
+    # draw site; each changes which state-dependent macro sites fire.
     # The calendar moves the release days, the phase clock and the meeting
     # schedule, so it moves the market and which macro draw sites fire
-    # (ECONOMY_STREAM_MOVERS). The lift-off branch fires at a meeting in the
-    # burn-in and moves the rate the valuation reads.
-    ("macro_calendar_days_per_year", 252.0, True),
-    ("fed_liftoff_rule", 1.0, True),
-    # INERT on this probe, measured: the US table changes only phase
-    # durations, and no transition falls inside three sessions of a phase
-    # the burn-in holds; market_pe is read only by the expansion hazard
-    # above a multiple of 28, which a three-session opening does not reach.
-    ("cycle_us_calibration", 1.0, False),
-    ("market_pe_buybacks", 1.0, False),
+    # (ECONOMY_STREAM_MOVERS).
+    ("macro_calendar_days_per_year", 365.0, True),
+    # Off, the bank never lifts off zero on its Taylor rule, so the burn-in's
+    # rate path and the valuation that reads it move (fed funds 3.25 against
+    # 2.75 at the probe's opening, seed 42). It also moves the economy
+    # stream, measured and located in ECONOMY_STREAM_MOVERS below.
+    ("fed_liftoff_rule", 0.0, True),
+    # LIVE on this probe since the fifth composition, and the reason it read
+    # inert is the reason it moves now. The US table changes phase durations
+    # only, and under the old default the burn-in restored the opening
+    # point, an expansion at age zero, so no transition fell inside three
+    # sessions. The default now DRAWS its opening from the table's own
+    # stationary law (`cycle_stationary_opening` 1.0), so the table decides
+    # the phase and age the run opens at: at seed 42 an expansion 96 months
+    # old on the US table, a recovery 21 months old on the shipped one, with
+    # fed funds 3.25 against 0.75. It moves the economy stream too
+    # (ECONOMY_STREAM_MOVERS). With the drawn opening off it is inert again
+    # on both streams, measured.
+    ("cycle_us_calibration", 0.0, True),
+    # INERT on this probe, measured, and the old reason still holds with
+    # the direction flipped: market_pe is read only by the expansion hazard
+    # above a multiple of 28, and with buybacks left out the multiple rises
+    # by about the buyback yield a year, which three sessions after the
+    # burn-in do not carry past 28.
+    ("market_pe_buybacks", 0.0, False),
     # The anchor's centre and its level law (2026-09-23, vix-law-levels).
-    # Read only with a weight, which COMPANIONS carries; no draw is added.
+    # Read only with a weight, which the default ships since the fifth
+    # composition (COMPANIONS carries it at the default's 0.375 for a base
+    # without one); no draw is added.
     ("vix_anchor_centre", 0.27, True),
-    ("vix_anchor_weight_level", 1.0, True),
-    ("vix_anchor_weight_level_cap", 1.75, True),
+    # 0.47, LAW2's exponent (vix-law-levels section 4), because the default
+    # ships LAW's 1.0 since the fifth composition and the 1.0 that stood
+    # here had become the default's own value. It read True all the same,
+    # on the 0.45 weight its companion then carried, which moved the
+    # market by itself; the companion is the default's 0.375 now, so this
+    # row reads the exponent alone. The probe's VIX (20.4 to 23.5 at seed
+    # 42) sits above the default's knee, where the law raises the weight.
+    ("vix_anchor_weight_level", 0.47, True),
+    # 1.0, the cap AT the knee, so the weight stops rising where the law
+    # starts it. The 1.75 that stood here moved nothing of its own
+    # (measured with the companion at the default's weight): the cap binds
+    # at `r K`, 1.75 or 2.2159 knees up, and the probe's VIX stays under
+    # both, so the row read True only on its companion's 0.45 weight. At
+    # 1.0 the cap binds across the whole of the probe's range above the
+    # knee, which is the path the dial acts on.
+    ("vix_anchor_weight_level_cap", 1.0, True),
     ("vix_anchor_weight_level_knee", 0.261, True),
+    # Runs the level law BELOW the knee as well. The probe's VIX sits above
+    # the default's knee, so the branch is not reached there (measured with
+    # the companion at the default's weight), and the row read True only on
+    # its companion's 0.45 weight. COMPANIONS puts the knee at the reference
+    # itself (0.0, `K = L * anchor`), in BOTH arms, so the probe's VIX is
+    # below it and the branch is read.
     ("vix_anchor_weight_level_below", 1.0, True),
     # The calm side's exponent on the market variance target (2026-09-23,
     # calm-regime). The default's VIX sits under its anchor, so the branch is
-    # read; no draw is added or moved.
+    # read; 2.0 against the default's 2.5 since the fifth composition. No
+    # draw is added or moved.
     ("market_vol_vix_exponent_below", 2.0, True),
     # Moves on the default, which ships the slow regime level live
-    # (`vix_level_sigma` 0.0173), so the knee it takes `L` out of differs.
+    # (`vix_level_sigma` 0.0181), so the knee it takes `L` out of differs.
     ("vix_anchor_weight_level_knee_fixed", 1.0, True),
     # The crisis epicentre (2026-09-22), and both rows are INERT here for
     # the reason `crisis_blend_source`, `crisis_blend_ramp` and
@@ -660,10 +715,18 @@ PERTURBATIONS = [
     # and no news term to re-quote on. `test_news_absorption.py` moves them
     # on days that have news. None takes a draw. The companions below carry
     # the half-life the two drift dials are refused without.
-    ("news_absorption_half_life", 0.6, False),
-    ("news_absorption_drift_share", 0.12, False),
-    ("news_absorption_drift_half_life", 42.0, False),
-    ("news_quote_revision", 1.0, False),
+    #
+    # The default ships the derived profile (0.6, 0.12, 42) and the re-quote
+    # since the fifth composition, so the values that stood here had become
+    # the default's own. The profile dials move to test_news_absorption.py's
+    # FAST profile (1.0, 0.2, 30.0) rather than back to 0.0, because 0.0 on
+    # the half-life or the share is refused while the default's drift dials
+    # are non-zero (they would be read by nothing); the re-quote switch goes
+    # back to 0.0, the value every preset through pt-v18 ships.
+    ("news_absorption_half_life", 1.0, False),
+    ("news_absorption_drift_share", 0.2, False),
+    ("news_absorption_drift_half_life", 30.0, False),
+    ("news_quote_revision", 0.0, False),
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
     ("volume_idio_variance_gain", 1.0, True),    # couples volume to the name's own variance, which is non-trivial from the first tick
@@ -698,10 +761,13 @@ PERTURBATIONS = [
     # probe runs three days, which is enough to carry one across.
     ("market_beta_down_asym_lag", 0.05, True),
     # WHERE that twin's condition is sampled. The default preset ships the
-    # wire itself at 0.375, so flipping the sampling re-times a live boost
-    # and the trajectory moves. It takes no draw at any value, so it is not
+    # wire itself (0.375, 0.46 since the fifth composition), so flipping the
+    # sampling re-times a live boost and the trajectory moves. Perturbed
+    # back to 0.0, the open's bit, because the fifth composition samples the
+    # wire on the live session (1.0) and the 1.0 that stood here had become
+    # the default's own value. It takes no draw at any value, so it is not
     # an economy-stream mover and `draws_market` must not budge.
-    ("market_beta_down_asym_lag_live", 1.0, True),
+    ("market_beta_down_asym_lag_live", 0.0, True),
     # Gives back the first moment the contemporaneous tilt injects. It is
     # gated on that tilt being nonzero, and pt-v16 ships it at 0.025, so
     # the probe's market moves. On a preset with the tilt at 0.0 this dial
@@ -754,13 +820,22 @@ PERTURBATIONS = [
     # discount rate never hears about it and the valuation never moves. Over
     # 252 days oil leaves that zone in both directions and the dial bites.
     ("oil_seasonality_target", 0.5, True),  # was False; the burn-in reaches it (see above)
-    # The clock the cycle hazard is read on. INERT over a probe this short
-    # for a reason the mechanism states rather than one the value hides: the
-    # engine opens at zero months in phase and an expansion's minimum
-    # duration is six months, so check_cycle_transition returns before it
-    # draws until day 180 and the probe runs three. Over 252 days it bites,
-    # and what separates the arms is the count of seeds that leave expansion.
-    ("cycle_hazard_per_month", 0.5, False),
+    # The clock the cycle hazard is read on. It read INERT over a probe this
+    # short for a reason the mechanism stated rather than one the value
+    # hid: the engine opened at zero months in phase and an expansion's
+    # minimum duration is six months, so check_cycle_transition returned
+    # before it drew until day 180 and the probe ran three.
+    #
+    # LIVE since the fifth composition, and that reason is why. The default
+    # now draws its opening from the cycle's stationary law
+    # (`cycle_stationary_opening` 1.0), and at seed 42 that is an expansion
+    # 90-odd months old, past its minimum, so the transition roll is taken
+    # on every day of the 755-day burn-in. At 0.5 the expansion turns to
+    # peak late in the burn-in (it is still an expansion at 1.0), which moves
+    # the market and the economy stream (ECONOMY_STREAM_MOVERS). With the
+    # drawn opening off it is inert on both again, measured, which is the
+    # old reason still standing where its condition does.
+    ("cycle_hazard_per_month", 0.5, True),
     # The floor waits on a phase the probe never reaches: it moves only the
     # trough's growth range, and a certified year reaches no trough at all,
     # let alone three days from an opening expansion.
@@ -806,6 +881,18 @@ PERTURBATIONS = [
     # exemption below landed, this test failed on the draw-count
     # assertion first and stopped, so the `moves` verdict was argued
     # and never run.
+    #
+    # THE OPENING THAT DECOMPOSITION WAS MEASURED ON IS CARRIED AS A
+    # COMPANION since the fifth composition. The default now draws its
+    # opening from the cycle's stationary law, and at seed 42 the burn-in
+    # ends in an expansion 96 months old with no phase change in it or in
+    # the probe's three sessions, so the block above never fires and the
+    # row read inert on both streams. That is a fact about where a drawn
+    # opening lands, not about the dial. COMPANIONS sets
+    # `cycle_stationary_opening` back to 0.0 in BOTH arms, where the burn-in
+    # restores the opening point (an expansion at age zero), days 0 and 1
+    # are phase-change days again, and the dial moves the economy stream by
+    # +2 and the market, as measured above.
     ("phase_target_range_draw", 0.5, True),
     # The yield at which the target multiple sits on its sector anchor.
     # 0.05 rather than either shipped value: 0.04 is the default this probe
@@ -839,7 +926,14 @@ PERTURBATIONS = [
     # days skips on both of the days it would fire. Measured over six
     # seeds at 1, 2, 3, 5, 10 and 30 days the difference runs 0, +1, +2,
     # +4 and +30, so the zero here is a coincidence of one cell.
-    ("cycle_stationary_opening", 1.0, True),
+    #
+    # Perturbed back to 0.0 since the fifth composition, which ships the
+    # drawn opening (1.0, by the owner's ruling of 2026-09-23) and made the
+    # 1.0 that stood here the default's own value. The coincidence above
+    # does not recur on the new default: the drawn opening lands mid-phase
+    # and the transition roll runs through the burn-in, so the fixed opening
+    # takes 128 fewer economy draws at seed 42.
+    ("cycle_stationary_opening", 0.0, True),
     # The share of earnings returned as net buybacks. It reaches the
     # valuation on the first tick that has a day behind it, and the probe's
     # first tick is day 0, where the elapsed time is zero and the factor is
@@ -877,6 +971,14 @@ PERTURBATIONS = [
     # The exponent on the VIX ratio in the market variance target. The
     # endogenous VIX leaves its anchor on day one, so the ratio is never
     # exactly 1.0 and any exponent but the shipped one moves the target.
+    #
+    # ABOVE THE ANCHOR ONLY since the fifth composition, which ships
+    # `market_vol_vix_exponent_below` 2.5: below the anchor the target reads
+    # that dial, and the probe's VIX (20.4 to 23.5 at seed 42) sits under
+    # the ratio's denominator for all three sessions, so this dial alone
+    # moved nothing. COMPANIONS sets the calm exponent to 0.0 in BOTH
+    # arms, the branch where this exponent is read on both sides of the
+    # anchor, so the probe reaches it and nothing else differs.
     ("market_vol_vix_exponent", 1.5, True),
     # EMA days on the VIX the variance target reads. Ships at 0.0, meaning no
     # smoothing; ten days of it changes the target from the first tick.
@@ -1128,6 +1230,33 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # The macro calendar (2026-09-23): it moves which days are release,
     # quarter and meeting days, so which state-dependent sites fire.
     "macro_calendar_days_per_year",
+    # THREE ARRIVED WITH THE FIFTH COMPOSITION (2026-09-23), and all three
+    # through the drawn opening it switched on: at seed 42 the burn-in now
+    # runs from an expansion past its minimum duration, where the cycle's
+    # transition roll (`economy/cycle.rs`, `check_cycle_transition_for`, one
+    # uniform a day once the minimum has elapsed) is taken every day. Each
+    # was located by bisecting the burn-in length for the first session
+    # whose economy draw count differs between the arms, and each is inert
+    # on the economy stream with `cycle_stationary_opening` at 0.0, measured.
+    #
+    # `cycle_hazard_per_month` changes the roll's probability: at 0.5 the
+    # expansion turns to peak late in the burn-in, and from burn-in day 731
+    # the peak arm, inside its minimum duration, stops rolling.
+    #
+    # `cycle_us_calibration` changes the table the opening is drawn from and
+    # the minimums the roll waits on: off, the run opens elsewhere in the
+    # cycle, enters contraction early in the burn-in and, inside its
+    # minimum, stops rolling from burn-in day 111.
+    #
+    # `fed_liftoff_rule` reaches a different site, the OPEC decision's
+    # conditional second uniform (`economy/daily.rs`, 0 draws on an ordinary
+    # day and 1 to 3 on a decision day by the price band). The lift-off's
+    # rate path moves oil, and on burn-in day 378, the sixth 63-step OPEC
+    # interval of the session calendar, oil sits at 95.96 (the raise band)
+    # with the rule and 84.11 (the comfort band) without, so one arm takes
+    # the second uniform and the other does not. It also needs the US table:
+    # with `cycle_us_calibration` at 0.0 it moves no economy draw.
+    "cycle_hazard_per_month", "cycle_us_calibration", "fed_liftoff_rule",
 })
 
 
@@ -1145,8 +1274,27 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
 
 #: A SECOND dial a row has to move with the first, because the pair is a
 #: universal invariant rather than a per-preset claim and therefore has no
-#: hatch. Exactly one entry, and it is kept OUT of `PERTURBATIONS` so that
-#: table stays uniform 3-tuples: `test_earnings_nominal_growth.py` unpacks it.
+#: hatch. Kept OUT of `PERTURBATIONS` so that table stays uniform 3-tuples:
+#: `test_earnings_nominal_growth.py` unpacks it.
+#:
+#: A companion is the CONDITION the row is read under, so both arms carry
+#: it: the test below builds its base from the companions alone and the
+#: perturbed arm from the companions plus the dial, and the difference
+#: between them is the dial's. Most entries are the default's own values
+#: and change nothing there; they bite on a base that ships the path off
+#: (the nominal-growth derivation perturbs pt-v18). Four are not the
+#: default's values -- `vix_level_identity`'s, which switches the VIX law
+#: off because the invariants refuse it without the identity, and, since
+#: the fifth composition, `market_vol_vix_exponent`'s,
+#: `phase_target_range_draw`'s and `vix_anchor_weight_level_below`'s knee,
+#: which put the probe on the path the dial acts on -- and an entry like
+#: that in the perturbed arm alone would move the market by itself and
+#: pass the row whatever the dial did. Three rows
+#: of the vix-law-levels family (the level law, its cap and its below
+#: switch) did exactly that on the 0.45 anchor weight their companions
+#: carried, a weight the default does not ship; measured against a base
+#: carrying the same companions, none of the three moved. The companions
+#: are the default's 0.375 now, and the three rows are re-valued.
 COMPANIONS: dict[str, dict[str, float]] = {
     # `market_vol_vix_excursion` reads the VIX's distance above the level the
     # index's own variance implies, and off `vix_level_identity` there is no
@@ -1191,7 +1339,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # base that ships the level off, which is the nominal-growth derivation's
     # pt-v18.
     "vix_level_loop_gain": {"vix_level_identity": 1.0,
-                            "vix_level_sigma": 0.0173},
+                            "vix_level_sigma": 0.0181},
     # The anchor reversion pulls the VIX toward the DERIVED identity anchor,
     # which exists only under the identity: `ModelParams::invariants` refuses
     # the pair for the same reason it refuses the excursion switch. The
@@ -1202,24 +1350,39 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # both exist only under the identity.
     "vix_anchor_weight": {"vix_level_identity": 1.0},
     # The memory is what the weight pulls against, so it is refused without one.
-    "vix_anchor_memory": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45},
+    # The weight is the default's 0.375 since the fifth composition (it was
+    # 0.45, the route-1 cell's, while the default shipped none).
+    "vix_anchor_memory": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.375},
     # The centre and the level law shape the weight's pull, so each is
     # refused without one; the cap is refused without the level law.
-    "vix_anchor_centre": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45},
-    "vix_anchor_weight_level": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45},
-    "vix_anchor_weight_level_cap": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45,
+    "vix_anchor_centre": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.375},
+    "vix_anchor_weight_level": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.375},
+    "vix_anchor_weight_level_cap": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.375,
                                     "vix_anchor_weight_level": 1.0},
-    "vix_anchor_weight_level_knee": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45,
+    "vix_anchor_weight_level_knee": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.375,
                                      "vix_anchor_weight_level": 1.0},
-    "vix_anchor_weight_level_below": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45,
-                                      "vix_anchor_weight_level": 1.0},
-    "vix_anchor_weight_level_knee_fixed": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45,
+    # ... and the knee at the reference itself, so the probe's VIX is below
+    # it and the branch this switch opens is read (see the row).
+    "vix_anchor_weight_level_below": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.375,
+                                      "vix_anchor_weight_level": 1.0,
+                                      "vix_anchor_weight_level_knee": 0.0},
+    "vix_anchor_weight_level_knee_fixed": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.375,
                                            "vix_anchor_weight_level": 1.0},
     # The post-news drift splits the fast absorption profile, so each of its
     # two dials is refused without the profile's half-life (news-speed).
     "news_absorption_drift_share": {"news_absorption_half_life": 0.6},
     "news_absorption_drift_half_life": {"news_absorption_half_life": 0.6,
                                         "news_absorption_drift_share": 0.12},
+    # The excursion reads the VIX's distance above the identity's read-back,
+    # so it is refused off the identity; a no-op on the default.
+    "market_vol_vix_excursion": {"vix_level_identity": 1.0},
+    # Since the fifth composition this exponent is read ABOVE the anchor
+    # only, and the probe's VIX stays below it. 0.0 on the calm exponent is
+    # the branch that reads this one on both sides (see the row).
+    "market_vol_vix_exponent": {"market_vol_vix_exponent_below": 0.0},
+    # The fixed opening the row's decomposition was measured on, where the
+    # probe's first two days are phase-change days (see the row).
+    "phase_target_range_draw": {"cycle_stationary_opening": 0.0},
 }
 
 
@@ -1231,13 +1394,22 @@ def test_each_settable_parameter_moves_the_market_or_names_why_not(
     trajectory moves (or is inert for the documented reason) while the draw
     count NEVER does. A parameter that changed `draws_consumed` would have
     changed the draw schedule, which no preset member may (§5.2)."""
-    base = market_state(run_market())
     # Perturb the DEFAULT preset, not a named one: `base` is the default
     # engine, so building the perturbation from any other preset compares
     # a preset change and a parameter change at once and calls the sum a
     # parameter effect. That is what happened at the pt-v3 era boundary --
     # six parameters documented as inert "failed" because the baseline had
     # moved underneath them.
+    #
+    # The same argument is why the base carries the row's COMPANIONS: a
+    # companion that is not the default's value is a second parameter
+    # change, and in the perturbed arm alone it would be read as the dial's.
+    # Where every companion is the default's own value the base is the
+    # default engine bit for bit.
+    companions = COMPANIONS.get(name, {})
+    base = market_state(run_market(
+        tradefloor.ModelParams.from_preset_unchecked(**companions)
+        if companions else None))
     #
     # `from_preset_unchecked`, and this is the case the hatch exists for.
     # EIGHT rows of this table move a dial pt-v19 DERIVES -- the cap off its
@@ -1265,7 +1437,7 @@ def test_each_settable_parameter_moves_the_market_or_names_why_not(
     # The universal invariant is NOT waived and cannot be; the one row that
     # would have tripped it carries its companion dial instead.
     custom = tradefloor.ModelParams.from_preset_unchecked(
-        **{name: value}, **COMPANIONS.get(name, {}))
+        **{name: value}, **companions)
     assert custom.fingerprint.startswith("custom-")
     perturbed = market_state(run_market(custom))
 
