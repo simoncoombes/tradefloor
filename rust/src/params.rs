@@ -422,6 +422,77 @@ pub struct ModelParams {
     /// information contagion works this way: when one bank misses, the
     /// market re-reads every other bank, and it does that harder in a panic.
     pub news_peer_vix_coupling: f64,
+    /// How fast the market prices an endogenous news event, as the
+    /// half-life in ticks (minutes) of the fast part of its move. 0.0 --
+    /// every preset -- is the straight line that has always stood.
+    ///
+    /// # The defect
+    ///
+    /// An event drawn at `open_market` adds `price_impact / 390` on every
+    /// tick of its day, so its move lands in a straight line across the
+    /// session: 5% of it by tick 30, half by lunch, all of it by the close.
+    /// An agent that reads the headline at tick 30 and trades its direction
+    /// earned about +120bp an event on pt-v19, 82% of the time
+    /// (docs/serve/HEADLINES.md). Real prices take in firm news in minutes,
+    /// so that is an edge a bot would learn here and lose with money.
+    ///
+    /// # The profile
+    ///
+    /// Off zero, the share of the move priced after `n` ticks is
+    /// `A(n) = (1 - d) * F(n; h) + d * F(n; h_d)`, where `F(n; h) = (1 -
+    /// 2^(-n/h)) / (1 - 2^(-390/h))`, `h` is this dial, and `d` and `h_d`
+    /// are `news_absorption_drift_share` and
+    /// `news_absorption_drift_half_life`. Each part is rescaled to be
+    /// complete at the close, so the day's total move is the same at every
+    /// setting; only its timing changes. Tick `m` of the session prices
+    /// `A(m + 1) - A(m)` of the event, and its sector peers the same share
+    /// of their transfer. See `market::factors::news_absorbed_share`.
+    ///
+    /// Caller-supplied news (`tick(news=...)`, `run_session(news=...)`) is
+    /// not reshaped. Off the regular session the profile prices nothing.
+    ///
+    /// # The derived values (not adopted by any preset)
+    ///
+    /// Half-life 0.6 ticks, drift share 0.12, drift half-life 42 ticks,
+    /// with `news_quote_revision` 1.0. Christensen, Timmermann and Veliyev
+    /// ("Warp speed price moves: jumps after earnings announcements",
+    /// arXiv 2601.08962, Table 7, liquid US stocks 2008-2020) buy on the
+    /// surprise at the first trade after the release: 0.74% by 30 seconds,
+    /// 1.05% by one minute, 1.58% by five and 1.80% by 6:30pm, so 58% of
+    /// the move is in after one minute and 88% after five. The half-life
+    /// puts `A(1)` at 0.60, the 12% after five minutes is the drift share,
+    /// and its 42-tick half-life (a 60-minute mean life) lands it over the
+    /// next hours, as Patell and Wolfson (1984, JFE) find return serial
+    /// correlation disturbed "for several hours" after the bulk of the
+    /// reaction is over within five to ten minutes. Kim, Lin and Slovin
+    /// (1997, JFQA) find news released before the open priced within the
+    /// first five minutes of NYSE trading; Busse and Green (2002, JFE) find
+    /// good news priced within a minute and bad news over fifteen. The
+    /// 2016-2020 half of the sample gives the same one-minute share (68%)
+    /// and nothing after five minutes, so the drift share is the slower of
+    /// the two readings. No drift past the close: post-earnings drift in
+    /// large caps has been nil since 2006 (Martineau 2022, CFR), and the
+    /// engine's momentum already carries about 5% of a news day's move into
+    /// the next (design repository, programme/results/news-speed/).
+    pub news_absorption_half_life: f64,
+    /// The share of an endogenous news event's move that arrives as
+    /// post-news drift, after the fast part: `d` in
+    /// [`ModelParams::news_absorption_half_life`]'s profile. 0.0 -- every
+    /// preset -- is no drift part; read only with that dial off zero.
+    pub news_absorption_drift_share: f64,
+    /// The half-life in ticks of the post-news drift part, `h_d` in
+    /// [`ModelParams::news_absorption_half_life`]'s profile. 0.0 lands the
+    /// drift share in a straight line over the session; read only with
+    /// `news_absorption_drift_share` off zero.
+    pub news_absorption_drift_half_life: f64,
+    /// Whether the market maker re-quotes on public news. 0.0 -- every
+    /// preset -- quotes the book around the last print, so a news move in
+    /// the model price reaches the tape only as fast as the tick's flow can
+    /// walk the book. 1.0 quotes it around the last print moved by the
+    /// tick's news term (`company_news / 390` as applied), the way dealers
+    /// revise quotes on a public announcement without waiting for a trade.
+    /// A switch. See `market::tick`, the settlement phase.
+    pub news_quote_revision: f64,
     /// Market-shock magnitude, in baseline sigmas, above which the crash
     /// amplifier fires (§5.4 promotion).
     pub crash_amplifier_threshold: f64,
@@ -4564,6 +4635,10 @@ impl ModelParams {
             news_peer_weight: 0.0,
             news_peer_weight_down: 0.0,
             news_peer_vix_coupling: 0.0,
+            news_absorption_half_life: 0.0,
+            news_absorption_drift_share: 0.0,
+            news_absorption_drift_half_life: 0.0,
+            news_quote_revision: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -6548,6 +6623,10 @@ impl ModelParams {
             "news_peer_weight" => self.news_peer_weight,
             "news_peer_weight_down" => self.news_peer_weight_down,
             "news_peer_vix_coupling" => self.news_peer_vix_coupling,
+            "news_absorption_half_life" => self.news_absorption_half_life,
+            "news_absorption_drift_share" => self.news_absorption_drift_share,
+            "news_absorption_drift_half_life" => self.news_absorption_drift_half_life,
+            "news_quote_revision" => self.news_quote_revision,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -6757,6 +6836,10 @@ impl ModelParams {
             "news_peer_weight" => out.news_peer_weight = value,
             "news_peer_weight_down" => out.news_peer_weight_down = value,
             "news_peer_vix_coupling" => out.news_peer_vix_coupling = value,
+            "news_absorption_half_life" => out.news_absorption_half_life = value,
+            "news_absorption_drift_share" => out.news_absorption_drift_share = value,
+            "news_absorption_drift_half_life" => out.news_absorption_drift_half_life = value,
+            "news_quote_revision" => out.news_quote_revision = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -7012,11 +7095,38 @@ impl ModelParams {
         }
         for (name, v) in [("cycle_us_calibration", self.cycle_us_calibration),
                           ("fed_liftoff_rule", self.fed_liftoff_rule),
-                          ("market_pe_buybacks", self.market_pe_buybacks)] {
+                          ("market_pe_buybacks", self.market_pe_buybacks),
+                          ("news_quote_revision", self.news_quote_revision)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!(
                     "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
             }
+        }
+        for (name, v) in [("news_absorption_half_life", self.news_absorption_half_life),
+                          ("news_absorption_drift_half_life",
+                           self.news_absorption_drift_half_life)] {
+            if !(v >= 0.0 && v <= 390.0) {
+                return Err(format!(
+                    "{name} is {v}. It is a half-life in ticks inside the 390-tick \
+                     session, in [0, 390]; 0.0 is the straight-line spread."));
+            }
+        }
+        if !(self.news_absorption_drift_share >= 0.0 && self.news_absorption_drift_share <= 1.0) {
+            return Err(format!(
+                "news_absorption_drift_share is {}. It is a share of the move, in [0, 1].",
+                self.news_absorption_drift_share));
+        }
+        if self.news_absorption_drift_share != 0.0 && self.news_absorption_half_life == 0.0 {
+            return Err(format!(
+                "news_absorption_drift_share is {} but news_absorption_half_life is 0: \
+                 it splits the fast profile and is read by nothing without it.",
+                self.news_absorption_drift_share));
+        }
+        if self.news_absorption_drift_half_life != 0.0 && self.news_absorption_drift_share == 0.0 {
+            return Err(format!(
+                "news_absorption_drift_half_life is {} but news_absorption_drift_share \
+                 is 0: it shapes the drift part and is read by nothing without it.",
+                self.news_absorption_drift_half_life));
         }
         if self.vix_anchor_memory != 0.0
             && !(self.vix_anchor_memory > 0.0 && self.vix_anchor_memory <= 1.0)
@@ -7382,6 +7492,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "mispricing_half_life_days",
         "momentum_theta",
         "news_market_weight",
+        "news_absorption_half_life",
+        "news_absorption_drift_share",
+        "news_absorption_drift_half_life",
+        "news_quote_revision",
         "news_peer_vix_coupling",
         "news_peer_weight",
         "news_peer_weight_down",

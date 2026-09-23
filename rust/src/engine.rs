@@ -1840,7 +1840,27 @@ impl Engine {
             // and exclusive, so order decides which branch an event takes.
             let mut v = Vec::with_capacity(request.news.len() + day_news.len());
             v.extend_from_slice(request.news);
-            v.extend(day_news.iter().cloned());
+            // WHEN the day's move lands. At `news_absorption_half_life` 0.0,
+            // every preset, each tick carries the event whole and the tick
+            // divides it by 390, so the move lands in a straight line over
+            // the session: this branch is the code that always stood. Off
+            // zero, each event is carried at this minute's share of the
+            // absorption profile, `390 * (A(m + 1) - A(m))`, and the same
+            // division prices `A(m + 1) - A(m)` of it. The weight is the
+            // same for every event, so the sign, the peer transfer and the
+            // day's total are unchanged. Caller-supplied news is not
+            // touched: it has no release time the profile could start from.
+            if self.params.news_absorption_half_life == 0.0 {
+                v.extend(day_news.iter().cloned());
+            } else {
+                let minutes = (request.time.hour - 9) * 60 + (request.time.minute - 30);
+                let w = crate::market::factors::news_absorption_weight(&self.params, minutes);
+                v.extend(day_news.iter().map(|e| NewsEvent {
+                    company_id: e.company_id.clone(),
+                    sector: e.sector.clone(),
+                    price_impact: e.price_impact.map(|x| x * w),
+                }));
+            }
             v
         };
         let request = &TickRequest {

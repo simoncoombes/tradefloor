@@ -465,6 +465,27 @@ OUT_OF_SCOPE = {
         "inflation a point over target. 1.0 adds the ladder's own cut "
         "branch mirrored, so the rate lifts off zero on its Taylor rule "
         "(programme/results/macro-cycle/, design repository). Not adopted",
+    "news_absorption_half_life":
+        "inert at 0.0 as shipped: a branch not taken, so every tick carries "
+        "an endogenous news event whole and the move lands in a straight "
+        "line over the session. Off zero it is the half-life in ticks of the "
+        "fast part of the move; 0.6 is derived from intraday event studies "
+        "(programme/results/news-speed/, design repository). Not adopted",
+    "news_absorption_drift_share":
+        "inert at 0.0 as shipped, and unread while "
+        "`news_absorption_half_life` is 0.0: the share of the move that "
+        "arrives as post-news drift. 0.12 is derived "
+        "(programme/results/news-speed/, design repository). Not adopted",
+    "news_absorption_drift_half_life":
+        "inert at 0.0 as shipped, and unread while "
+        "`news_absorption_drift_share` is 0.0: the drift part's half-life in "
+        "ticks. 42 is derived (programme/results/news-speed/, design "
+        "repository). Not adopted",
+    "news_quote_revision":
+        "inert at 0.0 as shipped: a branch not taken, so the maker quotes "
+        "around the last print and a news move reaches the tape only as "
+        "fast as the flow walks the book. 1.0 re-quotes by the tick's news "
+        "term (programme/results/news-speed/, design repository). Not adopted",
     "market_pe_buybacks":
         "inert at 0.0 as shipped: a branch not taken, so market_pe leaves "
         "out the buyback term the "

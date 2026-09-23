@@ -1336,7 +1336,23 @@ pub fn simulate_market_tick(
                 ])),
                 SettleDrawPolicy::FourOrZero => None,
             };
-            let micro = companies[idx].micro_view(companies[idx].stock.price);
+            // Quote revision on public news. The maker quotes around the
+            // last print, so a model price that jumps on news reaches the
+            // tape only as fast as the tick's flow can walk the book: an
+            // event priced whole in one tick printed a seventh of it after
+            // that tick and under half after five. Public news moves quotes
+            // without a trade (dealers re-quote on the wire), so with
+            // `news_quote_revision` on, the book is quoted around the last
+            // print moved by this tick's news term, and the flow trades
+            // from there. At 0.0 -- every preset -- or on a tick with no
+            // news term, the branch is not taken and the book is the one
+            // that always stood.
+            let quote_from = if p.news_quote_revision == 0.0 || s_components[i][3] == 0.0 {
+                companies[idx].stock.price
+            } else {
+                companies[idx].stock.price * mathx::exp(s_components[i][3])
+            };
+            let micro = companies[idx].micro_view(quote_from);
             let options = SettleOptions {
                 // From the params, so a preset that smooths the size curve
                 // smooths it in settlement too rather than only in the book.

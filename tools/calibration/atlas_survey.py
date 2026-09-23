@@ -272,6 +272,14 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_anchor_weight_level_below": (0.0, 1.0),
     # Whether the level law's knee reads the slow regime level: a switch.
     "vix_anchor_weight_level_knee_fixed": (0.0, 1.0),
+    # How fast an endogenous news event's move is priced (2026-09-23,
+    # news-speed): the fast part's half-life in ticks, the post-news drift's
+    # share and half-life, and the maker's re-quote on news (a switch). 0.0
+    # is the straight line over the session; derived 0.6, 0.12, 42 and 1.0.
+    "news_absorption_half_life": (0.0, 5.0),
+    "news_absorption_drift_share": (0.0, 0.5),
+    "news_absorption_drift_half_life": (0.0, 120.0),
+    "news_quote_revision": (0.0, 1.0),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is

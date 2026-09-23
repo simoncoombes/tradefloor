@@ -650,6 +650,16 @@ PERTURBATIONS = [
     # this entry used to describe.
     ("endogenous_news_sigma", 0.05, True),
     ("news_peer_vix_coupling", 4.0, False),      # multiplies a peer weight that is zero on every preset, and a crisis spike the harness never reaches
+    # How fast endogenous news is priced (2026-09-23, news-speed). INERT on
+    # this probe for the reason `endogenous_news_sigma` gives above: the
+    # probe's news uniforms deliver no event, so there is no move to time
+    # and no news term to re-quote on. `test_news_absorption.py` moves them
+    # on days that have news. None takes a draw. The companions below carry
+    # the half-life the two drift dials are refused without.
+    ("news_absorption_half_life", 0.6, False),
+    ("news_absorption_drift_share", 0.12, False),
+    ("news_absorption_drift_half_life", 42.0, False),
+    ("news_quote_revision", 1.0, False),
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
     ("volume_idio_variance_gain", 1.0, True),    # couples volume to the name's own variance, which is non-trivial from the first tick
@@ -1201,6 +1211,11 @@ COMPANIONS: dict[str, dict[str, float]] = {
                                       "vix_anchor_weight_level": 1.0},
     "vix_anchor_weight_level_knee_fixed": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45,
                                            "vix_anchor_weight_level": 1.0},
+    # The post-news drift splits the fast absorption profile, so each of its
+    # two dials is refused without the profile's half-life (news-speed).
+    "news_absorption_drift_share": {"news_absorption_half_life": 0.6},
+    "news_absorption_drift_half_life": {"news_absorption_half_life": 0.6,
+                                        "news_absorption_drift_share": 0.12},
 }
 
 
