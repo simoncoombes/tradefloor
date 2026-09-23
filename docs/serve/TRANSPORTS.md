@@ -409,10 +409,11 @@ the rule in `pyproject.toml`.
 
 ## Tests
 
-`pytest tests/serve/test_mcp_*.py tests/serve/test_http_*.py -n 2` runs about
-170 tests in about 15 seconds. Tests marked for the core run against
-`LocalSessionService` over a temporary `FileStore`, and skip when the core
-does not yet implement the contract version they need.
+`pytest tests/serve/test_mcp_*.py tests/serve/test_http_*.py -n 2` runs 156
+tests in about 20 seconds, 33 of them against `LocalSessionService` over a
+temporary `FileStore` (contract 0.4 core, `feat/serve-core` at f4ba748). A
+core-backed test skips when the core does not yet implement the contract
+version it needs.
 
 | File | Covers |
 |---|---|
