@@ -226,7 +226,7 @@ class FileStore:
         fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.",
                                    suffix=".tmp")
         try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="") as fh:
                 fh.write(text)
                 fh.flush()
                 if self.fsync:

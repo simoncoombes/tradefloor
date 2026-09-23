@@ -28,7 +28,7 @@ def atomic_write_json(path: Path, data: Any, *, mode: int = 0o600) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
             json.dump(data, f, indent=1, sort_keys=True)
             f.write("\n")
             f.flush()
