@@ -47,8 +47,9 @@ here, so a test that leans on one of these is visibly leaning on a choice:
   its close; `until="next_open"` with the market closed just opens it;
 - a market order carrying a `limit_price` is `invalid_order`;
 - `macro` uses the engine's field names in percent, `cycle_phase` an index;
-- a step bar's `step` is the clock's `step` after that step ran (1 for the
-  day's first step), so it starts at tick `(step - 1) * ticks_per_step`.
+- a step bar's `step` is the index of the step in its day (0 for the first),
+  so it starts at tick `step * ticks_per_step`; its open is the step's first
+  print and its high and low the step's prints (the core's CORE.md, "Bars").
 
 `FakeSessionService(headlines=True)` also publishes one headline a day, from
 tick 1, for one name, saying only the direction of the news.
@@ -596,8 +597,6 @@ class FakeSessionService:
         clk = s.info.clock
         seed = s.info.config.seed
         start = {t: b.last for t, b in s.books.items()}
-        step_hi = dict(start)
-        step_lo = dict(start)
         step_vol = {t: 0.0 for t in s.books}
 
         # 1. Queued orders fill at the start of the step, before the market
@@ -626,16 +625,14 @@ class FakeSessionService:
                 fills.append(f)
                 taken[(o.ticker, o.side)] = before + qty
                 b.last = round(b.last * (1 + sign * _IMPACT_PER_SHARE * qty), 6)  # flow moves the market
-                step_hi[o.ticker] = max(step_hi[o.ticker], b.last)
-                step_lo[o.ticker] = min(step_lo[o.ticker], b.last)
                 b.volume += qty
                 step_vol[o.ticker] += qty
         s.queued.clear()
         s.resting.extend(still_resting)
 
-        # 2. The market moves.
-        first_tick = clk.tick
+        # 2. The market moves. Each tick prints one price per name.
         n = min(s.info.config.ticks_per_step, TICKS_PER_SESSION - clk.tick)
+        prints: dict[str, list[float]] = {t: [] for t in s.books}
         for k in range(n):
             tick = clk.tick + k
             for t, b in s.books.items():
@@ -644,18 +641,18 @@ class FakeSessionService:
                 v = 100 + int(900 * _unit("vol", seed, clk.day, tick, t))
                 b.volume += v
                 step_vol[t] += v
-                step_hi[t] = max(step_hi[t], b.last)
-                step_lo[t] = min(step_lo[t], b.last)
-        clk.tick += n
-        clk.step += 1
+                prints[t].append(b.last)
+        step_hi = {t: max(p) for t, p in prints.items()}
+        step_lo = {t: min(p) for t, p in prints.items()}
         for t, b in s.books.items():
             b.day_high = max(b.day_high, step_hi[t])
             b.day_low = min(b.day_low, step_lo[t])
             b.step_volume = step_vol[t]
-            s.step_bars[t].append(Bar(ticker=t, day=clk.day, step=clk.step, open=start[t],
+            s.step_bars[t].append(Bar(ticker=t, day=clk.day, step=clk.step, open=prints[t][0],
                                       high=step_hi[t], low=step_lo[t], close=b.last,
                                       volume=step_vol[t]))
-        assert first_tick + n == clk.tick
+        clk.tick += n
+        clk.step += 1
 
         # 3. Resting limits fill in full at the limit; they do not move the market.
         for oid in list(s.resting):

@@ -982,9 +982,9 @@ def _daily_bar(q: Any, day: int) -> dict[str, Any]:
 
 
 def step_start_tick(step: int, ticks_per_step: int) -> int:
-    """The tick a step bar starts at. `Bar.step` is the clock's step after the
-    step ran (1 for the day's first step)."""
-    return min(TICKS_PER_SESSION, max(0, (step - 1) * ticks_per_step))
+    """The tick a step bar starts at. `Bar.step` is the index of the step in
+    its day, 0 for the first (docs/serve/CORE.md, "Bars")."""
+    return min(TICKS_PER_SESSION, max(0, step * ticks_per_step))
 
 
 def bar_time(bar: Bar, ticks_per_step: int) -> datetime:

@@ -128,7 +128,7 @@ def test_a_session_through_every_tool(server):
         == ["filled", "cancelled"]
     assert ok(server, "list_orders", session_id=sid, status="open")["orders"] == []
     steps = ok(server, "get_bars", session_id=sid, ticker=t0, resolution="step")["bars"]
-    assert [(b["day"], b["step"]) for b in steps] == [(0, 1)]
+    assert [(b["day"], b["step"]) for b in steps] == [(0, 0)]
     assert ok(server, "get_bars", session_id=sid, ticker=t0)["bars"][0]["step"] is None
     refused(server, "get_bars", "invalid_request", session_id=sid, ticker="NOPE")
 

@@ -562,8 +562,8 @@ def _script(client):
     rec("too-far", client.post(adv, json={"steps": 21, "until": "close"}))
     rec("list-accepted", client.get(orders, params={"status": "accepted"}),
         lambda b: [o["ticker"] for o in b])
-    for status in ("all", "open", "closed", "filled", "expired"):
-        rec(f"list-{status}", client.get(orders, params={"status": status}),
+    for which in ("all", "open", "closed", "filled", "expired"):
+        rec(f"list-{which}", client.get(orders, params={"status": which}),
             lambda b: [o["order_id"] for o in b])
     rec("updated", client.get(orders), lambda b: [(o["status"], o["updated_at"]["day"],
                                                    o["updated_at"]["tick"]) for o in b])
@@ -678,7 +678,7 @@ def test_bars(service03):
     assert all(T.Bar.from_dict(b).to_dict() == b for b in days)
     steps = client.get(base, params={"resolution": "step"}).json()
     assert len(steps) == 13 + 2
-    assert [b["step"] for b in steps[-2:]] == [1, 2] and steps[-1]["day"] == 1
+    assert [b["step"] for b in steps[-2:]] == [0, 1] and steps[-1]["day"] == 1
     for b in steps:
         assert b["low"] <= min(b["open"], b["close"]) and b["high"] >= max(b["open"], b["close"])
     obs = client.get(f"/v1/sessions/{sid}/observation").json()

@@ -422,7 +422,7 @@ def create_server(service: SessionService, owner: str = LOCAL_OWNER, *,
         f"step (ticks_per_step minutes) for the last {STEP_BAR_SESSIONS} sessions only. "
         "Today's bar is included up to the current step. since_day drops earlier days; "
         "limit keeps only the most recent bars. Prices per share, volume in shares. A "
-        "step bar's `step` is the clock step after that step ran."))
+        "step bar's `step` is its index in the day, 0 for the first."))
     def get_bars(session_id: SessionId,
                  ticker: Annotated[str, Field(description="One of the session's tickers.")],
                  resolution: Annotated[Literal["day", "step"], Field(
