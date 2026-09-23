@@ -208,3 +208,21 @@ def test_call_log_is_append_only_and_complete(tmp_path):
     assert log[-1]["state_hash"] == svc.observe(OWNER, sid).state_hash
     lines = (tmp_path / sid / "calls.jsonl").read_text().splitlines()
     assert [json.loads(line)["seq"] for line in lines] == [c["seq"] for c in log]
+
+
+def test_fork_carries_history_and_both_logs_say_so(tmp_path):
+    svc = LocalSessionService(FileStore(tmp_path))
+    parent = svc.open(OWNER, CONFIG).session_id
+    for call in _script(svc.info(OWNER, parent).tickers)[:8]:
+        _run(svc, parent, call)
+    child = svc.fork(OWNER, parent, label="b").session_id
+    fresh = LocalSessionService(FileStore(tmp_path))
+    assert [f.to_dict() for f in fresh.fills(OWNER, child)] == \
+        [f.to_dict() for f in fresh.fills(OWNER, parent)]
+    assert [o.to_dict() for o in fresh.orders(OWNER, child)] == \
+        [o.to_dict() for o in fresh.orders(OWNER, parent)]
+    assert fresh.calls(OWNER, child)[0]["op"] == "fork_of"
+    assert fresh.calls(OWNER, child)[0]["args"]["parent_session_id"] == parent
+    last = fresh.calls(OWNER, parent)[-1]
+    assert last["op"] == "fork" and last["child_session_id"] == child
+    assert {i.session_id for i in fresh.list(OWNER)} == {parent, child}
