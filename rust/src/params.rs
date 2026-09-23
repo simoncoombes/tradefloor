@@ -5759,6 +5759,16 @@ impl ModelParams {
     /// VIX's fall-rate symmetric, the sector loading raised and the
     /// per-name volume-variance channel switched on. Nothing else moves.
     ///
+    /// RECOMPOSED since, keeping its name because it has never been released
+    /// (0.7.x ships pt-v18); the constructor below carries each composition
+    /// in order. The FIFTH, of 2026-09-23, is twenty-three dials at the end
+    /// of the constructor: the long-run VIX law (LAWC-D), the macro session clock
+    /// and cycle, news priced within minutes and the calm-regime variance
+    /// target, taken on the owner's adopted long-run pass bar
+    /// (programme/longrun/CRITERIA.md in the design repository). The
+    /// constructor reads as a history: a later assignment replaces an
+    /// earlier one and says so.
+    ///
     /// THE DEFAULT since 0.8.0, and the envelope certifies whatever
     /// `DEFAULT_PRESET_NAME` names. It was composed, registered and
     /// selectable one release step before it took the default, because
@@ -5939,6 +5949,8 @@ impl ModelParams {
         // parameter-free sqrt law's 0.707, so the map is SUBLINEAR where
         // `crash_amplifier_conditional_sigma` made it asymptotically
         // linear. The index tail goes 3.0677 -> 1.9124 at 252 days.
+        // Off again from the fifth composition (2026-09-23, below): the VIX
+        // law became the anchor form, which runs with the excursion at 0.0.
         p.market_vol_vix_excursion = 1.0;
         // THE CRISIS BLEND, DERIVED TO ZERO AND ITS FORM RETIRED.
         //
@@ -6011,6 +6023,7 @@ impl ModelParams {
         // whole-span ACF's slow pole with the crisis decay inside it, and
         // it added within-year variance the tape's calm years do not have.
         p.vix_level_persistence = 0.9979;
+        // 0.0181 from the fifth composition (below), re-derived on its loop.
         p.vix_level_sigma = 0.0173;
         // THE THIRD COMPOSITION, 2026-09-21 (design repo,
         // results/ptv19fix/RESULT.md, registered first, decision rule written
@@ -6022,6 +6035,7 @@ impl ModelParams {
         // volatility for 13x of VIX, is `v ~ VIX^1.42`, which the same form
         // gives at `e = 2s / (2 - s)` = 4.9. DERIVED from that law; the
         // held-VIX read-back then rises 4.6x for 13x (3.0x at the square).
+        // 4.0 from the fifth composition (below), under the anchor form.
         p.market_vol_vix_exponent = 4.9;
         // And the defect that made every gain in the loop lengthen the VIX's
         // memory: the regime level's spread (0.267, the tape's yearly
@@ -6036,7 +6050,8 @@ impl ModelParams {
         // +0.007 against the tape's +0.012), the lever reads 3.05x, and
         // the sum of squared tape errors falls from 116 to 91 at one year
         // and 82 to 59 at two, the first composition to lower it since the
-        // VIX law arrived.
+        // VIX law arrived. 1.79 from the fifth composition (below),
+        // re-derived on the anchor form's loop.
         p.vix_level_loop_gain = 2.4684;
         // THE FOURTH COMPOSITION, 2026-09-22 (design repo, results/ptv19epi3/
         // RESULT.md, registered first; Simon's ruling that ties in the row
@@ -6421,6 +6436,76 @@ impl ModelParams {
         // and 0.609 at 504 on this base. The row goes from a term of 2.67 to
         // 0.00 at both horizons.
         p.sector_loading = 0.60;
+        // THE FIFTH COMPOSITION, 2026-09-23 (design repo,
+        // programme/ptv19-composed-fifth-2026-09-23.md and
+        // results/ptv19-fifth/RESULT.md). The design programme's candidate
+        // LMN-Q25A375, twenty-three dials (results/candidate-arm.txt), taken
+        // on the owner's adopted pass bar, programme/longrun/CRITERIA.md:
+        // what a user would notice over thirty 21-year histories, the 2008
+        // and 2020 replays, the headline edge and the one-year table. The
+        // fourth composition fails eight of its criteria; this vector
+        // passes them all. Every assignment below is a plain field write
+        // in its setter, so `from_preset("pt-v19")` here is bit for bit the
+        // fourth composition's `from_preset("pt-v19", **arm)` (checked
+        // across the two builds by results/ptv19-fifth/bitident.py). Two
+        // values are FITTED against certification gates (the anchor's
+        // memory 1/18 and the down-day wire's lag 0.46), the exponent 4.0
+        // was read off a ladder against the crisis lever, and the calm
+        // exponent 2.5 is CHOSEN inside a tape window; `provenance.py`
+        // carries each dial's kind.
+        //
+        // The VIX law, LAWC-D (results/vix-slow-regime/, vix-law-levels/):
+        // the variance target follows the VIX through `(VIX / anchor)^4`
+        // with no excursion term, and the VIX's target blends the read-back
+        // with a derived anchor through a weight with a memory, a centre
+        // and a level law.
+        p.market_vol_vix_excursion = 0.0;
+        p.market_vol_vix_exponent = 4.0;
+        // DERIVED: the tape's VIX-to-realised-volatility elasticity, 0.655,
+        // re-applied through `theta = (1 - a) k` (results/calm-regime/).
+        p.vix_anchor_weight = 0.375;
+        // FITTED against the VIX persistence gate (results/route1-blend/).
+        p.vix_anchor_memory = 0.05555555555555555;
+        // DERIVED: ln(1.252 / 1.076), two tape readings of the premium.
+        p.vix_anchor_centre = 0.1515;
+        // DERIVED off the engine's held map: the log-slope of the
+        // read-back's gain between VIX 18.5 and 30.
+        p.vix_anchor_weight_level = 1.0;
+        // The level law's cap and knee, re-derived for the 0.375 weight
+        // with the crisis side held: knee += ln(0.625 / 0.55) / eta, cap *=
+        // the same ratio.
+        p.vix_anchor_weight_level_cap = 2.2159;
+        p.vix_anchor_weight_level_knee = 0.3888;
+        // The slow level re-derived from the tape's yearly-median spread
+        // on the anchor form's loop (results/vix-slow-regime/ section 4).
+        p.vix_level_sigma = 0.0181;
+        p.vix_level_loop_gain = 1.79;
+        // The calm side of the variance target: 2.5 below the anchor,
+        // CHOSEN as the least change from 4.0 inside the tape's
+        // shared-variance window (results/calm-regime/).
+        p.market_vol_vix_exponent_below = 2.5;
+        // The down-day wire, sampled on the live session; the lag 0.46 is
+        // FITTED against the lagged asymmetry row's held-out count.
+        p.market_beta_down_asym_lag_live = 1.0;
+        p.market_beta_down_asym_lag = 0.46;
+        // The macro fix (results/macro-cycle/): the session clock and
+        // calendar, the NBER cycle table, the Fed's lift-off rule and
+        // buybacks in the market P/E; and the opening drawn from the
+        // cycle, by the owner's ruling that certification runs open at a
+        // random point in the business cycle.
+        p.macro_compound_days_per_year = 252.0;
+        p.macro_calendar_days_per_year = 252.0;
+        p.cycle_us_calibration = 1.0;
+        p.fed_liftoff_rule = 1.0;
+        p.market_pe_buybacks = 1.0;
+        p.cycle_stationary_opening = 1.0;
+        // News priced within minutes (results/news-speed/): the absorption
+        // profile from Christensen, Timmermann and Veliyev (arXiv
+        // 2601.08962, Table 7), with the maker re-quoting on news.
+        p.news_absorption_half_life = 0.6;
+        p.news_absorption_drift_share = 0.12;
+        p.news_absorption_drift_half_life = 42.0;
+        p.news_quote_revision = 1.0;
         p
     }
 

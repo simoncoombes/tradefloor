@@ -331,7 +331,20 @@ import tradefloor
 # by 0.0, so no other preset's trajectory moves; pt-v19's does, and this is
 # its third boundary in six days. `metadataSha256` does NOT move, for the
 # eighth boundary running.
-KAT_VERSION = 26
+#
+# pt-v19 COMPOSED A FIFTH TIME (2026-09-23). Twenty-three dials: the long-run
+# VIX law (the anchor form with its weight rising above a knee and the slow
+# regime level re-derived on its loop), the macro economy on the session
+# clock with the NBER/BEA cycle table, the Fed's lift-off rule and buybacks
+# in market_pe, news absorbed within minutes with the maker re-quoting, the
+# calm-side variance exponent, and the certification opening drawn from the
+# cycle. Taken on the owner's adopted long-run pass bar (design repo,
+# programme/longrun/CRITERIA.md: the fourth composition fails 8 of 15, this
+# one passes 15 of 15), and bit-identical to the fourth composition with
+# those dials set (programme/results/ptv19-fifth/bitident.py, five seeds x
+# 300 sessions). Every seeded pt-v19 trajectory changes; named presets before
+# it replay exactly. `metadataSha256` does NOT move.
+KAT_VERSION = 27
 
 SEED = 20260820
 DAYS = 250
