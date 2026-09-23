@@ -595,6 +595,10 @@ PARAM_SPECS: dict[str, dict] = {
                                "hard_range": (0.0, 2.0), "derived": False},
     "vix_anchor_weight_level_cap": {"kind": "abs", "step_unit": 0.05,
                                    "hard_range": (0.0, 4.0), "derived": False},
+    "vix_anchor_weight_level_knee": {"kind": "abs", "step_unit": 0.01,
+                                    "hard_range": (0.0, 1.0), "derived": False},
+    "vix_anchor_weight_level_below": {"kind": "abs", "step_unit": 1.0,
+                                     "hard_range": (0.0, 1.0), "derived": False},
     # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
     # the tape's three epicentre episodes (2.43, 1.93, 1.41). 0.0 is the
     # branch not taken; the range opens at zero to hold it and stops at 3.0,

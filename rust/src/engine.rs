@@ -3363,6 +3363,8 @@ impl Engine {
                 vix_anchor_centre: self.params.vix_anchor_centre,
                 vix_anchor_weight_level: self.params.vix_anchor_weight_level,
                 vix_anchor_weight_level_cap: self.params.vix_anchor_weight_level_cap,
+                vix_anchor_weight_level_knee: self.params.vix_anchor_weight_level_knee,
+                vix_anchor_weight_level_below: self.params.vix_anchor_weight_level_below,
                 vix_anchor_slow: self.vix_anchor_slow,
                 vix_jump_intensity: self.params.vix_jump_intensity,
                 vix_jump_scale: self.params.vix_jump_scale,

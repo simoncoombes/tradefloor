@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v14",
   "fingerprint": "pt-v14",
-  "coefficient_digest": "1b3476fea6ef60cf95003872aaf8260ad7b34853a85b0ae76b316af4d2408ac1",
+  "coefficient_digest": "e9949e0f292f6a3d85a32f20c64a43f2aa49df580949692c44e25e18b2a2817a",
   "coefficients": {
     "book_levels": 10.0,
     "buyback_payout_share": 0.0,
@@ -160,7 +160,9 @@
     "vix_anchor_reversion": 0.0,
     "vix_anchor_weight": 0.0,
     "vix_anchor_weight_level": 0.0,
+    "vix_anchor_weight_level_below": 0.0,
     "vix_anchor_weight_level_cap": 0.0,
+    "vix_anchor_weight_level_knee": 0.0,
     "vix_ceiling": 80.0,
     "vix_cycle_amplitude": 0.0,
     "vix_decay_ratio": 1.0,

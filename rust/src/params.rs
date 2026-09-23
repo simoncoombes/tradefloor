@@ -1570,24 +1570,35 @@ pub struct ModelParams {
     /// preset -- is the constant weight `vix_anchor_weight`. Nonzero,
     ///
     /// ```text
-    /// 1 - a(x) = (1 - a) * (C / min(x, r C))^eta,   a(x) floored at 0
+    /// 1 - a(x) = (1 - a) * (K / clamp(x, K, r K))^eta
     /// ```
     ///
-    /// with `x` the VIX entering the session, `C` the centre
-    /// (`L anchor exp(-c)`) and `r` [`ModelParams::vix_anchor_weight_level_cap`].
-    /// The loop's local gain is `(1 - a(x)) g(x)` with `g` the held
-    /// read-back's elasticity to the VIX; measured on the route-1 base `g`
-    /// rises about in proportion to the VIX from 16 to about 32 and then
-    /// flattens, so `eta = 1` holds the local gain at its centre value over
-    /// that range -- the fear trap at 30 to 50, where a constant 0.45 leaves
-    /// the gain at one, is removed -- and the weight falls toward zero in
-    /// calm, where the gain is under one without it.
+    /// with `x` the VIX entering the session, `K` the knee
+    /// (`L anchor exp(-k)`, [`ModelParams::vix_anchor_weight_level_knee`])
+    /// and `r` [`ModelParams::vix_anchor_weight_level_cap`]. At and below the
+    /// knee the weight is the dial. The loop's local gain is
+    /// `(1 - a(x)) g(x)` with `g` the held read-back's elasticity to the VIX;
+    /// measured on the route-1 base `g` crosses one at a held VIX of 18.5 and
+    /// rises about in proportion to the VIX from there to about 36, so
+    /// `eta = 1` holds the local gain at its knee value over that range and
+    /// the fear trap at 30 to 50, where a constant 0.45 leaves the gain at
+    /// one, is removed.
     pub vix_anchor_weight_level: f64,
 
     /// The level, as a multiple of the centre, above which
     /// [`ModelParams::vix_anchor_weight_level`] stops raising the weight:
     /// where the held read-back's elasticity stops rising. 0.0 is no cap.
     pub vix_anchor_weight_level_cap: f64,
+
+    /// Where [`ModelParams::vix_anchor_weight_level`] starts raising the
+    /// weight, as a log offset below `L * anchor`. Read only with the level
+    /// law on; 0.0 puts the knee at `L * anchor`.
+    pub vix_anchor_weight_level_knee: f64,
+
+    /// Nonzero, the level law also runs BELOW the knee, where it lowers the
+    /// weight toward zero. 0.0 -- the default -- holds the dial there. Read
+    /// only with the level law on.
+    pub vix_anchor_weight_level_below: f64,
 
     /// How many sessions of market-side warm-up the factor's variance
     /// components get before session one. 0.0 -- every preset through
@@ -4341,6 +4352,8 @@ impl ModelParams {
             vix_anchor_centre: 0.0,
             vix_anchor_weight_level: 0.0,
             vix_anchor_weight_level_cap: 0.0,
+            vix_anchor_weight_level_knee: 0.0,
+            vix_anchor_weight_level_below: 0.0,
             market_burn_in_sessions: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
@@ -6337,6 +6350,8 @@ impl ModelParams {
             "vix_anchor_centre" => self.vix_anchor_centre,
             "vix_anchor_weight_level" => self.vix_anchor_weight_level,
             "vix_anchor_weight_level_cap" => self.vix_anchor_weight_level_cap,
+            "vix_anchor_weight_level_knee" => self.vix_anchor_weight_level_knee,
+            "vix_anchor_weight_level_below" => self.vix_anchor_weight_level_below,
             "market_burn_in_sessions" => self.market_burn_in_sessions,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
@@ -6538,6 +6553,8 @@ impl ModelParams {
             "vix_anchor_centre" => out.vix_anchor_centre = value,
             "vix_anchor_weight_level" => out.vix_anchor_weight_level = value,
             "vix_anchor_weight_level_cap" => out.vix_anchor_weight_level_cap = value,
+            "vix_anchor_weight_level_knee" => out.vix_anchor_weight_level_knee = value,
+            "vix_anchor_weight_level_below" => out.vix_anchor_weight_level_below = value,
             "market_burn_in_sessions" => out.market_burn_in_sessions = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
@@ -6913,6 +6930,24 @@ impl ModelParams {
                 "vix_anchor_weight_level_cap is {}. It is a multiple of the centre at \
                  or above one, or 0.0 for no cap.", self.vix_anchor_weight_level_cap));
         }
+        for (name, v) in [("vix_anchor_weight_level_knee", self.vix_anchor_weight_level_knee),
+                          ("vix_anchor_weight_level_below", self.vix_anchor_weight_level_below)] {
+            if v != 0.0 && self.vix_anchor_weight_level == 0.0 {
+                return Err(format!(
+                    "{} is {} but vix_anchor_weight_level is 0: it shapes the level \
+                     law and is read by nothing without it.", name, v));
+            }
+        }
+        if !self.vix_anchor_weight_level_knee.is_finite() || self.vix_anchor_weight_level_knee.abs() > 3.0 {
+            return Err(format!(
+                "vix_anchor_weight_level_knee is {}. It is a log offset on the anchor, \
+                 in [-3, 3].", self.vix_anchor_weight_level_knee));
+        }
+        if !(self.vix_anchor_weight_level_below == 0.0 || self.vix_anchor_weight_level_below == 1.0) {
+            return Err(format!(
+                "vix_anchor_weight_level_below is {}. It is a switch, 0.0 or 1.0.",
+                self.vix_anchor_weight_level_below));
+        }
         if self.vix_anchor_weight_level_cap != 0.0 && self.vix_anchor_weight_level == 0.0 {
             return Err(format!(
                 "vix_anchor_weight_level_cap is {} but vix_anchor_weight_level is 0: the \
@@ -7178,6 +7213,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_anchor_centre",
         "vix_anchor_weight_level",
         "vix_anchor_weight_level_cap",
+        "vix_anchor_weight_level_knee",
+        "vix_anchor_weight_level_below",
         "market_burn_in_sessions",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",

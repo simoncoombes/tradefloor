@@ -433,6 +433,15 @@ OUT_OF_SCOPE = {
         "unread while `vix_anchor_weight_level` is 0.0, and 0.0 is no cap. "
         "The level, as a multiple of the centre, where the held read-back's "
         "elasticity stops rising. A probe, not adopted",
+    "vix_anchor_weight_level_knee":
+        "unread while `vix_anchor_weight_level` is 0.0. The level, as a log "
+        "offset below the anchor, where the level law starts raising the "
+        "weight: where the held read-back's elasticity crosses one. A probe, "
+        "not adopted",
+    "vix_anchor_weight_level_below":
+        "unread while `vix_anchor_weight_level` is 0.0; at 0.0 the weight is "
+        "the dial below the knee. 1.0 runs the level law below it too. A "
+        "probe, not adopted",
     "crisis_epicentre_end_sessions":
         "unread while `crisis_epicentre_extra` is 0.0: with no episode ever "
         "entered there is no counter to end. 21 sessions is a month and is a "

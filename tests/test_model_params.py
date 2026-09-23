@@ -323,6 +323,8 @@ PERTURBATIONS = [
     ("vix_anchor_centre", 0.27, True),
     ("vix_anchor_weight_level", 1.0, True),
     ("vix_anchor_weight_level_cap", 1.75, True),
+    ("vix_anchor_weight_level_knee", 0.261, True),
+    ("vix_anchor_weight_level_below", 1.0, True),
     # The crisis epicentre (2026-09-22), and both rows are INERT here for
     # the reason `crisis_blend_source`, `crisis_blend_ramp` and
     # `crisis_blend_cap` are: the mechanism is gated on the VIX being above
@@ -1132,7 +1134,9 @@ COMPANIONS: dict[str, dict[str, float]] = {
                            "vix_anchor_memory": 0.0,
                            "vix_anchor_centre": 0.0,
                            "vix_anchor_weight_level": 0.0,
-                           "vix_anchor_weight_level_cap": 0.0},
+                           "vix_anchor_weight_level_cap": 0.0,
+                           "vix_anchor_weight_level_knee": 0.0,
+                           "vix_anchor_weight_level_below": 0.0},
     # `vix_level_sigma` multiplies `vix_implied_from_market`, which exists
     # only under the identity, so `ModelParams::invariants` refuses the
     # sigma with the identity off. The default runs the identity, so the
@@ -1166,6 +1170,10 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "vix_anchor_weight_level": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45},
     "vix_anchor_weight_level_cap": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45,
                                     "vix_anchor_weight_level": 1.0},
+    "vix_anchor_weight_level_knee": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45,
+                                     "vix_anchor_weight_level": 1.0},
+    "vix_anchor_weight_level_below": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45,
+                                      "vix_anchor_weight_level": 1.0},
 }
 
 

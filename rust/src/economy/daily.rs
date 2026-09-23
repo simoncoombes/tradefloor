@@ -130,6 +130,10 @@ pub struct DailyInputs<'a> {
     pub vix_anchor_weight_level: f64,
     /// See [`crate::params::ModelParams::vix_anchor_weight_level_cap`].
     pub vix_anchor_weight_level_cap: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_weight_level_knee`].
+    pub vix_anchor_weight_level_knee: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_weight_level_below`].
+    pub vix_anchor_weight_level_below: f64,
     /// The anchor's slow memory of the read-back's log deviation, already
     /// advanced to today by the engine.
     pub vix_anchor_slow: f64,
@@ -277,6 +281,8 @@ impl<'a> Default for DailyInputs<'a> {
             vix_anchor_centre: 0.0,
             vix_anchor_weight_level: 0.0,
             vix_anchor_weight_level_cap: 0.0,
+            vix_anchor_weight_level_knee: 0.0,
+            vix_anchor_weight_level_below: 0.0,
             vix_anchor_slow: 0.0,
             vix_jump_intensity: 0.0,
             vix_jump_scale: 0.0,
@@ -476,15 +482,17 @@ pub fn return_spike_for(current: f64, gain: f64, gain_up: f64, exponent: f64) ->
 /// reproduce to the bit. The measurement behind the form, its error bars
 /// and the value each dial derives to are on
 /// `ModelParams::vix_return_level_exponent`.
-/// The anchor weight at the VIX's level: `1 - a(x) = (1 - a) (C / x')^eta`
-/// with `x' = min(x, cap C)` (no cap at 0.0), floored at zero. See
-/// [`crate::params::ModelParams::vix_anchor_weight_level`].
-pub fn anchor_weight_at_level(a: f64, eta: f64, cap: f64, vix: f64, centre: f64) -> f64 {
-    if !(vix > 0.0) || !(centre > 0.0) {
+/// The anchor weight at the VIX's level: `1 - a(x) = (1 - a) (K / x')^eta`
+/// with `x' = min(x, cap K)` (no cap at 0.0) and, unless `below` is
+/// nonzero, `x' >= K` so the weight is the dial at and below the knee `K`.
+/// Floored at zero. See [`crate::params::ModelParams::vix_anchor_weight_level`].
+pub fn anchor_weight_at_level(a: f64, eta: f64, cap: f64, below: f64, vix: f64, knee: f64) -> f64 {
+    if !(vix > 0.0) || !(knee > 0.0) {
         return a;
     }
-    let x = if cap != 0.0 { mathx::min(vix, cap * centre) } else { vix };
-    let one_minus = (1.0 - a) * mathx::pow(centre / x, eta);
+    let x = if cap != 0.0 { mathx::min(vix, cap * knee) } else { vix };
+    let x = if below == 0.0 { mathx::max(x, knee) } else { x };
+    let one_minus = (1.0 - a) * mathx::pow(knee / x, eta);
     mathx::max(0.0, 1.0 - one_minus)
 }
 
@@ -1186,12 +1194,18 @@ pub fn update_economy_daily(
             inputs.vix_anchor_level
         };
         let weight = if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_weight_level != 0.0 {
+            let knee = if inputs.vix_anchor_weight_level_knee != 0.0 {
+                inputs.vix_anchor_level * mathx::exp(-inputs.vix_anchor_weight_level_knee)
+            } else {
+                inputs.vix_anchor_level
+            };
             anchor_weight_at_level(
                 inputs.vix_anchor_weight,
                 inputs.vix_anchor_weight_level,
                 inputs.vix_anchor_weight_level_cap,
+                inputs.vix_anchor_weight_level_below,
                 economy.vix,
-                centre_level,
+                knee,
             )
         } else {
             inputs.vix_anchor_weight
@@ -3230,22 +3244,24 @@ mod anchor_weight_level {
     use super::anchor_weight_at_level;
 
     #[test]
-    fn at_the_centre_it_is_the_dial() {
-        assert!((anchor_weight_at_level(0.45, 1.0, 0.0, 18.5, 18.5) - 0.45).abs() < 1e-15);
+    fn at_and_below_the_knee_it_is_the_dial() {
+        for x in [9.0, 14.0, 18.5] {
+            assert!((anchor_weight_at_level(0.45, 1.0, 0.0, 0.0, x, 18.5) - 0.45).abs() < 1e-15);
+        }
     }
 
     #[test]
     fn it_holds_one_minus_a_times_level_constant_below_the_cap() {
         for x in [20.0, 25.0, 30.0, 36.0] {
-            let a = anchor_weight_at_level(0.45, 1.0, 1.95, x, 18.5);
+            let a = anchor_weight_at_level(0.45, 1.0, 1.95, 0.0, x, 18.5);
             assert!(((1.0 - a) * x - 0.55 * 18.5).abs() < 1e-12, "x {x} a {a}");
         }
     }
 
     #[test]
-    fn it_stops_rising_at_the_cap_and_floors_at_zero() {
-        let at_cap = anchor_weight_at_level(0.45, 1.0, 1.95, 1.95 * 18.5, 18.5);
-        assert_eq!(anchor_weight_at_level(0.45, 1.0, 1.95, 80.0, 18.5), at_cap);
-        assert_eq!(anchor_weight_at_level(0.45, 1.0, 1.95, 9.0, 18.5), 0.0);
+    fn it_stops_rising_at_the_cap_and_below_the_knee_only_if_asked_it_falls() {
+        let at_cap = anchor_weight_at_level(0.45, 1.0, 1.95, 0.0, 1.95 * 18.5, 18.5);
+        assert_eq!(anchor_weight_at_level(0.45, 1.0, 1.95, 0.0, 80.0, 18.5), at_cap);
+        assert_eq!(anchor_weight_at_level(0.45, 1.0, 1.95, 1.0, 9.0, 18.5), 0.0);
     }
 }
