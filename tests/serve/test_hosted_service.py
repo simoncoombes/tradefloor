@@ -87,7 +87,7 @@ def test_owner_isolation(tmp_path):
     hosted, alice, bob, _ = make(tmp_path)
     s = hosted.open(alice, cfg())
     for call, args in [("observe", ()), ("info", ()), ("advance", ()), ("close", ()),
-                       ("fork", ()), ("orders", ()), ("fills", ()),
+                       ("fork", ()), ("orders", ()), ("fills", ()), ("bars", ("T00",)),
                        ("place_order", (OrderRequest("T00", "buy", 1),)),
                        ("cancel_order", ("x",))]:
         assert code_of(getattr(hosted, call), bob, s.session_id, *args).code == "not_found", call

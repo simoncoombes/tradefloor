@@ -56,15 +56,12 @@ def _iso(t: float) -> str:
 
 
 def rate_limited(message: str, retry_after: float) -> ServeError:
-    err = ServeError("rate_limited", message)
-    err.retry_after = retry_after  # type: ignore[attr-defined]  # see HOSTED.md, contract requests
-    return err
+    return ServeError("rate_limited", message, retry_after=round(retry_after, 3))
 
 
 def quota_exceeded(message: str, retry_after: float | None = None) -> ServeError:
-    err = ServeError("quota_exceeded", message)
-    err.retry_after = retry_after  # type: ignore[attr-defined]
-    return err
+    return ServeError("quota_exceeded", message,
+                      retry_after=None if retry_after is None else round(retry_after, 3))
 
 
 class TokenBucket:

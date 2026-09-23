@@ -43,6 +43,7 @@ from tradefloor.serve.hosted.quotas import (
 )
 from tradefloor.serve.types import (
     AdvanceResult,
+    Bar,
     Fill,
     Observation,
     Order,
@@ -324,6 +325,12 @@ class HostedService:
     def fills(self, owner: str, session_id: str, since_day: int = 0) -> list[Fill]:
         with self._call(owner, "fills", session_id) as c:
             return c.timed(self.inner.fills, c.owner, session_id, since_day)
+
+    def bars(self, owner: str, session_id: str, ticker: str, resolution: str = "day",
+             since_day: int = 0, limit: int | None = None) -> list[Bar]:
+        with self._call(owner, "bars", session_id) as c:
+            return c.timed(self.inner.bars, c.owner, session_id, ticker, resolution,
+                           since_day, limit)
 
     def advance(self, owner: str, session_id: str, steps: int = 1,
                 until: str = "steps") -> AdvanceResult:

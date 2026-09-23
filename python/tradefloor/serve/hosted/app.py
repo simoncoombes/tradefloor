@@ -28,24 +28,6 @@ from tradefloor.serve.hosted.resolver import ApiKeyResolver
 from tradefloor.serve.hosted.service import HostedService
 from tradefloor.serve.types import ServeError
 
-STATUS = {
-    "invalid_request": 400, "invalid_order": 400, "insufficient_buying_power": 403,
-    "not_found": 404, "session_closed": 409, "conflict": 409, "unauthorized": 401,
-    "rate_limited": 429, "quota_exceeded": 429, "internal": 500,
-}
-
-
-def error_response(e: ServeError):
-    from fastapi.responses import JSONResponse
-    headers = {}
-    retry = getattr(e, "retry_after", None)
-    if retry:
-        headers["Retry-After"] = str(max(1, int(retry + 0.999)))
-    if e.code == "unauthorized":
-        headers["WWW-Authenticate"] = 'Bearer realm="tradefloor"'
-    return JSONResponse(e.to_dict(), status_code=STATUS.get(e.code, 500), headers=headers)
-
-
 def create_hosted_app(hosted: HostedService, *, trust_proxy: bool = False,
                       resolver: ApiKeyResolver | None = None,
                       create_app: Callable[..., Any] | None = None):
@@ -54,15 +36,17 @@ def create_hosted_app(hosted: HostedService, *, trust_proxy: bool = False,
 
     import inspect
 
+    from tradefloor.serve.http import error_response
+
     if create_app is None:
         from tradefloor.serve.http import create_app
     resolver = resolver or ApiKeyResolver(hosted, trust_forwarded_for=trust_proxy)
     kwargs: dict[str, Any] = {"owner_resolver": resolver}
     if "serialize" in inspect.signature(create_app).parameters:
-        # The transport's global lock is for services that are not known to be
-        # thread-safe. HostedService is (its meter, accounts and audit log
-        # lock), and the core locks per session, so bots in different sessions
-        # run concurrently instead of queueing behind each other's disk writes.
+        # Contract 0.3, section 4d: a SessionService is safe across threads
+        # (a lock per session), so no global lock. HostedService's meter,
+        # accounts and audit log lock themselves. Bots in different sessions
+        # then run concurrently instead of queueing behind each other's writes.
         kwargs["serialize"] = False
     app = create_app(hosted, **kwargs)
 

@@ -126,6 +126,14 @@ class FakeSessionService:
         self.calls.append(("fills", owner))
         return list(self._get(owner, session_id)["fills"])
 
+    def bars(self, owner: str, session_id: str, ticker: str, resolution: str = "day",
+             since_day: int = 0, limit: int | None = None) -> list:
+        self.calls.append(("bars", owner))
+        s = self._get(owner, session_id)
+        if ticker not in s["info"].tickers:
+            raise ServeError("invalid_request", f"unknown ticker {ticker!r}")
+        return []
+
     def advance(self, owner: str, session_id: str, steps: int = 1, until: str = "steps") -> AdvanceResult:
         self.calls.append(("advance", owner))
         s = self._get(owner, session_id, open_only=True)
