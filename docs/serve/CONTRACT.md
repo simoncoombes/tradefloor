@@ -1,4 +1,4 @@
-# The trading session server: contract 0.1
+# The trading session server: contract 0.2
 
 What it is for: a long-running agent (a bot) rehearses in a simulated market
 before it touches money, and is re-tested every time it changes. It opens a
@@ -53,8 +53,10 @@ adds the `serve` extra. The core package still depends on NOTHING.
   harness's `session_clock` and `run_session`), crossing session boundaries
   as needed: `close_market` after tick 390, `open_market` before the next
   day's first step. `until="close"` runs to the end of the current session;
-  `until="next_open"` to the first step of the next one. One call may not run
-  more than 20 sessions (7,800 ticks); larger is `invalid_request`.
+  `until="next_open"` to the first step of the next one. With `until="close"`
+  or `"next_open"`, `steps` counts closes or opens (`steps=3, until="close"`
+  runs through the third close). One call may not run more than 20 sessions
+  (7,800 ticks); larger is `invalid_request`.
 - `close` ends the session and returns a `SessionReport` with `caveats`
   COMPUTED at call time from the envelope and measured facts, never retyped
   prose (the rule in `tradefloor/mcp.py`). The caveats must include, while it
@@ -87,6 +89,17 @@ adds the `serve` extra. The core package still depends on NOTHING.
   `insufficient_buying_power` is raised at submission when it can already be
   known.
 - Shorting is allowed within `max_leverage` (as `Portfolio` allows).
+- A trade that REDUCES risk is never refused by the leverage cap (0.2): a fill
+  is refused only when its projected leverage is above the cap AND above the
+  account's current leverage. An account pushed over its cap by the market can
+  always trade back down. (`Portfolio`'s own rule refuses any fill projected
+  over the cap; the core applies this rule instead, without changing
+  `Portfolio`.)
+- Several market orders on one side of one name in one step sweep the book
+  cumulatively: splitting an order does not buy a better price. A market order
+  larger than the book can absorb fills partially: status `filled`,
+  `filled_quantity` below `quantity`, and a reason beginning "partial". There
+  is no resting remainder and no `partially_filled` status in 0.2.
 
 ## 4. Observations
 
@@ -95,6 +108,12 @@ previous close, volume so far; bid/ask optional), the VIX, a documented subset
 of the economy state (federal funds rate, 10-year yield, inflation, GDP growth,
 unemployment, cycle phase as a number), the account, positions, open orders,
 headlines (empty until the headlines layer lands), and a `state_hash`.
+
+## 4a. Accounts
+
+`Account.leverage` is gross exposure over net worth, and `null` (Python
+`None`) when net worth is at or below zero, with `insolvent: true`; strict
+JSON cannot carry infinity.
 
 ## 5. Determinism, persistence, resume, fork
 
@@ -110,8 +129,23 @@ headlines (empty until the headlines layer lands), and a `state_hash`.
   the crash, bit for bit, including `state_hash`. `FileStore(root)` is the
   default (`~/.tradefloor/sessions` for self-run); the hosted layer may supply
   another store (e.g. S3) through the same protocol.
+- The store protocol is `SessionStore` in `types.py` (0.2): `commit(session_id,
+  record, appends)` is the atomic commit point, then `load`, `read_stream`,
+  `version`, `heads(owner)`. FileStore and MemoryStore implement it; a hosted
+  store must keep the same atomicity.
 - `fork` copies a session's full state into a new session (same owner,
   `parent_session_id` set). Forks evolve independently and deterministically.
+
+## 5a. Edge cases decided (0.2)
+
+- Cancelling a finished order: `invalid_request`.
+- `fork` or `close` on a closed session: `session_closed`. Reads (`info`,
+  `observe`, `orders`, `fills`) work on a closed session.
+- `orders(status=...)`: None or "all", "open", "closed", or one OrderStatus.
+- A day order placed while the market is closed belongs to the next session.
+- `SessionReport.days` is the number of trading days the session has opened
+  (`clock.day + 1`).
+- JSON round trip: `from_dict` rebuilds nested types for every result type.
 
 ## 6. Transports (transport agent)
 
