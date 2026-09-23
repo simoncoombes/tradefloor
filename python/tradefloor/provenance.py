@@ -418,6 +418,21 @@ OUT_OF_SCOPE = {
         "day's variance move reaches the VIX in full. A probe of route 1 "
         "(programme/results/route1-blend/, design repository), not derived "
         "and not adopted",
+    "vix_anchor_centre":
+        "inert at 0.0: economy/daily.rs and the memory branch on `!= 0.0` "
+        "and the anchor weight pulls to `L * anchor` exactly. Nonzero, it "
+        "pulls to `L * anchor * exp(-c)`; the forward map's denominator is "
+        "not moved. A probe (programme/results/vix-law-levels/, design "
+        "repository), not adopted",
+    "vix_anchor_weight_level":
+        "inert at 0.0: the anchor weight is the constant dial. Nonzero, "
+        "`1 - a(x) = (1 - a) (C / min(x, r C))^eta`, the exponent read off "
+        "the held read-back's elasticity to the VIX (programme/results/"
+        "vix-law-levels/, design repository). A probe, not adopted",
+    "vix_anchor_weight_level_cap":
+        "unread while `vix_anchor_weight_level` is 0.0, and 0.0 is no cap. "
+        "The level, as a multiple of the centre, where the held read-back's "
+        "elasticity stops rising. A probe, not adopted",
     "crisis_epicentre_end_sessions":
         "unread while `crisis_epicentre_extra` is 0.0: with no episode ever "
         "entered there is no counter to end. 21 sessions is a month and is a "

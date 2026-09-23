@@ -3329,6 +3329,13 @@ impl Engine {
             let implied = crate::market::index_var::vix_from_variance(
                 self.params.vix_variance_premium, index_variance) * mult;
             let anchor = self.vix_anchor * mult;
+            // The memory is kept against the CENTRE the weight pulls to;
+            // guarded, so at 0.0 it is the anchor exactly.
+            let anchor = if self.params.vix_anchor_centre != 0.0 {
+                anchor * crate::mathx::exp(-self.params.vix_anchor_centre)
+            } else {
+                anchor
+            };
             if implied > 0.0 && anchor > 0.0 {
                 let h = self.params.vix_anchor_memory;
                 self.vix_anchor_slow = (1.0 - h) * self.vix_anchor_slow
@@ -3353,6 +3360,9 @@ impl Engine {
                 vix_anchor_level: self.vix_anchor * self.vix_level_multiplier(),
                 vix_anchor_weight: self.params.vix_anchor_weight,
                 vix_anchor_memory: self.params.vix_anchor_memory,
+                vix_anchor_centre: self.params.vix_anchor_centre,
+                vix_anchor_weight_level: self.params.vix_anchor_weight_level,
+                vix_anchor_weight_level_cap: self.params.vix_anchor_weight_level_cap,
                 vix_anchor_slow: self.vix_anchor_slow,
                 vix_jump_intensity: self.params.vix_jump_intensity,
                 vix_jump_scale: self.params.vix_jump_scale,

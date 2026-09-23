@@ -318,6 +318,11 @@ PERTURBATIONS = [
     # The anchor's slow memory. Read only with a weight, which COMPANIONS
     # carries; no draw is added or moved.
     ("vix_anchor_memory", 0.05, True),
+    # The anchor's centre and its level law (2026-09-23, vix-law-levels).
+    # Read only with a weight, which COMPANIONS carries; no draw is added.
+    ("vix_anchor_centre", 0.27, True),
+    ("vix_anchor_weight_level", 1.0, True),
+    ("vix_anchor_weight_level_cap", 1.75, True),
     # The crisis epicentre (2026-09-22), and both rows are INERT here for
     # the reason `crisis_blend_source`, `crisis_blend_ramp` and
     # `crisis_blend_cap` are: the mechanism is gated on the VIX being above
@@ -1124,7 +1129,10 @@ COMPANIONS: dict[str, dict[str, float]] = {
                            # derived anchor to revert to.
                            "vix_anchor_reversion": 0.0,
                            "vix_anchor_weight": 0.0,
-                           "vix_anchor_memory": 0.0},
+                           "vix_anchor_memory": 0.0,
+                           "vix_anchor_centre": 0.0,
+                           "vix_anchor_weight_level": 0.0,
+                           "vix_anchor_weight_level_cap": 0.0},
     # `vix_level_sigma` multiplies `vix_implied_from_market`, which exists
     # only under the identity, so `ModelParams::invariants` refuses the
     # sigma with the identity off. The default runs the identity, so the
@@ -1152,6 +1160,12 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "vix_anchor_weight": {"vix_level_identity": 1.0},
     # The memory is what the weight pulls against, so it is refused without one.
     "vix_anchor_memory": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45},
+    # The centre and the level law shape the weight's pull, so each is
+    # refused without one; the cap is refused without the level law.
+    "vix_anchor_centre": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45},
+    "vix_anchor_weight_level": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45},
+    "vix_anchor_weight_level_cap": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.45,
+                                    "vix_anchor_weight_level": 1.0},
 }
 
 

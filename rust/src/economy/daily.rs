@@ -122,6 +122,14 @@ pub struct DailyInputs<'a> {
     /// See [`crate::params::ModelParams::vix_anchor_memory`]. 0.0 is the
     /// instantaneous form and `vix_anchor_slow` is then not read.
     pub vix_anchor_memory: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_centre`]. 0.0 leaves the
+    /// reference at `vix_anchor_level` exactly.
+    pub vix_anchor_centre: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_weight_level`]. 0.0 is
+    /// the constant weight.
+    pub vix_anchor_weight_level: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_weight_level_cap`].
+    pub vix_anchor_weight_level_cap: f64,
     /// The anchor's slow memory of the read-back's log deviation, already
     /// advanced to today by the engine.
     pub vix_anchor_slow: f64,
@@ -266,6 +274,9 @@ impl<'a> Default for DailyInputs<'a> {
             vix_anchor_level: 0.0,
             vix_anchor_weight: 0.0,
             vix_anchor_memory: 0.0,
+            vix_anchor_centre: 0.0,
+            vix_anchor_weight_level: 0.0,
+            vix_anchor_weight_level_cap: 0.0,
             vix_anchor_slow: 0.0,
             vix_jump_intensity: 0.0,
             vix_jump_scale: 0.0,
@@ -465,6 +476,18 @@ pub fn return_spike_for(current: f64, gain: f64, gain_up: f64, exponent: f64) ->
 /// reproduce to the bit. The measurement behind the form, its error bars
 /// and the value each dial derives to are on
 /// `ModelParams::vix_return_level_exponent`.
+/// The anchor weight at the VIX's level: `1 - a(x) = (1 - a) (C / x')^eta`
+/// with `x' = min(x, cap C)` (no cap at 0.0), floored at zero. See
+/// [`crate::params::ModelParams::vix_anchor_weight_level`].
+pub fn anchor_weight_at_level(a: f64, eta: f64, cap: f64, vix: f64, centre: f64) -> f64 {
+    if !(vix > 0.0) || !(centre > 0.0) {
+        return a;
+    }
+    let x = if cap != 0.0 { mathx::min(vix, cap * centre) } else { vix };
+    let one_minus = (1.0 - a) * mathx::pow(centre / x, eta);
+    mathx::max(0.0, 1.0 - one_minus)
+}
+
 pub fn return_spike_at_level(
     current: f64,
     gain: f64,
@@ -1155,14 +1178,32 @@ pub fn update_economy_daily(
         // lag-one persistence is the loop's and not `mr + kappa`'s. Guarded,
         // so at 0.0 the target is the read-back bit for bit. See
         // `ModelParams::vix_anchor_weight`.
+        // The centre and the level law are guarded, so with both at 0.0 the
+        // weight and the reference are the dial and `L * anchor` exactly.
+        let centre_level = if inputs.vix_anchor_centre != 0.0 {
+            inputs.vix_anchor_level * mathx::exp(-inputs.vix_anchor_centre)
+        } else {
+            inputs.vix_anchor_level
+        };
+        let weight = if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_weight_level != 0.0 {
+            anchor_weight_at_level(
+                inputs.vix_anchor_weight,
+                inputs.vix_anchor_weight_level,
+                inputs.vix_anchor_weight_level_cap,
+                economy.vix,
+                centre_level,
+            )
+        } else {
+            inputs.vix_anchor_weight
+        };
         if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_memory != 0.0 {
-            // Against the slow memory: today's move passes in full.
-            inputs.vix_implied_from_market
-                * mathx::exp(-inputs.vix_anchor_weight * inputs.vix_anchor_slow)
+            // Against the slow memory: today's move passes in full. The
+            // memory is kept against the centre by the engine.
+            inputs.vix_implied_from_market * mathx::exp(-weight * inputs.vix_anchor_slow)
         } else if inputs.vix_anchor_weight != 0.0 {
-            let a = inputs.vix_anchor_weight;
+            let a = weight;
             mathx::exp((1.0 - a) * mathx::log(inputs.vix_implied_from_market)
-                + a * mathx::log(inputs.vix_anchor_level))
+                + a * mathx::log(centre_level))
         } else {
             inputs.vix_implied_from_market
         }
@@ -3181,5 +3222,30 @@ mod fear_response_shape {
              shape parameter the cap used to be",
             p.vix_return_clamp
         );
+    }
+}
+
+#[cfg(test)]
+mod anchor_weight_level {
+    use super::anchor_weight_at_level;
+
+    #[test]
+    fn at_the_centre_it_is_the_dial() {
+        assert!((anchor_weight_at_level(0.45, 1.0, 0.0, 18.5, 18.5) - 0.45).abs() < 1e-15);
+    }
+
+    #[test]
+    fn it_holds_one_minus_a_times_level_constant_below_the_cap() {
+        for x in [20.0, 25.0, 30.0, 36.0] {
+            let a = anchor_weight_at_level(0.45, 1.0, 1.95, x, 18.5);
+            assert!(((1.0 - a) * x - 0.55 * 18.5).abs() < 1e-12, "x {x} a {a}");
+        }
+    }
+
+    #[test]
+    fn it_stops_rising_at_the_cap_and_floors_at_zero() {
+        let at_cap = anchor_weight_at_level(0.45, 1.0, 1.95, 1.95 * 18.5, 18.5);
+        assert_eq!(anchor_weight_at_level(0.45, 1.0, 1.95, 80.0, 18.5), at_cap);
+        assert_eq!(anchor_weight_at_level(0.45, 1.0, 1.95, 9.0, 18.5), 0.0);
     }
 }

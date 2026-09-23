@@ -1550,6 +1550,45 @@ pub struct ModelParams {
     /// h = 1 it is the instantaneous form less one session's lag.
     pub vix_anchor_memory: f64,
 
+    /// Where the anchor's weight pulls TO, as a log offset below the
+    /// identity's derived anchor: the blend (and the memory's reference) use
+    /// `L * anchor * exp(-c)`. 0.0 -- every preset -- is the branch not
+    /// taken and the reference is `L * anchor` exactly. The forward map's
+    /// denominator (`vix_ratio_denominator`) is NOT moved, so a held VIX
+    /// drives the same variance it did.
+    ///
+    /// Why a centre and not the anchor: the anchor is the identity at the
+    /// UNCONDITIONAL (mean) variance, a root-mean-square level. The
+    /// geometric blend pulls log VIX toward it, so in calm it LIFTS the VIX
+    /// above its own read-back by `(L anchor / implied)^a`, 1.19 to 1.26 on
+    /// the route-1 cell, where the tape's VIX over realised volatility says
+    /// the read-back alone is already right. A probe of
+    /// `programme/results/vix-law-levels/` (design repository).
+    pub vix_anchor_centre: f64,
+
+    /// The anchor weight as a function of the VIX's level. 0.0 -- every
+    /// preset -- is the constant weight `vix_anchor_weight`. Nonzero,
+    ///
+    /// ```text
+    /// 1 - a(x) = (1 - a) * (C / min(x, r C))^eta,   a(x) floored at 0
+    /// ```
+    ///
+    /// with `x` the VIX entering the session, `C` the centre
+    /// (`L anchor exp(-c)`) and `r` [`ModelParams::vix_anchor_weight_level_cap`].
+    /// The loop's local gain is `(1 - a(x)) g(x)` with `g` the held
+    /// read-back's elasticity to the VIX; measured on the route-1 base `g`
+    /// rises about in proportion to the VIX from 16 to about 32 and then
+    /// flattens, so `eta = 1` holds the local gain at its centre value over
+    /// that range -- the fear trap at 30 to 50, where a constant 0.45 leaves
+    /// the gain at one, is removed -- and the weight falls toward zero in
+    /// calm, where the gain is under one without it.
+    pub vix_anchor_weight_level: f64,
+
+    /// The level, as a multiple of the centre, above which
+    /// [`ModelParams::vix_anchor_weight_level`] stops raising the weight:
+    /// where the held read-back's elasticity stops rising. 0.0 is no cap.
+    pub vix_anchor_weight_level_cap: f64,
+
     /// How many sessions of market-side warm-up the factor's variance
     /// components get before session one. 0.0 -- every preset through
     /// pt-v19 -- runs nothing, touches no state and is bit-identical.
@@ -4299,6 +4338,9 @@ impl ModelParams {
             vix_anchor_reversion: 0.0,
             vix_anchor_weight: 0.0,
             vix_anchor_memory: 0.0,
+            vix_anchor_centre: 0.0,
+            vix_anchor_weight_level: 0.0,
+            vix_anchor_weight_level_cap: 0.0,
             market_burn_in_sessions: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
@@ -6292,6 +6334,9 @@ impl ModelParams {
             "vix_anchor_reversion" => self.vix_anchor_reversion,
             "vix_anchor_weight" => self.vix_anchor_weight,
             "vix_anchor_memory" => self.vix_anchor_memory,
+            "vix_anchor_centre" => self.vix_anchor_centre,
+            "vix_anchor_weight_level" => self.vix_anchor_weight_level,
+            "vix_anchor_weight_level_cap" => self.vix_anchor_weight_level_cap,
             "market_burn_in_sessions" => self.market_burn_in_sessions,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
@@ -6490,6 +6535,9 @@ impl ModelParams {
             "vix_anchor_reversion" => out.vix_anchor_reversion = value,
             "vix_anchor_weight" => out.vix_anchor_weight = value,
             "vix_anchor_memory" => out.vix_anchor_memory = value,
+            "vix_anchor_centre" => out.vix_anchor_centre = value,
+            "vix_anchor_weight_level" => out.vix_anchor_weight_level = value,
+            "vix_anchor_weight_level_cap" => out.vix_anchor_weight_level_cap = value,
             "market_burn_in_sessions" => out.market_burn_in_sessions = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
@@ -6837,6 +6885,40 @@ impl ModelParams {
                  0.0 for the instantaneous form.",
                 self.vix_anchor_memory));
         }
+        for (name, v) in [("vix_anchor_centre", self.vix_anchor_centre),
+                          ("vix_anchor_weight_level", self.vix_anchor_weight_level),
+                          ("vix_anchor_weight_level_cap", self.vix_anchor_weight_level_cap)] {
+            if v != 0.0 && self.vix_anchor_weight == 0.0 {
+                return Err(format!(
+                    "{} is {} but vix_anchor_weight is 0. It shapes the anchor weight's \
+                     pull and with no weight it is read by nothing. Set \
+                     vix_anchor_weight, or {} to 0.0.", name, v, name));
+            }
+        }
+        if !self.vix_anchor_centre.is_finite() || self.vix_anchor_centre.abs() > 3.0 {
+            return Err(format!(
+                "vix_anchor_centre is {}. It is a log offset on the anchor, so it lives \
+                 in [-3, 3]; 0.0 is the anchor itself.", self.vix_anchor_centre));
+        }
+        if !(self.vix_anchor_weight_level >= 0.0 && self.vix_anchor_weight_level <= 4.0) {
+            return Err(format!(
+                "vix_anchor_weight_level is {}. It is the exponent of the weight's \
+                 level law, in [0, 4]; 0.0 is the constant weight.",
+                self.vix_anchor_weight_level));
+        }
+        if self.vix_anchor_weight_level_cap != 0.0
+            && !(self.vix_anchor_weight_level_cap >= 1.0 && self.vix_anchor_weight_level_cap.is_finite())
+        {
+            return Err(format!(
+                "vix_anchor_weight_level_cap is {}. It is a multiple of the centre at \
+                 or above one, or 0.0 for no cap.", self.vix_anchor_weight_level_cap));
+        }
+        if self.vix_anchor_weight_level_cap != 0.0 && self.vix_anchor_weight_level == 0.0 {
+            return Err(format!(
+                "vix_anchor_weight_level_cap is {} but vix_anchor_weight_level is 0: the \
+                 cap bounds the level law and is read by nothing without it.",
+                self.vix_anchor_weight_level_cap));
+        }
         if self.vix_anchor_memory != 0.0 && self.vix_anchor_weight == 0.0 {
             return Err(format!(
                 "vix_anchor_memory is {} but vix_anchor_weight is 0. The memory is \
@@ -7093,6 +7175,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_anchor_reversion",
         "vix_anchor_weight",
         "vix_anchor_memory",
+        "vix_anchor_centre",
+        "vix_anchor_weight_level",
+        "vix_anchor_weight_level_cap",
         "market_burn_in_sessions",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",
