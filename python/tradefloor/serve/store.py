@@ -19,6 +19,10 @@ session: the record is the size of the market, not the size of its history.
 - `version(session_id)`: the committed `seq`, or None. Cheap: the service
   calls it on every request to notice a record written by another instance.
 - `heads(owner)`: the `head` of every session that owner has.
+- `trim_stream(session_id, name, keep_last)` (contract 0.4): drop all but the
+  last `keep_last` committed entries of a stream. A reader sees the stream
+  before the trim or after it, never part of it. It does not change the
+  record or `version`.
 
 Values are JSON-like (dict, list, str, int, float, bool, None) plus `bytes`.
 Every float must come back BIT FOR BIT, including NaN payloads, infinities
@@ -32,9 +36,10 @@ database store should too.
 
 Layout, one directory per session:
 
-    <root>/<session_id>/head.json          seq, head, committed stream sizes
-    <root>/<session_id>/record-<seq>.json  the record at that seq
-    <root>/<session_id>/<stream>.jsonl     one entry per line
+    <root>/<session_id>/head.json            seq, head, committed stream sizes
+    <root>/<session_id>/record-<seq>.json    the record at that seq
+    <root>/<session_id>/<stream>.jsonl       one entry per line
+    <root>/<session_id>/<stream>.<g>.jsonl   the same, after its g-th trim
 
 A commit truncates each stream to its committed size, appends, writes
 `record-<seq>.json`, and then replaces `head.json` (temp file + rename). That
@@ -42,6 +47,10 @@ rename is the commit point. A process killed anywhere before it leaves the
 previous commit intact and readable; killed after it, the new one. Old record
 files are removed after the rename. `fsync=True` also flushes to the device
 (slower; guards against power loss, which a killed process does not need).
+
+A trim writes the kept entries to the stream's next generation file and then
+replaces `head.json` to point at it, so the same rename is its commit point;
+the old generation is removed afterwards.
 
 One process writes a given root at a time. Two live processes committing the
 same session concurrently is not supported in 0.1 (no cross-process lock).
@@ -177,6 +186,15 @@ class MemoryStore:
             lines = list(self._streams.get(session_id, {}).get(name, []))
         return [_loads(line) for line in lines]
 
+    def trim_stream(self, session_id: str, name: str, keep_last: int) -> None:
+        _check_stream(name)
+        if isinstance(keep_last, bool) or not isinstance(keep_last, int) or keep_last < 0:
+            raise ValueError(f"keep_last must be a non-negative integer, got {keep_last!r}")
+        with self._lock:
+            streams = self._streams.get(session_id, {})
+            if name in streams and len(streams[name]) > keep_last:
+                streams[name] = streams[name][len(streams[name]) - keep_last:]
+
     def version(self, session_id: str) -> int | None:
         with self._lock:
             got = self._records.get(session_id)
@@ -236,6 +254,16 @@ class FileStore:
         finally:
             os.close(fd)
 
+    @staticmethod
+    def _stream_path(d: Path, name: str, gen: int) -> Path:
+        return d / (f"{name}.jsonl" if gen == 0 else f"{name}.{gen}.jsonl")
+
+    @staticmethod
+    def _entry(value: Sequence[int]) -> tuple[int, int, int]:
+        """(count, size, generation) of a stream in head.json."""
+        count, size = int(value[0]), int(value[1])
+        return count, size, int(value[2]) if len(value) > 2 else 0
+
     def _head(self, session_id: str) -> dict[str, Any] | None:
         try:
             path = self._dir(session_id) / "head.json"
@@ -255,12 +283,13 @@ class FileStore:
         d.mkdir(parents=True, exist_ok=True)
         seq = int(record["seq"])
         prev = self._head(session_id) or {"seq": None, "streams": {}}
-        sizes: dict[str, list[int]] = {k: list(v) for k, v in prev["streams"].items()}
+        sizes: dict[str, list[int]] = {k: list(self._entry(v))
+                                       for k, v in prev["streams"].items()}
 
         for name, entries in appends.items():
             _check_stream(name)
-            count, size = sizes.get(name, [0, 0])
-            path = d / f"{name}.jsonl"
+            count, size, gen = sizes.get(name, [0, 0, 0])
+            path = self._stream_path(d, name, gen)
             mode = "r+b" if path.exists() else "w+b"
             with open(path, mode) as fh:
                 # Anything past the committed size belongs to a commit that
@@ -273,7 +302,7 @@ class FileStore:
                 fh.flush()
                 if self.fsync:
                     os.fsync(fh.fileno())
-                sizes[name] = [count + len(entries), fh.tell()]
+                sizes[name] = [count + len(entries), fh.tell(), gen]
 
         self._write_atomic(d / f"record-{seq}.json", _dumps(record))
         head = {"seq": seq, "head": encode(record["head"]), "streams": sizes}
@@ -294,18 +323,64 @@ class FileStore:
         path = self._dir(session_id) / f"record-{head['seq']}.json"
         return _loads(path.read_text(encoding="utf-8"))
 
+    def _read_lines(self, session_id: str, name: str) -> list[bytes]:
+        """The committed lines of a stream. A trim in another process can
+        remove the generation file between reading head.json and opening it;
+        head.json then names the new one, so read it again."""
+        for _ in range(3):
+            head = self._head(session_id)
+            if head is None or name not in head["streams"]:
+                return []
+            count, size, gen = self._entry(head["streams"][name])
+            path = self._stream_path(self._dir(session_id), name, gen)
+            try:
+                with open(path, "rb") as fh:
+                    data = fh.read(size)
+            except FileNotFoundError:
+                continue
+            return [line for line in data.split(b"\n")[:count] if line]
+        raise FileNotFoundError(f"stream {name!r} of {session_id} kept moving")
+
     def read_stream(self, session_id: str, name: str) -> list[dict[str, Any]]:
         _check_stream(name)
+        return [_loads(line) for line in self._read_lines(session_id, name)]
+
+    def trim_stream(self, session_id: str, name: str, keep_last: int) -> None:
+        _check_stream(name)
+        if isinstance(keep_last, bool) or not isinstance(keep_last, int) or keep_last < 0:
+            raise ValueError(f"keep_last must be a non-negative integer, got {keep_last!r}")
         head = self._head(session_id)
         if head is None or name not in head["streams"]:
-            return []
-        count, size = head["streams"][name]
-        path = self._dir(session_id) / f"{name}.jsonl"
-        with open(path, "rb") as fh:
-            data = fh.read(size)
-        lines = data.split(b"\n")
-        out = [_loads(line) for line in lines[:count] if line]
-        return out
+            return
+        count, _, gen = self._entry(head["streams"][name])
+        if count <= keep_last:
+            return
+        lines = self._read_lines(session_id, name)
+        kept = lines[len(lines) - keep_last:] if keep_last else []
+        d = self._dir(session_id)
+        data = b"".join(line + b"\n" for line in kept)
+        new = self._stream_path(d, name, gen + 1)
+        fd, tmp = tempfile.mkstemp(dir=d, prefix=f".{new.name}.", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(data)
+                fh.flush()
+                if self.fsync:
+                    os.fsync(fh.fileno())
+            os.replace(tmp, new)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+        head["streams"][name] = [len(kept), len(data), gen + 1]
+        self._write_atomic(d / "head.json",
+                           json.dumps(head, separators=(",", ":"), allow_nan=False))
+        try:
+            self._stream_path(d, name, gen).unlink()
+        except OSError:
+            pass
 
     def version(self, session_id: str) -> int | None:
         head = self._head(session_id)
