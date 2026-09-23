@@ -162,8 +162,10 @@ Every headline is kept in a per-session news log. `advance` returns, in
 `AdvanceResult.news`, every headline released during that advance, however
 many sessions it spans; `observe().news` stays the headlines visible in the
 current session. `news(owner, session_id, since_day=0, since_tick=0,
-limit=None)` returns the log from a clock point, oldest first. The log is
-persisted, so resume and fork carry it.
+limit=None)` returns the log from a clock point, oldest first; `limit=n`
+keeps the most recent n entries (as `bars` does), so a client paging forward
+passes `since_day`/`since_tick` without a limit. The log is persisted, so
+resume and fork carry it.
 
 ## 4c. Orders over time (0.3)
 
