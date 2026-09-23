@@ -17,7 +17,9 @@ write them. Every request carries the token the server wrote to
     POST /admin/reconcile
 """
 
-from __future__ import annotations
+# No `from __future__ import annotations`: the routes are closures that import
+# FastAPI lazily, and FastAPI resolves string annotations against module
+# globals, where `Request` is not. (The transport's http.py says the same.)
 
 import hmac
 from typing import Any, Callable
@@ -50,10 +52,19 @@ def create_hosted_app(hosted: HostedService, *, trust_proxy: bool = False,
     """The transport's app over `hosted`, with the hosted routes in front."""
     from fastapi import APIRouter, Request
 
+    import inspect
+
     if create_app is None:
         from tradefloor.serve.http import create_app
     resolver = resolver or ApiKeyResolver(hosted, trust_forwarded_for=trust_proxy)
-    app = create_app(hosted, owner_resolver=resolver)
+    kwargs: dict[str, Any] = {"owner_resolver": resolver}
+    if "serialize" in inspect.signature(create_app).parameters:
+        # The transport's global lock is for services that are not known to be
+        # thread-safe. HostedService is (its meter, accounts and audit log
+        # lock), and the core locks per session, so bots in different sessions
+        # run concurrently instead of queueing behind each other's disk writes.
+        kwargs["serialize"] = False
+    app = create_app(hosted, **kwargs)
 
     router = APIRouter()
 

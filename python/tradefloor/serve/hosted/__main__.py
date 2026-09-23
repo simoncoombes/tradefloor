@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import secrets
 import sys
 import threading
@@ -47,6 +48,10 @@ def main(argv: list[str] | None = None) -> int:
                           trust_proxy=args.trust_proxy)
     s.require_pepper(allow_empty=args.insecure_no_pepper)
     s.data.mkdir(parents=True, exist_ok=True)
+    try:  # key hashes, usage and the audit log: the service account's eyes only
+        os.chmod(s.data, 0o700)
+    except OSError:
+        pass
     hosted = build_hosted(s, audit_stream=sys.stdout)
     if not hosted.accounts.pepper_matches():
         eprint("refusing to start: accounts.json was written under a different "

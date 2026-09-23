@@ -137,7 +137,7 @@ Example messages:
     quota_exceeded: plan 'trial' allows 100 simulated days per UTC day; 99.80 used and
       this call may run 1.00 more; resets at 2026-09-24T00:00:00Z (in 3h12m)
     invalid_request: advance of 14 steps x 30 ticks = 420 ticks is above the 390 ticks
-      (1 sessions) one call may run on plan 'trial'; split it
+      (1 session) one call may run on plan 'trial'; split it
 
 How the meter works:
 

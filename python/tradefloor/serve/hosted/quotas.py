@@ -201,9 +201,6 @@ class Quotas:
             wait = self._bucket(self._call_buckets, owner, plan.calls_per_minute).take(1, now)
             u = self.usage(owner)
             if wait:
-                u.refused += 1
-                u.total["refused"] += 1
-                self._dirty = True
                 raise rate_limited(
                     f"plan {plan.name!r} allows {plan.calls_per_minute} calls per minute; "
                     f"retry in {_fmt_wait(wait)}", wait)
@@ -224,13 +221,11 @@ class Quotas:
             when = f"resets at {_iso(reset)} (in {_fmt_wait(reset - now)})"
             limit_ticks = plan.sim_days_per_day * TICKS_PER_SESSION
             if sim_ticks and u.sim_ticks + sim_ticks > limit_ticks:
-                self._refuse(u)
                 raise quota_exceeded(
                     f"plan {plan.name!r} allows {plan.sim_days_per_day:g} simulated days per UTC day; "
                     f"{u.sim_days:.2f} used and this call may run {sim_ticks / TICKS_PER_SESSION:.2f} more; "
                     f"{when}", reset - now)
             if compute and u.compute_s >= plan.compute_seconds_per_day:
-                self._refuse(u)
                 raise quota_exceeded(
                     f"plan {plan.name!r} allows {plan.compute_seconds_per_day:g} compute seconds per UTC "
                     f"day and {u.compute_s:.1f} are used; {when}", reset - now)
@@ -240,7 +235,6 @@ class Quotas:
             now = self.clock()
             wait = self._bucket(self._step_buckets, owner, plan.steps_per_minute).take(steps, now)
             if wait:
-                self._refuse(self.usage(owner))
                 raise rate_limited(
                     f"plan {plan.name!r} allows {plan.steps_per_minute} simulation steps per minute "
                     f"and this call needs up to {steps}; retry in {_fmt_wait(wait)}", wait)
@@ -253,10 +247,13 @@ class Quotas:
             if b is not None:
                 b.give_back(steps, self.clock())
 
-    def _refuse(self, u: OwnerUsage) -> None:
-        u.refused += 1
-        u.total["refused"] += 1
-        self._dirty = True
+    def note_refusal(self, owner: str) -> None:
+        """Count a call the plan refused (rate_limited or quota_exceeded)."""
+        with self._lock:
+            u = self.usage(owner)
+            u.refused += 1
+            u.total["refused"] += 1
+            self._dirty = True
 
     def charge(self, owner: str, *, steps: int = 0, sim_ticks: int = 0,
                compute_s: float = 0.0) -> None:

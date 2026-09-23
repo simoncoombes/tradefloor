@@ -106,3 +106,33 @@ def test_owner_isolation_through_the_real_core(world):
             call(q, s.session_id)
         assert e.value.code == "not_found"
     assert hosted.list(q) == []
+
+
+def test_concurrent_owners_through_one_hosted_service(world):
+    """The HTTP app runs HostedService without the transport's global lock,
+    so it must hold up to many threads at once: every call answered, every
+    mutating call audited once, and the meter adding up."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    hosted, _, _ = world
+    principals = []
+    for i in range(6):
+        _, key = hosted.accounts.create_key(f"bot{i}", plan="research")
+        principals.append(hosted.authenticate(key))
+
+    def run(p):
+        s = hosted.open(p, SessionConfig(universe_size=4, ticks_per_step=30))
+        for k in range(10):
+            hosted.place_order(p, s.session_id, OrderRequest(s.tickers[k % 4], "buy", 1))
+            hosted.advance(p, s.session_id, steps=1)
+            hosted.observe(p, s.session_id)
+        return s.session_id
+
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        sids = list(ex.map(run, principals))
+    assert len(set(sids)) == 6
+    lines = list(hosted.audit.read())
+    assert len(lines) == 6 * (1 + 10 + 10) and all(e["outcome"] == "ok" for e in lines)
+    for p in principals:
+        assert hosted.quotas.usage(p).steps == 10
+        assert hosted.quotas.usage(p).sim_ticks == 300

@@ -182,6 +182,8 @@ class HostedService:
             yield ctx
         except ServeError as e:
             outcome, error = e.code, e.message
+            if e.code in ("rate_limited", "quota_exceeded") and ctx.plan is not None:
+                self.quotas.note_refusal(ctx.owner)
             explained = self._explain_closed(e, ctx)
             if explained is not e:
                 error = explained.message
@@ -342,9 +344,10 @@ class HostedService:
             if est > plan.max_advance_ticks:
                 asked = (f"{steps} steps x {tps} ticks = {est} ticks" if until == "steps"
                          else f"until={until!r} x {steps} = up to {est} ticks")
+                n = plan.max_advance_ticks / 390
                 raise ServeError("invalid_request",
                                  f"advance of {asked} is above the {plan.max_advance_ticks} ticks "
-                                 f"({plan.max_advance_ticks / 390:g} sessions) one call may run on "
+                                 f"({n:g} session{'' if n == 1 else 's'}) one call may run on "
                                  f"plan {plan.name!r}; split it")
             self.quotas.check_daily(c.owner, plan, sim_ticks=est)
             est_steps = steps_for(est, tps)
