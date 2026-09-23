@@ -29,6 +29,19 @@ they replace are below the marker.
 
 <!-- release-note-ends -->
 
+**A forced VIX can set the market's volatility (2026-09-23).** A scenario
+built with `Scenario(vix_sets_variance=True)`, or with
+`vix_sets_variance: true` in its YAML block or its `to_json` document, sets
+the market factor's variance on every session it forces the VIX to the
+level the variance law reverts to at that VIX, instead of moving one step
+toward it. Replaying the real 2020 VIX on the candidate LMN-Q25A375, the
+model's worst month peaks 2 sessions after the real one (20 without the
+switch) and its stock correlation 9 sessions after (56 without). The switch
+is off by default, and with it off nothing changes: the known-answer digest,
+every preset, every scenario document and every fingerprint are as they
+were. The engine side is `Engine.pin_macro(vix_sets_variance=True)`, which
+marks tonight's close, and `Engine.vix_sets_variance_pending`.
+
 **The rise ruler is the tape's paired reading (2026-09-21).** The second
 gate's rise verdict compared each seed's two-year VIX persistence minus
 its own first year with the difference of the tape's two independent

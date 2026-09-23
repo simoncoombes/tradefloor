@@ -2333,11 +2333,24 @@ impl PyEngine {
     /// like every other rate here (0.025 is 2.5%). `oil_price` is a price in
     /// dollars, and the daily chain clamps it into [35, 150] on its next
     /// step, so a pin outside that band survives only the day it is written.
+    ///
+    /// # `vix_sets_variance`: a forced VIX that sets the market's volatility
+    ///
+    /// Off (the default), a pinned VIX reaches volatility the way the
+    /// model's own VIX does: each close moves the market factor's variance
+    /// one step toward the level the VIX implies, so a VIX that jumps is
+    /// felt over weeks. `vix_sets_variance=True` marks tonight's close to SET
+    /// the factor's variance (both components) to that level instead, so the
+    /// next session trades at it. The close consumes the mark; a session that
+    /// is not marked closes free, from the level the mark left, which is the
+    /// free law's own fixed point at that VIX. `tradefloor.Scenario` sets it
+    /// on every session it forces the VIX when the scenario asks for it
+    /// (`Scenario(vix_sets_variance=True)`), which is the intended way in.
     #[pyo3(signature = (
         *, vix = None, federal_funds_rate = None, corporate_bond_yield = None,
         inflation_rate = None, qe_pe_boost = None, qe_assets_ratio = None, fear_greed_index = None,
         gdp_growth = None, unemployment_rate = None, tariff_rate = None,
-        oil_price = None, cycle = None, epicentre = None
+        oil_price = None, cycle = None, epicentre = None, vix_sets_variance = false
     ))]
     #[allow(clippy::too_many_arguments)]
     fn pin_macro(
@@ -2355,6 +2368,7 @@ impl PyEngine {
         oil_price: Option<f64>,
         cycle: Option<String>,
         epicentre: Option<String>,
+        vix_sets_variance: bool,
     ) -> PyResult<()> {
         // Validate EVERYTHING before writing ANYTHING. A pin that applied the
         // first three fields and then rejected the fourth would leave the
@@ -2455,6 +2469,7 @@ impl PyEngine {
             fields: logged,
             cycle: cycle.clone(),
             epicentre: epicentre.clone(),
+            vix_sets_variance,
         });
 
         let e = self.inner.economy_mut();
@@ -2497,7 +2512,25 @@ impl PyEngine {
         if let Some(pin) = epicentre_pin {
             self.inner.set_crisis_epicentre_pin(Some(pin));
         }
+        // A FORCED VIX THAT SETS THE MARKET'S VOLATILITY. Marks tonight's
+        // close to set the market factor's variance to the level the
+        // variance law implies at the VIX then standing, instead of stepping
+        // one session toward it; the close consumes the mark. Only ever
+        // turned ON here: `False`, the default, leaves a mark an earlier
+        // call made today in place, so a later pin of another field cannot
+        // cancel it. See `MarketVarianceState::close_day_forced`.
+        if vix_sets_variance {
+            self.inner.set_vix_sets_variance_pending(true);
+        }
         Ok(())
+    }
+
+    /// Whether tonight's close will SET the market factor's variance from
+    /// the VIX, because a scenario forced the VIX today with
+    /// `vix_sets_variance` on. Cleared by the close.
+    #[getter]
+    fn vix_sets_variance_pending(&self) -> bool {
+        self.inner.vix_sets_variance_pending()
     }
 
     /// The crisis episode: `(in_episode, sessions_under, epicentre)`.
@@ -2948,6 +2981,11 @@ impl PyEngine {
         out.set_item("crisis_sessions_under", sessions_under)?;
         out.set_item("crisis_epicentre", epicentre)?;
         out.set_item("crisis_epicentre_pin", pin.unwrap_or(-2))?;
+        // A forced close pending tonight. A key only while true, so every
+        // snapshot of an engine that was never forced is the one it was.
+        if self.inner.vix_sets_variance_pending() {
+            out.set_item("vix_sets_variance_pending", true)?;
+        }
         // Nominal output when the run opened, the base of the growth
         // term's ratio. A constant of the run rather than advancing state,
         // and carried for the reason the two above are: an engine restored
@@ -3450,6 +3488,12 @@ impl PyEngine {
                 if pin <= -2 { None } else { Some(pin) },
             );
         }
+        // Absent means no forced close was pending when it was taken.
+        let pending: bool = match snapshot.get_item("vix_sets_variance_pending")? {
+            Some(v) => v.extract()?,
+            None => false,
+        };
+        self.inner.set_vix_sets_variance_pending(pending);
         // Restore the growth term's base. Absent means a snapshot from a
         // build without the term, whose preset carries the dial at 0.0.
         if let Some(raw) = snapshot.get_item("nominal_output_base")? {

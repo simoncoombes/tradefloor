@@ -820,6 +820,141 @@ impl MarketVarianceState {
         (target, Some(slow_target))
     }
 
+    /// The two targets a close at this VIX reverts toward, `(fast, slow)`,
+    /// spelled as [`Self::close_day_scaled`] spells them. The slow one is
+    /// the fast one whenever `market_vol_slow_vix_damp` is 0.0.
+    ///
+    /// Read only by the FORCED close below, so nothing that runs on a
+    /// free-running session goes through it and the arithmetic there is not
+    /// touched.
+    fn forced_targets(
+        params: &crate::params::ModelParams,
+        vix_ratio_denominator: f64,
+        vix: f64,
+        level: f64,
+    ) -> (f64, f64) {
+        let base = params.market_factor_sigma * params.market_factor_sigma;
+        let base = if level == 1.0 { base } else { base * level };
+        let vix_ratio = vix / vix_ratio_denominator;
+        let response = vix_response(params, vix_ratio);
+        let target = base
+            * (1.0 - params.market_vol_vix_coupling
+                + params.market_vol_vix_coupling * response);
+        let slow_target = if params.market_vol_slow_vix_damp == 0.0 {
+            target
+        } else {
+            let c = params.market_vol_vix_coupling
+                * (1.0 - params.market_vol_slow_vix_damp);
+            base * (1.0 - c + c * response)
+        };
+        (target, slow_target)
+    }
+
+    /// The factor variance a forced close at this denominator would set:
+    /// the clamped mixture of the two clamped targets, or the clamped single
+    /// target on a one-component preset. Moves no state.
+    ///
+    /// The engine reads it to find the denominator a forced close should
+    /// use when the denominator is itself a function of this variance
+    /// (`market_vol_vix_excursion`); see `Engine::forced_vix_denominator`.
+    pub fn forced_level(
+        params: &crate::params::ModelParams,
+        vix_ratio_denominator: f64,
+        vix: f64,
+        level: f64,
+    ) -> f64 {
+        let (target, slow_target) =
+            Self::forced_targets(params, vix_ratio_denominator, vix, level);
+        let w = params.market_vol_slow_weight;
+        if w == 0.0 {
+            return clamp_variance(params, target);
+        }
+        let fast = clamp_variance(params, target);
+        let slow = clamp_variance(params, slow_target);
+        clamp_variance(params, (1.0 - w) * fast + w * slow)
+    }
+
+    /// The close on a session whose VIX a scenario FORCED, with the
+    /// scenario's `vix_sets_variance` switch on: the variance is SET to the
+    /// level the variance law implies at that VIX instead of stepping one
+    /// session toward it.
+    ///
+    /// # What "the level the law implies" is
+    ///
+    /// Each component's GARCH step is, in expectation over the day's factor,
+    /// `E[v'] = (1 - p) * target + p * v` (see [`Self::warm_to_level`]), so a
+    /// VIX held for ever takes each component to ITS OWN target and the
+    /// mixture to `(1 - w) * fast_target + w * slow_target`. That is what
+    /// this close writes, clamped exactly as a free close clamps. Nothing
+    /// new is introduced: no coefficient, no half-life, no target other
+    /// than the two the free close already computes.
+    ///
+    /// # Why this and not a shorter half-life
+    ///
+    /// A free close approaches the target at `1 - p` of the gap a session,
+    /// and the fast component's `p` of 0.979 is a 33-session half-life,
+    /// which is why an imposed VIX path used to arrive in the market's
+    /// volatility weeks late. Shortening `p` while forced would need a
+    /// second pair of persistences (one per component) that the model does
+    /// not have and the tape does not give for the slow component, and it
+    /// would still lag a spike that builds in three weeks. Setting the
+    /// state to the fixed point has no free parameter.
+    ///
+    /// # Why release does not jolt
+    ///
+    /// The state this leaves is the fixed point of the free recursion at
+    /// this VIX, so the first free close after the force, at the same VIX,
+    /// has an expected step of zero: `E[v'] = (1 - p) * T + p * T = T`.
+    /// The market goes on from the level the free law would itself have
+    /// reached under a held VIX; what it does next is the free law's.
+    ///
+    /// # What it gives up while forced
+    ///
+    /// The day's squared factor does not feed the state on a forced close.
+    /// The forced VIX is the fear the scenario asserts, and letting the
+    /// model's own shocks move the variance off it would mean the scenario
+    /// did not set it. The per-name GARCH, the sector state and the jumps
+    /// are untouched and keep clustering on their own shocks.
+    ///
+    /// The VIX is read RAW, not through `market_vol_vix_smooth`'s EMA: the
+    /// EMA of a held VIX converges to it, so its fixed point is the raw
+    /// level. The EMA itself is still advanced, so a release hands the free
+    /// close a primed state rather than a stale one. The day accumulator is
+    /// rolled exactly as a free close rolls it.
+    ///
+    /// Returns the targets, as [`Self::close_day_scaled`] does.
+    pub fn close_day_forced(
+        &mut self,
+        params: &crate::params::ModelParams,
+        vix_ratio_denominator: f64,
+        vix: f64,
+        level: f64,
+    ) -> (f64, Option<f64>) {
+        if params.market_vol_vix_smooth != 0.0 {
+            let alpha = 2.0 / (params.market_vol_vix_smooth + 1.0);
+            let prev = self.smoothed_vix.unwrap_or(vix);
+            self.smoothed_vix = Some(prev + alpha * (vix - prev));
+        }
+        let (target, slow_target) =
+            Self::forced_targets(params, vix_ratio_denominator, vix, level);
+        let w = params.market_vol_slow_weight;
+        self.prev_day_factor = self.day_factor;
+        self.day_factor = 0.0;
+        if w == 0.0 {
+            // One component: the slow level is not a state here and is left
+            // where a free close leaves it, untouched.
+            self.variance = clamp_variance(params, target);
+            self.fast_variance = self.variance;
+            return (target, None);
+        }
+        let fast = clamp_variance(params, target);
+        let slow = clamp_variance(params, slow_target);
+        self.fast_variance = fast;
+        self.slow_variance = slow;
+        self.variance = clamp_variance(params, (1.0 - w) * fast + w * slow);
+        (target, Some(slow_target))
+    }
+
     /// Warm the variance components to the slow LEVEL the run opens on,
     /// before session one.
     ///
@@ -1581,5 +1716,147 @@ mod close_day_targets {
         let mut after = MarketVarianceState::new_with(&p);
         after.warm_to_level(&p, p.market_vol_vix_anchor, 20.0, 1.5, 1.57, 0);
         assert_eq!(before, after);
+    }
+
+    // ---- the forced close (`vix_sets_variance`) ---------------------------
+
+    /// pt-v19 off the excursion, so the denominator is the anchor and the
+    /// law's level is an explicit function of the VIX, as on the candidate.
+    fn forced_params() -> ModelParams {
+        let mut p = ModelParams::pt_v19();
+        p.market_vol_vix_excursion = 0.0;
+        p.market_vol_vix_exponent = 4.0;
+        p
+    }
+
+    /// A forced close writes each component's own target and the mixture of
+    /// the two, clamped as a free close clamps, whatever the state was.
+    #[test]
+    fn a_forced_close_sets_each_component_to_its_own_target() {
+        let p = forced_params();
+        let base = p.market_factor_sigma * p.market_factor_sigma;
+        let anchor = p.market_vol_vix_anchor;
+        for start in [0.2 * base, base, 5.0 * base] {
+            let mut s = MarketVarianceState::new_with(&p);
+            s.fast_variance = start;
+            s.slow_variance = start;
+            s.variance = start;
+            s.accumulate(0.03);
+            let (t, ts) = s.close_day_forced(&p, anchor, 30.0, 1.0);
+            let ts = ts.expect("pt-v19 has a slow component");
+            let w = p.market_vol_slow_weight;
+            assert_eq!(s.fast_variance, clamp_variance(&p, t));
+            assert_eq!(s.slow_variance, clamp_variance(&p, ts));
+            assert_eq!(
+                s.variance,
+                clamp_variance(&p, (1.0 - w) * s.fast_variance + w * s.slow_variance)
+            );
+            // The targets are the ones a free close at the same VIX reverts to.
+            let mut free = MarketVarianceState::new_with(&p);
+            let (ft, fts) = free.close_day_scaled(&p, anchor, 30.0, 1.0);
+            assert_eq!((t, Some(ts)), (ft, fts));
+            // and `forced_level` says what the close wrote.
+            assert_eq!(MarketVarianceState::forced_level(&p, anchor, 30.0, 1.0), s.variance);
+        }
+    }
+
+    /// Release does not jolt: from the state a forced close leaves, the free
+    /// close at the same VIX takes an expected step of zero on each
+    /// component. The expectation over the day's factor, which is
+    /// conditionally N(0, v), is the mean of an up and a down day of size
+    /// sqrt(v) -- that is exactly E[f^2] = v with the GJR arm at half weight.
+    #[test]
+    fn the_first_free_close_after_a_forced_one_expects_no_step() {
+        let p = forced_params();
+        let anchor = p.market_vol_vix_anchor;
+        // VIX 30 on this law is well inside the clamps, so the fixed point
+        // is the unclamped target and the identity is exact up to rounding.
+        let mut forced = MarketVarianceState::new_with(&p);
+        forced.close_day_forced(&p, anchor, 30.0, 1.0);
+        let ceiling = p.market_factor_sigma * p.market_factor_sigma * p.market_vol_ceiling_multiple;
+        assert!(forced.fast_variance < ceiling && forced.slow_variance < ceiling);
+        let mut up = forced;
+        let mut down = forced;
+        up.accumulate(forced.fast_variance.sqrt());
+        down.accumulate(-forced.fast_variance.sqrt());
+        up.close_day_scaled(&p, anchor, 30.0, 1.0);
+        down.close_day_scaled(&p, anchor, 30.0, 1.0);
+        let mean_fast = 0.5 * (up.fast_variance + down.fast_variance);
+        assert!(
+            (mean_fast / forced.fast_variance - 1.0).abs() < 1e-12,
+            "fast: forced {} -> expected free step to {}", forced.fast_variance, mean_fast
+        );
+        // The slow component has no GJR arm, so its step from a shock of the
+        // SLOW level's own size is exact on either sign.
+        let mut slow_up = forced;
+        slow_up.accumulate(forced.slow_variance.sqrt());
+        slow_up.close_day_scaled(&p, anchor, 30.0, 1.0);
+        assert!(
+            (slow_up.slow_variance / forced.slow_variance - 1.0).abs() < 1e-12,
+            "slow: forced {} -> free step to {}", forced.slow_variance, slow_up.slow_variance
+        );
+    }
+
+    /// The same, against the free law run for a long time: a VIX held on a
+    /// free run takes the mean recursion to the forced close's level.
+    #[test]
+    fn a_held_vix_run_free_arrives_where_the_forced_close_starts() {
+        let p = forced_params();
+        let anchor = p.market_vol_vix_anchor;
+        let mut forced = MarketVarianceState::new_with(&p);
+        forced.close_day_forced(&p, anchor, 30.0, 1.0);
+        // The expected path of the free close: warm_to_level IS the mean
+        // recursion of `component_step`, at level 1 (log level 0).
+        let mut free = MarketVarianceState::new_with(&p);
+        free.warm_to_level(&p, anchor, 30.0, 0.0, 0.0, 20_000);
+        for (name, a, b) in [
+            ("fast", free.fast_variance, forced.fast_variance),
+            ("slow", free.slow_variance, forced.slow_variance),
+            ("mixture", free.variance, forced.variance),
+        ] {
+            assert!((a / b - 1.0).abs() < 1e-9, "{name}: free run settles at {a}, forced close sets {b}");
+        }
+    }
+
+    /// The forced close consumes the day as a free close does: the day's
+    /// factor becomes yesterday's, and today's accumulator is cleared.
+    #[test]
+    fn a_forced_close_rolls_the_day_like_a_free_one() {
+        let p = forced_params();
+        let mut s = MarketVarianceState::new_with(&p);
+        s.accumulate(-0.02);
+        s.close_day_forced(&p, p.market_vol_vix_anchor, 45.0, 1.0);
+        assert_eq!(s.day_factor(), 0.0);
+        assert_eq!(s.prev_day_factor(), -0.02);
+        assert!(s.prev_day_down());
+    }
+
+    /// A forced VIX past what the ceiling allows is clipped where a free
+    /// close's would be.
+    #[test]
+    fn a_forced_close_is_clamped_like_a_free_one() {
+        let p = forced_params();
+        let base = p.market_factor_sigma * p.market_factor_sigma;
+        let mut s = MarketVarianceState::new_with(&p);
+        s.close_day_forced(&p, p.market_vol_vix_anchor, 200.0, 1.0);
+        assert_eq!(s.fast_variance, base * p.market_vol_ceiling_multiple);
+        assert!(s.variance <= base * p.market_vol_ceiling_multiple);
+        let mut t = MarketVarianceState::new_with(&p);
+        t.close_day_forced(&p, p.market_vol_vix_anchor, 0.5, 1.0);
+        assert!(t.variance >= base * p.market_vol_floor_multiple);
+    }
+
+    /// On a one-component preset the slow level is not a state and a forced
+    /// close leaves it where a free one would, untouched.
+    #[test]
+    fn a_forced_close_on_one_component_leaves_the_slow_level_alone() {
+        let p = crate::params::PT_V1;
+        let mut s = MarketVarianceState::new_with(&p);
+        let slow_before = s.slow_variance;
+        let (t, ts) = s.close_day_forced(&p, p.market_vol_vix_anchor, 30.0, 1.0);
+        assert_eq!(ts, None);
+        assert_eq!(s.variance, clamp_variance(&p, t));
+        assert_eq!(s.fast_variance, s.variance);
+        assert_eq!(s.slow_variance, slow_before);
     }
 }
