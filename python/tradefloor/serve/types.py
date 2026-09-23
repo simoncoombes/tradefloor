@@ -31,7 +31,7 @@ import types as _pytypes
 import typing
 from typing import Any, Literal, Mapping, Protocol, Sequence, runtime_checkable
 
-CONTRACT_VERSION = "0.3"
+CONTRACT_VERSION = "0.4"
 
 Side = Literal["buy", "sell"]
 OrderType = Literal["market", "limit"]
@@ -291,6 +291,7 @@ class AdvanceResult(_Data):
     fills: list[Fill]
     expired: list[Order]
     observation: Observation
+    news: list[Headline] = field(default_factory=list)   # every headline released during this advance (0.4)
 
 
 @dataclass
@@ -318,6 +319,10 @@ class SessionStore(Protocol):
     def read_stream(self, session_id: str, name: str) -> list[dict[str, Any]]: ...
     def version(self, session_id: str) -> int | None: ...
     def heads(self, owner: str) -> list[dict[str, Any]]: ...
+    # 0.4: keep only the last `keep_last` entries of a stream (older ones are
+    # dropped). Atomic with respect to `read_stream`: a reader sees the stream
+    # before or after the trim, never part of it.
+    def trim_stream(self, session_id: str, name: str, keep_last: int) -> None: ...
 
 
 # -- the service ---------------------------------------------------------------------
@@ -338,6 +343,8 @@ class SessionService(Protocol):
     def orders(self, owner: str, session_id: str, status: str | None = None) -> list[Order]: ...
     # status: None or "all" (every order), "open", "closed", or one OrderStatus
     def fills(self, owner: str, session_id: str, since_day: int = 0) -> list[Fill]: ...
+    def news(self, owner: str, session_id: str, since_day: int = 0,
+             since_tick: int = 0, limit: int | None = None) -> list[Headline]: ...
     def bars(self, owner: str, session_id: str, ticker: str,
              resolution: BarResolution = "day", since_day: int = 0,
              limit: int | None = None) -> list[Bar]: ...
