@@ -108,6 +108,14 @@ pub struct DailyInputs<'a> {
     /// See [`crate::params::ModelParams::vix_decay_ratio`]. 1.0 is the
     /// shipped symmetric reversion exactly.
     pub vix_decay_ratio: f64,
+    /// The VIX's own slow reversion toward the identity's anchor, and the
+    /// anchor it reverts to (`Engine::vix_anchor` times
+    /// `Engine::vix_level_multiplier`, the latter exactly 1.0 with the
+    /// regime level off). At a rate of 0.0 -- every preset through pt-v19 --
+    /// the term is not added and the step is the sum it always was, bit for
+    /// bit. See [`crate::params::ModelParams::vix_anchor_reversion`].
+    pub vix_anchor_reversion: f64,
+    pub vix_anchor_level: f64,
     /// See [`crate::params::ModelParams::vix_jump_intensity`]. 0.0 takes
     /// no draws and reproduces the shipped schedule exactly.
     pub vix_jump_intensity: f64,
@@ -245,6 +253,8 @@ impl<'a> Default for DailyInputs<'a> {
             phase_target_range_draw: 0.0,
             vix_mean_reversion: VIX_MEAN_REVERSION,
             vix_decay_ratio: 1.0,
+            vix_anchor_reversion: 0.0,
+            vix_anchor_level: 0.0,
             vix_jump_intensity: 0.0,
             vix_jump_scale: 0.0,
             vix_return_gain: VIX_RETURN_GAIN,
@@ -1282,14 +1292,25 @@ pub fn update_economy_daily(
     } else {
         0.0
     };
-    new_state.vix = clamp(
-        economy.vix
-            + (target_vix - economy.vix) * vix_mr
-            + random_normal(rng, 0.0, vix_noise_sd)
-            + fear_jump,
-        10.0,
-        inputs.vix_ceiling,
-    );
+    let stepped_vix = economy.vix
+        + (target_vix - economy.vix) * vix_mr
+        + random_normal(rng, 0.0, vix_noise_sd)
+        + fear_jump;
+    // THE ANCHOR THE LOOP LACKS. Under the identity the VIX reverts to the
+    // read-back and the read-back reverts to the VIX; neither reverts to a
+    // level, so the pair's only anchor is that its static gain is under one.
+    // This term is the third thing: a slow pull toward the identity's own
+    // derived anchor, times the regime level's multiplier. Guarded rather
+    // than added, for the reason `vix_target_offset` is guarded -- `x + 0.0`
+    // is not a no-op on a negative zero -- so at 0.0 the sum above is the
+    // literal expression that stood here and every preset reproduces.
+    // See `ModelParams::vix_anchor_reversion`.
+    let stepped_vix = if inputs.vix_anchor_reversion != 0.0 {
+        stepped_vix + inputs.vix_anchor_reversion * (inputs.vix_anchor_level - economy.vix)
+    } else {
+        stepped_vix
+    };
+    new_state.vix = clamp(stepped_vix, 10.0, inputs.vix_ceiling);
 
     // ── Treasury yields ───────────────────────────────────────────────────
     let debt_premium = mathx::max(0.0, (economy.government_debt_to_gdp - 100.0) * 0.002);
@@ -2737,6 +2758,112 @@ mod fear_response_shape {
     /// `derived` kind rests on: the last assertion drives the worst
     /// admissible session from the highest read-back the map produces and
     /// requires the state to come off the clamp.
+    /// The step with a pinned read-back, so the anchor reversion can be read
+    /// on its own. Everything else is the shipped identity vector.
+    fn vix_step_with_anchor(
+        kappa: f64,
+        anchor_level: f64,
+        vix: f64,
+        implied: f64,
+        sigma_pct: f64,
+        session_pct: f64,
+    ) -> f64 {
+        use crate::economy::state::{create_initial_economy_state, InitialEconomyOptions};
+        let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+            .expect("the default preset resolves");
+        let mut economy = create_initial_economy_state(&InitialEconomyOptions::default());
+        economy.vix = vix;
+        economy.inflation_rate = 2.0;
+        let inputs = DailyInputs {
+            vix_level_identity: p.vix_level_identity,
+            vix_implied_from_market: implied,
+            vix_index_sigma_pct: sigma_pct,
+            market_day_return_pct: session_pct,
+            vix_mean_reversion: p.vix_mean_reversion,
+            vix_decay_ratio: p.vix_decay_ratio,
+            vix_return_gain: p.vix_return_gain,
+            vix_return_gain_up: p.vix_return_gain_up,
+            vix_return_exponent: p.vix_return_exponent,
+            vix_return_exponent_up: p.vix_return_exponent_up,
+            vix_return_level_exponent: p.vix_return_level_exponent,
+            vix_return_level_exponent_up: p.vix_return_level_exponent_up,
+            vix_return_clamp: p.vix_return_clamp,
+            vix_target_shock_cap: p.vix_target_shock_cap,
+            vix_ceiling: p.vix_ceiling,
+            vix_return_source: p.vix_return_source,
+            vix_anchor_reversion: kappa,
+            vix_anchor_level: anchor_level,
+            game_day: 40,
+            ..Default::default()
+        };
+        update_economy_daily(&economy, &inputs, &mut Silent).vix
+    }
+
+    /// **AT 0.0 THE TERM IS NOT ADDED**, whatever anchor is threaded beside
+    /// it, and the step is the sum it was before the dial existed.
+    ///
+    /// Bit-identity, not closeness: `x + 0.0` is not a no-op on a negative
+    /// zero, so the zero arm is a BRANCH in `daily.rs` and this reads the
+    /// raw bits of both sides. The anchor passed on the left is the derived
+    /// one the engine threads on the certified roster, which is nowhere near
+    /// any of these states, so a term that ran would be visible in the top
+    /// bits and not only the last.
+    #[test]
+    fn the_anchor_reversion_at_zero_is_the_step_that_stood_before_it() {
+        for &vix in &[10.5, 15.0, 23.25, 40.0, 90.0] {
+            for &implied in &[12.0, 21.0, 60.0] {
+                for &session in &[-3.0, 0.0, 1.5] {
+                    let with = vix_step_with_anchor(0.0, 23.249857144842903, vix, implied,
+                                                    1.0, session);
+                    let without = vix_step_with_anchor(0.0, 0.0, vix, implied, 1.0, session);
+                    let plain = vix_after_one_session(vix, implied, 1.0, session);
+                    assert_eq!(
+                        with.to_bits(), plain.to_bits(),
+                        "the anchor reversion at 0.0 moved the step at VIX {vix}, \
+                         read-back {implied}, session {session}: {with} against {plain}"
+                    );
+                    assert_eq!(without.to_bits(), plain.to_bits());
+                }
+            }
+        }
+    }
+
+    /// **THE REVERSION MOVES THE VIX TOWARD `L * anchor`**, by exactly
+    /// `kappa` of the distance, on a day whose variance is pinned.
+    ///
+    /// The read-back is held at the state's own value and the session return
+    /// is zero, so `vix_mean_reversion` has almost nothing to carry and what
+    /// the state does is the new term. Three things are asserted: the size is
+    /// the closed form, the direction is toward the anchor from both sides,
+    /// and the anchor is a FIXED POINT of the added term rather than of the
+    /// whole step.
+    #[test]
+    fn the_anchor_reversion_moves_the_vix_toward_the_level_times_the_anchor() {
+        let kappa = 0.046081;
+        let anchor = 23.249857144842903;
+        for &level in &[1.0, 0.8, 1.25] {
+            let target = level * anchor;
+            for &vix in &[12.0, 18.0, 23.249857144842903, 30.0, 55.0] {
+                let base = vix_step_with_anchor(0.0, target, vix, vix, 1.0, 0.0);
+                let with = vix_step_with_anchor(kappa, target, vix, vix, 1.0, 0.0);
+                let pull = kappa * (target - vix);
+                assert!(
+                    (with - base - pull).abs() < 1e-12,
+                    "at level {level}, VIX {vix}: the term should be {pull}, read \
+                     {} ({with} against {base})", with - base
+                );
+                if vix < target {
+                    assert!(with > base, "below the anchor the reversion must lift");
+                } else if vix > target {
+                    assert!(with < base, "above the anchor the reversion must pull down");
+                } else {
+                    assert_eq!(with.to_bits(), base.to_bits(),
+                               "at the anchor the term is exactly zero");
+                }
+            }
+        }
+    }
+
     #[test]
     fn a_vix_at_the_ceiling_is_held_there_iff_the_target_is_at_or_above_it() {
         let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)

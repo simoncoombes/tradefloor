@@ -3317,6 +3317,16 @@ impl Engine {
             &DailyInputs {
                 vix_mean_reversion: self.params.vix_mean_reversion,
                 vix_decay_ratio: self.params.vix_decay_ratio,
+                // The VIX's own slow reversion toward the identity's anchor,
+                // and the anchor it reverts to: the derived anchor times the
+                // slow regime level's multiplier, which is exactly 1.0 with
+                // `vix_level_sigma` at 0.0. The rate ships 0.0 on every
+                // preset, where `daily.rs` does not add the term at all, and
+                // `ModelParams::invariants` refuses a rate with the identity
+                // off, where the anchor is the dial rather than a derived
+                // level. See `ModelParams::vix_anchor_reversion`.
+                vix_anchor_reversion: self.params.vix_anchor_reversion,
+                vix_anchor_level: self.vix_anchor * self.vix_level_multiplier(),
                 vix_jump_intensity: self.params.vix_jump_intensity,
                 vix_jump_scale: self.params.vix_jump_scale,
                 vix_return_level_exponent: self.params.vix_return_level_exponent,

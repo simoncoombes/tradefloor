@@ -239,6 +239,15 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # has to contain the shipped 0.0, the same price
     # market_vol_level_persistence pays above.
     "vix_level_loop_gain": (0.0, 6.0),
+    # The VIX's own slow reversion toward the identity's anchor. 0.0 is the
+    # branch not taken and the shipped vector; DERIVED 0.046 as the kappa at
+    # which the linearised loop's slow pole equals the tape's 0.9965 at
+    # market_vol_vix_exponent 1.83 and vix_mean_reversion 0.27. The box stops
+    # at 0.5, well under the invariant's own refusal at 1.0 (where the step
+    # lands on the anchor every session) and above vix_mean_reversion itself,
+    # so the survey can put more weight on the anchor than on the read-back
+    # and see what that costs.
+    "vix_anchor_reversion": (0.0, 0.5),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is

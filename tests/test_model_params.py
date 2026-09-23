@@ -302,6 +302,15 @@ PERTURBATIONS = [
     # stationary opening change scale, the opening draw is the same draw at
     # a different scale, and no draw moves on any stream.
     ("vix_level_loop_gain", 1.7486, True),
+    # The VIX's own slow reversion toward the identity's anchor (2026-09-22).
+    # Ships at 0.0 on every preset -- the term is not added at all there -- so
+    # the perturbation has to be TO a non-zero value, and 0.046081 is the
+    # DERIVED one: the kappa at which the linearised loop's slow pole equals
+    # the tape's 0.9965. The default runs `vix_level_identity` 1.0, so the
+    # anchor the reversion pulls toward exists and the dial is read; the
+    # invariants refuse it off the identity, which COMPANIONS carries. No
+    # draw is added or moved: the term is arithmetic on the day's own state.
+    ("vix_anchor_reversion", 0.046081, True),
     # The crisis epicentre (2026-09-22), and both rows are INERT here for
     # the reason `crisis_blend_source`, `crisis_blend_ramp` and
     # `crisis_blend_cap` are: the mechanism is gated on the VIX being above
@@ -1097,7 +1106,11 @@ COMPANIONS: dict[str, dict[str, float]] = {
                            # carries since 2026-09-21 and which is refused
                            # off the identity for the same reason, and
                            # the loop gain, refused with the sigma at 0.0.
-                           "vix_level_sigma": 0.0, "vix_level_loop_gain": 0.0},
+                           "vix_level_sigma": 0.0, "vix_level_loop_gain": 0.0,
+                           # ... and the VIX's own anchor reversion, refused
+                           # off the identity for the same reason: there is no
+                           # derived anchor to revert to.
+                           "vix_anchor_reversion": 0.0},
     # `vix_level_sigma` multiplies `vix_implied_from_market`, which exists
     # only under the identity, so `ModelParams::invariants` refuses the
     # sigma with the identity off. The default runs the identity, so the
@@ -1114,6 +1127,12 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # pt-v18.
     "vix_level_loop_gain": {"vix_level_identity": 1.0,
                             "vix_level_sigma": 0.0173},
+    # The anchor reversion pulls the VIX toward the DERIVED identity anchor,
+    # which exists only under the identity: `ModelParams::invariants` refuses
+    # the pair for the same reason it refuses the excursion switch. The
+    # default runs the identity, so the row above reads the dial alone on
+    # pt-v19; the companion only bites on a base that ships the identity off.
+    "vix_anchor_reversion": {"vix_level_identity": 1.0},
 }
 
 

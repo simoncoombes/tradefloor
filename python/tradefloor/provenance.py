@@ -386,6 +386,21 @@ OUT_OF_SCOPE = {
         "(programme/results/ptv19refine/jump-derivation.txt, design "
         "repository). Shipped at 0.0 because a derivation is not a "
         "measurement of the panel",
+    "vix_anchor_reversion":
+        "inert at 0.0: economy/daily.rs branches on `!= 0.0` after the VIX "
+        "step's own sum, so the term is not added and the step is the three "
+        "terms it always was. DERIVED 0.046081 and shipped 0.0: it is the "
+        "kappa at which the linearised VIX-variance loop's slow pole equals "
+        "the tape's own slow pole of log VIX, 0.9965, at "
+        "`market_vol_vix_exponent` 1.83 and the shipped "
+        "`vix_mean_reversion` 0.27 "
+        "(programme/loop-level-law-design-2026-09-22.md section 2(b) and "
+        "results/ptv19loop/looppoles.py, design repository). Shipped at 0.0 "
+        "because the arm it was derived for was MEASURED and refused: on "
+        "the level law the held-VIX index lever reads 4.61x against the "
+        "design's own falsifier of 7x, below the shipped form's 4.90x. The "
+        "derivation and the measurements are in "
+        "`ModelParams::vix_anchor_reversion`",
     "crisis_epicentre_end_sessions":
         "unread while `crisis_epicentre_extra` is 0.0: with no episode ever "
         "entered there is no counter to end. 21 sessions is a month and is a "

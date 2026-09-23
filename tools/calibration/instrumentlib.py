@@ -560,6 +560,15 @@ PARAM_SPECS: dict[str, dict] = {
     # gain is 1 / (1 - h) and never below it.
     "vix_level_loop_gain":    {"kind": "abs", "step_unit": 0.1,
                               "hard_range": (0.0, 6.0), "derived": True},
+    # The VIX's own slow reversion toward the identity's anchor (2026-09-22),
+    # the third thing the loop lacks: the VIX reverts to the read-back and the
+    # read-back reverts to the VIX, and neither reverts to a level. DERIVED
+    # 0.046 as the kappa at which the two-state loop's slow pole equals the
+    # tape's 0.9965 at market_vol_vix_exponent 1.83. 0.0 is the branch not
+    # taken; the top is the invariant's own, a rate at or above one landing
+    # on or past the anchor every session.
+    "vix_anchor_reversion":   {"kind": "abs", "step_unit": 0.01,
+                              "hard_range": (0.0, 0.5), "derived": True},
     # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
     # the tape's three epicentre episodes (2.43, 1.93, 1.41). 0.0 is the
     # branch not taken; the range opens at zero to hold it and stops at 3.0,

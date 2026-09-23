@@ -1345,6 +1345,170 @@ pub struct ModelParams {
     /// memory at all.
     pub vix_level_loop_gain: f64,
 
+    /// The VIX's own slow reversion toward the identity's anchor, per
+    /// session. 0.0 -- every preset through pt-v19 -- is the branch not
+    /// taken: the step is the same three-term sum it always was, no
+    /// arithmetic runs on this path and every preset is BIT-IDENTICAL.
+    ///
+    /// # The defect
+    ///
+    /// Under [`ModelParams::vix_level_identity`] the VIX reverts to the
+    /// read-back of the index's own conditional variance, and the variance
+    /// reverts to a target that reads the VIX. There is no third thing.
+    /// The VIX reverts to the variance, the variance reverts to the VIX,
+    /// and nothing in the pair reverts to a LEVEL: the loop's only anchor
+    /// is the fact that its static gain is under one, so the closer that
+    /// gain is to one the longer the pair wanders and the larger every
+    /// standing bias becomes at the level. On the tape the VIX does have a
+    /// third thing -- it sits near a regime mean over months -- and the
+    /// model has been supplying that from outside, as a driven regime level
+    /// (`vix_level_sigma`), because the loop itself could not.
+    ///
+    /// That is why the crisis lever and the VIX's memory have been traded
+    /// against one another at every composition. The excursion form
+    /// (`market_vol_vix_excursion` 1.0) buys stability by making the
+    /// factor's target FALL as the read-back rises, which is the same knob
+    /// that caps the held-VIX response: at `market_vol_vix_exponent` e the
+    /// held-VIX fixed point is `v ~ VIX^(e / (1 + e/2))`, so 4.9 gives
+    /// 1.42 where the tape's index variance rises as VIX^1.83, and 1.83
+    /// would need e = 21.5. The valve that damps the free loop is the valve
+    /// that shuts the lever.
+    ///
+    /// # The form
+    ///
+    /// The VIX step in `economy/daily.rs` is
+    /// `x + vix_mean_reversion (target - x) + noise + jumps`. This dial
+    /// adds one term:
+    ///
+    /// ```text
+    /// + vix_anchor_reversion * (L * anchor - x)
+    /// ```
+    ///
+    /// `anchor` is the derived identity anchor the engine already carries
+    /// (`Engine::vix_anchor`, the VIX the identity gives at the
+    /// unconditional point) and `L` is the slow regime level's multiplier
+    /// (`Engine::vix_level_multiplier`, exactly 1.0 with
+    /// `vix_level_sigma` at 0.0). So the VIX reverts to the read-back at
+    /// `vix_mean_reversion` AND to its regime level at this rate, and the
+    /// pair has an anchor that is not itself a function of the VIX. With
+    /// the anchor in place the variance target can read the VIX's LEVEL
+    /// with the tape's own exponent (`market_vol_vix_excursion` 0.0,
+    /// `market_vol_vix_exponent` 1.83) without the loop becoming a random
+    /// walk, which is what the pre-excursion form was.
+    ///
+    /// # Derivation
+    ///
+    /// Linearise the closed loop in logs about its fixed point, writing
+    /// `f = log(v / base)` and `y = log(VIX / (L anchor))`. The factor
+    /// mixture reverts to a target `p y` at rate `1 - rho`, and the VIX
+    /// reverts to `f / 2` at `mr` and to `0` at `kappa`:
+    ///
+    /// ```text
+    /// f' = rho f + (1 - rho) p y
+    /// y' = (mr / 2) f + (1 - mr - kappa) y
+    /// ```
+    ///
+    /// which is the two-state system whose static gain is
+    /// `theta = p w / 2` at `w = mr / (mr + kappa)` and whose poles are the
+    /// eigenvalues of `[[rho, (1 - rho) p], [mr / 2, 1 - mr - kappa]]`:
+    ///
+    /// ```text
+    /// lambda = (tr +- sqrt(tr^2 - 4 det)) / 2
+    /// tr  = rho + 1 - mr - kappa
+    /// det = rho (1 - mr - kappa) - (1 - rho) p mr / 2
+    /// ```
+    ///
+    /// `rho` is the factor mixture's effective persistence, the weight
+    /// average of the two components' own poles: the fast component's GJR
+    /// triple gives `alpha + beta + gamma / 2` = 0.979 and the slow
+    /// component's `market_vol_slow_persistence` is 0.9913 at
+    /// `market_vol_slow_weight` 0.35, so
+    /// `0.65 * 0.979 + 0.35 * 0.9913` = 0.98331. The weight average is the
+    /// right combination here because both components are fed by the SAME
+    /// innovation and both revert toward the same VIX-coupled target
+    /// (`factor_vol.rs`), so the mixture's response to a step in that
+    /// target is the weighted sum of two exponentials and 0.98331 is its
+    /// one-pole stand-in.
+    ///
+    /// The characteristic equation is LINEAR in `kappa`, so a target pole
+    /// inverts in closed form:
+    ///
+    /// ```text
+    /// kappa = [ -l^2 + l (rho + 1 - mr) - rho (1 - mr) + (1 - rho) p mr / 2 ]
+    ///         / (l - rho)
+    /// ```
+    ///
+    /// DERIVED 0.047 at `l` = 0.9965 -- the tape's own slow pole of log VIX
+    /// (`results/ptv19recomp/vix-level-derivation.txt`, the two-pole fit:
+    /// fast 0.942 with 21 per cent of the variance, slow 0.9965 with 79) --
+    /// with `p` = 1.83 and `mr` = 0.27. At `kappa` 0 the same algebra reads
+    /// the loop's slow pole at 0.9987, slower than the tape's; the dial is
+    /// the amount of anchor that brings it back to it. The slow pole then
+    /// comes from the LOOP and not from a driven regime level.
+    ///
+    /// # Invariants
+    ///
+    /// `kappa` lives in `[0, 1)`: it is a share of the distance to the
+    /// anchor taken in one session, and at one or above the step
+    /// overshoots the anchor every day. `ModelParams::invariants` refuses
+    /// it with `vix_level_identity` at 0.0 the way `vix_level_sigma` is
+    /// refused -- off the identity there is no derived anchor for the VIX
+    /// to revert to, `derive_vix_anchor` returns the dial
+    /// `market_vol_vix_anchor` and the VIX's target is the phase table, so
+    /// the reversion would be pulling one scale toward another.
+    ///
+    /// # What it moves, MEASURED on 16 seeds of the held roster
+    ///
+    /// On the arm the design note registers -- `market_vol_vix_excursion`
+    /// 0.0, `market_vol_vix_exponent` 1.83, this dial 0.046081 -- against
+    /// the shipped pt-v19, with the regime level on at its shipped values
+    /// (a), on at the gain the same algebra re-derives on this form, 2.3552
+    /// (b), and off (c):
+    ///
+    /// ```text
+    ///                          base      (a)      (b)      (c)    tape
+    /// held VIX 65 over 5, read-back, lever, correlation
+    ///   read-back            4.60x    4.38x    4.37x    4.37x       --
+    ///   index vol            4.90x    4.61x    4.60x    4.60x    10.50x
+    ///   a name in total      2.93x    2.88x    2.87x    2.91x     4.12x
+    ///   its private part     2.19x    2.23x    2.20x    2.22x     2.34x
+    ///   pairwise corr at 65  0.458    0.449    0.447    0.447    0.665
+    /// the free VIX at 504 sessions
+    ///   AR(1), debiased     0.9595   0.9579   0.9568   0.9590   0.93 (within-year)
+    ///   log-VIX ACF at 21    0.328    0.527    0.525    0.519     0.80
+    ///   log-VIX ACF at 63    0.015    0.113    0.117    0.129     0.63
+    ///   seeds at vix_ceiling  0/16     0/16     0/16     0/16       --
+    ///   S(252) / S(504)   42.4/31.6 51.3/37.6 48.8/39.9 47.7/36.1   --
+    /// ```
+    ///
+    /// **THE LEVEL LAW DID NOT ARRIVE, AND THE DIAL IS NOT WHY.** The
+    /// design derived p = 1.83 from the tape on the assumption that with
+    /// the excursion damping removed the target's held-VIX exponent passes
+    /// through to the variance's one for one. It does not: the transmission
+    /// measured on this form is about 0.8 from the target's own effective
+    /// exponent to the factor variance's, and about 0.9 again from there to
+    /// the index's, so p = 1.83 buys an index lever of 4.61x where the
+    /// design predicted 8x to 11x and where the shipped excursion form at
+    /// exponent 4.9 already reads 4.90x. The exponent ladder on THIS form,
+    /// with the anchor reversion on, measures the transmission directly:
+    /// p = 1.83 gives 4.61x, p = 3.0 gives 7.89x, p = 4.9 gives 11.27x, so
+    /// the tape's 10.5x sits near p = 4.5 and not near 1.83. The arm is
+    /// registered and refused; the dial ships at 0.0.
+    ///
+    /// What the dial itself does is what the algebra says. The free VIX's
+    /// log ACF at lags 21 and 63 rises from 0.33 / 0.01 to 0.53 / 0.11
+    /// toward the tape's 0.80 / 0.63, which is the loop's own slow pole
+    /// arriving, and it does so with `vix_ar1_debiased` unmoved: within
+    /// 0.001 of the base at 252 and within 0.003 at 504, on the level arm
+    /// at the re-derived gain and on the level-off arm alike. No seed's VIX
+    /// reaches `vix_ceiling` on any arm. One graded row leaves its band on
+    /// the level law and it is the same row on all three level arms:
+    /// `index_tail_dn3_pct` 0.398 against 0.64 to 2.34 at both horizons,
+    /// where the base reads 0.797 and 0.696 -- a three-sigma index day is
+    /// half as likely under a target that reads the VIX's level, because
+    /// the level moves slowly and the excursion form's target did not.
+    pub vix_anchor_reversion: f64,
+
     /// How many sessions of market-side warm-up the factor's variance
     /// components get before session one. 0.0 -- every preset through
     /// pt-v19 -- runs nothing, touches no state and is bit-identical.
@@ -4044,6 +4208,7 @@ impl ModelParams {
             vix_level_persistence: 0.0,
             vix_level_sigma: 0.0,
             vix_level_loop_gain: 0.0,
+            vix_anchor_reversion: 0.0,
             market_burn_in_sessions: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
@@ -6033,6 +6198,7 @@ impl ModelParams {
             "vix_level_persistence" => self.vix_level_persistence,
             "vix_level_sigma" => self.vix_level_sigma,
             "vix_level_loop_gain" => self.vix_level_loop_gain,
+            "vix_anchor_reversion" => self.vix_anchor_reversion,
             "market_burn_in_sessions" => self.market_burn_in_sessions,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
@@ -6227,6 +6393,7 @@ impl ModelParams {
             "vix_level_persistence" => out.vix_level_persistence = value,
             "vix_level_sigma" => out.vix_level_sigma = value,
             "vix_level_loop_gain" => out.vix_level_loop_gain = value,
+            "vix_anchor_reversion" => out.vix_anchor_reversion = value,
             "market_burn_in_sessions" => out.market_burn_in_sessions = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
@@ -6530,6 +6697,31 @@ impl ModelParams {
                  to 0.0.",
                 self.vix_level_loop_gain));
         }
+        if self.vix_anchor_reversion != 0.0
+            && !(self.vix_anchor_reversion > 0.0 && self.vix_anchor_reversion < 1.0)
+        {
+            return Err(format!(
+                "vix_anchor_reversion is {}. It is the share of the distance to the \
+                 identity's anchor the VIX takes in ONE session, added to the step \
+                 beside vix_mean_reversion, so it lives in [0, 1): at or above one the \
+                 step lands on or past the anchor every day and the reversion becomes \
+                 an oscillation, and below zero it pushes the VIX away from the anchor \
+                 it is named for. Set it inside [0, 1), or to 0.0, where the term is \
+                 not added at all.",
+                self.vix_anchor_reversion));
+        }
+        if self.vix_anchor_reversion != 0.0 && self.vix_level_identity == 0.0 {
+            return Err(format!(
+                "vix_anchor_reversion is {} but vix_level_identity is 0. The reversion \
+                 pulls the VIX toward the DERIVED identity anchor -- the VIX the \
+                 index's own variance implies at the unconditional point -- times the \
+                 slow level multiplier, and off the identity there is no such anchor: \
+                 `derive_vix_anchor` returns the dial `market_vol_vix_anchor` and the \
+                 VIX's target is the phase table, so the term would pull a VIX on one \
+                 scale toward a level on another. Set vix_level_identity to 1.0, or \
+                 vix_anchor_reversion to 0.0.",
+                self.vix_anchor_reversion));
+        }
         if self.market_vol_vix_excursion != 0.0 && self.vix_level_identity == 0.0 {
             return Err(format!(
                 "market_vol_vix_excursion is {} but vix_level_identity is 0. The \
@@ -6768,6 +6960,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_level_persistence",
         "vix_level_sigma",
         "vix_level_loop_gain",
+        "vix_anchor_reversion",
         "market_burn_in_sessions",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",
@@ -7031,6 +7224,50 @@ mod tests {
             .with_override("vix_level_identity", 0.0)
             .expect("settable");
         assert!(broken.invariants().is_err());
+    }
+
+    /// **THE ANCHOR REVERSION'S THREE REFUSALS.** A rate at or above one
+    /// lands on or past the anchor every session, a negative rate pushes the
+    /// VIX away from the anchor it is named for, and off
+    /// `vix_level_identity` there is no derived anchor at all -- the VIX's
+    /// target is the phase table and `derive_vix_anchor` returns the dial,
+    /// so the term would pull a VIX on one scale toward a level on another.
+    ///
+    /// The last is the same refusal `vix_level_sigma` carries and is written
+    /// the same way, so a reader meets one rule rather than two.
+    #[test]
+    fn the_anchor_reversion_is_a_rate_in_the_unit_interval_and_needs_the_identity() {
+        let shipped = ModelParams::preset("pt-v19").expect("shipped");
+        // The derived value on the identity is admissible.
+        let ok = shipped
+            .with_override("vix_anchor_reversion", 0.046081)
+            .expect("settable");
+        assert!(ok.invariants().is_ok(), "{}", ok.invariants().unwrap_err());
+        // A rate outside [0, 1) is not.
+        for bad_rate in [-0.1, 1.0, 1.5] {
+            let bad = shipped
+                .with_override("vix_anchor_reversion", bad_rate)
+                .expect("settable");
+            let err = bad.invariants().expect_err(
+                "a rate of {bad_rate} is outside [0, 1) and must be refused");
+            assert!(err.contains("vix_anchor_reversion"), "{err}");
+        }
+        // And it is refused with the identity off, the way the sigma is.
+        let no_identity = ModelParams::preset("pt-v18")
+            .expect("shipped")
+            .with_override("vix_anchor_reversion", 0.046081)
+            .expect("settable");
+        assert_eq!(no_identity.vix_level_identity, 0.0, "pt-v18 ships the identity off");
+        let err = no_identity
+            .invariants()
+            .expect_err("a reversion with no derived anchor must be refused");
+        assert!(err.contains("vix_level_identity"), "{err}");
+        // Every shipped preset ships it at 0.0, where nothing is refused and
+        // the term is not added.
+        for name in ModelParams::preset_names() {
+            let p = ModelParams::preset(name).expect("a name from preset_names resolves");
+            assert_eq!(p.vix_anchor_reversion, 0.0, "{name} ships the dial non-zero");
+        }
     }
 
     /// Every shipped preset satisfies the identities IT claims. pt-v19 is
