@@ -31,13 +31,14 @@ import types as _pytypes
 import typing
 from typing import Any, Literal, Mapping, Protocol, Sequence, runtime_checkable
 
-CONTRACT_VERSION = "0.2"
+CONTRACT_VERSION = "0.3"
 
 Side = Literal["buy", "sell"]
 OrderType = Literal["market", "limit"]
 TimeInForce = Literal["day", "gtc"]
 OrderStatus = Literal["accepted", "filled", "cancelled", "expired", "rejected"]
 AdvanceUnit = Literal["steps", "close", "next_open"]
+BarResolution = Literal["day", "step"]
 
 
 def _decode(hint: Any, value: Any) -> Any:
@@ -105,15 +106,21 @@ ERROR_CODES = (
 class ServeError(Exception):
     """Every refusal the service makes. `code` is one of ERROR_CODES."""
 
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(self, code: str, message: str, *, retry_after: float | None = None) -> None:
         if code not in ERROR_CODES:
             code = "internal"
         super().__init__(f"{code}: {message}")
         self.code = code
         self.message = message
+        # Seconds until a rate_limited / quota_exceeded refusal would succeed,
+        # when known (contract 0.3). HTTP sends it as Retry-After.
+        self.retry_after = retry_after
 
-    def to_dict(self) -> dict[str, str]:
-        return {"code": self.code, "message": self.message}
+    def to_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {"code": self.code, "message": self.message}
+        if self.retry_after is not None:
+            d["retry_after"] = self.retry_after
+        return d
 
 
 # -- configuration -----------------------------------------------------------
@@ -154,8 +161,9 @@ class Quote(_Data):
     day_low: float
     prev_close: float
     volume: float                     # shares traded so far today
-    bid: float | None = None          # optional in contract 0.1
+    bid: float | None = None          # optional
     ask: float | None = None
+    step_volume: float | None = None  # shares traded in the last step (0.3)
 
 
 @dataclass
@@ -233,7 +241,8 @@ class Order(_Data):
     submitted_at: Clock
     filled_quantity: float = 0.0
     avg_fill_price: float | None = None
-    reason: str | None = None         # why rejected / expired
+    reason: str | None = None         # why rejected / expired / cancelled
+    updated_at: Clock | None = None   # clock of the last status change (0.3)
 
 
 @dataclass
@@ -245,6 +254,20 @@ class Fill(_Data):
     price: float
     at: Clock
     liquidity: Literal["taker", "resting"] = "taker"
+
+
+@dataclass
+class Bar(_Data):
+    """One OHLCV bar (0.3). `step` is None for a day bar."""
+
+    ticker: str
+    day: int
+    step: int | None
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
 
 
 # -- results -----------------------------------------------------------------------
@@ -315,6 +338,9 @@ class SessionService(Protocol):
     def orders(self, owner: str, session_id: str, status: str | None = None) -> list[Order]: ...
     # status: None or "all" (every order), "open", "closed", or one OrderStatus
     def fills(self, owner: str, session_id: str, since_day: int = 0) -> list[Fill]: ...
+    def bars(self, owner: str, session_id: str, ticker: str,
+             resolution: BarResolution = "day", since_day: int = 0,
+             limit: int | None = None) -> list[Bar]: ...
     def advance(self, owner: str, session_id: str, steps: int = 1,
                 until: AdvanceUnit = "steps") -> AdvanceResult: ...
     def fork(self, owner: str, session_id: str, label: str = "") -> SessionInfo: ...

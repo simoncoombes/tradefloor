@@ -1,4 +1,4 @@
-# The trading session server: contract 0.2
+# The trading session server: contract 0.3
 
 What it is for: a long-running agent (a bot) rehearses in a simulated market
 before it touches money, and is re-tested every time it changes. It opens a
@@ -136,6 +136,27 @@ JSON cannot carry infinity.
 - `fork` copies a session's full state into a new session (same owner,
   `parent_session_id` set). Forks evolve independently and deterministically.
 
+## 4b. History (0.3)
+
+`bars(owner, session_id, ticker, resolution="day" | "step", since_day=0,
+limit=None)` returns OHLCV bars oldest first: day bars for every session the
+session has traded, step bars for the last 20 sessions (older step bars are
+not kept). The current, unfinished session's bars are included up to the
+current step. `limit` keeps the most recent `limit` bars. An unknown ticker is
+`invalid_request`. `Quote.step_volume` is the volume of the last step.
+
+## 4c. Orders over time (0.3)
+
+`Order.updated_at` is the clock of the order's last status change (accepted,
+filled, cancelled, expired, rejected); `submitted_at` stays the submission.
+
+## 4d. Concurrency (0.3)
+
+A `SessionService` must be safe to call from several threads: calls on
+DIFFERENT sessions may run concurrently; calls on the SAME session are
+serialised by the service (a lock per session). Transports need not add a
+global lock.
+
 ## 5a. Edge cases decided (0.2)
 
 - Cancelling a finished order: `invalid_request`.
@@ -146,6 +167,14 @@ JSON cannot carry infinity.
 - `SessionReport.days` is the number of trading days the session has opened
   (`clock.day + 1`).
 - JSON round trip: `from_dict` rebuilds nested types for every result type.
+- (0.3) Cancelling an order whose status is not `accepted` is
+  `invalid_request`. `advance(steps=n, until="close" | "next_open")` does it
+  n times. Closing a session CANCELS every open order (status `cancelled`,
+  reason "session closed", `updated_at` the closing clock), so a report never
+  carries live orders.
+- (0.3) `ServeError.retry_after` (seconds, optional) accompanies
+  `rate_limited` and `quota_exceeded` when the wait is known; HTTP sends it as
+  `Retry-After`.
 
 ## 6. Transports (transport agent)
 
