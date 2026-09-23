@@ -440,6 +440,8 @@ def create_app(service: SessionService, *, owner_resolver: Optional[OwnerResolve
         code = {401: "unauthorized", 404: "not_found", 409: "conflict", 429: "rate_limited"}.get(
             exc.status_code, "invalid_request" if exc.status_code < 500 else "internal")
         detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+        if exc.status_code in (404, 405) and request.url.path.startswith("/broker/"):
+            detail = _broker_hint(request.app, request.method, request.url.path, exc.status_code)
         return JSONResponse({"code": code, "message": detail}, status_code=exc.status_code,
                             headers=getattr(exc, "headers", None))
 
@@ -462,8 +464,19 @@ def create_app(service: SessionService, *, owner_resolver: Optional[OwnerResolve
             return getattr(service, method)(*args, **kwargs)
 
     app.include_router(_native_router(call, owner_dep, describe or describe_payload))
-    app.include_router(_broker_router(call, owner_dep), prefix="/broker/{session_id}/v2")
-    app.include_router(_news_router(call, owner_dep), prefix="/broker/{session_id}/v1beta1")
+    broker = _broker_router(call, owner_dep)
+    app.include_router(broker, prefix="/broker/{session_id}/v2")
+    # The one route that is not Alpaca's is also answered without /v2, where
+    # people writing raw HTTP look for it first.
+    app.add_api_route("/broker/{session_id}/tradefloor/advance", broker.advance_endpoint,
+                      methods=["POST"], include_in_schema=False)
+    news = _news_router(call, owner_dep)
+    app.include_router(news, prefix="/broker/{session_id}/v1beta1")
+    # What the facade serves, below /broker/{session_id}, for the 404 hints.
+    app.state.broker_routes = sorted(
+        [("/v2" + r.path, sorted(r.methods)) for r in broker.routes]
+        + [("/v1beta1" + r.path, sorted(r.methods)) for r in news.routes]
+        + [("/tradefloor/advance", ["POST"])])
     if mcp_endpoint is not None:
         app.add_route(mcp_path, mcp_endpoint, methods=["GET", "POST", "DELETE"],
                       include_in_schema=False)
@@ -1455,7 +1468,70 @@ def _broker_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> A
                 "expired": [alpaca_order(session_id, o) for o in res.expired],
                 "state_hash": res.observation.state_hash}
 
+    r.advance_endpoint = advance  # type: ignore[attr-defined]
     return r
+
+
+BROKER_PREFIX = "/broker/{session_id}"
+
+
+def _broker_routes(app: Any) -> list[tuple[str, list[str]]]:
+    """Every facade route below `/broker/{session_id}`, with its methods, as
+    `create_app` recorded them."""
+    return list(getattr(app.state, "broker_routes", []))
+
+
+def _segments_score(asked: list[str], template: list[str]) -> float:
+    from difflib import SequenceMatcher
+
+    score = 0.0
+    for a, t in zip(asked, template):
+        score += 0.9 if t.startswith("{") else SequenceMatcher(None, a.lower(), t.lower()).ratio()
+    return score / max(len(asked), len(template), 1)
+
+
+def nearest_broker_route(app: Any, method: str, rest: str) -> Optional[tuple[str, list[str]]]:
+    """The supported facade route most like `rest` (the path after
+    `/broker/{session_id}`), trying it under each API version too, since the
+    version is the part people leave out or get wrong. None when nothing is
+    close."""
+    segs = [x for x in rest.split("/") if x]
+    base = segs[1:] if segs and segs[0] in ("v2", "v1beta1") else segs
+    tries = [segs, ["v2", *base], ["v1beta1", *base]]
+    best: Optional[tuple[str, list[str]]] = None
+    best_score = 0.0
+    for asked in tries:
+        for path, methods in _broker_routes(app):
+            score = _segments_score(asked, [x for x in path.split("/") if x])
+            if method in methods:
+                score += 0.01  # prefer the route that takes this method
+            if score > best_score:
+                best, best_score = (path, methods), score
+    return best if best_score >= 0.6 else None
+
+
+def _broker_hint(app: Any, method: str, path: str, status: int) -> str:
+    """The message for a 404 or 405 under /broker: what was asked, and the
+    nearest route the facade does serve."""
+    parts = path.split("/", 3)
+    rest = "/" + parts[3] if len(parts) > 3 else ""
+    if status == 405:
+        asked = [x for x in rest.split("/") if x]
+
+        def matches(template: str) -> bool:
+            segs = [x for x in template.split("/") if x]
+            return len(segs) == len(asked) and all(
+                t.startswith("{") or t == a for a, t in zip(asked, segs))
+        allowed = sorted({m for p, ms in _broker_routes(app) if matches(p) for m in ms})
+        return (f"{method} is not supported on {path}"
+                + (f"; use {' or '.join(allowed)}" if allowed else "") + ".")
+    near = nearest_broker_route(app, method, rest)
+    msg = f"the broker facade has no route {method} {path}."
+    if near is not None:
+        route, methods = near
+        msg += (f" The nearest supported route is {' or '.join(methods)} "
+                f"{BROKER_PREFIX}{route}.")
+    return msg + " Supported routes are listed at /docs and in docs/serve/TRANSPORTS.md."
 
 
 def alpaca_news(session_id: str, h: Any, index: int) -> dict[str, Any]:

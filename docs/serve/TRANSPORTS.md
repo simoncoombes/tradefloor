@@ -21,8 +21,9 @@ pip install "tradefloor[serve]"
 python -m tradefloor.serve
 ```
 
-Until the `serve` extra exists, install the pieces by hand:
-`pip install tradefloor fastapi uvicorn mcp`.
+The `serve` extra installs FastAPI, uvicorn and the MCP SDK
+(`fastapi>=0.141`, `uvicorn>=0.53`, `mcp>=2.2`). Plain `pip install
+tradefloor` still installs none of them.
 
 The server listens on `127.0.0.1:8765` and keeps sessions in
 `~/.tradefloor/sessions`. It serves the HTTP API, the broker facade, and MCP
@@ -147,7 +148,11 @@ trading.post("/tradefloor/advance", {"steps": 1})   # where the live bot would s
 
 The base URL is the only change, with one exception. Simulated time moves
 only when you ask, so the place where a live bot sleeps becomes a call to
-`POST /broker/S/v2/tradefloor/advance` (or the native `/v1/sessions/S/advance`).
+`POST /broker/S/v2/tradefloor/advance`. The same route answers without the
+`/v2` (`POST /broker/S/tradefloor/advance`), and the native
+`/v1/sessions/S/advance` does the same job. An unknown path under `/broker`
+gets a 404 whose message names the nearest route the facade does serve, and a
+wrong method gets a 405 naming the right ones.
 `tests/serve/test_http_broker.py` runs this with the real alpaca-py 0.44.0
 (`TradingClient`, `StockHistoricalDataClient`, `NewsClient`) against a live
 server, on the fake service and on `LocalSessionService`.
@@ -245,7 +250,11 @@ All paths are under `/broker/{session_id}/v2`, except news.
 | `GET /stocks/quotes/latest?symbols`, `GET /stocks/{symbol}/quotes/latest` | `bp`/`ap` from the book's best bid and ask, or the last price when the service has none. Sizes are 0. |
 | `GET /stocks/snapshots?symbols`, `GET /stocks/{symbol}/snapshot` | `latestTrade`, `latestQuote`, `dailyBar` (today so far) and, from day 1, `prevDailyBar`. |
 | `GET /broker/{session_id}/v1beta1/news?symbols&start&end&limit&sort&page_token` | Alpaca's news API over the session's headline log: `headline` is the text, `symbols` the tickers, `created_at` when it reached the market, `source` and `author` `tradefloor`, `summary` and `content` empty. `limit` default 10, max 50; `sort` default `desc`. |
-| `POST /tradefloor/advance` | Not Alpaca. Body `{"steps": n}` and/or `{"until": "close" | "next_open"}`. Returns the Alpaca-shaped clock, the new fills as `FILL` activities, the headlines released as news items, the expired orders, and `state_hash`. |
+| `POST /tradefloor/advance` | Not Alpaca, and also served without `/v2` at `/broker/{session_id}/tradefloor/advance`. Body `{"steps": n}` and/or `{"until": "close" | "next_open"}`. Returns the Alpaca-shaped clock, the new fills as `FILL` activities, the headlines released as news items, the expired orders, and `state_hash`. |
+
+As on Alpaca, `/v2/stocks/bars` without `start` returns only the current
+day's bars, so pass `start` (for example `2000-01-01`, before day 0) to get
+the history.
 
 The multi-symbol data routes drop symbols the session does not have, as
 Alpaca does; the single-symbol routes answer 404.
@@ -409,9 +418,10 @@ the rule in `pyproject.toml`.
 
 ## Tests
 
-`pytest tests/serve/test_mcp_*.py tests/serve/test_http_*.py -n 2` runs 156
+`pytest tests/serve/test_mcp_*.py tests/serve/test_http_*.py -n 2` runs 166
 tests in about 20 seconds, 33 of them against `LocalSessionService` over a
-temporary `FileStore` (contract 0.4 core, `feat/serve-core` at f4ba748). A
+temporary `FileStore` (the contract 0.4 core, as merged into
+`feat/trading-server`). A
 core-backed test skips when the core does not yet implement the contract
 version it needs.
 

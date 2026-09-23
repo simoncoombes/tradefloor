@@ -724,3 +724,50 @@ def test_news_is_the_sessions_news_log():
     assert rest == {"news": every[2:], "next_page_token": None}
     asc = client.get(url, params={"sort": "asc", "start": "2000-01-04"}).json()["news"]
     assert asc == every[:2][::-1]
+
+
+# -- finding your way around the facade ------------------------------------------------------
+
+
+def test_advance_is_also_answered_without_v2(setup):
+    client, info, b = setup
+    sid = info["session_id"]
+    alias = client.post(f"/broker/{sid}/tradefloor/advance", json={"steps": 1})
+    assert alias.status_code == 200
+    assert alias.json()["clock"]["timestamp"] == "2000-01-03T10:00:00-05:00"
+    v2 = b.ok(b.post("/tradefloor/advance", {"steps": 1}))
+    assert v2["clock"]["timestamp"] == "2000-01-03T10:30:00-05:00"
+    _err(client.post(f"/broker/{sid}/tradefloor/advance", json={"steps": 0}), 400, "invalid_request")
+    _err(client.post(f"/broker/{'0' * 32}/tradefloor/advance", json={}), 404, "not_found")
+
+
+@pytest.mark.parametrize("method, path, nearest", [
+    ("GET", "/v2/positons", "GET /broker/{session_id}/v2/positions"),
+    ("GET", "/account", "GET /broker/{session_id}/v2/account"),
+    ("GET", "/clock", "GET /broker/{session_id}/v2/clock"),
+    ("POST", "/v2/order", "POST /broker/{session_id}/v2/orders"),
+    ("GET", "/v2/stocks/AAA/barz", "GET /broker/{session_id}/v2/stocks/{symbol}/bars"),
+    ("GET", "/v2/news", "GET /broker/{session_id}/v1beta1/news"),
+    ("POST", "/tradefloor/advanse", "/tradefloor/advance"),
+])
+def test_an_unknown_broker_path_names_the_nearest_route(setup, method, path, nearest):
+    client, info, _ = setup
+    r = client.request(method, f"/broker/{info['session_id']}{path}")
+    message = _err(r, 404, "not_found")
+    assert "The nearest supported route is " in message and nearest in message, message
+    assert "docs/serve/TRANSPORTS.md" in message
+
+
+def test_a_path_with_nothing_near_says_where_the_list_is(setup):
+    client, info, _ = setup
+    message = _err(client.get(f"/broker/{info['session_id']}/nothing/at/all/here"), 404, "not_found")
+    assert "nearest" not in message and "/docs" in message
+
+
+def test_a_wrong_method_on_a_broker_route_names_the_right_ones(setup):
+    client, info, _ = setup
+    sid = info["session_id"]
+    message = _err(client.get(f"/broker/{sid}/v2/tradefloor/advance"), 405, "invalid_request")
+    assert message.endswith("use POST.")
+    message = _err(client.patch(f"/broker/{sid}/v2/orders/abc"), 405, "invalid_request")
+    assert "use DELETE or GET" in message
