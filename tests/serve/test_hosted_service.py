@@ -163,10 +163,15 @@ def test_steps_per_minute_rate_limit_and_refund(tmp_path):
     e = code_of(hosted.advance, alice, s.session_id, steps=1)
     assert e.code == "rate_limited" and "steps per minute" in e.message
     clock.tick(60)
-    # until="next_open" from the close estimates 390+30 ticks but runs 1 step:
-    # the difference is refunded, so 12 more steps fit in the same minute.
+    # until="next_open" from the close runs nothing and is charged nothing
     hosted.advance(alice, s.session_id, until="next_open")
-    hosted.advance(alice, s.session_id, steps=12)
+    hosted.advance(alice, s.session_id, steps=3)
+    # until="close" is admitted on its estimate (the 10 steps left today, which
+    # the bucket holds) and charged what it ran
+    hosted.advance(alice, s.session_id, until="close")
+    e = code_of(hosted.advance, alice, s.session_id, steps=1)
+    assert e.code == "rate_limited"
+    assert hosted.usage_report(alice)["today"]["steps"] == 26
 
 
 def test_sim_days_per_day_quota_resets_at_utc_midnight(tmp_path):

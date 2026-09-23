@@ -118,12 +118,12 @@ def test_a_fresh_process_reads_what_was_committed():
     assert sum(1 for _, k in fake.objects if "/record-" in k) == 1
 
 
-@pytest.mark.parametrize("crash_on", ["stream-fills-000000000002", "record-000000000002",
-                                      "head.json"])
+@pytest.mark.parametrize("crash_on", ["/stream-fills-000000000002-", "/record-000000000002-",
+                                      "/head.json"])
 def test_a_crash_at_any_put_leaves_the_last_commit_whole(crash_on):
     s, fake = store()
     s.commit("s1", rec(1), {"fills": [{"a": 1}]})
-    fake.fail_put = lambda key: key.endswith(crash_on) or crash_on + "." in key
+    fake.fail_put = lambda key: crash_on in key
     with pytest.raises(ConnectionError):
         s.commit("s1", rec(2, marker="new"), {"fills": [{"a": 2}]})
     fake.fail_put = None
@@ -147,12 +147,15 @@ def test_a_second_writer_is_refused_not_interleaved():
     with pytest.raises(StoreConflict):
         a.commit("s1", rec(2), {"fills": [{"from": "a"}]})
     assert store(fake)[0].read_stream("s1", "fills") == [{"from": "b"}]
-    # two first commits of the same new session: If-None-Match catches it
+    # two first commits racing: d read "no head yet" just before c's landed.
+    # If-None-Match on d's head PUT catches it.
     c, _ = store(fake)
     d, _ = store(fake)
-    c.commit("s2", rec(1), {})
+    d._read_head = lambda sid, fresh=False: None
+    c.commit("s2", rec(1, marker="c"), {})
     with pytest.raises(StoreConflict):
-        d.commit("s2", rec(1), {})
+        d.commit("s2", rec(1, marker="d"), {})
+    assert store(fake)[0].load("s2")["marker"] == "c"
 
 
 def test_compaction_keeps_reads_short_and_gc_tidies():
@@ -206,3 +209,30 @@ def test_the_core_service_runs_on_s3store_and_resumes_bit_for_bit():
     assert after.state_hash == before.state_hash
     assert [s.session_id for s in resumed.list("alice")] == [info.session_id]
     assert resumed.list("bob") == []
+
+
+def test_against_moto_with_a_real_botocore_client(monkeypatch):
+    """The same guarantees through boto3 and botocore's real error shapes,
+    against moto's local S3 (still never real S3)."""
+    pytest.importorskip("boto3")
+    moto = pytest.importorskip("moto")
+    import boto3
+
+    for k, v in {"AWS_ACCESS_KEY_ID": "test", "AWS_SECRET_ACCESS_KEY": "test",
+                 "AWS_DEFAULT_REGION": "us-east-1"}.items():
+        monkeypatch.setenv(k, v)
+    with moto.mock_aws():
+        client = boto3.client("s3")
+        client.create_bucket(Bucket="tradefloor-test")
+        a = S3Store("tradefloor-test", "hosted", client=client)
+        b = S3Store("tradefloor-test", "hosted", client=client)
+        a.commit("s1", rec(1), {"fills": [{"a": 1}]})
+        assert b.version("s1") == 1
+        a.commit("s1", rec(2), {"fills": [{"a": 2}]})
+        with pytest.raises(StoreConflict):
+            b.commit("s1", rec(2), {"fills": [{"b": 2}]})
+        fresh = S3Store("tradefloor-test", "hosted", client=client)
+        assert fresh.read_stream("s1", "fills") == [{"a": 1}, {"a": 2}]
+        assert [bits(x) for x in fresh.load("s1")["floats"]] == [bits(x) for x in rec(2)["floats"]]
+        assert fresh.load("missing") is None and fresh.version("missing") is None
+        assert [h["owner"] for h in fresh.heads("alice")] == ["alice"]

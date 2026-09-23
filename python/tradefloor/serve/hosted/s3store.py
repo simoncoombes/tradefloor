@@ -10,9 +10,9 @@ August 2024).
 Layout under `s3://<bucket>/<prefix>`:
 
     sessions/<sid>/head.json                        THE COMMIT POINT
-    sessions/<sid>/record-<seq>.json                the record at that seq
-    sessions/<sid>/stream-<name>-<seq>.jsonl        entries one commit appended
-    sessions/<sid>/stream-<name>-base-<seq>.jsonl   a compaction of older chunks
+    sessions/<sid>/record-<seq>-<nonce>.json        the record at that seq
+    sessions/<sid>/stream-<name>-<seq>-<nonce>.jsonl        entries one commit appended
+    sessions/<sid>/stream-<name>-base-<seq>-<nonce>.jsonl   a compaction of older chunks
     owners/<owner>/<sid>.json                       an empty marker: which sessions an owner has
 
 `head.json` names the committed seq, the record object, and for each stream
@@ -27,6 +27,8 @@ conditionally on the ETag it last saw. So:
 - a second process committing the same session gets 412 on `head.json` and a
   `StoreConflict`, instead of silently interleaving (FileStore does not detect
   this; the contract says one writer per session, and here it is enforced).
+  Every object a commit writes has a fresh nonce in its name, so the loser's
+  objects never overwrite the winner's; they are garbage for `gc`.
 
 Streams are compacted into one base object every `compact_every` chunks, so
 reading a long session's history stays a handful of GETs.
@@ -46,6 +48,7 @@ from __future__ import annotations
 
 import json
 import re
+import secrets
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Mapping, Sequence
@@ -172,6 +175,10 @@ class S3Store:
         seq = int(record["seq"])
         prev = self._read_head(sid)
         etag, head = prev if prev is not None else (None, {"seq": None, "streams": {}})
+        # Every object this attempt writes gets a fresh name, so a writer that
+        # is about to lose the conditional PUT below can never overwrite an
+        # object the winning head names.
+        tag = f"{seq:012d}-{secrets.token_hex(4)}"
         streams = {n: {"base": s.get("base"), "chunks": [list(c) for c in s["chunks"]],
                        "count": s["count"]} for n, s in head["streams"].items()}
 
@@ -182,13 +189,14 @@ class S3Store:
                 continue
             st = streams.setdefault(name, {"base": None, "chunks": [], "count": 0})
             body = "".join(self._dumps(e) + "\n" for e in entries)
-            self._put(self._k("sessions", sid, f"stream-{name}-{seq:012d}.jsonl"), body)
-            st["chunks"].append([seq, len(entries)])
+            chunk_key = f"stream-{name}-{tag}.jsonl"
+            self._put(self._k("sessions", sid, chunk_key), body)
+            st["chunks"].append([chunk_key, len(entries)])
             st["count"] += len(entries)
             if len(st["chunks"]) >= self.compact_every:
-                self._compact(sid, name, st, seq)
+                self._compact(sid, name, st, tag)
 
-        record_key = f"record-{seq:012d}.json"
+        record_key = f"record-{tag}.json"
         self._put(self._k("sessions", sid, record_key), self._dumps(record))
         owner = str(record["head"].get("owner", ""))
         if prev is None and owner:
@@ -215,9 +223,9 @@ class S3Store:
         if head.get("record") and head["record"] != record_key:
             self._delete(self._k("sessions", sid, head["record"]))
 
-    def _compact(self, sid: str, name: str, st: dict[str, Any], seq: int) -> None:
+    def _compact(self, sid: str, name: str, st: dict[str, Any], tag: str) -> None:
         entries = self._stream_lines(sid, name, st)
-        base_key = f"stream-{name}-base-{seq:012d}.jsonl"
+        base_key = f"stream-{name}-base-{tag}.jsonl"
         self._put(self._k("sessions", sid, base_key), "".join(line + "\n" for line in entries))
         st["base"] = [base_key, len(entries)]
         st["chunks"] = []
@@ -228,7 +236,7 @@ class S3Store:
         keys = []
         if st.get("base"):
             keys.append((st["base"][0], st["base"][1]))
-        keys += [(f"stream-{name}-{c_seq:012d}.jsonl", n) for c_seq, n in st["chunks"]]
+        keys += [(key, n) for key, n in st["chunks"]]
         out: list[str] = []
         for key, n in keys:
             raw = self._get(self._k("sessions", sid, key))
@@ -299,7 +307,7 @@ class S3Store:
         for name, st in head["streams"].items():
             if st.get("base"):
                 live.add(st["base"][0])
-            live |= {f"stream-{name}-{c_seq:012d}.jsonl" for c_seq, _ in st["chunks"]}
+            live |= {key for key, _ in st["chunks"]}
         n = 0
         for key in self._list(self._k("sessions", sid) + "/"):
             if key.rsplit("/", 1)[-1] not in live:

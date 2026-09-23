@@ -2,8 +2,11 @@
 
 It keeps the parts of the contract the hosted layer depends on: owner
 isolation (`not_found` for another owner's session), the clock arithmetic of
-`advance`, `session_closed` after `close`, the 20-session cap on one advance,
-and `client_order_id` idempotency. It simulates no market: every quote is 100.
+`advance` as `LocalSessionService` does it (`until="next_open"` finishes the
+current session and opens the next without stepping it; `until="close"` with
+the market closed runs the next session), `session_closed` after `close`, the
+20-session cap on one advance, and `client_order_id` idempotency. It simulates
+no market: every quote is 100.
 """
 
 from __future__ import annotations
@@ -132,9 +135,12 @@ class FakeSessionService:
         c: Clock = s["info"].clock
         tps = s["info"].config.ticks_per_step
 
+        def open_next() -> None:
+            c.day, c.tick, c.step, c.market_open = c.day + 1, 0, 0, True
+
         def one_step() -> None:
             if not c.market_open:
-                c.day, c.tick, c.market_open = c.day + 1, 0, True
+                open_next()
             c.tick = min(TICKS, c.tick + tps)
             c.step += 1
             if c.tick >= TICKS:
@@ -150,10 +156,10 @@ class FakeSessionService:
             one_step()
             while c.market_open:
                 one_step()
-        else:
+        else:   # next_open: finish this session (if open), then open the next one
             while c.market_open:
                 one_step()
-            one_step()
+            open_next()
         if self.sleep_per_tick:
             import time
             time.sleep(self.sleep_per_tick * (c.day * TICKS + c.tick - start_ticks))
