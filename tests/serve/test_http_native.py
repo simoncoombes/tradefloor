@@ -38,6 +38,7 @@ CORE = pytest.mark.skipif(not core_available(), reason="tradefloor.serve.core ha
 #: The core's contract 0.3 items (bars, updated_at, close cancels, step
 #: volume) land on feat/serve-core after the contract; `bars` marks them.
 CORE03 = pytest.mark.skipif(not core_has("bars"), reason="the core has not landed contract 0.3")
+CORE04 = pytest.mark.skipif(not core_has("news"), reason="the core has not landed contract 0.4")
 SMALL = {"universe_size": 4, "ticks_per_step": 30}
 
 
@@ -486,7 +487,7 @@ def test_the_openapi_document_covers_every_route(fake):
         ("/v1/sessions/{session_id}/orders/{order_id}", "get"),
         ("/v1/sessions/{session_id}/orders/{order_id}", "delete"),
         ("/v1/sessions/{session_id}/fills", "get"), ("/v1/sessions/{session_id}/advance", "post"),
-        ("/v1/sessions/{session_id}/bars/{ticker}", "get"),
+        ("/v1/sessions/{session_id}/bars/{ticker}", "get"), ("/v1/sessions/{session_id}/news", "get"),
         ("/v1/sessions/{session_id}/fork", "post"), ("/v1/sessions/{session_id}/close", "post"),
         ("/v1/describe", "get"), ("/v1/health", "get"),
         ("/broker/{session_id}/v2/account", "get"), ("/broker/{session_id}/v2/orders", "post"),
@@ -494,6 +495,7 @@ def test_the_openapi_document_covers_every_route(fake):
         assert method in paths.get(path, {}), (method, path)
     schemas = doc["components"]["schemas"]
     for name in ("SessionInfo", "Observation", "Order", "Fill", "AdvanceResult", "SessionReport", "Bar",
+                 "Headline",
                  "SessionConfigBody", "OrderRequestBody"):
         assert name in schemas, name
     assert schemas["OrderRequestBody"]["additionalProperties"] is False
@@ -722,3 +724,39 @@ def test_calls_are_not_serialised_by_default(fake):
     assert isinstance(create_app(fake).state.service_lock, contextlib.nullcontext)
     assert not isinstance(create_app(fake, serialize=True).state.service_lock,
                           contextlib.nullcontext)
+
+
+@pytest.fixture(params=["fake", pytest.param("core", marks=[CORE, CORE04])])
+def service04(request, tmp_path):
+    return make_service(request.param, tmp_path / "sessions")
+
+
+def test_news_history_and_the_news_an_advance_releases(service04):
+    client = TestClient(create_app(service04))
+    info = _open(client, universe_size=40)
+    sid = info["session_id"]
+    assert client.get(f"/v1/sessions/{sid}/news").json() == []
+    first = _advance(client, sid, until="close")
+    rest = _advance(client, sid, steps=3, until="close")
+    log = client.get(f"/v1/sessions/{sid}/news").json()
+    assert log == first["news"] + rest["news"]
+    assert all(T.Headline.from_dict(h).to_dict() == h for h in log)
+    assert [(h["day"], h["tick"]) for h in log] == sorted((h["day"], h["tick"]) for h in log)
+    assert {h["day"] for h in rest["news"]} <= {1, 2, 3}
+    obs = client.get(f"/v1/sessions/{sid}/observation").json()
+    assert obs["news"] == [h for h in log if h["day"] == obs["clock"]["day"]]
+    if log:
+        last = log[-1]
+        since = client.get(f"/v1/sessions/{sid}/news",
+                           params={"since_day": last["day"], "since_tick": last["tick"]}).json()
+        assert since == [h for h in log if (h["day"], h["tick"]) >= (last["day"], last["tick"])]
+        assert client.get(f"/v1/sessions/{sid}/news", params={"limit": 1}).json() == [last]
+    _err(client.get(f"/v1/sessions/{sid}/news", params={"limit": 0}), 400, "invalid_request")
+
+
+def test_the_fake_releases_a_headline_a_day():
+    client = TestClient(create_app(FakeSessionService(headlines=True)))
+    sid = _open(client)["session_id"]
+    res = _advance(client, sid, steps=3, until="close")
+    assert [h["day"] for h in res["news"]] == [0, 1, 2]
+    assert client.get(f"/v1/sessions/{sid}/news", params={"since_day": 1}).json() == res["news"][1:]

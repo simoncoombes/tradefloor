@@ -351,6 +351,8 @@ def create_server(service: SessionService, owner: str = LOCAL_OWNER, *,
         "next advance), before prices move, at the book's impact-aware price, and it "
         "moves the market. An order bigger than the book can absorb fills partially "
         "(filled_quantity below quantity, reason 'partial...') and the rest is dropped. "
+        "An insolvent account (net worth <= 0) can only reduce positions; an order "
+        "that would add exposure is rejected with reason 'insolvent'. "
         "type 'limit' (needs limit_price, per share): rests on the server and fills in "
         "full at the limit after a step whose low (buy) or high (sell) reaches it; "
         "resting fills do not move the market; no partial fills. A limit that is already "
@@ -435,6 +437,21 @@ def create_server(service: SessionService, owner: str = LOCAL_OWNER, *,
         return run(ctx, lambda who: {"bars": [b.to_dict() for b in service.bars(
             who, session_id, ticker, resolution, since_day, limit)]})
 
+    @server.tool(annotations=READ, description=(
+        "The session's headlines, oldest first, from a clock point on: every headline "
+        "released so far (observe shows only the current session's). since_day and "
+        "since_tick give the point; limit keeps the most recent. A headline names the "
+        "company and whether the news is good or bad, never how big it is."))
+    def get_news(session_id: SessionId,
+                 since_day: Annotated[int, Field(ge=0, description="Trading day to start from.")] = 0,
+                 since_tick: Annotated[int, Field(ge=0, description="Tick in that day.")] = 0,
+                 limit: Annotated[Optional[int], Field(
+                     ge=1, description="Keep the most recent this many.")] = None,
+                 ctx: Context = None,  # type: ignore[assignment]
+                 ) -> dict[str, Any]:
+        return run(ctx, lambda who: {"news": [h.to_dict() for h in service.news(
+            who, session_id, since_day, since_tick, limit)]})
+
     @server.tool(annotations=WRITE, description=(
         "Move simulated time forward: the ONLY way time passes. Queued market orders "
         "fill at the start of the first step, prices move, resting limits are checked "
@@ -445,7 +462,8 @@ def create_server(service: SessionService, owner: str = LOCAL_OWNER, *,
         "so you can place orders before it trades. With until='close' or 'next_open', "
         "steps says how many times (steps=5, until='next_open' skips five days). "
         f"At most 20 sessions ({MAX_TICKS_PER_ADVANCE} ticks) per call. Returns the new "
-        "clock, the fills and expiries this call produced, and a fresh observation."))
+        "clock, the fills and expiries this call produced, every headline released during "
+        "it (news), and a fresh observation."))
     def advance(session_id: SessionId,
                 steps: Annotated[int, Field(ge=1, description=(
                     "Steps to run, or with until='close'/'next_open' how many times."))] = 1,

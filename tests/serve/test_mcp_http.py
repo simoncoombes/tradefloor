@@ -26,7 +26,7 @@ from tradefloor.serve.http import create_app, request_api_key  # noqa: E402
 from tradefloor.serve.mcp import create_http_app  # noqa: E402
 from tradefloor.serve.types import ServeError  # noqa: E402
 
-CORE03 = pytest.mark.skipif(not core_has("bars"), reason="the core has not landed contract 0.3")
+CORE04 = pytest.mark.skipif(not core_has("news"), reason="the core has not landed contract 0.4")
 KEYS = {"key-alice": "alice", "key-bob": "bob"}
 
 
@@ -104,7 +104,7 @@ def test_each_request_acts_as_the_owner_its_key_names(mount):
     with live(app) as base:
         url = base + path
         tools, (info, res, listed) = run(url, "key-alice", _open_and_trade)
-        assert "get_bars" in tools and "open_session" in tools
+        assert {"get_bars", "get_news", "open_session"} <= set(tools)
         assert info["owner"] == "alice"
         assert res["fills"][0]["quantity"] == 3
         assert [s["session_id"] for s in listed["sessions"]] == [info["session_id"]]
@@ -168,7 +168,7 @@ def test_a_server_built_with_a_resolver_refuses_calls_that_are_not_http():
     assert asyncio.run(server.call_tool("describe", {})).is_error is False
 
 
-@CORE03
+@CORE04
 def test_mcp_over_http_on_the_core(tmp_path):
     app = create_app(make_service("core", tmp_path / "sessions"), mcp_path="/mcp")
     with live(app) as base:

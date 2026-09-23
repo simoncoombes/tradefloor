@@ -1,4 +1,4 @@
-"""An in-memory SessionService that follows contract 0.3, for testing layers
+"""An in-memory SessionService that follows contract 0.4, for testing layers
 that sit on top of the service (transports, hosted) without the engine.
 
 This is a FAKE MARKET. Prices are a hashed random walk, not the tradefloor
@@ -27,12 +27,18 @@ layers above it are tested against (docs/serve/CONTRACT.md):
   projected leverage is above the cap AND above the current leverage is
   `rejected` with a reason (a trade that reduces risk always passes), and
   `insufficient_buying_power` at submission when that is already knowable;
-- `Account.leverage` is None and `insolvent` True when net worth <= 0;
+- `Account.leverage` is None and `insolvent` True when net worth <= 0, and an
+  insolvent account's fills that would add gross exposure are `rejected`
+  with the reason "insolvent";
 - `Order.updated_at` is the clock of the last status change;
 - `orders(status=)` takes None, "all", "open", "closed" or one OrderStatus;
 - `bars`: day bars for every session traded, step bars for the last 20
   sessions, the current session included up to the current step;
   `Quote.step_volume` is the last step's volume;
+- news: every released headline goes to a per-session log; `advance`
+  returns the ones released during it (`AdvanceResult.news`), `observe` the
+  current session's, and `news(since_day, since_tick, limit)` the log from a
+  clock point, oldest first (`limit` keeps the most recent);
 - cancelling an order that is not `accepted` is `invalid_request`;
 - closing a session cancels its open orders (reason "session closed"); a
   closed session refuses every mutating call, fork and close included, with
@@ -51,8 +57,9 @@ here, so a test that leans on one of these is visibly leaning on a choice:
   so it starts at tick `step * ticks_per_step`; its open is the step's first
   print and its high and low the step's prints (the core's CORE.md, "Bars").
 
-`FakeSessionService(headlines=True)` also publishes one headline a day, from
-tick 1, for one name, saying only the direction of the news.
+`FakeSessionService(headlines=True)` publishes one headline a day, released at
+tick 1, for one name, saying only the direction of the news. Without it the
+news log stays empty.
 """
 
 from __future__ import annotations
@@ -163,6 +170,7 @@ class _Session:
     queued: list[str] = field(default_factory=list)                    # fill at next step start
     resting: list[str] = field(default_factory=list)
     fills: list[Fill] = field(default_factory=list)
+    news: list[Headline] = field(default_factory=list)                 # every headline released
     day_bars: dict[str, list[Bar]] = field(default_factory=dict)       # finished days
     step_bars: dict[str, list[Bar]] = field(default_factory=dict)
     seq: int = 0
@@ -170,7 +178,7 @@ class _Session:
 
 
 class FakeSessionService:
-    """A contract-0.3 SessionService with a fake market. Thread-safe.
+    """A contract-0.4 SessionService with a fake market. Thread-safe.
 
     `calls` records `(method, owner, session_id_or_None)` for every call, so a
     transport test can check which owner reached the service.
@@ -328,6 +336,21 @@ class FakeSessionService:
             s = self._get(owner, session_id)
             return [copy.deepcopy(f) for f in s.fills if f.at.day >= since_day]
 
+    def news(self, owner: str, session_id: str, since_day: int = 0, since_tick: int = 0,
+             limit: int | None = None) -> list[Headline]:
+        with self._lock:
+            self._log("news", owner, session_id)
+            s = self._get(owner, session_id)
+            for name, v in (("since_day", since_day), ("since_tick", since_tick)):
+                if isinstance(v, bool) or not isinstance(v, int) or v < 0:
+                    raise ServeError("invalid_request", f"{name} must be an integer >= 0, got {v!r}")
+            if limit is not None and (isinstance(limit, bool) or not isinstance(limit, int) or limit < 1):
+                raise ServeError("invalid_request", f"limit must be a positive integer, got {limit!r}")
+            out = [h for h in s.news if (h.day, h.tick) >= (since_day, since_tick)]
+            if limit is not None:
+                out = out[-limit:]
+            return copy.deepcopy(out)
+
     def bars(self, owner: str, session_id: str, ticker: str, resolution: str = "day",
              since_day: int = 0, limit: int | None = None) -> list[Bar]:
         with self._lock:
@@ -475,6 +498,13 @@ class FakeSessionService:
 
     def _fill(self, s: _Session, o: Order, qty: float, price: float, liquidity: str,
               reason: str | None = None) -> Fill | None:
+        gross, worth = self._gross_and_worth(s)
+        if worth <= 0:
+            signed = qty if o.side == "buy" else -qty
+            after, _ = self._gross_and_worth(s, (o.ticker, signed, price))
+            if after > gross:
+                self._finish(s, o, "rejected", "insolvent")
+                return None
         if not self._within_leverage(s, o.ticker, o.side, qty, price):
             self._finish(s, o, "rejected",
                          f"filling {qty:g} {o.ticker} at {price:.4f} would take leverage "
@@ -534,6 +564,7 @@ class FakeSessionService:
             self._plan(s, steps, until, tps)
             fills: list[Fill] = []
             expired: list[Order] = []
+            released = len(s.news)
             for _ in range(steps):
                 if until == "steps":
                     self._step(s, fills, expired)
@@ -547,7 +578,8 @@ class FakeSessionService:
                         self._step(s, fills, expired)
                     self._open_market(s)
             return AdvanceResult(clock=copy.deepcopy(s.info.clock), fills=copy.deepcopy(fills),
-                                 expired=copy.deepcopy(expired), observation=self._observe(s))
+                                 expired=copy.deepcopy(expired), observation=self._observe(s),
+                                 news=copy.deepcopy(s.news[released:]))
 
     @staticmethod
     def _plan(s: _Session, steps: int, until: str, tps: int) -> None:
@@ -651,6 +683,8 @@ class FakeSessionService:
             s.step_bars[t].append(Bar(ticker=t, day=clk.day, step=clk.step, open=prints[t][0],
                                       high=step_hi[t], low=step_lo[t], close=b.last,
                                       volume=step_vol[t]))
+        if self._headlines and clk.tick == 0 and n >= 1:   # the day's news reaches the market at tick 1
+            s.news.append(self._headline(s, clk.day))
         clk.tick += n
         clk.step += 1
 
@@ -686,15 +720,17 @@ class FakeSessionService:
 
     # -- observation ----------------------------------------------------------
 
-    def _news(self, s: _Session) -> list[Headline]:
-        clk = s.info.clock
-        if not self._headlines or clk.tick < 1:
-            return []
+    def _headline(self, s: _Session, day: int) -> Headline:
         tickers = s.info.tickers
-        t = tickers[clk.day % len(tickers)]
-        up = _unit("news", s.info.config.seed, clk.day) >= 0.5
-        return [Headline(day=clk.day, tick=1, tickers=[t], category="company",
-                         text=f"{t} shares move {'higher' if up else 'lower'} on company news")]
+        t = tickers[day % len(tickers)]
+        up = _unit("news", s.info.config.seed, day) >= 0.5
+        return Headline(day=day, tick=1, tickers=[t], category="company",
+                        text=f"{t} shares move {'higher' if up else 'lower'} on company news")
+
+    def _news(self, s: _Session) -> list[Headline]:
+        """The headlines visible in the current session."""
+        clk = s.info.clock
+        return [copy.deepcopy(h) for h in s.news if h.day == clk.day and h.tick <= clk.tick]
 
     def _observe(self, s: _Session) -> Observation:
         quotes = [Quote(ticker=t, last=b.last, day_open=b.day_open, day_high=b.day_high,

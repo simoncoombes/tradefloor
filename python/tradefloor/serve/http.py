@@ -47,6 +47,7 @@ from tradefloor.serve.types import (
     Bar,
     Clock,
     Fill,
+    Headline,
     Observation,
     Order,
     OrderRequest,
@@ -175,7 +176,9 @@ def describe_payload() -> dict[str, Any]:
                          "fill is refused only when it would take leverage above the cap "
                          "AND above where it is now, so a trade that reduces risk always "
                          "passes. leverage is null, and insolvent true, when net worth is "
-                         "at or below zero."),
+                         "at or below zero. An insolvent account can only reduce or close "
+                         "positions: an order that would add gross exposure is rejected "
+                         "with the reason 'insolvent'."),
         },
         "history": (
             "bars(ticker, resolution) returns OHLCV bars oldest first: 'day' bars for "
@@ -183,9 +186,11 @@ def describe_payload() -> dict[str, Any]:
             "Today's bar is included up to the current step. Quote.step_volume is the "
             "shares traded in the last step."),
         "headlines": (
-            "observe returns the current day's headlines once the news reaches the "
-            "market. A headline says which company has news and its direction, never "
-            "its size."),
+            "A headline says which company has news and its direction, never its size. "
+            "observe returns the current session's headlines once they reach the market; "
+            "advance returns every headline released during it, however many sessions "
+            "it spans; news(since_day, since_tick) returns the whole log from a clock "
+            "point."),
         "units": {
             "quantity": "shares",
             "prices": "currency units per share",
@@ -571,6 +576,16 @@ def _native_router(call: Callable[..., Any], owner_dep: Callable[..., Any],
     def list_fills(session_id: str = SID, owner: str = Owner,
                    since_day: int = Query(0, ge=0, description="Only fills on this day or later.")) -> Any:
         return [f.to_dict() for f in call("fills", owner, session_id, since_day)]
+
+    @r.get("/v1/sessions/{session_id}/news", tags=["market"], response_model=list[Headline],
+           summary="Headlines released so far, oldest first",
+           description="The session's news log from (since_day, since_tick) on. limit keeps "
+                       "the most recent. A headline carries the company and the direction "
+                       "of the news, never its size.")
+    def news(session_id: str = SID, owner: str = Owner,
+             since_day: int = Query(0, ge=0), since_tick: int = Query(0, ge=0),
+             limit: Optional[int] = Query(None, ge=1)) -> Any:
+        return [h.to_dict() for h in call("news", owner, session_id, since_day, since_tick, limit)]
 
     @r.get("/v1/sessions/{session_id}/bars/{ticker}", tags=["market"], response_model=list[Bar],
            summary="OHLCV bars for one ticker, oldest first",
@@ -1433,7 +1448,9 @@ def _broker_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> A
         orders = call("orders", owner, session_id)
         every = _fill_activities(session_id, call("fills", owner, session_id), orders)
         activities = every[len(every) - len(res.fills):] if res.fills else []
+        start = len(call("news", owner, session_id)) - len(res.news)
         return {"clock": alpaca_clock(res.clock),
+                "news": [alpaca_news(session_id, h, start + i) for i, h in enumerate(res.news)],
                 "fills": activities,
                 "expired": [alpaca_order(session_id, o) for o in res.expired],
                 "state_hash": res.observation.state_hash}
@@ -1443,7 +1460,7 @@ def _broker_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> A
 
 def alpaca_news(session_id: str, h: Any, index: int) -> dict[str, Any]:
     """A Headline in the shape of Alpaca's news API. The id is an integer, as
-    Alpaca's is, derived from the session and the headline."""
+    Alpaca's is, derived from the session and the headline's place in the log."""
     when = _z(sim_datetime(h.day, h.tick))
     digest = uuid.uuid5(_ID_NS, f"news/{session_id}/{h.day}/{h.tick}/{index}/{h.text}")
     return {"id": digest.int % 2**53, "headline": h.text, "author": "tradefloor",
@@ -1452,14 +1469,14 @@ def alpaca_news(session_id: str, h: Any, index: int) -> dict[str, Any]:
 
 
 def _news_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> Any:
-    """Alpaca's news API (`/v1beta1/news`), served from the headlines the
-    session's observation carries: the current day's, from the tick the news
-    reaches the market. There is no older news to page through."""
+    """Alpaca's news API (`/v1beta1/news`), served from the session's news log
+    (contract 0.4): every headline released so far, from the tick it reached
+    the market."""
     from fastapi import APIRouter, Depends, Query
 
     r = APIRouter(tags=["broker facade (Alpaca v2 subset)"])
 
-    @r.get("/news", summary="Headlines (Alpaca news API): the current day's only")
+    @r.get("/news", summary="Headlines (Alpaca news API), from the session's news log")
     def news(session_id: str, owner: str = Depends(owner_dep),
              symbols: Optional[str] = Query(None), start: Optional[str] = Query(None),
              end: Optional[str] = Query(None), limit: int = Query(10, ge=1, le=50),
@@ -1468,19 +1485,25 @@ def _news_router(call: Callable[..., Any], owner_dep: Callable[..., Any]) -> Any
              page_token: Optional[str] = Query(None)) -> Any:
         if sort not in ("asc", "desc"):
             raise ServeError("invalid_request", f"sort must be asc or desc, got {sort!r}")
-        obs = call("observe", owner, session_id)
         wanted = {x.strip() for x in symbols.split(",") if x.strip()} if symbols else None
         lo, hi = _parse_time(start, "start"), _parse_time(end, "end")
+        since = max(0, _day_of(lo.astimezone(SIM_TZ).date())) if lo is not None else 0
+        log = call("news", owner, session_id)            # the whole log, so ids stay stable
         rows = []
-        for i, h in enumerate(obs.news):
+        for i, h in enumerate(log):
             when = sim_datetime(h.day, h.tick)
-            if wanted is not None and not wanted & set(h.tickers):
+            if h.day < since or (wanted is not None and not wanted & set(h.tickers)):
                 continue
             if (lo is not None and when < lo) or (hi is not None and when > hi):
                 continue
             rows.append(alpaca_news(session_id, h, i))
         if sort == "desc":
             rows.reverse()
-        return {"news": rows[:limit], "next_page_token": None}
+        try:
+            offset = int(page_token) if page_token else 0
+        except ValueError:
+            raise ServeError("invalid_request", f"unknown page_token {page_token!r}") from None
+        token = str(offset + limit) if offset + limit < len(rows) else None
+        return {"news": rows[offset:offset + limit], "next_page_token": token}
 
     return r

@@ -29,7 +29,7 @@ from fakes import FakeSessionService, core_available, core_has, make_service  # 
 from tradefloor.serve.http import create_app, sim_date, sim_datetime  # noqa: E402
 
 CORE = pytest.mark.skipif(not core_available(), reason="tradefloor.serve.core has not landed")
-CORE03 = pytest.mark.skipif(not core_has("bars"), reason="the core has not landed contract 0.3")
+CORE04 = pytest.mark.skipif(not core_has("news"), reason="the core has not landed contract 0.4")
 SMALL = {"universe_size": 4, "ticks_per_step": 30}
 
 
@@ -472,7 +472,7 @@ def _live(app):
         sock.close()
 
 
-@pytest.mark.parametrize("kind", ["fake", pytest.param("core", marks=[CORE, CORE03])])
+@pytest.mark.parametrize("kind", ["fake", pytest.param("core", marks=[CORE, CORE04])])
 def test_the_alpaca_sdk_drives_a_session_by_changing_its_base_url(kind, tmp_path):
     pytest.importorskip("alpaca", reason="alpaca-py is not installed")
     from alpaca.common.exceptions import APIError
@@ -575,11 +575,11 @@ def test_the_alpaca_sdk_drives_a_session_by_changing_its_base_url(kind, tmp_path
         with pytest.raises(APIError):
             data.get_stock_bars(StockBarsRequest(symbol_or_symbols=t0,
                                                  timeframe=TimeFrame(5, TimeFrameUnit.Minute)))
-        news = NewsClient("any-key", "any-secret", url_override=url).get_news(NewsRequest())
-        headlines = TestClient(app).get(f"/v1/sessions/{sid}/observation").json()["news"]
-        assert [item.headline for item in news.data["news"]] == [h["text"] for h in headlines]
+        news = NewsClient("any-key", "any-secret", url_override=url).get_news(NewsRequest(limit=50))
+        headlines = TestClient(app).get(f"/v1/sessions/{sid}/news").json()
+        assert [item.headline for item in news.data["news"]] == [h["text"] for h in headlines][::-1]
         if kind == "fake":
-            assert headlines
+            assert len(headlines) == 2
 
 
 # -- contract 0.2 and 0.3 in the facade ---------------------------------------------------
@@ -691,15 +691,16 @@ def test_snapshots_carry_the_previous_day(setup):
     assert snap["dailyBar"]["o"] == prev["close"]
 
 
-def test_news_is_the_days_headlines():
+def test_news_is_the_sessions_news_log():
     client = TestClient(create_app(FakeSessionService(headlines=True)))
     info = _session(client)
     sid = info["session_id"]
     b = Broker(client, sid)
     url = f"/broker/{sid}/v1beta1/news"
     assert client.get(url).json() == {"news": [], "next_page_token": None}     # tick 0: not out yet
-    b.ok(b.post("/tradefloor/advance", {"steps": 1}))
+    adv = b.ok(b.post("/tradefloor/advance", {"steps": 1}))
     headline = client.get(f"/v1/sessions/{sid}/observation").json()["news"][0]
+    assert [n["headline"] for n in adv["news"]] == [headline["text"]]
     news = client.get(url).json()["news"]
     assert len(news) == 1
     item = news[0]
@@ -709,3 +710,17 @@ def test_news_is_the_days_headlines():
     other = next(t for t in info["tickers"] if t not in headline["tickers"])
     assert client.get(url, params={"symbols": other}).json()["news"] == []
     assert client.get(url, params={"start": "2000-01-03T15:00:00Z"}).json()["news"] == []
+    # Later days add to the log; the facade pages through it newest first.
+    b.ok(b.post("/tradefloor/advance", {"steps": 2, "until": "next_open"}))
+    b.ok(b.post("/tradefloor/advance", {"steps": 1}))
+    every = client.get(url).json()["news"]
+    assert [n["created_at"][:10] for n in every] == ["2000-01-05", "2000-01-04", "2000-01-03"]
+    assert every[-1] == item                                                   # ids are stable
+    assert [n["headline"] for n in every] == [
+        h["text"] for h in client.get(f"/v1/sessions/{sid}/news").json()][::-1]
+    page = client.get(url, params={"limit": 2}).json()
+    assert page["news"] == every[:2] and page["next_page_token"]
+    rest = client.get(url, params={"limit": 2, "page_token": page["next_page_token"]}).json()
+    assert rest == {"news": every[2:], "next_page_token": None}
+    asc = client.get(url, params={"sort": "asc", "start": "2000-01-04"}).json()["news"]
+    assert asc == every[:2][::-1]

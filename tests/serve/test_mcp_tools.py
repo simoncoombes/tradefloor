@@ -23,11 +23,12 @@ from tradefloor.serve import types as T  # noqa: E402
 from tradefloor.serve.mcp import create_server  # noqa: E402
 
 CORE = pytest.mark.skipif(not core_available(), reason="tradefloor.serve.core has not landed")
-CORE03 = pytest.mark.skipif(not core_has("bars"), reason="the core has not landed contract 0.3")
+CORE04 = pytest.mark.skipif(not core_has("news"), reason="the core has not landed contract 0.4")
 HERE = Path(__file__).resolve().parent
 
 TOOLS = {"open_session", "list_sessions", "observe", "place_order", "cancel_order",
-         "list_orders", "list_fills", "get_bars", "advance", "fork_session", "close_session",
+         "list_orders", "list_fills", "get_bars", "get_news", "advance", "fork_session",
+         "close_session",
          "describe"}
 
 
@@ -50,7 +51,7 @@ def refused(server, name, code, **args):
     return body["message"]
 
 
-@pytest.fixture(params=["fake", pytest.param("core", marks=[CORE, CORE03])])
+@pytest.fixture(params=["fake", pytest.param("core", marks=[CORE, CORE04])])
 def server(request, tmp_path):
     return create_server(make_service(request.param, tmp_path / "sessions"))
 
@@ -69,7 +70,8 @@ def test_the_contract_tools_are_registered_with_real_descriptions():
         assert t.description and len(t.description) > 80, t.name
         assert t.input_schema["type"] == "object", t.name
     by_name = {t.name: t for t in tools}
-    for name in ("observe", "list_sessions", "list_orders", "list_fills", "get_bars", "describe"):
+    for name in ("observe", "list_sessions", "list_orders", "list_fills", "get_bars", "get_news",
+                 "describe"):
         assert by_name[name].annotations.read_only_hint is True, name
     assert by_name["close_session"].annotations.destructive_hint is True
     assert by_name["place_order"].annotations.read_only_hint is False
@@ -131,6 +133,8 @@ def test_a_session_through_every_tool(server):
     assert [(b["day"], b["step"]) for b in steps] == [(0, 0)]
     assert ok(server, "get_bars", session_id=sid, ticker=t0)["bars"][0]["step"] is None
     refused(server, "get_bars", "invalid_request", session_id=sid, ticker="NOPE")
+    assert ok(server, "get_news", session_id=sid)["news"] == res["news"]
+    refused(server, "get_news", "invalid_request", session_id=sid, limit=0)
 
     fork = ok(server, "fork_session", session_id=sid, label="branch")
     assert fork["parent_session_id"] == sid
@@ -236,6 +240,7 @@ async def _drive(args, env):
             await call("list_orders", session_id=sid)
             await call("list_fills", session_id=sid)
             await call("get_bars", session_id=sid, ticker=t0, resolution="step")
+            await call("get_news", session_id=sid)
             last = seen["advance"][1]["observation"]["quotes"][0]["last"]
             _, resting = await call("place_order", session_id=sid, ticker=t0, side="buy", quantity=1,
                                     type="limit", limit_price=round(last * 0.5, 2))
@@ -246,7 +251,7 @@ async def _drive(args, env):
             return init, tools, seen, error
 
 
-@pytest.mark.parametrize("kind", ["fake", pytest.param("core", marks=[CORE, CORE03])])
+@pytest.mark.parametrize("kind", ["fake", pytest.param("core", marks=[CORE, CORE04])])
 def test_every_tool_over_stdio(kind, tmp_path):
     env = dict(os.environ)
     if kind == "fake":
