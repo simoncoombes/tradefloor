@@ -1,0 +1,8 @@
+# Runtime dependencies of the hosted server, beyond the tradefloor wheel
+# itself (which depends on nothing). Floors are the versions the hosted layer
+# was written and tested against on 2026-09-23; integration folds these into
+# a `serve`/`hosted` extra in pyproject.toml (see docs/serve/HOSTED.md).
+fastapi>=0.141,<1
+uvicorn>=0.53,<1
+# Only for TRADEFLOOR_HOSTED_STORE=s3; harmless otherwise.
+boto3>=1.43,<2

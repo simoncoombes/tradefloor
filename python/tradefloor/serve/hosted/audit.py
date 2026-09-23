@@ -14,8 +14,10 @@ A line:
 `outcome` is "ok" or the ServeError code; `error` carries the message on a
 refusal. Files roll daily (`audit-YYYY-MM-DD.jsonl`, UTC) and are opened with
 O_APPEND, so lines from concurrent writers never interleave mid-line. Setting
-`stream` (the server passes stdout) copies each line there as well, which is
-how it reaches CloudWatch in the AWS path; the files remain the record.
+`stream` (the server passes stdout) copies each line there as well, as one
+JSON object per line, which is how it reaches CloudWatch in the AWS path (a
+metric filter `{ $.outcome = "unauthorized" }` counts refusals); the files
+remain the record.
 """
 
 from __future__ import annotations
@@ -76,7 +78,7 @@ class AuditLog:
                 os.close(fd)
             if self.stream is not None:
                 try:
-                    self.stream.write("AUDIT " + line)
+                    self.stream.write(line)
                     self.stream.flush()
                 except Exception:  # a broken stdout must not fail a call
                     pass

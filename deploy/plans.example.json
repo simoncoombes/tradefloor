@@ -1,0 +1,44 @@
+{
+  "trial": {
+    "max_open_sessions": 2,
+    "max_stored_sessions": 20,
+    "storage_bytes": 104857600,
+    "max_universe_size": 20,
+    "min_ticks_per_step": 10,
+    "max_advance_ticks": 390,
+    "max_open_orders": 50,
+    "calls_per_minute": 60,
+    "steps_per_minute": 60,
+    "sim_days_per_day": 100,
+    "compute_seconds_per_day": 300,
+    "idle_expiry_seconds": 86400
+  },
+  "standard": {
+    "max_open_sessions": 5,
+    "max_stored_sessions": 200,
+    "storage_bytes": 1073741824,
+    "max_universe_size": 40,
+    "min_ticks_per_step": 5,
+    "max_advance_ticks": 1950,
+    "max_open_orders": 200,
+    "calls_per_minute": 300,
+    "steps_per_minute": 300,
+    "sim_days_per_day": 1000,
+    "compute_seconds_per_day": 1800,
+    "idle_expiry_seconds": 604800
+  },
+  "research": {
+    "max_open_sessions": 20,
+    "max_stored_sessions": 2000,
+    "storage_bytes": 10737418240,
+    "max_universe_size": 40,
+    "min_ticks_per_step": 1,
+    "max_advance_ticks": 7800,
+    "max_open_orders": 1000,
+    "calls_per_minute": 1200,
+    "steps_per_minute": 3000,
+    "sim_days_per_day": 20000,
+    "compute_seconds_per_day": 21600,
+    "idle_expiry_seconds": 2592000
+  }
+}
