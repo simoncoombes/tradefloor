@@ -6,7 +6,11 @@ them at every tick hashes the same as one that never does.
 
 And `news_absorption_half_life` with its two companions, which move WHEN an
 endogenous event's move lands and never how much of it: shipped at 0.0, the
-straight line over the session every preset has always priced.
+straight line over the session every preset through pt-v18 prices. pt-v19
+takes the derived profile and the maker's re-quote since its fifth
+composition (2026-09-23), so a test here that compares news priced fast
+against the straight line builds the straight-line arm explicitly (`OFF`)
+rather than reading it off the default.
 """
 
 from __future__ import annotations
@@ -137,13 +141,33 @@ def _share(n, h, d=0.0, hd=0.0):
     return (1 - d) * comp(n, h) + d * comp(n, hd)
 
 
-def test_it_ships_inert_on_every_preset():
+#: The four dials at the straight line and the book quoted around the last
+#: print: what every preset through pt-v18 ships, and the arm the tests below
+#: compare fast pricing against. pt-v19 no longer ships it, so it is built.
+OFF = dict(news_absorption_half_life=0.0, news_absorption_drift_share=0.0,
+           news_absorption_drift_half_life=0.0, news_quote_revision=0.0)
+
+#: The presets that price news within minutes, and at what. pt-v19 takes the
+#: derived profile (Christensen, Timmermann and Veliyev's Table 7, design
+#: repository programme/results/news-speed/) with the maker's re-quote since
+#: its fifth composition. Written out, so a preset added without a decision
+#: about these dials fails below.
+NEWS_PRICED = {"pt-v19": dict(news_absorption_half_life=0.6,
+                              news_absorption_drift_share=0.12,
+                              news_absorption_drift_half_life=42.0,
+                              news_quote_revision=1.0)}
+
+
+def test_it_ships_inert_on_every_preset_but_pt_v19():
+    """Inert on every preset but the one that takes the profile, and that
+    one carries exactly the derived values."""
     for name in tf.preset_names():
         m = tf.ModelParams.from_preset(name).to_dict()
-        assert m["news_absorption_half_life"] == 0.0, name
-        assert m["news_absorption_drift_share"] == 0.0, name
-        assert m["news_absorption_drift_half_life"] == 0.0, name
-        assert m["news_quote_revision"] == 0.0, name
+        want = NEWS_PRICED.get(name, OFF)
+        assert set(want) == set(OFF)
+        for dial, value in want.items():
+            assert m[dial] == value, (name, dial, m[dial])
+    assert set(NEWS_PRICED) <= set(tf.preset_names())
 
 
 FAST = dict(news_absorption_half_life=1.0, news_absorption_drift_share=0.2,
@@ -158,9 +182,14 @@ FAST = dict(news_absorption_half_life=1.0, news_absorption_drift_share=0.2,
 def test_the_profile_moves_when_the_move_lands_not_how_much(dials):
     """Same seed, same events (the NEWS stream does not read prices). Tick by
     tick the announcer's `company_news` follows the profile; by the close it
-    is the whole `price_impact`, as on the shipped straight line."""
-    m = tf.ModelParams.from_preset("pt-v19", **dials)
-    fast, line = _engine(model=m), _engine()
+    is the whole `price_impact`, as on the straight line.
+
+    Both arms are pt-v19 with the four dials at the straight line (`OFF`),
+    and the fast arm then sets the ones under test, so the profile it follows
+    is exactly `dials` and nothing the default carries."""
+    m = tf.ModelParams.from_preset("pt-v19", **{**OFF, **dials})
+    line_model = tf.ModelParams.from_preset("pt-v19", **OFF)
+    fast, line = _engine(model=m), _engine(model=line_model)
     for e in (fast, line):
         e.run_days(3)
         e.open_market()
@@ -233,8 +262,11 @@ def test_off_session_ticks_price_none_of_it():
      "read by nothing"),
 ])
 def test_out_of_domain_values_are_refused(bad, match):
+    # On the straight-line arm, so each row is the combination it names: the
+    # default carries the profile, and on it a drift part with no half-life
+    # given would sit beside the default's 0.6 and be admissible.
     with pytest.raises(Exception, match=match):
-        tf.ModelParams.from_preset("pt-v19", **bad)
+        tf.ModelParams.from_preset("pt-v19", **{**OFF, **bad})
 
 
 def test_the_weights_sum_to_the_whole_move():
@@ -272,7 +304,10 @@ def test_the_maker_requotes_on_news_so_the_print_follows_the_model():
     re-quote on, the first tick's print carries about the profile's share."""
     profile = dict(news_absorption_half_life=0.6, news_absorption_drift_share=0.12,
                    news_absorption_drift_half_life=42.0)
-    lagged = _print_share_at_tick_one(tf.ModelParams.from_preset("pt-v19", **profile))
+    # The re-quote OFF explicitly: pt-v19 ships it on since its fifth
+    # composition, so the default is the second arm and not the first.
+    lagged = _print_share_at_tick_one(tf.ModelParams.from_preset(
+        "pt-v19", **profile, news_quote_revision=0.0))
     requoted = _print_share_at_tick_one(
         tf.ModelParams.from_preset("pt-v19", **profile, news_quote_revision=1.0))
     target = _share(1, 0.6, 0.12, 42.0)
