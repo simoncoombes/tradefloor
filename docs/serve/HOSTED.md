@@ -12,8 +12,8 @@ run. `deploy/aws/deploy.sh` refuses to start without an explicit confirmation
 phrase, and it should only be given after the owner approves.
 
 Code: `python/tradefloor/serve/hosted/`. Deployment: `deploy/`. Tests:
-`tests/serve/test_hosted_*.py`. The contract: `docs/serve/CONTRACT.md` (0.2),
-sections 1, 5, 6 and 7.
+`tests/serve/test_hosted_*.py`. The contract: `docs/serve/CONTRACT.md` (0.3),
+sections 1, 4d, 5, 6 and 7.
 
 ## 1. What the hosted layer is
 
@@ -41,6 +41,11 @@ The owner comes from the API key. The HTTP app's `owner_resolver` is
 `ApiKeyResolver`, which reads the key and returns a `Principal`: a `str`
 holding the owner id that also carries the key id for the audit log. The core
 then does its own check, so one owner's sessions are `not_found` to another.
+`create_hosted_app` builds the transport's app with its global lock off: under
+contract 0.3 (section 4d) a service locks per session, and the hosted meter,
+accounts and audit log lock themselves, so bots in different sessions do not
+queue behind each other's disk writes. A test runs six owners on six threads
+through one HostedService over the real core.
 
 Overhead, measured on a 20-name session with FileStore on a local SSD: an
 `advance` of one 30-tick step takes 1.7 ms on the bare core and 1.8 ms through
@@ -144,7 +149,7 @@ How the meter works:
 - Both buckets are token buckets that refill continuously. An `advance` asks
   the step bucket for an upper bound on its steps before it runs (from the
   clock and the core's rules for `until`), then refunds whatever it did not
-  use. The advance-length cap applies to every mode: under contract 0.2,
+  use. The advance-length cap applies to every mode: since contract 0.2,
   `steps=k` with `until="close"` or `"next_open"` counts k closes or opens,
   so it can run k sessions. A single close or open always fits, because
   every plan allows at least one session per call.
@@ -237,7 +242,7 @@ about 15 KiB at 20 names and 24 KiB at 40 (measured). A session directory is
 about 120 KiB after a few days of trading.
 
 **S3Store** (`hosted/s3store.py`) implements the `SessionStore` protocol
-(`types.py`, contract 0.2) on S3, with FileStore's atomicity. S3 has no append and no rename, so a commit
+(`types.py`, since contract 0.2) on S3, with FileStore's atomicity. S3 has no append and no rename, so a commit
 PUTs the stream chunks and the record under fresh names (sequence number plus
 a random nonce), then PUTs `head.json` conditionally (`If-Match` on the ETag
 it last saw, or `If-None-Match: *` for the first commit). `head.json` is the
@@ -325,6 +330,14 @@ exactly the files the ignore file lets through: `cargo fetch --locked`, then
 runtime requirements into a clean virtualenv, imports and runs the admin CLI.
 `tests/serve/test_hosted_deploy.py::test_docker_image_builds_and_starts`
 builds the real image, and skips cleanly when Docker is absent.
+
+The server itself (outside Docker) was run on 127.0.0.1 with a temporary data
+directory and driven with curl and the admin CLI: a key made by the CLI
+opened and advanced a session, the broker facade accepted the key split
+across the two `APCA-` headers, the 61st call in a minute got 429 with
+`Retry-After`, `revoke-all` took effect on the next request, `sessions` went
+through the admin listener (401 without its token), and SIGTERM shut down
+cleanly with the ledger flushed.
 
 ### AWS (`deploy/aws/`, written, linted, NOT run)
 
@@ -491,18 +504,14 @@ responses of about 5 KB.
    owner_resolver=None)`: when a resolver is given, each tool call resolves
    the owner from the request context, so the streamable-HTTP transport can
    be hosted at `/mcp` (section 10).
-3. **`ServeError.retry_after`.** The transport already turns a `retry_after`
-   attribute into `Retry-After`, and the hosted layer sets it. Make it an
-   optional field of `ServeError` in `types.py`, so the arrangement is part
-   of the contract and not a convention.
-4. **Limits in `describe`.** `describe` (MCP) and `/v1/describe` should
+3. **Limits in `describe`.** `describe` (MCP) and `/v1/describe` should
    report the caller's plan limits when the service is hosted. A hook such as
    `describe_extra(owner) -> dict` on the service would do it. Until then,
    `GET /v1/usage` carries them.
-5. **`SessionStore.size(session_id)`**, so the hosted storage meter does not
+4. **`SessionStore.size(session_id)`**, so the hosted storage meter does not
    need to know FileStore's directory layout (today it adds up
    `<root>/<session_id>/`, and S3Store has `size_of`).
-6. **Say what `Clock.step` means.** The core counts steps since the current
+5. **Say what `Clock.step` means.** The core counts steps since the current
    trading day opened, and `types.py` says "since the session opened", which
    reads as the whole server session. The hosted layer meters from `day` and
    `tick` for this reason.
@@ -516,7 +525,7 @@ responses of about 5 KB.
   reaching a running server without a restart, revoke-all and suspension,
   validation of owner names and plans.
 - `test_hosted_service.py`, over the in-memory fake: authorisation, owner
-  isolation for every call, and every limit in section 4 (open and stored
+  isolation for every call (bars included), and every limit in section 4 (open and stored
   sessions, storage, universe, ticks per step, advance length, calls and
   steps per minute with refunds, simulated days with the UTC reset, compute
   seconds, open orders with idempotent replay), idle expiry both swept and
@@ -525,7 +534,7 @@ responses of about 5 KB.
 - `test_hosted_with_core.py`, over LocalSessionService on FileStore:
   metering against the core's clock in every `until` mode, the FileStore
   storage meter, expiry of a real session, resume after a restart through
-  the hosted layer, and owner isolation.
+  the hosted layer, owner isolation, and six owners on six threads at once.
 - `test_hosted_s3store.py`: the round trip with bit-exact floats, a fresh
   process reading committed state, a crash at each PUT, a second writer
   refused, compaction and gc, heads by owner with a half-created session,
@@ -533,8 +542,13 @@ responses of about 5 KB.
   boto3 against moto.
 - `test_hosted_admin.py`: every CLI command, the pepper guard, and
   `sessions`/`expire-idle` through a running admin listener with its token.
-- `test_hosted_http.py`: owner isolation, limits and headers end to end
-  through the transport's HTTP app (runs once the transport is merged).
+- `test_hosted_http.py`, through the transport's HTTP app over the real core:
+  401 without a key and `WWW-Authenticate`, owner isolation on native and
+  broker routes, the broker facade with the key split in two, 429 with
+  `Retry-After` for rate limits and daily quotas, 400 for plan caps,
+  `/v1/usage`, the audit trail of HTTP requests with key ids, revocation and
+  suspension on the next request, and the failed-auth throttle letting a
+  valid key through.
 - `test_hosted_deploy.py`: the template's security properties and a clean
   cfn-lint, the deploy guard, the loopback-only compose file, the ignore file
   and Dockerfile, and the image build when Docker is present.
