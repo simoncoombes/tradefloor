@@ -10,10 +10,12 @@ Where the key may be sent, in order of precedence:
                                                  only a base URL and the key split in two
                                                  (or the whole key in the SECRET header)
 
-A source address that keeps failing authentication is throttled before its
-keys are even looked at (`rate_limited`), so a key-guessing flood costs a
-dictionary lookup, not a hash. Guessing cannot succeed anyway (256-bit
-secrets); the throttle protects the CPU and the audit log.
+A source address that keeps failing authentication (30 a minute by default)
+gets `rate_limited` instead of `unauthorized` for its further failures, and
+those are not audited again. A VALID key from that address still works, so a
+broken bot behind a shared NAT address cannot lock out its neighbours.
+Guessing cannot succeed anyway (256-bit secrets); the throttle keeps floods
+out of the audit log and tells a misconfigured client to back off.
 
 MCP: the contract's MCP transport is stdio, which a hosted service cannot
 offer (stdio means the server runs on the user's machine). Hosted MCP means
@@ -112,12 +114,21 @@ class ApiKeyResolver:
     def __call__(self, request: Any) -> Principal:
         headers = getattr(request, "headers", request)
         source = self.source_of(request) if hasattr(request, "headers") else None
+        key = extract_api_key(headers)
         wait = self._throttled(source)
         if wait:
-            raise rate_limited(f"too many failed authentications from this address; "
-                               f"retry in {_fmt_wait(wait)}", wait)
+            # A valid key still gets in from a throttled address, so one broken
+            # bot behind a shared NAT does not lock out the good ones. Failures
+            # from it are answered 429 and not audited again.
+            try:
+                owner, key_id = self.hosted.accounts.authenticate(key)
+            except ServeError:
+                self._failed(source)
+                raise rate_limited(f"too many failed authentications from this address; "
+                                   f"retry in {_fmt_wait(wait)}", wait) from None
+            return Principal(owner, key_id)
         try:
-            return self.hosted.authenticate(extract_api_key(headers), source=source)
+            return self.hosted.authenticate(key, source=source)
         except ServeError:
             self._failed(source)
             raise

@@ -102,7 +102,7 @@ next request, so a revoked key stops working at once, with no restart.
 A plan is data. `deploy/plans.example.json` holds the built-in three, and
 `TRADEFLOOR_HOSTED_PLANS` points the server at your own file, which replaces
 the built-in plans rather than merging with them. The numbers below are
-placeholders until the owner sets the plans and prices (section 12).
+placeholders until the owner sets the plans and prices (section 13).
 
 | Limit | trial | standard | research | Refusal |
 |---|---|---|---|---|
@@ -190,7 +190,7 @@ every 10 s, with a count of the ones it stands for, so a flood of bad keys
 cannot fill the disk through the log. Reads are metered but not logged. Set
 `audit_reads=True` to log them too.
 
-Retention is the owner's decision (section 12). The files on EFS are the
+Retention is the owner's decision (section 13). The files on EFS are the
 record, and CloudWatch keeps 90 days by default.
 
 ## 7. The admin CLI
@@ -272,7 +272,7 @@ so clients see 10 to 30 seconds of 502s and should retry.
 
 Capacity: with FileStore on a local disk, one process handles a few hundred
 mutating calls a second. Commits on EFS take longer, because each one makes
-several NFS round trips. **Measure this on EFS before launch** (section 12).
+several NFS round trips. **Measure this on EFS before launch** (section 13).
 At the placeholder plans, 50 bots all running at trial limits make about 50
 calls a second, which is well within capacity.
 
@@ -412,10 +412,12 @@ responses of about 5 KB.
   does not exist, and a test checks every call through both the fake and the
   real core. Owner names are limited to `[a-z0-9._-]`.
 - **Guessing keys.** It cannot succeed against 256-bit secrets. A source
-  address that keeps failing is throttled (30 failures a minute) before its
-  keys are even looked up. The audit log folds repeated failures. On AWS the
-  optional WAF adds a per-IP rate limit, and an alarm fires on spikes of
-  unauthorised calls.
+  address that keeps failing (more than 30 failures a minute) gets
+  `rate_limited` for further failures, which are not audited again, while a
+  valid key from the same address still works, so one broken bot behind a
+  shared NAT address does not lock out its neighbours. The audit log also
+  folds repeated failures per key id. On AWS the optional WAF adds a per-IP
+  rate limit, and an alarm fires on spikes of unauthorised calls.
 - **A leaked key.** (1) `admin revoke-key <id>`, or `revoke-all <owner>` if
   it is unclear which key leaked. It takes effect on the next request. (2)
   Read `admin audit --owner <owner>` and CloudWatch for calls from that key
