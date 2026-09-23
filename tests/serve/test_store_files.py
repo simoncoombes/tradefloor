@@ -212,10 +212,12 @@ def test_heads_ignore_stray_files(tmp_path):
 
 
 def test_history_goes_to_streams_so_the_record_stays_bounded(tmp_path):
-    """A long session's commit is the size of the market plus the 20-session
-    step-bar window, not the size of its past: fills, finished orders and day
-    bars go to streams."""
-    from tradefloor.serve.core import STEP_BAR_SESSIONS, LocalSessionService
+    """A long session's commit is the size of the market plus one session of
+    step bars, not the size of its past: fills, finished orders, day bars,
+    news and the step-bar window go to streams, and the window's stream is
+    trimmed at session boundaries (contract 0.4)."""
+    from tradefloor.serve.core import (STEP_BAR_SESSIONS, STEP_BAR_TRIM_AT,
+                                       LocalSessionService)
     from tradefloor.serve.types import OrderRequest, SessionConfig
 
     svc = LocalSessionService(FileStore(tmp_path))
@@ -233,12 +235,100 @@ def test_history_goes_to_streams_so_the_record_stays_bounded(tmp_path):
                                                    quantity=10))
             svc.advance("o", sid, until="close")
 
-    trade_days(STEP_BAR_SESSIONS + 1)
-    full = record_size()
-    trade_days(15)
-    assert record_size() <= full * 1.02
-    assert len(svc.fills("o", sid)) == STEP_BAR_SESSIONS + 16
-    lines = (tmp_path / sid / "fills.jsonl").read_text().splitlines()
-    assert len(lines) == STEP_BAR_SESSIONS + 16
-    days = (tmp_path / sid / "day_bars.jsonl").read_text().splitlines()
-    assert len(days) == STEP_BAR_SESSIONS + 16
+    trade_days(2)
+    early = record_size()
+    lengths = []
+    for _ in range(STEP_BAR_TRIM_AT + 5):
+        trade_days(1)
+        lengths.append(len(FileStore(tmp_path).read_stream(sid, "step_bars")))
+    assert record_size() <= early * 1.02
+    assert max(lengths) < STEP_BAR_TRIM_AT
+    assert min(lengths[STEP_BAR_SESSIONS:]) >= STEP_BAR_SESSIONS
+    days = STEP_BAR_TRIM_AT + 7
+    assert len(svc.fills("o", sid)) == days
+    assert len((tmp_path / sid / "fills.jsonl").read_text().splitlines()) == days
+    assert len((tmp_path / sid / "day_bars.jsonl").read_text().splitlines()) == days
+    steps = svc.bars("o", sid, t, "step")
+    assert sorted({b.day for b in steps}) == list(range(days - STEP_BAR_SESSIONS, days))
+    fresh = LocalSessionService(FileStore(tmp_path))
+    assert fresh.bars("o", sid, t, "step") == steps
+
+
+# -- trim_stream (contract 0.4) ------------------------------------------------------------
+
+def test_trim_stream_keeps_the_last_entries(any_store):
+    s = any_store
+    for i in range(1, 6):
+        s.commit("abc", rec(i), {"w": [{"i": i}], "calls": [{"c": i}]})
+    s.trim_stream("abc", "w", 2)
+    assert s.read_stream("abc", "w") == [{"i": 4}, {"i": 5}]
+    assert s.read_stream("abc", "calls") == [{"c": i} for i in range(1, 6)]
+    assert s.version("abc") == 5 and s.load("abc")["seq"] == 5
+    s.commit("abc", rec(6), {"w": [{"i": 6}]})          # appends after a trim
+    assert s.read_stream("abc", "w") == [{"i": 4}, {"i": 5}, {"i": 6}]
+    s.trim_stream("abc", "w", 10)                         # no-op
+    assert len(s.read_stream("abc", "w")) == 3
+    s.trim_stream("abc", "w", 0)
+    assert s.read_stream("abc", "w") == []
+    s.commit("abc", rec(7), {"w": [{"i": 7}]})
+    assert s.read_stream("abc", "w") == [{"i": 7}]
+    s.trim_stream("abc", "nothing", 1)                    # unknown stream: no-op
+    s.trim_stream("zzz", "w", 1)                          # unknown session: no-op
+    for bad in (-1, 1.5, True, "2"):
+        with pytest.raises(ValueError):
+            s.trim_stream("abc", "w", bad)
+
+
+def test_filestore_trim_layout(tmp_path):
+    fs = FileStore(tmp_path)
+    for i in range(1, 5):
+        fs.commit("abc", rec(i), {"w": [{"i": i}]})
+    fs.trim_stream("abc", "w", 1)
+    fs.trim_stream("abc", "w", 1)                         # already 1: no-op
+    fs.commit("abc", rec(5), {"w": [{"i": 5}]})
+    fs.trim_stream("abc", "w", 1)
+    names = sorted(p.name for p in (tmp_path / "abc").iterdir())
+    assert names == ["head.json", "record-5.json", "w.2.jsonl"]
+    assert FileStore(tmp_path).read_stream("abc", "w") == [{"i": 5}]
+    assert (tmp_path / "abc" / "w.2.jsonl").read_text() == '{"i":5}\n'
+
+
+def test_a_trim_killed_before_its_rename_changes_nothing(tmp_path, monkeypatch):
+    fs = FileStore(tmp_path)
+    for i in range(1, 5):
+        fs.commit("abc", rec(i), {"w": [{"i": i}]})
+    real = FileStore._write_atomic
+
+    def die_on_head(self, path, text):
+        if path.name == "head.json":
+            raise KeyboardInterrupt("killed")
+        return real(self, path, text)
+
+    monkeypatch.setattr(FileStore, "_write_atomic", die_on_head)
+    with pytest.raises(KeyboardInterrupt):
+        fs.trim_stream("abc", "w", 2)
+    monkeypatch.setattr(FileStore, "_write_atomic", real)
+    fresh = FileStore(tmp_path)
+    assert fresh.read_stream("abc", "w") == [{"i": i} for i in range(1, 5)]
+    # The orphaned generation file is harmless: commits and trims carry on.
+    fresh.commit("abc", rec(5), {"w": [{"i": 5}]})
+    fresh.trim_stream("abc", "w", 2)
+    assert fresh.read_stream("abc", "w") == [{"i": 4}, {"i": 5}]
+
+
+def test_a_reader_racing_a_trim_rereads_the_head(tmp_path, monkeypatch):
+    fs = FileStore(tmp_path)
+    for i in range(1, 5):
+        fs.commit("abc", rec(i), {"w": [{"i": i}]})
+    stale = fs._head("abc")                  # what a reader saw before the trim
+    fs.trim_stream("abc", "w", 2)            # removes w.jsonl
+    real = FileStore._head
+    calls = {"n": 0}
+
+    def head_once_stale(self, session_id):
+        calls["n"] += 1
+        return stale if calls["n"] == 1 else real(self, session_id)
+
+    monkeypatch.setattr(FileStore, "_head", head_once_stale)
+    assert fs.read_stream("abc", "w") == [{"i": 3}, {"i": 4}]
+    assert calls["n"] == 2
