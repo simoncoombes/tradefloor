@@ -165,7 +165,12 @@ BASELINE = "pt-v1"
 #: proposed to ship. A preset nobody runs is history, and history is not
 #: made better by demanding derivations for it now. pt-v19 is the one
 #: proposed to ship: composed 2026-09-10, recomposed 2026-09-20 on the
-#: factorial (the market variance family and the idio jumps back to pt-v18).
+#: factorial (the market variance family and the idio jumps back to pt-v18),
+#: and composed a fifth time on 2026-09-23 with twenty-three dials, the
+#: design programme's candidate LMN-Q25A375 (programme/results/ptv19-fifth/
+#: RESULT.md in the design repository). Fifteen of those dials left
+#: OUT_OF_SCOPE and three left POST_BASELINE for entries below, and
+#: `market_vol_vix_excursion` went the other way, back to pt-v1's 0.0.
 REQUIRED_PRESETS = ("pt-v16", "pt-v18", "pt-v19")
 
 KINDS = ("derived", "measured", "undetermined")
@@ -202,20 +207,11 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: `vix_level_identity` was the fifth until pt-v19 moved it to 1.0 on
 #: 2026-09-10; it is in scope under the difference rule now and has its
 #: entry in `DIAL_PROVENANCE`, which is the transition this list exists
-#: to make visible rather than absorb.
+#: to make visible rather than absorb. The same transition, three at once,
+#: on 2026-09-23: `cycle_stationary_opening`,
+#: `macro_calendar_days_per_year` and `macro_compound_days_per_year` left
+#: when pt-v19's fifth composition moved all three off pt-v1.
 POST_BASELINE = {
-    "macro_calendar_days_per_year":
-        "added 2026-09-23; every shipped preset carries 365.0, the calendar that has always stood (30-step months, 90-step quarters, a 365-step year), and it is LIVE there. "
-        "The economy steps once per session, so a macro year was 1.45 "
-        "trading years; 252.0 is the session calendar (21-step months), "
-        "DERIVED from the session count and not fitted "
-        "(programme/results/macro-cycle/, design repository). Not adopted",
-    "macro_compound_days_per_year":
-        "added 2026-09-23; every shipped preset carries 365.0, the division that has always stood, and it is LIVE there (it IS the compounding). The economy "
-        "steps once per trading session, 252 to a year, so 365 gives a "
-        "trading year 252/365 of its annual GDP and CPI growth; 252.0 is the "
-        "session clock, DERIVED from that count and not fitted "
-        "(programme/results/longrun-drift/, design repository). Not adopted",
     "jump_idio_vix_decoupled":
         "added at 0.8.0 for the idiosyncratic arrival rate under the "
         "identity; pt-v19 carried 1.0 from 2026-09-14 until the 2026-09-20 "
@@ -223,9 +219,6 @@ POST_BASELINE = {
         "its own at 1.0 (test_model_params measures it moving the market "
         "with `jump_idio_excitation` at 0.0), so it is a choice at 0.0 and "
         "not an inert partner",
-    "cycle_stationary_opening":
-        "added 2026-09-05 for the stationary opening; pt-v19 sets it to 1.0 "
-        "(charter 3.1, ruling R2) and every shipped preset leaves it at 0.0",
     "vix_variance_premium":
         "the measured variance risk premium. Read only while "
         "`vix_level_identity` is non-zero, so no preset has had to move it "
@@ -367,6 +360,25 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    # RETURNED TO 0.0 BY THE FIFTH COMPOSITION (2026-09-23). pt-v19 carried
+    # the excursion form for two days with a derivation this table held;
+    # the entry is in this file as of the composition commit (4d8f9cf) and
+    # the argument is in `ModelParams::market_vol_vix_excursion`.
+    "market_vol_vix_excursion":
+        "inert at 0.0: engine.rs `close_market` branches on `== 0.0` and the "
+        "factor's variance target measures the VIX against `self.vix_anchor`, "
+        "the expression that stood at the call site, and "
+        "`forced_vix_denominator` returns the free close's denominator. "
+        "Every shipped preset is there since 2026-09-23. pt-v19 carried 1.0, "
+        "the EXCURSION form (the loop's double count removed at its "
+        "mechanism, a switch with no interior, measured on b4fix2 and "
+        "b4fix4), from its third composition until its fifth returned it to "
+        "pt-v1's 0.0 for the ANCHOR form of the VIX law, LAWC-D, where the "
+        "anchor enters the VIX's own target through `vix_anchor_weight` "
+        "(programme/results/vix-slow-regime/ and results/vix-law-levels/, "
+        "design repository). The two forms are alternatives, so the "
+        "switch's value is the choice of form and the choice is recorded "
+        "under the anchor dials' entries",
     # THE FIVE THE 2026-09-20 RECOMPOSITION RETURNED TO 0.0 (six, until
     # `market_vol_gamma` returned to pt-v19 on 2026-09-21). Each shipped a
     # non-zero value on pt-v19 for six days, with a derivation the design
@@ -413,97 +425,25 @@ OUT_OF_SCOPE = {
         "design's own falsifier of 7x, below the shipped form's 4.90x. The "
         "derivation and the measurements are in "
         "`ModelParams::vix_anchor_reversion`",
-    "vix_anchor_weight":
-        "inert at 0.0: economy/daily.rs branches on `!= 0.0` and the VIX's "
-        "target is the read-back exactly. The anchor of "
-        "`vix_anchor_reversion` moved from the step's RATE into its TARGET, "
-        "as a geometric blend of the read-back and the derived anchor, so "
-        "the VIX reverts at `vix_mean_reversion` alone. DERIVED 0.609944 at "
-        "`market_vol_vix_exponent` 4.0 as the weight at which the linearised "
-        "loop's slow pole equals the tape's 0.9965 "
-        "(programme/results/route1-blend/looppoles.py, design repository). "
-        "Shipped at 0.0: a probe of route 1, not an adoption",
-    "vix_anchor_memory":
-        "inert at 0.0: the anchor weight reads today's read-back and the "
-        "engine never advances the memory. Nonzero, the weight pulls "
-        "against a slow memory of the read-back's log deviation, so the "
-        "day's variance move reaches the VIX in full. A probe of route 1 "
-        "(programme/results/route1-blend/, design repository), not derived "
-        "and not adopted",
-    "vix_anchor_centre":
-        "inert at 0.0: economy/daily.rs and the memory branch on `!= 0.0` "
-        "and the anchor weight pulls to `L * anchor` exactly. Nonzero, it "
-        "pulls to `L * anchor * exp(-c)`; the forward map's denominator is "
-        "not moved. A probe (programme/results/vix-law-levels/, design "
-        "repository), not adopted",
-    "vix_anchor_weight_level":
-        "inert at 0.0: the anchor weight is the constant dial. Nonzero, "
-        "`1 - a(x) = (1 - a) (C / min(x, r C))^eta`, the exponent read off "
-        "the held read-back's elasticity to the VIX (programme/results/"
-        "vix-law-levels/, design repository). A probe, not adopted",
-    "vix_anchor_weight_level_cap":
-        "unread while `vix_anchor_weight_level` is 0.0, and 0.0 is no cap. "
-        "The level, as a multiple of the centre, where the held read-back's "
-        "elasticity stops rising. A probe, not adopted",
-    "vix_anchor_weight_level_knee":
-        "unread while `vix_anchor_weight_level` is 0.0. The level, as a log "
-        "offset below the anchor, where the level law starts raising the "
-        "weight: where the held read-back's elasticity crosses one. A probe, "
-        "not adopted",
-    "market_vol_vix_exponent_below":
-        "inert at 0.0: the market variance target reads "
-        "`market_vol_vix_exponent` on both sides of the anchor and the "
-        "branch is never taken. Nonzero, it is the exponent below the "
-        "anchor only, read off the tape's common-variance elasticity to the "
-        "VIX in calm markets (programme/results/calm-regime/, design "
-        "repository). A probe, not adopted",
     "vix_anchor_weight_level_below":
-        "unread while `vix_anchor_weight_level` is 0.0; at 0.0 the weight is "
-        "the dial below the knee. 1.0 runs the level law below it too. A "
-        "probe, not adopted",
-    "cycle_us_calibration":
-        "inert at 0.0 as shipped: a branch that reads the reference "
-        "implementation's phase table. 1.0 "
-        "reads the table derived from NBER recession dates and BEA real GDP "
-        "(programme/results/macro-cycle/, design repository). Not adopted",
-    "fed_liftoff_rule":
-        "inert at 0.0 as shipped: a branch not taken, leaving the reference "
-        "ladder, whose every hike needs "
-        "inflation a point over target. 1.0 adds the ladder's own cut "
-        "branch mirrored, so the rate lifts off zero on its Taylor rule "
-        "(programme/results/macro-cycle/, design repository). Not adopted",
-    "news_absorption_half_life":
-        "inert at 0.0 as shipped: a branch not taken, so every tick carries "
-        "an endogenous news event whole and the move lands in a straight "
-        "line over the session. Off zero it is the half-life in ticks of the "
-        "fast part of the move; 0.6 is derived from intraday event studies "
-        "(programme/results/news-speed/, design repository). Not adopted",
-    "news_absorption_drift_share":
-        "inert at 0.0 as shipped, and unread while "
-        "`news_absorption_half_life` is 0.0: the share of the move that "
-        "arrives as post-news drift. 0.12 is derived "
-        "(programme/results/news-speed/, design repository). Not adopted",
-    "news_absorption_drift_half_life":
-        "inert at 0.0 as shipped, and unread while "
-        "`news_absorption_drift_share` is 0.0: the drift part's half-life in "
-        "ticks. 42 is derived (programme/results/news-speed/, design "
-        "repository). Not adopted",
-    "news_quote_revision":
-        "inert at 0.0 as shipped: a branch not taken, so the maker quotes "
-        "around the last print and a news move reaches the tape only as "
-        "fast as the flow walks the book. 1.0 re-quotes by the tick's news "
-        "term (programme/results/news-speed/, design repository). Not adopted",
-    "market_pe_buybacks":
-        "inert at 0.0 as shipped: a branch not taken, so market_pe leaves "
-        "out the buyback term the "
-        "valuation applies, so it rises by the buyback yield a year. 1.0 "
-        "reads it in (programme/results/macro-cycle/, design repository). "
-        "Not adopted",
+        "inert at 0.0: `economy::daily::anchor_weight_at_level` holds the "
+        "level at the knee from below (`max(x, knee)`) when it is 0.0, so "
+        "under the knee the weight is `vix_anchor_weight` itself. That is "
+        "the law pt-v19 runs since its fifth composition switched the level "
+        "law on (`vix_anchor_weight_level` 1.0); on every preset without the "
+        "level law it is unread. 1.0 runs the law below the knee too, "
+        "lowering the weight toward zero there, which was screened and "
+        "refused (programme/results/vix-law-levels/ sections 4 and 5, "
+        "design repository). A probe, not adopted",
     "vix_anchor_weight_level_knee_fixed":
-        "inert at 0.0, and unread while `vix_anchor_weight_level` is 0.0: the "
-        "knee reads `L * anchor` as it always has. 1.0 takes the slow regime "
-        "level out of the knee, which the held map places at an absolute VIX "
-        "(vix-slow-regime, design repository). A probe, not adopted",
+        "inert at 0.0: economy/daily.rs branches on `!= 0.0` and the knee "
+        "reads `L * anchor` as it always has, which is the knee pt-v19's "
+        "level law reads since its fifth composition; on every preset "
+        "without the level law it is unread. 1.0 takes the slow regime level "
+        "out of the knee, which the held map places at an absolute VIX "
+        "(vix-slow-regime section 7, design repository): it moves the "
+        "turbulent rows toward the tape and changes no gate, and it was not "
+        "in the adopted vector. A probe, not adopted",
     "crisis_epicentre_end_sessions":
         "unread while `crisis_epicentre_extra` is 0.0: with no episode ever "
         "entered there is no counter to end. 21 sessions is a month and is a "
@@ -613,20 +553,6 @@ OUT_OF_SCOPE = {
         "REFUTED as a mechanism by the `alphax2` box, which found the "
         "clustering response flat from 0.0 to 0.40; it stays in the tree at "
         "zero with the refutation beside it",
-    "market_beta_down_asym_lag_live":
-        "inert at 0.0: market/tick.rs branches on `== 0.0` and hands the "
-        "lagged wire the same `prev_day_down` bit the engine read at the "
-        "open, so every shipped preset -- including pt-v18 and pt-v19, "
-        "which run the wire itself at 0.375 -- is bit-identical. It takes "
-        "NO draw at any value: it re-reads two numbers "
-        "`MarketVarianceState::snapshot` already holds and the draw "
-        "schedule is a pure function of market status, active set and "
-        "sector count. It is a FORM dial with two admissible values and no "
-        "number to derive. Registered unrun: "
-        "`programme/results/corr-asymmetry-repair.md` (design repository) "
-        "section 8 is the diagnostic that would rule on the form, and "
-        "until that rules the 0.0 is the absence of a ruling rather than "
-        "the result of one",
     "market_idio_down_suppress":
         "inert at 0.0: market/factors.rs branches on `== 0.0` after the "
         "draw and neither scale is applied, so no preset that predates the "
@@ -735,80 +661,6 @@ OUT_OF_SCOPE = {
 #: workstreams that own them. Filling them in from here would be inventing
 #: derivations, which is the failure this module exists to prevent.
 DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
-    "market_vol_vix_excursion": {
-        "kind": "derived",
-        "presets": {"pt-v19": 1.0},
-        "identity": "the loop's own double count, removed at its "
-                    "mechanism. Under `vix_level_identity` the VIX IS "
-                    "the index's conditional variance in points plus a "
-                    "fear excursion, so a factor variance target built "
-                    "from `(VIX / anchor)^2` reads the factor's own "
-                    "variance back to itself: garch-derive-design.md "
-                    "3.3 shows it reverts the factor toward `c * s_f` "
-                    "of its own level, which makes "
-                    "`market_vol_vix_coupling` a loop-gain dial wearing "
-                    "a fear channel's name. Reading the EXCURSION above "
-                    "the identity's own read-back instead makes the "
-                    "ratio exactly 1.0 when the VIX is what the "
-                    "variance implies, so the target is exactly `base` "
-                    "and only the fear excursion lifts it. The value is "
-                    "1.0 because the dial is a SWITCH with no interior: "
-                    "engine.rs branches at `== 0.0` and every other "
-                    "value selects the same form",
-        "terms": {
-            "theta about 0.62": "the loop's static gain, `sum_k s_k "
-                                "c_k` (loop-gain-design.md 2.1), of "
-                                "which the factor arm carries about "
-                                "0.45 and the instantaneous sector, "
-                                "jump and per-name couplings about "
-                                "0.11. A standing bias in the target "
-                                "moves the level by `1 / (1 - theta)` = "
-                                "2.7x; cutting the variance arm leaves "
-                                "the instantaneous couplings and about "
-                                "1.1x",
-            "s_f c_f about 0.49": "the factor's share of the index's "
-                                  "conditional variance times its "
-                                  "effective static coupling. "
-                                  "Eliminating the regime ratio gives "
-                                  "`u^2 - u (1 - s_f c_f) - s_f c_f "
-                                  "(v/A)^2 = 0` for `u = I^2/A^2`, so "
-                                  "the read-back grows as sqrt(v) and "
-                                  "`implied(v)/v` falls as `v^(-1/2)`. "
-                                  "MEASURED on the pin ladder: the "
-                                  "pin-80 ratio is 0.474 against 0.651 "
-                                  "and `ratio(80)/ratio(40)` is 0.729 "
-                                  "against the parameter-free 0.707",
-            "market_vol_alpha 0.1059, market_vol_beta 0.8787":
-                "the pair this makes transportable. "
-                "garch-derive-design finding 4 says tape reduced-form "
-                "values run through the loop count its memory twice; "
-                "3.4's option B would correct beta by `[beta_tape - "
-                "(1 - alpha_tape) c s_f] / (1 - c s_f)` and was "
-                "rejected for depending on an unprovenanced dial and on "
-                "the roster. At `c s_f` = 0 that expression is "
-                "`beta_tape` exactly",
-        },
-        "source": "rust/src/params.rs, "
-                  "ModelParams::market_vol_vix_excursion; the branch is "
-                  "rust/src/engine.rs `close_market` and the ratio is "
-                  "rust/src/market/factor_vol.rs `close_day_at`. The "
-                  "sign that makes the fixed point unique is asserted "
-                  "by `the_excursion_form_makes_the_target_fall_as_the_"
-                  "read_back_rises` with the anchor branch as a "
-                  "negative control, and the exactness at a zero "
-                  "excursion by `a_vix_at_its_own_read_back_targets_"
-                  "the_baseline_exactly` on the bits. The design note "
-                  "is programme/garch-derive-design.md 3.4 option C, "
-                  "which flagged it and did not propose it",
-        "note": "MEASURED, b4fix2 and b4fix4 in the design repository. "
-                "`index_tail_dn3_pct` 3.0677 -> 1.9124 at 252 days and "
-                "4.6786 -> 1.7429 at 504, the panel 17 of 18 -> 18 of "
-                "18 at both horizons, and the census ceiling days "
-                "25 -> 15. The remedy it was measured against -- the "
-                "tape values alone, which is what the brief led with -- "
-                "moves the tail the WRONG way, 3.0677 -> 3.2271, which "
-                "is finding 4's double count showing up on this build",
-    },
     "vix_ceiling": {
         "kind": "derived",
         "presets": {"pt-v19": 181.3295},
@@ -1039,15 +891,39 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_level_sigma": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.0173},
-        "identity": "the innovation that gives the level its stationary "
-                    "spread at `vix_level_persistence`: 0.2667 * sqrt(1 - "
-                    "0.99791^2) = 0.01723",
-        "terms": {"0.2667": "sd of the yearly medians of log ^VIX over the "
-                            "same 35 years (variance 0.0711)"},
-        "source": "programme/results/ptv19gjr/regime-level-derivation.txt "
-                  "(design repository)",
-        "date": "2026-09-21",
+        "presets": {"pt-v19": 0.0181},
+        "identity": "the era spread the level must add to what the loop "
+                    "makes on its own: sigma = sqrt((V* - V0) / A) * "
+                    "sqrt(1 - 0.9979^2) = 0.0181, the innovation of a daily "
+                    "AR(1) at `vix_level_persistence`",
+        "terms": {
+            "V* 0.0796": "0.282^2, the tape's yearly-median variance of log "
+                         "VIX read by the arms' estimator on the tape's "
+                         "process (90% set 0.0435 to 0.159)",
+            "V0 0.0133": "what the LAW loop makes with the level off (the "
+                         "OFF arm)",
+            "A 0.8445": "the share of an AR(1)'s stationary variance a "
+                        "year's mean keeps at 0.9979",
+        },
+        "source": "programme/results/vix-slow-regime/RESULT.md section 4 "
+                  "(design repository), derived on LAWC-D; taken by pt-v19's "
+                  "fifth composition (results/ptv19-fifth/RESULT.md)",
+        "date": "2026-09-23",
+        "note": "Not exact: the split `V* = V0 + T^2 A sigma^2` is linear on "
+                "a convex loop. Derived on LAWC-D before the calm fix (anchor "
+                "weight 0.375, exponent 2.5 below the anchor), and not "
+                "re-derived on pt-v19's own loop. LAWC-D's box read the "
+                "yearly-median sd at 0.275 against the 0.282 target",
+        "superseded": "0.0173 from the ptv19gjr composition (2026-09-21) to "
+                      "the fifth, DERIVED as the innovation giving the level "
+                      "its stationary spread at `vix_level_persistence`: "
+                      "0.2667 * sqrt(1 - 0.99791^2) = 0.01723, with 0.2667 "
+                      "the sd of the yearly medians of log ^VIX over 35 "
+                      "years (variance 0.0711). That spread was the VIX's "
+                      "own, measured on the loop's OUTPUT; "
+                      "`vix_level_loop_gain` divided the loop back out. "
+                      "Source programme/results/ptv19gjr/"
+                      "regime-level-derivation.txt (design repository)",
     },
     "garch_vix_exponent": {
         "kind": "undetermined",
@@ -1227,46 +1103,72 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "one, so the finite fourth moment survives the asymmetry",
     },
     "market_vol_vix_exponent": {
-        "kind": "derived",
-        "presets": {"pt-v19": 4.9},
-        "identity": "the exponent at which the excursion form's fixed point "
-                    "carries the tape's crisis lever: under `target = base (1 - c "
-                    "+ c (VIX / I)^e)` with the read-back `I ~ sqrt(v)`, a held VIX "
-                    "settles the variance at `v ~ VIX^(e / (1 + e/2))`; the tape's "
-                    "6.16x of volatility for 13x of VIX is `v ~ VIX^1.42`, so `e = "
-                    "2 s / (2 - s)` = 4.9 at s = 1.42",
-        "terms": {"6.16x": "the real crisis lever, annualised volatility above "
-                           "VIX 45 over below VIX 12 on the reference roster "
-                           "(`real_crisis_lever` on every record)",
-                  "13x": "the lever protocol's held VIX 65 over held VIX 5",
-                  "fixed point": "programme/fixes-2026-09-21.md section 0.1 "
-                                 "(design repository), measured on the held-VIX "
-                                 "read-back terms: the read-back rises 3.0x at the "
-                                 "square and 4.6x at 4.9"},
-        "source": "programme/fixes-2026-09-21.md and results/ptv19fix/RESULT.md "
-                  "(design repository); 2.0, the literal square, from pt-v1 to the "
-                  "2026-09-21 composition",
-        "date": "2026-09-21",
+        # THE FIFTH COMPOSITION (2026-09-23) REPLACED THE VALUE AND ITS KIND.
+        # 4.9 was derived for the EXCURSION form's fixed point, and pt-v19
+        # left that form the same day; the identity below it no longer
+        # describes anything that ships, so it is kept in `superseded` and
+        # the entry records what 4.0 is: a ladder reading, not a derivation.
+        "kind": "undetermined",
+        "presets": {"pt-v19": 4.0},
+        "what_would_determine_it": (
+            "the anchor form's own identity against the tape's crisis lever, "
+            "the analogue of the excursion form's `e = 2 s / (2 - s)` below. "
+            "FITTED: 4.0 is read off route 1's exponent ladder, where the "
+            "held-VIX index lever lands near the tape's (10.34x against "
+            "10.50x at 4.0; programme/results/route1-anchor/RESULT.md section "
+            "2), and route1-blend/RESULT.md section 8.4 lists it under what "
+            "is fitted (design repository). Above the anchor only since the "
+            "fifth composition: below it the target reads "
+            "`market_vol_vix_exponent_below`. It is load-bearing -- the level "
+            "law's knee, eta and cap were read off the engine's held map at "
+            "4.0 -- so a derivation that moved it would move those too"),
+        "superseded": (
+            "4.9 from the third composition (2026-09-21) to the fifth, "
+            "DERIVED: the exponent at which the excursion form's fixed point "
+            "carries the tape's crisis lever. Under `target = base (1 - c + "
+            "c (VIX / I)^e)` with the read-back `I ~ sqrt(v)`, a held VIX "
+            "settles the variance at `v ~ VIX^(e / (1 + e/2))`; the tape's "
+            "6.16x of volatility for 13x of VIX is `v ~ VIX^1.42`, so `e = "
+            "2 s / (2 - s)` = 4.9 at s = 1.42 (6.16x the real crisis lever, "
+            "annualised volatility above VIX 45 over below VIX 12 on the "
+            "reference roster; 13x the lever protocol's held VIX 65 over "
+            "held VIX 5; the read-back rising 3.0x at the square and 4.6x at "
+            "4.9). Source programme/fixes-2026-09-21.md section 0.1 and "
+            "results/ptv19fix/RESULT.md (design repository). 2.0, the literal "
+            "square, from pt-v1 to the 2026-09-21 composition"),
+        "date": "2026-09-23",
     },
     "vix_level_loop_gain": {
         "kind": "derived",
-        "presets": {"pt-v19": 2.4684},
-        "identity": "`1 / (1 - h)`, the loop's transmission of the latent level "
-                    "into the VIX, with `h = ln(ratio) / ln 13` the read-back's "
-                    "held-VIX elasticity: the read-back rises 4.60x for 13x of held "
-                    "VIX at `market_vol_vix_exponent` 4.9, so h = 0.595 and the gain "
-                    "2.4684. The level's spread (`vix_level_sigma`) was measured on "
-                    "the VIX and belongs to the VIX; the engine writes it onto the "
-                    "multiplier the loop amplifies, and the gain divides it out",
-        "terms": {"4.60x": "the held-VIX read-back ratio at exponent 4.9 "
-                           "(results/ptv19refine/leverterms.py; 3.00x at 2.0, "
-                           "gain 1.7486 there)",
-                  "form": "engine.rs `vix_level_sigma_applied`: the innovation "
-                          "and the stationary opening divided by the gain"},
-        "source": "programme/fixes-2026-09-21.md design C and "
-                  "results/ptv19fix/RESULT.md (design repository); built "
-                  "2026-09-21, shipped the same day",
-        "date": "2026-09-21",
+        "presets": {"pt-v19": 1.79},
+        "identity": "the running loop's transmission of the level into the "
+                    "VIX at the derived spread. The transmission rises with "
+                    "the spread, so the gain is the self-consistent solution "
+                    "of `gain = T(sigma / gain)`, interpolated between two "
+                    "measured cells on the LAW loop",
+        "terms": {
+            "1.75": "the transmission measured at the shipped spread",
+            "1.78": "the transmission measured at 1.27 times it",
+            "form": "engine.rs `vix_level_sigma_applied`: the innovation "
+                    "and the stationary opening divided by the gain",
+        },
+        "source": "programme/results/vix-slow-regime/RESULT.md section 4 "
+                  "(design repository), derived on LAWC-D; taken by pt-v19's "
+                  "fifth composition (results/ptv19-fifth/RESULT.md)",
+        "date": "2026-09-23",
+        "note": "Checked on the box: LAWC-D's transmission reads 1.78 [1.69, "
+                "1.88] against the 1.79 it was set to. Interpolated, not "
+                "solved to a tolerance, so no `solve` is claimed. Derived "
+                "before the calm fix and not re-derived on pt-v19's own loop",
+        "superseded": "2.4684 from the third composition (2026-09-21) to "
+                      "the fifth, DERIVED as `1 / (1 - h)` with `h = "
+                      "ln(ratio) / ln 13` the read-back's held-VIX "
+                      "elasticity on the excursion form: the read-back rose "
+                      "4.60x for 13x of held VIX at `market_vol_vix_exponent` "
+                      "4.9, so h = 0.595 (1.7486 at the square). Source "
+                      "programme/fixes-2026-09-21.md design C and "
+                      "results/ptv19fix/RESULT.md (design repository). The "
+                      "form it read no longer ships",
     },
     "crisis_epicentre_extra": {
         "kind": "derived",
@@ -2377,7 +2279,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # an entry that records only the identity overstates it.
     "market_beta_down_asym_lag": {
         "kind": "measured",
-        "presets": {"pt-v18": 0.375, "pt-v19": 0.375},
+        "presets": {"pt-v18": 0.375, "pt-v19": 0.46},
         "source": "the certified panel plus index drift, the fear gauge and "
                   "the VIX's own persistence, scored by `loss.rule_table` at "
                   "nineteen rows, on thirty seeds over roster 40 @ seed 111 "
@@ -2402,6 +2304,23 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "marginal read it as monotone toward 1.0; both were wrong, in "
                 "opposite directions, which is why this entry cites a "
                 "thirty-seed one-dial arm and not either of them",
+        # THE BAR IS FOR pt-v18's 0.375 AND NOT FOR pt-v19's 0.46. pt-v19
+        # shipped 0.375 on this measurement until its fifth composition
+        # (2026-09-23), which ships 0.46 with the wire sampled on the live
+        # session. Nothing above measured 0.46, so the entry names the value
+        # its measurement is for and records the other as what it is.
+        "estimate": 0.375,
+        "fitted": "pt-v19's 0.46 is FITTED, not measured: f2sweep's value, "
+                  "kept because the held-out lagged asymmetry row clears "
+                  "under the live keying (`market_beta_down_asym_lag_live` "
+                  "1.0; k 25 / 24 of 30 against 23 / 19 at 0.375), "
+                  "programme/results/route1-blend/RESULT.md sections 8.2 and "
+                  "8.4 (design repository). The ledger's rulings refuse "
+                  "exactly this kind of value, and the tape identity has no "
+                  "power at this keying: the tape's lagged asymmetry is flat "
+                  "across lags two and three (results/corrlag2/), so it "
+                  "derives no window either. What would determine it is a "
+                  "tape identity for the lag under the live keying",
     },
     "vix_mean_reversion": {
         # THE SECTION 7 PATTERN, NAMED, and the dial that found the hole in
@@ -3441,6 +3360,308 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                       "direction whose correct value nobody "
                                       "has measured",
     },
+    # ---- pt-v19's FIFTH COMPOSITION (2026-09-23). Twenty-three dials, the
+    # design programme's candidate LMN-Q25A375 (programme/results/
+    # candidate-arm.txt, results/ptv19-fifth/RESULT.md section 4, design
+    # repository); eighteen of them arrive here, fifteen from OUT_OF_SCOPE
+    # and three from POST_BASELINE, and four more moved existing entries
+    # above (`market_vol_vix_exponent`, `vix_level_sigma`,
+    # `vix_level_loop_gain`, `market_beta_down_asym_lag`). Kinds as the
+    # record gives them: what was FITTED against a gate or CHOSEN inside a
+    # window is `undetermined`, because a gate or a window is why a value
+    # ships and not a measurement of the dial -- the anchor memory, the calm
+    # exponent, the lag wire's form and the news drift's timescale here, and
+    # the exponent and the lag above. Switches whose identity is the value
+    # are `derived` and say so.
+    "vix_anchor_weight": {
+        "kind": "derived",
+        "presets": {"pt-v19": 0.375},
+        "identity": "theta = (1 - a) k: the VIX's elasticity to realised "
+                    "volatility is the anchor weight's complement times the "
+                    "loop's transmission, the slow equilibrium of the memory "
+                    "form. Solved for the tape's theta: a = 1 - 0.655 / 1.05 "
+                    "= 0.376, shipped 0.375",
+        "terms": {
+            "theta 0.655 [0.61, 0.69]": "the tape's elasticity of log VIX on "
+                                        "log realised volatility "
+                                        "(programme/results/calm-regime/"
+                                        "RESULT.md section 4, design "
+                                        "repository)",
+            "k 1.05": "0.578 / 0.55: the transmission measured on the Q20 "
+                      "arm, whose weight is 0.45 (calm-regime section 4)",
+        },
+        "source": "programme/results/calm-regime/RESULT.md sections 4 and 7 "
+                  "(design repository); LAW2's procedure (theta pins the "
+                  "weight) re-applied on the new base, as "
+                  "results/vix-law-levels/RESULT.md section 4 pinned the "
+                  "earlier 0.45",
+        "date": "2026-09-23",
+        "note": "Measured theta on the LAW2C-based Q25A375 arm is 0.617, "
+                "inside the tape's interval; theta was not re-read on "
+                "pt-v19's own base (ptv19-fifth/RESULT.md section 4). Not the "
+                "slow-pole closed form in `ModelParams::vix_anchor_weight` "
+                "(0.6099 at exponent 4.0), a different identity no preset "
+                "ships",
+    },
+    "vix_anchor_memory": {
+        "kind": "undetermined",
+        "presets": {"pt-v19": 0.05555555555555555},
+        "what_would_determine_it": "a tape reading of how long a deviation "
+            "of the VIX from the level realised variance implies persists "
+            "before it is pulled back. FITTED: 1/18 was read off a ladder "
+            "against the certification's VIX persistence gate in route 1 "
+            "(programme/results/route1-blend/RESULT.md sections 8.1, 8.3 and "
+            "8.4, design repository). At 1/15 the 504-session VIX row fails "
+            "by one seed, so the value sits on an edge, not in a basin",
+    },
+    "vix_anchor_centre": {
+        "kind": "derived",
+        "presets": {"pt-v19": 0.1515},
+        "identity": "c = ln(1.252 / 1.076): the anchor pulls to `L * anchor "
+                    "* exp(-c)`, the VIX's MEAN level (the pooled premium on "
+                    "the pooled variance) rather than the per-window premium "
+                    "applied to the mean variance",
+        "terms": {
+            "1.252": "the tape's per-window median of VIX over realised "
+                     "volatility",
+            "1.076": "the same relation pooled over the whole tape",
+        },
+        "source": "programme/results/vix-law-levels/RESULT.md sections 3, 4 "
+                  "and 7 (design repository): two tape measurements, no "
+                  "model run chose it; the free-running zero-drift level "
+                  "lands at 17.6 against the tape's 18.3",
+        "date": "2026-09-23",
+    },
+    "vix_anchor_weight_level": {
+        "kind": "derived",
+        "presets": {"pt-v19": 1.0},
+        "identity": "eta in `1 - a(x) = (1 - a) (K / clamp(x, K, r K))^eta`: "
+                    "the log-slope of the held read-back's gain g(x) between "
+                    "VIX 18.5 and 30, so the loop's local gain `(1 - a(x)) "
+                    "g(x)` is held at its knee value above the knee (the "
+                    "tape's reversion toward its median is "
+                    "level-independent)",
+        "terms": {"1.06": "the measured log-slope on the engine's held-VIX "
+                          "map, rounded to 1.0 (vix-law-levels section 3)"},
+        "source": "programme/results/vix-law-levels/RESULT.md sections 3, 4 "
+                  "and 7 (design repository): LAW's law, the knee at g = 1. "
+                  "Read off the ENGINE's held map at "
+                  "`market_vol_vix_exponent` 4.0, not off the tape",
+        "date": "2026-09-23",
+    },
+    "vix_anchor_weight_level_knee": {
+        "kind": "derived",
+        "presets": {"pt-v19": 0.3888},
+        "identity": "k' = k + ln((1 - a') / (1 - a)) / eta: the crisis side "
+                    "of the weight, (1 - a)(K / x)^eta, held while the base "
+                    "weight moves from 0.45 to a' = 0.375: 0.2609 + "
+                    "ln(0.625 / 0.55) / 1.0 = 0.3888",
+        "terms": {
+            "k 0.2609": "ln(24.015 / 18.5), LAW's knee (where the held map's "
+                        "gain crosses one) as a log offset below the anchor "
+                        "(vix-law-levels sections 3 and 4)",
+            "0.55, 0.625": "1 - 0.45, the base weight the knee was read "
+                           "at; 1 - 0.375, pt-v19's",
+        },
+        "source": "programme/results/calm-regime/RESULT.md section 6b "
+                  "(design repository)",
+        "date": "2026-09-23",
+    },
+    "vix_anchor_weight_level_cap": {
+        "kind": "derived",
+        "presets": {"pt-v19": 2.2159},
+        "identity": "r' = r (1 - a') / (1 - a): the cap held at the same VIX "
+                    "as the knee moves, 1.95 * 0.625 / 0.55 = 2.2159",
+        "terms": {"r 1.95": "36 / 18.5, where the held map's gain reaches 95 "
+                            "per cent of its peak (vix-law-levels section 4)"},
+        "source": "programme/results/calm-regime/RESULT.md section 6b "
+                  "(design repository)",
+        "date": "2026-09-23",
+        "note": "vix-law-levels found LAW's cap inert at its settings; "
+                "nobody has checked whether 2.2159 binds on pt-v19 "
+                "(ptv19-fifth/RESULT.md section 4)",
+    },
+    "market_vol_vix_exponent_below": {
+        "kind": "undetermined",
+        "presets": {"pt-v19": 2.5},
+        "what_would_determine_it": "a single tape target where today there "
+            "is a window. CHOSEN, not derived: below the anchor the tape's "
+            "shared variance scales as VIX^2.25 [1.95, 2.57] and its calm "
+            "share over its mid-VIX share is 0.45 [0.38, 0.50]; on the LAW2C "
+            "base both hold for exponents of about 2 to 2.6, and 2.5 is the "
+            "least change from 4.0 inside that window "
+            "(programme/results/calm-regime/RESULT.md sections 4 and 7, "
+            "design repository). On the adopted vector the slope reads 1.94, "
+            "just under the window, and the ratio 0.42, inside it "
+            "(ptv19-fifth/RESULT.md section 4)",
+    },
+    "market_beta_down_asym_lag_live": {
+        "kind": "undetermined",
+        "presets": {"pt-v19": 1.0},
+        "what_would_determine_it": "the diagnostic registered in "
+            "programme/results/corr-asymmetry-repair.md section 8 (design "
+            "repository), which would rule on the form and is unrun. A FORM "
+            "dial with two admissible values and no number to derive: 1.0 "
+            "samples the down-day wire on the live session, and pt-v19 takes "
+            "it because that is what shows the tape's same-day "
+            "`corr_asymmetry` (k 25 of 30 against 19 without it; "
+            "route1-blend/RESULT.md section 8.2). CHOSEN for the mechanism "
+            "it shows, not derived",
+    },
+    "macro_compound_days_per_year": {
+        "kind": "derived",
+        "presets": {"pt-v19": 252.0},
+        "identity": "the economy steps once per trading session, so a year "
+                    "of compounding is 252 steps; at 365 a trading year "
+                    "received 252/365 of its annual GDP and CPI growth",
+        "terms": {"252": "sessions in a trading year"},
+        "source": "rust/src/params.rs `ModelParams::macro_compound_days_per_"
+                  "year`; programme/results/longrun-drift/RESULT.md section "
+                  "4 and results/macro-cycle/RESULT.md section 7 (design "
+                  "repository): the long-run index return 3.83 -> 4.92 per "
+                  "cent from this alone",
+        "date": "2026-09-23",
+    },
+    "macro_calendar_days_per_year": {
+        "kind": "derived",
+        "presets": {"pt-v19": 252.0},
+        "identity": "the session calendar: a 21-step month, a 63-step "
+                    "quarter and every calendar-day span scaled by 252 / 365 "
+                    "and rounded, because the economy steps once per session",
+        "terms": {"252": "sessions in a trading year"},
+        "source": "rust/src/params.rs `ModelParams::macro_calendar_days_per_"
+                  "year`; programme/results/macro-cycle/RESULT.md sections 2 "
+                  "and 7 (design repository)",
+        "date": "2026-09-23",
+    },
+    "cycle_us_calibration": {
+        "kind": "derived",
+        "presets": {"pt-v19": 1.0},
+        "identity": "a switch whose identity is the value: 1.0 reads the "
+                    "phase table derived from NBER recession dates and BEA "
+                    "real GDP, 1990-2025, with the Weibull scales solved "
+                    "from its duration means",
+        "terms": {"the table": "rust/src/economy/state.rs "
+                               "`us_phase_characteristics`, each number's "
+                               "derivation in its docstring"},
+        "source": "programme/results/macro-cycle/RESULT.md sections 3 and 7 "
+                  "(design repository): 1.13 recessions a decade, 8.7 months "
+                  "long, against the real 1.11 and 9.0",
+        "date": "2026-09-23",
+        "note": "Two choices inside the table, recorded as such by "
+                "macro-cycle section 3: the hazard cap raised from 0.3 to "
+                "1.0, and the 5.5 / 3.5 contraction-to-trough split taken "
+                "from the model's own occupancy",
+    },
+    "fed_liftoff_rule": {
+        "kind": "derived",
+        "presets": {"pt-v19": 1.0},
+        "identity": "a switch whose identity is the value: the ladder's own "
+                    "cut branch mirrored (its 50 bp trigger and 25 bp steps), "
+                    "so the rate lifts off zero on its Taylor rule instead "
+                    "of waiting for inflation a point over target",
+        "terms": {"2.61": "the model's mean fed funds rate with it, against "
+                          "1.68 without and the real 2.88"},
+        "source": "programme/results/macro-cycle/RESULT.md sections 4 and 7 "
+                  "(design repository)",
+        "date": "2026-09-23",
+    },
+    "market_pe_buybacks": {
+        "kind": "derived",
+        "presets": {"pt-v19": 1.0},
+        "identity": "a switch whose identity is the value: market_pe divides "
+                    "by the same buyback-scaled earnings the valuation "
+                    "already applies, so the multiple no longer rises by the "
+                    "buyback yield a year",
+        "terms": {"21.3": "market_pe in year 21 with it, against 28.1 "
+                          "without"},
+        "source": "programme/results/macro-cycle/RESULT.md sections 4 and 7 "
+                  "(design repository)",
+        "date": "2026-09-23",
+    },
+    "cycle_stationary_opening": {
+        "kind": "derived",
+        "presets": {"pt-v19": 1.0},
+        "identity": "a switch whose identity is the value: 1.0 draws day "
+                    "zero's phase AND age from the cycle's own stationary "
+                    "law, `P(i, a) = S_i(a + 1) / sum_j E[T_j]`, every term "
+                    "the engine's own (`ModelParams::cycle_stationary_"
+                    "opening`), instead of opening every run in expansion at "
+                    "age zero",
+        "terms": {"7.83 -> 7.35": "the certified index_drift_pct from the "
+                                  "boom opening and from a drawn one, "
+                                  "against a band centre of 7.37 "
+                                  "(programme/results/macro-cycle/RESULT.md "
+                                  "section 6, design repository)"},
+        "source": "the verdict ledger's standing ruling "
+                  "`ruling-certification-runs-open-at-a-random-point-in-the-"
+                  "business-cycle` (design repository, recorded 2026-09-23): "
+                  "certification runs open at a random point in the cycle, "
+                  "because a bot may start trading in any phase. The law is "
+                  "derived; turning it on is the owner's ruling",
+        "date": "2026-09-23",
+    },
+    "news_absorption_half_life": {
+        "kind": "derived",
+        "presets": {"pt-v19": 0.6},
+        "identity": "h solving A(1) = the share of an earnings move priced "
+                    "one minute after the release, with A(n) = (1 - d)(1 - "
+                    "2^(-n/h)) / (1 - 2^(-390/h)) + d (1 - 2^(-n/h_d)) / (1 "
+                    "- 2^(-390/h_d)): 0.64 on the 2008-2020 share, 0.60 on "
+                    "2016-2020's; 0.6 puts A(1) at 0.605",
+        "terms": {"1.05 of 1.80, 0.76 of 1.11": "Christensen, Timmermann and "
+                                                "Veliyev, arXiv 2601.08962, "
+                                                "Table 7: per cent earned at "
+                                                "one minute and by the "
+                                                "close, 2008-2020 and "
+                                                "2016-2020"},
+        "source": "programme/results/news-speed/RESULT.md section 2 and "
+                  "derive.txt (design repository)",
+        "date": "2026-09-23",
+        "note": "Set by the one-minute share, the first point a one-minute "
+                "tick can express; the least-squares fit over 1 to 5 minutes "
+                "(0.8) is printed and not used. The two samples bracket it; "
+                "no error bar is carried",
+    },
+    "news_absorption_drift_share": {
+        "kind": "derived",
+        "presets": {"pt-v19": 0.12},
+        "identity": "d = 1 - 1.58 / 1.80 = 0.122: the share of the move "
+                    "that arrives after five minutes",
+        "terms": {"1.58, 1.80": "per cent earned by five minutes and by the "
+                                "close, 2008-2020 (Christensen, Timmermann "
+                                "and Veliyev, Table 7)"},
+        "source": "programme/results/news-speed/RESULT.md section 2 and "
+                  "derive.txt (design repository)",
+        "date": "2026-09-23",
+    },
+    "news_absorption_drift_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v19": 42.0},
+        "what_would_determine_it": "an intraday event study that resolves "
+            "the timescale of the drift after five minutes. CHOSEN: 42 ticks "
+            "is a 60-minute mean life (60 ln 2 = 41.6), which lands 92 per "
+            "cent of the drift in 2.5 hours; the 60 minutes is chosen to fit "
+            "Patell and Wolfson (1984)'s disturbances lasting 'several "
+            "hours', not measured (programme/results/news-speed/RESULT.md "
+            "section 2, design repository)",
+    },
+    "news_quote_revision": {
+        "kind": "derived",
+        "presets": {"pt-v19": 1.0},
+        "identity": "a switch whose identity is the value: the maker "
+                    "re-quotes by the tick's news term, so the traded tape "
+                    "carries the absorption profile. With it the tape holds "
+                    "0.615 of the move after one tick against the profile's "
+                    "0.605; without it the book walk leaves 0.086, and the "
+                    "tick-1 headline edge is +123 bp against +49",
+        "terms": {"0.615, 0.086": "share of the event in the printed price "
+                                  "after one tick, with and without "
+                                  "(news-speed section 3)"},
+        "source": "programme/results/news-speed/RESULT.md section 3 (design "
+                  "repository)",
+        "date": "2026-09-23",
+    },
 }
 
 #: Dials in scope that carry NO entry.
@@ -3470,7 +3691,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: `vix_decay_ratio`, `sector_loading` and `volume_idio_variance_gain`. A
 #: fifth left on 2026-09-11 with charter bar B4: `vix_target_shock_cap`,
 #: which pt-v19 now sets to the image of its own clamp rather than to a
-#: value that bound inside the graded range. The list has not GROWN since,
+#: value that bound inside the graded range. Three more left on 2026-09-23
+#: with pt-v19's fifth composition (see the note at the head of the list).
+#: The list has not GROWN since,
 #: which is the point worth recording:
 #: `crash_amplifier_conditional_sigma` arrived on 2026-09-11 carrying its
 #: own entry, so the one dial added for the stability fix never spent a
@@ -3481,13 +3704,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: what the record measured about that value (the paired control; a
 #: plateau) rather than leaving it here.
 UNPROVENANCED = (
-    # 365.0: a calendar year of steps, wrong for an economy that steps once
-    # per session. The derived value is 252.0, not yet adopted.
-    "macro_calendar_days_per_year",
-    # 365.0: written as a calendar year, and wrong for an economy that steps
-    # once per trading session. The derived value is 252.0 and is not yet
-    # adopted, so the shipped constant is admitted here rather than hidden.
-    "macro_compound_days_per_year",
+    # `macro_calendar_days_per_year`, `macro_compound_days_per_year` and
+    # `cycle_stationary_opening` left on 2026-09-23 with pt-v19's fifth
+    # composition, which moves all three and carries an entry for each: the
+    # two clocks at the derived 252.0 and the opening at the stationary law,
+    # by the owner's ruling. The 365.0 and 0.0 pt-v16 and pt-v18 carry are
+    # pt-v1's own values, which the difference rule does not ask about.
     "crash_amplifier_slope",
     "crash_amplifier_threshold",
     "crisis_blend_cap",
@@ -3497,7 +3719,6 @@ UNPROVENANCED = (
     "crowd_lean_cap",
     "crowd_momentum_gain",
     "crowd_valuation_gain",
-    "cycle_stationary_opening",
     "daily_credit_floor_gain",
     "endogenous_news_intensity",
     "endogenous_news_sigma",
