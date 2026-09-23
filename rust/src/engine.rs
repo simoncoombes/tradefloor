@@ -419,6 +419,18 @@ pub struct Engine {
     /// pinned macro fields are -- a fork that dropped it would resume
     /// drawing its own epicentre part-way through a pinned experiment.
     crisis_epicentre_pin: Option<i32>,
+    /// Tonight's close sets the market factor's variance from the VIX
+    /// instead of stepping toward it. Written by `pin_macro` when a scenario
+    /// forces the VIX with its `vix_sets_variance` switch on, and consumed
+    /// by the next `close_market`, which clears it: one forced session, one
+    /// set. A session nobody forced closes as a free one.
+    ///
+    /// False on every session of every run that does not ask for it, so no
+    /// preset and no existing scenario ever reads it true. Carried by the
+    /// snapshot and the state hash only while true, for the reason the
+    /// epicentre pin is: a fork taken between the pin and the close that
+    /// dropped it would close a forced session as a free one.
+    vix_sets_variance_pending: bool,
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
     volume_state: f64,
@@ -916,6 +928,7 @@ impl Engine {
             crisis_sessions_under: 0,
             crisis_epicentre: -1,
             crisis_epicentre_pin: None,
+            vix_sets_variance_pending: false,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             jump_move: vec![0.0; companies_len],
@@ -1218,6 +1231,18 @@ impl Engine {
     fn index_conditional_variance_terms_now(
         &self,
     ) -> crate::market::index_var::IndexVarianceTerms {
+        self.index_conditional_variance_terms_at(self.market_vol.variance())
+    }
+
+    /// [`Self::index_conditional_variance_terms_now`] with the market
+    /// factor's variance supplied rather than read from the state, so a
+    /// forced close can ask what the identity would read at a variance the
+    /// state does not hold yet. `_now` passes `market_vol.variance()`, the
+    /// same f64 it passed before this existed.
+    fn index_conditional_variance_terms_at(
+        &self,
+        factor_variance: f64,
+    ) -> crate::market::index_var::IndexVarianceTerms {
         let names = self.index_variance_names();
         let sector_sigma = crate::market::tick::sector_sigma_at(
             &self.params, &self.economy, self.vix_anchor);
@@ -1243,7 +1268,7 @@ impl Engine {
             &self.params,
             &names,
             self.sector_keys.len(),
-            self.market_vol.variance(),
+            factor_variance,
             &sigmas,
             &excitations,
             rate_scale,
@@ -2557,6 +2582,72 @@ impl Engine {
         self.crisis_epicentre_pin = pin;
     }
 
+    /// Whether tonight's close will SET the market factor's variance from
+    /// the VIX rather than step toward it. See `vix_sets_variance_pending`.
+    pub fn vix_sets_variance_pending(&self) -> bool {
+        self.vix_sets_variance_pending
+    }
+
+    /// Mark tonight's close as a forced one, or unmark it. The close
+    /// consumes the mark. See [`Self::close_market`] and
+    /// `MarketVarianceState::close_day_forced`.
+    pub fn set_vix_sets_variance_pending(&mut self, on: bool) {
+        self.vix_sets_variance_pending = on;
+    }
+
+    /// The VIX-ratio denominator a FORCED close uses.
+    ///
+    /// Off `market_vol_vix_excursion` the denominator is the anchor, a
+    /// constant of the session, and the free close's own denominator is
+    /// returned unchanged: the level the law implies is then an explicit
+    /// function of the VIX.
+    ///
+    /// Under the excursion the denominator is the identity's read-back of
+    /// the index variance, which the factor variance being set is part of,
+    /// so "the level the law implies at this VIX" is a fixed point: the
+    /// denominator `d` at which the variance a forced close sets reads back
+    /// as `d`. Setting the target at today's read-back instead would move
+    /// tomorrow's read-back by the step just taken, and with the exponent
+    /// at 4.9 that feedback overshoots and oscillates. The fixed point is
+    /// the level a free run would settle at under the same VIX held for
+    /// ever, every other term of the index variance as it stands tonight.
+    ///
+    /// `h(d) = read_back(forced_level(d)) - d` is strictly decreasing
+    /// (the level falls as `d` rises, and the read-back rises with the
+    /// level), so the root is unique and is bracketed by the read-backs of
+    /// the floor and the ceiling. Found by bisection on those bounds. If the
+    /// bracket does not hold -- no shipped preset reaches that -- the free
+    /// close's denominator is returned, which is the free law's reading.
+    fn forced_vix_denominator(&self, free_denominator: f64, level: f64) -> f64 {
+        if self.params.market_vol_vix_excursion == 0.0 {
+            return free_denominator;
+        }
+        let vix = self.economy.vix;
+        let premium = self.params.vix_variance_premium;
+        let read_back = |v: f64| {
+            crate::market::index_var::vix_from_variance(
+                premium, self.index_conditional_variance_terms_at(v).total())
+        };
+        let base = self.params.market_factor_sigma * self.params.market_factor_sigma;
+        let mut lo = read_back(base * self.params.market_vol_floor_multiple);
+        let mut hi = read_back(base * self.params.market_vol_ceiling_multiple);
+        let h = |d: f64| {
+            read_back(MarketVarianceState::forced_level(&self.params, d, vix, level)) - d
+        };
+        if !(lo > 0.0 && hi > lo && h(lo) >= 0.0 && h(hi) <= 0.0) {
+            return free_denominator;
+        }
+        for _ in 0..80 {
+            let mid = 0.5 * (lo + hi);
+            if h(mid) >= 0.0 {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        0.5 * (lo + hi)
+    }
+
     pub fn open_market(&mut self) {
         // THE CRISIS EPISODE, stepped before anything else the session does.
         // At `crisis_epicentre_extra` 0.0 -- every preset before pt-v19's fourth
@@ -3046,12 +3137,30 @@ impl Engine {
             //
             crate::mathx::exp(self.market_vol_log_level - 0.25 * stationary_var)
         };
-        self.last_market_targets = Some(self.market_vol.close_day_scaled(
-            &self.params,
-            vix_ratio_denominator,
-            self.economy.vix,
-            market_vol_level,
-        ));
+        // A FORCED close sets the variance to the level the law implies at
+        // the VIX a scenario forced, instead of stepping toward it; see
+        // `MarketVarianceState::close_day_forced`. The mark is consumed
+        // here, so the next session closes free unless it is forced again.
+        // False on every session nothing forced, which takes the branch that
+        // stood here, unchanged.
+        self.last_market_targets = Some(if self.vix_sets_variance_pending {
+            self.vix_sets_variance_pending = false;
+            let denominator =
+                self.forced_vix_denominator(vix_ratio_denominator, market_vol_level);
+            self.market_vol.close_day_forced(
+                &self.params,
+                denominator,
+                self.economy.vix,
+                market_vol_level,
+            )
+        } else {
+            self.market_vol.close_day_scaled(
+                &self.params,
+                vix_ratio_denominator,
+                self.economy.vix,
+                market_vol_level,
+            )
+        });
         self.close_sector_state();
         // The forced-flow reservoir drains on stress days and rebuilds in
         // calm. Updated only while the mechanism is live: at gain 0 or
@@ -4593,6 +4702,11 @@ impl Engine {
         hash_f64(&mut buf, self.crisis_sessions_under as f64);
         hash_f64(&mut buf, self.crisis_epicentre as f64);
         hash_f64(&mut buf, self.crisis_epicentre_pin.unwrap_or(-2) as f64);
+        // A forced close pending tonight. Only while true, so every engine
+        // that was never forced hashes as it did before the mark existed.
+        if self.vix_sets_variance_pending {
+            hash_bool(&mut buf, true);
+        }
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where
         // every per-slot array above always follows the roster. An empty
