@@ -260,6 +260,9 @@ class Engine:
     recorded_days: int
     recorded_book_rows: int
     session_ticks_written: int
+    # Ticks since the current day's open; None before this engine (or a
+    # restored one) has opened a day.
+    session_tick: int | None
 
     def __init__(
         self, *, seed: int, universe: Sequence[Instrument],
@@ -369,6 +372,9 @@ class Engine:
         self, stream: str, from_day: int, to_day: int
     ) -> list[tuple[tuple[str, str, int], float, int, str, int]]: ...
     def day_marks(self) -> list[dict[str, Any]]: ...
+    # The current news day's endogenous events: ticker, sector,
+    # price_impact (the answer key; never an agent's), day.
+    def session_news(self) -> list[dict[str, Any]]: ...
     def market_day_layout(
         self, day: int
     ) -> list[tuple[int, int, int, int]] | None: ...

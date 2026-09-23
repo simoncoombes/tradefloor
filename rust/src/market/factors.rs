@@ -496,6 +496,72 @@ pub struct NewsEvent {
     pub price_impact: Option<f64>,
 }
 
+/// Regular-session minutes, the ticks an endogenous news event is absorbed
+/// over.
+pub const NEWS_SESSION_TICKS: f64 = 390.0;
+
+/// One component of the absorption profile: the share of its part of the
+/// move priced after `n` ticks, 0 at the open and exactly 1 after tick 390.
+///
+/// Half-life 0.0 is the straight line `n / 390`, the spread every preset
+/// ships. Above zero it is `1 - 2^(-n/h)`, rescaled so the component is
+/// complete at the close whatever the half-life: the profile moves WHEN the
+/// move lands, never how much of it lands.
+fn absorbed_component(n: f64, half_life: f64) -> f64 {
+    if n <= 0.0 {
+        return 0.0;
+    }
+    if n >= NEWS_SESSION_TICKS {
+        return 1.0;
+    }
+    if half_life == 0.0 {
+        return n / NEWS_SESSION_TICKS;
+    }
+    let ln2 = core::f64::consts::LN_2;
+    let at = 1.0 - mathx::exp(-ln2 * n / half_life);
+    let full = 1.0 - mathx::exp(-ln2 * NEWS_SESSION_TICKS / half_life);
+    at / full
+}
+
+/// The share of an endogenous news event's `price_impact` priced after `n`
+/// ticks of its session, under `news_absorption_half_life` and its two
+/// companions. See [`crate::params::ModelParams::news_absorption_half_life`]
+/// for the evidence each number is set from.
+///
+/// `(1 - d) * fast(n) + d * drift(n)`: a fast component at
+/// `news_absorption_half_life` and a post-news drift, share
+/// `d = news_absorption_drift_share`, at
+/// `news_absorption_drift_half_life`. Each is complete at the close, so the
+/// whole is too.
+pub fn news_absorbed_share(params: &crate::params::ModelParams, n: f64) -> f64 {
+    let fast = absorbed_component(n, params.news_absorption_half_life);
+    let d = params.news_absorption_drift_share;
+    if d == 0.0 {
+        return fast;
+    }
+    let drift = absorbed_component(n, params.news_absorption_drift_half_life);
+    (1.0 - d) * fast + d * drift
+}
+
+/// The multiple of `price_impact / 390` the tick at `minutes_since_open`
+/// applies for each endogenous news event: `390 * (A(m + 1) - A(m))`, with
+/// `A` [`news_absorbed_share`]. A full session's weights sum to 390 up to
+/// rounding, as the shipped constant 1.0 per tick does.
+///
+/// Outside the regular session (pre-market, after-hours) it is 0.0: the
+/// profile is keyed on the minute of the session, and a tick off it
+/// prices none of the move. Only read with `news_absorption_half_life` off
+/// zero; the shipped path never calls it.
+pub fn news_absorption_weight(params: &crate::params::ModelParams,
+                              minutes_since_open: i64) -> f64 {
+    if !(0..390).contains(&minutes_since_open) {
+        return 0.0;
+    }
+    let m = minutes_since_open as f64;
+    NEWS_SESSION_TICKS
+        * (news_absorbed_share(params, m + 1.0) - news_absorbed_share(params, m))
+}
+
 /// The company fields the live factor subset reads.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FactorCompany {

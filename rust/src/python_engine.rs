@@ -2063,6 +2063,61 @@ impl PyEngine {
         Ok(out)
     }
 
+    /// The current news day's endogenous events, one dict each:
+    /// `ticker` (the trading ticker, `None` if the event names no company
+    /// on the roster), `sector`, `price_impact` and `day`.
+    ///
+    /// The engine draws the day's events at `open_market` and keeps them
+    /// through `close_market`, so `day` is `day_count` while the market is
+    /// open and `day_count - 1` after the close, the frame
+    /// `tradefloor.headlines` uses. Empty before the first open and on any
+    /// preset with `endogenous_news_intensity` at zero.
+    ///
+    /// A read. It draws nothing, writes nothing and is not logged, so
+    /// calling it cannot change a run: `state_hash` is the same with and
+    /// without it. `price_impact` is the whole move the event adds to the
+    /// price by the close, which makes it the answer key; never hand it to
+    /// an agent (`tradefloor.headlines` cuts it to its sign).
+    fn session_news<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        let day: Option<i64> = if self.market_open {
+            Some(i64::from(self.day_count))
+        } else if self.day_count > 0 {
+            Some(i64::from(self.day_count) - 1)
+        } else {
+            None
+        };
+        let mut out = Vec::new();
+        for event in self.inner.session_news() {
+            let d = PyDict::new_bound(py);
+            d.set_item(
+                "ticker",
+                event.company_id.as_deref().and_then(|id| self.ticker_for_id(id)),
+            )?;
+            d.set_item("sector", event.sector.clone())?;
+            d.set_item("price_impact", event.price_impact)?;
+            d.set_item("day", day)?;
+            out.push(d);
+        }
+        Ok(out)
+    }
+
+    /// Ticks run since the current day's `open_market`: 0 at the open, 390
+    /// after a full session, and still 390 after the close until the next
+    /// open. Every tick call counts, as it does in `day_marks()[-1]
+    /// ["ticks"]`, which is the counter this reads.
+    ///
+    /// `None` when this engine has not opened a day since it was built or
+    /// restored. The count is recording state, like the day's tape, so a
+    /// snapshot does not carry it and a restored engine learns it again at
+    /// its next open.
+    ///
+    /// A read of a counter the engine already keeps: no draw, no write, so
+    /// it cannot change a run.
+    #[getter]
+    fn session_tick(&self) -> Option<u32> {
+        self.inner.day_marks().last().map(|m| m.ticks)
+    }
+
     /// Where each active company's market-stream normals sit on `day`:
     /// `(company, first, stride, ticks)`, the normal at tick `t` being
     /// `first + t * stride`. `None` if the day was never opened.
@@ -2870,6 +2925,11 @@ impl PyEngine {
         // actually carried.
         out.set_item("market_vol_log_level", self.inner.market_vol_log_level())?;
         out.set_item("vix_log_level", self.inner.vix_log_level())?;
+        // Only where the hash covers it: the memory moves, and is hashed,
+        // only with `vix_anchor_memory` nonzero.
+        if self.inner.params().vix_anchor_memory != 0.0 {
+            out.set_item("vix_anchor_slow", self.inner.vix_anchor_slow())?;
+        }
         // THE CRISIS EPISODE: whether one is running, how many consecutive
         // sessions it has spent under the threshold, the sector index its
         // epicentre was drawn at (`-1` for `none`, a crisis with no
@@ -3359,6 +3419,10 @@ impl PyEngine {
         // runs all carried a multiplier of exactly 1.0.
         if let Some(raw) = snapshot.get_item("vix_log_level")? {
             self.inner.set_vix_log_level(raw.extract()?);
+        }
+        // Absent means a build without the anchor's memory, where it was 0.0.
+        if let Some(raw) = snapshot.get_item("vix_anchor_slow")? {
+            self.inner.set_vix_anchor_slow(raw.extract()?);
         }
         // The crisis episode. Absent means a snapshot from a build without
         // it, and every such run shipped `crisis_epicentre_extra` at 0.0,

@@ -372,6 +372,17 @@ fn clamp_variance(params: &crate::params::ModelParams, v: f64) -> f64 {
 /// mid-VIX, and the exponent (with the coupling re-fit to preserve the
 /// held-VIX ratio) is the shape the driven window asks for.
 fn vix_response(params: &crate::params::ModelParams, vix_ratio: f64) -> f64 {
+    // The calm side's own exponent. Guarded, so at 0.0 -- every preset --
+    // this branch is never taken and the arithmetic below is unchanged to
+    // the bit. See `ModelParams::market_vol_vix_exponent_below`.
+    let below = params.market_vol_vix_exponent_below;
+    if below != 0.0 && vix_ratio < 1.0 {
+        return if below == 2.0 {
+            vix_ratio * vix_ratio
+        } else {
+            mathx::pow(vix_ratio, below)
+        };
+    }
     if params.market_vol_vix_exponent == 2.0 {
         vix_ratio * vix_ratio
     } else {
@@ -549,6 +560,25 @@ impl MarketVarianceState {
     /// the lagged transmission wire; false before the first close.
     pub fn prev_day_down(&self) -> bool {
         self.prev_day_factor < 0.0
+    }
+
+    /// Yesterday's whole-session accumulated market factor, the signed
+    /// quantity `prev_day_down` thresholds. Exposed beside the boolean for
+    /// `market_beta_down_asym_lag_live`, which needs the MAGNITUDE to
+    /// decay yesterday's tail across today's session. Already in
+    /// `snapshot()`; this is an accessor, not new state.
+    pub fn prev_day_factor(&self) -> f64 {
+        self.prev_day_factor
+    }
+
+    /// TODAY's running accumulated market factor, as it stands right now.
+    /// Read by `market_beta_down_asym_lag_live` BEFORE the current tick's
+    /// own factor is accumulated (`engine.rs` accumulates after the tick
+    /// returns), which is what makes that wire a function of strictly
+    /// earlier draws and therefore mean-preserving. Already in
+    /// `snapshot()`; this is an accessor, not new state.
+    pub fn day_factor(&self) -> f64 {
+        self.day_factor
     }
 
     /// Today's factor sigma at DAILY scale — what the tick multiplies by
@@ -1163,6 +1193,20 @@ mod tests {
         assert!(doubled > anchored);
         let extreme = update_toward(BASE * MARKET_VOL_CEILING_MULTIPLE, 0.06, BASE * 20.0);
         assert!(extreme <= BASE * MARKET_VOL_CEILING_MULTIPLE * 1.000001);
+    }
+
+    #[test]
+    fn the_calm_exponent_reshapes_only_below_the_anchor() {
+        let mut p = crate::params::PT_V1.clone();
+        p.market_vol_vix_exponent = 4.0;
+        let at_zero: Vec<f64> = [0.3, 0.7, 1.0, 1.6].iter().map(|&r| vix_response(&p, r)).collect();
+        p.market_vol_vix_exponent_below = 2.0;
+        assert_eq!(vix_response(&p, 0.5), 0.25);
+        assert_eq!(vix_response(&p, 1.0), at_zero[2]);
+        assert_eq!(vix_response(&p, 1.6), at_zero[3], "the crisis side must not move");
+        assert!(vix_response(&p, 0.7) > at_zero[1]);
+        p.market_vol_vix_exponent_below = 2.5;
+        assert!((vix_response(&p, 0.49) - 0.49f64.powf(2.5)).abs() < 1e-12);
     }
 
     #[test]

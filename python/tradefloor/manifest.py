@@ -450,7 +450,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
             f"{type(snapshot).__name__}."
         )
     carried = set(snapshot)
-    expected = set(_SNAPSHOT_KEYS)
+    # The anchor's slow memory is carried, and hashed, only on a run with
+    # `vix_anchor_memory` off zero; every other snapshot omits it.
+    expected = set(_SNAPSHOT_KEYS) | ({"vix_anchor_slow"} & carried)
     if carried != expected:
         missing = sorted(expected - carried)
         extra = sorted(carried - expected)
@@ -543,6 +545,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _f64(buf, snapshot["market_vol_log_level"])
     # The VIX's own slow log-level, for the same reason.
     _f64(buf, snapshot.get("vix_log_level", 0.0))
+    if "vix_anchor_slow" in snapshot:
+        _f64(buf, snapshot["vix_anchor_slow"])
     # The crisis episode, hashed for the reason the levels above are: two
     # engines alike in every column, one three sessions into a
     # financial-services episode and the other outside one, price the

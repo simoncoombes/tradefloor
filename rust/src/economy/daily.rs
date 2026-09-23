@@ -108,6 +108,51 @@ pub struct DailyInputs<'a> {
     /// See [`crate::params::ModelParams::vix_decay_ratio`]. 1.0 is the
     /// shipped symmetric reversion exactly.
     pub vix_decay_ratio: f64,
+    /// The VIX's own slow reversion toward the identity's anchor, and the
+    /// anchor it reverts to (`Engine::vix_anchor` times
+    /// `Engine::vix_level_multiplier`, the latter exactly 1.0 with the
+    /// regime level off). At a rate of 0.0 -- every preset through pt-v19 --
+    /// the term is not added and the step is the sum it always was, bit for
+    /// bit. See [`crate::params::ModelParams::vix_anchor_reversion`].
+    pub vix_anchor_reversion: f64,
+    pub vix_anchor_level: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_weight`]. 0.0 leaves the
+    /// target the read-back exactly.
+    pub vix_anchor_weight: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_memory`]. 0.0 is the
+    /// instantaneous form and `vix_anchor_slow` is then not read.
+    pub vix_anchor_memory: f64,
+    /// See [`crate::params::ModelParams::macro_compound_days_per_year`].
+    /// 365.0 is the shipped division exactly.
+    pub macro_compound_days_per_year: f64,
+    /// See [`crate::params::ModelParams::macro_calendar_days_per_year`].
+    /// [`MacroCalendar::shipped`] is every literal that stood exactly.
+    pub macro_calendar: MacroCalendar,
+    /// See [`crate::params::ModelParams::cycle_us_calibration`]. 0.0 reads
+    /// the shipped phase table.
+    pub cycle_us_calibration: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_centre`]. 0.0 leaves the
+    /// reference at `vix_anchor_level` exactly.
+    pub vix_anchor_centre: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_weight_level`]. 0.0 is
+    /// the constant weight.
+    pub vix_anchor_weight_level: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_weight_level_cap`].
+    pub vix_anchor_weight_level_cap: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_weight_level_knee`].
+    pub vix_anchor_weight_level_knee: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_weight_level_below`].
+    pub vix_anchor_weight_level_below: f64,
+    /// See [`crate::params::ModelParams::vix_anchor_weight_level_knee_fixed`].
+    /// 0.0 puts the knee on `vix_anchor_level` as it always was.
+    pub vix_anchor_weight_level_knee_fixed: f64,
+    /// The identity's derived anchor WITHOUT the slow regime level's
+    /// multiplier (`Engine::vix_anchor`). Read only by the knee, and only
+    /// with `vix_anchor_weight_level_knee_fixed` nonzero.
+    pub vix_anchor_level_fixed: f64,
+    /// The anchor's slow memory of the read-back's log deviation, already
+    /// advanced to today by the engine.
+    pub vix_anchor_slow: f64,
     /// See [`crate::params::ModelParams::vix_jump_intensity`]. 0.0 takes
     /// no draws and reproduces the shipped schedule exactly.
     pub vix_jump_intensity: f64,
@@ -245,6 +290,21 @@ impl<'a> Default for DailyInputs<'a> {
             phase_target_range_draw: 0.0,
             vix_mean_reversion: VIX_MEAN_REVERSION,
             vix_decay_ratio: 1.0,
+            vix_anchor_reversion: 0.0,
+            vix_anchor_level: 0.0,
+            vix_anchor_weight: 0.0,
+            vix_anchor_memory: 0.0,
+            macro_compound_days_per_year: 365.0,
+            macro_calendar: MacroCalendar::shipped(),
+            cycle_us_calibration: 0.0,
+            vix_anchor_centre: 0.0,
+            vix_anchor_weight_level: 0.0,
+            vix_anchor_weight_level_cap: 0.0,
+            vix_anchor_weight_level_knee: 0.0,
+            vix_anchor_weight_level_below: 0.0,
+            vix_anchor_weight_level_knee_fixed: 0.0,
+            vix_anchor_level_fixed: 0.0,
+            vix_anchor_slow: 0.0,
             vix_jump_intensity: 0.0,
             vix_jump_scale: 0.0,
             vix_return_gain: VIX_RETURN_GAIN,
@@ -443,6 +503,20 @@ pub fn return_spike_for(current: f64, gain: f64, gain_up: f64, exponent: f64) ->
 /// reproduce to the bit. The measurement behind the form, its error bars
 /// and the value each dial derives to are on
 /// `ModelParams::vix_return_level_exponent`.
+/// The anchor weight at the VIX's level: `1 - a(x) = (1 - a) (K / x')^eta`
+/// with `x' = min(x, cap K)` (no cap at 0.0) and, unless `below` is
+/// nonzero, `x' >= K` so the weight is the dial at and below the knee `K`.
+/// Floored at zero. See [`crate::params::ModelParams::vix_anchor_weight_level`].
+pub fn anchor_weight_at_level(a: f64, eta: f64, cap: f64, below: f64, vix: f64, knee: f64) -> f64 {
+    if !(vix > 0.0) || !(knee > 0.0) {
+        return a;
+    }
+    let x = if cap != 0.0 { mathx::min(vix, cap * knee) } else { vix };
+    let x = if below == 0.0 { mathx::max(x, knee) } else { x };
+    let one_minus = (1.0 - a) * mathx::pow(knee / x, eta);
+    mathx::max(0.0, 1.0 - one_minus)
+}
+
 pub fn return_spike_at_level(
     current: f64,
     gain: f64,
@@ -522,11 +596,12 @@ pub fn update_economy_daily(
 ) -> EconomyState {
     let volatility = inputs.volatility;
     let mut new_state = economy.clone();
-    let phase = phase_characteristics(economy.cycle_phase);
+    let phase = phase_characteristics_for(economy.cycle_phase, inputs.cycle_us_calibration != 0.0);
     let day = inputs.game_day;
 
-    let is_month_start = day % DAYS_PER_MONTH == 0;
-    let is_quarter_start = day % DAYS_PER_QUARTER == 0;
+    let cal = inputs.macro_calendar;
+    let is_month_start = day % cal.days_per_month == 0;
+    let is_quarter_start = day % cal.days_per_quarter() == 0;
 
     // ── Shock aggregation ─────────────────────────────────────────────────
     let mut shock_gdp_impact = 0.0;
@@ -550,7 +625,7 @@ pub fn update_economy_daily(
     // The `+ 0.001` is a tolerance on a float accumulated by repeated
     // `+= 1/30`, not a spare margin: `months_in_current_phase` is never
     // exactly 1/30 after the first increment.
-    if economy.months_in_current_phase < 1.0 / 30.0 + 0.001 {
+    if economy.months_in_current_phase < 1.0 / cal.month_f64() + 0.001 {
         // DRAW SITE (uniform) — on EVERY phase-change day, in every phase.
         //
         // The original builds a `Record<EconomicCyclePhase, number>` object
@@ -608,7 +683,7 @@ pub fn update_economy_daily(
     }
 
     // GDP level compounds daily from the CURRENT growth rate.
-    new_state.gdp = economy.gdp * (1.0 + new_state.gdp_growth / 100.0 / 365.0);
+    new_state.gdp = economy.gdp * (1.0 + new_state.gdp_growth / 100.0 / inputs.macro_compound_days_per_year);
 
     // ── Monthly releases ──────────────────────────────────────────────────
     if is_month_start {
@@ -891,7 +966,7 @@ pub fn update_economy_daily(
     }
 
     // CPI compounds daily whether or not a release happened.
-    new_state.cpi = economy.cpi * (1.0 + new_state.inflation_rate / 100.0 / 365.0);
+    new_state.cpi = economy.cpi * (1.0 + new_state.inflation_rate / 100.0 / inputs.macro_compound_days_per_year);
 
     // ── Oil ───────────────────────────────────────────────────────────────
     let oil_inventory = economy.oil_inventory_level;
@@ -937,9 +1012,14 @@ pub fn update_economy_daily(
     // day compounds: the product of these factors is 5.119 over the 252
     // game-days a certified year passes and 0.921 over a full 365, so a
     // window shorter than the period reads a near-neutral shape as a trend.
-    let day_of_year = ((day - 1) % 365) + 1;
-    let oil_seasonal_amplitude =
-        0.03 * mathx::sin(2.0 * std::f64::consts::PI * (day_of_year as f64 - 90.0) / 365.0);
+    //
+    // On the macro calendar: the period is the calendar's year and the
+    // valley its day 90, which are 365 and 90 as shipped.
+    let year = cal.days_per_year;
+    let day_of_year = ((day - 1) % year) + 1;
+    let oil_seasonal_amplitude = 0.03
+        * mathx::sin(2.0 * std::f64::consts::PI
+            * (day_of_year as f64 - cal.scale_days(90) as f64) / year as f64);
 
     let oil_usd_drag = -(economy.usd_index - 100.0) * 0.08;
 
@@ -947,7 +1027,7 @@ pub fn update_economy_daily(
     // A state-dependent draw site: 0 draws on an ordinary day, 1 to 3 on a
     // decision day depending on which branch the price difference selects.
     let mut opec_impact = 0.0;
-    if day - oil_last_opec >= OIL_OPEC_INTERVAL {
+    if day - oil_last_opec >= cal.opec_interval() {
         new_state.oil_last_opec_day = day;
         let oil_price = economy.oil_price;
         let opec_target = 80.0;
@@ -1128,7 +1208,55 @@ pub fn update_economy_daily(
     // this is the shipped arithmetic exactly. See §71.
     let identity_level = inputs.vix_level_identity != 0.0;
     let mut target_vix = if identity_level {
-        inputs.vix_implied_from_market
+        // THE ANCHOR IN THE TARGET, not in the rate: a geometric blend of the
+        // read-back and `L * anchor`. The VIX still reverts at `mr`, so its
+        // lag-one persistence is the loop's and not `mr + kappa`'s. Guarded,
+        // so at 0.0 the target is the read-back bit for bit. See
+        // `ModelParams::vix_anchor_weight`.
+        // The centre and the level law are guarded, so with both at 0.0 the
+        // weight and the reference are the dial and `L * anchor` exactly.
+        let centre_level = if inputs.vix_anchor_centre != 0.0 {
+            inputs.vix_anchor_level * mathx::exp(-inputs.vix_anchor_centre)
+        } else {
+            inputs.vix_anchor_level
+        };
+        let weight = if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_weight_level != 0.0 {
+            // The knee is where the held read-back's elasticity reaches the
+            // level the law holds, a property of the VIX's ABSOLUTE level; the
+            // switch takes the slow regime level out of it. Guarded, so at
+            // 0.0 the knee reads `vix_anchor_level` exactly as it did.
+            let knee_base = if inputs.vix_anchor_weight_level_knee_fixed != 0.0 {
+                inputs.vix_anchor_level_fixed
+            } else {
+                inputs.vix_anchor_level
+            };
+            let knee = if inputs.vix_anchor_weight_level_knee != 0.0 {
+                knee_base * mathx::exp(-inputs.vix_anchor_weight_level_knee)
+            } else {
+                knee_base
+            };
+            anchor_weight_at_level(
+                inputs.vix_anchor_weight,
+                inputs.vix_anchor_weight_level,
+                inputs.vix_anchor_weight_level_cap,
+                inputs.vix_anchor_weight_level_below,
+                economy.vix,
+                knee,
+            )
+        } else {
+            inputs.vix_anchor_weight
+        };
+        if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_memory != 0.0 {
+            // Against the slow memory: today's move passes in full. The
+            // memory is kept against the centre by the engine.
+            inputs.vix_implied_from_market * mathx::exp(-weight * inputs.vix_anchor_slow)
+        } else if inputs.vix_anchor_weight != 0.0 {
+            let a = weight;
+            mathx::exp((1.0 - a) * mathx::log(inputs.vix_implied_from_market)
+                + a * mathx::log(centre_level))
+        } else {
+            inputs.vix_implied_from_market
+        }
     } else if inputs.vix_cycle_amplitude == 1.0 {
         phase_vix
     } else {
@@ -1194,9 +1322,10 @@ pub fn update_economy_daily(
     //
     // Not read under the identity: half a point on the first half of a
     // month is a level constant, and the level is the variance now.
-    let earnings_month_vix = (((day_of_year - 1) % 365) as f64 / 30.44).floor() + 1.0;
-    let day_of_month_vix = day_of_year as f64 - ((earnings_month_vix - 1.0) * 30.44).floor();
-    if !identity_level && day_of_month_vix <= 15.0 {
+    let month_len = cal.mean_month_len();
+    let earnings_month_vix = (((day_of_year - 1) % year) as f64 / month_len).floor() + 1.0;
+    let day_of_month_vix = day_of_year as f64 - ((earnings_month_vix - 1.0) * month_len).floor();
+    if !identity_level && day_of_month_vix <= cal.scale_days(15) as f64 {
         target_vix += 0.5;
     }
 
@@ -1282,14 +1411,25 @@ pub fn update_economy_daily(
     } else {
         0.0
     };
-    new_state.vix = clamp(
-        economy.vix
-            + (target_vix - economy.vix) * vix_mr
-            + random_normal(rng, 0.0, vix_noise_sd)
-            + fear_jump,
-        10.0,
-        inputs.vix_ceiling,
-    );
+    let stepped_vix = economy.vix
+        + (target_vix - economy.vix) * vix_mr
+        + random_normal(rng, 0.0, vix_noise_sd)
+        + fear_jump;
+    // THE ANCHOR THE LOOP LACKS. Under the identity the VIX reverts to the
+    // read-back and the read-back reverts to the VIX; neither reverts to a
+    // level, so the pair's only anchor is that its static gain is under one.
+    // This term is the third thing: a slow pull toward the identity's own
+    // derived anchor, times the regime level's multiplier. Guarded rather
+    // than added, for the reason `vix_target_offset` is guarded -- `x + 0.0`
+    // is not a no-op on a negative zero -- so at 0.0 the sum above is the
+    // literal expression that stood here and every preset reproduces.
+    // See `ModelParams::vix_anchor_reversion`.
+    let stepped_vix = if inputs.vix_anchor_reversion != 0.0 {
+        stepped_vix + inputs.vix_anchor_reversion * (inputs.vix_anchor_level - economy.vix)
+    } else {
+        stepped_vix
+    };
+    new_state.vix = clamp(stepped_vix, 10.0, inputs.vix_ceiling);
 
     // ── Treasury yields ───────────────────────────────────────────────────
     let debt_premium = mathx::max(0.0, (economy.government_debt_to_gdp - 100.0) * 0.002);
@@ -1374,11 +1514,13 @@ pub fn update_economy_daily(
         0.95,
     );
 
-    new_state.months_in_current_phase = economy.months_in_current_phase + 1.0 / 30.0;
+    new_state.months_in_current_phase = economy.months_in_current_phase + 1.0 / cal.month_f64();
     new_state.previous_day_market_return = inputs.market_return_pct;
 
     let prev_30d = economy.rolling_market_return_30d;
-    new_state.rolling_market_return_30d = prev_30d + (inputs.market_return_pct - prev_30d) / 30.0;
+    // A month's memory: 30 steps as shipped.
+    new_state.rolling_market_return_30d =
+        prev_30d + (inputs.market_return_pct - prev_30d) / cal.month_f64();
 
     // `newState.derived = computeDerivedIndicators(newState)` sits here in
     // the original. Deliberately not ported — out of scope per the surface audit §0,
@@ -2737,6 +2879,181 @@ mod fear_response_shape {
     /// `derived` kind rests on: the last assertion drives the worst
     /// admissible session from the highest read-back the map produces and
     /// requires the state to come off the clamp.
+    /// The step with a pinned read-back, so the anchor reversion can be read
+    /// on its own. Everything else is the shipped identity vector.
+    fn vix_step_with_anchor(
+        kappa: f64,
+        anchor_level: f64,
+        vix: f64,
+        implied: f64,
+        sigma_pct: f64,
+        session_pct: f64,
+    ) -> f64 {
+        use crate::economy::state::{create_initial_economy_state, InitialEconomyOptions};
+        let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+            .expect("the default preset resolves");
+        let mut economy = create_initial_economy_state(&InitialEconomyOptions::default());
+        economy.vix = vix;
+        economy.inflation_rate = 2.0;
+        let inputs = DailyInputs {
+            vix_level_identity: p.vix_level_identity,
+            vix_implied_from_market: implied,
+            vix_index_sigma_pct: sigma_pct,
+            market_day_return_pct: session_pct,
+            vix_mean_reversion: p.vix_mean_reversion,
+            vix_decay_ratio: p.vix_decay_ratio,
+            vix_return_gain: p.vix_return_gain,
+            vix_return_gain_up: p.vix_return_gain_up,
+            vix_return_exponent: p.vix_return_exponent,
+            vix_return_exponent_up: p.vix_return_exponent_up,
+            vix_return_level_exponent: p.vix_return_level_exponent,
+            vix_return_level_exponent_up: p.vix_return_level_exponent_up,
+            vix_return_clamp: p.vix_return_clamp,
+            vix_target_shock_cap: p.vix_target_shock_cap,
+            vix_ceiling: p.vix_ceiling,
+            vix_return_source: p.vix_return_source,
+            vix_anchor_reversion: kappa,
+            vix_anchor_level: anchor_level,
+            game_day: 40,
+            ..Default::default()
+        };
+        update_economy_daily(&economy, &inputs, &mut Silent).vix
+    }
+
+    /// **AT 0.0 THE TERM IS NOT ADDED**, whatever anchor is threaded beside
+    /// it, and the step is the sum it was before the dial existed.
+    ///
+    /// Bit-identity, not closeness: `x + 0.0` is not a no-op on a negative
+    /// zero, so the zero arm is a BRANCH in `daily.rs` and this reads the
+    /// raw bits of both sides. The anchor passed on the left is the derived
+    /// one the engine threads on the certified roster, which is nowhere near
+    /// any of these states, so a term that ran would be visible in the top
+    /// bits and not only the last.
+    #[test]
+    fn the_anchor_reversion_at_zero_is_the_step_that_stood_before_it() {
+        for &vix in &[10.5, 15.0, 23.25, 40.0, 90.0] {
+            for &implied in &[12.0, 21.0, 60.0] {
+                for &session in &[-3.0, 0.0, 1.5] {
+                    let with = vix_step_with_anchor(0.0, 23.249857144842903, vix, implied,
+                                                    1.0, session);
+                    let without = vix_step_with_anchor(0.0, 0.0, vix, implied, 1.0, session);
+                    let plain = vix_after_one_session(vix, implied, 1.0, session);
+                    assert_eq!(
+                        with.to_bits(), plain.to_bits(),
+                        "the anchor reversion at 0.0 moved the step at VIX {vix}, \
+                         read-back {implied}, session {session}: {with} against {plain}"
+                    );
+                    assert_eq!(without.to_bits(), plain.to_bits());
+                }
+            }
+        }
+    }
+
+    /// **THE REVERSION MOVES THE VIX TOWARD `L * anchor`**, by exactly
+    /// `kappa` of the distance, on a day whose variance is pinned.
+    ///
+    /// The read-back is held at the state's own value and the session return
+    /// is zero, so `vix_mean_reversion` has almost nothing to carry and what
+    /// the state does is the new term. Three things are asserted: the size is
+    /// the closed form, the direction is toward the anchor from both sides,
+    /// and the anchor is a FIXED POINT of the added term rather than of the
+    /// whole step.
+    #[test]
+    fn the_anchor_reversion_moves_the_vix_toward_the_level_times_the_anchor() {
+        let kappa = 0.046081;
+        let anchor = 23.249857144842903;
+        for &level in &[1.0, 0.8, 1.25] {
+            let target = level * anchor;
+            for &vix in &[12.0, 18.0, 23.249857144842903, 30.0, 55.0] {
+                let base = vix_step_with_anchor(0.0, target, vix, vix, 1.0, 0.0);
+                let with = vix_step_with_anchor(kappa, target, vix, vix, 1.0, 0.0);
+                let pull = kappa * (target - vix);
+                assert!(
+                    (with - base - pull).abs() < 1e-12,
+                    "at level {level}, VIX {vix}: the term should be {pull}, read \
+                     {} ({with} against {base})", with - base
+                );
+                if vix < target {
+                    assert!(with > base, "below the anchor the reversion must lift");
+                } else if vix > target {
+                    assert!(with < base, "above the anchor the reversion must pull down");
+                } else {
+                    assert_eq!(with.to_bits(), base.to_bits(),
+                               "at the anchor the term is exactly zero");
+                }
+            }
+        }
+    }
+
+    /// The step with the anchor in the TARGET rather than in the rate.
+    fn vix_step_with_weight(weight: f64, anchor_level: f64, vix: f64, implied: f64) -> f64 {
+        let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+            .expect("the default preset resolves");
+        use crate::economy::state::{create_initial_economy_state, InitialEconomyOptions};
+        let mut economy = create_initial_economy_state(&InitialEconomyOptions::default());
+        economy.vix = vix;
+        economy.inflation_rate = 2.0;
+        let inputs = DailyInputs {
+            vix_level_identity: p.vix_level_identity,
+            vix_implied_from_market: implied,
+            vix_index_sigma_pct: 1.0,
+            market_day_return_pct: 0.0,
+            vix_mean_reversion: p.vix_mean_reversion,
+            vix_decay_ratio: 1.0,
+            vix_return_gain: p.vix_return_gain,
+            vix_return_gain_up: p.vix_return_gain_up,
+            vix_return_exponent: p.vix_return_exponent,
+            vix_return_exponent_up: p.vix_return_exponent_up,
+            vix_return_level_exponent: p.vix_return_level_exponent,
+            vix_return_level_exponent_up: p.vix_return_level_exponent_up,
+            vix_return_clamp: p.vix_return_clamp,
+            vix_target_shock_cap: p.vix_target_shock_cap,
+            vix_ceiling: p.vix_ceiling,
+            vix_return_source: p.vix_return_source,
+            vix_anchor_weight: weight,
+            vix_anchor_level: anchor_level,
+            game_day: 40,
+            ..Default::default()
+        };
+        update_economy_daily(&economy, &inputs, &mut Silent).vix
+    }
+
+    /// **AT 0.0 THE TARGET IS THE READ-BACK**, bit for bit, whatever anchor
+    /// is threaded beside it.
+    #[test]
+    fn the_anchor_weight_at_zero_is_the_step_that_stood_before_it() {
+        for &vix in &[10.5, 15.0, 23.25, 40.0, 90.0] {
+            for &implied in &[12.0, 21.0, 60.0] {
+                let with = vix_step_with_weight(0.0, 23.249857144842903, vix, implied);
+                let without = vix_step_with_weight(0.0, 0.0, vix, implied);
+                assert_eq!(with.to_bits(), without.to_bits(),
+                           "the weight at 0.0 moved the step at VIX {vix}, read-back {implied}");
+            }
+        }
+    }
+
+    /// **THE WEIGHT MOVES THE TARGET, NOT THE RATE.** The step's change is
+    /// `mr` times the move in the target, where the target becomes
+    /// `implied^(1 - a) * anchor^a`, and at the anchor itself nothing moves.
+    #[test]
+    fn the_anchor_weight_blends_the_target_geometrically_at_the_shipped_rate() {
+        let mr = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+            .expect("the default preset resolves")
+            .vix_mean_reversion;
+        let anchor = 23.249857144842903;
+        let a = 0.609944;
+        for &vix in &[12.0, 23.249857144842903, 55.0] {
+            for &implied in &[12.0, 23.249857144842903, 60.0] {
+                let base = vix_step_with_weight(0.0, anchor, vix, implied);
+                let with = vix_step_with_weight(a, anchor, vix, implied);
+                let blended = implied.powf(1.0 - a) * anchor.powf(a);
+                let want = mr * (blended - implied);
+                assert!((with - base - want).abs() < 1e-9,
+                        "VIX {vix}, read-back {implied}: moved {} against {want}", with - base);
+            }
+        }
+    }
+
     #[test]
     fn a_vix_at_the_ceiling_is_held_there_iff_the_target_is_at_or_above_it() {
         let p = ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
@@ -2958,5 +3275,32 @@ mod fear_response_shape {
              shape parameter the cap used to be",
             p.vix_return_clamp
         );
+    }
+}
+
+#[cfg(test)]
+mod anchor_weight_level {
+    use super::anchor_weight_at_level;
+
+    #[test]
+    fn at_and_below_the_knee_it_is_the_dial() {
+        for x in [9.0, 14.0, 18.5] {
+            assert!((anchor_weight_at_level(0.45, 1.0, 0.0, 0.0, x, 18.5) - 0.45).abs() < 1e-15);
+        }
+    }
+
+    #[test]
+    fn it_holds_one_minus_a_times_level_constant_below_the_cap() {
+        for x in [20.0, 25.0, 30.0, 36.0] {
+            let a = anchor_weight_at_level(0.45, 1.0, 1.95, 0.0, x, 18.5);
+            assert!(((1.0 - a) * x - 0.55 * 18.5).abs() < 1e-12, "x {x} a {a}");
+        }
+    }
+
+    #[test]
+    fn it_stops_rising_at_the_cap_and_below_the_knee_only_if_asked_it_falls() {
+        let at_cap = anchor_weight_at_level(0.45, 1.0, 1.95, 0.0, 1.95 * 18.5, 18.5);
+        assert_eq!(anchor_weight_at_level(0.45, 1.0, 1.95, 0.0, 80.0, 18.5), at_cap);
+        assert_eq!(anchor_weight_at_level(0.45, 1.0, 1.95, 1.0, 9.0, 18.5), 0.0);
     }
 }

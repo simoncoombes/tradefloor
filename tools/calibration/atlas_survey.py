@@ -167,6 +167,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the box the way ramp=50 does above: strong-to-implausible.
     "market_beta_down_asym": (0.0, 0.1),
     "market_beta_down_asym_lag": (0.0, 0.1),
+    # A SWITCH over the two admissible values, for the reason the box gives:
+    # the lagged wire's condition is sampled at the open or sampled live and
+    # the interior has no reading. Stops at 1.0; the sign control at 2.0 is a
+    # diagnostic arm, not a point of the search surface.
+    "market_beta_down_asym_lag_live": (0.0, 1.0),
     # The variance-neutral down-tick reallocation (`corr-asymmetry.md` §10,
     # design repository): the idiosyncratic shock is suppressed by `1 - c`
     # on a down tick of the factor and inflated by `sqrt(2 - (1 - c)^2)` on
@@ -239,6 +244,46 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # has to contain the shipped 0.0, the same price
     # market_vol_level_persistence pays above.
     "vix_level_loop_gain": (0.0, 6.0),
+    # The VIX's own slow reversion toward the identity's anchor. 0.0 is the
+    # branch not taken and the shipped vector; DERIVED 0.046 as the kappa at
+    # which the linearised loop's slow pole equals the tape's 0.9965 at
+    # market_vol_vix_exponent 1.83 and vix_mean_reversion 0.27. The box stops
+    # at 0.5, well under the invariant's own refusal at 1.0 (where the step
+    # lands on the anchor every session) and above vix_mean_reversion itself,
+    # so the survey can put more weight on the anchor than on the read-back
+    # and see what that costs.
+    "vix_anchor_reversion": (0.0, 0.5),
+    # The anchor's share of the VIX's target, in logs. 0.0 is the branch not
+    # taken; DERIVED 0.61 at market_vol_vix_exponent 4.0. The box stops at
+    # 0.9, under the invariant's refusal at 1.0 where the VIX ignores the
+    # index's variance altogether.
+    "vix_anchor_weight": (0.0, 0.9),
+    # The anchor's memory rate per session; 0.0 is the instantaneous form.
+    "vix_anchor_memory": (0.0, 1.0),
+    # Switches (0 shipped, 1 on): the US cycle table, Fed lift-off, PE buybacks.
+    "cycle_us_calibration": (0.0, 1.0),
+    "fed_liftoff_rule": (0.0, 1.0),
+    "market_pe_buybacks": (0.0, 1.0),
+    # The anchor's centre (log offset), the weight's level exponent and cap.
+    "vix_anchor_centre": (0.0, 1.0),
+    "vix_anchor_weight_level": (0.0, 2.0),
+    "vix_anchor_weight_level_cap": (0.0, 4.0),
+    "vix_anchor_weight_level_knee": (0.0, 1.0),
+    "vix_anchor_weight_level_below": (0.0, 1.0),
+    # The market variance target's exponent below the anchor; 0.0 reads the
+    # one exponent on both sides. The box spans the square's neighbourhood
+    # up to the crisis side's 4.9.
+    "market_vol_vix_exponent_below": (0.0, 5.0),
+    # Whether the level law's knee reads the slow regime level: a switch.
+    "vix_anchor_weight_level_knee_fixed": (0.0, 1.0),
+    # How fast an endogenous news event's move is priced (2026-09-23,
+    # news-speed): the fast part's half-life in ticks, the post-news drift's
+    # share and half-life, and the maker's re-quote on news (a switch). 0.0
+    # is the straight line over the session; derived 0.6, 0.12, 42 and 1.0.
+    "news_absorption_half_life": (0.0, 5.0),
+    "news_absorption_drift_share": (0.0, 0.5),
+    "news_absorption_drift_half_life": (0.0, 120.0),
+    "news_quote_revision": (0.0, 1.0),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is
@@ -589,6 +634,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
 #: header. Both known-good values (ramp 6.0, cap 0.98) are asserted inside
 #: these ranges at plan time.
 EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
+    # The macro calendar's year in steps: 365 as shipped, 252 the session
+    # calendar (21-step months, 63-step quarters).
+    "macro_calendar_days_per_year": (252.0, 365.0),
+    # The economy steps a year's GDP and CPI growth compounds over: 365 as
+    # shipped, 252 the session clock (the economy steps once per session).
+    "macro_compound_days_per_year": (252.0, 365.0),
     # The crisis epicentre's hysteresis, in SESSIONS, shipped at 21. 1 is an
     # episode that ends on the first session back under the threshold, which
     # is the mechanism with no memory at all; 63 is a quarter, half again the

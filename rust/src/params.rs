@@ -422,6 +422,77 @@ pub struct ModelParams {
     /// information contagion works this way: when one bank misses, the
     /// market re-reads every other bank, and it does that harder in a panic.
     pub news_peer_vix_coupling: f64,
+    /// How fast the market prices an endogenous news event, as the
+    /// half-life in ticks (minutes) of the fast part of its move. 0.0 --
+    /// every preset -- is the straight line that has always stood.
+    ///
+    /// # The defect
+    ///
+    /// An event drawn at `open_market` adds `price_impact / 390` on every
+    /// tick of its day, so its move lands in a straight line across the
+    /// session: 5% of it by tick 30, half by lunch, all of it by the close.
+    /// An agent that reads the headline at tick 30 and trades its direction
+    /// earned about +120bp an event on pt-v19, 82% of the time
+    /// (docs/serve/HEADLINES.md). Real prices take in firm news in minutes,
+    /// so that is an edge a bot would learn here and lose with money.
+    ///
+    /// # The profile
+    ///
+    /// Off zero, the share of the move priced after `n` ticks is
+    /// `A(n) = (1 - d) * F(n; h) + d * F(n; h_d)`, where `F(n; h) = (1 -
+    /// 2^(-n/h)) / (1 - 2^(-390/h))`, `h` is this dial, and `d` and `h_d`
+    /// are `news_absorption_drift_share` and
+    /// `news_absorption_drift_half_life`. Each part is rescaled to be
+    /// complete at the close, so the day's total move is the same at every
+    /// setting; only its timing changes. Tick `m` of the session prices
+    /// `A(m + 1) - A(m)` of the event, and its sector peers the same share
+    /// of their transfer. See `market::factors::news_absorbed_share`.
+    ///
+    /// Caller-supplied news (`tick(news=...)`, `run_session(news=...)`) is
+    /// not reshaped. Off the regular session the profile prices nothing.
+    ///
+    /// # The derived values (not adopted by any preset)
+    ///
+    /// Half-life 0.6 ticks, drift share 0.12, drift half-life 42 ticks,
+    /// with `news_quote_revision` 1.0. Christensen, Timmermann and Veliyev
+    /// ("Warp speed price moves: jumps after earnings announcements",
+    /// arXiv 2601.08962, Table 7, liquid US stocks 2008-2020) buy on the
+    /// surprise at the first trade after the release: 0.74% by 30 seconds,
+    /// 1.05% by one minute, 1.58% by five and 1.80% by 6:30pm, so 58% of
+    /// the move is in after one minute and 88% after five. The half-life
+    /// puts `A(1)` at 0.60, the 12% after five minutes is the drift share,
+    /// and its 42-tick half-life (a 60-minute mean life) lands it over the
+    /// next hours, as Patell and Wolfson (1984, JFE) find return serial
+    /// correlation disturbed "for several hours" after the bulk of the
+    /// reaction is over within five to ten minutes. Kim, Lin and Slovin
+    /// (1997, JFQA) find news released before the open priced within the
+    /// first five minutes of NYSE trading; Busse and Green (2002, JFE) find
+    /// good news priced within a minute and bad news over fifteen. The
+    /// 2016-2020 half of the sample gives the same one-minute share (68%)
+    /// and nothing after five minutes, so the drift share is the slower of
+    /// the two readings. No drift past the close: post-earnings drift in
+    /// large caps has been nil since 2006 (Martineau 2022, CFR), and the
+    /// engine's momentum already carries about 5% of a news day's move into
+    /// the next (design repository, programme/results/news-speed/).
+    pub news_absorption_half_life: f64,
+    /// The share of an endogenous news event's move that arrives as
+    /// post-news drift, after the fast part: `d` in
+    /// [`ModelParams::news_absorption_half_life`]'s profile. 0.0 -- every
+    /// preset -- is no drift part; read only with that dial off zero.
+    pub news_absorption_drift_share: f64,
+    /// The half-life in ticks of the post-news drift part, `h_d` in
+    /// [`ModelParams::news_absorption_half_life`]'s profile. 0.0 lands the
+    /// drift share in a straight line over the session; read only with
+    /// `news_absorption_drift_share` off zero.
+    pub news_absorption_drift_half_life: f64,
+    /// Whether the market maker re-quotes on public news. 0.0 -- every
+    /// preset -- quotes the book around the last print, so a news move in
+    /// the model price reaches the tape only as fast as the tick's flow can
+    /// walk the book. 1.0 quotes it around the last print moved by the
+    /// tick's news term (`company_news / 390` as applied), the way dealers
+    /// revise quotes on a public announcement without waiting for a trade.
+    /// A switch. See `market::tick`, the settlement phase.
+    pub news_quote_revision: f64,
     /// Market-shock magnitude, in baseline sigmas, above which the crash
     /// amplifier fires (§5.4 promotion).
     pub crash_amplifier_threshold: f64,
@@ -1345,6 +1416,343 @@ pub struct ModelParams {
     /// memory at all.
     pub vix_level_loop_gain: f64,
 
+    /// The VIX's own slow reversion toward the identity's anchor, per
+    /// session. 0.0 -- every preset through pt-v19 -- is the branch not
+    /// taken: the step is the same three-term sum it always was, no
+    /// arithmetic runs on this path and every preset is BIT-IDENTICAL.
+    ///
+    /// # The defect
+    ///
+    /// Under [`ModelParams::vix_level_identity`] the VIX reverts to the
+    /// read-back of the index's own conditional variance, and the variance
+    /// reverts to a target that reads the VIX. There is no third thing.
+    /// The VIX reverts to the variance, the variance reverts to the VIX,
+    /// and nothing in the pair reverts to a LEVEL: the loop's only anchor
+    /// is the fact that its static gain is under one, so the closer that
+    /// gain is to one the longer the pair wanders and the larger every
+    /// standing bias becomes at the level. On the tape the VIX does have a
+    /// third thing -- it sits near a regime mean over months -- and the
+    /// model has been supplying that from outside, as a driven regime level
+    /// (`vix_level_sigma`), because the loop itself could not.
+    ///
+    /// That is why the crisis lever and the VIX's memory have been traded
+    /// against one another at every composition. The excursion form
+    /// (`market_vol_vix_excursion` 1.0) buys stability by making the
+    /// factor's target FALL as the read-back rises, which is the same knob
+    /// that caps the held-VIX response: at `market_vol_vix_exponent` e the
+    /// held-VIX fixed point is `v ~ VIX^(e / (1 + e/2))`, so 4.9 gives
+    /// 1.42 where the tape's index variance rises as VIX^1.83, and 1.83
+    /// would need e = 21.5. The valve that damps the free loop is the valve
+    /// that shuts the lever.
+    ///
+    /// # The form
+    ///
+    /// The VIX step in `economy/daily.rs` is
+    /// `x + vix_mean_reversion (target - x) + noise + jumps`. This dial
+    /// adds one term:
+    ///
+    /// ```text
+    /// + vix_anchor_reversion * (L * anchor - x)
+    /// ```
+    ///
+    /// `anchor` is the derived identity anchor the engine already carries
+    /// (`Engine::vix_anchor`, the VIX the identity gives at the
+    /// unconditional point) and `L` is the slow regime level's multiplier
+    /// (`Engine::vix_level_multiplier`, exactly 1.0 with
+    /// `vix_level_sigma` at 0.0). So the VIX reverts to the read-back at
+    /// `vix_mean_reversion` AND to its regime level at this rate, and the
+    /// pair has an anchor that is not itself a function of the VIX. With
+    /// the anchor in place the variance target can read the VIX's LEVEL
+    /// with the tape's own exponent (`market_vol_vix_excursion` 0.0,
+    /// `market_vol_vix_exponent` 1.83) without the loop becoming a random
+    /// walk, which is what the pre-excursion form was.
+    ///
+    /// # Derivation
+    ///
+    /// Linearise the closed loop in logs about its fixed point, writing
+    /// `f = log(v / base)` and `y = log(VIX / (L anchor))`. The factor
+    /// mixture reverts to a target `p y` at rate `1 - rho`, and the VIX
+    /// reverts to `f / 2` at `mr` and to `0` at `kappa`:
+    ///
+    /// ```text
+    /// f' = rho f + (1 - rho) p y
+    /// y' = (mr / 2) f + (1 - mr - kappa) y
+    /// ```
+    ///
+    /// which is the two-state system whose static gain is
+    /// `theta = p w / 2` at `w = mr / (mr + kappa)` and whose poles are the
+    /// eigenvalues of `[[rho, (1 - rho) p], [mr / 2, 1 - mr - kappa]]`:
+    ///
+    /// ```text
+    /// lambda = (tr +- sqrt(tr^2 - 4 det)) / 2
+    /// tr  = rho + 1 - mr - kappa
+    /// det = rho (1 - mr - kappa) - (1 - rho) p mr / 2
+    /// ```
+    ///
+    /// `rho` is the factor mixture's effective persistence, the weight
+    /// average of the two components' own poles: the fast component's GJR
+    /// triple gives `alpha + beta + gamma / 2` = 0.979 and the slow
+    /// component's `market_vol_slow_persistence` is 0.9913 at
+    /// `market_vol_slow_weight` 0.35, so
+    /// `0.65 * 0.979 + 0.35 * 0.9913` = 0.98331. The weight average is the
+    /// right combination here because both components are fed by the SAME
+    /// innovation and both revert toward the same VIX-coupled target
+    /// (`factor_vol.rs`), so the mixture's response to a step in that
+    /// target is the weighted sum of two exponentials and 0.98331 is its
+    /// one-pole stand-in.
+    ///
+    /// The characteristic equation is LINEAR in `kappa`, so a target pole
+    /// inverts in closed form:
+    ///
+    /// ```text
+    /// kappa = [ -l^2 + l (rho + 1 - mr) - rho (1 - mr) + (1 - rho) p mr / 2 ]
+    ///         / (l - rho)
+    /// ```
+    ///
+    /// DERIVED 0.047 at `l` = 0.9965 -- the tape's own slow pole of log VIX
+    /// (`results/ptv19recomp/vix-level-derivation.txt`, the two-pole fit:
+    /// fast 0.942 with 21 per cent of the variance, slow 0.9965 with 79) --
+    /// with `p` = 1.83 and `mr` = 0.27. At `kappa` 0 the same algebra reads
+    /// the loop's slow pole at 0.9987, slower than the tape's; the dial is
+    /// the amount of anchor that brings it back to it. The slow pole then
+    /// comes from the LOOP and not from a driven regime level.
+    ///
+    /// # Invariants
+    ///
+    /// `kappa` lives in `[0, 1)`: it is a share of the distance to the
+    /// anchor taken in one session, and at one or above the step
+    /// overshoots the anchor every day. `ModelParams::invariants` refuses
+    /// it with `vix_level_identity` at 0.0 the way `vix_level_sigma` is
+    /// refused -- off the identity there is no derived anchor for the VIX
+    /// to revert to, `derive_vix_anchor` returns the dial
+    /// `market_vol_vix_anchor` and the VIX's target is the phase table, so
+    /// the reversion would be pulling one scale toward another.
+    ///
+    /// # What it moves, MEASURED on 16 seeds of the held roster
+    ///
+    /// On the arm the design note registers -- `market_vol_vix_excursion`
+    /// 0.0, `market_vol_vix_exponent` 1.83, this dial 0.046081 -- against
+    /// the shipped pt-v19, with the regime level on at its shipped values
+    /// (a), on at the gain the same algebra re-derives on this form, 2.3552
+    /// (b), and off (c):
+    ///
+    /// ```text
+    ///                          base      (a)      (b)      (c)    tape
+    /// held VIX 65 over 5, read-back, lever, correlation
+    ///   read-back            4.60x    4.38x    4.37x    4.37x       --
+    ///   index vol            4.90x    4.61x    4.60x    4.60x    10.50x
+    ///   a name in total      2.93x    2.88x    2.87x    2.91x     4.12x
+    ///   its private part     2.19x    2.23x    2.20x    2.22x     2.34x
+    ///   pairwise corr at 65  0.458    0.449    0.447    0.447    0.665
+    /// the free VIX at 504 sessions
+    ///   AR(1), debiased     0.9595   0.9579   0.9568   0.9590   0.93 (within-year)
+    ///   log-VIX ACF at 21    0.328    0.527    0.525    0.519     0.80
+    ///   log-VIX ACF at 63    0.015    0.113    0.117    0.129     0.63
+    ///   seeds at vix_ceiling  0/16     0/16     0/16     0/16       --
+    ///   S(252) / S(504)   42.4/31.6 51.3/37.6 48.8/39.9 47.7/36.1   --
+    /// ```
+    ///
+    /// **THE LEVEL LAW DID NOT ARRIVE, AND THE DIAL IS NOT WHY.** The
+    /// design derived p = 1.83 from the tape on the assumption that with
+    /// the excursion damping removed the target's held-VIX exponent passes
+    /// through to the variance's one for one. It does not: the transmission
+    /// measured on this form is about 0.8 from the target's own effective
+    /// exponent to the factor variance's, and about 0.9 again from there to
+    /// the index's, so p = 1.83 buys an index lever of 4.61x where the
+    /// design predicted 8x to 11x and where the shipped excursion form at
+    /// exponent 4.9 already reads 4.90x. The exponent ladder on THIS form,
+    /// with the anchor reversion on, measures the transmission directly:
+    /// p = 1.83 gives 4.61x, p = 3.0 gives 7.89x, p = 4.9 gives 11.27x, so
+    /// the tape's 10.5x sits near p = 4.5 and not near 1.83. The arm is
+    /// registered and refused; the dial ships at 0.0.
+    ///
+    /// What the dial itself does is what the algebra says. The free VIX's
+    /// log ACF at lags 21 and 63 rises from 0.33 / 0.01 to 0.53 / 0.11
+    /// toward the tape's 0.80 / 0.63, which is the loop's own slow pole
+    /// arriving, and it does so with `vix_ar1_debiased` unmoved: within
+    /// 0.001 of the base at 252 and within 0.003 at 504, on the level arm
+    /// at the re-derived gain and on the level-off arm alike. No seed's VIX
+    /// reaches `vix_ceiling` on any arm. One graded row leaves its band on
+    /// the level law and it is the same row on all three level arms:
+    /// `index_tail_dn3_pct` 0.398 against 0.64 to 2.34 at both horizons,
+    /// where the base reads 0.797 and 0.696 -- a three-sigma index day is
+    /// half as likely under a target that reads the VIX's level, because
+    /// the level moves slowly and the excursion form's target did not.
+    pub vix_anchor_reversion: f64,
+
+    /// The share of the VIX's TARGET taken by the identity's anchor, in
+    /// logs. 0.0 -- every preset through pt-v19 -- is the branch not taken:
+    /// the target is the read-back exactly and every preset is BIT-IDENTICAL.
+    ///
+    /// The same job as [`ModelParams::vix_anchor_reversion`] done in the
+    /// other place. That dial adds a second reversion RATE beside
+    /// `vix_mean_reversion`, so the VIX reverts `mr + kappa` of the way each
+    /// session and its lag-one persistence collapses with the loop's fast
+    /// pole. This one leaves the rate at `mr` and moves the TARGET instead:
+    ///
+    /// ```text
+    /// target = implied^(1 - a) * (L * anchor)^a
+    /// ```
+    ///
+    /// Linearised, `y' = (1 - mr) y + mr (1 - a) f / 2`. The static gain is
+    /// `p (1 - a) / 2`, the same as the rate form's at `1 - a = w`, and the
+    /// trace of the loop matrix is `rho + 1 - mr` whatever `a` is. So pinning
+    /// the slow pole pins the fast pole too: at the tape's 0.9965 the fast
+    /// pole is 0.717 at every exponent, where the rate form's runs from 0.671
+    /// down to 0.146. DERIVED in closed form from the characteristic equation,
+    /// `1 - a = (rho - l)(1 - mr - l) / ((1 - rho) p mr / 2)`: 0.6099 at
+    /// `market_vol_vix_exponent` 4.0. Geometric rather than arithmetic
+    /// because on the anchor form the held read-back rises about as
+    /// `VIX^(p / 2)`, so an arithmetic blend keeps a tail that grows faster
+    /// than the VIX, and the geometric one grows as `VIX^((1 - a) p / 2)`,
+    /// under one at the derived weight.
+    pub vix_anchor_weight: f64,
+
+    /// How fast the anchor's view of the read-back moves, per session.
+    /// 0.0 -- every preset -- is the instantaneous form: the target is
+    /// `implied^(1 - a) (L anchor)^a`, today's read-back against the anchor.
+    ///
+    /// Nonzero, the anchor pulls against a SLOW memory of the read-back's
+    /// log deviation instead, `s' = (1 - h) s + h log(implied / L anchor)`,
+    /// and the target is `implied * exp(-a s)`. Today's move in the
+    /// variance then reaches the VIX in full, which is the same-day fear
+    /// response and the range the instantaneous form damps by `1 - a`,
+    /// while a deviation that persists is pulled back at weight `a`. At
+    /// h = 1 it is the instantaneous form less one session's lag.
+    pub vix_anchor_memory: f64,
+
+    /// How many economy steps the macro model compounds a year's GDP and
+    /// CPI growth over. 365.0 -- every preset -- is the arithmetic that has
+    /// always stood, and the step at 365.0 is the same f64 division.
+    ///
+    /// # The defect
+    ///
+    /// The economy steps once per trading SESSION, 252 to a year, and
+    /// compounded `rate / 365` each step, so a trading year received
+    /// 252/365 of its annual growth: nominal output, and with it every
+    /// name's earnings and book (`earnings_nominal_growth`), grew about 1.1
+    /// points a year too slowly. Measured on 30 seeds x 21 years of pt-v19:
+    /// the index's long-run return 3.83 -> 4.92 per cent with only the two
+    /// divisors changed (design repository, results/longrun-drift/). 252.0
+    /// puts the compounding on the session clock. The rest of the macro
+    /// calendar (30-session months) is not moved by this dial.
+    pub macro_compound_days_per_year: f64,
+
+    /// How many economy steps make a macro YEAR on the rest of the macro
+    /// calendar. 365.0 -- every preset -- is the calendar that has always
+    /// stood: 30-step months (`DAYS_PER_MONTH`), 90-step quarters, a 90-step
+    /// OPEC interval, a 365-step seasonal year, a 30-step month on the
+    /// cycle's phase clock and its per-day hazard, a 30-step market-return
+    /// memory, and central-bank meetings every 42-55 (crisis 21-30) steps.
+    ///
+    /// # The defect
+    ///
+    /// The economy steps once per trading session, so a macro year was 365
+    /// sessions, 1.45 trading years: every business-cycle phase, release
+    /// and meeting interval ran 1.45 times slow in market time. At 252.0 --
+    /// the session clock, DERIVED from the session count and not fitted --
+    /// a month is 21 sessions, a quarter 63, the year 252, and calendar-day
+    /// intervals (meetings, the seasonal valley) are scaled by 252/365 and
+    /// rounded. A monthly rate stays a monthly rate; per-step processes are
+    /// not touched. Pair it with `macro_compound_days_per_year` 252.0.
+    /// Measured in the design repository, results/macro-cycle/.
+    pub macro_calendar_days_per_year: f64,
+
+    /// Selects the business-cycle phase table derived from NBER and BEA
+    /// (`economy::state::us_phase_characteristics`). 0.0 -- every preset --
+    /// reads the shipped table; any other value reads the US table. Its
+    /// durations are months of the macro calendar, so they mean real months
+    /// only with `macro_calendar_days_per_year` 252.0. See the table's own
+    /// docstring for each number's derivation.
+    pub cycle_us_calibration: f64,
+
+    /// Adds a lift-off branch to the central bank's ladder. 0.0 -- every
+    /// preset -- is the shipped ladder, in which every hike needs inflation
+    /// at least a point above target, so after the first recession the
+    /// rate sits at zero for the rest of a run. At any other value the
+    /// bank also hikes 25bp when its own Taylor rate is 50bp above the
+    /// policy rate, unemployment is not more than a point over target, and
+    /// the cycle is not in contraction or trough: the ladder's own cut
+    /// branch mirrored. See `economy::central_bank`.
+    pub fed_liftoff_rule: f64,
+
+    /// Reads buybacks into `market_pe`. 0.0 -- every preset -- divides price
+    /// by `eps * nominal` without the buyback term the valuation applies,
+    /// so the multiple rises by about the buyback yield a year (22.6 to 28.0
+    /// over 21 years on pt-v19) and slowly raises the expansion hazard,
+    /// which adds above a multiple of 28. At any other value the earnings
+    /// carry `market::tick::buyback_scale`, as the valuation's do.
+    pub market_pe_buybacks: f64,
+
+    /// Where the anchor's weight pulls TO, as a log offset below the
+    /// identity's derived anchor: the blend (and the memory's reference) use
+    /// `L * anchor * exp(-c)`. 0.0 -- every preset -- is the branch not
+    /// taken and the reference is `L * anchor` exactly. The forward map's
+    /// denominator (`vix_ratio_denominator`) is NOT moved, so a held VIX
+    /// drives the same variance it did.
+    ///
+    /// Why a centre and not the anchor: the anchor is the identity at the
+    /// UNCONDITIONAL (mean) variance, a root-mean-square level. The
+    /// geometric blend pulls log VIX toward it, so in calm it LIFTS the VIX
+    /// above its own read-back by `(L anchor / implied)^a`, 1.19 to 1.26 on
+    /// the route-1 cell, where the tape's VIX over realised volatility says
+    /// the read-back alone is already right. A probe of
+    /// `programme/results/vix-law-levels/` (design repository).
+    pub vix_anchor_centre: f64,
+
+    /// The anchor weight as a function of the VIX's level. 0.0 -- every
+    /// preset -- is the constant weight `vix_anchor_weight`. Nonzero,
+    ///
+    /// ```text
+    /// 1 - a(x) = (1 - a) * (K / clamp(x, K, r K))^eta
+    /// ```
+    ///
+    /// with `x` the VIX entering the session, `K` the knee
+    /// (`L anchor exp(-k)`, [`ModelParams::vix_anchor_weight_level_knee`])
+    /// and `r` [`ModelParams::vix_anchor_weight_level_cap`]. At and below the
+    /// knee the weight is the dial. The loop's local gain is
+    /// `(1 - a(x)) g(x)` with `g` the held read-back's elasticity to the VIX;
+    /// measured on the route-1 base `g` crosses one at a held VIX of 18.5 and
+    /// rises about in proportion to the VIX from there to about 36, so
+    /// `eta = 1` holds the local gain at its knee value over that range and
+    /// the fear trap at 30 to 50, where a constant 0.45 leaves the gain at
+    /// one, is removed.
+    pub vix_anchor_weight_level: f64,
+
+    /// The level, as a multiple of the centre, above which
+    /// [`ModelParams::vix_anchor_weight_level`] stops raising the weight:
+    /// where the held read-back's elasticity stops rising. 0.0 is no cap.
+    pub vix_anchor_weight_level_cap: f64,
+
+    /// Where [`ModelParams::vix_anchor_weight_level`] starts raising the
+    /// weight, as a log offset below `L * anchor`. Read only with the level
+    /// law on; 0.0 puts the knee at `L * anchor`.
+    pub vix_anchor_weight_level_knee: f64,
+
+    /// Nonzero, the level law also runs BELOW the knee, where it lowers the
+    /// weight toward zero. 0.0 -- the default -- holds the dial there. Read
+    /// only with the level law on.
+    pub vix_anchor_weight_level_below: f64,
+
+    /// Nonzero, the level law's knee does not read the slow regime level:
+    /// `K = anchor exp(-k)` instead of `K = L anchor exp(-k)`. 0.0 -- every
+    /// preset -- is the knee as it was. A switch, 0.0 or 1.0, read only with
+    /// the level law on.
+    ///
+    /// # Why
+    ///
+    /// The knee is DERIVED from the held-VIX map: it is where the read-back's
+    /// elasticity `g(x)` to a held VIX reaches `G* / (1 - a)`, and `g` is a
+    /// property of the VIX's absolute level (the index variance's floor and
+    /// coupling), which the slow regime level `L`
+    /// ([`ModelParams::vix_level_sigma`]) does not move. With the knee on
+    /// `L anchor`, a turbulent era (`L > 1`) lifts the knee, leaving the band
+    /// from `anchor exp(-k)` to `L anchor exp(-k)` at the constant weight,
+    /// where `(1 - a) g(x)` exceeds the gain the law holds -- toward the fear
+    /// trap the law exists to remove -- and a calm era lowers it. The centre
+    /// and the read-back keep `L`: that is the era.
+    pub vix_anchor_weight_level_knee_fixed: f64,
+
     /// How many sessions of market-side warm-up the factor's variance
     /// components get before session one. 0.0 -- every preset through
     /// pt-v19 -- runs nothing, touches no state and is bit-identical.
@@ -1487,6 +1895,22 @@ pub struct ModelParams {
     /// the variance floor clamps it; the vix5 instrument must be checked,
     /// not assumed.
     pub market_vol_vix_exponent: f64,
+    /// Exponent on the market variance target's VIX ratio BELOW one, i.e.
+    /// where the VIX sits under the ratio's denominator (the derived anchor
+    /// under the level form, the read-back under the excursion form).
+    /// 0.0 -- every preset -- reads `market_vol_vix_exponent` on both sides
+    /// and never branches, bit for bit.
+    ///
+    /// Nonzero, the response is `r^below` for `r < 1` and
+    /// `r^market_vol_vix_exponent` at and above one: continuous at the
+    /// anchor, so the held-VIX response from the anchor up (the crisis
+    /// side) is untouched and only the calm side is reshaped. The tape's
+    /// common variance (mean pairwise correlation times a name's variance,
+    /// 40-name roster 1990-2025) scales as about VIX^2.1 below the anchor
+    /// and steeper above it; a single exponent of 4.0 fitted for the crisis
+    /// lever starves calm markets of shared variance
+    /// (programme/results/calm-regime/, design repository).
+    pub market_vol_vix_exponent_below: f64,
     /// Downside transmission asymmetry: on a down tick of the market
     /// factor, every name receives `beta * factor * (1 + this)`. 0.0 --
     /// pt-v1 through pt-v15 -- is bit-identical; pt-v16 onward ship
@@ -1506,6 +1930,53 @@ pub struct ModelParams {
     /// its structure) is the measured motivation: real down-moves
     /// continue, and the contemporaneous wire alone cannot express that.
     pub market_beta_down_asym_lag: f64,
+    /// WHERE the lagged wire's condition is SAMPLED. A form dial with no
+    /// number to derive: it does not change what the boost is, only which
+    /// state the boolean is read off. 0.0 -- every shipped preset through
+    /// pt-v19 -- is bit-identical, because the branch below returns
+    /// `inputs.prev_day_down` unchanged.
+    ///
+    /// # The three values
+    ///
+    /// - **0.0, as shipped.** The condition is `prev_day_factor < 0`,
+    ///   sampled once at the open and held for the whole session. Exact at
+    ///   the bell and a day stale by the close.
+    /// - **1.0, live.** At tick `k` of 390 the condition is
+    ///   `prev_day_factor * (1 - k/390) + day_factor_so_far < 0`, which is
+    ///   `E[sum of the last 390 tick factors | prev_day_factor, day_factor]`
+    ///   under exchangeable within-day draws: yesterday's remaining tail
+    ///   decays linearly across the session while today's own running sum
+    ///   takes over. At `k = 0` it IS `prev_day_down`; at `k = 390` it is
+    ///   today's own sign.
+    /// - **2.0, the sign control.** The same quantity with the comparison
+    ///   REVERSED (`c_k > 0`). A diagnostic arm only, registered as F4 in
+    ///   `corr-asymmetry-repair.md` section 8: a live sample that moves
+    ///   `corr_asymmetry` the same way under both signs is adding variance,
+    ///   not re-timing a signed response. Never a shipping value.
+    ///
+    /// # Why this injects no first moment
+    ///
+    /// The multiplier `m_t = 1 + lag * 1{c_t < 0}` is a function of draws
+    /// strictly BEFORE tick `t` -- `day_factor_so_far` is the accumulator
+    /// as it stands when the tick is called, and `engine.rs` accumulates
+    /// this tick's factor only AFTER `simulate_market_tick` returns. The
+    /// tick's own factor `f_t` is an independent zero-mean draw, so
+    /// `E[m_t f_t] = E[m_t] E[f_t] = 0` tick by tick and the day's
+    /// delivered factor has mean zero. That is the sharp contrast with
+    /// `market_beta_down_asym`, which scales the draw WHOSE OWN SIGN IT
+    /// BRANCHES ON and therefore needs `market_beta_down_asym_recentre`
+    /// beside it. There is no recentring dial here and no `return_acf1`
+    /// channel: `E[F_d F_{d+1}] = 0` by the same independence. The shipped
+    /// keying has this property too, so it is PRESERVED, not gained.
+    ///
+    /// # No draw
+    ///
+    /// A branch on state the snapshot already holds
+    /// (`MarketVarianceState::prev_day_factor` and `::day_factor`). The
+    /// draw schedule is a pure function of market status, active set and
+    /// sector count and this touches none of them, so no stream is added
+    /// and no restore offset moves.
+    pub market_beta_down_asym_lag_live: f64,
     /// How much of the first moment `market_beta_down_asym` injects is
     /// given back. 0.0 -- every preset before pt-v18 -- is bit-identical.
     /// 1.0 returns the whole of it.
@@ -4044,6 +4515,20 @@ impl ModelParams {
             vix_level_persistence: 0.0,
             vix_level_sigma: 0.0,
             vix_level_loop_gain: 0.0,
+            vix_anchor_reversion: 0.0,
+            vix_anchor_weight: 0.0,
+            vix_anchor_memory: 0.0,
+            macro_compound_days_per_year: 365.0,
+            macro_calendar_days_per_year: 365.0,
+            cycle_us_calibration: 0.0,
+            fed_liftoff_rule: 0.0,
+            market_pe_buybacks: 0.0,
+            vix_anchor_centre: 0.0,
+            vix_anchor_weight_level: 0.0,
+            vix_anchor_weight_level_cap: 0.0,
+            vix_anchor_weight_level_knee: 0.0,
+            vix_anchor_weight_level_below: 0.0,
+            vix_anchor_weight_level_knee_fixed: 0.0,
             market_burn_in_sessions: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
@@ -4051,8 +4536,10 @@ impl ModelParams {
             market_vol_vix_anchor: factor_vol::MARKET_VOL_VIX_ANCHOR,
             market_vol_vix_smooth: 0.0,
             market_vol_vix_exponent: 2.0,
+            market_vol_vix_exponent_below: 0.0,
             market_beta_down_asym: 0.0,
             market_beta_down_asym_lag: 0.0,
+            market_beta_down_asym_lag_live: 0.0,
             market_beta_down_asym_recentre: 0.0,
             market_idio_down_suppress: 0.0,
             oil_supply_response: 0.0,
@@ -4165,6 +4652,10 @@ impl ModelParams {
             news_peer_weight: 0.0,
             news_peer_weight_down: 0.0,
             news_peer_vix_coupling: 0.0,
+            news_absorption_half_life: 0.0,
+            news_absorption_drift_share: 0.0,
+            news_absorption_drift_half_life: 0.0,
+            news_quote_revision: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -6033,6 +6524,20 @@ impl ModelParams {
             "vix_level_persistence" => self.vix_level_persistence,
             "vix_level_sigma" => self.vix_level_sigma,
             "vix_level_loop_gain" => self.vix_level_loop_gain,
+            "vix_anchor_reversion" => self.vix_anchor_reversion,
+            "vix_anchor_weight" => self.vix_anchor_weight,
+            "vix_anchor_memory" => self.vix_anchor_memory,
+            "macro_compound_days_per_year" => self.macro_compound_days_per_year,
+            "macro_calendar_days_per_year" => self.macro_calendar_days_per_year,
+            "cycle_us_calibration" => self.cycle_us_calibration,
+            "fed_liftoff_rule" => self.fed_liftoff_rule,
+            "market_pe_buybacks" => self.market_pe_buybacks,
+            "vix_anchor_centre" => self.vix_anchor_centre,
+            "vix_anchor_weight_level" => self.vix_anchor_weight_level,
+            "vix_anchor_weight_level_cap" => self.vix_anchor_weight_level_cap,
+            "vix_anchor_weight_level_knee" => self.vix_anchor_weight_level_knee,
+            "vix_anchor_weight_level_below" => self.vix_anchor_weight_level_below,
+            "vix_anchor_weight_level_knee_fixed" => self.vix_anchor_weight_level_knee_fixed,
             "market_burn_in_sessions" => self.market_burn_in_sessions,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
@@ -6040,8 +6545,10 @@ impl ModelParams {
             "market_vol_vix_anchor" => self.market_vol_vix_anchor,
             "market_vol_vix_smooth" => self.market_vol_vix_smooth,
             "market_vol_vix_exponent" => self.market_vol_vix_exponent,
+            "market_vol_vix_exponent_below" => self.market_vol_vix_exponent_below,
             "market_beta_down_asym" => self.market_beta_down_asym,
             "market_beta_down_asym_lag" => self.market_beta_down_asym_lag,
+            "market_beta_down_asym_lag_live" => self.market_beta_down_asym_lag_live,
             "market_beta_down_asym_recentre" => self.market_beta_down_asym_recentre,
             "market_idio_down_suppress" => self.market_idio_down_suppress,
             "oil_supply_response" => self.oil_supply_response,
@@ -6134,6 +6641,10 @@ impl ModelParams {
             "news_peer_weight" => self.news_peer_weight,
             "news_peer_weight_down" => self.news_peer_weight_down,
             "news_peer_vix_coupling" => self.news_peer_vix_coupling,
+            "news_absorption_half_life" => self.news_absorption_half_life,
+            "news_absorption_drift_share" => self.news_absorption_drift_share,
+            "news_absorption_drift_half_life" => self.news_absorption_drift_half_life,
+            "news_quote_revision" => self.news_quote_revision,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -6227,6 +6738,20 @@ impl ModelParams {
             "vix_level_persistence" => out.vix_level_persistence = value,
             "vix_level_sigma" => out.vix_level_sigma = value,
             "vix_level_loop_gain" => out.vix_level_loop_gain = value,
+            "vix_anchor_reversion" => out.vix_anchor_reversion = value,
+            "vix_anchor_weight" => out.vix_anchor_weight = value,
+            "vix_anchor_memory" => out.vix_anchor_memory = value,
+            "macro_compound_days_per_year" => out.macro_compound_days_per_year = value,
+            "macro_calendar_days_per_year" => out.macro_calendar_days_per_year = value,
+            "cycle_us_calibration" => out.cycle_us_calibration = value,
+            "fed_liftoff_rule" => out.fed_liftoff_rule = value,
+            "market_pe_buybacks" => out.market_pe_buybacks = value,
+            "vix_anchor_centre" => out.vix_anchor_centre = value,
+            "vix_anchor_weight_level" => out.vix_anchor_weight_level = value,
+            "vix_anchor_weight_level_cap" => out.vix_anchor_weight_level_cap = value,
+            "vix_anchor_weight_level_knee" => out.vix_anchor_weight_level_knee = value,
+            "vix_anchor_weight_level_below" => out.vix_anchor_weight_level_below = value,
+            "vix_anchor_weight_level_knee_fixed" => out.vix_anchor_weight_level_knee_fixed = value,
             "market_burn_in_sessions" => out.market_burn_in_sessions = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
@@ -6234,8 +6759,10 @@ impl ModelParams {
             "market_vol_vix_anchor" => out.market_vol_vix_anchor = value,
             "market_vol_vix_smooth" => out.market_vol_vix_smooth = value,
             "market_vol_vix_exponent" => out.market_vol_vix_exponent = value,
+            "market_vol_vix_exponent_below" => out.market_vol_vix_exponent_below = value,
             "market_beta_down_asym" => out.market_beta_down_asym = value,
             "market_beta_down_asym_lag" => out.market_beta_down_asym_lag = value,
+            "market_beta_down_asym_lag_live" => out.market_beta_down_asym_lag_live = value,
             "market_beta_down_asym_recentre" => out.market_beta_down_asym_recentre = value,
             "market_idio_down_suppress" => out.market_idio_down_suppress = value,
             "oil_supply_response" => out.oil_supply_response = value,
@@ -6328,6 +6855,10 @@ impl ModelParams {
             "news_peer_weight" => out.news_peer_weight = value,
             "news_peer_weight_down" => out.news_peer_weight_down = value,
             "news_peer_vix_coupling" => out.news_peer_vix_coupling = value,
+            "news_absorption_half_life" => out.news_absorption_half_life = value,
+            "news_absorption_drift_share" => out.news_absorption_drift_share = value,
+            "news_absorption_drift_half_life" => out.news_absorption_drift_half_life = value,
+            "news_quote_revision" => out.news_quote_revision = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -6529,6 +7060,184 @@ impl ModelParams {
                  it would read as live and do nothing. Set vix_level_sigma or the gain \
                  to 0.0.",
                 self.vix_level_loop_gain));
+        }
+        if self.vix_anchor_reversion != 0.0
+            && !(self.vix_anchor_reversion > 0.0 && self.vix_anchor_reversion < 1.0)
+        {
+            return Err(format!(
+                "vix_anchor_reversion is {}. It is the share of the distance to the \
+                 identity's anchor the VIX takes in ONE session, added to the step \
+                 beside vix_mean_reversion, so it lives in [0, 1): at or above one the \
+                 step lands on or past the anchor every day and the reversion becomes \
+                 an oscillation, and below zero it pushes the VIX away from the anchor \
+                 it is named for. Set it inside [0, 1), or to 0.0, where the term is \
+                 not added at all.",
+                self.vix_anchor_reversion));
+        }
+        if self.vix_anchor_reversion != 0.0 && self.vix_level_identity == 0.0 {
+            return Err(format!(
+                "vix_anchor_reversion is {} but vix_level_identity is 0. The reversion \
+                 pulls the VIX toward the DERIVED identity anchor -- the VIX the \
+                 index's own variance implies at the unconditional point -- times the \
+                 slow level multiplier, and off the identity there is no such anchor: \
+                 `derive_vix_anchor` returns the dial `market_vol_vix_anchor` and the \
+                 VIX's target is the phase table, so the term would pull a VIX on one \
+                 scale toward a level on another. Set vix_level_identity to 1.0, or \
+                 vix_anchor_reversion to 0.0.",
+                self.vix_anchor_reversion));
+        }
+        if self.vix_anchor_weight != 0.0
+            && !(self.vix_anchor_weight > 0.0 && self.vix_anchor_weight < 1.0)
+        {
+            return Err(format!(
+                "vix_anchor_weight is {}. It is the anchor's share of the VIX's \
+                 target in logs, so it lives in [0, 1): at one the VIX ignores the \
+                 index's variance altogether. Set it inside [0, 1), or to 0.0.",
+                self.vix_anchor_weight));
+        }
+        if !(self.macro_compound_days_per_year >= 1.0 && self.macro_compound_days_per_year <= 366.0) {
+            return Err(format!(
+                "macro_compound_days_per_year is {}. It is the number of economy steps a \
+                 year's GDP and CPI growth is compounded over: 365.0 as shipped, 252.0 on \
+                 the session clock. Set it inside [1, 366].",
+                self.macro_compound_days_per_year));
+        }
+        if self.market_vol_vix_exponent_below != 0.0
+            && !(self.market_vol_vix_exponent_below > 0.0
+                 && self.market_vol_vix_exponent_below.is_finite())
+        {
+            return Err(format!(
+                "market_vol_vix_exponent_below is {}. It is the exponent on the VIX \
+                 ratio below the anchor, so it is positive and finite, or 0.0 to read \
+                 market_vol_vix_exponent on both sides.",
+                self.market_vol_vix_exponent_below));
+        }
+        if !(self.macro_calendar_days_per_year >= 24.0
+            && self.macro_calendar_days_per_year <= 365.0
+            && self.macro_calendar_days_per_year.fract() == 0.0)
+        {
+            return Err(format!(
+                "macro_calendar_days_per_year is {}. It is the number of economy steps in a \
+                 macro year: 365.0 as shipped, 252.0 on the session calendar. Set a whole \
+                 number inside [24, 365].",
+                self.macro_calendar_days_per_year));
+        }
+        for (name, v) in [("cycle_us_calibration", self.cycle_us_calibration),
+                          ("fed_liftoff_rule", self.fed_liftoff_rule),
+                          ("market_pe_buybacks", self.market_pe_buybacks),
+                          ("news_quote_revision", self.news_quote_revision)] {
+            if !(v == 0.0 || v == 1.0) {
+                return Err(format!(
+                    "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
+            }
+        }
+        for (name, v) in [("news_absorption_half_life", self.news_absorption_half_life),
+                          ("news_absorption_drift_half_life",
+                           self.news_absorption_drift_half_life)] {
+            if !(v >= 0.0 && v <= 390.0) {
+                return Err(format!(
+                    "{name} is {v}. It is a half-life in ticks inside the 390-tick \
+                     session, in [0, 390]; 0.0 is the straight-line spread."));
+            }
+        }
+        if !(self.news_absorption_drift_share >= 0.0 && self.news_absorption_drift_share <= 1.0) {
+            return Err(format!(
+                "news_absorption_drift_share is {}. It is a share of the move, in [0, 1].",
+                self.news_absorption_drift_share));
+        }
+        if self.news_absorption_drift_share != 0.0 && self.news_absorption_half_life == 0.0 {
+            return Err(format!(
+                "news_absorption_drift_share is {} but news_absorption_half_life is 0: \
+                 it splits the fast profile and is read by nothing without it.",
+                self.news_absorption_drift_share));
+        }
+        if self.news_absorption_drift_half_life != 0.0 && self.news_absorption_drift_share == 0.0 {
+            return Err(format!(
+                "news_absorption_drift_half_life is {} but news_absorption_drift_share \
+                 is 0: it shapes the drift part and is read by nothing without it.",
+                self.news_absorption_drift_half_life));
+        }
+        if self.vix_anchor_memory != 0.0
+            && !(self.vix_anchor_memory > 0.0 && self.vix_anchor_memory <= 1.0)
+        {
+            return Err(format!(
+                "vix_anchor_memory is {}. It is the share of today's deviation the \
+                 anchor's memory takes in one session, so it lives in (0, 1], or \
+                 0.0 for the instantaneous form.",
+                self.vix_anchor_memory));
+        }
+        for (name, v) in [("vix_anchor_centre", self.vix_anchor_centre),
+                          ("vix_anchor_weight_level", self.vix_anchor_weight_level),
+                          ("vix_anchor_weight_level_cap", self.vix_anchor_weight_level_cap)] {
+            if v != 0.0 && self.vix_anchor_weight == 0.0 {
+                return Err(format!(
+                    "{} is {} but vix_anchor_weight is 0. It shapes the anchor weight's \
+                     pull and with no weight it is read by nothing. Set \
+                     vix_anchor_weight, or {} to 0.0.", name, v, name));
+            }
+        }
+        if !self.vix_anchor_centre.is_finite() || self.vix_anchor_centre.abs() > 3.0 {
+            return Err(format!(
+                "vix_anchor_centre is {}. It is a log offset on the anchor, so it lives \
+                 in [-3, 3]; 0.0 is the anchor itself.", self.vix_anchor_centre));
+        }
+        if !(self.vix_anchor_weight_level >= 0.0 && self.vix_anchor_weight_level <= 4.0) {
+            return Err(format!(
+                "vix_anchor_weight_level is {}. It is the exponent of the weight's \
+                 level law, in [0, 4]; 0.0 is the constant weight.",
+                self.vix_anchor_weight_level));
+        }
+        if self.vix_anchor_weight_level_cap != 0.0
+            && !(self.vix_anchor_weight_level_cap >= 1.0 && self.vix_anchor_weight_level_cap.is_finite())
+        {
+            return Err(format!(
+                "vix_anchor_weight_level_cap is {}. It is a multiple of the centre at \
+                 or above one, or 0.0 for no cap.", self.vix_anchor_weight_level_cap));
+        }
+        for (name, v) in [("vix_anchor_weight_level_knee", self.vix_anchor_weight_level_knee),
+                          ("vix_anchor_weight_level_below", self.vix_anchor_weight_level_below),
+                          ("vix_anchor_weight_level_knee_fixed", self.vix_anchor_weight_level_knee_fixed)] {
+            if v != 0.0 && self.vix_anchor_weight_level == 0.0 {
+                return Err(format!(
+                    "{} is {} but vix_anchor_weight_level is 0: it shapes the level \
+                     law and is read by nothing without it.", name, v));
+            }
+        }
+        if !self.vix_anchor_weight_level_knee.is_finite() || self.vix_anchor_weight_level_knee.abs() > 3.0 {
+            return Err(format!(
+                "vix_anchor_weight_level_knee is {}. It is a log offset on the anchor, \
+                 in [-3, 3].", self.vix_anchor_weight_level_knee));
+        }
+        if !(self.vix_anchor_weight_level_below == 0.0 || self.vix_anchor_weight_level_below == 1.0) {
+            return Err(format!(
+                "vix_anchor_weight_level_below is {}. It is a switch, 0.0 or 1.0.",
+                self.vix_anchor_weight_level_below));
+        }
+        if !(self.vix_anchor_weight_level_knee_fixed == 0.0 || self.vix_anchor_weight_level_knee_fixed == 1.0) {
+            return Err(format!(
+                "vix_anchor_weight_level_knee_fixed is {}. It is a switch, 0.0 or 1.0.",
+                self.vix_anchor_weight_level_knee_fixed));
+        }
+        if self.vix_anchor_weight_level_cap != 0.0 && self.vix_anchor_weight_level == 0.0 {
+            return Err(format!(
+                "vix_anchor_weight_level_cap is {} but vix_anchor_weight_level is 0: the \
+                 cap bounds the level law and is read by nothing without it.",
+                self.vix_anchor_weight_level_cap));
+        }
+        if self.vix_anchor_memory != 0.0 && self.vix_anchor_weight == 0.0 {
+            return Err(format!(
+                "vix_anchor_memory is {} but vix_anchor_weight is 0. The memory is \
+                 what the anchor weight pulls against, and with no weight it is read \
+                 by nothing. Set vix_anchor_weight, or vix_anchor_memory to 0.0.",
+                self.vix_anchor_memory));
+        }
+        if self.vix_anchor_weight != 0.0 && self.vix_level_identity == 0.0 {
+            return Err(format!(
+                "vix_anchor_weight is {} but vix_level_identity is 0. The blend is \
+                 between the identity's read-back and its derived anchor, and off \
+                 the identity there is neither. Set vix_level_identity to 1.0, or \
+                 vix_anchor_weight to 0.0.",
+                self.vix_anchor_weight));
         }
         if self.market_vol_vix_excursion != 0.0 && self.vix_level_identity == 0.0 {
             return Err(format!(
@@ -6768,6 +7477,20 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_level_persistence",
         "vix_level_sigma",
         "vix_level_loop_gain",
+        "vix_anchor_reversion",
+        "vix_anchor_weight",
+        "vix_anchor_memory",
+        "macro_compound_days_per_year",
+        "macro_calendar_days_per_year",
+        "cycle_us_calibration",
+        "fed_liftoff_rule",
+        "market_pe_buybacks",
+        "vix_anchor_centre",
+        "vix_anchor_weight_level",
+        "vix_anchor_weight_level_cap",
+        "vix_anchor_weight_level_knee",
+        "vix_anchor_weight_level_below",
+        "vix_anchor_weight_level_knee_fixed",
         "market_burn_in_sessions",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",
@@ -6778,8 +7501,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_vix_anchor",
         "market_vol_vix_smooth",
         "market_vol_vix_exponent",
+        "market_vol_vix_exponent_below",
         "market_beta_down_asym",
         "market_beta_down_asym_lag",
+        "market_beta_down_asym_lag_live",
         "market_beta_down_asym_recentre",
         "market_idio_down_suppress",
         "oil_opec_symmetry",
@@ -6797,6 +7522,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "mispricing_half_life_days",
         "momentum_theta",
         "news_market_weight",
+        "news_absorption_half_life",
+        "news_absorption_drift_share",
+        "news_absorption_drift_half_life",
+        "news_quote_revision",
         "news_peer_vix_coupling",
         "news_peer_weight",
         "news_peer_weight_down",
@@ -7031,6 +7760,50 @@ mod tests {
             .with_override("vix_level_identity", 0.0)
             .expect("settable");
         assert!(broken.invariants().is_err());
+    }
+
+    /// **THE ANCHOR REVERSION'S THREE REFUSALS.** A rate at or above one
+    /// lands on or past the anchor every session, a negative rate pushes the
+    /// VIX away from the anchor it is named for, and off
+    /// `vix_level_identity` there is no derived anchor at all -- the VIX's
+    /// target is the phase table and `derive_vix_anchor` returns the dial,
+    /// so the term would pull a VIX on one scale toward a level on another.
+    ///
+    /// The last is the same refusal `vix_level_sigma` carries and is written
+    /// the same way, so a reader meets one rule rather than two.
+    #[test]
+    fn the_anchor_reversion_is_a_rate_in_the_unit_interval_and_needs_the_identity() {
+        let shipped = ModelParams::preset("pt-v19").expect("shipped");
+        // The derived value on the identity is admissible.
+        let ok = shipped
+            .with_override("vix_anchor_reversion", 0.046081)
+            .expect("settable");
+        assert!(ok.invariants().is_ok(), "{}", ok.invariants().unwrap_err());
+        // A rate outside [0, 1) is not.
+        for bad_rate in [-0.1, 1.0, 1.5] {
+            let bad = shipped
+                .with_override("vix_anchor_reversion", bad_rate)
+                .expect("settable");
+            let err = bad.invariants().expect_err(
+                "a rate of {bad_rate} is outside [0, 1) and must be refused");
+            assert!(err.contains("vix_anchor_reversion"), "{err}");
+        }
+        // And it is refused with the identity off, the way the sigma is.
+        let no_identity = ModelParams::preset("pt-v18")
+            .expect("shipped")
+            .with_override("vix_anchor_reversion", 0.046081)
+            .expect("settable");
+        assert_eq!(no_identity.vix_level_identity, 0.0, "pt-v18 ships the identity off");
+        let err = no_identity
+            .invariants()
+            .expect_err("a reversion with no derived anchor must be refused");
+        assert!(err.contains("vix_level_identity"), "{err}");
+        // Every shipped preset ships it at 0.0, where nothing is refused and
+        // the term is not added.
+        for name in ModelParams::preset_names() {
+            let p = ModelParams::preset(name).expect("a name from preset_names resolves");
+            assert_eq!(p.vix_anchor_reversion, 0.0, "{name} ships the dial non-zero");
+        }
     }
 
     /// Every shipped preset satisfies the identities IT claims. pt-v19 is

@@ -204,6 +204,18 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: entry in `DIAL_PROVENANCE`, which is the transition this list exists
 #: to make visible rather than absorb.
 POST_BASELINE = {
+    "macro_calendar_days_per_year":
+        "added 2026-09-23; every shipped preset carries 365.0, the calendar that has always stood (30-step months, 90-step quarters, a 365-step year), and it is LIVE there. "
+        "The economy steps once per session, so a macro year was 1.45 "
+        "trading years; 252.0 is the session calendar (21-step months), "
+        "DERIVED from the session count and not fitted "
+        "(programme/results/macro-cycle/, design repository). Not adopted",
+    "macro_compound_days_per_year":
+        "added 2026-09-23; every shipped preset carries 365.0, the division that has always stood, and it is LIVE there (it IS the compounding). The economy "
+        "steps once per trading session, 252 to a year, so 365 gives a "
+        "trading year 252/365 of its annual GDP and CPI growth; 252.0 is the "
+        "session clock, DERIVED from that count and not fitted "
+        "(programme/results/longrun-drift/, design repository). Not adopted",
     "jump_idio_vix_decoupled":
         "added at 0.8.0 for the idiosyncratic arrival rate under the "
         "identity; pt-v19 carried 1.0 from 2026-09-14 until the 2026-09-20 "
@@ -386,6 +398,112 @@ OUT_OF_SCOPE = {
         "(programme/results/ptv19refine/jump-derivation.txt, design "
         "repository). Shipped at 0.0 because a derivation is not a "
         "measurement of the panel",
+    "vix_anchor_reversion":
+        "inert at 0.0: economy/daily.rs branches on `!= 0.0` after the VIX "
+        "step's own sum, so the term is not added and the step is the three "
+        "terms it always was. DERIVED 0.046081 and shipped 0.0: it is the "
+        "kappa at which the linearised VIX-variance loop's slow pole equals "
+        "the tape's own slow pole of log VIX, 0.9965, at "
+        "`market_vol_vix_exponent` 1.83 and the shipped "
+        "`vix_mean_reversion` 0.27 "
+        "(programme/loop-level-law-design-2026-09-22.md section 2(b) and "
+        "results/ptv19loop/looppoles.py, design repository). Shipped at 0.0 "
+        "because the arm it was derived for was MEASURED and refused: on "
+        "the level law the held-VIX index lever reads 4.61x against the "
+        "design's own falsifier of 7x, below the shipped form's 4.90x. The "
+        "derivation and the measurements are in "
+        "`ModelParams::vix_anchor_reversion`",
+    "vix_anchor_weight":
+        "inert at 0.0: economy/daily.rs branches on `!= 0.0` and the VIX's "
+        "target is the read-back exactly. The anchor of "
+        "`vix_anchor_reversion` moved from the step's RATE into its TARGET, "
+        "as a geometric blend of the read-back and the derived anchor, so "
+        "the VIX reverts at `vix_mean_reversion` alone. DERIVED 0.609944 at "
+        "`market_vol_vix_exponent` 4.0 as the weight at which the linearised "
+        "loop's slow pole equals the tape's 0.9965 "
+        "(programme/results/route1-blend/looppoles.py, design repository). "
+        "Shipped at 0.0: a probe of route 1, not an adoption",
+    "vix_anchor_memory":
+        "inert at 0.0: the anchor weight reads today's read-back and the "
+        "engine never advances the memory. Nonzero, the weight pulls "
+        "against a slow memory of the read-back's log deviation, so the "
+        "day's variance move reaches the VIX in full. A probe of route 1 "
+        "(programme/results/route1-blend/, design repository), not derived "
+        "and not adopted",
+    "vix_anchor_centre":
+        "inert at 0.0: economy/daily.rs and the memory branch on `!= 0.0` "
+        "and the anchor weight pulls to `L * anchor` exactly. Nonzero, it "
+        "pulls to `L * anchor * exp(-c)`; the forward map's denominator is "
+        "not moved. A probe (programme/results/vix-law-levels/, design "
+        "repository), not adopted",
+    "vix_anchor_weight_level":
+        "inert at 0.0: the anchor weight is the constant dial. Nonzero, "
+        "`1 - a(x) = (1 - a) (C / min(x, r C))^eta`, the exponent read off "
+        "the held read-back's elasticity to the VIX (programme/results/"
+        "vix-law-levels/, design repository). A probe, not adopted",
+    "vix_anchor_weight_level_cap":
+        "unread while `vix_anchor_weight_level` is 0.0, and 0.0 is no cap. "
+        "The level, as a multiple of the centre, where the held read-back's "
+        "elasticity stops rising. A probe, not adopted",
+    "vix_anchor_weight_level_knee":
+        "unread while `vix_anchor_weight_level` is 0.0. The level, as a log "
+        "offset below the anchor, where the level law starts raising the "
+        "weight: where the held read-back's elasticity crosses one. A probe, "
+        "not adopted",
+    "market_vol_vix_exponent_below":
+        "inert at 0.0: the market variance target reads "
+        "`market_vol_vix_exponent` on both sides of the anchor and the "
+        "branch is never taken. Nonzero, it is the exponent below the "
+        "anchor only, read off the tape's common-variance elasticity to the "
+        "VIX in calm markets (programme/results/calm-regime/, design "
+        "repository). A probe, not adopted",
+    "vix_anchor_weight_level_below":
+        "unread while `vix_anchor_weight_level` is 0.0; at 0.0 the weight is "
+        "the dial below the knee. 1.0 runs the level law below it too. A "
+        "probe, not adopted",
+    "cycle_us_calibration":
+        "inert at 0.0 as shipped: a branch that reads the reference "
+        "implementation's phase table. 1.0 "
+        "reads the table derived from NBER recession dates and BEA real GDP "
+        "(programme/results/macro-cycle/, design repository). Not adopted",
+    "fed_liftoff_rule":
+        "inert at 0.0 as shipped: a branch not taken, leaving the reference "
+        "ladder, whose every hike needs "
+        "inflation a point over target. 1.0 adds the ladder's own cut "
+        "branch mirrored, so the rate lifts off zero on its Taylor rule "
+        "(programme/results/macro-cycle/, design repository). Not adopted",
+    "news_absorption_half_life":
+        "inert at 0.0 as shipped: a branch not taken, so every tick carries "
+        "an endogenous news event whole and the move lands in a straight "
+        "line over the session. Off zero it is the half-life in ticks of the "
+        "fast part of the move; 0.6 is derived from intraday event studies "
+        "(programme/results/news-speed/, design repository). Not adopted",
+    "news_absorption_drift_share":
+        "inert at 0.0 as shipped, and unread while "
+        "`news_absorption_half_life` is 0.0: the share of the move that "
+        "arrives as post-news drift. 0.12 is derived "
+        "(programme/results/news-speed/, design repository). Not adopted",
+    "news_absorption_drift_half_life":
+        "inert at 0.0 as shipped, and unread while "
+        "`news_absorption_drift_share` is 0.0: the drift part's half-life in "
+        "ticks. 42 is derived (programme/results/news-speed/, design "
+        "repository). Not adopted",
+    "news_quote_revision":
+        "inert at 0.0 as shipped: a branch not taken, so the maker quotes "
+        "around the last print and a news move reaches the tape only as "
+        "fast as the flow walks the book. 1.0 re-quotes by the tick's news "
+        "term (programme/results/news-speed/, design repository). Not adopted",
+    "market_pe_buybacks":
+        "inert at 0.0 as shipped: a branch not taken, so market_pe leaves "
+        "out the buyback term the "
+        "valuation applies, so it rises by the buyback yield a year. 1.0 "
+        "reads it in (programme/results/macro-cycle/, design repository). "
+        "Not adopted",
+    "vix_anchor_weight_level_knee_fixed":
+        "inert at 0.0, and unread while `vix_anchor_weight_level` is 0.0: the "
+        "knee reads `L * anchor` as it always has. 1.0 takes the slow regime "
+        "level out of the knee, which the held map places at an absolute VIX "
+        "(vix-slow-regime, design repository). A probe, not adopted",
     "crisis_epicentre_end_sessions":
         "unread while `crisis_epicentre_extra` is 0.0: with no episode ever "
         "entered there is no counter to end. 21 sessions is a month and is a "
@@ -495,6 +613,20 @@ OUT_OF_SCOPE = {
         "REFUTED as a mechanism by the `alphax2` box, which found the "
         "clustering response flat from 0.0 to 0.40; it stays in the tree at "
         "zero with the refutation beside it",
+    "market_beta_down_asym_lag_live":
+        "inert at 0.0: market/tick.rs branches on `== 0.0` and hands the "
+        "lagged wire the same `prev_day_down` bit the engine read at the "
+        "open, so every shipped preset -- including pt-v18 and pt-v19, "
+        "which run the wire itself at 0.375 -- is bit-identical. It takes "
+        "NO draw at any value: it re-reads two numbers "
+        "`MarketVarianceState::snapshot` already holds and the draw "
+        "schedule is a pure function of market status, active set and "
+        "sector count. It is a FORM dial with two admissible values and no "
+        "number to derive. Registered unrun: "
+        "`programme/results/corr-asymmetry-repair.md` (design repository) "
+        "section 8 is the diagnostic that would rule on the form, and "
+        "until that rules the 0.0 is the absence of a ruling rather than "
+        "the result of one",
     "market_idio_down_suppress":
         "inert at 0.0: market/factors.rs branches on `== 0.0` after the "
         "draw and neither scale is applied, so no preset that predates the "
@@ -3349,6 +3481,13 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: what the record measured about that value (the paired control; a
 #: plateau) rather than leaving it here.
 UNPROVENANCED = (
+    # 365.0: a calendar year of steps, wrong for an economy that steps once
+    # per session. The derived value is 252.0, not yet adopted.
+    "macro_calendar_days_per_year",
+    # 365.0: written as a calendar year, and wrong for an economy that steps
+    # once per trading session. The derived value is 252.0 and is not yet
+    # adopted, so the shipped constant is admitted here rather than hidden.
+    "macro_compound_days_per_year",
     "crash_amplifier_slope",
     "crash_amplifier_threshold",
     "crisis_blend_cap",
