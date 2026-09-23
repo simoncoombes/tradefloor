@@ -266,6 +266,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_anchor_weight_level_cap": (0.0, 4.0),
     "vix_anchor_weight_level_knee": (0.0, 1.0),
     "vix_anchor_weight_level_below": (0.0, 1.0),
+    # The market variance target's exponent below the anchor; 0.0 reads the
+    # one exponent on both sides. The box spans the square's neighbourhood
+    # up to the crisis side's 4.9.
+    "market_vol_vix_exponent_below": (0.0, 5.0),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is

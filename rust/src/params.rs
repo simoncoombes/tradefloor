@@ -1759,6 +1759,22 @@ pub struct ModelParams {
     /// the variance floor clamps it; the vix5 instrument must be checked,
     /// not assumed.
     pub market_vol_vix_exponent: f64,
+    /// Exponent on the market variance target's VIX ratio BELOW one, i.e.
+    /// where the VIX sits under the ratio's denominator (the derived anchor
+    /// under the level form, the read-back under the excursion form).
+    /// 0.0 -- every preset -- reads `market_vol_vix_exponent` on both sides
+    /// and never branches, bit for bit.
+    ///
+    /// Nonzero, the response is `r^below` for `r < 1` and
+    /// `r^market_vol_vix_exponent` at and above one: continuous at the
+    /// anchor, so the held-VIX response from the anchor up (the crisis
+    /// side) is untouched and only the calm side is reshaped. The tape's
+    /// common variance (mean pairwise correlation times a name's variance,
+    /// 40-name roster 1990-2025) scales as about VIX^2.1 below the anchor
+    /// and steeper above it; a single exponent of 4.0 fitted for the crisis
+    /// lever starves calm markets of shared variance
+    /// (programme/results/calm-regime/, design repository).
+    pub market_vol_vix_exponent_below: f64,
     /// Downside transmission asymmetry: on a down tick of the market
     /// factor, every name receives `beta * factor * (1 + this)`. 0.0 --
     /// pt-v1 through pt-v15 -- is bit-identical; pt-v16 onward ship
@@ -4379,6 +4395,7 @@ impl ModelParams {
             market_vol_vix_anchor: factor_vol::MARKET_VOL_VIX_ANCHOR,
             market_vol_vix_smooth: 0.0,
             market_vol_vix_exponent: 2.0,
+            market_vol_vix_exponent_below: 0.0,
             market_beta_down_asym: 0.0,
             market_beta_down_asym_lag: 0.0,
             market_beta_down_asym_lag_live: 0.0,
@@ -6378,6 +6395,7 @@ impl ModelParams {
             "market_vol_vix_anchor" => self.market_vol_vix_anchor,
             "market_vol_vix_smooth" => self.market_vol_vix_smooth,
             "market_vol_vix_exponent" => self.market_vol_vix_exponent,
+            "market_vol_vix_exponent_below" => self.market_vol_vix_exponent_below,
             "market_beta_down_asym" => self.market_beta_down_asym,
             "market_beta_down_asym_lag" => self.market_beta_down_asym_lag,
             "market_beta_down_asym_lag_live" => self.market_beta_down_asym_lag_live,
@@ -6582,6 +6600,7 @@ impl ModelParams {
             "market_vol_vix_anchor" => out.market_vol_vix_anchor = value,
             "market_vol_vix_smooth" => out.market_vol_vix_smooth = value,
             "market_vol_vix_exponent" => out.market_vol_vix_exponent = value,
+            "market_vol_vix_exponent_below" => out.market_vol_vix_exponent_below = value,
             "market_beta_down_asym" => out.market_beta_down_asym = value,
             "market_beta_down_asym_lag" => out.market_beta_down_asym_lag = value,
             "market_beta_down_asym_lag_live" => out.market_beta_down_asym_lag_live = value,
@@ -6920,6 +6939,16 @@ impl ModelParams {
                  the session clock. Set it inside [1, 366].",
                 self.macro_compound_days_per_year));
         }
+        if self.market_vol_vix_exponent_below != 0.0
+            && !(self.market_vol_vix_exponent_below > 0.0
+                 && self.market_vol_vix_exponent_below.is_finite())
+        {
+            return Err(format!(
+                "market_vol_vix_exponent_below is {}. It is the exponent on the VIX \
+                 ratio below the anchor, so it is positive and finite, or 0.0 to read \
+                 market_vol_vix_exponent on both sides.",
+                self.market_vol_vix_exponent_below));
+        }
         if self.vix_anchor_memory != 0.0
             && !(self.vix_anchor_memory > 0.0 && self.vix_anchor_memory <= 1.0)
         {
@@ -7253,6 +7282,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_vix_anchor",
         "market_vol_vix_smooth",
         "market_vol_vix_exponent",
+        "market_vol_vix_exponent_below",
         "market_beta_down_asym",
         "market_beta_down_asym_lag",
         "market_beta_down_asym_lag_live",

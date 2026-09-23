@@ -444,6 +444,13 @@ OUT_OF_SCOPE = {
         "offset below the anchor, where the level law starts raising the "
         "weight: where the held read-back's elasticity crosses one. A probe, "
         "not adopted",
+    "market_vol_vix_exponent_below":
+        "inert at 0.0: the market variance target reads "
+        "`market_vol_vix_exponent` on both sides of the anchor and the "
+        "branch is never taken. Nonzero, it is the exponent below the "
+        "anchor only, read off the tape's common-variance elasticity to the "
+        "VIX in calm markets (programme/results/calm-regime/, design "
+        "repository). A probe, not adopted",
     "vix_anchor_weight_level_below":
         "unread while `vix_anchor_weight_level` is 0.0; at 0.0 the weight is "
         "the dial below the knee. 1.0 runs the level law below it too. A "

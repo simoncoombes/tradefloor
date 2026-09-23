@@ -328,6 +328,10 @@ PERTURBATIONS = [
     ("vix_anchor_weight_level_cap", 1.75, True),
     ("vix_anchor_weight_level_knee", 0.261, True),
     ("vix_anchor_weight_level_below", 1.0, True),
+    # The calm side's exponent on the market variance target (2026-09-23,
+    # calm-regime). The default's VIX sits under its anchor, so the branch is
+    # read; no draw is added or moved.
+    ("market_vol_vix_exponent_below", 2.0, True),
     # The crisis epicentre (2026-09-22), and both rows are INERT here for
     # the reason `crisis_blend_source`, `crisis_blend_ramp` and
     # `crisis_blend_cap` are: the mechanism is gated on the VIX being above

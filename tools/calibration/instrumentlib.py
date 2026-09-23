@@ -601,6 +601,8 @@ PARAM_SPECS: dict[str, dict] = {
                                    "hard_range": (0.0, 4.0), "derived": False},
     "vix_anchor_weight_level_knee": {"kind": "abs", "step_unit": 0.01,
                                     "hard_range": (0.0, 1.0), "derived": False},
+    "market_vol_vix_exponent_below": {"kind": "abs", "step_unit": 0.05,
+                                     "hard_range": (0.0, 5.0), "derived": False},
     "vix_anchor_weight_level_below": {"kind": "abs", "step_unit": 1.0,
                                      "hard_range": (0.0, 1.0), "derived": False},
     # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
