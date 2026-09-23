@@ -36,9 +36,9 @@ Parameters:
     Description: elastic bills per GB moved; bursting is free up to a baseline tied to stored size (HOSTED.md, "Cost").
   EnableWaf:
     Type: String
-    Default: "true"
+    Default: "false"
     AllowedValues: ["true", "false"]
-    Description: A WAF web ACL with a per-IP rate rule and AWS managed common rules in front of the ALB.
+    Description: A WAF web ACL with a per-IP rate rule and AWS managed common rules in front of the ALB (about $7/month plus $0.60 per million requests; HOSTED.md, "Cost").
   WafRateLimitPer5Min:
     Type: Number
     Default: 3000

@@ -242,9 +242,10 @@ about 15 KiB at 20 names and 24 KiB at 40 (measured). A session directory is
 about 120 KiB after a few days of trading.
 
 **S3Store** (`hosted/s3store.py`) implements the `SessionStore` protocol
-(`types.py`, since contract 0.2) on S3, with FileStore's atomicity. S3 has no append and no rename, so a commit
-PUTs the stream chunks and the record under fresh names (sequence number plus
-a random nonce), then PUTs `head.json` conditionally (`If-Match` on the ETag
+(`types.py`, since contract 0.2) on S3, with FileStore's atomicity. S3 has no
+append and no rename, so a commit PUTs the stream chunks and the record under
+fresh names (sequence number plus a random nonce), then PUTs `head.json`
+conditionally (`If-Match` on the ETag
 it last saw, or `If-None-Match: *` for the first commit). `head.json` is the
 commit point: a reader sees a whole commit or none of it, a commit cut off
 halfway leaves only objects no head names, and a second writer gets a 412
@@ -261,7 +262,7 @@ million PUTs a day, roughly $490 a month, against about $49 of EFS writes for
 the same traffic. Use S3Store for low-traffic deployments, or later as an
 archive for closed sessions.
 
-**Deleting sessions.** Nothing in contract 0.1 deletes a session, so a user
+**Deleting sessions.** Nothing in the contract (0.3) deletes a session, so a user
 who reaches `max_stored_sessions` or the storage cap cannot free space
 themselves. For now the operator deletes old closed sessions by hand while
 the server is stopped (`rm -r <data>/sessions/<id>`). See the contract change
@@ -334,7 +335,7 @@ builds the real image, and skips cleanly when Docker is absent.
 The server itself (outside Docker) was run on 127.0.0.1 with a temporary data
 directory and driven with curl and the admin CLI: a key made by the CLI
 opened and advanced a session, the broker facade accepted the key split
-across the two `APCA-` headers, the 61st call in a minute got 429 with
+across the two `APCA-` headers, calls past 60 in a minute got 429 with
 `Retry-After`, `revoke-all` took effect on the next request, `sessions` went
 through the admin listener (401 without its token), and SIGTERM shut down
 cleanly with the ledger flushed.
@@ -370,8 +371,8 @@ exits unless `TRADEFLOOR_DEPLOY_CONFIRM=owner-approved-public-launch` is set.
 
 ### Cost for a small launch
 
-Prices are us-east-1 on-demand list prices as I know them; London
-(eu-west-2) is roughly 10 to 15% higher. Check them against the AWS pricing
+Prices are us-east-1 on-demand list prices from 2025; London (eu-west-2) is
+roughly 10 to 15% higher. Check them against the AWS pricing
 pages before deciding. The workload assumed: **50 bots active around the
 clock, each making a call every 2 s on average, half of them mutating.** That
 is 2.2 million calls a day, 1.1 million of them writing about 25 KB each, with
@@ -398,14 +399,14 @@ responses of about 5 KB.
   bots), the total is **about $75**. The fixed part (task, ALB, IPs) is about
   $60 a month with no traffic at all.
 - WAF, if turned on, adds about $7 a month plus $0.60 per million requests,
-  **about $46** at this traffic. The template defaults it on. Turning it off
-  saves this, and leaves the app-level limits and the failed-auth throttle to
-  handle floods.
+  **about $46** at this traffic. The template defaults it off, which leaves
+  floods to the app-level limits and the failed-auth throttle; it can be
+  turned on with one parameter if the service is attacked.
 - The marginal cost is about **$3 per million mutating calls** (EFS writes,
   logs, data out). A bot running flat out at the trial limit costs about
   $4 a month on top of the fixed part. A bot at the standard limit costs
-  about $20 a month and uses about 4% of the task's CPU. That is the number
-  pricing has to cover.
+  about $20 a month, and on local-disk timings uses about 1% of the task's
+  CPU (more on EFS; measure it). That is the number pricing has to cover.
 - A cheaper route, not templated: one t4g.small EC2 instance with a gp3 EBS
   volume and Caddy terminating TLS comes to about $40 to $45 a month at the
   same load. It gives up managed TLS, automatic task replacement, multi-AZ
