@@ -28,6 +28,9 @@ _OPS = frozenset({
     "open_market", "close_market", "tick", "run_session", "pin_macro",
     "set_avg_volume", "list_instrument", "delist", "draw_uniform",
     "draw_normal", "record",
+    # Agents' orders against the book, and the collection of what they
+    # produced (0.10).
+    "submit", "cancel", "take_fills", "take_impacts",
 })
 
 
@@ -153,6 +156,16 @@ def apply_log(
             # and read as one long day.
             if ledger is not None and entry["close_at_end"]:
                 ledger.close(engine)
+        elif op == "submit":
+            engine.submit(entry["agent"], entry["ticker"], entry["quantity"],
+                          limit_price=entry.get("limit_price"),
+                          order_id=entry.get("order_id"))
+        elif op == "cancel":
+            engine.cancel(entry["order_id"], agent=entry.get("agent"))
+        elif op == "take_fills":
+            engine.take_fills(entry.get("agent"))
+        elif op == "take_impacts":
+            engine.take_impacts(entry.get("agent"))
 
     return engine
 

@@ -1,0 +1,18 @@
+{
+ "bookKatVersion": 1,
+ "bytes": 209106,
+ "days": 3,
+ "dials": {
+  "book_depth_coefficient": 0.75,
+  "book_depth_exponent": 0.5,
+  "book_depth_reach": 1.0,
+  "book_refill_half_life": 27.0,
+  "book_resting": 1.0,
+  "book_shared": 1.0,
+  "fill_impact_coefficient": 0.314
+ },
+ "kind": "pretium.known-answer.book",
+ "note": "The agent-facing book with every dial on at the values suggested for pt-v20: several agents, takers from a tenth of a percent to a whole day's volume, a queue at the touch, orders inside the spread, cancels. Separate from known_answer.json, whose digests an untraded market sets and these dials cannot move.",
+ "seed": 20260924,
+ "sha256": "b83323a60ae82c97825da50a303cf51fadad0e7613bb137b04ed12b526b510f9"
+}

@@ -455,7 +455,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     carried = set(snapshot)
     # The anchor's slow memory is carried, and hashed, only on a run with
     # `vix_anchor_memory` off zero; every other snapshot omits it.
-    expected = set(_SNAPSHOT_KEYS) | ({"vix_anchor_slow"} & carried)
+    # So is the agent-facing book, only once an agent has used it.
+    expected = set(_SNAPSHOT_KEYS) | ({"vix_anchor_slow", "book"} & carried)
     if carried != expected:
         missing = sorted(expected - carried)
         extra = sorted(carried - expected)
@@ -658,7 +659,87 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _u32(buf, kind)
         _u64(buf, index)
         _f64(buf, value)
+    # The agent-facing book, last, and only when the snapshot carries it,
+    # which is only once an agent has used it.
+    if "book" in snapshot:
+        _book(buf, snapshot["book"])
     return hashlib.sha256(bytes(buf)).hexdigest()
+
+
+#: The fields of the snapshot's ``book`` entry, which ``Engine.state_hash``
+#: covers in this order.
+_BOOK_KEYS = ("sequence", "fill_sequence", "taken", "orders", "flow",
+              "fills", "impacts")
+
+#: Values per company in the book's ``taken`` buffer: the maker's bid and
+#: ask consumed, the latent depth's bid and ask consumed, and the maker's
+#: inventory change waiting for its next quote.
+_TAKEN_WIDTH = 5
+
+
+def _book(buf: bytearray, book: dict[str, Any]) -> None:
+    """The agent-facing book's entry, as the engine hashes it."""
+    if set(book) != set(_BOOK_KEYS):
+        raise ValidationError(
+            "this snapshot's book is not the one the state hash covers: "
+            f"missing {sorted(set(_BOOK_KEYS) - set(book))}, unexpected "
+            f"{sorted(set(book) - set(_BOOK_KEYS))}.")
+    _text(buf, "book")
+    _u64(buf, book["sequence"])
+    _u64(buf, book["fill_sequence"])
+    raw = book["taken"]
+    if len(raw) % (8 * _TAKEN_WIDTH):
+        raise ValidationError(
+            f"the book's taken buffer carries {len(raw)} bytes, which is not "
+            f"a whole number of {_TAKEN_WIDTH}-value rows.")
+    rows = len(raw) // (8 * _TAKEN_WIDTH)
+    _u32(buf, rows)
+    for value in _column(raw, rows * _TAKEN_WIDTH, "book.taken"):
+        _f64(buf, value)
+    orders = list(book["orders"])
+    _u32(buf, len(orders))
+    for o in orders:
+        _text(buf, o["order_id"])
+        _text(buf, o["agent"])
+        _text(buf, o["ticker"])
+        _text(buf, o["side"])
+        _f64(buf, o["limit_price"])
+        _f64(buf, o["quantity"])
+        _f64(buf, o["remaining"])
+        _u64(buf, o["sequence"])
+        _text(buf, o["mode"])
+    flow = list(book["flow"])
+    _u32(buf, len(flow))
+    for agent, ticker, bought, sold in flow:
+        _text(buf, agent)
+        _text(buf, ticker)
+        _f64(buf, bought)
+        _f64(buf, sold)
+    fills = list(book["fills"])
+    _u32(buf, len(fills))
+    for f in fills:
+        _text(buf, f["agent"])
+        _text(buf, f["order_id"])
+        _text(buf, f["ticker"])
+        _text(buf, f["side"])
+        _f64(buf, f["quantity"])
+        _f64(buf, f["price"])
+        _text(buf, f["liquidity"])
+        _text(buf, f["counterparty"])
+        _f64(buf, f["reference"])
+        _i64(buf, f["day"])
+        # Not `tick`, which is a label counted from the engine's own open
+        # and restarts at a restore; see `Engine::state_hash`.
+        _u64(buf, f["sequence"])
+    impacts = list(book["impacts"])
+    _u32(buf, len(impacts))
+    for r in impacts:
+        _text(buf, r["agent"])
+        _text(buf, r["ticker"])
+        _f64(buf, r["bought"])
+        _f64(buf, r["sold"])
+        _f64(buf, r["permanent"])
+        _i64(buf, r["day"])
 
 
 
