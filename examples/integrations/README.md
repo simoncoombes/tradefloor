@@ -60,22 +60,39 @@ two adapters:
 
 | example | trades | return | impact |
 |---|---|---|---|
-| [`callable/five_days.py`](callable/five_days.py) | 4 | +1.49% | -1.48 bps |
-| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 4 | +1.49% | -1.48 bps |
-| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 4 | +6.35% | +0.93 bps |
-| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 1 | +0.68% | +8.90 bps |
+| [`callable/five_days.py`](callable/five_days.py) | 3 | +1.60% | -1.10 bps |
+| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 3 | +1.60% | -1.10 bps |
+| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 3 | +6.28% | +2.51 bps |
+| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 0 | +0.00% | +0.00 bps |
 
-Re-measured at 0.7.0, where the default preset moved to pt-v18 and every
-price in these markets moved with it. The three offline examples also run
-ten days rather than five now: they share one mean-reversion rule that acts
-on a five-day move past two per cent, and on a five-day run it gets a single
-usable reading -- which was enough on pt-v16's market and is not on this
-one, whose worst five-day fall over this roster is 1.85 per cent. Ten days
-gives the rule five readings instead of one. The rule is untouched, because
-lowering its trigger until this market tripped it would be fitting the
-demonstration to the market, and the trigger is the thing being
-demonstrated. The two recorded MODEL runs still use five days: a language
-model reads the observation rather than waiting for a window.
+Re-measured at 0.8.0, where the default preset moved to pt-v19 and every
+price in these markets moved with it -- and measured again each time pt-v19
+was recomposed, most recently at the fifth composition. The rows replaced
+there were callable and openai_agents 2 trades +1.20% +0.47 bps,
+pydantic_ai 2 trades +4.77% -0.27 bps, and langgraph 1 trade +0.63%
++25.71 bps; at the fourth composition before that, callable and
+openai_agents 3 trades +1.47%, pydantic_ai 3 trades +5.78% +1.55 bps, and
+langgraph +0.62% +18.99 bps. The langgraph row now reads no trades at all:
+it runs five days, not ten, and on this market no name in its roster falls
+more than two per cent over five days on any of them -- the deepest, HELX,
+falls 1.83 per cent on day 1 -- so the rule buys nothing, has nothing to
+trim, and holds every day. Nothing
+else about these examples changed: the rule, the rosters, the seed and the
+horizons are the ones 0.7.0 shipped, so every difference in the table
+above is the market and not the demonstration.
+
+The three offline examples run ten days rather than five, which is a
+choice 0.7.0 made and this release keeps. They share one mean-reversion
+rule that acts on a five-day move past two per cent, and on a five-day run
+it gets a single usable reading -- which was enough on pt-v16's market and
+was not on pt-v18's, whose worst five-day fall over this roster is 1.85 per
+cent. Measured again on the fifth composition of pt-v19: five days
+trades not at all, ten days three times, so ten still gives the rule the
+readings five does not. The rule is
+untouched, because lowering its trigger until this market tripped it would
+be fitting the demonstration to the market, and the trigger is the thing
+being demonstrated. The two recorded MODEL runs still use five days: a
+language model reads the observation rather than waiting for a window.
 
 Comparing two frameworks means holding the market fixed, which is what the
 shared contract checks in `tests/test_integrations.py` do.
@@ -103,7 +120,7 @@ Fuller example: [`callable/five_days.py`](callable/five_days.py).
 
 `rule` is handed the serialized payload and never the `Observation`. The
 Observation carries `.engine`, which holds the answer key: fair value, the
-nine-way attribution of every price move, each company's mispricing, and the
+ten-way attribution of every price move, each company's mispricing, and the
 macro path the run has not reached yet. A function given that would step
 around the allowlist where no test could see it. A policy that genuinely
 needs the Observation is a native Tradefloor agent and implements `act`

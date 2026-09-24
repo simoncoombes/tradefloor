@@ -18,8 +18,60 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::params::{settable_names, ModelParams};
+use crate::params::{claims_of, settable_names, Inconsistency, ModelParams};
 use crate::python::ValidationError;
+
+/// Refuse a vector that breaks an invariant every vector must satisfy.
+///
+/// Universal, and there is no hatch: `from_preset_unchecked` runs this too.
+/// See `ModelParams::invariants` for what is in the set and why.
+fn check_invariants(params: &ModelParams) -> PyResult<()> {
+    params
+        .invariants()
+        .map_err(|why| ValidationError::new_err(format!("REFUSED: {why}")))
+}
+
+/// Refuse a vector that breaks an identity its own preset claims.
+///
+/// `base` is the preset the vector was built FROM. If the result is
+/// bit-identical to some other shipped preset -- which an arm that reverts a
+/// block of dials can be, and `ALL31` in the sectorbisect run is -- then it
+/// IS that preset and answers to that preset's claims instead. The
+/// fingerprint is only computed when the base's claims already failed, so
+/// the consistent path never pays for it.
+fn check_claims(params: &ModelParams, base: &str) -> PyResult<()> {
+    let bad = params.claimed_inconsistencies(claims_of(base));
+    if bad.is_empty() {
+        return Ok(());
+    }
+    let landed = params.fingerprint();
+    if landed != base && ModelParams::preset(&landed).is_some() {
+        let bad = params.claimed_inconsistencies(claims_of(&landed));
+        if bad.is_empty() {
+            return Ok(());
+        }
+        return Err(refusal(&bad, &landed));
+    }
+    Err(refusal(&bad, base))
+}
+
+/// The refusal message. It names both sides of every broken identity,
+/// because a refusal a reader cannot act on is a refusal they will route
+/// around.
+fn refusal(bad: &[Inconsistency], owner: &str) -> PyErr {
+    let lines: Vec<String> = bad.iter().map(|i| format!("  - {i}")).collect();
+    ValidationError::new_err(format!(
+        "REFUSED: this vector breaks {} identit{} that {owner} claims about its own \
+         dials:\n{}\n\nA derived dial moved off its identity is a dial that follows \
+         from nothing, and a reading taken on one is a reading of the break as much as \
+         of the arm. Either move the dials the identity depends on so it holds again, \
+         or build the vector with ModelParams.from_preset_unchecked(...) and record the \
+         waiver with the measurement.",
+        bad.len(),
+        if bad.len() == 1 { "y" } else { "ies" },
+        lines.join("\n")
+    ))
+}
 
 /// An immutable model coefficient set: a shipped preset, or a named
 /// deviation from one.
@@ -49,42 +101,66 @@ impl PyModelParams {
     #[staticmethod]
     #[pyo3(signature = (name = crate::params::DEFAULT_PRESET_NAME, **overrides))]
     fn from_preset(name: &str, overrides: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
-        let mut params = ModelParams::preset(name).ok_or_else(|| {
-            ValidationError::new_err(format!(
-                "unknown model preset {name:?}. Shipped presets: {}",
-                ModelParams::preset_names().join(", ")
-            ))
-        })?;
-        if let Some(kwargs) = overrides {
-            // Sorted for a deterministic application order. The overrides
-            // commute, since each writes one independent field and the
-            // derived recomputation depends only on the final half-life, but a
-            // deterministic order keeps error messages stable too.
-            let mut keys: Vec<String> = Vec::new();
-            for key in kwargs.keys() {
-                keys.push(key.extract::<String>().map_err(|_| {
-                    ValidationError::new_err(
-                        "model parameter names must be strings".to_string(),
-                    )
-                })?);
-            }
-            keys.sort();
-            for key in keys {
-                let value: f64 = kwargs
-                    .get_item(&key)?
-                    .expect("key came from the dict")
-                    .extract()
-                    .map_err(|_| {
-                        ValidationError::new_err(format!(
-                            "{key} must be a number"
-                        ))
-                    })?;
-                params = params
-                    .with_override(&key, value)
-                    .map_err(ValidationError::new_err)?;
-            }
-        }
+        let params = build(name, overrides)?;
+        check_invariants(&params)?;
+        check_claims(&params, name)?;
         Ok(Self { inner: params })
+    }
+
+    /// `from_preset`, with the preset's own identity claims NOT checked.
+    ///
+    /// The escape hatch, and the reason it is a second constructor rather
+    /// than a keyword: `**overrides` IS the settable surface, so a flag name
+    /// would have to be reserved against every future dial forever.
+    ///
+    /// Probing a derived dial off its identity is a legitimate measurement --
+    /// it is how the record knows the cap and the ceiling are inert on the
+    /// pt-v19 vector -- and refusing it outright loses a tool. What this
+    /// constructor does NOT skip is `invariants`: a universal invariant has
+    /// no hatch, because no reading taken on a vector that breaks one means
+    /// anything.
+    ///
+    /// The vector it returns is the same frozen type with the same bits. A
+    /// caller that uses it owes the reader the waiver beside the number;
+    /// `dialarm.py --allow-identity-break` writes it into the arm record.
+    #[staticmethod]
+    #[pyo3(signature = (name = crate::params::DEFAULT_PRESET_NAME, **overrides))]
+    fn from_preset_unchecked(
+        name: &str,
+        overrides: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<Self> {
+        let params = build(name, overrides)?;
+        check_invariants(&params)?;
+        Ok(Self { inner: params })
+    }
+
+    /// The identities `preset` claims about its own dials, evaluated on this
+    /// vector: a list of `(dial, identity, expected, actual, claimed_by)` for
+    /// the ones that do not hold, empty when they all do.
+    ///
+    /// Read-only, and it is what a harness writes into an arm record after
+    /// waiving. It takes the preset name because the claims are a property of
+    /// the preset and not of the type: the cap identity holds on pt-v19 and
+    /// on nothing else shipped.
+    #[staticmethod]
+    #[pyo3(signature = (params, preset = crate::params::DEFAULT_PRESET_NAME))]
+    fn identity_breaks(
+        py: Python<'_>,
+        params: PyRef<'_, PyModelParams>,
+        preset: &str,
+    ) -> PyResult<PyObject> {
+        let out = pyo3::types::PyList::empty_bound(py);
+        for bad in params.inner.claimed_inconsistencies(claims_of(preset)) {
+            let row = PyDict::new_bound(py);
+            row.set_item("dial", bad.dial)?;
+            row.set_item("identity", bad.identity)?;
+            row.set_item("expected", bad.expected)?;
+            row.set_item("actual", bad.actual)?;
+            row.set_item("tolerance", bad.tolerance)?;
+            row.set_item("claimed_by", bad.claimed_by)?;
+            out.append(row)?;
+        }
+        Ok(out.into())
     }
 
     /// Rebuild from a full parameter dictionary, the manifest's embedded
@@ -145,6 +221,17 @@ impl PyModelParams {
                 }
             }
         }
+        // The universal invariant and NOT the claim table. `from_dict` is the
+        // manifest replay path and a manifest that embeds a waived vector must
+        // replay: a waiver is recorded beside the measurement, not inside the
+        // dictionary, so `to_dict` round-trips whatever was built. The
+        // invariant has no hatch anywhere, including here.
+        //
+        // After the second pass rather than inside either, because the keys
+        // apply in sorted order and "market_vol_vix_excursion" sorts before
+        // "vix_level_identity": a per-key check would fire on the first of a
+        // pair that is consistent once both have landed. The batch is the unit.
+        check_invariants(&params)?;
         Ok(Self { inner: params })
     }
 
@@ -221,4 +308,46 @@ impl PyModelParams {
         }
         format!("ModelParams(\"{fp}\", from pt-v1 with {})", diffs.join(", "))
     }
+}
+
+/// The preset plus its overrides, with nothing checked. Shared by the checked
+/// and the unchecked constructor so the two cannot drift apart in how they
+/// BUILD, only in what they refuse.
+fn build(name: &str, overrides: Option<&Bound<'_, PyDict>>) -> PyResult<ModelParams> {
+    let mut params = ModelParams::preset(name).ok_or_else(|| {
+        ValidationError::new_err(format!(
+            "unknown model preset {name:?}. Shipped presets: {}",
+            ModelParams::preset_names().join(", ")
+        ))
+    })?;
+    if let Some(kwargs) = overrides {
+        // Sorted for a deterministic application order. The overrides
+        // commute, since each writes one independent field and the derived
+        // recomputation depends only on the final half-life, but a
+        // deterministic order keeps error messages stable too.
+        //
+        // The identity checks run AFTER this loop and not inside it, and that
+        // is load-bearing: "market_vol_vix_excursion" sorts before
+        // "vix_level_identity", so an arm turning both on from a preset that
+        // runs neither would trip a per-override check on the first key and
+        // pass on the second. The batch is the unit.
+        let mut keys: Vec<String> = Vec::new();
+        for key in kwargs.keys() {
+            keys.push(key.extract::<String>().map_err(|_| {
+                ValidationError::new_err("model parameter names must be strings".to_string())
+            })?);
+        }
+        keys.sort();
+        for key in keys {
+            let value: f64 = kwargs
+                .get_item(&key)?
+                .expect("key came from the dict")
+                .extract()
+                .map_err(|_| ValidationError::new_err(format!("{key} must be a number")))?;
+            params = params
+                .with_override(&key, value)
+                .map_err(ValidationError::new_err)?;
+        }
+    }
+    Ok(params)
 }

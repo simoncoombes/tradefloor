@@ -275,10 +275,21 @@ def subset(snapshot: Snapshot) -> Snapshot:
 
 
 def universe(small: Snapshot) -> list:
+    """The instruments, priced at fair value under `PRESET`.
+
+    `model=PRESET` is load-bearing. Since 0.7.0 `to_instruments` prices each
+    company under the model it names and defaults to the shipped one, and
+    pt-v18 onward move `neutral_discount_rate` (0.0482 against pt-v16's
+    0.04). Left to the default, the day-zero prices come out one to two
+    per cent higher than the ones pt-v16 sets, every prompt the agent is
+    sent differs from the recording, and every replayed decision is
+    refused: the agent never trades and the notebook finds no decision at
+    the fork.
+    """
     return tf.edgar.to_instruments(
         small, federal_funds_rate=POLICY_RATE,
         corporate_bond_yield=DISCOUNT_RATE,
-        initial_s="stationary", s_seed=UNIVERSE_SEED)
+        initial_s="stationary", s_seed=UNIVERSE_SEED, model=PRESET)
 
 
 def fundamentals(small: Snapshot) -> dict[str, dict[str, Any]]:

@@ -104,8 +104,8 @@ def test_arms_share_every_other_draw():
     """Common random numbers: the arms and the control consume the same
     draws per stream, so an effect is the draw's and not a reshuffle.
 
-    Stated on ``stream_positions``, which reports all seven streams.
-    ``draws_by_stream`` reports three, and four of the five streams
+    Stated on ``stream_positions``, which reports every stream.
+    ``draws_by_stream`` reports three, and the rest of the streams
     attributed at event level are invisible to it, so it cannot state this
     claim. Swept over every arm the plan builds rather than one.
     """
@@ -115,7 +115,12 @@ def test_arms_share_every_other_draw():
     assert set(control.engine.stream_positions()) == set(noise.STREAMS)
     assert len(control.engine.draws_by_stream()) == 3
     blind = set(noise.STREAMS) - set(control.engine.draws_by_stream())
-    assert blind == {"jumps", "news", "volume", "volume_idio", "overnight"}
+    # `market_vol_level` joined at 0.8.0 and `crisis_epicentre` on
+    # 2026-09-22, and both are blind for the reason the five before them
+    # are: `draws_by_stream` counts the three streams an embedder can reach,
+    # and a mechanism stream is not one of them.
+    assert blind == {"jumps", "news", "volume", "volume_idio", "overnight",
+                     "market_vol_level", "crisis_epicentre"}
 
     attribution = noise.attribute(root, (1, 1), noise.column("price", 2),
                                   "event", streams=["news", "jumps"])
@@ -162,8 +167,15 @@ def test_facts_panel_statistics_is_what_measure_reports():
     key set: the fear rows read the macro table, which `panel_statistics`
     never sees, so they and their session diagnostics come from
     `fear_statistics`, the VIX's persistence from `persistence_statistics`,
-    and a key `measure` reports that none of the four parts produced fails
-    here by name.
+    the crisis sector dispersion from `crisis_statistics` -- which reads the
+    bars, the macro table AND the roster's sectors, so it is a part of its
+    own and not a line in any of the other three -- and a key `measure`
+    reports that none of the five parts produced fails here by name.
+
+    `crisis_statistics` joined on 2026-09-22 with the row. On a 40-session
+    run at a calm VIX it reports the row ABSENT under
+    `crisis_sector_dispersion_blind`, which is a reading of the part and
+    not a gap in it, so the rebuild below carries the same key.
 
     THE POINT IS THAT `measure` INVENTS NOTHING. A row computed inline
     there would be the one row with no independent caller and no
@@ -181,9 +193,17 @@ def test_facts_panel_statistics_is_what_measure_reports():
     stats = facts.panel_statistics(engine.bars(grain="day"), universe)
     fear = facts.fear_statistics(engine.bars(grain="day"),
                                  engine.macro_table(), universe)
+    # `burn` is part of the identity for the reason the two fingerprints are:
+    # a panel read over a settled window and one read from a cold open are
+    # different measurements. `measure` always emits it, 0 where nothing was
+    # discarded, so the hand-built identity carries it at the same value the
+    # call above ran at rather than leaving the reader to infer a default.
     identity = {"seed": 3, "universe_fingerprint": facts.fingerprint_of(universe),
-                "model_fingerprint": engine.model_fingerprint, "days": 40}
+                "model_fingerprint": engine.model_fingerprint, "days": 40,
+                "burn": 0}
     persistence = facts.persistence_statistics(engine.macro_table(), days=40)
+    crisis = facts.crisis_statistics(engine.bars(grain="day"),
+                                     engine.macro_table(), universe)
     assert set(stats) <= set(measured)
     assert all(measured[k] == v for k, v in stats.items())
     assert set(stats).isdisjoint(fear)
@@ -191,7 +211,11 @@ def test_facts_panel_statistics_is_what_measure_reports():
     assert set(persistence).isdisjoint(stats)
     assert set(persistence).isdisjoint(fear)
     assert all(measured[k] == v for k, v in persistence.items())
-    assert measured == {**identity, **stats, **fear, **persistence}
+    assert set(crisis).isdisjoint(stats)
+    assert set(crisis).isdisjoint(fear)
+    assert set(crisis).isdisjoint(persistence)
+    assert all(measured[k] == v for k, v in crisis.items())
+    assert measured == {**identity, **stats, **fear, **persistence, **crisis}
     # The graded rows outside the shape set are the fear part's, and the
     # noise module's statistic target reads the panel part alone, so a
     # crisis row is refused there by name rather than read as absent.
@@ -352,20 +376,107 @@ def test_the_day_step_is_delta_in_the_day_sums_own_sigma():
 def test_the_day_effect_grows_with_the_tick_count():
     """A fixed delta is a fixed number of day sigmas, and a day with more
     ticks carries more noise, so the effect grows with T. Measured on the
-    market factor over 20, 40, 80 and 160 ticks, four names at seed 99."""
+    market factor over 20, 40, 80 and 160 ticks, four names at seed 99.
+
+    THE PREMISE IS CHECKED AND IT HOLDS. `tick.rs` scales a tick by a FIXED
+    `1 / sqrt(390)`, not by `1 / sqrt(T)`, so the day-accumulated market
+    factor's sd really does grow as sqrt(T): measured over sixty seeds it
+    reads 1.750e-3, 2.323e-3, 3.532e-3 and 5.070e-3 at 20, 40, 80 and 160
+    ticks, a 20-to-160 ratio of 2.90 against sqrt(8) = 2.83.
+
+    THE MARKET JUMP IS HELD OFF, and that is the whole of what changed here.
+    `noise.attribute` shifts the factor and re-runs; `jump_vix_coupling`
+    makes the market jump's INTENSITY a function of the VIX, so a shift can
+    flip a Bernoulli draw and move the price by a whole jump. One flipped
+    coin on one seed with four names swamps a sqrt(T) trend, and a Bernoulli
+    inside a monotonicity assertion is not a monotone quantity at all.
+
+    It went unnoticed because the coin had been landing the same way on both
+    sides. At pt-v19's tape-derived `market_vol_alpha` / `market_vol_beta`
+    it stops: shipped reads 0.0650, 0.1175, 0.4700, 0.4425 -- NOT monotone,
+    at the 80-to-160 step -- and the same build with the old search optima
+    reads 0.0425, 0.1175, 0.3825, 0.4650, monotone. Ruled out by measurement
+    before the jump was found: `market_vol_ceiling_multiple` at 16, 40 and
+    400 (identical to the bit), `crash_amplifier_slope` 0,
+    `crisis_blend_gain` 0, `price_breaker_fraction` 0.999, `volume_move_cap`
+    1e9, `market_vol_vix_excursion` 0 and `vix_ceiling` 80 -- none moves it.
+    `jump_intensity_market` 0 makes it monotone, which is the negative
+    control this docstring rests on.
+
+    So the channel under test is held and the confounding one is switched
+    off, which is what attributing to `market_factor_z` meant all along.
+    Neither assertion is weakened: both are the ones that were here.
+    """
     universe = tf.Universe.random(4, seed=99)
+    model = tf.ModelParams.from_preset(tf.model_preset()["name"],
+                                       jump_intensity_market=0.0)
     effects = []
     for ticks in (20, 40, 80, 160):
         root = World(seed=SEED, universe=universe, agent=Buyer(),
-                     steps_per_day=1, ticks_per_step=ticks)
+                     steps_per_day=1, ticks_per_step=ticks, model=model)
         attribution = noise.attribute(root, (1, 1),
                                       noise.column("price", 1), "day",
                                       streams=["market"], delta=1.0)
         row = [r for r in attribution.rows
                if r["site"] == "market_factor_z"][0]
         effects.append(abs(row["effect"]))
-    assert effects == sorted(effects)
-    assert effects[-1] > 4 * effects[0]
+    # THE CLAIM IS THAT THE DAY'S DRAW MATTERS MORE IN A LONGER DAY, and it
+    # does: 0.0175, 0.1325, 0.4850, 0.4725 on pt-v19, a factor of 27 from
+    # end to end, against 0.0375, 0.1525, 0.2925, 0.4950 on pt-v18, a factor
+    # of 13. MEASURED 2026-09-13.
+    #
+    # THE SATURATION CLAIM IS WITHDRAWN, 2026-09-14, and the strict sort it
+    # displaced is back. The claim was that the rise is steep to 80 ticks
+    # and flat-to-falling after -- 0.4850 at 80, 0.4725 at 160, 0.4400 at
+    # 320 -- pinned as `0.8 * effects[2] < effects[3] <= 1.1 * effects[2]`.
+    # It was measured on ONE seed, and the ratio it bands is a one-seed
+    # quantity that no band of width 0.3 can hold.
+    #
+    # MEASURED on the market-side warm-up tree, `Universe.random(4,
+    # seed=99)`, `jump_intensity_market` 0, delta 1.0, one day, engine
+    # seeds 42 to 51, the same ladder of 20, 40, 80 and 160 ticks:
+    #
+    #   42  0.0825 0.1200 0.3600 0.4550   e3/e2 1.264
+    #   43  0.1000 0.1750 0.3525 0.6450   e3/e2 1.830
+    #   44  0.0700 0.1600 0.2650 0.4700   e3/e2 1.774
+    #   45  0.0475 0.2975 0.3475 0.4750   e3/e2 1.367
+    #   46  0.0750 0.1075 0.3825 0.4425   e3/e2 1.157
+    #   47  0.1075 0.1975 0.4500 0.6450   e3/e2 1.433
+    #   48  0.1500 0.1950 0.4875 0.7150   e3/e2 1.467
+    #   49  0.0850 0.2800 0.3800 0.8275   e3/e2 2.178
+    #   50  0.0800 0.3075 0.3375 0.7850   e3/e2 2.326
+    #   51  0.1075 0.1250 0.3400 0.4050   e3/e2 1.191
+    #
+    # The ratio runs 1.157 to 2.326, median 1.450, sd 0.411. ZERO of ten
+    # land inside the 0.8-to-1.1 the assertion asked for, so the band was
+    # not a near miss on this tree; the quantity it describes is somewhere
+    # else entirely. The effect grows at the last step on every one of the
+    # ten, and it grows FASTER than the sqrt(2) the fixed `1 / sqrt(390)`
+    # tick scaling predicts on six of them. Whatever clamp made the old
+    # reading flatten by 160 ticks does not bind there on this tree. That
+    # is a change in the model's behaviour and it is filed as one; it is
+    # not repaired here, because repairing it would move the draw
+    # schedule.
+    #
+    # So the assertion goes back to the strict sort over all FOUR points,
+    # which is what this test carried before the saturation comment cut it
+    # to three, and which ten of ten seeds support. A model that saturates
+    # again inside the ladder will fail this and say so.
+    assert effects == sorted(effects), effects
+    # Four, which is the bound this test has always carried, over the range
+    # that rises. pt-v19 gives 27.7 and pt-v18 7.8, so the bound separates a
+    # model where the day's length matters from one where it does not
+    # without pinning either preset's slope.
+    #
+    # IT IS THIN AND THE SAME TEN SEEDS SAY SO, recorded here rather than
+    # moved, because it passes today and lowering a passing bar is the
+    # thing this file is not for. `effects[2] / effects[0]` reads 4.36 on
+    # seed 42 and runs 3.16 to 7.32 over the ten, with 43, 44 and 51 below
+    # four. The sqrt(T) premise the docstring states predicts 2.0 for a
+    # four-fold day, so four is a bar somebody chose and not one anybody
+    # derived. Whoever moves this next should put it on the ten seeds the
+    # way `test_the_leverage_effect_is_real_since_the_gjr_term` was.
+    assert effects[2] > 4 * effects[0], effects
 
 
 # -- the counted caveats can be restated over merged rows ---------------------
@@ -409,11 +520,36 @@ def test_an_economy_attribution_carries_its_caveats():
     named = [c for c in attribution.caveats if "economy chain" in c]
     assert len(named) == 1
     assert "draw count depends on its own state" in named[0]
-    # and the measurement the caveat promises
-    measured = [c for c in attribution.caveats
-                if "draw positions on all eight streams" in c]
-    assert len(measured) == 1
-    assert f"all {len(attribution.rows)} arms" in measured[0]
+    # AND THE MEASUREMENT THE CAVEAT PROMISES, in BOTH of its branches.
+    #
+    # This asserted only the clean one -- "all N arms matched" -- and was
+    # therefore an assertion that could not fail in the way it mattered: the
+    # caveat exists precisely because the economy chain's draw count depends
+    # on its own state, so the interesting case is the one where an arm
+    # DOES displace the chain, and the test said nothing about it. It went
+    # red when pt-v19's VIX path made two of twenty-four arms displace it,
+    # which is the hazard arriving exactly as documented.
+    #
+    # So: one of the two sentences is present, and whichever it is says how
+    # many arms it is talking about. A run where every arm matches and a run
+    # where two do not are both correct behaviour; a run that reports
+    # neither is the defect.
+    n = len(attribution.rows)
+    streams = "draw positions on all %d streams" % len(noise.STREAMS)
+    matched = [c for c in attribution.caveats if streams in c]
+    displaced = [c for c in attribution.caveats
+                 if "consumed a different number of draws from the control" in c]
+    assert len(matched) + len(displaced) == 1, attribution.caveats
+    if matched:
+        assert f"all {n} arms" in matched[0]
+    else:
+        # "K of N arms", and K has to be under N: an attribution where EVERY
+        # arm displaced the chain is not a common-random-numbers comparison
+        # at all and should not be reported as one with a footnote.
+        head = displaced[0].split(" arms", 1)[0]
+        k, _, total = head.partition(" of ")
+        assert int(total) == n, displaced[0]
+        assert 0 < int(k) < n, displaced[0]
 
 
 def test_the_arms_are_compared_on_all_seven_streams():

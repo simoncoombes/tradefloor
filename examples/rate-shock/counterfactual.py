@@ -26,7 +26,7 @@ Everything reported is ground truth about THIS market. It is a controlled
 synthetic experiment, not a prediction about how real securities would react
 to a real rate rise.
 
-Takes about two seconds. No API keys, no network, no data files.
+Takes about a second. No API keys, no network, no data files.
 """
 
 from __future__ import annotations
@@ -75,10 +75,13 @@ BASE_PINS = {"federal_funds_rate": POLICY_RATE,
 #:
 #: Both, and not the policy rate alone, because of how this model transmits.
 #: `federal_funds_rate` reaches a valuation ONLY by steering the corporate
-#: bond yield, which is recomputed at central-bank meetings -- the first
-#: scheduled 45 days out, past the end of this run. A hike to the policy rate
-#: by itself would move the agent and not the market, and the demo would be
-#: showing half a mechanism. `tests/test_macro_transmission.py` pins that map.
+#: bond yield, and `BASE_PINS` pins that yield in both arms. A hike to the
+#: policy rate by itself would move the agent and not the market, and the
+#: demo would be showing half a mechanism. Left free, the yield follows the
+#: policy rate at central-bank meetings, the first 45 days out, on pt-v6,
+#: where `tests/test_macro_transmission.py` pins that map; this said that of
+#: every preset until 0.8.0, and on pt-v19 a free yield moves valuations
+#: from day 8.
 SHOCK_BPS = 200
 SHOCKED_POLICY_RATE = POLICY_RATE + SHOCK_BPS / 10_000
 SHOCKED_DISCOUNT_RATE = DISCOUNT_RATE + SHOCK_BPS / 10_000
@@ -198,13 +201,19 @@ def _show_market(roster: tf.Universe) -> None:
     print(f"  model preset          {tf.ModelParams.from_preset().fingerprint}"
           f"   (tradefloor {tf.__version__})")
     print()
+    # The fair value the engine runs, which uses the preset's own neutral
+    # rate. `fair_value` assumes 0.04 when it is not told, which every
+    # preset through pt-v16 ships and pt-v18 and pt-v19 do not (0.0482), so
+    # the column printed here was a valuation this market does not use.
+    neutral = tf.ModelParams.from_preset().to_dict()["neutral_discount_rate"]
     print(f"  {'':6}{'sector':<22}{'growth':>8}{'price':>9}"
           f"{'fair value':>12}   what it is")
     for (ticker, sector, label, price, _shares, eps, book, growth,
          *_rest) in BY_DURATION:
         value = tf.fair_value(eps=eps, sector=sector, revenue_growth=growth,
                               corporate_bond_yield=DISCOUNT_RATE,
-                              book_value_per_share=book)
+                              book_value_per_share=book,
+                              neutral_discount_rate=neutral)
         print(f"  {ticker:<6}{sector:<22}{growth:>8.2f}{price:>9.2f}"
               f"{value.fair_value:>12.2f}   {label}")
     print()

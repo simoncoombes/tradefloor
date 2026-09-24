@@ -57,6 +57,15 @@ pub enum LogEntry {
     PinMacro {
         fields: Vec<(String, f64)>,
         cycle: Option<String>,
+        /// The pinned crisis epicentre: a sector key, or `"none"`. Carried
+        /// for the reason `cycle` is -- it is an input to the run, and a
+        /// replay that dropped it would draw its own epicentre and call the
+        /// result the same experiment.
+        epicentre: Option<String>,
+        /// The forced-VIX mark (`pin_macro(vix_sets_variance=True)`). An
+        /// input like the pins beside it; written into `fields` only when
+        /// true, so every log of a run that never set it is the one it was.
+        vix_sets_variance: bool,
     },
     /// The whole `avg_volume` column, one value per instrument.
     ///
@@ -171,7 +180,7 @@ impl LogEntry {
                 d.set_item("news", news_to_py(py, news)?)?;
                 d.set_item("order_flow", flow_to_py(py, flow)?)?;
             }
-            LogEntry::PinMacro { fields, cycle } => {
+            LogEntry::PinMacro { fields, cycle, epicentre, vix_sets_variance } => {
                 d.set_item("op", "pin_macro")?;
                 let f = PyDict::new_bound(py);
                 for (name, value) in fields {
@@ -179,6 +188,12 @@ impl LogEntry {
                 }
                 if let Some(c) = cycle {
                     f.set_item("cycle", c)?;
+                }
+                if let Some(x) = epicentre {
+                    f.set_item("epicentre", x)?;
+                }
+                if *vix_sets_variance {
+                    f.set_item("vix_sets_variance", true)?;
                 }
                 d.set_item("fields", f)?;
             }

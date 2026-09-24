@@ -26,6 +26,86 @@ pub const DAYS_PER_MONTH: i64 = 30;
 /// Days between quarterly GDP releases.
 pub const DAYS_PER_QUARTER: i64 = 90;
 
+/// The macro calendar: how many economy steps make a macro year and a macro
+/// month. See [`crate::params::ModelParams::macro_calendar_days_per_year`].
+///
+/// The economy steps once per trading session. As written it keeps a
+/// 365-step year and 30-step months, so a macro year is 365 sessions, 1.45
+/// trading years, and every release, phase duration, meeting interval and
+/// seasonal period runs 1.45 times slow in market time. `shipped()` is that
+/// calendar and every accessor returns the literal that stood at its site;
+/// `from_days_per_year(252.0)` is the session calendar: 21-session months,
+/// 63-session quarters, a 252-session year.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MacroCalendar {
+    /// Economy steps in a macro year.
+    pub days_per_year: i64,
+    /// Economy steps in a macro month.
+    pub days_per_month: i64,
+    shipped: bool,
+}
+
+impl MacroCalendar {
+    /// The calendar every preset through pt-v18 runs: 365-step years,
+    /// 30-step months. pt-v19 runs the session calendar (252) since its
+    /// fifth composition.
+    pub const fn shipped() -> Self {
+        MacroCalendar { days_per_year: 365, days_per_month: DAYS_PER_MONTH, shipped: true }
+    }
+
+    /// 365.0 is [`MacroCalendar::shipped`] exactly. Any other value is a
+    /// year of that many steps and a month of a twelfth of it, rounded.
+    pub fn from_days_per_year(days: f64) -> Self {
+        if days == 365.0 {
+            return Self::shipped();
+        }
+        let y = days.round() as i64;
+        // Integer arithmetic, and no `.max`: the determinism lint keeps
+        // float min/max inside `mathx` and does not tell the two apart.
+        let m = (days / 12.0).round() as i64;
+        MacroCalendar {
+            days_per_year: y,
+            days_per_month: if m < 1 { 1 } else { m },
+            shipped: false,
+        }
+    }
+
+    pub fn is_shipped(&self) -> bool {
+        self.shipped
+    }
+
+    /// Steps in a macro month, as the f64 the phase clock advances by.
+    pub fn month_f64(&self) -> f64 {
+        self.days_per_month as f64
+    }
+
+    /// Steps between quarterly GDP releases: 90 as shipped.
+    pub fn days_per_quarter(&self) -> i64 {
+        if self.shipped { DAYS_PER_QUARTER } else { 3 * self.days_per_month }
+    }
+
+    /// Steps between OPEC decisions, a quarter: 90 as shipped.
+    pub fn opec_interval(&self) -> i64 {
+        if self.shipped { OIL_OPEC_INTERVAL } else { self.days_per_quarter() }
+    }
+
+    /// The mean month length the earnings-season bump reads: 30.44 as
+    /// shipped, a twelfth of the year otherwise.
+    pub fn mean_month_len(&self) -> f64 {
+        if self.shipped { 30.44 } else { self.days_per_year as f64 / 12.0 }
+    }
+
+    /// A span written in calendar days, in steps of this calendar: the
+    /// literal as shipped, `days * days_per_year / 365` rounded otherwise.
+    pub fn scale_days(&self, days: i64) -> i64 {
+        if self.shipped {
+            days
+        } else {
+            ((days * self.days_per_year) as f64 / 365.0).round() as i64
+        }
+    }
+}
+
 pub const INFLATION_TARGET: f64 = 2.0;
 /// Monthly fraction of the inflation gap closed toward the target. The
 /// shipped value; `ModelParams::inflation_reversion` carries it at runtime.
@@ -170,6 +250,15 @@ pub struct PhaseCharacteristics {
 }
 
 pub fn phase_characteristics(phase: CyclePhase) -> PhaseCharacteristics {
+    phase_characteristics_for(phase, false)
+}
+
+/// [`phase_characteristics`], or the table derived from NBER and BEA when
+/// `us` is set (`cycle_us_calibration`); see [`us_phase_characteristics`].
+pub fn phase_characteristics_for(phase: CyclePhase, us: bool) -> PhaseCharacteristics {
+    if us {
+        return us_phase_characteristics(phase);
+    }
     match phase {
         CyclePhase::Expansion => PhaseCharacteristics {
             gdp_growth_range: (2.0, 4.0),
@@ -211,6 +300,61 @@ pub fn phase_characteristics(phase: CyclePhase) -> PhaseCharacteristics {
             max_months: 12.0,
             next_phase: CyclePhase::Expansion,
         },
+    }
+}
+
+/// The US phase table (`cycle_us_calibration`), DERIVED from NBER recession
+/// dates and BEA real GDP, 1990-2025 (design repository,
+/// programme/results/macro-cycle/, `real_cycle.py`). Durations are months of
+/// the macro calendar, so they are real months only on the session calendar
+/// (`macro_calendar_days_per_year` 252).
+///
+/// Only the DURATIONS move. The growth ranges, trends, minima and Weibull
+/// shapes are the shipped table's:
+///
+/// - growth: the shipped model realises 3.02 in expansion, 2.29 at the peak,
+///   -1.77 across contraction and trough and 2.04 in recovery; BEA quarters
+///   in the same positions 1990-2019 grow 3.12, 1.98, -1.51 and 2.60, and
+///   -1.95 in recessions 1948-2025. Depth is not what is wrong.
+/// - minima: contraction 4 plus trough 2 is six months, the shortest NBER
+///   recession 1948-2019 (1980).
+///
+/// Mean sojourns on the hazard alone (`mean_sojourn_days_for`), each solved
+/// for its scale at the shipped shape:
+///
+/// | phase | target, months | from |
+/// |---|---:|---|
+/// | contraction + trough | 9.0 | NBER 1990-2025: 8, 8, 18, 2 (1948-2025: 10.3) |
+/// | split 5.5 / 3.5 | | the shipped model's own contraction:trough occupancy, 0.14:0.09 |
+/// | peak | 6.0 | the two quarters before an NBER peak, as BEA positions are labelled |
+/// | recovery | 12.0 | the four quarters after an NBER trough, likewise |
+/// | expansion | 81.0 | a 108-month cycle (1.11 recessions a decade, 1990-2025) less 9 + 6 + 12 |
+///
+/// The state-dependent ladder in `economy::cycle` still adds to these
+/// hazards, so realised durations are shorter; the measured ones are in the
+/// result.
+pub fn us_phase_characteristics(phase: CyclePhase) -> PhaseCharacteristics {
+    phase_characteristics_for(phase, false)
+}
+
+/// The cap on the US table's monthly hazard. The shipped 0.3 is the
+/// reference's cap on a DAILY probability carried over to the monthly
+/// reading, and on its own it forbids a recession averaging nine months
+/// after six months of minima (the least residual it admits is 3.3 months
+/// a phase). 1.0 is the bound of a monthly rate; `weibull_hazard`'s own 0.8
+/// still applies.
+pub const US_HAZARD_CAP: f64 = 1.0;
+
+/// Weibull `(shape, scale)` of the US table, scales in months, solved for
+/// the targets in [`us_phase_characteristics`] at the shipped shapes, on a
+/// 21-step month read per month.
+pub fn us_cycle_hazard_params(phase: CyclePhase) -> (f64, f64) {
+    match phase {
+        CyclePhase::Expansion => (1.8, 90.453),
+        CyclePhase::Peak => (2.0, 6.289),
+        CyclePhase::Contraction => (0.7, 0.546),
+        CyclePhase::Trough => (1.5, 2.564),
+        CyclePhase::Recovery => (1.3, 10.336),
     }
 }
 

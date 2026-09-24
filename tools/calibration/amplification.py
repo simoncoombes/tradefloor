@@ -333,7 +333,7 @@ def provenance() -> dict:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    p.add_argument("--presets", nargs=2, default=["pt-v16", "pt-v18"],
+    p.add_argument("--presets", nargs=2, default=["pt-v18", "pt-v19"],
                    metavar=("A", "B"))
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--roster-seed", type=int, default=111)

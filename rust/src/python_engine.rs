@@ -786,6 +786,8 @@ fn stream_name(id: u32) -> &'static str {
         crate::rng::stream::NEWS => "news",
         crate::rng::stream::VOLUME_IDIO => "volume_idio",
         crate::rng::stream::OVERNIGHT => "overnight",
+        crate::rng::stream::MARKET_VOL_LEVEL => "market_vol_level",
+        crate::rng::stream::CRISIS_EPICENTRE => "crisis_epicentre",
         _ => "unknown",
     }
 }
@@ -800,9 +802,11 @@ fn stream_id(name: &str) -> PyResult<u32> {
         "news" => crate::rng::stream::NEWS,
         "volume_idio" => crate::rng::stream::VOLUME_IDIO,
         "overnight" => crate::rng::stream::OVERNIGHT,
+        "market_vol_level" => crate::rng::stream::MARKET_VOL_LEVEL,
+        "crisis_epicentre" => crate::rng::stream::CRISIS_EPICENTRE,
         other => {
             return Err(ValidationError::new_err(format!(
-                "unknown stream {other:?}; one of market, economy, external, jumps, volume, news, volume_idio, overnight"
+                "unknown stream {other:?}; one of market, economy, external, jumps, volume, news, volume_idio, overnight, market_vol_level, crisis_epicentre"
             )))
         }
     })
@@ -1803,7 +1807,8 @@ impl PyEngine {
     /// The index variance the LAST VIX update read, term by term, or
     /// `None` if no day has advanced under `vix_level_identity`.
     ///
-    /// Keys: `factor`, `sector`, `idio` (the three noise blocks BEFORE the
+    /// Keys: `factor`, `sector`, `idio`, `crash`, `crisis`, `tilt` (the six
+    /// noise blocks BEFORE the
     /// intraday curve), `market_jump`, `idio_jump`, `news`, `k` (the
     /// curve's second moment, which multiplies the first three and not the
     /// last three), `total` (the variance itself, in fraction squared per
@@ -1840,6 +1845,17 @@ impl PyEngine {
         out.set_item("factor", terms.factor_raw)?;
         out.set_item("sector", terms.sector_raw)?;
         out.set_item("idio", terms.idio_raw)?;
+        // The two regime terms (charter B4). Both are pre-`K` like the three
+        // above and both are exactly 0.0 outside their regime, so a reader
+        // can tell a crisis session from a calm one by the key alone.
+        out.set_item("crash", terms.crash_raw)?;
+        out.set_item("crisis", terms.crisis_raw)?;
+        // The transmission tilt, pre-`K` like the rest of the noise block
+        // and exactly 0.0 on a session with neither wire live. A reader can
+        // tell a lagged session from an unlagged one by this key alone,
+        // which is the one bit of the read-back's state that is not in the
+        // VIX it was read at.
+        out.set_item("tilt", terms.tilt_raw)?;
         out.set_item("market_jump", terms.market_jump)?;
         out.set_item("idio_jump", terms.idio_jump)?;
         out.set_item("news", terms.news)?;
@@ -2045,6 +2061,61 @@ impl PyEngine {
             out.push(d);
         }
         Ok(out)
+    }
+
+    /// The current news day's endogenous events, one dict each:
+    /// `ticker` (the trading ticker, `None` if the event names no company
+    /// on the roster), `sector`, `price_impact` and `day`.
+    ///
+    /// The engine draws the day's events at `open_market` and keeps them
+    /// through `close_market`, so `day` is `day_count` while the market is
+    /// open and `day_count - 1` after the close, the frame a headline
+    /// writer uses. Empty before the first open and on any
+    /// preset with `endogenous_news_intensity` at zero.
+    ///
+    /// A read. It draws nothing, writes nothing and is not logged, so
+    /// calling it cannot change a run: `state_hash` is the same with and
+    /// without it. `price_impact` is the whole move the event adds to the
+    /// price by the close, which makes it the answer key; never hand it to
+    /// an agent (a headline writer cuts it to its sign).
+    fn session_news<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        let day: Option<i64> = if self.market_open {
+            Some(i64::from(self.day_count))
+        } else if self.day_count > 0 {
+            Some(i64::from(self.day_count) - 1)
+        } else {
+            None
+        };
+        let mut out = Vec::new();
+        for event in self.inner.session_news() {
+            let d = PyDict::new_bound(py);
+            d.set_item(
+                "ticker",
+                event.company_id.as_deref().and_then(|id| self.ticker_for_id(id)),
+            )?;
+            d.set_item("sector", event.sector.clone())?;
+            d.set_item("price_impact", event.price_impact)?;
+            d.set_item("day", day)?;
+            out.push(d);
+        }
+        Ok(out)
+    }
+
+    /// Ticks run since the current day's `open_market`: 0 at the open, 390
+    /// after a full session, and still 390 after the close until the next
+    /// open. Every tick call counts, as it does in `day_marks()[-1]
+    /// ["ticks"]`, which is the counter this reads.
+    ///
+    /// `None` when this engine has not opened a day since it was built or
+    /// restored. The count is recording state, like the day's tape, so a
+    /// snapshot does not carry it and a restored engine learns it again at
+    /// its next open.
+    ///
+    /// A read of a counter the engine already keeps: no draw, no write, so
+    /// it cannot change a run.
+    #[getter]
+    fn session_tick(&self) -> Option<u32> {
+        self.inner.day_marks().last().map(|m| m.ticks)
     }
 
     /// Where each active company's market-stream normals sit on `day`:
@@ -2262,11 +2333,24 @@ impl PyEngine {
     /// like every other rate here (0.025 is 2.5%). `oil_price` is a price in
     /// dollars, and the daily chain clamps it into [35, 150] on its next
     /// step, so a pin outside that band survives only the day it is written.
+    ///
+    /// # `vix_sets_variance`: a forced VIX that sets the market's volatility
+    ///
+    /// Off (the default), a pinned VIX reaches volatility the way the
+    /// model's own VIX does: each close moves the market factor's variance
+    /// one step toward the level the VIX implies, so a VIX that jumps is
+    /// felt over weeks. `vix_sets_variance=True` marks tonight's close to SET
+    /// the factor's variance (both components) to that level instead, so the
+    /// next session trades at it. The close consumes the mark; a session that
+    /// is not marked closes free, from the level the mark left, which is the
+    /// free law's own fixed point at that VIX. `tradefloor.Scenario` sets it
+    /// on every session it forces the VIX when the scenario asks for it
+    /// (`Scenario(vix_sets_variance=True)`), which is the intended way in.
     #[pyo3(signature = (
         *, vix = None, federal_funds_rate = None, corporate_bond_yield = None,
         inflation_rate = None, qe_pe_boost = None, qe_assets_ratio = None, fear_greed_index = None,
         gdp_growth = None, unemployment_rate = None, tariff_rate = None,
-        oil_price = None, cycle = None
+        oil_price = None, cycle = None, epicentre = None, vix_sets_variance = false
     ))]
     #[allow(clippy::too_many_arguments)]
     fn pin_macro(
@@ -2283,6 +2367,8 @@ impl PyEngine {
         tariff_rate: Option<f64>,
         oil_price: Option<f64>,
         cycle: Option<String>,
+        epicentre: Option<String>,
+        vix_sets_variance: bool,
     ) -> PyResult<()> {
         // Validate EVERYTHING before writing ANYTHING. A pin that applied the
         // first three fields and then rejected the fourth would leave the
@@ -2327,6 +2413,31 @@ impl PyEngine {
                 )));
             }
         }
+        // THE CRISIS EPICENTRE, a pin rather than a macro field: it names
+        // which sector carries the next crisis episode instead of setting a
+        // level the chain then evolves. `"none"` is a value in its own
+        // right -- a crisis with no epicentre, which is two of the tape's
+        // five episodes -- and is why this is a string and not a sector key
+        // or nothing. Validated here, where it is written, against the
+        // engine's own table, so a misspelt sector is refused rather than
+        // silently pinning nothing.
+        //
+        // It PERSISTS once written, like the macro pins beside it: a
+        // scenario's `hold` writes it every day it covers, and an episode
+        // that starts while it is set takes no draw.
+        let epicentre_pin = match epicentre.as_deref() {
+            None => None,
+            Some("none") => Some(-1_i32),
+            Some(key) => match crate::sectors::SECTORS.iter().position(|s| s.key == key) {
+                Some(i) => Some(i as i32),
+                None => {
+                    return Err(ValidationError::new_err(format!(
+                        "unknown epicentre {key:?}. Valid: none, {}",
+                        crate::sectors::keys().join(", ")
+                    )))
+                }
+            },
+        };
         let phase = match cycle.as_deref() {
             Some(name) => Some(CyclePhase::from_name(name).ok_or_else(|| {
                 ValidationError::new_err(format!(
@@ -2357,6 +2468,8 @@ impl PyEngine {
         self.log.push(crate::python_log::LogEntry::PinMacro {
             fields: logged,
             cycle: cycle.clone(),
+            epicentre: epicentre.clone(),
+            vix_sets_variance,
         });
 
         let e = self.inner.economy_mut();
@@ -2396,7 +2509,40 @@ impl PyEngine {
         if let Some(p) = phase {
             e.cycle_phase = p;
         }
+        if let Some(pin) = epicentre_pin {
+            self.inner.set_crisis_epicentre_pin(Some(pin));
+        }
+        // A FORCED VIX THAT SETS THE MARKET'S VOLATILITY. Marks tonight's
+        // close to set the market factor's variance to the level the
+        // variance law implies at the VIX then standing, instead of stepping
+        // one session toward it; the close consumes the mark. Only ever
+        // turned ON here: `False`, the default, leaves a mark an earlier
+        // call made today in place, so a later pin of another field cannot
+        // cancel it. See `MarketVarianceState::close_day_forced`.
+        if vix_sets_variance {
+            self.inner.set_vix_sets_variance_pending(true);
+        }
         Ok(())
+    }
+
+    /// Whether tonight's close will SET the market factor's variance from
+    /// the VIX, because a scenario forced the VIX today with
+    /// `vix_sets_variance` on. Cleared by the close.
+    #[getter]
+    fn vix_sets_variance_pending(&self) -> bool {
+        self.inner.vix_sets_variance_pending()
+    }
+
+    /// The crisis episode: `(in_episode, sessions_under, epicentre)`.
+    ///
+    /// `epicentre` is the sector key, or `"none"` for a crisis with no
+    /// epicentre, or `None` when no episode is running -- so a caller can
+    /// tell "no crisis" from "a crisis nobody is at the centre of", which
+    /// the tick deliberately cannot. Always `(False, 0, None)` while
+    /// `crisis_epicentre_extra` is 0.0, which is every shipped preset.
+    #[getter]
+    fn crisis_episode(&self) -> (bool, i64, Option<&'static str>) {
+        self.inner.crisis_episode()
     }
 
     /// Every field [`PyEngine::pin_macro`] can write, as it can write it.
@@ -2555,6 +2701,30 @@ impl PyEngine {
         Ok(f64_bytes(py, &self.inner.attribution_column(index)))
     }
 
+    /// The day's `random_noise` column split into the three draws it sums,
+    /// `"market"`, `"sector"` or `"idio"`, as f64 bytes per company.
+    ///
+    /// A window on the innovation the close feeds the per-name GJR. The
+    /// `random_noise` column is that innovation, and it is the sum of the
+    /// factor's transmission, the sector's and the name's own draw; only
+    /// the split says which of the three the name's variance process is
+    /// responding to. Reading it changes nothing: the close reads the same
+    /// accumulator directly, and only while
+    /// `garch_innovation_commensurate` is non-zero.
+    fn noise_split(&self, py: Python<'_>, part: &str) -> PyResult<Py<PyBytes>> {
+        let index = match part {
+            "market" => 0,
+            "sector" => 1,
+            "idio" => 2,
+            other => {
+                return Err(ValidationError::new_err(format!(
+                    "unknown noise part {other:?}. Valid: market, sector, idio"
+                )))
+            }
+        };
+        Ok(f64_bytes(py, &self.inner.noise_part_column(index)))
+    }
+
     /// `count` independent engines at exactly this state.
     ///
     /// A deep copy of the whole engine, so the branches share no memory and
@@ -2687,7 +2857,8 @@ impl PyEngine {
         // unmistakable at a glance and on restore.
         let mut rng_out = Vec::with_capacity(3 * crate::rng::stream::COUNT);
         for s in [rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
-                  rng.news, rng.volume_idio, rng.overnight] {
+                  rng.news, rng.volume_idio, rng.overnight, rng.market_vol_level,
+                  rng.crisis_epicentre] {
             rng_out.push(f64::from_bits(s.state));
             rng_out.push(f64::from_bits(s.increment));
             rng_out.push(s.spare.unwrap_or(f64::NAN));
@@ -2740,6 +2911,28 @@ impl PyEngine {
             f64_bytes(py, self.inner.tick_fundamental()),
         )?;
         out.set_item("tick_anchor", f64_bytes(py, self.inner.tick_anchor()))?;
+        // The day's `random_noise` split and the scale its idiosyncratic
+        // part was drawn at, beside the accumulators above because they are
+        // the same per-DAY state and lost the same way: off zero on
+        // `garch_innovation_commensurate` the close builds the per-name GJR
+        // innovation out of them, so a mid-day fork that dropped them closed
+        // on a different innovation and priced differently from its parent.
+        // Their own keys, so a snapshot written before they were carried
+        // restores to the zeros a day that has not started holds -- which is
+        // every run recorded while the dial shipped 0.0.
+        let flat3 = |rows: &[[f64; 3]]| -> Vec<f64> {
+            rows.iter().flat_map(|r| r.iter().copied()).collect()
+        };
+        out.set_item("noise_parts", f64_bytes(py, &flat3(self.inner.noise_parts())))?;
+        out.set_item(
+            "noise_own_scale2",
+            f64_bytes(py, self.inner.noise_own_scale2()),
+        )?;
+        // The jump each name booked at the last close, kept across the open
+        // for the session that trades the gap in. Written and read only off
+        // the shipped `volume_move_jump_share` of 1.0, and carried here so a
+        // restored engine's first session reads the gap a copy's reads.
+        out.set_item("jump_move", f64_bytes(py, self.inner.jump_move()))?;
         out.set_item("market_open", self.market_open)?;
         // The market factor's variance state: (variance, day_factor).
         // Engine-level rather than per-company, so it has no column; a
@@ -2758,6 +2951,41 @@ impl PyEngine {
         // a snapshot without it restores to 0.0, which is bit-exact for
         // every run recorded while the reservoir dial shipped 0.0.
         out.set_item("forced_flow_spent", self.inner.forced_flow_spent())?;
+        // The market factor's slow variance level, in logs. Its own key
+        // for the reason the line above has one: a snapshot without it
+        // restores to 0.0, a multiplier of exactly 1.0, which is what
+        // every run recorded while `market_vol_level_sigma` shipped 0.0
+        // actually carried.
+        out.set_item("market_vol_log_level", self.inner.market_vol_log_level())?;
+        out.set_item("vix_log_level", self.inner.vix_log_level())?;
+        // Only where the hash covers it: the memory moves, and is hashed,
+        // only with `vix_anchor_memory` nonzero.
+        if self.inner.params().vix_anchor_memory != 0.0 {
+            out.set_item("vix_anchor_slow", self.inner.vix_anchor_slow())?;
+        }
+        // THE CRISIS EPISODE: whether one is running, how many consecutive
+        // sessions it has spent under the threshold, the sector index its
+        // epicentre was drawn at (`-1` for `none`, a crisis with no
+        // epicentre) and the pin a scenario has set (`-2` for no pin, which
+        // is no sector index and not the `-1` that means `none`).
+        //
+        // Four keys of their own, for the reason the two levels above have
+        // theirs: a snapshot written before they existed restores to the
+        // state a run with `crisis_epicentre_extra` at 0.0 carries, which is
+        // every run ever recorded. A fork that dropped them would resume
+        // outside the episode its parent is three sessions into, price the
+        // epicentre's names without the multiple, and redraw a fresh
+        // epicentre on the next crossing.
+        let (in_episode, sessions_under, epicentre, pin) = self.inner.crisis_episode_raw();
+        out.set_item("crisis_in_episode", in_episode)?;
+        out.set_item("crisis_sessions_under", sessions_under)?;
+        out.set_item("crisis_epicentre", epicentre)?;
+        out.set_item("crisis_epicentre_pin", pin.unwrap_or(-2))?;
+        // A forced close pending tonight. A key only while true, so every
+        // snapshot of an engine that was never forced is the one it was.
+        if self.inner.vix_sets_variance_pending() {
+            out.set_item("vix_sets_variance_pending", true)?;
+        }
         // Nominal output when the run opened, the base of the growth
         // term's ratio. A constant of the run rather than advancing state,
         // and carried for the reason the two above are: an engine restored
@@ -2780,6 +3008,17 @@ impl PyEngine {
         // this and nothing called it. Carried now, while it is free.
         out.set_item("universe_stress", self.inner.universe_stress())?;
         out.set_item("volume_idio", f64_bytes(py, self.inner.volume_idio()))?;
+        // The two states pt-v19 turned on. Their own keys, so a snapshot
+        // written before they were carried restores to the zeros every
+        // preset through pt-v18 actually held.
+        out.set_item("sector_variance", f64_bytes(py, self.inner.sector_variance()))?;
+        out.set_item("jump_excitation", f64_bytes(py, self.inner.jump_excitation()))?;
+        // The sector state's two per-DAY companions, carried for the
+        // reason `attribution` and `tick_components` are: a fork taken
+        // mid-day needs the day's accumulated sector factor and the
+        // scale it was drawn at.
+        out.set_item("sector_day_factor", f64_bytes(py, self.inner.sector_day_factor()))?;
+        out.set_item("sector_target_day", self.inner.sector_target_day())?;
         // THE DAY'S JUMP AND OVERNIGHT MOVE, WAITING FOR A TAPE ROW.
         //
         // Both are applied at a day boundary, so no tick of that day can
@@ -2962,7 +3201,8 @@ impl PyEngine {
             return Err(ValidationError::new_err(format!(
                 "rng must be 9 numbers (market, economy, external), 12 \
                  (plus jumps), 15 (plus volume), 18 (plus news), 21 \
-                 (plus per-name volume) or 24 (plus overnight), as \
+                 (plus per-name volume), 24 (plus overnight), 27 (plus the \
+                 slow level) or 30 (plus the crisis epicentre), as \
                  (state, increment, spare) triples, got {}",
                 rng.len()
             )));
@@ -3012,7 +3252,17 @@ impl PyEngine {
         let volume = if rng.len() >= 15 { stream(12) } else { current.volume };
         let news = if rng.len() >= 18 { stream(15) } else { current.news };
         let volume_idio = if rng.len() >= 21 { stream(18) } else { current.volume_idio };
-        let overnight = if rng.len() >= 3 * crate::rng::stream::COUNT { stream(3 * (crate::rng::stream::COUNT - 1)) } else { current.overnight };
+        let overnight = if rng.len() >= 24 { stream(21) } else { current.overnight };
+        // LITERAL OFFSETS, not `3 * COUNT`. This read `>= 3 * COUNT` and
+        // `stream(3 * (COUNT - 1))` while `market_vol_level` happened to be
+        // the last stream, and the day a tenth stream was added those two
+        // expressions moved together: a 27-number snapshot stopped restoring
+        // the slow level at all and kept the fresh engine's seed-derived
+        // position, which diverged the market a day later and nothing here
+        // said so. Each stream's offset is its own position in the flat
+        // array and is fixed forever once written.
+        let market_vol_level = if rng.len() >= 27 { stream(24) } else { current.market_vol_level };
+        let crisis_epicentre = if rng.len() >= 30 { stream(27) } else { current.crisis_epicentre };
         self.inner.set_rng_state(crate::engine::EngineRngState {
             market: stream(0),
             economy: stream(3),
@@ -3022,6 +3272,8 @@ impl PyEngine {
             news,
             volume_idio,
             overnight,
+            market_vol_level,
+            crisis_epicentre,
         });
         if let Some(raw) = snapshot.get_item("draw_overlay")? {
             let entries: Vec<(u32, u8, u64, f64)> = raw.extract()?;
@@ -3069,6 +3321,23 @@ impl PyEngine {
                 .restore_day_state(&attribution, &components, &fundamental, &anchor)
                 .map_err(ValidationError::new_err)?;
         }
+        // The day's noise split. Absent means a snapshot from a build that
+        // did not carry it, whose day the close read at the whole
+        // `random_noise` column, which is what zeros here reproduce.
+        if let Some(parts) = buffer("noise_parts")? {
+            let scale2 = buffer("noise_own_scale2")?.unwrap_or_else(|| vec![0.0; n]);
+            self.inner
+                .restore_noise_split(&parts, &scale2)
+                .map_err(ValidationError::new_err)?;
+        }
+        // The jump waiting for the session that trades it in. Absent means a
+        // snapshot from a build without it, and every such run shipped
+        // `volume_move_jump_share` at 1.0, where the vector is never written.
+        if let Some(moves) = buffer("jump_move")? {
+            self.inner
+                .set_jump_move(&moves)
+                .map_err(ValidationError::new_err)?;
+        }
         if let Some(flag) = snapshot.get_item("market_open")? {
             // Without this the fork believes the day has not started, re-opens
             // on its next session, and re-anchors `previous_close` mid-day --
@@ -3105,6 +3374,46 @@ impl PyEngine {
                 .set_volume_idio(&values)
                 .map_err(ValidationError::new_err)?;
         }
+        // AFTER the volume states on purpose: `set_volume_idio`'s docstring
+        // describes a positional boundary -- what holds the snapshot's value
+        // when a width mismatch refuses, and what holds the engine's -- and
+        // adding these on that side leaves every sentence of it true.
+        //
+        // Absent means a snapshot from before these were carried, whose
+        // preset shipped both mechanisms at 0.0 and whose arrays were
+        // therefore all zeros, which is what a fresh engine holds.
+        // The day accumulators, restored together because the factor is
+        // only meaningful beside the scale it was drawn at. Absent means a
+        // snapshot from before they were carried, whose preset ran no
+        // sector state, and a fresh engine's zeros are what it described.
+        if let Some(raw) = snapshot.get_item("sector_day_factor")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            let target = match snapshot.get_item("sector_target_day")? {
+                Some(v) => v.extract()?,
+                None => 0.0,
+            };
+            self.inner
+                .set_sector_day(&values, target)
+                .map_err(ValidationError::new_err)?;
+        }
+        for (key, sector) in [("sector_variance", true), ("jump_excitation", false)] {
+            let Some(raw) = snapshot.get_item(key)? else { continue };
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            if sector {
+                self.inner.set_sector_variance(&values)
+            } else {
+                self.inner.set_jump_excitation(&values)
+            }
+            .map_err(ValidationError::new_err)?;
+        }
         // Absent in a snapshot written before this was carried. Such a
         // snapshot described a day whose news this engine cannot know, so the
         // honest restore is the empty day it recorded -- which is what those
@@ -3139,6 +3448,52 @@ impl PyEngine {
         if let Some(raw) = snapshot.get_item("forced_flow_spent")? {
             self.inner.set_forced_flow_spent(raw.extract()?);
         }
+        // Absent means a snapshot from a build without the slow level,
+        // whose runs all carried a multiplier of exactly 1.0.
+        if let Some(raw) = snapshot.get_item("market_vol_log_level")? {
+            self.inner.set_market_vol_log_level(raw.extract()?);
+        }
+        // Absent means a snapshot from a build without the VIX level, whose
+        // runs all carried a multiplier of exactly 1.0.
+        if let Some(raw) = snapshot.get_item("vix_log_level")? {
+            self.inner.set_vix_log_level(raw.extract()?);
+        }
+        // Absent means a build without the anchor's memory, where it was 0.0.
+        if let Some(raw) = snapshot.get_item("vix_anchor_slow")? {
+            self.inner.set_vix_anchor_slow(raw.extract()?);
+        }
+        // The crisis episode. Absent means a snapshot from a build without
+        // it, and every such run shipped `crisis_epicentre_extra` at 0.0,
+        // where no episode is ever entered -- which is what the defaults
+        // here reproduce. Read as one group so a half-written snapshot
+        // cannot restore an episode with no epicentre index behind it.
+        if let Some(raw) = snapshot.get_item("crisis_in_episode")? {
+            let in_episode: bool = raw.extract()?;
+            let sessions_under: i64 = match snapshot.get_item("crisis_sessions_under")? {
+                Some(v) => v.extract()?,
+                None => 0,
+            };
+            let epicentre: i32 = match snapshot.get_item("crisis_epicentre")? {
+                Some(v) => v.extract()?,
+                None => -1,
+            };
+            let pin: i32 = match snapshot.get_item("crisis_epicentre_pin")? {
+                Some(v) => v.extract()?,
+                None => -2,
+            };
+            self.inner.set_crisis_episode_raw(
+                in_episode,
+                sessions_under,
+                epicentre,
+                if pin <= -2 { None } else { Some(pin) },
+            );
+        }
+        // Absent means no forced close was pending when it was taken.
+        let pending: bool = match snapshot.get_item("vix_sets_variance_pending")? {
+            Some(v) => v.extract()?,
+            None => false,
+        };
+        self.inner.set_vix_sets_variance_pending(pending);
         // Restore the growth term's base. Absent means a snapshot from a
         // build without the term, whose preset carries the dial at 0.0.
         if let Some(raw) = snapshot.get_item("nominal_output_base")? {
@@ -4109,6 +4464,36 @@ pub fn sector_daily_sigma(sector: &str) -> PyResult<f64> {
                 crate::sectors::keys().join(", ")
             ))
         })
+}
+
+/// The crisis epicentre's solve at an extra, as the numbers the tick uses.
+///
+/// `market_share` and `sector_share` are the two MEASURED constants
+/// `market::factors::CRISIS_EPICENTRE_MARKET_SHARE` and
+/// `CRISIS_EPICENTRE_SECTOR_SHARE`; `gain_up` and `gain_down` are the
+/// multiples the epicentre sector's names and every other name carry on
+/// their non-market parts while an episode runs; `extra_min` and `extra_max`
+/// are the open interval `ModelParams::invariants` admits.
+///
+/// A window, not a dial: this computes nothing an engine does not compute
+/// for itself, and it exists so a reader (and
+/// `tests/test_crisis_epicentre.py`) can check the solve against its own two
+/// equations with the engine's numbers rather than a transcription of them.
+/// It takes the extra rather than a `ModelParams` because the solve reads
+/// exactly one field and a params argument would suggest otherwise.
+#[pyfunction]
+pub fn crisis_epicentre_solve(py: Python<'_>, extra: f64) -> PyResult<Bound<'_, PyDict>> {
+    let (up, down) = crate::market::factors::crisis_epicentre_gains(extra);
+    let (lo, hi) = crate::market::factors::crisis_epicentre_extra_bounds();
+    let out = PyDict::new_bound(py);
+    out.set_item("extra", extra)?;
+    out.set_item("market_share", crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE)?;
+    out.set_item("sector_share", crate::market::factors::CRISIS_EPICENTRE_SECTOR_SHARE)?;
+    out.set_item("gain_up", up)?;
+    out.set_item("gain_down", down)?;
+    out.set_item("extra_min", lo)?;
+    out.set_item("extra_max", hi)?;
+    Ok(out)
 }
 
 /// Standard deviation of the daily mispricing process at rest.

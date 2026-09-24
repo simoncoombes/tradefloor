@@ -97,6 +97,12 @@ share, revenue growth, share count and sector come from SEC EDGAR filings.
 Every price, spread, fill and order-book state after step zero is generated
 by Tradefloor under the `pt-v16` preset.
 
+`experiment.py` pins `pt-v16`. The shipped default has moved on since the
+recording was made (it is `pt-v19` from 0.8.0), and a replay is keyed to
+the exact text the agent was sent, so it only replays in the market it was
+recorded in. Every earlier preset stays selectable, which is what lets this
+run reproduce. The numbers below describe `pt-v16`.
+
 Nothing here predicts or describes the behaviour of any real security. The
 tickers are real companies and the market is not.
 
@@ -847,7 +853,7 @@ M("""
 ## Reproduction
 
 ```bash
-pip install tradefloor
+pip install "tradefloor[arrow]" matplotlib
 git clone https://github.com/simoncoombes/tradefloor
 cd tradefloor/examples/experiments/liquidity-crisis
 jupyter lab notebook.ipynb
@@ -857,13 +863,15 @@ Or rebuild the notebook from the module, which is what produced the copy
 committed here:
 
 ```bash
-pip install matplotlib nbformat nbclient
+pip install matplotlib pyarrow nbformat nbclient
 python build_notebook.py
 ```
 
-Either way it makes no model call, needs no API key and reaches no
-network. Every decision the agent took was recorded once, live, and is
-replayed from `tests/fixtures/finrobot/liquidity-crisis.json`.
+`pyarrow` is for the depth reading, which reads the prints table, and
+`matplotlib` draws the charts. Either way it makes no model call, needs no
+API key and reaches no network. Every decision the agent took was recorded
+once, live, and is replayed from
+`tests/fixtures/finrobot/liquidity-crisis.json`.
 
 ## What is not here
 

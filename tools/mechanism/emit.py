@@ -18,6 +18,13 @@ what the specification generates, the way ``record.py --check`` compares
 a record; ``--write`` replaces it. The known-answer digest is what proves
 the generated body is the shipped mechanism, and it is the gate's to run.
 
+Two of the statements exist for the shape of the Rust rather than for the
+arithmetic. ``Taken`` moves a per-company vector out of the engine for the
+length of a loop and back after it, because Rust will not let the loop
+reach a second field through ``self`` while it borrows the company list;
+``Note`` writes a comment, so a branch the emitted body cannot explain to
+its own reader is explained where that reader is.
+
 Declared state (``StateSpec(declared=True)``) generates the struct field,
 its default, the snapshot and restore entries and the Python getter, as
 text for the four places they go. No shipped mechanism declares state in
@@ -35,7 +42,8 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "mechanisms"))
 
 from spec import (Add, Bin, Call, Const, Dial, Draw, Extern, ForCompanies,  # noqa: E402
-                  If, IfSome, Let, Mechanism, Neg, Set, State, Var, When, bits)
+                  If, IfSome, Let, Mechanism, Neg, Note, Set, State, Taken,
+                  Var, When, bits)
 from check import SpecError, check, effect_of  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -70,6 +78,17 @@ class Emitter:
         self.state = {s.path: s for s in mech.state}
         self.externs = {e.name: e for e in mech.externs}
 
+    def state_rust(self, spec, index: str) -> str:
+        """A state field's Rust spelling, with the loop's index in it.
+
+        A per-company vector is spelled ``excitation[{index}]`` and reads
+        and writes inside a ``ForCompanies`` want the index the loop
+        bound. Every other field's spelling carries no placeholder and
+        comes back untouched.
+        """
+        text = spec.rust or spec.path
+        return text.format(index=index) if "{index}" in text else text
+
     # -- expressions --
 
     def expr(self, e, index: str = "index") -> str:
@@ -81,7 +100,7 @@ class Emitter:
             spec = self.state.get(e.path)
             if spec is None:
                 raise EmitError(f"state {e.path!r} is not declared on {self.mech.name}")
-            return spec.rust or e.path
+            return self.state_rust(spec, index)
         if isinstance(e, Var):
             return e.name
         if isinstance(e, Draw):
@@ -101,8 +120,15 @@ class Emitter:
                 raise EmitError(f"extern {e.name!r} is not declared")
             return spec.rust.format(*[self.expr(a, index) for a in e.args])
         if isinstance(e, If):
+            # A chain of conditions is `else if`, not `else { if ... }`.
+            # The tree is the same either way; the nesting is what a Rust
+            # reader would have written and what the shipped body reads
+            # as, and one line per branch beats one line per bracket.
+            otherwise = self.expr(e.otherwise, index)
+            if not isinstance(e.otherwise, If):
+                otherwise = f"{{ {otherwise} }}"
             return (f"if {self.cond(e.cond, index)} {{ {self.expr(e.then, index)} }} "
-                    f"else {{ {self.expr(e.otherwise, index)} }}")
+                    f"else {otherwise}")
         raise EmitError(f"not an expression: {e!r}")
 
     #: The expression forms that are not self-delimiting in Rust, so an
@@ -149,10 +175,11 @@ class Emitter:
             elif isinstance(s, Set):
                 spec = self.state[s.path]
                 value = self.expr(s.expr, index)
+                field = self.state_rust(spec, index)
                 if spec.optional:
-                    out.append(f"{pad}{spec.rust} = Some({value});")
+                    out.append(f"{pad}{field} = Some({value});")
                 else:
-                    out.append(f"{pad}{spec.rust} = {value};")
+                    out.append(f"{pad}{field} = {value};")
             elif isinstance(s, Add):
                 spec = self.state[s.path]
                 value = self.expr(s.expr, index)
@@ -168,15 +195,67 @@ class Emitter:
                 out.append(f"{pad}}}")
             elif isinstance(s, IfSome):
                 spec = self.state[s.path]
-                out.append(f"{pad}if let Some({s.name}) = {spec.rust} {{")
+                out.append(f"{pad}if let Some({s.name}) = {self.state_rust(spec, index)} {{")
                 out.extend(self.body(s.body, depth + 1, index))
                 out.append(f"{pad}}}")
             elif isinstance(s, ForCompanies):
                 out.append(f"{pad}for ({s.name}, company) in self.companies.iter_mut().enumerate() {{")
                 out.extend(self.body(s.body, depth + 1, s.name))
                 out.append(f"{pad}}}")
+            elif isinstance(s, Taken):
+                out.extend(self.taken(s, depth, index))
+            elif isinstance(s, Note):
+                out.extend(f"{pad}// {line}" if line else f"{pad}//"
+                           for line in s.text.split("\n"))
             else:
                 raise EmitError(f"not a statement: {s!r}")
+        return out
+
+    def taken(self, s, depth: int, index: str) -> list[str]:
+        """A per-company vector moved into a local for the length of a
+        body and moved back after it.
+
+        `std::mem::take` rather than a clone or a split borrow: the loop
+        inside holds `self.companies` mutably, so the second field cannot
+        be reached through `self` while it runs, and moving the vector out
+        and back is the borrow checker's own answer at no copy. The engine
+        keeps an empty `Vec` in the meantime, which is why the move back
+        is not optional.
+
+        The gate is emitted twice, once on the take and once on the
+        restore, from the same node: while it is false the local is an
+        empty `Vec` nothing indexes and the engine's field is never
+        touched, so a mechanism whose vector is switched off leaves it
+        bit-identical. The resize is a widening only -- a vector the
+        engine grew past is left as it is -- so a company added since the
+        last close gets its default slot and no existing slot moves.
+        """
+        spec = self.state[s.path]
+        if not spec.take_rust:
+            raise EmitError(
+                f"{s.path!r} is taken by {self.mech.name} and declares no "
+                "take_rust, so the emitter does not know which engine "
+                "field to move")
+        if not spec.rust.startswith(f"{s.name}["):
+            raise EmitError(
+                f"{s.path!r} is taken into {s.name!r} and spelled "
+                f"{spec.rust!r}; the body would index a local the take "
+                "does not bind")
+        pad = "    " * depth
+        gate = self.cond(s.gate, index)
+        fill = literal(float(spec.default))
+        out = [f"{pad}let mut {s.name} = if {gate} {{",
+               f"{pad}    let mut e = std::mem::take(&mut {spec.take_rust});",
+               f"{pad}    if e.len() < self.companies.len() {{ "
+               f"e.resize(self.companies.len(), {fill}); }}",
+               f"{pad}    e",
+               f"{pad}}} else {{",
+               f"{pad}    Vec::new()",
+               f"{pad}}};"]
+        out.extend(self.body(s.body, depth, index))
+        out.append(f"{pad}if {gate} {{")
+        out.append(f"{pad}    {spec.take_rust} = {s.name};")
+        out.append(f"{pad}}}")
         return out
 
     def function_body(self) -> str:
@@ -204,6 +283,28 @@ def markers(name: str) -> tuple[str, str]:
     return f"        // mechanism:{name} begin", f"        // mechanism:{name} end\n"
 
 
+def accessor_statements(body: tuple):
+    """The body's statements as the accessor scan sees them, each with
+    whether it sits inside a take.
+
+    A ``Note`` is prose for the mechanism's own reader and binds nothing,
+    so the scan steps over it; leaving it to stop the scan would have hid
+    a draw below it behind "no pure binding", which says the wrong thing
+    about a binding that is there. A ``Taken`` region is spliced in so the
+    scan keeps reaching the statements a take wraps, and flagged, because
+    a binding from inside one reads a local the accessor does not emit.
+    """
+    for stmt in body:
+        if isinstance(stmt, Note):
+            continue
+        if isinstance(stmt, Taken):
+            for inner in stmt.body:
+                if not isinstance(inner, Note):
+                    yield inner, True
+            continue
+        yield stmt, False
+
+
 def accessor_body(mech: Mechanism, var: str) -> str:
     """The generated body of a function returning one of the body's bindings.
 
@@ -220,8 +321,8 @@ def accessor_body(mech: Mechanism, var: str) -> str:
     takes a draw is not a function of the state and cannot be one.
     """
     emitter = Emitter(mech)
-    taken = []
-    for stmt in mech.body:
+    prefix = []
+    for stmt, in_take in accessor_statements(mech.body):
         if not isinstance(stmt, Let):
             break
         effect = effect_of(stmt.expr, mech)
@@ -229,12 +330,16 @@ def accessor_body(mech: Mechanism, var: str) -> str:
             raise EmitError(
                 f"{var!r} cannot be a function of the state: {stmt.name!r} "
                 f"above it takes {effect.describe()}")
-        taken.append(stmt)
+        if in_take:
+            raise EmitError(
+                f"{var!r} sits below a take, which the accessor does not "
+                "emit: the binding would read a local nothing bound")
+        prefix.append(stmt)
         if stmt.name == var:
             break
     else:
-        taken = []
-    if not taken or taken[-1].name != var:
+        prefix = []
+    if not prefix or prefix[-1].name != var:
         raise EmitError(
             f"{mech.name} has no pure binding {var!r} among the statements "
             "before its first draw")
@@ -244,7 +349,7 @@ def accessor_body(mech: Mechanism, var: str) -> str:
              f"{pad}// tools/mechanism/mechanisms/{mech.name}.py; do not "
              "edit by hand.",
              f"{pad}let {emitter.params} = &self.params;"]
-    lines.extend(emitter.body(tuple(taken), 2))
+    lines.extend(emitter.body(tuple(prefix), 2))
     lines.append(f"{pad}{var}")
     lines.append(f"{pad}// mechanism:{mech.name}.{var} end")
     return "\n".join(lines) + "\n"

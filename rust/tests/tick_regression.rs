@@ -152,10 +152,14 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
             // asymmetry branches on this flag and its gain defaults
             // to 0.0, so false is bit-identical here.
             prev_day_down: false,
+            // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
+            prev_day_factor: 0.0,
+            day_factor: 0.0,
             forced_flow_eff: 1.0,
             universe_stress: 0.0,
             volume_state: 0.0,
             volume_idio: &[],
+            jump_move: &[],
             economy: &economy,
             market_status: status,
             intraday_t: 0.5,
@@ -164,6 +168,7 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
             news_impact_queue: &[],
             order_volumes: &[],
             sector_keys: &keys,
+            sector_sigmas: &[],
             // The constant-sigma baseline: this harness probes the draw
             // schedule, which must not depend on the factor's conditional
             // sigma at all.
@@ -180,6 +185,9 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
                 // Trading days closed. The buyback factor is off on
                 // every preset these tests pin, so it is read
                 // nowhere; 0 is what a single-tick caller opens at.
+                // No crisis episode: the mechanism is off on every preset
+                // these tests pin, and a single-tick caller has none.
+                crisis_epicentre: None,
                 elapsed_days: 0,
                 params: &tradefloor::params::PT_V1,
         },

@@ -154,8 +154,8 @@ from .common import (DECISION_SCHEMA_VERSION, MAX_PARTICIPATION, AdapterInfo,
                      Decision, DecisionError, FrameworkAdapter,
                      FrameworkError, MissingDependencyError, Transcript,
                      check_prior, digest, moment_of, parse_decision,
-                     refuse_replay_reask, replay_response, require,
-                     run_sync, stamp_resume_counts)
+                     preset_of, refuse_replay_reask, replay_response,
+                     require, run_sync, stamp_preset, stamp_resume_counts)
 
 #: What the graph is told to produce, when the default input builder renders
 #: the prompt text. Short on purpose: the decision contract is stated once,
@@ -611,7 +611,7 @@ class LangGraphAdapter(FrameworkAdapter):
 
         if self.mode == "replay":
             return replay_response(self.transcript, key, step=obs.step,
-                                   day=obs.day)
+                                   day=obs.day, preset=preset_of(obs))
 
         graph_input = self.input_builder(payload)
         config = self.build_config(obs)
@@ -637,6 +637,11 @@ class LangGraphAdapter(FrameworkAdapter):
             # is the lookup rather than a check beside it.
             if not self.recorder.meta.get("framework"):
                 self.recorder.meta.update(self.provenance())
+            # WHICH MARKET, which `provenance()` cannot know: it is built
+            # before any engine exists and this is the first moment one is
+            # in reach. Without it a recording cannot say why it stops
+            # replaying when the shipped preset next moves.
+            stamp_preset(self.recorder, obs)
             # Recorded as text, because a replay feeds the recorded response
             # straight back to parse_decision and a string is the one shape
             # that survives a JSON round trip unchanged.

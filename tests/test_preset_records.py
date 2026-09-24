@@ -88,14 +88,46 @@ def test_the_envelope_agrees_with_the_record_for_the_preset_it_certifies():
     )
     rec = load(path)
 
+    # RE-PINNED 2026-09-22, WHEN A TABLE BECAME ABLE TO PUBLISH AN ABSENCE.
+    #
+    # `crisis_sector_dispersion` needs thirty sessions above the crisis
+    # threshold inside its window; a 252-day run of this preset holds single
+    # figures, so the certification run reads the row on no seed, the median
+    # panel OMITS it (`facts.aggregate_panels`'s rule for an all-empty
+    # pooled row), and the envelope publishes `None` for it.
+    #
+    # So the binding is in three parts rather than one equality, and each
+    # part fails on a different lie:
+    #
+    #   a row the envelope publishes a NUMBER for must be in the record and
+    #   must agree -- the original check, unchanged;
+    #
+    #   a row the envelope publishes `None` for must be ABSENT from the
+    #   record. This is the half that bites when the box re-measures: a
+    #   record that gains the reading while the module still says `None` is
+    #   a stale constant, which is exactly what this file exists for. Run
+    #   `tools/presets/envelope_tables.py --write` and it goes green;
+    #
+    #   a row the record carries and the envelope does not is still a schema
+    #   change and still fails.
     for field, published in (("panel_252", envelope.CERTIFIED),
                              ("panel_504", envelope.MEASURED_504)):
         measured = rec[field]
-        assert set(measured) == set(published), (
-            f"{field} and the envelope disagree on WHICH statistics the "
-            "panel holds"
-        )
+        assert set(measured) <= set(published), (
+            f"{field} carries "
+            f"{sorted(set(measured) - set(published))}, which the envelope "
+            f"does not publish: that is a schema change, not a measurement")
         for stat, value in published.items():
+            if value is None:
+                assert stat not in measured, (
+                    f"envelope publishes {stat} as absent for "
+                    f"{envelope.PRESET} and the record measured "
+                    f"{measured[stat]}. Rewrite the table from the record "
+                    f"with tools/presets/envelope_tables.py --write")
+                continue
+            assert stat in measured, (
+                f"envelope publishes {stat}={value} for {envelope.PRESET} "
+                f"and the record's {field} does not carry the row")
             assert value == pytest.approx(measured[stat], abs=10 ** -PLACES), (
                 f"envelope publishes {stat}={value} for {envelope.PRESET}, "
                 f"the record measured {measured[stat]}"
@@ -138,6 +170,48 @@ def test_the_envelope_agrees_with_the_record_on_the_level_and_crisis_rows():
                 f"the record measured {measured[stat]}")
 
 
+def test_the_level_block_was_measured_on_the_preset_the_record_describes():
+    """The block's own vector against the record's, name by name.
+
+    A `level_protocol` block is a thirty-seed measurement on a protocol no
+    panel runs, so `record.py --panel` cannot rebuild it and carries it
+    forward instead. Carrying it is only honest while the preset's
+    coefficient VALUES have not moved: a name ADDED to `ModelParams` is
+    inert, and a value that moved is a different model wearing the same
+    name, which is `restamp.py`'s rule applied to this block.
+
+    Both halves of that went wrong at once. pt-v19's block was written from
+    `b4fix10` at `2d83167`, nineteen of its coefficients moved at 31ef261,
+    and then `record.py --panel` deleted the block rather than reporting it
+    stale, which left `envelope.CERTIFIED_LEVEL` published with nothing
+    behind it (defect-26). This is the check that fails on the first of
+    those without waiting for the second.
+
+    A block written before `level_rows.py` stamped the vector carries
+    `coefficients: null` and is skipped, with the gap named rather than
+    passed over in silence.
+    """
+    rec = load(RECORDS / f"{envelope.PRESET}.json")
+    block = rec.get("level_protocol")
+    assert block is not None, (
+        f"{envelope.PRESET}.json carries no level_protocol block; "
+        "test_the_envelope_agrees_with_the_record_on_the_level_and_crisis_rows "
+        "says what to do about it")
+    ran = block.get("coefficients")
+    if ran is None:
+        pytest.skip(
+            f"{envelope.PRESET}.json's level block predates the coefficient "
+            "stamp, so nothing here can tell whether the preset moved under "
+            "it. Re-measure with tools/presets/level_panel.py to close this.")
+    moved = sorted(k for k in set(ran) & set(rec["coefficients"])
+                   if ran[k] != rec["coefficients"][k])
+    assert not moved, (
+        f"{len(moved)} of {envelope.PRESET}'s coefficients have moved since "
+        f"its level block was measured ({', '.join(moved[:6])}), so "
+        f"envelope.CERTIFIED_LEVEL and CERTIFIED_CRISIS describe a preset "
+        f"that no longer exists")
+
+
 def test_every_level_and_crisis_row_the_envelope_publishes_is_graded():
     """Nothing in these two blocks is published without a band to read it.
 
@@ -154,9 +228,42 @@ def test_every_level_and_crisis_row_the_envelope_publishes_is_graded():
                 f"band, so it earns no verdict")
 
 
+@pytest.mark.ship_bar
 def test_the_envelope_and_the_record_agree_on_the_band_count():
+    """Every row the record GRADED at 252 is in band, and the count says so.
+
+    RE-PINNED 2026-09-22, from `len(envelope.CERTIFIED)` to the record's own
+    denominator. `CERTIFIED` gained `crisis_sector_dispersion` and the count
+    did not, because the count is the rows TESTED and that row is neither
+    tested nor failed on a run that held too few crisis sessions:
+    `preset_panel._count_in_band` takes it out of both sides, the way it
+    already takes a row the basis carries no band for out of both sides.
+
+    The denominator is therefore the panel the record published, less the
+    rows named unreadable on it. A row that is ABSENT is not in the panel at
+    all, so it is already out; naming `len(CERTIFIED)` here would have
+    asserted 14 == 15 the day the row landed and 15 == 15 the day a preset
+    read it, and neither is the question. Any row the record does grade and
+    misses still fails on the line below.
+    """
     rec = load(RECORDS / f"{envelope.PRESET}.json")
-    assert rec["in_band"]["252"] == len(envelope.CERTIFIED)
+    graded = len(rec["panel_252"]) - len(rec["unreadable"]["252"] or [])
+    assert rec["in_band"]["252"] == graded, (
+        f"the record grades {graded} row(s) at 252 and counts "
+        f"{rec['in_band']['252']} in band")
+    # And NO SHAPE ROW may be absent. A shape row is a property of the
+    # returns and reads on every run -- `preset_panel._job` fetches it with
+    # `p[k]` and a run that dropped one fails there -- so the only row that
+    # can be missing from this panel is an `ABSENT_OK` one. This is what
+    # stops the denominator above from quietly shrinking: the "14 of 14" is
+    # fourteen shape rows and this asserts all fourteen are in the panel the
+    # count was taken over.
+    from tradefloor.facts import SHAPE
+
+    assert set(SHAPE) <= set(rec["panel_252"]), (
+        f"the record's panel_252 is missing shape row(s) "
+        f"{sorted(set(SHAPE) - set(rec['panel_252']))}, so the count beside "
+        f"it is not a count of the certified fourteen")
     assert rec["misses"]["252"] == [], (
         "the certified preset misses a band at the certified horizon, which "
         f"is a bigger fact than a stale number: {rec['misses']['252']}"
@@ -237,7 +344,14 @@ def test_certify_finds_no_tail_block_on_held_roster_panels():
     full = {k: (lo + hi) / 2.0 for k, (lo, hi) in REAL_MARKETS.items()}
     full["index_tail_dn3_hits"] = 3
     full["index_tail_dn3_sessions"] = 251
-    trimmed = [{k: full[k] for k in preset_panel.PANEL} for _ in range(4)]
+    # `if k in full`, since 2026-09-22. `PANEL` carries
+    # `crisis_sector_dispersion`, which is deliberately NOT in
+    # `REAL_MARKETS` -- the decade table has no reading for it -- and a
+    # held-roster seed that held no crisis does not carry it either. A
+    # fabricated value here would be this test asserting something about a
+    # panel shape `_job` never produces.
+    trimmed = [{k: full[k] for k in preset_panel.PANEL if k in full}
+               for _ in range(4)]
     result = envelope.certify(trimmed)
     assert result["tail"] is None
     assert envelope.certification_record(result)["tail"] is None

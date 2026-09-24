@@ -1074,6 +1074,18 @@ def test_every_recorded_meta_field_still_has_somewhere_to_live():
     stamped.save(scratch)
     housed.update(json.loads(scratch.read_text(encoding="utf-8"))["meta"])
 
+    # And what `stamp_preset` writes off the RUNNING ENGINE at the first
+    # exchange, which the empty save above cannot reach: `model_preset` has
+    # a save-time default and `model_preset_vector` does not, because the
+    # realised parameter vector is read from an observation and an empty
+    # transcript has never seen one. Stamped from a real one-day world
+    # rather than listed, for the same reason the block above is derived --
+    # a field added to the stamp cannot make this fail for a reason that
+    # has nothing to do with FinRobot.
+    probe_world, _probe_agent = one_observation(days=1)
+    _ci.stamp_preset(stamped, _observation(probe_world))
+    housed.update(stamped.meta)
+
     homeless = sorted(k for k in meta if k not in housed)
     assert not homeless, (
         f"the recorded run carries {homeless}, and provenance() has nowhere "
@@ -1088,6 +1100,47 @@ def test_the_published_state_carries_no_credential():
     published = json.dumps(agent.state())
     assert "sk-secret" not in published and "api_key" not in published, (
         "state() is printed by the fork agreement and written into artifacts")
+
+
+def test_a_finrobot_recording_is_stamped_like_every_other_recording(tmp_path):
+    """`finrobot.Transcript` predates the shared `Transcript` and kept its
+    own `save`, which wrote the bytes and stamped nothing: the FinRobot
+    fixture re-recorded at 0.8.0 was the only one of five without a
+    `recorded_utc`. Both fields are facts about the ARTEFACT rather than
+    about the framework -- when it became a file, and the market a
+    transcript that never met an engine would run under -- so the two saves
+    share `stamp_artefact`, and this holds them to one rule."""
+    import datetime
+    from tradefloor.integrations import common as ci
+
+    ours = fr.Transcript()
+    ours.save(tmp_path / "finrobot.json")
+    theirs = ci.Transcript()
+    theirs.save(tmp_path / "common.json")
+    assert set(ours.meta) == set(theirs.meta) == {"recorded_utc",
+                                                  "model_preset"}
+    assert (ours.meta["model_preset"] == theirs.meta["model_preset"]
+            == tf.ModelParams.from_preset().fingerprint)
+    when = datetime.datetime.fromisoformat(ours.meta["recorded_utc"])
+    assert when.tzinfo is not None and when.utcoffset().total_seconds() == 0
+    assert when.microsecond == 0, "whole seconds, like every other fixture"
+    written = json.loads(
+        (tmp_path / "finrobot.json").read_text(encoding="utf-8"))["meta"]
+    assert written == ours.meta, "the stamp must reach the file, not just meta"
+
+    # A re-save is not a re-recording: both fields keep what was recorded.
+    kept = {"recorded_utc": "2026-09-08T13:34:43+00:00",
+            "model_preset": "pt-v18"}
+    again = fr.Transcript(meta=dict(kept))
+    again.save(tmp_path / "again.json")
+    assert {k: again.meta[k] for k in kept} == kept
+
+    # And the committed recording, made through this path, carries both --
+    # the check `test_callable.py` makes of its own fixture, which this one
+    # had no equivalent of while its `save` stamped nothing.
+    meta = json.loads(FIXTURE.read_text(encoding="utf-8"))["meta"]
+    assert meta.get("recorded_utc"), "the committed recording has no date"
+    assert meta.get("model_preset"), "the committed recording names no market"
 
 
 # -- validating what the model returns --------------------------------------
@@ -1364,10 +1417,11 @@ def test_importing_the_adapter_still_needs_no_framework_after_the_rebase():
     # Standard library only, at ANY scope: `ast.walk` sees a function-local
     # import too, which is why `pathlib` is here -- `Transcript.save` imports
     # it inside the method. `datetime` joined it when `save` began stamping
-    # `recorded_utc`.
+    # `recorded_utc`. `warnings` joined it when `refuse_a_changed_preset`
+    # began saying out loud that a pre-0.8.0 recording names no preset.
     allowed = {"copy", "hashlib", "importlib", "json", "re", "statistics",
                "typing", "asyncio", "inspect", "concurrent", "pathlib",
-               "datetime", "__future__"}
+               "datetime", "warnings", "__future__"}
     assert imported <= allowed, (
         f"common.py imports {sorted(imported - allowed)} at module scope. "
         "finrobot.py imports common at module scope, so anything common "
@@ -2027,7 +2081,11 @@ def test_a_transcript_round_trips_through_a_file(tmp_path):
     transcript.save(path)
 
     again = fr.Transcript.load(path)
-    assert again.meta == {"framework": "FinRobot"}
+    # What the caller set survives, and `save` adds exactly the two fields
+    # every recording gains on becoming a file -- `common.stamp_artefact` --
+    # and nothing else.
+    assert again.meta["framework"] == "FinRobot"
+    assert set(again.meta) == {"framework", "recorded_utc", "model_preset"}
     assert again.response_for("abc") == "hello"
     assert len(again) == 1
 

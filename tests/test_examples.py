@@ -10,7 +10,7 @@ notebook read correctly, the output looked right, and the code raised
 `TypeError`. It was caught because the notebooks are executed rather than
 written and hoped over.
 
-Opt-in because executing every notebook takes about a minute and needs
+Opt-in because executing every notebook takes several minutes and needs
 `jupyter`, which the library does not depend on. Set `TRADEFLOOR_SLOW_TESTS=1`
 to run it; the release check does.
 
@@ -213,3 +213,47 @@ def test_the_claude_example_refuses_when_every_decision_fails():
     assert "Traceback" not in combined, f"refused with a traceback. Output: {tail}"
     assert "why-right" not in combined, (
         f"printed the leaderboard for a run Claude was never reached in. Output: {tail}")
+
+
+def test_the_liquidity_crisis_study_replays_its_recording():
+    """The study's first shared day, replayed from its fixture, NOT behind
+    the slow flag.
+
+    A replay is keyed to the exact text the agent was sent, so anything that
+    moves a day-zero price makes every recorded decision miss. Under
+    `on_refusal="skip"` a miss is counted and the run goes on, so the market
+    runs, the agent never trades, and nothing fails until the notebook looks
+    for a decision at the fork. That is how the study stopped replaying at
+    0.7.0 without anyone seeing it: `edgar.to_instruments` began pricing
+    under the shipped default rather than under the preset the study pins,
+    and only the opt-in notebook run could notice.
+
+    One day is one decision and a fraction of a second, and it is enough:
+    a mispriced universe misses on the first one.
+    """
+    import importlib.util
+    study = EXAMPLES / "experiments" / "liquidity-crisis"
+    spec = importlib.util.spec_from_file_location(
+        "liquidity_crisis_experiment", study / "experiment.py")
+    ex = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ex)
+
+    from tradefloor.counterfactual import World
+    from tradefloor.integrations.finrobot import FinRobotAdapter, Transcript
+
+    small = ex.subset(ex.load_snapshot())
+    agent = FinRobotAdapter(
+        mode="replay", transcript=Transcript.load(ex.FIXTURE),
+        fundamentals=ex.fundamentals(small), objective=ex.OBJECTIVE,
+        every=ex.DECISION_EVERY, arm="shared")
+    world = World(seed=ex.SEED, universe=ex.universe(small), agent=agent,
+                  pins=ex.BASE_PINS, cash=ex.CASH,
+                  steps_per_day=ex.STEPS_PER_DAY,
+                  ticks_per_step=ex.TICKS_PER_STEP,
+                  model=ex.PRESET, label="shared", on_refusal="skip")
+    world.run(days=1)
+
+    missed = [row["unusable"] for row in world.trace if row.get("unusable")]
+    assert not missed, missed[0][:300]
+    assert [e["step"] for e in agent.record] == list(
+        range(0, ex.STEPS_PER_DAY, ex.DECISION_EVERY))

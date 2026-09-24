@@ -35,8 +35,13 @@ def panel_at(outputs: dict, days: int) -> dict:
 
 
 def misses(outputs: dict, days: int) -> list[str]:
+    """The rows OUT of band, and never the rows the basis cannot read.
+
+    `is False`, not `not ...`. An unreadable row carries `in_band` None and
+    `not None` is True, so this returned every held-out row as a miss.
+    """
     sc = envelope.score(panel_at(outputs, days), horizon_days=days)["statistics"]
-    return sorted(k for k, v in sc.items() if not v.get("in_band", True))
+    return sorted(k for k, v in sc.items() if v.get("in_band") is False)
 
 
 def corr(a, b):

@@ -117,12 +117,23 @@ ASCII_PROSE = (
     "examples/integrations/finrobot/README.md",
 )
 
+#: The five characters `CONTENT.md` names, plus four the writing standard at
+#: `kill-ai-prose/human-writing-prompt.md` adds under "no decorative
+#: Unicode". All four are clean across `ASCII_PROSE` today except the
+#: ellipsis, which appeared twice in `rust/goldens/README.md` as a
+#: placeholder inside a JSON shape (`{ "dec": ..., "bits": ... }`) and was
+#: replaced with three periods when this rule landed. The bullet, check mark
+#: and sparkle have never appeared here and are listed so they cannot.
 NON_ASCII_PUNCTUATION = {
     "—": "em dash",
     "–": "en dash",
     "−": "typographic minus",
     "→": "rightwards arrow",
     "←": "leftwards arrow",
+    "…": "ellipsis character",
+    "•": "bullet glyph",
+    "✅": "check mark",
+    "✔": "check mark",
 }
 
 
@@ -261,7 +272,66 @@ BANNED_CONSTRUCTIONS = {
         'a trailing "which is what/why ..." clause',
     r"\bthe\s+(?:whole|entire)\s+point\b":
         '"the whole point"',
+
+    # Added 2026-09-12, when Simon adopted `kill-ai-prose/
+    # human-writing-prompt.md` as the standard for repository copy. Each of
+    # these is a SHAPE a regex can see, and each was measured over the ten
+    # `ASCII_PROSE` files before it was added: all eight report zero, so the
+    # rule arrives green rather than arriving as a chore. What the prompt
+    # calls vocabulary is not here; see the note below for the measurement
+    # that decided that.
+    r"\bnot\s+only\b[^.;\n]{0,80}?\bbut\s+(?:also\s+)?":
+        'a "not only X but also Y" pairing',
+    r"\b(?:is|was|are|were)n'?t\s+just\b":
+        'an "it isn\'t just X, it\'s Y" escalation',
+    r"\b(?:The result|The best part|The catch|The upshot|The kicker)\?":
+        "a setup-and-reveal question",
+    r"\bHere'?s\s+(?:the\s+thing|the\s+kicker|where)\b":
+        'a "here\'s the thing" opener',
+    r"(?mi)^(?:Moreover|Furthermore|Additionally|Notably|Importantly|"
+    r"Ultimately|Interestingly)\b":
+        "a filler transition opening a paragraph",
+    r"\bit'?s\s+(?:worth\s+noting|important\s+to\s+note|worth\s+mentioning)\b":
+        'an "it is worth noting" preamble',
+    r"\b(?:serves|stands|acts|functions)\s+as\b":
+        '"serves as" where "is" is meant',
+    r",\s+(?:highlighting|underscoring|reflecting|showcasing|ensuring|"
+    r"demonstrating|illustrating|emphasising|emphasizing|contributing to)\b":
+        "a tacked-on -ing clause assigning significance to a plain fact",
+    r"\b(?:In conclusion|To sum up|At the end of the day|At its core|"
+    r"In essence)\b":
+        "a signposted conclusion or filler abstraction",
+    r"\b(?:could potentially|may help to|can often|in many cases)\b":
+        "stacked hedges",
+    r"\b(?:experts say|studies show|industry reports suggest|"
+    r"many teams find)\b":
+        "vague attribution with no named source",
 }
+
+#: WHAT WAS MEASURED AND LEFT OUT, so the next reader can see the decision
+#: rather than the gap. Counts are over the ten `ASCII_PROSE` files.
+#:
+#: ` -- ` as an em-dash substitute: 54 lines. The writing standard bans the
+#: dramatic pause rather than the character, so the substitute is banned
+#: there too. Here it would fail on arrival across `README.md`,
+#: `CHANGELOG.md`, `CONTRIBUTING.md` and `RELEASING.md`, and the ASCII rule
+#: above still recommends it in its own failure message. Removing it is a
+#: prose sweep with its own review, not a side effect of this test.
+#:
+#: The vocabulary lists, which are left out on the standard's own terms:
+#: "These are defaults, not a find-and-replace table. If a word is the
+#: precise term, use it." `leverage` appears 11 times and every one is the
+#: financial term. `quietly` appears 3 times and every one means "without
+#: reporting", which is the distinction half this repository's guards exist
+#: to make. `crucial`, `pivotal`, `seamless`, `robust`, `comprehensive` and
+#: the rest of the inflated list appear zero times today, so a ban would
+#: assert nothing and would still be a word list.
+#:
+#: A trailing "X, not Y." antithesis: 1 line, `RELEASING.md`, "Three of the
+#: 0.3.0 rows were the measurement tool, not the inventory." The standard
+#: allows a contrast with something the reader actually believes, and a
+#: reader does believe those rows measured the inventory. A rule that flags
+#: it would be a rule with a known false positive on arrival.
 
 #: `exactly` is NOT on the list. It earns its place in an arithmetic claim --
 #: "exactly half", "exactly 1.0 at any coupling", "exactly the vector" -- and
@@ -324,10 +394,32 @@ def test_the_construction_guard_would_actually_catch_one():
         "Declared order is kept, and it is what breaks a tie.",
         "It reads the rate directly, which is what makes it macro-aware.",
         "The whole point of the convention is that 4.5 means 450%.",
+        "The band is not only wide but also derived from one panel.",
+        "This isn't just a cache, it's a whole second index.",
+        "The result? The build drops from nine minutes to forty seconds.",
+        "Here's the thing about the roster generator.",
+        "Moreover, the seed sd is measured rather than assumed.",
+        "It's worth noting that the digest moved at this boundary.",
+        "The manifest serves as the record of what ran.",
+        "The tail row came in from 5.26 to 3.07, underscoring the gain.",
+        "In conclusion, the dial is a switch.",
+        "The value could potentially move the tail row.",
+        "Experts say a pooled rate needs a seed scale.",
     ]
     for sentence in caught:
         assert any(re.search(p, sentence, re.IGNORECASE)
                    for p in BANNED_CONSTRUCTIONS), sentence
+
+    # EVERY pattern has to catch at least one of those, or a typo in a new
+    # one is invisible: the `any` above passes a sentence on the strength of
+    # some OTHER pattern matching it, so a dead pattern reports the
+    # commitment kept over the whole tree. This is the check the added rules
+    # needed and the original four had by being four.
+    for pattern in BANNED_CONSTRUCTIONS:
+        assert any(re.search(pattern, s, re.IGNORECASE) for s in caught), (
+            f"no sample sentence exercises {pattern!r}, so this pattern "
+            "would pass every file by vacuum"
+        )
 
     # And the shapes it must leave alone. "which is how" is ordinary English
     # for naming a mechanism, and a sentence can state a limit without the

@@ -272,10 +272,14 @@ fn check_scenario(file: &str) {
                 // asymmetry branches on this flag and its gain defaults
                 // to 0.0, so false is bit-identical here.
                 prev_day_down: false,
+                // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
+                prev_day_factor: 0.0,
+                day_factor: 0.0,
             forced_flow_eff: 1.0,
                 universe_stress: 0.0,
                 volume_state: 0.0,
                 volume_idio: &[],
+            jump_move: &[],
                 economy: &economy,
                 market_status: status,
                 intraday_t: intraday_fraction(time),
@@ -284,6 +288,7 @@ fn check_scenario(file: &str) {
                 news_impact_queue: &[],
                 order_volumes: &[],
                 sector_keys: &sector_keys,
+                sector_sigmas: &[],
                 // Replaying a RECORDED reference stream: the tape holds the
                 // draws the reference consumed, four-or-zero at settlement,
                 // and `ScriptedRng::finish` asserts exact consumption.
@@ -304,6 +309,9 @@ fn check_scenario(file: &str) {
                 // Trading days closed. The buyback factor is off on
                 // every preset these tests pin, so it is read
                 // nowhere; 0 is what a single-tick caller opens at.
+                // No crisis episode: the mechanism is off on every preset
+                // these tests pin, and a single-tick caller has none.
+                crisis_epicentre: None,
                 elapsed_days: 0,
                 params: &tradefloor::params::PT_V1,
             },

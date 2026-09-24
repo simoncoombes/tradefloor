@@ -334,6 +334,31 @@ read by `tradefloor.preset_record` and by the site.
 cannot disagree. That binding is what 0.6.0 lacked: the panel was re-typed by
 hand and `DECAY_252` beside it was not, and nothing failed.
 
+**2b. The level and crisis block, which the panel in step 2 cannot produce.**
+NEW, and missed twice. `envelope.CERTIFIED_LEVEL` and `CERTIFIED_CRISIS` are
+certified on `facts.LEVEL_PROTOCOL`, where the roster is drawn per seed, and
+`preset_panel.py` holds it at `Universe.random(40, seed=111)`. So they need
+their own paired run, and `record.py --panel` cannot rebuild the block it
+carries:
+
+```
+python tools/presets/level_panel.py <new default> out/j-level-<new>.json --workers N
+python tools/presets/level_panel.py <old default> out/j-level-<old>.json --workers N
+python tools/presets/level_rows.py --target out/j-level-<new>.json \
+       --control out/j-level-<old>.json --out out/level-rows.json
+python tools/presets/record.py --level-rows out/level-rows.json
+python tools/presets/envelope_tables.py --record python/tradefloor/presets/<new>.json --write
+```
+
+The second arm is the control and the run is void without it: it is the
+outgoing default, measured on the same build and seeds, and it must reproduce
+the constants its own record publishes. `level_rows.py` exits 1 if it does
+not, `record.py --level-rows` refuses the artefact, and `envelope_tables.py`
+refuses a record with no block. Run `record.py --panel --check` afterwards and
+read the `level_protocol` line: a block reported as differing is one the
+regeneration would delete. That is how pt-v18's block went at d4cfe22 and
+pt-v19's at 31ef261, which is defect-26.
+
 **3. The determinism baseline.** Every seeded trajectory changes, so
 `KAT_VERSION` bumps and `tests/known_answer.json` is regenerated. Produce the
 new digest on two architectures before committing it; the baseline note

@@ -23,7 +23,8 @@
     "max_participation": 0.02,
     "mandate_version": "1",
     "temperature": 0.0,
-    "unparseable_responses": 0
+    "unparseable_responses": 0,
+    "model_preset": "pt-v16"
   },
   "entries": [
     {

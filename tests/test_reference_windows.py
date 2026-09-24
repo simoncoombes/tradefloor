@@ -388,7 +388,13 @@ def test_the_index_tail_windows_are_anchored_at_the_tape_end_and_abut(horizon):
     - the newest window ENDS on the tape's last bar, which is the anchor.
       Catches the START-anchored table, whose windows all span correctly
       and all abut and which simply ends short, silently discarding the
-      most recent data and moving every window each time the cache grows.
+      most recent data. This bullet used to add "and moving every window
+      each time the cache grows", which is backwards: a start-anchored
+      table pins its boundaries to the first session, so growth appends
+      and nothing already in it moves. It is the END anchor this test
+      enforces whose every boundary shifts when the cache grows, which is
+      a real cost of the rule and is paid by committing the window table
+      so the band is rebuilt from dates rather than recut from a cache.
 
     Written as a property of the shipped table rather than of the tool, so
     it holds for whatever produced the table.
@@ -440,3 +446,294 @@ def test_the_index_tail_windows_are_anchored_at_the_tape_end_and_abut(horizon):
     lead_in = returns - len(windows) * horizon
     assert lead_in == {252: 140, 504: 392}[horizon]
     assert dates.index(windows[0][0]) == lead_in + 1
+
+
+# --------------------------------------------------------------------------
+# The -1 per cent fear row's own corpus
+#
+# `FEAR_DN1_WINDOWS` is the third window table. It landed on 2026-09-15 with
+# the whole-tape band, and it exists because the band that preceded it could
+# not be re-derived from anything in this package: the provenance carried a
+# summary and the readings behind it were never committed. Nothing below
+# carries a literal 0.39, 3.03, 0.59 or 2.73 that is not read from the
+# shipped tables.
+# --------------------------------------------------------------------------
+
+DN1_ROW = "fear_gauge_dn1"
+
+
+@pytest.mark.parametrize("horizon", (252, 504))
+def test_the_fear_dn1_band_is_derivable_from_its_windows(horizon):
+    """Both shipped edges, rebuilt from the committed window medians.
+
+    The rule is the whole-tape one: the median of the non-crisis window
+    medians, plus or minus the recorded multiplier times the across-window
+    trimmed standard deviation, each edge rounded outward. Centre and scale
+    are DERIVED here; only the multiplier is read, because it is a 200,000
+    draw tolerance solve rather than a closed form, and it is read from the
+    provenance rather than typed.
+
+    REFUSES: a band edge typed into `REAL_MARKETS` or `BANDS_504` that the
+    windows do not produce, which is the state this row was in until
+    2026-09-15 and the reason the table exists.
+    """
+    from tradefloor import envelope
+    from tradefloor.facts import (REAL_MARKETS, REAL_MARKETS_PROVENANCE,
+                                  fear_dn1_windows, round_outward, trimmed_sd)
+
+    terms = REAL_MARKETS_PROVENANCE[DN1_ROW]["band"]["horizons"][horizon]
+    values = fear_dn1_windows(horizon)
+    assert len(values) == terms["n"]
+
+    centre, scale = st.median(values), trimmed_sd(values)
+    assert centre == pytest.approx(terms["centre"], abs=5e-5)
+    assert scale == pytest.approx(terms["trimmed_sd"], abs=5e-6)
+
+    raw = (centre - terms["t"] * scale, centre + terms["t"] * scale)
+    assert raw == pytest.approx(terms["unrounded"], abs=5e-6)
+
+    derived = (round_outward(raw[0], "low", DN1_ROW),
+               round_outward(raw[1], "high", DN1_ROW))
+    shipped = REAL_MARKETS[DN1_ROW] if horizon == 252 else envelope.BANDS_504[DN1_ROW]
+    assert derived == pytest.approx(shipped)
+    assert derived == pytest.approx(terms["band"])
+
+    # The band it replaced, asserted so the supersession is recorded in
+    # executable form rather than only in a comment: the decade band is
+    # WIDER at both horizons and its floor is HIGHER, so the replacement is
+    # not a loosening.
+    superseded = REAL_MARKETS_PROVENANCE[DN1_ROW]["band"]["supersedes"]
+    assert shipped != superseded
+    assert shipped[1] - shipped[0] < superseded[1] - superseded[0]
+    assert shipped[0] < superseded[0] and shipped[1] < superseded[1]
+
+
+@pytest.mark.parametrize("horizon", (252, 504))
+def test_the_fear_dn1_windows_are_start_anchored_and_the_table_says_so(horizon):
+    """The anchor rule, asserted BECAUSE IT IS THE WRONG ONE.
+
+    `test_the_index_tail_windows_are_anchored_at_the_tape_end_and_abut`
+    above exists to catch "the START-anchored table, whose windows all span
+    correctly and all abut and which simply ends short, silently discarding
+    the most recent data and moving every window each time the cache grows".
+
+    This table is that construction. `derive_dn1.py` cuts forward from the
+    first paired session where `panel32.py`, which implements the same
+    whole-tape rule for the fourteen shape rows, walks backward from the
+    last bar. The band was adopted as derived rather than silently re-cut,
+    and the deviation is pinned here so that changing it is a deliberate act
+    with a failing test behind it instead of a quiet edit.
+
+    What it costs is measured in the provenance and it moves no verdict on
+    the record. What it would cost later is not bounded, which is why this
+    reads as a defect pinned rather than a property endorsed.
+    """
+    from tradefloor.facts import FEAR_DN1_WINDOWS, REAL_MARKETS_PROVENANCE
+
+    windows = FEAR_DN1_WINDOWS["windows"][horizon]
+    first, last = FEAR_DN1_WINDOWS["tape"]
+
+    assert windows[0][0] == first, (
+        "a start-anchored table opens on the tape's first session; if this "
+        "ever fails the table has been re-cut and the band moved with it")
+    assert windows[-1][1] < last, (
+        f"the newest window ends {windows[-1][1]} and the tape ends {last}. "
+        "That gap is the start anchor's cost and it is expected here. If it "
+        f"closes, the table has been re-anchored at the tape end and the "
+        f"{DN1_ROW} band must be re-derived with it")
+
+    # Correctly sized and contiguous, which the start anchor does not affect.
+    for (_, end, *_), (start, *_) in zip(windows, windows[1:]):
+        assert end < start, (end, start)
+    assert len(windows) == REAL_MARKETS_PROVENANCE[DN1_ROW]["band"]["horizons"][
+        horizon]["blocks"]
+
+    # Every window holds qualifying sessions, so the band's window count is
+    # the block count less the crisis drops and nothing else.
+    assert all(sessions >= 1 for *_, sessions, _ in windows)
+    crisis = [w for w in windows if w[4]]
+    assert len(windows) - len(crisis) == REAL_MARKETS_PROVENANCE[DN1_ROW][
+        "band"]["horizons"][horizon]["n"]
+    for start, end, *_ in crisis:
+        assert any(start <= date <= end
+                   for date in FEAR_DN1_WINDOWS["crisis_dates"]), (start, end)
+
+
+# --------------------------------------------------------------------------
+# The -3 per cent fear row's own corpus
+#
+# `FEAR_DN3_WINDOWS` is the fourth window table. It landed on 2026-09-15 with
+# the section 14 re-derivation under `ruling-nineteen-rows-with-dn3-re-
+# derived`, and it exists for the reason the -1 per cent table exists: until
+# it landed, (2.60, 9.58) and the triple (3.70, 5.30, 8.48) were hand-typed
+# literals that nothing in this package could re-derive. Nothing below
+# carries a literal 2.60, 9.58, 3.70, 5.30 or 8.48 that is not read from the
+# shipped tables.
+# --------------------------------------------------------------------------
+
+DN3_ROW = "fear_gauge_dn3"
+
+
+def test_the_fear_dn3_band_and_its_summary_are_derivable_from_its_windows():
+    """Both shipped edges and every recorded summary, from the table.
+
+    The rule is this row's own: the shared spread rule over the windows
+    holding at least five qualifying sessions, EXCLUDING NO WINDOW, which is
+    what separates it from `fear_gauge_dn1` and from the fourteen shape
+    rows. `envelope.BANDS_504` carries the same pair, because the band is a
+    per-session quantity and the row's provenance says the 252 windows are
+    what it is built from.
+
+    REFUSES: a band edge, a triple, a trimmed sd, a window count or a
+    bootstrap block count typed into this module that the windows do not
+    produce, which is the state this row was in until 2026-09-15.
+    """
+    from tradefloor import envelope
+    from tradefloor.facts import (FEAR_DN3_WINDOWS, REAL_MARKETS,
+                                  REAL_MARKETS_PROVENANCE, band_from_windows,
+                                  fear_dn3_windows, shared_rule)
+
+    prov = REAL_MARKETS_PROVENANCE[DN3_ROW]
+    values = fear_dn3_windows(252)
+    assert len(values) == prov["n_windows"]
+
+    derived = band_from_windows(DN3_ROW, list(values))
+    assert derived == pytest.approx(REAL_MARKETS[DN3_ROW])
+    assert derived == pytest.approx(envelope.BANDS_504[DN3_ROW])
+
+    triple = (min(values), st.median(values), max(values))
+    assert triple == pytest.approx(prov["windows"], abs=5e-9)
+
+    # The scale is the table's too, and it is the one the sources record.
+    scale = shared_rule(list(values))[2]
+    assert f"{scale:.4f}" == "1.0972"
+    assert "1.10" in prov["sources"][1]
+
+    # The error's blocks are a LARGER set than the band's, and the
+    # provenance argues at length that the two must not be conflated. Both
+    # counts come out of the same table.
+    assert len(fear_dn3_windows(252, condition=1)) == prov["centre_blocks"]
+    assert prov["centre_blocks"] > prov["n_windows"]
+    assert prov["centre_df"] == prov["centre_blocks"] - 1
+
+    # The crisis windows are IN the band's own window set, which is what
+    # "excludes no window" means here, and they are NOT what the row's
+    # `crisis_window` field reports. That field is a decade-panel reading
+    # and the block it sits in is otherwise whole-tape; the mismatch is
+    # asserted so the label cannot fall off the value again.
+    windows = FEAR_DN3_WINDOWS["windows"][252]
+    crisis = [w for w in windows if w[4] and w[3] >= 5]
+    assert len(crisis) == 2
+    assert all(w[2] in values for w in crisis)
+    assert [(w[2], w[3]) for w in crisis] == [
+        tuple(c) for c in prov["crisis_windows_whole_tape"]]
+    assert prov["crisis_window"] not in [w[2] for w in crisis]
+    assert "NOT the whole-tape" in prov["crisis_window_corpus"]
+
+    # Every window the table calls a crisis holds one of the named crash
+    # dates, and every one it does not, does not.
+    for start, end, _, _, is_crisis in windows:
+        holds = any(start <= date <= end
+                    for date in FEAR_DN3_WINDOWS["crisis_dates"])
+        assert holds == is_crisis, (start, end)
+
+
+@pytest.mark.parametrize("horizon", (252, 504))
+def test_the_fear_dn3_windows_are_start_anchored_and_the_table_says_so(horizon):
+    """The anchor rule, asserted BECAUSE IT IS THE WRONG ONE, again.
+
+    `FEAR_DN1_WINDOWS` pins the same deviation and its docstring explains
+    it. What is different here, and what makes this test worth its own
+    assertions rather than a shared helper, is the COST. On the -1 per cent
+    row every window holds qualifying sessions, so re-cutting the tape moves
+    each window's median a little and moves no verdict. On this row sixteen
+    of thirty-six windows hold none at all, so re-cutting moves whole
+    windows across the five-session condition: ten windows qualify at this
+    anchor and five at the last-bar anchor, and section 14's rule then has
+    three non-crisis windows to work with and produces no band.
+
+    That measurement is in
+    `REAL_MARKETS_PROVENANCE["fear_gauge_dn3"]["section14"]`. This test
+    exists so that re-cutting the table is a deliberate act with a failing
+    test behind it rather than a quiet edit that silently moves the band.
+    """
+    from tradefloor.facts import (FEAR_DN1_WINDOWS, FEAR_DN3_WINDOWS,
+                                  REAL_MARKETS_PROVENANCE)
+
+    windows = FEAR_DN3_WINDOWS["windows"][horizon]
+    first, last = FEAR_DN3_WINDOWS["tape"]
+
+    assert windows[0][0] == first, (
+        "a start-anchored table opens on the tape's first session; if this "
+        "ever fails the table has been re-cut and the band moved with it")
+    assert windows[-1][1] < last, (
+        f"the newest window ends {windows[-1][1]} and the tape ends {last}. "
+        "That gap is the start anchor's cost. If it closes, the table has "
+        f"been re-anchored at the tape end and the {DN3_ROW} band must be "
+        "re-derived with it")
+
+    for (_, end, *_), (start, *_) in zip(windows, windows[1:]):
+        assert end < start, (end, start)
+    if horizon == 252:
+        assert len(windows) == REAL_MARKETS_PROVENANCE[DN3_ROW]["ruler"]["blocks"]
+
+    # The property that makes this row's anchor expensive, asserted rather
+    # than described: windows holding no qualifying session exist here and
+    # do not exist in the -1 per cent table.
+    empty = [w for w in windows if w[3] == 0]
+    assert empty, "the cost this test guards depends on empty windows existing"
+    assert all(w[2] is None for w in empty)
+    assert not [w for w in FEAR_DN1_WINDOWS["windows"][horizon] if w[3] == 0]
+
+
+def test_the_section_14_rederivation_is_recorded_and_says_why_it_was_not_adopted():
+    """The ruled re-derivation, bound to the table it was cut from.
+
+    `ruling-nineteen-rows-with-dn3-re-derived` took the option that could
+    have removed a count from the release candidate. The two FRONT-anchored
+    variants are re-derived here from the shipped table, so the [2.16, 7.38]
+    the ruling quotes cannot drift away from the windows behind it. The
+    last-bar variants cannot be re-derived from this table by construction,
+    because the table is cut forward, and the one thing that matters about
+    them is asserted directly: at the project's own anchor the rule's 252
+    floor is far below anything this row's tape reads, which is why it was
+    recorded and not adopted.
+    """
+    from tradefloor.facts import (FEAR_DN3_WINDOWS, REAL_MARKETS,
+                                  REAL_MARKETS_PROVENANCE, fear_dn3_windows,
+                                  round_outward, trimmed_sd)
+
+    s14 = REAL_MARKETS_PROVENANCE[DN3_ROW]["section14"]
+
+    for horizon in (252, 504):
+        n, t, centre, scale, low, high = s14["variants"][
+            f"front_drop_crisis_{horizon}"]
+        values = fear_dn3_windows(horizon, drop_crisis=True)
+        assert len(values) == n
+        assert st.median(values) == pytest.approx(centre, abs=5e-6)
+        assert trimmed_sd(values) == pytest.approx(scale, abs=5e-6)
+        half = t * trimmed_sd(values)
+        derived = (round_outward(st.median(values) - half, "low", DN3_ROW),
+                   round_outward(st.median(values) + half, "high", DN3_ROW))
+        assert derived == pytest.approx((low, high))
+
+    # The refusal, in executable form. At the project's own anchor the 252
+    # rule puts its floor below every reading the row's tape holds by more
+    # than the whole range of those readings, which is the absence of an
+    # edge rather than an edge.
+    floor = s14["variants"]["last_bar_drop_crisis_252"][4]
+    medians = [w[2] for w in FEAR_DN3_WINDOWS["windows"][252] if w[2] is not None]
+    assert floor < min(medians) - (max(medians) - min(medians))
+    assert s14["variants"]["last_bar_drop_crisis_252"][0] == 3
+    assert s14["variants"]["last_bar_drop_crisis_504"][4] < 0
+
+    # And the reason it was not adopted is a measurement rather than a
+    # preference: the best correctly anchored form rejects fewer retained
+    # arm readings than the band it would have replaced.
+    rej = s14["arm_rejections_of_173"]
+    assert rej["last_bar_keep_crisis"] < rej["shipped"] < rej["front_drop_crisis"]
+
+    # The band the module ships is still the one the table derives.
+    assert REAL_MARKETS[DN3_ROW] == pytest.approx(
+        band_from_windows(DN3_ROW, list(fear_dn3_windows(252))))
+    assert "kept" in REAL_MARKETS_PROVENANCE[DN3_ROW]["ruler"]["form"]
