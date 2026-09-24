@@ -134,6 +134,10 @@ ROLES = ("shock", "transmission")
 CYCLES = ("expansion", "peak", "contraction", "trough", "recovery")
 
 _RATE_MIN, _RATE_MAX = -0.05, 0.50
+#: GDP growth's floor, lower than the rates' because growth falls further:
+#: -7.4 per cent year on year in 2020Q2, -10.0 annualised in 1958Q1 (FRED
+#: GDPC1). The engine's `units::check_rate` carries the same number.
+_GROWTH_MIN = -0.10
 
 
 class ScenarioValidationError(ValidationError):
@@ -365,13 +369,17 @@ def _domain_between(low: float, high: float, what: str) -> Callable[[Any], str |
     return domain
 
 
-def _domain_rate(value: Any) -> str | None:
+def _domain_rate(value: Any, low: float = _RATE_MIN) -> str | None:
     if not isinstance(value, (int, float)) or value != value:
         return f"{value!r} is not a number"
-    if not _RATE_MIN <= value <= _RATE_MAX:
+    if not low <= value <= _RATE_MAX:
         return (f"{value:g} is outside the plausible rate band "
-                f"[{_RATE_MIN}, {_RATE_MAX}]")
+                f"[{low}, {_RATE_MAX}]")
     return None
+
+
+def _domain_growth(value: Any) -> str | None:
+    return _domain_rate(value, _GROWTH_MIN)
 
 
 def _domain_finite(value: Any) -> str | None:
@@ -732,7 +740,7 @@ _register(_make_macro_target(
         "which pt-v14 measured on its own at +0.36%. `macro.cycle` is the "
         "lever a downturn scenario actually wants."
     ),
-    check=_rate_check(), format=_pp, domain=_domain_rate,
+    check=_rate_check(low=_GROWTH_MIN), format=_pp, domain=_domain_growth,
 ))
 
 _register(_make_macro_target(
