@@ -201,8 +201,8 @@ that adapts to you.
 
 The same seed gives the same market on every platform. Each release builds
 for five platforms, runs one fixed simulation on each, and stops if any result
-differs. tradefloor ships its own `exp`, `log`, `sin` and `cos`, so the
-system's math library cannot change a result.
+differs. tradefloor ships its own `exp`, `log`, `pow`, `sin` and `cos`, so
+the system's math library cannot change a result.
 
 `pt-v19` became the default in 0.8.0, replacing `pt-v18`. If you name your
 preset, a run replays exactly, and every preset from `pt-v1` on can still be
