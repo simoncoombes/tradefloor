@@ -39,9 +39,9 @@ information that matters here: a model is realistic in some respects, at some
 measurement scale, and not others. Modesty has nothing to do with it.
 
 There is also a practical failure mode. A scalar travels and a caveat does
-not. "87% realistic" is quotable in a way that "volatility memory is no
-longer distinguishable from zero by lag 20 and is negative by lag 45, where
-real markets stay weakly positive out to lag 60"
+not. "87% realistic" is quotable in a way that "volatility memory reads
+below real markets' at every lag and is indistinguishable from zero by lag
+30, where real markets stay weakly positive out to lag 60"
 is not, so a single number reliably becomes the thing people cite INSTEAD
 of the gaps -- which is exactly backwards, because the gaps are what decide
 whether a result means anything. A boolean with reasons attached cannot be
@@ -643,32 +643,36 @@ MEASURED_504: dict[str, float | None] = {
 
 #: |return| autocorrelation at the certified horizon, against real markets.
 #:
-#: NOT RE-MEASURED ON THE FIFTH COMPOSITION. Every value in this table, and
-#: `DECAY_SLOPE` and `MEMORY_VALID_TO_LAG` below, describes the 2026-09-14
-#: pt-v19 vector. pt-v19 was recomposed four times after that, most recently
-#: on 2026-09-23 (4d8f9cf), and the curve was not re-run. The three lags
-#: `CERTIFIED` also carries show how far it has moved: lag 1 reads 0.0486
-#: there against 0.0477 here, lag 5 0.0237 against 0.0188, and lag 20 0.0085
-#: against 0.0017. All three are still below real. Re-run
-#: `programme/scripts/decay-curve.py` on the shipped preset before quoting
-#: any other lag, the slope or the lag the memory is valid to.
+#: RE-MEASURED 2026-09-24 on the fifth composition of pt-v19, the vector that
+#: ships (engine `ed15e73`, known-answer digest `1e683b96`), at thirty seeds
+#: on the protocol `CERTIFIED` is measured on: the roster HELD at
+#: `Universe.random(40, seed=111)`, seeds 101 to 130, 252 days, each lag the
+#: median across names and then across seeds. The run is the design
+#: repository's fleet run `docs080`, whose `decay.py` ships inside the run's
+#: `scripts-as-run.tgz`. The script this comment used to name,
+#: `programme/scripts/decay-curve.py`, is in no commit of the design
+#: repository. Lags 1, 5 and 20 ARE `CERTIFIED`'s `abs_return_acf1`,
+#: `abs_return_acf5` and `abs_return_acf20`, the same per-name estimator on
+#: the same bars, and the run reproduces all three to four places. Seeds 101
+#: and 117 re-run on this build reproduce the run's per-seed curves to the
+#: bit.
 #:
-#: What follows describes the 2026-09-14 vector.
-#: The model reads BELOW real at every measured lag, from 0.0477 against
-#: 0.1071 at lag one. It is positive and resolved out to lag 12, it is not
-#: distinguishable from zero at lags 20 and 30, and it is negative at about
-#: two and a half standard errors by lag 45, where real markets stay weakly
-#: positive out to lag 60.
+#: The model reads BELOW real at every measured lag, from 0.0486 against
+#: 0.1071 at lag one, and about half of real through lag 8. It is positive
+#: and resolved out to lag 20 (+0.0085 against a thirty-seed bootstrap
+#: standard error of 0.0042, positive on 21 of 30 seeds), it is not
+#: distinguishable from zero at lag 30 (+0.0033 +/- 0.0047), and its point
+#: estimates at lags 45 and 60 are negative, at about 1.3 standard errors
+#: each, where real markets stay weakly positive out to lag 60.
 #:
-#: MEASURED 2026-09-14 on pt-v19, at thirty seeds on the protocol `CERTIFIED`
-#: is measured on -- the roster HELD at `Universe.random(40, seed=111)`,
-#: seeds 101 to 130, 252 days -- by `programme/scripts/decay-curve.py` in the
-#: design repository. Lags 1, 5 and 20 ARE `CERTIFIED`'s `abs_return_acf1`,
-#: `abs_return_acf5` and `abs_return_acf20`: the same per-name estimator on
-#: the same bars, so on the vector both were measured on the two tables
-#: agreed, and the measured residual between them was 0.0e+00 at all three
-#: lags. They disagree now because `CERTIFIED` was re-measured on the fifth
-#: composition and this table was not.
+#: The table read the 2026-09-14 vector's curve until this re-measurement:
+#: 0.0477, 0.0298, 0.0293, 0.0188, 0.0197, 0.0155, 0.0017, -0.0009, -0.0076
+#: and -0.0059, resolved to lag 12 only and negative at about two and a half
+#: standard errors by lag 45. pt-v19 was recomposed four times after that
+#: vector, most recently on 2026-09-23 (4d8f9cf), and the curve was not
+#: re-run until 2026-09-24, so 0.8.0 shipped the 2026-09-14 curve with a
+#: note saying it had not been re-measured. Lags 1, 5 and 20 of each curve
+#: agreed with `CERTIFIED` on the vector it was measured on.
 #:
 #: REPLACED, NOT UPDATED, 2026-09-14, and the distinction is the finding.
 #: This table read 0.1413, 0.1063, 0.0897, 0.0496, 0.0371, 0.0173, 0.0082,
@@ -698,32 +702,38 @@ MEASURED_504: dict[str, float | None] = {
 #: `dict[int, float]`. It is written one lag per line so that a fifth entry
 #: in that tool's `TABLES` reaches it. See `stale-constants.md` section 6.
 DECAY_252: dict[int, float] = {
-    1: 0.0477,
-    2: 0.0298,
-    3: 0.0293,
-    5: 0.0188,
-    8: 0.0197,
-    12: 0.0155,
-    20: 0.0017,
-    30: -0.0009,
-    45: -0.0076,
-    60: -0.0059,
+    1: 0.0486,
+    2: 0.0336,
+    3: 0.0359,
+    5: 0.0237,
+    8: 0.0208,
+    12: 0.0185,
+    20: 0.0085,
+    30: 0.0033,
+    45: -0.0074,
+    60: -0.0044,
 }
 REAL_DECAY: dict[int, float] = {
     1: 0.1071, 5: 0.0518, 8: 0.0453, 12: 0.0295, 20: 0.0286,
     30: 0.0179, 60: 0.0054,
 }
 #: Log-log slope over lags 1, 2, 3, 5, 8, 12 and 20 of `DECAY_252`. Real
-#: markets decay hyperbolically and this model decays exponentially, about
-#: twice as steeply, because it is built from exponentials. No parameter
-#: setting turns one slope into the other.
+#: markets decay hyperbolically, and this model is built from exponentials.
 #:
-#: READ THE ERROR BAR, which this constant did not carry until 2026-09-14.
-#: On thirty seeds the fit is -0.859 with a bootstrap standard error of
-#: 0.199, and on 28 per cent of resamples of those same seeds some lag inside
-#: the fit range is non-positive and the log-log slope DOES NOT EXIST. So
-#: three decimals overstate what the estimator can deliver, and the ratio
-#: against real markets is 1.97x with 2.2x well inside its own error.
+#: -0.515 on the fifth composition of pt-v19 (2026-09-24, the run named
+#: above), with a bootstrap standard error of 0.109 over the thirty seeds.
+#: On 1.2 per cent of resamples some lag inside the fit range is
+#: non-positive and the slope does not exist. Real markets read -0.436,
+#: which is 0.079 away and inside one standard error, so over lags 1 to 20
+#: the slope no longer tells this model from a real market. The LEVEL still
+#: does, because the curve sits below real at every lag, and so does the
+#: tail past lag 20. The same run refits pt-v18 at -0.648 +/- 0.139, which
+#: reproduces the -0.6476 below.
+#:
+#: This constant read -0.859 from 2026-09-14 until 2026-09-24, fitted on the
+#: 2026-09-14 vector's curve, with a bootstrap standard error of 0.199, no
+#: slope on 28 per cent of resamples, and a ratio to real of 1.97x. 0.8.0
+#: shipped that figure, labelled as the 2026-09-14 vector's.
 #:
 #: The value read -0.953 while `DECAY_252` was pt-v14's. Refitting the new
 #: curve moved it by less than one standard error, which is the honest
@@ -733,23 +743,23 @@ REAL_DECAY: dict[int, float] = {
 #: refit to -0.7368 (pt-v14), -1.4832 (pt-v16) and -0.6476 (pt-v18), so the
 #: quantity is not monotone across defaults and pt-v16's is undefined on
 #: half its own resamples.
-DECAY_SLOPE = -0.859
+DECAY_SLOPE = -0.515
 REAL_DECAY_SLOPE = -0.436
 
-#: The lag beyond which the model's volatility memory is not merely weak but
-#: wrong in sign. A strategy reading volatility over a window longer than
-#: this is reading a process that anti-predicts where the market persists.
+#: The last lag at which the model's volatility memory is resolved as
+#: positive. Beyond it the memory is indistinguishable from zero and then
+#: reads negative, so a strategy reading volatility over a longer window is
+#: reading a process that stops predicting where the market persists.
 #:
-#: 12 since 2026-09-14, and it read 20 from pt-v14's curve, where lag twenty
-#: stood at +0.0082. NOT RE-MEASURED on the fifth composition, where lag
-#: twenty reads +0.0085 in `CERTIFIED` and is positive on 21 of 30 seeds;
-#: the reasoning that follows is the 2026-09-14 vector's. On that vector
-#: lag twenty read +0.0017 against a thirty-seed
-#: bootstrap standard error of 0.0050, so the sign the constant turns on is
-#: not resolved there. The last lag positive by more than one standard error
-#: is 12, at +0.0155 +/- 0.0041. The change tightens what this module
-#: forbids rather than loosening it.
-MEMORY_VALID_TO_LAG = 12
+#: 20 since 2026-09-24, on the fifth composition's curve above: lag 20 reads
+#: +0.0085 +/- 0.0042 and is positive on 21 of 30 seeds, and lag 30 reads
+#: +0.0033 +/- 0.0047, which settles nothing. It read 12 from 2026-09-14 on
+#: the previous vector, where lag 20 stood at +0.0017 against a standard
+#: error of 0.0050 and the last lag positive by more than one standard error
+#: was 12 (+0.0155 +/- 0.0041), and 20 before that from pt-v14's curve,
+#: where lag 20 stood at +0.0082. The move back to 20 loosens what this
+#: module forbids, because the curve under it moved.
+MEMORY_VALID_TO_LAG = 20
 
 
 @dataclass(frozen=True)
@@ -853,28 +863,26 @@ GAPS: tuple[Gap, ...] = (
             "252 days on thirty seeds. The 504-day table is measured, not "
             "certified.\n\n"
             "What remains is a SHAPE problem rather than a level one. "
-            "Measured on pt-v12, volatility itself stabilises near 32%, so "
-            "a long run does not drift or blow up, and clustering at lags "
-            "one and five stays "
-            "inside its bands. The decay curve is the defect, and the "
-            "decay-shape gap carries it: exponential memory imitating "
-            "hyperbolic memory holds up over one year and comes apart over "
-            "several.\n\n"
-            "AND THE LONGER HORIZONS ARE MEASURED NOW. This gap ended "
-            "\'nothing beyond 504 has been measured at all\' until "
-            "2026-08-27, and pt-v12 made that untrue. "
+            "Nothing runs away over ten years, and clustering at lags one "
+            "and five stays inside its bands at every horizon measured. The "
+            "decay curve is the defect, and the decay-shape gap carries it.\n\n"
+            "THE LONGER HORIZONS ARE MEASURED on pt-v19 (2026-09-24, the "
+            "design repository's fleet runs docs080 and docs080b). "
             "tools/calibration/long_horizon.py runs 756, 1260 and 2520 days "
-            "on thirty seeds, and at 2520 days pt-v12's panel holds 10 of "
-            "14 -- "
-            "against the 504-day bands, which are the wrong ruler for a "
-            "ten-year window and are quoted only because no ten-year bands "
-            "have been derived. That nothing RUNS AWAY is settled by a "
-            "second measurement needing no band at all: "
+            "on thirty seeds. At 2520 days the panel holds all thirteen "
+            "shape rows the ruled 504-day bands can grade, and 12 of 14 on "
+            "the 2015-2025 504-day bands, missing sector_excess_corr at "
+            "0.0864 and corr_persistence_acf1 at 0.6377 against a ceiling of "
+            "0.49. Both are the wrong ruler for a ten-year window and are "
+            "quoted only because no ten-year bands have been derived. "
             "tools/calibration/memory_vs_drift.py reads annualised "
-            "volatility year by year over ten years on twenty seeds, and it "
-            "gives 31.5, 35.6, 30.2, 33.5, 33.0, 33.1, 31.3, 32.4, 32.4 and "
-            "31.6 percent on pt-v12, which is flat. Neither tool has been "
-            "re-run on pt-v19. For the shipped preset's own long run, "
+            "volatility year by year over ten years on twenty seeds, and "
+            "needs no band: 22.1, 21.1, 20.6, 20.3, 21.2, 21.8, 19.4, 19.6, "
+            "18.7 and 17.8 percent, so volatility eases by about a fifth "
+            "over the decade. pt-v12 read 31.5 to 31.6 percent on the same "
+            "tool, flat, and held 10 of 14 on the decade bands at 2520 "
+            "days; this paragraph quoted those until 2026-09-24. For the "
+            "shipped preset's own long run, "
             "`preset_record()[\"long_run\"]` carries thirty 21-year "
             "histories scored against the adopted long-run criteria. So a "
             "five-year study is "
@@ -888,25 +896,31 @@ GAPS: tuple[Gap, ...] = (
     ),
     Gap(
         id="decay-shape",
-        summary="volatility memory decays exponentially, not hyperbolically",
+        summary="volatility memory is weaker than real at every lag",
         detail=(
-            f"Log-log slope over lags 1-20 is {DECAY_SLOPE} +/- 0.199 "
-            f"against real markets' {REAL_DECAY_SLOPE}, a ratio of 1.97 "
-            f"whose own error covers 2.2, and the model reads BELOW real at "
-            f"every measured lag rather than crossing below partway along. "
-            f"It is positive and resolved to lag 12, indistinguishable from "
-            f"zero at lags 20 and 30, and negative by lag 45, where real "
-            f"markets remain weakly positive to lag 60. This is a mechanism "
-            f"gap and not a calibration one: the process is built from "
-            f"exponentials, and over one year two of them fake a power law "
-            f"well enough that no panel statistic objects. A two-component "
-            f"mixture was tried and is not sufficient.\n\n"
-            f"The curve, the slope and the lags above were measured on the "
-            f"2026-09-14 pt-v19 vector and have not been re-measured on the "
-            f"fifth composition that ships. On it lags 1, 5 and 20 read "
-            f"{CERTIFIED['abs_return_acf1']}, {CERTIFIED['abs_return_acf5']} "
-            f"and {CERTIFIED['abs_return_acf20']} (CERTIFIED), still below "
-            f"real at all three.\n\n"
+            f"The model reads BELOW real markets at every measured lag, "
+            f"{DECAY_252[1]} against {REAL_DECAY[1]} at lag 1 and "
+            f"{DECAY_252[20]} against {REAL_DECAY[20]} at lag 20, about half "
+            f"of real through lag 8. It is positive and resolved to lag "
+            f"{MEMORY_VALID_TO_LAG}, indistinguishable from zero at lag 30, "
+            f"and its point estimates at lags 45 and 60 are negative, where "
+            f"real markets remain weakly positive to lag 60. The log-log "
+            f"slope over lags 1 to 20 is {DECAY_SLOPE} +/- 0.109 against "
+            f"real markets' {REAL_DECAY_SLOPE}, inside one standard error, "
+            f"so on this preset the slope no longer separates the model from "
+            f"a real market and the level does. Measured 2026-09-24 on the "
+            f"fifth composition of pt-v19, thirty seeds on the certified "
+            f"protocol (envelope.DECAY_252).\n\n"
+            f"This is a mechanism gap and not a calibration one: the process "
+            f"is built from exponentials, and over one year two of them fake "
+            f"a power law well enough that no panel statistic objects. Past "
+            f"lag 20 a sum of exponentials dies out where a power law "
+            f"persists, which is the tail above. A two-component mixture was "
+            f"tried and is not sufficient.\n\n"
+            f"UPDATED 2026-09-24. This gap read 'log-log slope -0.859 +/- "
+            f"0.199, a ratio of 1.97', resolved to lag 12 and negative by lag "
+            f"45, which was the 2026-09-14 vector's curve and was published "
+            f"through 0.8.0 as not re-measured on the fifth composition.\n\n"
             f"CORRECTED 2026-09-14. This paragraph read 'about 2.2x steeper, "
             f"and the curve turns NEGATIVE by lag 30'. Both described "
             f"pt-v14's curve, which DECAY_252 carried across three defaults; "
@@ -918,7 +932,8 @@ GAPS: tuple[Gap, ...] = (
             f"much short memory decaying too fast, and this default has too "
             f"little memory at every lag, with abs_return_acf1 passing its "
             f"band low rather than high.\n\n"
-            f"SHARPENED 2026-08-26. The model already HAS two timescales, "
+            f"SHARPENED 2026-08-26, on pt-v12. The model already HAS two "
+            f"timescales, "
             f"which had not been established. De-trending |r| by a centred "
             f"252-day rolling mean over 2520 days on twenty seeds and "
             f"re-measuring: 86% of the lag-1 autocorrelation survives, 77% "
@@ -934,6 +949,12 @@ GAPS: tuple[Gap, ...] = (
             f"an artefact of a short estimator. Strip the slow level and the "
             f"slope returns to -0.867. The long horizon adds regime "
             f"variation on top of the defect rather than curing it.\n\n"
+            f"On pt-v19 the same tool (2026-09-24) keeps 61% of lag 1, 52% "
+            f"of lag 5 and 28% of lag 20, and annualised volatility eases "
+            f"from 22.1% in year one to 17.8% in year ten, so part of the "
+            f"slow component is now a downward drift in level. The raw slope "
+            f"at 2520 days reads -0.163 and the de-trended one -0.338, both "
+            f"flatter than real's {REAL_DECAY_SLOPE}.\n\n"
             f"So the target is specific now: not 'add long memory', which is "
             f"already present and already does its job at lag 20, but make "
             f"the FAST component decay hyperbolically rather than "
@@ -947,13 +968,15 @@ GAPS: tuple[Gap, ...] = (
             f"have BOTH short-lag clustering, `abs_return_acf1` between 0.02 "
             f"and 0.22, and weakly positive autocorrelation out to lag 60. "
             f"The slope is a ratio of shape to level and can be improved by "
-            f"destroying the level.\n\n"
+            f"destroying the level. pt-v19 is that case: its slope sits "
+            f"inside real's error and its lag-1 reading is less than half of "
+            f"real's.\n\n"
             f"Score work on this gap at lag 20 and beyond WITH LAG 1 HELD, "
             f"never on the slope alone. The same run cost `excess_kurtosis` "
             f"its 504-day band on five arms of six, because a smoother "
             f"variance has thinner tails.\n\n"
             f"Read the scope of that claim precisely. It says no setting of "
-            f"THIS model's parameters turns one slope into the other, "
+            f"THIS model's parameters turns its memory into a power law's, "
             f"because a sum of exponentials is not a power law. It does not "
             f"say the problem is beyond the project: the volume-change gap "
             f"carried the stronger claim, that its row was structurally "
@@ -962,17 +985,23 @@ GAPS: tuple[Gap, ...] = (
         ),
         forbids=(
             f"strategies whose edge depends on volatility memory beyond "
-            f"about lag {MEMORY_VALID_TO_LAG} -- vol targeting and risk "
-            f"parity on a one-month or longer estimate"
+            f"about lag {MEMORY_VALID_TO_LAG}, such as vol targeting and "
+            f"risk parity on a one-month or longer estimate"
         ),
         statistics=("abs_return_acf20",),
     ),
     Gap(
         id="scenario-magnitude",
-        summary="a scenario's size is right on average and unreliable in one run",
+        summary="a driven scenario moves prices at about a fifth of the real size",
         detail=(
-            "The expected size of a scenario\'s response is calibrated; "
-            "the dispersion around it is not. That is the gap now.\n\n"
+            "On pt-v19 a driven scenario moves prices in the direction "
+            "theory fixes and at about a fifth of the size real markets "
+            "showed, and the spread of daily returns around that response is "
+            "close to real. That is the gap now. Until 2026-09-24 it read "
+            "the other way round, that the expected size of a scenario\'s "
+            "response is calibrated and the dispersion around it is not. "
+            "That was pt-v10\'s and pt-v12\'s reading, and the driven "
+            "window below contradicts it on pt-v18 and pt-v19.\n\n"
             "The steady-state lever -- how much more violent a sustained "
             "crisis is than a calm market -- reads 5.22x on pt-v19 against "
             "real markets\' 6.16x, measured from a held VIX 5 to a held VIX "
@@ -1003,50 +1032,55 @@ GAPS: tuple[Gap, ...] = (
             "2026-09-14: this paragraph read 5.28x and '14.3 per cent BELOW "
             "real', measured on pt-v18 plus four dials with sector_loading "
             "0.8 in the ptv19panel run, which never shipped.\n\n"
-            "'Direction is right' is measured rather than asserted. Driving "
-            "the real 2020-21 macro path through the model and correlating "
-            "daily returns against each driver, over 504 sessions, against "
-            "the same correlations computed on real AAPL over the same "
-            "window:\n"
-            "  return vs change in VIX             -0.423 (real -0.622)\n"
-            "  return vs change in credit yield    -0.496 (real -0.592)\n"
-            "  return vs change in valuation       +0.573 (real +0.803)\n"
-            "  absolute return vs VIX level        +0.512 (real +0.489)\n\n"
-            "All four carry the sign theory fixes in advance, and the "
-            "volatility-clustering channel is close to exact.\n\n"
-            "This gap used to read those three directional correlations as "
-            "response SIZES, and said the model ran at seventy to eighty-five "
-            "percent of the real response. That is withdrawn (§81). A "
-            "correlation is beta * sd(driver) / sd(return), which is signal "
-            "share rather than gain, and measured as gains the three "
-            "channels are right: OLS slope of daily return on each driver "
-            "over the same 504 sessions gives -0.00461 against real AAPL's "
-            "-0.00500 for the VIX, -8.106 against -7.445 for the credit "
-            "yield, and +1.226 against +1.272 for valuation, all within ten "
-            "percent, with real AAPL inside the model\'s six-seed range on "
-            "every channel.\n\n"
-            "The denominator is the defect, and it keeps this a gap now "
-            "that the lever has arrived. Over the driven window the "
-            "model\'s residual sd is 1.565x real on pt-v12, down from 1.76x "
-            "at pt-v10 and barely moved from 1.555x at pt-v11. That is the "
-            "worst axis in the model. So the expected response to a scenario "
-            "is calibrated and the dispersion around it is too wide: one run "
-            "understates how much of its own move was the scenario. The "
-            "daily-return-sd pair behind the pt-v10 ratio, 0.0355 against "
-            "real AAPL\'s 0.0236, has not been re-measured since, so it is "
-            "quoted with its era rather than as a current reading.\n\n"
+            "The driven window is measured rather than asserted. It drives "
+            "the real 2020-21 macro path (the VIX, the policy rate, the "
+            "credit yield and the valuation proxy of "
+            "examples/09-a-pandemic-shaped-market.ipynb) through a roster "
+            "of a simulated AAPL on its FY2019 accounts and 39 generated "
+            "names, and compares the simulated AAPL\'s 504 daily returns "
+            "with real AAPL\'s over the same window. Measured 2026-09-24 on "
+            "pt-v19, the median of seven seeds (2020 and 101 to 106):\n"
+            "  OLS slope of return on the driver's daily change\n"
+            "    VIX                          -0.00083 (real -0.00500)\n"
+            "    credit yield                 -1.565   (real -7.445)\n"
+            "    valuation proxy              +0.159   (real +1.272)\n"
+            "  correlation with the driver's daily change\n"
+            "    VIX                          -0.092   (real -0.622)\n"
+            "    credit yield                 -0.127   (real -0.592)\n"
+            "    valuation proxy              +0.088   (real +0.803)\n"
+            "  absolute return vs VIX level   +0.332   (real +0.489)\n\n"
+            "Every slope carries the sign theory fixes on all seven seeds, "
+            "and the gains are 0.17, 0.21 and 0.13 of real. pt-v18 reads "
+            "0.14, 0.23 and 0.14 on the same seeds. The valuation input "
+            "moves nothing on pt-v16 and later, because qe_pe_gain is 0.0 "
+            "there, so its slope reads what the other drivers did on the "
+            "same days. The simulated AAPL\'s daily return sd is 1.10x real "
+            "AAPL\'s (0.98 to 1.25 across the seeds; pt-v18 1.15x), so the "
+            "spread is close to real and the response inside it is small.\n\n"
+            "WHAT THIS GAP SAID BEFORE, with its presets. The correlations "
+            "read -0.423, -0.496, +0.573 and +0.512 on pt-v3 (2026-08-25). "
+            "Read as gains, OLS slopes on pt-v10 were -0.00461, -8.106 and "
+            "+1.226, all within ten percent of real AAPL (§81), and the "
+            "residual sd was 1.76x real on pt-v10 and 1.565x on pt-v12, "
+            "which is where 'size right on average, unreliable in one run' "
+            "came from. The same script reproduces pt-v12 today: gains of "
+            "-0.00520, -8.194 and +1.192 and an sd ratio of 1.573. So the "
+            "method is the one this gap quoted, and the change is in the "
+            "model.\n\n"
             "An event study over the five sessions after each of six dated "
-            "2020-21 events agrees on sign TWO times out of six. This "
-            "paragraph said five of six until 2026-08-27; the notebook it "
-            "cites prints 2/6. The Fed\'s intermeeting cut of 3 March "
-            "2020 goes the wrong way, +9.9% against AAPL\'s -1.4%, because "
-            "an announcement-effect channel is absent rather than "
-            "miscalibrated; the VIX record close of 16 March misses by "
-            "declining to move, +0.3% against -7.4%; and the vaccine result "
-            "and Omicron are single-name Apple news, which a run driven only "
-            "by a macro path cannot know. The two that agree are the two the "
-            "macro path carries. See "
-            "examples/09-a-pandemic-shaped-market.ipynb.\n\n"
+            "2020-21 events agrees on sign three times out of six on pt-v19 "
+            "at seed 2020, and twice on pt-v12, which is what the notebook "
+            "prints for the preset it pins. This paragraph said five of six "
+            "until 2026-08-27 and two of six until 2026-09-24. The Fed\'s "
+            "intermeeting cut of 3 March 2020 goes the wrong way, +15.2% on "
+            "pt-v19 against AAPL\'s -1.4%, because an announcement-effect "
+            "channel is absent rather than miscalibrated. The VIX record "
+            "close of 16 March misses, +8.6% against -7.4%. The vaccine "
+            "result and Omicron are single-name Apple news, which a run "
+            "driven only by a macro path cannot know, so Omicron\'s "
+            "agreement on pt-v19 (+0.7% against +3.2%) is chance. The two "
+            "that agree on both presets are the two the macro path "
+            "carries.\n\n"
             "Sector structure was the same shortfall measured a second "
             "way, and whether it is closed now turns on the BAND BASIS "
             "rather than on the model. In calm markets the shipped preset "
@@ -1076,9 +1110,9 @@ GAPS: tuple[Gap, ...] = (
             "about a third as tightly as real ones' until 2026-08-26, "
             "measured at +0.035 on pt-v10 and +0.064 on pt-v7. pt-v11's "
             "crisis work closed it and pt-v12 carries that, so the claim "
-            "is WITHDRAWN. The crisis shape is right; what remains in "
-            "this gap is the dispersion above, which is about sizing a "
-            "scenario rather than about structure."
+            "is WITHDRAWN. The crisis shape is right. What remains in "
+            "this gap is the size of the driven response above, which is "
+            "about sizing a scenario rather than about structure."
         ),
         forbids="sizing a scenario's impact rather than detecting it",
     ),
@@ -1144,50 +1178,61 @@ GAPS: tuple[Gap, ...] = (
     ),
     Gap(
         id="roster-concentration",
-        summary="a concentrated roster holds at one year and comes apart at two",
+        summary="certification was measured on a sector-balanced roster only",
         detail=(
             "`Universe.random()` assigns sectors round-robin over the twelve "
             "in `sectors.SECTORS`, so a roster is as close to balanced as its "
             "size allows: the certified 40 names put four in each of four "
             "sectors and three in each of the other eight. No real index is "
-            "balanced that way -- the S&P is roughly a third technology and "
+            "balanced that way. The S&P is roughly a third technology and "
             "the Nasdaq more so.\n\n"
-            "RE-MEASURED 2026-08-26 on pt-v12: thirty seeds, the fourteen-"
-            "statistic panel, both horizons. This gap previously carried "
-            "'balanced 9, S&P-like 8, all-technology 7', counts out of the "
-            "TEN-statistic panel of the pt-v3 era at six seeds, and said so. "
-            "Superseded:\n\n"
-            "                      252d     504d   out at 504\n"
-            "  balanced           14/14    14/14   --\n"
-            "  S&P-like           14/14    13/14   annualised_vol_pct\n"
-            "  technology-heavy   14/14    11/14   vol, corr_persistence, xs_corr\n"
-            "  all-technology     13/13    10/13   vol, corr_persistence, xs_corr\n"
-            "  defensive          14/14    14/14   --\n\n"
-            "The finding has changed shape. AT THE CERTIFIED HORIZON, "
-            "concentration costs nothing: every shape tested holds the whole "
-            "panel, so the envelope transfers to a roster shaped like a real "
-            "index. This gap used to say part of the certification was an "
-            "artifact of balance; on pt-v12 at 252 days that is no longer "
-            "measurable.\n\n"
-            "What concentration costs is the SECOND year, and the mechanism "
-            "is visible rather than mysterious. Cross-sectional correlation "
-            "rises monotonically with it -- 0.3797 balanced, 0.3813 S&P-like, "
-            "0.4112 technology-heavy, 0.5316 all-technology -- which is the "
-            "model behaving CORRECTLY, since names in one industry should "
-            "move together more. It rises past the 504-day band's top of "
-            "0.41 and annualised volatility follows it out. A band derived "
-            "from broad real-market windows is the wrong ruler for a "
-            "single-sector portfolio, so part of this is a statement about "
-            "the grading rather than about the model.\n\n"
+            "RE-MEASURED 2026-09-24 on pt-v19: the certified roster "
+            "relabelled to each sector mix, thirty seeds, the fourteen shape "
+            "rows, both horizons, graded on the ruled bands `score` uses by "
+            "default (tools/calibration/roster_shapes.py; the design "
+            "repository's fleet run docs080b):\n\n"
+            "                      252d     504d   xs corr 252d / 504d\n"
+            "  balanced           14/14    13/13   0.3063 / 0.2966\n"
+            "  S&P-like           14/14    13/13   0.3085 / 0.3008\n"
+            "  technology-heavy   14/14    13/13   0.3208 / 0.3164\n"
+            "  all-technology     13/13    12/12   0.3751 / 0.3933\n"
+            "  defensive          14/14    13/13   0.3172 / 0.3212\n\n"
+            "The 504-day counts are over thirteen rows because "
+            "corr_persistence_acf1 has no ruled band there. On the "
+            "2015-2025 decade bands every shape but all-technology misses "
+            "sector_excess_corr at both horizons, as the balanced roster "
+            "does, and no other shape row.\n\n"
+            "So on pt-v19 concentration costs no graded shape row at either "
+            "horizon. Cross-sectional correlation still rises with "
+            "concentration, 0.3063 balanced to 0.3751 all-technology at 252 "
+            "days, which is the model behaving CORRECTLY, since names in one "
+            "industry should move together more, and it stays inside its "
+            "band. The gap stands for two reasons. The certification itself, "
+            "thirty seeds and two held-out axes, was run on the balanced "
+            "roster only, and the table above is one roster draw per shape. "
+            "And a band derived from broad real-market windows is the wrong "
+            "ruler for a single-sector portfolio. The level rows are left "
+            "out of the table: this tool holds one roster, and "
+            "index_drift_pct is certified on a roster that varies with the "
+            "seed (facts.LEVEL_PROTOCOL).\n\n"
+            "UPDATED 2026-09-24. This gap was headed 'a concentrated roster "
+            "holds at one year and comes apart at two', which was pt-v12's "
+            "reading of 2026-08-26 on the decade bands: 14 of 14 at 252 days "
+            "for every shape, and at 504 days 13 of 14 S&P-like, 11 of 14 "
+            "technology-heavy and 10 of 13 all-technology, as "
+            "cross-sectional correlation rose past the decade band's 0.41 "
+            "ceiling (0.5316 all-technology) and annualised volatility "
+            "followed it out. Before that it carried 'balanced 9, S&P-like "
+            "8, all-technology 7', counts out of the ten-statistic panel of "
+            "the pt-v3 era at six seeds.\n\n"
             "`sector_excess_corr` is UNDEFINED on an all-technology roster "
             "rather than out of band: it asks how much a name moves with its "
             "own industry beyond the market, and with one sector those are "
-            "the same thing. Hence 13 rather than 14 in that row. Measured by "
-            "`tools/calibration/roster_shapes.py`."
+            "the same thing. Hence 13 rather than 14 in that row."
         ),
         forbids=(
-            "inheriting this envelope for a sector-concentrated roster BEYOND "
-            "one year -- at the certified horizon it now transfers"
+            "citing the certification for a sector-concentrated roster "
+            "without measuring that roster"
         ),
         statistics=("cross_sectional_corr", "annualised_vol_pct",
                     "corr_persistence_acf1"),
@@ -1424,29 +1469,58 @@ def check(
         # name rather than by a
         # `KeyError` or a `TypeError` two frames down, and the denominator
         # is the rows tested, so "all fourteen" stays a count of fourteen.
+        #
+        # AND ON THE DEFAULT BASIS FIRST, since 2026-09-24. This sentence
+        # graded on `BANDS_504` alone, the 2015-2025 decade table, while
+        # `score` and `certified()` grade on `DEFAULT_BAND_BASIS` and the
+        # horizon gap's own detail quoted the ruled count. It reports the
+        # shape rows on the default basis, names the rows that basis cannot
+        # read, and then gives the decade table's count beside it.
+        ruled = score({k: v for k, v in MEASURED_504.items()
+                       if v is not None and k in _facts.SHAPE},
+                      horizon_days=504)
+        rows = ruled["statistics"]
+        graded = [k for k in rows if rows[k]["in_band"] is not None]
+        missed = [k for k in graded if not rows[k]["in_band"]]
+        held_ruled = (
+            f"holds all {len(graded)} shape rows the {DEFAULT_BAND_BASIS} "
+            f"bands can grade ({ruled['ruler']})"
+            if not missed else
+            f"holds {len(graded) - len(missed)} of {len(graded)} shape rows "
+            f"on the {DEFAULT_BAND_BASIS} bands ({ruled['ruler']}), out on "
+            + ", ".join(f"{k} at {rows[k]['measured']:.4f} against "
+                        f"{rows[k]['band']}" for k in missed))
+        if ruled["unreadable"]:
+            held_ruled += (f"; {', '.join(ruled['unreadable'])} has no band "
+                           f"there")
         graded504 = {k: v for k, v in MEASURED_504.items()
                      if v is not None and k in BANDS_504}
         out = [k for k, v in graded504.items()
                if not (BANDS_504[k][0] <= v <= BANDS_504[k][1])]
-        held = (f"holds all {len(graded504)} against the 2015-2025 "
-                f"horizon-matched bands"
+        held = (f"holds all {len(graded504)}"
                 if not out else
-                f"holds {len(graded504) - len(out)} of {len(graded504)} "
-                f"against the 2015-2025 horizon-matched bands, missing "
+                f"holds {len(graded504) - len(out)} of {len(graded504)}, "
+                f"missing "
                 + ", ".join(f"{k} at {MEASURED_504[k]:.4f} against "
                             f"{BANDS_504[k]}" for k in out))
+        roomy = [k for k in graded if rows[k]["room_sd"] is not None]
+        near = min(roomy, key=lambda k: rows[k]["room_sd"]) if roomy else None
+        nearest = ("" if near is None else
+                   f" The row nearest an edge of its {DEFAULT_BAND_BASIS} "
+                   f"band is {near} at {rows[near]['measured']:.4f} against "
+                   f"{rows[near]['band']}, {rows[near]['room_sd']:.2f} "
+                   f"seed-sd inside.")
         fire(g, (
             f"horizon {horizon_days}d exceeds the certified "
-            f"{CERTIFIED_HORIZON_DAYS}d. At 504 days the model {held}. The "
-            f"thin one is annualised_vol_pct at "
-            f"{MEASURED_504['annualised_vol_pct']:.2f} against "
-            f"{BANDS_504['annualised_vol_pct']}. Beyond 504 days the panel "
-            f"is measured but has no ruler of its own: at 2520 days pt-v12 "
-            f"held 10 of 14 against the 504-day bands "
-            f"(tools/calibration/long_horizon.py), and its annualised "
-            f"volatility was flat year by year across those ten years "
-            f"(tools/calibration/memory_vs_drift.py); neither has been "
-            f"re-run on the shipped preset. No bands have been "
+            f"{CERTIFIED_HORIZON_DAYS}d. At 504 days the model "
+            f"{held_ruled}. On the 2015-2025 decade bands (BANDS_504) it "
+            f"{held}.{nearest} Beyond 504 days the panel is measured but "
+            f"has no ruler of its own: at 2520 days pt-v19 holds all "
+            f"thirteen shape rows the ruled 504-day bands can grade and 12 "
+            f"of 14 on the decade bands (tools/calibration/long_horizon.py, "
+            f"2026-09-24), and its annualised volatility eases from 22.1% "
+            f"in year one to 17.8% in year ten "
+            f"(tools/calibration/memory_vs_drift.py). No bands have been "
             f"derived at a five-year window, so the certification "
             f"stops here"
         ))
@@ -1457,14 +1531,24 @@ def check(
             # wrong for the 7.75 pt-v12 reads there: the room halved and the
             # sentence did not move. Computed since, so none of pt-v14,
             # pt-v16, pt-v18 and pt-v19 moving it needed an edit here.
+            #
+            # And the conclusion is computed too, since 2026-09-24. It read
+            # "so a tail study at this horizon is reading the low edge of
+            # the band" at every room, which was pt-v10's 0.3 seed-sd and
+            # was still printed at pt-v19's 6.34. The decade band is the
+            # one quoted because the ruled band's floor, -9.3, is below the
+            # statistic's theoretical minimum of -2 and grades nothing.
             room_sd = ((MEASURED_504["excess_kurtosis"]
                         - BANDS_504["excess_kurtosis"][0])
                        / SEED_SD_504["excess_kurtosis"])
+            edge = ("so a tail study at this horizon is reading the low "
+                    "edge of the band" if room_sd < 2.0 else
+                    "which is well clear of it")
             warnings.append(
                 f"excess_kurtosis reads {MEASURED_504['excess_kurtosis']:.2f} "
-                f"at 504 days against {BANDS_504['excess_kurtosis']}: inside "
-                f"it, but {room_sd:.2f} seed-sd above the floor, so a tail "
-                f"study at this horizon is reading the low edge of the band"
+                f"at 504 days against the 2015-2025 band "
+                f"{BANDS_504['excess_kurtosis']}: inside it, "
+                f"{room_sd:.2f} seed-sd above the floor, {edge}"
             )
 
     for name in wanted:
@@ -1477,13 +1561,17 @@ def check(
             g = by_id["decay-shape"]
             fire(g, (
                 f"abs_return_acf20 depends on the decay shape, which is a "
-                f"mechanism gap: log-log slope {DECAY_SLOPE} against real "
-                f"markets' {REAL_DECAY_SLOPE}, and the curve reads below "
-                f"real at every lag, is indistinguishable from zero by lag "
-                f"{MEMORY_VALID_TO_LAG + 8} and is negative by lag 45, "
-                f"where real markets stay positive to lag 60. The curve and "
-                f"slope were measured on the 2026-09-14 pt-v19 vector and "
-                f"have not been re-measured on the fifth composition"
+                f"mechanism gap: the |return| autocorrelation reads below "
+                f"real markets' at every lag ({DECAY_252[1]} against "
+                f"{REAL_DECAY[1]} at lag 1, {DECAY_252[20]} against "
+                f"{REAL_DECAY[20]} at lag 20), is resolved as positive only "
+                f"to lag {MEMORY_VALID_TO_LAG}, is indistinguishable from "
+                f"zero at lag 30 and reads negative at lags 45 and 60, "
+                f"where real markets stay positive to lag 60. The log-log "
+                f"slope over lags 1 to 20, {DECAY_SLOPE} against real "
+                f"markets' {REAL_DECAY_SLOPE}, is inside its own error, so "
+                f"the level is the defect. Measured on the shipped pt-v19 "
+                f"(envelope.DECAY_252)"
             ))
         elif name not in CERTIFIED:
             # A level or crisis row. The verdict is COMPUTED, for the reason
@@ -1528,40 +1616,39 @@ def check(
         g = by_id["roster-concentration"]
         fire(g, (
             "the roster is sector-concentrated, and certification was "
-            "measured on a sector-balanced one. Re-measured on pt-v12 over "
-            "thirty seeds and the fourteen-statistic panel "
-            "(tools/calibration/roster_shapes.py): at the certified horizon "
-            "that costs nothing any more -- balanced, S&P-like, "
-            "technology-heavy and defensive rosters all hold 14 of 14 at 252 "
-            "days, and an all-technology roster holds the 13 that are "
-            "defined on it, sector_excess_corr having no meaning with one "
-            "sector. What concentration costs is the SECOND year: 13 of 14 "
-            "S&P-like, 11 of 14 technology-heavy and 10 of 13 "
-            "all-technology at 504 days, as cross-sectional correlation "
-            "rises past a band derived from broad-market windows. So this "
-            "refusal is about the two-year panel and about grading your "
+            "measured on a sector-balanced one. Measured on pt-v19 over "
+            "thirty seeds and the fourteen shape rows on the ruled bands "
+            "(tools/calibration/roster_shapes.py, 2026-09-24), balanced, "
+            "S&P-like, technology-heavy and defensive rosters hold every "
+            "shape row the bands can grade at 252 and 504 days, and an "
+            "all-technology roster holds the ones defined on it, "
+            "sector_excess_corr having no meaning with one sector. "
+            "Cross-sectional correlation rises with concentration, 0.31 "
+            "balanced to 0.38 all-technology at 252 days, and stays in band. "
+            "That is one roster draw per shape, and the bands come from "
+            "broad-market windows, so this refusal is about grading your "
             "roster with the right ruler: re-measure on your own universe"
         ))
 
     if scenario_magnitude:
         g = by_id["scenario-magnitude"]
         fire(g, (
-            "the result depends on the SIZE of a scenario's response. Its "
-            "EXPECTED size is calibrated: measured as a regression gain "
-            "rather than a correlation, the three driver channels run within "
-            "ten percent of real AAPL (§81), and the steady-state volatility "
-            "lever from VIX 5 to VIX 65 reads 5.22x on the shipped pt-v19 "
-            "against real markets' 6.16x, where pt-v18 read 7.06x. So a "
-            "crisis held at a fixed fear level is about 15 per cent milder "
-            "here than in a real market. That figure read 2.07x here until "
-            "2026-09-23, measured on the 2026-09-14 vector and never "
-            "updated as the preset was recomposed. What is "
-            "not calibrated is the DISPERSION around that response: over the "
-            "driven 2020-21 window the model's residual sd was 1.565x real "
-            "on pt-v12, down from 1.76x at pt-v10 and the worst axis in the "
-            "model then, so one run understates how much of its own move was the "
-            "scenario. Use a scenario to ask WHETHER a strategy breaks, and "
-            "read the size as a distribution over seeds"
+            "the result depends on the SIZE of a scenario's response. On "
+            "the shipped pt-v19 a driven scenario moves prices in the right "
+            "direction at about a fifth of the real size: driving the real "
+            "2020-21 macro path through the model, the regression gain of a "
+            "simulated AAPL's daily return on the VIX, the credit yield and "
+            "the valuation proxy is 0.17, 0.21 and 0.13 of real AAPL's "
+            "(median of seven seeds, 2026-09-24), while its daily return sd "
+            "is 1.10x real. pt-v18 reads about the same, and pt-v10 and "
+            "pt-v12 read within ten percent of real on all three, which is "
+            "what this reason said until 2026-09-24. The steady-state "
+            "volatility lever from VIX 5 to VIX 65 reads 5.22x against real "
+            "markets' 6.16x, where pt-v18 read 7.06x, so a crisis held at a "
+            "fixed fear level is about 15 per cent milder here than in a "
+            "real market. Use a scenario to ask WHETHER a strategy breaks, "
+            "and read the size as a distribution over seeds that sits below "
+            "a real market's"
         ))
 
     if macro_regime:

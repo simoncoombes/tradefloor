@@ -2539,7 +2539,10 @@ impl PyEngine {
     /// epicentre, or `None` when no episode is running -- so a caller can
     /// tell "no crisis" from "a crisis nobody is at the centre of", which
     /// the tick deliberately cannot. Always `(False, 0, None)` while
-    /// `crisis_epicentre_extra` is 0.0, which is every shipped preset.
+    /// `crisis_epicentre_extra` is 0.0, which is every preset before pt-v19.
+    /// pt-v19 ships `crisis_epicentre_extra` at 1.93, so on the default an
+    /// episode starts at the first session above the crisis threshold. This
+    /// read "every shipped preset" until 2026-09-24.
     #[getter]
     fn crisis_episode(&self) -> (bool, i64, Option<&'static str>) {
         self.inner.crisis_episode()

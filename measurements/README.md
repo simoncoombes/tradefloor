@@ -13,6 +13,6 @@ a table without its measurement is an assertion.
 | `real-panel.json` | Realism panels for the reference agents, with band verdicts | The envelope's per-statistic intervals |
 | `roster.json` | The same panel measured on a balanced roster and a concentrated one | The `roster-concentration` gap, since certification was measured on a sector-balanced roster and no real index is one |
 
-The citable artifact is `docs/envelope.json`, generated from
-`pretium.envelope.certified()` and guarded by a test against drifting from
-the module. These are the workings behind it.
+The citable artifact is `docs/envelope.json` in the `tradefloor-docs`
+repository, generated from `tradefloor.envelope.certified()`. These are the
+workings behind it.

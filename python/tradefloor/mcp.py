@@ -1448,7 +1448,8 @@ def explain_price_move(
         "rows": rows,
         "factors": list(tf.Engine.FACTORS),
         "reading_note": (
-            "The nine factors SUM to `total_log_move`. Each row carries "
+            f"The {len(tf.Engine.FACTORS)} factors in `factors` SUM to "
+            "`total_log_move`. Each row carries "
             "its own `residual` -- the measured disagreement in the figures "
             "as returned, so the claim is checkable rather than asserted. "
             "Contributions accumulate per day and reset at market open, so "

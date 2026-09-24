@@ -5,7 +5,7 @@ One command:
     .venv/bin/python tools/remeasure/remeasure.py
 
 runs every measurement group in tools/remeasure/measures.py against the
-installed `pretium` package, joins the results to the claim inventory in
+installed `tradefloor` package, joins the results to the claim inventory in
 tools/remeasure/inventory.json, and writes
 
     tools/remeasure/out/figures.json     machine-readable results
@@ -161,7 +161,7 @@ def write_report(rows: list[dict], meta: dict, path: Path) -> None:
     lines = [
         "# Published-figure re-measurement",
         "",
-        f"Commit `{meta['commit']}`, {meta['date']}, pretium {meta['pretium_version']}. "
+        f"Commit `{meta['commit']}`, {meta['date']}, tradefloor {meta['pretium_version']}. "
         f"{_scope_line(meta)}",
         "",
         "| status | figures |",

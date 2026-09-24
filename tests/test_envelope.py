@@ -7,7 +7,7 @@ import pytest
 
 import tradefloor
 from tradefloor import envelope as env
-from tradefloor.facts import REAL_MARKETS, band_distance
+from tradefloor.facts import REAL_MARKETS, SHAPE, band_distance
 
 
 def test_the_envelope_describes_the_preset_that_actually_ships():
@@ -149,7 +149,8 @@ def test_a_multi_year_question_is_outside_and_says_which_measurement():
 
 def test_long_memory_is_outside_even_within_the_certified_horizon():
     """The decay-shape gap is not a horizon gap: it applies at 252 days too,
-    because the curve is already negative by lag 30 there."""
+    because the memory it measures is below real at every lag there and
+    indistinguishable from zero by lag 30."""
     v = env.check(horizon_days=252, statistics=["abs_return_acf20"])
     assert not v.inside
     assert any(g.id == "decay-shape" for g in v.gaps)
@@ -211,7 +212,13 @@ def test_the_volume_change_row_is_now_inside_at_both_horizons():
     computed = {k for k, v in env.MEASURED_504.items()
                 if v is not None and k in env.BANDS_504
                 and not (env.BANDS_504[k][0] <= v <= env.BANDS_504[k][1])}
-    segment = reason.split("missing ", 1)[1].split(". The thin one")[0] if computed else ""
+    # The decade table's sentence, since 2026-09-24: `check` reports the
+    # default basis first and the decade table after it, and the sentence
+    # after that names the row nearest its edge, which is inside its band
+    # by construction and must not be read as a miss.
+    decade = reason.split("On the 2015-2025 decade bands", 1)[1]
+    decade = decade.split(". The row nearest", 1)[0]
+    segment = decade.split("missing ", 1)[1] if computed else ""
     named = {k: float(v)
              for k, v in re.findall(r"(\w+) at (-?[\d.]+) against \(", segment)}
 
@@ -228,9 +235,26 @@ def test_the_volume_change_row_is_now_inside_at_both_horizons():
     # And every row that does miss is named, so the sentence cannot go stale
     # in the other direction either.
     assert set(named) == computed, (set(named), computed)
+    # The same two properties on the default basis, which the sentence
+    # reports first: every shape row it names as out is out, at the value
+    # `MEASURED_504` holds, and every shape row that is out is named.
+    ruled_table = env.RULERS_BY_BASIS[env.DEFAULT_BAND_BASIS][504][0]
+    ruled_out = {k for k, v in env.MEASURED_504.items()
+                 if v is not None and k in SHAPE
+                 and ruled_table.get(k) is not None
+                 and not (ruled_table[k][0] <= v <= ruled_table[k][1])}
+    head = reason.split("On the 2015-2025 decade bands", 1)[0]
+    ruled_segment = head.split(", out on ", 1)[1] if ruled_out else ""
+    ruled_named = {k: float(v) for k, v in
+                   re.findall(r"(\w+) at (-?[\d.]+) against \(", ruled_segment)}
+    assert set(ruled_named) == ruled_out, (set(ruled_named), ruled_out)
+    for row, quoted in ruled_named.items():
+        assert quoted == pytest.approx(env.MEASURED_504[row], abs=5e-5)
+
     # This test's own subject: whichever rows miss at 504, volume_change_acf1
     # is not one of them.
     assert "volume_change_acf1" not in named
+    assert "volume_change_acf1" not in ruled_named
 
 
 def test_the_stale_sentence_assertion_actually_bites():
@@ -244,8 +268,10 @@ def test_the_stale_sentence_assertion_actually_bites():
     """
     stale = (
         "horizon 504d exceeds the certified 252d. At 504 days the model holds "
-        "13 of 14 against horizon-matched bands, missing volume_change_acf1 at "
-        "-0.2572 against (-0.29, -0.21). The thin one is annualised_vol_pct."
+        "all 13 shape rows the ruled bands can grade. On the 2015-2025 decade "
+        "bands (BANDS_504) it holds 13 of 14, missing volume_change_acf1 at "
+        "-0.2572 against (-0.29, -0.21). The row nearest an edge of its ruled "
+        "band is annualised_vol_pct."
     )
     # OVER THE ROWS THIS TABLE CAN BE GRADED BY, which is `check`'s own
     # `graded504` rule and not every key `MEASURED_504` carries. Re-pinned
@@ -257,7 +283,9 @@ def test_the_stale_sentence_assertion_actually_bites():
     computed = {k for k, v in env.MEASURED_504.items()
                 if v is not None and k in env.BANDS_504
                 and not (env.BANDS_504[k][0] <= v <= env.BANDS_504[k][1])}
-    segment = stale.split("missing ", 1)[1].split(". The thin one")[0]
+    decade = stale.split("On the 2015-2025 decade bands", 1)[1]
+    decade = decade.split(". The row nearest", 1)[0]
+    segment = decade.split("missing ", 1)[1]
     named = {k: float(v)
              for k, v in re.findall(r"(\w+) at (-?[\d.]+) against \(", segment)}
     assert named == {"volume_change_acf1": -0.2572}
@@ -668,7 +696,8 @@ def test_the_model_slope_needs_no_committed_file():
     The agreement is approximate, and the tolerance says why. `DECAY_252` is
     published rounded to four places and the full-precision panel it came
     from is not in this repository, so the fit over the rounded values
-    returns -0.9522 where the constant reads -0.953. The real side rounds
+    returns -0.5138 where the constant reads -0.515 (and returned -0.9522
+    against -0.953 when the table was pt-v14's). The real side rounds
     exactly, because there the full-precision source IS committed.
     """
     fitted = _log_log_slope(env.DECAY_252, _SLOPE_LAGS)

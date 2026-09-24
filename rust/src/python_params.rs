@@ -135,13 +135,26 @@ impl PyModelParams {
     }
 
     /// The identities `preset` claims about its own dials, evaluated on this
-    /// vector: a list of `(dial, identity, expected, actual, claimed_by)` for
-    /// the ones that do not hold, empty when they all do.
+    /// vector: one dict per identity that does not hold, with `dial`,
+    /// `identity`, `expected`, `actual`, `tolerance` and `claimed_by`, and
+    /// an empty list when they all do.
     ///
     /// Read-only, and it is what a harness writes into an arm record after
     /// waiving. It takes the preset name because the claims are a property of
     /// the preset and not of the type: the cap identity holds on pt-v19 and
     /// on nothing else shipped.
+    ///
+    /// `preset` defaults to the engine's default preset, pt-v19, which is
+    /// the default `from_preset` uses, and not to the preset the vector was
+    /// built from. A vector does not record its base, and a waived one
+    /// fingerprints as `custom-XXXXXXXX`, so there is nothing to infer it
+    /// from. A vector built from another preset is therefore checked
+    /// against pt-v19's claims unless you name its own:
+    /// `identity_breaks(from_preset("pt-v18"))` returns two rows,
+    /// `vix_target_shock_cap` and `garch_beta`, each with `claimed_by`
+    /// `"pt-v19"`, and `identity_breaks(from_preset("pt-v18"), "pt-v18")`
+    /// returns none, because pt-v18 claims no identities. Pass the name the
+    /// vector was built from.
     #[staticmethod]
     #[pyo3(signature = (params, preset = crate::params::DEFAULT_PRESET_NAME))]
     fn identity_breaks(
