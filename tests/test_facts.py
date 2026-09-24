@@ -177,10 +177,10 @@ def test_volatility_clustering_is_in_band_at_short_lags_and_dies_too_fast():
     # so the curve now stays weakly positive where real markets do. The
     # slow-variance mixture pt-v15 turned on is the mechanism.
     #
-    # Still pinned as a defect rather than a fix, because the decay SLOPE has
-    # not been re-measured: `envelope.DECAY_252` and `DECAY_SLOPE` describe
-    # pt-v14 and the gap text goes with them. One seed at one lag narrows the
-    # claim; it does not retire it.
+    # Still pinned as a defect rather than a fix. `envelope.DECAY_252` was
+    # re-measured on pt-v19 on 2026-09-24 and reads below real at every lag,
+    # so the gap stands on the level of the curve. One seed at one lag
+    # narrows the claim; it does not retire it.
     #
     # AND THE STRICT POSITIVITY WAS NEVER A PROPERTY OF THE MODEL. It was
     # `0.0 < facts["abs_return_acf20"]` from 0.6.0 to 0.8.0, put there

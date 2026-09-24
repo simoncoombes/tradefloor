@@ -1,7 +1,7 @@
 """Measurement groups for the re-measurement harness.
 
 Each function here recomputes one family of published figures from the
-installed `pretium` package and returns a flat dict of key -> value. The
+installed `tradefloor` package and returns a flat dict of key -> value. The
 mapping from published claims to these keys lives in `inventory.json`;
 `remeasure.py` joins the two and writes the delta report.
 

@@ -73,7 +73,8 @@ pub struct Sector {
     /// would move these numbers and nothing here pretends otherwise.
     ///
     /// Read only when [`crate::params::ModelParams::crisis_epicentre_extra`]
-    /// is non-zero, which no shipped preset sets.
+    /// is non-zero, which pt-v19 sets (1.93) and every preset before it
+    /// does not.
     pub crisis_weight: f64,
 }
 

@@ -7,7 +7,9 @@ A preset's published figures were spread across `envelope.py`, prose in three
 modules, a README, several test comments and the changelog, and every release
 that moved the default re-typed them by hand. Two survived 0.6.0 unmeasured
 because nobody could tell they were stale: `envelope.DECAY_252` and
-`DECAY_SLOPE` still describe pt-v14.
+`DECAY_SLOPE` described pt-v14 then. They were re-measured on 2026-09-14 and
+again on 2026-09-24, and they are still typed rather than written from a
+record.
 
 A record is one JSON file per preset holding what was measured, what it was
 measured with, and when. `python/tradefloor/presets/<name>.json`, generated

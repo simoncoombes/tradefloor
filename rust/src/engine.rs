@@ -394,9 +394,10 @@ pub struct Engine {
     /// no episode running, and ends after `crisis_epicentre_end_sessions`
     /// consecutive sessions back under it.
     ///
-    /// False on every shipped preset and on every session of one: the whole
-    /// block is gated on `crisis_epicentre_extra`, which ships 0.0. See
-    /// `ModelParams::crisis_epicentre_extra`.
+    /// False on every session of pt-v1 through pt-v18: the whole block is
+    /// gated on `crisis_epicentre_extra`, which those presets set to 0.0.
+    /// pt-v19 ships 1.93, so on the default this is true through every
+    /// episode. See `ModelParams::crisis_epicentre_extra`.
     crisis_in_episode: bool,
     /// Consecutive sessions the running episode has spent under the
     /// threshold. Reset to zero by any session back above it, which is what
@@ -1923,7 +1924,8 @@ impl Engine {
         // The per-sector sigmas from the state, or empty (the stateless draw).
         let sector_sigmas = self.sector_sigmas_now();
         // `'static`, so it does not borrow `self` while the tick takes it
-        // mutably. `None` on every shipped preset.
+        // mutably. `None` on every preset before pt-v19 and outside an
+        // episode on pt-v19.
         let epicentre = self.crisis_epicentre_key();
         if !sector_sigmas.is_empty() {
             let t = crate::market::tick::sector_sigma_at(&self.params, &self.economy, self.vix_anchor);
@@ -1966,7 +1968,7 @@ impl Engine {
                 settle_depth_counterfactual: self.settle_depth_counterfactual,
                 nominal_output_base: self.nominal_output_base,
                 // Resolved at this session's `open_market` and fixed for
-                // the day; `None` on every shipped preset.
+                // the day; `None` on every preset before pt-v19.
                 crisis_epicentre: epicentre,
                 elapsed_days: self.current_day,
                 params: &self.params,

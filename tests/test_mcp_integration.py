@@ -127,9 +127,9 @@ def test_the_catalogue_reaches_a_client_with_its_measurements(live):
     Not that it lists names -- that every target arrives with what it was
     MEASURED to be worth. A model choosing between twelve targets whose
     effect sizes differ by three orders of magnitude has nothing else to go
-    on: `macro.qe_pe_boost` moves the median instrument 19.78% and
-    `macro.fear_greed` moves it exactly 0.00%, and both are legitimate to
-    write.
+    on: on pt-v19 a held `macro.corporate_yield` moves the median
+    instrument -4.02% and `macro.fear_greed` and `macro.qe_pe_boost` move it
+    exactly 0.00%, and all three are legitimate to write.
     """
     _init, _tools, results = live
     _res, out = results["list_scenarios"]
