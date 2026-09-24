@@ -1371,9 +1371,14 @@ def test_the_committed_recording_replays_end_to_end():
     # the first: trades 8, pnl 24410.0, turnover 2611910.0. And the ones
     # the fourth composition replaced before them: trades 7, pnl 14495.0,
     # turnover 2566815.0.
-    assert card.trades == 7, card.trades
-    assert card.pnl == pytest.approx(22490.0), card.pnl
-    assert card.turnover == pytest.approx(1939890.0), card.turnover
+    #
+    # RE-RECORDED again for 0.9.0, when an agent's fills started reaching
+    # the market once instead of on every tick of the step. The market the
+    # model saw after its first trade moved, so the digests did. The values
+    # the flow fix replaced: trades 7, pnl 22490.0, turnover 1939890.0.
+    assert card.trades == 10, card.trades
+    assert card.pnl == pytest.approx(18930.0), card.pnl
+    assert card.turnover == pytest.approx(2257400.0), card.turnover
 
     # AND THE REFUSAL STAYS GONE, which is a fact about this market and
     # not a bug. gpt-5.2 sized inside the limits on pt-v18's market and the
