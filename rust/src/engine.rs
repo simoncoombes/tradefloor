@@ -1060,7 +1060,27 @@ impl Engine {
         if settle_opening {
             engine.burn_in_economy();
         }
+        // The earnings cycle opens at the level of the phase the economy
+        // opens in, so a market that opens in a contraction does not spend
+        // its first months drifting toward it: a stationary opening, as the
+        // mispricing's is. The opening's premium split books the difference
+        // into the names' fair-value levels, so no opening price moves.
+        if engine.params.earnings_cycle_depth != 0.0 {
+            engine.economy.earnings_cycle = engine.earnings_cycle_target();
+        }
         engine
+    }
+
+    /// The level the earnings cycle is pulled toward in the current phase:
+    /// `-depth` in a contraction or a trough, `+depth * upside` otherwise.
+    fn earnings_cycle_target(&self) -> f64 {
+        let p = &self.params;
+        match self.economy.cycle_phase {
+            crate::economy::CyclePhase::Contraction | crate::economy::CyclePhase::Trough => {
+                -p.earnings_cycle_depth
+            }
+            _ => p.earnings_cycle_depth * p.earnings_cycle_upside,
+        }
     }
 
     /// The VIX at which every variance coupling reads one.
@@ -4504,12 +4524,8 @@ impl Engine {
         // zero depth, so every preset through pt-v19 takes no draw here and
         // leaves the level at 0.0. See `ModelParams::earnings_cycle_depth`.
         if self.params.earnings_cycle_depth != 0.0 {
+            let target = self.earnings_cycle_target();
             let p = &self.params;
-            let target = match self.economy.cycle_phase {
-                crate::economy::CyclePhase::Contraction
-                | crate::economy::CyclePhase::Trough => -p.earnings_cycle_depth,
-                _ => p.earnings_cycle_depth * p.earnings_cycle_upside,
-            };
             let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / p.earnings_cycle_half_life);
             let mut level = self.economy.earnings_cycle
                 + pull * (target - self.economy.earnings_cycle);
