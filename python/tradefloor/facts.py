@@ -17,11 +17,17 @@ band is the same defect as an unreproducible figure, one level up.
 
 ## The headline
 
-**At 252 days the default preset holds all fourteen statistics in band, and
-at 504 days, against bands re-derived at that window, all fourteen again.**
-The committed record `python/tradefloor/presets/pt-v16.json` is what says so
-and `tests/test_preset_records.py` holds `envelope.CERTIFIED` and
-`MEASURED_504` to it. This headline read "thirteen at 504, the one that
+**At 252 days the default preset, pt-v19, holds all fourteen shape
+statistics in band on the ruled bands `envelope.score` grades with, and at
+504 days all thirteen the ruled 504-day table can read**
+(`corr_persistence_acf1` is unreadable there). On the 2015-2025 decade bands
+of `REAL_MARKETS` one row is out at both horizons: `sector_excess_corr`,
+0.0904 at 252 days and 0.0906 at 504 against a floor of 0.11. The committed
+record `python/tradefloor/presets/pt-v19.json` is what says so and
+`tests/test_preset_records.py` holds `envelope.CERTIFIED` and
+`MEASURED_504` to it. This headline named pt-v16's record and read "all
+fourteen" at both horizons until 2026-09-23, which was pt-v16 on the decade
+bands. It read "thirteen at 504, the one that
 misses is `volume_change_acf1`" until 2026-09-05: that described pt-v10 and
 pt-v11, whose miss `pt-v12`'s `volume_move_cap` closed on 2026-08-26, and it
 survived two era boundaries because nothing tested a sentence.
@@ -105,6 +111,17 @@ band before and after. So the verdicts hold and the digits do not. The row
 that moves is the ungraded one: `index_drift_pct` improves by 3.83
 percentage points a year on every one of thirty seeds, measured in the log
 convention that row carried at the time.
+
+**The sections from here to "Which statistics were targets" describe the
+model of the known-answer v8 era, not the shipped preset.** pt-v1's record
+reproduces them to about a percent (annualised volatility 41.1 against the
+41.5 below, return autocorrelation +0.244 against +0.249, volume-change
+autocorrelation -0.448 against -0.446), and pt-v1 is still selectable and
+still reads that way. Several of the failures they describe are closed at
+the shipped pt-v19: return autocorrelation reads -0.013, annualised
+volatility 22.8%, lag-one clustering 0.049 and volume-change
+autocorrelation -0.279, all in band. Read `envelope.CERTIFIED` or
+`tradefloor.preset_record()` for the shipped preset's figures.
 
 ## What lands
 
@@ -412,8 +429,9 @@ REAL_MARKETS = {
     # own resolution at thirty seeds; the derivation and its three URLs are
     # in `REAL_MARKETS_PROVENANCE` and reproducible with
     # tools/calibration/index_band.py. A band chosen so the current model
-    # passes was refused: the default preset reads far below the floor and
-    # the row is held red until the level is right.
+    # passes was refused: the default of the day, pt-v16, read far below
+    # the floor (-13.64) and the row was held red until the level was
+    # right. pt-v18 and pt-v19 read inside it (5.80 and 7.65).
     "index_drift_pct": (2.9, 11.9),
     # The CRISIS rows, graded from 2026-09-03: the median change in the
     # volatility index on a session whose cap-weighted index return is at or
@@ -794,11 +812,14 @@ REAL_MARKETS_PROVENANCE = {
             "Measured: a null model passes this band with probability 1.000 "
             "and the null-side edge sits 10 model standard errors beyond "
             "zero. The band admits more than the null on this row: the "
-            "shipped default reads the effect BACKWARDS -- real names co-move "
-            "MORE the day after a market fall, +0.111 in eight of nine "
-            "windows, and the model reads -0.064 with 25 of 30 seeds on the "
-            "wrong side -- and (-0.20, 0.55) admits that with room. The "
-            "mechanism gate reads it REVERSED."),
+            "default when this was written (2026-09-05) read the effect "
+            "BACKWARDS -- real names co-move MORE the day after a market "
+            "fall, +0.111 in eight of nine windows, and the model read "
+            "-0.064 with 25 of 30 seeds on the wrong side -- and (-0.20, "
+            "0.55) admits that with room. The mechanism gate read it "
+            "REVERSED. pt-v18 and pt-v19 read it the right way round, "
+            "+0.102 and +0.079 in their records, and the gate reads both "
+            "SHOWN."),
     },
     "sector_excess_corr": {
         "claim": "mean same-sector pairwise correlation minus mean cross-sector, "
@@ -1159,11 +1180,13 @@ REAL_MARKETS_PROVENANCE = {
         #
         # WHAT IT WOULD HAVE COST THE CANDIDATES, measured rather than
         # feared, because the ruling accepted the risk in advance: NOTHING.
-        # pt-v19 reads 6.3920 +/- 0.5001 at 252 and 6.1676 +/- 0.1921 at
-        # 504, pt-v18 3.2473 +/- 0.0800 and 3.1382 +/- 0.0598, and all four
-        # are inside all thirty of the band-producing cells in the anchor by
-        # conditioning sweep, the tightest of which is [2.16, 7.38] at 2.0
-        # of pt-v19's own standard errors. No count moves under any of them.
+        # pt-v19 as of 2026-09-14 read 6.3920 +/- 0.5001 at 252 and 6.1676
+        # +/- 0.1921 at 504, pt-v18 3.2473 +/- 0.0800 and 3.1382 +/- 0.0598,
+        # and all four are inside all thirty of the band-producing cells in
+        # the anchor by conditioning sweep, the tightest of which is [2.16,
+        # 7.38] at 2.0 of pt-v19's own standard errors. No count moves under
+        # any of them. The fifth composition reads 5.4237 at 252, also
+        # inside every cell; its 504-day reading is not measured.
         #
         # AND THE CORRECTED DERIVATION IS A WEAKER RULER THAN THE ONE IT
         # WOULD REPLACE, which is the finding that decides this. Over the
@@ -1210,9 +1233,11 @@ REAL_MARKETS_PROVENANCE = {
             },
             "arm_rejections_of_173": {"shipped": 8, "front_drop_crisis": 12,
                                       "last_bar_keep_crisis": 5},
-            "moves_no_count": "pt-v19 and pt-v18 are IN at both horizons "
-                              "under every variant above and under the "
-                              "shipped band",
+            "moves_no_count": "pt-v19 (as of 2026-09-14) and pt-v18 are IN "
+                              "at both horizons under every variant above "
+                              "and under the shipped band; the fifth "
+                              "composition's 252-day reading, 5.4237, is "
+                              "IN under all of them too",
             "source": "programme/results/dn3-rederive.md, and the three "
                       "scripts under programme/results/dn3-rederive/scripts",
         },
@@ -3584,7 +3609,8 @@ def _index_drift_pct(
     the residual is centred at -0.001 with a standard deviation of 0.005.
     An independent sweep regressed the gap on that variance and read a
     slope of 1.0081, an intercept of -0.0160 and an r squared of 0.9982,
-    and read +2.064 on the shipped default over thirty seeds with the
+    and read +2.064 on pt-v16, the default when it was measured, over
+    thirty seeds with the
     prediction accurate to a median of 0.011 and a worst case of 0.036.
 
     # Why a band forces the choice
@@ -5479,7 +5505,9 @@ def moving_block_bootstrap_se(values: Sequence[float], block_length: int, *,
 #:
 #: THE COST, RECORDED SO IT IS NOT DISCOVERED LATER. A band this wide
 #: discriminates less, and this row will not decide between pt-v19 and
-#: pt-v18: both are in at both horizons. That is the honest representation
+#: pt-v18: both were in at both horizons when this was written, and the
+#: fifth composition reads 1.1421 at 252, inside it. That is the honest
+#: representation
 #: of a row whose population moves this far, rather than a weakness. The
 #: -3 per cent session rate runs 6.38 per cent over 1928-40, 0.61 over
 #: 1941-59, 0.25 over 1960-89 and 1.21 over 1990-2025, a factor of 25
@@ -5623,10 +5651,11 @@ def drift_leg_band(cap_weighted: str, premium: str = "rsp") -> tuple[float, floa
 #: (1.0924524, 10.3017191).
 #:
 #: IT MOVES NO COUNT, and that was PREDICTED TO HELP pt-v19 AND FALSIFIED.
-#: pt-v19 reads 6.6238 at 252 and 6.0151 at 504; pt-v18 reads 5.7957 and
-#: 5.1238. All four were already well clear of the old floor of 2.9 and all
-#: four stay in. Both presets move from the lower third of the band toward
-#: its middle.
+#: pt-v19 read 6.6238 at 252 and 6.0151 at 504 on its 2026-09-14 vector;
+#: pt-v18 reads 5.7957 and 5.1238. All four were already well clear of the
+#: old floor of 2.9 and all four stay in. Both presets move from the lower
+#: third of the band toward its middle. The fifth composition that ships
+#: reads 7.6462 at 252, in either band.
 #:
 #: ONE LIMITATION, stated because extending the cap-weighted leg widens it:
 #: the equal-weight premium is measured over 22 calendar years and applied
@@ -5672,8 +5701,9 @@ RULED_FEAR_DN1_BAND: dict[int, tuple[float, float]] = {
 #: 5; the tighter front-anchored [2.16, 7.38] rejects 12 but is cut at an
 #: anchor the rule does not use, which is the growing-series failure
 #: `INDEX_TAIL_WINDOWS` names. So the shipped ruler is the strongest one
-#: with a sound construction, and it is NEUTRAL ON THE COUNT: pt-v19 and
-#: pt-v18 are in under every variant measured, so no choice here could
+#: with a sound construction, and it is NEUTRAL ON THE COUNT: pt-v19 (as
+#: of 2026-09-14, and its fifth composition at 252) and pt-v18 are in under
+#: every variant measured, so no choice here could
 #: have made a preset appear to work. The 2026-09-15 section 14
 #: re-derivation stays recorded under `['section14']` and is not adopted.
 RULED_FEAR_DN3_BAND: tuple[float, float] = tuple(REAL_MARKETS["fear_gauge_dn3"])
@@ -5821,8 +5851,10 @@ RULED_UNREADABLE: dict[int, dict[str, str]] = {
             "is attainable in principle and the floor is NOT dead the way "
             "vix_ar1_debiased's ceiling is dead, where debias_ar1's own "
             "bound of 1 + 4/n puts the ceiling out of reach by arithmetic. "
+            # The top of the range read 0.32927 (pt-v19 at 504) until the
+            # fifth composition moved pt-v19's record on 2026-09-23.
             "MEASURED over all 36 committed preset record cells the "
-            "readings run -0.00039 (pt-v2 at 252) to 0.32927 (pt-v19 at "
+            "readings run -0.00039 (pt-v2 at 252) to 0.40881 (pt-v19 at "
             "504), and the lowest clears -0.38 by 0.3796. So switching "
             "this row's constant would not make any preset on the record "
             "pass, and it would retire "
@@ -7055,8 +7087,8 @@ def structure_verdict(values: Sequence[float], key: str, *,
     `side` names which way a refusal went, because "high" and "low" are
     different repairs and a bare REFUSED would waste the reading. `at_the_
     cut` marks `k` exactly on either boundary, where one seed decides the
-    verdict -- the shipped default sits there at 252 and a reader must be
-    able to see that without recomputing the test.
+    verdict -- the 2026-09-14 pt-v19 vector sat there at 252 (k = 21), and
+    a reader must be able to see that without recomputing the test.
 
     `se_real` is carried beside the verdict and is NOT a gate: it is the
     tape centre's own standard error, and the gap between it and the test's

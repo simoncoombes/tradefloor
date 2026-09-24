@@ -13,7 +13,7 @@ The wheel carries the library, not the examples, so the clone is what puts
 the script on disk. `matplotlib` is optional and only decides whether you get
 the chart.
 
-It runs in about two seconds and answers one question:
+It runs in about a second and answers one question:
 
 > **How does the exact same trading agent behave when interest rates
 > unexpectedly rise by 200 basis points?**
@@ -58,11 +58,12 @@ Fair value in Tradefloor is earnings times a target multiple, and the multiple
 is discounted by
 
 ```
-rate_adjustment = 1 - (discount - 0.04) * 1.5 * (1 + growth * 2)
+rate_adjustment = 1 - (discount - neutral) * 1.5 * (1 + growth * 2)
 ```
 
-Revenue growth **is** the duration term. A 200bp rise costs `NOVA` about 5.3%
-of its multiple and `STAP` about 3.1%.
+where `neutral` is the preset's `neutral_discount_rate`, 0.0482 on `pt-v19`.
+Revenue growth **is** the duration term. On `pt-v19` a 200bp rise costs `NOVA`
+about 5.2% of its multiple and `STAP` about 3.1%.
 
 That correspondence is honest for this market and does not transfer. A real
 utility is a long-duration bond proxy; here, on one percent revenue growth, it
@@ -125,12 +126,12 @@ print(agree(control, shock).render())
 
 ```
   market columns         identical  18 columns x 4
-  prices                 identical  133.71  97.93  76.37  56.59
+  prices                 identical  122.13  93.20  71.99  54.74
   order book             identical  80 levels
-  generator state        identical  21 words
+  generator state        identical  30 words
   macro chain            identical  federal_funds_rate=0.04  corporate_bond_yield=0.055
-  whole engine state     identical  14 fields, day 20
-  portfolio              identical  $2,864,512 cash, 4 positions
+  whole engine state     identical  37 fields, day 20
+  portfolio              identical  $4,046,100 cash, 4 positions
   agent state            identical  3 fields
   shared history         identical  120 steps
 ```
@@ -158,9 +159,12 @@ agent watches and the corporate bond yield equities are discounted off.
 
 Both, and not the policy rate alone, because of how this model transmits:
 `federal_funds_rate` reaches a valuation *only* by steering the corporate bond
-yield, recomputed at central-bank meetings, the first scheduled 45
-days out. A policy-rate hike by itself would move the agent and not the
-market. `tests/test_macro_transmission.py` pins that map.
+yield, and this world pins that yield in both arms. A policy-rate hike by
+itself would move the agent and not the market. Left free, the yield follows
+the policy rate on a schedule that depends on the preset: at central-bank
+meetings, the first 45 days out, on `pt-v6`, which is where
+`tests/test_macro_transmission.py` pins that map, and from day 8 on
+`pt-v19`.
 
 `intervene` writes macro fields and nothing else. It cannot reach the
 portfolio, the book or the agent -- an intervention that could would not be a
@@ -185,31 +189,31 @@ not cut evenly:
 
 ```
             growth   control    shock      cut
-    NOVA      0.35    0.2375   0.0838   -64.7%
-    HELX      0.18    0.2375   0.0926   -61.0%
-    BRDG      0.06    0.2375   0.1001   -57.9%
-    STAP      0.01    0.2375   0.1036   -56.4%
+    NOVA      0.35    0.2266   0.0799   -64.7%
+    HELX      0.18    0.2266   0.0884   -61.0%
+    BRDG      0.06    0.2266   0.0955   -57.9%
+    STAP      0.01    0.2266   0.0988   -56.4%
 ```
 
 Twenty days later the two markets are apart, in the same order:
 
 ```
                                NOVA       HELX       BRDG       STAP
-  control        40 days     122.75      97.70      76.83      50.98
-  +200bps        40 days     117.21      93.66      74.50      49.44
-  difference                 -4.51%     -4.14%     -3.03%     -3.02%
+  control        40 days     117.90      93.27      73.67      52.17
+  +200bps        40 days     111.35      89.41      70.97      50.41
+  difference                 -5.56%     -4.14%     -3.66%     -3.37%
 ```
 
 And the two books:
 
 ```
                                     control          +200bps
-  final gross exposure                0.93x            0.37x
-  turnover                       $4,112,409      $31,875,630
-  cost against arrival               $1,059          $20,957
-  cash                           $3,518,470      $34,266,971
-  P&L since the fork            $-2,344,740      $-1,868,420
-  max drawdown since                  7.08%            4.45%
+  final gross exposure                0.95x            0.38x
+  turnover                      $15,302,836      $34,909,691
+  cost against arrival               $4,775          $16,059
+  cash                           $2,652,843      $32,030,346
+  P&L since the fork              $-620,983      $-1,053,830
+  max drawdown since                  5.28%            3.58%
 ```
 
 The behaviour comes first here deliberately. The P&L difference is one draw of

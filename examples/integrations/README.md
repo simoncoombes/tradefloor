@@ -120,7 +120,7 @@ Fuller example: [`callable/five_days.py`](callable/five_days.py).
 
 `rule` is handed the serialized payload and never the `Observation`. The
 Observation carries `.engine`, which holds the answer key: fair value, the
-nine-way attribution of every price move, each company's mispricing, and the
+ten-way attribution of every price move, each company's mispricing, and the
 macro path the run has not reached yet. A function given that would step
 around the allowlist where no test could see it. A policy that genuinely
 needs the Observation is a native Tradefloor agent and implements `act`

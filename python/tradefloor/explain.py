@@ -57,8 +57,8 @@ over, which the caveats say.
 days of most presets: earnings and the sector anchor are fixed for a run,
 the QE channel is off, and the discount rate moves only on the days the
 corporate bond yield does. It moves under a scenario that moves the macro
-path, and ``tests/test_explain.py`` measures one. Under pt-v18 it moves
-on every day, because ``earnings_nominal_growth`` restates earnings and
+path, and ``tests/test_explain.py`` measures one. Under pt-v18 and pt-v19
+it moves on every day, because ``earnings_nominal_growth`` restates earnings and
 book value in the nominal output the economy integrates. That output is
 ``gdp`` times ``cpi``, and ``Engine.macro_fields`` carries neither level,
 so the table below declares the dial and not the two levels behind it.

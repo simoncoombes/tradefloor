@@ -11,9 +11,9 @@ Two things live here, and neither is a score.
 with the spread it actually has across seeds, not as a bare median. A point
 estimate from a stochastic simulator invites a precision it does not have.
 `abs_return_acf20` is the example, and the number is read out of `CERTIFIED`
-below rather than typed here: it reads about +0.0017 at the shipped preset,
-against a thirty-seed spread wide enough that a single seed lands either
-side of zero. The band distance is reported in units of that spread, which
+below: it reads about +0.0085 at the shipped preset, positive on 21 of the
+30 certification seeds, so a single seed lands either side of zero. The
+band distance is reported in units of that spread, which
 is the same weighting `tradefloor.loss` uses -- so "how far out" is
 denominated in the model's own noise rather than in the statistic's
 arbitrary units.
@@ -23,7 +23,9 @@ on the current roster generator and was five defaults old while `CERTIFIED`
 a hundred and forty lines below it read 0.0017. The sentence warning against
 quoting a stale point estimate was quoting one, which is the plainest case
 this module contains for why a published number needs a producer rather than
-a careful author (`programme/results/stale-constants.md`).
+a careful author (`programme/results/stale-constants.md`). It then read
++0.0017 until 2026-09-23, when the fifth composition moved `CERTIFIED` to
+0.0085 and the sentence stayed behind again.
 
 **A membership check** (`check`). Given a horizon, the statistics a strategy
 leans on, and the shape of the roster, it answers whether the question falls
@@ -82,13 +84,17 @@ PRESET = "pt-v19"
 #: Not a soft preference, and not a band count either. What holds the
 #: horizon here is that `CERTIFIED` was MEASURED here, on thirty seeds and
 #: two held-out axes. The 504-day table beside it (`MEASURED_504`) is
-#: measured and not certified, and at this default one row is outside it:
-#: `sector_excess_corr`, 0.10421 against a floor of 0.11.
+#: measured and not certified. At this default one row is outside it on
+#: the 2015-2025 decade bands (`BANDS_504`): `sector_excess_corr`, 0.0906
+#: against a floor of 0.11 (0.10421 on the 2026-09-14 vector). On the ruled
+#: bands `score` grades with by default, no row is out at 504 days and
+#: `corr_persistence_acf1` is unreadable there.
 #:
 #: The old reason -- that the thinnest 504-day row cleared its ceiling by
 #: only 0.11 -- no longer applies: `annualised_vol_pct` read 33.89 under
 #: pt-v12, 30.24 under pt-v14, 28.12 under pt-v16, 25.40 under pt-v18 and
-#: 23.39 under pt-v19, against the same 34.0 ceiling throughout. The
+#: 22.58 under pt-v19's fifth composition (23.39 on the 2026-09-14 vector),
+#: against the same 34.0 ceiling throughout. The
 #: horizon stays 252 because that is where the certification was measured,
 #: not because 504 is fragile.
 #:
@@ -100,7 +106,9 @@ PRESET = "pt-v19"
 #: preset's reading, and it stayed in this prose through four regenerations
 #: of `MEASURED_504` beneath it (25.1132, 28.9478, 28.0585 and now 23.3899),
 #: which is how a figure measured on one vector comes to be quoted for
-#: another. `presets/pt-v19.json` reads 23.3899 and puts one row out.
+#: another. `presets/pt-v19.json` read 23.3899 then; it reads 22.5804 on
+#: the fifth composition of 2026-09-23, after four more regenerations
+#: (24.2780, 23.4833, 24.3476 and 24.7721 on the vectors between).
 #:
 #: This comment read "three statistics that are in band here leave it by 504
 #: days" until 2026-08-27, which described pt-v3. `check` refuses to certify
@@ -123,20 +131,25 @@ PRESET = "pt-v19"
 #: against a ruler the project stopped scoring with. A band result is stated
 #: as the rows that are out and their distances, never as a bare count.
 #:
-#: What the rows do at pt-v19, from `presets/pt-v19.json`: `sector_excess_
-#: corr` is out at 0.1011 against a floor of 0.11 at 252 days and 0.10421
-#: against 0.11 at 504, in all four cells of the record, and no other row is
-#: out in any cell. That reading is what `sector_loading` 0.60 was derived
-#: to produce against the whole-tape centre 0.1178. The values in this dict
+#: What the rows do at pt-v19's fifth composition (2026-09-23), from
+#: `presets/pt-v19.json`: on the 2015-2025 bands of `facts.REAL_MARKETS`,
+#: `sector_excess_corr` is out at 0.0904 against a floor of 0.11 at 252
+#: days and 0.0906 against 0.11 at 504, and no other row is out. On the
+#: ruled bands `score` grades with by default, the record's `misses` are
+#: empty in all four cells. The 2026-09-14 vector read 0.1011 and 0.10421
+#: on this row, which is what `sector_loading` 0.60 was derived to produce
+#: against the whole-tape centre 0.1178; the fifth composition keeps 0.60
+#: and reads lower. The values in this dict
 #: WERE NOT pt-v19's until 2026-09-14: all fourteen were the pre-31ef261
 #: vector's and disagreed with the record, which is `defect-26`. They are
 #: written from `presets/pt-v19.json` by `tools/presets/envelope_tables.py`
 #: now. The stale `sector_excess_corr` read 0.1809, inside the band, where
-#: the measured 0.1011 is outside it, so the row above became visible here
+#: the measured 0.1011 was outside it, so the row above became visible here
 #: only when the table stopped being stale. As an arithmetic check on the
-#: dict below rather than as a score, `envelope.score` returns
-#: thirteen of fourteen in band at this default, and the row it counts out
-#: is `sector_excess_corr`.
+#: dict below rather than as a score, `envelope.score(basis="shipped")`
+#: returns thirteen of fourteen shape rows in band at this default, and the
+#: row it counts out is `sector_excess_corr`; `envelope.score` on its
+#: default ruled basis returns all of them in band.
 #:
 #: This comment read "nine of ten" until 2026-08-26. It described pt-v3, and
 #: survived two era boundaries and four statistics being added to the panel
@@ -174,12 +187,17 @@ PRESET = "pt-v19"
 #: the "14 of 14" claim nowhere. `score` reports it apart, as
 #: `dispersion_in_band` of `dispersion_of`.
 #:
-#: ITS VALUE IS `None`, WHICH IS A MEASUREMENT AND NOT A GAP. The row needs
-#: `facts.CRISIS_DISPERSION_MIN_SESSIONS` (30) sessions above
+#: ITS VALUE IS A MEDIAN OVER THE SEEDS THAT READ IT, AND IT CAN BE `None`.
+#: The row needs `facts.CRISIS_DISPERSION_MIN_SESSIONS` (30) sessions above
 #: `facts.CRISIS_VIX_THRESHOLD` (30.88) inside the window it is read over,
-#: and a 252-day run of this preset on the certified roster does not hold
-#: them: the four seeds measured on 2026-09-22 held 0, 1, 0 and 10. So the
-#: shipped preset has NO certified reading at 252 and the honest entry is
+#: and most 252-day runs of this preset on the certified roster do not hold
+#: them. On the fifth composition (2026-09-23) 4 of the 30 seeds read the
+#: row and 1.2029 is their median; the record's `dispersion["panel_252"]`
+#: carries that count and why each other seed did not read. Four seeds is
+#: thin, so read the count beside the value. On the vector before it the
+#: entry was `None`: the four seeds measured on 2026-09-22 held 0, 1, 0 and
+#: 10 crisis sessions. A preset with no seed that reads the row has NO
+#: certified reading at 252 and the honest entry is
 #: the row's name against nothing, carried here rather than omitted so that
 #: the panel measures it, the record records the absence with the count of
 #: readable seeds beside it, and the day a preset holds enough crisis
@@ -206,10 +224,10 @@ CERTIFIED: dict[str, float | None] = {
     "corr_asymmetry_lagged": 0.0790,
     "sector_excess_corr": 0.0904,
     "corr_persistence_acf1": 0.2960,
-    # ABSENT AT THIS PRESET, with the reason above. Written by
-    # `envelope_tables.py` from the record's `panel_252`, which carries the
-    # row only when a seed read it; `dispersion_252` on the record carries
-    # how many of the thirty did and why the rest did not.
+    # Read on 4 of the 30 seeds at this preset, with the reason above.
+    # Written by `envelope_tables.py` from the record's `panel_252`, which
+    # carries the row only when a seed read it; `dispersion["panel_252"]` on
+    # the record carries how many of the thirty did and why the rest did not.
     "crisis_sector_dispersion": 1.2029,
 }
 
@@ -220,7 +238,8 @@ def certified_panel() -> dict[str, float]:
     A graded panel, for the callers that SCORE this table. `CERTIFIED` is
     allowed to carry `None` for a row the certification run could not read
     -- `crisis_sector_dispersion` needs thirty crisis sessions in the window
-    and a 252-day run of this preset holds single figures -- and a `None` in
+    and at 252 days only 4 of the shipped preset's 30 certification seeds
+    hold that many -- and a `None` in
     a panel is a `TypeError` inside `band_distance`, one frame down from
     anything that could say what went wrong.
 
@@ -238,8 +257,12 @@ def certified_panel() -> dict[str, float]:
 #: 130, 252 days, the roster varying WITH the seed, because a level that
 #: describes the MODEL cannot be measured on one draw (`facts.AGGREGATE`).
 #:
-#: Measured 2026-09-14 on the box run `levelproto`, at pin `f3cf10e`, by
-#: `tools/presets/level_panel.py` and `level_rows.py`. It replaces a reading
+#: Measured 2026-09-23 on the box run `ptv19fifth`, at engine commit
+#: `4d8f9cf`, pt-v19's fifth composition, by `tools/presets/level_panel.py`
+#: and `level_rows.py`. It replaces the reading of each earlier pt-v19
+#: vector in turn: 6.3635 (the fourth composition, 2026-09-22), 6.2819
+#: (2026-09-20), 6.6238 from the box run `levelproto` at pin `f3cf10e`
+#: (2026-09-14), and before that a reading
 #: from `b4fix10` at `2d83167`, which described the pt-v19 of that day:
 #: nineteen of the preset's coefficients moved at 31ef261 and the block was
 #: then deleted by a `record.py --panel` regeneration, leaving this table
@@ -251,8 +274,8 @@ def certified_panel() -> dict[str, float]:
 #: protocol and the same seeds in the same run, and reproduced the four
 #: constants its own record publishes to all four printed places, so these
 #: readings replace those on one ruler rather than beside another. Those
-#: four were first measured at `ee22c65` under 0.6.2 and have now reproduced
-#: twice across the 0.7.0 and 0.8.0 boundaries.
+#: four were first measured at `ee22c65` under 0.6.2 and have reproduced
+#: across the 0.7.0 and 0.8.0 boundaries and again on 2026-09-23.
 #: `python/tradefloor/presets/pt-v19.json` carries both under
 #: `level_protocol`, and `tests/test_preset_records.py` binds this table to
 #: it -- the binding `DECAY_252` below still does not have. The table
@@ -264,13 +287,17 @@ def certified_panel() -> dict[str, float]:
 #: 15.6 points on one preset, because a drawn roster opens away from fair
 #: value by a draw worth several points of first-year drift.
 CERTIFIED_LEVEL: dict[str, float] = {
-    # The default preset RETURNS 6.62 per cent a year, inside a band of 2.90
-    # to 11.90 at band position 0.41, on a thirty-seed standard error of
-    # 1.19 -- so 3.13 standard errors above the floor. pt-v18 read 5.7957 at
-    # position 0.32; pt-v16 read -13.6431 and was held red here for three
-    # eras, and this row exists because of that. The seed spread is wide
-    # against the band: the thirty-seed standard deviation is 6.52, so a
-    # single seed's first year says almost nothing about the row.
+    # The default preset RETURNS 7.65 per cent a year on its fifth
+    # composition, inside the 2015-2025 band of 2.90 to 11.90 at band
+    # position 0.53, and inside the ruled band of 1.1 to 10.3 that `score`
+    # grades with by default at position 0.71. The 2026-09-14 vector read
+    # 6.62 at position 0.41, on a thirty-seed standard error of 1.19 and a
+    # thirty-seed standard deviation of 6.52; those two spreads are that
+    # vector's and have not been re-read on the fifth composition. pt-v18
+    # read 5.7957 at position 0.32; pt-v16 read -13.6431 and was held red
+    # here for three eras, and this row exists because of that. The seed
+    # spread is wide against the band, so a single seed's first year says
+    # almost nothing about the row.
     "index_drift_pct": 7.6462,
 }
 
@@ -284,10 +311,11 @@ CERTIFIED_LEVEL: dict[str, float] = {
 #: it asserted "held red" here until 0.7.0, which was true of every default
 #: through pt-v16 and would have been a false statement the day one held.
 CERTIFIED_CRISIS: dict[str, float] = {
-    # The -1 per cent row reads 1.9359 in a band of 0.39 to 3.03, at band
-    # position 0.59, 0.23 ABOVE a centre of 1.71 (recomposed 2026-09-20;
-    # 1.7719 at position 0.52 from 2026-09-14). pt-v18 reads 1.5834 at
-    # position 0.45 and pt-v16 0.9500 at 0.21.
+    # The -1 per cent row reads 1.9427 on the fifth composition
+    # (2026-09-23) in a band of 0.39 to 3.03, at band position 0.59, 0.23
+    # ABOVE a centre of 1.71 (1.9359 at the same position on the 2026-09-20
+    # vector; 1.7719 at position 0.52 from 2026-09-14). pt-v18 reads 1.5834
+    # at position 0.45 and pt-v16 0.9500 at 0.21.
     #
     # THOSE THREE POSITIONS ARE NEW AND THE ROW'S STORY CHANGED WITH THEM.
     # Until 2026-09-15 this band was the 2015-2025 decade's 0.70 to 4.03,
@@ -307,40 +335,45 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # errors low on its score at the same time. `facts` carries the split in
     # `REAL_MARKETS_PROVENANCE["fear_gauge_dn1"]`.
     #
-    # The -3 per cent row reads 6.4046 (recomposed 2026-09-20; 6.3920 on 52
-    # pooled sessions from 2026-09-14), at band position 0.55, a little
-    # above the centre of 6.09. pt-v18 read
+    # The -3 per cent row reads 5.4237 on the fifth composition, at band
+    # position 0.40, 0.67 below the centre of 6.09 (6.4046 at position 0.55
+    # on the 2026-09-20 vector; 6.3920 on 52 pooled sessions from
+    # 2026-09-14). pt-v18 read
     # 3.2473 at position 0.09, close to the floor of 2.60; pt-v16 read
     # 1.9557 and was BELOW it. The VIX level identity and the symmetric
     # fall-rate are what moved it, and this is the row they were composed to
-    # move. Read the session count beside the value: 52 sessions is thin,
-    # and the same row stood on 118 under the pre-31ef261 vector, so the
-    # median moved on fewer and deeper falls rather than on more of them.
+    # move. Read the session count beside the value: the 2026-09-14 vector
+    # stood on 52 sessions, which is thin, against 118 under the pre-31ef261
+    # vector, so the median moved on fewer and deeper falls rather than on
+    # more of them. The record does not carry the fifth composition's count.
     "fear_gauge_dn1": 1.9427,
     "fear_gauge_dn3": 5.4237,
-    # The index tail row on the same thirty seeds: 79 sessions at or below
-    # -3 per cent in 7,530, a pooled rate of 1.0491 per cent against a band
-    # of 0.47 to 1.96 and a tape centre of 1.2132. IN band, at band position
-    # 0.39, 0.4 of a standard error (0.43) below the tape's centre.
-    # Recomposed 2026-09-20: from 2026-09-14 the row read 0.6906 on 52
-    # sessions at position 0.15, one standard error below the centre, and
+    # The index tail row on the same thirty seeds, fifth composition: 86
+    # sessions at or below -3 per cent in 7,530, a pooled rate of 1.1421 per
+    # cent against the 2015-2025 band of 0.47 to 1.96 (position 0.45) and
+    # the ruled band of 0.64 to 2.34 (position 0.30), and a tape centre of
+    # 1.2132: 0.1 of a standard error below it. The 2026-09-20 vector read
+    # 1.0491 on 79 sessions and the 2026-09-14 vector 0.6906 on 52, where
     # the stochastic level was what held it down. pt-v18 read 1.5803 at
-    # position 0.75 on the same build and seeds, so this preset has roughly
-    # a third of pt-v18's crash sessions. The row is the one that says when
-    # there are too many crash sessions; at this default the question is
-    # whether there are too few, and the verdict alone does not answer it.
+    # position 0.75 on the same build and seeds, so this preset has about
+    # seven tenths of pt-v18's crash sessions. The row is the one that says
+    # when there are too many crash sessions; the verdict alone does not
+    # say whether there are too few.
     #
-    # The three counts beside it, which the rate cannot see: 19 of 30 seeds
+    # The three counts beside it, which the rate cannot see: 13 of 30 seeds
     # hold no such session (the tape's 35 windows hold 13; pt-v18 held 11),
     # 3 of 30 hold five or more (the tape 7, pt-v18 5), and the worst seed
-    # holds 24 (the tape 33, pt-v18 39). Much more mass at zero than the
-    # tape and a lighter far end.
+    # holds 36 (the tape 33, pt-v18 39). More mass at zero than the tape and
+    # a far end about the tape's. On the 2026-09-20 vector the three read 19,
+    # 3 and 24.
     #
-    # GRADED AND NOT COUNTED at this preset: `cycle_stationary_opening` is
-    # 0.0, so every seed opens in expansion at phase age zero and this is
-    # year one of a non-stationary opening. `envelope.tail_block` carries
-    # that as data beside the verdict. The 504-day reading is NOT measured
-    # on this vector: `levelproto` ran 252 days only, and the year-two
+    # GRADED AND COUNTED at this preset since the fifth composition, which
+    # set `cycle_stationary_opening` to 1.0: each seed opens at a phase
+    # drawn from the stationary law, so year one is no longer an
+    # all-expansion opening. Through the 2026-09-22 vector the dial was 0.0
+    # and the row was graded and not counted; `envelope.tail_block` carries
+    # which as data beside the verdict. The 504-day reading is NOT measured
+    # on this vector: the level run is 252 days only, and the year-two
     # figure that stood here (1.2989 per cent) was the pre-31ef261 vector's.
     "index_tail_dn3_pct": 1.1421,
 }
@@ -551,9 +584,11 @@ BAR_BAND_BASIS = "ruled"
 #: the time) and then "thirteen of fourteen, missing only
 #: volume_change_acf1" (pt-v10 and pt-v11). Each of those quoted a count as
 #: a preset's quality figure, which it is not: `BANDS_504` is derived from
-#: 2015-2025 windows and the 0.8.0 scoring rule is not. At pt-v19 the row
-#: out at this horizon is `sector_excess_corr`, 0.10421 against a floor of
-#: 0.11, and it is the only one. The values below were stale in the same way
+#: 2015-2025 windows and the 0.8.0 scoring rule is not. At pt-v19's fifth
+#: composition the row out at this horizon is `sector_excess_corr`, 0.0906
+#: against a floor of 0.11 (0.10421 on the 2026-09-14 vector), and it is the
+#: only one. On the ruled 504-day bands no row is out. The values below were
+#: stale in the same way
 #: `CERTIFIED` was (`defect-26`) and were rewritten from the record on
 #: 2026-09-14. Two rows changed their verdict when they stopped being stale:
 #: `sector_excess_corr` read 0.1829 inside the band against a measured
@@ -565,22 +600,23 @@ BAR_BAND_BASIS = "ruled"
 #: row was `annualised_vol_pct` at 33.89 against a ceiling of 34.0 -- 0.11 of
 #: room on a statistic whose seed spread is far wider, so the count was
 #: genuine but would have flipped on a change that barely moved the model.
-#: pt-v19 reads 23.3899 there, 10.61 of room, having widened it at each of
-#: the 0.6.0, 0.7.0 and 0.8.0 boundaries. That figure read 23.81 here until
-#: 2026-09-14, which was the four-dial pt-v19 of `f317f8d` and not this one.
+#: pt-v19's fifth composition reads 22.5804 there, 11.42 of room, having
+#: widened it at each of the 0.6.0, 0.7.0 and 0.8.0 boundaries. That figure
+#: read 23.81 here until 2026-09-14, which was the four-dial pt-v19 of
+#: `f317f8d`, and 23.3899 until 2026-09-23, which was the 2026-09-14 vector.
 #:
 #: The count is still MEASURED rather than certified: the certified horizon
 #: is 252 because that is where `CERTIFIED` was measured.
 #:
 #: FIFTEEN KEYS SINCE 2026-09-22, for `CERTIFIED`'s reason and with the same
-#: `None`: `record["panel_504"]` is what `envelope_tables.py` writes this
-#: table from, and a table that cannot hold the row the record carries would
-#: make the tool refuse every future record as a schema change. The row
-#: READS more often at 504 than at 252 -- twice the window, so twice the
-#: chance of thirty crisis sessions, and two of four measured seeds read it
-#: on 2026-09-22 against none at 252 -- so this is the entry that is
-#: expected to gain a number first, off the box run that re-measures the
-#: eighteen records.
+#: possible `None`: `record["panel_504"]` is what `envelope_tables.py` writes
+#: this table from, and a table that cannot hold the row the record carries
+#: would make the tool refuse every future record as a schema change. The
+#: row READS more often at 504 than at 252, since twice the window is twice
+#: the chance of thirty crisis sessions: on the fifth composition 9 of the
+#: 30 seeds read it at 504 days against 4 at 252, and 1.3462 is their
+#: median (`dispersion["panel_504"]` on the record). On 2026-09-22 two of
+#: four measured seeds read it at 504 against none at 252.
 #:
 #: The count above stays FOURTEEN and so does the `out` list in `check`: the
 #: dispersion row is graded on `facts.REAL_MARKETS_RULED_504` and is not in
@@ -600,12 +636,24 @@ MEASURED_504: dict[str, float | None] = {
     "corr_asymmetry_lagged": 0.0678,
     "sector_excess_corr": 0.0906,
     "corr_persistence_acf1": 0.4088,
-    # Absent on the record this table was written from, which predates the
-    # row. See the note above and `CERTIFIED`'s.
+    # Read on 9 of the 30 seeds at this preset, and the value is their
+    # median. See the note above and `CERTIFIED`'s.
     "crisis_sector_dispersion": 1.3462,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
+#:
+#: NOT RE-MEASURED ON THE FIFTH COMPOSITION. Every value in this table, and
+#: `DECAY_SLOPE` and `MEMORY_VALID_TO_LAG` below, describes the 2026-09-14
+#: pt-v19 vector. pt-v19 was recomposed four times after that, most recently
+#: on 2026-09-23 (4d8f9cf), and the curve was not re-run. The three lags
+#: `CERTIFIED` also carries show how far it has moved: lag 1 reads 0.0486
+#: there against 0.0477 here, lag 5 0.0237 against 0.0188, and lag 20 0.0085
+#: against 0.0017. All three are still below real. Re-run
+#: `programme/scripts/decay-curve.py` on the shipped preset before quoting
+#: any other lag, the slope or the lag the memory is valid to.
+#:
+#: What follows describes the 2026-09-14 vector.
 #: The model reads BELOW real at every measured lag, from 0.0477 against
 #: 0.1071 at lag one. It is positive and resolved out to lag 12, it is not
 #: distinguishable from zero at lags 20 and 30, and it is negative at about
@@ -617,8 +665,10 @@ MEASURED_504: dict[str, float | None] = {
 #: seeds 101 to 130, 252 days -- by `programme/scripts/decay-curve.py` in the
 #: design repository. Lags 1, 5 and 20 ARE `CERTIFIED`'s `abs_return_acf1`,
 #: `abs_return_acf5` and `abs_return_acf20`: the same per-name estimator on
-#: the same bars, so the two tables cannot disagree, and the measured
-#: residual between them is 0.0e+00 at all three lags.
+#: the same bars, so on the vector both were measured on the two tables
+#: agreed, and the measured residual between them was 0.0e+00 at all three
+#: lags. They disagree now because `CERTIFIED` was re-measured on the fifth
+#: composition and this table was not.
 #:
 #: REPLACED, NOT UPDATED, 2026-09-14, and the distinction is the finding.
 #: This table read 0.1413, 0.1063, 0.0897, 0.0496, 0.0371, 0.0173, 0.0082,
@@ -691,7 +741,10 @@ REAL_DECAY_SLOPE = -0.436
 #: this is reading a process that anti-predicts where the market persists.
 #:
 #: 12 since 2026-09-14, and it read 20 from pt-v14's curve, where lag twenty
-#: stood at +0.0082. On pt-v19 lag twenty reads +0.0017 against a thirty-seed
+#: stood at +0.0082. NOT RE-MEASURED on the fifth composition, where lag
+#: twenty reads +0.0085 in `CERTIFIED` and is positive on 21 of 30 seeds;
+#: the reasoning that follows is the 2026-09-14 vector's. On that vector
+#: lag twenty read +0.0017 against a thirty-seed
 #: bootstrap standard error of 0.0050, so the sign the constant turns on is
 #: not resolved there. The last lag positive by more than one standard error
 #: is 12, at +0.0155 +/- 0.0041. The change tightens what this module
@@ -793,15 +846,16 @@ GAPS: tuple[Gap, ...] = (
             "count is neither. First, headroom -- though this reason has "
             "weakened: under pt-v12 annualised_vol_pct read 33.89 against a "
             "band ending at 34.0, only 0.11 of room on a statistic whose "
-            "seed spread is many times that. pt-v19 reads 23.3899 there, "
-            "which is 10.61 of room, so that row is no longer "
+            "seed spread is many times that. pt-v19 reads 22.5804 there, "
+            "which is 11.42 of room, so that row is no longer "
             "thin. Second and now decisive on its own, "
             "CERTIFIED is what this module certifies and it is measured at "
             "252 days on thirty seeds. The 504-day table is measured, not "
             "certified.\n\n"
             "What remains is a SHAPE problem rather than a level one. "
-            "Volatility itself stabilises near 32%, so a long run does not "
-            "drift or blow up, and clustering at lags one and five stays "
+            "Measured on pt-v12, volatility itself stabilises near 32%, so "
+            "a long run does not drift or blow up, and clustering at lags "
+            "one and five stays "
             "inside its bands. The decay curve is the defect, and the "
             "decay-shape gap carries it: exponential memory imitating "
             "hyperbolic memory holds up over one year and comes apart over "
@@ -810,7 +864,8 @@ GAPS: tuple[Gap, ...] = (
             "\'nothing beyond 504 has been measured at all\' until "
             "2026-08-27, and pt-v12 made that untrue. "
             "tools/calibration/long_horizon.py runs 756, 1260 and 2520 days "
-            "on thirty seeds, and at 2520 days the panel holds 10 of 14 -- "
+            "on thirty seeds, and at 2520 days pt-v12's panel holds 10 of "
+            "14 -- "
             "against the 504-day bands, which are the wrong ruler for a "
             "ten-year window and are quoted only because no ten-year bands "
             "have been derived. That nothing RUNS AWAY is settled by a "
@@ -818,7 +873,11 @@ GAPS: tuple[Gap, ...] = (
             "tools/calibration/memory_vs_drift.py reads annualised "
             "volatility year by year over ten years on twenty seeds, and it "
             "gives 31.5, 35.6, 30.2, 33.5, 33.0, 33.1, 31.3, 32.4, 32.4 and "
-            "31.6 percent, which is flat. So a five-year study is "
+            "31.6 percent on pt-v12, which is flat. Neither tool has been "
+            "re-run on pt-v19. For the shipped preset's own long run, "
+            "`preset_record()[\"long_run\"]` carries thirty 21-year "
+            "histories scored against the adopted long-run criteria. So a "
+            "five-year study is "
             "reading numbers that exist and are published. What it does not "
             "have is a band derived at its own horizon, and no committed "
             "tool derives one. That keeps the certification at 252 days."
@@ -842,10 +901,17 @@ GAPS: tuple[Gap, ...] = (
             f"exponentials, and over one year two of them fake a power law "
             f"well enough that no panel statistic objects. A two-component "
             f"mixture was tried and is not sufficient.\n\n"
+            f"The curve, the slope and the lags above were measured on the "
+            f"2026-09-14 pt-v19 vector and have not been re-measured on the "
+            f"fifth composition that ships. On it lags 1, 5 and 20 read "
+            f"{CERTIFIED['abs_return_acf1']}, {CERTIFIED['abs_return_acf5']} "
+            f"and {CERTIFIED['abs_return_acf20']} (CERTIFIED), still below "
+            f"real at all three.\n\n"
             f"CORRECTED 2026-09-14. This paragraph read 'about 2.2x steeper, "
             f"and the curve turns NEGATIVE by lag 30'. Both described "
             f"pt-v14's curve, which DECAY_252 carried across three defaults; "
-            f"on pt-v19 lag 30 reads -0.0009 against a thirty-seed standard "
+            f"on the 2026-09-14 pt-v19 vector lag 30 reads -0.0009 against "
+            f"a thirty-seed standard "
             f"error of 0.0033 and settles nothing, and the model no longer "
             f"crosses real anywhere because it starts below it. The DEFECT "
             f"has changed character with the model: the old reading was too "
@@ -908,12 +974,13 @@ GAPS: tuple[Gap, ...] = (
             "The expected size of a scenario\'s response is calibrated; "
             "the dispersion around it is not. That is the gap now.\n\n"
             "The steady-state lever -- how much more violent a sustained "
-            "crisis is than a calm market -- reads 2.07x on pt-v19 against "
+            "crisis is than a calm market -- reads 5.22x on pt-v19 against "
             "real markets\' 6.16x, measured from a held VIX 5 to a held VIX "
             "65 on the certified 40-name roster over 252 days at thirty "
-            "seeds (19.19 per cent annualised at the low pin, 39.74 at the "
-            "high one). pt-v18 read 6.53x there, pt-v16 6.23x, pt-v14 "
-            "6.18x, pt-v10 5.05x, and the default before it 3.07x. "
+            "seeds, after 252 discarded sessions at each pin (17.36 per cent "
+            "annualised at the low pin, 90.65 at the high one). On the same "
+            "method the records read pt-v18 7.06x, pt-v16 6.50x, pt-v14 "
+            "6.19x, pt-v10 5.04x and pt-v3 3.08x. "
             "This gap opened by saying the VIX shock response was materially "
             "weaker than the previous preset\'s, and that sentence was "
             "WITHDRAWN when every preset from pt-v11 to pt-v18 read stronger "
@@ -921,21 +988,21 @@ GAPS: tuple[Gap, ...] = (
             "mechanism rather than by accident: the VIX level identity reads "
             "the market\'s variance target against a derived anchor rather "
             "than the dial\'s, so a held VIX 65 is a smaller multiple of it. "
-            "pt-v19 sits 66 per cent BELOW real where pt-v18 sat 5.9 per "
-            "cent above, so the lever is the row on this panel the new "
-            "default reads FURTHEST from real, and it is a large shortfall "
-            "rather than a small one.\n\n"
-            "CORRECTED 2026-09-14. This paragraph read 5.28x and '14.3 per "
-            "cent BELOW real'. 5.28x was measured on pt-v18 plus four dials "
-            "with sector_loading 0.8, in the ptv19panel run, and does not "
-            "describe the composed vector that ships; presets/pt-v19.json "
-            "records 2.42 since the 2026-09-20 recomposition (2.0714 from "
-            "2026-09-14). Read the size of the shortfall, not just its "
-            "sign: it is more than three times what the withdrawn figure "
-            "said. Note also that this lever is read over a window pinned "
-            "from day zero with no burn-in, so the numerator and denominator "
-            "each average a transient, and every preset\'s recorded ratio is "
-            "low by an amount that is a property of the preset.\n\n"
+            "pt-v19 sits 15 per cent BELOW real where pt-v18 sat 15 per "
+            "cent above: a shortfall of about the size pt-v18\'s excess "
+            "was, in the other direction. A crisis held at a fixed fear "
+            "level is somewhat milder here than in a real market.\n\n"
+            "CORRECTED 2026-09-23. This paragraph read 2.07x, 'a third of "
+            "the real one' and '66 per cent BELOW real', which described "
+            "the 2026-09-14 vector (2.0714) and was not updated through "
+            "the 2026-09-20 recomposition (2.42) or the fifth composition "
+            "of 2026-09-23 that ships (5.22). It gave pt-v18 as 6.53x, "
+            "pt-v16 6.23x and pt-v10 5.05x, which were read with no "
+            "burn-in; the records now use a 252-session burn, which the "
+            "note that stood here said was missing. Before that, CORRECTED "
+            "2026-09-14: this paragraph read 5.28x and '14.3 per cent BELOW "
+            "real', measured on pt-v18 plus four dials with sector_loading "
+            "0.8 in the ptv19panel run, which never shipped.\n\n"
             "'Direction is right' is measured rather than asserted. Driving "
             "the real 2020-21 macro path through the model and correlating "
             "daily returns against each driver, over 504 sessions, against "
@@ -1021,11 +1088,19 @@ GAPS: tuple[Gap, ...] = (
         detail=(
             "Left to itself the economy stays in a moderate band, and two "
             "consequences follow that are easy to mistake for defects.\n\n"
-            "INFLATION. Measured over thirty seeds and five years, endogenous "
-            "inflation peaks at 4.0% on every seed, with sd 1.2 around a mean "
-            "of 2.0%; US CPI year-on-year 2015-2025 (FRED CPIAUCSL) has sd "
-            "2.18, a peak of 9.0% in June 2022 and monthly AR(1) 0.978 "
-            "against the model's 0.958. The cap is the inflation update's "
+            "INFLATION. Measured over thirty seeds and five years on the "
+            "shipped pt-v19 (tools/calibration/macro_range.py, seeds 101 to "
+            "130, 2026-09-23), endogenous inflation peaks at a median 3.1%, "
+            "passes 4% on 2 seeds of 30 and never reaches 4.2%, with a "
+            "median sd of 0.59 around a mean of 2.7% and monthly AR(1) "
+            "0.922. US CPI year-on-year 2015-2025 (FRED CPIAUCSL) has mean "
+            "2.87, sd 2.18, a peak of 9.0% in June 2022 and monthly AR(1) "
+            "0.978. So the mean is close to real and the range is narrow. "
+            "Until 2026-09-23 this paragraph read 'peaks at 4.0% on every "
+            "seed, with sd 1.2 around a mean of 2.0%' and AR(1) 0.958, which "
+            "is pt-v12: on the same tool and seeds pt-v12 peaks at 4.1% on "
+            "every seed, sd 1.18, mean 2.03, AR(1) 0.959. The cap is the "
+            "inflation update's "
             "mean reversion, 0.55 of the gap to target each month, a "
             "half-life under a month. That coefficient and the 6.0% clamp "
             "are dials since 0.1.4, `inflation_reversion` and "
@@ -1042,7 +1117,9 @@ GAPS: tuple[Gap, ...] = (
             "behind an inflation rate above 4%. That path is correct and "
             "well exercised, firing in 22.0% of the 11,898 central-bank cases "
             "in the parity corpus, but a default run cannot reach it because "
-            "inflation does not get there. It also fires in STAGFLATION "
+            "inflation does not get there: on pt-v19 its condition held on "
+            "none of the 37,800 simulated days above. It also fires in "
+            "STAGFLATION "
             "rather than in high inflation as such: at inflation 4.5% with "
             "unemployment 9.0% the bank cuts for the output gap and leaves "
             "itself further behind, so pinning inflation high with "
@@ -1342,18 +1419,20 @@ def check(
         # OVER THE ROWS THIS TABLE CAN BE GRADED BY, which since 2026-09-22
         # is not every row it carries. `crisis_sector_dispersion` has no
         # entry in `BANDS_504` -- its 504 band is on the ruled basis,
-        # `facts.REAL_MARKETS_RULED_504` -- and it carries no reading at
-        # this preset either. Both are skipped by name rather than by a
+        # `facts.REAL_MARKETS_RULED_504` -- and a preset whose seeds hold too
+        # few crisis sessions carries no reading for it. Both are skipped by
+        # name rather than by a
         # `KeyError` or a `TypeError` two frames down, and the denominator
         # is the rows tested, so "all fourteen" stays a count of fourteen.
         graded504 = {k: v for k, v in MEASURED_504.items()
                      if v is not None and k in BANDS_504}
         out = [k for k, v in graded504.items()
                if not (BANDS_504[k][0] <= v <= BANDS_504[k][1])]
-        held = (f"holds all {len(graded504)} against horizon-matched bands"
+        held = (f"holds all {len(graded504)} against the 2015-2025 "
+                f"horizon-matched bands"
                 if not out else
                 f"holds {len(graded504) - len(out)} of {len(graded504)} "
-                f"against horizon-matched bands, missing "
+                f"against the 2015-2025 horizon-matched bands, missing "
                 + ", ".join(f"{k} at {MEASURED_504[k]:.4f} against "
                             f"{BANDS_504[k]}" for k in out))
         fire(g, (
@@ -1362,11 +1441,12 @@ def check(
             f"thin one is annualised_vol_pct at "
             f"{MEASURED_504['annualised_vol_pct']:.2f} against "
             f"{BANDS_504['annualised_vol_pct']}. Beyond 504 days the panel "
-            f"is measured but has no ruler of its own: at 2520 days it holds "
-            f"10 of 14 against the 504-day bands "
-            f"(tools/calibration/long_horizon.py), and annualised volatility "
-            f"is flat year by year across those ten years "
-            f"(tools/calibration/memory_vs_drift.py). No bands have been "
+            f"is measured but has no ruler of its own: at 2520 days pt-v12 "
+            f"held 10 of 14 against the 504-day bands "
+            f"(tools/calibration/long_horizon.py), and its annualised "
+            f"volatility was flat year by year across those ten years "
+            f"(tools/calibration/memory_vs_drift.py); neither has been "
+            f"re-run on the shipped preset. No bands have been "
             f"derived at a five-year window, so the certification "
             f"stops here"
         ))
@@ -1401,7 +1481,9 @@ def check(
                 f"markets' {REAL_DECAY_SLOPE}, and the curve reads below "
                 f"real at every lag, is indistinguishable from zero by lag "
                 f"{MEMORY_VALID_TO_LAG + 8} and is negative by lag 45, "
-                f"where real markets stay positive to lag 60"
+                f"where real markets stay positive to lag 60. The curve and "
+                f"slope were measured on the 2026-09-14 pt-v19 vector and "
+                f"have not been re-measured on the fifth composition"
             ))
         elif name not in CERTIFIED:
             # A level or crisis row. The verdict is COMPUTED, for the reason
@@ -1468,15 +1550,16 @@ def check(
             "EXPECTED size is calibrated: measured as a regression gain "
             "rather than a correlation, the three driver channels run within "
             "ten percent of real AAPL (§81), and the steady-state volatility "
-            "lever from VIX 5 to VIX 65 reads 2.07x on the shipped pt-v19 "
-            "against real markets' 6.16x, where pt-v18 read 6.53x -- so the "
-            "crisis this model makes is a third of the real one, and that "
-            "figure read 5.28x here until 2026-09-14, measured on a "
-            "four-dial vector that never shipped. What is "
+            "lever from VIX 5 to VIX 65 reads 5.22x on the shipped pt-v19 "
+            "against real markets' 6.16x, where pt-v18 read 7.06x. So a "
+            "crisis held at a fixed fear level is about 15 per cent milder "
+            "here than in a real market. That figure read 2.07x here until "
+            "2026-09-23, measured on the 2026-09-14 vector and never "
+            "updated as the preset was recomposed. What is "
             "not calibrated is the DISPERSION around that response: over the "
-            "driven 2020-21 window the model's residual sd is 1.565x real, "
-            "down from 1.76x at pt-v10 and still the worst axis in the "
-            "model, so one run understates how much of its own move was the "
+            "driven 2020-21 window the model's residual sd was 1.565x real "
+            "on pt-v12, down from 1.76x at pt-v10 and the worst axis in the "
+            "model then, so one run understates how much of its own move was the "
             "scenario. Use a scenario to ask WHETHER a strategy breaks, and "
             "read the size as a distribution over seeds"
         ))
@@ -1485,13 +1568,15 @@ def check(
         g = by_id["macro-range"]
         fire(g, (
             "the result depends on the economy reaching a regime it does not "
-            "reach on its own. Measured over thirty seeds and five years, "
-            "endogenous inflation peaks at 4.0% on every seed against a 6.0% "
-            "clamp, with sd 1.2 around a mean of 2.0%, where US CPI "
-            "year-on-year over 2015-2025 (FRED CPIAUCSL) has sd 2.18 and a "
-            "peak of 9.0% in June 2022. So the central bank's own inflation "
-            "crisis cadence -- correct, and firing in 22.0% of the parity "
-            "corpus -- is unreachable from a default run. Drive the regime "
+            "reach on its own. Measured over thirty seeds and five years on "
+            "the shipped pt-v19, endogenous inflation peaks at a median 3.1% "
+            "against a 6.0% clamp and passes 4% on 2 seeds of 30, with sd "
+            "0.59 around a mean of 2.7%, where US CPI year-on-year over "
+            "2015-2025 (FRED CPIAUCSL) has sd 2.18 and a peak of 9.0% in "
+            "June 2022. So the central bank's own inflation crisis cadence "
+            "-- correct, and firing in 22.0% of the parity corpus -- is "
+            "unreachable from a default run: its condition held on none of "
+            "37,800 simulated days. Drive the regime "
             "through a scenario, and note that the crisis cadence responds to "
             "STAGFLATION rather than to high inflation alone"
         ))
@@ -1768,8 +1853,9 @@ def tail_block(panels: Sequence[Mapping[str, Any]], *,
     gives a sign count sitting on its cut.
 
     `stationary_opening` is the run's own answer to whether every seed
-    opened at phase age zero. On the current opening year one is
-    all-expansion on every seed and year two a synchronised contraction, so
+    opened at phase age zero. On a preset that opens at phase age zero
+    (`cycle_stationary_opening` 0.0, every preset through pt-v18) year one
+    is all-expansion on every seed and year two a synchronised contraction, so
     a rate measured there reads the OPENING and not the model; passed False,
     the block is graded, printed and NOT counted, with the reason carried as
     data. Passed None it says the opening was not stated, which is not the
@@ -2409,15 +2495,17 @@ def structure_bar(fresh: Mapping[str, Any] | None,
     record, never fewer, and a row that leaves the certificate is a loss and
     not a shorter list.
 
-    WHAT THIS DOES AND DOES NOT DO TODAY, said here because the block is
-    being laid down RED and a reader will otherwise expect it to be
-    blocking. pt-v19 reads REFUSED on `vix_ar1_debiased` on both panels and
-    it SHIPS, because there is no earlier record to regress from and the bar
-    is a non-regression rule rather than a fidelity threshold. What the
-    block buys today is visibility -- the row is on every record, by name,
-    with its `k`, its cut and its side -- and what it buys tomorrow is the
-    ratchet: the first model that repairs the row lays down a PASS, and from
-    that record on no model may lose it again.
+    WHAT THIS DOES AND DOES NOT DO, said here because the block was laid
+    down RED and a reader will otherwise expect it to have been blocking.
+    Every pt-v19 vector before the fifth composition read REFUSED on
+    `vix_ar1_debiased` on at least one panel, and none was stopped by it,
+    because there was no earlier record to regress from and the bar is a
+    non-regression rule rather than a fidelity threshold. The block buys
+    visibility -- the row is on every record, by name, with its `k`, its
+    cut and its side -- and the ratchet: the first model that repairs the
+    row lays down a PASS, and from that record on no model may lose it
+    again. pt-v19's fifth composition, which ships at 0.8.0, is that model:
+    it PASSES on both panels, at k = 18 and 17 of 30 against a cut of 21.
 
     WHY NOT A HARD FAIL ON REFUSED, which is the obvious alternative and the
     one the row's own evidence argues for. Two reasons, and the first is
@@ -2531,9 +2619,10 @@ def structure_bar(fresh: Mapping[str, Any] | None,
 #: each is read from. BOTH ARE READ AND EITHER FAILING IS A FAILURE, for
 #: `MECHANISM_BAR_PANELS`' reasons exactly: the two panels are different
 #: seed sets, the held-out seeds exist to catch what the measured thirty
-#: cannot, and the shipped default already reads k = 21 of 30 at 252 and
+#: cannot, and the 2026-09-14 pt-v19 vector read k = 21 of 30 at 252 and
 #: k = 28 of 30 held-out -- one at the cut and one nowhere near it, on the
-#: same preset and the same build. A bar reading either panel alone would
+#: same preset and the same build. (The fifth composition that ships reads
+#: 18 and 17, both passing.) A bar reading either panel alone would
 #: spend exactly the protection the second panel is there to give.
 STRUCTURE_BAR_PANELS = ("structure_252", "structure_heldout_seeds")
 

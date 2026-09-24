@@ -40,15 +40,18 @@ except ImportError:
     sys.exit('This example needs the extra: pip install "tradefloor[claude]"')
 
 
-# The nine components the engine decomposes every price move into. Claude
+# The ten components the engine decomposes every price move into. Claude
 # picks from exactly this list so the answer is checkable rather than prose.
-# It has to be all nine: the harness scores against tf.Engine.FACTORS, so a
+# It has to be all ten: the harness scores against tf.Engine.FACTORS, so a
 # list missing `circuit_breaker` and `jump` -- as this one was until 0.3.0 --
 # marks the agent wrong on a day it was never offered the right answer to.
+# `overnight`, the tenth slot since 0.7.0, was missing until 0.8.0. It is
+# zero on every shipped preset, so no day's answer was out of reach, but the
+# list follows FACTORS so that it stays right when a preset turns it on.
 Factor = Literal[
     "reversion", "momentum", "crowd_lean", "company_news",
     "order_flow_impact", "short_squeeze_effect", "random_noise",
-    "circuit_breaker", "jump",
+    "circuit_breaker", "jump", "overnight",
 ]
 
 
@@ -96,13 +99,15 @@ toward zero on a 60-day half-life.
 - Your orders consume real depth. A large order pays worse prices because it \
 ate the book, so size relative to average daily volume matters more than \
 notional size.
-- Returns carry only a small lag-one autocorrelation, +0.0239 on the shipped \
-model, which is inside the range real equities show. Momentum is not a free \
-edge here, though it was in earlier versions of this simulator.
+- Returns carry almost no lag-one autocorrelation, %+.4f on the shipped \
+model (%s), which is inside the range real equities show. Momentum is not a \
+free edge here, though it was in earlier versions of this simulator.
 
 Give a portfolio, not a trade list. Concentration is allowed and often \
 correct; equal-weighting everything is a way of declining to have a view.\
-"""
+""" % (tf.envelope.CERTIFIED["return_acf1"], tf.envelope.PRESET)
+# The autocorrelation is read from the envelope rather than typed: it read
+# +0.0239 here, a figure no current preset record carries, until 0.8.0.
 
 
 class ClaudeTrader:
