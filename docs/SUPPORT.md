@@ -1,8 +1,8 @@
 # Support and long-term support
 
-**Status: a draft policy.** Nothing here is in force until the owner adopts
-it and the first long-term support (LTS) release is tagged. Until then the
-supported line is the one `SECURITY.md` names.
+**Status: takes effect with 0.8.5**, the first long-term support (LTS)
+release. Until 0.8.5 is tagged, the supported line is the one `SECURITY.md`
+names.
 
 tradefloor moved fast in 2026: 0.3.0 on 2026-08-27, 0.8.1 on 2026-09-24,
 and five default presets in that month. That is fine for exploring and bad
@@ -24,19 +24,19 @@ Only the vector a tagged release ships is frozen.
 
 ## The LTS line
 
-**Proposal: the first release whose default preset is pt-v20 starts the
-first LTS line.** The line starts at that release and covers the patch
-releases that follow it.
+**0.8.5 starts the first LTS line.** It is the first release whose default
+preset is pt-v20, and the line covers 0.8.5 and the patch releases that
+follow it.
 
-pt-v20 is the right place to start, not pt-v19. The release that makes it
-the default carries the changes listed under "Coming in pt-v20" in
-[MODEL.md](MODEL.md): the agent order-flow fix, quotes centred on the model
-price, the herding retune, and the opening mispricing. A study pinned to pt-v19 would pin known defects in
+pt-v20 is the right place to start, not pt-v19. 0.8.5 carries the changes
+listed under "Coming in pt-v20" in [MODEL.md](MODEL.md): the agent
+order-flow fix, quotes centred on the model price, the herding retune, and
+the opening mispricing. A study pinned to pt-v19 would pin known defects in
 how an agent's trades reach the price.
 
 ### Support period
 
-- **24 months** of bug and security fixes from the day the LTS line's first version is tagged.
+- **24 months** of bug and security fixes from the day 0.8.5 is tagged.
 - After that, the line stays installable forever and gets no more fixes.
 - The next LTS line is named at least 6 months before the current one ends, so the two overlap.
 
@@ -80,8 +80,9 @@ From then on its coefficient vector, its fingerprint and its known-answer
 digest are fixed. A later release may re-measure a frozen preset and
 publish new figures about it. It never changes what the preset computes.
 
-**Default.** A new preset becomes the default only in a minor release
-(0.x.0), never in a patch. The release notes say which preset moved and
+**Default.** From the LTS line onward, a new preset becomes the default only
+in a minor release (0.x.0), never in a patch. 0.8.5 is the one exception,
+because this policy starts there. The release notes say which preset moved and
 what a user will notice. A run that names its preset replays exactly across
 the move. A run that relied on the default does not, which is why every
 published result should name its preset.
