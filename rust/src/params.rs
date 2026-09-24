@@ -3495,14 +3495,14 @@ pub struct ModelParams {
     /// The exponent `delta` of the latent depth's price-for-size law. Read
     /// only with [`ModelParams::book_depth_coefficient`] off zero, and
     /// refused off zero without it. 0.0 reads as 0.5, the square root of
-    /// Toth et al. (2011), so the coefficient alone turns the law on;
+    /// Toth et al. (2011), so the coefficient alone turns the law on.
     /// Almgren, Thum, Hauptmann and Li (Risk 18(7) 58-62, 2005) measure 0.6
     /// on the temporary cost of US equity executions.
     pub book_depth_exponent: f64,
     /// How far the latent depth reaches, in multiples of the name's average
     /// daily volume per side. Read only with
     /// [`ModelParams::book_depth_coefficient`] off zero, and refused off
-    /// zero without it; 0.0 reads as one day's volume. An order past the
+    /// zero without it. 0.0 reads as one day's volume. An order past the
     /// reach is cut off there, as an order past the ladder is without the
     /// tail.
     pub book_depth_reach: f64,
