@@ -89,6 +89,7 @@ from ._core import (  # noqa: F401
     apply_mispricing,
     characteristic_root_moduli,
     check_rate,
+    crisis_epicentre_solve,
     crowd_adjusted_root_moduli,
     fair_value,
     impulse_response,
@@ -133,7 +134,8 @@ __all__ = [
     "fingerprint", "BATTERY_VERSION", "Battery", "Cell", "Fingerprint",
     "FingerprintComparison", "battery", "commit", "reveal", "sealed_battery",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
-    "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
+    "crisis_epicentre_solve", "crowd_adjusted_root_moduli", "fair_value",
+    "impulse_response",
     "market_status", "model_preset", "preset_names", "run_many",
     "sector_daily_sigma", "sectors",
     "stationary_sigma", "step_mispricing_daily", "version",
@@ -480,7 +482,10 @@ def run_many(
     # The scenario is passed as its REALISED PATH rather than as the object.
     # A path is plain data, so a worker cannot be handed a driver that closes
     # over shared state, and the sweep records exactly what it ran.
-    path = None if scenario is None else [scenario.at(d) for d in range(days)]
+    # `_pin_kwargs` is `at` plus the forced-VIX mark on the days a scenario
+    # with `vix_sets_variance` on pins the VIX, so a sweep forces the same
+    # sessions `Scenario.apply` would.
+    path = None if scenario is None else [scenario._pin_kwargs(d) for d in range(days)]
     # Hashed ONCE, not per worker. The universe is the same for every seed,
     # and hashing it N times would be N times the work for one answer.
     fingerprint = _universe_util.fingerprint_of(universe)

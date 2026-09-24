@@ -8,7 +8,7 @@ short version is that the numbers are a curriculum and a directory is a study.
 **[`rate-shock/counterfactual.py`](rate-shock/counterfactual.py)** is the
 canonical demo: one market, one agent, twenty days of shared history, a
 checkpoint, a fork into two identical worlds, +200bps in one of them, and a
-comparison of what the same agent did next. It runs in about two seconds and
+comparison of what the same agent did next. It runs in about a second and
 needs nothing installed beyond the library.
 
 ```
@@ -31,11 +31,11 @@ Start at 00 if you have not used tradefloor before.
 | [`00-a-year-in-one-market.ipynb`](00-a-year-in-one-market.ipynb) | The shortest useful thing: one year, one company, two crises, and why the price moved |
 | [`01-first-simulation.ipynb`](01-first-simulation.ipynb) | Universe, engine, order book, determinism, provenance |
 | [`02-evaluating-a-strategy.ipynb`](02-evaluating-a-strategy.ipynb) | Strategy specs, baselines, capture ratio, ranking across seeds |
-| [`03-why-did-the-price-move.ipynb`](03-why-did-the-price-move.ipynb) | The nine factor contributions that sum to every move |
+| [`03-why-did-the-price-move.ipynb`](03-why-did-the-price-move.ipynb) | The factor contributions that sum to every move |
 | [`04-how-realistic-is-this.ipynb`](04-how-realistic-is-this.ipynb) | The realism panel, the gaps, choosing a preset |
 | [`05-training-an-agent.ipynb`](05-training-an-agent.ipynb) | The Gymnasium environment, episodes, what size costs |
 | [`06-execution-and-impact.ipynb`](06-execution-and-impact.ipynb) | TCA, the counterfactual run, partial fills, and the same orders in a book a scenario has thinned |
-| [`09-a-pandemic-shaped-market.ipynb`](09-a-pandemic-shaped-market.ipynb) | Driving a real 2020-21 macro path, and diagnosing why the first attempt missed |
+| [`09-a-pandemic-shaped-market.ipynb`](09-a-pandemic-shaped-market.ipynb) | Driving a real 2020-21 macro path, and diagnosing why the first attempt missed. Pinned to `pt-v12`, with the same path run on the default at the end |
 | [`07-research-workflow.py`](07-research-workflow.py) | A whole study in one file: sweep, evaluation, TCA, replay |
 | [`08-claude-agent.py`](08-claude-agent.py) | An LLM agent scored against the baselines |
 | [`10-forking-a-market.py`](10-forking-a-market.py) | Fork a market mid-flight, change the policy rate in one branch, compare |
@@ -54,7 +54,8 @@ same experiment two ways, and writes its output to its own git-ignored
 | | what it asks |
 |---|---|
 | [`rate-shock/`](rate-shock/) | Does the agent actually react to macro conditions? Checkpoint, fork, +200bps in one arm, compare. Two seconds, no keys |
-| [`finrobot/`](finrobot/) | The same experiment with a real [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent in place of the native one. Replays a recorded run by default, so it needs no API key |
+| [`integrations/finrobot/`](integrations/finrobot/) | The same experiment with a real [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent in place of the native one. Replays a recorded run by default, so it needs no API key |
+| [`integrations/`](integrations/) | The same decision loop under a plain function, the OpenAI Agents SDK, PydanticAI and LangGraph. Offline, no keys |
 | [`experiments/liquidity-crisis/`](experiments/liquidity-crisis/) | Will a financial AI agent reduce risk in a market crisis? A checkpoint, a two-way fork, and the packaged `liquidity_crisis` scenario on one arm. An executed notebook, replayed from a recording |
 
 ## Running them
@@ -64,16 +65,19 @@ pip install tradefloor jupyter
 jupyter lab
 ```
 
-Notebooks 00, 03 and 09 also need `matplotlib` for their charts, and 05 needs
+Notebooks 00, 03 and 09 also need `matplotlib` for their charts, 00 and 09
+read the Arrow tables and need `tradefloor[arrow]`, and 05 needs
 `tradefloor[rl]` for the Gymnasium environment. The core library has no
 dependencies.
 
-`rate-shock/counterfactual.py` runs in about two seconds,
-`07-research-workflow.py` in about five and `10-forking-a-market.py` in about
-two, and none of them needs anything extra. The first writes a chart if
-`matplotlib` is installed and says so if it is not. `finrobot/rate_shock.py`
-also runs on the core library alone in its default replay mode; `--live` is
-the one that needs `tradefloor[finrobot]`, Python 3.11 and an API key.
+`rate-shock/counterfactual.py`, `10-forking-a-market.py` and
+`11-scenario-fork.py` each run in about a second and need nothing extra. The
+first writes a chart if `matplotlib` is installed and says so if it is not.
+`07-research-workflow.py` takes ten to twenty seconds and needs
+`tradefloor[arrow]`, because its realism step reads the daily bars table.
+`integrations/finrobot/rate_shock.py` also runs on the core library alone in
+its default replay mode; `--live` is the one that needs `tradefloor[finrobot]`,
+Python 3.11 and an API key.
 `08-claude-agent.py` needs `tradefloor[claude]` and an API key, and spends
 money per decision, so it's the one file here that isn't run automatically.
 
@@ -87,10 +91,10 @@ that: `tests/test_rate_shock_demo.py`
 runs it end to end on every test run and checks its claims, not only its exit
 code -- that the arms started identical, that nothing diverged before the
 intervention, that the experiment reruns to the bit, and that both manifests
-reproduce. `finrobot/rate_shock.py` has the same in
+reproduce. `integrations/finrobot/rate_shock.py` has the same in
 `tests/test_finrobot.py`, which replays its recorded FinRobot run end to end
 on every pass. The rest is opt-in, because executing every notebook takes
-about a minute:
+several minutes:
 
 ```
 TRADEFLOOR_SLOW_TESTS=1 pytest tests/test_examples.py
@@ -104,5 +108,9 @@ Regenerate the committed output with:
 
 ```
 jupyter nbconvert --to notebook --execute --inplace examples/0*.ipynb
-jupyter nbconvert --to notebook --execute --inplace examples/*/*.ipynb
+jupyter nbconvert --to notebook --execute --inplace examples/integrations/*/*.ipynb
+python examples/experiments/liquidity-crisis/build_notebook.py
 ```
+
+The second line re-runs the integration notebooks, which replay recorded
+model calls. The third rebuilds the liquidity-crisis study from its module.

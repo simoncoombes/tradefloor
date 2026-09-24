@@ -167,6 +167,150 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the box the way ramp=50 does above: strong-to-implausible.
     "market_beta_down_asym": (0.0, 0.1),
     "market_beta_down_asym_lag": (0.0, 0.1),
+    # A SWITCH over the two admissible values, for the reason the box gives:
+    # the lagged wire's condition is sampled at the open or sampled live and
+    # the interior has no reading. Stops at 1.0; the sign control at 2.0 is a
+    # diagnostic arm, not a point of the search surface.
+    "market_beta_down_asym_lag_live": (0.0, 1.0),
+    # The variance-neutral down-tick reallocation (`corr-asymmetry.md` §10,
+    # design repository): the idiosyncratic shock is suppressed by `1 - c`
+    # on a down tick of the factor and inflated by `sqrt(2 - (1 - c)^2)` on
+    # an up tick, which holds the unconditional variance exactly and raises
+    # the factor's share where `corr_asymmetry` looks.
+    #
+    # The box runs from the shipped 0.0 -- the mechanism off, and the arm
+    # every falsifier is read against -- to 0.5, which is
+    # strong-to-implausible in the sense the entries above use rather than a
+    # convention. At 0.5 a down tick carries a QUARTER of its idiosyncratic
+    # variance and an up tick 1.75 times it, which at the candidate's
+    # unconditional pairwise correlation of 0.322 is a tick-level
+    # conditional correlation of 0.65 down against 0.21 up: a gap of 0.44
+    # where the tape's DAY-level gap is 0.08. The registered response curve
+    # stops at 0.20 and the prediction solves near 0.15, so the box holds
+    # the useful region several times over.
+    "market_idio_down_suppress": (0.0, 0.5),
+    # How far the market factor's shock share rotates with its own variance
+    # excursion. The top is not a convention: `alpha_beta_at` clamps the
+    # rotation at the value holding the GJR fourth-moment coefficient at
+    # 0.999, so past the point where the clamp binds on a typical excursion
+    # the dial buys nothing and the map would be flat there by
+    # construction. The `alphax2` box measured 0.0 to 0.40 and found the
+    # response flat across the whole of it, so 0.5 is already past
+    # strong-to-implausible and the box spans a refuted mechanism end to
+    # end.
+    "market_vol_alpha_excursion": (0.0, 0.5),
+    # The slow variance LEVEL's two dials. Both are bounded by the tape
+    # rather than by convention (`programme/results/cascade-fourth-moment.md`
+    # section 4.3, design repository): the derived pair is persistence
+    # 0.9977 [0.9945, 0.9992] and sigma 0.047 [0.035, 0.064].
+    #
+    # The persistence box has to CONTAIN the shipped 0.0 -- every range here
+    # does, and the survey refuses one that does not, because a map that
+    # cannot see the model you are running is a map of somewhere else. So it
+    # runs from 0.0, a white-noise level with no memory at all, to 0.9995,
+    # a half-life of 1,386 sessions, which is five and a half years and past
+    # the point where the tape can tell a level from a drift. The top is
+    # deliberately short of 1.0: at 1.0 there is no stationary dispersion to
+    # normalise against and the level is a random walk, which is a different
+    # model rather than a further setting. The useful region is the top
+    # thousandth -- the derived value is 0.9977 -- and a uniform box over
+    # the whole interval will spend most of its samples where the level
+    # reverts faster than the component it sits under. That is a real cost
+    # and it is the price of a range that includes the shipped value; the
+    # alternative is a box the survey would refuse.
+    "market_vol_level_persistence": (0.0, 0.9995),
+    # The sigma box spans zero -- the mechanism off, and the control arm --
+    # to 0.15, which at the derived persistence is a stationary
+    # `sd(log L)` of 2.2 and a two-sigma level swing of a factor of 80.
+    # That is strong-to-implausible in the sense the entries above use: the
+    # engine's clamps would be doing the modelling long before the top.
+    "market_vol_level_sigma": (0.0, 0.15),
+    # The VIX's own slow log-level: persistence up to the same ceiling, and
+    # a sigma box from off to three times the derived 0.0256, which at
+    # 0.9965 is a stationary sd of 0.9 in logs -- a two-sigma level swing
+    # of a factor of six, past which the VIX ceiling does the modelling.
+    "vix_level_persistence": (0.0, 0.9995),
+    "vix_level_sigma": (0.0, 0.08),
+    # The gain the VIX level's dispersion is divided by, so the spread the
+    # tape reads on the OUTPUT is not put on the INPUT. 0.0 is off, the
+    # shipped vector and the arm every reading is taken against. Above it
+    # the loop's own algebra fixes the gain at 1 / (1 - h), with h the
+    # held-VIX read-back exponent: 1.75 at the shipped
+    # market_vol_vix_exponent and 2.47 at the 4.9 the crisis lever asks
+    # for, so a gain is never below one. 6.0 is h = 0.83, past any exponent
+    # anyone has proposed. The stretch between 0 and 1 multiplies the
+    # dispersion instead of dividing it, which is the correction inverted
+    # rather than a wider search; it is inside the box only because the box
+    # has to contain the shipped 0.0, the same price
+    # market_vol_level_persistence pays above.
+    "vix_level_loop_gain": (0.0, 6.0),
+    # The VIX's own slow reversion toward the identity's anchor. 0.0 is the
+    # branch not taken and the shipped vector; DERIVED 0.046 as the kappa at
+    # which the linearised loop's slow pole equals the tape's 0.9965 at
+    # market_vol_vix_exponent 1.83 and vix_mean_reversion 0.27. The box stops
+    # at 0.5, well under the invariant's own refusal at 1.0 (where the step
+    # lands on the anchor every session) and above vix_mean_reversion itself,
+    # so the survey can put more weight on the anchor than on the read-back
+    # and see what that costs.
+    "vix_anchor_reversion": (0.0, 0.5),
+    # The anchor's share of the VIX's target, in logs. 0.0 is the branch not
+    # taken; DERIVED 0.61 at market_vol_vix_exponent 4.0. The box stops at
+    # 0.9, under the invariant's refusal at 1.0 where the VIX ignores the
+    # index's variance altogether.
+    "vix_anchor_weight": (0.0, 0.9),
+    # The anchor's memory rate per session; 0.0 is the instantaneous form.
+    "vix_anchor_memory": (0.0, 1.0),
+    # Switches (0 shipped, 1 on): the US cycle table, Fed lift-off, PE buybacks.
+    "cycle_us_calibration": (0.0, 1.0),
+    "fed_liftoff_rule": (0.0, 1.0),
+    "market_pe_buybacks": (0.0, 1.0),
+    # The anchor's centre (log offset), the weight's level exponent and cap.
+    "vix_anchor_centre": (0.0, 1.0),
+    "vix_anchor_weight_level": (0.0, 2.0),
+    "vix_anchor_weight_level_cap": (0.0, 4.0),
+    "vix_anchor_weight_level_knee": (0.0, 1.0),
+    "vix_anchor_weight_level_below": (0.0, 1.0),
+    # The market variance target's exponent below the anchor; 0.0 reads the
+    # one exponent on both sides. The box spans the square's neighbourhood
+    # up to the crisis side's 4.9.
+    "market_vol_vix_exponent_below": (0.0, 5.0),
+    # Whether the level law's knee reads the slow regime level: a switch.
+    "vix_anchor_weight_level_knee_fixed": (0.0, 1.0),
+    # How fast an endogenous news event's move is priced (2026-09-23,
+    # news-speed): the fast part's half-life in ticks, the post-news drift's
+    # share and half-life, and the maker's re-quote on news (a switch). 0.0
+    # is the straight line over the session; derived 0.6, 0.12, 42 and 1.0.
+    "news_absorption_half_life": (0.0, 5.0),
+    "news_absorption_drift_share": (0.0, 0.5),
+    "news_absorption_drift_half_life": (0.0, 120.0),
+    "news_quote_revision": (0.0, 1.0),
+    # How much more volatile the crisis epicentre's names are than the other
+    # sectors' at the same VIX. The top is 3.0, above the tape's largest
+    # episode ratio (2.43, 2008-09) with room for one worse: five episodes is
+    # the whole record, so a box that stopped at the largest seen would be
+    # surveying the sample rather than the process. The bottom is 0.0 only
+    # because the box has to contain the shipped value, the same price
+    # `vix_level_loop_gain` pays above: 0.0 is the branch not taken, not a
+    # small epicentre, and everything between it and 0.6052 is refused by
+    # `ModelParams::invariants` as an epicentre whose own non-market parts
+    # would carry a negative variance. The useful region starts at 1.0, an
+    # epicentre no different from anywhere else. The top is inside the OTHER
+    # refusal the redistributing solve has: the mechanism holds the roster's
+    # mean non-market variance, so past 4.0307 it is every other name's
+    # variance that would have to go negative, and 3.0 stops short of it.
+    "crisis_epicentre_extra": (0.0, 3.0),
+    # The market-side warm-up, in SESSIONS. Not a share and not a rate, so
+    # its box comes off the thing it has to outlast rather than off a
+    # convention: the warm-up converges geometrically at the SLOW variance
+    # component's persistence, 0.9913, so the initial condition is down to
+    # 0.012 of itself by session 504 and to 0.002 by 756. A box that ran
+    # past about 700 would be surveying arithmetic that has stopped moving.
+    # 1,008 is four years, twice the registered length, and holds the whole
+    # of the useful region with the flat tail visible at the top -- which is
+    # what a survey wants, because a dial whose map goes flat is a dial
+    # whose value is bounded rather than free. The bottom is the shipped
+    # 0.0, the mechanism off and the arm every falsifier is read against.
+    "market_burn_in_sessions": (0.0, 1008.0),
     # A constant added to the VIX target, in points. Not a share, so its box
     # is drawn from the bias it exists to cancel rather than from the unit
     # interval: an asymmetric return gain leaves a standing POSITIVE
@@ -279,6 +423,26 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # real P(VIX>30) tail; 12/yr at 30 points is far past plausible.
     "vix_jump_intensity": (0.0, 12.0),
     "vix_jump_scale": (0.0, 30.0),
+    # The VIX-dynamics dials (programme/results/vix-dynamics.md), each
+    # shipped at the value where its branch is not taken and each MEASURED
+    # on the tape with an error bar, so the box is drawn around the
+    # measurement rather than searched: a Latin hypercube over it maps the
+    # neighbourhood of a derived value, and the same written-down defect
+    # its siblings above carry applies -- the hypercube never draws the
+    # exact zero at which the branch is off.
+    "vix_return_level_exponent": (0.0, 1.0),
+    "vix_return_level_exponent_up": (-1.5, 0.0),
+    "vix_innovation_sigma": (0.0, 0.06),
+    "vix_innovation_return_sigma": (0.0, 0.04),
+    "vix_jump_level_scale": (0.0, 4.0),
+    "vix_jump_return_intensity": (0.0, 12.0),
+    # The per-component states (vix-dynamics.md 19), boxes around the
+    # measured values; the same hypercube caveat as the rows above.
+    "sector_vol_alpha": (0.0, 0.2),
+    "sector_vol_beta": (0.0, 0.98),
+    "jump_idio_excitation": (0.0, 4.0),
+    "jump_idio_excitation_decay": (0.0, 0.9),
+    "jump_idio_vix_decoupled": (0.0, 1.0),
     # Flow composition: lean per VIX point above threshold. At 0.001 and
     # the covid peak (40 points above), the daily common shock is 0.04 --
     # twice the crowd cap; 0.005 is far past plausible and bounds the box.
@@ -357,6 +521,15 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "jump_mean_market": (-0.08, 0.0),
     "jump_sigma_market": (0.0, 0.08),
     "jump_sigma_idio": (0.0, 0.08),
+    # How much of a market jump's log return joins the day's factor shock,
+    # so the variance update sees a crash day. A share, so the unit
+    # interval is the whole domain: 0.0 is the shipped update, which reads
+    # the diffusion alone, and 1.0 is the DERIVED value -- the whole of the
+    # jump, because the whole of it was in the index returns the GJR
+    # coefficients were fitted to. Past 1.0 the shock would carry more of
+    # the jump than the jump moved, so the top is where the fit's own
+    # series is rather than where a search stopped.
+    "jump_market_variance_share": (0.0, 1.0),
     # Volatility-persistence spread across names. Ships at zero, so no
     # multiplicative box exists; the range is the headroom to the GJR
     # persistence ceiling.
@@ -374,6 +547,16 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the cascade path's own arithmetic (garch.rs:187). A blend between is
     # meaningful, so the axis is the unit interval.
     "garch_omega_sector_scaled": (0.0, 1.0),
+    # Whether a name's GJR shock is fed the name's own innovation in the
+    # name's own units instead of the whole day's noise. A blend weight, so
+    # the unit interval is the domain: 0.0 is the shipped arithmetic, where
+    # the market's noise reaches a name as a shock, and 1.0 feeds
+    # `noise_idio_sum / sqrt(kappa2)`, whose mean square is the variance
+    # the coefficients were fitted in. The interior reads, because the two
+    # innovations blend linearly, and 1.0 is taken exactly rather than as
+    # the blend's limit. It travels with the entry above: taking the common
+    # noise out of the innovation takes the level with it.
+    "garch_innovation_commensurate": (0.0, 1.0),
     # Whether day zero is drawn from the cycle's stationary law. A SWITCH,
     # not a share: a day-zero state is either drawn from that law or it is
     # not, and there is no half-drawn phase, so the two admissible values
@@ -383,6 +566,40 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # point (0.0, 0.0) -- and a survey that lands inside the interval gets
     # the same opening as 1.0, which the dial's own tests assert.
     "cycle_stationary_opening": (0.0, 1.0),
+    # Which sigma the crash amplifier measures a shock in. A SWITCH on
+    # exactly the same footing as the entry above -- the branch is at zero
+    # and every nonzero value selects the conditional normaliser -- and the
+    # entry is here because the zero-shipped guard demands a range, not
+    # because the interval means anything.
+    #
+    # AND IT IS WORSE HERE THAN ABOVE, WHICH IS RECORDED RATHER THAN FIXED.
+    # The plan draws a Latin hypercube over each axis, and a hypercube over
+    # [0, 1] never draws exactly 0.0, so this axis surveys the dial
+    # PERMANENTLY ON and its map has no off arm at all. `cycle_stationary_
+    # opening` has the same defect and gets away with it because its two
+    # levels differ only in a day-zero state; this one changes the crash
+    # amplifier's denomination on every tick of every run. The right
+    # treatment is a two-level set -- `atlas.SWITCH_DIALS`, which does not
+    # exist yet -- surveyed at its ends rather than sampled over an
+    # interval. Until it does, read any surface over this axis as a
+    # measurement of the conditional normaliser alone.
+    "crash_amplifier_conditional_sigma": (0.0, 1.0),
+    # Which VIX the factor's variance target reads: the level against a
+    # fixed anchor, or the excursion above the identity's own read-back.
+    # THE THIRD SWITCH IN THIS BLOCK, and it carries the same defect as the
+    # two above for the same reason: the branch is at zero, every nonzero
+    # value selects the excursion form, and a Latin hypercube over [0, 1]
+    # never draws exactly 0.0, so this axis surveys the dial PERMANENTLY ON.
+    # It belongs in the two-level set `atlas.SWITCH_DIALS`, which still does
+    # not exist. Until it does, read any surface over this axis as a
+    # measurement of the excursion form alone.
+    #
+    # This one is the most misleading of the three if that caveat is
+    # dropped, because the dial does not change a magnitude anywhere: it
+    # changes what the ratio's denominator MEANS, from a constant to a
+    # state variable. A response surface in it is two models, not one model
+    # at two settings.
+    "market_vol_vix_excursion": (0.0, 1.0),
     # News peer transfer: weights of a peer's surprise, natural unit range.
     "news_peer_weight": (0.0, 1.0),
     "news_peer_weight_down": (0.0, 1.0),
@@ -417,6 +634,19 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
 #: header. Both known-good values (ramp 6.0, cap 0.98) are asserted inside
 #: these ranges at plan time.
 EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
+    # The macro calendar's year in steps: 365 as shipped, 252 the session
+    # calendar (21-step months, 63-step quarters).
+    "macro_calendar_days_per_year": (252.0, 365.0),
+    # The economy steps a year's GDP and CPI growth compounds over: 365 as
+    # shipped, 252 the session clock (the economy steps once per session).
+    "macro_compound_days_per_year": (252.0, 365.0),
+    # The crisis epicentre's hysteresis, in SESSIONS, shipped at 21. 1 is an
+    # episode that ends on the first session back under the threshold, which
+    # is the mechanism with no memory at all; 63 is a quarter, half again the
+    # longest gap the tape's five episodes contain inside one crisis. Past
+    # that the counter stops ending episodes at all within a registered year
+    # and the map goes flat.
+    "crisis_epicentre_end_sessions": (1.0, 63.0),
     # The sector draw's sigma. Shipped 0.002 gives a [1/4x, 4x] box topping
     # out at 0.008, and §59 measured the band reached at 0.012 and overshot
     # at 0.020, so the box is the range that can see the answer.

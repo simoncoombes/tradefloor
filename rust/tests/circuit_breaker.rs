@@ -105,12 +105,16 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
             // The lagged asymmetry branches on this flag and its gain
             // defaults to 0.0, so false is bit-identical here.
             prev_day_down: false,
+            // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
+            prev_day_factor: 0.0,
+            day_factor: 0.0,
             forced_flow_eff: 1.0,
             // The mechanism ships inert; 0.0 is the value that
             // preserves the behaviour these tests pin.
             universe_stress: 0.0,
             volume_state: 0.0,
             volume_idio: &[],
+            jump_move: &[],
             economy: &economy,
             market_status: MarketStatus::Open,
             intraday_t: 0.5,
@@ -119,6 +123,7 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
             news_impact_queue: &[],
             order_volumes: &[],
             sector_keys: &sectors(),
+            sector_sigmas: &[],
             // The constant-sigma baseline: these tests predate the factor's
             // variance process and pin behaviour at its baseline level.
             market_sigma_daily: MARKET_FACTOR_SIGMA,
@@ -134,6 +139,9 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
                 // Trading days closed. The buyback factor is off on
                 // every preset these tests pin, so it is read
                 // nowhere; 0 is what a single-tick caller opens at.
+                // No crisis episode: the mechanism is off on every preset
+                // these tests pin, and a single-tick caller has none.
+                crisis_epicentre: None,
                 elapsed_days: 0,
                 params: &tradefloor::params::PT_V1,
         },
@@ -249,12 +257,16 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
                     // The lagged asymmetry branches on this flag and its gain
                     // defaults to 0.0, so false is bit-identical here.
                     prev_day_down: false,
+                    // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
+                    prev_day_factor: 0.0,
+                    day_factor: 0.0,
             forced_flow_eff: 1.0,
                     // The mechanism ships inert; 0.0 is the value that
                     // preserves the behaviour these tests pin.
                     universe_stress: 0.0,
                     volume_state: 0.0,
                     volume_idio: &[],
+            jump_move: &[],
                     economy: &economy,
                     market_status: MarketStatus::Open,
                     intraday_t: t as f64 / 390.0,
@@ -263,6 +275,7 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
                     news_impact_queue: &[],
                     order_volumes: &[],
                     sector_keys: &sectors(),
+                    sector_sigmas: &[],
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
@@ -278,6 +291,9 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
                 // Trading days closed. The buyback factor is off on
                 // every preset these tests pin, so it is read
                 // nowhere; 0 is what a single-tick caller opens at.
+                // No crisis episode: the mechanism is off on every preset
+                // these tests pin, and a single-tick caller has none.
+                crisis_epicentre: None,
                 elapsed_days: 0,
                 params: &tradefloor::params::PT_V1,
                 },
@@ -307,12 +323,16 @@ fn the_band_holds_in_extended_hours_too() {
                     // The lagged asymmetry branches on this flag and its gain
                     // defaults to 0.0, so false is bit-identical here.
                     prev_day_down: false,
+                    // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
+                    prev_day_factor: 0.0,
+                    day_factor: 0.0,
             forced_flow_eff: 1.0,
                     // The mechanism ships inert; 0.0 is the value that
                     // preserves the behaviour these tests pin.
                     universe_stress: 0.0,
                     volume_state: 0.0,
                     volume_idio: &[],
+            jump_move: &[],
                     economy: &economy,
                     market_status: status,
                     intraday_t: 0.0,
@@ -321,6 +341,7 @@ fn the_band_holds_in_extended_hours_too() {
                     news_impact_queue: &[],
                     order_volumes: &[],
                     sector_keys: &sectors(),
+                    sector_sigmas: &[],
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
@@ -336,6 +357,9 @@ fn the_band_holds_in_extended_hours_too() {
                 // Trading days closed. The buyback factor is off on
                 // every preset these tests pin, so it is read
                 // nowhere; 0 is what a single-tick caller opens at.
+                // No crisis episode: the mechanism is off on every preset
+                // these tests pin, and a single-tick caller has none.
+                crisis_epicentre: None,
                 elapsed_days: 0,
                 params: &tradefloor::params::PT_V1,
                 },
@@ -375,12 +399,16 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
                     // The lagged asymmetry branches on this flag and its gain
                     // defaults to 0.0, so false is bit-identical here.
                     prev_day_down: false,
+                    // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
+                    prev_day_factor: 0.0,
+                    day_factor: 0.0,
             forced_flow_eff: 1.0,
                     // The mechanism ships inert; 0.0 is the value that
                     // preserves the behaviour these tests pin.
                     universe_stress: 0.0,
                     volume_state: 0.0,
                     volume_idio: &[],
+            jump_move: &[],
                     economy: &economy,
                     market_status: MarketStatus::Open,
                     intraday_t: t as f64 / 390.0,
@@ -389,6 +417,7 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
                     news_impact_queue: &[],
                     order_volumes: &[],
                     sector_keys: &sectors(),
+                    sector_sigmas: &[],
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
@@ -404,6 +433,9 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
                 // Trading days closed. The buyback factor is off on
                 // every preset these tests pin, so it is read
                 // nowhere; 0 is what a single-tick caller opens at.
+                // No crisis episode: the mechanism is off on every preset
+                // these tests pin, and a single-tick caller has none.
+                crisis_epicentre: None,
                 elapsed_days: 0,
                 params: &tradefloor::params::PT_V1,
                 },

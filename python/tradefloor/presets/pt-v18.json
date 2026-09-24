@@ -2,11 +2,12 @@
   "schema": 1,
   "preset": "pt-v18",
   "fingerprint": "pt-v18",
-  "coefficient_digest": "d10739a10782680112e239d533a14e2b03fd1438c1c20912f278a9dfb218acee",
+  "coefficient_digest": "06461304e6726941d4084511e8c88aeedc57f685773447d25e8d7f6a8ec3494e",
   "coefficients": {
     "book_levels": 10.0,
     "buyback_payout_share": 0.3333333333333333,
     "cascade_symmetry": 1.0,
+    "crash_amplifier_conditional_sigma": 0.0,
     "crash_amplifier_slope": 0.2,
     "crash_amplifier_threshold": 2.0,
     "crisis_blend_cap": 0.98,
@@ -14,12 +15,15 @@
     "crisis_blend_ramp": 1.4,
     "crisis_blend_source": 1.0,
     "crisis_blend_variance_damp": 0.0,
+    "crisis_epicentre_end_sessions": 21.0,
+    "crisis_epicentre_extra": 0.0,
     "crisis_vix_threshold": 30.88325108,
     "crowd_lean_cap": 0.02,
     "crowd_momentum_gain": 0.02,
     "crowd_valuation_gain": 0.006,
     "cycle_hazard_per_month": 1.0,
     "cycle_stationary_opening": 0.0,
+    "cycle_us_calibration": 0.0,
     "daily_credit_floor_gain": 1.0,
     "daily_shock_cap": 0.15,
     "default_sector_anchor_pe": 18.0,
@@ -28,6 +32,7 @@
     "endogenous_news_sigma": 0.01751004376,
     "fair_value_book_floor": 0.0,
     "fair_value_floor": 0.01,
+    "fed_liftoff_rule": 0.0,
     "fiscal_multiplier": 0.3,
     "forced_flow_beta_exponent": 0.0,
     "forced_flow_gain": 0.0,
@@ -43,9 +48,11 @@
     "garch_ceiling_multiple": 5.0,
     "garch_floor_multiple": 0.25,
     "garch_gamma": 0.18318536187800277,
+    "garch_innovation_commensurate": 0.0,
     "garch_omega": 2e-06,
     "garch_omega_sector_scaled": 0.0,
     "garch_vix_coupling": 0.14219611,
+    "garch_vix_exponent": 2.0,
     "gold_equilibrium_base": 2200.0,
     "gold_mean_reversion": 0.002,
     "growth_duration_scale": 2.0,
@@ -58,8 +65,12 @@
     "inflation_target": 2.0,
     "informed_flow_fraction": 0.35,
     "inventory_limit_levels": 12.0,
+    "jump_idio_excitation": 0.0,
+    "jump_idio_excitation_decay": 0.0,
+    "jump_idio_vix_decoupled": 0.0,
     "jump_intensity_idio": 0.0068895346,
     "jump_intensity_market": 0.0565753337,
+    "jump_market_variance_share": 0.0,
     "jump_mean_compensated": 1.0,
     "jump_mean_market": -0.008521833617959641,
     "jump_momentum_share": 0.0,
@@ -68,22 +79,33 @@
     "jump_vix_coupling": 0.2626,
     "loss_making_price_to_book": 1.2,
     "macro_burn_in_days": 755.0,
+    "macro_calendar_days_per_year": 365.0,
+    "macro_compound_days_per_year": 365.0,
     "market_beta_down_asym": 0.025,
     "market_beta_down_asym_lag": 0.375,
+    "market_beta_down_asym_lag_live": 0.0,
     "market_beta_down_asym_recentre": 1.0,
+    "market_burn_in_sessions": 0.0,
     "market_factor_sigma": 0.007593024924589399,
+    "market_idio_down_suppress": 0.0,
+    "market_pe_buybacks": 0.0,
     "market_vol_alpha": 0.28035004,
+    "market_vol_alpha_excursion": 0.0,
     "market_vol_beta": 0.69244622,
     "market_vol_ceiling_multiple": 32.0,
     "market_vol_floor_multiple": 0.05,
     "market_vol_gamma": 0.0,
+    "market_vol_level_persistence": 0.0,
+    "market_vol_level_sigma": 0.0,
     "market_vol_slow_gain": 0.05,
     "market_vol_slow_persistence": 0.98,
     "market_vol_slow_vix_damp": 0.374,
     "market_vol_slow_weight": 0.35,
     "market_vol_vix_anchor": 15.98426471,
     "market_vol_vix_coupling": 0.9540498202999739,
+    "market_vol_vix_excursion": 0.0,
     "market_vol_vix_exponent": 2.0,
+    "market_vol_vix_exponent_below": 0.0,
     "market_vol_vix_smooth": 0.0,
     "mispricing_cap": 0.9,
     "mispricing_half_life_days": 60.0,
@@ -91,10 +113,14 @@
     "momentum_theta": 0.018551562499999993,
     "name": "pt-v18",
     "neutral_discount_rate": 0.0482,
+    "news_absorption_drift_half_life": 0.0,
+    "news_absorption_drift_share": 0.0,
+    "news_absorption_half_life": 0.0,
     "news_market_weight": 0.3,
     "news_peer_vix_coupling": 8.0,
     "news_peer_weight": 0.05,
     "news_peer_weight_down": 0.05,
+    "news_quote_revision": 0.0,
     "news_sector_weight": 0.5,
     "oil_baseline": 75.0,
     "oil_opec_symmetry": 1.0,
@@ -129,6 +155,8 @@
     "sector_loading": 0.58821442,
     "sector_loading_beta_slope": 0.7,
     "sector_vix_coupling": 1.0,
+    "sector_vol_alpha": 0.0,
+    "sector_vol_beta": 0.0,
     "size_effect_exponent": 0.15,
     "size_effect_smoothness": 0.0,
     "spread_size_exponent": 0.455,
@@ -137,18 +165,37 @@
     "universe_stress_decay": 0.0,
     "universe_stress_weight": 0.0,
     "usd_crisis_vix_threshold": 25.5,
+    "vix_anchor_centre": 0.0,
+    "vix_anchor_memory": 0.0,
+    "vix_anchor_reversion": 0.0,
+    "vix_anchor_weight": 0.0,
+    "vix_anchor_weight_level": 0.0,
+    "vix_anchor_weight_level_below": 0.0,
+    "vix_anchor_weight_level_cap": 0.0,
+    "vix_anchor_weight_level_knee": 0.0,
+    "vix_anchor_weight_level_knee_fixed": 0.0,
     "vix_ceiling": 80.0,
     "vix_cycle_amplitude": 0.85,
     "vix_decay_ratio": 0.6,
+    "vix_innovation_return_sigma": 0.0,
+    "vix_innovation_sigma": 0.0,
     "vix_jump_intensity": 0.0,
+    "vix_jump_level_scale": 0.0,
+    "vix_jump_return_intensity": 0.0,
     "vix_jump_scale": 0.0,
     "vix_level_identity": 0.0,
+    "vix_level_loop_gain": 0.0,
+    "vix_level_persistence": 0.0,
+    "vix_level_sigma": 0.0,
     "vix_mean_reversion": 0.1,
     "vix_realised_vol_weight": 0.3,
     "vix_return_clamp": 15.0,
     "vix_return_exponent": 1.0,
+    "vix_return_exponent_up": 1.0,
     "vix_return_gain": 17.0,
     "vix_return_gain_up": 17.0,
+    "vix_return_level_exponent": 0.0,
+    "vix_return_level_exponent_up": 0.0,
     "vix_return_source": 1.0,
     "vix_target_offset": 0.0,
     "vix_target_shock_cap": 45.0,
@@ -159,6 +206,7 @@
     "volume_innovation_sigma": 0.21,
     "volume_move_cap": 12.0,
     "volume_move_floor": 0.6,
+    "volume_move_jump_share": 1.0,
     "volume_move_noise": 0.2,
     "volume_move_response": 1.0,
     "volume_persistence": 0.7,
@@ -166,7 +214,7 @@
   },
   "mechanisms": {
     "jumps": {
-      "spec": "b27965bd06cd6fc3ae3199835bbd8e7007839460d3f67fba8489d6a80df79ff1",
+      "spec": "0ff870280c51c8d5596640b72099a93306a0503da1f48c582749a87abf7ee980",
       "stream": "jumps",
       "doses": {
         "jump_intensity_market": 0.0565753337,
@@ -175,6 +223,9 @@
         "jump_intensity_idio": 0.0068895346,
         "jump_sigma_idio": 0.0752080062,
         "jump_vix_coupling": 0.2626,
+        "jump_idio_vix_decoupled": 0.0,
+        "jump_idio_excitation": 0.0,
+        "jump_idio_excitation_decay": 0.0,
         "market_vol_vix_anchor": 15.98426471,
         "jump_momentum_share": 0.0,
         "jump_mean_compensated": 1.0
@@ -183,19 +234,38 @@
   },
   "default_since": "0.7.0",
   "measured": {
-    "tradefloor_version": "0.6.2",
-    "commit": "ee22c65daf7c6d80435cb5822feb416ea3327b62",
-    "workers": 96,
-    "wall_seconds": 513.7,
+    "tradefloor_version": "0.8.0",
+    "commit": "26342a8e1e459c397ec847342de8e1657c5bce2d",
+    "workers": 64,
+    "wall_seconds": 63.7,
     "method": {
       "roster": "Universe.random(40, seed=111)",
       "heldout_universe": "Universe.random(60, seed=909)",
       "train_seeds": "101-130 (30)",
       "heldout_seeds": "1-30 (30)",
-      "bands_252": "facts.REAL_MARKETS",
-      "bands_504": "facts.REAL_MARKETS_504",
-      "index_tail_not_measured": "index_tail_dn3_pct is NOT measured by this tool. It is certified on facts.LEVEL_PROTOCOL, where the roster varies with the seed, and this tool holds Universe.random(40, seed=111); the two protocols differ by 13.4 percent on the shipped preset (1.2749 varying against 1.124 held). A held-roster figure under this row's name would be compared with the certified one, so none is emitted. What would fill it: a level-protocol arm in this tool, which is a box job and a Phase 1 follow-on rather than part of the row's own branch.",
-      "crisis_lever": "annualised vol at held VIX 65 over held VIX 5, certified roster, 252 days, thirty seeds",
+      "bands_252": "facts.REAL_MARKETS_RULED",
+      "bands_252_basis": {
+        "era": "1987-06..2025-07 on the fourteen shape rows, 1928-2025 on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
+        "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP on the two whole-record rows; ^VIX against ^GSPC on the two fear rows",
+        "n_windows": 35,
+        "rule": "fixed",
+        "tolerance": 0.06486,
+        "rows": 18
+      },
+      "bands_504": "facts.REAL_MARKETS_RULED_504",
+      "bands_504_basis": {
+        "era": "1987-06..2025-07 on the thirteen shape rows carried, 1928-2025 on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
+        "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP on the two whole-record rows; ^VIX against ^GSPC on the two fear rows",
+        "n_windows": 16,
+        "rule": "fixed",
+        "tolerance": 0.06486,
+        "rows": 17
+      },
+      "band_basis": "ruled",
+      "index_tail_not_measured": "index_tail_dn3_pct is NOT measured by this tool. It is certified on facts.LEVEL_PROTOCOL, where the roster varies with the seed, and this tool holds Universe.random(40, seed=111); the two protocols differ by 13.4 percent on pt-v16 (1.2749 varying against 1.124 held). A held-roster figure under this row's name would be compared with the certified one, so none is emitted. What would fill it: a level-protocol arm in this tool, which is a box job and a Phase 1 follow-on rather than part of the row's own branch.",
+      "reported_not_graded": "vix_ar1_debiased is MEASURED AND REPORTED HERE, NOT GRADED. It is not in envelope.CERTIFIED, so it is not in PANEL, so it is in no in_band count, no misses list, no unreadable list, no mechanism block and no preset record. No band table this tool grades against carries the row -- facts.REAL_MARKETS, facts.REAL_MARKETS_UNIVERSAL and facts.REAL_MARKETS_RULED all lack it at both horizons -- and facts.RULED_UNREADABLE records why. That reason is READ FROM THE LIBRARY as this block is written, into band.reason beside the null, and is not restated here -- so it cannot go stale against facts.py the way a copied sentence would. THERE IS NO BAND FOR THIS ROW AND NONE IS INVENTED HERE. The block carries the real tape's windowed readings (facts.REAL_VIX_AR1_WINDOWS) so the model's reading can be compared by eye, and the row's edge liveness (facts.BAND_EDGE_LIVENESS), which records that the ceiling is dead by debias_ar1's own 1 + 4/n bound. Neither is a verdict.",
+      "crisis_lever": "annualised vol at held VIX 65 over held VIX 5, certified roster, 252 days, thirty seeds, after 252 discarded sessions at the pin. The burn is the eighth measurement defect of measurement-integrity.md repaired: without it each pin's window averages the factor variance's walk toward the pinned target, the two pins walk in opposite directions, and the ratio reads 4 to 8 per cent low by an amount that is a property of the preset",
+      "crisis_lever_burn": 252,
       "real_crisis_lever": 6.16,
       "mechanism": "facts.mechanism_verdict per row on the per-seed panels of the cell: an exact sign test against the row's mechanism-absent reading (facts.NULLS) at the cut the band's own false-alarm rate gives (facts.sign_cut). Three counts, never one: in band, mechanism shown, at real centre"
     }
@@ -238,6 +308,51 @@
     "counts": {
       "in_band": 14,
       "in_band_of": 14,
+      "in_band_ruled": 14,
+      "in_band_ruled_of": 14,
+      "basis": {
+        "era": "2015-07..2025-07",
+        "roster": "the certified forty, exactly",
+        "n_windows": 9,
+        "rule": "spread",
+        "tolerance": 0.06486,
+        "rows": 18,
+        "note": "one decade, one crisis window excluded. corr_persistence_acf1 is the only row on a different count at 504 (four, BAND_WINDOWS_EXCEPTIONS)"
+      },
+      "basis_ruled": {
+        "era": "1987-06..2025-07 on the fourteen shape rows, 1928-2025 on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
+        "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP on the two whole-record rows; ^VIX against ^GSPC on the two fear rows",
+        "n_windows": 35,
+        "rule": "fixed",
+        "tolerance": 0.06486,
+        "multiplier": 2.111347,
+        "rows": 18,
+        "composed": {
+          "annualised_vol_pct": "facts.REAL_MARKETS_UNIVERSAL",
+          "excess_kurtosis": "facts.REAL_MARKETS_UNIVERSAL",
+          "return_acf1": "facts.REAL_MARKETS_UNIVERSAL",
+          "abs_return_acf1": "facts.REAL_MARKETS_UNIVERSAL",
+          "abs_return_acf5": "facts.REAL_MARKETS_UNIVERSAL",
+          "abs_return_acf20": "facts.REAL_MARKETS_UNIVERSAL",
+          "cross_sectional_corr": "facts.REAL_MARKETS_UNIVERSAL",
+          "volume_abs_return_corr": "facts.REAL_MARKETS_UNIVERSAL",
+          "leverage_effect": "facts.REAL_MARKETS_UNIVERSAL",
+          "volume_change_acf1": "facts.REAL_MARKETS_UNIVERSAL",
+          "corr_asymmetry": "facts.REAL_MARKETS_UNIVERSAL",
+          "corr_asymmetry_lagged": "facts.REAL_MARKETS_UNIVERSAL",
+          "sector_excess_corr": "facts.REAL_MARKETS_UNIVERSAL",
+          "corr_persistence_acf1": "facts.REAL_MARKETS_UNIVERSAL",
+          "index_drift_pct": "facts.RULED_DRIFT_BAND, 98 calendar years of ^GSPC from 1927-12-30 plus the RSP premium",
+          "index_tail_dn3_pct": "facts.RULED_TAIL_BAND, 97 non-overlapping 252-return windows from 1928-04-09 with a block-3 bootstrap error",
+          "fear_gauge_dn1": "facts.RULED_FEAR_DN1_BAND[252], 33 non-crisis 252-session windows of ^VIX against ^GSPC from 1990-01-03, fixed rule at t(33), read from REAL_MARKETS_PROVENANCE['fear_gauge_dn1']['band']",
+          "fear_gauge_dn3": "facts.RULED_FEAR_DN3_BAND, the shipped whole-record ruler: the spread rule over the ten 1990-2026 windows holding five or more qualifying sessions, ruled 2026-09-19 on its power against 173 retained readings"
+        },
+        "adjustments": "clamp #1 and clamp #2 re-applied on the shape rows; the Campbell ceiling retired as redundant. The tail row's error bar is corrected for clustering and the drift row's is not, because the drift row's annual returns read a lag-1 of +0.0265 and the tail row's window counts read +0.5952",
+        "unreadable": [
+          "vix_ar1_debiased"
+        ],
+        "note": "the composed band each row is graded against under ruling-longest-tape-per-row. One graded row has no ruled band and is absent rather than filled from the decade table"
+      },
       "mechanism_shown": 9,
       "mechanism_of": 10,
       "at_centre": 12,
@@ -275,7 +390,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 8.52438943834645,
-        "z0_bootstrap": 9.330227996040966,
+        "z0_bootstrap": 9.264617728729105,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -290,7 +405,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 1.759087913702212,
-        "z0_bootstrap": 2.9443964262928017,
+        "z0_bootstrap": 3.0140912142183724,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -305,7 +420,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 1.1412502151612118,
-        "z0_bootstrap": 2.5475321123079664,
+        "z0_bootstrap": 2.755664153691051,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -320,7 +435,7 @@
         "at_the_cut": false,
         "counted": false,
         "z0_normal": 0.6017281421706193,
-        "z0_bootstrap": 1.5934453447111068,
+        "z0_bootstrap": 1.6939764773525534,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -335,7 +450,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 9.707135131053011,
-        "z0_bootstrap": 10.013304182403376,
+        "z0_bootstrap": 10.022321785215054,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -350,7 +465,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 27.567097685416073,
-        "z0_bootstrap": 26.362664878479546,
+        "z0_bootstrap": 26.25171707452053,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -365,7 +480,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 3.3691328977492567,
-        "z0_bootstrap": 4.8120075331374945,
+        "z0_bootstrap": 4.60365331439307,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -380,7 +495,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 0.5383829266124657,
-        "z0_bootstrap": 0.7131197296541497,
+        "z0_bootstrap": 0.7206046708980693,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -395,7 +510,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 4.439887673925438,
-        "z0_bootstrap": 4.273977089974364,
+        "z0_bootstrap": 4.350853989537372,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -410,7 +525,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 17.942388991329103,
-        "z0_bootstrap": 22.95376043546109,
+        "z0_bootstrap": 23.60992584775481,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -425,7 +540,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 4.406095748795635,
-        "z0_bootstrap": 4.982028328476036,
+        "z0_bootstrap": 5.016161100789973,
         "tolerance": 0.06486,
         "band_windows": 9
       }
@@ -566,6 +681,51 @@
     "counts": {
       "in_band": 14,
       "in_band_of": 14,
+      "in_band_ruled": 14,
+      "in_band_ruled_of": 14,
+      "basis": {
+        "era": "2015-07..2025-07",
+        "roster": "the certified forty, exactly",
+        "n_windows": 9,
+        "rule": "spread",
+        "tolerance": 0.06486,
+        "rows": 18,
+        "note": "one decade, one crisis window excluded. corr_persistence_acf1 is the only row on a different count at 504 (four, BAND_WINDOWS_EXCEPTIONS)"
+      },
+      "basis_ruled": {
+        "era": "1987-06..2025-07 on the fourteen shape rows, 1928-2025 on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
+        "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP on the two whole-record rows; ^VIX against ^GSPC on the two fear rows",
+        "n_windows": 35,
+        "rule": "fixed",
+        "tolerance": 0.06486,
+        "multiplier": 2.111347,
+        "rows": 18,
+        "composed": {
+          "annualised_vol_pct": "facts.REAL_MARKETS_UNIVERSAL",
+          "excess_kurtosis": "facts.REAL_MARKETS_UNIVERSAL",
+          "return_acf1": "facts.REAL_MARKETS_UNIVERSAL",
+          "abs_return_acf1": "facts.REAL_MARKETS_UNIVERSAL",
+          "abs_return_acf5": "facts.REAL_MARKETS_UNIVERSAL",
+          "abs_return_acf20": "facts.REAL_MARKETS_UNIVERSAL",
+          "cross_sectional_corr": "facts.REAL_MARKETS_UNIVERSAL",
+          "volume_abs_return_corr": "facts.REAL_MARKETS_UNIVERSAL",
+          "leverage_effect": "facts.REAL_MARKETS_UNIVERSAL",
+          "volume_change_acf1": "facts.REAL_MARKETS_UNIVERSAL",
+          "corr_asymmetry": "facts.REAL_MARKETS_UNIVERSAL",
+          "corr_asymmetry_lagged": "facts.REAL_MARKETS_UNIVERSAL",
+          "sector_excess_corr": "facts.REAL_MARKETS_UNIVERSAL",
+          "corr_persistence_acf1": "facts.REAL_MARKETS_UNIVERSAL",
+          "index_drift_pct": "facts.RULED_DRIFT_BAND, 98 calendar years of ^GSPC from 1927-12-30 plus the RSP premium",
+          "index_tail_dn3_pct": "facts.RULED_TAIL_BAND, 97 non-overlapping 252-return windows from 1928-04-09 with a block-3 bootstrap error",
+          "fear_gauge_dn1": "facts.RULED_FEAR_DN1_BAND[252], 33 non-crisis 252-session windows of ^VIX against ^GSPC from 1990-01-03, fixed rule at t(33), read from REAL_MARKETS_PROVENANCE['fear_gauge_dn1']['band']",
+          "fear_gauge_dn3": "facts.RULED_FEAR_DN3_BAND, the shipped whole-record ruler: the spread rule over the ten 1990-2026 windows holding five or more qualifying sessions, ruled 2026-09-19 on its power against 173 retained readings"
+        },
+        "adjustments": "clamp #1 and clamp #2 re-applied on the shape rows; the Campbell ceiling retired as redundant. The tail row's error bar is corrected for clustering and the drift row's is not, because the drift row's annual returns read a lag-1 of +0.0265 and the tail row's window counts read +0.5952",
+        "unreadable": [
+          "vix_ar1_debiased"
+        ],
+        "note": "the composed band each row is graded against under ruling-longest-tape-per-row. One graded row has no ruled band and is absent rather than filled from the decade table"
+      },
       "mechanism_shown": 9,
       "mechanism_of": 10,
       "at_centre": 12,
@@ -603,7 +763,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 10.32568003782117,
-        "z0_bootstrap": 12.94122343601292,
+        "z0_bootstrap": 12.66948165481548,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -618,7 +778,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 3.0831449221687084,
-        "z0_bootstrap": 6.030819578152714,
+        "z0_bootstrap": 5.918224331592281,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -633,7 +793,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 1.5848182219197813,
-        "z0_bootstrap": 2.5266007776073875,
+        "z0_bootstrap": 2.442240306411203,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -648,7 +808,7 @@
         "at_the_cut": false,
         "counted": false,
         "z0_normal": 0.5215488713686873,
-        "z0_bootstrap": 0.9974086143759139,
+        "z0_bootstrap": 0.9683047650227304,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -663,7 +823,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 14.453510040974708,
-        "z0_bootstrap": 14.712502630756772,
+        "z0_bootstrap": 14.507742322726417,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -678,7 +838,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 43.584628144261,
-        "z0_bootstrap": 46.17756062486298,
+        "z0_bootstrap": 45.83637021938656,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -693,7 +853,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 4.960840454406829,
-        "z0_bootstrap": 5.0762258056719105,
+        "z0_bootstrap": 5.136999097476253,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -708,7 +868,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 1.0700544128704197,
-        "z0_bootstrap": 1.5407701319112106,
+        "z0_bootstrap": 1.562872798283073,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -723,7 +883,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 2.931185411672542,
-        "z0_bootstrap": 4.796879400116517,
+        "z0_bootstrap": 5.065649231015768,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -738,7 +898,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 26.43586377915136,
-        "z0_bootstrap": 34.16362644136421,
+        "z0_bootstrap": 32.88572070511731,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -753,7 +913,7 @@
         "at_the_cut": false,
         "counted": true,
         "z0_normal": 4.166769565271527,
-        "z0_bootstrap": 3.477913229307764,
+        "z0_bootstrap": 3.4043801881743185,
         "tolerance": 0.06486,
         "band_windows": 9
       }
@@ -906,7 +1066,52 @@
         "mechanism_shown": 9,
         "mechanism_of": 10,
         "at_centre": 13,
-        "at_centre_of": 14
+        "at_centre_of": 14,
+        "protocol": "facts.LEVEL_PROTOCOL, roster varying with the seed",
+        "band_basis": null,
+        "band_basis_candidates": [
+          "ruled",
+          "shipped"
+        ],
+        "basis": {
+          "note": "this count is 14 of 14 at every basis this build carries (ruled, shipped), so no one ruler is claimed for it"
+        },
+        "in_band_ruled": 14,
+        "in_band_ruled_of": 14,
+        "basis_ruled": {
+          "era": "1987-06..2025-07 on the fourteen shape rows, 1928-2025 on index_drift_pct and index_tail_dn3_pct",
+          "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP on the two whole-record rows",
+          "n_windows": 35,
+          "rule": "fixed",
+          "tolerance": 0.06486,
+          "multiplier": 2.111347,
+          "rows": 16,
+          "composed": {
+            "annualised_vol_pct": "facts.REAL_MARKETS_UNIVERSAL",
+            "excess_kurtosis": "facts.REAL_MARKETS_UNIVERSAL",
+            "return_acf1": "facts.REAL_MARKETS_UNIVERSAL",
+            "abs_return_acf1": "facts.REAL_MARKETS_UNIVERSAL",
+            "abs_return_acf5": "facts.REAL_MARKETS_UNIVERSAL",
+            "abs_return_acf20": "facts.REAL_MARKETS_UNIVERSAL",
+            "cross_sectional_corr": "facts.REAL_MARKETS_UNIVERSAL",
+            "volume_abs_return_corr": "facts.REAL_MARKETS_UNIVERSAL",
+            "leverage_effect": "facts.REAL_MARKETS_UNIVERSAL",
+            "volume_change_acf1": "facts.REAL_MARKETS_UNIVERSAL",
+            "corr_asymmetry": "facts.REAL_MARKETS_UNIVERSAL",
+            "corr_asymmetry_lagged": "facts.REAL_MARKETS_UNIVERSAL",
+            "sector_excess_corr": "facts.REAL_MARKETS_UNIVERSAL",
+            "corr_persistence_acf1": "facts.REAL_MARKETS_UNIVERSAL",
+            "index_drift_pct": "facts.RULED_DRIFT_BAND, 98 calendar years of ^GSPC from 1927-12-30 plus the RSP premium",
+            "index_tail_dn3_pct": "facts.RULED_TAIL_BAND, 97 non-overlapping 252-return windows from 1928-04-09 with a block-3 bootstrap error"
+          },
+          "adjustments": "clamp #1 and clamp #2 re-applied on the shape rows; the Campbell ceiling retired as redundant. The tail row's error bar is corrected for clustering and the drift row's is not, because the drift row's annual returns read a lag-1 of +0.0265 and the tail row's window counts read +0.5952",
+          "unreadable": [
+            "fear_gauge_dn1",
+            "fear_gauge_dn3",
+            "vix_ar1_debiased"
+          ],
+          "note": "the composed band each row is graded against under ruling-longest-tape-per-row. Three graded rows have no ruled band and are absent rather than filled from the decade table"
+        }
       },
       "shown": [
         "abs_return_acf1",
@@ -1255,6 +1460,7 @@
         "not_counted": "year one of a non-stationary opening: every seed opens in expansion at phase age zero, so the ensemble rate reads the opening and not the model -- 0.57x to 0.97x of the centre in year one and 2.06x to 2.19x in year two on the same preset and the same seeds. Graded and printed, not counted, until the run carries a stationary opening"
       }
     },
+    "coefficients": null,
     "control": {
       "preset": "pt-v16",
       "reproduced": true,
@@ -1310,9 +1516,222 @@
       "days": 252
     }
   },
+  "structure_252": {
+    "horizon_days": 252,
+    "seeds": 30,
+    "counts": {
+      "structure_pass": 1,
+      "structure_of": 1
+    },
+    "passed": [
+      "vix_ar1_debiased"
+    ],
+    "refused": [],
+    "absent": [],
+    "at_the_cut": [],
+    "rows": {
+      "vix_ar1_debiased": {
+        "row": "vix_ar1_debiased",
+        "n": 30,
+        "horizon_days": 252,
+        "real_centre": 0.9299390277777778,
+        "se_real": 0.010420076189324069,
+        "tape_windows": 35,
+        "k": 20,
+        "cut": 21,
+        "tolerance": 0.06486,
+        "band_windows": 9,
+        "p": 0.09873714670538902,
+        "verdict": "pass",
+        "side": null,
+        "at_the_cut": false,
+        "median": 0.9365070821183588,
+        "offset": 0.006568054340580942,
+        "se_normal": 0.005380350313628823
+      }
+    },
+    "measured": {
+      "tradefloor_version": "0.8.0",
+      "commit": "26342a8e1e459c397ec847342de8e1657c5bce2d",
+      "method": {
+        "roster": "Universe.random(40, seed=111)",
+        "heldout_universe": "Universe.random(60, seed=909)",
+        "train_seeds": "101-130 (30)",
+        "heldout_seeds": "1-30 (30)",
+        "bands_252": "facts.REAL_MARKETS_RULED",
+        "bands_252_basis": {
+          "era": "1987-06..2025-07 on the fourteen shape rows, 1928-2025 on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
+          "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP on the two whole-record rows; ^VIX against ^GSPC on the two fear rows",
+          "n_windows": 35,
+          "rule": "fixed",
+          "tolerance": 0.06486,
+          "rows": 18
+        },
+        "bands_504": "facts.REAL_MARKETS_RULED_504",
+        "bands_504_basis": {
+          "era": "1987-06..2025-07 on the thirteen shape rows carried, 1928-2025 on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
+          "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP on the two whole-record rows; ^VIX against ^GSPC on the two fear rows",
+          "n_windows": 16,
+          "rule": "fixed",
+          "tolerance": 0.06486,
+          "rows": 17
+        },
+        "band_basis": "ruled",
+        "index_tail_not_measured": "index_tail_dn3_pct is NOT measured by this tool. It is certified on facts.LEVEL_PROTOCOL, where the roster varies with the seed, and this tool holds Universe.random(40, seed=111); the two protocols differ by 13.4 percent on pt-v16 (1.2749 varying against 1.124 held). A held-roster figure under this row's name would be compared with the certified one, so none is emitted. What would fill it: a level-protocol arm in this tool, which is a box job and a Phase 1 follow-on rather than part of the row's own branch.",
+        "reported_not_graded": "vix_ar1_debiased is MEASURED AND REPORTED HERE, NOT GRADED. It is not in envelope.CERTIFIED, so it is not in PANEL, so it is in no in_band count, no misses list, no unreadable list, no mechanism block and no preset record. No band table this tool grades against carries the row -- facts.REAL_MARKETS, facts.REAL_MARKETS_UNIVERSAL and facts.REAL_MARKETS_RULED all lack it at both horizons -- and facts.RULED_UNREADABLE records why. That reason is READ FROM THE LIBRARY as this block is written, into band.reason beside the null, and is not restated here -- so it cannot go stale against facts.py the way a copied sentence would. THERE IS NO BAND FOR THIS ROW AND NONE IS INVENTED HERE. The block carries the real tape's windowed readings (facts.REAL_VIX_AR1_WINDOWS) so the model's reading can be compared by eye, and the row's edge liveness (facts.BAND_EDGE_LIVENESS), which records that the ceiling is dead by debias_ar1's own 1 + 4/n bound. Neither is a verdict.",
+        "crisis_lever": "annualised vol at held VIX 65 over held VIX 5, certified roster, 252 days, thirty seeds, after 252 discarded sessions at the pin. The burn is the eighth measurement defect of measurement-integrity.md repaired: without it each pin's window averages the factor variance's walk toward the pinned target, the two pins walk in opposite directions, and the ratio reads 4 to 8 per cent low by an amount that is a property of the preset",
+        "crisis_lever_burn": 252,
+        "real_crisis_lever": 6.16,
+        "mechanism": "facts.mechanism_verdict per row on the per-seed panels of the cell: an exact sign test against the row's mechanism-absent reading (facts.NULLS) at the cut the band's own false-alarm rate gives (facts.sign_cut). Three counts, never one: in band, mechanism shown, at real centre"
+      }
+    }
+  },
+  "structure_heldout_seeds": {
+    "horizon_days": 252,
+    "seeds": 30,
+    "counts": {
+      "structure_pass": 1,
+      "structure_of": 1
+    },
+    "passed": [
+      "vix_ar1_debiased"
+    ],
+    "refused": [],
+    "absent": [],
+    "at_the_cut": [],
+    "rows": {
+      "vix_ar1_debiased": {
+        "row": "vix_ar1_debiased",
+        "n": 30,
+        "horizon_days": 252,
+        "real_centre": 0.9299390277777778,
+        "se_real": 0.010420076189324069,
+        "tape_windows": 35,
+        "k": 18,
+        "cut": 21,
+        "tolerance": 0.06486,
+        "band_windows": 9,
+        "p": 0.361594608053565,
+        "verdict": "pass",
+        "side": null,
+        "at_the_cut": false,
+        "median": 0.9413747208671411,
+        "offset": 0.011435693089363319,
+        "se_normal": 0.006988484823472914
+      }
+    },
+    "measured": {
+      "tradefloor_version": "0.8.0",
+      "commit": "26342a8e1e459c397ec847342de8e1657c5bce2d",
+      "method": {
+        "roster": "Universe.random(40, seed=111)",
+        "heldout_universe": "Universe.random(60, seed=909)",
+        "train_seeds": "101-130 (30)",
+        "heldout_seeds": "1-30 (30)",
+        "bands_252": "facts.REAL_MARKETS_RULED",
+        "bands_252_basis": {
+          "era": "1987-06..2025-07 on the fourteen shape rows, 1928-2025 on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
+          "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP on the two whole-record rows; ^VIX against ^GSPC on the two fear rows",
+          "n_windows": 35,
+          "rule": "fixed",
+          "tolerance": 0.06486,
+          "rows": 18
+        },
+        "bands_504": "facts.REAL_MARKETS_RULED_504",
+        "bands_504_basis": {
+          "era": "1987-06..2025-07 on the thirteen shape rows carried, 1928-2025 on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
+          "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP on the two whole-record rows; ^VIX against ^GSPC on the two fear rows",
+          "n_windows": 16,
+          "rule": "fixed",
+          "tolerance": 0.06486,
+          "rows": 17
+        },
+        "band_basis": "ruled",
+        "index_tail_not_measured": "index_tail_dn3_pct is NOT measured by this tool. It is certified on facts.LEVEL_PROTOCOL, where the roster varies with the seed, and this tool holds Universe.random(40, seed=111); the two protocols differ by 13.4 percent on pt-v16 (1.2749 varying against 1.124 held). A held-roster figure under this row's name would be compared with the certified one, so none is emitted. What would fill it: a level-protocol arm in this tool, which is a box job and a Phase 1 follow-on rather than part of the row's own branch.",
+        "reported_not_graded": "vix_ar1_debiased is MEASURED AND REPORTED HERE, NOT GRADED. It is not in envelope.CERTIFIED, so it is not in PANEL, so it is in no in_band count, no misses list, no unreadable list, no mechanism block and no preset record. No band table this tool grades against carries the row -- facts.REAL_MARKETS, facts.REAL_MARKETS_UNIVERSAL and facts.REAL_MARKETS_RULED all lack it at both horizons -- and facts.RULED_UNREADABLE records why. That reason is READ FROM THE LIBRARY as this block is written, into band.reason beside the null, and is not restated here -- so it cannot go stale against facts.py the way a copied sentence would. THERE IS NO BAND FOR THIS ROW AND NONE IS INVENTED HERE. The block carries the real tape's windowed readings (facts.REAL_VIX_AR1_WINDOWS) so the model's reading can be compared by eye, and the row's edge liveness (facts.BAND_EDGE_LIVENESS), which records that the ceiling is dead by debias_ar1's own 1 + 4/n bound. Neither is a verdict.",
+        "crisis_lever": "annualised vol at held VIX 65 over held VIX 5, certified roster, 252 days, thirty seeds, after 252 discarded sessions at the pin. The burn is the eighth measurement defect of measurement-integrity.md repaired: without it each pin's window averages the factor variance's walk toward the pinned target, the two pins walk in opposite directions, and the ratio reads 4 to 8 per cent low by an amount that is a property of the preset",
+        "crisis_lever_burn": 252,
+        "real_crisis_lever": 6.16,
+        "mechanism": "facts.mechanism_verdict per row on the per-seed panels of the cell: an exact sign test against the row's mechanism-absent reading (facts.NULLS) at the cut the band's own false-alarm rate gives (facts.sign_cut). Three counts, never one: in band, mechanism shown, at real centre"
+      }
+    }
+  },
+  "structure_rise": {
+    "horizons": [
+      252,
+      504
+    ],
+    "seeds": 30,
+    "matches": [],
+    "below": [
+      "vix_ar1_debiased"
+    ],
+    "above": [],
+    "absent": [],
+    "rows": {
+      "vix_ar1_debiased": {
+        "row": "vix_ar1_debiased",
+        "n": 30,
+        "horizons": [
+          252,
+          504
+        ],
+        "tape_rise": 0.011989932539682502,
+        "se_real": 0.008066524430425851,
+        "median_252": 0.9365070821183588,
+        "median_504": 0.945627378808386,
+        "median_rise": 0.0023159178437668904,
+        "ci90": [
+          -0.0028060417553508743,
+          0.010965186178174935
+        ],
+        "draws": 2000,
+        "seed": 20260921,
+        "verdict": "below",
+        "side": "below",
+        "share_of_tape": 0.19315520217499213
+      }
+    },
+    "measured": {
+      "tradefloor_version": "0.8.0",
+      "commit": "26342a8e1e459c397ec847342de8e1657c5bce2d",
+      "method": {
+        "roster": "Universe.random(40, seed=111)",
+        "heldout_universe": "Universe.random(60, seed=909)",
+        "train_seeds": "101-130 (30)",
+        "heldout_seeds": "1-30 (30)",
+        "bands_252": "facts.REAL_MARKETS_RULED",
+        "bands_252_basis": {
+          "era": "1987-06..2025-07 on the fourteen shape rows, 1928-2025 on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
+          "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP on the two whole-record rows; ^VIX against ^GSPC on the two fear rows",
+          "n_windows": 35,
+          "rule": "fixed",
+          "tolerance": 0.06486,
+          "rows": 18
+        },
+        "bands_504": "facts.REAL_MARKETS_RULED_504",
+        "bands_504_basis": {
+          "era": "1987-06..2025-07 on the thirteen shape rows carried, 1928-2025 on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on fear_gauge_dn1, 1990-01..2026-09 on fear_gauge_dn3",
+          "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP on the two whole-record rows; ^VIX against ^GSPC on the two fear rows",
+          "n_windows": 16,
+          "rule": "fixed",
+          "tolerance": 0.06486,
+          "rows": 17
+        },
+        "band_basis": "ruled",
+        "index_tail_not_measured": "index_tail_dn3_pct is NOT measured by this tool. It is certified on facts.LEVEL_PROTOCOL, where the roster varies with the seed, and this tool holds Universe.random(40, seed=111); the two protocols differ by 13.4 percent on pt-v16 (1.2749 varying against 1.124 held). A held-roster figure under this row's name would be compared with the certified one, so none is emitted. What would fill it: a level-protocol arm in this tool, which is a box job and a Phase 1 follow-on rather than part of the row's own branch.",
+        "reported_not_graded": "vix_ar1_debiased is MEASURED AND REPORTED HERE, NOT GRADED. It is not in envelope.CERTIFIED, so it is not in PANEL, so it is in no in_band count, no misses list, no unreadable list, no mechanism block and no preset record. No band table this tool grades against carries the row -- facts.REAL_MARKETS, facts.REAL_MARKETS_UNIVERSAL and facts.REAL_MARKETS_RULED all lack it at both horizons -- and facts.RULED_UNREADABLE records why. That reason is READ FROM THE LIBRARY as this block is written, into band.reason beside the null, and is not restated here -- so it cannot go stale against facts.py the way a copied sentence would. THERE IS NO BAND FOR THIS ROW AND NONE IS INVENTED HERE. The block carries the real tape's windowed readings (facts.REAL_VIX_AR1_WINDOWS) so the model's reading can be compared by eye, and the row's edge liveness (facts.BAND_EDGE_LIVENESS), which records that the ceiling is dead by debias_ar1's own 1 + 4/n bound. Neither is a verdict.",
+        "crisis_lever": "annualised vol at held VIX 65 over held VIX 5, certified roster, 252 days, thirty seeds, after 252 discarded sessions at the pin. The burn is the eighth measurement defect of measurement-integrity.md repaired: without it each pin's window averages the factor variance's walk toward the pinned target, the two pins walk in opposite directions, and the ratio reads 4 to 8 per cent low by an amount that is a property of the preset",
+        "crisis_lever_burn": 252,
+        "real_crisis_lever": 6.16,
+        "mechanism": "facts.mechanism_verdict per row on the per-seed panels of the cell: an exact sign test against the row's mechanism-absent reading (facts.NULLS) at the cut the band's own false-alarm rate gives (facts.sign_cut). Three counts, never one: in band, mechanism shown, at real centre"
+      }
+    },
+    "regraded": "2026-09-21: tape_rise, se_real, share_of_tape and the verdict re-read from the block's own medians and interval against the tape's PAIRED rise (facts.REAL_VIX_AR1_PAIRED_RISES); the model readings are the box's and unchanged"
+  },
   "in_band": {
     "252": 14,
-    "504": 14,
+    "504": 13,
     "heldout_universe": 14,
     "heldout_seeds": 14
   },
@@ -1322,10 +1741,18 @@
     "heldout_universe": [],
     "heldout_seeds": []
   },
+  "unreadable": {
+    "252": [],
+    "504": [
+      "corr_persistence_acf1"
+    ],
+    "heldout_universe": [],
+    "heldout_seeds": []
+  },
   "crisis_lever": {
-    "ratio": 6.525828933315399,
-    "vol_at_vix_5": 18.882870484831727,
-    "vol_at_vix_65": 123.22638255396225,
+    "ratio": 7.058077938795557,
+    "vol_at_vix_5": 18.030019799879177,
+    "vol_at_vix_65": 127.2572849855743,
     "real": 6.16
   }
 }

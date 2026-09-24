@@ -361,13 +361,20 @@ def test_a_tick_that_printed_nothing_new_absorbed_nothing():
 # ── The breaker's share of the absorption ─────────────────────────────────
 
 
-def halted_run(days=12, ticks=100):
+def halted_run(days=12, ticks=100, pre_market_ticks=0):
     """A market stressed hard enough that the print breaker fires.
 
     The shipped roster at its shipped macro never halts a name, so the
     clamp column is a structural zero there and every assertion about it
     would pass over rows that could not fail. These pins are the ones a
     review measured 146 clamped prints on.
+
+    `pre_market_ticks` prepends a session from 07:00, where every tick
+    prices and none settles, so the table also holds rows that absorbed
+    nothing because nothing stood between the model and the tape. It is off
+    by default because it consumes draws and would move every number the
+    other tests here measured; the one test that needs those rows asks for
+    them, and says why.
     """
     universe = tradefloor.Universe.random(8, seed=5)
     engine = tradefloor.Engine(seed=11, universe=universe)
@@ -379,11 +386,19 @@ def halted_run(days=12, ticks=100):
         qe_pe_boost=0.0,
         fear_greed_index=3.0,
     )
-    for day in range(days):
+    day = 0
+    if pre_market_ticks:
+        engine.open_market()
+        engine.run_session(7, 0, 3, pre_market_ticks, volatility=12.0)
+        engine.close_market()
+        engine.record(day)
+        day += 1
+    for _ in range(days):
         engine.open_market()
         engine.run_session(9, 30, 3, ticks, volatility=12.0)
         engine.close_market()
         engine.record(day)
+        day += 1
     return engine
 
 
@@ -442,8 +457,26 @@ def test_a_clamped_print_is_told_apart_from_one_that_never_settled():
     Two rows both read `absorbed == 0.0`. One never settled and its print is
     the model price; the other was halted and its print is the band edge.
     `clamp` separates them, and nothing else in the table does.
+
+    The quiet rows come from a PRE-MARKET session, where none settles by
+    construction, and not from luck inside the stressed days. Until 0.8.0
+    this read `halted_run()` and drew both sets from the open sessions, and
+    it was passing on ONE quiet row in 9,600 -- a coincidence rather than a
+    fixture. pt-v19 is what exposed that, by taking the count to zero, but
+    the fragility was never pt-v19's: measured across nearby settings,
+    pt-v18 itself yields zero quiet rows at sixteen names, and both presets
+    move between zero and four as the horizon changes. A test whose subject
+    appears or does not appear depending on the draw is a test that will go
+    green over an empty set the next time the model moves.
+
+    `tests/test_prints.py` already knew the answer -- the pre-market run
+    above it exists for exactly this reason, and its docstring records an
+    open session producing "0 rows of 14,040". One engine, one table, so
+    the claim stays what it was: two kinds of row IN THE SAME TABLE that
+    `absorbed` cannot separate and `clamp` can. Measured at this boundary:
+    480 quiet rows and 55 halted ones.
     """
-    table = pa.table(halted_run().prints()).to_pydict()
+    table = pa.table(halted_run(pre_market_ticks=60).prints()).to_pydict()
     halted = [
         row
         for row, (a, c) in enumerate(zip(table["absorbed"], table["clamp"]))

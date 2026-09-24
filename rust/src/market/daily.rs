@@ -190,12 +190,25 @@ pub fn close_day_with(
     // name's variance hovers near a constant whatever the market is doing
     // while the market factor's tracks the VIX squared. At coupling zero the
     // branch is not taken and every preset is bit-identical. See §78.
+    //
+    // THE REFERENCE IS ALSO THE ONLY PLACE A NAME READS THE VIX AS A LEVEL.
+    // The recursion below takes a constant `garch_omega` while
+    // `garch_omega_sector_scaled` is 0.0, so this value reaches the process
+    // through the clamps and not through the long-run level -- and that
+    // level, 3.42e-5 at pt-v19, is under the floor for eight of the twelve
+    // sectors, so the floor is largely where the name rests. What
+    // else a name gets from the regime arrives as a SHOCK, because
+    // `innovation` above is the day's `random_noise` and `factors.rs` builds
+    // that from the market and sector components as well as the name's own.
+    // `ModelParams::garch_vix_exponent` carries the shape of this reference
+    // and the measurements that separate the two channels.
     let base_variance = if params.garch_vix_coupling == 0.0 {
         inputs.sector_base_daily_variance
     } else {
         let ratio = inputs.vix / inputs.vix_anchor;
         let c = params.garch_vix_coupling;
-        inputs.sector_base_daily_variance * (1.0 - c + c * ratio * ratio)
+        inputs.sector_base_daily_variance
+            * (1.0 - c + super::garch::vix_coupled_response(params, c, ratio))
     };
     // The cascade, when a preset asks for one, otherwise the single-component
     // process bit for bit. Branch rather than a blend at zero: `pt-v12` and

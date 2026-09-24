@@ -212,9 +212,28 @@ _CENTRAL_BANK_FIELDS = (
 _SNAPSHOT_KEYS = (
     "columns", "rng", "tickers", "model_fingerprint",
     "attribution", "tick_components", "tick_fundamental", "tick_anchor",
+    # The day's `random_noise` split, the scale its idiosyncratic part was
+    # drawn at, and the jump waiting for the session that trades it in.
+    # Per-day state that reaches a price: off zero on
+    # `garch_innovation_commensurate` the close builds the per-name GJR
+    # innovation out of the first two, and off 1.0 on
+    # `volume_move_jump_share` the volume scale reads the third.
+    "noise_parts", "noise_own_scale2", "jump_move",
     "market_open", "market_variance", "forced_flow_spent",
+    "market_vol_log_level",
+    "vix_log_level",
+    # The crisis episode: whether one is running, how many consecutive
+    # sessions it has spent under `crisis_vix_threshold`, the sector index
+    # its epicentre was drawn at (-1 for `none`, a crisis with no
+    # epicentre) and the pin a scenario set (-2 for no pin). All four are
+    # the state a run with `crisis_epicentre_extra` off zero carries, and
+    # all four read their defaults on every shipped preset.
+    "crisis_in_episode", "crisis_sessions_under",
+    "crisis_epicentre", "crisis_epicentre_pin",
     "nominal_output_base", "volume_state",
-    "universe_stress", "volume_idio", "session_news", "economy",
+    "universe_stress", "volume_idio", "sector_variance", "jump_excitation",
+    "sector_day_factor", "sector_target_day",
+    "session_news", "economy",
     "central_bank", "day_count",
     # Added by the draw-addressing layer, and hashed for the reason the
     # refusal above exists: an installed overlay decides what the engine
@@ -431,7 +450,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
             f"{type(snapshot).__name__}."
         )
     carried = set(snapshot)
-    expected = set(_SNAPSHOT_KEYS)
+    # The anchor's slow memory is carried, and hashed, only on a run with
+    # `vix_anchor_memory` off zero; every other snapshot omits it.
+    expected = set(_SNAPSHOT_KEYS) | ({"vix_anchor_slow"} & carried)
     if carried != expected:
         missing = sorted(expected - carried)
         extra = sorted(carried - expected)
@@ -479,7 +500,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
 
     from ._core import Engine  # the attribution width, one slot per factor
     for name, width in (("attribution", len(Engine.FACTORS)), ("tick_components", 8),
-                        ("tick_fundamental", 1), ("tick_anchor", 1)):
+                        ("tick_fundamental", 1), ("tick_anchor", 1),
+                        # The day's noise split, its idiosyncratic scale and
+                        # the pending jump move, hashed here because they sit
+                        # beside the accumulators above in the snapshot and
+                        # are lost the same way.
+                        ("noise_parts", 3), ("noise_own_scale2", 1),
+                        ("jump_move", 1)):
         for value in _column(snapshot[name], n * width, name):
             _f64(buf, value)
     _flag(buf, bool(snapshot["market_open"]))
@@ -495,8 +522,41 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _f64(buf, snapshot["volume_state"])
     for value in _column(snapshot["volume_idio"], n, "volume_idio"):
         _f64(buf, value)
+    # The two states the composed vector turned on, LENGTH-PREFIXED: the
+    # sector one follows the sector table rather than the roster, and the
+    # name one is empty on an engine built with no companies. Same reason
+    # the pending buffers below carry their lengths, and the same spelling.
+    for name in ("sector_variance", "jump_excitation", "sector_day_factor"):
+        raw = snapshot[name]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field {name!r} carries {len(raw)} bytes, which is "
+                "not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, name)
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    _f64(buf, snapshot["sector_target_day"])
     _f64(buf, snapshot["universe_stress"])
     _f64(buf, snapshot["forced_flow_spent"])
+    # The market factor's slow variance level, in logs. Hashed beside the
+    # line above and for the same reason: two engines alike in every column
+    # and sitting on different levels revert to different targets tonight.
+    _f64(buf, snapshot["market_vol_log_level"])
+    # The VIX's own slow log-level, for the same reason.
+    _f64(buf, snapshot.get("vix_log_level", 0.0))
+    if "vix_anchor_slow" in snapshot:
+        _f64(buf, snapshot["vix_anchor_slow"])
+    # The crisis episode, hashed for the reason the levels above are: two
+    # engines alike in every column, one three sessions into a
+    # financial-services episode and the other outside one, price the
+    # epicentre's names differently tomorrow. `.get` with the default a
+    # snapshot from before the mechanism carries, which is every recorded
+    # one.
+    _flag(buf, bool(snapshot.get("crisis_in_episode", False)))
+    _f64(buf, float(snapshot.get("crisis_sessions_under", 0)))
+    _f64(buf, float(snapshot.get("crisis_epicentre", -1)))
+    _f64(buf, float(snapshot.get("crisis_epicentre_pin", -2)))
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer
@@ -708,7 +768,9 @@ LEDGER_SCHEMA = 1
 #: ``tick_fundamental`` or in the ``rng`` array is a value, and JSON's own
 #: float syntax would round-trip it as some other NaN.
 _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
-                   "tick_anchor", "volume_idio",
+                   "tick_anchor", "noise_parts", "noise_own_scale2",
+                   "jump_move", "volume_idio",
+                   "sector_variance", "jump_excitation", "sector_day_factor",
                    "pending_jump", "pending_overnight")
 
 

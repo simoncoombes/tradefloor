@@ -613,15 +613,22 @@ server = MCPServer(
 def describe_simulator() -> dict[str, Any]:
     """Orientation, computed from the shipped envelope rather than prose."""
     cert = envelope.certified()
-    in_band, out_band, unmeasured = [], [], []
-    for name in REAL_MARKETS:
-        lo, hi = REAL_MARKETS[name]
-        measured = _certified_value(name)
-        if measured is None:
-            unmeasured.append(name)
-            continue
-        target = in_band if band_distance(measured, lo, hi) == 0 else out_band
-        target.append(name)
+    # READ THE ENVELOPE'S OWN VERDICTS, do not recompute them. This walked
+    # `REAL_MARKETS` and graded each row against the shipped decade pair,
+    # which made this surface a band path of its own: `certified` could be
+    # on one basis and the served split on another, and the two disagreed
+    # on `sector_excess_corr` the day the default basis moved. A row the
+    # basis has no band for is UNREADABLE and is served as neither in nor
+    # out, because calling it out would publish a verdict nobody reached.
+    in_band, out_band, unreadable = [], [], []
+    for name, row in cert["statistics"].items():
+        if row["in_band"] is None:
+            unreadable.append(name)
+        elif row["in_band"]:
+            in_band.append(name)
+        else:
+            out_band.append(name)
+    unmeasured = list(cert["unmeasured"])
 
     return {
         "ok": True,
@@ -636,6 +643,8 @@ def describe_simulator() -> dict[str, Any]:
             "horizon_days": cert["certified_horizon_days"],
             "statistics_in_band": in_band,
             "statistics_out_of_band": out_band,
+            "statistics_unreadable": unreadable,
+            "band_basis": cert["band_basis"],
             # The split: a green panel certifies the shape rows; the level
             # and crisis rows are reported with their own verdicts, and one
             # whose certified value is not yet measured is named here rather

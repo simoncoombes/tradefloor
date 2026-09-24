@@ -41,8 +41,19 @@ SCHEMA = 1
 #: holding an old result actually asks.
 DEFAULT_SINCE = {
     "pt-v3": "0.1.0", "pt-v10": "0.2.0", "pt-v12": "0.3.0",
-    "pt-v14": "0.4.0", "pt-v16": "0.6.0", "pt-v18": "0.7.0",
+    "pt-v14": "0.4.0", "pt-v16": "0.6.0", "pt-v18": "0.7.0", "pt-v19": "0.8.0",
 }
+
+
+def moved_values(was: dict[str, float], now: dict[str, float]) -> list[str]:
+    """The names both vectors carry at DIFFERENT values.
+
+    `restamp.py`'s rule, in one place: a name ADDED to `ModelParams` changes
+    every record's digest and moves no trajectory, and a name whose VALUE
+    moved is a different model wearing the same label. Only the second
+    invalidates a measured panel.
+    """
+    return sorted(k for k in set(was) & set(now) if was[k] != now[k])
 
 
 def coefficient_digest(values: dict[str, float]) -> str:
@@ -90,6 +101,99 @@ def git(*args: str) -> str:
     return out.stdout.strip() if out.returncode == 0 else ""
 
 
+def structure_measured(panel: dict) -> dict:
+    """The provenance a structural block carries, in ONE spelling.
+
+    `build` and `write_structure_rows` both produce this block, so both
+    stamp it from here. Two spellings would make `record.py --check` report
+    drift on every record against the very artefact the block was written
+    from -- a field diff that fires on no change at all, which is the
+    opposite of what the check is for.
+    """
+    return {
+        "tradefloor_version": panel["pretium_version"],
+        # The PANEL's commit first, for `build`'s reason: `git rev-parse
+        # HEAD` here names the checkout writing the file, which is the
+        # measuring one only when the record is written on the box.
+        "commit": panel.get("commit") or git("rev-parse", "HEAD") or None,
+        "method": panel["method"],
+    }
+
+
+def structure_blocks(panel: dict, name: str) -> dict:
+    """The two STRUCTURAL certificates, from the per-seed rows the panel kept.
+
+    NOT A MEASUREMENT. `facts.measure` computes `vix_ar1_debiased` on every
+    seed of every run and `preset_panel.py` has retained it per seed, under
+    the row's own key beside the certified rows, since the retain repair.
+    This reads what is already there and signs it against the tape; the
+    engine is not called and no draw schedule is touched.
+
+    EMPTY WHEN THE ARTEFACT DOES NOT CARRY THE ROWS, rather than a block
+    built from nothing. Two artefacts cannot: one written before the retain
+    repair, and a `--rescore` cell whose per-seed rows were nulled because
+    its panel was not the one the committed record was built from. Both are
+    honest absences and `carry_structure` keeps the committed block over
+    them rather than letting a rebuild delete a measurement -- which is
+    defect-26 and the reason `carry_level_protocol` exists one field up.
+    """
+    from tradefloor import envelope
+
+    cell = panel["presets"][name]
+    out = {}
+    for field, source in zip(envelope.STRUCTURE_BAR_PANELS,
+                             ("per_seed_252", "per_seed_heldout_seeds")):
+        rows = cell.get(source)
+        if not rows:
+            return {}
+        out[field] = dict(envelope.certify_structure(rows),
+                          measured=structure_measured(panel))
+    # The rise block, since 2026-09-21, when the artefact retains the 504
+    # rows beside the 252 ones. An artefact written before `per_seed_504`
+    # was retained produces no rise block, and `carry_structure` keeps a
+    # committed one over that absence.
+    rows504 = cell.get("per_seed_504")
+    if rows504 and cell.get("per_seed_252"):
+        out[envelope.STRUCTURE_RISE_FIELD] = dict(
+            envelope.certify_structure_rise(cell["per_seed_252"], rows504),
+            measured=structure_measured(panel))
+    return out
+
+
+def carry_structure(record: dict, path: pathlib.Path) -> str:
+    """Keep a committed structural block the panel could not rebuild.
+
+    `carry_level_protocol`'s rule on the fourth block. A record is the only
+    place a preset's structural verdict is written down, and a rebuild from
+    an artefact that does not retain the per-seed rows would delete it in
+    silence -- the same shape as the `--panel` regenerations that emptied
+    `envelope.CERTIFIED_LEVEL`.
+
+    Carried UNCHECKED against the coefficients, deliberately, and the note
+    says so. `level_protocol` can be checked because it stamps the vector it
+    ran on; these blocks do not, so what is carried is a verdict measured on
+    a build this run cannot identify. That is worth saying out loud and is
+    still better than deleting it.
+    """
+    from tradefloor import envelope
+
+    fields = envelope.STRUCTURE_BAR_PANELS + (envelope.STRUCTURE_RISE_FIELD,)
+    if all(record.get(f) for f in fields):
+        return ""
+    if not path.exists():
+        return ""
+    was = json.loads(path.read_text(encoding="utf-8"))
+    carried = [f for f in fields if was.get(f) and not record.get(f)]
+    if not carried:
+        return ""
+    for field in carried:
+        record[field] = was[field]
+    return ("carried %d structural block(s) forward UNCHECKED: this panel "
+            "retains no per-seed rows to rebuild them from, and they name "
+            "no vector, so nothing here can tell whether the preset has "
+            "moved under them" % len(carried))
+
+
 def build(name: str, panel: dict, values: dict[str, float]) -> dict:
     """One preset's record, from the panel that measured it."""
     p = panel["presets"][name]
@@ -124,6 +228,17 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
         # written before this field existed keeps working.
         "mechanism_252": p["mechanism_252"],
         "mechanism_heldout_seeds": p["mechanism_heldout_seeds"],
+        # THE SECOND GATE, BESIDE THE FIRST AND MIXED INTO NONE OF IT.
+        # `envelope.CERTIFIED_STRUCTURE`'s row has no band, is in no
+        # `in_band` count and in no mechanism count, and is graded here
+        # against the real tape's centre by an exact sign test. Simon's
+        # ruling is that a structural row goes in a gate of its own rather
+        # than into the panel, so it reaches the record under its own two
+        # fields. Additive, so schema 1 stays 1, and `**` rather than two
+        # literals because an artefact that does not retain the per-seed
+        # rows produces NO block here and `carry_structure` keeps the
+        # committed one instead of writing a hole.
+        **structure_blocks(panel, name),
         "in_band": {
             "252": p["in_band_252"],
             "504": p["in_band_504"],
@@ -136,6 +251,47 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
             "heldout_universe": p["misses_heldout_universe"],
             "heldout_seeds": p["misses_heldout_seeds"],
         },
+        # THE DENOMINATOR, WHICH `in_band` ABOVE DOES NOT CARRY. A basis does
+        # not band every row: `facts.REAL_MARKETS_RULED_504` holds thirteen of
+        # the fourteen, because `corr_persistence_acf1` is held out of the
+        # ruled band at 504. So pt-v19 under that basis reads 14 at 252 and 13
+        # at 504 with NO miss at either -- 13 of 13, not 13 of 14 -- and a
+        # bare 13 beside a bare 14 in the same dict reads as one short.
+        # `preset_panel._count_in_band` names the rows it could not read and
+        # this is where they reach the record; without it the count cannot be
+        # told from a failure. Additive, so schema 1 stays 1.
+        "unreadable": {
+            "252": p.get("unreadable_252"),
+            "504": p.get("unreadable_504"),
+            "heldout_universe": p.get("unreadable_heldout_universe"),
+            "heldout_seeds": p.get("unreadable_heldout_seeds"),
+        },
+        # THE OTHER HALF OF THE DENOMINATOR, and the other reason a count is
+        # not fifteen. `unreadable` is a row the BASIS carries no band for;
+        # this is a row the RUN did not read. `crisis_sector_dispersion`
+        # needs thirty sessions above the crisis threshold inside its
+        # window and a 252-day run of a calm preset holds single figures, so
+        # the row is absent on the 252 cells of most presets and reads at
+        # 504. Absent is not a miss and not a pass: it is out of the
+        # numerator AND out of the denominator, which is
+        # `facts.aggregate_panels`'s rule for an empty `fear_gauge_dn3`
+        # applied to a row that has a band. Additive, so schema 1 stays 1,
+        # and `.get` so a record rebuilt from an artefact written before the
+        # row carries null rather than failing.
+        "absent": {
+            "252": p.get("absent_252"),
+            "504": p.get("absent_504"),
+            "heldout_universe": p.get("absent_heldout_universe"),
+            "heldout_seeds": p.get("absent_heldout_seeds"),
+        },
+        # AND WHY, PER CELL, because "absent" with no count is
+        # indistinguishable from a run that stopped measuring the row. Per
+        # absence-capable row: how many of the cell's thirty seeds read it,
+        # how many there were, the aggregate over the ones that did (null
+        # when none did), the estimator by name, and the library's own
+        # sentences about the refusals. `preset_panel._absence` builds it
+        # from the same per-seed panels the median comes from.
+        "dispersion": p.get("dispersion"),
         "crisis_lever": {
             "ratio": p["crisis_lever"],
             "vol_at_vix_5": p["vol_at_vix_5"],
@@ -143,6 +299,394 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
             "real": panel["method"].get("real_crisis_lever"),
         },
     }
+
+
+def carry_level_protocol(record: dict, path: pathlib.Path) -> str:
+    """Carry an existing `level_protocol` block onto a rebuilt record.
+
+    THE BLOCK CANNOT BE REBUILT HERE AND MUST NOT BE DROPPED HERE. `build`
+    assembles a record from a panel measured with the roster HELD at
+    `Universe.random(40, seed=111)`, and `level_protocol` is measured on
+    `facts.LEVEL_PROTOCOL`, where the roster varies with the seed -- a
+    different run on a different protocol. A fresh `--panel` therefore
+    returns a dict with no such key, and writing it over the committed file
+    silently deletes a thirty-seed measurement that cost a box.
+
+    That is not hypothetical. pt-v18's block went at d4cfe22 and pt-v19's at
+    31ef261, both of them `--panel` regenerations by somebody fixing
+    something else, and the result was defect-26: `envelope.CERTIFIED_LEVEL`
+    and `CERTIFIED_CRISIS` left with nothing measured behind them,
+    `envelope_tables.py` refusing to run, and the published level rows
+    frozen on a preset that no longer existed.
+
+    So the block is carried, and carrying it is only honest while the
+    preset's coefficient VALUES have not moved. If they have, the block
+    describes a different model and is dropped -- LOUDLY, naming the tool
+    that replaces it, which is the difference between this and what
+    happened.
+    """
+    if not path.exists():
+        return ""
+    was = json.loads(path.read_text(encoding="utf-8")).get("level_protocol")
+    if not was:
+        return ""
+    stamped = was.get("coefficients")
+    if stamped is None:
+        record["level_protocol"] = was
+        return ("carried level_protocol forward UNCHECKED: it was written "
+                "before the block stamped the vector it ran on, so nothing "
+                "here can tell whether the preset has moved under it")
+    changed = moved_values(stamped, record["coefficients"])
+    if changed:
+        return ("DROPPED level_protocol: %d coefficient(s) moved since it was "
+                "measured (%s), so it describes a different %s. Re-measure "
+                "with tools/presets/level_panel.py and level_rows.py, then "
+                "record.py --level-rows."
+                % (len(changed), ", ".join(changed[:6]), record["preset"]))
+    record["level_protocol"] = was
+    added = sorted(set(record["coefficients"]) - set(stamped))
+    return ("carried level_protocol forward"
+            + ("; +%d dial(s) added inert since (%s)" % (len(added), ", ".join(added))
+               if added else ""))
+
+
+def carry_long_run(record: dict, path: pathlib.Path) -> str:
+    """Carry an existing `long_run` block onto a rebuilt record.
+
+    `carry_level_protocol`'s rule on the long-run verdict, which `--panel`
+    cannot rebuild either: it comes from thirty 21-year histories, the 2008
+    and 2020 replays and the headline edge, graded by the design
+    repository's `programme/longrun/criteria.py`, and it reaches a record
+    through `--long-run` or not at all. Carried while the preset's
+    coefficient VALUES have not moved since the verdict was written (a name
+    added inert does not invalidate it); dropped loudly when they have.
+    """
+    if not path.exists():
+        return ""
+    was = json.loads(path.read_text(encoding="utf-8")).get("long_run")
+    if not was:
+        return ""
+    changed = moved_values(was.get("coefficients") or {}, record["coefficients"])
+    if changed:
+        return ("; DROPPED long_run: %d coefficient(s) moved since the verdict "
+                "(%s). Re-run the long-run instrument and criteria.py, then "
+                "record.py --long-run." % (len(changed), ", ".join(changed[:6])))
+    record["long_run"] = was
+    return "; carried long_run forward"
+
+
+def mechanism_bar(fresh: dict, committed: dict | None) -> dict:
+    """`envelope.record_bar`, with the FIRST LAY-DOWN named as its own case.
+
+    The bar is a SUBSET rule -- no mechanism a record shows may go unshown --
+    and a preset with no committed record has laid down no set to be a subset
+    of. `envelope.mechanism_bar` refuses that, correctly, because a ship bar
+    that passed an absence would be reporting one as a result. The tool that
+    WRITES the first record is the one place where it is not a refusal, and
+    it is separated here rather than inside the library so that the exception
+    sits where it applies and cannot be inherited by a reader of the rule.
+    """
+    from tradefloor import envelope
+
+    if committed is None:
+        return {"passed": True, "first": True, "lost": [], "absent": [],
+                "reason": "no committed record: this run LAYS ONE DOWN, and "
+                          "a first measurement cannot regress against itself"}
+    return dict(envelope.record_bar(fresh, committed), first=False)
+
+
+def structure_bar(fresh: dict, committed: dict | None) -> dict:
+    """`envelope.structure_record_bar`, with the FIRST LAY-DOWN named.
+
+    `mechanism_bar`'s exception, on the fourth block and for the same
+    reason. The bar is a SUBSET rule -- no structural row a record passes
+    may go refused -- and a preset with no committed structural certificate
+    has laid down no set to be a subset of. `envelope.structure_bar` refuses
+    that, correctly. The tool that WRITES the first record is the one place
+    where it is not a refusal, and it is separated here rather than inside
+    the library so the exception sits where it applies.
+
+    THIS EXCEPTION IS DOING REAL WORK TODAY AND WILL NOT BE AGAIN. No
+    preset has ever carried a structural certificate, so the first
+    `--structure-rows` run takes this branch on all eighteen -- including
+    pt-v19, which lays down REFUSED on both panels and ships. Every run
+    after that is read against what was laid down.
+    """
+    from tradefloor import envelope
+
+    if committed is None or not any(
+            committed.get(f) for f in envelope.STRUCTURE_BAR_PANELS):
+        return {"passed": True, "first": True, "lost": [], "absent": [],
+                "reason": "no committed structural certificate: this run "
+                          "LAYS ONE DOWN, and a first measurement cannot "
+                          "regress against itself"}
+    return dict(envelope.structure_record_bar(fresh, committed), first=False)
+
+
+#: WHAT THE TWO BARS ABOVE MAY DO AT A WRITE, since the owner's ruling of
+#: 2026-09-23 (design repo `programme/longrun/CRITERIA.md`, ledger
+#: `ruling-the-pass-bar-is-what-a-user-would-notice-programme-longrun-
+#: criteria`): the pass bar for a preset is the fifteen long-run criteria
+#: and every ruled band, and "the certification's VIX persistence rows, the
+#: mechanism certificate ... are reported and investigated but do not gate
+#: ... These stay on the record and a regression in them is investigated;
+#: they do not by themselves stop a preset."
+#:
+#: Until that ruling the write paths REFUSED a certificate that showed less
+#: than the one on disk, and the way past it was to retire the committed
+#: record on purpose -- which the record boxes of the third, fourth and fifth
+#: compositions all did. That refusal gated a preset on exactly what the
+#: ruling says does not gate, and the retirement it forced erased the
+#: comparison the refusal existed to keep. So a write now GOES THROUGH, says
+#: so loudly on stderr, and carries the regression on the record it writes,
+#: under `REGRESSION_FIELD`: per certificate, the rows lost or gone absent,
+#: the bar's reason, and the record it was read against. The bars themselves
+#: are unchanged, `--check` still lists a loss as a difference, and the
+#: other refusals at a write (moved coefficients, an unnamed band count)
+#: are about the record's integrity rather than the preset's quality and
+#: stand.
+PASS_BAR_RULING = ("ruling-the-pass-bar-is-what-a-user-would-notice-"
+                   "programme-longrun-criteria")
+REGRESSION_FIELD = "reported_regression"
+
+
+def note_regression(record: dict, have: dict | None, **bars: dict) -> list[str]:
+    """Stamp `record` with the certificates that regressed against `have`.
+
+    `bars` maps a certificate name ("mechanism", "structure") to the bar's
+    verdict on this write. A certificate whose bar FAILED gets an entry
+    naming what went and the record it was read against; one whose bar
+    passed has any earlier entry removed, because the entry describes the
+    certificate against the one it replaced and that is no longer the
+    comparison. Returns the stderr lines, empty when nothing regressed.
+    """
+    block = dict(record.get(REGRESSION_FIELD) or {})
+    block.pop("ruling", None)
+    lines: list[str] = []
+    against = {
+        "commit": ((have or {}).get("measured") or {}).get("commit"),
+        "coefficient_digest": (have or {}).get("coefficient_digest"),
+    }
+    for name, bar in bars.items():
+        if bar is None or bar.get("passed", True):
+            block.pop(name, None)
+            continue
+        block[name] = {"lost": list(bar.get("lost") or []),
+                       "absent": list(bar.get("absent") or []),
+                       "reason": bar["reason"], "against": against}
+        lines.append(f"REGRESSION, REPORTED AND NOT GATED ({PASS_BAR_RULING}): "
+                     f"the {name} certificate shows less than the record it "
+                     f"replaces. {bar['reason']}. Written, with the loss "
+                     f"carried under `{REGRESSION_FIELD}`; investigate it")
+    if block:
+        record[REGRESSION_FIELD] = dict(block, ruling=PASS_BAR_RULING)
+    else:
+        record.pop(REGRESSION_FIELD, None)
+    return lines
+
+
+def count_block_gradings(block: dict) -> dict[str, dict]:
+    """One count block's published count, recomputed at every basis.
+
+    MEASURED, NOT ASSERTED, and that distinction is the whole of this
+    function. The block retains in `centre` the median it graded for each of
+    the fourteen shape rows, so the count it published can be recomputed
+    against each band table the library knows and compared with what the
+    block says. A basis that reproduces the published count is a candidate
+    for the ruler this block was read against; one that does not is ruled
+    out. Nothing is stamped here that does not re-derive from the block's own
+    retained numbers.
+
+    Desk cost: fourteen band lookups per basis, no panel, no box. The level
+    block was thought to need a re-measurement to be re-scored because the
+    per-seed panels behind it were never retained -- they were not, and they
+    are not needed, because the aggregate it graded is the thing `centre`
+    keeps.
+    """
+    from tradefloor import envelope
+
+    centre = block.get("centre") or {}
+    published = (block.get("counts") or {}).get("in_band")
+    days = block.get("horizon_days")
+    panel = {row: c["median"] for row, c in centre.items()
+             if c.get("median") is not None}
+    if not panel or published is None or not days:
+        return {}
+    out = {}
+    for basis in sorted(envelope.RULERS_BY_BASIS):
+        try:
+            s = envelope.score(panel, horizon_days=days, basis=basis)
+        except Exception:                      # a basis this horizon has no table for
+            continue
+        out[basis] = {
+            "in_band": s["shape_in_band"], "of": s["shape_of"],
+            "ruler": s["ruler"], "basis_detail": s["basis_detail"],
+            "reproduces": s["shape_in_band"] == published,
+        }
+    return out
+
+
+def stamp_band_ruler(block: dict, label: str) -> str:
+    """Name the ruler one count block was graded by, and add the bar's.
+
+    THE DEFECT THIS CLOSES. `level_protocol.certification` publishes its own
+    `in_band`, its own `at_centre`, eleven mechanism row verdicts and a tail
+    verdict, and it names no band anywhere -- not a basis, not even a symbol.
+    The top-level `in_band` beside it is regraded on every `--panel` run at
+    whatever `--band-basis` the panel was measured at. Regenerate pt-v19 at
+    the basis the ship bar is ruled against and the file publishes
+    `in_band["252"] = 14` from one path and `level_protocol...in_band = 13`
+    from the other, in the same file, with nothing saying they are counts of
+    different things. They are: a different roster, thirty different seeds,
+    and now a different ruler.
+
+    So the block is made to say which. `counts.protocol` names the roster
+    protocol, `counts.band_basis` and `counts.basis` name the ruler the
+    published count re-derives at, and `counts.in_band_ruled` carries the
+    same panel against the band the bar is scored at, stamped
+    `counts.basis_ruled`. Two counts that no longer collide: at the bar's own
+    basis they agree with the top-level count, and where they differ the
+    field names say why.
+
+    REFUSES rather than guessing. If the published count reproduces at no
+    basis the library knows, the block was graded by something not on the
+    shelf and this says so instead of stamping a ruler onto it. If it
+    reproduces at several -- which is the ordinary case for a preset in band
+    everywhere -- no single ruler is claimed; the candidates are listed, and
+    that the count does not move between them is a stronger statement than
+    picking one.
+    """
+    from tradefloor import envelope
+
+    counts = block.get("counts")
+    if not isinstance(counts, dict) or counts.get("in_band") is None:
+        return ""
+    if counts.get("basis") and counts.get("basis_ruled"):
+        return ""                # written by a certify that already stamps
+    graded = count_block_gradings(block)
+    if not graded:
+        return ("; %s counts NOT STAMPED: the block retains no graded "
+                "medians, so the ruler behind its count cannot be re-derived "
+                "and must not be guessed" % label)
+    repro = sorted(b for b, v in graded.items() if v["reproduces"])
+    if not repro:
+        return ("; %s counts NOT STAMPED: in_band %s of %s reproduces at none "
+                "of %s (%s), so it was graded by a table this build does not "
+                "carry"
+                % (label, counts["in_band"], counts.get("in_band_of"),
+                   ", ".join(sorted(graded)),
+                   "; ".join("%s gives %d" % (b, graded[b]["in_band"])
+                             for b in sorted(graded))))
+    counts["protocol"] = _PROTOCOL_OF.get(label, label)
+    if len(repro) == 1:
+        counts["band_basis"] = repro[0]
+        counts["basis"] = graded[repro[0]]["basis_detail"]
+    else:
+        counts["band_basis"] = None
+        counts["band_basis_candidates"] = repro
+        counts["basis"] = {
+            "note": "this count is %d of %s at every basis this build carries "
+                    "(%s), so no one ruler is claimed for it"
+                    % (counts["in_band"], counts.get("in_band_of"),
+                       ", ".join(repro)),
+        }
+    bar = envelope.BAR_BAND_BASIS
+    if bar in graded:
+        counts["in_band_ruled"] = graded[bar]["in_band"]
+        counts["in_band_ruled_of"] = graded[bar]["of"]
+        counts["basis_ruled"] = graded[bar]["basis_detail"]
+    return ("; %s counts stamped %s, and the bar's basis %r reads %s of %s on "
+            "the same medians"
+            % (label, "/".join(repro), bar,
+               counts.get("in_band_ruled"), counts.get("in_band_ruled_of")))
+
+
+#: Every place a committed record publishes a band-derived `in_band` count,
+#: and what a reader has to be able to tell them apart by. Three blocks, three
+#: rosters or seed sets, and until 2026-09-15 none of them named a ruler.
+_COUNT_BLOCKS = (
+    ("mechanism_252", ("mechanism_252",)),
+    ("mechanism_heldout_seeds", ("mechanism_heldout_seeds",)),
+    ("level_protocol.certification", ("level_protocol", "certification")),
+)
+
+#: The run behind each count, in one line, because the ruler is only half of
+#: what tells two of these counts apart. `mechanism_252` and
+#: `level_protocol.certification` are both 252-day thirty-seed counts and they
+#: are of different rosters; naming only the band would leave a reader
+#: thinking a difference between them was a disagreement.
+_PROTOCOL_OF = {
+    "mechanism_252": "the certified roster held at Universe.random(40, "
+                     "seed=111), training seeds",
+    "mechanism_heldout_seeds": "the certified roster held at Universe.random("
+                               "40, seed=111), held-out seeds",
+    "level_protocol.certification": "facts.LEVEL_PROTOCOL, roster varying "
+                                    "with the seed",
+}
+
+
+def stamp_band_rulers(record: dict) -> str:
+    """Every band-derived count block in the record, made to name its ruler."""
+    note = ""
+    for label, path in _COUNT_BLOCKS:
+        block = record
+        for key in path:
+            block = (block or {}).get(key) or {}
+        if isinstance(block, dict) and block:
+            note += stamp_band_ruler(block, label)
+    return note
+
+
+def unnamed_band_counts(record: dict) -> list[str]:
+    """Band-derived counts in this record that name no ruler.
+
+    A record publishes four of them and they are counts of different things:
+    `in_band` on the held roster at two horizons and two seed sets, and
+    `level_protocol.certification.counts.in_band` on the varying-roster
+    protocol. Two of those can disagree honestly. What they may not do is
+    disagree in silence, which is what happens when the ruler is a symbol in
+    one place and absent in the other.
+    """
+    bad = []
+    method = (record.get("measured") or {}).get("method") or {}
+    if not method.get("band_basis"):
+        bad.append("measured.method names no band_basis, so the top-level "
+                   "in_band and misses say nothing about which table graded "
+                   "them")
+    for label, path in _COUNT_BLOCKS:
+        block = record
+        for key in path:
+            block = (block or {}).get(key) or {}
+        counts = block.get("counts") or {}
+        if counts.get("in_band") is None:
+            continue
+        if counts.get("basis") or counts.get("band_basis_candidates"):
+            continue
+        bad.append("%s publishes in_band %s of %s and names no basis, so a "
+                   "reader cannot tell it from the top-level count beside it"
+                   % (label, counts.get("in_band"), counts.get("in_band_of")))
+    return bad
+
+
+def place_level_protocol(record: dict) -> dict:
+    """`level_protocol` after the mechanism blocks, wherever it was set.
+
+    One spelling of the field order, so a record written by `--panel` and one
+    written by `--level-rows` cannot end up with the same fields in two
+    different orders and a diff that reads as a change.
+    """
+    if "level_protocol" not in record:
+        return record
+    ordered = {}
+    for key, value in record.items():
+        if key == "level_protocol":
+            continue
+        ordered[key] = value
+        if key == "mechanism_heldout_seeds":
+            ordered["level_protocol"] = record["level_protocol"]
+    if "level_protocol" not in ordered:      # a record written before that field
+        ordered["level_protocol"] = record["level_protocol"]
+    return ordered
 
 
 def main() -> int:
@@ -165,12 +709,31 @@ def main() -> int:
                          "from a fresh run at the same time would silently "
                          "fold in every model and roster change since the "
                          "record was written")
+    ap.add_argument("--structure-rows", metavar="PANEL",
+                    help="write ONLY the two CERTIFIED_STRUCTURE blocks onto "
+                         "the committed records the given preset_panel.py "
+                         "artefact names, leaving every other field -- "
+                         "panel_252 included -- byte for byte as it is. The "
+                         "structural row has no band and is graded against "
+                         "the real tape's centre by an exact sign test, so "
+                         "it reaches a record through here or not at all. "
+                         "Nothing is measured: the per-seed readings are "
+                         "already retained in the artefact")
     ap.add_argument("--level-rows", metavar="ROWS",
                     help="write ONLY the LEVEL_PROTOCOL block onto the record "
-                         "the given ptv18-envelope-rows.py artefact names. "
+                         "the given level_rows.py artefact names. "
                          "envelope.CERTIFIED_LEVEL and CERTIFIED_CRISIS are "
                          "certified on a protocol no panel measures, so they "
                          "reach a record through here or not at all")
+    ap.add_argument("--long-run", metavar="VERDICT",
+                    help="write ONLY the long_run block onto the record the "
+                         "verdict names: the adopted long-run pass bar "
+                         "(design repo programme/longrun/CRITERIA.md) as "
+                         "graded by programme/longrun/criteria.py --verdict "
+                         "on thirty 21-year histories, the 2008 and 2020 "
+                         "replays, the headline edge and the one-year "
+                         "table. Refused unless the long run measured the "
+                         "preset BY NAME")
     ap.add_argument("--default-since", action="store_true",
                     help="rewrite only `default_since` on every committed "
                          "record from the DEFAULT_SINCE table; no panel "
@@ -184,8 +747,12 @@ def main() -> int:
     args = ap.parse_args()
     if args.mechanism_gate:
         return write_mechanism_gate(args.mechanism_gate)
+    if args.structure_rows:
+        return write_structure_rows(args.structure_rows)
     if args.level_rows:
         return write_level_protocol(args.level_rows)
+    if args.long_run:
+        return write_long_run(args.long_run)
     if args.default_since:
         return write_default_since()
     if args.mechanisms:
@@ -204,31 +771,127 @@ def main() -> int:
     for name in sorted(panel["presets"]):
         values = tradefloor.ModelParams.from_preset(name).to_dict()
         record = build(name, panel, values)
-        text = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
         path = OUT / f"{name}.json"
+        note = carry_level_protocol(record, path)
+        note += carry_structure(record, path)
+        note += carry_long_run(record, path)
+        # After the carry, whichever way the carry went: a block carried
+        # UNCHECKED needs the ruler named just as much as a checked one, and
+        # more, since nothing else about it has been verified.
+        note += stamp_band_rulers(record)
+        record = place_level_protocol(record)
         if args.check:
             if not path.exists():
                 drift.append(f"{path.name} is missing")
             else:
                 have = json.loads(path.read_text(encoding="utf-8"))
+                # THE SUBSET BAR, BEFORE THE FIELD DIFF AND NOT INSTEAD OF
+                # IT. A `differs` line says the block moved and says nothing
+                # about WHICH WAY: a preset that gained a mechanism and one
+                # that lost `leverage_effect` read the same there, and at an
+                # unchanged count of nine of ten the field diff is the only
+                # thing that fires at all. `envelope.record_bar` names the
+                # rows and the panel, so a loss cannot be read as drift.
+                bar = mechanism_bar(record, have)
+                if not bar["passed"]:
+                    drift.append(f"{path.name}: MECHANISM LOST -- "
+                                 + bar["reason"])
+                # AND THE SECOND GATE, read the same way and reported
+                # apart. A structural row is not in the mechanism count and
+                # its loss is not a mechanism loss, so it gets its own line
+                # naming the row and the panel it went on.
+                sbar = structure_bar(record, have)
+                if not sbar["passed"]:
+                    drift.append(f"{path.name}: STRUCTURAL ROW LOST -- "
+                                 + sbar["reason"])
                 # The measurement block carries a commit and a wall time, so
                 # comparing it would report drift on every re-run. What has
                 # to agree is the SCIENCE.
                 for field in ("coefficient_digest", "mechanisms", "panel_252",
                               "panel_504", "in_band", "misses", "crisis_lever",
-                              "mechanism_252", "mechanism_heldout_seeds"):
-                    if have.get(field) != record[field]:
+                              # The denominator is science, not bookkeeping: a
+                              # count of 13 means one thing beside an empty
+                              # `unreadable` and another beside a named row.
+                              "unreadable",
+                              # Both new fields are science by the same
+                              # argument: a 14 beside an empty `absent` and
+                              # a 14 beside a named one are different
+                              # claims, and a `dispersion` block that moved
+                              # from "read on 6 of 30 seeds" to "read on 0"
+                              # is the row going quiet. A field absent from
+                              # this list is a field `--check` reports
+                              # nothing about.
+                              "absent", "dispersion",
+                              "mechanism_252", "mechanism_heldout_seeds",
+                              # THE FOURTH BLOCK, NAMED HERE OR UNAUDITED.
+                              # A field absent from this list is a field
+                              # `--check` reports nothing about: it could
+                              # move, or go, on every record and the tool
+                              # would print "0 differences". The mechanism
+                              # blocks were named here the day they landed
+                              # and these are named here the day they land.
+                              "structure_252", "structure_heldout_seeds",
+                              "structure_rise",
+                              # A block this run would DROP is drift and the
+                              # loudest kind: it is a measurement about to be
+                              # deleted by a tool that cannot remake it.
+                              "level_protocol",
+                              # The long-run verdict: carried, never rebuilt
+                              # here, so a run that would drop it is drift.
+                              "long_run"):
+                    if have.get(field) != record.get(field):
                         drift.append(f"{path.name}: {field} differs")
         else:
+            # THE SAME BARS ON THE WRITE SIDE, because `--check` is advisory
+            # and this is the path that overwrites a measurement. A record
+            # is the only place a preset's mechanism set is written down, so
+            # a run that loses `leverage_effect` and writes it without a
+            # trace destroys the evidence that it did. Since the owner's
+            # ruling of 2026-09-23 the loss is REPORTED rather than refused
+            # (see `PASS_BAR_RULING`): the record is written and carries it.
+            have = (json.loads(path.read_text(encoding="utf-8"))
+                    if path.exists() else None)
+            # THE SECOND GATE beside it. `--panel` rebuilds both blocks from
+            # the artefact's per-seed rows, so this path is the one that can
+            # overwrite a PASS with a REFUSED.
+            for line in note_regression(
+                    record, have, mechanism=mechanism_bar(record, have),
+                    structure=structure_bar(record, have)):
+                print(f"{path.name}: {line}", file=sys.stderr)
+            # THE LAST GATE BEFORE TWO COUNTS GO INTO ONE FILE. A record's
+            # top-level `in_band` is regraded here at the panel's basis while
+            # `level_protocol` is carried forward from a run at whichever
+            # basis was live when it was measured. Writing both without
+            # naming either is how pt-v19 would have shipped a 14 and a 13 of
+            # the same-looking quantity, and the sweep that found it refused
+            # to write the eighteen records rather than do that. The refusal
+            # belongs here, at the write, where it can be answered.
+            unnamed = unnamed_band_counts(record)
+            if unnamed:
+                print(f"REFUSED: {path.name} would publish "
+                      f"{len(unnamed)} band-derived count(s) with no ruler "
+                      f"named: " + "; ".join(unnamed)
+                      + ". Re-measure or re-stamp the block rather than "
+                        "writing a count nobody can attribute",
+                      file=sys.stderr)
+                drift.append(f"{path.name}: {len(unnamed)} unnamed band count(s)")
+                continue
+            text = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
             path.write_text(text, encoding="utf-8", newline="\n")
-            print(f"  wrote {path.relative_to(ROOT)}")
+            print(f"  wrote {path.relative_to(ROOT)}"
+                  + (f"  ({note})" if note else ""))
 
     if args.check:
         for d in drift:
             print(f"  {d}")
         print(f"{len(drift)} differences")
         return 1 if drift else 0
-    return 0
+    # A refusal in the write path leaves `drift` non-empty, and a run that
+    # refused to write a record must not exit 0. The other records are still
+    # written: the fault is per record and stopping at the first one leaves
+    # the rest stale for a reason that has nothing to do with them, which is
+    # the lesson `write_coefficients` already learned.
+    return 1 if drift else 0
 
 
 def write_coefficients() -> int:
@@ -245,9 +908,20 @@ def write_coefficients() -> int:
     byte as they are. What it must NOT be used for is a preset whose
     coefficients actually moved: that is a new preset, and a new preset
     needs the panel.
+
+    A REFUSAL SKIPS ONE RECORD AND DOES NOT ABORT THE RUN, which it used to.
+    The refusal is per record and the bookkeeping change is global, so
+    stopping at the first one left the records after it in the sort order
+    stale for a reason that had nothing to do with them -- half a rewrite,
+    which is worse than either end of it. The run still fails (this returns
+    1) and the refused record is still not written; what changed is that the
+    other seventeen are not collateral. This bit on 2026-09-11, when
+    `crash_amplifier_conditional_sigma` was added while `pt-v19.json` was
+    deliberately un-regenerated for `vix_target_shock_cap`.
     """
     import tradefloor
 
+    refused = []
     for path in sorted(OUT.glob("*.json")):
         record = json.loads(path.read_text(encoding="utf-8"))
         # `to_dict()` whole, exactly as `build` passes it, `name` included:
@@ -260,7 +934,8 @@ def write_coefficients() -> int:
         if moved:
             print(f"  REFUSED {path.name}: {len(moved)} existing coefficient(s) "
                   f"moved, which is a new preset and needs --panel: {moved}")
-            return 1
+            refused.append(path.name)
+            continue
         record["coefficient_digest"] = coefficient_digest(values)
         record["coefficients"] = {k: values[k] for k in sorted(values)}
         text = json.dumps(record, indent=2, ensure_ascii=False) + chr(10)
@@ -268,6 +943,9 @@ def write_coefficients() -> int:
         added = sorted(set(values) - set(before))
         print(f"  wrote {path.relative_to(ROOT)}"
               + (f"  (+{', '.join(added)})" if added else ""))
+    if refused:
+        print(f"{len(refused)} record(s) not written: {', '.join(refused)}")
+        return 1
     return 0
 
 
@@ -290,6 +968,7 @@ def write_mechanism_gate(panel_path: str) -> int:
         "method": panel["method"],
     }
     written = 0
+    regressed = 0
     for name in sorted(panel["presets"]):
         path = OUT / f"{name}.json"
         if not path.exists():
@@ -297,6 +976,16 @@ def write_mechanism_gate(panel_path: str) -> int:
             continue
         record = json.loads(path.read_text(encoding="utf-8"))
         p = panel["presets"][name]
+        # THE BAR, READ BEFORE THE BLOCKS ARE REPLACED. This mode's whole job
+        # is to write a fresh certificate over a committed one, so it is the
+        # shortest path in the tool from a lost mechanism to a record that
+        # says the mechanism was never there. Refused per preset until the
+        # owner's ruling of 2026-09-23; REPORTED since (`PASS_BAR_RULING`):
+        # the certificate is written and the record carries the loss.
+        bar = mechanism_bar(p, record)
+        for line in note_regression(record, dict(record), mechanism=bar):
+            print(f"  {name}: {line}", file=sys.stderr)
+            regressed += 1
         for field in ("mechanism_252", "mechanism_heldout_seeds"):
             block = dict(p[field])
             block["measured"] = measured
@@ -310,6 +999,7 @@ def write_mechanism_gate(panel_path: str) -> int:
                 ordered["mechanism_252"] = record["mechanism_252"]
                 ordered["mechanism_heldout_seeds"] = \
                     record["mechanism_heldout_seeds"]
+        ordered = place_level_protocol(ordered)
         path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
                         encoding="utf-8", newline="\n")
         counts = record["mechanism_252"]["counts"]
@@ -317,7 +1007,108 @@ def write_mechanism_gate(panel_path: str) -> int:
               f"{counts['mechanism_shown']} of {counts['mechanism_of']}"
               + (f", REVERSED {record['mechanism_252']['reversed']}"
                  if record["mechanism_252"]["reversed"] else ""))
+        # The bar's own verdict beside the count it is taken on, so a run
+        # that PASSED says so in the same place a run that refused says why.
+        # A gate that is only visible when it fires is a gate a reader has
+        # no reason to believe is running.
+        from tradefloor import envelope
+        print("  " + envelope.mechanism_bar_line(bar).strip())
         written += 1
+    # Reported, not refused, since the owner's ruling of 2026-09-23: the
+    # count is printed so a run that wrote a regression cannot read as a
+    # clean one, and the exit is the write's.
+    if regressed:
+        print(f"  {regressed} preset(s) REGRESSED and were written with the "
+              f"loss on the record: a committed certificate showed a "
+              f"mechanism this panel does not", file=sys.stderr)
+    return 0 if written else 1
+
+
+def write_structure_rows(panel_path: str) -> int:
+    """Set the two structural certificates on every record the panel names.
+
+    Two fields and nothing else, for `write_mechanism_gate`'s reason word
+    for word: a preset's `panel_252` was measured on the build and the
+    roster generator of its own day, and this certificate is measured today.
+    Writing both from one run would move the published band figures for a
+    reason that has nothing to do with the structural question. So the
+    blocks carry their OWN provenance and a reader can see the two were
+    taken on different builds because each says which.
+
+    THE ROW IS NOT MEASURED HERE AND NOT MEASURED ANYWHERE FOR THIS.
+    `vix_ar1_debiased` is computed on every seed of every run and retained
+    per seed in the artefact; `structure_blocks` reads those readings and
+    signs them against `facts.REAL_VIX_AR1`. The engine is not called.
+
+    THE BAR, READ BEFORE THE BLOCKS ARE REPLACED, per preset rather than per
+    run. It refused a regression until the owner's ruling of 2026-09-23 and
+    reports it since (`PASS_BAR_RULING`): the record is written and carries
+    the loss under `REGRESSION_FIELD`. On the first run
+    of this mode every preset takes the first-lay-down branch, because none
+    has ever carried the block.
+    """
+    panel = json.loads(pathlib.Path(panel_path).read_text(encoding="utf-8"))
+    from tradefloor import envelope
+
+    written = 0
+    regressed = 0
+    skipped = 0
+    for name in sorted(panel["presets"]):
+        path = OUT / f"{name}.json"
+        if not path.exists():
+            print(f"  skipped {name}: no committed record to write onto")
+            continue
+        record = json.loads(path.read_text(encoding="utf-8"))
+        blocks = structure_blocks(panel, name)
+        if not blocks:
+            # Stated, never guessed, and never written as an empty block: an
+            # artefact that does not retain the per-seed rows cannot produce
+            # this certificate, and a record left without one is refused by
+            # the bar rather than passed by it.
+            print(f"  skipped {name}: this artefact retains no per-seed rows "
+                  f"for {', '.join(envelope.CERTIFIED_STRUCTURE)}, so there "
+                  f"is nothing to sign against the tape")
+            skipped += 1
+            continue
+        # Refused per preset until the owner's ruling of 2026-09-23;
+        # REPORTED since (`PASS_BAR_RULING`): written, with the loss carried.
+        bar = structure_bar(blocks, record)
+        for line in note_regression(record, dict(record), structure=bar):
+            print(f"  {name}: {line}", file=sys.stderr)
+            regressed += 1
+        record.update(blocks)
+        ordered = {}
+        for key, value in record.items():
+            if key in envelope.STRUCTURE_BAR_PANELS:
+                continue
+            ordered[key] = value
+            if key == "mechanism_heldout_seeds":
+                for field in envelope.STRUCTURE_BAR_PANELS:
+                    ordered[field] = record[field]
+        ordered = place_level_protocol(ordered)
+        path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8", newline="\n")
+        for field in envelope.STRUCTURE_BAR_PANELS:
+            b = record[field]
+            for row, v in b["rows"].items():
+                print(f"  wrote {path.relative_to(ROOT)}  {field}  {row}  "
+                      f"{v['verdict'].upper()}"
+                      + (f" ({v['side']} the tape centre)" if v["side"] else "")
+                      + f"  k {v['k']} of {v['n']}, cut {v['cut']}, median "
+                        f"{v['median']:.6f}, offset {v['offset']:+.4f}"
+                      + ("  AT THE CUT" if v["at_the_cut"] else ""))
+        # The bar's own verdict beside the verdicts it is taken on, so a run
+        # that PASSED says so where a run that refused says why.
+        print("  " + envelope.structure_bar_line(bar).strip()
+              if not bar.get("first") else
+              "  structure bar    FIRST     " + bar["reason"])
+        written += 1
+    if regressed:
+        print(f"  {regressed} preset(s) REGRESSED and were written with the "
+              f"loss on the record: a committed certificate passed a "
+              f"structural row this panel refuses", file=sys.stderr)
+    if skipped:
+        print(f"  {skipped} preset(s) skipped: no per-seed rows retained")
     return 0 if written else 1
 
 
@@ -343,6 +1134,14 @@ def write_level_protocol(rows_path: str) -> int:
     The refusal belongs here, at the write, rather than at the measurement:
     the readings are worth keeping either way, and it is publishing them that
     the verdict has to gate.
+
+    REFUSES, the same way, a measurement of a preset whose coefficient VALUES
+    have moved since -- `restamp.py`'s rule, which it applies to the panel
+    blocks and this now applies to the level block. A name ADDED to
+    `ModelParams` is inert and carries; a value that moved is a different
+    model wearing the same name, and the readings were taken on the old one.
+    The vector is stamped INTO the block so `--panel` can make the same
+    judgement later instead of deleting what it cannot rebuild.
     """
     doc = json.loads(pathlib.Path(rows_path).read_text(encoding="utf-8"))
     name = doc["target"]
@@ -361,10 +1160,29 @@ def write_level_protocol(rows_path: str) -> int:
         return 1
 
     record = json.loads(path.read_text(encoding="utf-8"))
+    ran = doc.get("target_coefficients")
+    if ran is None:
+        print(f"  NOTE: {pathlib.Path(rows_path).name} does not carry the "
+              f"vector it ran, so the block is written UNCHECKED against "
+              f"{name}'s coefficients. level_rows.py has stamped it since "
+              f"2026-09-14.")
+    else:
+        changed = moved_values(ran, record["coefficients"])
+        if changed:
+            print(f"REFUSED: {len(changed)} of {name}'s coefficients have "
+                  f"moved since this measurement ({', '.join(changed[:6])}), "
+                  f"so it describes a different model under the same name. "
+                  f"Re-measure with tools/presets/level_panel.py.",
+                  file=sys.stderr)
+            return 1
+
     record["level_protocol"] = {
         "certified_level": doc["certified_level"],
         "certified_crisis": doc["certified_crisis"],
         "certification": doc["certification_record"],
+        # The vector the readings were taken on, so a later `--panel` can tell
+        # a block that still describes this preset from one that does not.
+        "coefficients": (dict(sorted(ran.items())) if ran is not None else None),
         "control": {
             "preset": doc["control"],
             "reproduced": True,
@@ -379,21 +1197,88 @@ def write_level_protocol(rows_path: str) -> int:
             "days": doc.get("days"),
         },
     }
-    ordered = {}
-    for key, value in record.items():
-        if key == "level_protocol":
-            continue
-        ordered[key] = value
-        if key == "mechanism_heldout_seeds":
-            ordered["level_protocol"] = record["level_protocol"]
-    if "level_protocol" not in ordered:      # a record written before that field
-        ordered["level_protocol"] = record["level_protocol"]
+    # The same stamp the carried path gets, so a block written here and one
+    # carried forward by `--panel` cannot end up saying different amounts
+    # about the ruler behind the same count. A block from a `certify` that
+    # already stamps its basis is left alone.
+    #
+    # THE LEVEL BLOCK ONLY, because this mode promises to write the level
+    # block and leave the rest of the record where it is. The two mechanism
+    # blocks need the same stamp and they get it from `--panel`, which is the
+    # mode that owns them.
+    stamped_note = stamp_band_ruler(record["level_protocol"]["certification"],
+                                    "level_protocol.certification")
+    ordered = place_level_protocol(record)
     path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
                     encoding="utf-8", newline="\n")
+    if stamped_note:
+        print(f" {stamped_note.lstrip(';')}")
     rows = dict(doc["certified_level"])
     rows.update(doc["certified_crisis"])
     print(f"  wrote {path.relative_to(ROOT)}  level_protocol: "
           + ", ".join(f"{k}={v:.4f}" for k, v in rows.items()))
+    return 0
+
+
+def write_long_run(verdict_path: str) -> int:
+    """Set the `long_run` block on the record the verdict names.
+
+    The owner's adopted pass bar for a preset is the design repository's
+    `programme/longrun/CRITERIA.md`: what a user would notice over thirty
+    21-year histories, the 2008 and 2020 replays with the real VIX imposed,
+    the edge a headline read five ticks late is worth, and the one-year
+    table. `programme/longrun/criteria.py --verdict` grades it by code; this
+    writes that verdict, as it is, under `long_run`, where the trading
+    server reads whether the preset passes.
+
+    REFUSES a verdict whose long run did not measure the preset BY NAME: its
+    `measured.fingerprint` must be the record's preset, the rule
+    `level_panel.py` applies for the same reason (a measurement relabelled
+    onto a record by hand is the failure this path exists to stop). REFUSES
+    a verdict whose own counts do not add up. Stamps the record's coefficient
+    vector into the block, so `--panel` can carry it while the values stand
+    and drop it when they move; that stamp assumes the named preset had these
+    values on the measuring build, which is true when the verdict and the
+    record come from the same box, and the note names both commits otherwise.
+    """
+    doc = json.loads(pathlib.Path(verdict_path).read_text(encoding="utf-8"))
+    measured = doc.get("measured") or {}
+    name = measured.get("fingerprint")
+    rows = doc.get("rows") or []
+    passed = sum(1 for r in rows if r.get("pass") is True)
+    problems = []
+    if not name or name.startswith("custom-"):
+        problems.append(f"the long run ran fingerprint {name!r}, not a named "
+                        "preset, so there is no record it describes")
+    if not rows or doc.get("of") != len(rows) or doc.get("passed") != passed:
+        problems.append(f"the counts do not add up: of {doc.get('of')!r} and "
+                        f"passed {doc.get('passed')!r} against {len(rows)} rows "
+                        f"of which {passed} pass")
+    if any(r.get("pass") not in (True, False) for r in rows):
+        problems.append("a row carries no verdict")
+    want = "pass" if rows and passed == len(rows) else "fail"
+    if doc.get("verdict") != want:
+        problems.append(f"verdict {doc.get('verdict')!r} where the rows say {want!r}")
+    path = OUT / f"{name}.json"
+    if not problems and not path.exists():
+        problems.append(f"no committed record at {path} to write the block onto")
+    if problems:
+        for p in problems:
+            print(f"REFUSED: {p}", file=sys.stderr)
+        return 1
+    record = json.loads(path.read_text(encoding="utf-8"))
+    block = dict(doc)
+    block["coefficients"] = dict(sorted(record["coefficients"].items()))
+    record["long_run"] = block
+    path.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8", newline="\n")
+    rec_commit = (record.get("measured") or {}).get("commit")
+    note = ("" if rec_commit == measured.get("engine_commit") else
+            f"  (NOTE: the long run was measured on {measured.get('engine_commit')}, "
+            f"the record's panel on {rec_commit})")
+    shown = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+    print(f"  wrote {shown}  long_run: {doc['verdict']} "
+          f"{passed} of {len(rows)}" + note)
     return 0
 
 

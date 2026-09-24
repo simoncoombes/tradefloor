@@ -229,7 +229,16 @@ def _walk(snapshot):
                 yield label, mutated
 
 
-def test_the_hash_moves_when_any_snapshot_field_moves():
+#: The one key `state_hash` covers only where the run carries it: the VIX
+#: anchor's slow memory, which a snapshot holds only with
+#: `vix_anchor_memory` off zero (`manifest.state_hash`). pt-v19 carries it
+#: since its fifth composition (2026-09-23) and pt-v18 does not, so the walk
+#: below runs on both and each must cover exactly what it carries.
+CONDITIONAL_KEYS = {"pt-v19": {"vix_anchor_slow"}, "pt-v18": set()}
+
+
+@pytest.mark.parametrize("preset", sorted(CONDITIONAL_KEYS))
+def test_the_hash_moves_when_any_snapshot_field_moves(preset):
     """Every field a snapshot carries reaches the leaf.
 
     The drift guard for the hash, and it needs one for the reason
@@ -243,8 +252,15 @@ def test_the_hash_moves_when_any_snapshot_field_moves():
     snapshots. A single change is what a tampered archive looks like, and a
     walk that moved everything at once would pass while most of the fields
     it names were uncovered.
+
+    On the default AND on a preset without the anchor memory, because the
+    set of keys differs by one between them and a walk on one alone would
+    leave the other's set unchecked.
     """
-    engine = tf.Engine(seed=SEED, universe=UNIVERSE)
+    model = tf.ModelParams.from_preset(preset)
+    assert (model.to_dict()["vix_anchor_memory"] != 0.0) == bool(
+        CONDITIONAL_KEYS[preset])
+    engine = tf.Engine(seed=SEED, universe=UNIVERSE, model=model)
     engine.run_days(2, record=False, ticks_per_day=TICKS)
     engine.open_market()
     engine.run_session(9, 30, 3, 10)
@@ -254,7 +270,8 @@ def test_the_hash_moves_when_any_snapshot_field_moves():
     fields = list(_walk(snapshot))
     labels = [label for label, _ in fields]
     named = {label.split("[")[0] for label in labels}
-    assert {name.split(".")[0] for name in named} == set(mf._SNAPSHOT_KEYS)
+    assert {name.split(".")[0] for name in named} == (
+        set(mf._SNAPSHOT_KEYS) | CONDITIONAL_KEYS[preset])
     assert {name.split(".", 1)[1] for name in named
             if name.startswith("columns.")} == set(mf._STATE_HASH_COLUMNS)
     assert {name.split(".", 1)[1] for name in named

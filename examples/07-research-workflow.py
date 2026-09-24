@@ -1,13 +1,17 @@
-"""A complete research workflow, start to finish, in about forty seconds.
+"""A complete research workflow, start to finish, in ten to twenty seconds.
 
-It said "about ten seconds" until 2026-09-05, and had not for some time; the
-run prints its own total on the last line, which is the number to trust.
+It said "about ten seconds" until 2026-09-05 and "about forty" until 0.8.0;
+the run prints its own total on the last line, which is the number to trust.
 Roughly half of it is step 8, the realism panel, which runs the 252 days its
 bands were derived at.
 
 Run it:
 
+    pip install "tradefloor[arrow]"
     python examples/07-research-workflow.py
+
+Step 8 reads the daily bars table, which needs `pyarrow`; everything before
+it runs on the core library alone.
 
 This exercises all four things the library exists to provide: a reproducible
 market, ground truth about why prices moved, emergent impact through a real
@@ -137,14 +141,15 @@ def main() -> dict:
     # trading, which is a cost rather than a leak in the subtraction.
     #
     # It used to be a small cost: two untraded names moving by -6.5 and +3.2
-    # bps against a 13 bps median direct impact. Since the 2026-08-26 era
-    # boundary made pt-v10 the default it is a LARGE one, because that
-    # market's fear channel reads the day's index return: the ripple measures
-    # +10.1 bps against a 7.8 bps median direct impact, so a trade big enough
-    # to move the index now costs more through everyone else's volatility
-    # than through its own book. The bound below is what the assertion can
-    # honestly claim: the ripple stays the same order as the direct impact
-    # rather than dwarfing it.
+    # bps against a 13 bps median direct impact. From pt-v10, whose fear
+    # channel reads the day's index return, it is a LARGE one: +10.1 bps
+    # against a 7.8 bps median direct impact on pt-v10. On pt-v19, the
+    # default from 0.8.0, five untraded names move and the largest moves
+    # -15.8 bps against a 6.3 bps median, so a trade big enough to move the
+    # index can cost more through everyone else's volatility than through
+    # its own book. The bound below is what the assertion can honestly
+    # claim: the ripple stays the same order as the direct impact rather
+    # than dwarfing it. The line it prints gives this run's figures.
     leaked = execution.untouched_moved()
     report["leaked"] = leaked
     traded_names = {fill["ticker"] for fill in execution.fills}
@@ -159,8 +164,11 @@ def main() -> dict:
             f"dwarfs direct impact ({median_direct:.2f} bps median) -- "
             "that is no longer a fear ripple"
         )
+    largest = max((abs(execution.impact_bps(name)) for name in leaked),
+                  default=0.0)
     print(f"     untouched instruments moved: {len(leaked)}, all through the "
-          "fear gauge, all small against direct impact")
+          f"fear gauge, the largest {largest:.1f} bps against a "
+          f"{median_direct:.1f} bps median direct impact")
 
     # And with VIX pinned the macro channel is closed, so the subtraction is
     # byte-exact, the guarantee the RNG stream split actually makes, now
@@ -324,11 +332,23 @@ def main() -> dict:
     print(f"8. stylised facts in {time.time() - mark:.1f}s against {ruler}: "
           + ", ".join(f"{k.replace('_', ' ')} {v['verdict']}"
                       for k, v in verdicts.items()))
-    # Not all in range, and not none. If every statistic matched, the
-    # comparison would be doing no work; if none did, the model would be
-    # unusable and the report should say so loudly.
-    assert any(not v["matches"] for v in verdicts.values())
-    assert any(v["matches"] for v in verdicts.values())
+    # Some in range: if none were, the model would be unusable and the report
+    # should say so loudly.
+    #
+    # GRADED ROWS ONLY. A row the basis cannot read carries `matches` None,
+    # which says nothing either way.
+    #
+    # "Not all in range" was asserted here too, on the argument that a
+    # comparison every statistic passes is doing no work. pt-v19 is in band
+    # on every graded row at this seed, so that argument would call a good
+    # model a broken ruler. What the old assertion was for, a comparison that
+    # can fail, is shown directly instead: the same measurement with its
+    # volatility multiplied by ten is graded out of band.
+    graded = [v for v in verdicts.values() if v["matches"] is not None]
+    assert any(v["matches"] for v in graded)
+    broken = dict(facts, annualised_vol_pct=facts["annualised_vol_pct"] * 10)
+    assert not tf.facts.compare_to_real_markets(broken)[
+        "annualised_vol_pct"]["matches"]
 
     # 9. Every result names the market it came from. A seed does not identify
     #    a market -- the same seed over a different roster is a different one

@@ -184,8 +184,12 @@ def verdict(rows_by_kind: dict[str, list]) -> dict:
                 "shape_in_band": sc.get("shape_in_band"), "shape_of": sc.get("shape_of"),
                 "level_in_band": sc.get("level_in_band"), "level_of": sc.get("level_of"),
                 "crisis_in_band": sc.get("crisis_in_band"), "crisis_of": sc.get("crisis_of"),
+            # `is False`, not `not ...`: an unreadable row carries `in_band`
+            # None and would otherwise be listed as out of band, against a
+            # denominator (`sc["of"]`) that already excludes it.
             "out": [k for k, v in sc["statistics"].items()
-                    if not v.get("in_band", True)],
+                    if v.get("in_band") is False],
+            "unreadable": list(sc["unreadable"]),
             "median": med,
         }
     return out
