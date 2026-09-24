@@ -586,6 +586,7 @@ impl InstrumentInit {
                 mispricing_s: None,
                 mispricing_s_prev_close: None,
                 mispricing_momentum: None,
+                fair_value_offset: None,
                 maker_inventory: None,
                 garch_variance: sector.base_daily_variance(),
                 // Seeded at the sector base, like `garch_variance` beside

@@ -3061,6 +3061,12 @@ impl PyEngine {
         // preset through pt-v18 actually held.
         out.set_item("sector_variance", f64_bytes(py, self.inner.sector_variance()))?;
         out.set_item("jump_excitation", f64_bytes(py, self.inner.jump_excitation()))?;
+        // The fair-value levels pt-v20 turned on. Their own key, and only
+        // when the model can move them, so every earlier preset's snapshot
+        // is the one it was.
+        if self.inner.carries_fair_value_offsets() {
+            out.set_item("fair_value_offset", f64_bytes(py, &self.inner.fair_value_offsets()))?;
+        }
         // The sector state's two per-DAY companions, carried for the
         // reason `attribution` and `tick_components` are: a fork taken
         // mid-day needs the day's accumulated sector factor and the
@@ -3446,6 +3452,16 @@ impl PyEngine {
             };
             self.inner
                 .set_sector_day(&values, target)
+                .map_err(ValidationError::new_err)?;
+        }
+        if let Some(raw) = snapshot.get_item("fair_value_offset")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_fair_value_offsets(&values)
                 .map_err(ValidationError::new_err)?;
         }
         for (key, sector) in [("sector_variance", true), ("jump_excitation", false)] {

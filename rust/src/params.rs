@@ -497,6 +497,59 @@ pub struct ModelParams {
     /// revise quotes on a public announcement without waiting for a trade. A
     /// switch. See `market::tick`, the settlement phase.
     pub news_quote_revision: f64,
+    /// Where the market maker centres its book, as a weight on the model
+    /// price. 0.0, which every preset through pt-v19 carries, quotes around
+    /// the last print (moved by the tick's news term when
+    /// `news_quote_revision` is on), so the print chases the model price at
+    /// about a half-spread a tick and the maker's inventory skew carries it
+    /// past: on pt-v19 the print sits about 37 bp (sd) off the model price
+    /// in every liquidity bucket, and 65-minute returns carry a lag-one
+    /// autocorrelation of -0.135 against a Roll spread 5.8x the quoted one
+    /// (design repository, programme/meanrev-edge-ptv19-2026-09-24.md).
+    /// 1.0 quotes around the tick's model price, the way dealers revise
+    /// quotes on every change in the efficient price and not only on a
+    /// headline; in between, the centre is the geometric blend
+    /// `last^(1-w) * model^w`. A weight in [0, 1]. See `market::tick`, the
+    /// settlement phase.
+    pub quote_model_weight: f64,
+    /// The share of each IDIOSYNCRATIC shock that moves the name's fair
+    /// value for good rather than its mispricing. 0.0, which every preset
+    /// through pt-v19 carries, sends the whole shock to `s`, so every
+    /// stock-specific move reverts on the mispricing half-life: on pt-v19
+    /// 96% of a name's own daily variance is mispricing, its 60-day
+    /// idiosyncratic variance ratio is 0.51 against the certified forty's
+    /// 0.92, and a value screen on published fundamentals predicts the next
+    /// 20 days with rank IC +0.38 at stationarity against a real one near
+    /// +0.01 (design repository, programme/results/ptv20/).
+    ///
+    /// Off zero, a share `psi` of the name's own shocks -- the idiosyncratic
+    /// draw of the tick's noise, the news that names the company, and the
+    /// company's own jump at the close -- lands in a per-name log fair-value
+    /// level `v` (`TickStock::fair_value_offset`) and `1 - psi` in `s`. The
+    /// price moves by the whole shock on impact either way; what changes is
+    /// how much of it later reverts. `v` scales the published fundamentals
+    /// (earnings and book) the valuation reads, so the market P/E and the
+    /// buyback yield read the same earnings the price does, and it carries
+    /// an Ito term so `E[exp(v)]` stays one and the index's expected return
+    /// does not move. Market and sector shocks stay in `s`. In [0, 1].
+    pub fair_value_news_share: f64,
+    /// The cross-sectional sd of the opening mispricing. 0.0, which every
+    /// preset through pt-v19 carries, adopts the whole day-zero premium of
+    /// price over fair value as `s`: on a generated roster that premium is
+    /// the P/E scatter, sd about 0.32 against a stationary `s` of about
+    /// 0.06, so every name drifts toward fair value in a known direction
+    /// for months (the value screen's rank IC in a market's first 60 days
+    /// is +0.75 on pt-v19, and a 5-day momentum rule earns +10% there).
+    ///
+    /// Off zero, the opening `s` is the roster's cap-weighted premium (so
+    /// the index opens with the mispricing it always had) plus a draw of
+    /// this sd per name, re-centred to cap-weighted zero, and the rest of
+    /// each name's premium is its opening fair-value level `v`: the
+    /// published fundamentals are a noisy read of fair value, not a
+    /// statement that the price is wrong. The draw is one normal per name
+    /// on its own stream (`rng::stream::OPENING`), taken when the engine is
+    /// built, so no other stream moves.
+    pub opening_mispricing_sigma: f64,
     /// Market-shock magnitude, in baseline sigmas, above which the crash
     /// amplifier fires (§5.4 promotion).
     pub crash_amplifier_threshold: f64,
@@ -4697,6 +4750,9 @@ impl ModelParams {
             news_absorption_drift_share: 0.0,
             news_absorption_drift_half_life: 0.0,
             news_quote_revision: 0.0,
+            quote_model_weight: 0.0,
+            fair_value_news_share: 0.0,
+            opening_mispricing_sigma: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -6771,6 +6827,9 @@ impl ModelParams {
             "news_absorption_drift_share" => self.news_absorption_drift_share,
             "news_absorption_drift_half_life" => self.news_absorption_drift_half_life,
             "news_quote_revision" => self.news_quote_revision,
+            "quote_model_weight" => self.quote_model_weight,
+            "fair_value_news_share" => self.fair_value_news_share,
+            "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -6985,6 +7044,9 @@ impl ModelParams {
             "news_absorption_drift_share" => out.news_absorption_drift_share = value,
             "news_absorption_drift_half_life" => out.news_absorption_drift_half_life = value,
             "news_quote_revision" => out.news_quote_revision = value,
+            "quote_model_weight" => out.quote_model_weight = value,
+            "fair_value_news_share" => out.fair_value_news_share = value,
+            "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -7256,6 +7318,19 @@ impl ModelParams {
                 return Err(format!(
                     "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
             }
+        }
+        for (name, v) in [("quote_model_weight", self.quote_model_weight),
+                          ("fair_value_news_share", self.fair_value_news_share)] {
+            if !(v >= 0.0 && v <= 1.0) {
+                return Err(format!(
+                    "{name} is {v}. It is a weight in [0, 1]; 0.0 as shipped."));
+            }
+        }
+        if !(self.opening_mispricing_sigma >= 0.0 && self.opening_mispricing_sigma <= 0.9) {
+            return Err(format!(
+                "opening_mispricing_sigma is {}. It is the sd of the opening mispricing, \
+                 in [0, 0.9]; 0.0 adopts the whole day-zero premium, as shipped.",
+                self.opening_mispricing_sigma));
         }
         for (name, v) in [("news_absorption_half_life", self.news_absorption_half_life),
                           ("news_absorption_drift_half_life",
@@ -7652,6 +7727,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "news_absorption_drift_share",
         "news_absorption_drift_half_life",
         "news_quote_revision",
+        "quote_model_weight",
+        "fair_value_news_share",
+        "opening_mispricing_sigma",
         "news_peer_vix_coupling",
         "news_peer_weight",
         "news_peer_weight_down",

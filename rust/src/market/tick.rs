@@ -157,6 +157,13 @@ pub struct TickStock {
     pub mispricing_s: Option<f64>,
     pub mispricing_s_prev_close: Option<f64>,
     pub mispricing_momentum: Option<f64>,
+    /// The name's log fair-value level `v`: what its own permanent news has
+    /// moved its fair value away from the published fundamentals. `None`
+    /// (and 0.0) under every preset through pt-v19, where no shock reaches
+    /// fair value and the valuation reads the published figures as they
+    /// stand. See `ModelParams::fair_value_news_share` and
+    /// `ModelParams::opening_mispricing_sigma`.
+    pub fair_value_offset: Option<f64>,
     pub maker_inventory: Option<f64>,
     pub garch_variance: f64,
     /// The variance cascade's components, when one is running.
@@ -1030,6 +1037,18 @@ pub fn simulate_market_tick(
         } else {
             scale_valuation(companies[idx].valuation(), nominal)
         };
+        // The name's own fair-value level: the published fundamentals
+        // scaled by what its permanent news has done to them. A BRANCH at
+        // zero, so every preset through pt-v19, where nothing writes the
+        // level, values the published figures exactly as before. Read at
+        // the START of the tick; this tick's own news reaches the price
+        // below, through `fv_moved`.
+        let v_level = companies[idx].stock.fair_value_offset.unwrap_or(0.0);
+        let grown = if v_level == 0.0 {
+            grown
+        } else {
+            scale_valuation(grown, mathx::exp(v_level))
+        };
         // Per NAME, unlike the growth term above: the yield is this
         // company's own earnings over its own price. A BRANCH at 1.0 for
         // the same reason as the one above.
@@ -1150,7 +1169,35 @@ pub fn simulate_market_tick(
         } else {
             s_val = s_val + all_drifts[i] + all_noises[i];
         }
+        // THE PERMANENT SHARE of the name's own shocks. `psi` of this tick's
+        // idiosyncratic noise and of the news naming this company leaves `s`
+        // for the fair-value level, with an Ito term so `exp(v)` is a
+        // martingale. The price moves by the whole shock either way; only
+        // what later reverts changes. A branch, so 0.0 is the arithmetic
+        // that stood, bit for bit.
+        let mut fv_moved = fv;
+        if p.fair_value_news_share != 0.0 {
+            let psi = p.fair_value_news_share;
+            let noise_scale = if open { intraday_vol_mult } else { 0.15 };
+            let own_noise = psi * (raw.noise_idio * noise_scale);
+            let own_news = psi * (raw.company_news_own * scale);
+            let dv = own_noise + own_news;
+            // The component slots keep the WHOLE shock, deliberately: they
+            // report what moved the PRICE (the attribution an agent's
+            // explanation is scored against), and the close feeds slot 6 to
+            // the name's GJR as the day's innovation, which is the full
+            // move whichever of `s` and `v` carries it. Under this dial the
+            // slots therefore sum to the move in `s + v`, not in `s` alone.
+            if dv != 0.0 {
+                s_val = s_val - dv;
+                let step = dv - 0.5 * dv * dv;
+                companies[idx].stock.fair_value_offset = Some(v_level + step);
+                fv_moved = fv * mathx::exp(step);
+            }
+        }
         s_val = clamp_s(p, s_val);
+        let fv = fv_moved;
+        fundamentals[i] = fv;
 
         let mut new_price = mathx::max(0.01, fv * mathx::exp(s_val));
 
@@ -1347,7 +1394,20 @@ pub fn simulate_market_tick(
             // from there. At 0.0 -- every preset -- or on a tick with no
             // news term, the branch is not taken and the book is the one
             // that always stood.
-            let quote_from = if p.news_quote_revision == 0.0 || s_components[i][3] == 0.0 {
+            //
+            // `quote_model_weight` generalises that from news to every move:
+            // the book is centred on the tick's model price (1.0), or on the
+            // geometric blend of the last print and the model price in
+            // between. At 0.0 -- every preset through pt-v19 -- the branch
+            // is not taken and the news rule above is the one that stands.
+            let quote_from = if p.quote_model_weight != 0.0 {
+                if p.quote_model_weight == 1.0 {
+                    fair_value
+                } else {
+                    let last = companies[idx].stock.price;
+                    last * mathx::exp(p.quote_model_weight * mathx::log(fair_value / last))
+                }
+            } else if p.news_quote_revision == 0.0 || s_components[i][3] == 0.0 {
                 companies[idx].stock.price
             } else {
                 companies[idx].stock.price * mathx::exp(s_components[i][3])
@@ -1490,6 +1550,38 @@ pub fn simulate_market_tick(
         unbounded_print: unbounded_col,
         liquidity_share: share_col,
     }
+}
+
+/// A name's fair value on its PUBLISHED fundamentals, as the tick's phase 2
+/// computes it for a name whose fair-value level is zero: the nominal
+/// restatement, the buyback term at the current price, then the valuation.
+/// Used by the stationary opening (`Engine::apply_opening`) to read the
+/// day-zero premium the lazy opening would have adopted.
+pub fn published_fair_value(
+    p: &ModelParams,
+    economy: &EconomyState,
+    nominal_output_base: f64,
+    elapsed_days: i64,
+    company: &TickCompany,
+) -> f64 {
+    let nominal = nominal_scale(p, economy, nominal_output_base);
+    let grown = if nominal == 1.0 {
+        company.valuation()
+    } else {
+        scale_valuation(company.valuation(), nominal)
+    };
+    let buyback = buyback_scale(p, grown.eps, company.stock.price, elapsed_days);
+    let valuation = if buyback == 1.0 { grown } else { scale_valuation(grown, buyback) };
+    let econ_view = EconomyValuationInputs {
+        corporate_bond_yield: Some(economy.corporate_bond_yield),
+        federal_funds_rate: economy.federal_funds_rate,
+        qe_pe_boost: Some(economy.qe_pe_boost),
+        qe_assets_ratio: Some(economy.qe_assets_ratio),
+    };
+    compute_fair_value_with(
+        &valuation, &econ_view, p.fair_value_book_floor,
+        p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate)
+    .fair_value
 }
 
 pub fn clamp_s(params: &ModelParams, s: f64) -> f64 {

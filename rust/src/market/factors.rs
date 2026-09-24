@@ -584,6 +584,12 @@ pub struct FactorCompany {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LiveFactors {
     pub company_news: f64,
+    /// The part of `company_news` from events that name THIS company: its
+    /// own news, as against a peer's, its sector's or the market's. A copy
+    /// of the first branch's sum, written beside it, so nothing on the price
+    /// path is re-associated; read only when
+    /// [`crate::params::ModelParams::fair_value_news_share`] is non-zero.
+    pub company_news_own: f64,
     pub order_flow_impact: f64,
     pub short_squeeze_effect: f64,
     pub random_noise: f64,
@@ -726,10 +732,12 @@ pub fn calculate_live_factors(
     // through the peer arm, which is off in every shipped preset — so
     // before pt-v4 an event with a companyId moved exactly one name.
     let mut company_news = 0.0;
+    let mut company_news_own = 0.0;
     for event in news {
         let impact = truthy(event.price_impact);
         if event.company_id.as_deref() == Some(company.id.as_str()) {
             company_news += impact;
+            company_news_own += impact;
         } else if event.company_id.is_some()
             && event.sector.as_deref() == Some(company.sector.as_str())
         {
@@ -1157,6 +1165,7 @@ pub fn calculate_live_factors(
 
     LiveFactors {
         company_news,
+        company_news_own,
         order_flow_impact,
         short_squeeze_effect,
         random_noise,

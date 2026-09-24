@@ -259,6 +259,11 @@ pub struct Engine {
     overnight_rng: GameRng,
     market_vol_level_rng: GameRng,
     crisis_epicentre_rng: GameRng,
+    /// The opening mispricing draws, one standard normal per name of the
+    /// roster the engine was built with, from the one-shot
+    /// [`stream::OPENING`]. Empty unless `opening_mispricing_sigma` is
+    /// non-zero, and emptied once the opening has been applied.
+    opening_z: Vec<f64>,
     /// The move each name's `s` took at the last open under the overnight
     /// process, in roster order, 0.0 where nothing moved. Per-day state
     /// like the attribution: the tape books it onto the day's first row.
@@ -761,6 +766,38 @@ impl Engine {
         &self.jump_excitation
     }
 
+    /// Each name's log fair-value level `v`, in roster order, 0.0 where
+    /// nothing has moved it. See `ModelParams::fair_value_news_share`. For
+    /// checkpoints and forks; every preset through pt-v19 holds zeros.
+    pub fn fair_value_offsets(&self) -> Vec<f64> {
+        self.companies.iter().map(|c| c.stock.fair_value_offset.unwrap_or(0.0)).collect()
+    }
+
+    /// Put the fair-value levels back. A width mismatch is refused, as the
+    /// jump excitation's is: the levels are positional against the roster.
+    pub fn set_fair_value_offsets(&mut self, values: &[f64]) -> Result<(), String> {
+        if values.len() != self.companies.len() {
+            return Err(format!(
+                "this snapshot carries {} fair-value levels and the roster holds {} \
+                 companies. The levels are positional against the roster, so this \
+                 restore is refused rather than padded or truncated.",
+                values.len(),
+                self.companies.len()
+            ));
+        }
+        for (c, &v) in self.companies.iter_mut().zip(values) {
+            c.stock.fair_value_offset = if v == 0.0 { None } else { Some(v) };
+        }
+        Ok(())
+    }
+
+    /// Whether this engine's model can move a fair-value level, which is
+    /// when the snapshot and the state hash carry them. Off on every preset
+    /// through pt-v19, so their snapshots and hashes are the ones they were.
+    pub fn carries_fair_value_offsets(&self) -> bool {
+        self.params.fair_value_news_share != 0.0 || self.params.opening_mispricing_sigma != 0.0
+    }
+
     /// Put the per-name jump excitation back. See
     /// [`Engine::jump_excitation`]. A width mismatch is refused, on the
     /// reasoning in [`Engine::set_volume_idio`], and this write sits AFTER
@@ -895,6 +932,12 @@ impl Engine {
             overnight_rng: GameRng::substream(seed, stream::OVERNIGHT),
             market_vol_level_rng: GameRng::substream(seed, stream::MARKET_VOL_LEVEL),
             crisis_epicentre_rng: GameRng::substream(seed, stream::CRISIS_EPICENTRE),
+            opening_z: if params.opening_mispricing_sigma != 0.0 {
+                let mut g = GameRng::substream(seed, stream::OPENING);
+                (0..companies_len).map(|_| g.next_normal()).collect()
+            } else {
+                Vec::new()
+            },
             overnight_moves: vec![0.0; companies_len],
             companies,
             economy,
@@ -1931,6 +1974,9 @@ impl Engine {
             let t = crate::market::tick::sector_sigma_at(&self.params, &self.economy, self.vix_anchor);
             self.sector_target_day = t * t;
         }
+        if !self.opening_z.is_empty() && status != crate::market::MarketStatus::Closed {
+            self.apply_opening();
+        }
         let outcome = simulate_market_tick(
             &mut self.companies,
             &TickInputs {
@@ -2881,6 +2927,12 @@ impl Engine {
             } else {
                 crate::market::tick::scale_valuation(company.valuation(), nominal)
             };
+            let valuation = match company.stock.fair_value_offset {
+                Some(v) if v != 0.0 => {
+                    crate::market::tick::scale_valuation(valuation, crate::mathx::exp(v))
+                }
+                _ => valuation,
+            };
             let fv = crate::fair_value::compute_fair_value_with(
                 &valuation, &econ_view, p.fair_value_book_floor,
                 p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate,
@@ -3185,6 +3237,55 @@ impl Engine {
         self.update_volume_idio();
     }
 
+    /// The stationary opening (`opening_mispricing_sigma`), applied once,
+    /// before the first tick that prices anything.
+    ///
+    /// Each name's day-zero premium of price over its published fair value
+    /// is split in two. The mispricing `s` is the roster's cap-weighted
+    /// premium -- so the index opens with the mispricing it always had --
+    /// plus this name's draw at the dial's sd, the draws re-centred to
+    /// cap-weighted zero. The rest of the premium is the name's opening
+    /// fair-value level `v`. The price does not move: `P = FV exp(v) exp(s)`
+    /// holds with the same `P`. What changes is how much of the premium the
+    /// model later pulls back: only the stationary part.
+    ///
+    /// A name listed after the engine was built has no draw and takes the
+    /// lazy opening in `market::tick`, which adopts its whole premium as `s`.
+    fn apply_opening(&mut self) {
+        let z = std::mem::take(&mut self.opening_z);
+        let sigma = self.params.opening_mispricing_sigma;
+        let mut gap = vec![f64::NAN; self.companies.len()];
+        let (mut wsum, mut wgap, mut wz) = (0.0, 0.0, 0.0);
+        for (i, c) in self.companies.iter().enumerate() {
+            if i >= z.len() || c.stock.mispricing_s.is_some() || c.is_bankrupt || !c.is_public {
+                continue;
+            }
+            let fv = crate::market::tick::published_fair_value(
+                &self.params, &self.economy, self.nominal_output_base, self.current_day, c);
+            let g = crate::mathx::log(crate::mathx::max(0.01, c.stock.price) / fv);
+            gap[i] = g;
+            let w = c.stock.price * c.stock.shares_outstanding;
+            wsum += w;
+            wgap += w * g;
+            wz += w * z[i];
+        }
+        if !(wsum > 0.0) {
+            return;
+        }
+        let centre = wgap / wsum;
+        let zbar = wz / wsum;
+        for (i, c) in self.companies.iter_mut().enumerate() {
+            if gap[i].is_nan() {
+                continue;
+            }
+            let s0 = crate::market::tick::clamp_s(&self.params, centre + sigma * (z[i] - zbar));
+            c.stock.mispricing_s = Some(s0);
+            c.stock.mispricing_s_prev_close = Some(s0);
+            c.stock.mispricing_momentum = Some(0.0);
+            c.stock.fair_value_offset = Some(gap[i] - s0);
+        }
+    }
+
     /// Endogenous jumps, applied once per name at the day close.
     ///
     /// The model has no discontinuities without this. Prices diffuse; real
@@ -3226,6 +3327,15 @@ impl Engine {
     /// leave that comparison failing until somebody regenerated the body.
     #[rustfmt::skip]
     fn apply_jumps(&mut self) {
+        // The permanent share's reading of the jump (`fair_value_news_share`):
+        // each name's `s` before the generated body, so the company's own
+        // jump can be told from the market's after it. Empty, and nothing
+        // below runs, at 0.0.
+        let s_before: Vec<f64> = if self.params.fair_value_news_share != 0.0 {
+            self.companies.iter().map(|c| c.stock.mispricing_s.unwrap_or(f64::NAN)).collect()
+        } else {
+            Vec::new()
+        };
         // mechanism:jumps begin -- generated by tools/mechanism/emit.py from
         // tools/mechanism/mechanisms/jumps.py (spec 0ff870280c51); do not edit by hand.
         // Draws: 1 uniform, 1 normal, 1 uniform per company, 1 normal per company on the jumps stream, unconditionally.
@@ -3306,6 +3416,39 @@ impl Engine {
         if self.params.jump_market_variance_share != 0.0 && market != 0.0 {
             self.market_vol
                 .accumulate(self.params.jump_market_variance_share * market);
+        }
+        // THE COMPANY'S OWN JUMP, SHARED WITH FAIR VALUE. The body above put
+        // `market + idio - compensator` into `s`; what is left after taking
+        // the common part out is the company's own jump (exactly zero on a
+        // name that did not jump, up to the rounding of `(s + x) - s`, which
+        // the 1e-9 floor absorbs: a company jump is `jump_sigma_idio` times a
+        // normal). `psi` of it moves to the fair-value level, as the tick
+        // does with the name's own noise and news. The attribution slot
+        // keeps the whole jump: it reports what moved the price.
+        if !s_before.is_empty() {
+            let psi = self.params.fair_value_news_share;
+            let common = market - compensator;
+            for (index, company) in self.companies.iter_mut().enumerate() {
+                let (Some(after), Some(&before)) = (company.stock.mispricing_s, s_before.get(index)) else {
+                    continue;
+                };
+                if before.is_nan() {
+                    continue;
+                }
+                let own = (after - before) - common;
+                if own.abs() <= 1e-9 {
+                    continue;
+                }
+                let dv = psi * own;
+                let s_new = after - dv;
+                company.stock.mispricing_s = Some(s_new);
+                if let Some(prev) = company.stock.mispricing_s_prev_close {
+                    let carried = (1.0 - self.params.jump_momentum_share) * dv;
+                    company.stock.mispricing_s_prev_close = Some(prev - carried);
+                }
+                let v = company.stock.fair_value_offset.unwrap_or(0.0);
+                company.stock.fair_value_offset = Some(v + dv - 0.5 * dv * dv);
+            }
         }
     }
 
@@ -3965,6 +4108,14 @@ impl Engine {
                     // A branch, as at the valuation, so the arithmetic
                     // before pt-v18 is the arithmetic it always was.
                     let earnings = if nominal == 1.0 { eps } else { eps * nominal };
+                    // The earnings the valuation holds carry the name's own
+                    // fair-value level (`fair_value_news_share`), so the
+                    // market P/E reads the earnings the price does. A branch:
+                    // `None` on every preset through pt-v19.
+                    let earnings = match c.stock.fair_value_offset {
+                        Some(v) if v != 0.0 => earnings * crate::mathx::exp(v),
+                        _ => earnings,
+                    };
                     // `market_pe_buybacks`: the earnings the valuation holds
                     // also carry the buyback term (`market::tick`), so a
                     // multiple read without it rises by the buyback yield
@@ -4706,6 +4857,17 @@ impl Engine {
         if self.params.vix_anchor_memory != 0.0 {
             hash_f64(&mut buf, self.vix_anchor_slow);
         }
+        // The fair-value levels and the unspent opening draws, on the same
+        // rule: only when a dial can move them.
+        if self.carries_fair_value_offsets() {
+            for c in &self.companies {
+                hash_f64(&mut buf, c.stock.fair_value_offset.unwrap_or(0.0));
+            }
+            hash_u32(&mut buf, self.opening_z.len() as u32);
+            for value in &self.opening_z {
+                hash_f64(&mut buf, *value);
+            }
+        }
         // The crisis episode. Hashed for the reason every field here is:
         // two engines alike in every column, one of them three sessions
         // into a financial-services episode and the other not in an episode
@@ -5355,6 +5517,7 @@ mod tests {
                 mispricing_s: None,
                 mispricing_s_prev_close: None,
                 mispricing_momentum: None,
+                fair_value_offset: None,
                 maker_inventory: None,
                 garch_variance: 0.015 * 0.015,
                 garch_cascade: [0.015 * 0.015; crate::market::garch::CASCADE_MAX],
