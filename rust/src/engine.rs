@@ -885,7 +885,19 @@ impl Engine {
     /// default written as a bare `PT_V1` at two call sites, where moving an
     /// era means finding both.
     ///
-    /// Since 0.8.0 this is [`PT_V19`]: pt-v18 with four dials moved and
+    /// Since 0.8.5 this is [`PT_V20`]: pt-v19 with a tape that follows the
+    /// model price, a closing cross, the stock- and sector-specific part of
+    /// every shock in fair value, the agent-facing book on, the curve dials
+    /// and the aggregate earnings cycle. It holds all fifteen rows of the
+    /// fixed-roster panel at 252 days, fourteen of fourteen at 504, fifteen
+    /// on both held-out axes, and all 28 long-run criteria registered for
+    /// it (design repo, programme/ptv20-registration.md). It reads further
+    /// from real on two rows: the crisis lever is 3.60x against a real
+    /// 6.16x (pt-v19 5.22x), and on the level protocol the index returns
+    /// +1.14 per cent a year, inside the ruled band of 1.1 to 10.3 at its
+    /// floor (pt-v19 +7.65).
+    ///
+    /// In 0.8.0 and 0.8.1 it was [`PT_V19`]: pt-v18 with four dials moved and
     /// nothing else. It holds all fourteen shape rows at 252 and 504 days
     /// and on both held-out axes, as pt-v18 did, and every one of the
     /// fourteen at the real centre where pt-v18 held twelve. On the level
@@ -912,8 +924,9 @@ impl Engine {
     /// anything recorded under one replays exactly by naming it.
     ///
     /// [`PT_V19`]: crate::params::PT_V19
+    /// [`PT_V20`]: crate::params::PT_V20
     pub const fn default_model() -> crate::params::ModelParams {
-        crate::params::PT_V19
+        crate::params::PT_V20
     }
 
     /// [`Engine::new`] under an explicit model preset (the runtime seam,

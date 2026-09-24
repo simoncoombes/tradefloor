@@ -78,7 +78,7 @@ from .facts import (CERTIFIED_HORIZON_DAYS, REAL_MARKETS, SEED_SD,
                     SEED_SD_504, band_distance)
 
 #: The preset these measurements describe.
-PRESET = "pt-v19"
+PRESET = "pt-v20"
 
 #: The measurement horizon the envelope certifies, in trading days.
 #: Not a soft preference, and not a band count either. What holds the
@@ -211,25 +211,25 @@ PRESET = "pt-v19"
 #: is what every caller that GRADES this table reads. `band_distance(None,
 #: ...)` is a TypeError, and a row with no reading has no verdict to give.
 CERTIFIED: dict[str, float | None] = {
-    "annualised_vol_pct": 22.7591,
-    "excess_kurtosis": 9.8423,
-    "return_acf1": -0.0129,
-    "abs_return_acf1": 0.0486,
-    "abs_return_acf5": 0.0237,
-    "abs_return_acf20": 0.0085,
-    "cross_sectional_corr": 0.3063,
-    "volume_abs_return_corr": 0.5497,
-    "leverage_effect": -0.0281,
-    "volume_change_acf1": -0.2789,
-    "corr_asymmetry": 0.0527,
-    "corr_asymmetry_lagged": 0.0790,
-    "sector_excess_corr": 0.0904,
-    "corr_persistence_acf1": 0.2960,
+    "annualised_vol_pct": 20.0846,
+    "excess_kurtosis": 17.7886,
+    "return_acf1": 0.0130,
+    "abs_return_acf1": 0.0342,
+    "abs_return_acf5": 0.0221,
+    "abs_return_acf20": 0.0101,
+    "cross_sectional_corr": 0.2893,
+    "volume_abs_return_corr": 0.5757,
+    "leverage_effect": -0.0320,
+    "volume_change_acf1": -0.2580,
+    "corr_asymmetry": 0.0591,
+    "corr_asymmetry_lagged": 0.1076,
+    "sector_excess_corr": 0.1230,
+    "corr_persistence_acf1": 0.2843,
     # Read on 4 of the 30 seeds at this preset, with the reason above.
     # Written by `envelope_tables.py` from the record's `panel_252`, which
     # carries the row only when a seed read it; `dispersion["panel_252"]` on
     # the record carries how many of the thirty did and why the rest did not.
-    "crisis_sector_dispersion": 1.2029,
+    "crisis_sector_dispersion": 1.4041,
 }
 
 
@@ -299,7 +299,7 @@ CERTIFIED_LEVEL: dict[str, float] = {
     # here for three eras, and this row exists because of that. The seed
     # spread is wide against the band, so a single seed's first year says
     # almost nothing about the row.
-    "index_drift_pct": 7.6462,
+    "index_drift_pct": 1.1446,
 }
 
 #: The CRISIS rows, reserved for the fear gauge and the index tail, measured
@@ -347,8 +347,8 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # stood on 52 sessions, which is thin, against 118 under the pre-31ef261
     # vector, so the median moved on fewer and deeper falls rather than on
     # more of them. The record does not carry the fifth composition's count.
-    "fear_gauge_dn1": 1.9427,
-    "fear_gauge_dn3": 5.4237,
+    "fear_gauge_dn1": 1.7201,
+    "fear_gauge_dn3": 5.1188,
     # The index tail row on the same thirty seeds, fifth composition: 86
     # sessions at or below -3 per cent in 7,530, a pooled rate of 1.1421 per
     # cent against the 2015-2025 band of 0.47 to 1.96 (position 0.45) and
@@ -376,7 +376,7 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # which as data beside the verdict. The 504-day reading is NOT measured
     # on this vector: the level run is 252 days only, and the year-two
     # figure that stood here (1.2989 per cent) was the pre-31ef261 vector's.
-    "index_tail_dn3_pct": 1.1421,
+    "index_tail_dn3_pct": 0.8234,
 }
 
 #: THE STRUCTURAL ROWS: the fourth certification block, and the only one
@@ -623,23 +623,23 @@ BAR_BAND_BASIS = "ruled"
 #: dispersion row is graded on `facts.REAL_MARKETS_RULED_504` and is not in
 #: `BANDS_504`, and the count is over the rows this table can be graded by.
 MEASURED_504: dict[str, float | None] = {
-    "annualised_vol_pct": 22.5804,
-    "excess_kurtosis": 11.7059,
-    "return_acf1": -0.0153,
-    "abs_return_acf1": 0.0605,
-    "abs_return_acf5": 0.0360,
-    "abs_return_acf20": 0.0178,
-    "cross_sectional_corr": 0.2966,
-    "volume_abs_return_corr": 0.5861,
+    "annualised_vol_pct": 20.1191,
+    "excess_kurtosis": 20.2711,
+    "return_acf1": 0.0257,
+    "abs_return_acf1": 0.0416,
+    "abs_return_acf5": 0.0328,
+    "abs_return_acf20": 0.0117,
+    "cross_sectional_corr": 0.2769,
+    "volume_abs_return_corr": 0.6181,
     "leverage_effect": -0.0317,
-    "volume_change_acf1": -0.2598,
-    "corr_asymmetry": 0.0522,
-    "corr_asymmetry_lagged": 0.0678,
-    "sector_excess_corr": 0.0906,
-    "corr_persistence_acf1": 0.4088,
+    "volume_change_acf1": -0.2406,
+    "corr_asymmetry": 0.0403,
+    "corr_asymmetry_lagged": 0.0724,
+    "sector_excess_corr": 0.1112,
+    "corr_persistence_acf1": 0.3768,
     # Read on 9 of the 30 seeds at this preset, and the value is their
     # median. See the note above and `CERTIFIED`'s.
-    "crisis_sector_dispersion": 1.3462,
+    "crisis_sector_dispersion": 1.5426,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.

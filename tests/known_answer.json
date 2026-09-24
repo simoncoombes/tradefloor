@@ -1,12 +1,12 @@
 {
-  "bondsSha256": "522aeb76081b7f7d2a5dc2065ce93a6fab9547724e6b3c1a607bf5d08083bb5a",
+  "bondsSha256": "3d5bdd8c3325720c404e429f38437a86c8e715ff2c344ab36d47479828a632a2",
   "bytes": 16920,
   "days": 250,
-  "katVersion": 27,
+  "katVersion": 28,
   "kind": "pretium.known-answer",
   "metadataSha256": "8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165",
-  "note": "Re-based 2026-09-23 for the fifth composition of pt-v19: the long-run VIX law (LAWC-D), the macro session clock and US-calibrated cycle, news priced within minutes and the calm-regime variance target, adopted on the owner's long-run pass bar (design repo, programme/longrun/CRITERIA.md; programme/results/ptv19-fifth/RESULT.md). Every seeded pt-v19 trajectory changes; named presets before it replay exactly.",
+  "note": "Re-based 2026-09-24 for 0.8.5, where pt-v20 becomes the default: the tape follows the model price, a closing cross, every stock- and sector-specific shock in fair value, the agent-facing book, the curve dials and the aggregate earnings cycle, taken on all 28 rows registered for it (design repo, programme/ptv20-registration.md, box ptv20g3). Every seeded default trajectory changes; pt-v19 and every preset before it replay exactly (tests/known_answer_presets.json). Produced on macOS arm64 (M-series) first; the five-target determinism workflow is the second architecture.",
   "seed": 20260820,
-  "sha256": "c22d4a029b402fe395a9d2be1fec10194a3c28d89f93e7717db33696fc80b6af",
-  "simulationSha256": "1e683b96f75dc5693a0dedcb3b44ee73adce8ad1a063c4614fc0766299df5d7c"
+  "sha256": "92c9cb7cf3376674f1449479307264301bce64d5de5de76e928b7f0101576017",
+  "simulationSha256": "b0ef10ef6ebbc9c4919f50772b468a589016b28110ac446434812cbd137062e0"
 }

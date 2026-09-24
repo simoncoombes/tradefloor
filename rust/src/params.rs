@@ -4730,14 +4730,15 @@ pub const PT_V16: ModelParams = ModelParams::pt_v16();
 pub const PT_V18: ModelParams = ModelParams::pt_v18();
 /// pt-v18 with the VIX level identity on, the VIX's fall-rate symmetric,
 /// the sector loading raised and the per-name volume-variance channel
-/// switched on -- see [`ModelParams::pt_v19`]. THE DEFAULT since 0.8.0:
-/// `DEFAULT_PRESET_NAME` names it and `Engine::default_model` returns it,
-/// and the test at the bottom of this file asserts the two agree.
+/// switched on -- see [`ModelParams::pt_v19`]. The default in 0.8.0 and
+/// 0.8.1.
 pub const PT_V19: ModelParams = ModelParams::pt_v19();
 /// pt-v19 with a tape that follows the model price, a closing cross, the
 /// stock- and sector-specific part of every shock moved into fair value, a
 /// stationary opening and a smaller stop ladder -- see
-/// [`ModelParams::pt_v20`]. Selectable and NOT the default.
+/// [`ModelParams::pt_v20`]. THE DEFAULT since 0.8.5:
+/// `DEFAULT_PRESET_NAME` names it and `Engine::default_model` returns it,
+/// and the test at the bottom of this file asserts the two agree.
 pub const PT_V20: ModelParams = ModelParams::pt_v20();
 
 /// The name of the preset an engine runs when none is named.
@@ -4754,7 +4755,7 @@ pub const PT_V20: ModelParams = ModelParams::pt_v20();
 /// bottom of this file asserts it resolves to the engine's default
 /// bit-for-bit. A future era that moves the default and forgets this
 /// constant fails the suite instead of mislabelling every manifest.
-pub const DEFAULT_PRESET_NAME: &str = "pt-v19";
+pub const DEFAULT_PRESET_NAME: &str = "pt-v20";
 
 /// Every coefficient `pt-v3` moved, with the exact bits the converged
 /// certificate recorded.

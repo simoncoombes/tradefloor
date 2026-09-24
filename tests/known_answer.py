@@ -344,7 +344,18 @@ import tradefloor
 # those dials set (programme/results/ptv19-fifth/bitident.py, five seeds x
 # 300 sessions). Every seeded pt-v19 trajectory changes; named presets before
 # it replay exactly. `metadataSha256` does NOT move.
-KAT_VERSION = 27
+#
+# v28: pt-v20 IS THE DEFAULT (0.8.5, 2026-09-24). pt-v19 with a tape that
+# follows the model price, a closing cross, every stock- and sector-specific
+# shock in fair value, the agent-facing book on, the curve dials, the
+# aggregate earnings cycle and a smaller stop ladder, taken on all 28 rows
+# registered for it (design repo, programme/ptv20-registration.md, box
+# ptv20g3). Every seeded default trajectory changes. pt-v19 and every
+# preset before it replay exactly, which tests/known_answer_presets.py now
+# checks one preset at a time; pt-v20's own row there is 149d72de... and
+# does not move with this bump. `metadataSha256` does NOT move: pt-v20
+# carries pt-v19's mispricing and crowd coefficients.
+KAT_VERSION = 28
 
 SEED = 20260820
 DAYS = 250
