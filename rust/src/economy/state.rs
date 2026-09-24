@@ -427,6 +427,12 @@ pub struct EconomyState {
     // Cross-asset tracking
     pub previous_day_market_return: f64,
     pub rolling_market_return_30d: f64,
+    /// The aggregate earnings cycle: the log level of every company's
+    /// earnings relative to what nominal output alone would give them. 0.0,
+    /// and never written, on every preset whose `earnings_cycle_depth` is
+    /// 0.0 (every preset through pt-v19). See
+    /// [`crate::params::ModelParams::earnings_cycle_depth`].
+    pub earnings_cycle: f64,
     /// `economy.marketPE ?? 18` at the cycle-transition sites. Kept optional
     /// because the reference implementation genuinely leaves it unset before the first market
     /// tick, and the `?? 18` there is a real fallback rather than a
@@ -574,6 +580,7 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
 
         previous_day_market_return: 0.0,
         rolling_market_return_30d: 0.0,
+        earnings_cycle: 0.0,
         market_pe: Some(18.0),
 
         qe_pe_boost: 0.0,

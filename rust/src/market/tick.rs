@@ -367,6 +367,20 @@ pub fn crisis_spike_for(p: &ModelParams, vix: f64, universe_stress: f64) -> f64 
 /// [`TickInputs`] directly, and a NaN entering the valuation would freeze
 /// every book downstream with no indication of where it came from.
 pub fn nominal_scale(p: &ModelParams, economy: &EconomyState, base: f64) -> f64 {
+    let scale = nominal_scale_output(p, economy, base);
+    // The aggregate earnings cycle rides on the same common multiplier, so
+    // every reader of the restated earnings -- the valuation, the market
+    // P/E, the overnight open, the opening -- reads it with no second path.
+    // A branch at zero depth: every preset through pt-v19 never sees it.
+    if p.earnings_cycle_depth == 0.0 || economy.earnings_cycle == 0.0 {
+        scale
+    } else {
+        scale * mathx::exp(economy.earnings_cycle)
+    }
+}
+
+/// The nominal-output part of [`nominal_scale`], the arithmetic that stood.
+fn nominal_scale_output(p: &ModelParams, economy: &EconomyState, base: f64) -> f64 {
     if p.earnings_nominal_growth == 0.0 {
         return 1.0;
     }

@@ -3146,6 +3146,38 @@ impl PyEngine {
     /// so a column read with `column("avg_volume")` can be scaled and written
     /// back whole. A rate index quotes its depth off this column exactly as an
     /// equity does.
+    /// Every company's three fair-value inputs, in roster order: earnings
+    /// per share, book value per share and revenue growth, NaN where absent.
+    /// The equities only; rate instruments carry no fundamentals.
+    ///
+    /// What the engine is valuing on, which is the published figures: under
+    /// a preset with `fair_value_news_share` or an earnings cycle, the
+    /// valuation scales these by the name's own level and the aggregate
+    /// cycle, and neither is here.
+    fn fundamentals(&self) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+        self.inner.fundamentals()
+    }
+
+    /// Replace every company's fair-value inputs, in roster order, NaN to
+    /// clear one. The equities only, one value each.
+    ///
+    /// The embedder's hook for reported earnings, and the one the
+    /// `market.earnings` scenario target writes through. It consumes no
+    /// draws, so it cannot move the generator, and an engine that is never
+    /// told anything values on the figures it was built with, exactly as
+    /// before this was exposed. A change moves every affected fair value, and
+    /// so every price, from the next tick.
+    fn set_fundamentals(
+        &mut self,
+        eps: Vec<f64>,
+        book_value_per_share: Vec<f64>,
+        revenue_growth: Vec<f64>,
+    ) -> PyResult<()> {
+        self.inner
+            .set_fundamentals(&eps, &book_value_per_share, &revenue_growth)
+            .map_err(ValidationError::new_err)
+    }
+
     fn set_avg_volume(&mut self, values: Vec<f64>) -> PyResult<()> {
         let n = self.inner.instrument_count();
         if values.len() != n {
@@ -3721,6 +3753,11 @@ impl PyEngine {
         );
         econ.set_item("gdp_trend", economy.gdp_trend.to_vec())?;
         econ.set_item("cycle_phase", economy.cycle_phase.as_str())?;
+        // The aggregate earnings cycle, only when the model moves it, so
+        // every earlier preset's snapshot is the dict it was.
+        if self.inner.params().earnings_cycle_depth != 0.0 {
+            econ.set_item("earnings_cycle", economy.earnings_cycle)?;
+        }
         out.set_item("economy", econ)?;
 
         let bank = self.inner.central_bank();
@@ -4237,6 +4274,9 @@ impl PyEngine {
                 fiscal_stimulus, government_debt_to_gdp,
                 months_in_current_phase, phase_gdp_target, recession_probability,
             );
+            if let Some(v) = d.get_item("earnings_cycle")? {
+                economy.earnings_cycle = v.extract()?;
+            }
             if let Some(v) = d.get_item("gdp_trend")? {
                 let trend: Vec<f64> = v.extract()?;
                 if trend.len() != 4 {

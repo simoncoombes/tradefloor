@@ -4483,6 +4483,33 @@ impl Engine {
         let spec = self.cycle_spec();
         self.economy = check_cycle_transition_for(&self.economy, rng, &spec);
 
+        // THE AGGREGATE EARNINGS CYCLE, one step a session after the phase
+        // has moved: every company's earnings, beyond what nominal output
+        // gives them, pulled toward a level set by the cycle phase at a
+        // half-life of `earnings_cycle_half_life` sessions. Contraction and
+        // trough pull toward `-depth`, every other phase toward
+        // `+depth * earnings_cycle_upside`, the share that centres the
+        // level over a cycle. `earnings_cycle_sigma` adds a normal on the
+        // economy stream when it is non-zero, and only then. Nothing runs at
+        // zero depth, so every preset through pt-v19 takes no draw here and
+        // leaves the level at 0.0. See `ModelParams::earnings_cycle_depth`.
+        if self.params.earnings_cycle_depth != 0.0 {
+            let p = &self.params;
+            let target = match self.economy.cycle_phase {
+                crate::economy::CyclePhase::Contraction
+                | crate::economy::CyclePhase::Trough => -p.earnings_cycle_depth,
+                _ => p.earnings_cycle_depth * p.earnings_cycle_upside,
+            };
+            let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / p.earnings_cycle_half_life);
+            let mut level = self.economy.earnings_cycle
+                + pull * (target - self.economy.earnings_cycle);
+            if p.earnings_cycle_sigma != 0.0 {
+                rng.site(Site::EconomyCycle, 1);
+                level += p.earnings_cycle_sigma * rng.next_normal();
+            }
+            self.economy.earnings_cycle = level;
+        }
+
         let policy = crate::economy::PolicyOptions {
             calendar: self.macro_calendar(),
             liftoff: self.params.fed_liftoff_rule,
@@ -5694,6 +5721,10 @@ impl Engine {
         // was before the field existed.
         if self.params.vix_anchor_memory != 0.0 {
             hash_f64(&mut buf, self.vix_anchor_slow);
+        }
+        // The aggregate earnings cycle, on the same rule.
+        if self.params.earnings_cycle_depth != 0.0 {
+            hash_f64(&mut buf, self.economy.earnings_cycle);
         }
         // The fair-value levels and the unspent opening draws, on the same
         // rule: only when a dial can move them.

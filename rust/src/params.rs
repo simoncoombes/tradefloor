@@ -527,6 +527,31 @@ pub struct ModelParams {
     /// the same draws, and its book fills do not move the maker's
     /// inventory. A switch. See `market::tick`, the settlement phase.
     pub closing_auction: f64,
+    /// The aggregate earnings cycle's depth: the log level every company's
+    /// earnings are pulled toward in a contraction or a trough, beyond what
+    /// nominal output alone gives them. 0.0, which every preset through
+    /// pt-v19 carries, has no cycle: earnings grow with nominal output and a
+    /// recession reaches equities only through rates, credit and fear, so a
+    /// year's index return spread 9 to 12 per cent (sd) against the S&P's
+    /// 17.4, and a replayed crisis left the index a third as far down as the
+    /// real one. S&P reported earnings fell 29, 54, 92 and 33 per cent around
+    /// the 1990, 2001, 2008 and 2020 recessions (Shiller's series; operating
+    /// earnings about 40 in 2008), and their twelve-month log growth has an sd
+    /// of 0.18 over 1950-2023 with the 2008 write-down capped (design
+    /// repository, programme/results/ptv20/shiller_earnings.py).
+    pub earnings_cycle_depth: f64,
+    /// Every other phase's pull toward `+depth * upside`, the share that
+    /// centres the level over a cycle, so the cycle moves earnings around
+    /// the nominal-output path without shifting it. Read only with
+    /// `earnings_cycle_depth` non-zero.
+    pub earnings_cycle_upside: f64,
+    /// Half-life in sessions of the pull toward the phase's level. Read only
+    /// with `earnings_cycle_depth` non-zero.
+    pub earnings_cycle_half_life: f64,
+    /// The daily sd of the earnings level's own noise; 0.0 is the phase path
+    /// alone and takes no draw. Read only with `earnings_cycle_depth`
+    /// non-zero.
+    pub earnings_cycle_sigma: f64,
     /// The 10-year Treasury yield's daily noise, in percentage points. 0.03,
     /// which every preset through pt-v19 carries, is the literal that stood:
     /// with the pull toward the policy rate it gives a daily change of about
@@ -4953,6 +4978,10 @@ impl ModelParams {
             news_quote_revision: 0.0,
             quote_model_weight: 0.0,
             closing_auction: 0.0,
+            earnings_cycle_depth: 0.0,
+            earnings_cycle_upside: 0.0,
+            earnings_cycle_half_life: 60.0,
+            earnings_cycle_sigma: 0.0,
             treasury_10y_noise: 0.03,
             treasury_2y_noise: 0.0,
             flight_to_quality_gain: 0.02,
@@ -7115,6 +7144,10 @@ impl ModelParams {
             "news_quote_revision" => self.news_quote_revision,
             "quote_model_weight" => self.quote_model_weight,
             "closing_auction" => self.closing_auction,
+            "earnings_cycle_depth" => self.earnings_cycle_depth,
+            "earnings_cycle_upside" => self.earnings_cycle_upside,
+            "earnings_cycle_half_life" => self.earnings_cycle_half_life,
+            "earnings_cycle_sigma" => self.earnings_cycle_sigma,
             "treasury_10y_noise" => self.treasury_10y_noise,
             "treasury_2y_noise" => self.treasury_2y_noise,
             "flight_to_quality_gain" => self.flight_to_quality_gain,
@@ -7348,6 +7381,10 @@ impl ModelParams {
             "news_quote_revision" => out.news_quote_revision = value,
             "quote_model_weight" => out.quote_model_weight = value,
             "closing_auction" => out.closing_auction = value,
+            "earnings_cycle_depth" => out.earnings_cycle_depth = value,
+            "earnings_cycle_upside" => out.earnings_cycle_upside = value,
+            "earnings_cycle_half_life" => out.earnings_cycle_half_life = value,
+            "earnings_cycle_sigma" => out.earnings_cycle_sigma = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
             "treasury_2y_noise" => out.treasury_2y_noise = value,
             "flight_to_quality_gain" => out.flight_to_quality_gain = value,
@@ -7704,6 +7741,26 @@ impl ModelParams {
                 return Err(format!(
                     "{name} is {v}. It is in percentage points of yield, in [0, {hi}]."));
             }
+        }
+        if !(self.earnings_cycle_depth >= 0.0 && self.earnings_cycle_depth <= 1.5) {
+            return Err(format!(
+                "earnings_cycle_depth is {}. It is a log level in [0, 1.5]; 0.0 is no cycle.",
+                self.earnings_cycle_depth));
+        }
+        if !(self.earnings_cycle_upside >= 0.0 && self.earnings_cycle_upside <= 1.0) {
+            return Err(format!(
+                "earnings_cycle_upside is {}. It is a share of the depth, in [0, 1].",
+                self.earnings_cycle_upside));
+        }
+        if !(self.earnings_cycle_half_life >= 1.0 && self.earnings_cycle_half_life <= 2520.0) {
+            return Err(format!(
+                "earnings_cycle_half_life is {}. It is a half-life in sessions, in [1, 2520].",
+                self.earnings_cycle_half_life));
+        }
+        if !(self.earnings_cycle_sigma >= 0.0 && self.earnings_cycle_sigma <= 0.05) {
+            return Err(format!(
+                "earnings_cycle_sigma is {}. It is a daily sd, in [0, 0.05].",
+                self.earnings_cycle_sigma));
         }
         if !(self.cascade_gain >= 0.0 && self.cascade_gain <= 1.0) {
             return Err(format!(
@@ -8129,6 +8186,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "news_quote_revision",
         "quote_model_weight",
         "closing_auction",
+        "earnings_cycle_depth",
+        "earnings_cycle_upside",
+        "earnings_cycle_half_life",
+        "earnings_cycle_sigma",
         "treasury_10y_noise",
         "treasury_2y_noise",
         "flight_to_quality_gain",
