@@ -84,7 +84,7 @@ STALE_RECORDINGS = {
     EXAMPLES / "experiments" / "liquidity-crisis" / "notebook.ipynb": (
         "the liquidity-crisis study replays FinRobot runs recorded under the "
         "0.8.x harness, which counted an agent's fills on every tick of a "
-        "step; since 0.9.0 they reach the market once, every price after the "
+        "step; since 0.8.5 they reach the market once, every price after the "
         "first trade moves, and the recorded decisions stop matching. "
         "Re-record tests/fixtures/finrobot/liquidity-crisis.json (60 calls) "
         "and the four replications in data/ to remove this skip."),

@@ -777,7 +777,7 @@ def test_removing_an_agent_that_traded_moves_the_other_agents_pnl():
     both entries at 3,000 and 5,000 shares over one, two and three days, on
     the fifth composition and on the fourth.
 
-    5,000 shares since 0.9.0. With each buy's flow reaching the market once
+    5,000 shares since 0.8.5. With each buy's flow reaching the market once
     instead of on all 65 ticks of the step, 3,000 shares of this $84 name
     (average volume 976,206) moves `s` by well under a cent and no print
     differs: both entries read exactly 0.0 over one, two and three days.

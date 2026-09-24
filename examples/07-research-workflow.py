@@ -77,7 +77,7 @@ def main() -> dict:
     # out-earns it -- the same information on three names a side instead of
     # five does, on 6 of 8 markets in the baselines module's grid. From an
     # agent that reads only prices it is now rare: 0 of 48 agent-seed pairs
-    # on that grid since 0.9.0, against 5 of 48 before, when every agent was
+    # on that grid since 0.8.5, against 5 of 48 before, when every agent was
     # marked to its own impact counted on each tick of a step. It is a
     # finding about portfolio construction, not a broken denominator, so
     # nothing here clamps it.

@@ -285,7 +285,7 @@ def test_replay_can_fail():
 def test_shortfall_is_a_cost_and_is_not_stuck_at_zero():
     """A shortfall stuck at zero would satisfy every loose inequality near it.
 
-    Until 0.9.0 this test was `shortfall can be both signs`: a round trip
+    Until 0.8.5 this test was `shortfall can be both signs`: a round trip
     recouped on 6 of 8 seeds, because the harness held the entry's flow on
     every tick of the step and the exit sold into an impact the agent had
     made 65 times over. That was the defect, not the phenomenon. With the

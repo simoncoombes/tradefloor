@@ -343,7 +343,7 @@ def run_sync(awaitable: Any) -> Any:
     the real error. The caller's context variables go with the coroutine,
     as they would under ``asyncio.run``.
 
-    One loop and not a fresh one per call, since 0.9.0. Until then every
+    One loop and not a fresh one per call, since 0.8.5. Until then every
     call got its own loop, closed when it returned, and this docstring told
     adapters to create loop-bound resources inside the coroutine. The
     frameworks do not: the OpenAI Agents SDK caches a default

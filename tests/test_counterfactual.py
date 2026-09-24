@@ -568,7 +568,7 @@ def _every_reference_agent() -> dict:
 
 def test_a_world_holding_every_reference_agent_forks_and_replays_identically():
     """Found by the hosted app: `World.fork` falls back to `copy.deepcopy`
-    for an agent with no `fork()`, and until 0.9.0 two of the five
+    for an agent with no `fork()`, and until 0.8.5 two of the five
     reference agents could not be copied. The random baseline holds a
     `GameRng` and the Oracle holds the engine it last read; both raised,
     so a world holding either could not be forked at all.

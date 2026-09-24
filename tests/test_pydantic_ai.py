@@ -737,7 +737,7 @@ def test_the_frameworks_own_sync_entry_point_would_have_failed_here():
 
 
 def test_an_override_set_outside_crosses_the_bridge_in_both_modes():
-    """`Agent.override` is built on context variables. Until 0.9.0 it
+    """`Agent.override` is built on context variables. Until 0.8.5 it
     reached the run in a script, where the bridge was `asyncio.run` in the
     caller's thread, and not in a notebook, where it crossed a thread
     without the context; this test pinned that as a documented trap. The

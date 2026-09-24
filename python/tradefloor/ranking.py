@@ -13,7 +13,7 @@ Measured on this build, with the reference agents over
         random           -0.337       [-0.625, -0.248]      0/12
         momentum         -0.950       [-1.336, -0.477]      0/12
 
-Until 0.9.0 this table was led by mean reversion at +0.947, winning 11 of
+Until 0.8.5 this table was led by mean reversion at +0.947, winning 11 of
 12. That lead was the harness: an agent's fills were held on every tick of
 the step, so an agent that trades a lot was marked to many times its own
 impact. With the fills applied once, nothing that sees only prices keeps
@@ -69,7 +69,7 @@ and against the thinnest denominator, 1.1% of the $1M book, momentum's ratio
 is **-2.54** and buy-and-hold's +1.00. Values like those drag a median of ten
 far enough to reorder the table: ranked by median of ratios, mean reversion
 (+0.189) goes above buy-and-hold (+0.054), which the pooled figure reverses
-(-0.035 against +0.042). Until 0.9.0, which stopped counting an agent's
+(-0.035 against +0.042). Until 0.8.5, which stopped counting an agent's
 fills on every tick of a step, the same grid read $15.5k to $34.1k and a
 mean-reversion ratio of +1.50 on its best seed.
 

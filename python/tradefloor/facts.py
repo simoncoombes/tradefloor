@@ -78,7 +78,7 @@ one. It is in `DISPERSION` and in neither `SHAPE` nor `REAL_MARKETS`,
 because its ruler is the whole tape and the decade panel carries no
 reading for it -- so the fourteen above are untouched and the RULED basis
 now grades nineteen rows (fourteen `SHAPE`, one `LEVEL`, three `CRISIS`
-and this one) at two horizons, thirty-eight cells. Until 0.9.0 this
+and this one) at two horizons, thirty-eight cells. Until 0.8.5 this
 paragraph said twentieth, twenty and forty, which no list here adds up to.
 `crisis_dispersion`
 is the estimator, run by the same code on the tape
@@ -4033,7 +4033,7 @@ def measure(
     stocks, with volume, and asymmetrically with their own sign), the
     `LEVEL` row and the three `CRISIS` rows. With `crisis_sector_dispersion`,
     which `crisis_statistics` reads, they are the nineteen rows the one-year
-    realism table grades. This docstring said ten until 0.9.0, the count
+    realism table grades. This docstring said ten until 0.8.5, the count
     before the panel grew; the marginal-dependence split is still the
     finding, so `report` prints it in two sections.
 

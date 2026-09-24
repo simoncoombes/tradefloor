@@ -176,7 +176,7 @@ def _flow(entry: dict[str, Any], key: str = "order_flow"
 def _session_flow(entry: dict[str, Any]) -> dict[str, tuple[float, float]] | None:
     """A session's per-tick flow, under either key a log has carried.
 
-    Logs written before 0.9.0 name it ``order_flow``, the argument that held
+    Logs written before 0.8.5 name it ``order_flow``, the argument that held
     it on every tick of the session; later logs name it ``flow_per_tick``,
     the argument that does so now. The meaning is the same, so an archived
     run replays into the market it recorded.

@@ -183,7 +183,7 @@ impl LogEntry {
                 d.set_item("close_at_end", close_at_end)?;
                 d.set_item("news", news_to_py(py, news)?)?;
                 // Named after the arguments that carried them. A log written
-                // before 0.9.0 has `order_flow` here instead, which meant the
+                // before 0.8.5 has `order_flow` here instead, which meant the
                 // per-tick flow, and the replays read it as `flow_per_tick`,
                 // so an archived run replays into the market it described.
                 d.set_item("flow_per_tick", flow_to_py(py, flow)?)?;
