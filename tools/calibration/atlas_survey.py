@@ -284,6 +284,15 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "news_absorption_drift_share": (0.0, 0.5),
     "news_absorption_drift_half_life": (0.0, 120.0),
     "news_quote_revision": (0.0, 1.0),
+    # pt-v20's tape, closing cross, fair-value share, opening spread and
+    # stop-ladder scale (design repository, programme/ptv20-registration.md).
+    "quote_model_weight": (0.0, 1.0),
+    "closing_auction": (0.0, 1.0),
+    "fair_value_news_share": (0.0, 1.0),
+    "opening_mispricing_sigma": (0.0, 0.3),
+    "opening_market_sigma": (0.0, 0.3),
+    "fair_value_market_share": (0.0, 1.0),
+    "cascade_gain": (0.0, 1.0),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is

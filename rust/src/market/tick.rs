@@ -1177,12 +1177,22 @@ pub fn simulate_market_tick(
         // what later reverts changes. A branch, so 0.0 is the arithmetic
         // that stood, bit for bit.
         let mut fv_moved = fv;
-        if p.fair_value_news_share != 0.0 {
+        if p.fair_value_news_share != 0.0 || p.fair_value_market_share != 0.0 {
             let psi = p.fair_value_news_share;
             let noise_scale = if open { intraday_vol_mult } else { 0.15 };
             let own_noise = psi * ((raw.noise_idio + raw.noise_sector) * noise_scale);
             let own_news = psi * ((raw.company_news - raw.company_news_market) * scale);
-            let dv = own_noise + own_news;
+            // The market-wide part, on its own share: the name's loading on
+            // the market factor's draw and the market-wide news. A branch at
+            // zero, so the stock-level share alone is the arithmetic above.
+            let dv = if p.fair_value_market_share == 0.0 {
+                own_noise + own_news
+            } else {
+                let psim = p.fair_value_market_share;
+                own_noise + own_news
+                    + psim * (raw.noise_market * noise_scale)
+                    + psim * (raw.company_news_market * scale)
+            };
             // The component slots keep the WHOLE shock, deliberately: they
             // report what moved the PRICE (the attribution an agent's
             // explanation is scored against), and the close feeds slot 6 to

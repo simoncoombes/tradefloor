@@ -260,9 +260,10 @@ pub struct Engine {
     market_vol_level_rng: GameRng,
     crisis_epicentre_rng: GameRng,
     /// The opening mispricing draws, one standard normal per name of the
-    /// roster the engine was built with, from the one-shot
-    /// [`stream::OPENING`]. Empty unless `opening_mispricing_sigma` is
-    /// non-zero, and emptied once the opening has been applied.
+    /// roster the engine was built with and one more for the market's
+    /// common level, from the one-shot [`stream::OPENING`]. Empty unless
+    /// `opening_mispricing_sigma` or `opening_market_sigma` is non-zero,
+    /// and emptied once the opening has been applied.
     opening_z: Vec<f64>,
     /// The move each name's `s` took at the last open under the overnight
     /// process, in roster order, 0.0 where nothing moved. Per-day state
@@ -795,7 +796,10 @@ impl Engine {
     /// when the snapshot and the state hash carry them. Off on every preset
     /// through pt-v19, so their snapshots and hashes are the ones they were.
     pub fn carries_fair_value_offsets(&self) -> bool {
-        self.params.fair_value_news_share != 0.0 || self.params.opening_mispricing_sigma != 0.0
+        self.params.fair_value_news_share != 0.0
+            || self.params.fair_value_market_share != 0.0
+            || self.params.opening_mispricing_sigma != 0.0
+            || self.params.opening_market_sigma != 0.0
     }
 
     /// Put the per-name jump excitation back. See
@@ -932,9 +936,13 @@ impl Engine {
             overnight_rng: GameRng::substream(seed, stream::OVERNIGHT),
             market_vol_level_rng: GameRng::substream(seed, stream::MARKET_VOL_LEVEL),
             crisis_epicentre_rng: GameRng::substream(seed, stream::CRISIS_EPICENTRE),
-            opening_z: if params.opening_mispricing_sigma != 0.0 {
+            // One normal per name, then one for the market's common level,
+            // whenever either opening dial is on.
+            opening_z: if params.opening_mispricing_sigma != 0.0
+                || params.opening_market_sigma != 0.0
+            {
                 let mut g = GameRng::substream(seed, stream::OPENING);
-                (0..companies_len).map(|_| g.next_normal()).collect()
+                (0..companies_len + 1).map(|_| g.next_normal()).collect()
             } else {
                 Vec::new()
             },
@@ -3241,10 +3249,14 @@ impl Engine {
     /// before the first tick that prices anything.
     ///
     /// Each name's day-zero premium of price over its published fair value
-    /// is split in two. The mispricing `s` is the roster's cap-weighted
-    /// premium -- so the index opens with the mispricing it always had --
-    /// plus this name's draw at the dial's sd, the draws re-centred to
-    /// cap-weighted zero. The rest of the premium is the name's opening
+    /// is split in two. The mispricing `s` is a common level plus this
+    /// name's draw at `opening_mispricing_sigma`, the draws re-centred to
+    /// cap-weighted zero. The common level is a draw at
+    /// `opening_market_sigma` when that is non-zero, the market opening at
+    /// a point of its own stationary mispricing; at 0.0 it is the roster's
+    /// cap-weighted premium, so the index opens with the mispricing the
+    /// generated roster gives it (and reverts from it over the first months,
+    /// which is a start-up drift of up to 30 per cent on a 20-name roster). The rest of the premium is the name's opening
     /// fair-value level `v`. The price does not move: `P = FV exp(v) exp(s)`
     /// holds with the same `P`. What changes is how much of the premium the
     /// model later pulls back: only the stationary part.
@@ -3254,10 +3266,12 @@ impl Engine {
     fn apply_opening(&mut self) {
         let z = std::mem::take(&mut self.opening_z);
         let sigma = self.params.opening_mispricing_sigma;
+        // The per-name draws are the first `n`, the market's the last.
+        let n_draws = z.len().saturating_sub(1);
         let mut gap = vec![f64::NAN; self.companies.len()];
         let (mut wsum, mut wgap, mut wz) = (0.0, 0.0, 0.0);
         for (i, c) in self.companies.iter().enumerate() {
-            if i >= z.len() || c.stock.mispricing_s.is_some() || c.is_bankrupt || !c.is_public {
+            if i >= n_draws || c.stock.mispricing_s.is_some() || c.is_bankrupt || !c.is_public {
                 continue;
             }
             let fv = crate::market::tick::published_fair_value(
@@ -3272,7 +3286,11 @@ impl Engine {
         if !(wsum > 0.0) {
             return;
         }
-        let centre = wgap / wsum;
+        let centre = if self.params.opening_market_sigma != 0.0 {
+            self.params.opening_market_sigma * z[n_draws]
+        } else {
+            wgap / wsum
+        };
         let zbar = wz / wsum;
         for (i, c) in self.companies.iter_mut().enumerate() {
             if gap[i].is_nan() {
@@ -3331,7 +3349,9 @@ impl Engine {
         // each name's `s` before the generated body, so the company's own
         // jump can be told from the market's after it. Empty, and nothing
         // below runs, at 0.0.
-        let s_before: Vec<f64> = if self.params.fair_value_news_share != 0.0 {
+        let s_before: Vec<f64> = if self.params.fair_value_news_share != 0.0
+            || self.params.fair_value_market_share != 0.0
+        {
             self.companies.iter().map(|c| c.stock.mispricing_s.unwrap_or(f64::NAN)).collect()
         } else {
             Vec::new()
@@ -3427,6 +3447,7 @@ impl Engine {
         // keeps the whole jump: it reports what moved the price.
         if !s_before.is_empty() {
             let psi = self.params.fair_value_news_share;
+            let psim = self.params.fair_value_market_share;
             let common = market - compensator;
             for (index, company) in self.companies.iter_mut().enumerate() {
                 let (Some(after), Some(&before)) = (company.stock.mispricing_s, s_before.get(index)) else {
@@ -3436,10 +3457,15 @@ impl Engine {
                     continue;
                 }
                 let own = (after - before) - common;
-                if own.abs() <= 1e-9 {
+                // The company's own jump on the stock-level share, the
+                // market's on the market-wide share (a name the clamp held
+                // back from the market jump keeps the share of what it took).
+                let own = if own.abs() <= 1e-9 { 0.0 } else { own };
+                let taken_common = (after - before) - own;
+                let dv = psi * own + psim * taken_common;
+                if dv == 0.0 {
                     continue;
                 }
-                let dv = psi * own;
                 let s_new = after - dv;
                 company.stock.mispricing_s = Some(s_new);
                 if let Some(prev) = company.stock.mispricing_s_prev_close {

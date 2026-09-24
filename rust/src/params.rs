@@ -549,6 +549,18 @@ pub struct ModelParams {
     /// an Ito term so `E[exp(v)]` stays one and the index's expected return
     /// does not move. Market and sector shocks stay in `s`. In [0, 1].
     pub fair_value_news_share: f64,
+    /// The share of each MARKET-WIDE shock that moves fair value for good:
+    /// the name's loading on the market factor's draw, market-wide news and
+    /// the market jump. 0.0, which every preset through pt-v19 carries,
+    /// sends them to `s`, whose pull reverts every market move on the
+    /// mispricing half-life: on pt-v19 the index's calendar-year returns
+    /// spread 11.4 per cent (sd) against the S&P's 17.4 at the same daily
+    /// volatility, a 20 per cent bear market recovers in 158 sessions
+    /// against the tape's 670, and a replayed crisis leaves the index a
+    /// third as far down at the window's end as the real one did (design
+    /// repository, programme/results/ptv20/). Off zero, that share joins the
+    /// name's fair-value level, as the stock-level share does. In [0, 1].
+    pub fair_value_market_share: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -566,6 +578,22 @@ pub struct ModelParams {
     /// on its own stream (`rng::stream::OPENING`), taken when the engine is
     /// built, so no other stream moves.
     pub opening_mispricing_sigma: f64,
+    /// The sd of the common level of the opening mispricing: the market's
+    /// own opening premium. 0.0, which every preset through pt-v19 carries,
+    /// is the roster's cap-weighted day-zero premium of price over fair
+    /// value (under `opening_mispricing_sigma`; without it every name adopts
+    /// its whole premium, which comes to the same index). A generated roster
+    /// opens its index that far from fair value by construction -- +0.11 on
+    /// the certified roster, -0.33 to +0.30 on the suite's 20-name rosters
+    /// -- and the index then reverts on the mispricing half-life: a drift of
+    /// up to 30 per cent in the first months with nothing happening, and a
+    /// certified year one of +2 per cent against the tape's +10.
+    ///
+    /// Off zero, the common level is a draw at this sd, the market opening
+    /// at a point of its own stationary mispricing; the rest of each name's
+    /// premium is its fair-value level. One more normal on
+    /// `rng::stream::OPENING`, after the per-name draws.
+    pub opening_market_sigma: f64,
     /// Market-shock magnitude, in baseline sigmas, above which the crash
     /// amplifier fires (§5.4 promotion).
     pub crash_amplifier_threshold: f64,
@@ -4789,7 +4817,9 @@ impl ModelParams {
             quote_model_weight: 0.0,
             closing_auction: 0.0,
             fair_value_news_share: 0.0,
+            fair_value_market_share: 0.0,
             opening_mispricing_sigma: 0.0,
+            opening_market_sigma: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -6670,7 +6700,11 @@ impl ModelParams {
     /// value; the mispricing keeps the market-wide part. The published
     /// fundamentals do not move, so they are a noisy read of fair value.
     /// `opening_mispricing_sigma` opens each name's mispricing at the model's
-    /// stationary spread instead of the whole day-zero premium.
+    /// stationary spread instead of the whole day-zero premium, and
+    /// `opening_market_sigma` opens the market's common level at a draw from
+    /// its own stationary spread instead of the roster's cap-weighted
+    /// premium, which drifted a 20-name suite market by up to 30 per cent in
+    /// its first months with nothing happening.
     ///
     /// THE DAILY CONTINUATION. With the tape honest, the stop and squeeze
     /// ladders were the largest daily momentum left in the model price;
@@ -6685,6 +6719,7 @@ impl ModelParams {
         p.closing_auction = 1.0;
         p.fair_value_news_share = 1.0;
         p.opening_mispricing_sigma = 0.016;
+        p.opening_market_sigma = 0.10;
         p.cascade_gain = 0.1;
         p
     }
@@ -6915,7 +6950,9 @@ impl ModelParams {
             "quote_model_weight" => self.quote_model_weight,
             "closing_auction" => self.closing_auction,
             "fair_value_news_share" => self.fair_value_news_share,
+            "fair_value_market_share" => self.fair_value_market_share,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
+            "opening_market_sigma" => self.opening_market_sigma,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -7134,7 +7171,9 @@ impl ModelParams {
             "quote_model_weight" => out.quote_model_weight = value,
             "closing_auction" => out.closing_auction = value,
             "fair_value_news_share" => out.fair_value_news_share = value,
+            "fair_value_market_share" => out.fair_value_market_share = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
+            "opening_market_sigma" => out.opening_market_sigma = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -7414,11 +7453,18 @@ impl ModelParams {
                  1.0 as shipped.", self.cascade_gain));
         }
         for (name, v) in [("quote_model_weight", self.quote_model_weight),
-                          ("fair_value_news_share", self.fair_value_news_share)] {
+                          ("fair_value_news_share", self.fair_value_news_share),
+                          ("fair_value_market_share", self.fair_value_market_share)] {
             if !(v >= 0.0 && v <= 1.0) {
                 return Err(format!(
                     "{name} is {v}. It is a weight in [0, 1]; 0.0 as shipped."));
             }
+        }
+        if !(self.opening_market_sigma >= 0.0 && self.opening_market_sigma <= 0.9) {
+            return Err(format!(
+                "opening_market_sigma is {}. It is the sd of the market's opening \
+                 mispricing, in [0, 0.9]; 0.0 keeps the roster's own premium, as shipped.",
+                self.opening_market_sigma));
         }
         if !(self.opening_mispricing_sigma >= 0.0 && self.opening_mispricing_sigma <= 0.9) {
             return Err(format!(
@@ -7825,7 +7871,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "quote_model_weight",
         "closing_auction",
         "fair_value_news_share",
+        "fair_value_market_share",
         "opening_mispricing_sigma",
+        "opening_market_sigma",
         "news_peer_vix_coupling",
         "news_peer_weight",
         "news_peer_weight_down",

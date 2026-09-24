@@ -727,6 +727,21 @@ PERTURBATIONS = [
     ("news_absorption_drift_share", 0.2, False),
     ("news_absorption_drift_half_life", 30.0, False),
     ("news_quote_revision", 0.0, False),
+    # pt-v20's tape and cross-section (2026-09-24). The book centred on the
+    # model price and the closing cross both reach the print on the first
+    # session; the fair-value share splits every stock-specific shock from
+    # the first tick; the opening spread re-draws each name's opening
+    # mispricing, and so its whole path.
+    ("quote_model_weight", 1.0, True),
+    # The cross prints the session's 15:59 tick, and the probe's sessions
+    # stop at 10:47, so no probe session has a close to cross.
+    ("closing_auction", 1.0, False),
+    ("fair_value_news_share", 0.5, True),
+    ("opening_mispricing_sigma", 0.05, True),
+    # The market-wide share splits the market factor's draw from the first
+    # tick; the market opening spread re-draws the index's opening level.
+    ("fair_value_market_share", 0.5, True),
+    ("opening_market_sigma", 0.05, True),
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
     ("volume_idio_variance_gain", 1.0, True),    # couples volume to the name's own variance, which is non-trivial from the first tick
@@ -957,6 +972,10 @@ PERTURBATIONS = [
     # touches is evaluated. Over 252 days it bites: the thirty-seed sweep
     # separates the arms.
     ("cascade_symmetry", 0.5, False),
+    # Scales the stop and squeeze ladders, which fire on a previous day's
+    # move past 2.5 per cent; no name on the probe's 78-tick sessions moves
+    # that far, so the ladders add nothing to scale.
+    ("cascade_gain", 0.5, False),
     # How much of nominal output growth the valuation's earnings carry. It
     # reads a level the economy compounds daily, so it moves the market as
     # soon as one day has closed rather than waiting on a branch: over the

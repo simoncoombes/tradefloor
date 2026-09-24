@@ -631,6 +631,23 @@ PARAM_SPECS: dict[str, dict] = {
                                         "hard_range": (0.0, 120.0), "derived": True},
     "news_quote_revision": {"kind": "abs", "step_unit": 1.0,
                             "hard_range": (0.0, 1.0), "derived": True},
+    # pt-v20 (2026-09-24, design repository programme/ptv20-registration.md).
+    # The two tape switches and the fair-value share are derived as the
+    # values that make the mechanism what it says (1.0 each); the opening
+    # spread and the ladder's scale are measured.
+    "quote_model_weight": {"kind": "abs", "step_unit": 0.1,
+                           "hard_range": (0.0, 1.0), "derived": True},
+    "closing_auction": {"kind": "abs", "step_unit": 1.0,
+                        "hard_range": (0.0, 1.0), "derived": True},
+    "fair_value_news_share": {"kind": "abs", "step_unit": 0.05,
+                              "hard_range": (0.0, 1.0), "derived": True},
+    "opening_mispricing_sigma": {"kind": "abs", "step_unit": 0.002,
+                                 "hard_range": (0.0, 0.3)},
+    "opening_market_sigma": {"kind": "abs", "step_unit": 0.005,
+                             "hard_range": (0.0, 0.3)},
+    "fair_value_market_share": {"kind": "abs", "step_unit": 0.05,
+                                "hard_range": (0.0, 1.0)},
+    "cascade_gain": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
     # the tape's three epicentre episodes (2.43, 1.93, 1.41). 0.0 is the
     # branch not taken; the range opens at zero to hold it and stops at 3.0,

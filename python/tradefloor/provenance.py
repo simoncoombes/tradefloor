@@ -171,7 +171,7 @@ BASELINE = "pt-v1"
 #: RESULT.md in the design repository). Fifteen of those dials left
 #: OUT_OF_SCOPE and three left POST_BASELINE for entries below, and
 #: `market_vol_vix_excursion` went the other way, back to pt-v1's 0.0.
-REQUIRED_PRESETS = ("pt-v16", "pt-v18", "pt-v19")
+REQUIRED_PRESETS = ("pt-v16", "pt-v18", "pt-v19", "pt-v20")
 
 KINDS = ("derived", "measured", "undetermined")
 
@@ -212,6 +212,13 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: `macro_calendar_days_per_year` and `macro_compound_days_per_year` left
 #: when pt-v19's fifth composition moved all three off pt-v1.
 POST_BASELINE = {
+    "fair_value_market_share":
+        "added for pt-v20 (2026-09-24) beside `fair_value_news_share`: the "
+        "share of MARKET-WIDE shocks that moves fair value for good. Every "
+        "preset ships 0.0, so the market's mispricing keeps the whole market "
+        "move and pulls it back on its half-life; that is a choice with a "
+        "measured cost (the index's annual spread, B9) and the owner decides "
+        "it on the ptv20g1 box's arms",
     "jump_idio_vix_decoupled":
         "added at 0.8.0 for the idiosyncratic arrival rate under the "
         "identity; pt-v19 carried 1.0 from 2026-09-14 until the 2026-09-20 "
@@ -344,6 +351,7 @@ RETURNED_TO_BASELINE = {
                   "returns it to 1.0 as one of the four dials measured at "
                   "120 seeds against pt-v18, whose 0.6 is the paired control "
                   "(DIAL_PROVENANCE entry)",
+        "pt-v20": "inherits pt-v19's return to 1.0 unchanged",
     },
 }
 
@@ -663,7 +671,7 @@ OUT_OF_SCOPE = {
 DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "vix_ceiling": {
         "kind": "derived",
-        "presets": {"pt-v19": 181.3295},
+        "presets": {"pt-v19": 181.3295, "pt-v20": 181.3295},
         "identity": "a VIX already at C must come off it on a session at "
                     "the top of the graded range: `C - implied(C) >= F(C)`, "
                     "where `implied(C)` is the settled read-back the map "
@@ -870,7 +878,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_level_persistence": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.9979},
+        "presets": {"pt-v19": 0.9979, "pt-v20": 0.9979},
         "identity": "the year-to-year persistence of the tape's VIX regime, "
                     "as a daily AR(1): the lag-one autocorrelation of the 35 "
                     "yearly medians of log VIX (1990-2024) is 0.590, and "
@@ -891,7 +899,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_level_sigma": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.0181},
+        "presets": {"pt-v19": 0.0181, "pt-v20": 0.0181},
         "identity": "the era spread the level must add to what the loop "
                     "makes on its own: sigma = sqrt((V* - V0) / A) * "
                     "sqrt(1 - 0.9979^2) = 0.0181, the innovation of a daily "
@@ -927,7 +935,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "garch_vix_exponent": {
         "kind": "undetermined",
-        "presets": {"pt-v16": 2.0, "pt-v18": 2.0, "pt-v19": 2.0},
+        "presets": {"pt-v16": 2.0, "pt-v18": 2.0, "pt-v19": 2.0, "pt-v20": 2.0},
         "what_would_determine_it": "a box on the PAIR this dial belongs "
                                    "to, because the shipped 2.0 is the "
                                    "market factor's exponent borrowed for "
@@ -979,7 +987,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 
     "jump_idio_vix_decoupled": {
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0},
+        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0, "pt-v20": 0.0},
         "what_would_determine_it": "a derivation of how the idiosyncratic "
                                    "jump arrival rate should couple to the "
                                    "VIX. The 2026-09-20 factorial's idio "
@@ -1059,7 +1067,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                      "corr(gamma, beta) -0.21, "
                                      "corr(alpha, beta) -0.48",
         },
-        "presets": {"pt-v19": 0.1556},
+        "presets": {"pt-v19": 0.1556, "pt-v20": 0.1556},
         "identity": "the tape's leverage response, at a LIKELIHOOD RATIO "
                     "of 2 * 152.5 = 305 on one degree of freedom. Same "
                     "tape, same window, same estimator:\n"
@@ -1109,7 +1117,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # describes anything that ships, so it is kept in `superseded` and
         # the entry records what 4.0 is: a ladder reading, not a derivation.
         "kind": "undetermined",
-        "presets": {"pt-v19": 4.0},
+        "presets": {"pt-v19": 4.0, "pt-v20": 4.0},
         "what_would_determine_it": (
             "the anchor form's own identity against the tape's crisis lever, "
             "the analogue of the excursion form's `e = 2 s / (2 - s)` below. "
@@ -1140,7 +1148,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_level_loop_gain": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.79},
+        "presets": {"pt-v19": 1.79, "pt-v20": 1.79},
         "identity": "the running loop's transmission of the level into the "
                     "VIX at the derived spread. The transmission rises with "
                     "the spread, so the gain is the self-consistent solution "
@@ -1172,7 +1180,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "crisis_epicentre_extra": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.93},
+        "presets": {"pt-v19": 1.93, "pt-v20": 1.93},
         "identity": "the median of the tape's three epicentre episodes: the "
                     "epicentre sector's episode volatility over the median "
                     "sector's, per-sector volatility being the median over the "
@@ -1265,7 +1273,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                         "target would put it, and nothing checks the two "
                         "against each other",
         "presets": {"pt-v16": 0.28035004, "pt-v18": 0.28035004,
-                    "pt-v19": 0.0066},
+                    "pt-v19": 0.0066, "pt-v20": 0.0066},
         "identity": "GJR(1,1) by Gaussian QMLE on the tape's index over "
                     "the whole span: omega 0.0202, alpha 0.0066 "
                     "(sandwich se 0.0082), gamma 0.1556 (0.0236), beta "
@@ -1341,7 +1349,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                         "is the reason this is recorded rather than "
                         "adopted",
         "presets": {"pt-v16": 0.69244622, "pt-v18": 0.69244622,
-                    "pt-v19": 0.8946},
+                    "pt-v19": 0.8946, "pt-v20": 0.8946},
         "identity": "the same fit as `market_vol_alpha`: beta = 0.8946, "
                     "sandwich se 0.0181, corr(beta, omega) -0.91. The "
                     "GJR persistence `alpha + gamma/2 + beta` is 0.9790; "
@@ -1366,7 +1374,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "crash_amplifier_conditional_sigma": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "the VIX loop's stability condition. Under "
                     "`vix_level_identity` the deterministic map is "
                     "`v -> implied(v)`, the state lives on "
@@ -1456,7 +1464,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "crisis_blend_gain": {
         "kind": "derived",
-        "presets": {"pt-v16": 0.8275881, "pt-v18": 0.8275881, "pt-v19": 0.0},
+        "presets": {"pt-v16": 0.8275881, "pt-v18": 0.8275881, "pt-v19": 0.0, "pt-v20": 0.0},
         "identity": "zero, the identity: the tape supports no loading lift. "
                     "Three measured facts, none needing the model. (1) The "
                     "tape's VIX has no crisis attractor: its conditional "
@@ -1526,7 +1534,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_target_shock_cap": {
         "kind": "derived",
-        "presets": {"pt-v16": 45.0, "pt-v18": 45.0, "pt-v19": 158.8524},
+        "presets": {"pt-v16": 45.0, "pt-v18": 45.0, "pt-v19": 158.8524, "pt-v20": 158.8524},
         "identity": "the SUPREMUM of the return spike over the domain the "
                     "update admits, which is the image of `vix_return_clamp` "
                     "evaluated at the VIX floor: `vix_return_gain * clamp ** "
@@ -1640,7 +1648,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "oil_supply_response": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "the value at which supply equals demand in expectation, "
                     "so inventory_change is the noise term alone and "
                     "inventory is driftless",
@@ -1662,7 +1670,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # undetermined is not a demotion of the source; it is the schema
         # refusing to call a point estimate a measurement.
         "kind": "undetermined",
-        "presets": {"pt-v18": 1.0 / 3.0, "pt-v19": 1.0 / 3.0},
+        "presets": {"pt-v18": 1.0 / 3.0, "pt-v19": 1.0 / 3.0, "pt-v20": 0.3333333333333333},
         "what_would_determine_it": "the dispersion of net buyback yield "
                                    "across the US large-cap filing record "
                                    "the value is taken from. The point "
@@ -1686,7 +1694,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # derived on a model whose sector volatility does not run, so
         # whether any value is needed is itself open.
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.008583053614, "pt-v18": 0.008583053614, "pt-v19": 0.008583053614},
+        "presets": {"pt-v16": 0.008583053614, "pt-v18": 0.008583053614, "pt-v19": 0.008583053614, "pt-v20": 0.008583053614},
         "what_would_determine_it": "the same inversion run against the "
                                    "SHIPPED value, or the shipped value "
                                    "replaced by the derived one. A residual "
@@ -1732,7 +1740,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # argument for reading the record and the table against each other
         # rather than either alone.
         "kind": "derived",
-        "presets": {"pt-v19": 0.7905},
+        "presets": {"pt-v19": 0.7905, "pt-v20": 0.7905},
         "identity": "`beta = rho - alpha - gamma / 2`: the GJR first-moment "
                     "persistence identity solved for beta at the SHIPPED "
                     "alpha and gamma, with rho the tape's own per-name "
@@ -1834,7 +1842,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # not be the response ratio, and nobody has measured the shipped
         # one.
         "kind": "undetermined",
-        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 0.049},
+        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 0.049, "pt-v20": 0.049},
         "what_would_determine_it": "the shipped pair's RESPONSE ratio at 2 "
                                    "per cent, measured the way the tape's "
                                    "0.848 was, and a value for this dial "
@@ -1849,7 +1857,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_vol_slow_gain": {
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.05, "pt-v18": 0.05, "pt-v19": 0.05},
+        "presets": {"pt-v16": 0.05, "pt-v18": 0.05, "pt-v19": 0.05, "pt-v20": 0.05},
         "what_would_determine_it": "a measured slow-component gain. ws-b "
                                    "withdrew this dial as undetermined "
                                    "rather than deriving it; 0.05 is a "
@@ -1862,7 +1870,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # this table could not see. Found by the same audit as `garch_beta`
         # above and added on the same day.
         "kind": "derived",
-        "presets": {"pt-v19": 0.9913},
+        "presets": {"pt-v19": 0.9913, "pt-v20": 0.9913},
         "identity": "the SLOW POLE of the tape's own variance impulse "
                     "response, read off a two-component fit and carried "
                     "into the mixture as its persistence. One exponential "
@@ -1961,7 +1969,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # this quantity reads 1.076 pooled over one history and 1.252 per
         # calendar year, and the panel's own statistic is a per-window one.
         "kind": "measured",
-        "presets": {"pt-v16": 0.252, "pt-v18": 0.252, "pt-v19": 0.252},
+        "presets": {"pt-v16": 0.252, "pt-v18": 0.252, "pt-v19": 0.252, "pt-v20": 0.252},
         "source": "^GSPC and ^VIX adjusted closes, 1990-01-03 to "
                   "2025-07-30, 8,959 aligned sessions with a return; "
                   "per-calendar-year estimator over 35 years",
@@ -2027,7 +2035,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "note": "the level-blind form is REFUSED at F = 118, so the "
                     "level exponent is not an optional refinement of it",
         },
-        "presets": {"pt-v19": 1.4483},
+        "presets": {"pt-v19": 1.4483, "pt-v20": 1.4483},
         "identity": "the down-side response is `gain * |r|^p * V^-g` with "
                     "`g = p - 1`, the one-parameter-fewer standardised "
                     "form; the free fit's g of 0.49 +/- 0.12 contains "
@@ -2062,7 +2070,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # ======================================================================
     "vix_return_level_exponent": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.4483},
+        "presets": {"pt-v19": 0.4483, "pt-v20": 0.4483},
         "identity": "`p - 1` where p is `vix_return_exponent` 1.4483. The "
                     "engine runs the standardised form of the down-side "
                     "law, in which the level exponent is not free: fixing "
@@ -2090,12 +2098,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "note": "CONCAVE in the move, against the down side's convex "
                     "1.4483: the two sides are not one law with a sign",
         },
-        "presets": {"pt-v19": 0.5433},
+        "presets": {"pt-v19": 0.5433, "pt-v20": 0.5433},
         "identity": "the up-side response is `gain * |r|^p_up * V^-g_up`",
     },
     "vix_return_level_exponent_up": {
         "kind": "derived",
-        "presets": {"pt-v19": -1.0},
+        "presets": {"pt-v19": -1.0, "pt-v20": -1.0},
         "identity": "the RATIO form in the level: an up-side response "
                     "proportional to the VIX is `V^-g_up` with g_up = -1. "
                     "The free fit reads -0.85 +/- 0.12, which is 1.2 "
@@ -2126,7 +2134,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "VIX's own innovation is the variance forecast's, "
                     "which is why the tape's residual persists",
         },
-        "presets": {"pt-v19": 0.0175},
+        "presets": {"pt-v19": 0.0175, "pt-v20": 0.0175},
         "identity": "the residual a level-aware law leaves, which a "
                     "level-blind law books as innovation and which the "
                     "`vix_dlog_innovation_sd` row of new-rows.md reads",
@@ -2152,14 +2160,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "caps the VIX fourth moment below it. The dial is not "
                     "what is short",
         },
-        "presets": {"pt-v19": 1.700},
+        "presets": {"pt-v19": 1.700, "pt-v20": 1.7},
         "identity": "the jump size in LEVEL units, which is what makes the "
                     "response scale-free; 0.0 selects the points of "
                     "`vix_jump_scale` instead",
     },
     "vix_jump_return_intensity": {
         "kind": "derived",
-        "presets": {"pt-v19": 6.199},
+        "presets": {"pt-v19": 6.199, "pt-v20": 6.199},
         "identity": "the derived 2.24 arrivals a year spread over the "
                     "down-return distribution as `max(0, -r)`: a rate per "
                     "year per percentage point of down move, which "
@@ -2195,7 +2203,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "same state was measured on vixdyn8 and is worse at "
                     "504 by 2.68 against a paired error bar of 1.60",
         },
-        "presets": {"pt-v19": 0.067},
+        "presets": {"pt-v19": 0.067, "pt-v20": 0.067},
         "identity": "the shock share of the sector variance state",
     },
     "sector_vol_beta": {
@@ -2213,7 +2221,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "estimate": 0.904,
             "standard_error": 0.069,
         },
-        "presets": {"pt-v19": 0.837},
+        "presets": {"pt-v19": 0.837, "pt-v20": 0.837},
         "identity": "the carry-over of the sector variance state. The "
                     "state is a ratio with fixed point 1.0, so beta alone "
                     "with alpha at 0.0 leaves it there forever, which is "
@@ -2234,7 +2242,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # that both halves of the opening ship together without fixing the
         # length.
         "kind": "undetermined",
-        "presets": {"pt-v18": 755.0, "pt-v19": 755.0},
+        "presets": {"pt-v18": 755.0, "pt-v19": 755.0, "pt-v20": 755.0},
         "what_would_determine_it": "the burn-in table re-run across the "
                                    "certified seed cohort, reporting the "
                                    "dispersion of the day each field "
@@ -2255,7 +2263,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # 2026-09-05. So the sentence that would BE the derivation is about
         # a value the default does not use.
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.025, "pt-v18": 0.025, "pt-v19": 0.025},
+        "presets": {"pt-v16": 0.025, "pt-v18": 0.025, "pt-v19": 0.025, "pt-v20": 0.025},
         "what_would_determine_it": "a daily-scale measurement of what 0.025 "
                                    "does. The recorded argument for this "
                                    "dial says a per-tick tilt is CLT-washed "
@@ -2279,7 +2287,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # an entry that records only the identity overstates it.
     "market_beta_down_asym_lag": {
         "kind": "measured",
-        "presets": {"pt-v18": 0.375, "pt-v19": 0.46},
+        "presets": {"pt-v18": 0.375, "pt-v19": 0.46, "pt-v20": 0.46},
         "source": "the certified panel plus index drift, the fear gauge and "
                   "the VIX's own persistence, scored by `loss.rule_table` at "
                   "nineteen rows, on thirty seeds over roster 40 @ seed 111 "
@@ -2376,7 +2384,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # and the readings are in `ruling` below. The gap is in the
         # ARGUMENT, not in the choice.
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.06, "pt-v18": 0.10, "pt-v19": 0.27},
+        "presets": {"pt-v16": 0.06, "pt-v18": 0.10, "pt-v19": 0.27, "pt-v20": 0.27},
         "what_would_determine_it": "a JOINT re-solve of the three "
                                    "constraints of `vix-dynamics.md` 10.3 "
                                    "with the read-back constant c_d "
@@ -2487,7 +2495,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # on a curve is the defect in the module note's first paragraph with
         # the paragraph already written.
         "kind": "undetermined",
-        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 8.83},
+        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 8.83, "pt-v20": 8.83},
         "what_would_determine_it": "the same joint re-solve "
                                    "`vix_mean_reversion` names -- this dial "
                                    "is the other unknown in it. A tape "
@@ -2546,7 +2554,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # such.
     "vix_level_identity": {
         "kind": "measured",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "source": "the nineteen-row scoring rule over ONE HUNDRED AND TWENTY "
                   "seeds (101-220) on roster 40 @ seed 111 at both certified "
                   "horizons, pt-v18 as the paired control in the same run; "
@@ -2623,7 +2631,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_decay_ratio": {
         "kind": "measured",
-        "presets": {"pt-v16": 0.6, "pt-v18": 0.6, "pt-v19": 1.0},
+        "presets": {"pt-v16": 0.6, "pt-v18": 0.6, "pt-v19": 1.0, "pt-v20": 1.0},
         "source": "the same 120-seed paired run and the same varying-roster "
                   "certification as `vix_level_identity` above: the two were "
                   "composed and measured together and are one regime. "
@@ -2693,7 +2701,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # because at read time the two are indistinguishable, which is the
         # sentence this module opens with.
         "kind": "measured",
-        "presets": {"pt-v16": 0.58821442, "pt-v18": 0.58821442, "pt-v19": 0.60},
+        "presets": {"pt-v16": 0.58821442, "pt-v18": 0.58821442, "pt-v19": 0.60, "pt-v20": 0.6},
         "source": "MEASURED ON THE COMPOSED BASE. transmit1 varied the "
                   "level and the loading in ONE box for the first time: two "
                   "ladders over `sector_loading` 0.55, 0.60, 0.65 and 0.70, "
@@ -2836,7 +2844,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "volume_idio_variance_gain": {
         "kind": "measured",
-        "presets": {"pt-v19": 0.20},
+        "presets": {"pt-v19": 0.20, "pt-v20": 0.2},
         "source": "`volume_change_acf1` traced (volume-acf-result.md section "
                   "1) to a per-name volume-variance channel every earlier "
                   "preset ships at 0.0 -- a name's volume following its OWN "
@@ -2916,7 +2924,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_beta_down_asym_recentre": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "`E[f 1{f<0}] = -s / sqrt(2 pi)` for `f ~ N(0, s^2)`. "
                     "Scaling one side of a zero-mean draw moves its mean, so "
                     "the tilt adds `a * beta * -s / sqrt(2 pi)` to every name "
@@ -2973,7 +2981,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "oil_opec_symmetry": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "at 1.0 both branches of the OPEC rule use one "
                     "probability and one magnitude range, so the expected "
                     "impact is equal and opposite either side of the 80 "
@@ -3020,7 +3028,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "oil_seasonality_target": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "the amplitude is SPLIT, `1 + g*a` on the reversion "
                     "target against `1 + (1-g)*a` on the price level, so the "
                     "total is conserved at every `g` and the level carries "
@@ -3064,7 +3072,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "cycle_hazard_per_month": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "`weibull_hazard` returns `(shape/scale) * "
                     "pow(months/scale, shape-1)` and every scale in "
                     "`cycle_hazard_params` is in MONTHS -- 36 for an "
@@ -3131,7 +3139,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "jump_mean_compensated": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "a jump arriving with probability `lambda` and mean `m` "
                     "contributes `lambda * m` to the expected return every "
                     "day whether it fires or not. Subtracting `lambda * m` is "
@@ -3176,7 +3184,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "earnings_nominal_growth": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "price is `fair_value * exp(s)` with `s` a stationary "
                     "AR(2) around zero and `eps` fixed when an instrument is "
                     "built, so the only time variation in fair value is the "
@@ -3246,7 +3254,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "neutral_discount_rate": {
         "kind": "derived",
-        "presets": {"pt-v18": 0.0482, "pt-v19": 0.0482},
+        "presets": {"pt-v18": 0.0482, "pt-v19": 0.0482, "pt-v20": 0.0482},
         "identity": "`compute_target_pe` compresses the multiple by "
                     "`(discount - neutral) * RATE_PE_SENSITIVITY * duration` "
                     "(fair_value.rs:189), so a name is valued exactly on its "
@@ -3318,7 +3326,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # because the neighbouring entries are would be exactly the
         # inherited authority this module exists to refuse.
         "kind": "undetermined",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "what_would_determine_it": "the ladder's expected contribution "
                                    "measured at 1.0 over the returns this "
                                    "engine actually produces. The drift "
@@ -3375,7 +3383,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # are `derived` and say so.
     "vix_anchor_weight": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.375},
+        "presets": {"pt-v19": 0.375, "pt-v20": 0.375},
         "identity": "theta = (1 - a) k: the VIX's elasticity to realised "
                     "volatility is the anchor weight's complement times the "
                     "loop's transmission, the slow equilibrium of the memory "
@@ -3405,7 +3413,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_memory": {
         "kind": "undetermined",
-        "presets": {"pt-v19": 0.05555555555555555},
+        "presets": {"pt-v19": 0.05555555555555555, "pt-v20": 0.05555555555555555},
         "what_would_determine_it": "a tape reading of how long a deviation "
             "of the VIX from the level realised variance implies persists "
             "before it is pulled back. FITTED: 1/18 was read off a ladder "
@@ -3416,7 +3424,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_centre": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.1515},
+        "presets": {"pt-v19": 0.1515, "pt-v20": 0.1515},
         "identity": "c = ln(1.252 / 1.076): the anchor pulls to `L * anchor "
                     "* exp(-c)`, the VIX's MEAN level (the pooled premium on "
                     "the pooled variance) rather than the per-window premium "
@@ -3434,7 +3442,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_weight_level": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "eta in `1 - a(x) = (1 - a) (K / clamp(x, K, r K))^eta`: "
                     "the log-slope of the held read-back's gain g(x) between "
                     "VIX 18.5 and 30, so the loop's local gain `(1 - a(x)) "
@@ -3451,7 +3459,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_weight_level_knee": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.3888},
+        "presets": {"pt-v19": 0.3888, "pt-v20": 0.3888},
         "identity": "k' = k + ln((1 - a') / (1 - a)) / eta: the crisis side "
                     "of the weight, (1 - a)(K / x)^eta, held while the base "
                     "weight moves from 0.45 to a' = 0.375: 0.2609 + "
@@ -3469,7 +3477,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_weight_level_cap": {
         "kind": "derived",
-        "presets": {"pt-v19": 2.2159},
+        "presets": {"pt-v19": 2.2159, "pt-v20": 2.2159},
         "identity": "r' = r (1 - a') / (1 - a): the cap held at the same VIX "
                     "as the knee moves, 1.95 * 0.625 / 0.55 = 2.2159",
         "terms": {"r 1.95": "36 / 18.5, where the held map's gain reaches 95 "
@@ -3483,7 +3491,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_vol_vix_exponent_below": {
         "kind": "undetermined",
-        "presets": {"pt-v19": 2.5},
+        "presets": {"pt-v19": 2.5, "pt-v20": 2.5},
         "what_would_determine_it": "a single tape target where today there "
             "is a window. CHOSEN, not derived: below the anchor the tape's "
             "shared variance scales as VIX^2.25 [1.95, 2.57] and its calm "
@@ -3497,7 +3505,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_beta_down_asym_lag_live": {
         "kind": "undetermined",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "what_would_determine_it": "the diagnostic registered in "
             "programme/results/corr-asymmetry-repair.md section 8 (design "
             "repository), which would rule on the form and is unrun. A FORM "
@@ -3510,7 +3518,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "macro_compound_days_per_year": {
         "kind": "derived",
-        "presets": {"pt-v19": 252.0},
+        "presets": {"pt-v19": 252.0, "pt-v20": 252.0},
         "identity": "the economy steps once per trading session, so a year "
                     "of compounding is 252 steps; at 365 a trading year "
                     "received 252/365 of its annual GDP and CPI growth",
@@ -3524,7 +3532,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "macro_calendar_days_per_year": {
         "kind": "derived",
-        "presets": {"pt-v19": 252.0},
+        "presets": {"pt-v19": 252.0, "pt-v20": 252.0},
         "identity": "the session calendar: a 21-step month, a 63-step "
                     "quarter and every calendar-day span scaled by 252 / 365 "
                     "and rounded, because the economy steps once per session",
@@ -3536,7 +3544,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "cycle_us_calibration": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "a switch whose identity is the value: 1.0 reads the "
                     "phase table derived from NBER recession dates and BEA "
                     "real GDP, 1990-2025, with the Weibull scales solved "
@@ -3555,7 +3563,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "fed_liftoff_rule": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "a switch whose identity is the value: the ladder's own "
                     "cut branch mirrored (its 50 bp trigger and 25 bp steps), "
                     "so the rate lifts off zero on its Taylor rule instead "
@@ -3568,7 +3576,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_pe_buybacks": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "a switch whose identity is the value: market_pe divides "
                     "by the same buyback-scaled earnings the valuation "
                     "already applies, so the multiple no longer rises by the "
@@ -3581,7 +3589,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "cycle_stationary_opening": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "a switch whose identity is the value: 1.0 draws day "
                     "zero's phase AND age from the cycle's own stationary "
                     "law, `P(i, a) = S_i(a + 1) / sum_j E[T_j]`, every term "
@@ -3603,7 +3611,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "news_absorption_half_life": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.6},
+        "presets": {"pt-v19": 0.6, "pt-v20": 0.6},
         "identity": "h solving A(1) = the share of an earnings move priced "
                     "one minute after the release, with A(n) = (1 - d)(1 - "
                     "2^(-n/h)) / (1 - 2^(-390/h)) + d (1 - 2^(-n/h_d)) / (1 "
@@ -3625,7 +3633,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "news_absorption_drift_share": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.12},
+        "presets": {"pt-v19": 0.12, "pt-v20": 0.12},
         "identity": "d = 1 - 1.58 / 1.80 = 0.122: the share of the move "
                     "that arrives after five minutes",
         "terms": {"1.58, 1.80": "per cent earned by five minutes and by the "
@@ -3637,7 +3645,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "news_absorption_drift_half_life": {
         "kind": "undetermined",
-        "presets": {"pt-v19": 42.0},
+        "presets": {"pt-v19": 42.0, "pt-v20": 42.0},
         "what_would_determine_it": "an intraday event study that resolves "
             "the timescale of the drift after five minutes. CHOSEN: 42 ticks "
             "is a 60-minute mean life (60 ln 2 = 41.6), which lands 92 per "
@@ -3648,7 +3656,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "news_quote_revision": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "a switch whose identity is the value: the maker "
                     "re-quotes by the tick's news term, so the traded tape "
                     "carries the absorption profile. With it the tape holds "
@@ -3662,6 +3670,136 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "repository)",
         "date": "2026-09-23",
     },
+    # pt-v20 (2026-09-24): the tape, the closing cross, the fair-value share,
+    # the stationary opening and the stop ladder's scale. Rows, bands and
+    # predictions registered before the grading box in the design
+    # repository's programme/ptv20-registration.md; the desk runs behind
+    # every figure below are programme/results/ptv20/desk/.
+    "quote_model_weight": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a weight whose identity is the value: at 1.0 the "
+                    "maker's book is centred on the efficient price (the "
+                    "model price) every tick, which is what quotes that "
+                    "track the efficient price means (Roll 1984), and the "
+                    "print's noise around it is then the bid-ask bounce. At "
+                    "0.0 the print chased the model price and the inventory "
+                    "skew carried it past",
+        "terms": {"-0.135 -> -0.03": "lag-one autocorrelation of 65-minute "
+                                     "print returns, median name, certified "
+                                     "roster (meanrev-edge section 4; ptv20 "
+                                     "desk r1-r6)",
+                  "5.8x -> 1.3-1.5x": "Roll spread over the quoted spread"},
+        "source": "programme/meanrev-edge-ptv19-2026-09-24.md section 4 and "
+                  "programme/ptv20-registration.md (design repository)",
+        "date": "2026-09-24",
+    },
+    "closing_auction": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: a closing cross "
+                    "clears at the efficient price, so the session's close "
+                    "is the model price and the close-to-close return "
+                    "carries no bid-ask bounce. Without it the 15:59 print "
+                    "sat 14 bp (sd) off the model price on the certified "
+                    "roster's large names and 45 bp on its small ones, the "
+                    "intraday volume curve being at its peak there, and the "
+                    "noise reverted the next day",
+        "terms": {"+13 -> -1 bp": "daily Lo-MacKinlay one-day book on the "
+                                  "roster's large names, with and without the "
+                                  "cross (ptv20 desk r3, r4), against the "
+                                  "certified forty's -1.7, whose closes are "
+                                  "auction prices"},
+        "source": "programme/ptv20-registration.md (design repository)",
+        "date": "2026-09-24",
+    },
+    "fair_value_news_share": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "every stock- and sector-specific shock -- the "
+                    "idiosyncratic and sector noise draws, the company's "
+                    "own, peer and sector news, its own jump -- is news "
+                    "about the company's value and not about how the market "
+                    "prices it, so all of it moves fair value for good; the "
+                    "mispricing keeps the market-wide part. The end point "
+                    "of the dial is the statement, and it is not tuned: the "
+                    "cross-sectional rows land on the real panel at it",
+        "terms": {"0.59 -> 0.95": "60-session idiosyncratic variance ratio, "
+                                  "median name (real 0.924; C5)",
+                  "+0.40 -> 0.00": "rank IC of the value signal on "
+                                   "published fundamentals against the next "
+                                   "20 sessions (real +0.009; C6)",
+                  "-0.17 -> -0.01": "12-1 month momentum rank IC (real "
+                                    "+0.027; C7)"},
+        "source": "programme/meanrev-edge-ptv19-2026-09-24.md section 8 and "
+                  "programme/ptv20-registration.md; ptv20 desk r1-r6 "
+                  "(design repository)",
+        "date": "2026-09-24",
+    },
+    "opening_mispricing_sigma": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.016},
+        "source": "programme/results/ptv20/desk/r5.json and r6b.json "
+                  "(design repository)",
+        "date": "2026-09-24",
+        "script": "programme/results/ptv20/desk.py, row s_xsd_stationary",
+        "estimator": "the cross-sectional sd of s after the cross-sectional "
+                     "mean is taken out, averaged over sessions 250-2660, "
+                     "certified roster, untraded, seeds 201-212, at the "
+                     "shipped vector's tape, cross and fair-value share",
+        "residual": "0.0155 to 0.0165 across cascade_gain 0.2 to 0.4 "
+                    "(seeds 201-206), 0.012 at 0.1 (seeds 207-212); the "
+                    "value moves the opening only, and C6's first-60 "
+                    "reading is 0.00 to 0.015 across it",
+    },
+    "fair_value_market_share": {
+        "kind": "undetermined",
+        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0, "pt-v20": 0.0},
+        "what_would_determine_it": "the index's annual return spread (B9, "
+            "S&P 500 calendar years 1990-2024, sd 17.4) and a replayed "
+            "crisis's persistence against 2008, 2020 and 2022, graded with "
+            "the fifteen on the ptv20g1 box's arms at 0.5 and 1.0 (design "
+            "repository programme/ptv20-registration.md section B9); a "
+            "ruling by the owner, since it rewrites the index's variance "
+            "structure the B rows were calibrated on",
+    },
+    "opening_market_sigma": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.1},
+        "source": "programme/results/ptv20/ (desk, mkts.py; design repository)",
+        "date": "2026-09-24",
+        "script": "the cap-weighted mean of s over the certified roster, its "
+                  "time-series sd over sessions 250-2660, pt-v20's vector",
+        "estimator": "the stationary spread of the market's own mispricing: "
+                     "the sd over sessions of the cap-weighted s, certified "
+                     "roster, untraded, seeds 201-203",
+        "residual": "0.148, 0.105 and 0.042 on the three seeds (mean 0.099): "
+                    "the level is episodic, and the opening draws from the "
+                    "mean spread",
+    },
+    "cascade_gain": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.1},
+        "source": "programme/results/ptv20/desk/r4.json, r5.json (design "
+                  "repository)",
+        "date": "2026-09-24",
+        "script": "programme/results/ptv20/desk.py, row lm1_bps",
+        "estimator": "the daily Lo-MacKinlay one-day contrarian book on the "
+                     "certified roster's closes, median over histories of "
+                     "2660 sessions, against the certified forty's -1.74; "
+                     "the reading moves about -8.5 bp a day per unit of gain "
+                     "from about -0.7 at zero, so -1.74 puts the gain at "
+                     "0.12",
+        # The bar of the estimate: the desk median's se over six histories
+        # (about 0.95 bp) over the slope. It is as large as the value, which
+        # is the honest reading: the ladder's scale is not distinguishable
+        # from zero on the daily row, and 0.1 keeps a tenth of the crash
+        # continuation it carries rather than deleting a mechanism on a
+        # reading that cannot tell the two apart.
+        "standard_error": 0.11,
+        "estimate": 0.12,
+    },
+
 }
 
 #: Dials in scope that carry NO entry.
