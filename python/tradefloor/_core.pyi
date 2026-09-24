@@ -284,7 +284,12 @@ class Engine:
         volatility: float = ..., close_at_end: bool = ...,
         news: Sequence[News] | None = ...,
         news_impacts: Sequence[NewsImpact] | None = ...,
-        order_flow: dict[str, tuple[float, float]] | None = ...,
+        fills: dict[str, tuple[float, float]] | None = ...,
+        flow_per_tick: dict[str, tuple[float, float]] | None = ...,
+        # Refused at runtime since 0.9.0; typed None so a checker says so
+        # first. Use `fills` for an agent's trades, `flow_per_tick` for a
+        # standing rate.
+        order_flow: None = ...,
     ) -> int: ...
     def run_days(
         self, days: int, *, hour: int = ..., minute: int = ...,

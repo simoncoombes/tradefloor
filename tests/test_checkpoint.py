@@ -41,7 +41,7 @@ def test_branches_are_identical_until_they_are_driven_apart():
     # so the difference is the flow and nothing else.
     a.open_market(); a.run_session(9, 30, 3, 390); a.close_market()
     b.open_market()
-    b.run_session(9, 30, 3, 390, order_flow={b.tickers[0]: (500_000.0, 0.0)})
+    b.run_session(9, 30, 3, 390, flow_per_tick={b.tickers[0]: (500_000.0, 0.0)})
     b.close_market()
 
     assert a.prices() != b.prices()

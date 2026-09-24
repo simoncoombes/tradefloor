@@ -86,7 +86,7 @@ def test_the_reconstruction_still_holds_with_news_and_order_flow():
     ticker = engine.tickers[0]
     engine.run_session(9, 30, 3, 60,
                        news=[tradefloor.News(ticker=ticker, price_impact=0.08)],
-                       order_flow={ticker: (900_000.0, 0.0)})
+                       flow_per_tick={ticker: (900_000.0, 0.0)})
     table = pa.table(engine.truth()).to_pydict()
     assert max(residuals(table, 6)) < 1e-15
 
@@ -98,7 +98,7 @@ def test_news_and_flow_land_on_the_traded_name_and_nowhere_else():
     ticker = engine.tickers[0]
     engine.run_session(9, 30, 3, 60,
                        news=[tradefloor.News(ticker=ticker, price_impact=0.08)],
-                       order_flow={ticker: (900_000.0, 0.0)})
+                       flow_per_tick={ticker: (900_000.0, 0.0)})
     table = pa.table(engine.truth()).to_pydict()
     ids = table["instrument_id"]
     for column in ("company_news", "order_flow_impact"):
@@ -307,7 +307,7 @@ def test_attribution_covers_the_whole_day_not_the_last_step():
         hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
         flow = ({ticker: (universe[0].avg_volume * 0.4, 0.0)}
                 if step == 0 else None)
-        engine.run_session(hour, minute, 3, 60, order_flow=flow)
+        engine.run_session(hour, minute, 3, 60, flow_per_tick=flow)
     engine.close_market()
     engine.record(0)
 

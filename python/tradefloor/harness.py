@@ -505,8 +505,12 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             step_hour, step_minute, step_dow = session_clock(
                 (hour, minute, day_of_week), step % steps_per_day,
                 ticks_per_step)
+            # `fills`, once, on the step's first tick: the minute after the
+            # agent filled. Until 0.9.0 this was `order_flow`, held on every
+            # one of the step's ticks, so an order was counted 65 times and
+            # the agent collected its own impact. See `Engine.run_session`.
             engine.run_session(step_hour, step_minute, step_dow, ticks_per_step,
-                               order_flow=portfolio.pending_flow())
+                               fills=portfolio.pending_flow())
             portfolio.clear_flow()
 
             leverage = portfolio.leverage(engine)

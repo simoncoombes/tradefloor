@@ -1331,13 +1331,18 @@ def _replay_inputs(engine: Engine, inputs: Sequence[dict],
             engine.record(int(day))
             recorded = True
         elif op == "run_session":
+            # `flow_per_tick` since 0.9.0, `order_flow` before it: the same
+            # per-tick flow under the name each log was written with.
+            per_tick = (entry["flow_per_tick"] if "flow_per_tick" in entry
+                        else entry.get("order_flow"))
             engine.run_session(
                 int(entry["hour"]), int(entry["minute"]),
                 int(entry["day_of_week"]), int(entry["ticks"]),
                 volatility=float(entry["volatility"]),
                 close_at_end=bool(entry["close_at_end"]),
                 news=_news(entry["news"]),
-                order_flow=_flow(entry["order_flow"]))
+                fills=_flow(entry.get("fills")),
+                flow_per_tick=_flow(per_tick))
         elif op == "tick":
             engine.tick(int(entry["hour"]), int(entry["minute"]),
                         int(entry["day_of_week"]),

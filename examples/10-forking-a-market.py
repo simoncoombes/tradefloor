@@ -50,7 +50,7 @@ def trading_day(engine, day, universe):
     flow = {universe[0].ticker: (300_000.0, 0.0),
             universe[1].ticker: (0.0, 220_000.0)}
     engine.open_market()
-    engine.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=flow)
+    engine.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=flow)
     engine.record(day)
     engine.close_market()
 

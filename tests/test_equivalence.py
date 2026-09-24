@@ -141,7 +141,7 @@ def test_a_replayed_log_matches_the_run_that_produced_it():
     engine = tradefloor.Engine(seed=42, universe=UNIVERSE)
     engine.open_market()
     engine.run_session(9, 30, 3, 80,
-                       order_flow={engine.tickers[0]: (5000.0, 0.0)})
+                       flow_per_tick={engine.tickers[0]: (5000.0, 0.0)})
     engine.close_market()
 
     replayed = tradefloor.replay(json.loads(json.dumps(engine.order_log)),

@@ -145,7 +145,8 @@ def apply_log(
                 volatility=entry["volatility"],
                 close_at_end=entry["close_at_end"],
                 news=_news(entry),
-                order_flow=_flow(entry),
+                fills=_flow(entry, "fills"),
+                flow_per_tick=_session_flow(entry),
             )
             # The second spelling of a close. A ledger that knew only
             # `close_market` would leave a session-closed run with no leaves
@@ -166,6 +167,20 @@ def _news(entry: dict[str, Any]) -> list[News] | None:
     ]
 
 
-def _flow(entry: dict[str, Any]) -> dict[str, tuple[float, float]] | None:
-    flow = entry.get("order_flow") or {}
+def _flow(entry: dict[str, Any], key: str = "order_flow"
+          ) -> dict[str, tuple[float, float]] | None:
+    flow = entry.get(key) or {}
     return {t: tuple(v) for t, v in flow.items()} if flow else None
+
+
+def _session_flow(entry: dict[str, Any]) -> dict[str, tuple[float, float]] | None:
+    """A session's per-tick flow, under either key a log has carried.
+
+    Logs written before 0.9.0 name it ``order_flow``, the argument that held
+    it on every tick of the session; later logs name it ``flow_per_tick``,
+    the argument that does so now. The meaning is the same, so an archived
+    run replays into the market it recorded.
+    """
+    if "flow_per_tick" in entry:
+        return _flow(entry, "flow_per_tick")
+    return _flow(entry, "order_flow")

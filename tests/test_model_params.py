@@ -1798,7 +1798,7 @@ def test_the_conditionally_inert_parameters_act_under_their_conditions():
                 tradefloor.News(price_impact=0.02)]
         engine.open_market()
         engine.run_session(9, 30, 3, 39, news=news,
-                           order_flow={UNIVERSE.tickers()[0]: (200_000.0, 0.0)})
+                           flow_per_tick={UNIVERSE.tickers()[0]: (200_000.0, 0.0)})
         engine.close_market()
         return market_state(engine)
 

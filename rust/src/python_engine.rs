@@ -1267,9 +1267,29 @@ impl PyEngine {
     /// the same name.
     ///
     /// Returns the number of ticks written.
+    ///
+    /// # Two kinds of order flow, and which one an agent's trades are
+    ///
+    /// `fills` is what a trader filled at the step boundary just before this
+    /// session, `{ticker: (bought, sold)}` in shares, which is what
+    /// `Portfolio.pending_flow()` returns. It reaches the market ONCE, on the
+    /// session's first tick, whatever `ticks` is. That is the argument an
+    /// agent loop wants.
+    ///
+    /// `flow_per_tick` is a standing rate instead: that many shares bought
+    /// and sold on EVERY tick of the session, a program that trades all
+    /// session long. `tf.flow_impact` uses it. Handing an agent's fills to
+    /// it counts one order once a minute for the whole step.
+    ///
+    /// `order_flow` is refused here since 0.9.0, because it was the second
+    /// kind under a name that read as the first: every harness in the
+    /// package passed an agent's fills through it, so one order was counted
+    /// on each of a step's 65 ticks and landed after the fill it came from.
+    /// `tick(order_flow=...)` is unchanged, since a tick is one minute.
     #[pyo3(signature = (
         hour, minute, day_of_week, ticks, *, volatility = 1.0,
-        close_at_end = false, news = None, news_impacts = None, order_flow = None
+        close_at_end = false, news = None, news_impacts = None, fills = None,
+        flow_per_tick = None, order_flow = None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn run_session(
@@ -1287,14 +1307,33 @@ impl PyEngine {
         // mean a one-off news item belongs in `tick`, not here.
         news: Option<Vec<PyNews>>,
         news_impacts: Option<Vec<PyNewsImpact>>,
+        fills: Option<std::collections::HashMap<String, (f64, f64)>>,
+        flow_per_tick: Option<std::collections::HashMap<String, (f64, f64)>>,
         order_flow: Option<std::collections::HashMap<String, (f64, f64)>>,
     ) -> PyResult<usize> {
+        if order_flow.is_some() {
+            // Refused rather than kept under its old meaning, so a caller
+            // still passing `order_flow=portfolio.pending_flow()` is told
+            // rather than left counting one order on every tick. Before any
+            // other check and before anything is logged, so a refused call
+            // leaves no trace.
+            return Err(ValidationError::new_err(
+                "run_session no longer takes order_flow (0.9.0). It held the \
+                 flow on every tick of the session, so an agent's fills passed \
+                 through it were counted once a minute for the whole step. Pass \
+                 an agent's trades as fills=portfolio.pending_flow(), which \
+                 reaches the market once, on the session's first tick. Pass \
+                 flow_per_tick= for a standing rate of shares a minute held for \
+                 the whole session, which is what order_flow= did.",
+            ));
+        }
         if ticks == 0 {
             return Err(ValidationError::new_err("ticks must be greater than zero"));
         }
         let session_news = self.build_news(news)?;
         let session_impacts = self.build_impacts(news_impacts)?;
-        let session_flow = self.build_flow(order_flow)?;
+        let session_flow = self.build_flow(flow_per_tick)?;
+        let session_fills = self.build_flow(fills)?;
         // Open the day here if the caller has not, and exactly once however
         // many sessions the day is made of. Letting `run_session` re-open made
         // attribution and the daily anchor per-STEP; see
@@ -1326,6 +1365,10 @@ impl PyEngine {
                 })
                 .collect(),
             flow: session_flow
+                .iter()
+                .map(|(t, v)| (t.clone(), v.buy, v.sell))
+                .collect(),
+            fills: session_fills
                 .iter()
                 .map(|(t, v)| (t.clone(), v.buy, v.sell))
                 .collect(),
@@ -1374,6 +1417,7 @@ impl PyEngine {
                     news: &session_news,
                     news_impact_queue: &session_impacts,
                     order_volumes: &session_flow,
+                    fills: &session_fills,
                     close_at_end,
                     reopen: false,
                     daily_innovations: &innovations,
@@ -1478,7 +1522,7 @@ impl PyEngine {
             // it, for the reason `open_market_on` gives.
             self.open_market_on((first_day + offset as u32) as i64);
             self.run_session(py, hour, minute, day_of_week, ticks_per_day, volatility,
-                             false, None, None, None)?;
+                             false, None, None, None, None, None)?;
             // Record BEFORE the close: the close advances the macro chain
             // into the next day, and the macro row for day N must carry the
             // values day N actually traded under, not the ones day N+1 will.
@@ -1592,6 +1636,7 @@ impl PyEngine {
                 news: &[],
                 news_impact_queue: &[],
                 order_volumes: &[],
+                fills: &[],
                 close_at_end: false,
                 reopen: false,
                 daily_innovations: &innovations,
@@ -4083,10 +4128,11 @@ impl PyEngine {
     /// Worth being explicit, because the opposite is easy to assume. The book
     /// is rebuilt per call from current state, so the object returned is
     /// detached: filling against it tells you your execution price, but the
-    /// market only learns about your trading through `order_flow` on the next
-    /// tick. Those are two separate channels on purpose -- one prices your
-    /// fill, the other applies your pressure -- and a harness that wants both
-    /// must do both.
+    /// market only learns about your trading through `fills` on the next
+    /// `run_session` (or `order_flow` on the next `tick`). Those are two
+    /// separate channels on purpose -- one prices your fill, the other
+    /// applies your pressure, once -- and a harness that wants both must do
+    /// both.
     fn book(&self, ticker: &str) -> PyResult<crate::python_book::PyOrderBook> {
         let index = self.tickers.iter().position(|t| t == ticker).ok_or_else(|| {
             ValidationError::new_err(format!(

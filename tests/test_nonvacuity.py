@@ -138,7 +138,7 @@ def test_every_truth_component_can_be_non_zero():
         engine.run_session(
             9, 30, 3, 390,
             news=[tradefloor.News(ticker=ticker, price_impact=0.06)] if day == 0 else None,
-            order_flow={ticker: (800_000.0, 0.0)},
+            flow_per_tick={ticker: (800_000.0, 0.0)},
         )
         engine.close_market()
         engine.record(day)

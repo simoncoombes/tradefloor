@@ -45,7 +45,7 @@ An effect on b is b's P&L change. It arrives as prices, by three routes,
 and the number holds all three without separating them.
 
 The direct one: a's flow reaches the market as part of the merged
-``order_flow`` of a session, and the prices of the names a traded come out
+``fills`` of a session, and the prices of the names a traded come out
 different. b holds or trades some of those names.
 
 The market-wide one: a's flow moves the cap-weighted index, the fear gauge

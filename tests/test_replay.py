@@ -22,7 +22,7 @@ def busy_run(seed=99):
         e.open_market()
         e.run_session(9, 30, 3, 60,
                       news=[tradefloor.News(ticker=UNIVERSE[1].ticker, price_impact=0.03)],
-                      order_flow={UNIVERSE[0].ticker: (2e6, 5e5)})
+                      flow_per_tick={UNIVERSE[0].ticker: (2e6, 5e5)})
         e.tick(10, 45, 3)
         e.draw_uniform()
         e.draw_normal()
@@ -215,7 +215,7 @@ def test_the_log_round_trips_through_json_by_value():
     engine = tradefloor.Engine(seed=99, universe=universe)
     engine.open_market()
     engine.run_session(9, 30, 3, 30,
-                       order_flow={engine.tickers[0]: (5000.0, 0.0)},
+                       flow_per_tick={engine.tickers[0]: (5000.0, 0.0)},
                        news=[tradefloor.News(ticker=engine.tickers[1],
                                           price_impact=0.03)])
     engine.tick(10, 0, 3, order_flow={engine.tickers[2]: (100.0, 200.0)})
@@ -232,7 +232,7 @@ def test_a_log_that_has_been_through_json_replays_exactly():
     engine = tradefloor.Engine(seed=99, universe=universe)
     engine.open_market()
     engine.run_session(9, 30, 3, 30,
-                       order_flow={engine.tickers[0]: (5000.0, 0.0)})
+                       flow_per_tick={engine.tickers[0]: (5000.0, 0.0)})
     engine.close_market()
 
     archived = json.loads(json.dumps(engine.order_log))

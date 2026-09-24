@@ -404,7 +404,7 @@ def analyse(
                                               step % steps_per_day,
                                               ticks_per_step),
                                ticks_per_step,
-                               order_flow=portfolio.pending_flow())
+                               fills=portfolio.pending_flow())
             portfolio.clear_flow()
             step += 1
         engine.close_market()

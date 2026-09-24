@@ -29,7 +29,7 @@ def full_run(seed=42, days=3):
         shock.apply(engine, day)
         engine.open_market()
         flow = {UNIVERSE.tickers()[0]: (250_000.0, 0.0)} if day == 1 else None
-        engine.run_session(9, 30, 3, 78, order_flow=flow)
+        engine.run_session(9, 30, 3, 78, flow_per_tick=flow)
         engine.close_market()
     return engine, macro, shock
 

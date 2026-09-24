@@ -92,7 +92,7 @@ STATE_COLUMNS = (
 def day(engine, index, *, flow=FLOW, record=True):
     """One step of the canonical scenario."""
     engine.open_market()
-    engine.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=flow)
+    engine.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=flow)
     if record:
         engine.record(index)
     engine.close_market()
@@ -333,7 +333,7 @@ def test_fork_initial_state_matches_source_mid_day():
     engine = fresh()
     run(engine, 3)
     engine.open_market()
-    engine.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    engine.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
 
     fork, = tf.branch(engine, 1)
     assert differences(state(fork), state(engine)) == []
@@ -646,7 +646,7 @@ def test_a_checkpoint_survives_the_process(tmp_path):
         for i in range(30, 45):
             engine.open_market()
             engine.run_session(9, 30, 3, {TICKS_PER_DAY},
-                               order_flow={FLOW!r})
+                               flow_per_tick={FLOW!r})
             engine.record(i)
             engine.close_market()
         print(json.dumps({{"digest": market_digest(engine),
@@ -862,11 +862,11 @@ def test_a_mid_day_fork_keeps_the_days_endogenous_news():
     model = tf.ModelParams.from_preset("pt-v14", endogenous_news_intensity=0.9)
     parent = fresh(model=model)
     parent.open_market()
-    parent.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    parent.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
 
     fork, = tf.branch(parent, 1)
-    parent.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
-    fork.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    parent.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
+    fork.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
 
     gap = differences(state(fork), state(parent))
     assert gap == [], f"the fork lost the day's news: {gap}"
@@ -875,8 +875,8 @@ def test_a_mid_day_fork_keeps_the_days_endogenous_news():
     quiet = tf.ModelParams.from_preset("pt-v14", endogenous_news_intensity=0.0)
     newsless = fresh(model=quiet)
     newsless.open_market()
-    newsless.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
-    newsless.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    newsless.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
+    newsless.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
     assert newsless.prices() != parent.prices()
 
 
@@ -894,11 +894,11 @@ def test_a_mid_day_fork_keeps_the_days_recorded_ticks():
     """
     parent = fresh()
     parent.open_market()
-    parent.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    parent.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
     fork, = tf.branch(parent, 1)
 
     for engine in (parent, fork):
-        engine.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+        engine.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
         engine.record(0)
         engine.close_market()
 
@@ -1098,7 +1098,7 @@ def _mid_day_parent(model, macro):
                        model=model)
     run(engine, 4)
     engine.open_market()
-    engine.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    engine.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
     return engine
 
 
@@ -1112,7 +1112,7 @@ CONTINUE_DAYS = 25
 
 def _continue(engine):
     """Finish the open day, then run on."""
-    engine.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    engine.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
     engine.record(SPLIT_DAY)
     engine.close_market()
     run(engine, CONTINUE_DAYS, first=SPLIT_DAY + 1)
@@ -1392,10 +1392,10 @@ def test_the_fork_guarantees_hold_on_every_shipped_preset(preset):
 
     # A mid-day fork continues the parent exactly.
     parent.open_market()
-    parent.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    parent.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
     fork, = tf.branch(parent, 1)
-    parent.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
-    fork.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    parent.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
+    fork.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
     assert differences(state(fork), state(parent)) == [], preset
     for engine in (parent, fork):
         engine.record(4)

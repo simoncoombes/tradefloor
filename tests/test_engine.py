@@ -378,7 +378,7 @@ def test_order_flow_moves_the_targeted_name_in_the_right_direction():
     def run(flow=None):
         e = engine(seed=42, n=3)
         e.open_market()
-        e.run_session(9, 30, 3, 300, order_flow=flow)
+        e.run_session(9, 30, 3, 300, flow_per_tick=flow)
         return arr(e.column("mispricing_s")), arr(e.prices())
 
     s_none, p_none = run()
@@ -452,7 +452,7 @@ def test_news_driven_runs_are_reproducible():
                       news=[tradefloor.News(ticker="C1", price_impact=0.03)],
                       news_impacts=[tradefloor.NewsImpact(ticker="C1",
                                                        remaining_impact=0.02)],
-                      order_flow={"C0": (2e6, 1e5)})
+                      flow_per_tick={"C0": (2e6, 1e5)})
         return arr(e.prices()), e.draws_consumed
 
     assert run() == run()
@@ -473,7 +473,7 @@ def test_attribution_names_the_cause_of_each_move():
     e = tradefloor.Engine(seed=42, universe=u)
     e.open_market()
     e.run_session(9, 30, 3, 200,
-                  order_flow={u[0].ticker: (4e6, 0.0)},
+                  flow_per_tick={u[0].ticker: (4e6, 0.0)},
                   news=[tradefloor.News(ticker=u[1].ticker, price_impact=0.04)])
 
     news = arr(e.attribution("company_news"))
@@ -557,7 +557,7 @@ def test_attribution_is_reproducible():
     def run():
         e = engine(seed=9, n=3)
         e.open_market()
-        e.run_session(9, 30, 3, 60, order_flow={"C0": (1e6, 5e5)})
+        e.run_session(9, 30, 3, 60, flow_per_tick={"C0": (1e6, 5e5)})
         return [arr(e.attribution(f)) for f in tradefloor.Engine.FACTORS]
 
     assert run() == run()

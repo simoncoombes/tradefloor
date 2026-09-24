@@ -421,7 +421,7 @@ def test_no_agent_perturbs_the_market_s_draw_schedule():
                         except (tradefloor.OrderError, tradefloor.ValidationError):
                             pass
                 engine.run_session(9, 30, 3, 65,
-                                   order_flow=portfolio.pending_flow())
+                                   fills=portfolio.pending_flow())
                 portfolio.clear_flow()
             engine.close_market()
         counts.add(engine.draws_consumed)

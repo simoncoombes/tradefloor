@@ -245,7 +245,7 @@ def traded(days=3, steps=4, ticks=60):
             p.stamp(day, day * steps + step, step * ticks)
             size = u[0].avg_volume * 0.5
             p.execute(e, ticker, size if step % 2 == 0 else -size)
-            e.run_session(9, 30, 3, ticks, order_flow=p.pending_flow())
+            e.run_session(9, 30, 3, ticks, fills=p.pending_flow())
             p.clear_flow()
         e.close_market()
         e.record(day)

@@ -226,6 +226,7 @@ impl PyEngineBatch {
                     news: &[],
                     news_impact_queue: &[],
                     order_volumes: &[],
+                    fills: &[],
                     close_at_end: false,
                     // False, matching `Engine`. The day is opened once, above.
                     //

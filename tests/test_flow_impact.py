@@ -107,7 +107,7 @@ def test_order_flow_consumes_no_draws():
     def draws(flow):
         e = tradefloor.Engine(seed=42, universe=UNIVERSE)
         e.open_market()
-        e.run_session(9, 30, 3, 390, order_flow=flow)
+        e.run_session(9, 30, 3, 390, flow_per_tick=flow)
         return e.draws_consumed
 
     assert draws(None) == draws({TRADED: (6e6, 0.0)})
@@ -263,7 +263,7 @@ def _shock(model, ticker, size, seed=42, ticks=390):
     """
     engine = tradefloor.Engine(seed=seed, universe=UNIVERSE, model=model)
     engine.open_market()
-    engine.run_session(9, 30, 3, ticks, order_flow={ticker: (size, 0.0)})
+    engine.run_session(9, 30, 3, ticks, flow_per_tick={ticker: (size, 0.0)})
     engine.close_market()
     raw = engine.attribution("order_flow_impact")
     values = struct.unpack("<%dd" % (len(raw) // 8), raw)

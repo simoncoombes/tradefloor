@@ -177,7 +177,7 @@ def test_flow_fed_back_actually_moves_the_market():
     traded = market()
     p = tradefloor.Portfolio(cash=1e10)
     p.execute(traded, thin, 500_000)
-    traded.run_session(10, 30, 3, 200, order_flow=p.pending_flow())
+    traded.run_session(10, 30, 3, 200, fills=p.pending_flow())
 
     assert quiet.prices() != traded.prices()
 
@@ -248,7 +248,7 @@ def test_a_trading_session_is_reproducible():
         p = tradefloor.Portfolio(cash=1e8)
         for _ in range(3):
             p.execute(e, TICKER, 20_000)
-            e.run_session(10, 0, 3, 60, order_flow=p.pending_flow())
+            e.run_session(10, 0, 3, 60, fills=p.pending_flow())
             p.clear_flow()
         return p.pnl(e), p.realised(), [f["price"] for f in p.fills]
 

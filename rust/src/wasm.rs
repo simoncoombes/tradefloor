@@ -198,6 +198,7 @@ impl Sim {
                 news: &[],
                 news_impact_queue: &[],
                 order_volumes: &[],
+                fills: &[],
                 // The close is `Engine::close_day` below, which also steps
                 // the macro chain. Letting the session close would settle
                 // the day without that step.

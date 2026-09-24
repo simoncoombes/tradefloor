@@ -99,7 +99,7 @@ engine, which `portfolio.py` was written to allow. Within a step every agent
 sees the same prices and the same book, each over its own portfolio; they are
 asked in label order, they execute in label order against the shared book,
 and every portfolio's pending flow is merged per ticker and reaches the
-market as the one ``order_flow`` argument of the one session. Agents see each
+market as the one ``fills`` argument of the one session. Agents see each
 other's impact and never each other's orders, and :meth:`Scenario.apply` runs
 once a day for the whole cohort.
 
@@ -118,7 +118,7 @@ not move rather than two fills at the top of the book.
 ``test_externality.py`` pins it.
 
 The cohort's whole footprint reaches the market once, as the merged
-``order_flow`` of that step's session, so an agent meets another's trading
+``fills`` of that step's session, on its first tick, so an agent meets another's trading
 from the next step on and never inside the step it happened. Order priority
 within a step is a queue this engine does not run, and a cohort does not
 introduce one.
@@ -613,7 +613,7 @@ class World:
                                    self._step % self.steps_per_day,
                                    self.ticks_per_step),
                     self.ticks_per_step,
-                    order_flow=self._merged_flow())
+                    fills=self._merged_flow())
                 for portfolio in self._portfolios.values():
                     portfolio.clear_flow()
 
@@ -688,7 +688,7 @@ class World:
     def _merged_flow(self) -> dict[str, tuple[float, float]]:
         """Every portfolio's pending flow, summed per ticker.
 
-        One `order_flow` argument reaches the session, so a cohort's
+        One `fills` argument reaches the session, so a cohort's
         footprint is what the market sees rather than one agent's. The sum
         runs in label order, which fixes the order the floats are added in.
 

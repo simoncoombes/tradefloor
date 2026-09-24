@@ -13,10 +13,24 @@ seed requires.
 the same book the tick settles through, so slippage is real levels consumed.
 That tells you what *you* paid. It tells the market nothing.
 
-The market learns about your trading through ``order_flow`` on the next tick,
-and :meth:`Portfolio.pending_flow` accumulates it. A harness that
-executes without feeding the flow back has a trader whose fills are realistic
-and whose footprint is invisible, profitable in a way no real trader could be.
+The market learns about your trading through the flow
+:meth:`Portfolio.pending_flow` accumulates, handed to the next session as
+``Engine.run_session(..., fills=...)``, which applies it ONCE, on the
+session's first tick (or as ``order_flow`` to a single ``Engine.tick``). A
+harness that executes without feeding the flow back has a trader whose fills
+are realistic and whose footprint is invisible, profitable in a way no real
+trader could be.
+
+A harness that feeds it back on every tick of a step is the opposite error,
+and every harness here made it until 0.9.0: ``run_session``'s old
+``order_flow`` held the flow for the whole session, so one order was counted
+65 times at six steps a day, after the agent had already filled at the
+pre-trade book. The agent collected its own impact instead of paying it. A
+buy of 1% of daily volume, sold the next step, beat a one-share control by
+12 to 52 bp in 10 of the 20 names of ``Universe.random(20, seed=93001)`` that
+way (design repo, ``programme/meanrev-edge-ptv19-2026-09-24.md``).
+``run_session`` now refuses ``order_flow`` and names the two arguments that
+replace it.
 """
 
 from __future__ import annotations
@@ -274,8 +288,10 @@ class Portfolio:
     def pending_flow(self) -> dict[str, tuple[float, float]]:
         """Order flow accumulated since the last :meth:`clear_flow`.
 
-        Feed this to the next ``tick`` or ``run_session`` as ``order_flow`` so
-        the market feels the trading.
+        Feed this to the next ``run_session`` as ``fills``, or to the next
+        single ``tick`` as ``order_flow``, so the market feels the trading
+        once, on the minute after the fills. Then call :meth:`clear_flow`:
+        flow left in place is sent again with the next step's.
         """
         return {
             ticker: (buy, sell)

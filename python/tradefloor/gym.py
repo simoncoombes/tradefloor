@@ -215,7 +215,7 @@ class TradingEnv(_Base):
             *session_clock(self.start, self._step % self.steps_per_day,
                            self.ticks_per_step),
             self.ticks_per_step,
-            order_flow=self.portfolio.pending_flow())
+            fills=self.portfolio.pending_flow())
         self.portfolio.clear_flow()
 
         self._step += 1

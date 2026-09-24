@@ -3689,7 +3689,20 @@ impl Engine {
         let (mut hour, mut minute) = (request.start.hour, request.start.minute);
         let mut halted_at = None;
 
+        // The first tick's flow: the standing rate plus the fills, once.
+        // Built only when there are fills, so a session without them reads
+        // `order_volumes` on every tick exactly as it always did.
+        let first_tick_flow = if request.fills.is_empty() {
+            None
+        } else {
+            Some(merge_order_volumes(request.order_volumes, request.fills))
+        };
+
         for t in 0..request.ticks {
+            let order_volumes = match (&first_tick_flow, t) {
+                (Some(flow), 0) => flow.as_slice(),
+                _ => request.order_volumes,
+            };
             let outcome = self.tick(&TickRequest {
                 time: GameTime {
                     hour,
@@ -3699,7 +3712,7 @@ impl Engine {
                 volatility_multiplier: request.volatility_multiplier,
                 news: request.news,
                 news_impact_queue: request.news_impact_queue,
-                order_volumes: request.order_volumes,
+                order_volumes,
             });
             draws += outcome.draws_consumed;
             buffer.write_tick(
@@ -5033,7 +5046,41 @@ pub struct SessionRequest<'a> {
     pub volatility_multiplier: f64,
     pub news: &'a [NewsEvent],
     pub news_impact_queue: &'a [NewsImpactEntry],
+    /// Order volume held on EVERY tick of the session: a standing rate, in
+    /// shares per minute, for a program that trades all session long.
     pub order_volumes: &'a [(String, OrderVolume)],
+    /// Order volume that reaches the market ONCE, on the session's first
+    /// tick: the trades an agent filled at the step boundary just before it.
+    ///
+    /// # Why this is not `order_volumes`
+    ///
+    /// Until 0.9.0 every harness handed an agent's fills to the session as
+    /// `order_volumes`, so one order was counted on every tick of the step:
+    /// 65 times at six steps a day, 390 at one. It also landed only after the
+    /// agent had filled at the pre-trade book, so the agent never paid its
+    /// own permanent impact and collected it instead. A spec mean reversion
+    /// rule beat buy-and-hold on 20 of 20 suite markets by a median 42
+    /// points in 60 days on that alone (design repo,
+    /// `programme/meanrev-edge-ptv19-2026-09-24.md`).
+    ///
+    /// # When it lands, and who pays for it
+    ///
+    /// The fill is priced against the book standing at the step boundary,
+    /// which charges the spread and the depth the order walks. The order's
+    /// permanent impact then moves `s` once, on the first tick after the
+    /// fill, and the next trader meets the moved price. That is the
+    /// discrete Almgren-Chriss convention: a trade executes at the
+    /// pre-trade price less its temporary impact, and its permanent impact
+    /// reaches the trades after it. The convention is free of a round-trip
+    /// profit only while the book charges at least the permanent impact an
+    /// order causes, and `tests/test_agent_flow.py` holds that on every
+    /// shipped preset: a fill's premium over the print it traded at is
+    /// never below the move its own flow leaves behind.
+    ///
+    /// Summed with `order_volumes` per ticker on the first tick when both
+    /// name one. Empty is bit-identical to the session this field did not
+    /// exist in: the first tick reads `order_volumes` untouched.
+    pub fills: &'a [(String, OrderVolume)],
     /// Run the close bookkeeping when the session finishes normally.
     pub close_at_end: bool,
     /// Open the market before the first tick.
@@ -5064,6 +5111,30 @@ pub struct SessionRequest<'a> {
     pub sector_base_variances: &'a [f64],
     /// Stop early when a condition is met, for event-driven advancement.
     pub stop: Option<StopCondition>,
+}
+
+/// One flow per ticker: `standing` with `once` added to it.
+///
+/// The tick finds a ticker's flow with the FIRST matching entry, so two
+/// entries for one name would drop the second rather than add it. Standing
+/// entries keep their order and take any fills for the same name; fills for
+/// names the standing flow does not carry follow, in their own order. Both
+/// inputs arrive sorted from the bindings, and neither order reaches a price.
+pub fn merge_order_volumes(
+    standing: &[(String, OrderVolume)],
+    once: &[(String, OrderVolume)],
+) -> Vec<(String, OrderVolume)> {
+    let mut out: Vec<(String, OrderVolume)> = standing.to_vec();
+    for (ticker, v) in once {
+        match out.iter_mut().find(|(t, _)| t == ticker) {
+            Some((_, have)) => {
+                have.buy += v.buy;
+                have.sell += v.sell;
+            }
+            None => out.push((ticker.clone(), *v)),
+        }
+    }
+    out
 }
 
 /// Why a session might end before its last tick.
@@ -5779,6 +5850,7 @@ mod tests {
             news: &[],
             news_impact_queue: &[],
             order_volumes: &[],
+            fills: &[],
             close_at_end: true,
             // These tests run one session per day, where opening inside the
             // session and opening the day are the same act. True preserves
@@ -5788,6 +5860,149 @@ mod tests {
             sector_base_variances: variances,
             stop: None,
         }
+    }
+
+    // ── Fills: an agent's trades reach the market once ────────────────────
+
+    /// A session of `ticks` from `start_minute` past 09:30, inside a day
+    /// already opened, carrying `standing` on every tick and `fills` once.
+    fn stepped<'a>(
+        ticks: usize,
+        start_minute: i64,
+        standing: &'a [(String, OrderVolume)],
+        fills: &'a [(String, OrderVolume)],
+        innovations: &'a [Option<f64>],
+        variances: &'a [f64],
+    ) -> SessionRequest<'a> {
+        let at = 30 + start_minute;
+        SessionRequest {
+            start: GameTime {
+                hour: 9 + at / 60,
+                minute: at % 60,
+                day_of_week: 3,
+            },
+            order_volumes: standing,
+            fills,
+            close_at_end: false,
+            reopen: false,
+            ..session(ticks, innovations, variances)
+        }
+    }
+
+    /// `fills` IS one tick of `order_volumes` followed by the rest of the
+    /// session without it: the same prices to the bit and the same draws.
+    /// That is the whole contract, stated as the market the tick loop
+    /// already defines, so it cannot drift into a second meaning.
+    #[test]
+    fn fills_are_one_tick_of_flow_at_the_start_of_the_session() {
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let fills = vec![("A".to_string(), OrderVolume { buy: 40_000.0, sell: 0.0 })];
+
+        let mut once = engine(11);
+        once.open_market();
+        let mut buf = SessionBuffer::new();
+        once.run_session(&stepped(65, 0, &[], &fills, &innovations, &variances), &mut buf);
+
+        let mut spelled = engine(11);
+        spelled.open_market();
+        spelled.tick(&TickRequest {
+            order_volumes: &fills,
+            ..request(9, 30)
+        });
+        let mut buf2 = SessionBuffer::new();
+        spelled.run_session(&stepped(64, 1, &[], &[], &innovations, &variances), &mut buf2);
+
+        assert_eq!(once.draws_consumed(), spelled.draws_consumed());
+        for (i, (x, y)) in once.prices().iter().zip(spelled.prices()).enumerate() {
+            assert_eq!(x.to_bits(), y.to_bits(), "company {i}");
+        }
+        let flow = crate::market::factors::S_COMPONENT_KEYS
+            .iter()
+            .position(|f| *f == "order_flow_impact")
+            .unwrap();
+        let a = once.attribution_column(flow);
+        assert!(a[0] > 0.0, "the buy reached A: {a:?}");
+        assert_eq!(a[1], 0.0);
+        assert_eq!(a[2], 0.0);
+    }
+
+    /// The same flow held on every tick is counted on every tick. This is
+    /// what every harness did with an agent's fills until 0.9.0, and the
+    /// ratio is the 65 the investigation measured, not an approximation of
+    /// it: a name's flow impact depends on its average volume, which does
+    /// not move inside a day.
+    #[test]
+    fn a_standing_flow_is_counted_on_every_tick_and_fills_once() {
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let flow = vec![("A".to_string(), OrderVolume { buy: 40_000.0, sell: 0.0 })];
+        let column = crate::market::factors::S_COMPONENT_KEYS
+            .iter()
+            .position(|f| *f == "order_flow_impact")
+            .unwrap();
+
+        let run = |standing: &[(String, OrderVolume)], fills: &[(String, OrderVolume)]| {
+            let mut e = engine(11);
+            e.open_market();
+            let mut buf = SessionBuffer::new();
+            e.run_session(&stepped(65, 0, standing, fills, &innovations, &variances), &mut buf);
+            e.attribution_column(column)[0]
+        };
+        let once = run(&[], &flow);
+        let held = run(&flow, &[]);
+        assert!(once > 0.0);
+        let ratio = held / once;
+        assert!((ratio - 65.0).abs() < 1e-9, "held / once = {ratio}");
+    }
+
+    /// With no fills the session is the one that existed before the field:
+    /// the first tick reads `order_volumes` untouched. Bit-identical rather
+    /// than equal, since the untraded known-answer digest rests on it.
+    #[test]
+    fn empty_fills_change_nothing() {
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let standing = vec![("B".to_string(), OrderVolume { buy: 0.0, sell: 9_000.0 })];
+        let run = |fills: &[(String, OrderVolume)]| {
+            let mut e = engine(5);
+            e.open_market();
+            let mut buf = SessionBuffer::new();
+            e.run_session(&stepped(90, 0, &standing, fills, &innovations, &variances), &mut buf);
+            (e.prices(), e.draws_consumed())
+        };
+        let (a, da) = run(&[]);
+        // A zero fill for a name is a no-op too: zero volume is the literal
+        // 0.0 imbalance under either impact law.
+        let (b, db) = run(&[("C".to_string(), OrderVolume { buy: 0.0, sell: 0.0 })]);
+        assert_eq!(da, db);
+        for (i, (x, y)) in a.iter().zip(&b).enumerate() {
+            assert_eq!(x.to_bits(), y.to_bits(), "company {i}");
+        }
+    }
+
+    /// One entry per ticker on the first tick, standing and fills summed.
+    /// The tick reads the FIRST entry for a name, so a second entry would
+    /// be dropped rather than added.
+    #[test]
+    fn standing_flow_and_fills_merge_per_ticker() {
+        let standing = vec![
+            ("A".to_string(), OrderVolume { buy: 1.0, sell: 2.0 }),
+            ("C".to_string(), OrderVolume { buy: 7.0, sell: 0.0 }),
+        ];
+        let fills = vec![
+            ("A".to_string(), OrderVolume { buy: 3.0, sell: 4.0 }),
+            ("B".to_string(), OrderVolume { buy: 5.0, sell: 0.0 }),
+        ];
+        let merged = merge_order_volumes(&standing, &fills);
+        assert_eq!(
+            merged,
+            vec![
+                ("A".to_string(), OrderVolume { buy: 4.0, sell: 6.0 }),
+                ("C".to_string(), OrderVolume { buy: 7.0, sell: 0.0 }),
+                ("B".to_string(), OrderVolume { buy: 5.0, sell: 0.0 }),
+            ]
+        );
     }
 
     // ── The depth counterfactual ──────────────────────────────────────────
@@ -6507,6 +6722,7 @@ pub fn fixed_simulation_digest(
                 news: &[],
                 news_impact_queue: &[],
                 order_volumes: &[],
+                fills: &[],
                 close_at_end: false,
                 reopen: false,
                 daily_innovations: &[],

@@ -680,6 +680,13 @@ def flow_impact(
     Runs the same seed twice, once with ``order_flow`` and once without, and
     returns both worlds plus their difference.
 
+    ``order_flow`` is a STANDING rate: ``{ticker: (bought, sold)}`` shares
+    on every tick of each day's session, the ``flow_per_tick`` argument of
+    :meth:`Engine.run_session`. So ``(6e6, 0.0)`` over the default 390 ticks
+    is a day-long program of 2.34 billion shares, not one order. One agent's
+    one trade is ``fills`` instead, which reaches the market once;
+    :func:`tradefloor.tca.analyse` measures that.
+
     The two runs are otherwise identical by construction: same seed, same
     universe, same macro, same session, and the same ``model``, either a preset
     name or a :class:`tradefloor.ModelParams`, applied to BOTH worlds, since a
@@ -699,7 +706,7 @@ def flow_impact(
                         model=model)
         for _ in range(days):
             engine.open_market()
-            engine.run_session(*start, ticks, order_flow=flow)
+            engine.run_session(*start, ticks, flow_per_tick=flow)
             engine.close_market()
         return engine
 

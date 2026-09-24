@@ -52,7 +52,10 @@ pub enum LogEntry {
         volatility: f64,
         close_at_end: bool,
         news: Vec<(Option<String>, Option<String>, f64)>,
+        /// `flow_per_tick`: held on every tick of the session.
         flow: Vec<(String, f64, f64)>,
+        /// `fills`: applied once, on the session's first tick.
+        fills: Vec<(String, f64, f64)>,
     },
     PinMacro {
         fields: Vec<(String, f64)>,
@@ -169,6 +172,7 @@ impl LogEntry {
                 close_at_end,
                 news,
                 flow,
+                fills,
             } => {
                 d.set_item("op", "run_session")?;
                 d.set_item("hour", hour)?;
@@ -178,7 +182,12 @@ impl LogEntry {
                 d.set_item("volatility", volatility)?;
                 d.set_item("close_at_end", close_at_end)?;
                 d.set_item("news", news_to_py(py, news)?)?;
-                d.set_item("order_flow", flow_to_py(py, flow)?)?;
+                // Named after the arguments that carried them. A log written
+                // before 0.9.0 has `order_flow` here instead, which meant the
+                // per-tick flow, and the replays read it as `flow_per_tick`,
+                // so an archived run replays into the market it described.
+                d.set_item("flow_per_tick", flow_to_py(py, flow)?)?;
+                d.set_item("fills", flow_to_py(py, fills)?)?;
             }
             LogEntry::PinMacro { fields, cycle, epicentre, vix_sets_variance } => {
                 d.set_item("op", "pin_macro")?;
