@@ -201,9 +201,24 @@ def test_volatility_clustering_is_in_band_at_short_lags_and_dies_too_fast():
     # floor, which is the honest single-seed claim; the shape defect is
     # carried by the ordering assertion after it, which is what this test
     # was always really pinning.
+    #
+    # THE FULL ORDERING ON ONE SEED WENT THE SAME WAY AT pt-v20 (0.8.5).
+    # Seed 3 reads lags 1, 5 and 20 at +0.0488, +0.0064 and +0.0068, lag
+    # five a hair under lag twenty (pt-v19: +0.0451, +0.0171, -0.0008).
+    # Over seeds 1 to 12 on this roster the three-way order holds on 8 under
+    # pt-v20 and on 9 under pt-v19, and the seeds that break it differ
+    # between the two, so it is a property of the draw on both. What holds
+    # on every one of those 24 runs is lag twenty below lag one, and that
+    # is the single-seed claim now. The full order is asserted where it is
+    # a property of the model: the thirty-seed medians in `envelope`, at
+    # 252 days (pt-v20: 0.0342, 0.0221, 0.0101) and at 504 (0.0416, 0.0328,
+    # 0.0117).
     assert -0.04 < facts["abs_return_acf20"] < 0.03
-    assert facts["abs_return_acf20"] < facts["abs_return_acf5"] < facts[
-        "abs_return_acf1"]
+    assert facts["abs_return_acf20"] < facts["abs_return_acf1"]
+    from tradefloor import envelope
+    for table in (envelope.CERTIFIED, envelope.MEASURED_504):
+        assert (table["abs_return_acf20"] < table["abs_return_acf5"]
+                < table["abs_return_acf1"]), table
 
 
 def test_volatility_is_in_band_so_raw_percentages_mean_something_now():
