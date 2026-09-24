@@ -6746,6 +6746,13 @@ impl ModelParams {
     /// premium, which drifted a 20-name suite market by up to 30 per cent in
     /// its first months with nothing happening.
     ///
+    /// THE CURVE. The 2-year had no noise of its own (0.85 policy + 0.15
+    /// 10-year), the flight to quality read a closing minute behind a gate it
+    /// never crossed, and the corporate yield moved only at meetings, so the
+    /// bonds priced off the curve were quiet and uncorrelated with stocks.
+    /// `treasury_2y_noise`, `flight_to_quality_day` and `_gain`,
+    /// `corporate_yield_daily` and `treasury_10y_noise` fix all three.
+    ///
     /// THE DAILY CONTINUATION. With the tape honest, the stop and squeeze
     /// ladders were the largest daily momentum left in the model price;
     /// `cascade_gain` scales them to the certified forty's daily
@@ -6761,6 +6768,16 @@ impl ModelParams {
         p.opening_mispricing_sigma = 0.016;
         p.opening_market_sigma = 0.10;
         p.cascade_gain = 0.1;
+        // The yield curve (2026-09-24, for the bonds this release prices off
+        // it): the 2-year its own process, the flight to quality reading the
+        // session's return, the corporate yield moving between meetings, and
+        // the 10-year's noise trimmed because its meeting-day moves already
+        // carry most of its variance.
+        p.treasury_10y_noise = 0.025;
+        p.treasury_2y_noise = 0.022;
+        p.flight_to_quality_gain = 0.008;
+        p.flight_to_quality_day = 1.0;
+        p.corporate_yield_daily = 1.0;
         p
     }
 

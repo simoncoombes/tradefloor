@@ -3777,6 +3777,76 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "the level is episodic, and the opening draws from the "
                     "mean spread",
     },
+    "treasury_2y_noise": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.022},
+        "source": "programme/results/ptv20/real_rates.json and the desk curve "
+                  "runs (design repository)",
+        "date": "2026-09-24",
+        "script": "the desk's rates.py: sd of the daily change of the 2-year, "
+                  "certified roster, seeds 204-209, 1008 sessions; the tape's "
+                  "from FRED DGS2 2015-2025 (real_rates.py)",
+        "estimator": "the noise at which the model's 2-year daily change sd "
+                     "meets the tape's 5.23 bp",
+        "residual": "5.33 bp against 5.23 at 0.022; 5.73 at 0.028",
+    },
+    "treasury_10y_noise": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.025},
+        "source": "programme/results/ptv20/real_rates.json and the desk curve "
+                  "runs (design repository)",
+        "date": "2026-09-24",
+        "script": "the desk's rates.py: sd of the daily change of the 10-year, "
+                  "seeds 204-209, 1008 sessions; the tape's from FRED DGS10",
+        "estimator": "the noise at which the model's 10-year daily change sd, "
+                     "most of it meeting-day moves toward the policy target, "
+                     "meets the tape's 5.41 bp. 0.03 through pt-v19 is the "
+                     "reference literal, unmeasured",
+        "residual": "6.1 bp at 0.03 with the flight to quality on, against "
+                    "5.41; 0.025 trims it",
+    },
+    "flight_to_quality_gain": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.008},
+        "source": "programme/results/ptv20/real_rates.json and the desk curve "
+                  "runs (design repository)",
+        "date": "2026-09-24",
+        "script": "the desk's rates.py: correlation of the roster index's "
+                  "daily return with minus the 10-year's change",
+        "estimator": "the gain at which that correlation meets the tape's "
+                     "-0.16 (SPY against IEF, 2015-2025). 0.02 through "
+                     "pt-v19 is the reference literal, which never fired",
+        "residual": "-0.19 to -0.20 at 0.008 on seeds 204-209, -0.11 at "
+                    "0.005, -0.60 at 0.02",
+    },
+    "flight_to_quality_day": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: the yield the "
+                    "step writes after the close is that session's close, so "
+                    "the move it answers is that session's return. The "
+                    "shipped rule read the previous session's closing minute "
+                    "behind a 0.5 per cent gate that minute never crosses",
+        "terms": {"+0.02 -> -0.20": "correlation of the index's daily return "
+                                    "with minus the 10-year's change (tape "
+                                    "-0.16)"},
+        "source": "programme/results/ptv20/ (design repository)",
+        "date": "2026-09-24",
+    },
+    "corporate_yield_daily": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: the meeting "
+                    "formula's own terms (the 10-year plus a spread of 2 bp a "
+                    "VIX point times the cycle multiplier) applied to each "
+                    "session's changes, so the level between meetings is the "
+                    "formula's and the next meeting re-anchors it",
+        "terms": {"+0.03 -> +0.22": "correlation of the index's daily return "
+                                    "with minus the corporate yield's change "
+                                    "(tape +0.27, SPY against LQD)"},
+        "source": "programme/results/ptv20/ (design repository)",
+        "date": "2026-09-24",
+    },
     "cascade_gain": {
         "kind": "measured",
         "presets": {"pt-v20": 0.1},

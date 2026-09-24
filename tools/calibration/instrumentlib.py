@@ -647,6 +647,13 @@ PARAM_SPECS: dict[str, dict] = {
                              "hard_range": (0.0, 0.3)},
     "fair_value_market_share": {"kind": "abs", "step_unit": 0.05,
                                 "hard_range": (0.0, 1.0)},
+    "treasury_10y_noise": {"kind": "abs", "step_unit": 0.0025, "hard_range": (0.0, 0.1)},
+    "treasury_2y_noise": {"kind": "abs", "step_unit": 0.0025, "hard_range": (0.0, 0.1)},
+    "flight_to_quality_gain": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 0.05)},
+    "flight_to_quality_day": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                              "derived": True},
+    "corporate_yield_daily": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                              "derived": True},
     "cascade_gain": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
     # the tape's three epicentre episodes (2.43, 1.93, 1.41). 0.0 is the

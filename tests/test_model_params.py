@@ -741,6 +741,20 @@ PERTURBATIONS = [
     # The market-wide share splits the market factor's draw from the first
     # tick; the market opening spread re-draws the index's opening level.
     ("fair_value_market_share", 0.5, True),
+    # The yield curve (pt-v20). Each moves the macro chain from the first
+    # close, and the corporate yield reaches every price through fair value
+    # on the next session.
+    ("treasury_10y_noise", 0.06, True),
+    ("treasury_2y_noise", 0.02, True),
+    # Inert on the probe: the preset under test here is the default, whose
+    # 0.02 gain the switch reads, and the probe's three sessions of 78 ticks
+    # never move the index far enough for a 0.02-point shift to reach a
+    # printed price through fair value in the window.
+    ("flight_to_quality_day", 1.0, False),
+    # Read only behind the gate the shipped rule never crosses; with the
+    # switch off nothing reaches it.
+    ("flight_to_quality_gain", 0.05, False),
+    ("corporate_yield_daily", 1.0, True),
     ("opening_market_sigma", 0.05, True),
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
@@ -1214,6 +1228,9 @@ PERTURBATIONS = [
 #: more sites and would find more dials here, which is why the assertion
 #: below names the site rather than asserting a count.
 ECONOMY_STREAM_MOVERS = frozenset({
+    # pt-v20's 2-year takes its own normal each session when its noise is
+    # on: the draw IS the mechanism, as for the VIX jump below.
+    "treasury_2y_noise",
     "vix_jump_intensity", "macro_burn_in_days", "phase_target_range_draw",
     "cycle_stationary_opening", "inflation_reversion",
     # The return-driven arrival rate takes the same arrival draw as
