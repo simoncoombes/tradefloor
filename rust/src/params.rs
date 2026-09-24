@@ -3696,8 +3696,8 @@ pub struct ModelParams {
     /// correlation. 0.0 is a branch, not arithmetic, and is bit-inert.
     pub forced_flow_gain: f64,
     /// Where forced flow wakes, in VIX points. Below it the segment does
-    /// not exist, which is what makes composition invisible in calm
-    /// markets by construction.
+    /// not exist, so by construction flow composition has no effect in
+    /// calm markets.
     pub forced_flow_threshold: f64,
     /// How unevenly forced flow lands, as beta^k. Screen one measured the
     /// uniform lean pinning crash cohesion (0.52 -> 0.69, IQR halved) at the
