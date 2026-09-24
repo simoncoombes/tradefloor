@@ -455,8 +455,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     carried = set(snapshot)
     # The anchor's slow memory is carried, and hashed, only on a run with
     # `vix_anchor_memory` off zero; every other snapshot omits it.
-    # So is the agent-facing book, only once an agent has used it.
-    expected = set(_SNAPSHOT_KEYS) | ({"vix_anchor_slow", "book"} & carried)
+    # So are the rate instruments, only on an engine that holds them, and
+    # the agent-facing book, only once an agent has used it.
+    expected = set(_SNAPSHOT_KEYS) | (
+        {"vix_anchor_slow", "rates", "book"} & carried)
     if carried != expected:
         missing = sorted(expected - carried)
         extra = sorted(carried - expected)
@@ -659,11 +661,40 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _u32(buf, kind)
         _u64(buf, index)
         _f64(buf, value)
-    # The agent-facing book, last, and only when the snapshot carries it,
-    # which is only once an agent has used it.
+    # The rate instruments, before the book and only when carried, so every
+    # snapshot of an engine without them hashes as it did before they existed. Each
+    # instrument's state in `_RATE_STATE_FIELDS` order, then the curve state
+    # the book shares.
+    rates = snapshot.get("rates")
+    if rates is not None:
+        _text(buf, "rates")
+        items = list(rates["instruments"])
+        _u32(buf, len(items))
+        for item in items:
+            if set(item) != {"ticker", *_RATE_STATE_FIELDS}:
+                raise ValidationError(
+                    "a rate instrument in this snapshot does not carry the "
+                    f"fields the state hash covers: {sorted(item)}.")
+            _text(buf, item["ticker"])
+            for name in _RATE_STATE_FIELDS:
+                _f64(buf, item[name])
+        _f64(buf, rates["ig_spread"])
+        _f64(buf, rates["last_corporate"])
+        _flag(buf, bool(rates["closed_since_open"]))
+    # The agent-facing book, after the rate instruments, and only when the
+    # snapshot carries it, which is only once an agent has used it.
     if "book" in snapshot:
         _book(buf, snapshot["book"])
     return hashlib.sha256(bytes(buf)).hexdigest()
+
+
+#: A rate instrument's state in a snapshot, in the order the state hash walks
+#: it. The same list as `RATE_STATE_FIELDS` in `rust/src/python_engine.rs`.
+_RATE_STATE_FIELDS = (
+    "level", "marked_yield", "price", "previous_close", "open", "high", "low",
+    "volume", "avg_volume", "units_outstanding", "maker_inventory",
+    "day_carry", "day_duration", "day_convexity",
+)
 
 
 #: The fields of the snapshot's ``book`` entry, which ``Engine.state_hash``

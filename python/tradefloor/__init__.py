@@ -137,6 +137,7 @@ __all__ = [
     "crisis_epicentre_solve", "crowd_adjusted_root_moduli", "fair_value",
     "impulse_response",
     "market_status", "model_preset", "preset_names", "run_many",
+    "bonds", "rate_specs", "RATE_TICKERS", "RATE_SECTOR",
     "sector_daily_sigma", "sectors",
     "stationary_sigma", "step_mispricing_daily", "version",
     "__version__",
@@ -172,8 +173,16 @@ class Universe(list):
     """
 
     @classmethod
-    def random(cls, n: int = 108, *, seed: int = 0) -> "Universe":
+    def random(cls, n: int = 108, *, seed: int = 0,
+               bonds: bool = False) -> "Universe":
         """Generate ``n`` plausible instruments.
+
+        ``bonds=True`` appends the three simulated rate indices, ``UST2Y``,
+        ``UST10Y`` and ``IGCORP``, after the ``n`` equities (see
+        :func:`tradefloor.bonds`). The equities are the same ``n`` names
+        either way, and so is their market: the indices take no draws and
+        write nothing back to the economy, so every equity price is
+        bit-identical with or without them. Off by default.
 
         A generator is not a convenience here. A realistic study needs on the
         order of a hundred names, and nobody hand-authors a hundred rosters,
@@ -193,7 +202,30 @@ class Universe(list):
         what IS guaranteed is that ``(n, seed)`` gives the same universe on
         every platform, so ``random(108, seed=7)`` is citable.
         """
-        return cls(_core.random_instruments(n, seed=seed))
+        universe = cls(_core.random_instruments(n, seed=seed))
+        if bonds:
+            universe.extend(_core.rate_instruments())
+        return universe
+
+    def with_bonds(self, tickers: Sequence[str] | None = None) -> "Universe":
+        """This universe with the simulated rate indices appended.
+
+        ``tickers`` picks among ``UST2Y``, ``UST10Y`` and ``IGCORP`` and
+        defaults to all three, in that order. Returns a new universe and
+        leaves this one alone. Refuses a universe that already holds one of
+        them, since each index is one instrument.
+        """
+        wanted = list(RATE_TICKERS) if tickers is None else list(tickers)
+        held = {inst.ticker for inst in self if inst.sector == RATE_SECTOR}
+        repeated = sorted(held & set(wanted))
+        if repeated:
+            raise ValidationError(
+                f"this universe already holds {', '.join(repeated)}")
+        return Universe(list(self) + list(_core.rate_instruments(wanted)))
+
+    def equities(self) -> "Universe":
+        """The equities, without any rate indices, in roster order."""
+        return Universe(inst for inst in self if inst.sector != RATE_SECTOR)
 
     @classmethod
     def from_edgar(cls, snapshot, **kwargs: Any) -> "Universe":
@@ -304,6 +336,47 @@ class Universe(list):
 
 def _rebuild(instruments: Sequence[Instrument]) -> Universe:
     return Universe(instruments)
+
+
+# --------------------------------------------------------------------------
+# Rate instruments
+# --------------------------------------------------------------------------
+
+#: The sector a rate index carries. Not an equity sector: an engine splits
+#: these instruments out before any equity code sees them.
+RATE_SECTOR = "rates"
+
+#: The simulated rate indices this build prices, in their default order.
+RATE_TICKERS: tuple[str, ...] = tuple(s["ticker"] for s in _core.rate_specs())
+
+
+def bonds(tickers: Sequence[str] | None = None) -> list[Instrument]:
+    """The simulated rate indices, as instruments with their default terms.
+
+    ``UST2Y``, ``UST10Y`` and ``IGCORP`` are simulated constant-maturity
+    indices, not real securities: a 2-year and a 10-year treasury index and
+    an investment-grade corporate bond index, priced off the engine's own
+    curve (``treasury_yield_2y``, ``treasury_yield_10y``, and the 10-year
+    plus the credit spread the engine sets). Each day an index returns
+
+        carry - D * dy + 0.5 * C * dy**2,  carry = yield / 252,
+
+    with duration and convexity of 1.9 and 4.6, 8.5 and 84, and 7.0 and 100.
+    :func:`rate_specs` returns every term, and ``rust/src/rates.rs`` documents
+    where each comes from.
+
+    They trade like any other instrument: ``engine.book(ticker)``,
+    ``Portfolio.execute``, ``fills=`` on ``run_session``, the tape, TCA. They
+    must come after every equity in a roster, which :meth:`Universe.with_bonds`
+    and ``Universe.random(..., bonds=True)`` arrange.
+    """
+    return list(_core.rate_instruments(None if tickers is None else list(tickers)))
+
+
+def rate_specs() -> list[dict[str, Any]]:
+    """Each rate index's fixed terms: name, curve point, duration,
+    convexity, quoted spread in basis points, and default depth and level."""
+    return list(_core.rate_specs())
 
 
 # --------------------------------------------------------------------------

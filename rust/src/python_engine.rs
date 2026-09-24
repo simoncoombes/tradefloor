@@ -96,10 +96,46 @@ impl PyInstrument {
         beta: f64,
         short_interest: f64,
     ) -> PyResult<Self> {
-        if crate::sectors::by_key(sector).is_none() {
+        if sector == crate::rates::RATE_SECTOR {
+            // A simulated rate index rather than a company. Its duration,
+            // convexity, spread and curve point come from the ticker, so only
+            // the tickers this build prices are accepted, and the company
+            // fields must be absent: a bond index with earnings would be a
+            // universe nobody could have meant.
+            if crate::rates::spec_for(ticker).is_none() {
+                return Err(ValidationError::new_err(format!(
+                    "{ticker:?} is not a rate instrument this build prices. \
+                     Sector \"rates\" takes one of: {}. They are simulated \
+                     constant-maturity indices, not real securities; \
+                     tradefloor.bonds() builds them with their defaults.",
+                    crate::rates::tickers().join(", ")
+                )));
+            }
+            for (name, v) in [
+                ("eps", eps),
+                ("book_value_per_share", book_value_per_share),
+                ("revenue_growth", revenue_growth),
+            ] {
+                if v.is_some() {
+                    return Err(ValidationError::new_err(format!(
+                        "{name} is a company field and {ticker} is a rate index; \
+                         leave it unset."
+                    )));
+                }
+            }
+            if short_interest != 0.0 {
+                return Err(ValidationError::new_err(format!(
+                    "short_interest is a company field and {ticker} is a rate \
+                     index; leave it at 0."
+                )));
+            }
+        } else if crate::sectors::by_key(sector).is_none() {
             return Err(ValidationError::new_err(format!(
-                "unknown sector {sector:?}. Valid sectors: {}",
-                crate::sectors::keys().join(", ")
+                "unknown sector {sector:?}. Valid sectors: {}, or \"{}\" for a \
+                 simulated rate index ({})",
+                crate::sectors::keys().join(", "),
+                crate::rates::RATE_SECTOR,
+                crate::rates::tickers().join(", ")
             )));
         }
         for (name, v) in [
@@ -187,6 +223,23 @@ impl PyInstrument {
     /// Shared with the batch surface.
     pub fn to_core_public(&self, index: usize) -> TickCompany {
         self.to_core(index)
+    }
+
+    /// Whether this is a simulated rate index rather than a company.
+    pub fn is_rate(&self) -> bool {
+        self.sector == crate::rates::RATE_SECTOR
+    }
+
+    /// The rate instrument this describes. Only for `is_rate()`, which the
+    /// constructor has already checked names a priced ticker.
+    fn to_rate(&self) -> crate::rates::RateInstrument {
+        let spec = *crate::rates::spec_for(&self.ticker).expect("validated at construction");
+        crate::rates::RateInstrument::new(
+            spec,
+            self.initial_price,
+            self.avg_volume,
+            self.shares_outstanding,
+        )
     }
 
     fn to_core(&self, index: usize) -> TickCompany {
@@ -366,6 +419,22 @@ impl PyEngine {
         self.tickers.get(pos).cloned()
     }
 
+    /// Why a news item cannot name `ticker`: it is not on the roster, or it
+    /// is a rate index, which the news channels never reach.
+    fn no_news_for(&self, ticker: &str) -> PyErr {
+        if self.inner.rates().index_of(ticker).is_some() {
+            ValidationError::new_err(format!(
+                "{ticker} is a rate index. News moves equities through the \
+                 factor model, which never runs on an index; move a rate index \
+                 by writing the yield it reads with pin_macro."
+            ))
+        } else {
+            ValidationError::new_err(format!(
+                "no instrument with ticker {ticker:?} in this universe"
+            ))
+        }
+    }
+
     fn id_for(&self, ticker: &str) -> Option<String> {
         let pos = self.tickers.iter().position(|t| t == ticker)?;
         self.inner.ids().get(pos).cloned()
@@ -386,11 +455,7 @@ impl PyEngine {
         let mut out = Vec::with_capacity(items.len());
         for n in items {
             let company_id = match n.ticker.as_deref() {
-                Some(t) => Some(self.id_for(t).ok_or_else(|| {
-                    ValidationError::new_err(format!(
-                        "no instrument with ticker {t:?} in this universe"
-                    ))
-                })?),
+                Some(t) => Some(self.id_for(t).ok_or_else(|| self.no_news_for(t))?),
                 None => None,
             };
             // A company-tagged event with no sector is resolved to the
@@ -425,11 +490,7 @@ impl PyEngine {
         let mut out = Vec::with_capacity(items.len());
         for i in items {
             let company_id = match i.ticker.as_deref() {
-                Some(t) => Some(self.id_for(t).ok_or_else(|| {
-                    ValidationError::new_err(format!(
-                        "no instrument with ticker {t:?} in this universe"
-                    ))
-                })?),
+                Some(t) => Some(self.id_for(t).ok_or_else(|| self.no_news_for(t))?),
                 None => None,
             };
             out.push(NewsImpactEntry {
@@ -588,6 +649,24 @@ impl PyEngine {
         let end = if n > buf.len() { buf.len() } else { n };
         &buf[..end]
     }
+
+    /// One field across every instrument: the equities, then the rate
+    /// instruments. Every per-instrument surface on the Python side is this
+    /// width and in this order, which is the order of `tickers`.
+    fn all_column(&self, field: PriceField) -> Vec<f64> {
+        let mut values = self.inner.column(field);
+        if !self.inner.rates().is_empty() {
+            values.extend(self.inner.rate_column(field));
+        }
+        values
+    }
+
+    /// A per-equity column widened to every instrument, with `fill` in the
+    /// rate instruments' slots.
+    fn padded(&self, mut values: Vec<f64>, fill: f64) -> Vec<f64> {
+        values.resize(values.len() + self.inner.rates().len(), fill);
+        values
+    }
 }
 
 /// Resolve the `model=` argument: `None` is the shipped preset, a string
@@ -630,6 +709,66 @@ pub fn economy_from(
         Some(m) => m.to_core(),
         None => PyMacro::new(15.0, 0.025, None, 0.02, 0.0, 1.0, 50.0, "expansion")?.to_core(),
     })
+}
+
+/// Split a universe into its equities and its rate instruments.
+///
+/// Rate instruments must come after every equity. The engine keeps the two in
+/// separate blocks, equities first, and every per-instrument surface (tickers,
+/// prices, columns, the tape) lists them in that order; accepting a rate index
+/// in the middle would either reorder the caller's roster, which is
+/// contractual, or put two orders on one market. So the order the caller
+/// wrote must already be that order. `Universe.random(..., bonds=True)` and
+/// `Universe.with_bonds()` append them.
+///
+/// A universe of rate instruments alone is refused: the curve they read is
+/// the economy's, and the economy steps with an equity market.
+pub fn split_roster(
+    universe: &[PyInstrument],
+) -> PyResult<(Vec<PyInstrument>, Vec<PyInstrument>)> {
+    let mut equities = Vec::new();
+    let mut rates: Vec<PyInstrument> = Vec::new();
+    for inst in universe {
+        if inst.is_rate() {
+            if rates.iter().any(|r| r.ticker == inst.ticker) {
+                return Err(ValidationError::new_err(format!(
+                    "{} is listed twice. Each rate index is one instrument; list it once.",
+                    inst.ticker
+                )));
+            }
+            rates.push(inst.clone());
+        } else {
+            if !rates.is_empty() {
+                return Err(ValidationError::new_err(format!(
+                    "{} is an equity listed after the rate instrument {}. Rate \
+                     instruments must come after every equity in the roster, \
+                     because the engine lists them in that order and roster order \
+                     is contractual. Append them: Universe.with_bonds() does.",
+                    inst.ticker, rates[0].ticker
+                )));
+            }
+            equities.push(inst.clone());
+        }
+    }
+    if let Some(clash) = equities
+        .iter()
+        .find(|e| rates.iter().any(|r| r.ticker == e.ticker))
+    {
+        return Err(ValidationError::new_err(format!(
+            "the equity {0} carries the ticker of the rate index {0}. Order flow \
+             and books are found by ticker, so the two would trade as one; rename \
+             the equity.",
+            clash.ticker
+        )));
+    }
+    if equities.is_empty() && !rates.is_empty() {
+        return Err(ValidationError::new_err(
+            "this universe holds rate instruments and no equities. The curve they \
+             are priced off is the economy's, which steps with an equity market; \
+             add equities, for example Universe.random(20, seed=..., bonds=True).",
+        ));
+    }
+    Ok((equities, rates))
 }
 
 impl PyMacro {
@@ -1379,14 +1518,15 @@ impl PyEngine {
         // macro and the default one look the same.
         let settle_opening = macro_state.is_none();
         let economy = economy_from(macro_state)?;
-        let companies: Vec<TickCompany> = universe
+        let (equities, rates) = split_roster(&universe)?;
+        let companies: Vec<TickCompany> = equities
             .iter()
             .enumerate()
             .map(|(i, inst)| inst.to_core(i))
             .collect();
         let tickers = universe.iter().map(|i| i.ticker.clone()).collect();
 
-        Ok(Self {
+        let mut engine = Self {
             inner: Engine::with_params_from_opening(
                 seed,
                 companies,
@@ -1408,7 +1548,15 @@ impl PyEngine {
             recorded_book: Vec::new(),
             log: Vec::new(),
             explanations: Explanations::default(),
-        })
+        };
+        // After construction, so a settled opening has run its burn-in and
+        // the indices are marked at the curve the run actually starts from.
+        if !rates.is_empty() {
+            engine
+                .inner
+                .set_rate_instruments(rates.iter().map(|i| i.to_rate()).collect());
+        }
+        Ok(engine)
     }
 
     /// Roll the day's opening marks. Call once before the session's ticks.
@@ -1847,6 +1995,18 @@ impl PyEngine {
                     "no instrument with ticker {ticker:?} in this universe"
                 ))
             })?;
+        // The stop reads an equity's print inside the tick loop. A rate
+        // index moves only when a yield is written, which no session does,
+        // so a band on one could never fire; refused rather than run to
+        // `max_ticks` in silence.
+        if company >= self.inner.len() {
+            return Err(ValidationError::new_err(format!(
+                "{ticker} is a rate index, and run_until stops on an equity's \
+                 print. An index level moves only when a yield is written, \
+                 between sessions or by pin_macro, so a band on it cannot fire \
+                 inside one."
+            )));
+        }
 
         let n = self.inner.len();
         let innovations: Vec<Option<f64>> = vec![None; n];
@@ -1944,14 +2104,19 @@ impl PyEngine {
     /// Read it with `numpy.frombuffer(buf, dtype="<f8")`, which adopts the
     /// bytes without copying. Values are in roster order, which is
     /// contractual -- see `tickers`.
+    ///
+    /// Rate instruments come after the equities, as in `tickers`. A field that
+    /// does not exist for an index reads NaN there (`garch_variance`, `beta`,
+    /// `last_daily_return`, `previous_tick_price`); the mispricing fields read
+    /// zero, because an index level is its own fair value.
     fn column(&self, py: Python<'_>, field: &str) -> PyResult<Py<PyBytes>> {
         let f = parse_field(field)?;
-        Ok(f64_bytes(py, &self.inner.column(f)))
+        Ok(f64_bytes(py, &self.all_column(f)))
     }
 
     /// Current price per instrument, as little-endian f64 bytes.
     fn prices(&self, py: Python<'_>) -> Py<PyBytes> {
-        f64_bytes(py, &self.inner.prices())
+        f64_bytes(py, &self.all_column(PriceField::Price))
     }
 
     /// The last session's price path: `ticks_written x instruments`, row-major.
@@ -1997,7 +2162,17 @@ impl PyEngine {
     /// What IS guaranteed is reproducibility: the generator carries across the
     /// change, so one seed plus the same edits at the same ticks reproduces
     /// the same market exactly. Replay works; invariance was never available.
-    fn list_instrument(&mut self, instrument: PyInstrument) -> usize {
+    ///
+    /// Equities only. A rate index is part of the universe an engine is built
+    /// with, and listing one mid-run is refused.
+    fn list_instrument(&mut self, instrument: PyInstrument) -> PyResult<usize> {
+        if instrument.is_rate() {
+            return Err(ValidationError::new_err(format!(
+                "{} is a rate index; rate instruments are fixed when the engine \
+                 is built. Include it in the universe instead.",
+                instrument.ticker
+            )));
+        }
         self.log.push(crate::python_log::LogEntry::ListInstrument {
             ticker: instrument.ticker.clone(),
             sector: instrument.sector.clone(),
@@ -2012,8 +2187,11 @@ impl PyEngine {
         });
         let index = self.inner.len();
         let core = instrument.to_core(index);
-        self.tickers.push(instrument.ticker.clone());
-        self.inner.add_company(core)
+        // Inserted after the last equity, ahead of any rate instruments,
+        // which is where the engine puts it. Without rate instruments that is
+        // the end of the list, as it always was.
+        self.tickers.insert(index, instrument.ticker.clone());
+        Ok(self.inner.add_company(core))
     }
 
     /// Delist the instrument at `index`, returning its ticker.
@@ -2021,6 +2199,13 @@ impl PyEngine {
     /// The tail keeps its relative order and shifts down by one, so any index
     /// a caller is holding past this point is stale. Re-read `tickers`.
     fn delist(&mut self, index: usize) -> PyResult<String> {
+        if index >= self.inner.len() && index < self.inner.instrument_count() {
+            return Err(ValidationError::new_err(format!(
+                "index {index} is the rate index {}; rate instruments are fixed \
+                 when the engine is built and cannot be delisted.",
+                self.tickers[index]
+            )));
+        }
         match self.inner.remove_company(index) {
             Some(c) => {
                 self.tickers.remove(index);
@@ -2472,6 +2657,14 @@ impl PyEngine {
     /// for rather than handed a tree with no leaves.
     fn explain(slf: &Bound<'_, Self>, ticker: &str, day: i64) -> PyResult<PyObject> {
         let py = slf.py();
+        if slf.borrow().inner.rates().index_of(ticker).is_some() {
+            return Err(ValidationError::new_err(format!(
+                "{ticker} is a rate index, and explain walks the equity factor \
+                 model, which never runs on one. Its move is the repricing formula: \
+                 read rate_attribution(\"carry\" | \"duration\" | \"convexity\" | \
+                 \"flow\")."
+            )));
+        }
         let (sector, window, kept, opened, inputs, before, ops) = {
             let me = slf.borrow();
             let window = me.explanations.window;
@@ -2530,11 +2723,11 @@ impl PyEngine {
 
     #[getter]
     fn len(&self) -> usize {
-        self.inner.len()
+        self.inner.instrument_count()
     }
 
     fn __len__(&self) -> usize {
-        self.inner.len()
+        self.inner.instrument_count()
     }
 
     /// Take one uniform from the engine's EXTERNAL stream.
@@ -2627,11 +2820,26 @@ impl PyEngine {
     /// free law's own fixed point at that VIX. `tradefloor.Scenario` sets it
     /// on every session it forces the VIX when the scenario asks for it
     /// (`Scenario(vix_sets_variance=True)`), which is the intended way in.
+    ///
+    /// # The treasury curve
+    ///
+    /// `treasury_yield_2y` and `treasury_yield_10y` are FRACTIONAL and write
+    /// the curve the rate instruments read (`UST2Y`, `UST10Y`, and `IGCORP`
+    /// through the 10-year). The chain keeps running from a pinned value: the
+    /// 10-year closes 5% of its gap to the policy rate plus a term premium
+    /// every session, and the 2-year is recomputed at every close as
+    /// `0.85 * policy + 0.15 * 10-year`, so a 2-year pinned alone lasts until
+    /// that close. A parallel curve shift therefore pins the policy rate and
+    /// the 10-year with it, which is what `scenarios/curve_shock.yml` does.
+    /// Equities read neither directly: they are discounted off
+    /// `corporate_bond_yield`, which the next central-bank meeting recomputes
+    /// from the 10-year.
     #[pyo3(signature = (
         *, vix = None, federal_funds_rate = None, corporate_bond_yield = None,
         inflation_rate = None, qe_pe_boost = None, qe_assets_ratio = None, fear_greed_index = None,
         gdp_growth = None, unemployment_rate = None, tariff_rate = None,
-        oil_price = None, cycle = None, epicentre = None, vix_sets_variance = false
+        oil_price = None, cycle = None, epicentre = None, vix_sets_variance = false,
+        treasury_yield_2y = None, treasury_yield_10y = None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn pin_macro(
@@ -2650,6 +2858,8 @@ impl PyEngine {
         cycle: Option<String>,
         epicentre: Option<String>,
         vix_sets_variance: bool,
+        treasury_yield_2y: Option<f64>,
+        treasury_yield_10y: Option<f64>,
     ) -> PyResult<()> {
         // Validate EVERYTHING before writing ANYTHING. A pin that applied the
         // first three fields and then rejected the fourth would leave the
@@ -2662,6 +2872,8 @@ impl PyEngine {
             ("gdp_growth", gdp_growth),
             ("unemployment_rate", unemployment_rate),
             ("tariff_rate", tariff_rate),
+            ("treasury_yield_2y", treasury_yield_2y),
+            ("treasury_yield_10y", treasury_yield_10y),
         ] {
             if let Some(v) = v {
                 crate::units::check_rate(name, v).map_err(ValidationError::new_err)?;
@@ -2741,6 +2953,8 @@ impl PyEngine {
             ("unemployment_rate", unemployment_rate),
             ("tariff_rate", tariff_rate),
             ("oil_price", oil_price),
+            ("treasury_yield_2y", treasury_yield_2y),
+            ("treasury_yield_10y", treasury_yield_10y),
         ] {
             if let Some(v) = value {
                 logged.push((name.to_string(), v));
@@ -2787,8 +3001,20 @@ impl PyEngine {
         if let Some(v) = oil_price {
             e.oil_price = v;
         }
+        if let Some(v) = treasury_yield_2y {
+            e.treasury_yield_2y = crate::units::fraction_to_percent(v);
+        }
+        if let Some(v) = treasury_yield_10y {
+            e.treasury_yield_10y = crate::units::fraction_to_percent(v);
+        }
         if let Some(p) = phase {
             e.cycle_phase = p;
+        }
+        // A pinned corporate yield is the corporate index's yield, including
+        // when the pin repeats yesterday's value. Nothing without rate
+        // instruments.
+        if corporate_bond_yield.is_some() {
+            self.inner.remark_credit_spread();
         }
         if let Some(pin) = epicentre_pin {
             self.inner.set_crisis_epicentre_pin(Some(pin));
@@ -2877,6 +3103,14 @@ impl PyEngine {
         )?;
         out.set_item("oil_price", e.oil_price)?;
         out.set_item("cycle", cycle_name(e.cycle_phase))?;
+        out.set_item(
+            "treasury_yield_2y",
+            crate::units::percent_to_fraction(e.treasury_yield_2y),
+        )?;
+        out.set_item(
+            "treasury_yield_10y",
+            crate::units::percent_to_fraction(e.treasury_yield_10y),
+        )?;
         Ok(out.into())
     }
 
@@ -2907,8 +3141,13 @@ impl PyEngine {
     /// through to realised volume, then to half a percent of shares
     /// outstanding, so a zeroed column quietly quotes a book off a different
     /// input rather than a thin one.
+    ///
+    /// One value per instrument in `tickers` order, rate instruments included,
+    /// so a column read with `column("avg_volume")` can be scaled and written
+    /// back whole. A rate index quotes its depth off this column exactly as an
+    /// equity does.
     fn set_avg_volume(&mut self, values: Vec<f64>) -> PyResult<()> {
-        let n = self.inner.len();
+        let n = self.inner.instrument_count();
         if values.len() != n {
             return Err(ValidationError::new_err(format!(
                 "set_avg_volume needs one value per instrument: this engine \
@@ -2929,8 +3168,18 @@ impl PyEngine {
         }
         self.log
             .push(crate::python_log::LogEntry::SetAvgVolume { values: values.clone() });
+        let equities = self.inner.len();
+        for (inst, v) in self
+            .inner
+            .rates_mut()
+            .instruments
+            .iter_mut()
+            .zip(&values[equities..])
+        {
+            inst.avg_volume = *v;
+        }
         self.inner
-            .set_column(PriceField::AvgVolume, &values)
+            .set_column(PriceField::AvgVolume, &values[..equities])
             .map_err(ValidationError::new_err)
     }
 
@@ -2982,7 +3231,101 @@ impl PyEngine {
                     FACTOR_NAMES.join(", ")
                 ))
             })?;
-        Ok(f64_bytes(py, &self.inner.attribution_column(index)))
+        // Zero in every rate instrument's slot: none of these drivers moves
+        // an index. Its move is in `rate_attribution`.
+        Ok(f64_bytes(py, &self.padded(self.inner.attribution_column(index), 0.0)))
+    }
+
+    /// The rate components of today's move, one value per instrument in
+    /// `tickers` order, as f64 bytes. Zero for every equity.
+    ///
+    /// `"carry"`, `"duration"` and `"convexity"` are the terms of the
+    /// repricing formula summed over the day (fractions of the level: see
+    /// `RATE_COMPONENTS`), so `1 + carry + duration + convexity` is the
+    /// day's index return whenever the curve moved once, which is how the
+    /// engine moves it. `"flow"` is the tape's premium over the index level
+    /// right now, `price / level - 1`: the part of a print that is the book's
+    /// response to trading rather than the curve.
+    ///
+    /// Reset at each open, before the open reprices, so the night's move is
+    /// in the day it lands on.
+    fn rate_attribution(&self, py: Python<'_>, component: &str) -> PyResult<Py<PyBytes>> {
+        let rates = &self.inner.rates().instruments;
+        let values: Vec<f64> = match component {
+            "carry" => rates.iter().map(|i| i.day_carry).collect(),
+            "duration" => rates.iter().map(|i| i.day_duration).collect(),
+            "convexity" => rates.iter().map(|i| i.day_convexity).collect(),
+            "flow" => rates.iter().map(|i| i.price / i.level - 1.0).collect(),
+            other => {
+                return Err(ValidationError::new_err(format!(
+                    "unknown rate component {other:?}. Valid: {}",
+                    RATE_COMPONENTS.join(", ")
+                )))
+            }
+        };
+        let mut out = vec![0.0; self.inner.len()];
+        out.extend(values);
+        Ok(f64_bytes(py, &out))
+    }
+
+    /// The rate components `rate_attribution` reports, in order.
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn RATE_COMPONENTS() -> Vec<String> {
+        RATE_COMPONENTS.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// The rate instruments this engine holds, one dict each, in `tickers`
+    /// order: the spec (name, curve point, duration, convexity, spread) and
+    /// the state (level, the yield it is marked at, price). Empty without
+    /// them.
+    #[getter]
+    fn rate_instruments<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        let mut out = Vec::new();
+        for inst in &self.inner.rates().instruments {
+            let d = PyDict::new_bound(py);
+            d.set_item("ticker", inst.spec.ticker)?;
+            d.set_item("name", inst.spec.name)?;
+            d.set_item("curve_point", inst.spec.point.as_str())?;
+            d.set_item("duration", inst.spec.duration)?;
+            d.set_item("convexity", inst.spec.convexity)?;
+            d.set_item("spread_bps", inst.spec.spread_bps)?;
+            d.set_item("level", inst.level)?;
+            d.set_item("yield", inst.marked_yield)?;
+            d.set_item("price", inst.price)?;
+            d.set_item("avg_volume", inst.avg_volume)?;
+            out.push(d);
+        }
+        Ok(out)
+    }
+
+    /// The curve as the engine holds it now, fractional: the policy rate, the
+    /// 2-year and 10-year treasury yields, the corporate yield equities are
+    /// discounted off, and the yield the corporate index reads (the 10-year
+    /// plus the credit spread last marked, which equals the corporate yield
+    /// whenever the engine has just set it). The last is present only on an
+    /// engine holding rate instruments.
+    #[getter]
+    fn curve<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let e = self.inner.economy();
+        let d = PyDict::new_bound(py);
+        d.set_item("policy_rate", crate::units::percent_to_fraction(e.federal_funds_rate))?;
+        d.set_item("treasury_2y", crate::units::percent_to_fraction(e.treasury_yield_2y))?;
+        d.set_item("treasury_10y", crate::units::percent_to_fraction(e.treasury_yield_10y))?;
+        d.set_item("corporate", crate::units::percent_to_fraction(e.corporate_bond_yield))?;
+        let rates = self.inner.rates();
+        if !rates.is_empty() {
+            let spread = if e.corporate_bond_yield != rates.last_corporate {
+                crate::rates::credit_spread(e)
+            } else {
+                rates.ig_spread
+            };
+            d.set_item(
+                "investment_grade",
+                crate::rates::curve_yield(crate::rates::CurvePoint::InvestmentGrade, e, spread),
+            )?;
+        }
+        Ok(d)
     }
 
     /// The day's `random_noise` column split into the three draws it sums,
@@ -3006,7 +3349,7 @@ impl PyEngine {
                 )))
             }
         };
-        Ok(f64_bytes(py, &self.inner.noise_part_column(index)))
+        Ok(f64_bytes(py, &self.padded(self.inner.noise_part_column(index), 0.0)))
     }
 
     /// `count` independent engines at exactly this state.
@@ -3387,6 +3730,28 @@ impl PyEngine {
         out.set_item("central_bank", cb)?;
 
         out.set_item("day_count", self.day_count)?;
+        // The rate instruments, only when the engine holds any, so every
+        // snapshot of an engine without them is the one it always was. Each
+        // instrument's state by name, in `RATE_STATE_FIELDS` order, which is
+        // the order the state hash walks.
+        let rates = self.inner.rates();
+        if !rates.is_empty() {
+            let block = PyDict::new_bound(py);
+            let items = pyo3::types::PyList::empty_bound(py);
+            for inst in &rates.instruments {
+                let item = PyDict::new_bound(py);
+                item.set_item("ticker", inst.spec.ticker)?;
+                for (name, value) in RATE_STATE_FIELDS.iter().zip(rate_state(inst)) {
+                    item.set_item(*name, value)?;
+                }
+                items.append(item)?;
+            }
+            block.set_item("instruments", items)?;
+            block.set_item("ig_spread", rates.ig_spread)?;
+            block.set_item("last_corporate", rates.last_corporate)?;
+            block.set_item("closed_since_open", rates.closed_since_open)?;
+            out.set_item("rates", block)?;
+        }
         // The agent-facing book, only once it has been used, so every
         // snapshot of a run that never saw an agent's order is the dict it
         // was before the book existed. `manifest.state_hash` accepts it
@@ -3928,6 +4293,75 @@ impl PyEngine {
         // for: something the engine carries drove the market and was not
         // restored with it.
         self.inner.set_current_day(i64::from(self.day_count));
+
+        // The rate instruments. Required exactly when this engine holds them,
+        // and for the same tickers in the same order: a snapshot restored
+        // without them would leave the indices at this engine's own levels
+        // under a restored curve, and they would reprice by the difference at
+        // the next open.
+        let held: Vec<&str> = self
+            .inner
+            .rates()
+            .instruments
+            .iter()
+            .map(|i| i.spec.ticker)
+            .collect();
+        match snapshot.get_item("rates")? {
+            None if held.is_empty() => {}
+            None => {
+                return Err(ValidationError::new_err(format!(
+                    "this engine holds the rate instruments {} and the snapshot \
+                     carries none. It was taken on a roster without them.",
+                    held.join(", ")
+                )))
+            }
+            Some(block) => {
+                let block = block.downcast::<PyDict>()?;
+                let items: Vec<Bound<'_, PyDict>> = block
+                    .get_item("instruments")?
+                    .ok_or_else(|| ValidationError::new_err("snapshot rates has no 'instruments'"))?
+                    .extract()?;
+                let mut tickers = Vec::with_capacity(items.len());
+                for item in &items {
+                    let t: String = item
+                        .get_item("ticker")?
+                        .ok_or_else(|| ValidationError::new_err("a rate instrument has no 'ticker'"))?
+                        .extract()?;
+                    tickers.push(t);
+                }
+                if tickers != held {
+                    return Err(ValidationError::new_err(format!(
+                        "the snapshot's rate instruments are [{}] and this engine \
+                         holds [{}]. Columns are positional, so they must match.",
+                        tickers.join(", "),
+                        held.join(", ")
+                    )));
+                }
+                fn get<'py>(d: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {
+                    d.get_item(key)?.ok_or_else(|| {
+                        ValidationError::new_err(format!("snapshot rates is missing {key:?}"))
+                    })
+                }
+                let mut values: Vec<[f64; RATE_STATE_FIELDS.len()]> = Vec::new();
+                for item in &items {
+                    let mut row = [0.0; RATE_STATE_FIELDS.len()];
+                    for (k, name) in RATE_STATE_FIELDS.iter().enumerate() {
+                        row[k] = get(item, name)?.extract()?;
+                    }
+                    values.push(row);
+                }
+                let ig_spread: f64 = get(block, "ig_spread")?.extract()?;
+                let last_corporate: f64 = get(block, "last_corporate")?.extract()?;
+                let closed: bool = get(block, "closed_since_open")?.extract()?;
+                let book = self.inner.rates_mut();
+                for (inst, row) in book.instruments.iter_mut().zip(values) {
+                    set_rate_state(inst, &row);
+                }
+                book.ig_spread = ig_spread;
+                book.last_corporate = last_corporate;
+                book.closed_since_open = closed;
+            }
+        }
         // The book is part of the state: restored when the snapshot carries
         // it, and pristine when it does not, so a restore never keeps the
         // orders or the consumed depth of the market it replaced.
@@ -3963,7 +4397,7 @@ impl PyEngine {
             // The session's open, the engine's mark from `open_market`,
             // which the close leaves alone, so a record taken on either
             // side of it reads the same value.
-            opens: self.inner.column(PriceField::Open),
+            opens: self.all_column(PriceField::Open),
             mispricing: self.day_buffer.mispricing.clone(),
             fundamental: self.day_buffer.fundamental.clone(),
             anchor: self.day_buffer.anchor.clone(),
@@ -4041,7 +4475,7 @@ impl PyEngine {
                 instruments: self.buffer.companies,
                 prices: self.written(&self.buffer.prices).to_vec(),
                 volumes: self.written(&self.buffer.volumes).to_vec(),
-                opens: self.inner.column(PriceField::Open),
+                opens: self.all_column(PriceField::Open),
                 // bars() reads neither, and cloning the ground-truth
                 // buffers to build a table that discards them would be pure
                 // copying. truth() has its own path below.
@@ -4426,7 +4860,7 @@ impl PyEngine {
             return Err(ValidationError::new_err("levels must be at least 1"));
         }
         let before = self.recorded_book.len();
-        for index in 0..self.inner.len() {
+        for index in 0..self.inner.instrument_count() {
             let Some(book) = self.inner.book_for(index) else {
                 continue;
             };
@@ -4659,7 +5093,7 @@ impl PyEngine {
     fn __repr__(&self) -> String {
         format!(
             "Engine({} instruments, draws={})",
-            self.inner.len(),
+            self.inner.instrument_count(),
             self.inner.draws_consumed()
         )
     }
@@ -4714,6 +5148,64 @@ pub fn random_instruments(n: usize, seed: u32) -> PyResult<Vec<PyInstrument>> {
             short_interest: g.short_interest,
         })
         .collect())
+}
+
+/// The rate instruments this build prices, as instruments with their
+/// default level, depth and size, in the order given.
+///
+/// `tickers` defaults to all of them. `tradefloor.bonds()` wraps this, and
+/// `Universe.random(..., bonds=True)` appends the result. Every number comes
+/// from `crate::rates::RATE_SPECS`, so the defaults have one home.
+#[pyfunction]
+#[pyo3(signature = (tickers = None))]
+pub fn rate_instruments(tickers: Option<Vec<String>>) -> PyResult<Vec<PyInstrument>> {
+    let wanted: Vec<String> = match tickers {
+        Some(t) => t,
+        None => crate::rates::tickers().iter().map(|t| t.to_string()).collect(),
+    };
+    let mut out = Vec::with_capacity(wanted.len());
+    for ticker in &wanted {
+        let spec = crate::rates::spec_for(ticker).ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "{ticker:?} is not a rate instrument this build prices. Valid: {}",
+                crate::rates::tickers().join(", ")
+            ))
+        })?;
+        out.push(PyInstrument {
+            ticker: spec.ticker.to_string(),
+            sector: crate::rates::RATE_SECTOR.to_string(),
+            initial_price: spec.initial_price,
+            shares_outstanding: spec.units_outstanding,
+            eps: None,
+            book_value_per_share: None,
+            revenue_growth: None,
+            avg_volume: spec.avg_volume,
+            beta: 0.0,
+            short_interest: 0.0,
+        });
+    }
+    Ok(out)
+}
+
+/// Each rate instrument's fixed terms, one dict per ticker: name, curve
+/// point, duration, convexity, spread and the default depth and level.
+#[pyfunction]
+pub fn rate_specs(py: Python<'_>) -> PyResult<Vec<Py<PyDict>>> {
+    let mut out = Vec::new();
+    for spec in crate::rates::RATE_SPECS.iter() {
+        let d = PyDict::new_bound(py);
+        d.set_item("ticker", spec.ticker)?;
+        d.set_item("name", spec.name)?;
+        d.set_item("curve_point", spec.point.as_str())?;
+        d.set_item("duration", spec.duration)?;
+        d.set_item("convexity", spec.convexity)?;
+        d.set_item("spread_bps", spec.spread_bps)?;
+        d.set_item("avg_volume", spec.avg_volume)?;
+        d.set_item("units_outstanding", spec.units_outstanding)?;
+        d.set_item("initial_price", spec.initial_price)?;
+        out.push(d.into());
+    }
+    Ok(out)
 }
 
 fn cycle_name(p: CyclePhase) -> &'static str {
@@ -4868,6 +5360,44 @@ pub fn random_noise_index() -> usize {
         .position(|name| *name == "random_noise")
         .expect("random_noise is one of the components")
 }
+
+/// A rate instrument's state in a snapshot, in the order the state hash
+/// walks it (`Engine::state_hash_with_pending`, `manifest.state_hash`).
+pub const RATE_STATE_FIELDS: [&str; 14] = [
+    "level", "marked_yield", "price", "previous_close", "open", "high", "low",
+    "volume", "avg_volume", "units_outstanding", "maker_inventory", "day_carry",
+    "day_duration", "day_convexity",
+];
+
+fn rate_state(inst: &crate::rates::RateInstrument) -> [f64; 14] {
+    [
+        inst.level, inst.marked_yield, inst.price, inst.previous_close, inst.open,
+        inst.high, inst.low, inst.volume, inst.avg_volume, inst.units_outstanding,
+        inst.maker_inventory, inst.day_carry, inst.day_duration, inst.day_convexity,
+    ]
+}
+
+fn set_rate_state(inst: &mut crate::rates::RateInstrument, row: &[f64; 14]) {
+    let [level, marked_yield, price, previous_close, open, high, low, volume, avg_volume,
+         units_outstanding, maker_inventory, day_carry, day_duration, day_convexity] = *row;
+    inst.level = level;
+    inst.marked_yield = marked_yield;
+    inst.price = price;
+    inst.previous_close = previous_close;
+    inst.open = open;
+    inst.high = high;
+    inst.low = low;
+    inst.volume = volume;
+    inst.avg_volume = avg_volume;
+    inst.units_outstanding = units_outstanding;
+    inst.maker_inventory = maker_inventory;
+    inst.day_carry = day_carry;
+    inst.day_duration = day_duration;
+    inst.day_convexity = day_convexity;
+}
+
+/// The components `Engine.rate_attribution` reports.
+pub const RATE_COMPONENTS: [&str; 4] = ["carry", "duration", "convexity", "flow"];
 
 pub const COLUMN_FIELDS: [&str; 18] = [
     "price",

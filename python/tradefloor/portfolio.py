@@ -48,6 +48,12 @@ A limit order (:meth:`submit_limit`) always goes to the engine. Its
 unfilled part waits: in the book's queue with ``book_resting`` on, for the
 traded range with it off. What fills later, during a session, reaches the
 portfolio through :meth:`sync`.
+
+The simulated rate indices (``UST2Y``, ``UST10Y``, ``IGCORP``) are not in
+that book: they quote their own ladder whatever the dials say. An order on
+one is priced off its book as before and its flow waits in
+:meth:`pending_flow` for ``run_session``'s ``fills``, and a limit order on
+one is refused.
 """
 
 from __future__ import annotations
@@ -57,6 +63,12 @@ from typing import Literal
 
 from . import _core
 from ._core import Engine, OrderError, ValidationError
+from ._core import rate_specs as _rate_specs
+
+#: The simulated rate indices. They quote their own ladder and are not in the
+#: engine's agent-facing book, so an order on one is priced off its book and
+#: its flow goes to ``run_session``'s ``fills`` whatever the book's dials say.
+_RATE_TICKERS = frozenset(spec["ticker"] for spec in _rate_specs())
 
 
 class Limit:
@@ -127,12 +139,19 @@ class Portfolio:
     """Cash, positions and P&L for one trader."""
 
     __slots__ = ("cash", "starting_cash", "positions", "_flow", "fills",
-                 "max_leverage", "_stamp", "owner", "_in_book")
+                 "max_leverage", "_stamp", "cash_interest", "interest",
+                 "owner", "_in_book")
 
     def __init__(self, cash: float = 1_000_000.0,
                  *, max_leverage: float | None = None,
+                 cash_interest: bool = False,
                  owner: str = "agent") -> None:
         """
+        ``cash_interest`` makes cash earn the policy rate, one day at a time,
+        when :meth:`accrue` is called; the harness calls it once a day, before
+        the close. Off by default, and with it off cash earns nothing, which
+        is how every run before this option behaved. See :meth:`accrue`.
+
         ``max_leverage`` caps gross exposure as a multiple of net worth. It
         defaults to ``None``, meaning unconstrained, because a bare simulator should
         not impose a broker's risk policy on a researcher studying, say, what
@@ -153,6 +172,9 @@ class Portfolio:
                 f"max_leverage must be finite and positive, got {max_leverage}"
             )
         self.max_leverage = max_leverage
+        self.cash_interest = bool(cash_interest)
+        # Interest credited so far, net of any charged on a negative balance.
+        self.interest = 0.0
         self._stamp = (0, 0, 0)
         self.cash = float(cash)
         self.starting_cash = float(cash)
@@ -191,7 +213,7 @@ class Portfolio:
                 f"quantity must be non-zero and finite, got {quantity}"
             )
 
-        if getattr(engine, "book_live", False):
+        if getattr(engine, "book_live", False) and ticker not in _RATE_TICKERS:
             return self._execute_in_book(engine, ticker, float(quantity), None)
 
         side: Literal["buy", "sell"] = "buy" if quantity > 0 else "sell"
@@ -258,6 +280,11 @@ class Portfolio:
                 f"quantity must be non-zero and finite, got {quantity}")
         if not (price > 0) or price != price:
             raise ValidationError(f"price must be finite and positive, got {price}")
+        if ticker in _RATE_TICKERS:
+            raise ValidationError(
+                f"{ticker} is a simulated rate index, which the engine's book "
+                "does not hold: a limit order cannot wait on it. Trade it with "
+                "execute().")
         return self._execute_in_book(engine, ticker, float(quantity), float(price),
                                      report=True)
 
@@ -492,6 +519,36 @@ class Portfolio:
 
     def realised(self) -> float:
         return sum(p.realised for p in self.positions.values())
+
+    # -- cash -------------------------------------------------------------
+
+    def accrue(self, engine: Engine) -> float:
+        """Credit one trading day's interest on cash, if ``cash_interest``.
+
+        ``cash * policy_rate / 252``, at the policy rate in force now
+        (``engine.macro_fields["federal_funds_rate"]``), added to cash and to
+        :attr:`interest`. Returns the amount, 0.0 with the option off.
+
+        A negative balance, which is borrowing to hold more than the account
+        is worth, is charged at the same rate. That is cheaper than any broker
+        lends, so a levered strategy's financing cost is a floor here, not an
+        estimate.
+
+        Call it once per trading day. The harness calls it just before the
+        close, so the day's interest is at the rate the day traded under and
+        the close's macro step, which may move the rate, applies to the next
+        day. Before this option existed cash earned nothing: a portfolio
+        holding cash through a rate shock gained nothing from the higher
+        rate, and a 60/40 portfolio's bond sleeve was compared against cash
+        that paid zero.
+        """
+        if not self.cash_interest:
+            return 0.0
+        rate = engine.macro_fields["federal_funds_rate"]
+        amount = self.cash * rate / 252.0
+        self.cash += amount
+        self.interest += amount
+        return amount
 
     # -- impact -----------------------------------------------------------
 

@@ -154,8 +154,15 @@ def test_battery_names_one_cell_per_shipped_scenario():
     b = tf.battery()
     assert b.version == tf.BATTERY_VERSION == 1
     assert len(b.cells) == 6
-    assert sorted(cell.scenario for cell in b.cells) == list(
-        tf.Scenario.available())
+    # The six scenarios that shipped when version 1 was set. A version pins
+    # its names rather than the live directory (`fingerprint.py`), so
+    # `curve_shock`, packaged later, is not a cell of it; every cell must
+    # still name a scenario the package ships.
+    version_one = ["geopolitical_conflict", "liquidity_crisis",
+                   "oil_price_spike", "policy_regime_shift", "rate_shock",
+                   "recession"]
+    assert sorted(cell.scenario for cell in b.cells) == version_one
+    assert set(version_one) <= set(tf.Scenario.available())
     # Every cell shares the library's own decision cadence and runs long
     # enough to reach its own scenario's shock: the six shipped scenarios'
     # earliest interventions fire at day 30 (`policy_regime_shift`) and

@@ -42,6 +42,8 @@ pub mod mispricing;
 pub mod order_book;
 /// The runtime parameter seam: `ModelParams` and the preset table.
 pub mod params;
+/// Simulated constant-maturity bond indices priced off the engine's curve.
+pub mod rates;
 pub mod rng;
 /// The twelve sectors and their model parameters.
 pub mod sectors;

@@ -461,7 +461,7 @@ def _make_macro_target(name: str, field: str, *, units: str, note: str,
 #: 39 comparisons behind these numbers came back with a market draw delta of
 #: zero, so the difference is the intervention and nothing else.
 #:
-#: Read them before believing a scenario. Four of the twelve targets are
+#: Read them before believing a scenario. Four of the fourteen targets are
 #: honest mechanisms with effects too small to see over a hundred days, and
 #: one of them is measurably worth exactly nothing. Knowing which is which is
 #: the difference between an experiment and a number.
@@ -587,6 +587,40 @@ _register(Target(
     # for the rest of the run.
     restores=False,
     format=_shares,
+))
+
+# -- the treasury curve: what the rate indices read -------------------------
+
+_register(_make_macro_target(
+    "macro.treasury_2y", "treasury_yield_2y",
+    units="fraction",
+    note=(
+        "The 2-year treasury yield. The UST2Y rate index reads it and nothing in "
+        "the equity market does. The chain recomputes it at every close as "
+        "0.85 x the policy rate + 0.15 x the 10-year, so a write lasts until "
+        "that close: hold it, or move the policy rate with it. Measured, "
+        "+200bp: UST2Y -3.71% on the day under either shape; by day 120 "
+        "+0.05% as an impulse and -2.95% held. Equities 0.00% either way."
+    ),
+    check=_rate_check(), format=_pp, domain=_domain_rate,
+))
+
+_register(_make_macro_target(
+    "macro.treasury_10y", "treasury_yield_10y",
+    units="fraction",
+    note=(
+        "The 10-year treasury yield. UST10Y reads it, and IGCORP reads it with "
+        "the credit spread on top. It closes 5% of its gap to the policy rate "
+        "plus a term premium every session, so an impulse decays over weeks "
+        "unless the policy rate moves with it, which is what "
+        "scenarios/curve_shock.yml does. Equities see it only when the "
+        "central bank's next meeting, or the daily credit floor, carries it "
+        "into the corporate yield. Measured, +200bp: UST10Y -15.32% and "
+        "IGCORP -12.01% on the day; by day 120 +0.49% and +1.40% as an "
+        "impulse and -14.76% and -9.62% held, with the median equity "
+        "-0.01% and -3.12%."
+    ),
+    check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
 
 # -- the chain levers: real, and slower than a short study ------------------
@@ -756,7 +790,7 @@ def suggest(name: str) -> str:
     target is a typo and gets the spelling. A name in :data:`UNSUPPORTED` is
     not a typo at all -- the reader has a mechanism in mind that this model
     does not have -- and gets the reason and the nearest real lever. Anything
-    else gets the whole registry, because a list of twelve names is shorter
+    else gets the whole registry, because a list of fourteen names is shorter
     than a conversation.
     """
     if name in UNSUPPORTED:
