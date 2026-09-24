@@ -20,9 +20,9 @@ libm.
   consumed levels, not because a slippage coefficient said so.
 - **Ground truth.** The simulator knows the fair value it computed and the
   macro regime it is in, so both are readable. No real dataset has labels.
-- **Named, frozen model presets.** Coefficients ship as eighteen presets,
-  `pt-v1` through `pt-v19` with no `pt-v17`, all selectable and all
-  bit-reproducing. `pt-v19` is the default (`params::DEFAULT_PRESET_NAME`). A
+- **Named, frozen model presets.** Coefficients ship as nineteen presets,
+  `pt-v1` through `pt-v20` with no `pt-v17`, all selectable and all
+  bit-reproducing. `pt-v20` is the default (`params::DEFAULT_PRESET_NAME`). A
   modified coefficient set fingerprints as `custom-XXXXXXXX` and can never
   present as a shipped one.
 - **A published realism envelope.** A one-year realism table of 19 statistics

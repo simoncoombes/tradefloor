@@ -14,7 +14,7 @@
 # a release; a version without the date it shipped is half a citation.
 #
 # A citation identifies the software. It does not identify a model or a RUN.
-# Name the preset beside the version (for example pt-v19): results depend on
+# Name the preset beside the version (for example pt-v20): results depend on
 # it, and the default preset has changed between minor releases. Reproducing
 # a published result needs four more things: the seed, the universe
 # fingerprint and how it was built, the macro initial conditions, and the
@@ -23,7 +23,7 @@
 # and for how long.
 
 cff-version: 1.2.0
-message: "If you use this software, please cite it using these metadata, and name the model preset you used (for example pt-v19)."
+message: "If you use this software, please cite it using these metadata, and name the model preset you used (for example pt-v20)."
 title: tradefloor
 abstract: >-
   A deterministic market simulator with a real limit order book. A Rust core

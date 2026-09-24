@@ -1,7 +1,7 @@
 {
   "upload_type": "software",
   "title": "tradefloor: a deterministic market simulator with a limit order book",
-  "description": "<p>tradefloor is a deterministic market simulator with a real limit order book: a Rust core with a Python API. The same seed produces the same market on every platform, every price move carries a labelled factor decomposition, and orders match against depth so trading moves the price.</p><p>The model is specified in docs/MODEL.md, and the realism statistics it is checked against are defined in docs/STATISTICS.md. Results depend on the model preset: cite the preset name (for example pt-v19) with the version.</p><p>Licensed MIT OR Apache-2.0, at the user's option.</p>",
+  "description": "<p>tradefloor is a deterministic market simulator with a real limit order book: a Rust core with a Python API. The same seed produces the same market on every platform, every price move carries a labelled factor decomposition, and orders match against depth so trading moves the price.</p><p>The model is specified in docs/MODEL.md, and the realism statistics it is checked against are defined in docs/STATISTICS.md. Results depend on the model preset: cite the preset name (for example pt-v20) with the version.</p><p>Licensed MIT OR Apache-2.0, at the user's option.</p>",
   "creators": [
     {
       "name": "Coombes, Simon"

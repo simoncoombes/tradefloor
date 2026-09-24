@@ -175,20 +175,21 @@ volatility, fat tails, how much stocks move together and how far the VIX
 jumps after a fall. `tf.facts.measure()` reads 18 of them over 252 days, and
 `tf.facts.crisis_statistics()` the nineteenth, which needs a run with a
 crisis in it. `tf.envelope.score()` compares each with the range real
-markets show over a year. On the default preset, `pt-v19`, all 19 are inside their ranges. The
-check runs 30 random seeds. Fifteen of the statistics are read on one fixed
+markets show over a year. On the default preset, `pt-v20`, all 19 are inside
+their ranges. The check runs 30 random seeds. Fifteen of the statistics are read on one fixed
 set of companies, and that fixed-roster panel is repeated on held-out seeds
 and on a held-out set of companies.
 
 Four of the 19 describe the index as a whole. An equal-weight index of the
-stocks gains 7.6 percent a year, inside a real range of 1.1 to 10.3. On a day
-the index falls 1 percent or more, the VIX rises a median 1.9 points, inside
-a real range of 0.39 to 3.03; on a 3 percent fall it rises 5.4, inside 2.6 to
-9.58. The index falls 3 percent or more on 1.14 percent of days, against 1.21
-percent in real markets.
+stocks gains 1.1 percent a year over one year, at the floor of a real range
+of 1.1 to 10.3 (pt-v19 gained 7.6). On a day the index falls 1 percent or
+more, the VIX rises a median 1.7 points, inside a real range of 0.39 to
+3.03. On a 3 percent fall it rises 5.1, inside 2.6 to 9.58. The index falls
+3 percent or more on 0.82 percent of days, against 1.21 percent in real
+markets.
 
 **The two-year panel** is the fixed-roster panel run for 504 days. Fourteen
-of its 15 statistics have a two-year range, and pt-v19 has all 14 inside.
+of its 15 statistics have a two-year range, and pt-v20 has all 14 inside.
 
 **The long-run criteria** are 17 checks over 21 years from 0.8.5, and 15
 before it. The check runs the market for 21 years, 30 times over, and
@@ -196,33 +197,32 @@ replays 2008 and 2020 with the real VIX. Fifteen criteria compare what a
 user would notice with real markets: how deep crashes go, how long fear
 lasts, how often the VIX is above 30 or below 15, how many bear markets and
 corrections a decade brings, the long-run return, and whether a headline
-read late still pays. pt-v19 meets all fifteen. pt-v18, the previous
-default, meets eight. In the 2008 replay the market falls 41 percent against
-the real 57, the VIX is above 30 on 8.1 percent of days against a real 8.2,
-and the index returns 6.3 percent a year over 21 years.
-
-The other two, C4a and C4b, added in 0.8.5, ask whether a rule that reads
-only prices can find an edge real markets do not have, and pt-v19 fails
-both. Hour-to-hour returns reverse too much: the lag-1 autocorrelation of
-65-minute returns is -0.19, where the spreads real large caps quote imply
-about zero. So on the published suite of 20 markets, a mean-reversion rule
-that trades every 65 minutes beats buy-and-hold in 18 of them, by a median
-13.6 points in 60 days, and five-day momentum also beats it. The next preset
-is meant to fix both. The verdicts ship with the package as
+read late still pays. The other two, C4a and C4b, ask whether a rule that
+reads only prices can find an edge real markets do not have. pt-v20 meets
+all 17, and the eleven more registered for it, among them the rate indices against real
+treasury and corporate bonds, the earnings cycle, value and momentum
+signals, and the cost of size in the book. pt-v19, the previous default,
+meets 15 of the 17 and fails C4a and C4b. On pt-v20 the 2008 replay falls 47
+percent against the real 57, the VIX is above 30 on 5.8 percent of days
+against a real 8.2, and the index returns 5.7 percent a year over 21 years
+against a real 6.25. The verdicts ship with the package as
 `tf.preset_record()["long_run"]`.
 
-Three things are still off. The worst month of the 2020 replay is about 30
-percent milder than the real one. Over two years the VIX forgets a shock a
-little too fast. With the VIX held at 65 the market is 5.2 times as volatile as
-with it held at 5, against 6.2 times in real markets.
+Three things are still off. The worst month of the 2020 replay is about 20
+percent milder than the real one. The index has 2.1 bear markets a decade
+against a real 1.1, inside the criterion's range of half to twice real but
+near its edge. With the VIX held at 65 the market is 3.6 times as volatile
+as with it held at 5, against 6.2 times in real markets (pt-v19 5.2).
 
 Each crisis starts in one sector, picked at random. A scenario can pick it for
 you with `Scenario().hold(epicentre="financial_services")`.
 
-pt-v19's coefficients were chosen with a scoring rule over 19 statistics
-that overlaps the one-year table, so that table helped choose them and
-cannot also serve as a held-out test. The held-out checks are the fresh seeds
-and the fresh set of companies.
+pt-v20 keeps pt-v19's coefficients where it does not add a mechanism, and
+those were chosen with a scoring rule over 19 statistics that overlaps the
+one-year table, so that table helped choose them and cannot also serve as a
+held-out test. pt-v20's own dials were chosen against the long-run
+criteria. The held-out checks are the fresh seeds and the fresh set of
+companies.
 
 Five limits are measured and written down:
 
@@ -250,9 +250,9 @@ for five platforms, runs one fixed simulation on each, and stops if any result
 differs. tradefloor ships its own `exp`, `log`, `pow`, `sin` and `cos`, so
 the system's math library cannot change a result.
 
-`pt-v19` became the default in 0.8.0, replacing `pt-v18`. If you name your
+`pt-v20` became the default in 0.8.5, replacing `pt-v19`. If you name your
 preset, a run replays exactly, and every preset from `pt-v1` on can still be
-selected.
+selected. Each release checks that one, with a digest per shipped preset.
 
 ```python
 eng = tf.Engine(seed=42, universe=u, model="pt-v10")
@@ -359,7 +359,7 @@ several presets, and results depend on the preset.
   year    = {2026},
   url     = {https://github.com/simoncoombes/tradefloor},
   doi     = {10.5281/zenodo.XXXXXXX},
-  note    = {Model preset pt-v19}
+  note    = {Model preset pt-v20}
 }
 ```
 
@@ -370,7 +370,7 @@ carries the same details, and GitHub's "Cite this repository" button reads
 it.
 
 In the text, say which model you used, for example: "tradefloor 0.8.5,
-preset pt-v19, specified in its docs/MODEL.md". To let a reader rerun a
+preset pt-v20, specified in its docs/MODEL.md". To let a reader rerun a
 result, publish its `RunManifest`: it records the version, preset, seed,
 universe, macro state and scenario, and `reproduce()` stops on a mismatch.
 [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)

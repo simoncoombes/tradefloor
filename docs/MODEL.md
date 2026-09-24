@@ -1,5 +1,14 @@
 # The tradefloor model
 
+**From 0.8.5 the default preset is pt-v20, and this document still describes
+pt-v19.** pt-v20 is pt-v19 with the dials listed in
+[Coming in pt-v20](#coming-in-pt-v20) and in `ModelParams.pt_v20` in
+`rust/src/params.rs`, where each one carries its value and its source.
+Every equation below holds for both presets. Where pt-v20 turns on a term
+that pt-v19 switches off, this document does not write it out yet. The
+pt-v19 values below are pt-v19's, and `tf.ModelParams.from_preset("pt-v20")`
+gives pt-v20's.
+
 This document states the tradefloor market model as equations. It describes
 **tradefloor 0.8.1** running the default preset **pt-v19**. Every equation
 was read off the code at the `v0.8.1` tag, and each one names the source line
