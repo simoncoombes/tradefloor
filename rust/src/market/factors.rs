@@ -1678,8 +1678,9 @@ mod tests {
         for name in crate::params::ModelParams::preset_names() {
             let p = crate::params::ModelParams::preset(name).expect("named");
             // pt-v18 switched the recentring on; pt-v19 is built on pt-v18
-            // and inherits it. Every preset before pt-v18 must read 0.0.
-            if *name == "pt-v18" || *name == "pt-v19" {
+            // and pt-v20 on pt-v19, and both inherit it. Every preset before
+            // pt-v18 must read 0.0.
+            if *name == "pt-v18" || *name == "pt-v19" || *name == "pt-v20" {
                 assert_eq!(p.market_beta_down_asym_recentre, 1.0, "{name}");
                 continue;
             }
