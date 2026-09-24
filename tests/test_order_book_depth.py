@@ -90,9 +90,21 @@ def taken(engine: tf.Engine, index: int) -> list[float]:
 # -- off is off ------------------------------------------------------------------
 
 
+#: The presets that take the book: pt-v20 carries the values the hand-off
+#: suggested (design repository, programme/ptv20-registration.md). Written
+#: out, so a preset added without a decision about the book fails below.
+BOOK_ON = {"pt-v20": dict(book_depth_coefficient=0.75, book_depth_exponent=0.5,
+                          book_depth_reach=1.0, book_shared=1.0,
+                          book_refill_half_life=27.0, book_resting=1.0,
+                          fill_impact_coefficient=0.314)}
+
+
 @pytest.mark.parametrize("preset", tuple(tf.preset_names()))
 def test_every_dial_ships_off(preset):
     values = tf.ModelParams.from_preset(preset).to_dict()
+    if preset in BOOK_ON:
+        assert {name: values[name] for name in DIALS} == BOOK_ON[preset], preset
+        return
     assert all(values[name] == 0.0 for name in DIALS), preset
 
 

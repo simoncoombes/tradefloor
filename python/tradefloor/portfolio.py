@@ -48,6 +48,12 @@ A limit order (:meth:`submit_limit`) always goes to the engine. Its
 unfilled part waits: in the book's queue with ``book_resting`` on, for the
 traded range with it off. What fills later, during a session, reaches the
 portfolio through :meth:`sync`.
+
+The simulated rate indices (``UST2Y``, ``UST10Y``, ``IGCORP``) are not in
+that book: they quote their own ladder whatever the dials say. An order on
+one is priced off its book as before and its flow waits in
+:meth:`pending_flow` for ``run_session``'s ``fills``, and a limit order on
+one is refused.
 """
 
 from __future__ import annotations
@@ -57,6 +63,12 @@ from typing import Literal
 
 from . import _core
 from ._core import Engine, OrderError, ValidationError
+from ._core import rate_specs as _rate_specs
+
+#: The simulated rate indices. They quote their own ladder and are not in the
+#: engine's agent-facing book, so an order on one is priced off its book and
+#: its flow goes to ``run_session``'s ``fills`` whatever the book's dials say.
+_RATE_TICKERS = frozenset(spec["ticker"] for spec in _rate_specs())
 
 
 class Limit:
@@ -201,7 +213,7 @@ class Portfolio:
                 f"quantity must be non-zero and finite, got {quantity}"
             )
 
-        if getattr(engine, "book_live", False):
+        if getattr(engine, "book_live", False) and ticker not in _RATE_TICKERS:
             return self._execute_in_book(engine, ticker, float(quantity), None)
 
         side: Literal["buy", "sell"] = "buy" if quantity > 0 else "sell"
@@ -268,6 +280,11 @@ class Portfolio:
                 f"quantity must be non-zero and finite, got {quantity}")
         if not (price > 0) or price != price:
             raise ValidationError(f"price must be finite and positive, got {price}")
+        if ticker in _RATE_TICKERS:
+            raise ValidationError(
+                f"{ticker} is a simulated rate index, which the engine's book "
+                "does not hold: a limit order cannot wait on it. Trade it with "
+                "execute().")
         return self._execute_in_book(engine, ticker, float(quantity), float(price),
                                      report=True)
 

@@ -2718,6 +2718,16 @@ impl Engine {
                 return Err(format!("limit_price must be finite and greater than zero, got {p}"));
             }
         }
+        // The rate indices quote their own ladder (`crate::rates`) and take
+        // their flow from `run_session`'s `fills`; the agent-facing book
+        // holds equities only.
+        if self.rates.instruments.iter().any(|i| i.spec.ticker == ticker) {
+            return Err(format!(
+                "{ticker} is a simulated rate index, and the agent-facing book holds \
+                 equities only: price it with Portfolio.execute, which reads its own \
+                 book, and pass its flow in run_session's fills"
+            ));
+        }
         let index = self
             .companies
             .iter()
@@ -4595,11 +4605,24 @@ impl Engine {
         // Under `fill_impact_coefficient` the fills are agent fills priced by
         // the linear law instead, so they join the book's pending flow and
         // the first open tick applies them with every other agent's.
+        //
+        // The rate indices are not in the agent-facing book and the linear
+        // law does not price them, so their fills stay on the first tick's
+        // flow, where their own books read them, under either law.
         let first_tick_flow = if request.fills.is_empty() {
             None
         } else if self.params.fill_impact_coefficient != 0.0 {
-            self.queue_external_fills(request.fills);
-            None
+            let (equity, rates): (Vec<_>, Vec<_>) = request
+                .fills
+                .iter()
+                .cloned()
+                .partition(|(t, _)| !self.rates.instruments.iter().any(|i| i.spec.ticker == t.as_str()));
+            self.queue_external_fills(&equity);
+            if rates.is_empty() {
+                None
+            } else {
+                Some(merge_order_volumes(request.order_volumes, &rates))
+            }
         } else {
             Some(merge_order_volumes(request.order_volumes, request.fills))
         };
