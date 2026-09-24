@@ -1285,7 +1285,7 @@ agent's fills to the next `run_session` as order flow, and the session
 applies the same flow on every tick (`python_engine.rs:1290-1297`,
 `engine.rs:3692-3703`). At six steps a day, one order is applied 65 times,
 after the agent has already filled at the pre-trade book. So the agent
-collects its own impact rather than paying it. This is corrected in 0.9.0;
+collects its own impact rather than paying it. This is corrected in 0.8.5;
 see [Coming in pt-v20](#coming-in-pt-v20).
 
 | Symbol | Dial | Value | Kind | Source |
@@ -1455,7 +1455,7 @@ their details may change before they ship, so this section says only what
 each one is for. When pt-v20 ships, this document will specify it in the
 same way.
 
-- **Agent order flow applied once.** At 0.8.1 an agent's fills are held as order flow for every tick of the next step, after the agent has already filled at the pre-trade book (see [Agent orders](#agent-orders)). The fix applies a fill once, on the tick after it. Runs where no agent trades do not change. It ships in 0.9.0.
+- **Agent order flow applied once.** At 0.8.1 an agent's fills are held as order flow for every tick of the next step, after the agent has already filled at the pre-trade book (see [Agent orders](#agent-orders)). The fix applies a fill once, on the tick after it. Runs where no agent trades do not change. It ships in 0.8.5.
 - **Quotes around the model price.** The maker quotes around the last print, so the traded price can lag the model price by tens of basis points, and hour-to-hour returns reverse more than real ones do (long-run criterion C4a). A new dial centres the book on the model price every tick.
 - **A share of news in fair value.** Every company-level shock now lives in the mispricing, which reverts, so all company news is temporary. A new dial sends a share of each company's own shocks to a permanent fair-value level.
 - **The opening mispricing.** A random roster opens with a spread of mispricing far wider than the model's stationary spread, so every run starts with a predictable drift back to fair value. A new dial opens it at the stationary spread.

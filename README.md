@@ -175,7 +175,7 @@ percent in real markets.
 **The two-year panel** is the fixed-roster panel run for 504 days. Fourteen
 of its 15 statistics have a two-year range, and pt-v19 has all 14 inside.
 
-**The long-run criteria** are 17 checks over 21 years from 0.9.0, and 15
+**The long-run criteria** are 17 checks over 21 years from 0.8.5, and 15
 before it. The check runs the market for 21 years, 30 times over, and
 replays 2008 and 2020 with the real VIX. Fifteen criteria compare what a
 user would notice with real markets: how deep crashes go, how long fear
@@ -186,7 +186,7 @@ default, meets eight. In the 2008 replay the market falls 41 percent against
 the real 57, the VIX is above 30 on 8.1 percent of days against a real 8.2,
 and the index returns 6.3 percent a year over 21 years.
 
-The other two, C4a and C4b, added in 0.9.0, ask whether a rule that reads
+The other two, C4a and C4b, added in 0.8.5, ask whether a rule that reads
 only prices can find an edge real markets do not have, and pt-v19 fails
 both. Hour-to-hour returns reverse too much: the lag-1 autocorrelation of
 65-minute returns is -0.19, where the spreads real large caps quote imply

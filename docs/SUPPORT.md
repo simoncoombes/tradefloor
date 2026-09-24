@@ -25,7 +25,8 @@ Only the vector a tagged release ships is frozen.
 ## The LTS line
 
 **Proposal: the first release whose default preset is pt-v20 starts the
-first LTS line.** If that release is 0.9.0, the LTS line is 0.9.x.
+first LTS line.** The line starts at that release and covers the patch
+releases that follow it.
 
 pt-v20 is the right place to start, not pt-v19. The release that makes it
 the default carries the changes listed under "Coming in pt-v20" in

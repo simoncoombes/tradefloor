@@ -16,7 +16,7 @@ The model itself is specified in
 |---|---|---|---|
 | [The one-year table](#the-one-year-table) | 19 statistics | 252 sessions | 19 of 19 in band |
 | [The two-year panel](#the-two-year-panel) | 15 statistics, 14 with a band | 504 sessions | 14 of 14 in band |
-| [The long-run criteria](#the-long-run-criteria) | 17 criteria from 0.9.0; 15 before | 21 years | 15 of 17 met; 15 of 15 in 0.8.x |
+| [The long-run criteria](#the-long-run-criteria) | 17 criteria from 0.8.5; 15 before | 21 years | 15 of 17 met; 15 of 15 up to 0.8.1 |
 | [The hosted report](#the-hosted-report) | no statistics of its own | | quotes the long-run criteria |
 
 Three parts of the one-year table have counts of their own, and appear on
@@ -124,7 +124,7 @@ hosted preset list.
 
 ## The long-run criteria
 
-**17 criteria over 21 years, from 0.9.0; 15 before.** Thirty free-running
+**17 criteria over 21 years, from 0.8.5; 15 before.** Thirty free-running
 histories of 21 years each, plus replays of 2008 and 2020 with the real VIX
 imposed, plus a probe of how much a late-read headline is worth. Each
 criterion is something a user would notice, with a tolerance that is easy to
@@ -132,11 +132,11 @@ read. The result is in `tf.preset_record()["long_run"]`.
 
 pt-v19 was adopted as the default on the first 15, and meets all 15;
 pt-v18, the previous default, meets 8. Two criteria were added on
-2026-09-24 and ship in 0.9.0: C4a and C4b ask whether a rule that reads
+2026-09-24 and ship in 0.8.5: C4a and C4b ask whether a rule that reads
 only prices finds an edge real markets do not offer. pt-v19 fails both, so
-its record reads 15 of 17 from 0.9.0. Records in 0.8.x carry the first 15
-rows, and the documentation site, which describes the released 0.8.1
-package, shows those 15 until 0.9.0 is released.
+its record reads 15 of 17 from 0.8.5. Records up to 0.8.1 carry the first
+15 rows, and the documentation site, which describes the released 0.8.1
+package, shows those 15 until 0.8.5 is released.
 
 | Id | Criterion | Tolerance |
 |---|---|---|
@@ -154,8 +154,8 @@ package, shows those 15 until 0.9.0 is released.
 | C1 | crash rate in years 3 to 21 against years 1 to 2 | two thirds to 1.5 times |
 | C2 | histories that touch the VIX ceiling | at most 1 of 30 |
 | C3 | the edge from reading a headline 5 ticks late | under 20 basis points |
-| C4a | lag-1 autocorrelation of 65-minute returns, median name, and the Roll spread against the quoted spread (from 0.9.0) | at or above −0.05, or Roll at most twice quoted |
-| C4b | the best price-only rule on the published suite of 20 markets: median points over buy-and-hold, and markets beaten (from 0.9.0) | every rule at most +5 points and 14 of 20 |
+| C4a | lag-1 autocorrelation of 65-minute returns, median name, and the Roll spread against the quoted spread (from 0.8.5) | at or above −0.05, or Roll at most twice quoted |
+| C4b | the best price-only rule on the published suite of 20 markets: median points over buy-and-hold, and markets beaten (from 0.8.5) | every rule at most +5 points and 14 of 20 |
 | D1 | the one-year table, in band on all four cells | every band in |
 
 On pt-v19, C4a reads −0.187 with a Roll spread 5.0 times the quoted one,
@@ -177,7 +177,7 @@ report.
 
 The hosted service's report card shows no realism statistics of its own.
 Its one count is the long-run verdict, "passes all 15 of its long-run
-checks", which is the long-run criteria as 0.8.x records them; with a 0.9.0
+checks", which is the long-run criteria as records up to 0.8.1 hold them; with a 0.8.5
 record the same line counts 17. The hosted preset list quotes the
 fixed-roster panel and the two-year panel: "all 15 checks over one year and
 all 14 over two". Both use the word "checks" for different sets; the names
