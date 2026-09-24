@@ -725,9 +725,10 @@ def _committed_curve():
     import json
     from pathlib import Path
 
-    path = Path(__file__).resolve().parent.parent / "decay-curve-504.json"
+    path = (Path(__file__).resolve().parent.parent / "measurements"
+            / "decay-curve-504.json")
     assert path.exists(), (
-        f"{path.name} is missing from the repository root. tradefloor.dev's "
+        f"{path.name} is missing from measurements/. tradefloor.dev's "
         "realism-metrics page cites it as the source of REAL_DECAY and "
         "REAL_DECAY_SLOPE, and nothing else in the library carries lags 2 "
         "and 3 of the real curve."
