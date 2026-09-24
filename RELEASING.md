@@ -38,6 +38,9 @@ PRIVATE `simoncoombes/tradefloor-docs` repo now, along with every
 rendered page that prints the version. Bump it there, rebuild, and
 push that repo as part of the same release pass.
 
+The BibTeX entry in the README's "Citing tradefloor" section carries the
+version too, with the preset beside it, so bump the version in both places.
+
 `CITATION.cff` carries two fields, not one: `version:` and `date-released:`,
 the day the version was tagged. A version without the date it shipped is half
 a citation.
@@ -640,6 +643,36 @@ one still 404s after ten minutes, the build failed and the crate page says why.
   what the site needs. Check it serves: `curl -sI https://tradefloor.dev/`.
 - Submit the sitemap in Search Console if the page set changed. Google
   removed the ping endpoint in 2024, so it is a manual step.
+
+## DOI (Zenodo)
+
+`.zenodo.json` is the metadata Zenodo's GitHub integration reads when a
+GitHub release is published. Zenodo then mints a DOI for that release, and
+one concept DOI that always resolves to the newest. It reads `.zenodo.json`
+before `CITATION.cff`, so keep the two saying the same thing. It takes the
+version from the release tag, which is why `.zenodo.json` has no
+`version` field.
+
+Switching it on is the owner's job, once, in the owner's own accounts:
+
+1. Sign in at https://zenodo.org with "Log in with GitHub" and allow the
+   Zenodo app to see the repositories.
+2. Open the GitHub page of the Zenodo account settings
+   (https://zenodo.org/account/settings/github/), press "Sync now", and
+   switch `simoncoombes/tradefloor` on.
+3. Merge the branch that adds `.zenodo.json` before the next release.
+   Zenodo archives only releases published after the switch, and only a
+   published GitHub release (not a bare tag or a draft) triggers it. The
+   release workflow already publishes one per tag.
+4. After that release, open the new record on Zenodo and check the title,
+   author and licence. Copy the concept DOI.
+5. Put the concept DOI in `CITATION.cff` (`doi:`), in the README's "Citing
+   tradefloor" section in place of the placeholder, and on the docs site's
+   Install page.
+
+A release published before the switch gets no DOI, so the first DOI is
+the next release's. If 0.8.1 needs one, its source archive can be uploaded
+to Zenodo by hand.
 
 ## Past failures and their checks
 

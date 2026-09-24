@@ -1,26 +1,29 @@
 # Citation metadata for tradefloor, in Citation File Format 1.2.0.
 # https://citation-file-format.github.io/
 #
-# NO DOI YET. A DOI is deliberately absent rather than invented: the fields
-# `doi:` and `identifiers:` are left out until the repository is deposited to
-# Zenodo, which mints one per release and one concept DOI for the project as a
-# whole. That deposit is the next step for citability, and when it happens the
-# `doi:` field and a `date-released:` for the tagged version belong here.
+# NO DOI YET. A DOI is deliberately absent rather than invented. `.zenodo.json`
+# beside this file is ready for Zenodo's GitHub integration, which mints one
+# DOI per GitHub release and one concept DOI for the project as a whole. The
+# owner switches that integration on (RELEASING.md, "DOI (Zenodo)"). When the
+# first DOI exists, add the concept DOI here as `doi:`, and keep
+# `.zenodo.json` and this file saying the same thing: Zenodo reads
+# `.zenodo.json` first.
 #
 # `version:` tracks the `version` field in pyproject.toml, and
 # `date-released:` is the day that version was tagged. Both move together at
 # a release; a version without the date it shipped is half a citation.
 #
-# A citation identifies the software. It does not identify a RUN. Reproducing a
-# published result needs four more things: the seed, the universe fingerprint
-# and how it was built, the macro initial conditions, and the order log. The
-# package version and preset name come from the citation itself. All five are
-# at https://tradefloor.dev/citing.html. That page is the reference now: the
-# `docs/` tree this comment used to name left the repository with the
-# documentation site at 0.5.0.
+# A citation identifies the software. It does not identify a model or a RUN.
+# Name the preset beside the version (for example pt-v19): results depend on
+# it, and the default preset has changed between minor releases. Reproducing
+# a published result needs four more things: the seed, the universe
+# fingerprint and how it was built, the macro initial conditions, and the
+# order log. `RunManifest` records them. The model itself is specified in
+# docs/MODEL.md, and docs/SUPPORT.md says which release lines are supported
+# and for how long.
 
 cff-version: 1.2.0
-message: "If you use this software, please cite it using these metadata."
+message: "If you use this software, please cite it using these metadata, and name the model preset you used (for example pt-v19)."
 title: tradefloor
 abstract: >-
   A deterministic market simulator with a real limit order book. A Rust core
