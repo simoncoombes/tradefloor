@@ -527,6 +527,41 @@ pub struct ModelParams {
     /// the same draws, and its book fills do not move the maker's
     /// inventory. A switch. See `market::tick`, the settlement phase.
     pub closing_auction: f64,
+    /// The 10-year Treasury yield's daily noise, in percentage points. 0.03,
+    /// which every preset through pt-v19 carries, is the literal that stood:
+    /// with the pull toward the policy rate it gives a daily change of about
+    /// 3.1 bp against the tape's 5.4 (FRED DGS10, 2015-2025; design
+    /// repository programme/results/ptv20/real_rates.py).
+    pub treasury_10y_noise: f64,
+    /// The 2-year Treasury yield's own daily noise, in percentage points.
+    /// 0.0, which every preset through pt-v19 carries, keeps the 2-year the
+    /// formula `0.85 policy rate + 0.15 10-year`, which between meetings
+    /// moves by 0.15 of the 10-year's noise: 0.46 bp a session against the
+    /// tape's 5.2 (FRED DGS2, 2015-2025). Off zero the 2-year is its own
+    /// process, pulled toward the formula at the 10-year's rate (0.05 a
+    /// session), with this noise; one more normal on the economy stream,
+    /// taken only under the dial.
+    pub treasury_2y_noise: f64,
+    /// The flight to quality's size: percentage points of 10-year yield per
+    /// per cent of index return, down with the market when inflation is
+    /// under 3 per cent and up when it is over 4. 0.02, which every preset
+    /// through pt-v19 carries, is the literal that stood.
+    pub flight_to_quality_gain: f64,
+    /// Which return the flight to quality reads. 0.0, which every preset
+    /// through pt-v19 carries, reads the PREVIOUS session's closing-minute
+    /// return behind a 0.5 per cent gate, which that return never crosses,
+    /// so the rule never fires and the curve carries no stock-bond
+    /// correlation (tape: -0.16 for Treasuries, +0.27 for IG corporates,
+    /// 2015-2025). 1.0 reads THIS session's index return, with no gate. A
+    /// switch.
+    pub flight_to_quality_day: f64,
+    /// Whether the corporate yield moves between central-bank meetings.
+    /// 0.0, which every preset through pt-v19 carries, writes it only at a
+    /// meeting, so fair value's discount rate and an IG bond priced off it
+    /// sit still for six weeks at a time. 1.0 moves it every session by the
+    /// 10-year's move plus the meeting formula's VIX slope on the session's
+    /// VIX change; the next meeting re-anchors the level. A switch.
+    pub corporate_yield_daily: f64,
     /// The share of each IDIOSYNCRATIC shock that moves the name's fair
     /// value for good rather than its mispricing. 0.0, which every preset
     /// through pt-v19 carries, sends the whole shock to `s`, so every
@@ -4816,6 +4851,11 @@ impl ModelParams {
             news_quote_revision: 0.0,
             quote_model_weight: 0.0,
             closing_auction: 0.0,
+            treasury_10y_noise: 0.03,
+            treasury_2y_noise: 0.0,
+            flight_to_quality_gain: 0.02,
+            flight_to_quality_day: 0.0,
+            corporate_yield_daily: 0.0,
             fair_value_news_share: 0.0,
             fair_value_market_share: 0.0,
             opening_mispricing_sigma: 0.0,
@@ -6949,6 +6989,11 @@ impl ModelParams {
             "news_quote_revision" => self.news_quote_revision,
             "quote_model_weight" => self.quote_model_weight,
             "closing_auction" => self.closing_auction,
+            "treasury_10y_noise" => self.treasury_10y_noise,
+            "treasury_2y_noise" => self.treasury_2y_noise,
+            "flight_to_quality_gain" => self.flight_to_quality_gain,
+            "flight_to_quality_day" => self.flight_to_quality_day,
+            "corporate_yield_daily" => self.corporate_yield_daily,
             "fair_value_news_share" => self.fair_value_news_share,
             "fair_value_market_share" => self.fair_value_market_share,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
@@ -7170,6 +7215,11 @@ impl ModelParams {
             "news_quote_revision" => out.news_quote_revision = value,
             "quote_model_weight" => out.quote_model_weight = value,
             "closing_auction" => out.closing_auction = value,
+            "treasury_10y_noise" => out.treasury_10y_noise = value,
+            "treasury_2y_noise" => out.treasury_2y_noise = value,
+            "flight_to_quality_gain" => out.flight_to_quality_gain = value,
+            "flight_to_quality_day" => out.flight_to_quality_day = value,
+            "corporate_yield_daily" => out.corporate_yield_daily = value,
             "fair_value_news_share" => out.fair_value_news_share = value,
             "fair_value_market_share" => out.fair_value_market_share = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
@@ -7441,10 +7491,20 @@ impl ModelParams {
                           ("fed_liftoff_rule", self.fed_liftoff_rule),
                           ("market_pe_buybacks", self.market_pe_buybacks),
                           ("news_quote_revision", self.news_quote_revision),
-                          ("closing_auction", self.closing_auction)] {
+                          ("closing_auction", self.closing_auction),
+                          ("flight_to_quality_day", self.flight_to_quality_day),
+                          ("corporate_yield_daily", self.corporate_yield_daily)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!(
                     "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
+            }
+        }
+        for (name, v, hi) in [("treasury_10y_noise", self.treasury_10y_noise, 0.5),
+                              ("treasury_2y_noise", self.treasury_2y_noise, 0.5),
+                              ("flight_to_quality_gain", self.flight_to_quality_gain, 0.5)] {
+            if !(v >= 0.0 && v <= hi) {
+                return Err(format!(
+                    "{name} is {v}. It is in percentage points of yield, in [0, {hi}]."));
             }
         }
         if !(self.cascade_gain >= 0.0 && self.cascade_gain <= 1.0) {
@@ -7870,6 +7930,11 @@ pub fn settable_names() -> Vec<&'static str> {
         "news_quote_revision",
         "quote_model_weight",
         "closing_auction",
+        "treasury_10y_noise",
+        "treasury_2y_noise",
+        "flight_to_quality_gain",
+        "flight_to_quality_day",
+        "corporate_yield_daily",
         "fair_value_news_share",
         "fair_value_market_share",
         "opening_mispricing_sigma",

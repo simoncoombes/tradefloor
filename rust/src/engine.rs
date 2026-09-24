@@ -3609,6 +3609,7 @@ impl Engine {
         // `apply_jumps` has already run, so the jumps are in `price`.
         let market_day_return_pct = if self.params.vix_return_source == 0.0
             && self.params.vix_level_identity == 0.0
+            && self.params.flight_to_quality_day == 0.0
         {
             0.0
         } else {
@@ -3772,6 +3773,13 @@ impl Engine {
                 oil_seasonality_target: self.params.oil_seasonality_target,
                 trough_growth_floor: self.params.trough_growth_floor,
                 phase_target_range_draw: self.params.phase_target_range_draw,
+                yields: crate::economy::daily::YieldDials {
+                    treasury_10y_noise: self.params.treasury_10y_noise,
+                    treasury_2y_noise: self.params.treasury_2y_noise,
+                    flight_to_quality_gain: self.params.flight_to_quality_gain,
+                    flight_to_quality_day: self.params.flight_to_quality_day,
+                    corporate_yield_daily: self.params.corporate_yield_daily,
+                },
                 volatility: request.volatility,
                 active_shocks: request.active_shocks,
                 market_return_pct: request.market_return_pct,
