@@ -1,5 +1,68 @@
 # Changelog
 
+## Unreleased
+
+**What 0.8.0 changed and its release note left out.** Read this if you keep
+state saved under 0.7.x.
+
+**Preset identities are checked.** `ModelParams.from_preset` refuses an
+override that breaks an identity pt-v19 claims about its own dials, so
+`from_preset(garch_alpha=0.07)`, which worked on 0.7.x, raises on the
+default. `ModelParams.from_preset_unchecked` skips that check and
+`ModelParams.identity_breaks` lists what breaks.
+
+**Saved 0.7.x state is refused.** `Checkpoint.resume` and
+`RunManifest.reproduce` refuse anything written under 0.7.x, whatever preset
+it names, because the era digest they compare runs the default preset.
+`Engine.restore_state` refuses a 0.7.x snapshot, because the engine now has
+ten random streams where it had eight.
+
+**Hashes and names move.** `state_hash` covers 13 more snapshot fields under
+the same `state/1` label, so the same prices hash differently. A
+`custom-XXXXXXXX` fingerprint hashes every `to_dict()` entry, and 0.8.0 added
+48 settable dials, so a custom name does not carry across releases.
+
+**Replays check the preset.** A transcript whose recorded preset differs from
+the running one raises `ReplayMiss` naming both. Recordings made before 0.8.0
+carry no preset and replay with a warning.
+
+**Bands take a basis.** `envelope.score`, `envelope.certified`,
+`facts.compare_to_real_markets` and `facts.report` take a `basis` argument
+that defaults to `ruled`, the 1987-2025 bands. 0.7.x graded on the 2015-2025
+table, so a verdict or a count taken there can differ from one taken now.
+
+**New public API.** `tf.crisis_epicentre_solve`, `Engine.noise_split` and
+`Engine.crisis_episode`.
+
+<!-- release-note-ends -->
+
+### Text corrections after 0.8.0
+
+No coefficient, default or trajectory moves, and the known-answer digest
+stays at `1e683b96`.
+
+`envelope`'s decay curve, slope and memory lag are re-measured on the
+fifth composition of pt-v19: the slope reads -0.515 +/- 0.109 against the
+-0.859 of the 2026-09-14 vector, and `MEMORY_VALID_TO_LAG` moves from 12 to
+20. The `scenario-magnitude` gap now says what the driven 2020-21 window
+measures on pt-v19, a response about a fifth of real AAPL's with a return
+spread 1.10x real, where it described pt-v10 and pt-v12. The
+`roster-concentration` gap carries pt-v19's roster measurement, which holds
+every graded shape row at both horizons. `check` reports the 504-day count
+on the default band basis first.
+
+The `interventions.TARGETS` notes are re-measured on pt-v19: `qe_pe_boost`
+moves nothing on pt-v16 and later, a policy-rate move reaches fair value
+within days, and weaker growth lowers prices. The MCP attribution note
+counts ten factors. Comments that said the crisis epicentre is off on every
+shipped preset now name pt-v19 as the one that ships it. The `loss` and
+`atlas` docstrings, `measurements/README.md`, the re-measurement report
+header and the `ModelParams` field summaries the parameter table reads are
+brought up to date, and the `crisis_blend_source` description no longer sits
+on `crisis_blend_gain`. `ModelParams.identity_breaks` says that it checks the
+default preset's claims unless it is given the preset a vector was built
+from.
+
 ## 0.8.0
 
 **The default preset moves to pt-v19.** A run that did not name a preset
