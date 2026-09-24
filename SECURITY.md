@@ -8,8 +8,8 @@ versions, and they receive no fixes.
 
 | version | supported |
 |---|---|
-| 0.6.x | yes |
-| 0.5.x and earlier | no, and published forever |
+| 0.8.x | yes |
+| 0.7.x and earlier | no, and published forever |
 
 ## Reporting a vulnerability
 
