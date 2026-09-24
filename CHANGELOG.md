@@ -15,7 +15,9 @@ fills on every tick of the session, so one order counted 65 times and agents
 were marked to their own impact.
 
 `Universe.random(n, bonds=True)` adds three simulated rate indices priced off
-the engine's curve (`UST2Y`, `UST10Y` and `IGCORP`). `docs/MODEL.md` states
+the engine's curve (`UST2Y`, `UST10Y` and `IGCORP`). The packaged
+`recession` and `liquidity_crisis` are recalibrated to 2008 and March 2020.
+`docs/MODEL.md` states
 the model as equations, and `docs/STATISTICS.md` names the statistic sets
 behind every count the site quotes.
 
@@ -293,6 +295,33 @@ faster than 2%, which happened to one of the twenty published suite markets
 under pt-v20. A run that worked before gives the same result: the change only
 lets through runs that used to fail. `tests/test_suite_markets.py` runs all
 twenty markets on pt-v19 and pt-v20.
+
+### Two packaged scenarios recalibrated
+
+The owner's decision, from the design repo's
+`programme/ptv20-scenario-size.md`, measured on pt-v20 on the certified
+roster, each figure paired against the same seed with no scenario, seeds
+301 to 330 (box ptv20g3).
+
+`recession.yml` holds growth at -2 per cent rather than shifting it three
+points, triples the VIX for sixty days where it went x1.5, widens credit 150
+basis points as before, and cuts every company's earnings 40 per cent over
+four quarters, holds them two and restores them over four. The index is
+-44.7 per cent at 120 sessions, the depth of 2008 (-45 from Lehman to March
+2009), where the old file read -5.8 on pt-v19 and -28.7 on pt-v20.
+
+`liquidity_crisis.yml` takes the VIX x3.5 where it went x2.0 and cuts
+earnings 15 per cent over two months, back over four, with depth and credit
+as before. The index is -10.0 per cent at 21 sessions and -33.9 at worst,
+against March 2020's -28.8 and -33.9, where the old file read -1.5 at 21
+sessions. The model prices a company off its current earnings with no
+forward-looking valuation, so it cannot fall as fast as March 2020 did, and
+each file says so. The fingerprints are `sha256:ba41a923...` and
+`sha256:7d8c8cc8...`. `rate_shock.yml` keeps its shocks and its fingerprint.
+
+The earnings shocks write through `Engine.set_fundamentals`, which the order
+log did not record, so a `RunManifest` of such a run failed its own digest.
+The log now carries the write as `set_fundamentals`, and replay restores it.
 
 ### The model specification and the support policy
 
