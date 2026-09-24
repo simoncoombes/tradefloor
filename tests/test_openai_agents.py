@@ -1600,3 +1600,86 @@ def test_the_brief_names_no_ground_truth_and_no_arm():
         "is usually the funding cap, and an agent told to size against the "
         "wrong limit is refused at a limit nothing pointed it at. That cost "
         "a live recording an order.")
+
+
+# -- one bridge loop, against the real SDK client -----------------------------
+
+
+def _local_chat_completions_server():
+    """An HTTP/1.1 keep-alive server that answers every chat completion
+    with "ok". Keep-alive is the point: the client's pooled connection is
+    what binds it to the loop that opened it."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("content-length", 0)))
+            body = json.dumps({
+                "id": "c", "object": "chat.completion", "created": 0,
+                "model": "m",
+                "choices": [{"index": 0, "finish_reason": "stop",
+                             "message": {"role": "assistant",
+                                         "content": "ok"}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1,
+                          "total_tokens": 2}}).encode()
+            self.send_response(200)
+            self.send_header("content-type", "application/json")
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def test_the_sdks_client_survives_consecutive_decisions():
+    """The live re-record of 2026-09-24 recorded 3 of 5 decisions on every
+    attempt: "Event loop is closed" at steps 6 and 18. The SDK's client
+    holds a connection pool bound to the loop that first used it, and the
+    bridge gave every call a fresh loop and closed it.
+
+    Reproduced here with the real SDK and a real ``AsyncOpenAI`` client
+    against a local server, no network and no key: one ``asyncio.run`` per
+    call fails the second call, and ``run_sync``, one loop per process,
+    passes all three."""
+    import asyncio
+
+    agents = pytest.importorskip("agents")
+    openai = pytest.importorskip("openai")
+    server = _local_chat_completions_server()
+    try:
+        def agent():
+            client = openai.AsyncOpenAI(
+                base_url=f"http://127.0.0.1:{server.server_port}/v1",
+                api_key="not-a-key")
+            model = agents.OpenAIChatCompletionsModel(
+                model="m", openai_client=client)
+            return agents.Agent(name="probe", instructions="x", model=model)
+
+        config = agents.RunConfig(tracing_disabled=True)
+
+        fresh, outcomes = agent(), []
+        for _ in range(3):
+            try:
+                outcomes.append(asyncio.run(agents.Runner.run(
+                    fresh, "hi", run_config=config)).final_output)
+            except RuntimeError as exc:
+                outcomes.append(str(exc))
+        assert outcomes[0] == "ok"
+        assert "Event loop is closed" in outcomes, (
+            "the fresh-loop control no longer fails; this test would pass "
+            "without the bridge doing anything")
+
+        bridged = agent()
+        assert [ci.run_sync(agents.Runner.run(bridged, "hi",
+                                              run_config=config)).final_output
+                for _ in range(3)] == ["ok", "ok", "ok"]
+    finally:
+        server.shutdown()
