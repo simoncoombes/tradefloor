@@ -1,37 +1,27 @@
 # Changelog
 
-## Unreleased
+## 0.8.1
 
-**What 0.8.0 changed and its release note left out.** Read this if you keep
-state saved under 0.7.x.
+**Text only.** No coefficient, default or trajectory changes, and the
+known-answer digest stays at `1e683b96`. The README, the `envelope` gap notes
+and `check()` messages, the scenario target notes and the parameter summaries
+now describe pt-v19. `check()` accepts and refuses the same questions.
 
-**Preset identities are checked.** `ModelParams.from_preset` refuses an
-override that breaks an identity pt-v19 claims about its own dials, so
-`from_preset(garch_alpha=0.07)`, which worked on 0.7.x, raises on the
-default. `ModelParams.from_preset_unchecked` skips that check and
-`ModelParams.identity_breaks` lists what breaks.
-
-**Saved 0.7.x state is refused.** `Checkpoint.resume` and
-`RunManifest.reproduce` refuse anything written under 0.7.x, whatever preset
-it names, because the era digest they compare runs the default preset.
-`Engine.restore_state` refuses a 0.7.x snapshot, because the engine now has
-ten random streams where it had eight.
-
-**Hashes and names move.** `state_hash` covers 13 more snapshot fields under
-the same `state/1` label, so the same prices hash differently. A
-`custom-XXXXXXXX` fingerprint hashes every `to_dict()` entry, and 0.8.0 added
-48 settable dials, so a custom name does not carry across releases.
-
-**Replays check the preset.** A transcript whose recorded preset differs from
-the running one raises `ReplayMiss` naming both. Recordings made before 0.8.0
-carry no preset and replay with a warning.
-
-**Bands take a basis.** `envelope.score`, `envelope.certified`,
-`facts.compare_to_real_markets` and `facts.report` take a `basis` argument
-that defaults to `ruled`, the 1987-2025 bands. 0.7.x graded on the 2015-2025
-table, so a verdict or a count taken there can differ from one taken now.
-
-**New public API.** `tf.crisis_epicentre_solve`, `Engine.noise_split` and
+**What 0.8.0 changed and its note left out**, if you keep state saved under
+0.7.x. `ModelParams.from_preset` refuses an override that breaks an identity
+pt-v19 claims, so `from_preset(garch_alpha=0.07)` now raises.
+`from_preset_unchecked` skips the check and `identity_breaks` lists what
+breaks. `Checkpoint.resume` and `RunManifest.reproduce` refuse anything
+written under 0.7.x, and `Engine.restore_state` refuses a 0.7.x snapshot,
+because the engine now has ten random streams where it had eight.
+`state_hash` covers 13 more snapshot fields, so the same prices hash
+differently. A `custom-XXXXXXXX` fingerprint covers every `to_dict()` entry,
+and 0.8.0 added 48 settable dials, so custom names do not carry across. A
+transcript recorded under a different preset raises `ReplayMiss`.
+`envelope.score`, `envelope.certified`, `facts.compare_to_real_markets` and
+`facts.report` take a `basis` argument that defaults to `ruled`, the
+1987-2025 bands, where 0.7.x graded on 2015-2025. New public API:
+`tf.crisis_epicentre_solve`, `Engine.noise_split` and
 `Engine.crisis_episode`.
 
 <!-- release-note-ends -->
