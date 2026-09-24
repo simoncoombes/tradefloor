@@ -212,6 +212,16 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: `macro_calendar_days_per_year` and `macro_compound_days_per_year` left
 #: when pt-v19's fifth composition moved all three off pt-v1.
 POST_BASELINE = {
+    "earnings_cycle_half_life":
+        "added for pt-v20 (2026-09-24) with the aggregate earnings cycle: "
+        "how fast earnings reach the phase's level. Unread while "
+        "`earnings_cycle_depth` is 0.0, as it ships through pt-v19; LIVE on "
+        "pt-v20, which ships the default 60 sessions unsearched",
+    "earnings_cycle_sigma":
+        "added for pt-v20 (2026-09-24) with the aggregate earnings cycle: "
+        "the level's own daily noise. Unread while `earnings_cycle_depth` "
+        "is 0.0, as it ships through pt-v19; LIVE on pt-v20, where 0.0 is "
+        "a choice (the phase path alone)",
     "fair_value_market_share":
         "added for pt-v20 (2026-09-24) beside `fair_value_news_share`: the "
         "share of MARKET-WIDE shocks that moves fair value for good. Every "
@@ -368,19 +378,6 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
-    # The aggregate earnings cycle (2026-09-24, pt-v20). Inert at depth 0.0
-    # on every preset: the step and the multiplier are branches not taken.
-    # The calibration boxes choose pt-v20's values, which then move to
-    # DIAL_PROVENANCE. (The book's seven dials left for pt-v20's entries.)
-    "earnings_cycle_depth":
-        "inert at 0.0 as shipped: no level is kept and no draw taken "
-        "(engine.rs, the macro step). Not yet adopted",
-    "earnings_cycle_upside":
-        "unread while `earnings_cycle_depth` is 0.0, as it ships on every preset",
-    "earnings_cycle_half_life":
-        "unread while `earnings_cycle_depth` is 0.0, as it ships on every preset",
-    "earnings_cycle_sigma":
-        "unread while `earnings_cycle_depth` is 0.0, as it ships on every preset",
     # RETURNED TO 0.0 BY THE FIFTH COMPOSITION (2026-09-23). pt-v19 carried
     # the excursion form for two days with a derivation this table held;
     # the entry is in this file as of the composition commit (4d8f9cf) and
@@ -3938,6 +3935,71 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                     "(tape +0.27, SPY against LQD)"},
         "source": "programme/results/ptv20/ (design repository)",
         "date": "2026-09-24",
+    },
+    "earnings_cycle_depth": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.35},
+        "source": "programme/results/ptv20/grid-e4.txt and box-e4/ (design "
+                  "repository), box ptv20e4",
+        "date": "2026-09-24",
+        "script": "programme/results/ptv20/grid_table.py over longrun.py's "
+                  "report, 90 pooled histories (seeds 101-130, 401-430, "
+                  "701-730), 21 years each",
+        "estimator": "row B9, the sd of annual index log returns over "
+                     "non-overlapping 252-session blocks, years 2-21, "
+                     "pooled, against the S&P 500's 17.4 (1990-2024), "
+                     "among the arms that keep every long-run row in its "
+                     "band. Depth 0 reads 11.7; 0.25, 0.30 and 0.35 read "
+                     "14.6, 15.4 and 16.4 at pt-v19's transient shocks, "
+                     "and 0.35 reads 16.8 with the market factor at 0.85 "
+                     "and market jumps at half rate, the arm shipped. "
+                     "Deeper moves B3 out first",
+        # The bar: B9's real value carries a bootstrap se of 2.8 points over
+        # calendar years, and the pooled reading moves about 20 points per
+        # unit of depth, so the depth the tape pins is +/- 0.14.
+        "standard_error": 0.14,
+        "residual": -0.6,
+        "estimate": 0.35,
+    },
+    "earnings_cycle_upside": {
+        "kind": "derived",
+        "presets": {"pt-v20": 0.09},
+        "identity": "upside = q / (1 - q), where q is the share of the cycle "
+                    "spent in contraction and trough, so the pull toward "
+                    "-depth there and +depth * upside elsewhere averages to "
+                    "zero and the cycle moves earnings around the nominal-"
+                    "output path without shifting it",
+        "terms": {"q = 9 / 108": "contraction plus trough, 9.0 months of a "
+                                 "108-month cycle, the US phase table's "
+                                 "targets (rust/src/economy/state.rs, "
+                                 "us_phase_characteristics; NBER 1990-2025)",
+                  "9 / 99 = 0.0909": "rounded to 0.09"},
+        "source": "rust/src/economy/state.rs, us_phase_characteristics",
+    },
+    "earnings_cycle_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v16": 60.0, "pt-v18": 60.0, "pt-v19": 60.0,
+                    "pt-v20": 60.0},
+        "what_would_determine_it": "the lag of S&P earnings behind the NBER "
+                                   "turning points in Shiller's monthly "
+                                   "series, read as the half-life of a pull "
+                                   "toward the phase's level. The co-tune "
+                                   "grid held it at the default; the "
+                                   "calibration box ptv20e1 found the market "
+                                   "mispricing's half-life at 40 or 90 did "
+                                   "not help B9, and this one was not "
+                                   "searched. Unread on pt-v16 to pt-v19",
+    },
+    "earnings_cycle_sigma": {
+        "kind": "undetermined",
+        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0,
+                    "pt-v20": 0.0},
+        "what_would_determine_it": "the within-phase sd of twelve-month "
+                                   "earnings growth in Shiller's series "
+                                   "once the phase means are taken out. "
+                                   "0.0 takes no draw, so the cycle moves "
+                                   "earnings only through the phase path. "
+                                   "Unread on pt-v16 to pt-v19",
     },
     "cascade_gain": {
         "kind": "measured",

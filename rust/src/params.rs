@@ -6891,6 +6891,18 @@ impl ModelParams {
     /// `treasury_2y_noise`, `flight_to_quality_day` and `_gain`,
     /// `corporate_yield_daily` and `treasury_10y_noise` fix all three.
     ///
+    /// THE MARKET'S YEARS. Every market-wide move was mispricing and
+    /// reverted on the 60-day half-life, so the index's year-to-year spread
+    /// was 11.7 per cent against a real 17.4. `earnings_cycle_depth` and
+    /// `_upside` give aggregate earnings a cycle that falls in a contraction
+    /// and recovers in an expansion, and `market_factor_sigma` and
+    /// `jump_intensity_market` take the transient part down by as much.
+    ///
+    /// A LIMIT. The model's inflation almost never leaves the under-3-per-
+    /// cent regime, so stocks and Treasuries are always in flight to
+    /// quality: their correlation matches the 2015-24 pooled figure, not the
+    /// positive one of an inflation regime such as 2022's.
+    ///
     /// THE DAILY CONTINUATION. With the tape honest, the stop and squeeze
     /// ladders were the largest daily momentum left in the model price;
     /// `cascade_gain` scales them to the certified forty's daily
@@ -6928,6 +6940,19 @@ impl ModelParams {
         p.book_refill_half_life = 27.0;
         p.book_resting = 1.0;
         p.fill_impact_coefficient = 0.314;
+        // The market's variance, moved from transient to lasting (the
+        // co-tune grid, box ptv20e4, 90 pooled histories). An aggregate
+        // earnings cycle a third deep in a contraction and 9 per cent up in
+        // an expansion, against Shiller's reported earnings around the NBER
+        // recessions (median fall 17 per cent, 2 to 54 per cent), gives the
+        // index its real year-to-year spread; the market factor's daily
+        // shock at 0.85 of pt-v19's and market jumps at half their rate take
+        // out the transient variance the cycle adds, so the mispricing's
+        // share of index variance stays in its band.
+        p.earnings_cycle_depth = 0.35;
+        p.earnings_cycle_upside = 0.09;
+        p.market_factor_sigma = 0.006454071;
+        p.jump_intensity_market = 0.02828766685;
         p
     }
 
