@@ -550,3 +550,72 @@ def test_a_forked_arms_log_holds_the_shared_history_exactly_once():
     assert len(control.order_log) > before
     assert control.order_log[:before] == world.order_log
     assert len(shock.order_log) == before, "the arms are not independent"
+
+
+# ---------------------------------------------------------------------------
+# Forking a world that holds the shipped reference agents
+# ---------------------------------------------------------------------------
+
+
+def _every_reference_agent() -> dict:
+    """The five reference agents, and the spec-built random and oracle at
+    daily cadence, whose wrapper deep-copies the agent inside it."""
+    agents = dict(tf.baselines.reference_agents(seed=3))
+    agents["random_daily"] = tf.StrategySpec.random(seed=5, cadence="daily").build()
+    agents["oracle_daily"] = tf.StrategySpec.oracle(cadence="daily").build()
+    return agents
+
+
+def test_a_world_holding_every_reference_agent_forks_and_replays_identically():
+    """Found by the hosted app: `World.fork` falls back to `copy.deepcopy`
+    for an agent with no `fork()`, and until 0.9.0 two of the five
+    reference agents could not be copied. The random baseline holds a
+    `GameRng` and the Oracle holds the engine it last read; both raised,
+    so a world holding either could not be forked at all.
+
+    Now both have `fork()`, and a `GameRng` copies at its position. Two
+    arms forked after two days and run three more are the same market to
+    the bit, and each is the market a world that never forked reaches
+    in five: every trace row, every agent's net worth and every price."""
+    universe = tf.Universe.random(12, seed=7)
+    world = World(seed=SEED, universe=universe, agents=_every_reference_agent())
+    world.run(days=2)
+    a, b = world.fork("a", "b")
+    a.run(days=3)
+    b.run(days=3)
+    assert a.digest() == b.digest()
+    assert a.trace == b.trace
+
+    straight = World(seed=SEED, universe=universe,
+                     agents=_every_reference_agent())
+    straight.run(days=5)
+    assert a.trace == straight.trace
+    assert a.engine.prices() == straight.engine.prices()
+    # Non-vacuity: every agent traded, the random ones included, so the
+    # copied generators were drawn from on both sides of the fork.
+    for label, portfolio in a.portfolios.items():
+        assert portfolio.fills, f"{label} never traded"
+
+
+def test_a_forked_random_baseline_draws_what_the_original_would_draw():
+    """The generator is copied at its position, and the two copies are
+    independent: drawing from one does not move the other."""
+    agent = tf.baselines.RandomTrader(seed=11)
+    for _ in range(7):
+        agent.rng.next_float()
+    agent.rng.next_normal()          # leaves a Box-Muller spare behind
+    twin = agent.fork()
+    ahead = [agent.rng.next_normal() for _ in range(3)]
+    assert [twin.rng.next_normal() for _ in range(3)] == ahead
+    assert copy.deepcopy(agent).rng.next_float() == agent.rng.next_float()
+
+
+def test_a_forked_oracle_forgets_the_engine_it_was_reading():
+    world = World(seed=SEED, universe=tf.Universe.random(8, seed=7),
+                  agent=tf.baselines.Oracle())
+    world.run(days=1)
+    assert world.agent._engine is world.engine
+    (arm,) = world.fork("arm")
+    assert arm.agent._engine is None
+    arm.run(days=1)
+    assert arm.agent._engine is arm.engine

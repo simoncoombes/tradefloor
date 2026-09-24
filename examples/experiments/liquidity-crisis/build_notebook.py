@@ -44,6 +44,13 @@ def C(text, alt=None):
 M("""
 # Will a financial AI agent reduce risk in a market crisis?
 
+> **Measured under the 0.8.x harness.** Every number on this page comes from
+> FinRobot runs recorded before 0.9.0, when Tradefloor counted an agent's own
+> orders on every minute of a step instead of once. From 0.9.0 the prices
+> after the first trade differ, so these recordings no longer replay past the
+> first decision, and the results below have not been re-measured. Re-recording
+> the study is a listed follow-up.
+
 This runs [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot)
 inside [Tradefloor](https://tradefloor.dev), copies the market it is
 trading, and drops a liquidity crisis on one copy.

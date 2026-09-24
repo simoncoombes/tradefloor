@@ -118,8 +118,9 @@ not move rather than two fills at the top of the book.
 ``test_externality.py`` pins it.
 
 The cohort's whole footprint reaches the market once, as the merged
-``fills`` of that step's session, on its first tick, so an agent meets another's trading
-from the next step on and never inside the step it happened. Order priority
+``fills`` of that step's session, on its first tick, so an agent meets
+another's trading from the next step on and never inside the step it
+happened. Order priority
 within a step is a queue this engine does not run, and a cohort does not
 introduce one.
 

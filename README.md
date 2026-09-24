@@ -140,10 +140,12 @@ lists every target and what each one reaches.
 
 ## Realism
 
-tradefloor checks its market against real ones. `tf.facts.measure()` measures
-19 statistics of a simulated market, such as volatility, fat tails, how much
-stocks move together and how far the VIX jumps after a fall. It compares each
-one with the range real markets show. On the default preset, `pt-v19`, every
+tradefloor checks its market against real ones. A one-year realism table
+grades 19 statistics of a simulated market, such as volatility, fat tails, how
+much stocks move together and how far the VIX jumps after a fall.
+`tf.facts.measure()` reads 18 of them and `tf.facts.crisis_statistics()` the
+nineteenth, and each is compared with the range real markets show. On the
+default preset, `pt-v19`, every
 statistic is inside its real range at one year, and every one that can be read
 at two years is inside too. The check runs 30 random seeds and is repeated on
 a second, held-out set of companies. The statistic furthest from real is how
@@ -156,16 +158,25 @@ falls 1 percent or more, the VIX rises a median 1.9 points against a real 2.7,
 and on a 3 percent fall it rises 5.4 against 5.7. The index falls 3 percent or
 more on 1.14 percent of days, against 1.21 percent in real markets.
 
-pt-v19 also passes a long-run check. It runs the market for 21 years, 30 times
-over, and replays 2008 and 2020 with the real VIX. Fifteen things a user would
-notice are compared with real markets: how deep crashes go, how long fear
-lasts, how often the VIX is above 30 or below 15, how many bear markets and
-corrections a decade brings, the long-run return, and whether a headline read
-late still pays. pt-v19 passes all fifteen. pt-v18, the previous default,
-passes eight. In the 2008 replay the market falls 41 percent against the real
-57, the VIX is above 30 on 8.1 percent of days against a real 8.2, and the
-index returns 6.3 percent a year over 21 years. The result ships with the
-package as `tf.preset_record()["long_run"]`.
+pt-v19 also takes a long-run check of 17 criteria. It runs the market for 21
+years, 30 times over, and replays 2008 and 2020 with the real VIX. Fifteen
+criteria compare what a user would notice with real markets: how deep crashes
+go, how long fear lasts, how often the VIX is above 30 or below 15, how many
+bear markets and corrections a decade brings, the long-run return, and whether
+a headline read late still pays. pt-v19 passes all fifteen. pt-v18, the
+previous default, passes eight. In the 2008 replay the market falls 41 percent
+against the real 57, the VIX is above 30 on 8.1 percent of days against a real
+8.2, and the index returns 6.3 percent a year over 21 years.
+
+The other two ask whether a rule that reads only prices can find an edge real
+markets do not have, and pt-v19 fails both. Hour-to-hour returns reverse too
+much: the lag-1 autocorrelation of 65-minute returns is -0.19, where the
+spreads real large caps quote imply about zero. So on the published suite of
+20 markets, a
+mean-reversion rule that trades every 65 minutes beats buy-and-hold in 18 of
+them, by a median 13.6 points in 60 days, and five-day momentum beats it in 17,
+by 7.1 points. The next preset is meant to fix both. The verdicts ship with
+the package as `tf.preset_record()["long_run"]`.
 
 Three things are still off. The worst month of the 2020 replay is about 30
 percent milder than the real one. Over two years the VIX forgets a shock a

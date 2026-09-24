@@ -8,18 +8,25 @@ Measured on this build, with the reference agents over
 ``Universe.random(30, seed=11)``, ten days, sim seeds 0 through 11:
 
     pooled capture over 12 seeds        per-seed range      wins
-        momentum         +0.773       [+0.007, +2.834]      9/12
-        buy_and_hold     +0.081       [-0.621, +0.592]      0/12
-        mean_reversion   -0.010       [-1.863, +0.980]      3/12
-        random           -0.037       [-0.305, +0.138]      0/12
+        buy_and_hold     +0.095       [-0.776, +0.836]      9/12
+        mean_reversion   -0.075       [-0.464, +0.273]      3/12
+        random           -0.337       [-0.625, -0.248]      0/12
+        momentum         -0.950       [-1.336, -0.477]      0/12
+
+Until 0.9.0 this table was led by mean reversion at +0.947, winning 11 of
+12. That lead was the harness: an agent's fills were held on every tick of
+the step, so an agent that trades a lot was marked to many times its own
+impact. With the fills applied once, nothing that sees only prices keeps
+much of what the Oracle earns over ten days, and the winner is the agent
+that trades least.
 
 **A single seed names the pooled leader nine times in twelve here, and still
 misreports the verdict.** The case for many seeds is not that one seed picks
-the wrong winner, since it usually does not. It is that one seed cannot say what
-the winner is WORTH: momentum's own capture runs from +0.007 to +2.834
-depending only on which market it drew, from a rounding error above nothing
-to nearly triple the Oracle, and that range is printed next to the verdict for
-exactly that reason.
+the wrong winner, since it usually does not. It is that one seed cannot say
+what the winner is WORTH: buy-and-hold's own capture runs from -0.776 to
++0.836 depending only on which market it drew, from losing three quarters of
+what the Oracle made to keeping most of it, and that range is printed next
+to the verdict for exactly that reason.
 
 So a leaderboard from one call to `evaluate` is a measurement of the seed at
 least as much as of the agents, and anything built on it (a benchmark, a
@@ -28,23 +35,25 @@ that.
 
 ## And the aggregate can overstate too, so `separation` exists
 
-That gap does NOT establish that momentum is the better agent. Paired across
-the same twelve markets, momentum beats mean-reversion on nine and loses on
-three: `p = 0.15`, no separation worth the name. Momentum wins by MORE when
-it wins; it does not win often enough for twelve paired trials to call the
-ordering real, and no aggregate of returns can tell those apart.
+That gap does NOT establish that buy-and-hold is the better agent. Paired
+across the same twelve markets, buy-and-hold beats mean reversion on nine and
+loses on three: `p = 0.15`, no separation worth the name. It wins more often
+than it loses; twelve paired trials cannot call the ordering real, and no
+aggregate of returns can tell those apart.
 
-Against random the same test reads 11 to 1, `p = 0.006`. That is what a real
-difference looks like here, and the contrast is the point: two orderings that
-appear on the same table, one of them meaningless.
+Mean reversion against random reads 10 to 2, `p = 0.039`, and momentum
+against random 0 to 12, `p = 0.0005`, a clean sweep in random's favour. That
+is what a real difference looks like here, and the contrast is the point:
+orderings that appear on the same table, one of them meaningless.
 
 A p-value also carries its seed window with it: the identical
-momentum-versus-mean-reversion test over seeds 12 to 23 reads 10 to 2 at
-`p = 0.039`. Twelve paired seeds is a small experiment, and even a clean
-sweep only reaches p = 0.0005, so one window's p is a single draw of a noisy
-statistic, and the honest quote names the seeds.
+buy-and-hold-versus-mean-reversion test over seeds 12 to 23 reads 4 to 8,
+`p = 0.39`, the other way round, and there mean reversion leads the pooled
+table by a hair (-0.093 against -0.098). Twelve paired seeds is a small
+experiment, and even a clean sweep only reaches p = 0.0005, so one window's p
+is a single draw of a noisy statistic, and the honest quote names the seeds.
 
-Note that even 11 to 1 is not `decisive`. That flag is reserved for a clean
+Note that 10 to 2 is not `decisive`. That flag is reserved for a clean
 sweep, the one verdict that needs no distributional assumption at all. A
 small `p` and a clean sweep are different claims and the result reports both.
 
@@ -55,11 +64,14 @@ version of the single-seed verdict.
 
 A capture ratio divides by what the reference earned in that market, which on
 a short horizon can be almost nothing. Measured at three days on the same
-universe, sim seeds 0-9: the Oracle's per-seed P&L spans $10.6k to $36.8k,
-and against one thin denominator, 1.1% of the $1M book, mean-reversion's
-ratio is **+3.85**. A single value like that drags a median of ten far
-enough to reorder the whole table: ranked by median of ratios, momentum
-drops below buy-and-hold, which the pooled figure reverses.
+universe, sim seeds 0-9: the Oracle's per-seed P&L spans $11.5k to $28.1k,
+and against the thinnest denominator, 1.1% of the $1M book, momentum's ratio
+is **-2.54** and buy-and-hold's +1.00. Values like those drag a median of ten
+far enough to reorder the table: ranked by median of ratios, mean reversion
+(+0.189) goes above buy-and-hold (+0.054), which the pooled figure reverses
+(-0.035 against +0.042). Until 0.9.0, which stopped counting an agent's
+fills on every tick of a step, the same grid read $15.5k to $34.1k and a
+mean-reversion ratio of +1.50 on its best seed.
 
 So the headline sums the numerators and the denominators instead. Each market
 is weighted by the opportunity that actually existed in it, a seed with
@@ -137,9 +149,9 @@ class AgentRecord:
         per-seed ratio divides by whatever the reference happened to earn in
         that market, which on a short horizon can be almost nothing --
         measured at three days on the grid in this module's docstring, a
-        seed where the reference earned 1.1% of capital produced a capture
-        ratio of **+3.85**, and one such seed drags a median of ten far
-        enough to reorder the table.
+        seed where the reference earned 1.1% of capital produced capture
+        ratios of **-2.54** and +1.00, and seeds like it drag a median of
+        ten far enough to reorder the table.
 
         Pooling weights each market by the opportunity that existed in it. A
         seed where nothing was there to earn contributes nearly nothing to the
@@ -220,7 +232,7 @@ class Ranking:
         self.seeds = seeds
         #: What the reference earned on each seed, parallel to ``seeds``. This
         #: is the denominator, and it varies several-fold across seeds --
-        #: measured $10.6k to $36.8k over ten three-day seeds on the grid in
+        #: measured $11.5k to $28.1k over ten three-day seeds on the grid in
         #: this module's docstring -- so the headline number pools rather
         #: than averages ratios.
         self.reference_pnls = reference_pnls

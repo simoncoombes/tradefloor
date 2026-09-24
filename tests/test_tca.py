@@ -161,24 +161,22 @@ def test_an_order_larger_than_the_book_fills_partially_and_says_so():
 SEEDS = (2026, 1, 2, 3, 4, 5, 7, 11)
 
 
-def test_a_round_trip_recoups_its_own_impact():
-    """Buying then selling shows a NEGATIVE shortfall, correctly.
+def test_a_round_trip_does_not_recoup_its_own_impact():
+    """Buying then selling costs on both legs, on every seed.
 
-    The entry pushes the price up, part of that impact persists, and the exit
-    sells into it. The agent really did transact at prices better than the
-    untraded world offered on that leg.
+    Until 0.9.0 this test was `a round trip recoups its own impact`, and it
+    read a NEGATIVE shortfall as correct: the entry pushed the price up, the
+    impact persisted, and the exit sold into it. What persisted was the
+    harness counting the entry's flow on every one of the step's 65 ticks,
+    so the agent sold into 65 times its own impact. Under 0.8.1 the entry
+    cost +96.01 on all eight seeds and the exit recouped on seven, by -59.8
+    to -224.2, for a round trip of -13.5 to +3.8 bp.
 
-    Measured across eight seeds: the entry costs +79.47 on every one of them
-    -- it happens at step 0, before the worlds have had a chance to diverge --
-    and the exit recoups on six, by between -82 and -268.
-
-    Asserted as a MAJORITY rather than on one seed. It was pinned to seed 2026
-    and read "-182.73 exiting, -103.26 net"; when a stepped day was fixed to
-    stop re-opening the market at every step, seed 2026 became one of the two
-    that do not recoup and this test failed while the phenomenon it names was
-    unchanged. A single seed measures the seed.
+    With the fills applied once the entry still costs +96.01 on every seed
+    and the exit costs too, +26.4 to +174.9, so the round trip is +12.7 to
+    +28.8 bp and positive on all eight. How much the exit costs is the
+    market's call; that it costs something is the point.
     """
-    recouped = 0
     for seed in SEEDS:
         held = analyse(BuyOnce(0.01), seed=seed)
         traded = analyse(RoundTrip(0.01), seed=seed)
@@ -187,62 +185,68 @@ def test_a_round_trip_recoups_its_own_impact():
         assert held.shortfall() > 0, f"seed {seed}"
         # The entry leg is the same trade in both, so it costs the same.
         assert traded.by_step()[0][1] == pytest.approx(held.shortfall())
-        if traded.shortfall() < 0:
-            recouped += 1
-    assert recouped >= len(SEEDS) // 2, (
-        f"only {recouped}/{len(SEEDS)} round trips recouped; impact has "
-        "stopped persisting to the exit"
-    )
+        assert traded.shortfall() > held.shortfall() > 0, (
+            f"seed {seed}: the round trip cost {traded.shortfall():.2f}, no "
+            f"more than its entry's {held.shortfall():.2f}; the exit sold "
+            "into impact the entry should not have left")
 
 
-def test_by_step_shows_the_entry_paying_and_the_exit_recouping():
+def test_by_step_shows_both_legs_paying():
     # The netted total hides both halves. This is the accessor that does not.
     #
-    # The entry always pays; the exit recoups on most seeds but not all, so
-    # that half is counted rather than asserted per seed.
-    favourable = 0
+    # Until 0.9.0 it showed the entry paying and the exit recouping on most
+    # seeds, and that recoup was the agent's own impact counted on every
+    # tick of the step. Now both legs pay on every seed.
     for seed in SEEDS:
         execution = analyse(RoundTrip(0.01), seed=seed)
         steps = dict(execution.by_step())
         assert steps[0] > 0, f"seed {seed}: the entry did not cost anything"
+        assert steps[3] > 0, f"seed {seed}: the exit recouped"
         assert sum(steps.values()) == pytest.approx(execution.shortfall())
-        if steps[3] < 0:
-            favourable += 1
-    assert favourable >= len(SEEDS) // 2, (
-        f"the exit leg was favourable on only {favourable}/{len(SEEDS)} seeds"
-    )
 
 
-def test_a_round_trip_leaves_less_lasting_impact_than_holding():
-    # The market substantially recovers once the position is unwound, which
-    # is why the exit had a favourable price to sell into in the first place.
-    #
-    # Asserted as a majority, like the recoup tests above, and for the same
-    # reason: it was pinned to one seed at "< 10% of the held impact" and
-    # the stream-split re-deal moved that seed's residual from under the
-    # threshold to 19% while the phenomenon was unchanged. A single seed
-    # measures the seed. Re-measured across all eight: the round trip's
-    # lasting impact is smaller than holding's on seven (held between 22.9
-    # and 85.6 bps, round trip between -34.6 and +16.1). The exception is
-    # seed 11, where the HELD impact is itself only 10.8 bps -- when the
-    # thing being recovered is small, the nonlinear residual of entering
-    # and exiting can exceed it.
-    smaller = 0
-    for seed in SEEDS:
-        held = analyse(BuyOnce(0.01), seed=seed)
-        traded = analyse(RoundTrip(0.01), seed=seed)
-        ticker = UNIVERSE[0].ticker
-        if abs(traded.impact_bps(ticker)) < abs(held.impact_bps(ticker)):
-            smaller += 1
-    # Two, not one, since the 2026-08-26 era boundary. pt-v10's market is
-    # more volatile than pt-v3's, so the nonlinear residual the comment above
-    # describes exceeds the recovered impact on more seeds: six of eight
-    # rather than seven of eight. The property is a tendency, and the
-    # tolerance is what says so.
-    assert smaller >= len(SEEDS) - 2, (
-        f"a round trip out-impacted holding on {len(SEEDS) - smaller} of "
-        f"{len(SEEDS)} seeds; unwinding has stopped recovering impact"
-    )
+def test_a_round_trip_leaves_no_lasting_information_impact():
+    """The information channel, read where it lives: in `s`.
+
+    Until 0.9.0 this was asserted on the end-of-day print, where a held
+    buy's impact stood well above a round trip's on six of eight seeds
+    (held +34.8 to +76.2 bp, where it was the harness counting the flow
+    on every tick). A 1% buy applied once moves `s` by under a basis point,
+    and the print after a day sits anywhere within the tape's own noise of
+    that: measured on the same eight seeds, held -28.6 to +6.7 bp and
+    round trip -58.0 to +11.5, neither reliably larger. The print cannot
+    carry the claim any more.
+
+    `s` can, exactly. The day's `order_flow_impact` attribution after a
+    held buy is the buy's permanent impact, and after the round trip it is
+    that impact less the sell's, which for the same quantity in the same
+    name is zero to the bit: the imbalance of a sell is the negative of the
+    buy's.
+    """
+    from tradefloor import Engine, Portfolio
+    from tradefloor.harness import session_clock
+    import struct
+
+    def lasting(unwind: bool) -> float:
+        engine = Engine(seed=2026, universe=UNIVERSE)
+        portfolio = Portfolio()
+        ticker = engine.tickers[0]
+        engine.open_market()
+        for step in range(6):
+            if step == 0:
+                portfolio.execute(engine, ticker, 0.01 * UNIVERSE[0].avg_volume)
+            if step == 3 and unwind:
+                portfolio.execute(engine, ticker,
+                                  -portfolio.positions[ticker].quantity)
+            engine.run_session(*session_clock((9, 30, 3), step, 65), 65,
+                               fills=portfolio.pending_flow())
+            portfolio.clear_flow()
+        column = engine.attribution("order_flow_impact")
+        return struct.unpack("<%dd" % (len(column) // 8), column)[0]
+
+    held = lasting(unwind=False)
+    assert held > 0, "the buy left no information impact at all"
+    assert lasting(unwind=True) == 0.0
 
 
 # --------------------------------------------------------------------------

@@ -191,24 +191,35 @@ def test_a_real_difference_separates_and_a_median_gap_may_not(ranking):
     mispricing one, which is much closer to real equities, where momentum is
     a weak and contested effect rather than a free lunch.
 
+    Re-measured at 0.9.0, when an agent's fills stopped being held on every
+    tick of the step, and the pairs changed again. Under 0.8.1 mean
+    reversion led on pooled capture at +0.947 and swept random 12 to 0;
+    that lead was its own impact, collected on every tick. Now the table
+    reads buy-and-hold +0.095, mean reversion -0.075, random -0.337 and
+    momentum -0.950. The strong pair is still mean reversion against
+    random, 10 to 2 at p = 0.039. The weak pair is buy-and-hold against
+    mean reversion: buy-and-hold is ahead on pooled capture and wins 9 of
+    12 paired seeds, p = 0.146, which the sign test does not confirm.
+
     Asserted as the CONTRAST rather than as two fixed p-values, because the
     counts belong to these seeds. What must hold is that the sign test can
     tell the two situations apart at all.
     """
     strong = ranking.separation("mean_reversion", "random")
-    weak = ranking.separation("momentum", "random")
+    weak = ranking.separation("buy_and_hold", "mean_reversion")
     assert strong["p_value"] < 0.05, (
-        f"momentum did not separate from random: {strong}"
+        f"mean reversion did not separate from random: {strong}"
     )
     assert not weak["decisive"]
     assert weak["p_value"] > strong["p_value"], (
-        "the sign test gave mean-reversion-vs-random at least as much "
-        "confidence as momentum-vs-random; it is not discriminating"
+        "the sign test gave buy-and-hold-vs-mean-reversion at least as much "
+        "confidence as mean-reversion-vs-random; it is not discriminating"
     )
     # And the ordering the aggregate suggests is the one the sign test
     # refuses to confirm, and reporting both exists for that.
     table = {r.name: r.pooled_capture for r in ranking.table()}
     assert table["mean_reversion"] > table["random"]
+    assert table["buy_and_hold"] > table["mean_reversion"]
 
 
 def test_separation_is_symmetric_in_its_verdict(ranking):

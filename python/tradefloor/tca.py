@@ -23,7 +23,10 @@ comes from there.
 
 **The information channel.** Order imbalance feeds the factor model as a
 signal, moving the mispricing itself. This one PERSISTS: the book recovers as
-liquidity replenishes, but a shift in `s` is a new level.
+liquidity replenishes, but a shift in `s` is a new level. A step's fills reach
+it once, on the tick after they filled (``fills=`` on ``run_session``); until
+0.9.0 they were held on every tick of the step, which counted each order 65
+times at six steps a day.
 
 The split matters because they decay differently, and every serious execution
 model is built on the distinction. Elsewhere it is fitted from data with
@@ -54,8 +57,16 @@ identical numbers. Measured on this build, with ``analyse`` and a single
 first-step buy of the first name of ``Universe.random(20, seed=7)``, sim
 seed 2026, one six-step day, reading ``impact_bps`` on that name: requests of 20x
 and 100x the average minute volume (498 and 2,490 shares) both fill the
-same 483 shares and land exactly the same 201.52 bps of end-of-run impact.
-The response is linear in what actually fills, not in what you ask for.
+same 483 shares and land exactly the same 74.79 bps of end-of-run impact
+(315.00 under 0.8.1, which held the flow on every tick of the step). The
+response is a function of what actually fills, not of what you ask for.
+
+Most of that 74.79 is not the buy's permanent impact, which moves `s` by
+about 3 bps here. It is the tape: the print chases the model price with a
+gap of tens of basis points, so any change to the model price, however
+small, re-deals where the print sits inside that gap from then on. Read a
+single run's ``impact_bps`` as permanent impact plus that noise, and read
+the permanent part from ``Engine.attribution("order_flow_impact")``.
 
 ## What the number means
 
@@ -68,36 +79,36 @@ shortfall. So does a seller who received less. Reporting a signed difference
 and leaving the reader to work out which direction hurt is how sign errors get
 into published numbers.
 
-## This is an execution measure, not a strategy P&L, and a round trip shows why
+## This is an execution measure, not a strategy P&L
 
 Measured on this build, on the first instrument of ``Universe.random(20,
 seed=7)``, one six-step day, buying 1% of ADV (97 shares) at the first
-step: holding costs **+16.71 bps**, identically on every one of the eight
+step: holding costs **+20.18 bps**, identically on every one of the eight
 suite seeds (2026, 1, 2, 3, 4, 5, 7, 11), because the entry lands at step
 zero, before the two worlds can diverge. Selling the same 97 shares three
-steps later ends anywhere between **-13.25 and +5.76 bps** across those
-seeds, negative on six of the eight, median -8.4. An earlier version of
-this docstring quoted a single round-trip figure (-13.57, at sim seed
-2026, pre-GJR); that same seed now reads +5.76, and the sign genuinely
-flips with the seed, so the seed range is the honest number where the
-entry gets one figure.
+steps later costs again: the round trip ends between **+12.7 and +28.8
+bps** of the notional it traded across those seeds, median +18.0, positive
+on all eight.
 
-Nothing is wrong where the round trip comes back negative. The entry pushed
-the price up, part of that impact persisted, and the exit sold into it. On
-that leg the agent really did transact at prices better than the untraded
-world offered. How much impact survives three steps is the market's call,
-so this is quoted as a range.
+Until 0.9.0 the same round trip came back NEGATIVE on seven of the eight,
+median -6.2 bps, and this docstring called that correct: the entry pushed
+the price up, the impact persisted, and the exit sold into it. What
+persisted was the harness counting the entry's flow on every tick of the
+step, so the exit sold into 65 times the impact the order made. An agent
+cannot sell into more of its own impact than its order causes, and a
+single order's permanent impact is smaller than what the book charges to
+trade it, so a round trip against its own footprint is a cost.
 
-What it means is that shortfall answers "what did each execution cost against a
-market where I never traded", which is the execution desk's question. It does
-not answer "did this strategy make money". For that, read `pnl` from
+Shortfall answers "what did each execution cost against a market where I
+never traded", which is the execution desk's question. It does not answer
+"did this strategy make money". For that, read `pnl` from
 :func:`tradefloor.evaluate`, which marks the portfolio to the market the agent
-actually created. A strategy that round-trips can show a negative shortfall and
-still lose, and the two numbers are not in conflict because they are answers to
-different questions.
+actually created. A strategy can pay a positive shortfall on every trade
+and still profit, from the market's own moves, and the two numbers are not
+in conflict because they are answers to different questions.
 
-Use :meth:`Execution.by_step` when the split matters: it shows the entry paying
-and the exit recouping, rather than one netted figure that hides both.
+Use :meth:`Execution.by_step` when the split matters: it shows each leg's
+cost rather than one netted figure.
 """
 
 from __future__ import annotations
@@ -202,9 +213,10 @@ class Execution:
     def by_step(self) -> list[tuple[int, float]]:
         """Shortfall per decision step, in currency.
 
-        A single netted figure hides the structure that matters: entering
-        pays, and unwinding into your own impact recoups. Both are visible
-        here and neither is visible in the total.
+        A single netted figure hides the structure that matters: what the
+        entry cost and what the exit cost, which differ because the exit
+        trades into a market the entry moved. Both are visible here and
+        neither is visible in the total.
         """
         buckets: dict[int, float] = {}
         for fill in self.fills:
@@ -254,12 +266,19 @@ class Execution:
         afraid of the trading: the fear gauge reacts same-day to the
         cap-weighted market return, VIX sets the shared factor's variance
         target, and the nudge reaches every name's volatility two closes
-        later. Measured on this build, with ``analyse(Momentum(), seed=7,
+        later. Measured under pt-v12, with ``analyse(Momentum(), seed=7,
         universe=Universe.random(60, seed=11), days=10)``, defaults
         otherwise: 57 names traded, and all three it never touched moved,
         by -10.72, +2.00 and +1.97 bps, against a 9.71 bps median
-        ``|impact_bps|`` across the traded names that moved. Read that
-        ordering carefully. The largest ripple is bigger than the median
+        ``|impact_bps|`` across the traded names that moved. Under 0.8.1
+        (pt-v19) the same run traded 54 and five of the six untouched names
+        moved, the largest by -15.82 bps. Since 0.9.0, which applies each
+        step's fills once rather than on every tick of the step, it trades
+        57 and none of the three untouched names moves at all: one agent's
+        flow no longer moves the index far enough to reach the gauge. The
+        channel is still there for flow that does, a standing
+        ``flow_impact`` programme for instance. Read the pt-v12 ordering
+        carefully. The largest ripple was bigger than the median
         direct impact, so this is not a rounding-error channel: on pt-v12
         ``vix_return_source`` is 1.0, so the fear gauge reads the whole
         day's cap-weighted index return rather than the closing minute

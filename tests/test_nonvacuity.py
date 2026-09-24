@@ -282,18 +282,18 @@ def test_replay_can_fail():
 # --------------------------------------------------------------------------
 
 
-def test_shortfall_can_be_both_signs():
+def test_shortfall_is_a_cost_and_is_not_stuck_at_zero():
     """A shortfall stuck at zero would satisfy every loose inequality near it.
 
-    Both directions are reachable, and which one you get is a fact about the
-    trade rather than about the code.
-
-    Measured ACROSS SEEDS rather than on one. This test used to pin seed 2026,
-    where a round trip recouped; it stopped recouping there when a stepped day
-    was fixed to stop re-opening the market at every step, and the test failed
-    while the phenomenon it names was as true as ever -- 6 of 8 seeds still
-    recoup. Pinning one seed pins the seed, which is a lesson this repository
-    has now learned twice.
+    Until 0.9.0 this test was `shortfall can be both signs`: a round trip
+    recouped on 6 of 8 seeds, because the harness held the entry's flow on
+    every tick of the step and the exit sold into an impact the agent had
+    made 65 times over. That was the defect, not the phenomenon. With the
+    fills applied once, a round trip of 1% of daily volume in this name
+    never recoups: measured over sim seeds 0 to 39, its shortfall runs from
+    +5.8 to +432.2, positive on all forty. So what is pinned is that both
+    trades cost something on every seed and that the cost is a reading
+    rather than a constant: the round trip's differs across seeds.
     """
     class Buyer:
         def act(self, obs):
@@ -309,7 +309,7 @@ def test_shortfall_can_be_both_signs():
                 return {ticker: -obs.position(ticker)}
             return {}
 
-    positive = negative = 0
+    round_trips = []
     for seed in (2026, 1, 2, 3, 4, 5, 7, 11):
         held = tradefloor.tca.analyse(Buyer(), seed=seed, universe=UNIVERSE,
                                    days=1, steps_per_day=6)
@@ -318,15 +318,14 @@ def test_shortfall_can_be_both_signs():
         # A one-way buyer always pays: they moved the price and never sold
         # into it. That direction is structural, so it is asserted per seed.
         assert held.shortfall() > 0, f"seed {seed}: a one-way buyer got paid"
-        positive += 1
-        if traded.shortfall() < 0:
-            negative += 1
+        # And so does a round trip now, on every seed: its own impact is not
+        # there to sell into.
+        assert traded.shortfall() > 0, f"seed {seed}: a round trip recouped"
+        round_trips.append(traded.shortfall())
 
-    assert positive, "no positive shortfall observed"
-    assert negative, (
-        "no round trip recouped on any seed -- either impact stopped "
-        "persisting or the exit leg stopped being priced against the "
-        "untraded world"
+    assert len(set(round_trips)) > 1, (
+        "every seed's round trip cost the same; the exit leg is not being "
+        "priced against the untraded world"
     )
 
 
