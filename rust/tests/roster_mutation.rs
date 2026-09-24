@@ -42,6 +42,7 @@ fn company(id: &str, price: f64) -> TickCompany {
             mispricing_s: None,
             mispricing_s_prev_close: None,
             mispricing_momentum: None,
+            fair_value_offset: None,
             maker_inventory: None,
             garch_variance: 0.000625,
             garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],

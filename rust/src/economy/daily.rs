@@ -277,6 +277,45 @@ pub struct DailyInputs<'a> {
     /// shipped behaviour exactly. See
     /// [`crate::params::ModelParams::phase_target_range_draw`].
     pub phase_target_range_draw: f64,
+    /// The yield curve's daily dials (pt-v20). See [`YieldDials`].
+    pub yields: YieldDials,
+}
+
+/// The yield curve's daily step, as dials. [`YieldDials::default`] is the
+/// arithmetic that always stood, bit for bit: the 10-year's 0.03 noise, the
+/// 2-year as the formula of the policy rate and the 10-year, the flight to
+/// quality at 0.02 read off the PREVIOUS day's closing-minute return behind a
+/// 0.5 per cent gate (which that return never crosses, so it never fires),
+/// and the corporate yield moved only at a central-bank meeting.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct YieldDials {
+    /// The 10-year's daily noise, percentage points. See
+    /// [`crate::params::ModelParams::treasury_10y_noise`].
+    pub treasury_10y_noise: f64,
+    /// The 2-year's own daily noise; 0.0 is the formula. See
+    /// [`crate::params::ModelParams::treasury_2y_noise`].
+    pub treasury_2y_noise: f64,
+    /// Percentage points of yield per per cent of index return. See
+    /// [`crate::params::ModelParams::flight_to_quality_gain`].
+    pub flight_to_quality_gain: f64,
+    /// A switch: 1.0 reads the session's own index return. See
+    /// [`crate::params::ModelParams::flight_to_quality_day`].
+    pub flight_to_quality_day: f64,
+    /// A switch: 1.0 moves the corporate yield every session. See
+    /// [`crate::params::ModelParams::corporate_yield_daily`].
+    pub corporate_yield_daily: f64,
+}
+
+impl Default for YieldDials {
+    fn default() -> Self {
+        Self {
+            treasury_10y_noise: 0.03,
+            treasury_2y_noise: 0.0,
+            flight_to_quality_gain: 0.02,
+            flight_to_quality_day: 0.0,
+            corporate_yield_daily: 0.0,
+        }
+    }
 }
 
 impl<'a> Default for DailyInputs<'a> {
@@ -288,6 +327,7 @@ impl<'a> Default for DailyInputs<'a> {
             game_day: 0,
             trough_growth_floor: 0.0,
             phase_target_range_draw: 0.0,
+            yields: YieldDials::default(),
             vix_mean_reversion: VIX_MEAN_REVERSION,
             vix_decay_ratio: 1.0,
             vix_anchor_reversion: 0.0,
@@ -1445,21 +1485,52 @@ pub fn update_economy_daily(
     new_state.treasury_yield_10y = clamp(
         current_10y
             + (fed_rate_for_10y + term_premium_10y - current_10y) * 0.05
-            + random_normal(rng, 0.0, 0.03 * volatility),
+            + random_normal(rng, 0.0, inputs.yields.treasury_10y_noise * volatility),
         0.5,
         12.0,
     );
-    new_state.treasury_yield_2y = fed_rate_for_10y * 0.85 + new_state.treasury_yield_10y * 0.15;
+    // THE 2-YEAR. The formula has no noise of its own: between meetings the
+    // policy rate is flat, so the 2-year moved by 0.15 of the 10-year's
+    // noise, 0.46 bp a session against the tape's 5.2. Off zero it is its
+    // own process, pulled at the 10-year's rate toward the formula, with
+    // its own noise: one more normal on the economy stream, taken only
+    // under the dial.
+    let target_2y = fed_rate_for_10y * 0.85 + new_state.treasury_yield_10y * 0.15;
+    let own_2y = inputs.yields.treasury_2y_noise != 0.0;
+    new_state.treasury_yield_2y = if own_2y {
+        clamp(
+            economy.treasury_yield_2y
+                + (target_2y - economy.treasury_yield_2y) * 0.05
+                + random_normal(rng, 0.0, inputs.yields.treasury_2y_noise * volatility),
+            0.0,
+            12.0,
+        )
+    } else {
+        target_2y
+    };
 
     // Bond-stock correlation regime: inflation sets the sign.
-    let prev_mkt_ret = economy.previous_day_market_return;
-    if prev_mkt_ret.abs() > 0.5 {
+    //
+    // WHICH RETURN, AND WHEN. The shipped rule reads the PREVIOUS session's
+    // closing-minute return behind a 0.5 per cent gate, which that return
+    // never crosses, so the rule has never fired and the curve has no
+    // stock-bond correlation at all. `flight_to_quality_day` 1.0 reads THIS
+    // session's index return (the step runs after the close, so the yield
+    // it writes is the session's own close) with no gate: the relation is
+    // linear in the move.
+    let (prev_mkt_ret, ftq_gate) = if inputs.yields.flight_to_quality_day != 0.0 {
+        (inputs.market_day_return_pct, 0.0)
+    } else {
+        (economy.previous_day_market_return, 0.5)
+    };
+    let ftq_gain = inputs.yields.flight_to_quality_gain;
+    if prev_mkt_ret.abs() > ftq_gate {
         let bond_stock_yield_shift = if economy.inflation_rate > 4.0 {
             // Positive correlation: stocks down, yields up.
-            -prev_mkt_ret * 0.02
+            -prev_mkt_ret * ftq_gain
         } else if economy.inflation_rate < 3.0 {
             // Flight to quality.
-            prev_mkt_ret * 0.02
+            prev_mkt_ret * ftq_gain
         } else {
             0.0
         };
@@ -1468,8 +1539,34 @@ pub fn update_economy_daily(
             0.5,
             12.0,
         );
-        new_state.treasury_yield_2y =
-            new_state.federal_funds_rate * 0.85 + new_state.treasury_yield_10y * 0.15;
+        new_state.treasury_yield_2y = if own_2y {
+            clamp(new_state.treasury_yield_2y + bond_stock_yield_shift, 0.0, 12.0)
+        } else {
+            new_state.federal_funds_rate * 0.85 + new_state.treasury_yield_10y * 0.15
+        };
+    }
+
+    // THE CORPORATE YIELD BETWEEN MEETINGS. It was written only at a
+    // central-bank meeting, so fair value's discount rate, and an IG bond
+    // priced off it, sat still for six weeks at a time. Off zero it moves
+    // every session by the 10-year's move and by the meeting formula's own
+    // VIX slope (2 bp a point, times the cycle phase's multiplier) on the
+    // session's VIX change: increments, so a scenario's write to the level
+    // survives, and the next meeting re-anchors the level to the formula.
+    if inputs.yields.corporate_yield_daily != 0.0 {
+        let cycle_spread_multiplier = match economy.cycle_phase {
+            CyclePhase::Contraction => 2.8,
+            CyclePhase::Trough => 3.5,
+            CyclePhase::Recovery => 1.4,
+            CyclePhase::Peak => 1.1,
+            CyclePhase::Expansion => 1.0,
+        };
+        let moved = (new_state.treasury_yield_10y - economy.treasury_yield_10y)
+            + 0.02 * cycle_spread_multiplier * (new_state.vix - economy.vix);
+        new_state.corporate_bond_yield = mathx::max(
+            economy.corporate_bond_yield + moved,
+            new_state.treasury_yield_10y + crate::economy::central_bank::CORPORATE_SPREAD_FLOOR,
+        );
     }
 
     // ── Fear/greed ────────────────────────────────────────────────────────

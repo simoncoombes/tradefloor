@@ -461,6 +461,17 @@ pub mod stream {
     /// arm takes no draw on any stream a price reads.
     pub const CRISIS_EPICENTRE: u32 = 9;
 
+    /// The opening mispricing: one normal per name, taken once when the
+    /// engine is built and only when `opening_mispricing_sigma` is non-zero.
+    ///
+    /// A ONE-SHOT stream, and that is why it sits outside [`COUNT`]: the
+    /// engine derives it, takes its draws into a vector and drops it, so
+    /// there is no position to snapshot, restore or mark, and no array
+    /// indexed by stream id needs a slot for it. Every other stream is
+    /// untouched at every setting, so every shipped preset reproduces bit
+    /// for bit.
+    pub const OPENING: u32 = 10;
+
     /// How many streams there are. Every array indexed by stream id, the
     /// snapshot's generator and count vectors, the day mark's positions
     /// and the loops that enable, clear or stamp every stream are sized

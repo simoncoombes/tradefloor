@@ -497,6 +497,163 @@ pub struct ModelParams {
     /// revise quotes on a public announcement without waiting for a trade. A
     /// switch. See `market::tick`, the settlement phase.
     pub news_quote_revision: f64,
+    /// Where the market maker centres its book, as a weight on the model
+    /// price. 0.0, which every preset through pt-v19 carries, quotes around
+    /// the last print (moved by the tick's news term when
+    /// `news_quote_revision` is on), so the print chases the model price at
+    /// about a half-spread a tick and the maker's inventory skew carries it
+    /// past: on pt-v19 the print sits about 37 bp (sd) off the model price
+    /// in every liquidity bucket, and 65-minute returns carry a lag-one
+    /// autocorrelation of -0.135 against a Roll spread 5.8x the quoted one
+    /// (design repository, programme/meanrev-edge-ptv19-2026-09-24.md).
+    /// 1.0 quotes around the tick's model price, the way dealers revise
+    /// quotes on every change in the efficient price and not only on a
+    /// headline; in between, the centre is the geometric blend
+    /// `last^(1-w) * model^w`. A weight in [0, 1]. See `market::tick`, the
+    /// settlement phase.
+    pub quote_model_weight: f64,
+    /// Whether the session closes with a cross. 0.0, which every preset
+    /// through pt-v19 carries, closes on the last minute's print: whichever
+    /// side of the book the final tick's flow hit, and at the close the
+    /// intraday volume curve is at its peak, so the flow walks deepest. The
+    /// closing print then sits 14 bp (sd) off the model price on a large
+    /// name of the certified roster and 45 bp on a small one, and that noise
+    /// reverts the next day: a daily Lo-MacKinlay contrarian book earns
+    /// +13 bp a day on the large names from it alone, against the certified
+    /// forty's -1.7 +/- 2.3, whose closes are auction prices (design
+    /// repository, programme/results/ptv20/). 1.0 prints the session's
+    /// final regular tick at the model price, as a closing auction clears at
+    /// the efficient price; the tick's settlement still runs, so it costs
+    /// the same draws, and its book fills do not move the maker's
+    /// inventory. A switch. See `market::tick`, the settlement phase.
+    pub closing_auction: f64,
+    /// The aggregate earnings cycle's depth: the log level every company's
+    /// earnings are pulled toward in a contraction or a trough, beyond what
+    /// nominal output alone gives them. 0.0, which every preset through
+    /// pt-v19 carries, has no cycle: earnings grow with nominal output and a
+    /// recession reaches equities only through rates, credit and fear, so a
+    /// year's index return spread 9 to 12 per cent (sd) against the S&P's
+    /// 17.4, and a replayed crisis left the index a third as far down as the
+    /// real one. S&P reported earnings fell 29, 54, 92 and 33 per cent around
+    /// the 1990, 2001, 2008 and 2020 recessions (Shiller's series; operating
+    /// earnings about 40 in 2008), and their twelve-month log growth has an sd
+    /// of 0.18 over 1950-2023 with the 2008 write-down capped (design
+    /// repository, programme/results/ptv20/shiller_earnings.py).
+    pub earnings_cycle_depth: f64,
+    /// Every other phase's pull toward `+depth * upside`, the share that
+    /// centres the level over a cycle, so the cycle moves earnings around
+    /// the nominal-output path without shifting it. Read only with
+    /// `earnings_cycle_depth` non-zero.
+    pub earnings_cycle_upside: f64,
+    /// Half-life in sessions of the pull toward the phase's level. Read only
+    /// with `earnings_cycle_depth` non-zero.
+    pub earnings_cycle_half_life: f64,
+    /// The daily sd of the earnings level's own noise; 0.0 is the phase path
+    /// alone and takes no draw. Read only with `earnings_cycle_depth`
+    /// non-zero.
+    pub earnings_cycle_sigma: f64,
+    /// The 10-year Treasury yield's daily noise, in percentage points. 0.03,
+    /// which every preset through pt-v19 carries, is the literal that stood:
+    /// with the pull toward the policy rate it gives a daily change of about
+    /// 3.1 bp against the tape's 5.4 (FRED DGS10, 2015-2025; design
+    /// repository programme/results/ptv20/real_rates.py).
+    pub treasury_10y_noise: f64,
+    /// The 2-year Treasury yield's own daily noise, in percentage points.
+    /// 0.0, which every preset through pt-v19 carries, keeps the 2-year the
+    /// formula `0.85 policy rate + 0.15 10-year`, which between meetings
+    /// moves by 0.15 of the 10-year's noise: 0.46 bp a session against the
+    /// tape's 5.2 (FRED DGS2, 2015-2025). Off zero the 2-year is its own
+    /// process, pulled toward the formula at the 10-year's rate (0.05 a
+    /// session), with this noise; one more normal on the economy stream,
+    /// taken only under the dial.
+    pub treasury_2y_noise: f64,
+    /// The flight to quality's size: percentage points of 10-year yield per
+    /// per cent of index return, down with the market when inflation is
+    /// under 3 per cent and up when it is over 4. 0.02, which every preset
+    /// through pt-v19 carries, is the literal that stood.
+    pub flight_to_quality_gain: f64,
+    /// Which return the flight to quality reads. 0.0, which every preset
+    /// through pt-v19 carries, reads the PREVIOUS session's closing-minute
+    /// return behind a 0.5 per cent gate, which that return never crosses,
+    /// so the rule never fires and the curve carries no stock-bond
+    /// correlation (tape: -0.16 for Treasuries, +0.27 for IG corporates,
+    /// 2015-2025). 1.0 reads THIS session's index return, with no gate. A
+    /// switch.
+    pub flight_to_quality_day: f64,
+    /// Whether the corporate yield moves between central-bank meetings.
+    /// 0.0, which every preset through pt-v19 carries, writes it only at a
+    /// meeting, so fair value's discount rate and an IG bond priced off it
+    /// sit still for six weeks at a time. 1.0 moves it every session by the
+    /// 10-year's move plus the meeting formula's VIX slope on the session's
+    /// VIX change; the next meeting re-anchors the level. A switch.
+    pub corporate_yield_daily: f64,
+    /// The share of each IDIOSYNCRATIC shock that moves the name's fair
+    /// value for good rather than its mispricing. 0.0, which every preset
+    /// through pt-v19 carries, sends the whole shock to `s`, so every
+    /// stock-specific move reverts on the mispricing half-life: on pt-v19
+    /// 96% of a name's own daily variance is mispricing, its 60-day
+    /// idiosyncratic variance ratio is 0.51 against the certified forty's
+    /// 0.92, and a value screen on published fundamentals predicts the next
+    /// 20 days with rank IC +0.38 at stationarity against a real one near
+    /// +0.01 (design repository, programme/results/ptv20/).
+    ///
+    /// Off zero, a share `psi` of the name's own shocks -- the idiosyncratic
+    /// and sector draws of the tick's noise, the news that names the
+    /// company, a peer or its sector, and the company's own jump at the
+    /// close -- lands in a per-name log fair-value level `v`
+    /// (`TickStock::fair_value_offset`) and `1 - psi` in `s`. The
+    /// price moves by the whole shock on impact either way; what changes is
+    /// how much of it later reverts. `v` scales the published fundamentals
+    /// (earnings and book) the valuation reads, so the market P/E and the
+    /// buyback yield read the same earnings the price does, and it carries
+    /// an Ito term so `E[exp(v)]` stays one and the index's expected return
+    /// does not move. Market and sector shocks stay in `s`. In [0, 1].
+    pub fair_value_news_share: f64,
+    /// The share of each MARKET-WIDE shock that moves fair value for good:
+    /// the name's loading on the market factor's draw, market-wide news and
+    /// the market jump. 0.0, which every preset through pt-v19 carries,
+    /// sends them to `s`, whose pull reverts every market move on the
+    /// mispricing half-life: on pt-v19 the index's calendar-year returns
+    /// spread 11.4 per cent (sd) against the S&P's 17.4 at the same daily
+    /// volatility, a 20 per cent bear market recovers in 158 sessions
+    /// against the tape's 670, and a replayed crisis leaves the index a
+    /// third as far down at the window's end as the real one did (design
+    /// repository, programme/results/ptv20/). Off zero, that share joins the
+    /// name's fair-value level, as the stock-level share does. In [0, 1].
+    pub fair_value_market_share: f64,
+    /// The cross-sectional sd of the opening mispricing. 0.0, which every
+    /// preset through pt-v19 carries, adopts the whole day-zero premium of
+    /// price over fair value as `s`: on a generated roster that premium is
+    /// the P/E scatter, sd about 0.32 against a stationary `s` of about
+    /// 0.06, so every name drifts toward fair value in a known direction
+    /// for months (the value screen's rank IC in a market's first 60 days
+    /// is +0.75 on pt-v19, and a 5-day momentum rule earns +10% there).
+    ///
+    /// Off zero, the opening `s` is the roster's cap-weighted premium (so
+    /// the index opens with the mispricing it always had) plus a draw of
+    /// this sd per name, re-centred to cap-weighted zero, and the rest of
+    /// each name's premium is its opening fair-value level `v`: the
+    /// published fundamentals are a noisy read of fair value, not a
+    /// statement that the price is wrong. The draw is one normal per name
+    /// on its own stream (`rng::stream::OPENING`), taken when the engine is
+    /// built, so no other stream moves.
+    pub opening_mispricing_sigma: f64,
+    /// The sd of the common level of the opening mispricing: the market's
+    /// own opening premium. 0.0, which every preset through pt-v19 carries,
+    /// is the roster's cap-weighted day-zero premium of price over fair
+    /// value (under `opening_mispricing_sigma`; without it every name adopts
+    /// its whole premium, which comes to the same index). A generated roster
+    /// opens its index that far from fair value by construction -- +0.11 on
+    /// the certified roster, -0.33 to +0.30 on the suite's 20-name rosters
+    /// -- and the index then reverts on the mispricing half-life: a drift of
+    /// up to 30 per cent in the first months with nothing happening, and a
+    /// certified year one of +2 per cent against the tape's +10.
+    ///
+    /// Off zero, the common level is a draw at this sd, the market opening
+    /// at a point of its own stationary mispricing; the rest of each name's
+    /// premium is its fair-value level. One more normal on
+    /// `rng::stream::OPENING`, after the per-name draws.
+    pub opening_market_sigma: f64,
     /// Market-shock magnitude, in baseline sigmas, above which the crash
     /// amplifier fires (§5.4 promotion).
     pub crash_amplifier_threshold: f64,
@@ -2798,6 +2955,20 @@ pub struct ModelParams {
     /// Whether these literals should become parameters at all is an open
     /// question for the era's owner rather than something settled here.
     pub cascade_symmetry: f64,
+    /// A scale on the whole forced-flow term: the short squeeze and both
+    /// stop ladders ([`ModelParams::cascade_symmetry`]). 1.0, which every
+    /// preset through pt-v19 carries, is the ladder as it stands; 0.0
+    /// switches it off.
+    ///
+    /// The term reacts to the name's own previous day (a stop cascade after
+    /// any fall of 2.5 per cent, a buy cascade on a heavily shorted rally),
+    /// so it is a next-day continuation in the model price. With the tape
+    /// following the model price (`quote_model_weight`) it is the largest
+    /// daily momentum left in it: on pt-v19's certified roster it carries
+    /// about -18 bp a day of a Lo-MacKinlay one-day contrarian book's -23
+    /// (design repository, programme/results/ptv20/), against the certified
+    /// forty's -1.7 +/- 2.3.
+    pub cascade_gain: f64,
     /// Persistence of the slow variance component (Engle-Lee style). The
     /// market factor's variance carries two timescales from the pt-v4 era:
     /// the fast one above tracks the VIX-scaled target, this one carries
@@ -3474,7 +3645,7 @@ pub struct ModelParams {
 
     /// Latent depth behind the maker's ladder: `Y` in the square-root law.
     ///
-    /// 0.0, every shipped preset, is no depth past the maker's ten levels,
+    /// 0.0, which every preset through pt-v19 carries, is no depth past the maker's ten levels,
     /// so an order larger than the ladder fills what the ladder holds and
     /// drops the rest (whole-book depth is 2.6 to 5% of daily volume per
     /// side). Off zero, levels are appended behind the ladder out to
@@ -3508,7 +3679,7 @@ pub struct ModelParams {
     pub book_depth_reach: f64,
     /// Whether agents consume the book they share. A switch.
     ///
-    /// 0.0, every shipped preset: an agent's order is priced against the
+    /// 0.0, which every preset through pt-v19 carries: an agent's order is priced against the
     /// book and removes nothing from it (`Portfolio.execute` reads
     /// `sweep_cost`), so two agents buying the same name in one step fill
     /// at the same price against the same levels, and the maker's
@@ -3535,7 +3706,7 @@ pub struct ModelParams {
     pub book_refill_half_life: f64,
     /// Whether an agent's limit order rests IN the book. A switch.
     ///
-    /// 0.0, every shipped preset: an unfilled limit waits outside the book
+    /// 0.0, which every preset through pt-v19 carries: an unfilled limit waits outside the book
     /// and fills in full at its limit when a later print reaches it, the
     /// traded-range convention the hosted service has always used. It takes
     /// no queue, meets no flow, and no other agent can trade against it.
@@ -3551,7 +3722,7 @@ pub struct ModelParams {
     /// `ds = gamma * sigma * (bought - sold) / V`, applied to the name's
     /// mispricing `s` once, on the first tick after the fills.
     ///
-    /// 0.0, every shipped preset, sends fills through the order-imbalance
+    /// 0.0, which every preset through pt-v19 carries, sends fills through the order-imbalance
     /// law the model's standing flow uses (`order_flow_impact`), which is
     /// concave and floored: a one-share order carries the imbalance floor
     /// of 0.2, worth up to 0.9 bp of `s` in the thinnest names, so a
@@ -4563,6 +4734,11 @@ pub const PT_V18: ModelParams = ModelParams::pt_v18();
 /// `DEFAULT_PRESET_NAME` names it and `Engine::default_model` returns it,
 /// and the test at the bottom of this file asserts the two agree.
 pub const PT_V19: ModelParams = ModelParams::pt_v19();
+/// pt-v19 with a tape that follows the model price, a closing cross, the
+/// stock- and sector-specific part of every shock moved into fair value, a
+/// stationary opening and a smaller stop ladder -- see
+/// [`ModelParams::pt_v20`]. Selectable and NOT the default.
+pub const PT_V20: ModelParams = ModelParams::pt_v20();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -4697,6 +4873,7 @@ impl ModelParams {
             buyback_payout_share: 0.0,
             jump_mean_compensated: 0.0,
             cascade_symmetry: 0.0,
+            cascade_gain: 1.0,
             // Legacy values: the slow component is OFF, and the update
             // reduces to the single-component form bit for bit.
             market_vol_slow_persistence: 0.0,
@@ -4799,6 +4976,21 @@ impl ModelParams {
             news_absorption_drift_share: 0.0,
             news_absorption_drift_half_life: 0.0,
             news_quote_revision: 0.0,
+            quote_model_weight: 0.0,
+            closing_auction: 0.0,
+            earnings_cycle_depth: 0.0,
+            earnings_cycle_upside: 0.0,
+            earnings_cycle_half_life: 60.0,
+            earnings_cycle_sigma: 0.0,
+            treasury_10y_noise: 0.03,
+            treasury_2y_noise: 0.0,
+            flight_to_quality_gain: 0.02,
+            flight_to_quality_day: 0.0,
+            corporate_yield_daily: 0.0,
+            fair_value_news_share: 0.0,
+            fair_value_market_share: 0.0,
+            opening_mispricing_sigma: 0.0,
+            opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
             book_depth_exponent: 0.0,
             book_depth_reach: 0.0,
@@ -6659,6 +6851,122 @@ impl ModelParams {
         p
     }
 
+    /// pt-v19 with the market-behaviour faults the mean-reversion
+    /// investigation found fixed (design repository,
+    /// programme/meanrev-edge-ptv19-2026-09-24.md; the composition, the
+    /// registered rows and the grade are programme/ptv20-*.md). Selectable
+    /// and NOT the default: composing it moves no digest.
+    ///
+    /// # What it changes, and why
+    ///
+    /// THE TAPE. The maker quoted around the last print, so the print chased
+    /// the model price and the inventory skew carried it past: 65-minute
+    /// returns carried a lag-one autocorrelation of -0.135 and a Roll spread
+    /// 5.8x the quoted one, and a one-step reversal rule beat buy-and-hold
+    /// after costs in 8 markets of 8. `quote_model_weight` 1.0 centres the
+    /// book on the model price every tick; `closing_auction` 1.0 prints the
+    /// session's last tick at the model price, as a closing cross does, so
+    /// the close-to-close return carries no bid-ask bounce.
+    ///
+    /// THE CROSS-SECTION. 96 per cent of a name's own daily variance was
+    /// mispricing and none of it fair value, so every stock-specific move
+    /// reverted on the 60-day half-life: a value screen on published
+    /// fundamentals ranked the next 20 days at IC +0.38 (+0.75 in a market's
+    /// first 60 days) against a real +0.01, and 12-1 momentum ran at -0.17
+    /// against a real +0.03. `fair_value_news_share` 1.0 moves the whole
+    /// stock- and sector-specific part of every shock into the name's fair
+    /// value; the mispricing keeps the market-wide part. The published
+    /// fundamentals do not move, so they are a noisy read of fair value.
+    /// `opening_mispricing_sigma` opens each name's mispricing at the model's
+    /// stationary spread instead of the whole day-zero premium, and
+    /// `opening_market_sigma` opens the market's common level at a draw from
+    /// its own stationary spread instead of the roster's cap-weighted
+    /// premium, which drifted a 20-name suite market by up to 30 per cent in
+    /// its first months with nothing happening.
+    ///
+    /// THE CURVE. The 2-year had no noise of its own (0.85 policy + 0.15
+    /// 10-year), the flight to quality read a closing minute behind a gate it
+    /// never crossed, and the corporate yield moved only at meetings, so the
+    /// bonds priced off the curve were quiet and uncorrelated with stocks.
+    /// `treasury_2y_noise`, `flight_to_quality_day` and `_gain`,
+    /// `corporate_yield_daily` and `treasury_10y_noise` fix all three.
+    ///
+    /// THE MARKET'S YEARS. Every market-wide move was mispricing and
+    /// reverted on the 60-day half-life, so the index's year-to-year spread
+    /// was 11.7 per cent against a real 17.4. `earnings_cycle_depth` and
+    /// `_upside` give aggregate earnings a cycle that falls in a contraction
+    /// and recovers in an expansion, and `market_factor_sigma` and
+    /// `jump_intensity_market` take the transient part down by as much.
+    /// With less market noise a name's volume tracks its own move more
+    /// tightly, so `volume_move_response` 0.8 keeps that tie inside the
+    /// certified band.
+    ///
+    /// A LIMIT. The model's inflation almost never leaves the under-3-per-
+    /// cent regime, so stocks and Treasuries are always in flight to
+    /// quality: their correlation matches the 2015-24 pooled figure, not the
+    /// positive one of an inflation regime such as 2022's.
+    ///
+    /// THE DAILY CONTINUATION. With the tape honest, the stop and squeeze
+    /// ladders were the largest daily momentum left in the model price;
+    /// `cascade_gain` scales them to the certified forty's daily
+    /// Lo-MacKinlay reading.
+    ///
+    /// Every value, its derivation or measurement, and the residual it
+    /// leaves, is in `python/tradefloor/provenance.py`.
+    pub const fn pt_v20() -> ModelParams {
+        let mut p = ModelParams::pt_v19();
+        p.quote_model_weight = 1.0;
+        p.closing_auction = 1.0;
+        p.fair_value_news_share = 1.0;
+        p.opening_mispricing_sigma = 0.016;
+        p.opening_market_sigma = 0.10;
+        p.cascade_gain = 0.1;
+        // The yield curve (2026-09-24, for the bonds this release prices off
+        // it): the 2-year its own process, the flight to quality reading the
+        // session's return, the corporate yield moving between meetings, and
+        // the 10-year's noise trimmed because its meeting-day moves already
+        // carry most of its variance.
+        p.treasury_10y_noise = 0.025;
+        p.treasury_2y_noise = 0.022;
+        p.flight_to_quality_gain = 0.008;
+        p.flight_to_quality_day = 1.0;
+        p.corporate_yield_daily = 1.0;
+        // The agent-facing book (feature/order-book-depth, E4): size walks a
+        // latent book to the square-root law and pays for it, agents rest
+        // orders and meet each other, and an agent's fill leaves Almgren's
+        // linear permanent impact. Read only on an agent's path, so no
+        // untraded statistic moves with any of them.
+        p.book_depth_coefficient = 0.75;
+        p.book_depth_exponent = 0.5;
+        p.book_depth_reach = 1.0;
+        p.book_shared = 1.0;
+        p.book_refill_half_life = 27.0;
+        p.book_resting = 1.0;
+        p.fill_impact_coefficient = 0.314;
+        // The market's variance, moved from transient to lasting (the
+        // co-tune grid, box ptv20e4, 90 pooled histories). An aggregate
+        // earnings cycle a third deep in a contraction and 9 per cent up in
+        // an expansion, against Shiller's reported earnings around the NBER
+        // recessions (median fall 17 per cent, 2 to 54 per cent), gives the
+        // index its real year-to-year spread; the market factor's daily
+        // shock at 0.85 of pt-v19's and market jumps at half their rate take
+        // out the transient variance the cycle adds, so the mispricing's
+        // share of index variance stays in its band.
+        p.earnings_cycle_depth = 0.35;
+        p.earnings_cycle_upside = 0.09;
+        p.market_factor_sigma = 0.006454071;
+        p.jump_intensity_market = 0.02828766685;
+        // With less transient market noise, the common volume multiplier is
+        // a smaller share of a name's volume, which then tracks its own move
+        // more tightly: the 504-session certification panel's
+        // `volume_abs_return_corr` read 0.639 against the band's 0.63 (box
+        // ptv20g2). The same-day response to a move at 0.8 puts it at 0.618,
+        // and the other three cells stay in (design repository,
+        // programme/results/ptv20/d1screen.py).
+        p.volume_move_response = 0.8;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -6691,6 +6999,7 @@ impl ModelParams {
             "pt-v16" => Some(PT_V16),
             "pt-v18" => Some(PT_V18),
             "pt-v19" => Some(PT_V19),
+            "pt-v20" => Some(PT_V20),
             _ => None,
         }
     }
@@ -6699,7 +7008,7 @@ impl ModelParams {
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
           "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15",
-          "pt-v16", "pt-v18", "pt-v19"]
+          "pt-v16", "pt-v18", "pt-v19", "pt-v20"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -6798,6 +7107,7 @@ impl ModelParams {
             "buyback_payout_share" => self.buyback_payout_share,
             "jump_mean_compensated" => self.jump_mean_compensated,
             "cascade_symmetry" => self.cascade_symmetry,
+            "cascade_gain" => self.cascade_gain,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
@@ -6880,6 +7190,21 @@ impl ModelParams {
             "news_absorption_drift_share" => self.news_absorption_drift_share,
             "news_absorption_drift_half_life" => self.news_absorption_drift_half_life,
             "news_quote_revision" => self.news_quote_revision,
+            "quote_model_weight" => self.quote_model_weight,
+            "closing_auction" => self.closing_auction,
+            "earnings_cycle_depth" => self.earnings_cycle_depth,
+            "earnings_cycle_upside" => self.earnings_cycle_upside,
+            "earnings_cycle_half_life" => self.earnings_cycle_half_life,
+            "earnings_cycle_sigma" => self.earnings_cycle_sigma,
+            "treasury_10y_noise" => self.treasury_10y_noise,
+            "treasury_2y_noise" => self.treasury_2y_noise,
+            "flight_to_quality_gain" => self.flight_to_quality_gain,
+            "flight_to_quality_day" => self.flight_to_quality_day,
+            "corporate_yield_daily" => self.corporate_yield_daily,
+            "fair_value_news_share" => self.fair_value_news_share,
+            "fair_value_market_share" => self.fair_value_market_share,
+            "opening_mispricing_sigma" => self.opening_mispricing_sigma,
+            "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
             "book_depth_exponent" => self.book_depth_exponent,
             "book_depth_reach" => self.book_depth_reach,
@@ -7019,6 +7344,7 @@ impl ModelParams {
             "buyback_payout_share" => out.buyback_payout_share = value,
             "jump_mean_compensated" => out.jump_mean_compensated = value,
             "cascade_symmetry" => out.cascade_symmetry = value,
+            "cascade_gain" => out.cascade_gain = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
@@ -7101,6 +7427,21 @@ impl ModelParams {
             "news_absorption_drift_share" => out.news_absorption_drift_share = value,
             "news_absorption_drift_half_life" => out.news_absorption_drift_half_life = value,
             "news_quote_revision" => out.news_quote_revision = value,
+            "quote_model_weight" => out.quote_model_weight = value,
+            "closing_auction" => out.closing_auction = value,
+            "earnings_cycle_depth" => out.earnings_cycle_depth = value,
+            "earnings_cycle_upside" => out.earnings_cycle_upside = value,
+            "earnings_cycle_half_life" => out.earnings_cycle_half_life = value,
+            "earnings_cycle_sigma" => out.earnings_cycle_sigma = value,
+            "treasury_10y_noise" => out.treasury_10y_noise = value,
+            "treasury_2y_noise" => out.treasury_2y_noise = value,
+            "flight_to_quality_gain" => out.flight_to_quality_gain = value,
+            "flight_to_quality_day" => out.flight_to_quality_day = value,
+            "corporate_yield_daily" => out.corporate_yield_daily = value,
+            "fair_value_news_share" => out.fair_value_news_share = value,
+            "fair_value_market_share" => out.fair_value_market_share = value,
+            "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
+            "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
             "book_depth_exponent" => out.book_depth_exponent = value,
             "book_depth_reach" => out.book_depth_reach = value,
@@ -7431,12 +7772,68 @@ impl ModelParams {
                           ("fed_liftoff_rule", self.fed_liftoff_rule),
                           ("market_pe_buybacks", self.market_pe_buybacks),
                           ("news_quote_revision", self.news_quote_revision),
+                          ("closing_auction", self.closing_auction),
+                          ("flight_to_quality_day", self.flight_to_quality_day),
+                          ("corporate_yield_daily", self.corporate_yield_daily),
                           ("book_shared", self.book_shared),
                           ("book_resting", self.book_resting)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!(
                     "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
             }
+        }
+        for (name, v, hi) in [("treasury_10y_noise", self.treasury_10y_noise, 0.5),
+                              ("treasury_2y_noise", self.treasury_2y_noise, 0.5),
+                              ("flight_to_quality_gain", self.flight_to_quality_gain, 0.5)] {
+            if !(v >= 0.0 && v <= hi) {
+                return Err(format!(
+                    "{name} is {v}. It is in percentage points of yield, in [0, {hi}]."));
+            }
+        }
+        if !(self.earnings_cycle_depth >= 0.0 && self.earnings_cycle_depth <= 1.5) {
+            return Err(format!(
+                "earnings_cycle_depth is {}. It is a log level in [0, 1.5]; 0.0 is no cycle.",
+                self.earnings_cycle_depth));
+        }
+        if !(self.earnings_cycle_upside >= 0.0 && self.earnings_cycle_upside <= 1.0) {
+            return Err(format!(
+                "earnings_cycle_upside is {}. It is a share of the depth, in [0, 1].",
+                self.earnings_cycle_upside));
+        }
+        if !(self.earnings_cycle_half_life >= 1.0 && self.earnings_cycle_half_life <= 2520.0) {
+            return Err(format!(
+                "earnings_cycle_half_life is {}. It is a half-life in sessions, in [1, 2520].",
+                self.earnings_cycle_half_life));
+        }
+        if !(self.earnings_cycle_sigma >= 0.0 && self.earnings_cycle_sigma <= 0.05) {
+            return Err(format!(
+                "earnings_cycle_sigma is {}. It is a daily sd, in [0, 0.05].",
+                self.earnings_cycle_sigma));
+        }
+        if !(self.cascade_gain >= 0.0 && self.cascade_gain <= 1.0) {
+            return Err(format!(
+                "cascade_gain is {}. It scales the squeeze and stop ladders, in [0, 1]; \
+                 1.0 as shipped.", self.cascade_gain));
+        }
+        for (name, v) in [("quote_model_weight", self.quote_model_weight),
+                          ("fair_value_news_share", self.fair_value_news_share),
+                          ("fair_value_market_share", self.fair_value_market_share)] {
+            if !(v >= 0.0 && v <= 1.0) {
+                return Err(format!(
+                    "{name} is {v}. It is a weight in [0, 1]; 0.0 as shipped."));
+            }
+        }
+        if !(self.opening_market_sigma >= 0.0 && self.opening_market_sigma <= 0.9) {
+            return Err(format!(
+                "opening_market_sigma is {}. It is the sd of the market's opening \
+                 mispricing, in [0, 0.9]; 0.0 keeps the roster's own premium, as shipped.",
+                self.opening_market_sigma));
+        }
+        if !(self.opening_mispricing_sigma >= 0.0 && self.opening_mispricing_sigma <= 0.9) {
+            return Err(format!(
+                "opening_mispricing_sigma is {}. It is the sd of the opening mispricing, \
+                 in [0, 0.9]; 0.0 adopts the whole day-zero premium, as shipped.",
+                self.opening_mispricing_sigma));
         }
         for (name, v) in [("news_absorption_half_life", self.news_absorption_half_life),
                           ("news_absorption_drift_half_life",
@@ -7725,6 +8122,7 @@ pub fn claims_of(preset: &str) -> &'static [Claim] {
 pub fn settable_names() -> Vec<&'static str> {
     vec![
         "cascade_symmetry",
+        "cascade_gain",
         "crash_amplifier_conditional_sigma",
         "market_vol_vix_excursion",
         "crash_amplifier_slope",
@@ -7834,6 +8232,21 @@ pub fn settable_names() -> Vec<&'static str> {
         "news_absorption_drift_share",
         "news_absorption_drift_half_life",
         "news_quote_revision",
+        "quote_model_weight",
+        "closing_auction",
+        "earnings_cycle_depth",
+        "earnings_cycle_upside",
+        "earnings_cycle_half_life",
+        "earnings_cycle_sigma",
+        "treasury_10y_noise",
+        "treasury_2y_noise",
+        "flight_to_quality_gain",
+        "flight_to_quality_day",
+        "corporate_yield_daily",
+        "fair_value_news_share",
+        "fair_value_market_share",
+        "opening_mispricing_sigma",
+        "opening_market_sigma",
         "book_depth_coefficient",
         "book_depth_exponent",
         "book_depth_reach",

@@ -672,7 +672,9 @@ def test_the_derived_macro_field_is_the_one_the_target_writes(name):
     target = tf.TARGETS[name]
     field = macro_field_of(target)
     engine = tf.Engine(seed=3, universe=list(tf.Universe.random(2, seed=1)))
-    if name == "market.liquidity":
+    if name in ("market.liquidity", "market.earnings"):
+        # Company columns, not macro fields: the book's depth and the
+        # reported earnings.
         assert field is None
         return
     assert field in engine.macro_fields

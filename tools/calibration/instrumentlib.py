@@ -631,6 +631,34 @@ PARAM_SPECS: dict[str, dict] = {
                                         "hard_range": (0.0, 120.0), "derived": True},
     "news_quote_revision": {"kind": "abs", "step_unit": 1.0,
                             "hard_range": (0.0, 1.0), "derived": True},
+    # pt-v20 (2026-09-24, design repository programme/ptv20-registration.md).
+    # The two tape switches and the fair-value share are derived as the
+    # values that make the mechanism what it says (1.0 each); the opening
+    # spread and the ladder's scale are measured.
+    "quote_model_weight": {"kind": "abs", "step_unit": 0.1,
+                           "hard_range": (0.0, 1.0), "derived": True},
+    "closing_auction": {"kind": "abs", "step_unit": 1.0,
+                        "hard_range": (0.0, 1.0), "derived": True},
+    "fair_value_news_share": {"kind": "abs", "step_unit": 0.05,
+                              "hard_range": (0.0, 1.0), "derived": True},
+    "opening_mispricing_sigma": {"kind": "abs", "step_unit": 0.002,
+                                 "hard_range": (0.0, 0.3)},
+    "opening_market_sigma": {"kind": "abs", "step_unit": 0.005,
+                             "hard_range": (0.0, 0.3)},
+    "fair_value_market_share": {"kind": "abs", "step_unit": 0.05,
+                                "hard_range": (0.0, 1.0)},
+    "treasury_10y_noise": {"kind": "abs", "step_unit": 0.0025, "hard_range": (0.0, 0.1)},
+    "treasury_2y_noise": {"kind": "abs", "step_unit": 0.0025, "hard_range": (0.0, 0.1)},
+    "flight_to_quality_gain": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 0.05)},
+    "flight_to_quality_day": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                              "derived": True},
+    "corporate_yield_daily": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                              "derived": True},
+    "earnings_cycle_depth": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.5)},
+    "earnings_cycle_upside": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    "earnings_cycle_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (1.0, 2520.0)},
+    "earnings_cycle_sigma": {"kind": "abs", "step_unit": 0.0005, "hard_range": (0.0, 0.05)},
+    "cascade_gain": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # The agent-facing book (2026-09-24, feature/order-book-depth). Read only
     # on an agent's path, so no untraded statistic moves with any of them.
     "book_depth_coefficient": {"kind": "abs", "step_unit": 0.05,

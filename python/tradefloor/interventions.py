@@ -134,6 +134,10 @@ ROLES = ("shock", "transmission")
 CYCLES = ("expansion", "peak", "contraction", "trough", "recovery")
 
 _RATE_MIN, _RATE_MAX = -0.05, 0.50
+#: GDP growth's floor, lower than the rates' because growth falls further:
+#: -7.4 per cent year on year in 2020Q2, -10.0 annualised in 1958Q1 (FRED
+#: GDPC1). The engine's `units::check_rate` carries the same number.
+_GROWTH_MIN = -0.10
 
 
 class ScenarioValidationError(ValidationError):
@@ -365,13 +369,17 @@ def _domain_between(low: float, high: float, what: str) -> Callable[[Any], str |
     return domain
 
 
-def _domain_rate(value: Any) -> str | None:
+def _domain_rate(value: Any, low: float = _RATE_MIN) -> str | None:
     if not isinstance(value, (int, float)) or value != value:
         return f"{value!r} is not a number"
-    if not _RATE_MIN <= value <= _RATE_MAX:
+    if not low <= value <= _RATE_MAX:
         return (f"{value:g} is outside the plausible rate band "
-                f"[{_RATE_MIN}, {_RATE_MAX}]")
+                f"[{low}, {_RATE_MAX}]")
     return None
+
+
+def _domain_growth(value: Any) -> str | None:
+    return _domain_rate(value, _GROWTH_MIN)
 
 
 def _domain_finite(value: Any) -> str | None:
@@ -461,7 +469,7 @@ def _make_macro_target(name: str, field: str, *, units: str, note: str,
 #: 39 comparisons behind these numbers came back with a market draw delta of
 #: zero, so the difference is the intervention and nothing else.
 #:
-#: Read them before believing a scenario. Four of the fourteen targets are
+#: Read them before believing a scenario. Four of the fifteen targets are
 #: honest mechanisms with effects too small to see over a hundred days, and
 #: one of them is measurably worth exactly nothing. Knowing which is which is
 #: the difference between an experiment and a number.
@@ -623,6 +631,65 @@ _register(_make_macro_target(
     check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
 
+def _earnings_read(engine: Engine) -> tuple[float, ...]:
+    eps, _, _ = engine.fundamentals()
+    return tuple(eps)
+
+
+def _earnings_write(engine: Engine, values: Sequence[float]) -> None:
+    # Book value moves by each name's own factor, so a loss-maker, valued off
+    # book, falls with the rest rather than being the one name an earnings
+    # recession cannot touch. A zero or absent EPS has no factor and keeps
+    # its book.
+    eps, book, growth = engine.fundamentals()
+    new_book = []
+    for old, new, b in zip(eps, values, book):
+        factor = (new / old) if (old == old and old != 0.0 and new == new) else 1.0
+        new_book.append(b * factor if b == b else b)
+    engine.set_fundamentals(list(values), new_book, list(growth))
+
+
+def _earnings_check(operation: str, value: Any) -> None:
+    _finite(value)
+    if operation != "multiply":
+        raise ScenarioValidationError(
+            "market.earnings takes `multiply` only: it scales every company's "
+            "reported earnings (and book, by the same factor), and a level or a "
+            "shift in dollars means a different thing for every name.")
+    _positive_multiplier(value)
+
+
+_register(Target(
+    "market.earnings",
+    units="earnings per share, every company",
+    note=(
+        "Every company's reported earnings per share, and its book value by "
+        "the same factor, so fair value -- earnings times the target multiple, "
+        "or book for a loss-maker -- scales with it and every price follows "
+        "from the next tick. The channel a recession's earnings fall takes: "
+        "S&P reported earnings fell 29, 54, 92 and 33 per cent around the "
+        "1990, 2001, 2008 and 2020 recessions (operating earnings about 40 in "
+        "2008-09), and held in 2022, whose fall came through rates and "
+        "multiples. Use a `ramp` for a fall over quarters, a `hold` at "
+        "`multiply 1` to stay at the low, and a `ramp` back. Nothing in the "
+        "engine writes these figures back, so the pre-shock earnings are "
+        "restored when the LAST window on this target closes: keep the "
+        "windows contiguous, or the earnings jump back in the gap. Measured "
+        "on pt-v20, the certified roster, one seed: x0.6 over 60 sessions "
+        "took the index -39.6 per cent against the same seed without it. "
+        "Inert unless a scenario names it. `multiply` only."
+    ),
+    read=_earnings_read,
+    write=_earnings_write,
+    check=_earnings_check,
+    # Any finite figure: a loss-maker's earnings are negative before the
+    # shock and after it.
+    domain=lambda v: None if isinstance(v, (int, float)) and v == v and abs(v) != float("inf")
+    else f"{v!r} is not a finite earnings figure",
+    restores=False,
+    format=_plain,
+))
+
 # -- the chain levers: real, and slower than a short study ------------------
 
 _register(_make_macro_target(
@@ -673,7 +740,7 @@ _register(_make_macro_target(
         "which pt-v14 measured on its own at +0.36%. `macro.cycle` is the "
         "lever a downturn scenario actually wants."
     ),
-    check=_rate_check(), format=_pp, domain=_domain_rate,
+    check=_rate_check(low=_GROWTH_MIN), format=_pp, domain=_domain_growth,
 ))
 
 _register(_make_macro_target(
@@ -790,7 +857,7 @@ def suggest(name: str) -> str:
     target is a typo and gets the spelling. A name in :data:`UNSUPPORTED` is
     not a typo at all -- the reader has a mechanism in mind that this model
     does not have -- and gets the reason and the nearest real lever. Anything
-    else gets the whole registry, because a list of fourteen names is shorter
+    else gets the whole registry, because a list of fifteen names is shorter
     than a conversation.
     """
     if name in UNSUPPORTED:

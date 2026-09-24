@@ -1047,6 +1047,11 @@ def _nothing_dormant():
                    # could not see `session_news`. The 42-tick drift keeps
                    # the news priced all day.
                    news_quote_revision=1.0,
+                   # pt-v20's closing cross and curve switches are
+                   # switches as well.
+                   closing_auction=1.0,
+                   flight_to_quality_day=1.0,
+                   corporate_yield_daily=1.0,
                    news_absorption_half_life=0.6,
                    news_absorption_drift_share=0.12,
                    news_absorption_drift_half_life=42.0,

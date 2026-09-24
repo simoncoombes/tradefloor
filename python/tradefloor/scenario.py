@@ -350,6 +350,9 @@ RATE_FIELDS = ("federal_funds_rate", "corporate_bond_yield", "inflation_rate",
                "treasury_yield_2y", "treasury_yield_10y")
 
 RATE_MIN, RATE_MAX = -0.05, 0.50
+#: `gdp_growth` alone may fall to -10 per cent (the engine's
+#: `units::check_rate`; US real GDP -7.4 per cent year on year in 2020Q2).
+GROWTH_MIN = -0.10
 
 #: The business-cycle phases the engine accepts. Duplicated from
 #: ``_core.CycleName`` so a misspelt phase is caught where it is WRITTEN
@@ -408,10 +411,11 @@ def _check(field: str, value: Any) -> None:
             )
         return
     if field in RATE_FIELDS and isinstance(value, (int, float)):
-        if not RATE_MIN <= value <= RATE_MAX:
+        low = GROWTH_MIN if field == "gdp_growth" else RATE_MIN
+        if not low <= value <= RATE_MAX:
             raise ValidationError(
                 f"{field} = {value} is outside the plausible range "
-                f"[{RATE_MIN}, {RATE_MAX}]. Rates are FRACTIONS here: 5.2% is "
+                f"[{low}, {RATE_MAX}]. Rates are FRACTIONS here: 5.2% is "
                 "0.052, not 5.2."
             )
     if field == "oil_price" and isinstance(value, (int, float)):

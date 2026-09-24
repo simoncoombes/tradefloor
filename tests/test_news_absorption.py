@@ -157,6 +157,10 @@ NEWS_PRICED = {"pt-v19": dict(news_absorption_half_life=0.6,
                               news_absorption_drift_share=0.12,
                               news_absorption_drift_half_life=42.0,
                               news_quote_revision=1.0)}
+# pt-v20 is built on pt-v19 and inherits the profile and the re-quote. Its
+# book is centred on the model price every tick (`quote_model_weight`), which
+# subsumes the news re-quote, and the switch stays on as inherited.
+NEWS_PRICED["pt-v20"] = dict(NEWS_PRICED["pt-v19"])
 
 
 def test_it_ships_inert_on_every_preset_but_pt_v19():

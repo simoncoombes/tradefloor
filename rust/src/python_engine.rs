@@ -3146,6 +3146,38 @@ impl PyEngine {
     /// so a column read with `column("avg_volume")` can be scaled and written
     /// back whole. A rate index quotes its depth off this column exactly as an
     /// equity does.
+    /// Every company's three fair-value inputs, in roster order: earnings
+    /// per share, book value per share and revenue growth, NaN where absent.
+    /// The equities only; rate instruments carry no fundamentals.
+    ///
+    /// What the engine is valuing on, which is the published figures: under
+    /// a preset with `fair_value_news_share` or an earnings cycle, the
+    /// valuation scales these by the name's own level and the aggregate
+    /// cycle, and neither is here.
+    fn fundamentals(&self) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+        self.inner.fundamentals()
+    }
+
+    /// Replace every company's fair-value inputs, in roster order, NaN to
+    /// clear one. The equities only, one value each.
+    ///
+    /// The embedder's hook for reported earnings, and the one the
+    /// `market.earnings` scenario target writes through. It consumes no
+    /// draws, so it cannot move the generator, and an engine that is never
+    /// told anything values on the figures it was built with, exactly as
+    /// before this was exposed. A change moves every affected fair value, and
+    /// so every price, from the next tick.
+    fn set_fundamentals(
+        &mut self,
+        eps: Vec<f64>,
+        book_value_per_share: Vec<f64>,
+        revenue_growth: Vec<f64>,
+    ) -> PyResult<()> {
+        self.inner
+            .set_fundamentals(&eps, &book_value_per_share, &revenue_growth)
+            .map_err(ValidationError::new_err)
+    }
+
     fn set_avg_volume(&mut self, values: Vec<f64>) -> PyResult<()> {
         let n = self.inner.instrument_count();
         if values.len() != n {
@@ -3640,6 +3672,12 @@ impl PyEngine {
         // preset through pt-v18 actually held.
         out.set_item("sector_variance", f64_bytes(py, self.inner.sector_variance()))?;
         out.set_item("jump_excitation", f64_bytes(py, self.inner.jump_excitation()))?;
+        // The fair-value levels pt-v20 turned on. Their own key, and only
+        // when the model can move them, so every earlier preset's snapshot
+        // is the one it was.
+        if self.inner.carries_fair_value_offsets() {
+            out.set_item("fair_value_offset", f64_bytes(py, &self.inner.fair_value_offsets()))?;
+        }
         // The sector state's two per-DAY companions, carried for the
         // reason `attribution` and `tick_components` are: a fork taken
         // mid-day needs the day's accumulated sector factor and the
@@ -3715,6 +3753,11 @@ impl PyEngine {
         );
         econ.set_item("gdp_trend", economy.gdp_trend.to_vec())?;
         econ.set_item("cycle_phase", economy.cycle_phase.as_str())?;
+        // The aggregate earnings cycle, only when the model moves it, so
+        // every earlier preset's snapshot is the dict it was.
+        if self.inner.params().earnings_cycle_depth != 0.0 {
+            econ.set_item("earnings_cycle", economy.earnings_cycle)?;
+        }
         out.set_item("economy", econ)?;
 
         let bank = self.inner.central_bank();
@@ -4056,6 +4099,16 @@ impl PyEngine {
                 .set_sector_day(&values, target)
                 .map_err(ValidationError::new_err)?;
         }
+        if let Some(raw) = snapshot.get_item("fair_value_offset")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_fair_value_offsets(&values)
+                .map_err(ValidationError::new_err)?;
+        }
         for (key, sector) in [("sector_variance", true), ("jump_excitation", false)] {
             let Some(raw) = snapshot.get_item(key)? else { continue };
             let bytes: &[u8] = raw.extract()?;
@@ -4221,6 +4274,9 @@ impl PyEngine {
                 fiscal_stimulus, government_debt_to_gdp,
                 months_in_current_phase, phase_gdp_target, recession_probability,
             );
+            if let Some(v) = d.get_item("earnings_cycle")? {
+                economy.earnings_cycle = v.extract()?;
+            }
             if let Some(v) = d.get_item("gdp_trend")? {
                 let trend: Vec<f64> = v.extract()?;
                 if trend.len() != 4 {

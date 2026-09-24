@@ -727,6 +727,44 @@ PERTURBATIONS = [
     ("news_absorption_drift_share", 0.2, False),
     ("news_absorption_drift_half_life", 30.0, False),
     ("news_quote_revision", 0.0, False),
+    # pt-v20's tape and cross-section (2026-09-24). The book centred on the
+    # model price and the closing cross both reach the print on the first
+    # session; the fair-value share splits every stock-specific shock from
+    # the first tick; the opening spread re-draws each name's opening
+    # mispricing, and so its whole path.
+    ("quote_model_weight", 1.0, True),
+    # The cross prints the session's 15:59 tick, and the probe's sessions
+    # stop at 10:47, so no probe session has a close to cross.
+    ("closing_auction", 1.0, False),
+    ("fair_value_news_share", 0.5, True),
+    ("opening_mispricing_sigma", 0.05, True),
+    # The market-wide share splits the market factor's draw from the first
+    # tick; the market opening spread re-draws the index's opening level.
+    ("fair_value_market_share", 0.5, True),
+    # The yield curve (pt-v20). Each moves the macro chain from the first
+    # close, and the corporate yield reaches every price through fair value
+    # on the next session.
+    ("treasury_10y_noise", 0.06, True),
+    ("treasury_2y_noise", 0.02, True),
+    # Inert on the probe: the preset under test here is the default, whose
+    # 0.02 gain the switch reads, and the probe's three sessions of 78 ticks
+    # never move the index far enough for a 0.02-point shift to reach a
+    # printed price through fair value in the window.
+    ("flight_to_quality_day", 1.0, False),
+    # Read only behind the gate the shipped rule never crosses; with the
+    # switch off nothing reaches it.
+    ("flight_to_quality_gain", 0.05, False),
+    ("corporate_yield_daily", 1.0, True),
+    # The aggregate earnings cycle (pt-v20). Inert on the probe: with the
+    # upside at its default 0.0 every phase but a contraction or a trough
+    # pulls the level toward 0.0, and the probe's economy opens in neither,
+    # so the level opens at 0.0 and stays there. The others are read only
+    # with a depth.
+    ("earnings_cycle_depth", 0.3, False),
+    ("earnings_cycle_upside", 0.1, False),
+    ("earnings_cycle_half_life", 30.0, False),
+    ("earnings_cycle_sigma", 0.002, False),
+    ("opening_market_sigma", 0.05, True),
     # The agent-facing book (2026-09-24, feature/order-book-depth). INERT on
     # this probe by construction: every one is read only on the path an
     # agent's order takes, and the probe sends none. The settlement the
@@ -970,6 +1008,10 @@ PERTURBATIONS = [
     # touches is evaluated. Over 252 days it bites: the thirty-seed sweep
     # separates the arms.
     ("cascade_symmetry", 0.5, False),
+    # Scales the stop and squeeze ladders, which fire on a previous day's
+    # move past 2.5 per cent; no name on the probe's 78-tick sessions moves
+    # that far, so the ladders add nothing to scale.
+    ("cascade_gain", 0.5, False),
     # How much of nominal output growth the valuation's earnings carry. It
     # reads a level the economy compounds daily, so it moves the market as
     # soon as one day has closed rather than waiting on a branch: over the
@@ -1208,6 +1250,9 @@ PERTURBATIONS = [
 #: more sites and would find more dials here, which is why the assertion
 #: below names the site rather than asserting a count.
 ECONOMY_STREAM_MOVERS = frozenset({
+    # pt-v20's 2-year takes its own normal each session when its noise is
+    # on: the draw IS the mechanism, as for the VIX jump below.
+    "treasury_2y_noise",
     "vix_jump_intensity", "macro_burn_in_days", "phase_target_range_draw",
     "cycle_stationary_opening", "inflation_reversion",
     # The return-driven arrival rate takes the same arrival draw as

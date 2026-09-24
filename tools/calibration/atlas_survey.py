@@ -284,6 +284,20 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "news_absorption_drift_share": (0.0, 0.5),
     "news_absorption_drift_half_life": (0.0, 120.0),
     "news_quote_revision": (0.0, 1.0),
+    # pt-v20's tape, closing cross, fair-value share, opening spread and
+    # stop-ladder scale (design repository, programme/ptv20-registration.md).
+    "quote_model_weight": (0.0, 1.0),
+    "closing_auction": (0.0, 1.0),
+    "fair_value_news_share": (0.0, 1.0),
+    "opening_mispricing_sigma": (0.0, 0.3),
+    "opening_market_sigma": (0.0, 0.3),
+    "fair_value_market_share": (0.0, 1.0),
+    "treasury_2y_noise": (0.0, 0.1),
+    "flight_to_quality_day": (0.0, 1.0),
+    "corporate_yield_daily": (0.0, 1.0),
+    "earnings_cycle_depth": (0.0, 0.6),
+    "earnings_cycle_upside": (0.0, 0.3),
+    "earnings_cycle_sigma": (0.0, 0.005),
     # The agent-facing book (2026-09-24): read only on an agent's path.
     "book_depth_coefficient": (0.0, 2.0),
     "book_depth_exponent": (0.0, 1.0),
@@ -642,6 +656,17 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
 #: header. Both known-good values (ramp 6.0, cap 0.98) are asserted inside
 #: these ranges at plan time.
 EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
+    # The stop and squeeze ladders' scale: 1.0 on every preset through
+    # pt-v19, 0.1 on pt-v20 (measured against the daily Lo-MacKinlay book).
+    # The whole unit range, off to full.
+    "cascade_gain": (0.0, 1.0),
+    # The 10-year's noise and the flight to quality's size: 0.03 and 0.02
+    # through pt-v19, 0.025 and 0.008 on pt-v20.
+    "treasury_10y_noise": (0.0, 0.1),
+    # The earnings cycle's half-life in sessions: 60 through every preset
+    # (unread there), a quarter to two years around it.
+    "earnings_cycle_half_life": (20.0, 504.0),
+    "flight_to_quality_gain": (0.0, 0.05),
     # The macro calendar's year in steps: 365 as shipped, 252 the session
     # calendar (21-step months, 63-step quarters).
     "macro_calendar_days_per_year": (252.0, 365.0),

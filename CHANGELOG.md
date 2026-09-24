@@ -241,6 +241,19 @@ The `forced_flow_threshold` summary that the parameter table reads is
 reworded in plain terms, and `decay-curve-504.json` moves into
 `measurements/`.
 
+### Growth's floor
+
+`gdp_growth` alone now has a floor of -10%. The other rates keep -5%. The
+engine's `check_rate`, `pin_macro`, scenario checks and the fire-time check on
+a relative change all use it. US real GDP fell 7.4% year on year to 2020 Q2,
+and 10.0% at an annualised quarterly rate in 1958 Q1 (FRED GDPC1), so -5%
+refused real downturns. The packaged `recession.yml` holds growth three points
+lower. It was refused whenever the economy it met was already contracting
+faster than 2%, which happened to one of the twenty published suite markets
+under pt-v20. A run that worked before gives the same result: the change only
+lets through runs that used to fail. `tests/test_suite_markets.py` runs all
+twenty markets on pt-v19 and pt-v20.
+
 ### The model specification and the support policy
 
 `docs/MODEL.md` states the pt-v19 model as equations read off the code: the
