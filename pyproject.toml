@@ -54,11 +54,6 @@ claude = ["anthropic>=0.40", "pydantic>=2"]
 # Optional for the same reason as the rest: nothing in the library imports it,
 # and a user who only wants the simulator should not install a server stack.
 mcp = ["mcp>=2.0"]
-# The trading session server (python -m tradefloor.serve): the HTTP API, its
-# broker-shaped facade and the write-capable MCP server, stdio and HTTP. The
-# floors are the versions the transports were written and tested against
-# (docs/serve/TRANSPORTS.md). The core session service needs none of them.
-serve = ["fastapi>=0.141", "uvicorn>=0.53", "mcp>=2.2"]
 # One extra per framework adapter under python/tradefloor/integrations/,
 # named after the framework, as that subpackage's rules require. Floors only,
 # no ceilings: every adapter imports its framework lazily and validates
