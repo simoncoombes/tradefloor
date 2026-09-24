@@ -354,6 +354,18 @@ def test_every_packaged_scenario_moves_the_indices_the_way_it_says(name):
         pytest.fail(f"{name} writes no rate; say what it does to the indices")
 
 
+def test_a_scenario_path_can_pin_the_treasury_curve():
+    scenario = tf.Scenario(name="steepener").step(
+        "treasury_yield_10y", before=0.04, after=0.05, at=3)
+    closes = _scenario_run(scenario, 5)
+    ten = [row["UST10Y"] for row in closes]
+    # Day 3 prices a 100bp rise from the 4% held on days 0 to 2.
+    assert ten[3] / ten[2] - 1.0 == pytest.approx(
+        0.04 / 252 - 8.5 * 0.01 + 0.5 * 84.0 * 0.01**2, abs=5e-4)
+    with pytest.raises(tf.ValidationError, match="FRACTIONS|fraction|plausible"):
+        tf.Scenario().hold(treasury_yield_10y=4.5)
+
+
 def test_the_rate_shock_reaches_the_2_year_at_that_evenings_close():
     scenario = tf.Scenario.load("rate_shock")
     shocked = _scenario_run(scenario, 53)
