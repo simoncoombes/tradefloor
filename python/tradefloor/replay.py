@@ -29,7 +29,7 @@ _OPS = frozenset({
     "set_avg_volume", "list_instrument", "delist", "draw_uniform",
     "draw_normal", "record",
     # Agents' orders against the book, and the collection of what they
-    # produced (0.10).
+    # produced.
     "submit", "cancel", "take_fills", "take_impacts",
 })
 

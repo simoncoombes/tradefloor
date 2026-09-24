@@ -345,7 +345,7 @@ class Engine:
     ) -> int: ...
 
     def book(self, ticker: str) -> OrderBook: ...
-    # Agents' orders against this market's book (0.10). `quantity` is
+    # Agents' orders against this market's book. `quantity` is
     # signed, positive to buy; `limit_price=None` is a market order. The
     # dicts' fields are listed on the bindings.
     def submit(
