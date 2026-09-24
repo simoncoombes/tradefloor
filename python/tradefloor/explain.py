@@ -316,6 +316,9 @@ MECHANISMS: tuple[Mechanism, ...] = (
         state=("price",),
         macro=("vix",),
         sites=(("market", "settle_u", "company"),),
+        # The body it shares with the agents' variant, which puts resting
+        # orders in the same book (`agent_book.rs`).
+        via=("microstructure::settle_inner",),
     ),
 )
 
@@ -1357,6 +1360,18 @@ def _replay_inputs(engine: Engine, inputs: Sequence[dict],
             engine.draw_uniform()
         elif op == "draw_normal":
             engine.draw_normal()
+        # Agents' orders against the book: the day's trading, replayed
+        # into the fork in the order it happened.
+        elif op == "submit":
+            engine.submit(entry["agent"], entry["ticker"], entry["quantity"],
+                          limit_price=entry.get("limit_price"),
+                          order_id=entry.get("order_id"))
+        elif op == "cancel":
+            engine.cancel(entry["order_id"], agent=entry.get("agent"))
+        elif op == "take_fills":
+            engine.take_fills(entry.get("agent"))
+        elif op == "take_impacts":
+            engine.take_impacts(entry.get("agent"))
         else:
             raise ValidationError(
                 f"a day of inputs carries {op!r}, which a replay of one day "

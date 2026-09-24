@@ -103,34 +103,46 @@ market as the one ``fills`` argument of the one session. Agents see each
 other's impact and never each other's orders, and :meth:`Scenario.apply` runs
 once a day for the whole cohort.
 
-## Agents do not take each other's liquidity within a step
+## Whether agents take each other's liquidity depends on the model
 
-:meth:`Portfolio.execute` prices a fill through ``book.sweep_cost``, which
-walks the levels to compute an average and removes nothing from the book. So
-two agents buying the same name on the same step meet the same ladder and
-fill at the same price, and the ladder after both of them is the ladder
-before either. Measured on this build, on ``Universe.random(8, seed=99)``
-at seed 42, two agents each buying 10,000 shares of the first name at step
-0: both fill at 83.96118999999999 against a first ask level of 9,762 shares
-at 83.96 that neither of them moved, and the sweep walks past that level to
-a worst price of 84.01, so the equality is a claim about a ladder that did
-not move rather than two fills at the top of the book.
-``test_externality.py`` pins it.
+On every shipped preset they do not. :meth:`Portfolio.execute` prices a fill
+through ``book.sweep_cost``, which walks the levels to compute an average and
+removes nothing from the book. So two agents buying the same name on the
+same step meet the same ladder and fill at the same price, and the ladder
+after both of them is the ladder before either. Measured on this build, on
+``Universe.random(8, seed=99)`` at seed 42, two agents each buying 10,000
+shares of the first name at step 0: both fill at 83.96118999999999 against a
+first ask level of 9,762 shares at 83.96 that neither of them moved, and the
+sweep walks past that level to a worst price of 84.01, so the equality is a
+claim about a ladder that did not move rather than two fills at the top of
+the book. ``test_externality.py`` pins it. The cohort's whole footprint
+reaches the market once, as the merged ``fills`` of that step's session, on
+its first tick, so an agent meets another's trading from the next step on
+and never inside the step it happened.
 
-The cohort's whole footprint reaches the market once, as the merged
-``fills`` of that step's session, on its first tick, so an agent meets
-another's trading from the next step on and never inside the step it
-happened. Order priority
-within a step is a queue this engine does not run, and a cohort does not
-introduce one.
+Under a model with ``book_shared`` on (``Engine.book_live``), each
+portfolio's orders execute in the engine's book, under the portfolio's
+label (its ``owner``). Label order is then arrival order: the second agent
+meets the book the first left, pays for the levels the first took, and can
+hit the first's resting limit order. Each agent's flow reaches the market
+once, on the next tick, and is attributed to it (``Engine.take_impacts``).
+An agent's value in the ``act()`` mapping may be a :class:`tradefloor.Limit`
+as well as a number: it takes what the book holds at its price and the rest
+waits, in the book's queue with ``book_resting`` on, until it fills, is
+replaced by the agent's next ``Limit`` on that name, or is cancelled with
+:class:`tradefloor.Cancel`. What fills during a session is collected into
+the agent's portfolio after the session, and a live-book row carries it
+under ``book_fills``. ``tests/test_order_book_depth.py`` measures both
+regimes.
 
-Label order therefore decides three things and no price: the order agents are
-asked, the order their flows are summed into the merged mapping, and the
-order :attr:`World.rejected` is written. It is sorted order, so the same
-labels give the same market whatever order the mapping was built in. A dict
-literal's own order would make the market a property of how the caller typed
-it, and with three or more agents on one ticker the summation order is a
-float-associativity question rather than a cosmetic one.
+Label order therefore decides, off, three things and no price: the order
+agents are asked, the order their flows are summed into the merged mapping,
+and the order :attr:`World.rejected` is written; and on, the arrival order at
+the book as well. It is sorted order, so the same labels give the same market
+whatever order the mapping was built in. A dict literal's own order would
+make the market a property of how the caller typed it, and with three or
+more agents on one ticker the summation order is a float-associativity
+question rather than a cosmetic one.
 
 The single-agent form is a one-element cohort under its old names.
 :attr:`World.agent` and :attr:`World.portfolio` read that one element and
@@ -171,7 +183,7 @@ from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
 from .checkpoint import Checkpoint, branch
 from .harness import Observation, session_clock
 from .manifest import RunManifest, market_digest
-from .portfolio import Portfolio
+from .portfolio import Cancel, Limit, Portfolio
 from .interventions import Intervention
 from . import noise as _noise
 from .render import Renderer, check_renderer
@@ -297,7 +309,7 @@ class World:
                  "trace", "pins",
                  "interventions", "applied", "rejected", "fork_step",
                  "on_refusal", "surgeries", "_expected", "_day", "_step",
-                 "_adv", "_ran")
+                 "_adv", "_ran", "_step_mids")
 
     def __init__(
         self,
@@ -363,8 +375,12 @@ class World:
         # `max_leverage` are per agent: a cohort is several traders in one
         # market, and pooling their capital would make each one's limit a
         # function of how many others happened to be in the room.
+        # Each portfolio's orders carry its label in the engine's book; the
+        # single-agent form's empty label is "agent" there, since the book
+        # needs a name to attribute a fill to.
         self._portfolios: dict[str, Portfolio] = {
-            key: Portfolio(cash=self.cash, max_leverage=max_leverage)
+            key: Portfolio(cash=self.cash, max_leverage=max_leverage,
+                           owner=key or "agent")
             for key in self._agents}
         self.trace: list[dict[str, Any]] = []
         self.rejected: list[str] = []
@@ -386,6 +402,9 @@ class World:
         #: clip that exists to keep an order realistic was sized against a
         #: market that no longer existed.
         self._adv = [instrument.avg_volume for instrument in self.universe]
+        # The mid each name's book showed when the current step opened,
+        # before any agent's order. See `_execute`.
+        self._step_mids: dict[str, float | None] = {}
 
     # -- who is in this world ---------------------------------------------
 
@@ -601,11 +620,13 @@ class World:
 
                 asked = {label: self._ask_agent(label, obs)
                          for label, obs in observed.items()}
-                # Execution in label order, against the one book. The order
-                # fixes which agent's rejection is written first and nothing
-                # about price: `sweep_cost` reads the ladder and removes
-                # nothing, so both agents meet the same levels and fill at
-                # the same price. See the module docstring.
+                self._step_mids = {}
+                # Execution in label order, against the one book. Off a live
+                # book the order fixes which agent's rejection is written
+                # first and nothing about price: `sweep_cost` reads the
+                # ladder and removes nothing, so both agents meet the same
+                # levels and fill at the same price. On one, it is the
+                # arrival order at the book. See the module docstring.
                 done = {label: self._execute(asked[label][0], tickers, label)
                         for label in self._agents}
 
@@ -617,8 +638,13 @@ class World:
                     fills=self._merged_flow())
                 for portfolio in self._portfolios.values():
                     portfolio.clear_flow()
+                # Resting and waiting orders filled during the session,
+                # collected into each portfolio in label order. Nothing is
+                # asked of an engine no portfolio has sent an order to.
+                synced = {label: self._portfolios[label].sync(self.engine)
+                          for label in self._agents}
 
-                self.trace.append(self._row(day, macro, asked, done))
+                self.trace.append(self._row(day, macro, asked, done, synced))
                 self._step += 1
 
             if record:
@@ -630,8 +656,8 @@ class World:
             self._day += 1
         return self
 
-    def _row(self, day: int, macro: dict[str, Any], asked: dict, done: dict
-             ) -> dict[str, Any]:
+    def _row(self, day: int, macro: dict[str, Any], asked: dict, done: dict,
+             synced: dict | None = None) -> dict[str, Any]:
         """One trace row, in whichever of the two shapes this world has.
 
         A single-agent row carries the per-agent fields at the top level, in
@@ -650,10 +676,19 @@ class World:
             "step_of_day": self._step % self.steps_per_day,
             "macro": macro,
         }
+        # What resting and waiting orders filled during the session, per
+        # agent, only when any did: a row of a run that never used the book
+        # is the row it always was.
+        book_fills = {label: [
+            {k: f[k] for k in ("ticker", "order_id", "side", "quantity",
+                               "price", "liquidity", "counterparty", "tick")}
+            for f in fills] for label, fills in (synced or {}).items() if fills}
         if not self._single:
             row["prices"] = prices
             row["agents"] = {label: self._fields(label, asked, done)
                              for label in self._agents}
+            for label, fills in book_fills.items():
+                row["agents"][label]["book_fills"] = fills
             return row
         fields = self._fields(SOLO, asked, done)
         for name in ("decision", "orders", "fills", "refused", "unusable"):
@@ -661,6 +696,8 @@ class World:
         row["prices"] = prices
         for name in ("cash", "net_worth", "exposure", "positions"):
             row[name] = fields[name]
+        if SOLO in book_fills:
+            row["book_fills"] = book_fills[SOLO]
         return row
 
     def _fields(self, label: str, asked: dict, done: dict) -> dict[str, Any]:
@@ -801,11 +838,29 @@ class World:
         where = f"step {self._step}" if self._single \
             else f"step {self._step} {label}"
         for ticker, quantity in orders.items():
+            if isinstance(quantity, Cancel):
+                portfolio.cancel(self.engine, ticker=ticker)
+                continue
             if not quantity:
                 continue
-            book = self.engine.book(ticker)
-            mid = book.mid_price
+            # The step's arrival mid: the book's before ANY agent's order
+            # this step, read once per name. Off a live book every agent in
+            # the step reads the same book, so this is the mid the agent's
+            # own sweep started from, as it always was. On one, a later
+            # agent meets the book an earlier one left, and its slippage
+            # against the step's mid holds the levels the earlier one took,
+            # which is what `externalities` reads as `levels`.
+            if ticker not in self._step_mids:
+                self._step_mids[ticker] = self.engine.book(ticker).mid_price
+            mid = self._step_mids[ticker]
             try:
+                if isinstance(quantity, Limit):
+                    # A new limit on a name replaces the one waiting there.
+                    portfolio.cancel(self.engine, ticker=ticker)
+                    report = portfolio.submit_limit(
+                        self.engine, ticker, quantity.quantity, quantity.price)
+                    fills.append(self._limit_fill(report, mid))
+                    continue
                 fill = portfolio.execute(self.engine, ticker, quantity)
             except (OrderError, ValidationError) as exc:
                 refused.append(f"{ticker}: {exc}")
@@ -821,6 +876,24 @@ class World:
                 "mid": mid,
             })
         return fills, refused
+
+    @staticmethod
+    def _limit_fill(report: dict, mid: float | None) -> dict:
+        """A limit order's trace entry: what filled at once, and what waits."""
+        sign = 1.0 if report["side"] == "buy" else -1.0
+        notional = sum(f["quantity"] * f["price"] for f in report["fills"])
+        return {
+            "ticker": report["ticker"],
+            "quantity": sign * report["filled"],
+            "price": report["average_price"],
+            "worst_price": report["worst_price"],
+            "notional": sign * notional,
+            "partial": report["filled"] < report["requested"],
+            "mid": mid,
+            "limit": True,
+            "resting": report["resting"],
+            "order_id": report["order_id"],
+        }
 
     # -- the macro path ---------------------------------------------------
 
@@ -1058,6 +1131,12 @@ class World:
                 f"{', '.join(self._agents)}.")
         (child,) = self.fork(f"without {label}")
         child._frozen = self._frozen | {label}
+        # Inaction includes the orders it left waiting: a resting order is
+        # an order still being sent. Only an agent that has sent any has
+        # any, so a world that never used the book asks nothing here.
+        portfolio = child._portfolios[label]
+        if portfolio._in_book:
+            portfolio.cancel(child.engine)
         return child
 
     def remove(self, label: str) -> "World":

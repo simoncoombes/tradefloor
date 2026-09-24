@@ -1054,7 +1054,19 @@ def _nothing_dormant():
                    corporate_yield_daily=1.0,
                    news_absorption_half_life=0.6,
                    news_absorption_drift_share=0.12,
-                   news_absorption_drift_half_life=42.0)
+                   news_absorption_drift_half_life=42.0,
+                   # The agent-facing book's two switches are 0.0 or 1.0,
+                   # and its depth dials carry the values suggested for
+                   # pt-v20. They move nothing an untraded market carries;
+                   # `test_order_book_depth.py` guards the book's own state
+                   # across a restore, with agents in the market.
+                   book_shared=1.0,
+                   book_resting=1.0,
+                   book_depth_coefficient=0.75,
+                   book_depth_exponent=0.5,
+                   book_depth_reach=1.0,
+                   book_refill_half_life=27.0,
+                   fill_impact_coefficient=0.314)
     return tf.ModelParams.from_preset(**dormant)
 
 

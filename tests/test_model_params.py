@@ -756,6 +756,19 @@ PERTURBATIONS = [
     ("flight_to_quality_gain", 0.05, False),
     ("corporate_yield_daily", 1.0, True),
     ("opening_market_sigma", 0.05, True),
+    # The agent-facing book (2026-09-24, feature/order-book-depth). INERT on
+    # this probe by construction: every one is read only on the path an
+    # agent's order takes, and the probe sends none. The settlement the
+    # model's own flow runs is the maker's ladder at any setting.
+    # `test_order_book_depth.py` moves them with agents in the market. The
+    # companions carry the parents each is refused without.
+    ("book_depth_coefficient", 0.5, False),
+    ("book_depth_exponent", 0.6, False),
+    ("book_depth_reach", 2.0, False),
+    ("book_shared", 1.0, False),
+    ("book_refill_half_life", 27.0, False),
+    ("book_resting", 1.0, False),
+    ("fill_impact_coefficient", 0.314, False),
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
     ("volume_idio_variance_gain", 1.0, True),    # couples volume to the name's own variance, which is non-trivial from the first tick
@@ -1409,6 +1422,11 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "news_absorption_drift_share": {"news_absorption_half_life": 0.6},
     "news_absorption_drift_half_life": {"news_absorption_half_life": 0.6,
                                         "news_absorption_drift_share": 0.12},
+    # The latent depth's shape dials are refused without the depth, and its
+    # refill without both the depth and the shared book (order-book-depth).
+    "book_depth_exponent": {"book_depth_coefficient": 0.5},
+    "book_depth_reach": {"book_depth_coefficient": 0.5},
+    "book_refill_half_life": {"book_depth_coefficient": 0.5, "book_shared": 1.0},
     # The excursion reads the VIX's distance above the identity's read-back,
     # so it is refused off the identity; a no-op on the default.
     "market_vol_vix_excursion": {"vix_level_identity": 1.0},

@@ -528,6 +528,77 @@ pub fn settle_price_through_book(
     options: &SettleOptions,
     rng: &mut impl Rng,
 ) -> SettlementResult {
+    // `Vec::new` does not allocate, so the shipped path pays nothing for the
+    // agents' variant sharing its body.
+    let mut unused = Vec::new();
+    settle_inner(company, fair_value, tick_volume, options, &[], rng, &mut unused)
+}
+
+/// One fill of an agent's order inside a settlement.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SettledAgentFill {
+    /// The agent's order that filled.
+    pub order_id: String,
+    pub agent: String,
+    /// The AGENT's side.
+    pub side: Side,
+    pub quantity: f64,
+    pub price: f64,
+    /// True when the agent's order took liquidity: a resting order the
+    /// maker's re-quote left crossed, matched before the flow.
+    pub taker: bool,
+    /// Who was on the other side: the maker, the flow, or another agent.
+    pub counterparty: String,
+}
+
+/// [`settle_price_through_book`] with agents' resting orders in the book.
+///
+/// The orders join the maker's ladder in the order given (their arrival
+/// order), each through `submit` with its limit and `post_remainder`, so an
+/// order the maker's re-quote has left crossed trades against the ladder at
+/// the ladder's prices before the flow, and the rest queues by price and
+/// time behind the maker's size. The flow's four slices then walk the book
+/// as they always have, and fill an agent's order when they reach it.
+///
+/// The draw contract is unchanged: four uniforms or none, and none of the
+/// guards reads the orders. With no orders this IS
+/// [`settle_price_through_book`], which calls the same body.
+pub fn settle_price_through_book_with_orders(
+    company: &CompanyMicrostructure,
+    fair_value: f64,
+    tick_volume: f64,
+    options: &SettleOptions,
+    resting: &[RestingOrder],
+    rng: &mut impl Rng,
+) -> (SettlementResult, Vec<SettledAgentFill>) {
+    let mut fills = Vec::new();
+    let result = settle_inner(company, fair_value, tick_volume, options, resting, rng, &mut fills);
+    (result, fills)
+}
+
+/// True for an owner id that belongs to an agent rather than the house.
+fn is_agent(owner: &str) -> bool {
+    owner != MARKET_MAKER_ID
+        && owner != "flow"
+        && owner != crate::agent_book::DEPTH_OWNER
+}
+
+fn opposite(side: Side) -> Side {
+    match side {
+        Side::Buy => Side::Sell,
+        Side::Sell => Side::Buy,
+    }
+}
+
+fn settle_inner(
+    company: &CompanyMicrostructure,
+    fair_value: f64,
+    tick_volume: f64,
+    options: &SettleOptions,
+    resting: &[RestingOrder],
+    rng: &mut impl Rng,
+    agent_fills: &mut Vec<SettledAgentFill>,
+) -> SettlementResult {
     let last_price = company.price;
 
     // Nothing traded, so the print IS the model price and the book absorbed
@@ -603,6 +674,47 @@ pub fn settle_price_through_book(
         return no_trade();
     }
 
+    // Agents' resting orders, after the guard so no guard reads them. A
+    // crossed order trades here, at the ladder's prices, before any flow.
+    let mut pre_traded = 0.0;
+    let mut pre_inventory = 0.0;
+    for o in resting {
+        let r = book.submit(
+            o.side,
+            o.quantity,
+            &o.owner_id,
+            SubmitOptions {
+                limit_price: Some(o.price),
+                post_remainder: true,
+                order_id: Some(o.id.clone()),
+            },
+        );
+        for f in &r.fills {
+            pre_traded += f.quantity;
+            agent_fills.push(SettledAgentFill {
+                order_id: o.id.clone(),
+                agent: o.owner_id.clone(),
+                side: o.side,
+                quantity: f.quantity,
+                price: f.price,
+                taker: true,
+                counterparty: f.maker_id.clone(),
+            });
+            if is_agent(&f.maker_id) {
+                agent_fills.push(SettledAgentFill {
+                    order_id: f.maker_order_id.clone(),
+                    agent: f.maker_id.clone(),
+                    side: opposite(o.side),
+                    quantity: f.quantity,
+                    price: f.price,
+                    taker: false,
+                    counterparty: o.owner_id.clone(),
+                });
+            }
+        }
+        pre_inventory += maker_delta_from_fills(&r.fills);
+    }
+
     // Lean the flow toward whichever side closes the gap to fair value, plus
     // whichever side the crowd is leaning.
     let gap = (fair_value - last_price) / last_price;
@@ -640,6 +752,27 @@ pub fn settle_price_through_book(
             traded += f.quantity;
         }
         maker_inventory_delta += maker_delta_from_fills(&result.fills);
+        if !resting.is_empty() {
+            for f in &result.fills {
+                if is_agent(&f.maker_id) {
+                    agent_fills.push(SettledAgentFill {
+                        order_id: f.maker_order_id.clone(),
+                        agent: f.maker_id.clone(),
+                        side: opposite(side),
+                        quantity: f.quantity,
+                        price: f.price,
+                        taker: false,
+                        counterparty: f.taker_id.clone(),
+                    });
+                }
+            }
+        }
+    }
+    // Added after the flow, and only when there were orders, so the
+    // shipped path's two sums are the ones it always computed.
+    if !resting.is_empty() {
+        traded += pre_traded;
+        maker_inventory_delta += pre_inventory;
     }
 
     // Guard 3 — the only one AFTER the draws, so it still costs four.
@@ -1223,6 +1356,93 @@ mod tests {
             taker_side: Side::Buy,
         }];
         assert_eq!(maker_delta_from_fills(&fills), 0.0);
+    }
+
+    // ── Agents' resting orders in the settlement ──────────────────────────
+
+    fn resting(id: &str, side: Side, price: f64, quantity: f64) -> RestingOrder {
+        RestingOrder {
+            id: id.to_string(),
+            side,
+            price,
+            quantity,
+            owner_id: id.split('-').next().unwrap().to_string(),
+        }
+    }
+
+    /// With no orders the variant IS the shipped settlement, to the bit and
+    /// to the draw.
+    #[test]
+    fn with_no_orders_the_variant_is_the_shipped_settlement() {
+        for volume in [0.0, 10_000.0, 100_000.0] {
+            let mut a = GameRng::from_seed(3);
+            let mut b = GameRng::from_seed(3);
+            let x = settle_price_through_book(
+                &company(), 101.0, volume, &SettleOptions::default(), &mut a);
+            let (y, fills) = settle_price_through_book_with_orders(
+                &company(), 101.0, volume, &SettleOptions::default(), &[], &mut b);
+            assert_eq!(x, y);
+            assert_eq!(a, b);
+            assert!(fills.is_empty());
+        }
+    }
+
+    /// The flow reaches a bid a cent inside the spread before the maker's,
+    /// fills it at its own price, and takes the same four draws.
+    #[test]
+    fn the_flow_fills_a_resting_bid_inside_the_spread_first() {
+        let bid = build_live_book(&company(), &LiveBookOptions::default())
+            .best_bid()
+            .unwrap();
+        let price = bid + 0.01;
+        let orders = vec![resting("a-0", Side::Buy, price, 3_000.0)];
+        // Fair value under the last print, and four uniforms above the buy
+        // fraction: every slice sells.
+        let (out, fills) = settle_price_through_book_with_orders(
+            &company(), 99.0, 20_000.0, &SettleOptions::default(), &orders,
+            &mut Fixed([0.9, 0.9, 0.9, 0.9], 0));
+        assert!(out.traded);
+        assert_eq!(fills.len(), 1, "one slice of 5,000 took all 3,000: {fills:?}");
+        let f = &fills[0];
+        assert_eq!((f.agent.as_str(), f.side, f.price, f.quantity, f.taker),
+                   ("a", Side::Buy, price, 3_000.0, false));
+        assert_eq!(f.counterparty, "flow");
+        let mut rng = GameRng::from_seed(42);
+        let before = rng.clone();
+        settle_price_through_book_with_orders(
+            &company(), 99.0, 20_000.0, &SettleOptions::default(), &orders, &mut rng);
+        assert_eq!(draws_consumed(&before, &rng), 4);
+    }
+
+    /// A slice smaller than the order fills it in part; the next slice
+    /// continues where it stopped.
+    #[test]
+    fn a_slice_smaller_than_the_order_fills_it_in_part() {
+        let bid = build_live_book(&company(), &LiveBookOptions::default())
+            .best_bid()
+            .unwrap();
+        let orders = vec![resting("a-0", Side::Buy, bid + 0.01, 7_000.0)];
+        let (_, fills) = settle_price_through_book_with_orders(
+            &company(), 99.0, 20_000.0, &SettleOptions::default(), &orders,
+            &mut Fixed([0.9, 0.9, 0.9, 0.9], 0));
+        let q: Vec<f64> = fills.iter().map(|f| f.quantity).collect();
+        assert_eq!(q, vec![5_000.0, 2_000.0]);
+    }
+
+    /// A resting order the re-quote leaves crossed trades against the
+    /// ladder at the ladder's price, before the flow, as a taker.
+    #[test]
+    fn a_crossed_resting_order_takes_the_ladder_before_the_flow() {
+        let ask = build_live_book(&company(), &LiveBookOptions::default())
+            .best_ask()
+            .unwrap();
+        let orders = vec![resting("a-0", Side::Buy, ask + 0.05, 1_000.0)];
+        let (_, fills) = settle_price_through_book_with_orders(
+            &company(), 100.0, 20_000.0, &SettleOptions::default(), &orders,
+            &mut Fixed([0.9, 0.9, 0.9, 0.9], 0));
+        let f = &fills[0];
+        assert!(f.taker);
+        assert_eq!((f.price, f.quantity, f.counterparty.as_str()), (ask, 1_000.0, MARKET_MAKER_ID));
     }
 
     #[test]

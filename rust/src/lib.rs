@@ -30,6 +30,7 @@
 // for, so the lint is silenced here with the reason rather than at each site.
 #![allow(clippy::neg_cmp_op_on_partial_ord)]
 
+pub mod agent_book;
 pub mod economy;
 pub mod engine;
 pub mod fair_value;

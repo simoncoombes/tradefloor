@@ -1245,6 +1245,242 @@ impl PyEngine {
     }
 }
 
+/// The agents' half of the binding, kept off the Python surface.
+impl PyEngine {
+    fn submit_one(
+        &mut self,
+        agent: &str,
+        ticker: &str,
+        quantity: f64,
+        limit_price: Option<f64>,
+        order_id: Option<String>,
+    ) -> PyResult<crate::engine::OrderReport> {
+        if !quantity.is_finite() || quantity == 0.0 {
+            return Err(ValidationError::new_err(format!(
+                "quantity must be non-zero and finite, got {quantity}"
+            )));
+        }
+        if !self.tickers.iter().any(|t| t == ticker) {
+            return Err(ValidationError::new_err(format!(
+                "no instrument with ticker {ticker:?} in this universe"
+            )));
+        }
+        let side = if quantity > 0.0 {
+            crate::order_book::Side::Buy
+        } else {
+            crate::order_book::Side::Sell
+        };
+        // Validated by the core before it changes anything, so a refused
+        // order is logged by nobody: it did not happen.
+        let report = self
+            .inner
+            .submit_order(agent, ticker, side, quantity.abs(), limit_price, order_id.clone())
+            .map_err(crate::python_book::OrderError::new_err)?;
+        self.log.push(crate::python_log::LogEntry::Submit {
+            agent: agent.to_string(),
+            ticker: ticker.to_string(),
+            quantity,
+            limit_price,
+            order_id,
+        });
+        Ok(report)
+    }
+}
+
+fn side_str(side: crate::order_book::Side) -> &'static str {
+    match side {
+        crate::order_book::Side::Buy => "buy",
+        crate::order_book::Side::Sell => "sell",
+    }
+}
+
+fn parse_side_str(s: &str) -> PyResult<crate::order_book::Side> {
+    match s {
+        "buy" => Ok(crate::order_book::Side::Buy),
+        "sell" => Ok(crate::order_book::Side::Sell),
+        other => Err(ValidationError::new_err(format!("unknown side {other:?}"))),
+    }
+}
+
+fn fill_to_py(py: Python<'_>, f: &crate::agent_book::AgentFill) -> PyResult<PyObject> {
+    let d = PyDict::new_bound(py);
+    d.set_item("agent", &f.agent)?;
+    d.set_item("order_id", &f.order_id)?;
+    d.set_item("ticker", &f.ticker)?;
+    d.set_item("side", side_str(f.side))?;
+    d.set_item("quantity", f.quantity)?;
+    d.set_item("price", f.price)?;
+    d.set_item("liquidity", f.liquidity.as_str())?;
+    d.set_item("counterparty", &f.counterparty)?;
+    d.set_item("reference", f.reference)?;
+    d.set_item("day", f.day)?;
+    d.set_item("tick", f.tick)?;
+    d.set_item("sequence", f.sequence)?;
+    Ok(d.into())
+}
+
+fn order_to_py(py: Python<'_>, o: &crate::agent_book::AgentOrder) -> PyResult<PyObject> {
+    let d = PyDict::new_bound(py);
+    d.set_item("order_id", &o.id)?;
+    d.set_item("agent", &o.agent)?;
+    d.set_item("ticker", &o.ticker)?;
+    d.set_item("side", side_str(o.side))?;
+    d.set_item("limit_price", o.limit)?;
+    d.set_item("quantity", o.quantity)?;
+    d.set_item("remaining", o.remaining)?;
+    d.set_item("sequence", o.sequence)?;
+    d.set_item("mode", o.mode.as_str())?;
+    Ok(d.into())
+}
+
+fn report_to_py(py: Python<'_>, r: &crate::engine::OrderReport) -> PyResult<PyObject> {
+    let d = PyDict::new_bound(py);
+    d.set_item("order_id", &r.order_id)?;
+    d.set_item("agent", &r.agent)?;
+    d.set_item("ticker", &r.ticker)?;
+    d.set_item("side", side_str(r.side))?;
+    d.set_item("requested", r.requested)?;
+    d.set_item("filled", r.filled)?;
+    d.set_item("average_price", r.average_price)?;
+    d.set_item("worst_price", r.worst_price)?;
+    d.set_item("reference", r.reference)?;
+    d.set_item("resting", r.resting)?;
+    d.set_item("unfilled", r.unfilled)?;
+    d.set_item("mode", r.mode.map(|m| m.as_str()))?;
+    let fills: PyResult<Vec<PyObject>> = r.fills.iter().map(|f| fill_to_py(py, f)).collect();
+    d.set_item("fills", fills?)?;
+    Ok(d.into())
+}
+
+/// The snapshot's `book` entry. See `Engine::state_hash`, which hashes the
+/// same fields in the same order.
+fn book_to_py(py: Python<'_>, book: &crate::agent_book::BookState) -> PyResult<Py<PyDict>> {
+    let d = PyDict::new_bound(py);
+    d.set_item("sequence", book.sequence)?;
+    d.set_item("fill_sequence", book.fill_sequence)?;
+    let flat: Vec<f64> = book.taken.iter().flat_map(|row| row.iter().copied()).collect();
+    d.set_item("taken", f64_bytes(py, &flat))?;
+    let orders: PyResult<Vec<PyObject>> = book.orders.iter().map(|o| order_to_py(py, o)).collect();
+    d.set_item("orders", orders?)?;
+    let flow = pyo3::types::PyList::empty_bound(py);
+    for (agent, ticker, bought, sold) in &book.flow {
+        flow.append((agent.as_str(), ticker.as_str(), *bought, *sold))?;
+    }
+    d.set_item("flow", flow)?;
+    let fills: PyResult<Vec<PyObject>> = book.fills.iter().map(|f| fill_to_py(py, f)).collect();
+    d.set_item("fills", fills?)?;
+    let impacts = pyo3::types::PyList::empty_bound(py);
+    for r in &book.impacts {
+        let x = PyDict::new_bound(py);
+        x.set_item("agent", &r.agent)?;
+        x.set_item("ticker", &r.ticker)?;
+        x.set_item("bought", r.bought)?;
+        x.set_item("sold", r.sold)?;
+        x.set_item("permanent", r.permanent)?;
+        x.set_item("day", r.day)?;
+        x.set_item("tick", r.tick)?;
+        impacts.append(x)?;
+    }
+    d.set_item("impacts", impacts)?;
+    Ok(d.into())
+}
+
+fn book_from_py(d: &Bound<'_, PyDict>) -> PyResult<crate::agent_book::BookState> {
+    use crate::agent_book::*;
+    let get = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
+        d.get_item(k)?
+            .ok_or_else(|| ValidationError::new_err(format!("the snapshot's book has no {k:?}")))
+    };
+    let mut state = BookState {
+        sequence: get("sequence")?.extract()?,
+        fill_sequence: get("fill_sequence")?.extract()?,
+        ..Default::default()
+    };
+    let raw: Vec<u8> = get("taken")?.extract()?;
+    if raw.len() % (8 * TAKEN_WIDTH) != 0 {
+        return Err(ValidationError::new_err("the snapshot's book `taken` is not whole rows"));
+    }
+    for row in raw.chunks(8 * TAKEN_WIDTH) {
+        let mut r = [0.0; TAKEN_WIDTH];
+        for (k, bytes) in row.chunks(8).enumerate() {
+            let mut b = [0u8; 8];
+            b.copy_from_slice(bytes);
+            r[k] = f64::from_le_bytes(b);
+        }
+        state.taken.push(r);
+    }
+    for item in get("orders")?.iter()? {
+        let o = item?;
+        let o = o.downcast::<PyDict>()?;
+        let g = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
+            o.get_item(k)?
+                .ok_or_else(|| ValidationError::new_err(format!("a snapshot order has no {k:?}")))
+        };
+        let side: String = g("side")?.extract()?;
+        let mode: String = g("mode")?.extract()?;
+        state.orders.push(AgentOrder {
+            id: g("order_id")?.extract()?,
+            agent: g("agent")?.extract()?,
+            ticker: g("ticker")?.extract()?,
+            side: parse_side_str(&side)?,
+            limit: g("limit_price")?.extract()?,
+            quantity: g("quantity")?.extract()?,
+            remaining: g("remaining")?.extract()?,
+            sequence: g("sequence")?.extract()?,
+            mode: RestMode::parse(&mode)
+                .ok_or_else(|| ValidationError::new_err(format!("unknown order mode {mode:?}")))?,
+        });
+    }
+    for item in get("flow")?.iter()? {
+        let (agent, ticker, bought, sold): (String, String, f64, f64) = item?.extract()?;
+        state.flow.push((agent, ticker, bought, sold));
+    }
+    for item in get("fills")?.iter()? {
+        let f = item?;
+        let f = f.downcast::<PyDict>()?;
+        let g = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
+            f.get_item(k)?
+                .ok_or_else(|| ValidationError::new_err(format!("a snapshot fill has no {k:?}")))
+        };
+        let side: String = g("side")?.extract()?;
+        let liquidity: String = g("liquidity")?.extract()?;
+        state.fills.push(AgentFill {
+            agent: g("agent")?.extract()?,
+            order_id: g("order_id")?.extract()?,
+            ticker: g("ticker")?.extract()?,
+            side: parse_side_str(&side)?,
+            quantity: g("quantity")?.extract()?,
+            price: g("price")?.extract()?,
+            liquidity: Liquidity::parse(&liquidity).ok_or_else(|| {
+                ValidationError::new_err(format!("unknown liquidity {liquidity:?}"))
+            })?,
+            counterparty: g("counterparty")?.extract()?,
+            reference: g("reference")?.extract()?,
+            day: g("day")?.extract()?,
+            tick: g("tick")?.extract()?,
+            sequence: g("sequence")?.extract()?,
+        });
+    }
+    for item in get("impacts")?.iter()? {
+        let r = item?;
+        let r = r.downcast::<PyDict>()?;
+        let g = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
+            r.get_item(k)?
+                .ok_or_else(|| ValidationError::new_err(format!("a snapshot impact has no {k:?}")))
+        };
+        state.impacts.push(AgentImpact {
+            agent: g("agent")?.extract()?,
+            ticker: g("ticker")?.extract()?,
+            bought: g("bought")?.extract()?,
+            sold: g("sold")?.extract()?,
+            permanent: g("permanent")?.extract()?,
+            day: g("day")?.extract()?,
+            tick: g("tick")?.extract()?,
+        });
+    }
+    Ok(state)
+}
+
 #[pymethods]
 impl PyEngine {
     /// Build an engine over a universe.
@@ -3522,6 +3758,13 @@ impl PyEngine {
             block.set_item("closed_since_open", rates.closed_since_open)?;
             out.set_item("rates", block)?;
         }
+        // The agent-facing book, only once it has been used, so every
+        // snapshot of a run that never saw an agent's order is the dict it
+        // was before the book existed. `manifest.state_hash` accepts it
+        // exactly when it is here.
+        if !self.inner.book_state().is_pristine() {
+            out.set_item("book", book_to_py(py, self.inner.book_state())?)?;
+        }
         Ok(out.into())
     }
 
@@ -4135,6 +4378,14 @@ impl PyEngine {
                 book.closed_since_open = closed;
             }
         }
+        // The book is part of the state: restored when the snapshot carries
+        // it, and pristine when it does not, so a restore never keeps the
+        // orders or the consumed depth of the market it replaced.
+        let book = match snapshot.get_item("book")? {
+            Some(raw) => book_from_py(raw.downcast::<PyDict>()?)?,
+            None => crate::agent_book::BookState::default(),
+        };
+        self.inner.set_book_state(book).map_err(ValidationError::new_err)?;
         Ok(())
     }
 
@@ -4670,6 +4921,167 @@ impl PyEngine {
     #[getter]
     fn recorded_book_rows(&self) -> usize {
         self.recorded_book.len()
+    }
+
+    // ── Agents' orders ────────────────────────────────────────────────────
+
+    /// Send one agent's order to this market's book.
+    ///
+    /// ``quantity`` is signed, positive to buy, as ``Portfolio.execute``
+    /// takes it. ``limit_price=None`` is a market order: it takes what the
+    /// book holds and the rest is reported ``unfilled``. A limit order takes
+    /// what the book holds at its limit or better, and its remainder waits,
+    /// in the book's queue with ``book_resting`` on, or for the traded range
+    /// with it off; ``resting`` says how much. ``order_id`` is optional and
+    /// must be unique among waiting orders; the engine assigns
+    /// ``"{agent}-{n}"`` otherwise.
+    ///
+    /// Every share taken is taker flow: it reaches the market once, on the
+    /// next tick that is not closed, with every other agent's, and the fills
+    /// are reported both here and in ``take_fills``. Orders are processed in
+    /// the order they arrive; ``submit_many`` fixes that order for a step.
+    ///
+    /// Returns a dict: ``order_id``, ``agent``, ``ticker``, ``side``,
+    /// ``requested``, ``filled``, ``average_price``, ``worst_price``,
+    /// ``reference`` (the mid the order met), ``resting``, ``unfilled``,
+    /// ``mode`` (``"queue"``, ``"range"`` or None) and ``fills``.
+    ///
+    /// Recorded in the order log, so a replay and a fork carry it.
+    #[pyo3(signature = (agent, ticker, quantity, *, limit_price = None, order_id = None))]
+    fn submit(
+        &mut self,
+        py: Python<'_>,
+        agent: &str,
+        ticker: &str,
+        quantity: f64,
+        limit_price: Option<f64>,
+        order_id: Option<String>,
+    ) -> PyResult<PyObject> {
+        let report = self.submit_one(agent, ticker, quantity, limit_price, order_id)?;
+        report_to_py(py, &report)
+    }
+
+    /// Send several agents' orders for one step, in a fixed order.
+    ///
+    /// ``orders`` is a list of dicts with ``agent``, ``ticker``,
+    /// ``quantity`` and optionally ``limit_price`` and ``order_id``. They
+    /// are processed sorted by agent label, and within one agent in the
+    /// order the list gives: the arrival order of a step is a property of
+    /// who sent what, never of how the caller happened to build the list,
+    /// so the same orders give the same market. Each one meets the book the
+    /// ones before it left, so an agent later in the order pays for the
+    /// levels an earlier one took and can hit an earlier one's resting
+    /// order.
+    ///
+    /// Returns one report per order, in the order they were processed. An
+    /// order the engine refuses raises, and the orders before it stand.
+    fn submit_many(&mut self, py: Python<'_>, orders: Vec<Bound<'_, PyDict>>) -> PyResult<Vec<PyObject>> {
+        let mut parsed: Vec<(String, usize, String, f64, Option<f64>, Option<String>)> = Vec::new();
+        for (i, d) in orders.iter().enumerate() {
+            let get = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
+                d.get_item(k)?.ok_or_else(|| {
+                    ValidationError::new_err(format!("order {i} has no {k:?}"))
+                })
+            };
+            let agent: String = get("agent")?.extract()?;
+            let ticker: String = get("ticker")?.extract()?;
+            let quantity: f64 = get("quantity")?.extract()?;
+            let limit: Option<f64> = match d.get_item("limit_price")? {
+                Some(v) if !v.is_none() => Some(v.extract()?),
+                _ => None,
+            };
+            let id: Option<String> = match d.get_item("order_id")? {
+                Some(v) if !v.is_none() => Some(v.extract()?),
+                _ => None,
+            };
+            parsed.push((agent, i, ticker, quantity, limit, id));
+        }
+        // Stable on the list position, so one agent's orders keep theirs.
+        parsed.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+        let mut out = Vec::with_capacity(parsed.len());
+        for (agent, _, ticker, quantity, limit, id) in parsed {
+            let report = self.submit_one(&agent, &ticker, quantity, limit, id)?;
+            out.push(report_to_py(py, &report)?);
+        }
+        Ok(out)
+    }
+
+    /// Cancel a waiting order. With ``agent``, only that agent's. Returns
+    /// whether one was removed. Recorded in the order log.
+    #[pyo3(signature = (order_id, *, agent = None))]
+    fn cancel(&mut self, order_id: &str, agent: Option<String>) -> bool {
+        self.log.push(crate::python_log::LogEntry::Cancel {
+            order_id: order_id.to_string(),
+            agent: agent.clone(),
+        });
+        self.inner.cancel_order(order_id, agent.as_deref())
+    }
+
+    /// Waiting orders, in arrival order, for one agent or all: dicts with
+    /// ``order_id``, ``agent``, ``ticker``, ``side``, ``limit_price``,
+    /// ``quantity``, ``remaining``, ``sequence`` and ``mode``. A read.
+    #[pyo3(signature = (agent = None))]
+    fn open_orders(&self, py: Python<'_>, agent: Option<String>) -> PyResult<Vec<PyObject>> {
+        self.inner
+            .open_orders(agent.as_deref())
+            .iter()
+            .map(|o| order_to_py(py, o))
+            .collect()
+    }
+
+    /// Collect the fills the book holds for one agent, or for all, in the
+    /// order they happened, and forget them.
+    ///
+    /// Each is a dict: ``agent``, ``order_id``, ``ticker``, ``side``,
+    /// ``quantity``, ``price``, ``liquidity`` (``"taker"``, ``"maker"`` or
+    /// ``"range"``), ``counterparty`` (``"mm"``, ``"depth"``, ``"flow"``,
+    /// ``"range"`` or another agent's label), ``reference``, ``day``,
+    /// ``tick`` and ``sequence``. A resting order the model's flow filled
+    /// during a session arrives here, and only here. Recorded in the order
+    /// log, because the book no longer owes what was collected.
+    #[pyo3(signature = (agent = None))]
+    fn take_fills(&mut self, py: Python<'_>, agent: Option<String>) -> PyResult<Vec<PyObject>> {
+        self.log.push(crate::python_log::LogEntry::TakeFills { agent: agent.clone() });
+        self.inner
+            .take_fills(agent.as_deref())
+            .iter()
+            .map(|f| fill_to_py(py, f))
+            .collect()
+    }
+
+    /// Collect each agent's permanent impact, one row per agent, name and
+    /// tick its flow reached the market, and forget them.
+    ///
+    /// ``permanent`` is the change to the name's ``s`` the agent's fills
+    /// made, in log units: exact under ``fill_impact_coefficient``, whose
+    /// law is linear and additive, and the tick's flow impact shared pro
+    /// rata by signed shares under the imbalance law. Recorded in the log.
+    #[pyo3(signature = (agent = None))]
+    fn take_impacts(&mut self, py: Python<'_>, agent: Option<String>) -> PyResult<Vec<PyObject>> {
+        self.log.push(crate::python_log::LogEntry::TakeImpacts { agent: agent.clone() });
+        self.inner
+            .take_impacts(agent.as_deref())
+            .iter()
+            .map(|r| {
+                let d = PyDict::new_bound(py);
+                d.set_item("agent", &r.agent)?;
+                d.set_item("ticker", &r.ticker)?;
+                d.set_item("bought", r.bought)?;
+                d.set_item("sold", r.sold)?;
+                d.set_item("permanent", r.permanent)?;
+                d.set_item("day", r.day)?;
+                d.set_item("tick", r.tick)?;
+                Ok(d.into())
+            })
+            .collect()
+    }
+
+    /// Whether an agent's order executes in this engine rather than being
+    /// priced off a snapshot of the book: ``book_shared`` or
+    /// ``book_resting`` is on. ``Portfolio.execute`` reads this.
+    #[getter]
+    fn book_live(&self) -> bool {
+        self.inner.book_live()
     }
 
     /// Every input that crossed into this engine, in order.

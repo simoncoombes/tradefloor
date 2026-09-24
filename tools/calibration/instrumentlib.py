@@ -655,6 +655,22 @@ PARAM_SPECS: dict[str, dict] = {
     "corporate_yield_daily": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
                               "derived": True},
     "cascade_gain": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # The agent-facing book (2026-09-24, feature/order-book-depth). Read only
+    # on an agent's path, so no untraded statistic moves with any of them.
+    "book_depth_coefficient": {"kind": "abs", "step_unit": 0.05,
+                               "hard_range": (0.0, 10.0), "derived": False},
+    "book_depth_exponent": {"kind": "abs", "step_unit": 0.05,
+                            "hard_range": (0.0, 1.0), "derived": False},
+    "book_depth_reach": {"kind": "abs", "step_unit": 0.25,
+                         "hard_range": (0.0, 10.0), "derived": False},
+    "book_shared": {"kind": "abs", "step_unit": 1.0,
+                    "hard_range": (0.0, 1.0), "derived": False},
+    "book_refill_half_life": {"kind": "abs", "step_unit": 1.0,
+                              "hard_range": (0.0, 390.0), "derived": True},
+    "book_resting": {"kind": "abs", "step_unit": 1.0,
+                     "hard_range": (0.0, 1.0), "derived": False},
+    "fill_impact_coefficient": {"kind": "abs", "step_unit": 0.01,
+                                "hard_range": (0.0, 5.0), "derived": False},
     # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
     # the tape's three epicentre episodes (2.43, 1.93, 1.41). 0.0 is the
     # branch not taken; the range opens at zero to hold it and stops at 3.0,

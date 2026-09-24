@@ -191,6 +191,33 @@ pub struct TickOutcome {
     pub draws_consumed: usize,
 }
 
+/// What an agent's order did when it met the book.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OrderReport {
+    pub order_id: String,
+    pub agent: String,
+    pub ticker: String,
+    pub side: crate::order_book::Side,
+    pub requested: f64,
+    /// Shares taken from the book on arrival.
+    pub filled: f64,
+    /// Volume-weighted across the taker fills, or `None` if none.
+    pub average_price: Option<f64>,
+    /// The last level the order reached, or `None` if it took nothing.
+    pub worst_price: Option<f64>,
+    /// The mid of the book the order met.
+    pub reference: f64,
+    /// Shares left waiting, in the queue or for the traded range.
+    pub resting: f64,
+    /// Shares of a market order the book could not fill. Zero for a limit
+    /// order, whose remainder waits.
+    pub unfilled: f64,
+    /// How the remainder waits, when it does.
+    pub mode: Option<crate::agent_book::RestMode>,
+    /// The taker fills, one per level, in the order the order took them.
+    pub fills: Vec<crate::agent_book::AgentFill>,
+}
+
 /// What the embedder supplies at the close of a simulated day.
 #[derive(Debug, Clone)]
 pub struct DayCloseRequest<'a> {
@@ -537,6 +564,14 @@ pub struct Engine {
     /// draws and write nothing back to the economy, so adding them leaves
     /// every equity price bit-identical. See `crate::rates`.
     rates: crate::rates::RateBook,
+    /// The agent-facing book's state: consumed depth, agents' waiting
+    /// orders, their taker flow not yet applied, and fills and impact rows
+    /// not yet collected. See `crate::agent_book`.
+    ///
+    /// Pristine on every engine no agent has sent an order through, and a
+    /// pristine state takes no part in a tick, the state hash or the
+    /// snapshot, so every such run is the one it was before this existed.
+    book: crate::agent_book::BookState,
 }
 
 impl Engine {
@@ -1009,6 +1044,7 @@ impl Engine {
             last_index_variance: None,
             last_market_targets: None,
             rates: crate::rates::RateBook::default(),
+            book: crate::agent_book::BookState::default(),
         };
         engine.vix_anchor = engine.derive_vix_anchor();
         // The opening meeting interval, 45 calendar days, onto the macro
@@ -2001,6 +2037,77 @@ impl Engine {
         if !self.opening_z.is_empty() && status != crate::market::MarketStatus::Closed {
             self.apply_opening();
         }
+        // The agent-facing book's part of the tick, before the market moves:
+        // the maker re-quotes on the inventory agents left it and the
+        // consumed depth refills; agents' taker flow reaches the market,
+        // once, on the first tick that is not closed; resting orders join
+        // the settlement book. None of it runs on an engine no agent has
+        // used, which is what keeps every such tick the tick it was.
+        let book_on = !self.book.is_pristine();
+        let open_now = status == MarketStatus::Open;
+        if book_on && open_now {
+            self.requote_book();
+        }
+        let mut merged_flow: Option<Vec<(String, OrderVolume)>> = None;
+        let mut fill_impact: Vec<f64> = Vec::new();
+        let mut applied: Vec<(String, String, f64, f64)> = Vec::new();
+        if book_on && status != MarketStatus::Closed && !self.book.flow.is_empty() {
+            applied = std::mem::take(&mut self.book.flow);
+            if self.params.fill_impact_coefficient != 0.0 {
+                fill_impact = vec![0.0; self.companies.len()];
+                for (_, t, b, s) in &applied {
+                    if let Some(i) = self.companies.iter().position(|c| &c.ticker == t) {
+                        fill_impact[i] += self.fill_impact_of(i, b - s);
+                    }
+                }
+            } else {
+                let mut agg: Vec<(String, OrderVolume)> = Vec::new();
+                for (_, t, b, s) in &applied {
+                    match agg.iter_mut().find(|(x, _)| x == t) {
+                        Some((_, v)) => {
+                            v.buy += *b;
+                            v.sell += *s;
+                        }
+                        None => agg.push((t.clone(), OrderVolume { buy: *b, sell: *s })),
+                    }
+                }
+                merged_flow = Some(merge_order_volumes(request.order_volumes, &agg));
+            }
+        }
+        let resting: Vec<Vec<crate::microstructure::RestingOrder>> = if book_on
+            && open_now
+            && self.book.orders.iter().any(|o| o.mode == crate::agent_book::RestMode::Queue)
+        {
+            let mut per: Vec<Vec<crate::microstructure::RestingOrder>> =
+                vec![Vec::new(); self.companies.len()];
+            for o in &self.book.orders {
+                if o.mode != crate::agent_book::RestMode::Queue {
+                    continue;
+                }
+                if let Some(i) = self.companies.iter().position(|c| c.ticker == o.ticker) {
+                    per[i].push(crate::microstructure::RestingOrder {
+                        id: o.id.clone(),
+                        side: o.side,
+                        price: o.limit,
+                        quantity: o.remaining,
+                        owner_id: o.agent.clone(),
+                    });
+                }
+            }
+            per
+        } else {
+            Vec::new()
+        };
+        let prints_before: Vec<f64> = if book_on {
+            self.companies.iter().map(|c| c.stock.price).collect()
+        } else {
+            Vec::new()
+        };
+        let order_volumes: &[(String, OrderVolume)] = match &merged_flow {
+            Some(flow) => flow.as_slice(),
+            None => request.order_volumes,
+        };
+
         let outcome = simulate_market_tick(
             &mut self.companies,
             &TickInputs {
@@ -2029,13 +2136,15 @@ impl Engine {
                 volatility_multiplier: request.volatility_multiplier,
                 news: request.news,
                 news_impact_queue: request.news_impact_queue,
-                order_volumes: request.order_volumes,
+                order_volumes,
                 sector_keys: &self.sector_keys,
                 sector_sigmas: &sector_sigmas,
                 market_sigma_daily,
                 vix_anchor: self.vix_anchor,
                 settle_draws,
                 settle_depth_counterfactual: self.settle_depth_counterfactual,
+                resting_orders: &resting,
+                fill_impact: &fill_impact,
                 nominal_output_base: self.nominal_output_base,
                 // Resolved at this session's `open_market` and fixed for
                 // the day; `None` on every preset before pt-v19.
@@ -2179,12 +2288,558 @@ impl Engine {
             }
         }
 
+        if book_on {
+            self.settle_book(&outcome, &applied, &prints_before, open_now);
+        }
+
         TickOutcome {
             market_status: status,
             active_indices: outcome.active_indices,
             fair_values: outcome.fair_values,
             volumes: outcome.volumes,
             draws_consumed: 0,
+        }
+    }
+
+    /// The maker re-quotes: the inventory agents left it lands, its ladder
+    /// is whole again, and consumed latent depth refills by one tick.
+    fn requote_book(&mut self) {
+        use crate::agent_book::*;
+        let refill = refill_factor(&self.params);
+        for (i, row) in self.book.taken.iter_mut().enumerate() {
+            if row[TAKEN_MAKER_INVENTORY] != 0.0 {
+                if let Some(c) = self.companies.get_mut(i) {
+                    c.stock.maker_inventory =
+                        Some(c.stock.maker_inventory.unwrap_or(0.0) + row[TAKEN_MAKER_INVENTORY]);
+                }
+                row[TAKEN_MAKER_INVENTORY] = 0.0;
+            }
+            row[TAKEN_MAKER_BID] = 0.0;
+            row[TAKEN_MAKER_ASK] = 0.0;
+            for k in [TAKEN_DEPTH_BID, TAKEN_DEPTH_ASK] {
+                // Below a millionth of a share it is gone, rather than a
+                // geometric tail that never reaches zero.
+                row[k] = if row[k] * refill < 1e-6 { 0.0 } else { row[k] * refill };
+            }
+        }
+    }
+
+    /// The linear law's change to one name's `s` for a net signed size:
+    /// `gamma * sigma * net / V`.
+    fn fill_impact_of(&self, index: usize, net: f64) -> f64 {
+        let c = &self.companies[index];
+        let sigma = crate::agent_book::daily_sigma(c, self.market_vol.sigma_daily());
+        self.params.fill_impact_coefficient * sigma * net / crate::agent_book::daily_volume(c)
+    }
+
+    /// After the market moved: attribute the flow that was applied, record
+    /// the fills of resting orders in the settlement, and fill any waiting
+    /// limit the tick's print reached.
+    fn settle_book(
+        &mut self,
+        outcome: &crate::market::TickOutcome,
+        applied: &[(String, String, f64, f64)],
+        prints_before: &[f64],
+        open_now: bool,
+    ) {
+        use crate::agent_book::*;
+        let (day, tick) = (self.current_day, self.ticks_today());
+
+        // Permanent impact, per agent and name.
+        let linear = self.params.fill_impact_coefficient != 0.0;
+        for (agent, t, b, s) in applied {
+            let Some(i) = self.companies.iter().position(|c| &c.ticker == t) else {
+                continue;
+            };
+            let Some(n) = outcome.active_indices.iter().position(|&x| x == i) else {
+                continue;
+            };
+            let permanent = if linear {
+                self.fill_impact_of(i, b - s)
+            } else {
+                let mut net = 0.0;
+                for (_, t2, b2, s2) in applied {
+                    if t2 == t {
+                        net += b2 - s2;
+                    }
+                }
+                if net == 0.0 {
+                    0.0
+                } else {
+                    outcome.s_components[n][4] * (b - s) / net
+                }
+            };
+            self.book.impacts.push(AgentImpact {
+                agent: agent.clone(),
+                ticker: t.clone(),
+                bought: *b,
+                sold: *s,
+                permanent,
+                day,
+                tick,
+            });
+        }
+
+        // Resting orders the settlement filled. A resting order the maker's
+        // re-quote left crossed took liquidity, so its share of the fills
+        // is taker flow like any other agent's, and reaches the market on
+        // the next tick. Left out, a standing bid at the ask would take the
+        // maker's fresh size every tick and never pay the impact of it.
+        for (i, f) in &outcome.agent_fills {
+            let ticker = self.companies[*i].ticker.clone();
+            if f.taker {
+                self.book.add_flow(&f.agent, &ticker, f.side, f.quantity);
+            }
+            self.reduce_order(&f.order_id, f.quantity);
+            self.push_fill(AgentFill {
+                agent: f.agent.clone(),
+                order_id: f.order_id.clone(),
+                ticker,
+                side: f.side,
+                quantity: f.quantity,
+                price: f.price,
+                liquidity: if f.taker { Liquidity::Taker } else { Liquidity::Maker },
+                counterparty: f.counterparty.clone(),
+                reference: prints_before.get(*i).copied().unwrap_or(f64::NAN),
+                day,
+                tick,
+                sequence: 0,
+            });
+        }
+
+        // Limits waiting for the traded range.
+        if open_now {
+            let waiting: Vec<AgentOrder> = self
+                .book
+                .orders
+                .iter()
+                .filter(|o| o.mode == RestMode::Range)
+                .cloned()
+                .collect();
+            for o in waiting {
+                let Some(i) = self.companies.iter().position(|c| c.ticker == o.ticker) else {
+                    continue;
+                };
+                if !outcome.active_indices.contains(&i) {
+                    continue;
+                }
+                let print = self.companies[i].stock.price;
+                if !range_reached(o.side, o.limit, print) {
+                    continue;
+                }
+                self.reduce_order(&o.id, o.remaining);
+                self.push_fill(AgentFill {
+                    agent: o.agent.clone(),
+                    order_id: o.id.clone(),
+                    ticker: o.ticker.clone(),
+                    side: o.side,
+                    quantity: o.remaining,
+                    price: o.limit,
+                    liquidity: Liquidity::Range,
+                    counterparty: RANGE_OWNER.to_string(),
+                    reference: prints_before.get(i).copied().unwrap_or(f64::NAN),
+                    day,
+                    tick,
+                    sequence: 0,
+                });
+            }
+        }
+    }
+
+    // ── Agents' orders: the agent-facing book ──────────────────────────────
+    //
+    // `crate::agent_book` carries the model. What is here is the engine's
+    // half: an order meeting the book, what it leaves behind, and what the
+    // tick does with it.
+
+    /// The agent-facing book's state, for a snapshot.
+    pub fn book_state(&self) -> &crate::agent_book::BookState {
+        &self.book
+    }
+
+    /// Install a book state, for a restore. `taken` must follow the roster
+    /// or be empty.
+    pub fn set_book_state(&mut self, state: crate::agent_book::BookState) -> Result<(), String> {
+        if !state.taken.is_empty() && state.taken.len() != self.companies.len() {
+            return Err(format!(
+                "the book's consumed-depth table has {} rows and the roster {} names",
+                state.taken.len(),
+                self.companies.len()
+            ));
+        }
+        self.book = state;
+        Ok(())
+    }
+
+    /// Whether an agent's order must execute in the engine rather than be
+    /// priced off a snapshot of the book: when agents consume the book they
+    /// share, or when their limit orders rest in it.
+    pub fn book_live(&self) -> bool {
+        self.params.book_shared != 0.0 || self.params.book_resting != 0.0
+    }
+
+    /// Whether the book a caller reads is the agent-facing one rather than
+    /// the maker's ladder alone.
+    fn agent_view(&self) -> bool {
+        self.book_live() || self.params.book_depth_coefficient != 0.0 || !self.book.is_pristine()
+    }
+
+    /// The ticks already run on the current day.
+    fn ticks_today(&self) -> u32 {
+        self.day_marks.last().map(|m| m.ticks).unwrap_or(0)
+    }
+
+    /// The agent-facing book for one name, leaving out one agent's orders.
+    fn agent_book_at(&self, index: usize, exclude: Option<&str>) -> Option<crate::order_book::OrderBook> {
+        let company = self.companies.get(index)?;
+        let taken = self
+            .book
+            .taken
+            .get(index)
+            .copied()
+            .unwrap_or([0.0; crate::agent_book::TAKEN_WIDTH]);
+        Some(crate::agent_book::agent_book(&crate::agent_book::AgentBookInputs {
+            company,
+            vix: self.economy.vix,
+            params: &self.params,
+            market_sigma_daily: self.market_vol.sigma_daily(),
+            taken,
+            orders: &self.book.orders,
+            exclude_agent: exclude,
+        }))
+    }
+
+    fn push_fill(&mut self, mut fill: crate::agent_book::AgentFill) -> crate::agent_book::AgentFill {
+        fill.sequence = self.book.fill_sequence;
+        self.book.fill_sequence += 1;
+        self.book.fills.push(fill.clone());
+        fill
+    }
+
+    /// Reduce a waiting order by a fill, removing it once it is done.
+    fn reduce_order(&mut self, order_id: &str, quantity: f64) {
+        if let Some(o) = self.book.orders.iter_mut().find(|o| o.id == order_id) {
+            o.remaining -= quantity;
+        }
+        self.book.orders.retain(|o| o.remaining > 1e-9);
+    }
+
+    /// An order meets the book an agent trades against, for one name.
+    ///
+    /// Everything it takes is recorded: the consumed depth and the maker's
+    /// inventory when the book is shared, the other agents' resting orders
+    /// it hit, a taker fill per level and, when `count_flow`, the taker flow
+    /// the next tick applies. Returns the taker fills and the mid the order
+    /// met.
+    fn meet_book(
+        &mut self,
+        index: usize,
+        agent: &str,
+        order_id: &str,
+        side: crate::order_book::Side,
+        quantity: f64,
+        limit: Option<f64>,
+        count_flow: bool,
+    ) -> (Vec<crate::agent_book::AgentFill>, f64) {
+        use crate::agent_book::{self as ab, AgentFill, Liquidity};
+        use crate::order_book::{Side, SubmitOptions};
+        let Some(mut book) = self.agent_book_at(index, Some(agent)) else {
+            return (Vec::new(), f64::NAN);
+        };
+        let ticker = self.companies[index].ticker.clone();
+        let reference = book.mid_price().unwrap_or(self.companies[index].stock.price);
+        let r = book.submit(
+            side,
+            quantity,
+            agent,
+            SubmitOptions { limit_price: limit, post_remainder: false, order_id: None },
+        );
+        let shared = self.params.book_shared != 0.0;
+        if shared {
+            self.book.fit(self.companies.len());
+        }
+        let (day, tick) = (self.current_day, self.ticks_today());
+        let mut taker = Vec::with_capacity(r.fills.len());
+        for f in &r.fills {
+            let owner = f.maker_id.as_str();
+            if shared {
+                if let Some(slot) = ab::taken_slot(side, owner) {
+                    self.book.taken[index][slot] += f.quantity;
+                }
+                if owner == crate::market_maker::MARKET_MAKER_ID {
+                    // The maker is opposite the taker; it quotes on this
+                    // from its next re-quote.
+                    self.book.taken[index][ab::TAKEN_MAKER_INVENTORY] += match side {
+                        Side::Buy => -f.quantity,
+                        Side::Sell => f.quantity,
+                    };
+                }
+            }
+            if !ab::is_house(owner) {
+                self.reduce_order(&f.maker_order_id, f.quantity);
+                self.push_fill(AgentFill {
+                    agent: owner.to_string(),
+                    order_id: f.maker_order_id.clone(),
+                    ticker: ticker.clone(),
+                    side: match side { Side::Buy => Side::Sell, Side::Sell => Side::Buy },
+                    quantity: f.quantity,
+                    price: f.price,
+                    liquidity: Liquidity::Maker,
+                    counterparty: agent.to_string(),
+                    reference,
+                    day,
+                    tick,
+                    sequence: 0,
+                });
+            }
+            let fill = self.push_fill(AgentFill {
+                agent: agent.to_string(),
+                order_id: order_id.to_string(),
+                ticker: ticker.clone(),
+                side,
+                quantity: f.quantity,
+                price: f.price,
+                liquidity: Liquidity::Taker,
+                counterparty: owner.to_string(),
+                reference,
+                day,
+                tick,
+                sequence: 0,
+            });
+            if count_flow {
+                self.book.add_flow(agent, &ticker, side, f.quantity);
+            }
+            taker.push(fill);
+        }
+        (taker, reference)
+    }
+
+    /// Match every resting order on one name that the book now crosses,
+    /// against the book at the book's prices, in arrival order.
+    ///
+    /// A resting order is never posted crossed, and a tick's settlement
+    /// matches any its re-quote crosses. What is left is the night: the
+    /// open moves every price without a tick, and an order the gap went
+    /// through would otherwise sit crossed for the first agent to pick off
+    /// at a price the market left behind. Matched here it fills at the
+    /// opening ladder's prices, as an opening auction would fill it, and
+    /// what it takes is taker flow like any other.
+    fn cross_resting(&mut self, index: usize) {
+        use crate::agent_book::RestMode;
+        use crate::order_book::Side;
+        let Some(ticker) = self.companies.get(index).map(|c| c.ticker.clone()) else {
+            return;
+        };
+        let ids: Vec<String> = self
+            .book
+            .orders
+            .iter()
+            .filter(|o| o.mode == RestMode::Queue && o.ticker == ticker)
+            .map(|o| o.id.clone())
+            .collect();
+        for id in ids {
+            let Some(o) = self.book.orders.iter().find(|o| o.id == id).cloned() else {
+                continue;
+            };
+            let Some(book) = self.agent_book_at(index, Some(&o.agent)) else {
+                continue;
+            };
+            let crossed = match o.side {
+                Side::Buy => book.best_ask().is_some_and(|a| o.limit >= a),
+                Side::Sell => book.best_bid().is_some_and(|b| o.limit <= b),
+            };
+            if !crossed {
+                continue;
+            }
+            let (fills, _) = self.meet_book(index, &o.agent, &o.id, o.side, o.remaining, Some(o.limit), true);
+            let filled: f64 = fills.iter().map(|f| f.quantity).sum();
+            self.reduce_order(&o.id, filled);
+        }
+    }
+
+    /// The book at the open: the maker's pending inventory lands, the
+    /// consumed depth is whole again, and crossed resting orders match.
+    fn open_book(&mut self) {
+        use crate::agent_book::{RestMode, TAKEN_MAKER_INVENTORY};
+        for (i, row) in self.book.taken.iter_mut().enumerate() {
+            if row[TAKEN_MAKER_INVENTORY] != 0.0 {
+                if let Some(c) = self.companies.get_mut(i) {
+                    c.stock.maker_inventory =
+                        Some(c.stock.maker_inventory.unwrap_or(0.0) + row[TAKEN_MAKER_INVENTORY]);
+                }
+            }
+            *row = [0.0; crate::agent_book::TAKEN_WIDTH];
+        }
+        let names: Vec<usize> = (0..self.companies.len())
+            .filter(|&i| {
+                let t = &self.companies[i].ticker;
+                self.book.orders.iter().any(|o| o.mode == RestMode::Queue && &o.ticker == t)
+            })
+            .collect();
+        for i in names {
+            self.cross_resting(i);
+        }
+    }
+
+    /// Send one agent's order to the book.
+    ///
+    /// A market order (`limit` None) takes what the book holds up to
+    /// `quantity` and the rest is unfilled. A limit order takes what the
+    /// book holds at its limit or better, and its remainder waits: resting
+    /// in the queue with `book_resting` on, outside the book for the traded
+    /// range with it off. Every share taken is taker flow, applied to the
+    /// market once, on the next open tick.
+    ///
+    /// Orders are processed in the order they arrive. A caller submitting
+    /// for several agents in one step decides that order, and
+    /// `PyEngine::submit_many` documents the one it uses.
+    #[allow(clippy::too_many_arguments)]
+    pub fn submit_order(
+        &mut self,
+        agent: &str,
+        ticker: &str,
+        side: crate::order_book::Side,
+        quantity: f64,
+        limit: Option<f64>,
+        order_id: Option<String>,
+    ) -> Result<OrderReport, String> {
+        use crate::agent_book::{self as ab, AgentOrder, RestMode};
+        if agent.is_empty() || ab::is_house(agent) {
+            return Err(format!(
+                "{agent:?} cannot place orders: agent labels are non-empty and \
+                 not one of the book's own owners (mm, depth, flow, range)"
+            ));
+        }
+        if !(quantity > 0.0) || !quantity.is_finite() {
+            return Err(format!("quantity must be finite and greater than zero, got {quantity}"));
+        }
+        if let Some(p) = limit {
+            if !(p > 0.0) || !p.is_finite() {
+                return Err(format!("limit_price must be finite and greater than zero, got {p}"));
+            }
+        }
+        let index = self
+            .companies
+            .iter()
+            .position(|c| c.ticker == ticker)
+            .ok_or_else(|| format!("no instrument with ticker {ticker:?}"))?;
+        let company = &self.companies[index];
+        if company.is_bankrupt || !company.is_public {
+            return Err(format!("{ticker} does not trade: it is bankrupt or no longer public"));
+        }
+        let id = match order_id {
+            Some(id) => {
+                if id.is_empty() {
+                    return Err("order_id cannot be empty".to_string());
+                }
+                id
+            }
+            None => format!("{agent}-{}", self.book.sequence),
+        };
+        if self.book.orders.iter().any(|o| o.id == id) {
+            return Err(format!("order id {id:?} is already waiting in the book"));
+        }
+        let sequence = self.book.sequence;
+        self.book.sequence += 1;
+
+        if self.book.orders.iter().any(|o| o.mode == RestMode::Queue && o.ticker == ticker) {
+            self.cross_resting(index);
+        }
+        let (fills, reference) = self.meet_book(index, agent, &id, side, quantity, limit, true);
+        let mut filled = 0.0;
+        let mut notional = 0.0;
+        let mut worst: Option<f64> = None;
+        for f in &fills {
+            filled += f.quantity;
+            notional += f.price * f.quantity;
+            worst = Some(f.price);
+        }
+        let remainder = quantity - filled;
+        let (resting, mode) = match limit {
+            Some(p) if remainder > 1e-9 => {
+                let mode = if self.params.book_resting != 0.0 { RestMode::Queue } else { RestMode::Range };
+                self.book.orders.push(AgentOrder {
+                    id: id.clone(),
+                    agent: agent.to_string(),
+                    ticker: ticker.to_string(),
+                    side,
+                    limit: p,
+                    quantity,
+                    remaining: remainder,
+                    sequence,
+                    mode,
+                });
+                (remainder, Some(mode))
+            }
+            _ => (0.0, None),
+        };
+        Ok(OrderReport {
+            order_id: id,
+            agent: agent.to_string(),
+            ticker: ticker.to_string(),
+            side,
+            requested: quantity,
+            filled,
+            average_price: if filled > 0.0 { Some(notional / filled) } else { None },
+            worst_price: worst,
+            reference,
+            resting,
+            unfilled: if mode.is_some() { 0.0 } else { remainder },
+            mode,
+            fills,
+        })
+    }
+
+    /// Cancel a waiting order. `agent`, when given, must own it. Returns
+    /// whether an order was removed.
+    pub fn cancel_order(&mut self, order_id: &str, agent: Option<&str>) -> bool {
+        let before = self.book.orders.len();
+        self.book
+            .orders
+            .retain(|o| !(o.id == order_id && agent.is_none_or(|a| a == o.agent)));
+        self.book.orders.len() != before
+    }
+
+    /// Waiting orders, in arrival order, for one agent or all.
+    pub fn open_orders(&self, agent: Option<&str>) -> Vec<crate::agent_book::AgentOrder> {
+        self.book
+            .orders
+            .iter()
+            .filter(|o| agent.is_none_or(|a| a == o.agent))
+            .cloned()
+            .collect()
+    }
+
+    /// Collect fills, for one agent or all, in the order they happened.
+    pub fn take_fills(&mut self, agent: Option<&str>) -> Vec<crate::agent_book::AgentFill> {
+        let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.book.fills)
+            .into_iter()
+            .partition(|f| agent.is_none_or(|a| a == f.agent));
+        self.book.fills = kept;
+        taken
+    }
+
+    /// Collect permanent-impact rows, for one agent or all.
+    pub fn take_impacts(&mut self, agent: Option<&str>) -> Vec<crate::agent_book::AgentImpact> {
+        let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.book.impacts)
+            .into_iter()
+            .partition(|f| agent.is_none_or(|a| a == f.agent));
+        self.book.impacts = kept;
+        taken
+    }
+
+    /// Queue fills that arrived from outside the engine (`run_session`'s
+    /// `fills`) as anonymous taker flow, so the linear law prices them too.
+    /// Only under `fill_impact_coefficient`; the imbalance law merges them
+    /// into the first tick's flow as it always has.
+    pub fn queue_external_fills(&mut self, fills: &[(String, OrderVolume)]) {
+        for (ticker, v) in fills {
+            if v.buy > 0.0 {
+                self.book.add_flow("", ticker, crate::order_book::Side::Buy, v.buy);
+            }
+            if v.sell > 0.0 {
+                self.book.add_flow("", ticker, crate::order_book::Side::Sell, v.sell);
+            }
         }
     }
 
@@ -2822,6 +3477,14 @@ impl Engine {
         // pin written since. No draw. Skipped on an engine without them.
         if !self.rates.is_empty() {
             self.rates.open(&self.economy);
+        }
+        // The book opens whole: the maker quotes afresh on its inventory,
+        // the night has refilled any consumed depth, and a resting order
+        // the night moved the price through is matched against the opening
+        // ladder at the ladder's prices, as an opening auction would fill
+        // it, rather than left crossed for the first agent to pick off.
+        if !self.book.is_pristine() {
+            self.open_book();
         }
     }
 
@@ -3901,7 +4564,14 @@ impl Engine {
         // The first tick's flow: the standing rate plus the fills, once.
         // Built only when there are fills, so a session without them reads
         // `order_volumes` on every tick exactly as it always did.
+        //
+        // Under `fill_impact_coefficient` the fills are agent fills priced by
+        // the linear law instead, so they join the book's pending flow and
+        // the first open tick applies them with every other agent's.
         let first_tick_flow = if request.fills.is_empty() {
+            None
+        } else if self.params.fill_impact_coefficient != 0.0 {
+            self.queue_external_fills(request.fills);
             None
         } else {
             Some(merge_order_volumes(request.order_volumes, request.fills))
@@ -4397,6 +5067,11 @@ impl Engine {
         self.tick_anchor.push(f64::NAN);
         self.volume_idio.push(0.0);
         self.jump_move.push(0.0);
+        // The book's per-slot row, only once the book has been used: an
+        // engine that never saw an agent's order keeps its empty table.
+        if !self.book.taken.is_empty() {
+            self.book.taken.push([0.0; crate::agent_book::TAKEN_WIDTH]);
+        }
         // The per-name jump excitation follows the roster for the reason
         // `volume_idio` above does, and it was left out for the same
         // reason: it landed after this function was written. A name that
@@ -4465,6 +5140,15 @@ impl Engine {
         if index < self.jump_move.len() {
             self.jump_move.remove(index);
         }
+        // A name that leaves takes its book with it: its waiting orders are
+        // cancelled and its unapplied flow is dropped, since there is no
+        // market left for either to reach.
+        if index < self.book.taken.len() {
+            self.book.taken.remove(index);
+        }
+        let leaving = self.companies[index].ticker.clone();
+        self.book.orders.retain(|o| o.ticker != leaving);
+        self.book.flow.retain(|(_, t, _, _)| *t != leaving);
         // `Vec::remove` for the reason the line above uses it: the tail
         // shifts down and keeps its relative order, so every remaining
         // name keeps its own excitation.
@@ -4517,12 +5201,21 @@ impl Engine {
     /// keeps the tick pure and replay deterministic for free.
     ///
     /// Returns `None` for an out-of-range index.
+    ///
+    /// With any of the agent-facing book's dials on, or once an agent has
+    /// used the book, this is that book instead
+    /// (`crate::agent_book::agent_book`): the ladder less what agents have
+    /// taken, the latent depth behind it, and every agent's resting orders.
+    /// Otherwise it is the maker's ladder, built exactly as it always was.
     pub fn book_for(&self, index: usize) -> Option<crate::order_book::OrderBook> {
         // Rate instruments sit after the equities, so their index is the
         // equity count plus their place in the rate book.
         if index >= self.companies.len() {
             let inst = self.rates.instruments.get(index - self.companies.len())?;
             return Some(inst.book(self.economy.vix));
+        }
+        if self.agent_view() {
+            return self.agent_book_at(index, None);
         }
         let company = self.companies.get(index)?;
         Some(crate::microstructure::build_live_book(
@@ -5162,6 +5855,16 @@ impl Engine {
             hash_f64(&mut buf, self.rates.last_corporate);
             hash_bool(&mut buf, self.rates.closed_since_open);
         }
+        // The agent-facing book, LAST and only when it has been used, so
+        // every state that never saw an agent's order hashes as it did
+        // before the book existed. Everything in it decides what the next
+        // tick or the next agent meets, the undelivered fills included:
+        // two engines alike in every column but owing an agent different
+        // fills are not the same state. `manifest.state_hash` writes the
+        // same bytes from the snapshot's `book` entry.
+        if !self.book.is_pristine() {
+            hash_book(&mut buf, &self.book);
+        }
 
         let mut hasher = Sha256::new();
         hasher.update(&buf);
@@ -5316,6 +6019,70 @@ fn hash_opt_f64(buf: &mut Vec<u8>, value: Option<f64>) {
             hash_f64(buf, v);
         }
         None => hash_bool(buf, false),
+    }
+}
+
+/// The agent-facing book, in the order the snapshot's `book` entry holds it.
+fn hash_book(buf: &mut Vec<u8>, book: &crate::agent_book::BookState) {
+    use crate::order_book::Side;
+    let side = |s: Side| match s {
+        Side::Buy => "buy",
+        Side::Sell => "sell",
+    };
+    hash_str(buf, "book");
+    hash_u64(buf, book.sequence);
+    hash_u64(buf, book.fill_sequence);
+    hash_u32(buf, book.taken.len() as u32);
+    for row in &book.taken {
+        for v in row {
+            hash_f64(buf, *v);
+        }
+    }
+    hash_u32(buf, book.orders.len() as u32);
+    for o in &book.orders {
+        hash_str(buf, &o.id);
+        hash_str(buf, &o.agent);
+        hash_str(buf, &o.ticker);
+        hash_str(buf, side(o.side));
+        hash_f64(buf, o.limit);
+        hash_f64(buf, o.quantity);
+        hash_f64(buf, o.remaining);
+        hash_u64(buf, o.sequence);
+        hash_str(buf, o.mode.as_str());
+    }
+    hash_u32(buf, book.flow.len() as u32);
+    for (agent, ticker, bought, sold) in &book.flow {
+        hash_str(buf, agent);
+        hash_str(buf, ticker);
+        hash_f64(buf, *bought);
+        hash_f64(buf, *sold);
+    }
+    hash_u32(buf, book.fills.len() as u32);
+    for f in &book.fills {
+        hash_str(buf, &f.agent);
+        hash_str(buf, &f.order_id);
+        hash_str(buf, &f.ticker);
+        hash_str(buf, side(f.side));
+        hash_f64(buf, f.quantity);
+        hash_f64(buf, f.price);
+        hash_str(buf, f.liquidity.as_str());
+        hash_str(buf, &f.counterparty);
+        hash_f64(buf, f.reference);
+        hash_i64(buf, f.day);
+        // Not `tick`: it is a label counted from this engine's own open,
+        // and a restore clears the day marks it is counted from, so a
+        // restored engine would hash apart from the one it copied on a
+        // label alone. The fill's sequence orders it.
+        hash_u64(buf, f.sequence);
+    }
+    hash_u32(buf, book.impacts.len() as u32);
+    for r in &book.impacts {
+        hash_str(buf, &r.agent);
+        hash_str(buf, &r.ticker);
+        hash_f64(buf, r.bought);
+        hash_f64(buf, r.sold);
+        hash_f64(buf, r.permanent);
+        hash_i64(buf, r.day);
     }
 }
 

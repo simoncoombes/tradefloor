@@ -115,6 +115,16 @@ pub struct OrderBook {
     /// Last traded price. `None` until the book has printed a trade.
     pub last_price: Option<f64>,
     pub sequence: u64,
+    /// Resting orders kept per side. [`MAX_DEPTH_PER_SIDE`] for every book
+    /// the reference built, which is every book the market settles through.
+    ///
+    /// Larger only for the book an agent executes against when the depth
+    /// tail is on (`ModelParams::book_depth_coefficient`): that book carries
+    /// the maker's ladder, the latent levels behind it and every agent's
+    /// resting orders, and trimming it at 32 would drop the far levels a
+    /// large order is priced against, which is the silent cut-off the tail
+    /// exists to remove. Trimming still drops the worst-priced orders first.
+    pub cap: usize,
 }
 
 impl OrderBook {
@@ -125,7 +135,14 @@ impl OrderBook {
             asks: Vec::new(),
             last_price,
             sequence: 0,
+            cap: MAX_DEPTH_PER_SIDE,
         }
+    }
+
+    /// The same book with a different per-side cap. See [`OrderBook::cap`].
+    pub fn with_cap(mut self, cap: usize) -> Self {
+        self.cap = cap;
+        self
     }
 
     pub fn best_bid(&self) -> Option<f64> {
@@ -226,6 +243,7 @@ impl OrderBook {
     fn insert_resting(&mut self, order: BookOrder) {
         let is_buy = order.side == Side::Buy;
         let price = order.price;
+        let cap = self.cap;
         let side = self.side_mut(order.side);
 
         let mut i = 0;
@@ -244,8 +262,8 @@ impl OrderBook {
 
         // Trim the far end. The worst-priced orders are the ones that would
         // never trade, so dropping them cannot change any fill.
-        if side.len() > MAX_DEPTH_PER_SIDE {
-            side.truncate(MAX_DEPTH_PER_SIDE);
+        if side.len() > cap {
+            side.truncate(cap);
         }
     }
 
@@ -469,7 +487,7 @@ impl OrderBook {
         if !(quantity > 0.0) || !(price > 0.0) {
             return None;
         }
-        if self.side(side).len() >= MAX_DEPTH_PER_SIDE {
+        if self.side(side).len() >= self.cap {
             return None;
         }
         let order = BookOrder {

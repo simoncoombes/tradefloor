@@ -132,6 +132,8 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
             settle_draws: SettleDrawPolicy::FourAlways,
             // The depth counterfactual, off. It reaches no company field.
             settle_depth_counterfactual: false,
+            resting_orders: &[],
+            fill_impact: &[],
                 // The run's opening nominal output. The growth term is
                 // off on every preset these tests pin, so it is read
                 // nowhere; this tick's own value is what a single-tick
@@ -284,6 +286,8 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
                     settle_draws: SettleDrawPolicy::FourAlways,
                     // The depth counterfactual, off. It reaches no company field.
                     settle_depth_counterfactual: false,
+                    resting_orders: &[],
+                    fill_impact: &[],
                 // The run's opening nominal output. The growth term is
                 // off on every preset these tests pin, so it is read
                 // nowhere; this tick's own value is what a single-tick
@@ -350,6 +354,8 @@ fn the_band_holds_in_extended_hours_too() {
                     settle_draws: SettleDrawPolicy::FourAlways,
                     // The depth counterfactual, off. It reaches no company field.
                     settle_depth_counterfactual: false,
+                    resting_orders: &[],
+                    fill_impact: &[],
                 // The run's opening nominal output. The growth term is
                 // off on every preset these tests pin, so it is read
                 // nowhere; this tick's own value is what a single-tick
@@ -426,6 +432,8 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
                     settle_draws: SettleDrawPolicy::FourAlways,
                     // The depth counterfactual, off. It reaches no company field.
                     settle_depth_counterfactual: false,
+                    resting_orders: &[],
+                    fill_impact: &[],
                 // The run's opening nominal output. The growth term is
                 // off on every preset these tests pin, so it is read
                 // nowhere; this tick's own value is what a single-tick

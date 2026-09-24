@@ -17,7 +17,7 @@ import json
 from typing import Any, Iterable, Sequence
 
 from . import _core
-from .portfolio import Portfolio, Position
+from .portfolio import Cancel, Limit, Portfolio, Position
 from . import harness as _harness
 from . import universe_util as _universe_util
 from .harness import Agent, Observation, Scorecard, evaluate, leaderboard
@@ -113,7 +113,7 @@ __all__ = [
     "MatchResult", "MispricingState", "ModelParams", "News", "NewsImpact", "OrderBook",
     "OrderError", "PriceLevel",
     "SweepCost", "TickResult", "Universe", "ValidationError", "FlowImpact",
-    "flow_impact", "Portfolio", "Position", "Agent", "Observation",
+    "flow_impact", "Portfolio", "Position", "Limit", "Cancel", "Agent", "Observation",
     "Scorecard", "evaluate", "leaderboard", "replay", "edgar",
     "baselines", "reference_agents", "capture_ratio", "tca", "Execution",
     "rank", "Ranking", "AgentRecord",
