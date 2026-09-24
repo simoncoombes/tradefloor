@@ -901,10 +901,12 @@ _TCA_SEEDS = (2026, 1, 2, 3, 4, 5, 7, 11)
 def g_tca_example(ctx: Ctx) -> dict:
     """transaction-cost-analysis.md's worked figures, method stated on the
     page: the first name of Universe.random(20, seed=7) (ADV 9,713 shares),
-    one six-step day. Entry: 97 shares (1% ADV) at the first step costs
-    +16.71 bps on every seed measured. Round trip (sell three steps later):
-    a seed range, -17.72 to +2.03 bps over sim seeds 2026,1,2,3,4,5,7,11,
-    negative on 7 of 8, median -12.40. Partial fill: a request for 4,856
+    one six-step day. Measured on pt-v19 at 0.8.5, where an agent's fills
+    reach the market once. Entry: 97 shares (1% ADV) at the first step costs
+    +20.18 bps on every seed measured. Round trip (sell three steps later):
+    +12.67 to +28.75 bps over sim seeds 2026,1,2,3,4,5,7,11, a cost on all
+    8, median +18.01. Before 0.8.5 the fill was counted on every tick of
+    the step and the range crossed zero. Partial fill: a request for 4,856
     shares (half ADV, sim seed 2026) fills 483 - the whole displayed
     depth - and requests of 9,713 and 48,563 fill the same 483, on every
     seed measured."""
@@ -954,12 +956,12 @@ def g_tca_example(ctx: Ctx) -> dict:
 def g_tca_ripple(ctx: Ctx) -> dict:
     """transaction-cost-analysis.md's macro boundary, method stated on the
     page: Momentum() over Universe.random(60, seed=11), sim seed 7, ten
-    days. The agent trades 57 names; all 3 untouched names move (-10.72,
-    +1.97 and +2.00 bps) against a 9.71 bps median direct impact, so the
-    largest ripple now EXCEEDS the median direct impact. The channel needs a
-    horizon: nothing leaks at one or two days, nine untouched names leak at
-    three and eighteen at four. Pinning VIX returns untouched_moved() to
-    empty, byte-exact. Mirrors the assertions
+    days. Measured on pt-v19 at 0.8.5: the agent trades 57 names, none of
+    the 3 untouched names moves, and the median direct impact is 10.10 bps.
+    Nothing leaks at one to four days either. Before 0.8.5 the agent's
+    fills were counted on every tick of the step, and that flow was large
+    enough to reach the untouched names through the VIX. Pinning VIX
+    returns untouched_moved() to empty, byte-exact. Mirrors the assertions
     examples/07-research-workflow.py runs every time."""
     u = _u(60, 11)
 
