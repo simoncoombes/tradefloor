@@ -512,6 +512,21 @@ pub struct ModelParams {
     /// `last^(1-w) * model^w`. A weight in [0, 1]. See `market::tick`, the
     /// settlement phase.
     pub quote_model_weight: f64,
+    /// Whether the session closes with a cross. 0.0, which every preset
+    /// through pt-v19 carries, closes on the last minute's print: whichever
+    /// side of the book the final tick's flow hit, and at the close the
+    /// intraday volume curve is at its peak, so the flow walks deepest. The
+    /// closing print then sits 14 bp (sd) off the model price on a large
+    /// name of the certified roster and 45 bp on a small one, and that noise
+    /// reverts the next day: a daily Lo-MacKinlay contrarian book earns
+    /// +13 bp a day on the large names from it alone, against the certified
+    /// forty's -1.7 +/- 2.3, whose closes are auction prices (design
+    /// repository, programme/results/ptv20/). 1.0 prints the session's
+    /// final regular tick at the model price, as a closing auction clears at
+    /// the efficient price; the tick's settlement still runs, so it costs
+    /// the same draws, and its book fills do not move the maker's
+    /// inventory. A switch. See `market::tick`, the settlement phase.
+    pub closing_auction: f64,
     /// The share of each IDIOSYNCRATIC shock that moves the name's fair
     /// value for good rather than its mispricing. 0.0, which every preset
     /// through pt-v19 carries, sends the whole shock to `s`, so every
@@ -523,9 +538,10 @@ pub struct ModelParams {
     /// +0.01 (design repository, programme/results/ptv20/).
     ///
     /// Off zero, a share `psi` of the name's own shocks -- the idiosyncratic
-    /// draw of the tick's noise, the news that names the company, and the
-    /// company's own jump at the close -- lands in a per-name log fair-value
-    /// level `v` (`TickStock::fair_value_offset`) and `1 - psi` in `s`. The
+    /// and sector draws of the tick's noise, the news that names the
+    /// company, a peer or its sector, and the company's own jump at the
+    /// close -- lands in a per-name log fair-value level `v`
+    /// (`TickStock::fair_value_offset`) and `1 - psi` in `s`. The
     /// price moves by the whole shock on impact either way; what changes is
     /// how much of it later reverts. `v` scales the published fundamentals
     /// (earnings and book) the valuation reads, so the market P/E and the
@@ -2851,6 +2867,20 @@ pub struct ModelParams {
     /// Whether these literals should become parameters at all is an open
     /// question for the era's owner rather than something settled here.
     pub cascade_symmetry: f64,
+    /// A scale on the whole forced-flow term: the short squeeze and both
+    /// stop ladders ([`ModelParams::cascade_symmetry`]). 1.0, which every
+    /// preset through pt-v19 carries, is the ladder as it stands; 0.0
+    /// switches it off.
+    ///
+    /// The term reacts to the name's own previous day (a stop cascade after
+    /// any fall of 2.5 per cent, a buy cascade on a heavily shorted rally),
+    /// so it is a next-day continuation in the model price. With the tape
+    /// following the model price (`quote_model_weight`) it is the largest
+    /// daily momentum left in it: on pt-v19's certified roster it carries
+    /// about -18 bp a day of a Lo-MacKinlay one-day contrarian book's -23
+    /// (design repository, programme/results/ptv20/), against the certified
+    /// forty's -1.7 +/- 2.3.
+    pub cascade_gain: f64,
     /// Persistence of the slow variance component (Engle-Lee style). The
     /// market factor's variance carries two timescales from the pt-v4 era:
     /// the fast one above tracks the VIX-scaled target, this one carries
@@ -4514,6 +4544,11 @@ pub const PT_V18: ModelParams = ModelParams::pt_v18();
 /// `DEFAULT_PRESET_NAME` names it and `Engine::default_model` returns it,
 /// and the test at the bottom of this file asserts the two agree.
 pub const PT_V19: ModelParams = ModelParams::pt_v19();
+/// pt-v19 with a tape that follows the model price, a closing cross, the
+/// stock- and sector-specific part of every shock moved into fair value, a
+/// stationary opening and a smaller stop ladder -- see
+/// [`ModelParams::pt_v20`]. Selectable and NOT the default.
+pub const PT_V20: ModelParams = ModelParams::pt_v20();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -4648,6 +4683,7 @@ impl ModelParams {
             buyback_payout_share: 0.0,
             jump_mean_compensated: 0.0,
             cascade_symmetry: 0.0,
+            cascade_gain: 1.0,
             // Legacy values: the slow component is OFF, and the update
             // reduces to the single-component form bit for bit.
             market_vol_slow_persistence: 0.0,
@@ -4751,6 +4787,7 @@ impl ModelParams {
             news_absorption_drift_half_life: 0.0,
             news_quote_revision: 0.0,
             quote_model_weight: 0.0,
+            closing_auction: 0.0,
             fair_value_news_share: 0.0,
             opening_mispricing_sigma: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
@@ -6606,6 +6643,52 @@ impl ModelParams {
         p
     }
 
+    /// pt-v19 with the market-behaviour faults the mean-reversion
+    /// investigation found fixed (design repository,
+    /// programme/meanrev-edge-ptv19-2026-09-24.md; the composition, the
+    /// registered rows and the grade are programme/ptv20-*.md). Selectable
+    /// and NOT the default: composing it moves no digest.
+    ///
+    /// # What it changes, and why
+    ///
+    /// THE TAPE. The maker quoted around the last print, so the print chased
+    /// the model price and the inventory skew carried it past: 65-minute
+    /// returns carried a lag-one autocorrelation of -0.135 and a Roll spread
+    /// 5.8x the quoted one, and a one-step reversal rule beat buy-and-hold
+    /// after costs in 8 markets of 8. `quote_model_weight` 1.0 centres the
+    /// book on the model price every tick; `closing_auction` 1.0 prints the
+    /// session's last tick at the model price, as a closing cross does, so
+    /// the close-to-close return carries no bid-ask bounce.
+    ///
+    /// THE CROSS-SECTION. 96 per cent of a name's own daily variance was
+    /// mispricing and none of it fair value, so every stock-specific move
+    /// reverted on the 60-day half-life: a value screen on published
+    /// fundamentals ranked the next 20 days at IC +0.38 (+0.75 in a market's
+    /// first 60 days) against a real +0.01, and 12-1 momentum ran at -0.17
+    /// against a real +0.03. `fair_value_news_share` 1.0 moves the whole
+    /// stock- and sector-specific part of every shock into the name's fair
+    /// value; the mispricing keeps the market-wide part. The published
+    /// fundamentals do not move, so they are a noisy read of fair value.
+    /// `opening_mispricing_sigma` opens each name's mispricing at the model's
+    /// stationary spread instead of the whole day-zero premium.
+    ///
+    /// THE DAILY CONTINUATION. With the tape honest, the stop and squeeze
+    /// ladders were the largest daily momentum left in the model price;
+    /// `cascade_gain` scales them to the certified forty's daily
+    /// Lo-MacKinlay reading.
+    ///
+    /// Every value, its derivation or measurement, and the residual it
+    /// leaves, is in `python/tradefloor/provenance.py`.
+    pub const fn pt_v20() -> ModelParams {
+        let mut p = ModelParams::pt_v19();
+        p.quote_model_weight = 1.0;
+        p.closing_auction = 1.0;
+        p.fair_value_news_share = 1.0;
+        p.opening_mispricing_sigma = 0.016;
+        p.cascade_gain = 0.1;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -6638,6 +6721,7 @@ impl ModelParams {
             "pt-v16" => Some(PT_V16),
             "pt-v18" => Some(PT_V18),
             "pt-v19" => Some(PT_V19),
+            "pt-v20" => Some(PT_V20),
             _ => None,
         }
     }
@@ -6646,7 +6730,7 @@ impl ModelParams {
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
           "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15",
-          "pt-v16", "pt-v18", "pt-v19"]
+          "pt-v16", "pt-v18", "pt-v19", "pt-v20"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -6745,6 +6829,7 @@ impl ModelParams {
             "buyback_payout_share" => self.buyback_payout_share,
             "jump_mean_compensated" => self.jump_mean_compensated,
             "cascade_symmetry" => self.cascade_symmetry,
+            "cascade_gain" => self.cascade_gain,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
@@ -6828,6 +6913,7 @@ impl ModelParams {
             "news_absorption_drift_half_life" => self.news_absorption_drift_half_life,
             "news_quote_revision" => self.news_quote_revision,
             "quote_model_weight" => self.quote_model_weight,
+            "closing_auction" => self.closing_auction,
             "fair_value_news_share" => self.fair_value_news_share,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
@@ -6962,6 +7048,7 @@ impl ModelParams {
             "buyback_payout_share" => out.buyback_payout_share = value,
             "jump_mean_compensated" => out.jump_mean_compensated = value,
             "cascade_symmetry" => out.cascade_symmetry = value,
+            "cascade_gain" => out.cascade_gain = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
@@ -7045,6 +7132,7 @@ impl ModelParams {
             "news_absorption_drift_half_life" => out.news_absorption_drift_half_life = value,
             "news_quote_revision" => out.news_quote_revision = value,
             "quote_model_weight" => out.quote_model_weight = value,
+            "closing_auction" => out.closing_auction = value,
             "fair_value_news_share" => out.fair_value_news_share = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "momentum_theta" => out.momentum_theta = value,
@@ -7313,11 +7401,17 @@ impl ModelParams {
         for (name, v) in [("cycle_us_calibration", self.cycle_us_calibration),
                           ("fed_liftoff_rule", self.fed_liftoff_rule),
                           ("market_pe_buybacks", self.market_pe_buybacks),
-                          ("news_quote_revision", self.news_quote_revision)] {
+                          ("news_quote_revision", self.news_quote_revision),
+                          ("closing_auction", self.closing_auction)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!(
                     "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
             }
+        }
+        if !(self.cascade_gain >= 0.0 && self.cascade_gain <= 1.0) {
+            return Err(format!(
+                "cascade_gain is {}. It scales the squeeze and stop ladders, in [0, 1]; \
+                 1.0 as shipped.", self.cascade_gain));
         }
         for (name, v) in [("quote_model_weight", self.quote_model_weight),
                           ("fair_value_news_share", self.fair_value_news_share)] {
@@ -7618,6 +7712,7 @@ pub fn claims_of(preset: &str) -> &'static [Claim] {
 pub fn settable_names() -> Vec<&'static str> {
     vec![
         "cascade_symmetry",
+        "cascade_gain",
         "crash_amplifier_conditional_sigma",
         "market_vol_vix_excursion",
         "crash_amplifier_slope",
@@ -7728,6 +7823,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "news_absorption_drift_half_life",
         "news_quote_revision",
         "quote_model_weight",
+        "closing_auction",
         "fair_value_news_share",
         "opening_mispricing_sigma",
         "news_peer_vix_coupling",

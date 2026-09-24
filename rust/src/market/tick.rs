@@ -1170,7 +1170,8 @@ pub fn simulate_market_tick(
             s_val = s_val + all_drifts[i] + all_noises[i];
         }
         // THE PERMANENT SHARE of the name's own shocks. `psi` of this tick's
-        // idiosyncratic noise and of the news naming this company leaves `s`
+        // idiosyncratic and sector noise and of the news naming this company,
+        // its peers or its sector leaves `s`
         // for the fair-value level, with an Ito term so `exp(v)` is a
         // martingale. The price moves by the whole shock either way; only
         // what later reverts changes. A branch, so 0.0 is the arithmetic
@@ -1179,8 +1180,8 @@ pub fn simulate_market_tick(
         if p.fair_value_news_share != 0.0 {
             let psi = p.fair_value_news_share;
             let noise_scale = if open { intraday_vol_mult } else { 0.15 };
-            let own_noise = psi * (raw.noise_idio * noise_scale);
-            let own_news = psi * (raw.company_news_own * scale);
+            let own_noise = psi * ((raw.noise_idio + raw.noise_sector) * noise_scale);
+            let own_news = psi * ((raw.company_news - raw.company_news_market) * scale);
             let dv = own_noise + own_news;
             // The component slots keep the WHOLE shock, deliberately: they
             // report what moved the PRICE (the attribution an agent's
@@ -1432,6 +1433,19 @@ pub fn simulate_market_tick(
                 None => settle_price_through_book(&micro, fair_value, volume, &options, rng),
             };
             new_price = settled.price;
+            // THE CLOSING CROSS. The session's final regular tick (15:59,
+            // `intraday_t` = 389/390, the same division `intraday_fraction`
+            // makes) prints at the model price, as a closing auction clears
+            // at the efficient price and not at whichever side of the book
+            // the last minute's flow hit. The settlement above still ran,
+            // so the tick costs the same draws; its fills are the book's
+            // and not the auction's, so they do not move the maker's
+            // inventory. A switch at 0.0 on every preset through pt-v19,
+            // where the branch is not taken.
+            let auction = p.closing_auction != 0.0 && inputs.intraday_t == 389.0 / 390.0;
+            if auction {
+                new_price = fair_value;
+            }
 
             // The depth counterfactual: this tick again, from the same state,
             // against every level the maker quotes.
@@ -1484,7 +1498,7 @@ pub fn simulate_market_tick(
             // Carry maker inventory forward. This is what makes impact
             // PERSIST: a large buy leaves the maker short, so it keeps quoting
             // higher until opposing flow lets it unwind.
-            if settled.maker_inventory_delta != 0.0 {
+            if settled.maker_inventory_delta != 0.0 && !auction {
                 companies[idx].stock.maker_inventory = Some(
                     companies[idx].stock.maker_inventory.unwrap_or(0.0)
                         + settled.maker_inventory_delta,
