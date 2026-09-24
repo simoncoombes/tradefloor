@@ -1,8 +1,9 @@
 """The day's news as the engine holds it, and how fast its move is priced.
 
 Two read-only accessors, `Engine.session_news()` and `Engine.session_tick`,
-for `tradefloor.headlines`: they must change nothing, so a run that calls
-them at every tick hashes the same as one that never does.
+for code that turns the day's news into headlines: they must change nothing,
+so a run that calls them at every tick hashes the same as one that never
+does.
 
 And `news_absorption_half_life` with its two companions, which move WHEN an
 endogenous event's move lands and never how much of it: shipped at 0.0, the

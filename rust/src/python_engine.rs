@@ -2069,15 +2069,15 @@ impl PyEngine {
     ///
     /// The engine draws the day's events at `open_market` and keeps them
     /// through `close_market`, so `day` is `day_count` while the market is
-    /// open and `day_count - 1` after the close, the frame
-    /// `tradefloor.headlines` uses. Empty before the first open and on any
+    /// open and `day_count - 1` after the close, the frame a headline
+    /// writer uses. Empty before the first open and on any
     /// preset with `endogenous_news_intensity` at zero.
     ///
     /// A read. It draws nothing, writes nothing and is not logged, so
     /// calling it cannot change a run: `state_hash` is the same with and
     /// without it. `price_impact` is the whole move the event adds to the
     /// price by the close, which makes it the answer key; never hand it to
-    /// an agent (`tradefloor.headlines` cuts it to its sign).
+    /// an agent (a headline writer cuts it to its sign).
     fn session_news<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
         let day: Option<i64> = if self.market_open {
             Some(i64::from(self.day_count))
