@@ -145,26 +145,19 @@ def test_the_solve_reaches_a_day_whose_draws_are_known(short_days):
         f"against at most one over twenty measured configurations: {norms}")
     assert sorted(norms)[len(norms) // 2] > shadow.CLAMP_BELOW, norms
 
-    # And the one that clamps on THIS day, with the mechanism, because a
-    # count alone would not say whether the right name is the quiet one.
-    # The roster's cheapest name opens at $5.00, so one cent of it is
-    # 0.00200 in log return against 0.00006 to 0.00032 on the other five.
-    # Measured grid-free (the same difference at step 8.0, which crosses
-    # enough risers to average over the tread) one sigma of a name's own
-    # idiosyncratic draw is worth 2.1 ticks of its own grid on that name
-    # against 17.0, 17.5, 24.4, 25.6 and 51.7 on the rest. It has an order
-    # of magnitude less headroom than any other name, and it is the one
-    # the step-1.0 difference reads as zero.
-    # IF a name clamps it is the cheapest one. Zero clamps is the common
-    # case over the twenty configurations (0 on eight of ten pt-v19 seeds,
-    # 0 on six of ten pt-v18 seeds), and on the recomposed pt-v19 of
-    # 2026-09-20 seed 11 is one of them: the previous vector clamped the
-    # $5.00 name here and this one does not. The claim was always about
-    # WHICH name clamps, never that one must.
-    cheapest = int(min(range(len(prices)), key=lambda i: prices[i]))
-    assert all(i == cheapest for i in clamped), (
-        f"the clamped name is not the cheapest one: norms {norms} against "
-        f"prices {[round(p, 2) for p in prices]}")
+    # WHICH name clamps is NOT asserted, and the claim that stood here --
+    # "if a name clamps it is the cheapest one" -- is withdrawn as FALSE,
+    # not relaxed. MEASURED 2026-09-23 on `Universe.random(6, seed=3)` at
+    # engine seeds 11 to 20: pt-v18 clamps the $97 or $100 names (not the
+    # $5.00 one) at seeds 11, 12, 15 and 20, and pt-v19's fourth composition
+    # does at seed 18; on the fifth composition seed 11 clamps the $100.66
+    # name. It passed for months only because this test runs at seed 11,
+    # where the earlier vectors happened to clamp the cheapest name or none.
+    # The one-cent tick argument above is a reason the cheapest name CAN
+    # clamp, not a proof that no other name does: a quiet name's own draw
+    # can also leave its step-1.0 difference on a riser. What holds on every
+    # configuration measured is asserted above: at most one clamped name and
+    # a median column well above `CLAMP_BELOW`.
 
 
 def test_a_jump_at_the_previous_close_is_addressed(short_days):
