@@ -308,6 +308,7 @@ MECHANISMS: tuple[Mechanism, ...] = (
                "earnings_nominal_growth"),
         via=("market::tick::simulate_market_tick",
              "market::tick::nominal_scale",
+             "market::tick::nominal_scale_output",
              "fair_value::compute_target_pe"),
     ),
     Mechanism(

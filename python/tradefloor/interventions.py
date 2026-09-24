@@ -461,7 +461,7 @@ def _make_macro_target(name: str, field: str, *, units: str, note: str,
 #: 39 comparisons behind these numbers came back with a market draw delta of
 #: zero, so the difference is the intervention and nothing else.
 #:
-#: Read them before believing a scenario. Four of the fourteen targets are
+#: Read them before believing a scenario. Four of the fifteen targets are
 #: honest mechanisms with effects too small to see over a hundred days, and
 #: one of them is measurably worth exactly nothing. Knowing which is which is
 #: the difference between an experiment and a number.
@@ -849,7 +849,7 @@ def suggest(name: str) -> str:
     target is a typo and gets the spelling. A name in :data:`UNSUPPORTED` is
     not a typo at all -- the reader has a mechanism in mind that this model
     does not have -- and gets the reason and the nearest real lever. Anything
-    else gets the whole registry, because a list of fourteen names is shorter
+    else gets the whole registry, because a list of fifteen names is shorter
     than a conversation.
     """
     if name in UNSUPPORTED:

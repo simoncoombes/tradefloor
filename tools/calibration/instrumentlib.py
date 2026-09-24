@@ -654,6 +654,10 @@ PARAM_SPECS: dict[str, dict] = {
                               "derived": True},
     "corporate_yield_daily": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
                               "derived": True},
+    "earnings_cycle_depth": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.5)},
+    "earnings_cycle_upside": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    "earnings_cycle_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (1.0, 2520.0)},
+    "earnings_cycle_sigma": {"kind": "abs", "step_unit": 0.0005, "hard_range": (0.0, 0.05)},
     "cascade_gain": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # The agent-facing book (2026-09-24, feature/order-book-depth). Read only
     # on an agent's path, so no untraded statistic moves with any of them.

@@ -755,6 +755,15 @@ PERTURBATIONS = [
     # switch off nothing reaches it.
     ("flight_to_quality_gain", 0.05, False),
     ("corporate_yield_daily", 1.0, True),
+    # The aggregate earnings cycle (pt-v20). Inert on the probe: with the
+    # upside at its default 0.0 every phase but a contraction or a trough
+    # pulls the level toward 0.0, and the probe's economy opens in neither,
+    # so the level opens at 0.0 and stays there. The others are read only
+    # with a depth.
+    ("earnings_cycle_depth", 0.3, False),
+    ("earnings_cycle_upside", 0.1, False),
+    ("earnings_cycle_half_life", 30.0, False),
+    ("earnings_cycle_sigma", 0.002, False),
     ("opening_market_sigma", 0.05, True),
     # The agent-facing book (2026-09-24, feature/order-book-depth). INERT on
     # this probe by construction: every one is read only on the path an

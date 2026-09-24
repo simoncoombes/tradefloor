@@ -295,6 +295,9 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "treasury_2y_noise": (0.0, 0.1),
     "flight_to_quality_day": (0.0, 1.0),
     "corporate_yield_daily": (0.0, 1.0),
+    "earnings_cycle_depth": (0.0, 0.6),
+    "earnings_cycle_upside": (0.0, 0.3),
+    "earnings_cycle_sigma": (0.0, 0.005),
     # The agent-facing book (2026-09-24): read only on an agent's path.
     "book_depth_coefficient": (0.0, 2.0),
     "book_depth_exponent": (0.0, 1.0),
@@ -660,6 +663,9 @@ EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
     # The 10-year's noise and the flight to quality's size: 0.03 and 0.02
     # through pt-v19, 0.025 and 0.008 on pt-v20.
     "treasury_10y_noise": (0.0, 0.1),
+    # The earnings cycle's half-life in sessions: 60 through every preset
+    # (unread there), a quarter to two years around it.
+    "earnings_cycle_half_life": (20.0, 504.0),
     "flight_to_quality_gain": (0.0, 0.05),
     # The macro calendar's year in steps: 365 as shipped, 252 the session
     # calendar (21-step months, 63-step quarters).

@@ -368,44 +368,19 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
-    # The agent-facing book (2026-09-24, feature/order-book-depth). Every one
-    # is read only on the path an AGENT's order takes; the market's own
-    # flow settles through the maker's ladder as it always has, so an
-    # untraded run is bit-identical at any setting (rust/src/agent_book.rs).
-    "book_depth_coefficient":
-        "inert at 0.0 as shipped: a branch not taken in agent_book.rs, so "
-        "the book an agent meets is the maker's ten levels and an order past "
-        "them is cut off. Off zero, latent depth follows Y sigma (Q/V)^delta "
-        "behind the ladder (Toth et al. 2011). Starting value from the "
-        "impact-curve comparison is in the hand-off to pt-v20. Not adopted",
-    "book_depth_exponent":
-        "inert at 0.0 as shipped, and refused off zero while "
-        "`book_depth_coefficient` is 0.0: the exponent of the latent "
-        "depth's law. 0.5 is the square root (Toth et al. 2011), 0.6 the "
-        "Almgren et al. (2005) estimate. Not adopted",
-    "book_depth_reach":
-        "inert at 0.0 as shipped, and refused off zero while "
-        "`book_depth_coefficient` is 0.0: how far the latent depth reaches, "
-        "in daily volumes per side. Not adopted",
-    "book_shared":
-        "inert at 0.0 as shipped: a switch, so `Portfolio.execute` prices "
-        "off a snapshot of the book and removes nothing. 1.0 executes agents' "
-        "orders in the engine's book, where what one takes the next meets "
-        "gone until it refills. Not adopted",
-    "book_refill_half_life":
-        "inert at 0.0 as shipped, and refused off zero unless `book_shared` "
-        "is on and `book_depth_coefficient` off zero: the half-life in ticks "
-        "at which consumed latent depth refills. 27 is derived from the "
-        "model's own volume clock (agent_book.rs). Not adopted",
-    "book_resting":
-        "inert at 0.0 as shipped: a switch, so an agent's unfilled limit "
-        "waits outside the book for the traded range. 1.0 rests it in the "
-        "book's queue behind the depth at its price. Not adopted",
-    "fill_impact_coefficient":
-        "inert at 0.0 as shipped: a branch not taken, so agents' fills reach "
-        "`s` through the order-imbalance law. Off zero the law is linear, "
-        "gamma sigma Q/V (Huberman and Stanzl 2004; Almgren et al. 2005 "
-        "measure 0.314). Not adopted",
+    # The aggregate earnings cycle (2026-09-24, pt-v20). Inert at depth 0.0
+    # on every preset: the step and the multiplier are branches not taken.
+    # The calibration boxes choose pt-v20's values, which then move to
+    # DIAL_PROVENANCE. (The book's seven dials left for pt-v20's entries.)
+    "earnings_cycle_depth":
+        "inert at 0.0 as shipped: no level is kept and no draw taken "
+        "(engine.rs, the macro step). Not yet adopted",
+    "earnings_cycle_upside":
+        "unread while `earnings_cycle_depth` is 0.0, as it ships on every preset",
+    "earnings_cycle_half_life":
+        "unread while `earnings_cycle_depth` is 0.0, as it ships on every preset",
+    "earnings_cycle_sigma":
+        "unread while `earnings_cycle_depth` is 0.0, as it ships on every preset",
     # RETURNED TO 0.0 BY THE FIFTH COMPOSITION (2026-09-23). pt-v19 carried
     # the excursion form for two days with a derivation this table held;
     # the entry is in this file as of the composition commit (4d8f9cf) and
@@ -3814,6 +3789,85 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "residual": "0.148, 0.105 and 0.042 on the three seeds (mean 0.099): "
                     "the level is episodic, and the opening draws from the "
                     "mean spread",
+    },
+    # The agent-facing book (E4, feature/order-book-depth), taken by pt-v20.
+    # Read only on an agent's path, so no untraded statistic moves with any
+    # of them; tools/calibration/impact_curve.py measures what they buy.
+    "book_depth_coefficient": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.75},
+        "source": "tools/calibration/impact_curve.py (feature/order-book-depth; "
+                  "pt-v20's run in the design repository, programme/results/ptv20/)",
+        "date": "2026-09-24",
+        "script": "tools/calibration/impact_curve.py --base pt-v20",
+        "estimator": "the latent depth's scale at which the median average cost "
+                     "of an immediate order of Q = f V, in the name's daily "
+                     "sigma, meets two thirds of Toth et al.'s (2011) peak Y in "
+                     "[0.5, 1]: fitted 0.469 sigma (Q/V)^0.495 from 1 per cent "
+                     "of daily volume up, 3 seeds x 40 names",
+        "residual": "average coefficient 0.469 against the band 0.33-0.67; "
+                    "peak 0.672 against 0.5-1; matches Almgren et al. (2005) "
+                    "at 10 and 30 per cent of daily volume",
+    },
+    "book_depth_exponent": {
+        "kind": "derived",
+        "presets": {"pt-v20": 0.5},
+        "identity": "the square-root law's exponent: latent depth growing "
+                    "linearly with distance gives a cost in sqrt(Q/V)",
+        "terms": {"0.495": "fitted exponent of the average cost, pt-v20"},
+        "source": "Toth et al., Physical Review X 1, 021006 (2011); "
+                  "tools/calibration/impact_curve.py",
+        "date": "2026-09-24",
+    },
+    "book_depth_reach": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "the latent book reaches a whole day's volume, so an order "
+                    "up to 100 per cent of V walks it rather than being cut off",
+        "terms": {"1.0": "one day's volume"},
+        "source": "feature/order-book-depth hand-off (E4)",
+        "date": "2026-09-24",
+    },
+    "book_shared": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: agents consume one "
+                    "book, so one agent's fill is liquidity the next does not get",
+        "terms": {"1.0": "on"},
+        "source": "feature/order-book-depth hand-off (E4)",
+        "date": "2026-09-24",
+    },
+    "book_resting": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: an agent's limit "
+                    "order rests in the book with queue priority",
+        "terms": {"1.0": "on"},
+        "source": "feature/order-book-depth hand-off (E4)",
+        "date": "2026-09-24",
+    },
+    "book_refill_half_life": {
+        "kind": "measured",
+        "presets": {"pt-v20": 27.0},
+        "source": "tools/calibration/impact_curve.py refill arm (E4)",
+        "date": "2026-09-24",
+        "script": "tools/calibration/impact_curve.py (refill)",
+        "estimator": "the half-life in ticks at which a second order's extra "
+                     "temporary cost after a first decays as E4's hand-off "
+                     "measured; the literature's resilience of minutes to an "
+                     "hour",
+        "residual": "at 10 per cent of V the second order pays 23.1 bp more "
+                    "at k=0, 9.7 at 30 ticks and 1.6 at 130 (pt-v20 run)",
+    },
+    "fill_impact_coefficient": {
+        "kind": "derived",
+        "presets": {"pt-v20": 0.314},
+        "identity": "Almgren, Thum, Hauptmann and Li (Risk 18(7), 2005)'s "
+                    "permanent impact gamma: 0.314 sigma X / V, the linear "
+                    "permanent law, attributed per agent",
+        "terms": {"0.314": "gamma, US equity program trades"},
+        "source": "Almgren et al. 2005; feature/order-book-depth hand-off (E4)",
+        "date": "2026-09-24",
     },
     "treasury_2y_noise": {
         "kind": "measured",
