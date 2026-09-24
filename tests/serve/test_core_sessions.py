@@ -336,27 +336,38 @@ def test_caveats_are_computed():
                                         max_leverage=None)).session_id
     cav = svc.caveats(OWNER, sid)
     text = " | ".join(cav)
-    # The long-run caveat, while it is true of the preset.
-    assert "FAILS the long-run check" in text
-    assert "volatility regimes and crash frequency drift" in text
+    # The long-run caveat, while it is true of the preset: pt-v19's record
+    # passes all fifteen adopted criteria since its fifth composition
+    # (2026-09-23; the fourth failed eight and this test asserted the
+    # failing wording until then).
+    blk = core.long_run_verdict("pt-v19")
+    assert "passes the long-run check" in text
+    assert f"({blk['passed']} of {blk['of']} criteria" in text
+    assert "FAILS the long-run check" not in text
     assert "SHORT WINDOW: 1 trading day" in text
     assert "Leverage is unbounded" in text
     assert "A 4-name roster" in text
     assert "0 of 0 fills" in text
-    # Made true, the caveat turns: it is computed from the preset's record,
-    # not typed.
+    # Made false, the caveat turns: it is computed from the preset's record,
+    # not typed, and a failing verdict names the rows it fails.
     real = core.long_run_verdict
     try:
         core.long_run_verdict = lambda preset: {
-            "verdict": "pass", "passed": 15, "of": 15, "criteria": "test",
-            "rows": [{"id": "A1", "words": "w", "value": 1, "real": 1,
-                      "rule": "r", "pass": True}]}
+            "verdict": "fail", "passed": 14, "of": 15, "criteria": "test",
+            "rows": [{"id": "A1", "words": "worst month's volatility",
+                      "value": [46, 38], "real": [84, 95], "rule": "within 30%",
+                      "pass": False},
+                     {"id": "B7", "words": "index volatility", "value": 17.7,
+                      "real": 18.1, "rule": "within 20%", "pass": True}]}
         text2 = " | ".join(svc.caveats(OWNER, sid))
-        assert "FAILS the long-run check" not in text2
-        assert "passes the long-run check" in text2
+        assert "passes the long-run check" not in text2
+        assert "FAILS the long-run check on 1 of 15 criteria" in text2
+        assert "volatility regimes and crash frequency drift" in text2
+        assert "A1 worst month's volatility: 46 / 38 against 84 / 95 real" in text2
+        assert "B7" not in text2
     finally:
         core.long_run_verdict = real
-    assert core.long_run_failures("pt-v19")        # and it is true today
+    assert core.long_run_failures("pt-v19") == []   # and it passes today
 
 
 def test_caveats_for_an_unchecked_preset():
@@ -394,7 +405,23 @@ def test_caveats_count_resting_fills_and_track_the_horizon():
     text = " | ".join(svc.caveats(OWNER, sid))
     assert "Outside the certified realism envelope" in text
     assert "SHORT WINDOW" not in text
+    # The session's own day count, as the envelope check reports it.
+    assert f"horizon {days}d exceeds the certified {horizon}d" in text
+    # And the long-run caveat's own sentence carrying it, which only a
+    # FAILING preset's caveat has: pt-v19 passes the long-run check since its
+    # fifth composition, so the failing wording is read off a failing block.
+    real = core.long_run_verdict
+    try:
+        core.long_run_verdict = lambda preset: {
+            "verdict": "fail", "passed": 14, "of": 15, "criteria": "test",
+            "rows": [{"id": "B1", "words": "time with VIX above 30",
+                      "value": 0.194, "real": 0.082, "rule": "1/2x to 2x",
+                      "pass": False}]}
+        text = " | ".join(svc.caveats(OWNER, sid))
+    finally:
+        core.long_run_verdict = real
     assert f"This session has run {days} trading days" in text
+    assert f"the certification below covers at most {horizon}" in text
 
 
 # -- safety ----------------------------------------------------------------------------------------
