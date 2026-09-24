@@ -164,7 +164,7 @@ SEEDS = (2026, 1, 2, 3, 4, 5, 7, 11)
 def test_a_round_trip_does_not_recoup_its_own_impact():
     """Buying then selling costs on both legs, on every seed.
 
-    Until 0.9.0 this test was `a round trip recoups its own impact`, and it
+    Until 0.8.5 this test was `a round trip recoups its own impact`, and it
     read a NEGATIVE shortfall as correct: the entry pushed the price up, the
     impact persisted, and the exit sold into it. What persisted was the
     harness counting the entry's flow on every one of the step's 65 ticks,
@@ -194,7 +194,7 @@ def test_a_round_trip_does_not_recoup_its_own_impact():
 def test_by_step_shows_both_legs_paying():
     # The netted total hides both halves. This is the accessor that does not.
     #
-    # Until 0.9.0 it showed the entry paying and the exit recouping on most
+    # Until 0.8.5 it showed the entry paying and the exit recouping on most
     # seeds, and that recoup was the agent's own impact counted on every
     # tick of the step. Now both legs pay on every seed.
     for seed in SEEDS:
@@ -208,7 +208,7 @@ def test_by_step_shows_both_legs_paying():
 def test_a_round_trip_leaves_no_lasting_information_impact():
     """The information channel, read where it lives: in `s`.
 
-    Until 0.9.0 this was asserted on the end-of-day print, where a held
+    Until 0.8.5 this was asserted on the end-of-day print, where a held
     buy's impact stood well above a round trip's on six of eight seeds
     (held +34.8 to +76.2 bp, where it was the harness counting the flow
     on every tick). A 1% buy applied once moves `s` by under a basis point,

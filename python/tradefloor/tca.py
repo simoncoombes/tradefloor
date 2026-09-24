@@ -25,7 +25,7 @@ comes from there.
 signal, moving the mispricing itself. This one PERSISTS: the book recovers as
 liquidity replenishes, but a shift in `s` is a new level. A step's fills reach
 it once, on the tick after they filled (``fills=`` on ``run_session``); until
-0.9.0 they were held on every tick of the step, which counted each order 65
+0.8.5 they were held on every tick of the step, which counted each order 65
 times at six steps a day.
 
 The split matters because they decay differently, and every serious execution
@@ -90,7 +90,7 @@ steps later costs again: the round trip ends between **+12.7 and +28.8
 bps** of the notional it traded across those seeds, median +18.0, positive
 on all eight.
 
-Until 0.9.0 the same round trip came back NEGATIVE on seven of the eight,
+Until 0.8.5 the same round trip came back NEGATIVE on seven of the eight,
 median -6.2 bps, and this docstring called that correct: the entry pushed
 the price up, the impact persisted, and the exit sold into it. What
 persisted was the harness counting the entry's flow on every tick of the
@@ -272,7 +272,7 @@ class Execution:
         by -10.72, +2.00 and +1.97 bps, against a 9.71 bps median
         ``|impact_bps|`` across the traded names that moved. Under 0.8.1
         (pt-v19) the same run traded 54 and five of the six untouched names
-        moved, the largest by -15.82 bps. Since 0.9.0, which applies each
+        moved, the largest by -15.82 bps. Since 0.8.5, which applies each
         step's fills once rather than on every tick of the step, it trades
         57 and none of the three untouched names moves at all: one agent's
         flow no longer moves the index far enough to reach the gauge. The

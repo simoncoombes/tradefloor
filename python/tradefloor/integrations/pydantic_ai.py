@@ -193,7 +193,7 @@ async `Agent.run` and hands the coroutine to `common.run_sync`, the one
 shared bridge.
 
 `Agent.override(...)` is implemented with context variables, and since
-0.9.0 the bridge carries the caller's context to the coroutine in a script
+0.8.5 the bridge carries the caller's context to the coroutine in a script
 and in a notebook alike, so an override set around `World.run` reaches the
 run either way. Until then it reached it in a script and not in a notebook,
 where the bridge crossed a thread without the context. This adapter never

@@ -144,7 +144,7 @@ already running.
 
 The bridge runs every decision on ONE long-lived loop, and this adapter is
 why. The SDK caches a default ``AsyncOpenAI`` client whose connection pool
-is bound to the loop that first used it. Until 0.9.0 the bridge gave each
+is bound to the loop that first used it. Until 0.8.5 the bridge gave each
 call a fresh loop and closed it, so from the second decision on the cached
 client raised "Event loop is closed": a live five-day run recorded 3 of 5
 decisions, on every attempt.

@@ -1429,7 +1429,7 @@ impl PyEngine {
     /// session long. `tf.flow_impact` uses it. Handing an agent's fills to
     /// it counts one order once a minute for the whole step.
     ///
-    /// `order_flow` is refused here since 0.9.0, because it was the second
+    /// `order_flow` is refused here since 0.8.5, because it was the second
     /// kind under a name that read as the first: every harness in the
     /// package passed an agent's fills through it, so one order was counted
     /// on each of a step's 65 ticks and landed after the fill it came from.
@@ -1466,7 +1466,7 @@ impl PyEngine {
             // other check and before anything is logged, so a refused call
             // leaves no trace.
             return Err(ValidationError::new_err(
-                "run_session no longer takes order_flow (0.9.0). It held the \
+                "run_session no longer takes order_flow (0.8.5). It held the \
                  flow on every tick of the session, so an agent's fills passed \
                  through it were counted once a minute for the whole step. Pass \
                  an agent's trades as fills=portfolio.pending_flow(), which \

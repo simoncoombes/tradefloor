@@ -288,7 +288,7 @@ class Engine:
         news_impacts: Sequence[NewsImpact] | None = ...,
         fills: dict[str, tuple[float, float]] | None = ...,
         flow_per_tick: dict[str, tuple[float, float]] | None = ...,
-        # Refused at runtime since 0.9.0; typed None so a checker says so
+        # Refused at runtime since 0.8.5; typed None so a checker says so
         # first. Use `fills` for an agent's trades, `flow_per_tick` for a
         # standing rate.
         order_flow: None = ...,

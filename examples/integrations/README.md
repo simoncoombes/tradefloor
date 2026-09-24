@@ -65,7 +65,7 @@ two adapters:
 | [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 3 | +6.24% | -1.55 bps |
 | [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 0 | +0.00% | +0.00 bps |
 
-Re-measured at 0.9.0, where an agent's fills stopped being counted on every
+Re-measured at 0.8.5, where an agent's fills stopped being counted on every
 tick of a step and reach the market once. The same three trades now move
 the prices they are marked at far less: callable and openai_agents read
 +1.60% and -1.10 bps before, and pydantic_ai +6.28% and +2.51 bps. The

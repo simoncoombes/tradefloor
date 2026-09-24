@@ -58,7 +58,7 @@ equal-weight equities and a 6.5-year bond sleeve through each scenario is
 `tools/bonds/realism.py`, against FRED's DGS2 and DGS10 and Yahoo's SPY,
 SHY, IEF and LQD.
 
-## 0.9.0
+## 0.8.5
 
 **An agent's orders now reach the market once.** Every harness passed an
 agent's fills to `run_session` as `order_flow`, which the session held on

@@ -5190,7 +5190,7 @@ pub struct SessionRequest<'a> {
     ///
     /// # Why this is not `order_volumes`
     ///
-    /// Until 0.9.0 every harness handed an agent's fills to the session as
+    /// Until 0.8.5 every harness handed an agent's fills to the session as
     /// `order_volumes`, so one order was counted on every tick of the step:
     /// 65 times at six steps a day, 390 at one. It also landed only after the
     /// agent had filled at the pre-trade book, so the agent never paid its
@@ -6093,7 +6093,7 @@ mod tests {
     }
 
     /// The same flow held on every tick is counted on every tick. This is
-    /// what every harness did with an agent's fills until 0.9.0, and the
+    /// what every harness did with an agent's fills until 0.8.5, and the
     /// ratio is the 65 the investigation measured, not an approximation of
     /// it: a name's flow impact depends on its average volume, which does
     /// not move inside a day.

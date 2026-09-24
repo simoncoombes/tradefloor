@@ -1419,7 +1419,7 @@ def test_importing_the_adapter_still_needs_no_framework_after_the_rebase():
     # it inside the method. `datetime` joined it when `save` began stamping
     # `recorded_utc`. `warnings` joined it when `refuse_a_changed_preset`
     # began saying out loud that a pre-0.8.0 recording names no preset.
-    # `atexit`, `os` and `threading` joined it at 0.9.0, when `run_sync`
+    # `atexit`, `os` and `threading` joined it at 0.8.5, when `run_sync`
     # began running every call on one long-lived loop on its own thread.
     allowed = {"copy", "hashlib", "importlib", "json", "re", "statistics",
                "typing", "asyncio", "inspect", "concurrent", "pathlib",
