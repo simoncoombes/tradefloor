@@ -156,10 +156,141 @@ def test_long_memory_is_outside_even_within_the_certified_horizon():
     assert any(g.id == "decay-shape" for g in v.gaps)
 
 
-def test_a_concentrated_roster_is_outside():
-    v = env.check(horizon_days=252, sector_concentrated=True)
+def test_a_concentrated_roster_with_no_mix_named_is_outside():
+    """`True` says the roster is concentrated and not which mix it is.
+
+    Until 2026-09-24 every concentrated question was refused, and this test
+    pinned that with no statistics named. It still holds, and it holds with
+    a shape row named too, because only four mixes were measured and `True`
+    does not say the roster is one of them.
+    """
+    for stats in ((), ("cross_sectional_corr",)):
+        v = env.check(horizon_days=252, statistics=stats,
+                      sector_concentrated=True)
+        assert not v.inside, stats
+        assert [g.id for g in v.gaps] == ["roster-concentration"], stats
+        assert "docs080b" in v.reasons[0]
+
+
+@pytest.mark.parametrize("mix", sorted(env.ROSTER_SHAPES))
+def test_a_measured_mix_is_inside_on_the_shape_rows_it_held(mix):
+    """The grant: every row the mix held, at a horizon it was measured to."""
+    held = env.ROSTER_SHAPE_ROWS[mix][252]
+    # The decay-shape gap refuses abs_return_acf20 on every roster, so it
+    # is asked apart from the rest.
+    rows = [k for k in held if k != "abs_return_acf20"]
+    v = env.check(horizon_days=252, statistics=rows, sector_concentrated=mix)
+    assert v.inside, v.reasons
+    assert any(w.startswith(f"the roster is the {mix} mix")
+               for w in v.warnings)
+    v = env.check(horizon_days=252, statistics=["abs_return_acf20"],
+                  sector_concentrated=mix)
+    assert [g.id for g in v.gaps] == ["decay-shape"]
+    # Past 252 the horizon gap refuses on any roster. The roster gap does
+    # not add itself for a row the mix held at 504.
+    v = env.check(horizon_days=504,
+                  statistics=list(env.ROSTER_SHAPE_ROWS[mix][504]),
+                  sector_concentrated=mix)
+    assert "roster-concentration" not in [g.id for g in v.gaps]
+
+
+@pytest.mark.parametrize("mix", sorted(env.ROSTER_SHAPES))
+def test_a_measured_mix_is_still_refused_where_the_measurement_stops(mix):
+    from tradefloor.facts import LEVEL, CRISIS
+
+    def refused(**q):
+        v = env.check(sector_concentrated=mix, **q)
+        return not v.inside and "roster-concentration" in [
+            g.id for g in v.gaps]
+
+    # The level and crisis rows are certified on a protocol where the
+    # roster varies with the seed, and the measurement held one roster.
+    for row in LEVEL + CRISIS:
+        assert refused(horizon_days=252, statistics=[row]), row
+    # A question naming nothing may lean on one of them.
+    assert refused(horizon_days=252)
+    # Nothing was measured past 504 days.
+    assert refused(horizon_days=505, statistics=["return_acf1"])
+    # corr_persistence_acf1 has no ruled band at 504, so it is held at 252
+    # only.
+    assert not refused(horizon_days=252,
+                       statistics=["corr_persistence_acf1"])
+    assert refused(horizon_days=253, statistics=["corr_persistence_acf1"])
+
+
+def test_sector_excess_corr_is_refused_on_an_all_technology_roster():
+    """Undefined with one sector, so the measurement could not grade it."""
+    v = env.check(horizon_days=252, statistics=["sector_excess_corr"],
+                  sector_concentrated="all_technology")
     assert not v.inside
-    assert any(g.id == "roster-concentration" for g in v.gaps)
+    assert "undefined" in v.reasons[0]
+    v = env.check(horizon_days=252, statistics=["sector_excess_corr"],
+                  sector_concentrated="tech_heavy")
+    assert v.inside, v.reasons
+
+
+def test_an_unmeasured_mix_is_refused_by_name():
+    with pytest.raises(tradefloor.ValidationError, match="all_technology"):
+        env.check(horizon_days=252, sector_concentrated="all_energy")
+
+
+def test_the_roster_grant_lapses_when_the_preset_moves(monkeypatch):
+    """The mixes were measured on one preset, and a new default is not it."""
+    monkeypatch.setattr(env, "PRESET", "pt-v99")
+    v = env.check(horizon_days=252, statistics=["return_acf1"],
+                  sector_concentrated="tech_heavy")
+    assert not v.inside
+    assert "pt-v99" in v.reasons[0]
+
+
+def test_the_roster_tables_are_the_committed_measurement():
+    """`ROSTER_SHAPE_ROWS` and `ROSTER_INDEX_DRIFT`, re-read from the record.
+
+    The record is the fleet run's output as collected. Its medians are
+    scored here with this build's `score`, so a band that moves, or a table
+    edited by hand, fails here.
+    """
+    import json
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    m = env.ROSTER_MEASUREMENT
+    record = json.loads((root / m["record"]).read_text(encoding="utf-8"))
+    assert record["preset"] == m["preset"] == env.PRESET
+    assert tuple(record["seeds"]) == m["seeds"]
+    assert record["shapes"] == {"balanced": {}, **env.ROSTER_SHAPES}
+    sys.path.insert(0, str(root / "tools" / "calibration"))
+    try:
+        import roster_shapes
+    finally:
+        sys.path.remove(str(root / "tools" / "calibration"))
+    assert roster_shapes.SHAPES == record["shapes"]
+
+    # The balanced mix is the certified roster on the shipped vector: it
+    # reads both certified tables to the four places they carry.
+    for h, table in ((252, env.CERTIFIED), (504, env.MEASURED_504)):
+        med = record["results"][f"balanced@{h}"]["median"]
+        for k in SHAPE:
+            assert round(med[k], 4) == table[k], (h, k)
+
+    for mix in env.ROSTER_SHAPES:
+        for h in m["horizons"]:
+            r = record["results"][f"{mix}@{h}"]
+            sc = env.score(r["median"], horizon_days=h, basis=m["basis"])
+            rows = sc["statistics"]
+            held = {k for k in SHAPE if k in rows and rows[k]["in_band"]}
+            assert held == set(env.ROSTER_SHAPE_ROWS[mix][h]), (mix, h)
+            # Every shape row the bands graded was in band. The two left
+            # out are the ones the measurement could not grade.
+            assert not [k for k in SHAPE
+                        if k in rows and rows[k]["in_band"] is False]
+            assert set(SHAPE) - held <= {"corr_persistence_acf1",
+                                          "sector_excess_corr"}
+    for mix, drift in env.ROSTER_INDEX_DRIFT.items():
+        got = tuple(round(record["results"][f"{mix}@{h}"]["median"]
+                          ["index_drift_pct"], 4) for h in m["horizons"])
+        assert got == drift, mix
 
 
 def test_the_volume_change_row_is_now_inside_at_both_horizons():

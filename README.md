@@ -186,7 +186,7 @@ Five limits are measured and written down:
 | volatility memory | it decays too fast |
 | scenario size | the response has the right sign, but one run cannot size it |
 | macro crises | an inflation crisis or a policy crisis needs a scenario to drive it |
-| roster | certification used a sector-balanced roster, which no real index is |
+| roster | certification used a sector-balanced roster. Four concentrated sector mixes are also measured, on the shape rows only and for up to two years |
 
 `tf.envelope.check()` refuses a question that falls outside a limit, and
 [the realism envelope](https://tradefloor.dev/realism-envelope.html) says

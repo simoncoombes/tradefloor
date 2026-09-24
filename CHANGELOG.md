@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+No coefficient, default or trajectory changes, and the known-answer digest
+stays at `1e683b96`.
+
+`envelope.check()` accepts a sector-concentrated roster when
+`sector_concentrated` names one of the four mixes measured on pt-v19
+(`sp500_like`, `tech_heavy`, `all_technology`, `defensive`), the horizon is
+504 days or less, and every named statistic is a shape row that mix held. It
+still refuses `sector_concentrated=True` with no mix named, any other mix, a
+question that names no statistics, the level and crisis rows,
+`sector_excess_corr` on an all-technology roster, `corr_persistence_acf1`
+past 252 days, anything past 504 days and any preset but pt-v19. An unknown
+mix name raises `ValidationError`. The measurement is thirty seeds at 252 and
+504 days from fleet run `docs080b`, and its output is
+`measurements/roster-shapes-pt-v19.json`. The `roster-concentration` gap now
+lists the rows it still refuses as its statistics, where it listed three
+shape rows.
+
+The `forced_flow_threshold` summary that the parameter table reads is
+reworded in plain terms.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the
