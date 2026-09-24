@@ -157,7 +157,8 @@ CONSTRAINTS = (
 #: its seed sd on the pinned protocol since 2026-09-04, so the one-tuple
 #: edit that promotes it now runs; it is not made here because it changes
 #: the objective every recorded calibration score was measured under, at
-#: the default preset by 16.5 points against a scale of 9.6, and that is
+#: the default preset of 2026-09-04, pt-v16, by 16.5 points against a scale
+#: of 9.6, and that is
 #: a decision about the search rather than about the row.
 #:
 #: The index tail row `index_tail_dn3_pct` is structural and is meant to

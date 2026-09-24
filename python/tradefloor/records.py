@@ -8,8 +8,8 @@ re-running a 96-core measurement.
 
     >>> import tradefloor as tf
     >>> rec = tf.preset_record()            # the shipped default
-    >>> rec["in_band"]["252"]
-    14
+    >>> rec["in_band"]["252"]            # pt-v19; pt-v18's record reads 14
+    15
 
 The point is that a figure and the preset it describes travel together. The
 alternative, which this replaces, was a published number in one file and the

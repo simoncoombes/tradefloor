@@ -1251,13 +1251,16 @@ def stamp_artefact(meta: dict[str, Any]) -> None:
 #: A name is not a model. :meth:`ModelParams.fingerprint` returns a shipped
 #: preset's name whenever the vector is bit-equal to THIS BUILD's preset of
 #: that name, so it is self-referential: the five fixtures recorded at
-#: ``d8e0709`` and a run today both say ``"pt-v19"`` across 131 settable
-#: dials and 148 (MEASURED). The vector is the only field that separates
-#: them.
+#: ``d8e0709`` and a run at ``38f2c43`` both said ``"pt-v19"`` across 131
+#: settable dials and 148 (MEASURED). The vector is the only field that
+#: separates them. Those fixtures were re-recorded on pt-v19's fifth
+#: composition for 0.8.0, which has 177 settable dials.
 #:
-#: The PAIRS and not a digest. ``to_dict()`` as it stands: the 177 pairs
-#: ``digest()`` hashes plus ``name``, 178 keys and 5,656 bytes of JSON
-#: (MEASURED, pt-v19). The name rides along as a label and is never part of
+#: The PAIRS and not a digest. ``to_dict()`` on the 0.8.0 build: the 206
+#: pairs ``digest()`` hashes plus ``name``, 207 keys and 6,636 bytes of JSON
+#: (MEASURED, pt-v19's fifth composition; it read 177 pairs, 178 keys and
+#: 5,656 bytes when this was written). The name rides along as a label and
+#: is never part of
 #: the comparison, exactly as ``digest()`` leaves it out. A digest can only
 #: say "different", and a recording made to exercise a moved dial is MEANT
 #: to differ; only the pairs say WHICH dial moved, which is the whole of
@@ -1312,8 +1315,10 @@ def moved_dials(recorded: dict[str, Any],
     build's value for it equals ``pt-v1``'s. A dial that was added switched
     off is genuinely absent from the recorded model; a dial that was added
     carrying a value is a model the recording never ran. Measured on those
-    seventeen at ``pt-v19``: four are inert and THIRTEEN are live, among them
-    ``market_vol_level_sigma`` 0.085 and ``jump_idio_excitation`` 2.0.
+    seventeen at the ``pt-v19`` of ``38f2c43``: four were inert and THIRTEEN
+    live, among them ``market_vol_level_sigma`` 0.085 and
+    ``jump_idio_excitation`` 2.0. pt-v19's fifth composition carries both
+    at 0.0, so the count is that vector's and not the shipped one's.
 
     A key the RECORD carries and the build does not is returned separately
     and never refused. The build cannot evaluate it -- ``pt-v1`` does not
@@ -1329,7 +1334,8 @@ def moved_dials(recorded: dict[str, Any],
     check that cannot run must not refuse. The same holds for a key ``pt-v1``
     itself does not carry, which cannot arise on the call site here (both
     sides come off one build and every preset on a build carries one keyset,
-    MEASURED: pt-v1 and pt-v19 carry the same 178 keys) and does arise for a
+    MEASURED: pt-v1 and pt-v19 carry the same 207 keys on 0.8.0) and does
+    arise for a
     caller comparing two builds.
 
     :returns: ``(disagreeing, live, undeclared)``, each sorted.
