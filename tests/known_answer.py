@@ -545,6 +545,61 @@ def simulation_buffer() -> bytes:
     return bytes(buf)
 
 
+#: Presets that are not the default and carry their own simulation digest,
+#: so a change that moves one of them is caught even while the default's
+#: digest stands still. pt-v20 is composed and selectable, not the default
+#: (RELEASING.md: a new preset gets its own known-answer entry).
+PRESET_DIGESTS = ("pt-v20",)
+
+
+def preset_simulation_buffer(name: str) -> bytes:
+    """The simulation block of :func:`simulation_buffer` -- the same twelve
+    instruments, macro opening and five sessions -- under the named preset."""
+    buf = bytearray()
+    # The roster, written out as simulation_buffer writes it.
+    sector_names = tradefloor.sectors()
+    instruments = [
+        tradefloor.Instrument(
+            f"KAT{i}",
+            sector_names[i % 12],
+            initial_price=20.0 + i * 7.5,
+            shares_outstanding=2.5e8 + i * 1e7,
+            eps=(-1.0 if i in (5, 11) else 1.0 + i * 0.6),
+            book_value_per_share=10.0 + i * 2.0,
+            revenue_growth=-0.02 + i * 0.03,
+            avg_volume=250_000 + i * 100_000,
+            beta=0.7 + i * 0.1,
+        )
+        for i in range(12)
+    ]
+    engine = tradefloor.Engine(
+        seed=SEED, universe=instruments, model=name,
+        macro_state=tradefloor.Macro(
+            vix=19.5, federal_funds_rate=0.0425, corporate_bond_yield=0.0610,
+            inflation_rate=0.031, qe_pe_boost=0.0, fear_greed_index=38.0,
+            cycle="contraction",
+        ),
+    )
+    for _ in range(5):
+        engine.open_market()
+        engine.run_session(9, 30, 3, 78, volatility=1.0)
+        engine.close_market()
+        for field in ("price", "previous_close", "open", "high", "low",
+                      "volume", "market_cap", "mispricing_s", "garch_variance"):
+            for value in struct.unpack("<%dd" % len(instruments), engine.column(field)):
+                _f64(buf, value)
+    for value in struct.unpack(
+            "<%dd" % (engine.session_ticks_written * len(instruments)),
+            engine.session_prices()):
+        _f64(buf, value)
+    _f64(buf, float(engine.draws_consumed))
+    return bytes(buf)
+
+
+def preset_digest(name: str) -> str:
+    return hashlib.sha256(preset_simulation_buffer(name)).hexdigest()
+
+
 def bonds_buffer() -> bytes:
     """A session with the simulated rate indices, hashed on its own.
 
@@ -687,3 +742,5 @@ if __name__ == "__main__":
     print(f"  sim      {simulation_digest()}")
     print(f"  meta     {metadata_digest()}")
     print(f"  bonds    {bonds_digest()}")
+    for name in PRESET_DIGESTS:
+        print(f"  {name:<8} {preset_digest(name)}")

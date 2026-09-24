@@ -12,7 +12,7 @@
   "fill_impact_coefficient": 0.314
  },
  "kind": "pretium.known-answer.book",
- "note": "The agent-facing book with every dial on at the values suggested for pt-v20: several agents, takers from a tenth of a percent to a whole day's volume, a queue at the touch, orders inside the spread, cancels. Separate from known_answer.json, whose digests an untraded market sets and these dials cannot move. Re-based 2026-09-24 when the book merged with pt-v20's and the bonds' dials: the run's fills, orders, impacts and prices are unchanged (their digest without the engine's state hash is d075094c... on the book's own branch at e1affe0 and on the merge), and the state hash moved only because it carries the custom model's fingerprint, which covers every dial the merged build knows. So BOOK_KAT_VERSION stays 1.",
+ "note": "The agent-facing book with every dial on at the values suggested for pt-v20: several agents, takers from a tenth of a percent to a whole day's volume, a queue at the touch, orders inside the spread, cancels. Separate from known_answer.json, whose digests an untraded market sets and these dials cannot move. Re-based 2026-09-24 when the book merged with pt-v20's and the bonds' dials: the run's fills, orders, impacts and prices are unchanged (their digest without the engine's state hash is d075094c... on the book's own branch at e1affe0 and on the merge), and the state hash moved only because it carries the custom model's fingerprint, which covers every dial the merged build knows. So BOOK_KAT_VERSION stays 1. Re-based again 2026-09-24 when the earnings cycle's four dials joined the build: the digest without the state hash is still d075094c..., so only the fingerprint moved and BOOK_KAT_VERSION stays 1.",
  "seed": 20260924,
- "sha256": "c765d6a611a231b8dede3fad1632f1c6f6e8a7700e91e8fd86b0acade5df5393"
+ "sha256": "1e7f1884fa6882d71d9a9e5b446a83a33d56b4850019520a3ae342811a227fc5"
 }

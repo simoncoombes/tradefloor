@@ -84,6 +84,25 @@ def test_a_session_with_the_rate_indices_matches_its_baseline():
         "changed and bondsSha256 must be regenerated with the change, or a "
         "platform disagrees."
     )
+
+
+def test_each_named_preset_matches_its_own_baseline():
+    """A preset that is not the default gets its own known answer
+    (RELEASING.md), so a change that moved it is caught while the default's
+    digest stands still. The same simulation as the default's, under the
+    named preset."""
+    baseline = json.loads(
+        (HERE / "known_answer.json").read_text(encoding="utf-8")
+    )
+    recorded = baseline.get("presetDigests", {})
+    assert sorted(recorded) == sorted(known_answer.PRESET_DIGESTS)
+    for name in known_answer.PRESET_DIGESTS:
+        assert known_answer.preset_digest(name) == recorded[name], (
+            f"{name}'s simulation digest moved: either the preset changed "
+            "and its baseline must be regenerated with it, or a platform "
+            "disagrees.")
+
+
 def test_the_book_known_answer_matches_its_baseline():
     """The agent-facing book's gate, beside the market's.
 
@@ -160,8 +179,12 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
     # landed, this test and that workflow had to move together -- leaving the
     # workflow alone would have made it count three digests as three
     # disagreements and fail every green run.
-    assert len(digests) == 4, result.stdout
+    # FIVE since pt-v20: the named presets' own simulation digests follow,
+    # one line each (known_answer.PRESET_DIGESTS).
+    assert len(digests) == 4 + len(known_answer.PRESET_DIGESTS), result.stdout
     assert digests[0] == known_answer.known_answer_digest()
     assert digests[1] == known_answer.simulation_digest()
     assert digests[2] == known_answer.metadata_digest()
     assert digests[3] == known_answer.bonds_digest()
+    for k, name in enumerate(known_answer.PRESET_DIGESTS):
+        assert digests[4 + k] == known_answer.preset_digest(name)
