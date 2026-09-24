@@ -66,6 +66,33 @@ def test_replay_reproduces_ground_truth_too():
     assert arr(replayed.column("mispricing_s")) == arr(original.column("mispricing_s"))
 
 
+def test_a_fundamentals_write_is_logged_and_replayed():
+    """`set_fundamentals` is an input, and the log carries it.
+
+    The `market.earnings` scenario target writes through it and nothing in
+    the engine writes the figures back. Until 0.8.5 the log did not record
+    it, so a `RunManifest` of a run under the recalibrated recession replayed
+    the original earnings and failed its own digest. A NaN goes out as None
+    and comes back as NaN, through JSON.
+    """
+    e = tradefloor.Engine(seed=7, universe=UNIVERSE,
+                          macro_state=tradefloor.Macro(federal_funds_rate=0.03))
+    e.open_market()
+    e.run_session(9, 30, 3, 30)
+    eps, book, growth = e.fundamentals()
+    e.set_fundamentals([v * 0.6 for v in eps], book,
+                       [float("nan")] + list(growth[1:]))
+    e.run_session(10, 0, 3, 30)
+    e.close_market()
+    writes = [x for x in e.order_log if x["op"] == "set_fundamentals"]
+    assert len(writes) == 1 and writes[0]["revenue_growth"][0] is None
+    log = json.loads(json.dumps(e.order_log, allow_nan=False))
+    replayed = tradefloor.replay(log, seed=7, universe=UNIVERSE,
+                                 macro=tradefloor.Macro(federal_funds_rate=0.03))
+    assert arr(replayed.prices()) == arr(e.prices())
+    assert replayed.draws_consumed == e.draws_consumed
+
+
 def test_a_log_is_plain_data():
     # A script may not run next year; a list of dicts will. That is what makes
     # a published experiment archivable rather than merely described.

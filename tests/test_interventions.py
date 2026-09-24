@@ -810,8 +810,12 @@ def test_the_manifest_records_the_resolved_scenario_not_the_filename():
     assert doc["name"] == "liquidity_crisis"
     assert doc["fingerprint"] == scenario.fingerprint
     assert doc["source"] == "liquidity_crisis.yml"
+    # From 0.8.5 the packaged file carries an earnings shock in two
+    # contiguous windows (0.8.1: market.liquidity and macro.vix only), and
+    # the manifest's reproduce() below rebuilds it through the logged
+    # set_fundamentals writes.
     assert [s["target"] for s in doc["shocks"]] == [
-        "market.liquidity", "macro.vix"]
+        "market.liquidity", "macro.vix", "market.earnings", "market.earnings"]
     assert doc["transmission"][0]["target"] == "macro.corporate_yield"
 
     # It survives the round trip, and it reproduces.

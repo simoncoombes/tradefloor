@@ -1,7 +1,7 @@
 # Example experimental assumptions. This scenario is not a forecast, and not
 # a claim about how a real market would respond to a real liquidity event.
 #
-# Calibrated in 0.8.5 against March 2020 (design repository,
+# Calibrated in 0.8.5 against March 2020 (tradefloor-design,
 # programme/ptv20-scenario-size.md). The S&P 500 fell 28.8 per cent in the 21
 # sessions to 23 March 2020 and 33.9 per cent at worst, with the VIX going
 # from 14 to 83.

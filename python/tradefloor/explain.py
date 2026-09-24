@@ -1357,6 +1357,11 @@ def _replay_inputs(engine: Engine, inputs: Sequence[dict],
             engine.pin_macro(**entry["fields"])
         elif op == "set_avg_volume":
             engine.set_avg_volume(entry["values"])
+        elif op == "set_fundamentals":
+            # NaN is logged as None, which JSON can carry.
+            engine.set_fundamentals(
+                *([float("nan") if v is None else v for v in entry[k]]
+                  for k in ("eps", "book_value_per_share", "revenue_growth")))
         elif op == "draw_uniform":
             engine.draw_uniform()
         elif op == "draw_normal":

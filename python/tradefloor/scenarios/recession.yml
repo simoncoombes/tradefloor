@@ -1,7 +1,7 @@
 # Example experimental assumptions. This scenario is not a forecast, and not
 # a claim about how a real market behaves in a real recession.
 #
-# Calibrated in 0.8.5 to the depth of 2008 (design repository,
+# Calibrated in 0.8.5 to the depth of 2008 (tradefloor-design,
 # programme/ptv20-scenario-size.md). The S&P 500 fell 45 per cent over the
 # 120 sessions from Lehman to March 2009, with the VIX going from 26 to 81,
 # and 57 per cent from the 2007 peak to the March 2009 trough. S&P operating

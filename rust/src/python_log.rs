@@ -78,6 +78,20 @@ pub enum LogEntry {
     SetAvgVolume {
         values: Vec<f64>,
     },
+    /// Every company's fair-value inputs, as `Engine.set_fundamentals` wrote
+    /// them: reported earnings, book value and revenue growth per share, one
+    /// value each in roster order, NaN where absent.
+    ///
+    /// An input for the reason `SetAvgVolume` is: the `market.earnings`
+    /// scenario target writes through it, nothing in the engine writes these
+    /// figures back, and a replay that did not carry them rebuilt the market
+    /// with its original earnings and failed its digest. NaN goes out as
+    /// `None`, which JSON can carry.
+    SetFundamentals {
+        eps: Vec<f64>,
+        book_value_per_share: Vec<f64>,
+        revenue_growth: Vec<f64>,
+    },
     ListInstrument {
         ticker: String,
         sector: String,
@@ -257,6 +271,15 @@ impl LogEntry {
             LogEntry::SetAvgVolume { values } => {
                 d.set_item("op", "set_avg_volume")?;
                 d.set_item("values", values.to_vec())?;
+            }
+            LogEntry::SetFundamentals { eps, book_value_per_share, revenue_growth } => {
+                let absent = |v: &Vec<f64>| -> Vec<Option<f64>> {
+                    v.iter().map(|x| if x.is_nan() { None } else { Some(*x) }).collect()
+                };
+                d.set_item("op", "set_fundamentals")?;
+                d.set_item("eps", absent(eps))?;
+                d.set_item("book_value_per_share", absent(book_value_per_share))?;
+                d.set_item("revenue_growth", absent(revenue_growth))?;
             }
             LogEntry::Delist { index } => {
                 d.set_item("op", "delist")?;

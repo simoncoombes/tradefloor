@@ -3175,7 +3175,15 @@ impl PyEngine {
     ) -> PyResult<()> {
         self.inner
             .set_fundamentals(&eps, &book_value_per_share, &revenue_growth)
-            .map_err(ValidationError::new_err)
+            .map_err(ValidationError::new_err)?;
+        // Logged once the engine has taken it, so a refused write leaves no
+        // entry a replay would then fail on.
+        self.log.push(crate::python_log::LogEntry::SetFundamentals {
+            eps,
+            book_value_per_share,
+            revenue_growth,
+        });
+        Ok(())
     }
 
     fn set_avg_volume(&mut self, values: Vec<f64>) -> PyResult<()> {

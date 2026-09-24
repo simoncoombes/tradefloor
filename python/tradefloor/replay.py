@@ -26,8 +26,8 @@ from ._core import Engine, Instrument, Macro, ModelParams, News, ValidationError
 # by name rather than by falling through a chain of ifs into silence.
 _OPS = frozenset({
     "open_market", "close_market", "tick", "run_session", "pin_macro",
-    "set_avg_volume", "list_instrument", "delist", "draw_uniform",
-    "draw_normal", "record",
+    "set_avg_volume", "set_fundamentals", "list_instrument", "delist",
+    "draw_uniform", "draw_normal", "record",
     # Agents' orders against the book, and the collection of what they
     # produced.
     "submit", "cancel", "take_fills", "take_impacts",
@@ -134,6 +134,11 @@ def apply_log(
             engine.pin_macro(**entry["fields"])
         elif op == "set_avg_volume":
             engine.set_avg_volume(entry["values"])
+        elif op == "set_fundamentals":
+            # NaN is logged as None, which JSON can carry.
+            engine.set_fundamentals(
+                *([float("nan") if v is None else v for v in entry[k]]
+                  for k in ("eps", "book_value_per_share", "revenue_growth")))
         elif op == "tick":
             engine.tick(
                 entry["hour"], entry["minute"], entry["day_of_week"],
