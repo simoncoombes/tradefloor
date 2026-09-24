@@ -22,6 +22,17 @@ price.
 Documentation is at https://tradefloor.dev. It covers install, core
 concepts, the realism envelope, presets, the API and the notebooks.
 
+Three documents in this repository are for anyone publishing with it:
+
+- [docs/MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md):
+  the model as equations, with every coefficient's value on the default
+  preset and where it came from
+- [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md):
+  the named sets of realism statistics, so a count on one page can be
+  matched to a count on another
+- [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md):
+  which release lines get fixes, and for how long
+
 ## Install
 
 ```
@@ -140,32 +151,50 @@ lists every target and what each one reaches.
 
 ## Realism
 
-tradefloor checks its market against real ones. `tf.facts.measure()` measures
-19 statistics of a simulated market, such as volatility, fat tails, how much
-stocks move together and how far the VIX jumps after a fall. It compares each
-one with the range real markets show. On the default preset, `pt-v19`, every
-statistic is inside its real range at one year, and every one that can be read
-at two years is inside too. The check runs 30 random seeds and is repeated on
-a second, held-out set of companies. The statistic furthest from real is how
-much stocks in one sector move together beyond the market, 0.090 against a
-real 0.164, which is still inside the range.
+tradefloor checks its market against real ones with three named sets of
+statistics. [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md)
+lists every member of each, and the counts below refer to them.
 
-Four of the 19 measure levels. An equal-weight portfolio of the stocks gains
-7.6 percent a year, inside a real range of 1.1 to 10.3. On a day the index
-falls 1 percent or more, the VIX rises a median 1.9 points against a real 2.7,
-and on a 3 percent fall it rises 5.4 against 5.7. The index falls 3 percent or
-more on 1.14 percent of days, against 1.21 percent in real markets.
+**The one-year table** has 19 statistics of a simulated market, such as
+volatility, fat tails, how much stocks move together and how far the VIX
+jumps after a fall. `tf.facts.measure()` reads 18 of them over 252 days, and
+`tf.facts.crisis_statistics()` the nineteenth, which needs a run with a
+crisis in it. `tf.envelope.score()` compares each with the range real
+markets show over a year. On the default preset, `pt-v19`, all 19 are inside their ranges. The
+check runs 30 random seeds. Fifteen of the statistics are read on one fixed
+set of companies, and that fixed-roster panel is repeated on held-out seeds
+and on a held-out set of companies.
 
-pt-v19 also passes a long-run check. It runs the market for 21 years, 30 times
-over, and replays 2008 and 2020 with the real VIX. Fifteen things a user would
-notice are compared with real markets: how deep crashes go, how long fear
+Four of the 19 describe the index as a whole. An equal-weight index of the
+stocks gains 7.6 percent a year, inside a real range of 1.1 to 10.3. On a day
+the index falls 1 percent or more, the VIX rises a median 1.9 points, inside
+a real range of 0.39 to 3.03; on a 3 percent fall it rises 5.4, inside 2.6 to
+9.58. The index falls 3 percent or more on 1.14 percent of days, against 1.21
+percent in real markets.
+
+**The two-year panel** is the fixed-roster panel run for 504 days. Fourteen
+of its 15 statistics have a two-year range, and pt-v19 has all 14 inside.
+
+**The long-run criteria** are 17 checks over 21 years from 0.9.0, and 15
+before it. The check runs the market for 21 years, 30 times over, and
+replays 2008 and 2020 with the real VIX. Fifteen criteria compare what a
+user would notice with real markets: how deep crashes go, how long fear
 lasts, how often the VIX is above 30 or below 15, how many bear markets and
-corrections a decade brings, the long-run return, and whether a headline read
-late still pays. pt-v19 passes all fifteen. pt-v18, the previous default,
-passes eight. In the 2008 replay the market falls 41 percent against the real
-57, the VIX is above 30 on 8.1 percent of days against a real 8.2, and the
-index returns 6.3 percent a year over 21 years. The result ships with the
-package as `tf.preset_record()["long_run"]`.
+corrections a decade brings, the long-run return, and whether a headline
+read late still pays. pt-v19 meets all fifteen. pt-v18, the previous
+default, meets eight. In the 2008 replay the market falls 41 percent against
+the real 57, the VIX is above 30 on 8.1 percent of days against a real 8.2,
+and the index returns 6.3 percent a year over 21 years.
+
+The other two, C4a and C4b, added in 0.9.0, ask whether a rule that reads
+only prices can find an edge real markets do not have, and pt-v19 fails
+both. Hour-to-hour returns reverse too much: the lag-1 autocorrelation of
+65-minute returns is -0.19, where the spreads real large caps quote imply
+about zero. So on the published suite of 20 markets, a mean-reversion rule
+that trades every 65 minutes beats buy-and-hold in 18 of them, by a median
+13.6 points in 60 days, and five-day momentum also beats it. The next preset
+is meant to fix both. The verdicts ship with the package as
+`tf.preset_record()["long_run"]`.
 
 Three things are still off. The worst month of the 2020 replay is about 30
 percent milder than the real one. Over two years the VIX forgets a shock a
@@ -175,14 +204,16 @@ with it held at 5, against 6.2 times in real markets.
 Each crisis starts in one sector, picked at random. A scenario can pick it for
 you with `Scenario().hold(epicentre="financial_services")`.
 
-Five of the statistics were also used to tune the model, so they were not held
-out for testing.
+pt-v19's coefficients were chosen with a scoring rule over 19 statistics
+that overlaps the one-year table, so that table helped choose them and
+cannot also serve as a held-out test. The held-out checks are the fresh seeds
+and the fresh set of companies.
 
 Five limits are measured and written down:
 
 | limit | what it means |
 |---|---|
-| horizon | one year is certified against the bands. Longer runs are graded only by the long-run check |
+| horizon | one year is certified. Two years is graded on the two-year panel, and longer runs only by the long-run criteria |
 | volatility memory | it decays too fast |
 | scenario size | the response has the right sign, but one run cannot size it |
 | macro crises | an inflation crisis or a policy crisis needs a scenario to drive it |
@@ -300,8 +331,35 @@ To contribute, see [CONTRIBUTING.md](https://github.com/simoncoombes/tradefloor/
 is that any change to the simulated trajectory is a breaking change, however
 small.
 
-To cite the software, see [CITATION.cff](https://github.com/simoncoombes/tradefloor/blob/main/CITATION.cff). To cite a result, use its
-`RunManifest`.
+## Citing tradefloor
+
+Cite the version you ran and name the preset. The same version can run
+several presets, and results depend on the preset.
+
+```bibtex
+@software{tradefloor,
+  author  = {Coombes, Simon},
+  title   = {tradefloor: a deterministic market simulator with a limit order book},
+  version = {0.8.1},
+  year    = {2026},
+  url     = {https://github.com/simoncoombes/tradefloor},
+  doi     = {10.5281/zenodo.XXXXXXX},
+  note    = {Model preset pt-v19}
+}
+```
+
+The DOI is a placeholder. Zenodo will mint one DOI per release once the
+archive is switched on; until then, cite the version and the URL and leave
+the `doi` line out. [CITATION.cff](https://github.com/simoncoombes/tradefloor/blob/main/CITATION.cff)
+carries the same details, and GitHub's "Cite this repository" button reads
+it.
+
+In the text, say which model you used, for example: "tradefloor 0.8.1,
+preset pt-v19, specified in its docs/MODEL.md". To let a reader rerun a
+result, publish its `RunManifest`: it records the version, preset, seed,
+universe, macro state and scenario, and `reproduce()` stops on a mismatch.
+[docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)
+says which release to pin for a long study.
 
 ## License
 
