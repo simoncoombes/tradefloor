@@ -5,8 +5,8 @@ One command:
     .venv/bin/python tools/remeasure/remeasure.py
 
 runs every measurement group in tools/remeasure/measures.py against the
-installed `tradefloor` package, joins the results to the claim inventory in
-tools/remeasure/inventory.json, and writes
+installed `tradefloor` package, joins the results to the claim register, and
+writes
 
     tools/remeasure/out/figures.json     machine-readable results
     tools/remeasure/out/REPORT.md        the delta report, grouped by document
@@ -28,6 +28,16 @@ Statuses:
     not_harnessable        needs a rebuilt engine, another platform, or a paid
                            external service
     covered_by_tests       exercised by the test suite, not duplicated here
+    bound_missing          the row is bound to a data file the documentation
+                           build generates, and that file or the path in it
+                           could not be read, so the row has no published
+                           value to judge
+
+The register lives in the documentation repository, beside the pages it
+describes, at tools/remeasure/inventory.json. Point TRADEFLOOR_DOCS at a
+checkout of it or pass --inventory; see register.py. A row whose figure the
+build writes from a data file carries `bound`, and its published value is
+read from that file here rather than from the copy typed into the row.
 
 Options:
     --only GROUP[,GROUP..]  run a subset of measurement groups
@@ -153,6 +163,21 @@ def _scope_line(meta: dict) -> str:
     return f"Full run: {wall}."
 
 
+def _where(r: dict) -> str:
+    """The row's own line, then every other place the page repeats it.
+
+    A figure printed in three places is edited in three places, and a report
+    naming only the first sends the editor away with two of them stale.
+    """
+    here = f"{r['file']}:{r['line']}"
+    also = r.get("also") or []
+    return here + (" (also " + ", ".join(also) + ")" if also else "")
+
+
+def _label(r: dict) -> str:
+    return r["label"] + (" (bound)" if r.get("bound") else "")
+
+
 def write_report(rows: list[dict], meta: dict, path: Path) -> None:
     counts: dict[str, int] = {}
     for r in rows:
@@ -169,13 +194,15 @@ def write_report(rows: list[dict], meta: dict, path: Path) -> None:
     ]
     order = ["reproduced", "within_seed_variation", "MOVED", "machine_bound",
              "structural_ok", "structural_fail", "method_unknown",
-             "not_harnessable", "covered_by_tests", "measurement_failed"]
+             "not_harnessable", "covered_by_tests", "measurement_failed",
+             "bound_missing"]
     for s in order:
         if s in counts:
             lines.append(f"| {s} | {counts[s]} |")
     lines.append("")
 
-    moved = [r for r in rows if r["status"] in ("MOVED", "structural_fail")]
+    moved = [r for r in rows
+             if r["status"] in ("MOVED", "structural_fail", "bound_missing")]
     if moved:
         lines += [
             "## Doc edits needed",
@@ -185,11 +212,11 @@ def write_report(rows: list[dict], meta: dict, path: Path) -> None:
             "were already stale; after an engine change, this section IS the edit",
             "list.",
             "",
-            "| where | figure | published | measured |",
-            "|---|---|---|---|",
+            "| where | figure | preset | published | measured |",
+            "|---|---|---|---|---|",
         ]
         for r in moved:
-            lines.append(f"| {r['file']}:{r['line']} | {r['label']} | "
+            lines.append(f"| {_where(r)} | {_label(r)} | {r.get('preset') or '-'} | "
                          f"{_fmt(r['published'])} | {_fmt(r['measured'])} |")
         lines.append("")
 
@@ -212,11 +239,12 @@ def write_report(rows: list[dict], meta: dict, path: Path) -> None:
         by_file.setdefault(r["file"], []).append(r)
     for file in sorted(by_file):
         lines += [f"### {file}", "",
-                  "| line | figure | published | measured | delta | status |",
-                  "|---|---|---|---|---|---|"]
+                  "| line | figure | preset | published | measured | delta | status |",
+                  "|---|---|---|---|---|---|---|"]
         for r in sorted(by_file[file], key=lambda x: (x["line"], x["id"])):
             lines.append(
-                f"| {r['line']} | {r['label']} | {_fmt(r['published'])} | "
+                f"| {r['line']} | {_label(r)} | {r.get('preset') or '-'} | "
+                f"{_fmt(r['published'])} | "
                 f"{_fmt(r['measured'])} | {_fmt(r.get('delta'))} | {r['status']} |")
         lines.append("")
 
@@ -257,6 +285,26 @@ def main() -> int:
     unknown = wanted - set(GROUPS)
     if unknown:
         ap.error(f"unknown groups: {sorted(unknown)}; know {sorted(GROUPS)}")
+
+    # Before anything is measured: every bound row the run will judge must be
+    # able to read the data file its page is built from. Finding out after
+    # six minutes of measurement that the register was copied somewhere
+    # without its data files is how a gate reports a pass it never checked.
+    docs_root = register.docs_root_of(inventory_path)
+    unreadable = []
+    for fig in inventory:
+        if fig.get("bound") and (fig.get("group") is None
+                                 or fig["group"] in wanted):
+            try:
+                register.bound_value(fig, docs_root)
+            except LookupError as err:
+                unreadable.append(str(err))
+    if unreadable:
+        raise SystemExit(
+            "bound rows cannot read the data files their pages are built "
+            "from. Run against a register inside a documentation checkout "
+            "(TRADEFLOOR_DOCS), or one copied with tools/docs/learn/*.json "
+            "beside it in the same layout.\n  " + "\n  ".join(unreadable))
 
     ctx = Ctx(root=ROOT, workers=args.workers)
     results: dict[str, dict] = {}
@@ -302,17 +350,30 @@ def main() -> int:
         "errors": errors,
     }
 
+    # A bound row's published value is whatever the build wrote on the page,
+    # which is the data file it was built from, read here.
     rows = []
     for fig in inventory:
         group, key = fig.get("group"), fig.get("key")
         if group is not None and group not in wanted:
             continue
         measured = results.get(group, {}).get(key) if group else None
-        status, delta = judge(fig, measured)
+        fig = dict(fig)
+        bound_error = None
+        if fig.get("bound"):
+            try:
+                fig["published"] = register.bound_value(fig, docs_root)
+            except LookupError as err:
+                bound_error = str(err)
+        if bound_error:
+            status, delta = "bound_missing", None
+        else:
+            status, delta = judge(fig, measured)
         rows.append({**{k: fig.get(k) for k in
-                        ("id", "file", "line", "label", "published",
-                         "method", "source", "note")},
-                     "measured": measured, "delta": delta, "status": status})
+                        ("id", "file", "line", "label", "published", "preset",
+                         "bound", "also", "method", "source", "note")},
+                     "measured": measured, "delta": delta, "status": status,
+                     **({"bound_error": bound_error} if bound_error else {})})
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -326,12 +387,20 @@ def main() -> int:
     print(f"\n{len(rows)} figures in {meta['wall_s']:.0f}s -> "
           + ", ".join(f"{k}: {v}" for k, v in sorted(counts.items())))
     print(f"wrote {out_dir / 'figures.json'} and {out_dir / 'REPORT.md'}")
+    unbound = [r for r in rows if r["status"] == "bound_missing"]
+    if unbound:
+        # A bound row with no readable source has no published value, so
+        # nothing judged it. That is a register defect, not a quiet pass.
+        print(f"\n{len(unbound)} bound rows could not read their source:",
+              file=sys.stderr)
+        for r in unbound:
+            print(f"  {r['bound_error']}", file=sys.stderr)
     if errors:
         print(f"\nGROUP FAILURES: {sorted(errors)}", file=sys.stderr)
         for name, tb in errors.items():
             print(f"\n--- {name} ---\n{tb}", file=sys.stderr)
         return 1
-    return 0
+    return 1 if unbound else 0
 
 
 if __name__ == "__main__":

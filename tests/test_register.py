@@ -1,21 +1,22 @@
 """The claim register must be found deliberately, or not at all.
 
 The register describes the documentation, and the documentation left this
-repository at 0.5.0, so the register follows it. That makes "which register
-did this run read" a question with more than one answer, and a gate that
-reads a different one than its operator believes is no better than a gate
-that reads none.
+repository at 0.5.0, so the register lives there now. That makes "which
+register did this run read" a question with more than one answer, and a gate
+that reads a different one than its operator believes is no better than a
+gate that reads none.
 
-The failure guarded hardest here is the quiet fallback: TRADEFLOOR_DOCS set,
-the register not present under it, and the tool reaching for the copy still
-committed in this repository. That would report figures measured against the
-old register while its operator believed the documentation's own was in use,
-and nothing in the output would say so.
+Two failures are guarded here. The quiet fallback: TRADEFLOOR_DOCS set, the
+register not present under it, and the tool reaching for some other copy.
+And the copy itself: this repository kept one until 0.8.1, it stayed behind
+when the pages moved, and for four releases every coordinate in it named a
+page nothing held.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -28,10 +29,10 @@ sys.path.insert(0, str(REPO / "tools" / "remeasure"))
 import register  # noqa: E402
 
 
-def _register_at(root: Path) -> Path:
+def _register_at(root: Path, figures=None) -> Path:
     path = root / register.IN_DOCS
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"figures": []}), encoding="utf-8")
+    path.write_text(json.dumps({"figures": figures or []}), encoding="utf-8")
     return path
 
 
@@ -62,11 +63,11 @@ def test_docs_root_is_used_when_it_holds_the_register(tmp_path, monkeypatch):
 
 def test_docs_root_without_a_register_does_not_fall_back_quietly(tmp_path,
                                                                 monkeypatch):
-    """The whole point. Asked for the documentation's register and not given
-    one, this must stop rather than substitute the copy committed here.
+    """Asked for the documentation's register and not given one, this must
+    stop rather than substitute anything else.
 
-    A silent substitution reports the old register's figures under the new
-    register's name, and the run looks entirely normal.
+    A silent substitution reports another register's figures under this
+    one's name, and the run looks entirely normal.
     """
     monkeypatch.setenv("TRADEFLOOR_DOCS", str(tmp_path / "empty"))
     with pytest.raises(SystemExit) as caught:
@@ -76,23 +77,35 @@ def test_docs_root_without_a_register_does_not_fall_back_quietly(tmp_path,
     assert "tools/remeasure/inventory.json" in message
 
 
-def test_the_local_copy_answers_when_nothing_is_set(monkeypatch):
-    """A clone of this repository alone still runs the gate.
+def test_this_repository_keeps_no_register():
+    """The copy that went stale is gone, and must not come back.
 
-    This is the transition fallback and not the destination: it exists so the
-    move can land in the two repositories in either order.
+    Two copies of one register drift, and the one beside the code is the one
+    nobody edits when a page changes.
     """
+    assert not (REPO / "tools" / "remeasure" / "inventory.json").exists(), (
+        "tools/remeasure/inventory.json is back in this repository. The "
+        "register lives in tradefloor-docs, beside the pages it describes.")
+
+
+def test_nothing_set_is_refused_with_a_pointer(monkeypatch):
+    """A clone of this repository alone stops, and says where to look."""
     monkeypatch.delenv("TRADEFLOOR_DOCS", raising=False)
-    path, how = register.resolve()
-    assert path == (REPO / "tools" / "remeasure" / "inventory.json").resolve()
-    assert how == "the copy in this repository"
+    with pytest.raises(SystemExit) as caught:
+        register.resolve()
+    message = str(caught.value)
+    assert "tradefloor-docs" in message
+    assert "TRADEFLOOR_DOCS" in message
+    assert "--inventory" in message
 
 
 @pytest.mark.parametrize("tool", ["remeasure.py", "resync.py"])
-def test_each_tool_says_which_register_it_read(tool):
+def test_each_tool_says_which_register_it_read(tool, tmp_path):
     """Naming it is the difference between a gate and a rumour."""
+    mine = _register_at(tmp_path / "docs-repo")
     done = subprocess.run(
-        [sys.executable, str(REPO / "tools" / "remeasure" / tool)]
+        [sys.executable, str(REPO / "tools" / "remeasure" / tool),
+         "--inventory", str(mine)]
         + (["--list"] if tool == "remeasure.py" else
            # A stored run, not `out/`, which is not committed: on a fresh
            # clone the default figures file does not exist, and a test that
@@ -105,6 +118,19 @@ def test_each_tool_says_which_register_it_read(tool):
         f"{tool} did not name the register it read. stdout:\n"
         f"{done.stdout[-800:]}\nstderr:\n{done.stderr[-800:]}"
     )
+
+
+@pytest.mark.parametrize("tool", ["remeasure.py", "resync.py"])
+def test_each_tool_without_a_register_points_at_it(tool):
+    env = {k: v for k, v in os.environ.items() if k != "TRADEFLOOR_DOCS"}
+    done = subprocess.run(
+        [sys.executable, str(REPO / "tools" / "remeasure" / tool)]
+        + (["--list"] if tool == "remeasure.py" else ["--lines"]),
+        capture_output=True, text=True, cwd=REPO, timeout=300, env=env,
+    )
+    assert done.returncode != 0
+    assert "Traceback" not in done.stderr, done.stderr[-800:]
+    assert "tradefloor-docs" in done.stderr, done.stderr[-800:]
 
 
 def test_the_code_repository_is_searched_before_the_documentation(tmp_path,
@@ -152,8 +178,10 @@ def test_a_missing_measurement_run_is_explained(tmp_path):
     and it arrived before the register line, so the run said nothing at all
     about what it had been asked to read.
     """
+    mine = _register_at(tmp_path / "docs-repo")
     done = subprocess.run(
         [sys.executable, str(REPO / "tools" / "remeasure" / "resync.py"),
+         "--inventory", str(mine),
          "--report", "--figures", "tools/remeasure/out/definitely-absent.json"],
         capture_output=True, text=True, cwd=REPO, timeout=300,
     )
@@ -164,3 +192,85 @@ def test_a_missing_measurement_run_is_explained(tmp_path):
     assert "register:" in done.stdout, (
         "the run did not say which register it was going to read before "
         f"stopping. stdout: {done.stdout[-800:]}")
+
+
+# ---------------------------------------------------------------------------
+# bound figures
+# ---------------------------------------------------------------------------
+
+def _docs_with_fixture(tmp_path: Path) -> Path:
+    docs = tmp_path / "docs-repo"
+    fixture = docs / "tools" / "docs" / "learn" / "experiments.json"
+    fixture.parent.mkdir(parents=True)
+    fixture.write_text(json.dumps({
+        "grid": {
+            "agents_table": [
+                {"name": "mean_reversion", "pooled_capture": 0.9466,
+                 "capture_range": [0.33, 1.58]},
+                {"name": "momentum", "pooled_capture": -0.1031,
+                 "capture_range": [-0.53, 0.39]},
+            ],
+            "separation": {"wins_a": 12, "wins_b": 0},
+        },
+        "rebalance": {"rows": [{"steps": 3, "return_pct": 38.6}]},
+    }), encoding="utf-8")
+    return docs
+
+
+def test_a_register_knows_the_checkout_it_sits_in(tmp_path):
+    docs = tmp_path / "docs-repo"
+    path = _register_at(docs)
+    assert register.docs_root_of(path) == docs.resolve()
+    assert register.docs_root_of(tmp_path / "loose.json") is None
+
+
+@pytest.mark.parametrize("path, expected", [
+    ("grid.agents_table[name=momentum].pooled_capture", -0.1031),
+    ("grid.agents_table[name=mean_reversion].capture_range[1]", 1.58),
+    ("rebalance.rows[steps=3].return_pct", 38.6),
+    (["grid.separation.wins_a", "grid.separation.wins_b"], "12-0"),
+])
+def test_a_bound_value_is_read_from_the_data_file(tmp_path, path, expected):
+    """The page states what the build wrote from the file, so the file is
+    the published value, whatever the row last typed."""
+    docs = _docs_with_fixture(tmp_path)
+    row = {"id": "x", "published": 0.0,
+           "bound": {"file": "tools/docs/learn/experiments.json", "path": path}}
+    assert register.bound_value(row, docs) == expected
+
+
+@pytest.mark.parametrize("path", [
+    "grid.agents_table[name=nobody].pooled_capture",
+    "grid.nothing_here",
+])
+def test_a_bound_path_that_is_not_there_is_named(tmp_path, path):
+    docs = _docs_with_fixture(tmp_path)
+    row = {"id": "x", "bound": {"file": "tools/docs/learn/experiments.json",
+                                "path": path}}
+    with pytest.raises(LookupError) as caught:
+        register.bound_value(row, docs)
+    assert "x" in str(caught.value)
+
+
+def test_remeasure_refuses_bound_rows_it_cannot_read_before_measuring(tmp_path):
+    """A register copied somewhere without the data files its bound rows
+    read must stop the run at once, not after minutes of measurement end in
+    rows with no published value."""
+    loose = tmp_path / "loose" / "inventory.json"
+    loose.parent.mkdir()
+    loose.write_text(json.dumps({"figures": [{
+        "id": "agents.pooled_mr", "file": "docs/agents.html", "line": 1,
+        "label": "x", "published": 0.947, "group": "arith",
+        "key": "clean_sweep_p", "compare": {"kind": "round", "decimals": 3},
+        "bound": {"file": "tools/docs/learn/experiments.json",
+                  "path": "grid.agents_table[name=mean_reversion].pooled_capture"},
+    }]}), encoding="utf-8")
+    done = subprocess.run(
+        [sys.executable, str(REPO / "tools" / "remeasure" / "remeasure.py"),
+         "--inventory", str(loose), "--only", "arith",
+         "--out", str(tmp_path / "out")],
+        capture_output=True, text=True, cwd=REPO, timeout=300,
+    )
+    assert done.returncode != 0
+    assert "bound rows cannot read" in done.stderr, done.stderr[-800:]
+    assert not (tmp_path / "out" / "figures.json").exists()
