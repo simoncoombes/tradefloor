@@ -1,94 +1,67 @@
 # Changelog
 
-## Unreleased
-
-**Bonds.** Three simulated rate indices can join a roster: `UST2Y` and
-`UST10Y`, constant-maturity 2-year and 10-year treasury indices, and
-`IGCORP`, an investment-grade corporate bond index. None is a real security.
-`Universe.random(n, seed=..., bonds=True)` appends them after the equities
-and `tf.bonds()` builds them. Each returns `yield / 252 - D * dy + 0.5 * C *
-dy^2` a day off the engine's own curve, with duration and convexity of 1.9
-and 4.6, 8.5 and 84, and 7.0 and 100. They trade through the same books,
-fills, portfolio, tape and TCA as the equities.
-
-**Scenarios and cash.** `pin_macro` and the scenario registry take the
-2-year and 10-year yields, and `curve_shock.yml` moves the whole curve 200bp
-on day 50: `UST10Y` -15.35%, `UST2Y` -3.71% and `IGCORP` -12.30% that day.
-`rate_shock.yml` is unchanged and reaches the 10-year only over the weeks
-after. `baselines.Balanced` is a 60/40 book with a drift band, and
-`evaluate(..., cash_interest=True)` pays cash the policy rate.
-
-**What does not move.** Without the indices, every digest and every preset.
-With them, every equity price, draw and macro value is identical to
-the run without, because they take no draws and write nothing back. A new
-`bondsSha256` covers a session with them.
-
-**Still off.** The engine's curve is quieter than the real one: the 2-year
-moves 0.46bp a day against 5.2bp over 2015-2025 and the 10-year 3.1bp against
-5.35bp, and bond and stock returns are uncorrelated where IEF reads -0.16 and
-LQD +0.27.
-
-<!-- release-note-ends -->
-
-### The pricing and the books
-
-`rust/src/rates.rs` holds the pricing, the curve reads and the books, and
-documents every number. An index level reprices whenever the yield it reads
-has moved: at the open after the close's macro step, and on the first tick
-after a pin. Carry accrues once, at the first open after a close. Nothing
-interpolates toward a later yield, and no tracking noise is added, so no
-price can reveal a yield before the close that sets it. `IGCORP` reads the
-10-year plus a credit spread that is re-marked whenever the engine sets the
-corporate yield or a caller pins it, so it carries rate risk between
-central-bank meetings and reads a held corporate yield exactly.
-
-The books are the equity maker's ladder around the index level, with a
-0.6bp spread before cent rounding for the treasuries and 0.8bp for the
-corporate index, widening with the VIX by the equity rule, and depth from
-the median dollar volume of SHY, IEF and LQD over 2015-2025. A trade leaves
-the maker holding inventory that skews its quotes by up to a half spread and
-decays with a 15-minute half-life, so impact on an index is transient.
-
-### Measured
-
-Every packaged scenario's effect on the three indices is in
-`tests/test_bonds.py` and in each scenario file's notes. A 60/40 book of
-equal-weight equities and a 6.5-year bond sleeve through each scenario is
-`tools/bonds/sixty_forty.py`; the comparison with real bond markets is
-`tools/bonds/realism.py`, against FRED's DGS2 and DGS10 and Yahoo's SPY,
-SHY, IEF and LQD.
-
 ## 0.8.5
 
-**An agent's orders now reach the market once.** Every harness passed an
-agent's fills to `run_session` as `order_flow`, which the session held on
-every tick. At six steps a day one order was counted 65 times, after the
-agent had filled at the price before it, so agents were marked to their own
-impact. The spec mean-reversion rule beat buy-and-hold on all 20 markets of
-the published suite by a median 42 points in 60 days. With fills applied
-once it reads +0.5 points, ahead in 10 of 20.
+0.8.5 is the first long-term support release. The 0.8 line gets fixes that
+leave every known-answer digest unchanged for 24 months from this tag
+(`docs/SUPPORT.md`), and `pt-v20` becomes the default. [PLACEHOLDER pt-v20]
+pt-v20's readings on the one-year table, the two-year panel and the 17
+long-run criteria, and its known-answer digest, go here when the preset
+lands. Every earlier preset replays as it did.
 
-**What breaks.** `run_session(order_flow=...)` now raises. Pass an agent's
-trades as `fills=`, applied once on the session's first tick, or a standing
-rate as `flow_per_tick=`, the old meaning of `order_flow=`;
-`tick(order_flow=)` is unchanged. `evaluate`, the gym environment, `tca.analyse` and `World` use
-`fills`, and logs written by 0.8.x replay as they were recorded.
+An agent's orders now reach the market once. Harnesses passed an agent's
+fills to `run_session` as `order_flow`, which the session applied on every
+tick, so at six steps a day one order counted 65 times and agents were marked
+to their own impact. On pt-v19 the spec mean-reversion rule's median lead
+over buy-and-hold on the published suite falls from 42 points in 60 days to
+0.5.
 
-**What moves.** Untraded runs are identical, and the known-answer digest
-stays at `1e683b96`. Every traded result changes: scorecards, rankings, TCA
-and the recorded agent fixtures. No price-only reference agent now beats the
-Oracle on the reference grids, and a round trip no longer recoups its own
-impact. `World.fork` now copies the random and Oracle baselines.
+Agents can trade in a book with depth priced by size, resting limit orders
+and a linear permanent impact, shared by several agents, through
+`Engine.submit`, `cancel`, `open_orders` and `take_fills`. Its seven dials
+are off on every preset before pt-v20. `Universe.random(n, bonds=True)` adds
+three simulated rate indices priced off the engine's curve (`UST2Y`,
+`UST10Y` and `IGCORP`), with `curve_shock.yml`, `baselines.Balanced` and
+`evaluate(cash_interest=True)`. `docs/MODEL.md` states the model as
+equations, and `docs/STATISTICS.md` names the three statistic sets behind
+every count the site quotes.
 
-**Still off.** The long-run check gains C4a and C4b, no price-only edge, and
-pt-v19 fails both. Its 65-minute returns reverse too much (autocorrelation
--0.187), so a mean-reversion rule that trades every 65 minutes still beats
-buy-and-hold in 18 of 20 suite markets, and five-day momentum in 17. pt-v19
-reads 15 of 17.
+**What breaks.** `run_session(order_flow=...)` raises. Pass trades as
+`fills=` or a standing rate as `flow_per_tick=`. Every traded result moves:
+scorecards, rankings, TCA and the recorded agent fixtures.
+
+**Still off.** [PLACEHOLDER pt-v20] What pt-v20 still misses goes here when the
+preset lands.
 
 <!-- release-note-ends -->
 
-### The fix and its measurement
+### pt-v20
+
+[PLACEHOLDER pt-v20] The composition, the paired run against pt-v19, the
+measured panel, the long-run verdicts, the new `KAT_VERSION` and digests, and
+the test expectations re-measured for the new default go in this section
+when the preset lands.
+
+### The flow fix and its measurement
+
+Every harness passed an agent's fills to `run_session` as `order_flow`,
+which the session held on every tick. At six steps a day one order was
+counted 65 times, after the agent had filled at the price before it, so
+agents were marked to their own impact. The spec mean-reversion rule beat
+buy-and-hold on all 20 markets of the published suite by a median 42 points
+in 60 days. With fills applied once it reads +0.5 points, ahead in 10 of 20.
+
+`run_session(order_flow=...)` now raises. Pass an agent's trades as
+`fills=`, applied once on the session's first tick, or a standing rate as
+`flow_per_tick=`, the old meaning of `order_flow=`. `tick(order_flow=)` is
+unchanged. `evaluate`, the gym environment, `tca.analyse` and `World` use
+`fills`, and logs written by 0.8.x replay as they were recorded.
+
+Untraded runs are identical, and under pt-v19 the known-answer digest stays
+at `1e683b96`. Every traded result changes: scorecards, rankings, TCA and
+the recorded agent fixtures. No price-only reference agent now beats the
+Oracle on the reference grids, and a round trip no longer recoups its own
+impact.
 
 `Engine.run_session` takes `fills`, carried to the core as
 `SessionRequest.fills` and summed with any standing flow on the session's
@@ -117,6 +90,11 @@ carried on the pt-v19 record's `long_run` block, 17 rows. The ship-bar tests
 gate on the fifteen criteria pt-v19 was adopted under and pin C4a and C4b as
 failing.
 
+The long-run check gains C4a and C4b, no price-only edge. pt-v19 fails both
+and reads 15 of 17. Its 65-minute returns reverse too much (autocorrelation
+-0.187), so a mean-reversion rule that trades every 65 minutes still beats
+buy-and-hold in 18 of 20 suite markets, and five-day momentum in 17.
+
 `World.fork` copied an agent with no `fork()` by `copy.deepcopy`, which
 raised on the random baseline's generator, on the engine the Oracle keeps,
 and on any spec-built agent inside a daily-cadence wrapper. `RandomTrader`
@@ -136,6 +114,139 @@ Agents SDK's did not, and a live five-day run recorded 3 of 5 decisions.
 The README, `rust/README.md` and the `facts` docstrings now name three
 counts consistently: 19 graded rows in the one-year realism table, 18 of them
 read by `facts.measure()`, and 17 long-run criteria.
+
+### The agent-facing book
+
+Seven `ModelParams` dials, 0.0 on every preset before pt-v20.
+`book_depth_coefficient`, `book_depth_exponent` and `book_depth_reach` put
+latent depth beside the maker's ladder, priced so that its own Q-th share
+costs Y sigma (Q/V)^delta over the touch. `book_shared` makes agents' orders
+execute in the engine's book and consume it: the ladder refills when the
+maker re-quotes, and the latent depth at `book_refill_half_life`.
+`book_resting` rests an unfilled limit order behind the depth at its price,
+to fill against the model's flow or another agent. `fill_impact_coefficient`
+adds each agent's permanent impact, gamma sigma Q/V on the mispricing, and
+attributes it to the agent.
+
+None of the seven is read by the model's own flow, so an untraded market is
+the same at any setting and the known-answer simulation digest does not
+move. The book's state is absent from the state hash and the snapshot on
+every engine no agent has sent an order to.
+
+The Python surface is `Engine.submit`, `submit_many` (by agent label, then
+list order), `cancel`, `open_orders`, `take_fills`, `take_impacts` and
+`book_live`, all recorded in the order log and replayed. `Portfolio.execute`
+routes through the engine when the book is live, and `Portfolio.submit_limit`,
+`cancel` and `sync` join it. `World` takes `tf.Limit` and `tf.Cancel` in an
+`act()` mapping and collects resting fills after each session, and
+`externalities()` reports the levels one agent takes from another.
+
+`tests/test_order_book_depth.py` holds the claims: off is off, price for
+size follows the square-root law, consumption and refill, linear and
+attributed permanent impact, round trips from one share to a whole day's
+volume, the queue and partial fills, two agents crossing, and determinism
+under replay, fork and restore. `tests/known_answer_book.py` is the book's
+own determinism gate with every dial on, beside `known_answer.py`, and the
+determinism workflow runs it on every target.
+`tools/calibration/impact_curve.py` measures the impact curve against the
+estimates in Toth and coauthors (2011) and Almgren and coauthors (2005).
+
+### Bonds
+
+Three simulated rate indices can join a roster: `UST2Y` and `UST10Y`,
+constant-maturity 2-year and 10-year treasury indices, and `IGCORP`, an
+investment-grade corporate bond index. None is a real security.
+`Universe.random(n, seed=..., bonds=True)` appends them after the equities
+and `tf.bonds()` builds them. Each returns `yield / 252 - D * dy + 0.5 * C *
+dy^2` a day off the engine's own curve, with duration and convexity of 1.9
+and 4.6, 8.5 and 84, and 7.0 and 100. They trade through the same fills,
+portfolio, tape and TCA as the equities, on their own books: the
+agent-facing book above holds equities only.
+
+`pin_macro` and the scenario registry take the 2-year and 10-year yields,
+and `curve_shock.yml` moves the whole curve 200bp on day 50: `UST10Y`
+-15.35%, `UST2Y` -3.71% and `IGCORP` -12.30% that day. `rate_shock.yml` is
+unchanged and reaches the 10-year only over the weeks after.
+`baselines.Balanced` is a 60/40 book with a drift band, and
+`evaluate(..., cash_interest=True)` pays cash the policy rate.
+
+Without the indices, every digest and every preset is unchanged. With them,
+every equity price, draw and macro value is identical to the run without,
+because they take no draws and write nothing back. A new `bondsSha256` in
+`tests/known_answer.json` covers a session with them.
+
+Under pt-v19 the engine's curve is quieter than the real one: the 2-year
+moves 0.46bp a day against 5.2bp over 2015-2025 and the 10-year 3.1bp
+against 5.35bp, and bond and stock returns are uncorrelated where IEF reads
+-0.16 and LQD +0.27. [PLACEHOLDER pt-v20] The same readings under pt-v20's
+curve dials go in this sentence when the preset lands.
+
+`rust/src/rates.rs` holds the pricing, the curve reads and the books, and
+documents every number. An index level reprices whenever the yield it reads
+has moved: at the open after the close's macro step, and on the first tick
+after a pin. Carry accrues once, at the first open after a close. Nothing
+interpolates toward a later yield, and no tracking noise is added, so no
+price can reveal a yield before the close that sets it. `IGCORP` reads the
+10-year plus a credit spread that is re-marked whenever the engine sets the
+corporate yield or a caller pins it, so it carries rate risk between
+central-bank meetings and reads a held corporate yield exactly.
+
+The books are the equity maker's ladder around the index level, with a
+0.6bp spread before cent rounding for the treasuries and 0.8bp for the
+corporate index, widening with the VIX by the equity rule, and depth from
+the median dollar volume of SHY, IEF and LQD over 2015-2025. A trade leaves
+the maker holding inventory that skews its quotes by up to a half spread and
+decays with a 15-minute half-life, so impact on an index is transient.
+
+Every packaged scenario's effect on the three indices is in
+`tests/test_bonds.py` and in each scenario file's notes. A 60/40 book of
+equal-weight equities and a 6.5-year bond sleeve through each scenario is
+`tools/bonds/sixty_forty.py`; the comparison with real bond markets is
+`tools/bonds/realism.py`, against FRED's DGS2 and DGS10 and Yahoo's SPY,
+SHY, IEF and LQD.
+
+### The book and the rate indices together
+
+The two branches were written apart, and two behaviours needed settling when
+they merged. The agent-facing book holds equities only: `Engine.submit`
+refuses a rate index by name, `Portfolio.execute` prices an index off its
+own book whatever the book dials say (its flow waits in `pending_flow` for
+`fills=`), and `Portfolio.submit_limit` on an index is refused. Under
+`fill_impact_coefficient`, `run_session` had queued every external fill as
+book flow, where the linear law skips a rate index, so an index's fills no
+longer reached it. Rate-index fills now stay on the first tick's flow, where
+the indices' books read them. `tests/test_bonds_with_book.py` covers both.
+The state hash takes the rate instruments after every equity field and
+before the agent-facing book, in the engine and in `manifest.state_hash`.
+
+### The model specification and the support policy
+
+`docs/MODEL.md` states the pt-v19 model as equations read off the code: the
+macro economy and central bank, fair value, the mispricing and its factor
+structure, news, jumps, the three variance processes, the VIX, crisis
+regimes, the market maker and book, agent order flow, volume and scenarios.
+Each equation names its source line, and each parameter carries its pt-v19
+value, timescale and how it was set (measured, derived, fitted, chosen or
+guard). [PLACEHOLDER pt-v20] Whether MODEL.md is brought to pt-v20 for this
+tag, or says it describes pt-v19, is decided when the preset lands.
+
+`docs/STATISTICS.md` names the sets of realism statistics behind the counts
+the documentation quotes, with every member: the one-year table (19, of
+which `facts.measure()` reads 18), the two-year panel (15 rows, 14 graded)
+and the long-run criteria (17 from this release, 15 in 0.8.x records).
+
+`docs/SUPPORT.md` takes effect with this tag. The LTS line covers 0.8.5 and
+the patch releases after it, with fixes that leave every known-answer digest
+unchanged for 24 months. A preset is frozen when it first ships and is never
+removed. From this line on a new default comes only in a minor release, and
+0.8.5 is the one exception because the policy starts here. `SECURITY.md`
+names the line in its table of supported versions.
+
+`.zenodo.json` carries what Zenodo's GitHub integration needs to mint a DOI
+for each published release, once the owner switches it on (`RELEASING.md`,
+"DOI (Zenodo)"). `CITATION.cff` asks for the preset beside the version, and
+the README gains a section on citing a version and a preset, with a BibTeX
+entry whose DOI is a placeholder until Zenodo mints one.
 
 ## 0.8.1
 
