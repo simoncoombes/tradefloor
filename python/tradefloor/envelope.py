@@ -165,8 +165,9 @@ PRESET = "pt-v19"
 #: with no empirical train/test split behind them. And the held-out universe
 #: comes from the same `Universe.random()` generator as the training one, a
 #: different draw rather than a different market -- `GAPS`
-#: "roster-concentration" measures what changes when the roster's SHAPE
-#: changes, and it changes the count.
+#: "roster-concentration" measures what changes when the roster's sector
+#: mix changes. On pt-v19 no graded shape row leaves its band and the level
+#: row does.
 #: The SHAPE rows only. The level and crisis rows are held in
 #: `CERTIFIED_LEVEL` and `CERTIFIED_CRISIS`, because the two kinds are
 #: certified separately: a green panel means the fourteen shape rows are in
@@ -761,6 +762,86 @@ REAL_DECAY_SLOPE = -0.436
 #: module forbids, because the curve under it moved.
 MEMORY_VALID_TO_LAG = 20
 
+#: The concentrated sector mixes the roster measurement ran, as counts out
+#: of forty. They are `SHAPES` in `tools/calibration/roster_shapes.py` less
+#: the balanced mix `Universe.random` deals. `check` takes one of these
+#: names as `sector_concentrated`. A roster matching none of them was not
+#: measured, and `sector_concentrated=True` does not say which mix it is,
+#: so `check` refuses both.
+ROSTER_SHAPES: dict[str, dict[str, int]] = {
+    "sp500_like": {
+        "technology": 13, "financial_services": 5, "healthcare": 5,
+        "consumer_discretionary": 4, "industrials": 3, "consumer_staples": 3,
+        "energy": 2, "telecommunications": 2, "utilities": 1,
+        "real_estate": 1, "materials": 1,
+    },
+    "tech_heavy": {"technology": 24, "consumer_discretionary": 6,
+                   "healthcare": 5, "financial_services": 5},
+    "all_technology": {"technology": 40},
+    "defensive": {"consumer_staples": 10, "utilities": 10, "healthcare": 10,
+                  "real_estate": 10},
+}
+
+#: Where the roster measurement comes from. The certified forty names
+#: (universe seed 111) are relabelled to each mix, so sector is the only
+#: thing that changes, and each mix runs seeds 101 to 130 at 252 and 504
+#: days. `measurements/roster-shapes-pt-v19.json` is the run's output as
+#: collected, and `tests/test_envelope.py` re-scores it against the tables
+#: below.
+#:
+#: `check` accepts a concentrated roster only while `PRESET` is the preset
+#: named here, so a new default loses the grant until it is measured again.
+ROSTER_MEASUREMENT: dict[str, Any] = {
+    "preset": "pt-v19",
+    "run": "docs080b",
+    "date": "2026-09-24",
+    "tool": "tools/calibration/roster_shapes.py",
+    "record": "measurements/roster-shapes-pt-v19.json",
+    "seeds": tuple(range(101, 131)),
+    "universe_seed": 111,
+    "horizons": (252, 504),
+    "basis": "ruled",
+}
+
+
+def _shape_rows(*without: str) -> tuple[str, ...]:
+    return tuple(k for k in _facts.SHAPE if k not in without)
+
+
+#: The shape rows each mix held in band on the ruled bands, per horizon.
+#: Every row the bands could grade was in band for every mix. Two rows are
+#: left out where the measurement could not grade them.
+#: `corr_persistence_acf1` has no ruled band at 504 days, for the balanced
+#: roster too. `sector_excess_corr` is undefined on an all-technology
+#: roster: it asks how far a name moves with its own industry beyond the
+#: market, and with one sector the two are the same.
+ROSTER_SHAPE_ROWS: dict[str, dict[int, tuple[str, ...]]] = {
+    "sp500_like": {252: _shape_rows(),
+                   504: _shape_rows("corr_persistence_acf1")},
+    "tech_heavy": {252: _shape_rows(),
+                   504: _shape_rows("corr_persistence_acf1")},
+    "all_technology": {252: _shape_rows("sector_excess_corr"),
+                       504: _shape_rows("sector_excess_corr",
+                                        "corr_persistence_acf1")},
+    "defensive": {252: _shape_rows(),
+                  504: _shape_rows("corr_persistence_acf1")},
+}
+
+#: `index_drift_pct` on the held roster, the median over the thirty seeds
+#: at 252 and 504 days. The level row is certified on
+#: `facts.LEVEL_PROTOCOL`, where the roster varies with the seed and the
+#: estimator is a mean, so these readings certify nothing. They are kept
+#: because they show the level row moving with the mix: the balanced
+#: roster reads inside the ruled band of 1.1 to 10.3 and every
+#: concentrated mix reads above it.
+ROSTER_INDEX_DRIFT: dict[str, tuple[float, float]] = {
+    "balanced": (4.8522, 5.4489),
+    "sp500_like": (18.2124, 12.4087),
+    "tech_heavy": (34.4531, 20.3449),
+    "all_technology": (52.7374, 29.1161),
+    "defensive": (22.0414, 13.8965),
+}
+
 
 @dataclass(frozen=True)
 class Gap:
@@ -1178,7 +1259,8 @@ GAPS: tuple[Gap, ...] = (
     ),
     Gap(
         id="roster-concentration",
-        summary="certification was measured on a sector-balanced roster only",
+        summary=("a concentrated roster is measured for four sector mixes "
+                 "and the shape rows only"),
         detail=(
             "`Universe.random()` assigns sectors round-robin over the twelve "
             "in `sectors.SECTORS`, so a roster is as close to balanced as its "
@@ -1186,11 +1268,15 @@ GAPS: tuple[Gap, ...] = (
             "sectors and three in each of the other eight. No real index is "
             "balanced that way. The S&P is roughly a third technology and "
             "the Nasdaq more so.\n\n"
-            "RE-MEASURED 2026-09-24 on pt-v19: the certified roster "
-            "relabelled to each sector mix, thirty seeds, the fourteen shape "
-            "rows, both horizons, graded on the ruled bands `score` uses by "
-            "default (tools/calibration/roster_shapes.py; the design "
-            "repository's fleet run docs080b):\n\n"
+            "MEASURED 2026-09-24 on pt-v19: the certified roster relabelled "
+            "to four concentrated mixes (`ROSTER_SHAPES`), thirty seeds "
+            "(101 to 130), 252 and 504 days, graded on the ruled bands "
+            "`score` uses by default. The tool is "
+            "tools/calibration/roster_shapes.py, the run is the design "
+            "repository's fleet run docs080b, and its output is "
+            "measurements/roster-shapes-pt-v19.json. The table gives each "
+            "mix's shape rows in band and its cross-sectional correlation:"
+            "\n\n"
             "                      252d     504d   xs corr 252d / 504d\n"
             "  balanced           14/14    13/13   0.3063 / 0.2966\n"
             "  S&P-like           14/14    13/13   0.3085 / 0.3008\n"
@@ -1198,44 +1284,58 @@ GAPS: tuple[Gap, ...] = (
             "  all-technology     13/13    12/12   0.3751 / 0.3933\n"
             "  defensive          14/14    13/13   0.3172 / 0.3212\n\n"
             "The 504-day counts are over thirteen rows because "
-            "corr_persistence_acf1 has no ruled band there. On the "
-            "2015-2025 decade bands every shape but all-technology misses "
-            "sector_excess_corr at both horizons, as the balanced roster "
-            "does, and no other shape row.\n\n"
-            "So on pt-v19 concentration costs no graded shape row at either "
-            "horizon. Cross-sectional correlation still rises with "
-            "concentration, 0.3063 balanced to 0.3751 all-technology at 252 "
-            "days, which is the model behaving CORRECTLY, since names in one "
-            "industry should move together more, and it stays inside its "
-            "band. The gap stands for two reasons. The certification itself, "
-            "thirty seeds and two held-out axes, was run on the balanced "
-            "roster only, and the table above is one roster draw per shape. "
-            "And a band derived from broad real-market windows is the wrong "
-            "ruler for a single-sector portfolio. The level rows are left "
-            "out of the table: this tool holds one roster, and "
-            "index_drift_pct is certified on a roster that varies with the "
-            "seed (facts.LEVEL_PROTOCOL).\n\n"
-            "UPDATED 2026-09-24. This gap was headed 'a concentrated roster "
-            "holds at one year and comes apart at two', which was pt-v12's "
-            "reading of 2026-08-26 on the decade bands: 14 of 14 at 252 days "
-            "for every shape, and at 504 days 13 of 14 S&P-like, 11 of 14 "
+            "corr_persistence_acf1 has no ruled band there. The "
+            "all-technology counts are one lower again because "
+            "sector_excess_corr is undefined with one sector: it asks how "
+            "far a name moves with its own industry beyond the market, and "
+            "with one sector the two are the same. On the 2015-2025 decade "
+            "bands every mix but all-technology misses sector_excess_corr at "
+            "both horizons, as the balanced roster does, and no other shape "
+            "row. Cross-sectional correlation rises with concentration, "
+            "0.3063 balanced to 0.3751 all-technology at 252 days, and stays "
+            "inside its band.\n\n"
+            "`check` accepts a roster named as one of the four mixes, for "
+            "example `sector_concentrated=\"tech_heavy\"`, when the preset "
+            "is pt-v19, the horizon is 504 days or less, and every named "
+            "statistic is a shape row that mix held at that horizon "
+            "(`ROSTER_SHAPE_ROWS`). Two limits remain and come back as "
+            "warnings: each mix is one roster draw, and the bands come from "
+            "broad real-market windows, so a single-sector portfolio is "
+            "graded on a broad market's ruler.\n\n"
+            "`check` still refuses the rest. `sector_concentrated=True` does "
+            "not say which mix the roster is, and no mix outside the four "
+            "was measured. A question that names no statistics may lean on "
+            "a level or crisis row. The level and crisis rows are certified "
+            "on facts.LEVEL_PROTOCOL, where the roster varies with the seed, "
+            "and this tool holds one roster. On that one roster "
+            "index_drift_pct read 4.85 balanced and 18.21 to 52.74 for the "
+            "concentrated mixes at 252 days, against a ruled band of 1.1 to "
+            "10.3 (`ROSTER_INDEX_DRIFT`). sector_excess_corr on an "
+            "all-technology roster and corr_persistence_acf1 past 252 days "
+            "were not graded, for the reasons above. The measurement ran no "
+            "horizon past 504 days and no preset but pt-v19.\n\n"
+            "NARROWED 2026-09-24. Until then `check` refused every "
+            "sector-concentrated question, whatever it named, and the gap's "
+            "statistics were cross_sectional_corr, annualised_vol_pct and "
+            "corr_persistence_acf1, the rows pt-v12 lost at 504 days. It was "
+            "headed 'certification was measured on a sector-balanced roster "
+            "only' until then, and 'a concentrated roster holds at one year "
+            "and comes apart at two' before that, which was pt-v12's reading "
+            "of 2026-08-26 on the decade bands: 14 of 14 at 252 days for "
+            "every shape, and at 504 days 13 of 14 S&P-like, 11 of 14 "
             "technology-heavy and 10 of 13 all-technology, as "
             "cross-sectional correlation rose past the decade band's 0.41 "
             "ceiling (0.5316 all-technology) and annualised volatility "
             "followed it out. Before that it carried 'balanced 9, S&P-like "
             "8, all-technology 7', counts out of the ten-statistic panel of "
-            "the pt-v3 era at six seeds.\n\n"
-            "`sector_excess_corr` is UNDEFINED on an all-technology roster "
-            "rather than out of band: it asks how much a name moves with its "
-            "own industry beyond the market, and with one sector those are "
-            "the same thing. Hence 13 rather than 14 in that row."
+            "the pt-v3 era at six seeds."
         ),
         forbids=(
-            "citing the certification for a sector-concentrated roster "
-            "without measuring that roster"
+            "citing the certification for a concentrated roster on a level "
+            "or crisis row, past 504 days, or for a sector mix other than "
+            "the four measured"
         ),
-        statistics=("cross_sectional_corr", "annualised_vol_pct",
-                    "corr_persistence_acf1"),
+        statistics=_facts.LEVEL + _facts.CRISIS + ("sector_excess_corr",),
     ),
 )
 
@@ -1396,11 +1496,113 @@ def report_intervals(rows: Mapping[str, Mapping[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _and(names: Iterable[str]) -> str:
+    """`a`, `a and b`, `a, b and c`."""
+    names = list(names)
+    return (names[0] if len(names) == 1 else
+            f"{', '.join(names[:-1])} and {names[-1]}")
+
+
+def _roster_source() -> str:
+    """Where the roster measurement comes from, for a reason to cite."""
+    m = ROSTER_MEASUREMENT
+    return (f"measured on {m['preset']} over {len(m['seeds'])} seeds at "
+            f"{' and '.join(str(h) for h in m['horizons'])} days on the "
+            f"{m['basis']} bands ({m['tool']}, fleet run {m['run']}, "
+            f"{m['date']})")
+
+
+def _roster_horizon(horizon_days: int) -> int | None:
+    """The measured horizon a question falls under, or None past the last.
+
+    A question at or under 252 days is read at 252, the way the certified
+    table is. One between 252 and 504 is read at 504, whose table is the
+    smaller of the two.
+    """
+    for h in sorted(ROSTER_MEASUREMENT["horizons"]):
+        if horizon_days <= h:
+            return h
+    return None
+
+
+def _roster_refusal(shape: str | None, horizon_days: int,
+                    wanted: Sequence[str]) -> str | None:
+    """Why a concentrated roster is refused, or None when it is covered.
+
+    Covered means: a mix from `ROSTER_SHAPES`, the preset the measurement
+    ran on, a horizon it ran to, and statistics named, every one of them a
+    shape row the mix held at that horizon. Everything else is refused
+    with the reason, so a caller can see which part of the question the
+    measurement does not reach.
+    """
+    m = ROSTER_MEASUREMENT
+    if shape is None:
+        return (
+            f"the roster is sector-concentrated and its mix is not named. "
+            f"Four mixes are {_roster_source()}, and each held every shape "
+            f"row the bands could grade: {_and(ROSTER_SHAPES)}. If your "
+            f"roster is one of them, pass its name as `sector_concentrated`. "
+            f"Otherwise measure your own roster, since no other mix was "
+            f"measured")
+    if PRESET != m["preset"]:
+        return (
+            f"the {shape} mix was {_roster_source()}, and this module "
+            f"describes {PRESET}. Re-run {m['tool']} on {PRESET} before "
+            f"citing it for a concentrated roster")
+    h = _roster_horizon(horizon_days)
+    if h is None:
+        return (
+            f"horizon {horizon_days}d is past the {max(m['horizons'])} days "
+            f"the roster mixes were measured to. The {shape} mix was "
+            f"{_roster_source()}, and nothing was measured beyond that")
+    if not wanted:
+        return (
+            f"no statistics named, and the {shape} mix was "
+            f"{_roster_source()} for the shape rows only. Name the rows the "
+            f"result leans on, since the level and crisis rows are not "
+            f"covered")
+    held = ROSTER_SHAPE_ROWS[shape][h]
+    missing = [k for k in dict.fromkeys(wanted) if k not in held]
+    if not missing:
+        return None
+    why = []
+    level = [k for k in missing if k in _facts.LEVEL + _facts.CRISIS]
+    if level:
+        lo, hi = RULERS_BY_BASIS[m["basis"]][252][0]["index_drift_pct"]
+        drift, base = ROSTER_INDEX_DRIFT[shape][0], ROSTER_INDEX_DRIFT[
+            "balanced"][0]
+        why.append(
+            f"{_and(level)} {'is' if len(level) == 1 else 'are'} "
+            f"certified on facts.LEVEL_PROTOCOL, where the roster varies "
+            f"with the seed, and the roster measurement holds one roster, so "
+            f"it does not cover the level and crisis rows. On that one "
+            f"roster index_drift_pct read {drift:.2f} for the {shape} mix "
+            f"at 252 days against {base:.2f} balanced and a ruled band of "
+            f"{lo} to {hi}")
+    for k in missing:
+        if k in level:
+            continue
+        if k == "sector_excess_corr" and shape == "all_technology":
+            why.append(
+                "sector_excess_corr is undefined on an all-technology "
+                "roster: it asks how far a name moves with its own industry "
+                "beyond the market, and with one sector the two are the same")
+        elif k == "corr_persistence_acf1" and h > 252:
+            why.append(
+                f"corr_persistence_acf1 has no ruled band at {h} days, so "
+                f"the measurement could not grade it past 252")
+        else:
+            why.append(f"The {shape} mix is not recorded as holding {k} at "
+                       f"{h} days (ROSTER_SHAPE_ROWS)")
+    return (f"the roster is the {shape} mix, {_roster_source()}. "
+            + ". ".join(why))
+
+
 def check(
     *,
     horizon_days: int,
     statistics: Iterable[str] = (),
-    sector_concentrated: bool = False,
+    sector_concentrated: bool | str = False,
     scenario_magnitude: bool = False,
     macro_regime: bool = False,
 ) -> Verdict:
@@ -1420,8 +1622,13 @@ def check(
     crisis regimes.
 
     `sector_concentrated` says the roster is not sector-balanced, which a
-    real index never is. `scenario_magnitude` says the result depends on
-    the SIZE of a scenario's effect rather than its direction.
+    real index never is. `True` says only that, and is refused on the
+    `roster-concentration` gap. A name from `ROSTER_SHAPES` says which
+    measured mix the roster is, and is accepted when the horizon is 504
+    days or less and every named statistic is a shape row that mix held
+    (`ROSTER_SHAPE_ROWS`). Any other name raises. `scenario_magnitude`
+    says the result depends on the SIZE of a scenario's effect rather than
+    its direction.
 
     Returns a `Verdict`, which is falsy when the answer is no. Every reason
     names the measurement behind it, so a refusal can be checked rather
@@ -1442,6 +1649,13 @@ def check(
         raise ValidationError(
             f"unknown statistics {sorted(unknown)}; expected keys of "
             f"facts.REAL_MARKETS: {sorted(REAL_MARKETS)}"
+        )
+    if (isinstance(sector_concentrated, str)
+            and sector_concentrated not in ROSTER_SHAPES):
+        raise ValidationError(
+            f"unknown roster mix {sector_concentrated!r}; the measured mixes "
+            f"are {sorted(ROSTER_SHAPES)}, and `True` says the roster is "
+            f"concentrated without naming one"
         )
 
     reasons: list[str] = []
@@ -1613,22 +1827,23 @@ def check(
                 )
 
     if sector_concentrated:
-        g = by_id["roster-concentration"]
-        fire(g, (
-            "the roster is sector-concentrated, and certification was "
-            "measured on a sector-balanced one. Measured on pt-v19 over "
-            "thirty seeds and the fourteen shape rows on the ruled bands "
-            "(tools/calibration/roster_shapes.py, 2026-09-24), balanced, "
-            "S&P-like, technology-heavy and defensive rosters hold every "
-            "shape row the bands can grade at 252 and 504 days, and an "
-            "all-technology roster holds the ones defined on it, "
-            "sector_excess_corr having no meaning with one sector. "
-            "Cross-sectional correlation rises with concentration, 0.31 "
-            "balanced to 0.38 all-technology at 252 days, and stays in band. "
-            "That is one roster draw per shape, and the bands come from "
-            "broad-market windows, so this refusal is about grading your "
-            "roster with the right ruler: re-measure on your own universe"
-        ))
+        # NARROWED 2026-09-24. This arm fired on every concentrated roster,
+        # whatever the question named. `_roster_refusal` now grants what
+        # the roster measurement covers and refuses the rest by name.
+        shape = (sector_concentrated if isinstance(sector_concentrated, str)
+                 else None)
+        why = _roster_refusal(shape, horizon_days, wanted)
+        if why is None:
+            h = _roster_horizon(horizon_days)
+            warnings.append(
+                f"the roster is the {shape} mix. It held all "
+                f"{len(ROSTER_SHAPE_ROWS[shape][h])} shape rows the ruled "
+                f"bands could grade at {h} days, {_roster_source()}. That is "
+                f"one roster draw, and the bands come from broad real-market "
+                f"windows, so a single-sector portfolio is graded on a broad "
+                f"market's ruler")
+        else:
+            fire(by_id["roster-concentration"], why)
 
     if scenario_magnitude:
         g = by_id["scenario-magnitude"]

@@ -180,12 +180,15 @@ def test_matching_gap_respects_the_horizon_gate():
 
 
 def test_matching_gap_excludes_roster_concentration():
-    # cross_sectional_corr is one of roster-concentration's three
-    # statistics, but this search always runs a balanced Universe.random()
-    # roster, never a concentrated one, so it must never match -- at
-    # either horizon, since the gap's own beyond_days is None.
-    assert red_team._matching_gap("cross_sectional_corr", days=252) is None
-    assert red_team._matching_gap("cross_sectional_corr", days=504) is None
+    # index_drift_pct is one of roster-concentration's statistics, but this
+    # search always runs a balanced Universe.random() roster, never a
+    # concentrated one, so it must never match, at either horizon, since
+    # the gap's own beyond_days is None. The row was cross_sectional_corr
+    # until 2026-09-24, when the gap stopped naming the shape rows.
+    gap = next(g for g in envelope.GAPS if g.id == "roster-concentration")
+    assert "index_drift_pct" in gap.statistics
+    assert red_team._matching_gap("index_drift_pct", days=252) is None
+    assert red_team._matching_gap("index_drift_pct", days=504) is None
 
 
 def test_matching_gap_returns_none_for_an_uncovered_statistic():

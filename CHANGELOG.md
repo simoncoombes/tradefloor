@@ -219,6 +219,28 @@ the indices' books read them. `tests/test_bonds_with_book.py` covers both.
 The state hash takes the rate instruments after every equity field and
 before the agent-facing book, in the engine and in `manifest.state_hash`.
 
+### Concentrated rosters in `envelope.check`
+
+`envelope.check()` accepts a sector-concentrated roster when
+`sector_concentrated` names one of the four mixes measured on pt-v19
+(`sp500_like`, `tech_heavy`, `all_technology`, `defensive`), the horizon is
+504 days or less, and every named statistic is a shape row that mix held. It
+still refuses `sector_concentrated=True` with no mix named, any other mix, a
+question that names no statistics, the level and crisis rows,
+`sector_excess_corr` on an all-technology roster, `corr_persistence_acf1`
+past 252 days, anything past 504 days and any preset but pt-v19. An unknown
+mix name raises `ValidationError`. The measurement is thirty seeds at 252 and
+504 days from fleet run `docs080b`, and its output is
+`measurements/roster-shapes-pt-v19.json`. The `roster-concentration` gap now
+lists the rows it still refuses as its statistics, where it listed three
+shape rows. [PLACEHOLDER pt-v20] Whether the four mixes are measured on
+pt-v20, or `check()` refuses them there as it refuses any preset but pt-v19,
+is settled when the preset lands.
+
+The `forced_flow_threshold` summary that the parameter table reads is
+reworded in plain terms, and `decay-curve-504.json` moves into
+`measurements/`.
+
 ### The model specification and the support policy
 
 `docs/MODEL.md` states the pt-v19 model as equations read off the code: the
