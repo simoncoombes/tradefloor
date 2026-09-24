@@ -97,6 +97,18 @@ a reason to run more seeds before reading a pattern.
 `KAT_VERSION` 27: `tests/known_answer.json`'s simulation digest moves from
 `f05e769f` to `1e683b96`.
 
+**The example notebooks describe the model that ships.** Each is
+re-executed on pt-v19 and its prose read against the new output. Three
+fixes change behaviour. The liquidity-crisis study had not traded since
+0.7.0: its roster was priced under the shipped default rather than pt-v16,
+the preset it pins, so every recorded prompt missed and each decision was
+counted unusable. It now prices under pt-v16 and a fast test replays its
+first day. `09-a-pandemic-shaped-market` repairs its market through the QE
+valuation channel, which pt-v19 does not use, so it is pinned to pt-v12 and
+ends with the same path run on pt-v19. The scenario-fork cost check moves
+from 50,000 shares to 20,000, because the larger sweep ran past a thinned
+book and stopped measuring anything.
+
 ### The four compositions before it
 
 The entries below were written as pt-v19 was built, over four compositions

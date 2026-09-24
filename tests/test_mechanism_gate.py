@@ -544,7 +544,8 @@ def test_the_centre_distance_is_determined_on_every_shape_row():
 
 def synthetic_panels(reversed_row: str = "corr_asymmetry_lagged") -> list[dict]:
     """Per-seed panels for a model that is in band everywhere and has one
-    row's real effect BACKWARDS -- the shipped default's actual shape."""
+    row's real effect BACKWARDS -- the shape the default had before pt-v19,
+    which shows every mechanism at one year."""
     panels: list[dict] = [{} for _ in range(SEEDS)]
     for row in SHAPE:
         centre = real_centre(row)

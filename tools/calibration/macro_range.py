@@ -1,9 +1,12 @@
 """What range the endogenous macro state actually reaches, per candidate.
 
 The `macro-range` gap says the economy left to itself stays in a moderate
-band: endogenous inflation peaks at 4.0% on every seed with sd 1.2 around a
-mean of 2.0%, against US CPI year-on-year 2015-2025 with sd 2.18, a peak of
-9.0% in June 2022 and monthly AR(1) 0.978 against the model's 0.958.
+band. On pt-v12, where this tool was written, endogenous inflation peaked at
+4.0% on every seed with sd 1.2 around a mean of 2.0%, and a monthly AR(1) of
+0.958. On pt-v19 it peaks at a median 3.1% with sd 0.59 around a mean of 2.7%
+(`envelope.GAPS`, macro-range). The tape it is read against is US CPI
+year-on-year 2015-2025: sd 2.18, a peak of 9.0% in June 2022, monthly AR(1)
+0.978.
 
 `gate_batch.py` scores what a candidate COSTS on the equity panel. It does not
 measure what the candidate BUYS, because the panel is measured at a flat VIX

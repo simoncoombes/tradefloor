@@ -44,7 +44,7 @@ def test_when_the_policy_rate_reaches_equities_depends_on_the_preset():
     `daily_credit_floor_gain` re-asserts both credit floors on every daily
     step. pt-v15 turned it on and pt-v16 inherits it, so the spread is now
     touched daily and the ramp reaches equities without waiting for a
-    meeting: -3.34% at 40 days on the shipped default. The 0.4.2 changelog
+    meeting: -2.56% at 40 days on pt-v19 (-3.34% on pt-v16). The 0.4.2 changelog
     named this consequence in advance and placed it at a preset boundary,
     which is where it arrived.
 
@@ -71,7 +71,8 @@ def test_the_policy_rate_reaches_the_curve_at_the_first_meeting():
     # The other half of the horizon dependence: past the first central-bank
     # meeting (day 45), the pinned policy path feeds the Taylor-rule state,
     # the meeting recomputes the corporate yield off the 10Y, and equities
-    # reprice. Measured at 60 days: median -3.99%, worst -5.56%.
+    # reprice. Measured at 60 days on pt-v19: median -3.22%, worst -4.99%
+    # (pt-v16: -3.99%, -5.56%).
     policy_only = Scenario().ramp("federal_funds_rate",
                                   start=0.025, end=0.05, over=30)
     result = run(policy_only, days=60)
@@ -80,8 +81,8 @@ def test_the_policy_rate_reaches_the_curve_at_the_first_meeting():
 
 
 def test_rate_shock_moves_the_whole_curve_and_prices_fall():
-    # Both legs, the shape a rate shock takes. Measured: -4.74% median on a
-    # 250bp hike over thirty days.
+    # Both legs, the shape a rate shock takes. Measured on pt-v19: -4.51%
+    # median on a 250bp hike over thirty days (pt-v16: -4.74%).
     result = run(Scenario.rate_shock(start=0.025, end=0.05, over=30))
     assert result["median_pct"] < -3.0
     assert set(Scenario.rate_shock().fields) == {
@@ -90,7 +91,8 @@ def test_rate_shock_moves_the_whole_curve_and_prices_fall():
 
 def test_a_rate_shock_does_not_move_every_name_equally():
     # A scenario that shifted the whole cross-section by one number would tell
-    # a cross-sectional strategy nothing. Measured: -6.41% worst, +0.25% best.
+    # a cross-sectional strategy nothing. Measured on pt-v19: -6.60% worst,
+    # +0.25% best (pt-v16: -6.41%, +0.25%).
     result = run(Scenario.rate_shock(start=0.025, end=0.05, over=30))
     assert result["best_pct"] - result["worst_pct"] > 3.0
 
