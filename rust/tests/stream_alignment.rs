@@ -152,6 +152,8 @@ fn run_world(policy: SettleDrawPolicy, trader_flow: f64) -> (Vec<f64>, usize) {
                 settle_draws: policy,
                 // The depth counterfactual, off. It reaches no company field.
                 settle_depth_counterfactual: false,
+                resting_orders: &[],
+                fill_impact: &[],
                 // The run's opening nominal output. The growth term is
                 // off on every preset these tests pin, so it is read
                 // nowhere; this tick's own value is what a single-tick

@@ -39,7 +39,8 @@ use crate::economy::EconomyState;
 use crate::fair_value::{compute_fair_value_with, CompanyValuationInputs, EconomyValuationInputs};
 use crate::mathx;
 use crate::microstructure::{
-    decompose, settle_price_through_book, CompanyMicrostructure, SettleOptions,
+    decompose, settle_price_through_book, settle_price_through_book_with_orders,
+    CompanyMicrostructure, SettleOptions,
 };
 use crate::mispricing::crowd_lean_with;
 use crate::params::ModelParams;
@@ -572,6 +573,17 @@ pub struct TickInputs<'a> {
     /// skipped under `FourOrZero`, where the settlement draws from the
     /// caller's recorded source and there is no buffer to rewind.
     pub settle_depth_counterfactual: bool,
+    /// Agents' resting orders, per company slot, in arrival order: the
+    /// orders the settlement book carries beside the maker's ladder
+    /// (`ModelParams::book_resting`). EMPTY, which is every caller but an
+    /// engine holding such orders, settles exactly as before: a slot with
+    /// no entry, or an empty one, takes the shipped settlement untouched.
+    pub resting_orders: &'a [Vec<crate::microstructure::RestingOrder>],
+    /// A one-off change to each company's `s` this tick, in log units, per
+    /// slot: agents' fills under `ModelParams::fill_impact_coefficient`,
+    /// added to the drift and recorded in the order-flow slot. EMPTY, or a
+    /// zero entry, adds nothing and is bit-identical to its absence.
+    pub fill_impact: &'a [f64],
     /// Nominal output when the run opened: `gdp * cpi` at construction.
     ///
     /// Read only by [`nominal_scale`], and only when
@@ -712,6 +724,9 @@ pub struct TickOutcome {
     /// far. Nothing bounds it by one, so a small printed move against a large
     /// truncation gives a large ratio.
     pub liquidity_share: Vec<f64>,
+    /// Fills of agents' resting orders in this tick's settlement, with the
+    /// company slot each belongs to. Empty unless `resting_orders` held any.
+    pub agent_fills: Vec<(usize, crate::microstructure::SettledAgentFill)>,
 }
 
 /// Run one simulated market minute.
@@ -795,6 +810,7 @@ pub fn simulate_market_tick(
             clamp: Vec::new(),
             unbounded_print: Vec::new(),
             liquidity_share: Vec::new(),
+            agent_fills: Vec::new(),
         };
     }
 
@@ -959,6 +975,13 @@ pub fn simulate_market_tick(
                 factors.random_noise * 0.15,
             )
         };
+        // An agent's fills under the linear law land here, whole, on the
+        // tick after the fills. A branch on the slot, so a caller with no
+        // entry adds nothing rather than `+ 0.0`.
+        let drift = match inputs.fill_impact.get(idx) {
+            Some(&x) if x != 0.0 => drift + x,
+            _ => drift,
+        };
         all_drifts.push(drift);
         all_noises.push(noise);
         all_factors.push(factors);
@@ -1096,7 +1119,7 @@ pub fn simulate_market_tick(
                     crowd_lean_with(p, s_val, momentum)
                 }) / 390.0,
                 raw.company_news * scale,
-                raw.order_flow_impact * scale,
+                with_fill_impact(raw.order_flow_impact * scale, inputs.fill_impact.get(idx)),
                 raw.short_squeeze_effect * scale,
                 all_noises[i] * intraday_vol_mult,
                 // The breaker's slot, filled below if it binds.
@@ -1111,7 +1134,7 @@ pub fn simulate_market_tick(
                 0.0,
                 0.0,
                 raw.company_news * scale,
-                raw.order_flow_impact * scale,
+                with_fill_impact(raw.order_flow_impact * scale, inputs.fill_impact.get(idx)),
                 0.0,
                 all_noises[i],
                 0.0,
@@ -1293,6 +1316,7 @@ pub fn simulate_market_tick(
         && inputs.settle_draws == SettleDrawPolicy::FourAlways;
     let mut unbounded_col = if depth_arm { vec![0.0; active_count] } else { Vec::new() };
     let mut share_col = if depth_arm { vec![0.0; active_count] } else { Vec::new() };
+    let mut agent_fills: Vec<(usize, crate::microstructure::SettledAgentFill)> = Vec::new();
 
     for i in 0..active_count {
         let idx = active_indices[i];
@@ -1365,11 +1389,28 @@ pub fn simulate_market_tick(
                 // untouched at 1.0, so this line moves no trajectory.
                 depth_multiplier: 1.0,
             };
-            let settled = match predrawn.as_mut() {
-                Some(buffer) => {
-                    settle_price_through_book(&micro, fair_value, volume, &options, buffer)
+            // Agents' resting orders for this name, if any. With none, the
+            // settlement is the shipped call, untouched.
+            let resting = match inputs.resting_orders.get(idx) {
+                Some(orders) if !orders.is_empty() => orders.as_slice(),
+                _ => &[],
+            };
+            let settled = if resting.is_empty() {
+                match predrawn.as_mut() {
+                    Some(buffer) => {
+                        settle_price_through_book(&micro, fair_value, volume, &options, buffer)
+                    }
+                    None => settle_price_through_book(&micro, fair_value, volume, &options, rng),
                 }
-                None => settle_price_through_book(&micro, fair_value, volume, &options, rng),
+            } else {
+                let (settled, fills) = match predrawn.as_mut() {
+                    Some(buffer) => settle_price_through_book_with_orders(
+                        &micro, fair_value, volume, &options, resting, buffer),
+                    None => settle_price_through_book_with_orders(
+                        &micro, fair_value, volume, &options, resting, rng),
+                };
+                agent_fills.extend(fills.into_iter().map(|f| (idx, f)));
+                settled
             };
             new_price = settled.price;
 
@@ -1391,7 +1432,10 @@ pub fn simulate_market_tick(
                     // is a pure function of the company and the options, and
                     // the only option that differs is the depth multiplier.
                     // The arm's book IS the first one with more levels.
-                    let deep = settle_price_through_book(
+                    // The agents' orders go in the arm's book too, so the
+                    // arm differs from the real settlement by the depth and
+                    // nothing else. Their fills are discarded with the rest.
+                    let (deep, _) = settle_price_through_book_with_orders(
                         &micro,
                         fair_value,
                         volume,
@@ -1399,6 +1443,7 @@ pub fn simulate_market_tick(
                             depth_multiplier: f64::INFINITY,
                             ..options
                         },
+                        resting,
                         buffer,
                     );
                     // The maker inventory this returns is DISCARDED, along
@@ -1489,6 +1534,17 @@ pub fn simulate_market_tick(
         clamp: clamp_col,
         unbounded_print: unbounded_col,
         liquidity_share: share_col,
+        agent_fills,
+    }
+}
+
+/// The order-flow slot of a tick's components, with an agent fill's one-off
+/// impact added when there is one. A branch, so a slot with none is the
+/// shipped value to the bit.
+fn with_fill_impact(slot: f64, fill: Option<&f64>) -> f64 {
+    match fill {
+        Some(&x) if x != 0.0 => slot + x,
+        _ => slot,
     }
 }
 

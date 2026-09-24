@@ -284,6 +284,14 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "news_absorption_drift_share": (0.0, 0.5),
     "news_absorption_drift_half_life": (0.0, 120.0),
     "news_quote_revision": (0.0, 1.0),
+    # The agent-facing book (2026-09-24): read only on an agent's path.
+    "book_depth_coefficient": (0.0, 2.0),
+    "book_depth_exponent": (0.0, 1.0),
+    "book_depth_reach": (0.0, 2.0),
+    "book_shared": (0.0, 1.0),
+    "book_refill_half_life": (0.0, 120.0),
+    "book_resting": (0.0, 1.0),
+    "fill_impact_coefficient": (0.0, 1.0),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is

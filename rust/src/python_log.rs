@@ -107,6 +107,30 @@ pub enum LogEntry {
     Record {
         day: u32,
     },
+    /// An agent's order sent to the book. `quantity` is signed, positive to
+    /// buy. The id is logged only when the caller chose it: an id the
+    /// engine assigned is a consequence of the log, and replaying the log
+    /// assigns it again.
+    Submit {
+        agent: String,
+        ticker: String,
+        quantity: f64,
+        limit_price: Option<f64>,
+        order_id: Option<String>,
+    },
+    Cancel {
+        order_id: String,
+        agent: Option<String>,
+    },
+    /// Fills collected by `take_fills`. Logged because collecting them is a
+    /// change of state (the book no longer owes them), so a replay that did
+    /// not collect at the same point would hash differently.
+    TakeFills {
+        agent: Option<String>,
+    },
+    TakeImpacts {
+        agent: Option<String>,
+    },
 }
 
 fn news_to_py(py: Python<'_>, news: &[(Option<String>, Option<String>, f64)]) -> PyResult<PyObject> {
@@ -244,6 +268,27 @@ impl LogEntry {
             LogEntry::Record { day } => {
                 d.set_item("op", "record")?;
                 d.set_item("day", day)?;
+            }
+            LogEntry::Submit { agent, ticker, quantity, limit_price, order_id } => {
+                d.set_item("op", "submit")?;
+                d.set_item("agent", agent)?;
+                d.set_item("ticker", ticker)?;
+                d.set_item("quantity", quantity)?;
+                d.set_item("limit_price", limit_price)?;
+                d.set_item("order_id", order_id)?;
+            }
+            LogEntry::Cancel { order_id, agent } => {
+                d.set_item("op", "cancel")?;
+                d.set_item("order_id", order_id)?;
+                d.set_item("agent", agent)?;
+            }
+            LogEntry::TakeFills { agent } => {
+                d.set_item("op", "take_fills")?;
+                d.set_item("agent", agent)?;
+            }
+            LogEntry::TakeImpacts { agent } => {
+                d.set_item("op", "take_impacts")?;
+                d.set_item("agent", agent)?;
             }
         }
         Ok(d.into())
