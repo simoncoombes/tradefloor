@@ -274,3 +274,19 @@ def test_remeasure_refuses_bound_rows_it_cannot_read_before_measuring(tmp_path):
     assert done.returncode != 0
     assert "bound rows cannot read" in done.stderr, done.stderr[-800:]
     assert not (tmp_path / "out" / "figures.json").exists()
+
+
+def test_the_report_names_each_repeat_by_its_line():
+    """`also` holds {file, line, anchor} entries, as resync.py reads them.
+    The report writer joined them as strings and raised a TypeError after
+    every group had been measured, so a whole gate run wrote no report."""
+    import remeasure  # noqa: PLC0415
+
+    row = {"file": "docs/presets.html", "line": 68,
+           "also": [{"file": "docs/principles.html", "line": 119,
+                     "anchor": "reports custom-d70ecdf0"},
+                    "docs/index.html:12"]}
+    assert remeasure._where(row) == (
+        "docs/presets.html:68 (also docs/principles.html:119, "
+        "docs/index.html:12)")
+

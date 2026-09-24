@@ -170,7 +170,11 @@ def _where(r: dict) -> str:
     naming only the first sends the editor away with two of them stale.
     """
     here = f"{r['file']}:{r['line']}"
-    also = r.get("also") or []
+    # The register writes each repeat as {file, line, anchor}, the shape
+    # resync.py reads, so the line is taken from the entry. A bare string is
+    # still accepted, which is what the field held before the anchors.
+    also = [p if isinstance(p, str) else f"{p['file']}:{p['line']}"
+            for p in r.get("also") or []]
     return here + (" (also " + ", ".join(also) + ")" if also else "")
 
 
