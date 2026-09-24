@@ -433,8 +433,9 @@ pub struct ModelParams {
     /// tick of its day, so its move lands in a straight line across the
     /// session: 5% of it by tick 30, half by lunch, all of it by the close.
     /// An agent that reads the headline at tick 30 and trades its direction
-    /// earned about +120bp an event on pt-v19, 82% of the time
-    /// (docs/serve/HEADLINES.md). Real prices take in firm news in minutes,
+    /// earned about +120bp an event on pt-v19, 82% of the time (measured
+    /// for the trading session server's headlines, which now live in their
+    /// own repository). Real prices take in firm news in minutes,
     /// so that is an edge a bot would learn here and lose with money.
     ///
     /// # The profile
