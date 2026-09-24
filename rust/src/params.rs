@@ -3645,7 +3645,7 @@ pub struct ModelParams {
 
     /// Latent depth behind the maker's ladder: `Y` in the square-root law.
     ///
-    /// 0.0, every shipped preset, is no depth past the maker's ten levels,
+    /// 0.0, which every preset through pt-v19 carries, is no depth past the maker's ten levels,
     /// so an order larger than the ladder fills what the ladder holds and
     /// drops the rest (whole-book depth is 2.6 to 5% of daily volume per
     /// side). Off zero, levels are appended behind the ladder out to
@@ -3679,7 +3679,7 @@ pub struct ModelParams {
     pub book_depth_reach: f64,
     /// Whether agents consume the book they share. A switch.
     ///
-    /// 0.0, every shipped preset: an agent's order is priced against the
+    /// 0.0, which every preset through pt-v19 carries: an agent's order is priced against the
     /// book and removes nothing from it (`Portfolio.execute` reads
     /// `sweep_cost`), so two agents buying the same name in one step fill
     /// at the same price against the same levels, and the maker's
@@ -3706,7 +3706,7 @@ pub struct ModelParams {
     pub book_refill_half_life: f64,
     /// Whether an agent's limit order rests IN the book. A switch.
     ///
-    /// 0.0, every shipped preset: an unfilled limit waits outside the book
+    /// 0.0, which every preset through pt-v19 carries: an unfilled limit waits outside the book
     /// and fills in full at its limit when a later print reaches it, the
     /// traded-range convention the hosted service has always used. It takes
     /// no queue, meets no flow, and no other agent can trade against it.
@@ -3722,7 +3722,7 @@ pub struct ModelParams {
     /// `ds = gamma * sigma * (bought - sold) / V`, applied to the name's
     /// mispricing `s` once, on the first tick after the fills.
     ///
-    /// 0.0, every shipped preset, sends fills through the order-imbalance
+    /// 0.0, which every preset through pt-v19 carries, sends fills through the order-imbalance
     /// law the model's standing flow uses (`order_flow_impact`), which is
     /// concave and floored: a one-share order carries the imbalance floor
     /// of 0.2, worth up to 0.9 bp of `s` in the thinnest names, so a
