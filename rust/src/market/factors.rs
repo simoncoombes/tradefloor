@@ -464,13 +464,15 @@ pub struct SharedFactors {
     /// The sector at the epicentre of the crisis episode this session is
     /// inside, if there is one.
     ///
-    /// `None` on every shipped preset, and `None` in three further cases
-    /// that mean different things and read the same here on purpose: the
-    /// dial [`crate::params::ModelParams::crisis_epicentre_extra`] is 0.0,
-    /// no episode is running, or the episode drew `none` as its epicentre --
-    /// which is two of the tape's five episodes and is a DRAW rather than
-    /// the absence of one. In all four the tick does exactly what it did
-    /// before this field existed.
+    /// `None` in three cases that mean different things and read the same
+    /// here on purpose: the dial
+    /// [`crate::params::ModelParams::crisis_epicentre_extra`] is 0.0, which
+    /// is every preset before pt-v19; no episode is running; or the episode
+    /// drew `none` as its epicentre, which is two of the tape's five
+    /// episodes and is a DRAW rather than the absence of one. In all three
+    /// the tick does exactly what it did before this field existed. This
+    /// read "`None` on every shipped preset" until 2026-09-24; pt-v19 ships
+    /// the dial at 1.93.
     pub crisis_epicentre: Option<String>,
 }
 

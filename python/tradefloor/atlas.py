@@ -50,8 +50,8 @@ every number involved was correct, and the connective sentence was
 invented. So every rendered explanation here carries the row counts, the
 ranges, and the dropped-row tally it stands on, and states its own limits
 inline: a rank correlation is not an elasticity, a binned marginal is an
-estimate with the other fifty parameters varying, an attribution assumes
-additivity. A number invites scepticism; a sentence does not, so the
+estimate with every other surveyed parameter varying, an attribution
+assumes additivity. A number invites scepticism; a sentence does not, so the
 sentence has to carry its own.
 
 # Cost, stated plainly
@@ -59,10 +59,14 @@ sentence has to carry its own.
 A survey costs whatever `measure` costs, times the sample count. It is
 meant to be run once at a screening resolution and reused via `save`/`load`
 for every later question, not re-run per question. A screening resolution
-is exactly that: on the shipped preset, nine of the fourteen panel statistics
-have their across-seed p10-p90 range crossing a band edge, so any point
-this map recommends still needs a full-seed (thirty, not six) confirmation
-before it is believed. `unidentified` and the shapes in `explain` rank and
+is exactly that. On pt-v19, over the thirty certification seeds, two of the
+fourteen shape rows have their across-seed p10-p90 range crossing an edge of
+`facts.REAL_MARKETS` (`abs_return_acf5` and `sector_excess_corr`, read by
+`envelope.intervals`), and twelve have at least one seed past an edge. This
+read "nine of the fourteen" until 2026-09-24, which was pt-v10's count. A
+single seed can land out of band on most rows, so any point this map
+recommends still needs a full-seed (thirty, not six) confirmation before it
+is believed. `unidentified` and the shapes in `explain` rank and
 describe; they do not certify.
 
 # Considered and rejected, so the next reader does not re-litigate blind
@@ -72,8 +76,9 @@ describe; they do not certify.
   out the other parameters moves each coefficient by O(1/n) while adding
   machinery that implies a precision gain it does not deliver. If a survey
   is ever built on a correlated design, revisit.
-- **An automatic all-pairs interaction scan.** Fifty-four parameters is
-  1,431 pairs, each tested on a halved sample at screening resolution:
+- **An automatic all-pairs interaction scan.** Fifty-four parameters, the
+  survey's size when this was decided, is 1,431 pairs, each tested on a
+  halved sample at screening resolution:
   noise dressed as findings. The targeted question -- "does this parameter
   act differently when that one is high?" -- is asked with the `where=`
   filter on `sensitivity` and `profile`, deliberately one hypothesis at a

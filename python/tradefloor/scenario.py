@@ -330,7 +330,9 @@ FIELDS = (
     # A pinned epicentre takes NO draw, so a pinned run and an unpinned one
     # are not the same random world on the epicentre's stream. See
     # ``ModelParams.crisis_epicentre_extra``; the pin does nothing at all
-    # while that dial is 0.0, which is every shipped preset.
+    # while that dial is 0.0, which is every preset before pt-v19. pt-v19
+    # ships 1.93, so on the default the pin takes effect. This read "every
+    # shipped preset" until 2026-09-24.
     "epicentre",
 )
 

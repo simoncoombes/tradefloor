@@ -27,15 +27,28 @@ and a scenario that appeared to run would be measuring nothing.
 
 So every entry here is a field some part of the engine actually reads, and
 each one records WHAT reads it and HOW FAST it arrives. That second column is
-not decoration. Only five things reach a price directly -- the policy rate,
-the corporate bond yield, the QE boost, VIX and the cycle phase, plus quoted
-depth through the book. Everything else in the economy reaches the market
+not decoration. On pt-v19 four things reach a price the day they move: the
+corporate bond yield, VIX, the cycle phase, and quoted depth through the
+book. From pt-v18 onward growth and inflation also reach fair value,
+because earnings grow with nominal output (`earnings_nominal_growth`), but
+through a level they compound: on pt-v19, 300bp less growth held for a
+hundred sessions lowers nominal output by about 1.2%. The QE boost reaches nothing from pt-v16 onward,
+where `qe_pe_gain` is 0.0. Everything else in the economy reaches the market
 through the macro chain: a monthly inflation update, then the central bank's
-next MEETING, then the curve. The first meeting is scheduled 45 days out. A
+next MEETING, then the curve. Through pt-v16 the first meeting is 45 days
+out. From pt-v18 the economy opens part-way through the meeting cycle, and on
+pt-v19 the first meeting fell between day 6 and day 25 on five seeds. A
 sixty-day study of an oil shock will see very little, and it will not warn
 you. `note` on each target says so before you run it. The policy rate is the
-exception from pt-v15 onward, where the daily credit floor touches the spread
-every day and a rate pin reaches equities inside the window.
+exception from pt-v15 onward, where the daily credit floor carries the
+10-year's move into the corporate yield and a rate pin reaches equities
+within days.
+
+Every "Measured" figure in a note is the median name's close on day 120
+against an unshocked twin on the same seed, `Universe.random(20, seed=101)`,
+with the intervention starting on day 20, and the median of that over seeds
+3, 11 and 29. The figures are pt-v19's unless the note names another preset.
+Until 2026-09-24 they were pt-v14's, the default when the notes were written.
 
 ## Three operations and one clock
 
@@ -470,7 +483,7 @@ _register(_make_macro_target(
         "that reprices fair value on the day it moves. Sustain it: the "
         "chain recomputes the corporate yield from the 10-year at the "
         "central bank's next MEETING, so a one-shot write is erased. "
-        "Measured, +200bp: -0.23% as an impulse, -3.50% as a permanent."
+        "Measured, +200bp: +0.00% as an impulse, -4.02% as a permanent."
     ),
     check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
@@ -481,11 +494,16 @@ _register(_make_macro_target(
     note=(
         "The central bank's rate. It is a FALLBACK inside fair value, used "
         "only when no corporate yield is present, and inside the engine "
-        "there always is one -- so it changes nothing on the day it moves. "
-        "It reaches prices through the curve at the bank's next MEETING, "
-        "the first of which is 45 days out, and nothing overwrites it in "
-        "between. Measured, +200bp: -3.57%, the same as a permanent, "
-        "because for this field an impulse already is one."
+        "there always is one, so it changes nothing on the day it moves. "
+        "It reaches prices through the curve. From pt-v15 the 10-year "
+        "closes 5% of its gap to the policy rate plus a term premium every "
+        "session, and the daily credit floor lifts the corporate yield once "
+        "the 10-year has risen far enough. On pt-v19 a +200bp move first "
+        "reached fair value 2 to 12 sessions after it was made (three "
+        "seeds, five dates) and kept lifting it for weeks. Through pt-v14 "
+        "it waits for the bank's next MEETING, 45 days out. Nothing "
+        "overwrites the rate between meetings, so an impulse persists. "
+        "Measured, +200bp: -3.61% as an impulse and -3.61% as a permanent."
     ),
     check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
@@ -495,14 +513,19 @@ _register(_make_macro_target(
     units="index points",
     note=(
         "Four channels, all immediate: the market factor's conditional "
-        "variance target scales as (vix/15)^2, the quoted bid-ask widens by "
+        "variance target scales as (vix/anchor)^4 above the anchor and "
+        "(vix/anchor)^2.5 below it, the quoted bid-ask widens by "
         "1 + max(0, (vix-15)/30), cross-sectional correlation rises above "
         "the crisis threshold, and the economy's own crisis premium keys "
-        "off it. The strongest short-horizon stress lever here. Measured, "
-        "x2.0 held 25 days: -2.23% median, worst name -9.64%. Held for the "
-        "whole run instead it measures +16.8% median with a +65% best, "
-        "which is a dispersion effect rather than a crisis -- use a "
-        "duration for a crisis."
+        "off it. On pt-v19 the anchor is derived from the roster's own "
+        "variance, 20.6 on Universe.random(20, seed=101) and 24.0 on the "
+        "certified 40 names. pt-v18 and earlier square the ratio against a "
+        "fixed anchor, 15.98 on pt-v18 and 15 before it. Measured, x2.0 "
+        "held 25 days: +1.76% median, worst name -10.98%, best +8.41%, so "
+        "the lever widens the spread of outcomes far more than it moves the "
+        "median. Held for the whole run it measures +4.46% median with a "
+        "+62.7% best, which is also a dispersion effect rather than a "
+        "crisis. Use a duration for a crisis."
     ),
     check=_positive_check("VIX level"), format=_points,
     domain=_domain_positive("VIX level"),
@@ -512,9 +535,13 @@ _register(_make_macro_target(
     "macro.qe_pe_boost", "qe_pe_boost",
     units="P/E points",
     note=(
-        "Added to the target P/E in fair value. Immediate, and the "
-        "strongest lever in the registry: it moves valuation without "
-        "touching a rate. Measured, set to 3.0: +19.78%."
+        "Scales the target P/E in fair value by 1 + qe_pe_gain x boost. "
+        "`qe_pe_gain` is 0.0 from pt-v16 onward, so on the default this "
+        "target moves nothing: set to 3.0 it measures exactly 0.00% on "
+        "every name and seed, on pt-v19 and on pt-v18. On pt-v14, where "
+        "the gain is 1.0, the same write measured +19.78% and was the "
+        "strongest lever in the registry. Pin a preset before pt-v16 to "
+        "use it."
     ),
     check=_finite_check, format=_plain, domain=_domain_finite,
 ))
@@ -526,7 +553,7 @@ _register(_make_macro_target(
         "The business-cycle phase. Immediate through the universe's stress "
         "intensity, and it retargets GDP growth, unemployment and the "
         "recession probability at the next monthly step. `set` only: a "
-        "phase is a name. Measured, set to contraction: -3.04%."
+        "phase is a name. Measured, set to contraction: -3.61%."
     ),
     check=_cycle_check, format=str, numeric=False,
 ))
@@ -540,7 +567,8 @@ _register(Target(
         "it, and a tick's printed volume is bounded by avg_volume/390. "
         "Immediate, and the only target here that touches execution rather "
         "than valuation -- so it is nearly invisible in prices and "
-        "expensive in fills. Measured over five seeds after twenty days: "
+        "expensive in fills. Measured on pt-v14 over five seeds after twenty "
+        "days, and not re-measured since: "
         "quoted depth scales exactly with the multiplier (175,060 shares to "
         "70,019 at x0.40), and sweeping 50,000 shares costs 6.08bp at x1.0, "
         "8.57bp at x0.40 and 14.59bp at x0.10. The quoted SPREAD does not "
@@ -567,11 +595,13 @@ _register(_make_macro_target(
     "macro.inflation", "inflation_rate",
     units="fraction",
     note=(
-        "Nothing in the market reads inflation. It reaches prices through "
-        "the central bank's reaction function at its next MEETING, then the "
-        "curve. The endogenous update is MONTHLY and closes 55% of the gap "
-        "to target, so a pinned level persists for weeks rather than days. "
-        "Measured, +150bp: -0.60% as an impulse, -1.27% held."
+        "It reaches prices through the central bank's reaction function at "
+        "its next MEETING, then the curve, and from pt-v18 onward also "
+        "through fair value, because earnings grow with nominal output and "
+        "the price level compounds inflation every day. The endogenous "
+        "update is MONTHLY and closes 55% of the gap to target, so a pinned "
+        "level persists for weeks rather than days. Measured, +150bp: "
+        "+0.06% as an impulse, -1.76% held."
     ),
     check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
@@ -584,9 +614,9 @@ _register(_make_macro_target(
         "inflation step and below $50 subtracts; that is the whole channel, "
         "and it reaches equities through inflation, the bank and the curve. "
         "The daily chain mean-reverts it 3% a day toward a target near "
-        "$75-80 and clamps it into [35, 150]. Measured, x1.40: -0.02% as an "
-        "impulse, +0.09% held for the whole run; oil pinned at $140 for a "
-        "hundred days measures -0.83%. If a scenario needs a 40% oil shock "
+        "$75-80 and clamps it into [35, 150]. Measured, x1.40: +0.00% as an "
+        "impulse, +0.02% held for the whole run; oil pinned at $140 for a "
+        "hundred days measures -1.13%. If a scenario needs a 40% oil shock "
         "to move a market, the pass-through has to be stated as an "
         "assumption -- see scenarios/oil_price_spike.yml."
     ),
@@ -600,11 +630,14 @@ _register(_make_macro_target(
     note=(
         "Annualised GDP growth. Feeds unemployment, confidence, the "
         "recession probability, the oil target and the cycle's phase "
-        "transitions, all MONTHLY, and reaches equities only through the "
-        "central bank -- whose response to weaker growth is to cut, which "
-        "supports prices. Measured, -300bp held for a hundred days: +0.36%, "
-        "and that sign is the rates channel, not a defect. `macro.cycle` is "
-        "the lever a downturn scenario actually wants."
+        "transitions, all MONTHLY. From pt-v18 onward it also reaches fair "
+        "value directly, because earnings grow with nominal output, which "
+        "compounds growth every day. The central bank's response to weaker "
+        "growth is to cut, which supports prices. Measured, -300bp held for "
+        "a hundred days: -0.87%. That is the nominal-output channel, about "
+        "1.2% off earnings over those sessions, net of the bank's cut, "
+        "which pt-v14 measured on its own at +0.36%. `macro.cycle` is the "
+        "lever a downturn scenario actually wants."
     ),
     check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
@@ -615,7 +648,7 @@ _register(_make_macro_target(
     note=(
         "The other half of the central bank's mandate, and the Phillips "
         "curve's gap term. Monthly, and it reaches prices through the bank. "
-        "Measured, +200bp held: +1.17%, again the dovish-response sign."
+        "Measured, +200bp held: +0.14%, the dovish-response sign."
     ),
     check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
@@ -628,7 +661,7 @@ _register(_make_macro_target(
         "it endogenously, so it is the one target here that is PERMANENT by "
         "construction: an impulse stays. It adds (rate-5pp)*0.01 to the "
         "monthly inflation step and drags the trade balance. Measured, "
-        "+800bp: 0.00% median (worst -0.25%, best +0.37%), which at three "
+        "+800bp: 0.00% median (worst -0.18%, best +0.54%), which at three "
         "seeds is indistinguishable from noise. Being unmoved by the engine "
         "cuts both ways: a `hold` on it restores the old rate itself when its "
         "window closes, because nothing else would."
