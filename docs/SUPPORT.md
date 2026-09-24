@@ -28,11 +28,13 @@ Only the vector a tagged release ships is frozen.
 preset is pt-v20, and the line covers 0.8.5 and the patch releases that
 follow it.
 
-pt-v20 is the right place to start, not pt-v19. 0.8.5 carries the changes
-listed under "Coming in pt-v20" in [MODEL.md](MODEL.md): the agent
-order-flow fix, quotes centred on the model price, the herding retune, and
-the opening mispricing. A study pinned to pt-v19 would pin known defects in
-how an agent's trades reach the price.
+pt-v20 is the right place to start. It centres quotes on the model price,
+moves a stock's own news into its fair value, opens the market at its
+stationary spread, and gives agents a book with depth, and 0.8.5 applies an
+agent's fills to the market once. pt-v19 fails two long-run criteria that
+pt-v20 passes, C4a and C4b, because a rule reading only prices finds an edge
+on it that real markets do not have, so a study pinned to pt-v19 would pin
+that defect. `ModelParams.pt_v20` in `rust/src/params.rs` lists every change.
 
 ### Support period
 
