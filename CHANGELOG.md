@@ -1,46 +1,83 @@
-# Changelog
-
 ## 0.8.5
 
 0.8.5 is the first long-term support release. The 0.8 line gets fixes that
 leave every known-answer digest unchanged for 24 months from this tag
-(`docs/SUPPORT.md`), and `pt-v20` becomes the default. [PLACEHOLDER pt-v20]
-pt-v20's readings on the one-year table, the two-year panel and the 17
-long-run criteria, and its known-answer digest, go here when the preset
-lands. Every earlier preset replays as it did.
+(`docs/SUPPORT.md`). `pt-v20` is the default: its tape follows the model
+price, a stock's own news moves its fair value, and agents trade in a book
+with depth through `Engine.submit`, `cancel`, `open_orders` and
+`take_fills`. It holds all 19 one-year rows, 14 of 14 at two years and all 28
+long-run criteria registered for it. A run that took the default will not
+replay against 0.8.1; `model="pt-v19"` keeps that market, and every preset
+replays as it did.
 
-An agent's orders now reach the market once. Harnesses passed an agent's
-fills to `run_session` as `order_flow`, which the session applied on every
-tick, so at six steps a day one order counted 65 times and agents were marked
-to their own impact. On pt-v19 the spec mean-reversion rule's median lead
-over buy-and-hold on the published suite falls from 42 points in 60 days to
-0.5.
+An agent's orders now reach the market once. Harnesses applied an agent's
+fills on every tick of the session, so one order counted 65 times and agents
+were marked to their own impact.
 
-Agents can trade in a book with depth priced by size, resting limit orders
-and a linear permanent impact, shared by several agents, through
-`Engine.submit`, `cancel`, `open_orders` and `take_fills`. Its seven dials
-are off on every preset before pt-v20. `Universe.random(n, bonds=True)` adds
-three simulated rate indices priced off the engine's curve (`UST2Y`,
-`UST10Y` and `IGCORP`), with `curve_shock.yml`, `baselines.Balanced` and
-`evaluate(cash_interest=True)`. `docs/MODEL.md` states the model as
-equations, and `docs/STATISTICS.md` names the three statistic sets behind
-every count the site quotes.
+`Universe.random(n, bonds=True)` adds three simulated rate indices priced off
+the engine's curve (`UST2Y`, `UST10Y` and `IGCORP`). `docs/MODEL.md` states
+the model as equations, and `docs/STATISTICS.md` names the statistic sets
+behind every count the site quotes.
 
 **What breaks.** `run_session(order_flow=...)` raises. Pass trades as
 `fills=` or a standing rate as `flow_per_tick=`. Every traded result moves:
 scorecards, rankings, TCA and the recorded agent fixtures.
 
-**Still off.** [PLACEHOLDER pt-v20] What pt-v20 still misses goes here when the
-preset lands.
+**Still off.** On pt-v20 the crisis lever is 3.6x against a real 6.2x
+(pt-v19 5.2x), an equal-weight index gains 1.1 per cent over one year at the
+floor of its band, and it has 2.1 bear markets a decade against a real 1.1.
 
 <!-- release-note-ends -->
 
 ### pt-v20
 
-[PLACEHOLDER pt-v20] The composition, the paired run against pt-v19, the
-measured panel, the long-run verdicts, the new `KAT_VERSION` and digests, and
-the test expectations re-measured for the new default go in this section
-when the preset lands.
+pt-v20 is pt-v19 with the market-behaviour faults found by the
+mean-reversion investigation fixed (design repository,
+`programme/meanrev-edge-ptv19-2026-09-24.md`; the composition, the registered
+rows and the grade are `programme/ptv20-*.md`). `ModelParams.pt_v20` in
+`rust/src/params.rs` documents every dial, and `python/tradefloor/provenance.py`
+gives each value's derivation or measurement.
+
+- The tape. The maker quoted around the last print, so 65-minute returns
+  carried a lag-one autocorrelation of -0.135 and a one-step reversal rule
+  beat buy-and-hold after costs. `quote_model_weight` 1.0 centres the book on
+  the model price, and `closing_auction` 1.0 prints the session's last tick
+  at the model price.
+- The cross-section. `fair_value_news_share` 1.0 moves the stock- and
+  sector-specific part of every shock into fair value, so a value screen on
+  published fundamentals no longer ranks the next 20 days at an IC of +0.38
+  against a real +0.01. `opening_mispricing_sigma` and `opening_market_sigma`
+  open the market at its stationary spread.
+- The curve. `treasury_2y_noise`, `flight_to_quality_day` and `_gain`,
+  `corporate_yield_daily` and `treasury_10y_noise`.
+- The market's years. An aggregate earnings cycle (`earnings_cycle_depth`
+  0.35, `_upside` 0.09) with `market_factor_sigma` and
+  `jump_intensity_market` lowered by as much, and `volume_move_response` 0.8.
+- The book. The seven book dials at depth 0.75, exponent 0.5, reach 1,
+  shared, resting, refill 27 ticks and fill impact 0.314, so an agent's
+  orders execute in the engine's own book on the default.
+- `cascade_gain` scales the stop and squeeze ladders to the certified
+  forty's daily Lo-MacKinlay reading.
+
+Measured on the final grade box (ptv20g3, 90 pooled 21-year histories) and
+recorded in `python/tradefloor/presets/pt-v20.json`: 15 of 15 on the
+fixed-roster panel at 252 days, 14 of 14 at 504, 15 of 15 on held-out seeds
+and on a held-out roster, 10 of 10 mechanisms, and all 28 long-run criteria
+registered for it, the 17 of `CRITERIA.md` and eleven more (the rate
+indices against FRED and SPY, IEF and LQD, the earnings cycle against
+Shiller, value and momentum signals, the one-day reversal book and the cost
+of size). The level and crisis block comes from a paired level-protocol run
+on one build, pt-v20 against pt-v19 on seeds 101 to 130, whose control
+reproduced every row pt-v19 publishes to four places
+(`tools/presets/results/level-rows-pt-v20-2026-09-24.json`). On it the index
+drift is +1.14 per cent a year (pt-v19 +7.65), inside the ruled band of 1.1
+to 10.3 at its floor, and the three crisis rows are inside their bands.
+
+`KAT_VERSION` is 28. `simulationSha256` moves from `1e683b96` to `b0ef10ef`,
+`sha256` from `c22d4a02` to `92c9cb7c` and `bondsSha256` from `522aeb76` to
+`3d5bdd8c`. `metadataSha256` does not move, because pt-v20 carries pt-v19's
+mispricing and crowd coefficients. No per-preset digest moves, and pt-v20's
+row is `149d72de`.
 
 ### The flow fix and its measurement
 
@@ -178,8 +215,11 @@ because they take no draws and write nothing back. A new `bondsSha256` in
 Under pt-v19 the engine's curve is quieter than the real one: the 2-year
 moves 0.46bp a day against 5.2bp over 2015-2025 and the 10-year 3.1bp
 against 5.35bp, and bond and stock returns are uncorrelated where IEF reads
--0.16 and LQD +0.27. [PLACEHOLDER pt-v20] The same readings under pt-v20's
-curve dials go in this sentence when the preset lands.
+-0.16 and LQD +0.27. pt-v20's curve dials fix most of that: the 2-year
+moves 4.48bp a day against 5.23bp and the 10-year 4.72bp against 5.41bp,
+and the index's daily correlation with a Treasury bond's return is -0.154
+against -0.161 and with an IG bond's +0.231 against +0.272 (long-run
+criteria R1 to R4).
 
 `rust/src/rates.rs` holds the pricing, the curve reads and the books, and
 documents every number. An index level reprices whenever the yield it reads
@@ -233,9 +273,9 @@ mix name raises `ValidationError`. The measurement is thirty seeds at 252 and
 504 days from fleet run `docs080b`, and its output is
 `measurements/roster-shapes-pt-v19.json`. The `roster-concentration` gap now
 lists the rows it still refuses as its statistics, where it listed three
-shape rows. [PLACEHOLDER pt-v20] Whether the four mixes are measured on
-pt-v20, or `check()` refuses them there as it refuses any preset but pt-v19,
-is settled when the preset lands.
+shape rows. The four mixes were measured on pt-v19 only, so `check()`
+accepts them for pt-v19 and refuses them on pt-v20 until they are measured
+there.
 
 The `forced_flow_threshold` summary that the parameter table reads is
 reworded in plain terms, and `decay-curve-504.json` moves into
@@ -262,8 +302,8 @@ structure, news, jumps, the three variance processes, the VIX, crisis
 regimes, the market maker and book, agent order flow, volume and scenarios.
 Each equation names its source line, and each parameter carries its pt-v19
 value, timescale and how it was set (measured, derived, fitted, chosen or
-guard). [PLACEHOLDER pt-v20] Whether MODEL.md is brought to pt-v20 for this
-tag, or says it describes pt-v19, is decided when the preset lands.
+guard). It says at the top that it still describes pt-v19; pt-v20's
+additions are documented in `ModelParams.pt_v20` and in `provenance.py`.
 
 `docs/STATISTICS.md` names the sets of realism statistics behind the counts
 the documentation quotes, with every member: the one-year table (19, of
@@ -284,7 +324,8 @@ its own, `tests/known_answer_presets.json` holds the eighteen digests, and
 determinism workflow now compares five digests per platform. With the two
 treasury yields left out, which 0.8.1 does not report, the harness gives the
 same eighteen digests on the published 0.8.1 wheel as on 0.8.5.
-[PLACEHOLDER pt-v20] pt-v20's row is added when the preset lands.
+pt-v20's row was added when it merged, with the eighteen before it
+unchanged.
 
 `.zenodo.json` carries what Zenodo's GitHub integration needs to mint a DOI
 for each published release, once the owner switches it on (`RELEASING.md`,
