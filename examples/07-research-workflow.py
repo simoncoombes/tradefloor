@@ -324,18 +324,23 @@ def main() -> dict:
     print(f"8. stylised facts in {time.time() - mark:.1f}s against {ruler}: "
           + ", ".join(f"{k.replace('_', ' ')} {v['verdict']}"
                       for k, v in verdicts.items()))
-    # Not all in range, and not none. If every statistic matched, the
-    # comparison would be doing no work; if none did, the model would be
-    # unusable and the report should say so loudly.
+    # Some in range: if none were, the model would be unusable and the report
+    # should say so loudly.
     #
     # GRADED ROWS ONLY. A row the basis cannot read carries `matches` None,
-    # and `not None` is True, so `any(not v["matches"] ...)` was satisfied by
-    # a row nobody tested once the default basis gained held-out rows. That
-    # would let a model in band on everything through an assertion written to
-    # prove the comparison does work.
+    # which says nothing either way.
+    #
+    # "Not all in range" was asserted here too, on the argument that a
+    # comparison every statistic passes is doing no work. pt-v19 is in band
+    # on every graded row at this seed, so that argument would call a good
+    # model a broken ruler. What the old assertion was for, a comparison that
+    # can fail, is shown directly instead: the same measurement with its
+    # volatility multiplied by ten is graded out of band.
     graded = [v for v in verdicts.values() if v["matches"] is not None]
-    assert any(not v["matches"] for v in graded)
     assert any(v["matches"] for v in graded)
+    broken = dict(facts, annualised_vol_pct=facts["annualised_vol_pct"] * 10)
+    assert not tf.facts.compare_to_real_markets(broken)[
+        "annualised_vol_pct"]["matches"]
 
     # 9. Every result names the market it came from. A seed does not identify
     #    a market -- the same seed over a different roster is a different one
