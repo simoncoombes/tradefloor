@@ -142,8 +142,11 @@ stream.
 own, with the market frozen and the day's return set to zero
 (`engine.rs:1430-1499`). The business cycle's opening phase and its age are
 drawn from the cycle's stationary law first (`engine.rs:1343-1367`). Because
-the market is frozen during this burn-in, the VIX settles to a fixed level
-that does not depend on the seed: 20.1 on `Universe.random(40, seed=111)`.
+the market is frozen during this burn-in, the VIX settles near a fixed level
+that depends on the roster and hardly on the seed: on
+`Universe.random(40, seed=111)` it opens at 20.11 on 28 of seeds 101 to 130,
+and at 20.18 and 20.24 on the other two, where inflation ended the burn-in
+above 3%.
 
 ## The macro economy
 
@@ -1470,7 +1473,7 @@ equation. They are listed so a reader can judge them.
 
 - The neutral rate $r^{\ast}$ = 0.0482 was read off pt-v18's burn-in, which always opened in expansion. pt-v19 opens at a random point in the cycle, and its opening corporate yield ranges from 2.6% to 6.6% across seeds (median 5.65%). So a roster does not open exactly at its fair value; the rate term shifts the opening mispricing by −0.04 to +0.03.
 - The opening yield also depends on the roster: 2.9% for a one-company roster, 5.6% for 12 or 40 companies at the same seed. The likely path is the roster-derived VIX anchor acting through the burn-in; it has not been traced.
-- The opening VIX is a fixed point of the burn-in, because the market is frozen during it: 20.1 on every seed for `Universe.random(40, seed=111)`.
+- The opening VIX is close to a fixed point of the burn-in, because the market is frozen during it, so every run on a roster opens at nearly the same VIX (20.11 on 28 of 30 seeds for `Universe.random(40, seed=111)`).
 - After the burn-in the macro calendar restarts at day 1, so the first monthly step of a run comes 41 sessions after the last one of the burn-in.
 
 **Macro.**
