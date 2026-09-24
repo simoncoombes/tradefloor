@@ -154,11 +154,11 @@ package, shows those 15 until 0.8.5 is released.
 | C1 | crash rate in years 3 to 21 against years 1 to 2 | two thirds to 1.5 times |
 | C2 | histories that touch the VIX ceiling | at most 1 of 30 |
 | C3 | the edge from reading a headline 5 ticks late | under 20 basis points |
-| C4a | lag-1 autocorrelation of 65-minute returns, median name, and the Roll spread against the quoted spread (from 0.8.5) | at or above −0.05, or Roll at most twice quoted |
+| C4a | lag-1 autocorrelation of 65-minute returns, median name, and the Roll spread against the quoted spread (from 0.8.5) | at or above -0.05, or Roll at most twice quoted |
 | C4b | the best price-only rule on the published suite of 20 markets: median points over buy-and-hold, and markets beaten (from 0.8.5) | every rule at most +5 points and 14 of 20 |
 | D1 | the one-year table, in band on all four cells | every band in |
 
-On pt-v19, C4a reads −0.187 with a Roll spread 5.0 times the quoted one,
+On pt-v19, C4a reads -0.187 with a Roll spread 5.0 times the quoted one,
 and in C4b a mean-reversion rule that trades every 65 minutes beats
 buy-and-hold in 18 of 20 markets by a median 13.6 points; five-day momentum
 also fails. The next preset is meant to fix both; see

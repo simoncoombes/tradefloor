@@ -650,7 +650,7 @@ one still 404s after ten minutes, the build failed and the crate page says why.
 GitHub release is published. Zenodo then mints a DOI for that release, and
 one concept DOI that always resolves to the newest. It reads `.zenodo.json`
 before `CITATION.cff`, so keep the two saying the same thing. It takes the
-version from the release tag, which is why `.zenodo.json` has no
+version from the release tag, so `.zenodo.json` has no
 `version` field.
 
 Switching it on is the owner's job, once, in the owner's own accounts:

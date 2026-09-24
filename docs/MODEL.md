@@ -243,9 +243,9 @@ length, and its age from the phase's survival function
 and a daily level update. **State:** real growth $g$ (percent a year) and
 real output $Y$.
 
-Each phase has a growth midpoint $\bar g$: E 3.0, P 1.25, C −1.5, T −0.25,
+Each phase has a growth midpoint $\bar g$: E 3.0, P 1.25, C -1.5, T -0.25,
 R 2.25 (`economy/state.rs:263-302`). On entering a phase, growth takes a
-shock $\delta$: C $-(2 + 2U)$, T −0.5, R +1, E +0.5, P none
+shock $\delta$: C $-(2 + 2U)$, T -0.5, R +1, E +0.5, P none
 (`economy/daily.rs:628-650`), and then growth is updated in three steps:
 
 ```math
@@ -275,8 +275,8 @@ u_d = \mathrm{clip}\Big(u + 0.3\,\theta^{u}_{\mathcal{P}} + 0.2\,(2 - g) + 0.06\
  - 0.08\,g\,\mathbf{1}[\mathcal{P} \in \lbrace E, R\rbrace,\ g > 1] + 0.06\,Z;\ 2.5,\ 15\Big)
 ```
 
-(`economy/daily.rs:726-745`). The phase trends $\theta^{u}$ are E −0.05,
-P 0, C 0.30, T 0.04, R −0.10. The $0.2 (2 - g)$ term is Okun's law. The
+(`economy/daily.rs:726-745`). The phase trends $\theta^{u}$ are E -0.05,
+P 0, C 0.30, T 0.04, R -0.10. The $0.2 (2 - g)$ term is Okun's law. The
 structural rate carries hysteresis (`economy/daily.rs:913-925`):
 
 ```math
@@ -312,7 +312,7 @@ and the terms are these:
 - $R^{r}$ is a real-rate drag: $-0.04 (r^{p} - \pi)$ when the policy rate is above inflation, $-0.015 (r^{p} - 3)$ when it is below inflation but above 3, else 0 (`economy/daily.rs:760-766`).
 - $\Omega$ is the oil pass-through: $0.01 (o - 80)$ above USD 80 a barrel, $0.005 (o - 50)$ below USD 50 (`economy/daily.rs:768-774`).
 - $e$ is the dollar index and $\tau$ the tariff rate. The tariff rate stays at 5, so its term is 0, unless a scenario changes it.
-- The phase trends $\theta^{\pi}$ are E 0.015, P 0.015, C −0.02, T −0.01, R 0.01.
+- The phase trends $\theta^{\pi}$ are E 0.015, P 0.015, C -0.02, T -0.01, R 0.01.
 
 The price level compounds daily: $Q_d = Q_{d-1} (1 + \pi_d / (100 \cdot 252))$
 (`economy/daily.rs:969`).
@@ -321,7 +321,7 @@ The price level compounds daily: $Q_d = Q_{d-1} (1 + \pi_d / (100 \cdot 252))$
 |---|---|---|---|
 | inflation target | 2.0 | chosen | |
 | `inflation_reversion` $\kappa_\pi$ | 0.55 a month | chosen | reference value; it gives too little persistence against FRED CPI (lag-1 autocorrelation 0.936 against 0.978, `params.rs:313-325`) |
-| `inflation_floor` $\pi_{\min}$ | −1.0 | guard | |
+| `inflation_floor` $\pi_{\min}$ | -1.0 | guard | |
 | `inflation_ceiling` $\pi_{\max}$ | 6.0 | guard | real CPI inflation peaked at 9.0 in June 2022, so this binds in a 2022-like episode |
 | `phillips_curve_coeff` | 0.2 | chosen | |
 
@@ -367,15 +367,15 @@ sets the change $\delta$ in the policy rate (`economy/central_bank.rs:181-285`):
 |---|---|---|
 | 1 | $g < -2$ and $u > 10$ | $-(1 + 0.5U)$ |
 | 2 | $g < 0$ and $u > 8$ | $-(0.5 + 0.5U)$ |
-| 3 | $u > 8$ and $\pi < 3$ | −0.75 |
-| 4 | C or T, $g < 0$, $u > 7$ | −0.25 if $\pi < r^{p}$, else 0 |
-| 5 | C or T, $r^{p} > 5$ | −0.25 |
+| 3 | $u > 8$ and $\pi < 3$ | -0.75 |
+| 4 | C or T, $g < 0$, $u > 7$ | -0.25 if $\pi < r^{p}$, else 0 |
+| 5 | C or T, $r^{p} > 5$ | -0.25 |
 | 6 | $\Delta > 2$, $\pi > 6$, $r^{p} < \pi$ | +1.0 or +0.75 (unreachable: needs $\pi > 6$) |
 | 7 | $\pi - r^{p} > 2$ and $\pi > 4$ | +0.75 |
 | 8 | $\Delta > 1$ and $\pi > 4$ | +0.5 |
 | 9 | $\Delta > 0.5$ and $\pi > 3$ | +0.25 |
-| 10 | $\Delta < -0.5$, $u > 5$, $\pi < 4$ | −0.25 |
-| 11 | $\Delta < -1$, C or T, $\pi < 3.5$ | −0.5 |
+| 10 | $\Delta < -0.5$, $u > 5$, $\pi < 4$ | -0.25 |
+| 11 | $\Delta < -1$, C or T, $\pi < 3.5$ | -0.5 |
 | 12 | $\pi > 3.5$, $r^{p} < \pi$, $u < 8$ | +0.5 if $\pi - r^{p} > 3$, else +0.25 |
 | 13 | $\Delta > 0.5$, $u \le 5$, not C or T | +0.25 (lift-off) |
 
@@ -819,7 +819,7 @@ carries the same profile (`news_quote_revision` = 1, `market/tick.rs:1350-1355`)
 | $w_p$ | `news_peer_weight`, `news_peer_weight_down` | 0.05, 0.05 | chosen | motivated by Foster (1981) and Freeman and Tse (1992) on intra-industry information transfer |
 | $c_p$ | `news_peer_vix_coupling` | 8.0 | fitted | |
 | $h_f$ | `news_absorption_half_life` | 0.6 ticks | derived | one-minute share of the earnings-announcement move, Christensen, Timmermann and Veliyev (arXiv 2601.08962, Table 7, 2008 to 2020) |
-| $\delta$ | `news_absorption_drift_share` | 0.12 | derived | same table: 1 − 1.58/1.80 |
+| $\delta$ | `news_absorption_drift_share` | 0.12 | derived | same table: 1 - 1.58/1.80 |
 | $h_D$ | `news_absorption_drift_half_life` | 42 ticks | chosen | a 60-minute mean life for the drift, to fit Patell and Wolfson (1984)'s "several hours"; not measured |
 | | `news_quote_revision` | 1.0 | derived | with it the tape holds 0.615 of an event after one tick against the profile's 0.605; without it 0.086 |
 
@@ -843,13 +843,13 @@ s_i \leftarrow \mathrm{clip}\Big(s_i
 
 A jump changes $s$ at the close and so reaches the price at the next
 session's first ticks, through the book. At $X = A$ there are about 14
-market-jump days a year, of mean −0.85%, and each company has about 1.7
+market-jump days a year, of mean -0.85%, and each company has about 1.7
 idiosyncratic jumps a year, of standard deviation 7.5%.
 
 | Symbol | Dial | Value | Kind | Source |
 |---|---|---|---|---|
 | $\lambda_M$ | `jump_intensity_market` | 0.05658 a day | fitted | search; for the two-year excess kurtosis |
-| $\mu_M$ | `jump_mean_market` | −0.008522 | fitted | search; negative for skew |
+| $\mu_M$ | `jump_mean_market` | -0.008522 | fitted | search; negative for skew |
 | $\sigma_M^{J}$ | `jump_sigma_market` | 0.002460 | fitted | search |
 | $\lambda_I$ | `jump_intensity_idio` | 0.006890 a day | fitted | search |
 | $\sigma_I^{J}$ | `jump_sigma_idio` | 0.07521 | fitted | search |
@@ -1471,7 +1471,7 @@ equation. They are listed so a reader can judge them.
 
 **Openings.**
 
-- The neutral rate $r^{\ast}$ = 0.0482 was read off pt-v18's burn-in, which always opened in expansion. pt-v19 opens at a random point in the cycle, and its opening corporate yield ranges from 2.6% to 6.6% across seeds (median 5.65%). So a roster does not open exactly at its fair value; the rate term shifts the opening mispricing by −0.04 to +0.03.
+- The neutral rate $r^{\ast}$ = 0.0482 was read off pt-v18's burn-in, which always opened in expansion. pt-v19 opens at a random point in the cycle, and its opening corporate yield ranges from 2.6% to 6.6% across seeds (median 5.65%). So a roster does not open exactly at its fair value; the rate term shifts the opening mispricing by -0.04 to +0.03.
 - The opening yield also depends on the roster: 2.9% for a one-company roster, 5.6% for 12 or 40 companies at the same seed. The likely path is the roster-derived VIX anchor acting through the burn-in; it has not been traced.
 - The opening VIX is close to a fixed point of the burn-in, because the market is frozen during it, so every run on a roster opens at nearly the same VIX (20.11 on 28 of 30 seeds for `Universe.random(40, seed=111)`).
 - After the burn-in the macro calendar restarts at day 1, so the first monthly step of a run comes 41 sessions after the last one of the burn-in.
