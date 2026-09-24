@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.0
+## 0.8.5
 
 **An agent's orders now reach the market once.** Every harness passed an
 agent's fills to `run_session` as `order_flow`, which the session held on

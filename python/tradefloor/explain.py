@@ -1331,7 +1331,7 @@ def _replay_inputs(engine: Engine, inputs: Sequence[dict],
             engine.record(int(day))
             recorded = True
         elif op == "run_session":
-            # `flow_per_tick` since 0.9.0, `order_flow` before it: the same
+            # `flow_per_tick` since 0.8.5, `order_flow` before it: the same
             # per-tick flow under the name each log was written with.
             per_tick = (entry["flow_per_tick"] if "flow_per_tick" in entry
                         else entry.get("order_flow"))

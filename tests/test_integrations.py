@@ -1960,7 +1960,7 @@ def test_a_loop_bound_client_fails_across_fresh_loops():
 
 
 def test_run_sync_reuses_one_loop_across_calls_in_a_script():
-    """Five calls in a row, as a five-day live run makes them. Until 0.9.0
+    """Five calls in a row, as a five-day live run makes them. Until 0.8.5
     the second failed, and so did every other one after it."""
     client = _LoopBoundClient()
     assert [ci.run_sync(client.complete(k)) for k in range(5)] == [0, 2, 4, 6, 8]

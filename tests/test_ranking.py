@@ -191,7 +191,7 @@ def test_a_real_difference_separates_and_a_median_gap_may_not(ranking):
     mispricing one, which is much closer to real equities, where momentum is
     a weak and contested effect rather than a free lunch.
 
-    Re-measured at 0.9.0, when an agent's fills stopped being held on every
+    Re-measured at 0.8.5, when an agent's fills stopped being held on every
     tick of the step, and the pairs changed again. Under 0.8.1 mean
     reversion led on pooled capture at +0.947 and swept random 12 to 0;
     that lead was its own impact, collected on every tick. Now the table

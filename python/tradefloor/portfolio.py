@@ -22,7 +22,7 @@ are realistic and whose footprint is invisible, profitable in a way no real
 trader could be.
 
 A harness that feeds it back on every tick of a step is the opposite error,
-and every harness here made it until 0.9.0: ``run_session``'s old
+and every harness here made it until 0.8.5: ``run_session``'s old
 ``order_flow`` held the flow for the whole session, so one order was counted
 65 times at six steps a day, after the agent had already filled at the
 pre-trade book. The agent collected its own impact instead of paying it. A

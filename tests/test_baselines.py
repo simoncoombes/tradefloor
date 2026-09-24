@@ -207,7 +207,7 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # bottom pair held, buy_and_hold now just above flat, and the oracle has
     # still never moved, in twelve swaps.
     #
-    # Re-measured at 0.9.0, when an agent's fills stopped being held on
+    # Re-measured at 0.8.5, when an agent's fills stopped being held on
     # every tick of the step and reached the market once (`fills=` on
     # `run_session`): oracle +4.894%, buy_and_hold +0.244%, momentum
     # -1.970%, random -2.127%, mean_reversion -2.647%. Until this
@@ -256,7 +256,7 @@ def test_random_trading_is_close_to_flat_over_a_short_run(scores):
     # under the oracle on the same seed and horizon, which the ratio below
     # measures properly across seeds.
     #
-    # 2.5 since 0.9.0, and this time it IS costs. An agent's fills now reach
+    # 2.5 since 0.8.5, and this time it IS costs. An agent's fills now reach
     # the market once instead of on every tick of the step, so a random
     # book no longer marks its own positions up by the impact it made. On
     # the same twelve seeds the mean goes -0.495% to -1.522% and the worst
@@ -277,7 +277,7 @@ def test_random_trading_is_close_to_flat_over_a_short_run(scores):
     # foresight typically, not on every draw. Five days is short enough that
     # one seed's oracle can have little mispricing to capture.
     #
-    # Re-measured at 0.9.0, when fills stopped being held on every tick of
+    # Re-measured at 0.8.5, when fills stopped being held on every tick of
     # the step. Both halves of the ratio moved against it: the oracle no
     # longer collects its own impact (its five-day return on these six
     # seeds falls from a median 5.30% to 3.68%) and random no longer
@@ -561,7 +561,7 @@ def test_capture_ratio_is_a_fraction_of_the_ceiling(scores):
     assert ratios["momentum"] == pytest.approx(
         scores["momentum"].pnl / scores["oracle"].pnl)
     # Every agent below the ceiling on this fixture, and buy-and-hold a
-    # fraction of it. The fraction was momentum's until 0.9.0 (0.281); with
+    # fraction of it. The fraction was momentum's until 0.8.5 (0.281); with
     # its fills applied once it loses money over these five days (-0.402),
     # and a negative capture is a loss, not a fraction.
     assert all(r < 1.0 for r in ratios.values()), ratios
@@ -691,7 +691,7 @@ def test_a_nonsense_lookback_days_is_refused():
 def test_no_reference_agent_beats_the_oracle_once_it_pays_its_own_impact():
     """What the reference agents can do against perfect information.
 
-    Until 0.9.0 this test was `the Oracle is beaten only by agents that
+    Until 0.8.5 this test was `the Oracle is beaten only by agents that
     trade a signal`, and on this grid the signal traders did beat it: 4 of
     16 agent-market pairs under 0.8.1, and buy-and-hold and random never.
     The beats were the harness, not the signal. Every harness held an
@@ -741,7 +741,7 @@ def test_an_agent_can_beat_the_oracle():
     across the top_k most mispriced names -- so an agent whose selection suits
     the constraint better out-earns it.
 
-    Measured across eight seeds until 0.9.0: momentum beat it twice and
+    Measured across eight seeds until 0.8.5: momentum beat it twice and
     mean-reversion once. Those beats were the reference agents collecting
     their own impact, and with an agent's fills applied once none of them
     beats it on these eight markets. The point survives with the same

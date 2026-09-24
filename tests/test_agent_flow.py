@@ -1,6 +1,6 @@
 """An agent's trades reach the market once, and the agent pays for them.
 
-Until 0.9.0 every harness in the package handed an agent's fills to
+Until 0.8.5 every harness in the package handed an agent's fills to
 ``Engine.run_session`` as ``order_flow``, which the session held on EVERY
 tick. One order was counted 65 times at six steps a day, and it landed only
 after the agent had filled at the pre-trade book, so the agent collected its
@@ -20,7 +20,7 @@ session's first tick, and a refusal of the old one. What this file holds:
   a one-share agent moves nothing it can see, and on every shipped preset a
   fill costs at least the permanent impact its own order leaves behind;
 - the log: new sessions record ``fills`` and ``flow_per_tick``, and a log
-  written before 0.9.0 still replays into the market it recorded.
+  written before 0.8.5 still replays into the market it recorded.
 """
 
 from __future__ import annotations
@@ -259,7 +259,7 @@ def round_trip(universe, seed: int, index: int, shares: float, *,
                feed: str | None) -> dict:
     """Buy at the first step of day 1, flatten at the second, after one
     untraded day. ``feed`` is how the flow reaches the market: ``fills``,
-    ``flow_per_tick`` (the pre-0.9.0 harness) or None (not at all)."""
+    ``flow_per_tick`` (the pre-0.8.5 harness) or None (not at all)."""
     e = Engine(seed=seed, universe=universe)
     p = Portfolio(cash=1e10)
     t = e.tickers[index]

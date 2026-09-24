@@ -22,12 +22,12 @@ This needs saying first because the name invites the opposite reading, and I
 made that mistake in this file's own documentation for a week.
 
 The Oracle sees the true mispricing. It does not follow that nothing can beat
-it: the same information spent on a different rule beats it, and until 0.9.0
+it: the same information spent on a different rule beats it, and until 0.8.5
 the reference agents did too. Counted on a fully stated grid, meaning the
 reference agents over ``Universe.random(30, seed=11)``, sim seeds 0 through
 11, ten days each, and a beat being a capture ratio above 1.0:
 
-                          0.9.0      0.8.1
+                          0.8.5      0.8.1
         mean_reversion    0/12       5/12
         buy_and_hold      0/12       0/12
         momentum          0/12       0/12
@@ -248,7 +248,7 @@ class RandomTrader:
 
         `World.fork` calls it. The generator is copied at its position, so
         both arms flip the same coins from here and neither moves the
-        other's stream. Until 0.9.0 there was no hook and the world fell
+        other's stream. Until 0.8.5 there was no hook and the world fell
         back to `copy.deepcopy`, which raised on the generator, so a world
         holding this baseline could not be forked.
         """
@@ -395,14 +395,14 @@ class Oracle:
     underpriced names and short the ``top_k`` most overpriced. A different
     rule on the same information beats it -- ``top_k=3`` on 6 of 8 markets
     on the module docstring's grid -- and that is a result rather than a
-    fault. Until 0.9.0 mean reversion beat it in 5 of 12 of them too; that
+    fault. Until 0.8.5 mean reversion beat it in 5 of 12 of them too; that
     was the harness applying its fills on every tick of the step, and none
     of the price-only agents beats it there now.
 
     Three further caveats, all worth knowing before quoting a capture ratio:
 
     **Its height is a CHOICE, and ``top_k`` is a real lever on it.**
-    Re-measured on 0.9.0 under ``pt-v19`` at sim seed 2026 over thirty
+    Re-measured on 0.8.5 under ``pt-v19`` at sim seed 2026 over thirty
     days, holding gross exposure and the participation cap fixed at the values
     every other baseline gets:
 
@@ -436,7 +436,7 @@ class Oracle:
     module docstring the same information on three names a side beats it
     on 6 of 8 markets, and fifteen names a side at twice the gross earns
     1.44x its median. No
-    price-only reference agent beats it there since 0.9.0; the ones that
+    price-only reference agent beats it there since 0.8.5; the ones that
     did before were marked to their own impact. That a better rule under
     the same constraints CAN out-earn revealed information has held in
     every era measured. A capture ratio above 1.0 is a finding about
@@ -468,7 +468,7 @@ class Oracle:
         it was reading, and a fork runs a different engine, so the copy
         forgets it and picks its own up at its first `act`. A fork happens
         between days, and `explain` is asked only after a day's steps, so
-        nothing reads the gap. Until 0.9.0 there was no hook, and the
+        nothing reads the gap. Until 0.8.5 there was no hook, and the
         world's fallback `copy.deepcopy` raised on the engine.
         """
         twin = copy.copy(self)
@@ -549,7 +549,7 @@ def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str
     equal-weight rule, so a better portfolio under the same constraint
     out-earns it, and ``Oracle(top_k=3)`` does on 6 of the 8 markets this
     module's docstring measures. From a price-only agent it no longer
-    occurs on that grid: 0 of 48 agent-market pairs since 0.9.0, where 0.8.1
+    occurs on that grid: 0 of 48 agent-market pairs since 0.8.5, where 0.8.1
     counted 5 of mean reversion's 12, all of them its own impact counted on
     every tick of a step. Treat a ratio above 1.0 as a finding about
     portfolio construction, not as a broken denominator, and from a
