@@ -592,7 +592,7 @@ pub struct TickInputs<'a> {
     /// inside, or `None`.
     ///
     /// The engine's episode state, resolved at `open_market` and fixed for
-    /// the whole session. `None` on every shipped preset -- see
+    /// the whole session. `None` on every preset before pt-v19. See
     /// [`crate::params::ModelParams::crisis_epicentre_extra`] and
     /// `SharedFactors::crisis_epicentre`, which this is copied onto.
     pub crisis_epicentre: Option<&'a str>,
